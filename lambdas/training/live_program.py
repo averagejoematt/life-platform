@@ -118,13 +118,6 @@ STACK_RULE: dict[str, dict[str, Any]] = {
         "low-spinal-load member or dropped (fatigue_model's axial-stacking finding, acted on)",
     },
 }
-STACK_RULE["pinned_light_rpe"] = {
-    "value": 7,
-    "label": HEURISTIC,
-    "basis": "second red team (2026-11-13): when the owner-pinned slot is the session's third spinal-loading lift it stays (his "
-    "ruling) as a technique dose at RPE <= 7 with its load held, instead of displacing the only squat — the kettlebell slot is "
-    "an entry into the swing and needs no heavy effort",
-}
 STALL_RULE: dict[str, dict[str, Any]] = {
     "rep_shift": {
         "value": 2,
@@ -171,8 +164,10 @@ def is_live(rx: dict[str, Any] | None) -> bool:
 
 def settings(lib: dict[str, Any] | None) -> dict[str, Any]:
     """The library's programming settings over SETTINGS_DEFAULTS (a missing key reads its default)."""
+    from training.live_balance import SETTINGS_DEFAULTS as FIX3  # #5861 FIX3: the third red team's settings
+
     got = (lib or {}).get(SETTINGS_KEY) or {}
-    return {k: got.get(k, v) for k, v in SETTINGS_DEFAULTS.items()}
+    return {k: got.get(k, v) for k, v in {**SETTINGS_DEFAULTS, **FIX3}.items()}
 
 
 def _entry(key: str | None, ctx: dict[str, Any]) -> dict[str, Any]:
@@ -381,7 +376,9 @@ def apply_joint_rule(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str
 
 # ── 4. stacking and stalls ────────────────────────────────────────────────────
 def _axial(entry: dict[str, Any]) -> bool:
-    return entry.get("pattern") in AXIAL and _compound(entry) and _stress(entry, "spinal_load") >= 1
+    from training.live_balance import spine_loading  # #5861 FIX3: ONE definition (rule, gates, generator)
+
+    return spine_loading(entry)
 
 
 def _sole(e: dict[str, Any], axial: list[dict[str, Any]], ctx: dict[str, Any]) -> bool:
@@ -390,31 +387,17 @@ def _sole(e: dict[str, Any], axial: list[dict[str, Any]], ctx: dict[str, Any]) -
     return sum(1 for x in axial if _entry(x.get("movement_key"), ctx).get("pattern") == pat) <= 1
 
 
-def _lighten(e: dict[str, Any], ctx: dict[str, Any]) -> str | None:
-    """IN PLACE: a pinned spinal-loading slot kept as a technique dose (STACK_RULE pinned_light) — at most its sets, RPE <= the
-    cap, its load held — and so no longer a loaded third axial lift. Returns the rationale line."""
-    rpe = int(STACK_RULE["pinned_light_rpe"]["value"])
-    e["live_effort"] = min(rpe, int(e.get("live_effort") or 99))
-    e["live_light"] = True
-    e["live_load"] = {**(e.get("live_load") or {}), "hold": True, "why": "technique dose"}
-    title = (ctx["catalog"].get(e.get("movement_key")) or {}).get("title") or e.get("movement_key")
-    return (
-        f"kept light (live): {title} — the owner-pinned slot is the session's third spinal-loading squat/hinge: kept as a "
-        f"technique dose at RPE <= {rpe}, load held, so the session keeps its squat (STACK_RULE, heuristic)"
-    )
-
-
 def avoid_stacking(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str, Any], pinned: set[str]) -> list[str]:
     """IN PLACE: past STACK_RULE axial_per_session spinal-loading squat/hinge compounds in one session, in this order:
     (1) an unpinned accessory is swapped for a member of its pattern with LOW spinal load (unilateral kept unilateral), else
-    dropped; (2) an owner-pinned slot is never moved (his ruling) but is kept LIGHT — a technique dose, RPE <= 7, load held
-    (second red team, 2026-11-13: the pin used to displace the session's only squat); (3) a non-heavy anchor, squat before
-    hinge — but never the session's ONLY squat or ONLY hinge: each lower session keeps one of each. Returns the lines."""
+    dropped; (2) an owner-pinned slot is never swapped (his ruling) — it is the movable one: placed off a stacked session
+    (`live_balance.place_kb`), here DROPPED if still third (third red team: "kept light" was not a limit); (3) a non-heavy
+    anchor, squat before hinge — never the session's ONLY squat or ONLY hinge: each lower session keeps one of each."""
     from training import live_session as ls
 
     cap = int(STACK_RULE["axial_per_session"]["value"])
     ex = rx["exposures"]
-    axial = [e for e in ex if _axial(_entry(e.get("movement_key"), ctx)) and not e.get("live_light")]
+    axial = [e for e in ex if _axial(_entry(e.get("movement_key"), ctx))]
     if len(axial) <= cap:
         return []
     order = [e for e in axial if e.get("kind") == "accessory" and e.get("slot") not in pinned]
@@ -431,12 +414,11 @@ def avoid_stacking(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str, 
         if over <= 0:
             break
         if e.get("kind") == "accessory" and e.get("slot") in pinned:
-            line = _lighten(e, ctx)
-            if line:
-                lines.append(line)
-                over -= 1
+            drop.append(e)
+            lines.append(f"dropped (live): {_entry(e.get('movement_key'), ctx).get('title')} — the third spine-loading lift (STACK_RULE)")
+            over -= 1
             continue
-        if e.get("kind") == "anchor" and _sole(e, [x for x in axial if x not in drop and not x.get("live_light")], ctx):
+        if e.get("kind") == "anchor" and _sole(e, [x for x in axial if x not in drop], ctx):
             continue  # second red team: never the session's only squat or only hinge
         entry = _entry(e.get("movement_key"), ctx)
         uni = _unilateral(entry)
@@ -671,12 +653,16 @@ def plan(rx: dict[str, Any], rotation: dict[str, Any], ctx: dict[str, Any], work
     sel = (rotation.get("selection") or {}).get("slots") or []
     pinned = {str(s.get("incumbent")) for s in sel if (s.get("owner_pin") or {}).get("state") == "held"}
     pinned |= {sid.split(".", 1)[1] for sid in selection_live.SLOT_OBJECTIVES if sid.startswith(f"{rx.get('session_role')}.")}
-    lines = apply_joint_rule(rx, ctx, rotation, joint_flags(ctx, workouts, ctx.get("discomfort") or set()))
+    from training import live_balance as lb  # #5861 FIX3
+
+    flags = joint_flags(ctx, workouts, ctx.get("discomfort") or set())
+    lines = apply_joint_rule(rx, ctx, rotation, flags) + lb.pain_assess(rx, ctx, flags, workouts) + lb.place_kb(rx, ctx, workouts)
     lines += live_week.kb_slot(rx, ctx)  # the kettlebell slot names its implement, capped at RPE 7-8 (before stacking)
+    lines += lb.allocate(rx, ctx)  # volume by priority: over-MAV isolation gives, priority muscles at MEV + 1 take
+    lines += live_week.press_sets(rx, ctx)  # the press option takes its sets from the delt isolation left after it
     lines += avoid_stacking(rx, ctx, rotation, pinned)
     lines += mark_retreats(rx, ctx, workouts, trends)
     lines += stall_scheme(rx, ctx, trends)
-    lines += live_week.press_sets(rx, ctx)
     lines += short_week_carry(rx, ctx)
     mark_costs(rx, ctx)
     return lines
@@ -788,7 +774,7 @@ def guard_loads(
         lb = lambda kg: f"{round(kg / 0.45359237 * 2) / 2:g} lb"  # noqa: E731
         rationale.append(
             f"load (live): {(entry.get('title') or b.movement_key)} {lb(top)} -> {lb(cap)} — {d['mode']}"
-            + (f" {d['pct']}%" if d["pct"] else "")
+            + (f" {d['pct']}% under the last top set ({prev['lb']:g} lb)" if d["pct"] else " at the last top set")
             + f": {d['why']} (last {prev['lb']:g} lb x {prev.get('reps')} @ RPE {prev.get('rpe')}; LOAD_POLICY, heuristic)"
         )
     if ls.MARK in rx:
@@ -851,7 +837,7 @@ def annotate(blocks: list[Any], rx: dict[str, Any]) -> None:
     …`, `Now aiming a–b: …`) and each capped effort (deload shape, a joint flag) on its own Hevy note."""
     if not is_live(rx):
         return
-    from training import live_session as ls, live_week, session_block
+    from training import live_balance, live_session as ls, live_week, session_block
 
     guard = {d["key"]: d for d in (rx.get(ls.MARK) or {}).get("load_guard") or []}
     by_key = {e.get("movement_key"): e for e in rx.get("exposures") or []}
@@ -865,6 +851,7 @@ def annotate(blocks: list[Any], rx: dict[str, Any]) -> None:
             b.notes = session_block.add_reason(b.notes, clause)
         if e.get("live_kb"):
             b.notes = live_week.kb_note(b.notes or "")
+        b.notes = live_balance.assess_note(live_balance.one_effort(b.notes), str(e.get("live_assess") or ""))  # FIX3
 
 
 # ── 5. cardio ─────────────────────────────────────────────────────────────────
@@ -876,19 +863,20 @@ def aerobic(inputs: Any) -> dict[str, Any] | None:
     steps = getattr(inputs, "steps_by_day", None)
     if not steps:
         return None
-    plan_ = cardio_model.aerobic_plan(steps, purposes=("intensity_domain",))
+    cadence = getattr(inputs, "cadence_minutes_by_day", None)  # FIX3: cadence-qualified minutes count first, where a source has them
+    plan_ = cardio_model.aerobic_plan(steps, cadence_minutes_by_day=cadence, purposes=("intensity_domain",))
     return {"volume_covered": plan_["volume_covered"], "walking_min_per_wk": plan_["walking"]["moderate_min_per_wk"]}
 
 
 def rate_line(fatigue: dict[str, Any] | None, sleep_hours: Any) -> str | None:
-    """The loss-rate band as ADVISORY text for the rationale (`health.rate_policy.propose_band`, L5's proposal): nothing
+    """The loss-rate band as ADVISORY text for the rationale (`live_balance.rate_band`, L5's proposal): nothing
     reads it back, no kcal or target changes — the live rate and titration are untouched (owner decision to wire)."""
-    from health import rate_policy
+    from training.live_balance import rate_band
 
-    short = sleep_hours is not None and float(sleep_hours) < 6.5
-    band = rate_policy.propose_band(fatigue_level=(fatigue or {}).get("fatigue_level"), recovery_low=short or None)
+    band = rate_band(fatigue, sleep_hours)  # #5861 FIX3: the owner's body_fat_tier and rate_band_mode settings
     lo, hi = band["band_pct_bw_per_wk"]
-    return f"rate band (advisory only, not applied): {lo}-{hi} %BW/wk — {band['reason']}"
+    how = "advisory only, not applied" if band["mode"] == "advisory" else "recorded on the draft for a nutrition reader; none reads it yet"
+    return f"rate band ({how}): {lo}-{hi} %BW/wk — {band['reason']}"
 
 
 def cardio_context(ideal: Any) -> dict[str, Any] | None:
@@ -911,6 +899,7 @@ def cardio_context(ideal: Any) -> dict[str, Any] | None:
         "lifting_minutes": (snap.get("session_shape") or {}).get("lifting_minutes"),
         "cap": (getattr(ideal, "caps", None) or {}).get("session_minutes"),
         "aerobic": (rx.get(ls.MARK) or {}).get("aerobic"),
+        "host": mark.get("conditioning_host") or SHORT_WEEK_SKIP,
         "settings": settings(se.load_library_failsoft()),
     }
 
@@ -930,9 +919,10 @@ def cardio_fit(menu: dict[str, Any], live: dict[str, Any] | None) -> tuple[dict[
     and a block under MIN_CARDIO_MINUTES is dropped. Returns (menu or None, rationale lines)."""
     if not live:
         return menu, []
-    from training import cardio_menu, live_week
+    from training import cardio_menu, live_balance, live_week, selection_engine as se
 
-    kind, lines = menu["kind"], []
+    menu, lines = live_balance.cardio_machine(menu, se.load_library_failsoft())  # FIX3: a machine the gym has
+    kind = menu["kind"]
     shared = bool((live.get("settings") or {}).get("session_cap_includes_cardio"))
     role = live.get("role")
     trip = live.get("tripwire")
@@ -950,8 +940,8 @@ def cardio_fit(menu: dict[str, Any], live: dict[str, Any] | None) -> tuple[dict[
             why = "recovery is strained (red readiness or a short night): easy work first, hard work waits"
         elif role == "lower_heavy" or _next_role(role) == "lower_heavy":
             why = "never on the heavy lower day or the session before it"
-        elif shared and role != "shoulders_arms":
-            why = f"the shared cap puts conditioning on {SHORT_WEEK_SKIP}"
+        elif shared and role != live.get("host", SHORT_WEEK_SKIP):
+            why = f"the shared cap puts conditioning on {live.get('host', SHORT_WEEK_SKIP)}"
         if why:
             easy = "easy" if cardio_menu.fits_machine("easy", menu["machine"]) else "incline_treadmill_walk"
             lines.append(f"cardio (live): {kind} -> {easy} — {why}")
@@ -959,8 +949,8 @@ def cardio_fit(menu: dict[str, Any], live: dict[str, Any] | None) -> tuple[dict[
     aer = live.get("aerobic") or {}
     if kind not in HARD_KINDS and aer.get("volume_covered"):
         lines.append(
-            f"cardio (live): no easy block — steps already give ~{aer.get('walking_min_per_wk')} moderate min/wk "
-            "(cardio_model.aerobic_plan: steps first, no cardio added without a purpose)"
+            f"cardio (live): no easy block — steps already give ~{aer.get('walking_min_per_wk')} moderate min/wk, conservatively "
+            "credited (cardio_model.aerobic_plan: steps first, no cardio added without a purpose)"
         )
         return None, lines
     minutes, prog = live_week.cardio_progress(kind, live, cardio_menu.block_minutes(kind))  # week to week: cardio_model.progress
@@ -981,6 +971,10 @@ def cardio_note(notes: str, live: dict[str, Any] | None, kind: str) -> str:
     note's last line. Generic on purpose — no condition named, no heart-rate number (owner rulings)."""
     if live and live.get("tripwire") and live_review_note() not in notes:
         notes = f"{notes}\n{live_review_note()}".strip()
+    if live:
+        from training import live_balance, selection_engine as se
+
+        notes = live_balance.machine_label(notes, se.load_library_failsoft())  # FIX3: no "Recumbent" without one
     if not live or kind not in HARD_KINDS:
         return notes
     line = str((live.get("settings") or {}).get("symptom_line") or "").strip()

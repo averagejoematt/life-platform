@@ -151,8 +151,9 @@ def test_dry_run_script_runs_on_synthetic_profiles():
     assert all(p["applied"] is False for p in got.values())
 
 
-ADVISORY_READERS = {"lambdas/training/live_program.py"}
-"""The ONE module allowed to read the proposal (#5861 red team, fix 7): `live_program.rate_line` renders the band as ADVISORY
+ADVISORY_READERS = {"lambdas/training/live_balance.py"}
+"""The ONE module allowed to read the proposal (#5861 red team, fix 7; FIX3 moved the read into `live_balance.rate_band`, which
+adds the owner's `body_fat_tier` / `rate_band_mode` settings): `live_program.rate_line` renders the band as ADVISORY
 text in a LIVE draft's rationale. It never feeds the rate band, titration or a kcal target — wiring the band into nutrition
 stays the owner's decision (WEEKLY_STRUCTURE.md, `health.titration.band_for`)."""
 
@@ -174,7 +175,7 @@ def test_no_live_path_reads_the_proposal():
     targets are untouched. The advisory reader only renders a rationale line (asserted on its source)."""
     offenders = [p for p in _readers() if p not in ADVISORY_READERS]
     assert offenders == [], f"a live module reads the rate proposal (owner decision first): {offenders}"
-    src = (REPO / "lambdas/training/live_program.py").read_text()
+    src = (REPO / "lambdas/training/live_balance.py").read_text()
     use = [ln.strip() for ln in src.splitlines() if "rate_policy." in ln]
     assert use and all("propose_band" in ln for ln in use), use  # the band proposal only
     imports = [ln for ln in src.splitlines() if ln.strip().startswith(("import ", "from "))]

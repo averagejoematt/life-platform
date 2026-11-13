@@ -885,6 +885,7 @@ def build_library(
     for e in movements.values():
         e["job"], e["pattern"] = job_and_pattern(e)
     families = apply_evaluation_layer(movements)  # #5861: category, objective inputs, secondary rows, canonical layer
+    input_review.apply_class_rules(movements)  # #5861 FIX3: shoulder-provoking work >= moderate; one spine-loading class
     missing = reviews.apply_evidence_changes(movements, reviews.ledger_evidence_changes(_ledger()))
     if missing:
         raise SystemExit(f"evidence-review ledger: evidence change for a movement not in the library: {missing}")

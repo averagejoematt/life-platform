@@ -57,7 +57,6 @@ LANDMARK_OF = {
 }
 """Library target -> the volume-landmark muscle it counts toward (config/training_landmarks.json has 11 muscles)."""
 SECONDARY_CREDIT = 0.5  # the fatigue model's own fractional-set convention (fatigue_model.THRESHOLDS, heuristic)
-AXIAL = ("squat", "hinge")
 SYNTHETIC_LOAD_LB = {"barbell": 175, "machine": 120, "cable": 65, "dumbbell": 50, "kettlebell": 53, "other": 70}
 """Invented starting loads for the synthetic record (no person's numbers), by catalog equipment, in 5-lb implement steps."""
 LB_PER_KG = 2.20462
@@ -449,15 +448,15 @@ def generate_week(profile: dict[str, Any], mode: str = "approved", world: dict[s
         from training import live_program
 
         roles, short_line = live_program.short_week_roles(list(_all_roles()), len(p["days"]), world["lib"])
-    if mode == "approved" and short_line is None:  # the OFF-by-default behind-schedule option (live_week, owner decision)
-        from training import live_week
+    if mode == "approved" and short_line is None:  # a dip: the default shorter week, or the keep-the-anchors option (FIX3)
+        from training import live_balance, live_week
 
-        roles, short_line = live_week.behind_schedule_roles(roles, live_week.behind_schedule(record, p["as_of"], world["lib"]))
+        roles, short_line = live_week.behind_schedule_roles(roles, live_balance.adherence_response(record, p["as_of"], world["lib"]))
     with offline(world["lib"], hidx, p["bodyweight_lb"], p["as_of"], world["overlay"]):
         for n, (role, day) in enumerate(zip(roles, p["days"][: len(roles)]), start=1):
             entry = _entry(role, p["position"]["week"], p["position"]["block"], n, prev)
             inp = _inputs(p, day, record, world["rows"])
-            if short_line and ("skip_shoulders_arms" in short_line or short_line.startswith("behind schedule")):
+            if short_line and ("skip_shoulders_arms" in short_line or short_line.startswith(("behind schedule", "adherence dip"))):
                 setattr(inp, "short_week", roles[-1])  # the live short-week rule's host: the carry + trunk floor move here
             out = fbs.full_body_routines(inp, entry, rw.week, landmarks, catalog, rw, [], block_workouts=record)
             ideal = out[0]
@@ -466,6 +465,9 @@ def generate_week(profile: dict[str, Any], mode: str = "approved", world: dict[s
             record.append(_performed(ideal, day, role, hidx, catalog["movements"]))  # the next morning's draft reads this session as done
             prev = {"session_role": role, "date": day, "title": role, "was": "synthetic"}
     out = {"profile": p["name"], "label": p.get("label"), "story": p.get("story"), "mode": mode, "sessions": sessions}
+    from training import cardio_model
+
+    out["steps_credit"] = cardio_model._walking_dose(steps_by_day(p))  # the conservative walking credit (#5861 FIX3)
     return out | ({"short_week": short_line} if short_line else {})
 
 
@@ -509,11 +511,12 @@ def _session(ideal: Any, role: str, day: str, movements: dict[str, Any], cardio:
 
     snap = ideal.inputs_snapshot or {}
     rx = snap.get("session_prescription") or {}
-    from training import session_block
+    from training import live_balance, session_block
     from training.routine_title import format_why_note
 
     why = session_block.why_note_for(ideal, format_why_note(ideal))  # the draft path's own WHY line (hevy_routine_cron)
-    body = hevy_compiler.to_create_body(ideal, lambda k: str((movements.get(k) or {}).get("hevy_template_id_hint") or k), why_note=why)
+    resolve = live_balance.template_resolver(lambda k: str((movements.get(k) or {}).get("hevy_template_id_hint") or k))  # the cron's
+    body = hevy_compiler.to_create_body(ideal, resolve, why_note=why)
     wire_notes = [e.get("notes") or "" for e in body["routine"]["exercises"]]  # branchless: the IR's exercises, in order
     lifts = []
     for b, wire_note in zip(ideal.exercises, wire_notes):
@@ -619,14 +622,13 @@ def landmark_verdicts(sets: dict[str, float], landmarks: dict[str, Any]) -> dict
 
 
 def axial_days(week: dict[str, Any], lib: dict[str, Any], catalog: dict[str, Any]) -> list[dict[str, Any]]:
-    """Free-weight squat/hinge compounds per session — the redundant axial fatigue the fatigue model guards (3 inside 72 h)."""
+    """Spine-loading lifts per session by THE one definition (`live_balance.spine_loading`, #5861 FIX3 — the stacking rule and
+    the acceptance gates read the same one; this generator used to count every free-weight squat/hinge, a dumbbell lunge too)."""
+    from training.live_balance import spine_loading
+
     out = []
     for s in week["sessions"]:
-        hits = []
-        for lift in s["lifts"]:
-            e = _lib_entry(lib, catalog, lift["key"])
-            if e.get("pattern") in AXIAL and e.get("job") == "compound" and e.get("resistance_profile") == "free_weight":
-                hits.append(lift["key"])
+        hits = [lift["key"] for lift in s["lifts"] if spine_loading(_lib_entry(lib, catalog, lift["key"]))]
         out.append({"day": s["day"], "role": s["role"], "axial": hits})
     return out
 
@@ -642,9 +644,11 @@ def measure(week: dict[str, Any], lib: dict[str, Any], catalog: dict[str, Any], 
             "cardio": s["cardio"].get("key"),
             "cardio_kind": s["cardio"].get("kind"),
             "cardio_minutes": s["cardio"].get("minutes"),
+            "morning_minutes": round(float(s["lifting_minutes"] or 0) + float(s["cardio"].get("minutes") or 0), 1),
         }
         for s in week["sessions"]
     ]
+    blocks = [int(s["cardio"].get("minutes") or 0) for s in week["sessions"]]
     keys = [x["key"] for s in week["sessions"] for x in s["lifts"]]
     return {
         "trunk_sets": trunk_sets(week, lib, catalog),
@@ -654,7 +658,21 @@ def measure(week: dict[str, Any], lib: dict[str, Any], catalog: dict[str, Any], 
         "axial": axial_days(week, lib, catalog),
         "repeats": {k: n for k, n in Counter(keys).items() if n > 1},
         "new_this_week": sorted({x["key"] for s in week["sessions"] for x in s["lifts"] if "New:" in (x["hevy_note"] or "")}),
+        "effort_conflicts": _effort_conflicts(week),
+        "aerobic": {
+            "structured_min": sum(blocks),
+            "blocks_20_plus": sum(1 for b in blocks if b >= 20),
+            "steps_credit_min_per_wk": (week.get("steps_credit") or {}).get("moderate_min_per_wk"),
+            "steps_credit_source": (week.get("steps_credit") or {}).get("source"),
+        },
     }
+
+
+def _effort_conflicts(week: dict[str, Any]) -> list[str]:
+    """Lifts whose note states more than one effort target (#5861 FIX3 guard, `live_balance.effort_targets`)."""
+    from training.live_balance import effort_targets
+
+    return [f"{s['role']}: {x['key']}" for s in week["sessions"] for x in s["lifts"] if len(effort_targets(x["hevy_note"])) > 1]
 
 
 # ── markdown ──────────────────────────────────────────────────────────────────
@@ -692,8 +710,15 @@ def render(week: dict[str, Any], m: dict[str, Any]) -> str:
         lines.append("")
         lines.append("Other targets (no landmark): " + ", ".join(f"{k} {v}" for k, v in extra.items()))
     lines.append("")
-    lines.append("Axial free-weight compounds by day: " + "; ".join(f"{a['role']}: {', '.join(a['axial']) or '-'}" for a in m["axial"]))
+    lines.append("Spine-loading lifts by day: " + "; ".join(f"{a['role']}: {', '.join(a['axial']) or '-'}" for a in m["axial"]))
+    lines.append("Morning minutes (lifting + cardio): " + "; ".join(f"{p['role']}: {p['morning_minutes']}" for p in m["per_session"]))
+    a = m["aerobic"]
+    lines.append(
+        f"Aerobic: structured {a['structured_min']} min ({a['blocks_20_plus']} block(s) of 20+ min) + steps credit "
+        f"~{a['steps_credit_min_per_wk']} moderate min/wk ({a['steps_credit_source']}, conservative)"
+    )
     lines.append(f"Repeated movements: {m['repeats'] or 'none'}; new this week: {', '.join(m['new_this_week']) or 'none'}")
+    lines.append(f"Notes with more than one effort target: {', '.join(m['effort_conflicts']) or 'none'}")
     return "\n".join(lines) + "\n"
 
 
@@ -719,6 +744,10 @@ LIVE_PREFIXES = (
     "behind schedule",
     "new movement (live)",
     "press (live option)",
+    "allocation (live)",
+    "moved (live)",
+    "pain (live)",
+    "adherence dip",
 )
 
 

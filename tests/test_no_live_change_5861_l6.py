@@ -48,7 +48,7 @@ def test_the_proposed_drafts_serve_exactly_what_the_base_tree_served():
 
 
 def _poisoned():
-    from training import live_session, live_week, selection_live
+    from training import live_balance, live_session, live_week, selection_live
 
     def boom(name):
         def _f(*a, **k):
@@ -76,6 +76,19 @@ def _poisoned():
         (live_week, "vertical_pull_fallback"),
         (live_week, "press_sets"),
         (live_week, "symptom_gate"),
+        # #5861 FIX3: the third red team's live rules never run in shadow (why_effort and template_resolver are reached in
+        # shadow and return their input there — proved by the pinned digests above)
+        (live_balance, "place_kb"),
+        (live_balance, "pain_assess"),
+        (live_balance, "allocate"),
+        (live_balance, "allocation_plan"),
+        (live_balance, "adherence_response"),
+        (live_balance, "lighter_week"),
+        (live_balance, "library_fallbacks"),
+        (live_balance, "one_effort"),
+        (live_balance, "cardio_machine"),
+        (live_balance, "machine_label"),
+        (live_balance, "rate_band"),
     ]
     return [patch.object(mod, name, boom(f"{mod.__name__}.{name}")) for mod, name in targets]
 

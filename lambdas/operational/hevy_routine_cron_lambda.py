@@ -340,7 +340,9 @@ def lambda_handler(event, context):
             try:
                 title_ctx = build_title_context(ir)
                 why = session_block.why_note_for(ir, format_why_note(ir))  # #5428: no second session line over the block
-                body = to_create_body(ir, resolve_movement, title_context=title_ctx, why_note=why)
+                from training.live_balance import template_resolver  # #5861 FIX3: the KB template setting (approved only)
+
+                body = to_create_body(ir, template_resolver(resolve_movement), title_context=title_ctx, why_note=why)
                 resp = wc.create_routine(body)
                 from training.hevy_compiler import from_hevy_response
 

@@ -27,6 +27,7 @@ import copy
 import json
 import pathlib
 import random
+import re
 import sys
 from collections import Counter
 from unittest.mock import patch
@@ -39,8 +40,10 @@ for _p in (REPO, REPO / "lambdas", REPO / "scripts", REPO / "deploy"):
 
 import sample_weeks_5861 as sw  # noqa: E402
 from training import (  # noqa: E402
+    cardio_model as cm,
     exercise_library as xl,
     fatigue_model as fm,
+    live_balance as lb,
     live_program as lp,
     live_session as ls,
     live_week as lw,
@@ -296,10 +299,11 @@ def unprogrammed(week: dict, lib: dict, catalog: dict) -> list[str]:
         out.append("carry")
     if not any(e.get("trunk_function") in lp.TRUNK_FUNCTIONS and e.get("pattern") != "carry" for e in served):
         out.append("trunk_stability")
-    # second red team: any cardio block of any length passed (a 13-minute week). Now: one block of at least CARDIO_ROOM's
-    # minimum, or the steps-dose rationale (cardio_model.aerobic_plan: the week's walking already covers the easy volume)
+    # third red team: the aerobic check passed on the engine's OWN sentence ("no easy block — steps already give"). Now an
+    # OUTCOME: one block of at least CARDIO_ROOM's minimum, or the week's walking dose COMPUTED from its steps by the cardio
+    # model's conservative credit (`week["steps_credit"]`, the generator's own call — never a rationale string)
     long_enough = any((s["cardio"].get("minutes") or 0) >= lw.CARDIO_ROOM["min_block"]["value"] for s in week["sessions"])
-    steps_dose = any("no easy block — steps already give" in ln for s in week["sessions"] for ln in s.get("rationale") or [])
+    steps_dose = float((week.get("steps_credit") or {}).get("moderate_min_per_wk") or 0) >= cm.WEEKLY_MODERATE_MIN[0]
     if not (long_enough or steps_dose):
         out.append("aerobic")
     return out
@@ -313,7 +317,8 @@ def test_b2_unilateral_carry_trunk_and_aerobic_work_are_programmable(weeks):
             e["not_for_you_now"] = {"reason_code": "control", "unlock_condition": "never"}
     assert unprogrammable(bad, CAT0) == ["carry"]
     # the WEEK programs every function (full weeks, nothing trimmed for recovery)
-    for name in ("a_large_deficit_experienced", "c_equipment_limited", "d_stalled_anchor_adherence_dip"):
+    # (d is a dip week since FIX3: the shorter week's trunk floor waits by design — e, the short week, moves it instead)
+    for name in ("a_large_deficit_experienced", "c_equipment_limited", "e_short_week"):
         w = weeks[name]
         assert unprogrammed(w["week"], w["world"]["lib"], w["world"]["catalog"]["movements"]) == [], name
     # control 2: the trunk floor off -> the week's only trunk work is the crunch and the carry
@@ -329,21 +334,34 @@ def test_b2_unilateral_carry_trunk_and_aerobic_work_are_programmable(weeks):
             if not (single_leg(sw._lib_entry(lib, cat, x["key"])) or PATTERNS["carry"](sw._lib_entry(lib, cat, x["key"])))
         ]
     assert unprogrammed(bad_week, lib, cat) == ["unilateral", "carry"]
-    # control 4: a week whose only structured cardio is a 13-minute stub and no steps-dose line (the red team's shared-cap week)
+    # control 4: a week whose only structured cardio is a 13-minute stub and whose steps credit under the guideline floor
     stub = copy.deepcopy(weeks["a_large_deficit_experienced"]["week"])
     for s in stub["sessions"]:
-        s["rationale"] = [ln for ln in s["rationale"] if "steps already give" not in ln]
         s["cardio"] = {"key": "cycling", "kind": "tempo", "minutes": 13} if s["role"] == "shoulders_arms" else {}
+    stub["steps_credit"] = cm._walking_dose({d: 9000 for d in sw.steps_by_day(PROFILES["a_large_deficit_experienced"])})
     assert unprogrammed(stub, lib, cat) == ["aerobic"]
+    # control 5: the engine's own sentence no longer passes the gate (the steps-dose line kept, the credit gone)
+    talk = copy.deepcopy(stub)
+    talk["sessions"][0]["rationale"] = ["cardio (live): no easy block — steps already give ~630 moderate min/wk"]
+    assert unprogrammed(talk, lib, cat) == ["aerobic"]
 
 
 def impossible(week: dict, lib: dict, catalog: dict, overlay: dict | None = None) -> list[str]:
-    """Every served lift the gym can't serve (home_gym availability under the profile's inventory) or his pain note names."""
+    """Every served lift the gym can't serve (home_gym availability under the profile's inventory) or his pain note names —
+    and (third red team) every CARDIO block whose machine the gym lacks or whose note names a machine it lacks (a
+    "Recumbent" note where the recumbent is unavailable)."""
     out = []
     for x in _lifts(week):
         e = sw._lib_entry(lib, catalog, x["key"])
         if e and (se.availability(e, lib, overlay) or se.pain_exclusion(e, overlay)):
             out.append(x["key"])
+    for s in week["sessions"]:
+        c = s.get("cardio") or {}
+        e = (lib.get("movements") or {}).get(str(c.get("key") or ""))
+        if c.get("key") and e and se.availability(e, lib, overlay):
+            out.append(f"cardio:{c['key']}")
+        if "Recumbent" in str(c.get("note") or "") and lb.recumbent_missing(lib):
+            out.append(f"cardio note: Recumbent on {s['role']}")
     return out
 
 
@@ -356,6 +374,16 @@ def test_b3_missing_equipment_never_yields_an_impossible_prescription(weeks):
     # control 2: the live session fit switched off
     off = _week_of("c_equipment_limited", {(ls, "fit_exposures"): lambda rx, rot, ctx: []})
     assert impossible(off["week"], off["world"]["lib"], off["world"]["catalog"]["movements"])
+    # control 3 (third red team): the cardio note's machine name left as composed -> "Recumbent" with no recumbent at the gym
+    raw = _week_of("c_equipment_limited", {(lb, "machine_label"): lambda notes, lib: notes})
+    assert any(
+        p.startswith("cardio note: Recumbent") for p in impossible(raw["week"], raw["world"]["lib"], raw["world"]["catalog"]["movements"])
+    )
+    # control 4: a cardio machine the gym lacks -> named (the gate reads the block's machine, not only the lifts)
+    gone = copy.deepcopy(w["world"]["lib"])
+    gone["movements"]["cycling"]["availability"] = {"home_gym": {"state": "unavailable", "source": "control"}}
+    gone["movements"]["cycling"]["equipment"] = ["recumbent_bike"]
+    assert any(p.startswith("cardio:") for p in impossible(w["week"], gone, w["world"]["catalog"]["movements"]))
 
 
 # ══ C. individualization ═════════════════════════════════════════════════════
@@ -399,17 +427,32 @@ def test_c2_pain_and_equipment_are_respected_on_every_exposure(weeks):
     assert "machine_shoulder_press" in {x["key"] for x in _lifts(off["week"])}
 
 
+PROVOKING = {"shoulder": ("lateral_raise", "rear_delt", "shoulder_rotation")}
+"""Third red team (PT): abduction, horizontal abduction and loaded rotation provoke a painful shoulder whatever the library's
+joint-stress data says — the gate names them by PATTERN, independently of the data (it used to inherit the data's error)."""
+
+
+def capped_at(note: str | None, rpe: float) -> bool:
+    """The lift's ONE effort target (`live_balance.effort_targets`: its own line, or exercise 1's session line restated at it)
+    tops out at `rpe` or under."""
+    targets = lb.effort_targets(note)
+    return bool(targets) and all(max(float(v) for v in re.findall(r"\d+(?:\.\d+)?", t)) <= rpe for t in targets)
+
+
 def joint_unprotected(week: dict, lib: dict, catalog: dict, joint: str, group: str) -> list[str]:
-    """Served lifts that load `joint` at moderate or more with no protection: a same-group movement (the flagged pattern) still
-    served, or another joint-loading lift served with no RPE cap at 7 or less on its note (the pain-monitoring rule)."""
+    """Served lifts that load `joint` at moderate or more — or whose pattern provokes it (`PROVOKING`) — with no protection: a
+    same-group movement (the flagged pattern) still served, or another such lift served with no RPE cap at 7 or less on its
+    note (the pain-monitoring rule)."""
     out = []
     for x in _lifts(week):
         e = sw._lib_entry(lib, catalog, x["key"])
-        if not e or x["tag"].endswith(":carry") or lp._stress(e, joint) < 1:
+        if not e or x["tag"].endswith(":carry"):
+            continue
+        if lp._stress(e, joint) < 1 and e.get("pattern") not in PROVOKING.get(joint, ()):
             continue
         if lp._group(e.get("pattern")) == group:
             out.append(f"{x['key']}: same pattern")
-        elif not any(ln.strip() in ("RPE 7", "RPE 6–7") for ln in (x["hevy_note"] or "").splitlines()):
+        elif not capped_at(x["hevy_note"], 7):
             out.append(f"{x['key']}: no cap")
     return out
 
@@ -426,6 +469,18 @@ def test_c2c_a_pain_flag_reaches_every_movement_loading_that_joint_all_week(week
     assert any(ln.startswith("reduced (live)") for s in b["week"]["sessions"] for ln in s["rationale"])
     off = _week_of("b_shoulder_flag_low_recovery", {(lp, "apply_joint_rule"): lambda rx, ctx, rot, flags: []})  # control
     assert joint_unprotected(off["week"], lib, cat, "shoulder", "press")
+    # third red team: the lateral raise and the rear-delt fly are IN the gate (served, capped) — never invisible to it
+    raises = [x for x in _lifts(b["week"]) if sw._lib_entry(lib, cat, x["key"]).get("pattern") in PROVOKING["shoulder"]]
+    capped = [x for x in raises if capped_at(x["hevy_note"], 7)]
+    assert any("lateral_raise" in x["key"] for x in raises) and capped == raises
+    # control: the shoulder data as it was (abduction / rear-delt work rated LOW) -> the rule leaves the lateral raise at RPE 9-10
+    old = copy.deepcopy(b["world"]["lib"])
+    for e in old["movements"].values():
+        if e.get("provocation_floor"):
+            e["joint_stress"] = {**e["joint_stress"], "shoulder": e["provocation_floor"]["shoulder"]["from"]}
+    prof = PROFILES["b_shoulder_flag_low_recovery"]
+    was = sw.generate_week(prof, "approved", b["world"] | {"lib": old})
+    assert any("lateral_raise" in p and "no cap" in p for p in joint_unprotected(was, old, cat, "shoulder", "press"))
     # the monitoring rule itself: a mild stated score reduces, a higher or 'sharp' one avoids
     flags = lambda note: lp.joint_flags(  # noqa: E731
         {"lib": lib, "overlay": b["world"]["overlay"], "idx": se.key_index(lib, cat)},
@@ -619,26 +674,54 @@ def landmark_problems(m: dict, muscles: tuple = MAJOR, with_abs: bool = True) ->
     return out
 
 
-def misallocated(m: dict, muscles: tuple = MAJOR) -> list[str]:
-    """Second red team (2026-11-13): d1 tested bounds, not ALLOCATION — delts at 18 (over MAV) beside chest at its MEV passed.
-    A week that leaves a major muscle under its MEV while another sits over its MAV put sets in the wrong place: they could
-    have moved."""
+PRIORITY = ("chest", "back", "quadriceps", "hamstrings")
+"""Retention first (owner brief priority 1): the muscles whose weekly sets come before any surplus (`live_balance` setting
+`priority_muscles`, same default)."""
+
+
+def misallocated(m: dict, muscles: tuple = MAJOR, movable: dict | None = None) -> list[str]:
+    """Third red team (2026-11-13): the second red team's gate fired only for a major muscle STRICTLY under MEV — delts at 18
+    beside chest at exactly 8 (MEV) passed. Now: any muscle over its MAV while a priority muscle sits at or under MEV + 1 is
+    misallocated, when sets could move — the over-MAV muscle has accessory sets in the week (`movable`: muscle -> accessory
+    sets; None = assume they could)."""
     lm = m["landmarks"]
-    over = [mu for mu in muscles if lm[mu]["sets"] > lm[mu]["MAV"]]
-    under = [mu for mu in muscles if lm[mu]["sets"] < lm[mu]["MEV"]]
-    return [f"{o} over MAV while {u} is under MEV" for o in over for u in under]
+    margin = lb.ALLOCATION["priority_margin"]["value"]
+    over = [mu for mu in muscles if lm[mu]["sets"] > lm[mu]["MAV"] and (movable is None or movable.get(mu, 0) > 0)]
+    low = [mu for mu in PRIORITY if lm[mu]["sets"] <= lm[mu]["MEV"] + margin]
+    return [f"{o} over MAV while {u} is at or under MEV + {margin}" for o in over for u in low]
+
+
+def accessory_sets(week: dict, lib: dict, catalog: dict) -> dict:
+    """Accessory working sets per landmark muscle in the drafted week (what an allocation could move)."""
+    out: Counter = Counter()
+    for x in _lifts(week):
+        if str(x["tag"]).startswith("accessory:") and not str(x["tag"]).endswith(":carry"):
+            t = (sw._lib_entry(lib, catalog, x["key"]).get("target") or {}).get("primary")
+            out[sw.LANDMARK_OF.get(str(t), str(t))] += x["working_sets"]
+    return dict(out)
 
 
 def test_d1_weekly_sets_per_muscle_sit_inside_the_volume_landmarks(weeks):
     for name in ("a_large_deficit_experienced", "c_equipment_limited"):  # full weeks, nothing trimmed for recovery
         assert landmark_problems(weeks[name]["m"]) == [], name
-    for name, w in weeks.items():  # the DISTRIBUTION: no muscle over MAV while another is under MEV, in any profile
-        assert misallocated(w["m"]) == [], name
-    lop = copy.deepcopy(weeks["a_large_deficit_experienced"]["m"])  # control: delts at 20 beside chest at 6
-    lop["landmarks"]["shoulders"]["sets"], lop["landmarks"]["chest"]["sets"] = 20, 6
-    assert misallocated(lop) == ["shoulders over MAV while chest is under MEV"]
+    for name, w in weeks.items():  # the DISTRIBUTION: no muscle over MAV while a priority muscle sits at or under MEV + 1
+        lib, cat = w["world"]["lib"], w["world"]["catalog"]["movements"]
+        assert misallocated(w["m"], movable=accessory_sets(w["week"], lib, cat)) == [], name
+    for name in ("a_large_deficit_experienced", "c_equipment_limited"):  # delts at or under MAV, priority muscles at MEV+
+        lm = weeks[name]["m"]["landmarks"]
+        assert lm["shoulders"]["sets"] <= lm["shoulders"]["MAV"] and all(lm[p]["sets"] >= lm[p]["MEV"] for p in PRIORITY), name
+    lop = copy.deepcopy(weeks["a_large_deficit_experienced"]["m"])  # control 1: the red team's week — delts 18, chest AT MEV
+    lop["landmarks"]["shoulders"]["sets"], lop["landmarks"]["chest"]["sets"] = 18, 8
+    assert misallocated(lop) == ["shoulders over MAV while chest is at or under MEV + 1"]
+    # control 2: the week's allocation switched off -> the drafted week puts delts over MAV beside chest at its MEV
+    raw = _week_of("a_large_deficit_experienced", {(lb, "allocate"): lambda rx, ctx: []})
+    lib, cat = raw["world"]["lib"], raw["world"]["catalog"]["movements"]
+    assert misallocated(raw["m"], movable=accessory_sets(raw["week"], lib, cat))
     # control: no trunk fallback -> the equipment-limited week's crunch slot stays empty and abs fall under MEV
-    bare = _week_of("c_equipment_limited", {(lp, "trunk_fallback"): lambda e, ctx, taken: None})
+    # (FIX3: the library fallback also serves a trunk slot's same-pattern member, so both fallbacks go off together)
+    bare = _week_of(
+        "c_equipment_limited", {(lp, "trunk_fallback"): lambda e, ctx, taken: None, (lb, "library_fallbacks"): lambda e, ctx: []}
+    )
     assert any(p.startswith("abs ") for p in landmark_problems(bare["m"]))
     # the SHORT week (4 mornings): legs keep 2x and every leg muscle stays at or over MEV (L5's rule, live default); chest and
     # back too. Delts and arms may sit at their floor for that week — the rule's stated cost, named here, not hidden
@@ -698,21 +781,38 @@ def test_d2_redundant_axial_fatigue_is_detected():
         assert fm.axial_stacking(rec, idx, as_of="2026-11-16") == []
 
 
-def _light(s: dict, x: dict) -> bool:
-    """The owner-pinned slot kept as a technique dose (STACK_RULE pinned_light_rpe): said in the rationale AND capped on its note."""
-    said = any(ln.startswith(f"kept light (live): {x['title']} ") for ln in s["rationale"])
-    return said and (x["hevy_note"] or "").startswith(f"RPE {lp.STACK_RULE['pinned_light_rpe']['value']}")
-
-
 def stacked_sessions(week: dict, lib: dict, catalog: dict) -> list[str]:
-    """Sessions serving more than STACK_RULE axial_per_session LOADED spinal-loading squat/hinge compounds (library joint
-    stress) — a pinned slot kept light (`_light`) is a technique dose, not a loaded third lift."""
+    """Sessions serving more than STACK_RULE axial_per_session spine-loading lifts by THE one definition
+    (`live_balance.spine_loading` — the rule and the sample-week generator read the same one). Third red team: no exemption
+    for a pinned slot "kept light" (it matched the engine's own rationale line, and a light third hinge is still a third)."""
     out = []
     for s in week["sessions"]:
-        ax = [x["key"] for x in s["lifts"] if lp._axial(sw._lib_entry(lib, catalog, x["key"])) and not _light(s, x)]
+        ax = [x["key"] for x in s["lifts"] if lb.spine_loading(sw._lib_entry(lib, catalog, x["key"]))]
         if len(ax) > lp.STACK_RULE["axial_per_session"]["value"]:
             out.append(f"{s['role']}: {', '.join(ax)}")
     return out
+
+
+def spine_class_split(lib: dict) -> list[str]:
+    """Label-only swaps' root (third red team): one implement class rated two ways — a dumbbell/kettlebell-at-the-sides
+    squat-pattern compound must read ONE spinal load (the class rule), or a stacking 'swap' can move a label, not the fatigue."""
+    import re
+
+    import exercise_library_input_review as ir
+
+    out = set()
+    for k, e in xl.movements(lib).items():
+        eq = set(e.get("equipment") or [])
+        cls = (
+            e.get("pattern") == "squat"
+            and e.get("job") == "compound"
+            and eq & set(ir.SPINE_AT_SIDES["equipment"])
+            and "barbell" not in eq
+            and not re.search(ir.SPINE_AT_SIDES["not_title"], str(e.get("title") or ""), re.I)
+        )
+        if cls:
+            out.add(str((e.get("joint_stress") or {}).get("spinal_load")))
+    return sorted(out - {"unknown"}) if len(out - {"unknown"}) > 1 else []
 
 
 def lower_without(week: dict, lib: dict, catalog: dict) -> list[str]:
@@ -743,22 +843,85 @@ def test_d2b_redundant_axial_fatigue_is_avoided_in_the_drafted_week(weeks):
         assert lower_without(w["week"], lib, cat) == [], name
     a = weeks["a_large_deficit_experienced"]
     lower_volume = next(s for s in a["week"]["sessions"] if s["role"] == "lower_volume")
-    assert "kettlebell_deadlift" in {x["key"] for x in lower_volume["lifts"]}  # the pin stands
-    assert "squat_barbell" in {x["key"] for x in lower_volume["lifts"]}  # and so does the squat
-    off = _week_of("a_large_deficit_experienced", {(lp, "avoid_stacking"): lambda rx, ctx, rot, pinned: []})  # control 1
+    assert "squat_barbell" in {x["key"] for x in lower_volume["lifts"]}  # the squat stays
+    assert "kettlebell_deadlift" not in {x["key"] for x in lower_volume["lifts"]}  # third red team: the pin MOVES (default)
+    sa = next(s for s in a["week"]["sessions"] if s["role"] == "shoulders_arms")
+    assert "kettlebell_deadlift" in {x["key"] for x in sa["lifts"]}  # ... to its move-to session, not lost
+    assert spine_class_split(a["world"]["lib"]) == []  # one spinal rating for the dumbbell-at-the-sides class
+    bad = copy.deepcopy(a["world"]["lib"])  # control: the split squat back at moderate beside a low reverse lunge
+    bad["movements"]["bulgarian_split_squat_dumbbell"]["joint_stress"]["spinal_load"] = "moderate"
+    assert spine_class_split(bad) == ["low", "moderate"]
+    # control 1: the KB placement AND the stacking rule off -> lower volume serves three spine-loading lifts
+    off = _week_of(
+        "a_large_deficit_experienced",
+        {(lp, "avoid_stacking"): lambda rx, ctx, rot, pinned: [], (lb, "place_kb"): lambda rx, ctx, workouts: []},
+    )
     assert stacked_sessions(off["week"], off["world"]["lib"], off["world"]["catalog"]["movements"])
-    # control 2: the old precedence (the pin untouched, the only squat may go) -> the squat is swapped out of lower volume
-    old = _week_of("a_large_deficit_experienced", {(lp, "_lighten"): lambda e, ctx: None, (lp, "_sole"): lambda e, axial, ctx: False})
-    lv = next(s for s in old["week"]["sessions"] if s["role"] == "lower_volume")
-    assert "squat_barbell" not in {x["key"] for x in lv["lifts"]}
+    # control 2: never the session's ONLY squat — three spine-loading anchors (one squat, two hinges): the rule moves a hinge;
+    # with the only-squat guard off it takes the squat (the second red team's failure)
+    lib, cat = a["world"]["lib"], a["world"]["catalog"]["movements"]
+    ctx = {
+        "lib": lib,
+        "catalog": cat,
+        "idx": se.key_index(lib, cat),
+        "overlay": None,
+        "ceiling": 2,
+        "role": "lower_volume",
+        "discomfort": set(),
+    }
+
+    def three() -> dict:
+        ex = [
+            ("squat", "squat_barbell", "volume"),
+            ("hinge", "romanian_deadlift_barbell", "volume"),
+            ("hinge", "deadlift_barbell", "volume"),
+        ]
+        return {
+            "exposures": [
+                {"kind": "anchor", "pattern": p, "intensity": i, "movement_key": k, "sets": [{"reps": [8, 10]}]} for p, k, i in ex
+            ]
+        }
+
+    rx = three()
+    lp.avoid_stacking(rx, ctx, {}, set())
+    assert "squat_barbell" in {e["movement_key"] for e in rx["exposures"]}
+    with patch.object(lp, "_sole", lambda e, axial, ctx: False):
+        rx = three()
+        lp.avoid_stacking(rx, ctx, {}, set())
+    assert "squat_barbell" not in {e["movement_key"] for e in rx["exposures"]}
+    # control 3: ONE definition — the rule, this gate and the generator all move with it
+    with patch.object(lb, "spine_loading", lambda e: bool(e)):
+        assert lp._axial({"pattern": "curl"}) and stacked_sessions(a["week"], a["world"]["lib"], a["world"]["catalog"]["movements"])
+        assert all(
+            len(d["axial"]) == len(s["lifts"])
+            for d, s in zip(sw.axial_days(a["week"], a["world"]["lib"], a["world"]["catalog"]["movements"]), a["week"]["sessions"])
+        )
 
 
-def over_cap(week: dict) -> list[tuple[str, float]]:
-    return [(s["role"], s["lifting_minutes"]) for s in week["sessions"] if (s["lifting_minutes"] or 0) > CAP]
+def over_cap(week: dict, shared: bool = False) -> list[tuple[str, float]]:
+    """Sessions over the cap: the LIFTING minutes by default (`session_cap_includes_cardio` false, today's cap), the whole
+    MORNING (lifting + cardio) when the cap is shared (third red team: the default-cap gate never saw a ~100-minute morning)."""
+
+    def minutes(s: dict) -> float:
+        return float(s["lifting_minutes"] or 0) + (float(s["cardio"].get("minutes") or 0) if shared else 0.0)
+
+    return [(s["role"], minutes(s)) for s in week["sessions"] if minutes(s) > CAP]
+
+
+def morning_report(m: dict) -> list[tuple[str, float]]:
+    """The total morning minutes the generator REPORTS for every session, whatever the cap setting (lifting + cardio)."""
+    return [(p["role"], p["morning_minutes"]) for p in m["per_session"]]
 
 
 def test_d3_every_session_fits_75_minutes_by_the_5799_model(weeks):
     assert {n: over_cap(w["week"]) for n, w in weeks.items() if over_cap(w["week"])} == {}
+    for n, w in weeks.items():  # the morning is always reported — the owner's cap decision is read off these numbers
+        rep = morning_report(w["m"])
+        assert len(rep) == len(w["week"]["sessions"]), n
+        for (role, mins), s in zip(rep, w["week"]["sessions"]):
+            assert abs(mins - (float(s["lifting_minutes"] or 0) + float(s["cardio"].get("minutes") or 0))) < 0.05, (n, role)
+    # control: the shared-cap reading of the default week finds the long mornings (the setting decides which one binds)
+    assert over_cap(weeks["a_large_deficit_experienced"]["week"], shared=True)
     # stress: no load on file for anything (a first week back): every lift gets its "find the load" warm-up set as written,
     # the time the prescription's estimate does not see — the routine is still fitted to the ceiling, accessories first
     real = sw.history_index
@@ -787,9 +950,11 @@ def test_d3b_with_the_shared_cap_the_whole_morning_fits_and_conditioning_sits_on
         for name, prof in PROFILES.items():
             world = sw.build_world(prof, "approved")
             week = sw.generate_week(prof, "approved", world)
-            assert morning_over_cap(week) == [], name
-            assert {s["role"] for s in week["sessions"] if s["cardio"].get("kind") in lp.HARD_KINDS} <= {"shoulders_arms"}, name
-            if name in ("a_large_deficit_experienced", "c_equipment_limited", "d_stalled_anchor_adherence_dip"):
+            assert morning_over_cap(week) == [] and over_cap(week, shared=True) == [], name
+            roles = {s["role"] for s in week["sessions"]}
+            host = lb.conditioning_host(None if "shoulders_arms" in roles else "shoulders_arms")  # the short / dip week's host
+            assert {s["role"] for s in week["sessions"] if s["cardio"].get("kind") in lp.HARD_KINDS} <= {host}, name
+            if name in ("a_large_deficit_experienced", "c_equipment_limited", "d_stalled_anchor_adherence_dip", "e_short_week"):
                 # second red team: lifting gives over-MAV sets (after the charter's antagonist supersets) so the week keeps a
                 # real aerobic block — not the 13-minute stub the shared cap used to leave
                 assert max(s["cardio"].get("minutes") or 0 for s in week["sessions"]) >= lw.CARDIO_ROOM["min_block"]["value"], name
@@ -836,7 +1001,9 @@ def filled(week: dict, lib: dict, catalog: dict) -> list[str]:
         expected = len(tmpl["anchors"]) + len(tmpl["accessories"])
         rat = s["rationale"]
         expected -= sum(1 for ln in rat if ln.startswith(("skipped (live)", "dropped (live)")))
-        added_titles = {ln[len("added (live): ") :].split(" — ")[0].rsplit(" ", 3)[0] for ln in rat if ln.startswith("added (live): ")}
+        added_titles = {
+            re.sub(r" \d+ x \d+-\d+$", "", ln[len("added (live): ") :].split(" — ")[0]) for ln in rat if ln.startswith("added (live): ")
+        }
         timed = [
             t
             for ln in rat
@@ -844,7 +1011,9 @@ def filled(week: dict, lib: dict, catalog: dict) -> list[str]:
             for t in ln.split("dropped ", 1)[1].split(" -> ")[0].split(", ")
         ]  # second red team: the time fit takes surplus SETS first and says so; only "dropped …" names a whole exercise
         expected -= sum(1 for t in timed if t not in added_titles)  # an added drill the time fit dropped was never a template slot
-        moved = [x for x in s["lifts"] if any(ln.startswith(f"added (live): {x['title']} — short week") for ln in rat)]
+        expected -= sum(1 for ln in rat if ln.startswith("moved (live)"))  # FIX3: the kettlebell slot left for its host session
+        hosts = ("added (live): {} — short week", "added (live): {} — the kettlebell slot's host")
+        moved = [x for x in s["lifts"] if any(ln.startswith(h.format(x["title"])) for ln in rat for h in hosts)]
         added = [x for x in s["lifts"] if any(ln.startswith(f"added (live): {x['title']} ") for ln in rat) and x not in moved]
         if len(s["lifts"]) != expected + len(added) + len(moved):
             out.append(f"{s['role']}: {len(s['lifts'])} exercises, expected {expected} + {len(added)} added + {len(moved)} moved")
@@ -855,6 +1024,9 @@ def filled(week: dict, lib: dict, catalog: dict) -> list[str]:
             if not lm or lm["sets"] - x["working_sets"] >= lm["MEV"]:
                 out.append(f"{s['role']}: {x['key']} added for {mu}, already at MEV without it")
     out += [f"{mu} over MRV" for mu, v in m["landmarks"].items() if v["verdict"] == "over MRV"]
+    # third red team: the template's OWN accessories could never be "filling" (the delt spread passed). An outcome now: a muscle
+    # over its MAV in a drafted week is being filled, whoever placed the sets
+    out += [f"{mu} over MAV: {v['sets']} sets filled past the landmark" for mu, v in m["landmarks"].items() if v["verdict"] == "over MAV"]
     return out
 
 
@@ -872,6 +1044,9 @@ def test_d5_no_training_is_added_to_fill_slots(weeks):
     s["lifts"].append(dict(lr))
     s["rationale"].append(f"added (live): {lr['title']} 2 x 8-12 — a filler")
     assert any("already at MEV" in p for p in filled(bad, weeks["a_large_deficit_experienced"]["world"]["lib"], cat))
+    # control 3 (third red team): the template's own delt spread with the week's allocation off -> filled past MAV
+    raw = _week_of("a_large_deficit_experienced", {(lb, "allocate"): lambda rx, ctx: []})
+    assert any(p.startswith("shoulders over MAV") for p in filled(raw["week"], raw["world"]["lib"], raw["world"]["catalog"]["movements"]))
 
 
 def exercise_count_problems(week: dict) -> list[str]:

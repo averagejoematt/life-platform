@@ -30,7 +30,9 @@ _LIB = json.loads((_REPO / "config" / "exercise_library.json").read_text(encodin
 _HR_TEXT = re.compile(r"\bHR\b|\bbpm\b|heart[- ]rate|\bzone\s*\d", re.IGNORECASE)
 
 # synthetic profiles (not the owner's numbers): a high-step walker and a low-step one
-HIGH_WALKER = {f"2030-01-0{i}": 10000 for i in range(1, 8)}
+HIGH_WALKER = {f"2030-01-0{i}": 20000 for i in range(1, 8)}
+"""#5861 FIX3: the steps credit is conservative (a quarter of the steps over 5,000) — 10k a day no longer covers the weekly
+volume by itself (tests/test_programming_fix3_5861.py holds that); a walker whose steps DO cover it now walks ~20k."""
 LOW_WALKER = {f"2030-01-0{i}": 6000 for i in range(1, 8)}
 
 

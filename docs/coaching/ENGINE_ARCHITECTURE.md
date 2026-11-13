@@ -7,7 +7,10 @@
 > **Updated:** 2026-11-13 for the red-team programming fixes (`live_program`, §4–§7, §9): the generated weeks, not the
 > architecture, were graded C+; every change below is LIVE-only and measured on the sample weeks. **Updated again** the same
 > day for the SECOND red team's programming findings (`live_week`, the novelty budget, the load evidence rule; §3–§10),
-> measured on the sample weeks and on the owner's private real-data run.
+> measured on the sample weeks and on the owner's private real-data run. **Updated a third time** (2026-11-13) for the THIRD
+> red team (graded B-): `live_balance` (volume by priority, one spine-loading definition and the kettlebell slot's placement,
+> pain persistence, the adherence dip, the library fallback, one effort target per lift, cardio host and machine) and the
+> library's S quota and two class rules (rubric 3.3.0) — §1–§10 and the new §4b, measured the same two ways.
 > No personal data: every example is a synthetic profile (`tests/fixtures/sample_week_profiles_5861.json`).
 
 ## The principle
@@ -141,14 +144,27 @@ What the selection cannot see, because it ranks slots:
   3/10 (and not "sharp") reduces — 10 % lighter, RPE ≤ 7 — on each joint-loading lift; above it, "sharp", or no number, the
   movements in the flagged PATTERN GROUP (pressing, pulling, hinge, squat) are avoided (swapped for a member under moderate
   stress on that joint, else skipped) and the rest are reduced.
-- **Axial stacking avoided, not only detected.** Past two spinal-loading squat/hinge compounds in one session the lowest
-  priority goes: an unpinned accessory first (a unilateral slot stays unilateral — a split squat becomes a reverse lunge);
-  then an owner-pinned slot is KEPT but light — a technique dose at RPE ≤ 7, load held (`STACK_RULE pinned_light_rpe`); then
-  a non-heavy anchor, squat before hinge — but never the session's ONLY squat or ONLY hinge. Second red team: the old order
-  protected the pinned kettlebell hinge by swapping the lower-volume day's only squat for a leg press.
+- **Axial stacking avoided, not only detected — a real limit.** ONE spine-loading definition (`live_balance.spine_loading`: a
+  squat/hinge compound at moderate+ spinal load) is read by the rule, the acceptance gates and the sample-week generator (third red
+  team: the generator counted free-weight compounds, so a dumbbell lunge read "axial" there and "low" here). Past two in one session:
+  an unpinned accessory is swapped for a member that is NOT spine-loading (a unilateral slot stays unilateral), else dropped; an
+  owner-pinned slot is never swapped — it is the movable one (below) and, if still third, dropped; then a non-heavy anchor, squat
+  before hinge — but never the session's ONLY squat or ONLY hinge. Second red team: the old order swapped the lower-volume day's only
+  squat; third red team: the pin "kept light" was not a limit (three spine-loading lifts every Friday), and the split-squat ->
+  reverse-lunge swap moved a label, not the fatigue (the data now rates the dumbbell-at-the-sides class low as one,
+  `EXERCISE_LIBRARY.md` third red team §3 — the swap no longer happens).
+- **The kettlebell slot's placement** (`live_balance.kb_placement` / `place_kb`). Its home is `programming_settings.kb_slot_role`
+  (default `lower_volume`, the owner's pin). When the home's template already holds two spine-loading lifts (RDL + back squat), the
+  slot MOVES (`kb_slot_when_stacked` default `move`) to the first of `kb_slot_move_to` (default shoulders+arms, then upper volume)
+  that is drafted this week, has room, and is not the shared cap's conditioning host; `drop` drops it for the week. Either way the
+  rationale says so on both sessions. The movement follows `kb_entry` (the KB deadlift until two are logged, then the swing).
 - **The kettlebell slot names its implement** (`live_week.kb_slot`, `KB_SLOT`). The KB deadlift logs under Hevy's "Sumo
-  Deadlift" (template D20D7BBE, the owner-ruled stand-in — the template stays): its note reads "KB deadlift — logged as Sumo
-  Deadlift.", its effort is capped at RPE 7–8 (an entry drill into the swing), and its rows carry the bell on file — its own
+  Deadlift" (template D20D7BBE, the owner-ruled stand-in — the template stays) unless the owner sets
+  `programming_settings.kb_deadlift_template_id` to a custom "Kettlebell Deadlift" template (third red team: the KB pulls land in his
+  barbell Sumo Deadlift history and e1RM): then the compiler's resolver writes the slot under that id
+  (`live_balance.template_resolver`, approved library only — wired in the nightly cron, the MCP resolver and the sample weeks), the
+  bell and the entry count read it first, and the note says "KB deadlift — one kettlebell." No template is created by the engine. Its
+  note reads "KB deadlift — logged as Sumo Deadlift.", its effort is capped at RPE 7–8 (an entry drill into the swing), and its rows carry the bell on file — its own
   last load, else the swing's — never "find the load" while his history names the bell. Its sets count toward glutes (and
   hamstrings at the secondary credit) through the library target; the catalog's `other` no longer hides them
   (`live_week.landmark_muscle`, also read by the surplus-first trim).
@@ -175,6 +191,41 @@ What the selection cannot see, because it ranks slots:
   four mornings skip shoulders+arms, so both lower days keep 2x; the carry and the trunk floor move to the week's last
   session. Delts and arms sit at their floor that week. The cron's session sequence still slides (it credits by position):
   wiring the skip into `session_sequence` is an owner decision.
+
+## 4b. The third red team's week (`live_balance`, 2026-11-13)
+
+- **Volume by priority** (`allocation_plan`, `allocate`, `ALLOCATION`). The template's delt spread (lateral raise 3+3, rear delt
+  2+3, face pull 3) put shoulders at 18 (MAV 16) beside chest at exactly its MEV. Before drafting, the week is allocated: every
+  muscle over its MAV gives isolation sets (the largest slot first, never under two sets, never a pinned slot) until it sits at MAV;
+  the freed sets go first to the priority muscles (`programming_settings.priority_muscles`, default chest, back, quadriceps,
+  hamstrings — retention first) at or under MEV + 1, one per accessory slot; the rest is time back. Sample week (a): shoulders 18 ->
+  16, chest 8 -> 9 (the face pull on shoulders+arms and on upper volume 3 -> 2, the cable fly 2 -> 3). `live_week.week_sets` (the
+  cardio room and the time trim) reads the allocated week. Whether the delts become a priority muscle is the owner's call (his split).
+- **Pain that persists** (`pain_assess`, `programming_settings.pain_assess_line`, default on: "Still hurts 2 sessions? Get it
+  assessed."). While a pain flag stands, every session's first joint-flagged lift carries that one neutral line and the rationale says
+  how many sessions logged the note. No diagnosis, no number; "" turns it off. The shoulder pain map itself is data (abduction,
+  rear-delt and rotation work rated at least moderate for the shoulder), so a sharp shoulder flag now caps lateral raises, face pulls
+  and reverse flies at RPE 7, 10 % lighter.
+- **The adherence dip** (`adherence_response`, `lighter_week`, `ADHERENCE_DIP`). Five of fourteen sessions done used to mean a full
+  five-day week minus two isolation sets. The DEFAULT response (`programming_settings.adherence_response` `short_week`; `trim_sets` =
+  the old answer) is now fewer, shorter sessions focused on the anchors: four mornings (shoulders+arms skipped, as in the short
+  week), each fitted to ~60 min, every anchor whole, every accessory at two sets, the trunk floor waiting. The dip is judged once a
+  week, as of its Monday, so every morning of the week gives the same answer. The stricter keep-the-anchors week (one accessory per
+  major muscle, ~45 min) stays behind `behind_schedule_week` (default off).
+- **The library fallback** (`library_fallbacks`). An accessory whose slot's ranked fallbacks are all unservable now searches the
+  library's same-pattern, same-muscle members (best tier for that muscle, familiar first; equipment, pain, gates and joint limits
+  judged as for any swap): the garage week keeps hamstring knee flexion with a banded lying curl instead of dropping it.
+- **One effort target per lift** (`one_effort`, `why_effort`, `effort_targets`). Exercise 1's session line said "RPE 8–9 on big
+  lifts" above the same lift's "RPE 6–7". When exercise 1's own effort differs, the session line is restated at it (the note
+  standard's grammar kept) and the lift's own line printed once. `effort_targets` is the guard the sample weeks and
+  `tests/test_programming_fix3_5861.py` run over every generated note.
+- **Cardio: the host and the machine** (`conditioning_host`, `cardio_machine`, `machine_label`). Under the shared cap the conditioning
+  host is shoulders+arms, or — in a week that skips it (short, dip) — the session after the heavy lower day (the owner's 2026-10-25
+  placement), which the cardio room then trims for; the short week used to have no conditioning at all. A menu machine the gym lacks
+  is swapped for one it has that runs the kind; a `cycling` note names "Bike", not "Recumbent", where the gym has no recumbent.
+- **The cardio room trims harder before the block is cut**: after the over-MAV and over-MEV passes at two sets, a second pass to one
+  set, then whole isolation accessories (largest week surplus over MEV first, never under MEV, never pinned) — so the shared-cap
+  morning keeps a 20-minute block.
 
 ## 5. Progression
 
@@ -234,7 +285,11 @@ layer — one person's usage count is fit, not modality quality.
 - a hard block (tempo, hills, intervals) turns easy under a recommended deload or when hard cardio is itself a strain signal,
   never sits on the heavy lower day or the session before it, and — with the shared cap — sits only on shoulders+arms;
 - **steps first** (`cardio_model.aerobic_plan` over the steps the cron reads through the one steps resolver): an easy block is
-  dropped when the week's steps already cover the aerobic volume — the walking IS the easy aerobic; unread steps never count;
+  dropped when the week's steps already cover the aerobic volume — the walking IS the easy aerobic; unread steps never count.
+  **The credit is conservative** (third red team: ">= 100 steps a minute" is a cadence, not a conversion — every step over 5,000 at
+  100 a minute read 344–630 "moderate" min/wk for a 12–15k walker): minutes recorded at a qualifying cadence count as they are
+  (`cadence_minutes_by_day`, where a source records them — none is wired today), otherwise `STEPS_CREDIT_SHARE` (a quarter, labelled
+  heuristic) of the steps over 5,000; a 14k-step synthetic week reads ~158 min/wk, not 630;
 - **`programming_settings.session_cap_includes_cardio`** (library setting, default `false` = today's 75-minute LIFTING cap
   with the cardio block apart): `true` makes the 75 minutes cover lifting + cardio — a block shrinks to what lifting leaves,
   under 10 minutes it is dropped — and hard conditioning lands on shoulders+arms;
@@ -302,7 +357,16 @@ Before flipping, the owner should decide (each is listed on the epic's PRs):
       trimming sets — wiring the four-session sequence into `session_sequence` is a separate change, as for the short week;
 - [ ] `programming_settings.press_sets` (default `1`, the charter's `overhead_press_per_wk`, #5162): the shoulders+arms press at 2+
       sets, each taken from the face pull;
-- [ ] the symptom-line wording — whether to add "heart racing or irregular" (the default is unchanged);
+- [ ] the symptom-line wording — whether to add "heart racing or irregular" (the default is unchanged; the longer wording is
+      exercised and prints on every conditioning note);
+- [ ] third red team settings, each at today's default and each alternative exercised in `tests/test_programming_fix3_5861.py`:
+      `kb_slot_role` (lower_volume) / `kb_slot_when_stacked` (move | drop) / `kb_slot_move_to`; `kb_deadlift_template_id` (none: the
+      Sumo Deadlift stand-in — set it once a custom "Kettlebell Deadlift" template exists); `pain_assess_line` (on); `priority_muscles`
+      (chest, back, quadriceps, hamstrings — add the delts if they stay a priority); `adherence_response` (short_week | trim_sets);
+      `body_fat_tier` (unknown) and `rate_band_mode` (advisory | structured — structured records the band on the draft; nothing
+      reads it back: wiring it into nutrition is a separate, owner-approved change);
+- [ ] the S quota and the shoulder pain-map floor (library rubric 3.3.0) and the conservative steps credit (a quarter of the steps
+      over 5,000) — accept or adjust;
 - [ ] the novelty budget's reach: on the flip, the current phase's ledger (written in shadow by the #5075 calendar) is served
       only within the budget — the rest of the shadow rotation waits;
 - [ ] showing the loss-rate band as advisory text in the rationale (no nutrition change either way).
@@ -319,6 +383,18 @@ Before flipping, the owner should decide (each is listed on the epic's PRs):
   no session carries a third spinal-loading squat/hinge (d2b); the whole morning fits with the shared cap (d3b); abs reach
   MEV from direct trunk work, not carries, and the short week keeps every leg muscle at MEV (d1); a WEEK programs single-leg,
   carry, trunk-stability and aerobic work (b2); nothing is added without a landmark purpose (d5).
+- The third red team's gates (2026-11-13) test OUTCOMES, not the engine's own words: d1 fails any muscle over MAV while a
+  priority muscle sits at or under MEV + 1 with sets that could move (the 18/8 week fails; its control replays it); d2b counts
+  spine-loading lifts by the one definition with no "kept light" exemption, holds the dumbbell-at-the-sides class to one rating, and
+  proves the rule, the gate and the generator share the definition; d3 checks lifting minutes under the default cap and the whole
+  morning under the shared cap, and the morning is always reported; b2's aerobic check is a 20-minute block or the steps dose
+  COMPUTED by the cardio model (the engine's sentence no longer passes — a control proves it); b3 checks the cardio block's machine
+  and its note's machine name; c2c names abduction / rear-delt / rotation work by pattern, independent of the joint data (its
+  control puts the old data back and the lateral raise goes uncapped); d5 fails a muscle over MAV however the sets got there.
+  `tests/test_programming_fix3_5861.py` holds the rest, each with a control: the shoulder class rule, the persistence line, the
+  allocation, the KB placement and template settings, the S quota, one effort target on every generated note, the adherence dip on a
+  realistic irregular history, the steps credit, the garage leg curl, the short week's conditioning host, the machine and its name,
+  and the owner settings.
 - The second red team's gates (2026-11-13): d1 now checks the DISTRIBUTION (no major muscle over MAV while another is under
   MEV); b2 needs a 20-minute aerobic block or the steps-dose rationale, not any block; d2b keeps a squat and a hinge in every
   lower session (its control replays the old precedence that swapped the squat out); d3b keeps a 20-minute block under the

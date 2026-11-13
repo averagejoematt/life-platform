@@ -92,13 +92,14 @@ def test_the_kettlebell_slot_names_its_implement_caps_effort_and_loads_the_bell(
     """The KB deadlift logs as Hevy's "Sumo Deadlift" (an owner-ruled stand-in): the note must name the kettlebell, cap the
     effort at RPE 7-8 (an entry drill — 7 when it is also the session's third hinge), and carry the bell he swings instead of
     "find the load". Control: the KB rules off -> no implement on the note and the load to find."""
-    kb = _lift(weeks["a_large_deficit_experienced"]["week"], "lower_volume", "kettlebell_deadlift")
+    # FIX3 (third red team): the slot moves off lower volume (two spine-loading lifts already) to shoulders+arms by default
+    kb = _lift(weeks["a_large_deficit_experienced"]["week"], "shoulders_arms", "kettlebell_deadlift")
     assert kb is not None and kb["title"] == "Sumo Deadlift"
     note = kb["hevy_note"]
     assert lw.KB_SLOT["implement_line"]["value"] in note.split("\n")
     assert note.startswith(("RPE 7\n", "RPE 7–8\n")) and "9–10" not in note and "find the load" not in note
     off = _week("a_large_deficit_experienced", {(lw, "kb_slot"): lambda rx, ctx: [], (lw, "kb_seed"): lambda *a, **k: None})
-    bare = _lift(off["week"], "lower_volume", "kettlebell_deadlift")["hevy_note"]
+    bare = _lift(off["week"], "shoulders_arms", "kettlebell_deadlift")["hevy_note"]
     assert lw.KB_SLOT["implement_line"]["value"] not in bare and "find the load" in bare
 
 
@@ -462,7 +463,9 @@ def test_the_behind_schedule_week_is_an_off_by_default_option():
     `behind_schedule_week` (off by default; owner decision) offers a shorter week instead: four sessions of ~45 lifting min that
     keep every anchor, with at most one accessory per major muscle. Controls: the default (off) drafts the usual five; on, with
     the miss threshold out of reach, nothing changes."""
-    off = _week("d_stalled_anchor_adherence_dip")
+    # FIX3: the DEFAULT response to a dip is now the shorter week (live_balance.lighter_week, tests/test_programming_fix3_5861.py);
+    # `adherence_response=trim_sets` is today's old answer — five sessions, two sets off
+    off = _week("d_stalled_anchor_adherence_dip", settings={"adherence_response": "trim_sets"})
     assert len(off["week"]["sessions"]) == 5 and not off["week"].get("short_week")
     on = _week("d_stalled_anchor_adherence_dip", settings={"behind_schedule_week": True})
     w = on["week"]
@@ -486,6 +489,6 @@ def test_every_live_week_constant_is_a_labelled_heuristic():
             assert row["label"] == "heuristic" and row["basis"], name
     for name in ("evidence_rpe", "one_retreat_per_week"):
         assert lp.LOAD_POLICY[name]["label"] == "heuristic"
-    assert lp.STACK_RULE["pinned_light_rpe"]["label"] == "heuristic"
+    assert "pinned_light_rpe" not in lp.STACK_RULE  # FIX3: "kept light" was not a limit — the pinned slot moves or is dropped
     assert lp.SETTINGS_DEFAULTS["behind_schedule_week"] is False and "press_sets" not in (LIB0.get("programming_settings") or {})
     assert lp.SETTINGS_DEFAULTS["symptom_line"] == "Chest, breathing, dizzy? Stop, log it."  # the owner's wording decision is open

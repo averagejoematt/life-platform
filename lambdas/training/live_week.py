@@ -148,8 +148,9 @@ def kb_slot(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
 def kb_note(note: str) -> str:
     """The implement line right under the effort line (never displacing a reason or the pick-load line). Idempotent."""
     from training import session_block as sb
+    from training.live_balance import kb_note_line
 
-    line = str(KB_SLOT["implement_line"]["value"])
+    line = kb_note_line()  # #5861 FIX3: the custom template, when the owner sets one, needs no stand-in line
     if line in note.split("\n"):
         return note
     block, own = sb.split(note)
@@ -173,7 +174,11 @@ def kb_seed(
         work = [s for s in b.sets if str(getattr(s, "type", "") or "normal") != "warmup"]
         if b.movement_key != kb_entry.ENTRY or not work or any(getattr(s, "weight_kg", None) for s in work):
             continue
-        bell = previous_load(history_index, kb_entry.ENTRY_TEMPLATE_ID, target_date) or previous_load(history_index, swing, target_date)
+        custom = str(_settings().get("kb_deadlift_template_id") or "").upper() or None  # FIX3: his own KB template first
+        bell = (previous_load(history_index, custom, target_date) if custom else None) or previous_load(
+            history_index, kb_entry.ENTRY_TEMPLATE_ID, target_date
+        )
+        bell = bell or previous_load(history_index, swing, target_date)
         if not bell or not bell.get("lb"):
             continue
         for s in work:
@@ -195,23 +200,10 @@ def landmark_muscle(key: str | None, catalog: dict[str, Any], lib: dict[str, Any
 
 def week_sets(catalog: dict[str, Any], lib: dict[str, Any] | None) -> Counter:
     """The program week's planned sets per landmark muscle (primary 1.0, each secondary 0.5 — the fatigue model's convention),
-    from the five role templates."""
-    from training import program_structure as ps, selection_engine as se
+    from the five role templates AFTER the week's allocation by priority (#5861 FIX3, `live_balance.allocation_plan`)."""
+    from training import live_balance
 
-    idx = se.key_index(lib or {}, catalog) if lib else {"to_lib": {}}
-    out: Counter = Counter()
-    for role in ps.SPLIT_ROLES:
-        for e in ps.session_prescription_for_role(role, catalog_movements=catalog)["exposures"]:
-            key, n = e.get("movement_key"), len(e.get("sets") or [])
-            prim = landmark_muscle(key, catalog, lib)
-            out[prim] += n
-            lid = idx["to_lib"].get(str(key))
-            entry = (((lib or {}).get("movements") or {}).get(lid) or {}) if lid else {}
-            for sec in (entry.get("target") or {}).get("secondary") or []:
-                m = LANDMARK_OF.get(str(sec), str(sec))
-                if m != prim:
-                    out[m] += n * 0.5
-    return out
+    return live_balance.allocated_week(catalog, lib or {})
 
 
 def _hard_blocked(rx: dict[str, Any]) -> bool:
@@ -232,7 +224,8 @@ def cardio_reserve(rx: dict[str, Any]) -> int:
     if not _settings().get("session_cap_includes_cardio"):
         return 0
     covered = ((rx.get("live_session") or {}).get("aerobic") or {}).get("volume_covered")
-    host = rx.get("session_role") == "shoulders_arms" and not _hard_blocked(rx)
+    on = (rx.get("live_session") or {}).get("conditioning_host") or "shoulders_arms"  # FIX3: the short week's host
+    host = rx.get("session_role") == on and not _hard_blocked(rx)
     return int(CARDIO_ROOM["min_block"]["value"]) if host or not covered else 0
 
 
@@ -253,15 +246,18 @@ def make_cardio_room(blocks: list[Any], rx: dict[str, Any], movements: dict[str,
     lib = se.load_library_failsoft() or {}
     week, marks = week_sets(movements, lib), (block_model.load_landmarks() or {})
     taken: Counter = Counter()
-    floor = int(CARDIO_ROOM["min_sets"]["value"])
     before = shape["lifting_minutes"]
     paired = _pair_antagonists(blocks, rx) if shape["lifting_minutes"] > cap - reserve else []  # charter: pair before cutting
-    while True:
-        now = routine_minutes(blocks, movements)["lifting_minutes"]
-        # sets over a muscle's MAV buy the WHOLE block (they add little); a muscle's surplus over MEV buys only the minimum block
-        tiers = (0, 1) if now > cap - reserve else ((0,) if now > cap - full else ())
-        if not tiers or not _trim_one(blocks, movements, lib, (week, marks, taken, floor, _fixed(rx)), tiers):
-            break
+    # #5861 FIX3: a second pass to ONE set (isolation surplus over MEV only) before the minimum block is cut short — the third
+    # red team: "let the room come from delt-isolation surplus, not from the intervals"
+    for floor in (int(CARDIO_ROOM["min_sets"]["value"]), 1):
+        while True:
+            now = routine_minutes(blocks, movements)["lifting_minutes"]
+            # sets over a muscle's MAV buy the WHOLE block (they add little); a surplus over MEV buys only the minimum block
+            tiers = (0, 1) if now > cap - reserve else ((0,) if now > cap - full and floor > 1 else ())
+            if not tiers or not _trim_one(blocks, movements, lib, (week, marks, taken, floor, _fixed(rx)), tiers):
+                break
+    dropped = _drop_for_room(blocks, rx, movements, lib, (week, marks, taken), cap - reserve)  # FIX3: then a whole isolation
     if not taken and not paired:
         return shape
     new = program_structure.enforce_session_shape(blocks, movements) | {
@@ -269,11 +265,40 @@ def make_cardio_room(blocks: list[Any], rx: dict[str, Any], movements: dict[str,
     }
     how = [f"supersets {', '.join(paired)}"] if paired else []
     how += [", ".join(f"{n} {m}" for m, n in sorted(taken.items())) + " set(s) off (over MAV first)"] if taken else []
+    how += [f"dropped {', '.join(dropped)}"] if dropped else []
     (rx.get("live_session") or {}).setdefault("lines", []).append(
         f"cardio room (live): ~{before} -> ~{new['lifting_minutes']} min lifting — {'; '.join(how)} — so a {reserve}+ min aerobic "
         f"block fits the shared {cap}-min cap (CARDIO_ROOM, heuristic)"
     )
     return new
+
+
+def _drop_for_room(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any], lib: dict[str, Any], env: tuple, limit: float) -> list:
+    """IN PLACE (#5861 FIX3): when set trims could not make the minimum aerobic block fit, whole isolation accessories go —
+    the one whose muscle the week holds furthest over its MEV first (the delt surplus before anything else), never an
+    anchor, a carry, a pinned slot or a live addition, never a muscle the week would leave under its MEV. Returns titles."""
+    from training.session_shape import routine_minutes
+
+    week, marks, taken = env
+    out = []
+    while routine_minutes(blocks, movements)["lifting_minutes"] > limit:
+        cands = []
+        for i, b in enumerate(blocks):
+            tag = str(b.rationale_tag or "")
+            if not tag.startswith("accessory:") or tag.endswith(":carry") or b.movement_key in _fixed(rx):
+                continue
+            m = landmark_muscle(b.movement_key, movements, lib)
+            n = sum(1 for st in b.sets if str(getattr(st, "type", "") or "normal") != "warmup")
+            lm = marks.get(m) or {}
+            if lm and m != "abs" and week[m] - taken[m] - n >= float(lm["MEV"]):
+                cands.append((week[m] - taken[m] - float(lm["MEV"]), i, b, m, n))
+        if not cands:
+            break
+        _s, i, b, m, n = max(cands, key=lambda c: c[:2])
+        blocks.pop(i)
+        taken[m] += n
+        out.append((movements.get(b.movement_key) or {}).get("title") or b.movement_key)
+    return out
 
 
 def _fixed(rx: dict[str, Any]) -> set[str]:
@@ -432,12 +457,13 @@ def review_line(trip: dict[str, Any]) -> str:
 
 
 # ── 4. behind schedule ───────────────────────────────────────────────────────
-def behind_schedule(workouts: Any, as_of: str, lib: dict[str, Any] | None = None) -> dict[str, Any] | None:
+def behind_schedule(workouts: Any, as_of: str, lib: dict[str, Any] | None = None, force: bool = False) -> dict[str, Any] | None:
     """The live option `programming_settings.behind_schedule_week` (default False): {missed, planned, performed} when at least
-    BEHIND_SCHEDULE missed_min of the fortnight's planned sessions were missed over a fully covered window; else None."""
+    BEHIND_SCHEDULE missed_min of the fortnight's planned sessions were missed over a fully covered window; else None.
+    `force` (#5861 FIX3, `live_balance.adherence_response`): the same reading for the default dip response."""
     from training import fatigue_model, live_program, program_structure as ps, selection_engine as se
 
-    if not live_program.settings(lib if lib is not None else se.load_library_failsoft()).get("behind_schedule_week"):
+    if not force and not live_program.settings(lib if lib is not None else se.load_library_failsoft()).get("behind_schedule_week"):
         return None
     adh = fatigue_model.adherence(workouts, as_of=as_of, planned_per_week=len(ps.SPLIT_ROLES))
     if adh.get("state") == "unknown" or not adh.get("window_covered"):
@@ -457,6 +483,11 @@ def behind_schedule_roles(roles: list[str], behind: dict[str, Any] | None) -> tu
     from training.live_program import SHORT_WEEK_SKIP
 
     kept = [r for r in roles if r != SHORT_WEEK_SKIP]
+    if behind.get("mode") == "dip":  # #5861 FIX3: the default response to a dip (live_balance.lighter_week)
+        return kept, (
+            f"adherence dip (live, adherence_response=short_week): {behind['missed']} of the last {behind['planned']} planned "
+            f"sessions missed — a {len(kept)}-session week, anchors whole, accessories at 2 sets, ~60 min each"
+        )
     return kept, (
         f"behind schedule (live option, heuristic): {behind['missed']} of the last {behind['planned']} planned sessions missed — "
         f"a {len(kept)}-session 'keep the anchors' week, ~{BEHIND_SCHEDULE['session_minutes']['value']} min each"
@@ -467,7 +498,7 @@ def keep_the_anchors(rx: dict[str, Any], ctx: dict[str, Any], behind: dict[str, 
     """IN PLACE: a behind-schedule session keeps every anchor, every owner-pinned slot (the carry, the kettlebell slot) and ONE
     accessory per major muscle no anchor of the session already trains (the first listed); the rest wait. The routine is
     then fitted to BEHIND_SCHEDULE session_minutes (`live_session.fit_routine`). Returns the rationale lines."""
-    if not behind:
+    if not behind or behind.get("mode") == "dip":
         return []
     from training import selection_live
 
@@ -552,14 +583,20 @@ def press_sets(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
     if want <= 1 or rx.get("session_role") != "shoulders_arms":
         return []
     press = next((e for e in rx["exposures"] if e.get("kind") == "anchor" and e.get("pattern") == "overhead_press"), None)
-    donor = next((e for e in rx["exposures"] if e.get("slot") == "face_pull"), None)
     if press is None:
         return []
     added = 0
-    while len(press["sets"]) < want and donor is not None and len(donor["sets"]) > 2:
+    while len(press["sets"]) < want:  # FIX3: the face pull first; once the week's allocation left it at two, the lateral raise
+        donor = next(
+            (e for slot in ("face_pull", "db_lateral_raise") for e in rx["exposures"] if e.get("slot") == slot and len(e["sets"]) > 2), None
+        )
+        if donor is None:
+            break
         press["sets"].append(dict(press["sets"][-1]))
         donor["sets"].pop()
         added += 1
     return (
-        [f"press (live option): overhead press {len(press['sets'])} sets, {added} taken from the face pull (press_sets)"] if added else []
+        [f"press (live option): overhead press {len(press['sets'])} sets, {added} taken from the delt isolation (press_sets)"]
+        if added
+        else []
     )
