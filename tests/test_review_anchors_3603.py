@@ -236,7 +236,7 @@ def test_history_is_not_retroactively_disqualified(tmp_path):
 
 
 def test_the_live_review_clocks_read_the_calibrated_probe():
-    for name in ("fullreview-delta", "fullreview-full"):
+    for name in ("fullreview-full",):
         assert oc.CALENDAR[name]["qualifier"] is oc.calibrated_run, f"{name} advances on an artifact nobody calibrated"
 
 

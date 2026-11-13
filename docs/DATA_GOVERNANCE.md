@@ -311,8 +311,8 @@ deprecated doc). On ANY public surface (site, OG images, RSS, podcasts, build be
   and its history ride on `/api/predictions`, `/api/calibration`, `/api/ledger_export` and `/api/calls` (`method`).
   Owner rulings 2026-11-06: mood, felt-sense and self-report calls (a public morning note included), unnamed
   logging-gap calls, symptom-logging requests and every part of a bet with a private side stay private; a new bet and
-  a new free-text observation wait for review. The review is REVIEW-ONLY and rides the weekly `fullreview-delta`
-  clock (`docs/OPERATING_CALENDAR.md`): `scripts/prediction_publication_registry.py review` writes a PROPOSED manifest
+  a new free-text observation wait for review. The review is REVIEW-ONLY and rides the monthly `fullreview-full`
+  clock (moved from the retired weekly `fullreview-delta`, owner ruling 2026-11-13) (`docs/OPERATING_CALENDAR.md`): `scripts/prediction_publication_registry.py review` writes a PROPOSED manifest
   to a private file outside the repo and approves nothing; approval is the owner's `approve` registry edit, by PR.
   Classification follows the actual source and content, not keywords alone (same day): training fatigue and RPE are
   public when the call is graded on physiology or training data; fatigue he rates or reports is a self-report; calls

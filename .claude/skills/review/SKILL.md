@@ -21,7 +21,7 @@ Phase 0; everything lens-specific lives there and nowhere else.
 
 | Lens | Grades | Rubric (read this) | On a clock? |
 |---|---|---|---|
-| `full` | the product — every area, A–F, with a remediation ledger to A | `.claude/skills/review/references/full.md` | yes — `fullreview-delta` (weekly) + `fullreview-full` (monthly) |
+| `full` | the product — every area, A–F, with a remediation ledger to A | `.claude/skills/review/references/full.md` | yes — `fullreview-full` (monthly; also after a material architecture or publication-policy change, and on request). Delta mode is on-demand only (the weekly clock was retired 2026-11-13) |
 | `accuracy` | the truth of the public surface — are the published numbers true and the AI prose grounded | `.claude/skills/review/references/accuracy.md` | yes — `accuracy-full` (monthly) |
 | `craft` | the repo as a craft artifact a hiring panel judges cold | `.claude/skills/review/references/craft.md` | yes — `craft-review` (monthly) |
 | `sdlc` | the machinery and operator practice — ideation → issue → build → ship → oversight | `.claude/skills/review/references/sdlc.md` | yes — `sdlc-review` (quarterly) |
