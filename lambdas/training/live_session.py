@@ -245,7 +245,13 @@ def for_live_draft(
         lib = se.load_library_failsoft() or {}
         catalog = catalog_movements or {}
         sig: dict[str, Any] = (
-            fatigue_model.movement_signals(block_workouts, as_of=str(getattr(inputs, "target_date", ""))) if block_workouts else {}
+            fatigue_model.movement_signals(
+                block_workouts,
+                as_of=str(getattr(inputs, "target_date", "")),
+                deficit=fatigue_model.in_deficit(getattr(inputs, "weights_by_day", None)),  # #5861 FIX7: held in a deficit = held
+            )
+            if block_workouts
+            else {}
         )
         n_hurt = fatigue_model.THRESHOLDS["discomfort_sessions"]["value"]
         hurts = {tid for tid, v in sig.items() if v.get("discomfort_sessions", 0) >= n_hurt}

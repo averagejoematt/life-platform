@@ -120,6 +120,33 @@ THRESHOLDS: dict[str, dict[str, Any]] = {
         "steps_by_day) is counted and reported but is NOT a strain vote: a high daily step count is this trainee's baseline, and "
         "a spike rule needs a personal multi-week baseline nobody has set (an owner decision, #5861 L6)",
     },
+    "reset_detect_pct": {
+        "value": 0.07,
+        "label": HEURISTIC,
+        "basis": "#5861 FIX7 (sixth red team: the reset ratchet): an exposure whose top working load sits 7%+ under the exposure "
+        "before it, on a lift whose trend before it was not climbing (not progressing / step_due), is the engine's own retreat (a STALL_RULE reset or a "
+        "LOAD_POLICY regression cut: ~10%, floored to the implement step) — the trend is judged from that exposure on, never "
+        "against the pre-reset best",
+    },
+    "post_reset_min_exposures": {
+        "value": 3,
+        "label": HEURISTIC,
+        "basis": "#5861 FIX7: after a reset no stall (or regression) call before 3 exposures since it, the reset session included — "
+        "a reset is a short rebuild, not a weekly cut: a lift resets at most once per 3 post-reset exposures",
+    },
+    "deficit_hold_pct": {
+        "value": 0.03,
+        "label": HEURISTIC,
+        "basis": "#5861 FIX7: in a calorie deficit an e1RM held within 3% of its best at steady effort (top-set RPE not drifting up "
+        "by rpe_drift) is MAINTAINED, the retention goal met — it holds and keeps building reps/effort; a reset is for rep loss with "
+        "effort drift (practitioner consensus for a cut, not a measured band; re-tuned at the block retro)",
+    },
+    "deficit_rate_pct_bw": {
+        "value": 0.25,
+        "label": HEURISTIC,
+        "basis": "#5861 FIX7: a deficit is read when the mean weekly loss over the weigh-ins the draft read (rate_policy.weekly_rates) "
+        "is at least 0.25 %BW/week; no weekly rate = unknown (the stall rule then stands)",
+    },
     "sleep_short_hours": {"value": 6.5, "label": HEURISTIC, "basis": "the charter's progression refusal text (sleep < 6.5 h)"},
     "adherence_low": {
         "value": 0.6,
@@ -241,11 +268,75 @@ def hard_sets_by_muscle(workouts: list[dict[str, Any]] | None, index: dict[str, 
     return {k: round(v, 1) for k, v in sorted(out.items())}
 
 
-def _trend(points: list[tuple[str, float | None, float | None, float | None, int | None]]) -> dict[str, Any]:
-    """One movement's performed trend from its top working sets (day, e1RM, RPE, load, reps), oldest first."""
+def _trend(
+    points: list[tuple[str, float | None, float | None, float | None, int | None]],
+    deficit: bool | None = None,
+    roles: list[str] | None = None,
+) -> dict[str, Any]:
+    """One movement's performed trend from its top working sets (day, e1RM, RPE, load, reps), oldest first. #5861 FIX7: judged
+    from the latest reset on (`_reset_start`): with fewer than post_reset_min_exposures since it the trend is `rebuilding`
+    (no stall or regression call); in a deficit a held e1RM at steady effort is `holding`, never `stalled` (`_judge`)."""
+    keep = [i for i, p in enumerate(points) if p[1] is not None]
+    pts = [points[i] for i in keep]
+    rl = [(roles or [])[i] if i < len(roles or []) else "" for i in keep]
+    start = _reset_start(pts, deficit, rl)
+    if start is None:
+        return _judge(pts, deficit, rl)
+    since, need = pts[start:], int(THRESHOLDS["post_reset_min_exposures"]["value"])
+    reset = {"reset_at": pts[start][0], "since_reset": len(since)}
+    if len(since) < need:
+        why = f"reset on {pts[start][0]}: {len(since)} of {need} exposures since — rebuilding, no stall call (post_reset_min_exposures)"
+        return {"trend": "rebuilding", "why": why, **reset}
+    return _judge(since, deficit, rl[start:]) | reset
+
+
+def _reset_start(
+    pts: list[tuple[str, float | None, float | None, float | None, int | None]], deficit: bool | None, roles: list[str] | None = None
+) -> int | None:
+    """Index of the latest exposure that was a reset (`reset_detect_pct`): its top load 7%+ under the latest COMPARABLE exposure
+    before it (`_comparable`: the same session role, else a top set within 3 reps — a volume day's lighter squat is not a reset
+    of the heavy day's) while the trend judged up to it (from the previous reset on, the same rule) was not climbing (stalled,
+    regressing, holding or too few exposures to call — the record may hold fewer exposures than the draft that reset it saw).
+    None = no reset in the window."""
+    start, drop = None, float(THRESHOLDS["reset_detect_pct"]["value"])
+    need = int(THRESHOLDS["post_reset_min_exposures"]["value"])
+    roles = roles or [""] * len(pts)
+    for k in range(1, len(pts)):
+        j = next((i for i in range(k - 1, -1, -1) if _comparable(pts[i], pts[k], roles[i], roles[k])), None)
+        before, now = (pts[j][3] if j is not None else None), pts[k][3]
+        if before is None or now is None or now > before * (1 - drop):
+            continue
+        base = pts[(start or 0) : k]
+        if start is not None and len(base) < need:
+            continue  # still rebuilding from the last reset: a lighter session here is not a second reset
+        if _judge(base, deficit)["trend"] not in ("progressing", "step_due"):  # a drop off a lift that was not climbing
+            start = k
+    return start
+
+
+def _comparable(a: tuple[Any, ...], b: tuple[Any, ...], role_a: str, role_b: str) -> bool:
+    """Two exposures of one lift prescribed alike: the same session role when both are known, else top sets within 3 reps."""
+    if role_a and role_b:
+        return role_a == role_b
+    return a[4] is not None and b[4] is not None and abs(int(a[4]) - int(b[4])) <= 3
+
+
+def session_role(workout: dict[str, Any]) -> str:
+    """The session role a Hevy workout title names (`LOWER-HEAVY — W10 — …` -> `lower_heavy`); '' when it names none."""
+    import re
+
+    head = re.split(r"\s+[—–-]\s+", str(workout.get("title") or "").strip(), maxsplit=1)[0]
+    role = re.sub(r"[^a-z]+", "_", head.lower()).strip("_")
+    return role if role in ("upper_heavy", "lower_heavy", "shoulders_arms", "upper_volume", "lower_volume", "full_body") else ""
+
+
+def _judge(
+    pts: list[tuple[str, float | None, float | None, float | None, int | None]], deficit: bool | None = None, roles: list[str] | None = None
+) -> dict[str, Any]:
+    """The trend over readable points (the pre-FIX7 rule), plus the deficit hold (`deficit_hold_pct`, judged per session role:
+    a heavy day and a volume day of one lift are each held against their own best)."""
     from training import stall_detector
 
-    pts = [p for p in points if p[1] is not None]
     if len(pts) < 2:
         return {"trend": "unknown", "why": f"{len(pts)} exposure(s) with a readable top set"}
     drop = THRESHOLDS["e1rm_drop_pct"]["value"]
@@ -264,7 +355,43 @@ def _trend(points: list[tuple[str, float | None, float | None, float | None, int
         step = None
     if step is not None:
         return {"trend": "step_due", "why": "the prescription held still at an easy RPE — the load steps, the movement stays"}
+    groups: dict[str, list[int]] = {}
+    for i, r in enumerate(roles or [""] * len(pts)):
+        groups.setdefault(r or "", []).append(i)
+    if deficit and all(_held([pts[i] for i in ix], [e1[i] for i in ix]) for ix in groups.values()):
+        band = THRESHOLDS["deficit_hold_pct"]["value"]
+        return {"trend": "holding", "why": f"in a deficit: e1RM within {band:.0%} of its best at steady effort — maintained, not stalled"}
     return {"trend": "stalled", "why": f"no new best e1RM over the last {len(pts)} exposures at working effort"}
+
+
+def _held(pts: list[tuple[str, float | None, float | None, float | None, int | None]], e1: list[float]) -> bool:
+    """`deficit_hold_pct`: the latest effort-adjusted e1RM within the band of the best, and its top-set RPE not `rpe_drift` over
+    the best's. Effort-adjusted (`_e1rm_rir`): a top set's reps plus its reps in reserve (10 - RPE) — 4 reps at RPE 8 and 6 at
+    RPE 10 are the same strength; with no RPE logged the plain Epley e1RM stands."""
+    adj = [_e1rm_rir(p) or v for p, v in zip(pts, e1)]
+    best = max(range(len(adj)), key=lambda i: adj[i])
+    if adj[-1] < adj[best] * (1 - float(THRESHOLDS["deficit_hold_pct"]["value"])):
+        return False
+    rpe_now, rpe_best = pts[-1][2], pts[best][2]
+    return rpe_now is None or rpe_best is None or float(rpe_now) - float(rpe_best) < float(THRESHOLDS["rpe_drift"]["value"])
+
+
+def _e1rm_rir(p: tuple[str, float | None, float | None, float | None, int | None]) -> float | None:
+    """Epley on reps + reps in reserve (10 - RPE, RPE clamped 6-10); None without a load, reps and RPE."""
+    if p[2] is None or p[3] is None or p[4] is None:
+        return None
+    rir = 10.0 - min(10.0, max(6.0, float(p[2])))
+    return float(p[3]) * 2.20462262 * (1 + (int(p[4]) + rir) / 30.0)
+
+
+def in_deficit(weights_by_day: Any) -> bool | None:
+    """`deficit_rate_pct_bw`: the mean weekly loss over the weigh-ins read (`rate_policy.weekly_rates`); None with no weekly rate."""
+    from health import rate_policy
+
+    rates = rate_policy.weekly_rates(weights_by_day or {}) if isinstance(weights_by_day, dict) else []
+    if not rates:
+        return None
+    return sum(float(r["pct_bw"]) for r in rates) / len(rates) >= float(THRESHOLDS["deficit_rate_pct_bw"]["value"])
 
 
 def _recent_best(pts: list[tuple[str, float | None, float | None, float | None, int | None]], e1: list[float]) -> bool:
@@ -278,13 +405,17 @@ def _recent_best(pts: list[tuple[str, float | None, float | None, float | None, 
     return max(recent) > max(earlier)
 
 
-def movement_signals(workouts: list[dict[str, Any]] | None, *, as_of: str, window_days: int = 42) -> dict[str, dict[str, Any]]:
-    """Template id -> {exposures, trend, why, discomfort_sessions, pain_sessions, rpe_drift} over the window (the block)."""
+def movement_signals(
+    workouts: list[dict[str, Any]] | None, *, as_of: str, window_days: int = 42, deficit: bool | None = None
+) -> dict[str, dict[str, Any]]:
+    """Template id -> {exposures, trend, why, discomfort_sessions, pain_sessions, rpe_drift} over the window (the block).
+    `deficit` (#5861 FIX7, `in_deficit`): True lets a held e1RM read `holding`; None/False keeps the stall rule."""
     from training.live_rules import LIGHT, note_class  # #5861 FIX5: a joint-located "sore" at the mild line is light discomfort
     from training.training_notes_pain import DISCOMFORT, PAIN
 
     recent = THRESHOLDS["discomfort_window_days"]["value"]
     by: dict[str, list[tuple[str, dict[str, Any]]]] = {}
+    role_of = {(_day(w), id(x)): session_role(w) for w in workouts or [] for x in w.get("exercises") or []}
     for day, tid, ex in _exposures(workouts, as_of, window_days):
         if tid:
             by.setdefault(tid, []).append((day, ex))
@@ -307,7 +438,7 @@ def movement_signals(workouts: list[dict[str, Any]] | None, *, as_of: str, windo
         classes = [(day, note_class(str(ex.get("notes") or ""))) for day, ex in rows if (_ago(as_of, day) or 0) <= recent]
         out[tid] = {
             "exposures": len(rows),
-            **_trend(points),
+            **_trend(points, deficit, [role_of.get((d, id(x)), "") for d, x in rows]),
             "discomfort_sessions": sum(1 for _d, c in classes if c == DISCOMFORT),
             "light_sessions": sum(1 for _d, c in classes if c == LIGHT),  # FIX5: kept, lighter (the joint rule) — never swapped
             "pain_sessions": sum(1 for _d, c in classes if c == PAIN),
@@ -531,10 +662,11 @@ def assess(
     planned_per_week: int = 5,
     session_minutes: float | None = None,
     minutes_ceiling: float | None = None,
+    deficit: bool | None = None,
 ) -> dict[str, Any]:
     """The recovery state and the recommended action (module doc). Pure; deterministic for its inputs."""
     index = library_index(lib)
-    movs = movement_signals(workouts, as_of=as_of)
+    movs = movement_signals(workouts, as_of=as_of, deficit=deficit)
     hard = hard_sets_by_muscle(workouts, index, as_of=as_of)
     stacking = axial_stacking(workouts, index, as_of=as_of)
     adh = adherence(workouts, as_of=as_of, planned_per_week=planned_per_week)
@@ -661,6 +793,7 @@ def for_live_draft(
             planned_per_week=len(program_structure.SPLIT_ROLES),
             session_minutes=(rx.get("session_minutes") or {}).get("lifting_minutes"),
             minutes_ceiling=charter_value("split.session_minutes.lifting_ceiling"),
+            deficit=in_deficit(getattr(inputs, "weights_by_day", None)),  # #5861 FIX7: a held e1RM in a deficit is not a stall
         )
     except Exception as e:  # noqa: BLE001 — the fatigue model never blocks a draft
         import logging

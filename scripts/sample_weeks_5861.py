@@ -446,8 +446,12 @@ def _all_roles() -> tuple[str, ...]:
 
 
 # ── one week ──────────────────────────────────────────────────────────────────
-def generate_week(profile: dict[str, Any], mode: str = "approved", world: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Every session of the profile's week, drafted through the real path (module doc). Pure over the fixture."""
+def generate_week(
+    profile: dict[str, Any], mode: str = "approved", world: dict[str, Any] | None = None, perform: Any = None
+) -> dict[str, Any]:
+    """Every session of the profile's week, drafted through the real path (module doc). Pure over the fixture. `perform`
+    (#5861 FIX7, `scripts/progression_sim_5861.py`): `(session, day, role) -> workout` records each drafted session as
+    performed (the prescription as written) instead of `_performed`; the week's performed rows come back as `performed`."""
     from training import full_body_session as fbs, routine_generator as rg
     from training.program_seam import resolve_week_grid
 
@@ -480,13 +484,15 @@ def generate_week(profile: dict[str, Any], mode: str = "approved", world: dict[s
             ideal = out[0]
             cardio = _cardio(ideal, p, day, cardio_index)
             sessions.append(_session(ideal, role, day, catalog["movements"], cardio))
-            record.append(_performed(ideal, day, role, hidx, catalog["movements"]))  # the next morning's draft reads this session as done
+            done = perform(sessions[-1], day, role) if perform else _performed(ideal, day, role, hidx, catalog["movements"])
+            record.append(done)  # the next morning's draft reads this session as done
             prev = {"session_role": role, "date": day, "title": role, "was": "synthetic"}
     out = {"profile": p["name"], "label": p.get("label"), "story": p.get("story"), "mode": mode, "sessions": sessions}
     from training import cardio_model
 
     recorded = (p.get("aerobic_record") or {}).get("minutes_by_day") or None  # #5861 FIX6 (ruling 12): recorded minutes only
     out["steps_credit"] = cardio_model._walking_dose(steps_by_day(p), recorded)  # steps reported, never credited
+    out |= {"performed": record[len(world["record"]) :]} if perform else {}
     return out | ({"short_week": short_line} if short_line else {})
 
 

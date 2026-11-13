@@ -451,12 +451,20 @@ def stall_scheme(rx: dict[str, Any], ctx: dict[str, Any], trends: dict[str, str]
     for e in rx["exposures"]:
         entry = _entry(e.get("movement_key"), ctx)
         tid = str(entry.get("template_id") or "").upper()
-        if e.get("kind") != "anchor" or trends.get(tid) != "stalled" or e.get("live_load") or e.get("live_retreated"):
+        rebuild = trends.get(tid) == "rebuilding"  # #5861 FIX7: after a reset the scheme stays, the load is never cut again
+        if e.get("kind") != "anchor" or trends.get(tid) not in ("stalled", "rebuilding") or e.get("live_load") or e.get("live_retreated"):
             continue
         for s in e.get("sets") or []:
             if s.get("reps"):
                 s["reps"] = [int(s["reps"][0]) + shift, int(s["reps"][1]) + shift]
         lo, hi = e["sets"][0]["reps"]
+        if rebuild:
+            e["live_rebuild"] = [lo, hi]
+            lines.append(
+                f"stall (live): {entry.get('title')} — rebuilding after a reset: rep range {lo}-{hi}, the load builds by double "
+                "progression, no second cut before 3 post-reset exposures (STALL_RULE; fatigue_model post_reset_min_exposures, heuristic)"
+            )
+            continue
         e["live_load"] = {"pct": int(STALL_RULE["load_pct"]["value"]), "why": "stall", "stall": [lo, hi]}
         lines.append(
             f"stall (live): {entry.get('title')} — no new best over 3+ exposures: rep range -> {lo}-{hi} at "
@@ -679,7 +687,7 @@ def plan(rx: dict[str, Any], rotation: dict[str, Any], ctx: dict[str, Any], work
     lines += stall_scheme(rx, ctx, trends)
     lines += short_week_carry(rx, ctx)
     lines += live_shape.deadlift_shape(rx, ctx["lib"]) + live_shape.order_lower_volume(rx)  # FIX4: the heavy pull, squat first
-    lines += live_rulings.lead_lift(rx, ctx)  # FIX6 ruling 5: squat and deadlift never both maximal in one session
+    lines += live_rulings.lead_lift(rx, ctx, trends)  # FIX6 ruling 5: squat and deadlift never both maximal in one session
     mark_costs(rx, ctx)
     return lines
 
@@ -763,6 +771,9 @@ def guard_loads(
         if not work:
             continue
         reps = [int(getattr(s, "rep_range_start", 0) or 0) for s in work]
+        # #5861 FIX7: the PRESCRIBED floor, not one the double progression just raised (#5057 "aim for more reps"): reps under a
+        # floor raised today are the progression's ask, never effort evidence of a regression (the multi-week simulation's cut)
+        reps += [int(s["reps"][0]) for s in e.get("sets") or [] if s.get("reps")]
         prev = previous_load(history_index, tid, target_date)
         d = load_decision(e, trends.get(tid), prev, state, min(reps) if reps else None)
         if not d or prev is None:
@@ -875,6 +886,8 @@ def annotate(blocks: list[Any], rx: dict[str, Any]) -> None:
         e = by_key.get(b.movement_key) or {}
         d, cap = guard.get(b.movement_key), e.get("live_effort")
         clause = _clause(d) if d and not d.get("held_top") else None
+        if not clause and e.get("live_rebuild"):  # #5861 FIX7: the reset's rep range stays while the load builds back
+            clause = f"Now aiming {e['live_rebuild'][0]}–{e['live_rebuild'][1]}: rebuilding, add reps."
         if cap:
             b.notes = _cap_effort(b.notes or "", int(cap), clause, e.get("live_effort_band"))
         elif clause:
