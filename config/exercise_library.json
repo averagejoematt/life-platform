@@ -43,9 +43,9 @@
   },
   "untagged_exercises": 0,
   "distinct_template_ids": 539,
-  "movements": 626,
+  "movements": 625,
   "by_source": {
-   "expansion": 87,
+   "expansion": 86,
    "history": 539
   },
   "hypertrophy_rows_by_tier": {
@@ -54,7 +54,7 @@
    "B": 123,
    "C": 101,
    "D": 64,
-   "not_applicable": 191
+   "not_applicable": 190
   },
   "ratings_by_objective": {
    "hypertrophy": {
@@ -63,7 +63,7 @@
     "B": 119,
     "C": 101,
     "D": 64,
-    "not_applicable": 191
+    "not_applicable": 190
    },
    "strength": {
     "S": 10,
@@ -71,7 +71,7 @@
     "B": 127,
     "C": 30,
     "D": 10,
-    "not_applicable": 412
+    "not_applicable": 411
    },
    "functional": {
     "S": 11,
@@ -79,13 +79,13 @@
     "B": 73,
     "C": 50,
     "D": 0,
-    "not_applicable": 431
+    "not_applicable": 430
    },
    "conditioning": {
-    "S": 3,
-    "A": 8,
-    "B": 11,
-    "C": 34,
+    "S": 2,
+    "A": 4,
+    "B": 10,
+    "C": 39,
     "D": 0,
     "not_applicable": 570
    },
@@ -95,7 +95,7 @@
     "B": 33,
     "C": 4,
     "D": 0,
-    "not_applicable": 577
+    "not_applicable": 576
    }
   },
   "s_census": {
@@ -329,11 +329,10 @@
    },
    "conditioning": {
     "cardio": {
-     "s": 3,
-     "families": 3,
+     "s": 2,
+     "families": 2,
      "movements": [
       "cycling",
-      "elliptical_trainer",
       "treadmill"
      ]
     }
@@ -349,7 +348,7 @@
    "rct_direct": 14,
    "rct_characteristic": 7,
    "consensus": 0,
-   "none_reviewed": 615
+   "none_reviewed": 614
   },
   "expansion_candidates_already_in_history": [
    "back_extension_45",
@@ -730,7 +729,6 @@
   "other_unspecified": "kit the history cannot name (review)",
   "recumbent_bike": "recumbent (back-supported) exercise bike",
   "ski_erg": "ski ergometer",
-  "arm_ergometer": "arm / upper-body ergometer",
   "swimming_pool": "swimming pool (not part of home_gym)",
   "ruck_vest": "weighted vest or loaded rucksack",
   "stability_ball": "stability / physio ball",
@@ -751,12 +749,6 @@
     "home_gym": {
      "state": "available",
      "source": "rule: used by a movement logged on or after 2021-11-11"
-    }
-   },
-   "arm_ergometer": {
-    "home_gym": {
-     "state": "unknown",
-     "source": "rule: seen only in expansion candidates"
     }
    },
    "assisted_pullup_dip_machine": {
@@ -4816,11 +4808,12 @@
     "conditioning": {
      "tier": "S",
      "basis": [
-      "aerobic high",
-      "intensity control high",
-      "impact low",
+      "cardio_model (cardio-model@0.1.0) modality recumbent_bike",
+      "high aerobic stimulus with fine, repeatable intensity control",
+      "impact none",
+      "lower-body interference low",
       "recovery demand low",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "S: A-level stimulus and control, low impact, and a modality he sustains (10+ sessions on file)"
      ],
      "evidence_confidence": "consensus"
     },
@@ -5930,15 +5923,16 @@
      "evidence_confidence": "none_reviewed"
     },
     "conditioning": {
-     "tier": "B",
+     "tier": "C",
      "basis": [
-      "aerobic moderate",
-      "intensity control moderate",
-      "impact low",
+      "cardio_model (cardio-model@0.1.0) modality kettlebell_swing",
+      "moderate aerobic stimulus, moderate intensity control: hard to dose and progress",
+      "impact none",
+      "lower-body interference moderate",
       "recovery demand moderate",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "N=1: established (31 sessions on file)"
      ],
-     "evidence_confidence": "none_reviewed"
+     "evidence_confidence": "consensus"
     },
     "mobility": {
      "tier": null,
@@ -7682,11 +7676,12 @@
     "conditioning": {
      "tier": "S",
      "basis": [
-      "aerobic high",
-      "intensity control high",
+      "cardio_model (cardio-model@0.1.0) modality treadmill_incline_walk",
+      "high aerobic stimulus with fine, repeatable intensity control",
       "impact low",
+      "lower-body interference low",
       "recovery demand low",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "S: A-level stimulus and control, low impact, and a modality he sustains (10+ sessions on file)"
      ],
      "evidence_confidence": "consensus"
     },
@@ -12728,11 +12723,13 @@
     "conditioning": {
      "tier": "C",
      "basis": [
-      "aerobic moderate",
-      "intensity control moderate",
+      "cardio_model (cardio-model@0.1.0) modality jump_rope",
+      "high aerobic stimulus, low intensity control: hard to dose and progress",
       "impact high",
+      "lower-body interference moderate",
       "recovery demand moderate",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "N=1: tried (9 sessions on file)",
+      "readiness-gated (charter_plyometric): never auto-programmed while the gate is closed"
      ],
      "evidence_confidence": "consensus"
     },
@@ -22472,13 +22469,14 @@
      "evidence_confidence": null
     },
     "conditioning": {
-     "tier": "A",
+     "tier": "C",
      "basis": [
-      "aerobic moderate",
-      "intensity control moderate",
+      "cardio_model (cardio-model@0.1.0) modality walking",
+      "moderate aerobic stimulus, low intensity control: hard to dose and progress",
       "impact low",
+      "lower-body interference low",
       "recovery demand low",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "N=1: tried (5 sessions on file)"
      ],
      "evidence_confidence": "consensus"
     },
@@ -32056,13 +32054,15 @@
     "conditioning": {
      "tier": "C",
      "basis": [
-      "aerobic low",
-      "intensity control low",
+      "cardio_model (cardio-model@0.1.0) modality sprint_agility_drills",
+      "high aerobic stimulus, low intensity control: hard to dose and progress",
       "impact high",
+      "lower-body interference high",
       "recovery demand high",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "N=1: tried (3 sessions on file)",
+      "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
-     "evidence_confidence": "none_reviewed"
+     "evidence_confidence": "consensus"
     },
     "mobility": {
      "tier": null,
@@ -35544,13 +35544,15 @@
     "conditioning": {
      "tier": "C",
      "basis": [
-      "aerobic low",
-      "intensity control low",
+      "cardio_model (cardio-model@0.1.0) modality sprint_agility_drills",
+      "high aerobic stimulus, low intensity control: hard to dose and progress",
       "impact high",
+      "lower-body interference high",
       "recovery demand high",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "N=1: tried (2 sessions on file)",
+      "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
-     "evidence_confidence": "none_reviewed"
+     "evidence_confidence": "consensus"
     },
     "mobility": {
      "tier": null,
@@ -35819,13 +35821,15 @@
     "conditioning": {
      "tier": "C",
      "basis": [
-      "aerobic low",
-      "intensity control low",
+      "cardio_model (cardio-model@0.1.0) modality sprint_agility_drills",
+      "high aerobic stimulus, low intensity control: hard to dose and progress",
       "impact high",
+      "lower-body interference high",
       "recovery demand high",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "N=1: tried (2 sessions on file)",
+      "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
-     "evidence_confidence": "none_reviewed"
+     "evidence_confidence": "consensus"
     },
     "mobility": {
      "tier": null,
@@ -37826,13 +37830,15 @@
     "conditioning": {
      "tier": "C",
      "basis": [
-      "aerobic low",
-      "intensity control low",
+      "cardio_model (cardio-model@0.1.0) modality sprint_agility_drills",
+      "high aerobic stimulus, low intensity control: hard to dose and progress",
       "impact high",
+      "lower-body interference high",
       "recovery demand high",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "N=1: tried (2 sessions on file)",
+      "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
-     "evidence_confidence": "none_reviewed"
+     "evidence_confidence": "consensus"
     },
     "mobility": {
      "tier": null,
@@ -40979,13 +40985,14 @@
      "evidence_confidence": null
     },
     "conditioning": {
-     "tier": "S",
+     "tier": "A",
      "basis": [
-      "aerobic high",
-      "intensity control high",
+      "cardio_model (cardio-model@0.1.0) modality elliptical",
+      "high aerobic stimulus with fine, repeatable intensity control",
       "impact low",
+      "lower-body interference low",
       "recovery demand low",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "N=1: tried (2 sessions on file)"
      ],
      "evidence_confidence": "consensus"
     },
@@ -41645,13 +41652,15 @@
     "conditioning": {
      "tier": "C",
      "basis": [
-      "aerobic low",
-      "intensity control low",
+      "cardio_model (cardio-model@0.1.0) modality sprint_agility_drills",
+      "high aerobic stimulus, low intensity control: hard to dose and progress",
       "impact high",
+      "lower-body interference high",
       "recovery demand high",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "N=1: tried (2 sessions on file)",
+      "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
-     "evidence_confidence": "none_reviewed"
+     "evidence_confidence": "consensus"
     },
     "mobility": {
      "tier": null,
@@ -41930,13 +41939,15 @@
     "conditioning": {
      "tier": "C",
      "basis": [
-      "aerobic low",
-      "intensity control low",
+      "cardio_model (cardio-model@0.1.0) modality sprint_agility_drills",
+      "high aerobic stimulus, low intensity control: hard to dose and progress",
       "impact high",
+      "lower-body interference high",
       "recovery demand high",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "N=1: tried (2 sessions on file)",
+      "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
-     "evidence_confidence": "none_reviewed"
+     "evidence_confidence": "consensus"
     },
     "mobility": {
      "tier": null,
@@ -42072,11 +42083,13 @@
     "conditioning": {
      "tier": "C",
      "basis": [
-      "aerobic moderate",
-      "intensity control moderate",
+      "cardio_model (cardio-model@0.1.0) modality jump_rope",
+      "high aerobic stimulus, low intensity control: hard to dose and progress",
       "impact high",
+      "lower-body interference moderate",
       "recovery demand moderate",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "N=1: tried (2 sessions on file)",
+      "readiness-gated (charter_plyometric): never auto-programmed while the gate is closed"
      ],
      "evidence_confidence": "consensus"
     },
@@ -45486,13 +45499,15 @@
      "evidence_confidence": null
     },
     "conditioning": {
-     "tier": "B",
+     "tier": "C",
      "basis": [
-      "aerobic high",
-      "intensity control moderate",
+      "cardio_model (cardio-model@0.1.0) modality running",
+      "high aerobic stimulus with fine, repeatable intensity control; capped at C: high impact (landing load scales with body mass)",
       "impact high",
-      "recovery demand moderate",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "lower-body interference high",
+      "recovery demand high",
+      "N=1: tried (2 sessions on file)",
+      "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
      "evidence_confidence": "consensus"
     },
@@ -46931,11 +46946,13 @@
     "conditioning": {
      "tier": "C",
      "basis": [
-      "aerobic low",
-      "intensity control low",
+      "cardio_model (cardio-model@0.1.0) modality sprint_agility_drills",
+      "high aerobic stimulus, low intensity control: hard to dose and progress",
       "impact high",
+      "lower-body interference high",
       "recovery demand high",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "N=1: tried (2 sessions on file)",
+      "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
      "evidence_confidence": "consensus"
     },
@@ -49534,13 +49551,15 @@
     "conditioning": {
      "tier": "C",
      "basis": [
-      "aerobic low",
-      "intensity control low",
+      "cardio_model (cardio-model@0.1.0) modality sprint_agility_drills",
+      "high aerobic stimulus, low intensity control: hard to dose and progress",
       "impact high",
+      "lower-body interference high",
       "recovery demand high",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "N=1: tried (1 sessions on file)",
+      "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
-     "evidence_confidence": "none_reviewed"
+     "evidence_confidence": "consensus"
     },
     "mobility": {
      "tier": null,
@@ -49673,13 +49692,15 @@
     "conditioning": {
      "tier": "C",
      "basis": [
-      "aerobic low",
-      "intensity control low",
+      "cardio_model (cardio-model@0.1.0) modality sprint_agility_drills",
+      "high aerobic stimulus, low intensity control: hard to dose and progress",
       "impact high",
+      "lower-body interference high",
       "recovery demand high",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "N=1: tried (1 sessions on file)",
+      "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
-     "evidence_confidence": "none_reviewed"
+     "evidence_confidence": "consensus"
     },
     "mobility": {
      "tier": null,
@@ -50188,13 +50209,15 @@
     "conditioning": {
      "tier": "C",
      "basis": [
-      "aerobic low",
-      "intensity control low",
+      "cardio_model (cardio-model@0.1.0) modality sprint_agility_drills",
+      "high aerobic stimulus, low intensity control: hard to dose and progress",
       "impact high",
+      "lower-body interference high",
       "recovery demand high",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "N=1: tried (1 sessions on file)",
+      "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
-     "evidence_confidence": "none_reviewed"
+     "evidence_confidence": "consensus"
     },
     "mobility": {
      "tier": null,
@@ -52784,13 +52807,15 @@
     "conditioning": {
      "tier": "C",
      "basis": [
-      "aerobic low",
-      "intensity control low",
+      "cardio_model (cardio-model@0.1.0) modality sprint_agility_drills",
+      "high aerobic stimulus, low intensity control: hard to dose and progress",
       "impact high",
+      "lower-body interference high",
       "recovery demand high",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "N=1: tried (1 sessions on file)",
+      "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
-     "evidence_confidence": "none_reviewed"
+     "evidence_confidence": "consensus"
     },
     "mobility": {
      "tier": null,
@@ -53076,13 +53101,15 @@
     "conditioning": {
      "tier": "C",
      "basis": [
-      "aerobic low",
-      "intensity control low",
+      "cardio_model (cardio-model@0.1.0) modality sprint_agility_drills",
+      "high aerobic stimulus, low intensity control: hard to dose and progress",
       "impact high",
+      "lower-body interference high",
       "recovery demand high",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "N=1: tried (1 sessions on file)",
+      "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
-     "evidence_confidence": "none_reviewed"
+     "evidence_confidence": "consensus"
     },
     "mobility": {
      "tier": null,
@@ -60979,13 +61006,15 @@
     "conditioning": {
      "tier": "C",
      "basis": [
-      "aerobic low",
-      "intensity control low",
+      "cardio_model (cardio-model@0.1.0) modality sprint_agility_drills",
+      "high aerobic stimulus, low intensity control: hard to dose and progress",
       "impact high",
+      "lower-body interference high",
       "recovery demand high",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "N=1: tried (1 sessions on file)",
+      "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
-     "evidence_confidence": "none_reviewed"
+     "evidence_confidence": "consensus"
     },
     "mobility": {
      "tier": null,
@@ -61973,13 +62002,15 @@
     "conditioning": {
      "tier": "C",
      "basis": [
-      "aerobic low",
-      "intensity control low",
+      "cardio_model (cardio-model@0.1.0) modality sprint_agility_drills",
+      "high aerobic stimulus, low intensity control: hard to dose and progress",
       "impact high",
+      "lower-body interference high",
       "recovery demand high",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "N=1: tried (1 sessions on file)",
+      "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
-     "evidence_confidence": "none_reviewed"
+     "evidence_confidence": "consensus"
     },
     "mobility": {
      "tier": null,
@@ -62112,13 +62143,15 @@
     "conditioning": {
      "tier": "C",
      "basis": [
-      "aerobic low",
-      "intensity control low",
+      "cardio_model (cardio-model@0.1.0) modality sprint_agility_drills",
+      "high aerobic stimulus, low intensity control: hard to dose and progress",
       "impact high",
+      "lower-body interference high",
       "recovery demand high",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "N=1: tried (1 sessions on file)",
+      "readiness-gated (charter_running): never auto-programmed while the gate is closed"
      ],
-     "evidence_confidence": "none_reviewed"
+     "evidence_confidence": "consensus"
     },
     "mobility": {
      "tier": null,
@@ -73091,11 +73124,12 @@
     "conditioning": {
      "tier": "A",
      "basis": [
-      "aerobic high",
-      "intensity control high",
-      "impact low",
+      "cardio_model (cardio-model@0.1.0) modality rower",
+      "high aerobic stimulus with fine, repeatable intensity control",
+      "impact none",
+      "lower-body interference moderate",
       "recovery demand moderate",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "N=1: tried (1 sessions on file)"
      ],
      "evidence_confidence": "consensus"
     },
@@ -79388,13 +79422,13 @@
      "evidence_confidence": null
     },
     "conditioning": {
-     "tier": "A",
+     "tier": "B",
      "basis": [
-      "aerobic high",
-      "intensity control high",
-      "impact low",
-      "recovery demand moderate",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "cardio_model (cardio-model@0.1.0) modality air_bike",
+      "high aerobic stimulus, moderate intensity control",
+      "impact none",
+      "lower-body interference low",
+      "recovery demand moderate"
      ],
      "evidence_confidence": "consensus"
     },
@@ -83251,13 +83285,13 @@
      "evidence_confidence": null
     },
     "conditioning": {
-     "tier": "A",
+     "tier": "C",
      "basis": [
-      "aerobic moderate",
-      "intensity control moderate",
+      "cardio_model (cardio-model@0.1.0) modality step_aerobics",
+      "moderate aerobic stimulus, low intensity control: hard to dose and progress",
       "impact low",
-      "recovery demand low",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "lower-body interference moderate",
+      "recovery demand low"
      ],
      "evidence_confidence": "consensus"
     },
@@ -84253,11 +84287,11 @@
     "conditioning": {
      "tier": "A",
      "basis": [
-      "aerobic moderate",
-      "intensity control high",
-      "impact low",
-      "recovery demand low",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "cardio_model (cardio-model@0.1.0) modality recumbent_bike",
+      "high aerobic stimulus with fine, repeatable intensity control",
+      "impact none",
+      "lower-body interference low",
+      "recovery demand low"
      ],
      "evidence_confidence": "consensus"
     },
@@ -86012,13 +86046,13 @@
      "evidence_confidence": null
     },
     "conditioning": {
-     "tier": "A",
+     "tier": "B",
      "basis": [
-      "aerobic high",
-      "intensity control high",
-      "impact low",
-      "recovery demand moderate",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "cardio_model (cardio-model@0.1.0) modality ski_erg",
+      "moderate aerobic stimulus, high intensity control",
+      "impact none",
+      "lower-body interference low",
+      "recovery demand moderate"
      ],
      "evidence_confidence": "consensus"
     },
@@ -86227,11 +86261,11 @@
     "conditioning": {
      "tier": "B",
      "basis": [
-      "aerobic moderate",
-      "intensity control high",
-      "impact low",
-      "recovery demand moderate",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "cardio_model (cardio-model@0.1.0) modality sled",
+      "high aerobic stimulus, moderate intensity control",
+      "impact none",
+      "lower-body interference moderate",
+      "recovery demand moderate"
      ],
      "evidence_confidence": "consensus"
     },
@@ -86381,11 +86415,11 @@
     "conditioning": {
      "tier": "B",
      "basis": [
-      "aerobic moderate",
-      "intensity control high",
-      "impact low",
-      "recovery demand moderate",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "cardio_model (cardio-model@0.1.0) modality sled",
+      "high aerobic stimulus, moderate intensity control",
+      "impact none",
+      "lower-body interference moderate",
+      "recovery demand moderate"
      ],
      "evidence_confidence": "consensus"
     },
@@ -86860,11 +86894,11 @@
     "conditioning": {
      "tier": "A",
      "basis": [
-      "aerobic high",
-      "intensity control high",
+      "cardio_model (cardio-model@0.1.0) modality stair_climber",
+      "high aerobic stimulus with fine, repeatable intensity control",
       "impact low",
-      "recovery demand moderate",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "lower-body interference moderate",
+      "recovery demand moderate"
      ],
      "evidence_confidence": "consensus"
     },
@@ -87074,13 +87108,13 @@
      "evidence_confidence": null
     },
     "conditioning": {
-     "tier": "A",
+     "tier": "C",
      "basis": [
-      "aerobic high",
-      "intensity control moderate",
-      "impact low",
-      "recovery demand moderate",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "cardio_model (cardio-model@0.1.0) modality swimming",
+      "high aerobic stimulus, low intensity control: hard to dose and progress",
+      "impact none",
+      "lower-body interference none",
+      "recovery demand low"
      ],
      "evidence_confidence": "consensus"
     },
@@ -87580,214 +87614,6 @@
     "influence": {
      "verdict": "available_only",
      "why": "used when squat depth is adductor/hip limited"
-    },
-    "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
-    }
-   }
-  },
-  "arm_ergometer": {
-   "title": "Arm Ergometer",
-   "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
-   "expansion_origin": "#5861 amendment 15 §17",
-   "target": {
-    "primary": "cardio",
-    "secondary": [
-     "front_delts",
-     "back"
-    ],
-    "region": "cardio"
-   },
-   "family": "carry_conditioning",
-   "job": "isolation",
-   "pattern": "other",
-   "length_bias": "not_applicable",
-   "resistance_profile": "cardio_machine",
-   "stability": "high",
-   "joint_stress": {
-    "spinal_load": "low",
-    "shear": "low",
-    "wrist": "low",
-    "elbow": "low",
-    "shoulder": "moderate"
-   },
-   "skill_complexity": "low",
-   "equipment": [
-    "arm_ergometer"
-   ],
-   "category": "conditioning",
-   "canonical": "arm_ergometer",
-   "hypertrophy": [
-    {
-     "target": "cardio",
-     "tier": null,
-     "rubric_tier": null,
-     "rubric_score": null,
-     "points_tier": null,
-     "applicable": false,
-     "basis": [
-      "not applicable: category conditioning is rated on its own objective, never on muscle growth"
-     ],
-     "evidence_confidence": "none_reviewed",
-     "citations": [],
-     "last_reviewed": "unreviewed"
-    }
-   ],
-   "ratings": {
-    "hypertrophy": {
-     "tier": null,
-     "target": "cardio",
-     "by_target": {
-      "cardio": null
-     },
-     "basis": [
-      "not applicable: category conditioning is rated on its own objective, never on muscle growth"
-     ],
-     "evidence_confidence": null
-    },
-    "strength": {
-     "tier": null,
-     "basis": [
-      "not applicable: category conditioning"
-     ],
-     "evidence_confidence": null
-    },
-    "functional": {
-     "tier": null,
-     "basis": [
-      "not applicable: no functional quality (unilateral, balance, carry, locomotion, trunk_stability, multiplanar, power)"
-     ],
-     "evidence_confidence": null
-    },
-    "conditioning": {
-     "tier": "C",
-     "basis": [
-      "aerobic low",
-      "intensity control high",
-      "impact low",
-      "recovery demand low",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
-     ],
-     "evidence_confidence": "consensus"
-    },
-    "mobility": {
-     "tier": null,
-     "basis": [
-      "not applicable: not a mobility or joint-function movement"
-     ],
-     "evidence_confidence": null
-    }
-   },
-   "objective_inputs": {
-    "ceiling": "moderate",
-    "limiter": "cardio",
-    "systemic_fatigue": "low",
-    "resistance_class": "light",
-    "strength_lift": false,
-    "ladder": false,
-    "functional": [],
-    "conditioning": {
-     "aerobic": "low",
-     "control": "high",
-     "impact": "low",
-     "recovery": "low"
-    },
-    "mobility": null,
-    "reviewed": true
-   },
-   "gates": [
-    "clinical_cue_breathing"
-   ],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "the owner approves creating the Hevy custom template (#5861 owner approval list), then a catalog entry"
-   },
-   "availability": {
-    "home_gym": {
-     "state": "unknown",
-     "source": "rule: not logged in the window and some equipment unknown"
-    }
-   },
-   "fallbacks": [
-    {
-     "movement_id": "cycling",
-     "reason": "same_target"
-    },
-    {
-     "movement_id": "treadmill",
-     "reason": "same_target"
-    },
-    {
-     "movement_id": "walking",
-     "reason": "same_target"
-    }
-   ],
-   "cardio_protocols": [
-    "easy_recovery",
-    "moderate_continuous",
-    "structured_intervals"
-   ],
-   "expansion_profile": {
-    "section": "§17",
-    "priority": "P3",
-    "aliases": [
-     "upper-body ergometer",
-     "UBE",
-     "arm bike"
-    ],
-    "movement_function": "aerobic_upper_body_only",
-    "objectives": [
-     "conditioning"
-    ],
-    "laterality": "alternating",
-    "progression": {
-     "resistance": [
-      "resistance",
-      "duration"
-     ],
-     "reps": [
-      "continuous or intervals"
-     ]
-    },
-    "stability_demand": "low",
-    "fatigue": {
-     "local": "moderate",
-     "systemic": "low"
-    },
-    "joint_notes": "seated; the conditioning option when the legs must rest",
-    "levels": {
-     "regressions": [
-      "short easy bouts"
-     ],
-     "progressions": [
-      "longer bouts",
-      "intervals"
-     ]
-    },
-    "alternatives": [
-     "ski_erg",
-     "air_bike"
-    ],
-    "evidence_confidence": "consensus",
-    "evidence_basis": "practitioner consensus over reviewed categorical inputs; no trial claimed, no citation added",
-    "category": "conditioning",
-    "trunk_function": null,
-    "personal_fit": [
-     "equipment_unconfirmed"
-    ],
-    "phase_suitability": "specialist",
-    "programming": {
-     "mode": "readiness_gated",
-     "gate_reason": "equipment_unconfirmed"
-    },
-    "influence": {
-     "verdict": "available_only",
-     "why": "a lower-limb-injury fallback; small aerobic stimulus otherwise"
     },
     "hevy": {
      "template": null,
@@ -92060,13 +91886,13 @@
      "evidence_confidence": null
     },
     "conditioning": {
-     "tier": "B",
+     "tier": "C",
      "basis": [
-      "aerobic moderate",
-      "intensity control high",
-      "impact low",
-      "recovery demand moderate",
-      "rule: S = aerobic high + control high + impact low + recovery low; A = aerobic high + low impact"
+      "cardio_model (cardio-model@0.1.0) modality rucking",
+      "moderate aerobic stimulus, moderate intensity control: hard to dose and progress",
+      "impact moderate",
+      "lower-body interference moderate",
+      "recovery demand moderate"
      ],
      "evidence_confidence": "consensus"
     },

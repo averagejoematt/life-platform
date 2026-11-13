@@ -12,14 +12,14 @@ Comprehensive library, selective engine: this page lists what the library covers
 
 ## Summary
 
-**197 candidates** (Amendment 15 §1-§20) + **23 keep-list items**, one outcome each. **48 new canonical movements** in the library.
+**197 candidates** (Amendment 15 §1-§20) + **23 keep-list items**, one outcome each. **47 new canonical movements** in the library.
 
 | Outcome | Candidates | P0 | P1 | P2 | P3 |
 |---|---|---|---|---|---|
-| ADD | 47 | 3 | 5 | 21 | 18 |
+| ADD | 46 | 3 | 5 | 21 | 17 |
 | VARIANT | 131 | 0 | 3 | 47 | 81 |
 | ALREADY_COVERED | 17 | 0 | 0 | 9 | 8 |
-| DEFER | 2 | 0 | 0 | 0 | 2 |
+| DEFER | 3 | 0 | 0 | 0 | 3 |
 
 ## Coverage matrix
 
@@ -89,7 +89,7 @@ Comprehensive library, selective engine: this page lists what the library covers
 | cardio | stair climbing | — | `stair_machine` | home_gym equipment unconfirmed |
 | cardio | non-weight-bearing (pool) | — | `swimming` | pool not at home_gym |
 | cardio | loaded walking | — | `rucking` | later phase |
-| cardio | upper-body only | `air_bike` | `arm_ergometer` | none |
+| cardio | upper-body only | `air_bike` | — | arm ergometer deferred (cardio model rates it D; injury-day fallback only) |
 | cardio | intervals (bike / sprint) | `air_bike`, `sprints` | — | protocols are data on the modality (L4) |
 | mobility | ankle dorsiflexion | — | `knee_to_wall_dorsiflexion` | none |
 | mobility | hip (active / passive) | `90_90_hip_stretch`, `walking_hip_circles`, `leg_swings`, `long_leg_marches` | `hip_cars`, `adductor_rock_back`, `half_kneeling_hip_flexor_stretch` | none |
@@ -140,11 +140,10 @@ Ratings are the library's own (L1's per-objective rubric over the inputs authore
 | `front_rack_carry_kettlebell` | Front Rack Carry (Kettlebell) | 16 | P2 | carry | loaded_carry_anterior | —/B/S/B/— | none: custom template needed | now | auto_programmable | available_only: the farmer's and suitcase carries already cover loaded carrying |
 | `stair_machine` | Stair Machine (Steps) | 17 | P1 | conditioning | aerobic_stair_climbing | —/—/—/A/— | `4377A52C` (builtin) | now | readiness_gated (equipment_unconfirmed) | available_only: a strong low-impact option, but the home_gym stair machine is unconfirmed |
 | `recumbent_bike` | Recumbent Bike | 17 | P1 | conditioning | aerobic_cycling_seated_supported | —/—/—/A/— | `35e53528-d898-4721-9a36-65bc003eb0cb` (custom_existing) | now | readiness_gated (equipment_unconfirmed) | available_only: named in the brief's modality list; equipment state unconfirmed, so it informs the cardio model only once confirmed |
-| `ski_erg` | Ski Erg | 17 | P2 | conditioning | aerobic_upper_body_dominant | —/—/—/A/— | `5D99A2FA` (builtin) | now | readiness_gated (equipment_unconfirmed) | available_only: rowing and the air bike already serve upper-body-inclusive conditioning |
-| `swimming` | Swimming | 17 | P2 | conditioning | aerobic_non_weight_bearing | —/—/—/A/— | `B60A678F` (builtin) | now | readiness_gated (equipment_unconfirmed) | available_only: pool access is not part of home_gym |
-| `rucking` | Rucking (Loaded Walk) | 17 | P2 | conditioning | aerobic_loaded_walking | —/—/—/B/— | none: custom template needed | later | readiness_gated (joint_tolerance) | available_only: while body mass is high, the body itself is the load; incline walking progresses walking first |
-| `step_aerobics_low_impact` | Low-Impact Step Aerobics | 17 | P3 | conditioning | aerobic_stepping | —/—/—/A/— | `5E0DDACE` (builtin) | now | auto_programmable | available_only: walking already covers this stimulus |
-| `arm_ergometer` | Arm Ergometer | 17 | P3 | conditioning | aerobic_upper_body_only | —/—/—/C/— | none: custom template needed | specialist | readiness_gated (equipment_unconfirmed) | available_only: a lower-limb-injury fallback; small aerobic stimulus otherwise |
+| `ski_erg` | Ski Erg | 17 | P2 | conditioning | aerobic_upper_body_dominant | —/—/—/B/— | `5D99A2FA` (builtin) | now | readiness_gated (equipment_unconfirmed) | available_only: rowing and the air bike already serve upper-body-inclusive conditioning |
+| `swimming` | Swimming | 17 | P2 | conditioning | aerobic_non_weight_bearing | —/—/—/C/— | `B60A678F` (builtin) | now | readiness_gated (equipment_unconfirmed) | available_only: pool access is not part of home_gym |
+| `rucking` | Rucking (Loaded Walk) | 17 | P2 | conditioning | aerobic_loaded_walking | —/—/—/C/— | none: custom template needed | later | readiness_gated (joint_tolerance) | available_only: while body mass is high, the body itself is the load; incline walking progresses walking first |
+| `step_aerobics_low_impact` | Low-Impact Step Aerobics | 17 | P3 | conditioning | aerobic_stepping | —/—/—/C/— | `5E0DDACE` (builtin) | now | auto_programmable | available_only: walking already covers this stimulus |
 | `knee_to_wall_dorsiflexion` | Knee-to-Wall Ankle Dorsiflexion | 18 | P2 | mobility (library: rehab_control) | mobility_ankle_dorsiflexion | —/—/—/—/B | none: custom template needed | now | readiness_gated (identified_need) | available_only: used when squat or step-down depth is ankle-limited |
 | `hip_cars` | Hip CARs | 18 | P2 | mobility | mobility_hip_active | —/—/—/—/B | none: custom template needed | now | readiness_gated (identified_need) | available_only: warm-up or limitation tool; walking_hip_circles already exists |
 | `shoulder_cars` | Shoulder CARs | 18 | P2 | mobility | mobility_shoulder_active | —/—/—/—/B | none: custom template needed | now | readiness_gated (identified_need) | available_only: warm-up or limitation tool |
@@ -160,7 +159,6 @@ Ratings are the library's own (L1's per-objective rubric over the inputs authore
 ## Owner approval list: custom Hevy templates needed
 
 - `adductor_rock_back` — Adductor Rock-Back (P2)
-- `arm_ergometer` — Arm Ergometer (P3)
 - `band_assisted_reverse_nordic` — Band-Assisted Reverse Nordic (P3)
 - `band_finger_extension` — Band Finger Extension (P3)
 - `banded_ankle_inversion_eversion` — Banded Ankle Inversion and Eversion (P3)
@@ -208,19 +206,19 @@ Ratings are the library's own (L1's per-objective rubric over the inputs authore
 | 1 | chest-focused isometric cable press | candidate | VARIANT | P3 | `standing_cable_chest_press` | tempo: isometric hold |
 | 2 | single-arm high-to-low cable pulldown | candidate | VARIANT | P2 | `lat_pulldown_cable` | laterality: single-arm, high-to-low (Hevy `2EE45F81`) |
 | 2 | half-kneeling single-arm cable pulldown | candidate | VARIANT | P3 | `lat_pulldown_cable` | position: half-kneeling, single-arm |
-| 2 | iso-lateral plate-loaded pulldown | candidate | VARIANT | P3 | `lat_pulldown_machine` | equipment: iso-lateral plate-loaded (Hevy `72880C57`) |
+| 2 | iso-lateral plate-loaded pulldown | candidate | VARIANT | P3 | `lat_pulldown_cable` | equipment: iso-lateral plate-loaded (Hevy `72880C57`); family member `lat_pulldown_machine` |
 | 2 | barbell seal row | candidate | VARIANT | P2 | `db_chest_supported_rows` | equipment: barbell, prone on a raised flat bench (Hevy `DF3BDB9C`) |
 | 2 | incline-bench-supported barbell row | candidate | VARIANT | P3 | `db_chest_supported_rows` | equipment: barbell, incline bench |
 | 2 | unilateral chest-supported machine row | candidate | VARIANT | P2 | `seated_row_machine` | laterality: iso-lateral, one arm (Hevy `AA1EB7D8`) |
 | 2 | plate-loaded iso-lateral high row | candidate | VARIANT | P2 | `high_cable_row` | equipment: plate-loaded iso-lateral high row (Hevy `BC3492DA`) |
-| 2 | single-arm machine high row | candidate | VARIANT | P3 | `1_arm_high_cable_row` | equipment: machine, single-arm (Hevy `BC3492DA`) |
+| 2 | single-arm machine high row | candidate | VARIANT | P3 | `high_cable_row` | equipment: machine, single-arm (Hevy `BC3492DA`); family member `1_arm_high_cable_row` |
 | 2 | chest-supported scapular retraction | candidate | VARIANT | P3 | `dead_arm_scap_rows` | position: chest-supported, straight-arm retraction |
 | 2 | prone incline scapular row | candidate | VARIANT | P3 | `db_chest_supported_rows` | tempo: pause in full retraction |
-| 2 | cable row with deliberate scapular retraction | candidate | VARIANT | P3 | `seated_cable_row` | tempo: pause in full retraction |
+| 2 | cable row with deliberate scapular retraction | candidate | VARIANT | P3 | `seated_cable_row_bar_grip` | tempo: pause in full retraction; family member `seated_cable_row` |
 | 2 | sternum chin-up | candidate | VARIANT | P3 | `chin_up` | range: to the sternum, leaning back (advanced) (Hevy `EE2938D1`); behind the chin-up's bodyweight gate |
 | 3 | trap-bar shrug | candidate | VARIANT | P3 | `shrug_barbell` | equipment: trap bar, neutral grip |
-| 3 | cable shrug | candidate | VARIANT | P3 | `shrug_dumbbell` | equipment: cable (Hevy `FFABC123`) |
-| 3 | prone incline DB shrug | candidate | VARIANT | P3 | `shrug_dumbbell` | position: prone on an incline (mid-trap bias) |
+| 3 | cable shrug | candidate | VARIANT | P3 | `shrug_barbell` | equipment: cable (Hevy `FFABC123`); family member `shrug_dumbbell` |
+| 3 | prone incline DB shrug | candidate | VARIANT | P3 | `shrug_barbell` | position: prone on an incline (mid-trap bias); family member `shrug_dumbbell` |
 | 3 | lower-trap prone Y raise | candidate | ADD | P1 | `chest_supported_y_raise_dumbbell` | lower-trap upward rotation was unserved |
 | 3 | trap-3 raise | candidate | VARIANT | P2 | `chest_supported_y_raise_dumbbell` | laterality: single-arm, bent-over, arm in line with the lower-trap fibres |
 | 3 | cable Y raise | candidate | VARIANT | P2 | `chest_supported_y_raise_dumbbell` | equipment: cable, standing (Hevy `28927A36`) |
@@ -231,15 +229,15 @@ Ratings are the library's own (L1's per-objective rubric over the inputs authore
 | 4 | cable scaption | candidate | VARIANT | P3 | `front_raise_dumbbell` | plane: scapular plane, cable (Hevy `DBB91A3C`) |
 | 4 | DB scaption | candidate | VARIANT | P2 | `front_raise_dumbbell` | plane: scapular plane, thumbs up |
 | 4 | single-arm cable rear-delt row | candidate | VARIANT | P2 | `db_rear_delt_rows` | equipment: cable, single-arm, high elbow |
-| 4 | incline cable rear-delt fly | candidate | VARIANT | P3 | `rear_delt_reverse_fly_cable` | position: chest-supported on an incline bench |
+| 4 | incline cable rear-delt fly | candidate | VARIANT | P3 | `rear_delt_reverse_fly_machine` | position: chest-supported on an incline bench; family member `rear_delt_reverse_fly_cable` |
 | 4 | side-lying cable lateral | candidate | VARIANT | P3 | `lateral_raise_cable_single_arm` | position: side-lying (lengthened-range peak) |
 | 4 | cable ER at side | candidate | ALREADY_COVERED | P2 | `rotator_cuff_external_rotation` | its equipment/pattern labels are wrong — see QUALITY_FINDINGS |
 | 4 | cable ER at 90° abduction | candidate | VARIANT | P3 | `rotator_cuff_external_rotation` | position: 90/90 (abducted) |
-| 4 | side-lying DB ER | candidate | ALREADY_COVERED | P3 | `db_external_rotation` |  |
+| 4 | side-lying DB ER | candidate | ALREADY_COVERED | P3 | `rotator_cuff_external_rotation` | family member `db_external_rotation` |
 | 4 | cable IR | candidate | ADD | P3 | `cable_internal_rotation` | internal rotation had no movement |
 | 4 | serratus cable punch | candidate | ADD | P1 | `cable_serratus_punch` | serratus had no movement |
 | 4 | serratus wall slide with lift-off | candidate | VARIANT | P2 | `er_wall_slides` | range: forearms on the wall, slide up and lift off (serratus) |
-| 4 | push-up plus | candidate | VARIANT | P2 | `incline_push_up` | range: + full protraction at the top (serratus) |
+| 4 | push-up plus | candidate | VARIANT | P2 | `push_up` | range: + full protraction at the top (serratus); family member `incline_push_up` |
 | 4 | bottoms-up KB hold | candidate | VARIANT | P3 | `overhead_hold` | grip: kettlebell bottoms-up (reflexive cuff demand) |
 | 5 | cable rope hammer curl | candidate | VARIANT | P2 | `hammer_curl_dumbbell` | equipment: cable rope (Hevy `36E8F14E`) |
 | 5 | reverse-grip cable curl | candidate | VARIANT | P3 | `reverse_curl_dumbbell` | equipment: cable (Hevy `9F48F858`) |
@@ -253,7 +251,7 @@ Ratings are the library's own (L1's per-objective rubric over the inputs authore
 | 6 | reverse-grip pushdown | candidate | VARIANT | P3 | `triceps_pushdown` | grip: supinated (Hevy `8B5BED30`) |
 | 6 | single-arm neutral pushdown | candidate | VARIANT | P3 | `triceps_pushdown` | laterality: single-arm, neutral grip (Hevy `552AB030`) |
 | 6 | cable katana extension | candidate | ALREADY_COVERED | P3 | `overhead_triceps_extension_cable` | an influencer name for its single-arm cross-body variant |
-| 6 | plate-loaded dip machine | candidate | VARIANT | P2 | `triceps_dip_assisted` | equipment: seated plate-loaded dip machine (Hevy `5122E7D9`) |
+| 6 | plate-loaded dip machine | candidate | VARIANT | P2 | `triceps_dip` | equipment: seated plate-loaded dip machine (Hevy `5122E7D9`); family member `triceps_dip_assisted` |
 | 6 | single-arm overhead cable extension | candidate | VARIANT | P2 | `overhead_triceps_extension_cable` | laterality: single-arm |
 | 7 | seated DB wrist extension | candidate | ADD | P2 | `wrist_extension_dumbbell` | wrist extension had no movement |
 | 7 | barbell reverse wrist curl | candidate | VARIANT | P3 | `wrist_extension_dumbbell` | equipment: barbell (Hevy `9202CC23`) |
@@ -331,7 +329,7 @@ Ratings are the library's own (L1's per-objective rubric over the inputs authore
 | 13 | cable anti-rotation walkout | candidate | VARIANT | P3 | `cable_pallof_press` | level: walkout away from the stack |
 | 13 | suitcase deadlift | candidate | ADD | P2 | `suitcase_deadlift` | anti-lateral flexion under a hinge |
 | 13 | weighted dead bug | candidate | VARIANT | P3 | `dead_bug` | load: dumbbell / ankle weights |
-| 13 | tall-kneeling cable anti-extension pulldown | candidate | VARIANT | P3 | `kneeling_straight_arm_pulldown` | position: tall-kneeling, ribs-down anti-extension cue |
+| 13 | tall-kneeling cable anti-extension pulldown | candidate | VARIANT | P3 | `straight_arm_pulldown` | position: tall-kneeling, ribs-down anti-extension cue; family member `kneeling_straight_arm_pulldown` |
 | 13 | single-arm loaded standing march | candidate | VARIANT | P2 | `suitcase_carry` | range: march in place, single load |
 | 13 | side plank with hip abduction | candidate | VARIANT | P2 | `side_plank` | level: top-leg abduction |
 | 14 | Sorensen hold | candidate | VARIANT | P2 | `back_extension_45` | tempo: isometric hold, horizontal |
@@ -364,7 +362,7 @@ Ratings are the library's own (L1's per-objective rubric over the inputs authore
 | 17 | hiking | candidate | VARIANT | P2 | `walking` | terrain: trail (Hevy `1C34A172`) |
 | 17 | loaded hiking/rucking | candidate | ADD | P2 | `rucking` |  |
 | 17 | low-impact step aerobics | candidate | ADD | P3 | `step_aerobics_low_impact` |  |
-| 17 | arm ergometer | candidate | ADD | P3 | `arm_ergometer` |  |
+| 17 | arm ergometer | candidate | DEFER | P3 | — | a lower-limb-injury fallback only; the cardio model rates its aerobic stimulus low (D) and it is no current need — kept as data in cardio_model.MODALITIES, addable on an injury |
 | 17 | backward treadmill walking | candidate | VARIANT | P3 | `treadmill` | direction: backward (quad bias, knee-friendly) |
 | 18 | knee-to-wall dorsiflexion | candidate | ADD | P2 | `knee_to_wall_dorsiflexion` | ankle mobility had no movement |
 | 18 | bent-knee dorsiflexion | candidate | VARIANT | P3 | `knee_to_wall_dorsiflexion` | load: half-kneeling, loaded (soleus) |

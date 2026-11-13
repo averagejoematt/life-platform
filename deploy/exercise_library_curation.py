@@ -106,7 +106,6 @@ EQUIPMENT_VOCABULARY: dict[str, str] = {
     # #5861 lane L2 (deploy/exercise_library_additions.py): equipment its new movements name
     "recumbent_bike": "recumbent (back-supported) exercise bike",
     "ski_erg": "ski ergometer",
-    "arm_ergometer": "arm / upper-body ergometer",
     "swimming_pool": "swimming pool (not part of home_gym)",
     "ruck_vest": "weighted vest or loaded rucksack",
     "stability_ball": "stability / physio ball",

@@ -342,7 +342,6 @@ _INPUTS: dict[str, dict[str, Any]] = {
     "swimming": _inputs(_M, "technique", "light", [], _cond(_H, _M, _L, _M), None),
     "rucking": _inputs(_M, "cardio", "light", [_CARRY, _LOC], _cond(_M, _H, _L, _M), None),
     "step_aerobics_low_impact": _inputs(_L, "cardio", "light", [_LOC], _cond(_M, _M, _L, _L), None),
-    "arm_ergometer": _inputs(_M, "cardio", "light", [], _cond(_L, _H, _L, _L), None),
     "knee_to_wall_dorsiflexion": _inputs(_L, "mobility", "light", [], None, "active"),
     "hip_cars": _inputs(_L, "mobility", "light", [], None, "active"),
     "shoulder_cars": _inputs(_L, "mobility", "light", [], None, "active"),
@@ -1382,33 +1381,6 @@ ADDITIONS: list[dict[str, Any]] = [
         influence=(_AVAIL, "walking already covers this stimulus"),
         protocols=["easy_recovery", "moderate_continuous", "structured_intervals"],
     ),
-    _add(
-        "arm_ergometer",
-        "Arm Ergometer",
-        None,
-        sec=17,
-        pri="P3",
-        aliases=["upper-body ergometer", "UBE", "arm bike"],
-        target=("cardio", ["front_delts", "back"], "cardio"),
-        function="aerobic_upper_body_only",
-        category="conditioning",
-        attrs=("carry_conditioning", "not_applicable", "cardio_machine", _H, _js(_L, _L, _L, _L, _M)),
-        skill=_L,
-        equipment=["arm_ergometer"],
-        objectives=["conditioning"],
-        lat="alternating",
-        progression=(["resistance", "duration"], ["continuous or intervals"]),
-        demand=_L,
-        fatigue=(_M, _L),
-        joint_notes="seated; the conditioning option when the legs must rest",
-        levels=(["short easy bouts"], ["longer bouts", "intervals"]),
-        alts=["ski_erg", "air_bike"],
-        fit=["equipment_unconfirmed"],
-        phase="specialist",
-        gate="equipment_unconfirmed",
-        influence=(_AVAIL, "a lower-limb-injury fallback; small aerobic stimulus otherwise"),
-        protocols=["easy_recovery", "moderate_continuous", "structured_intervals"],
-    ),
     # §18 mobility — never in a muscle-growth ranking; programmed only for an identified limitation or purpose.
     _add(
         "knee_to_wall_dorsiflexion",
@@ -1724,14 +1696,19 @@ def A(sec: int, cand: str, key: str, note: str = "", kind: str = "candidate") ->
     return _row(sec, cand, "ADD", pri, key, note, kind=kind)
 
 
-def V(sec: int, cand: str, pri: str, of: str, axis: str, value: str, hevy: str | None = None, note: str = "") -> dict[str, Any]:
-    """VARIANT of canonical `of` (existing or added): what changes, and Hevy's template for it when one exists."""
-    return _row(sec, cand, "VARIANT", pri, of, note, variant={"axis": axis, "value": value, "hevy_template": hevy})
+def V(
+    sec: int, cand: str, pri: str, of: str, axis: str, value: str, hevy: str | None = None, note: str = "", member: str | None = None
+) -> dict[str, Any]:
+    """VARIANT of canonical `of` — a canonical-family HEAD key (`exercise_library.canonical_of`), or an addition: what
+    changes, and Hevy's template for it when one exists. `member` names the family member it sits closest to."""
+    extra = {"nearest_member": member} if member else {}
+    return _row(sec, cand, "VARIANT", pri, of, note, variant={"axis": axis, "value": value, "hevy_template": hevy}, **extra)
 
 
-def C(sec: int, cand: str, pri: str, by: str, note: str = "", kind: str = "candidate") -> dict[str, Any]:
-    """ALREADY_COVERED by library movement `by`."""
-    return _row(sec, cand, "ALREADY_COVERED", pri, by, note, kind=kind)
+def C(sec: int, cand: str, pri: str, by: str, note: str = "", kind: str = "candidate", member: str | None = None) -> dict[str, Any]:
+    """ALREADY_COVERED by canonical-family head `by`; `member` names the family member that is this candidate."""
+    extra = {"nearest_member": member} if member else {}
+    return _row(sec, cand, "ALREADY_COVERED", pri, by, note, kind=kind, **extra)
 
 
 def D(sec: int, cand: str, pri: str, why: str) -> dict[str, Any]:
@@ -2020,15 +1997,41 @@ RECONCILIATION: list[dict[str, Any]] = [
     # §2 lats / upper back / rhomboids
     V(2, "single-arm high-to-low cable pulldown", "P2", "lat_pulldown_cable", "laterality", "single-arm, high-to-low", "2EE45F81"),
     V(2, "half-kneeling single-arm cable pulldown", "P3", "lat_pulldown_cable", "position", "half-kneeling, single-arm"),
-    V(2, "iso-lateral plate-loaded pulldown", "P3", "lat_pulldown_machine", "equipment", "iso-lateral plate-loaded", "72880C57"),
+    V(
+        2,
+        "iso-lateral plate-loaded pulldown",
+        "P3",
+        "lat_pulldown_cable",
+        "equipment",
+        "iso-lateral plate-loaded",
+        "72880C57",
+        member="lat_pulldown_machine",
+    ),
     V(2, "barbell seal row", "P2", "db_chest_supported_rows", "equipment", "barbell, prone on a raised flat bench", "DF3BDB9C"),
     V(2, "incline-bench-supported barbell row", "P3", "db_chest_supported_rows", "equipment", "barbell, incline bench"),
     V(2, "unilateral chest-supported machine row", "P2", "seated_row_machine", "laterality", "iso-lateral, one arm", "AA1EB7D8"),
     V(2, "plate-loaded iso-lateral high row", "P2", "high_cable_row", "equipment", "plate-loaded iso-lateral high row", "BC3492DA"),
-    V(2, "single-arm machine high row", "P3", "1_arm_high_cable_row", "equipment", "machine, single-arm", "BC3492DA"),
+    V(
+        2,
+        "single-arm machine high row",
+        "P3",
+        "high_cable_row",
+        "equipment",
+        "machine, single-arm",
+        "BC3492DA",
+        member="1_arm_high_cable_row",
+    ),
     V(2, "chest-supported scapular retraction", "P3", "dead_arm_scap_rows", "position", "chest-supported, straight-arm retraction"),
     V(2, "prone incline scapular row", "P3", "db_chest_supported_rows", "tempo", "pause in full retraction"),
-    V(2, "cable row with deliberate scapular retraction", "P3", "seated_cable_row", "tempo", "pause in full retraction"),
+    V(
+        2,
+        "cable row with deliberate scapular retraction",
+        "P3",
+        "seated_cable_row_bar_grip",
+        "tempo",
+        "pause in full retraction",
+        member="seated_cable_row",
+    ),
     V(
         2,
         "sternum chin-up",
@@ -2041,8 +2044,8 @@ RECONCILIATION: list[dict[str, Any]] = [
     ),
     # §3 traps / scapular (upper trap served by shrugs; the lower/mid trap Y-raise line is new)
     V(3, "trap-bar shrug", "P3", "shrug_barbell", "equipment", "trap bar, neutral grip"),
-    V(3, "cable shrug", "P3", "shrug_dumbbell", "equipment", "cable", "FFABC123"),
-    V(3, "prone incline DB shrug", "P3", "shrug_dumbbell", "position", "prone on an incline (mid-trap bias)"),
+    V(3, "cable shrug", "P3", "shrug_barbell", "equipment", "cable", "FFABC123", member="shrug_dumbbell"),
+    V(3, "prone incline DB shrug", "P3", "shrug_barbell", "position", "prone on an incline (mid-trap bias)", member="shrug_dumbbell"),
     A(3, "lower-trap prone Y raise", "chest_supported_y_raise_dumbbell", "lower-trap upward rotation was unserved"),
     V(
         3,
@@ -2061,15 +2064,23 @@ RECONCILIATION: list[dict[str, Any]] = [
     V(4, "cable scaption", "P3", "front_raise_dumbbell", "plane", "scapular plane, cable", "DBB91A3C"),
     V(4, "DB scaption", "P2", "front_raise_dumbbell", "plane", "scapular plane, thumbs up"),
     V(4, "single-arm cable rear-delt row", "P2", "db_rear_delt_rows", "equipment", "cable, single-arm, high elbow"),
-    V(4, "incline cable rear-delt fly", "P3", "rear_delt_reverse_fly_cable", "position", "chest-supported on an incline bench"),
+    V(
+        4,
+        "incline cable rear-delt fly",
+        "P3",
+        "rear_delt_reverse_fly_machine",
+        "position",
+        "chest-supported on an incline bench",
+        member="rear_delt_reverse_fly_cable",
+    ),
     V(4, "side-lying cable lateral", "P3", "lateral_raise_cable_single_arm", "position", "side-lying (lengthened-range peak)"),
     C(4, "cable ER at side", "P2", "rotator_cuff_external_rotation", "its equipment/pattern labels are wrong — see QUALITY_FINDINGS"),
     V(4, "cable ER at 90° abduction", "P3", "rotator_cuff_external_rotation", "position", "90/90 (abducted)"),
-    C(4, "side-lying DB ER", "P3", "db_external_rotation"),
+    C(4, "side-lying DB ER", "P3", "rotator_cuff_external_rotation", member="db_external_rotation"),
     A(4, "cable IR", "cable_internal_rotation", "internal rotation had no movement"),
     A(4, "serratus cable punch", "cable_serratus_punch", "serratus had no movement"),
     V(4, "serratus wall slide with lift-off", "P2", "er_wall_slides", "range", "forearms on the wall, slide up and lift off (serratus)"),
-    V(4, "push-up plus", "P2", "incline_push_up", "range", "+ full protraction at the top (serratus)"),
+    V(4, "push-up plus", "P2", "push_up", "range", "+ full protraction at the top (serratus)", member="incline_push_up"),
     V(4, "bottoms-up KB hold", "P3", "overhead_hold", "grip", "kettlebell bottoms-up (reflexive cuff demand)"),
     # §5 biceps / brachialis / brachioradialis (elbow-flexor emphasis is grip orientation, never a new canonical)
     V(5, "cable rope hammer curl", "P2", "hammer_curl_dumbbell", "equipment", "cable rope", "36E8F14E"),
@@ -2085,7 +2096,16 @@ RECONCILIATION: list[dict[str, Any]] = [
     V(6, "reverse-grip pushdown", "P3", "triceps_pushdown", "grip", "supinated", "8B5BED30"),
     V(6, "single-arm neutral pushdown", "P3", "triceps_pushdown", "laterality", "single-arm, neutral grip", "552AB030"),
     C(6, "cable katana extension", "P3", "overhead_triceps_extension_cable", "an influencer name for its single-arm cross-body variant"),
-    V(6, "plate-loaded dip machine", "P2", "triceps_dip_assisted", "equipment", "seated plate-loaded dip machine", "5122E7D9"),
+    V(
+        6,
+        "plate-loaded dip machine",
+        "P2",
+        "triceps_dip",
+        "equipment",
+        "seated plate-loaded dip machine",
+        "5122E7D9",
+        member="triceps_dip_assisted",
+    ),
     V(6, "single-arm overhead cable extension", "P2", "overhead_triceps_extension_cable", "laterality", "single-arm"),
     # §7 forearms / grip / wrist
     A(7, "seated DB wrist extension", "wrist_extension_dumbbell", "wrist extension had no movement"),
@@ -2182,9 +2202,10 @@ RECONCILIATION: list[dict[str, Any]] = [
         13,
         "tall-kneeling cable anti-extension pulldown",
         "P3",
-        "kneeling_straight_arm_pulldown",
+        "straight_arm_pulldown",
         "position",
         "tall-kneeling, ribs-down anti-extension cue",
+        member="kneeling_straight_arm_pulldown",
     ),
     V(13, "single-arm loaded standing march", "P2", "suitcase_carry", "range", "march in place, single load"),
     V(13, "side plank with hip abduction", "P2", "side_plank", "level", "top-leg abduction"),
@@ -2222,7 +2243,12 @@ RECONCILIATION: list[dict[str, Any]] = [
     V(17, "hiking", "P2", "walking", "terrain", "trail", "1C34A172"),
     A(17, "loaded hiking/rucking", "rucking"),
     A(17, "low-impact step aerobics", "step_aerobics_low_impact"),
-    A(17, "arm ergometer", "arm_ergometer"),
+    D(
+        17,
+        "arm ergometer",
+        "P3",
+        "a lower-limb-injury fallback only; the cardio model rates its aerobic stimulus low (D) and it is no current need — kept as data in cardio_model.MODALITIES, addable on an injury",
+    ),
     V(17, "backward treadmill walking", "P3", "treadmill", "direction", "backward (quad bias, knee-friendly)"),
     # §18 mobility (passive flexibility, active mobility, loaded mobility, motor control — never a growth ranking)
     A(18, "knee-to-wall dorsiflexion", "knee_to_wall_dorsiflexion", "ankle mobility had no movement"),
@@ -2488,7 +2514,7 @@ COVERAGE: list[tuple[str, str, list[str], list[str], str]] = [
     ("cardio", "stair climbing", [], ["stair_machine"], "home_gym equipment unconfirmed"),
     ("cardio", "non-weight-bearing (pool)", [], ["swimming"], "pool not at home_gym"),
     ("cardio", "loaded walking", [], ["rucking"], "later phase"),
-    ("cardio", "upper-body only", ["air_bike"], ["arm_ergometer"], "none"),
+    ("cardio", "upper-body only", ["air_bike"], [], "arm ergometer deferred (cardio model rates it D; injury-day fallback only)"),
     ("cardio", "intervals (bike / sprint)", ["air_bike", "sprints"], [], "protocols are data on the modality (L4)"),
     ("mobility", "ankle dorsiflexion", [], ["knee_to_wall_dorsiflexion"], "none"),
     (
@@ -2742,7 +2768,9 @@ def metadata_problems(additions: list[dict[str, Any]]) -> list[str]:
     return out
 
 
-def reconciliation_problems(rows: list[dict[str, Any]], additions: list[dict[str, Any]], library_keys: set[str]) -> list[str]:
+def reconciliation_problems(
+    rows: list[dict[str, Any]], additions: list[dict[str, Any]], library_keys: set[str], heads: dict[str, str] | None = None
+) -> list[str]:
     """Candidates in == rows out (each amendment candidate and keep item exactly once), every row's outcome and priority
     is from the vocabulary, every ref resolves, every ADD row names an addition and every addition is some row's ADD."""
     out: list[str] = []
@@ -2760,6 +2788,8 @@ def reconciliation_problems(rows: list[dict[str, Any]], additions: list[dict[str
             out.append(f"{tag}: ADD names no addition")
         if r["outcome"] in ("VARIANT", "ALREADY_COVERED") and r["ref"] not in library_keys | add_keys:
             out.append(f"{tag}: {r['ref']!r} is not a library movement")
+        if heads is not None and r["outcome"] in ("VARIANT", "ALREADY_COVERED") and r["ref"] in heads and heads[r["ref"]] != r["ref"]:
+            out.append(f"{tag}: {r['ref']!r} is a member of canonical family {heads[r['ref']]!r} — name the head")
         if r["outcome"] == "VARIANT" and r["variant"]["axis"] not in VARIANT_AXES:
             out.append(f"{tag}: variant axis {r['variant']['axis']!r}")
         if r["outcome"] == "DEFER" and not r["note"]:
@@ -2889,7 +2919,8 @@ def render_doc(library: dict[str, Any] | None = None) -> str:
     for r in RECONCILIATION:
         v = r.get("variant")
         detail = f"{v['axis']}: {v['value']}" + (f" (Hevy `{v['hevy_template']}`)" if v["hevy_template"] else "") if v else ""
-        detail = "; ".join(x for x in (detail, r["note"]) if x)
+        member = f"family member `{r['nearest_member']}`" if r.get("nearest_member") else ""
+        detail = "; ".join(x for x in (detail, member, r["note"]) if x)
         out.append(
             f"| {r['section']} | {r['candidate']} | {r['kind']} | {r['outcome']} | {r['priority']} | {_md_keys([r['ref']] if r['ref'] else [])} | {detail} |"
         )
@@ -2911,7 +2942,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--check-doc", action="store_true")
     args = ap.parse_args(argv)
     lib = _load(LIBRARY_PATH) or {}
-    problems = metadata_problems(ADDITIONS) + reconciliation_problems(RECONCILIATION, ADDITIONS, set(lib.get("movements") or {}))
+    mv = lib.get("movements") or {}
+    heads = {k: str(e.get("canonical") or k) for k, e in mv.items()}
+    problems = metadata_problems(ADDITIONS) + reconciliation_problems(RECONCILIATION, ADDITIONS, set(mv), heads)
     problems += duplicate_problems(ADDITIONS, lib, _load(CATALOG_PATH))
     for p in problems:
         print(p)

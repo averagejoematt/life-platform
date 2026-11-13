@@ -44,6 +44,7 @@ from training import (
 LIB = json.loads((REPO / "config" / "exercise_library.json").read_text())
 MV = LIB["movements"]
 CATALOG = json.loads((REPO / "config" / "movement_catalog.json").read_text())
+HEADS = {k: str(e.get("canonical") or k) for k, e in MV.items()}
 MINE = {k: e for k, e in MV.items() if str(e.get("expansion_origin") or "").startswith(adds.ORIGIN)}
 
 
@@ -170,7 +171,23 @@ def test_every_candidate_is_reconciled_exactly_once():
     n_candidates = sum(len(v) for v in adds.AMENDMENT_15_CANDIDATES.values())
     assert n_candidates == 197 and len(adds.AMENDMENT_15_CANDIDATES) == 20
     assert sum(1 for r in adds.RECONCILIATION if r["kind"] == "candidate") == n_candidates
-    assert adds.reconciliation_problems(adds.RECONCILIATION, adds.ADDITIONS, set(MV)) == []
+    assert adds.reconciliation_problems(adds.RECONCILIATION, adds.ADDITIONS, set(MV), HEADS) == []
+
+
+def test_variant_and_covered_rows_name_a_canonical_family_head():
+    """L1's canonical layer: a VARIANT / ALREADY_COVERED row names the family HEAD (`exercise_library.canonical_of`), never a
+    member; the member it sits closest to is `nearest_member`."""
+    for r in adds.RECONCILIATION:
+        if r["outcome"] in ("VARIANT", "ALREADY_COVERED") and r["ref"] in MV:
+            assert xl.canonical_of(LIB, r["ref"]) == r["ref"], r["candidate"]
+        if r.get("nearest_member"):
+            assert xl.canonical_of(LIB, r["nearest_member"]) == r["ref"], r["candidate"]
+    # control: point a row at a family member -> red
+    rows = copy.deepcopy(adds.RECONCILIATION)
+    member = next(k for k, h in HEADS.items() if h != k)
+    row = next(r for r in rows if r["outcome"] == "VARIANT" and r["ref"] in MV)
+    row["ref"] = member
+    assert any("name the head" in p for p in adds.reconciliation_problems(rows, adds.ADDITIONS, set(MV), HEADS))
 
 
 def test_reconciliation_check_fails_on_a_dropped_doubled_or_dangling_row():
