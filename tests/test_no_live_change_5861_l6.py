@@ -32,12 +32,12 @@ for _p in (REPO, REPO / "lambdas", REPO / "scripts"):
 import sample_weeks_5861 as sw  # noqa: E402
 
 PINNED = {
-    "a_large_deficit_experienced": "7cba01ca6a45e9f5",
-    "b_shoulder_flag_low_recovery": "fcff792d5f10c0c6",
-    "c_equipment_limited": "7cba01ca6a45e9f5",
-    "d_stalled_anchor_adherence_dip": "d95c2f2bd0c9e971",
-    "e_short_week": "fff086a9a5114170",
-    "f_high_fatigue_poor_sleep": "e706a1992f293e86",
+    "a_large_deficit_experienced": "482036aa60a4ad1e",
+    "b_shoulder_flag_low_recovery": "c44c886a72aa40c0",
+    "c_equipment_limited": "482036aa60a4ad1e",
+    "d_stalled_anchor_adherence_dip": "f9f775a9435653f1",
+    "e_short_week": "8ae572edb08aac5c",
+    "f_high_fatigue_poor_sleep": "696de7e8a021a19a",
 }
 """Computed on the base tree (ea3906604) and on this branch — identical. (a) and (c) agree because today's path ignores the
 equipment profile: the gap the live session fit closes."""

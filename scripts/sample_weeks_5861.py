@@ -134,7 +134,9 @@ def synthetic_record(profile: dict[str, Any], served: dict[str, list[tuple[str, 
     planned = [(w, i, role) for w in range(HISTORY_WEEKS) for i, role in enumerate(profile["defaults_roles"])]
     keep = int(profile.get("sessions_last_14d") or 10)
     recent = [x for x in planned if x[0] >= HISTORY_WEEKS - 2]
-    drop = {(w, i) for w, i, _ in recent[keep:]} if keep < len(recent) else set()
+    # an adherence dip misses the END of the week first (late-week sessions slip), latest week first
+    by_slip = sorted(recent, key=lambda x: (-x[1], -x[0]))
+    drop = {(w, i) for w, i, _ in by_slip[: max(0, len(recent) - keep)]}
     out = []
     for w, i, role in planned:
         if (w, i) in drop:
@@ -221,6 +223,12 @@ def overlay(profile: dict[str, Any], lib: dict[str, Any], catalog: dict[str, Any
     return {"pain_source": xl.PAIN_SOURCE_ID, "per_template": per}
 
 
+def walk_minutes_7d(profile: dict[str, Any]) -> float:
+    """The read aerobic minutes a draft caller passes (#4410), for the synthetic profile: its steps over the incidental 5,000 a
+    day at 100 steps a minute (`cardio_model`'s own walking-dose heuristic), over 7 days."""
+    return float(sum(max(0, n - 5000) / 100 for n in steps_by_day(profile).values()))
+
+
 def steps_by_day(profile: dict[str, Any]) -> dict[str, int]:
     return {_day(profile["as_of"], -n): int(profile.get("steps_per_day") or 0) for n in range(1, 8)}
 
@@ -289,7 +297,7 @@ def _inputs(profile: dict[str, Any], day: str, record: list[dict[str, Any]], row
         acwr_flag=acwr,
         block_workouts=record,
         rotation_rows=rows,
-        z2_minutes_7d=None,
+        z2_minutes_7d=walk_minutes_7d(profile),
     )
     setattr(inp, "sleep_hours", profile.get("sleep_hours"))
     setattr(inp, "steps_by_day", steps_by_day(profile))  # the cron's live input (steps_resolver), into cardio_model.cardio_load
@@ -422,7 +430,8 @@ def generate_week(profile: dict[str, Any], mode: str = "approved", world: dict[s
     rw = resolve_week_grid(rg._load_json)
     record = list(world["record"])
     sessions, cardio_index, prev = [], _cardio_index(record), None
-    with offline(world["lib"], history_index(record, catalog["movements"], p["as_of"]), p["bodyweight_lb"], p["as_of"], world["overlay"]):
+    hidx = history_index(record, catalog["movements"], p["as_of"])
+    with offline(world["lib"], hidx, p["bodyweight_lb"], p["as_of"], world["overlay"]):
         for n, (role, day) in enumerate(zip(p["roles"], p["days"]), start=1):
             entry = _entry(role, p["position"]["week"], p["position"]["block"], n, prev)
             inp = _inputs(p, day, record, world["rows"])
@@ -430,8 +439,32 @@ def generate_week(profile: dict[str, Any], mode: str = "approved", world: dict[s
             ideal = out[0]
             cardio = _cardio(ideal, p, day, cardio_index)
             sessions.append(_session(ideal, role, day, catalog["movements"], cardio))
+            record.append(_performed(ideal, day, role, hidx, catalog["movements"]))  # the next morning's draft reads this session as done
             prev = {"session_role": role, "date": day, "title": role, "was": "synthetic"}
     return {"profile": p["name"], "label": p.get("label"), "story": p.get("story"), "mode": mode, "sessions": sessions}
+
+
+def _performed(ideal: Any, day: str, role: str, hidx: dict[str, list[dict[str, Any]]], catalog: dict[str, Any]) -> dict[str, Any]:
+    """The drafted session as performed (synthetic): each lift's working sets at its last synthetic load and the bottom of its
+    rep range, RPE 8 — so the week's later drafts see it in the record (adherence, the trend, the 7-day sets)."""
+    from training import warmup_sets
+
+    exercises = []
+    for b in ideal.exercises:
+        tid = _tid(catalog, str(b.movement_key)) or ""
+        last = (hidx.get(tid) or [{}])[0].get("top_weight_kg")
+        n = warmup_sets.working_set_count(b.sets)
+        reps = next((getattr(s, "rep_range_start", None) for s in b.sets if getattr(s, "rep_range_start", None)), None)
+        if tid and last and reps and n:
+            exercises.append(
+                {
+                    "name": b.movement_key,
+                    "template_id": tid,
+                    "notes": "",
+                    "sets": [{"type": "normal", "weight_kg": last, "reps": reps, "rpe": 8.0}] * n,
+                }
+            )
+    return _workout(day, role, exercises)
 
 
 def _cardio_index(record: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
@@ -456,13 +489,12 @@ def _session(ideal: Any, role: str, day: str, movements: dict[str, Any], cardio:
 
     why = session_block.why_note_for(ideal, format_why_note(ideal))  # the draft path's own WHY line (hevy_routine_cron)
     body = hevy_compiler.to_create_body(ideal, lambda k: str((movements.get(k) or {}).get("hevy_template_id_hint") or k), why_note=why)
-    wire = {e.get("exercise_template_id"): e.get("notes") or "" for e in body["routine"]["exercises"]}
+    wire_notes = [e.get("notes") or "" for e in body["routine"]["exercises"]]  # branchless: the IR's exercises, in order
     lifts = []
-    for b in ideal.exercises:
+    for b, wire_note in zip(ideal.exercises, wire_notes):
         if str(b.rationale_tag or "").startswith("cardio:"):
             continue
         title = (movements.get(b.movement_key) or {}).get("title") or b.movement_key
-        tid = (movements.get(b.movement_key) or {}).get("hevy_template_id_hint") or b.movement_key
         lifts.append(
             {
                 "key": b.movement_key,
@@ -472,7 +504,7 @@ def _session(ideal: Any, role: str, day: str, movements: dict[str, Any], cardio:
                 "warmup_sets": len(b.sets) - warmup_sets.working_set_count(b.sets),
                 "reps": _reps(b.sets),
                 "superset": getattr(b, "superset_id", None),
-                "hevy_note": wire.get(tid, b.notes or ""),
+                "hevy_note": wire_note,
             }
         )
     blk = cardio.get("block")

@@ -44,6 +44,8 @@ SLOT_OBJECTIVES: dict[str, str] = {
 entry overrides it (data, not code) — the L4 conditioning seam."""
 CONDITIONING_SLOT_SEAM = "library selection_policy.slot_objectives[<role>.<slot>] = 'conditioning' (L4 cardio_model, #5861)"
 
+SYSTEMIC_REGRESSION_MIN = 4  # heuristic: four or more lifts stalling/regressing at once (and half of all judged) is systemic
+MAX_NEW_PER_WEEK = 2  # heuristic: at most two new-to-him movements enter in one week (learning cost, soreness, load-finding)
 MAX_WEEKLY_EXPOSURES = 2  # heuristic: a movement serves at most two slots a week (two exposures, different days)
 MAX_HOLD_WEEKS = 12  # heuristic, owner brief: primaries ~6-12 weeks; a held accessory stays while it progresses
 ROTATION_TRIGGERS: dict[str, str] = {
@@ -60,6 +62,10 @@ ROTATION_TRIGGERS: dict[str, str] = {
 }
 """Every reason a held slot may rotate under live. Nothing else rotates it — never a calendar alone."""
 HOLD_REASONS = {
+    "upgrade_waits": "a better-rated movement is open, but an upgrade waits for the next block's first phase — no mid-block "
+    "swap of a working lift (#5861 L6)",
+    "systemic_regression": "most of his lifts are stalling or regressing together — systemic fatigue (sleep, recovery, the "
+    "deficit), not this movement: volume comes down (the fatigue model), the movement stays (#5861 L6, heuristic)",
     "progressing": "progressing — the latest top set is his best in the window",
     "step_due": "the prescription held still at an easy RPE — the load steps, the movement stays",
     "unknown": "no rotation trigger (too few exposures to judge a trend)",
@@ -116,7 +122,7 @@ def decorate(c: dict[str, Any], entry: dict[str, Any], ctx: dict[str, Any]) -> d
     policy = ctx["policy"]
     objective = objective_of(ctx["slot_id"], ctx["lib"])
     tier = objective_tier(entry, objective, ctx["spec"]["muscle"])
-    if tier is None:
+    if tier is None or not same_trunk_job(entry, ctx):
         return None
     sig = _signals_for(entry, policy)
     from training.fatigue_model import THRESHOLDS
@@ -130,6 +136,16 @@ def decorate(c: dict[str, Any], entry: dict[str, Any], ctx: dict[str, Any]) -> d
         "discomfort": hurts,
         "trend": sig.get("trend") or "unknown",
     }
+
+
+def same_trunk_job(entry: dict[str, Any], ctx: dict[str, Any]) -> bool:
+    """#5861 L6: a trunk slot keeps its TRUNK FUNCTION (L1's `trunk_function`: loaded flexion, anti-extension, anti-rotation,
+    ...). The pattern table files rotation, twists and side bends under trunk flexion, so a crunch slot could serve a torso
+    rotation machine; the job is the function, not the word. A slot whose incumbent has no trunk function is unaffected."""
+    from training import selection_engine as se
+
+    inc = (se.xl.movements(ctx["lib"]).get(str(ctx["spec"].get("incumbent_library_id") or "")) or {}).get("trunk_function")
+    return not inc or not entry.get("trunk_function") or entry.get("trunk_function") == inc
 
 
 def gate_locked(entry: dict[str, Any], lib: dict[str, Any], mid: str, gate_eval: dict[str, Any] | None) -> list[str]:
@@ -253,12 +269,18 @@ def _trigger(prev: str, eligible: list[dict[str, Any]], excluded: list[dict[str,
     if c["movement_id"] in swaps:
         return "fatigue", c, trend
     if trend in ("stalled", "regressing"):
+        if policy.get("systemic_regression"):
+            return None, c, "systemic_regression"  # #5861 L6: a week where everything stalls is fatigue, not novelty-hunger
         return "stall", c, trend
     if (c["n1"].get("components") or {}).get("swap_out") == -1:
         return "adherence", c, trend
-    if c["tier"] not in pool and any(x["tier"] in pool and _open(x, policy) for x in eligible):
-        return "pool_change", c, trend  # #5861 L6: only when a better band is SERVABLE this week (not every member at its cap)
     pos = policy.get("position") or {}
+    if c["tier"] not in pool and any(x["tier"] in pool and _open(x, policy) for x in eligible):
+        # #5861 L6: only when a better band is SERVABLE this week (not every member at its cap), and only at a block's first
+        # phase — an upgrade is a block-start decision (the block design review's), never a mid-block swap of a working lift
+        if int(pos.get("phase") or 1) == 1:
+            return "pool_change", c, trend
+        return None, c, "upgrade_waits"
     if int(pos.get("phase") or 0) == 1 and int(pos.get("step") or 0) > 0 and trend != "progressing":
         if held_weeks(policy.get("rows"), pos, ctx["slot_id"], prev) >= MAX_HOLD_WEEKS:
             return "block_end_review", c, trend
@@ -303,6 +325,19 @@ def _choose(ranked: list[dict[str, Any]], counts: Counter, skip: str | None) -> 
     return rest, {"code": "week_repeat_cap", "why": f"{best['title']} already serves {n} slots this week (cap {MAX_WEEKLY_EXPOSURES})"}
 
 
+def _novelty_cap(chosen: dict, ranked: list[dict], policy: dict, skip: str | None, repeat: Any) -> tuple[dict, Any]:
+    """#5861 L6: `MAX_NEW_PER_WEEK` — past the week's new-movement budget a new pick yields to the best familiar candidate the
+    repetition cap still allows (said so); with none it stands. Every new pick served is counted."""
+    if chosen.get("novel") and policy.get("novel_count", 0) >= MAX_NEW_PER_WEEK:
+        alt = next((c for c in ranked if not c.get("novel") and c.get("catalog_key") != skip and _open(c, policy)), None)
+        if alt is not None:
+            why = f"{chosen['title']} would be the week's {MAX_NEW_PER_WEEK + 1}th new movement; {alt['title']} is familiar"
+            return alt, {"code": "novelty_budget", "why": why}
+    if chosen.get("novel"):
+        policy["novel_count"] = policy.get("novel_count", 0) + 1
+    return chosen, repeat
+
+
 def select_slot(slot: dict[str, Any], ctx: dict[str, Any], recent: set[str]) -> dict[str, Any]:
     """One slot under the live policy: hold the previous variant unless a trigger fires, else the best by `rank_key`, with
     the repetition rule over the week's counts (`ctx['policy']['week_counts']`)."""
@@ -331,6 +366,7 @@ def select_slot(slot: dict[str, Any], ctx: dict[str, Any], recent: set[str]) -> 
             repeat = {"code": "repeat_beneficial", "why": f"{held['title']} is held here while it progresses and serves another slot too"}
     else:
         chosen, repeat = _choose(ranked, counts, prev if trigger else None)
+        chosen, repeat = _novelty_cap(chosen, ranked, ctx["policy"], prev if trigger else None, repeat)  # a hold is never "new"
         if prev and trigger is None:  # held, but already at the weekly cap
             trigger = "week_repeat_cap"
         rotation = (
@@ -380,6 +416,8 @@ def build_policy(
         stacking = bool(found)
         swaps = [{"movement_id": f["exposures"][-1]["movement_id"], "why": f["finding"]} for f in found]
     ge = gate_eval if isinstance(gate_eval, dict) else {"state": "not_read", "row": None}
+    trends = [v.get("trend") for v in (signals or {}).values() if v.get("trend") not in (None, "unknown")]
+    down = sum(1 for t in trends if t in ("stalled", "regressing"))
     return {
         "issue": ISSUE,
         "gate_eval": ge.get("row") if ge.get("state") == "read" else None,
@@ -388,6 +426,8 @@ def build_policy(
         "signals_state": "read" if signals is not None else "not_read (every trend unknown: holds, never a stall rotation)",
         "fatigue_swaps": swaps,
         "stacking": stacking,
+        # #5861 L6 (heuristic): SYSTEMIC_REGRESSION_MIN or more judged lifts and at least half stalling or regressing together
+        "systemic_regression": down >= SYSTEMIC_REGRESSION_MIN and down * 2 >= len(trends),
         "rows": rows,
         "position": position,
         "week_counts": Counter(),

@@ -385,6 +385,44 @@ def test_c3_a_progressing_movement_is_held_not_rotated(weeks):
     assert stalls, "the strict trend reads a twice-a-week progressing movement as a stall"
 
 
+def _rotations(week: dict) -> list[str]:
+    return [ln for s in week["sessions"] for ln in s["selection"] if "rotate: stall" in ln]
+
+
+def test_c3b_a_systemic_slump_holds_the_movements_and_cuts_volume_instead(weeks):
+    """Every lift regressing in an overreached week is fatigue, not a reason to churn every accessory: the movements hold
+    (`systemic_regression`), the fatigue model takes sets off. Control: the systemic read off — every accessory rotates."""
+    f = weeks["f_high_fatigue_poor_sleep"]["week"]
+    assert _rotations(f) == [] and any("systemic fatigue" in ln for s in f["sessions"] for ln in s["selection"])
+    real = sl.build_policy
+    off = _week_of("f_high_fatigue_poor_sleep", {(sl, "build_policy"): lambda *a, **k: real(*a, **k) | {"systemic_regression": False}})
+    assert len(_rotations(off["week"])) >= 10
+    d = weeks["d_stalled_anchor_adherence_dip"]["week"]  # one stalled lift among progressing ones still rotates (a real stall)
+    assert _rotations(d)
+
+
+def test_c3c_novelty_is_budgeted_and_upgrades_wait_for_a_block_start():
+    """Stress cases for novelty churn: (1) a third new movement in a week yields to the best familiar candidate; (2) a better
+    band opening mid-block holds the working lift (`upgrade_waits`) and rotates only at a block's first phase. Controls: the
+    budget raised; the phase rule read as phase 1."""
+    cand = lambda k, novel, tier="S": {"catalog_key": k, "title": k, "novel": novel, "tier": tier, "canonical": k}  # noqa: E731
+    ranked = [cand("new_a", True), cand("familiar_b", False, "A")]
+    pick, rep = sl._novelty_cap(ranked[0], ranked, {"novel_count": 2, "week_counts": Counter()}, None, None)
+    assert pick["catalog_key"] == "familiar_b" and rep["code"] == "novelty_budget"
+    with patch.object(sl, "MAX_NEW_PER_WEEK", 99):
+        assert sl._novelty_cap(ranked[0], ranked, {"novel_count": 2, "week_counts": Counter()}, None, None)[0]["catalog_key"] == "new_a"
+
+    held = cand("held_b", False, "B") | {"trend": "progressing", "discomfort": False, "movement_id": "held_b", "n1": {"components": {}}}
+    better = cand("better_s", False, "S") | {"movement_id": "better_s"}
+    ctx = lambda phase: {
+        "policy": {"position": {"phase": phase, "step": 3}, "week_counts": Counter(), "rows": []},
+        "slot_id": "x",
+    }  # noqa: E731
+    assert sl._trigger("held_b", [held, better], [], ("S", "A"), ctx(2))[0] is None  # mid-block: the upgrade waits
+    assert sl._trigger("held_b", [held, better], [], ("S", "A"), ctx(2))[2] == "upgrade_waits"
+    assert sl._trigger("held_b", [held, better], [], ("S", "A"), ctx(1))[0] == "pool_change"  # control: a block start rotates
+
+
 def _working_sets(week: dict) -> int:
     return sum(x["working_sets"] for x in _lifts(week))
 
@@ -399,7 +437,7 @@ def test_c4_volume_comes_down_when_recovery_worsens_and_strength_work_is_held(we
     assert all(s["fatigue"]["action"] == "deload_recommended" for s in f["sessions"])  # recommended — applied only on his word
     shared = set(_anchor_sets(a)) & set(_anchor_sets(f))
     assert shared and all(_anchor_sets(f)[k] == _anchor_sets(a)[k] for k in shared)  # anchors held
-    off = _week_of("f_high_fatigue_poor_sleep", {(fm, "trim_accessory_sets"): lambda ex, n: 0})  # control: the reduction off
+    off = _week_of("f_high_fatigue_poor_sleep", {(fm, "trim_accessory_sets"): lambda ex, n, order=None: 0})  # control: the reduction off
     assert _working_sets(off["week"]) > _working_sets(f)
 
 
@@ -413,11 +451,33 @@ def landmark_problems(m: dict) -> list[str]:
 
 
 def test_d1_weekly_sets_per_muscle_sit_inside_the_volume_landmarks(weeks):
-    for name in ("a_large_deficit_experienced", "c_equipment_limited", "d_stalled_anchor_adherence_dip"):
+    for name in ("a_large_deficit_experienced", "c_equipment_limited"):  # full weeks, nothing trimmed for recovery
         assert landmark_problems(weeks[name]["m"]) == [], name
+    # a trimmed week takes sets from the muscle furthest above its MEV first (the delts), never past MRV anywhere
+    full = weeks["a_large_deficit_experienced"]["m"]["landmarks"]
+    for name in ("b_shoulder_flag_low_recovery", "d_stalled_anchor_adherence_dip", "f_high_fatigue_poor_sleep"):
+        lm = weeks[name]["m"]["landmarks"]
+        assert lm["shoulders"]["sets"] < full["shoulders"]["sets"] and not [m for m, v in lm.items() if v["verdict"] == "over MRV"], name
     bad = copy.deepcopy(weeks["a_large_deficit_experienced"]["m"])  # control: a week with the lateral raises tripled
     bad["landmarks"]["shoulders"] = dict(bad["landmarks"]["shoulders"], sets=40, verdict="over MRV")
     assert landmark_problems(bad) == ["shoulders over MRV"]
+
+
+def test_d1b_a_recovery_trim_takes_sets_where_the_week_has_most_surplus():
+    """Upper volume, 2 sets off: the face pull's delts (the week's largest surplus over MEV) give them first, the chest fly
+    (chest at its MEV) keeps its sets. Control: the default trim order (last-listed first) takes the arms and leaves the delts."""
+    rx = ps.session_prescription_for_role("upper_volume", catalog_movements=CAT0)
+
+    def trimmed(order):
+        ex = copy.deepcopy(rx["exposures"])
+        fm.trim_accessory_sets(ex, 2, order(ex) if order else None)
+        return {e["slot"]: len(e["sets"]) for e in ex if e["kind"] == "accessory"}
+
+    before = {e["slot"]: len(e["sets"]) for e in rx["exposures"] if e["kind"] == "accessory"}
+    after = trimmed(ls.surplus_first(CAT0))
+    assert after["face_pull"] < before["face_pull"] and after["cable_chest_fly"] == before["cable_chest_fly"]
+    default = trimmed(None)
+    assert default["db_curl"] < before["db_curl"] and default["face_pull"] == before["face_pull"]
 
 
 def test_d2_redundant_axial_fatigue_is_detected():
@@ -507,6 +567,43 @@ def test_d6_each_session_has_a_sensible_number_of_exercises(weeks):
     # control: today's red-day rule (every accessory dropped) leaves the aesthetic day one exercise long
     strip = _week_of("b_shoulder_flag_low_recovery", {(ls, "drop_accessories"): lambda autoreg, rx, rat, at: autoreg <= at})
     assert exercise_count_problems(strip["week"])
+
+
+def test_d7_a_trunk_slot_keeps_its_function_even_when_his_fit_favours_another():
+    """Stress case — the top-ranked movement is the wrong practical choice: his N=1 fit favours the torso-rotation machine,
+    but the crunch slot's job is loaded flexion (L1's trunk_function); the slot serves a crunch. Control: the rule off and
+    the rotation machine serves the crunch slot."""
+    slot = "lower_volume.machine_crunch"
+    tid = str(LIB0["movements"]["torso_rotation"]["template_id"]).upper()
+    ov = {
+        "pain_source": xl.PAIN_SOURCE_ID,
+        "per_template": {
+            tid: {
+                "best_set_by_band": {"8-12": {"date": "2026-11-10", "weight_kg": 40, "reps": 12}},
+                "note_signals": {"sentiment_positive": 3},
+            }
+        },
+    }
+    pick = next(s for s in _select_live(overlay=ov)["slots"] if s["slot_id"] == slot)["pick"]
+    assert pick["movement_id"] != "torso_rotation" and LIB0["movements"][pick["movement_id"]]["trunk_function"] == "loaded_flexion"
+    with patch.object(sl, "same_trunk_job", lambda entry, ctx: True):
+        off = next(s for s in _select_live(overlay=ov)["slots"] if s["slot_id"] == slot)["pick"]
+    assert off["movement_id"] == "torso_rotation"
+
+
+def test_d8_the_rationale_names_what_serves_when_the_ledger_already_decided_the_phase():
+    rot = {
+        "selection": {
+            "mode": "live",
+            "slots": [{"slot_id": "upper_heavy.db_lateral_raise", "pick": {"catalog_key": "lateral_raise_machine"}}],
+        },
+        "source": "selection",
+        "slots": [{"slot_id": "upper_heavy.db_lateral_raise", "source": "ledger", "variant": "db_lateral_raise"}],
+        "rationale": ["selection: Lateral Raise (Machine) [tier A] for upper_heavy.db_lateral_raise — hold: progressing"],
+    }
+    assert "THIS phase serves db_lateral_raise" in ls.rotation_lines(rot)[0]
+    shadow = rot | {"selection": rot["selection"] | {"mode": "shadow"}}  # control: shadow lines are never rewritten
+    assert ls.rotation_lines(shadow) == rot["rationale"]
 
 
 # ══ E. regression / compatibility ════════════════════════════════════════════

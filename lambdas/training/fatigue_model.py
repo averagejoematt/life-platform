@@ -31,7 +31,6 @@ library `approved`); in shadow it returns the prescription untouched (the same o
 from __future__ import annotations
 
 import copy
-from datetime import date
 from typing import Any
 
 from training.stall_detector import MIN_SESSIONS
@@ -70,9 +69,8 @@ THRESHOLDS: dict[str, dict[str, Any]] = {
         "value": 14,
         "label": HEURISTIC,
         "basis": "double progression repeats a load while the reps climb, and a movement trained twice a week repeats it inside "
-        "one week, so a tie between two exposures is not a stall: a movement PROGRESSES when its best e1RM in the last 14 days "
-        "(back from its latest exposure) beats its best before them, and STALLS when it does not (#5861 L6) — about two weekly "
-        "exposures, the stall detector's own horizon",
+        "one week, so a tie is not a stall: a movement PROGRESSES when its best e1RM in the last 14 days (back from its latest "
+        "exposure) beats its best before them, and STALLS when it does not (#5861 L6) — a fortnight of weekly sessions",
     },
     "trend_min_exposures": {
         "value": MIN_SESSIONS,
@@ -93,7 +91,7 @@ THRESHOLDS: dict[str, dict[str, Any]] = {
     "discomfort_window_days": {
         "value": 14,
         "label": HEURISTIC,
-        "basis": "a fortnight, inclusive: a weekly movement's last two exposures sit 7 and 14 days back on its own weekday",
+        "basis": "a fortnight, inclusive: a weekly movement's latest sessions sit 7 and 14 days back on its own weekday",
     },
     "axial_stack_window_hours": {
         "value": 72,
@@ -127,7 +125,8 @@ THRESHOLDS: dict[str, dict[str, Any]] = {
         "value": 0.6,
         "label": HEURISTIC,
         "basis": "fewer than 60% of the planned sessions performed in 14 days: keep the plan short and never add — adherence "
-        "comes first for long-term results",
+        "comes first for long-term results. With no other reduction it takes one step (reduce_sets_per_step) of accessory sets off "
+        "(#5861 L6: the basis said 'short' and the code only reported it); anchors held",
     },
     "reduce_at_strain_signals": {
         "value": 2,
@@ -271,9 +270,8 @@ def _trend(points: list[tuple[str, float | None, float | None, float | None, int
 def _recent_best(pts: list[tuple[str, float | None, float | None, float | None, int | None]], e1: list[float]) -> bool:
     """`trend_recent_days`: the best e1RM inside the recent window (back from the latest exposure) beats the best before it.
     With nothing before the window, any exposure after the first beating the first counts (a new movement climbing)."""
-    last = date.fromisoformat(str(pts[-1][0])[:10])
     span = THRESHOLDS["trend_recent_days"]["value"]
-    recent = [v for p, v in zip(pts, e1) if (last - date.fromisoformat(str(p[0])[:10])).days < span]
+    recent = [v for p, v in zip(pts, e1) if (_ago(str(pts[-1][0]), str(p[0])) or 0) < span]
     earlier = e1[: len(e1) - len(recent)]
     if not earlier:
         return max(e1[1:]) > e1[0]
@@ -391,7 +389,16 @@ def adherence(workouts: list[dict[str, Any]] | None, *, as_of: str, planned_per_
     planned = planned_per_week * days // 7
     ratio = round(performed / planned, 2) if planned else None
     low = ratio is not None and ratio < THRESHOLDS["adherence_low"]["value"]
-    return {"state": "low" if low else "ok", "performed": performed, "planned": planned, "ratio": ratio}
+    # #5861 L6: the record is the BLOCK's — a block that started inside the window under-counts; only a record reaching back
+    # over the whole window may shorten a session (`assess`), so a block start is never read as missed sessions
+    oldest = max((_ago(as_of, _day(w)) or 0) for w in workouts) if workouts else 0
+    return {
+        "state": "low" if low else "ok",
+        "performed": performed,
+        "planned": planned,
+        "ratio": ratio,
+        "window_covered": oldest >= days - 1,
+    }
 
 
 # ── the decision ──────────────────────────────────────────────────────────────
@@ -530,7 +537,11 @@ def assess(
     deload = len(strain) >= THRESHOLDS["deload_at_strain_signals"]["value"] or (regressing and bad_day)
     step = THRESHOLDS["reduce_sets_per_step"]["value"]
     reduce = 0 if len(strain) < THRESHOLDS["reduce_at_strain_signals"]["value"] else min(6, step * (len(strain) - 1))
-    state = "overreached" if deload else ("strained" if reduce else ("normal" if strain or adh["state"] == "low" else "recovered"))
+    reasons = [f"{len(strain)} strain signals"] if reduce else []
+    strained = bool(reduce)  # the recovery STATE reads strain only; an adherence trim is not a recovery verdict
+    state = "overreached" if deload else ("strained" if strained else ("normal" if strain or adh["state"] == "low" else "recovered"))
+    if adh["state"] == "low" and adh.get("window_covered") and not reduce:  # #5861 L6: `adherence_low`'s "keep it short"
+        reduce, reasons = step, ["adherence low: a shorter session is easier to keep; anchors held"]
     over = session_minutes is not None and minutes_ceiling is not None and session_minutes > minutes_ceiling
     return {
         "issue": ISSUE,
@@ -540,6 +551,7 @@ def assess(
         "fatigue_level": fatigue_level(state),  # L5's loss-rate proposal input (vocabulary: FATIGUE_LEVELS)
         "action": "deload_recommended" if deload else ("reduce" if reduce else "maintain"),
         "reduce_sets": reduce,
+        "reduce_reasons": reasons,
         "never_adds": True,
         "maintain_strength": "a reduction takes accessory sets only; anchors and their top sets are held" if reduce else None,
         "swaps": _swaps(movs, stacking, index),
@@ -560,11 +572,11 @@ def assess(
 
 
 # ── the live draft hook ───────────────────────────────────────────────────────
-def trim_accessory_sets(exposures: list[dict[str, Any]], n: int) -> int:
-    """Take up to `n` sets off the accessories, IN PLACE: last-listed first, one set per pass, never below one set and never
-    a top set; anchors are never touched. Returns the sets removed."""
+def trim_accessory_sets(exposures: list[dict[str, Any]], n: int, order: list[dict[str, Any]] | None = None) -> int:
+    """Take up to `n` sets off the accessories, IN PLACE: in `order` (default last-listed first), one set per pass, never below
+    one set and never a top set; anchors are never touched. Returns the sets removed."""
     removed = 0
-    order = [e for e in exposures if e.get("kind") == "accessory"][::-1]
+    order = order if order is not None else [e for e in exposures if e.get("kind") == "accessory"][::-1]
     progressed = True
     while removed < n and progressed:
         progressed = False
@@ -579,7 +591,9 @@ def trim_accessory_sets(exposures: list[dict[str, Any]], n: int) -> int:
     return removed
 
 
-def apply_to_session(rx: dict[str, Any], rotation: dict[str, Any] | None, assessment: dict[str, Any] | None) -> dict[str, Any]:
+def apply_to_session(
+    rx: dict[str, Any], rotation: dict[str, Any] | None, assessment: dict[str, Any] | None, trim_order: Any = None
+) -> dict[str, Any]:
     """The live draft's reduction: with the selection LIVE and an assessment that recommends `reduce` (or a deload, whose
     reduction is applied while the deload itself waits for his word), take `reduce_sets` accessory sets off a COPY of the
     prescription and record it as `fatigue`. In shadow (or with no assessment) the prescription is returned untouched —
@@ -588,7 +602,8 @@ def apply_to_session(rx: dict[str, Any], rotation: dict[str, Any] | None, assess
         return rx
     out = copy.deepcopy(rx)
     n = int(assessment.get("reduce_sets") or 0)
-    removed = trim_accessory_sets(out["exposures"], n) if n > 0 else 0
+    order = trim_order(out["exposures"]) if callable(trim_order) else None  # #5861 L6: surplus-first, else last-listed first
+    removed = trim_accessory_sets(out["exposures"], n, order) if n > 0 else 0
     if removed:
         from training.session_cues import exposure_cue
         from training.session_shape import session_minutes_estimate
@@ -597,12 +612,14 @@ def apply_to_session(rx: dict[str, Any], rotation: dict[str, Any] | None, assess
             e["cue"] = exposure_cue(e["intensity"], e["sets"])
         out["total_sets"] = sum(len(e["sets"]) for e in out["exposures"])
         out["session_minutes"] = session_minutes_estimate(out["exposures"])
-    keep = ("state", "fatigue_level", "action", "reduce_sets", "strain_signals", "swaps", "deload", "version")
+    keep = ("state", "fatigue_level", "action", "reduce_sets", "reduce_reasons", "strain_signals", "swaps", "deload", "version")
     out["fatigue"] = {k: assessment.get(k) for k in keep} | {"sets_removed": removed}
     return out
 
 
-def for_live_draft(rx: dict[str, Any], rotation: dict[str, Any] | None, inputs: Any, block_workouts: list[dict[str, Any]] | None) -> dict:
+def for_live_draft(
+    rx: dict[str, Any], rotation: dict[str, Any] | None, inputs: Any, block_workouts: list[dict[str, Any]] | None, trim_order: Any = None
+) -> dict:
     """The draft path's hook (`full_body_session._prescription`): LIVE only — assess from what the draft already carries
     (the generator inputs' readiness tier, the block's Hevy record, the library, the landmarks, the session estimate) and
     apply the reduction. In shadow it returns `rx` itself before reading anything. Never raises: a failure keeps `rx`."""
@@ -632,4 +649,4 @@ def for_live_draft(rx: dict[str, Any], rotation: dict[str, Any] | None, inputs: 
 
         logging.getLogger(__name__).warning(f"fatigue_model: assessment failed ({type(e).__name__}) — the draft is unchanged")
         return rx
-    return apply_to_session(rx, rotation, assessment)
+    return apply_to_session(rx, rotation, assessment, trim_order)

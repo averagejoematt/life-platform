@@ -225,12 +225,38 @@ def for_live_draft(
         lines.append(f"live session fit failed ({type(e).__name__}) — the prescription is unchanged")
         out = copy.deepcopy(rx)
     before = [len(x["sets"]) for x in out["exposures"]]
-    out = fatigue_model.for_live_draft(out, rotation, inputs, block_workouts)
+    out = fatigue_model.for_live_draft(out, rotation, inputs, block_workouts, trim_order=surplus_first(catalog_movements or {}))
     for x, n in zip(out["exposures"], before):
         if len(x["sets"]) < n:
             x["live_reduced"] = n - len(x["sets"])
     out[MARK] = {"issue": ISSUE, "lines": lines}
     return out
+
+
+def surplus_first(catalog: dict[str, Any]) -> Any:
+    """The fatigue model's trim order: take sets first from the accessory whose muscle the program's week loads furthest above
+    its MEV landmark (config/training_landmarks.json), ties last-listed first — a recovery trim never takes a muscle sitting at
+    its minimum effective dose (the crunch, the calves) below it while the delts sit near MAV. Heuristic over existing data."""
+    from collections import Counter
+
+    from training import block_model, program_structure as ps
+
+    marks = block_model.load_landmarks() or {}
+    week: Counter = Counter()
+    for role in ps.SPLIT_ROLES:
+        for e in ps.session_prescription_for_role(role, catalog_movements=catalog)["exposures"]:
+            week[str((catalog.get(e.get("movement_key") or "") or {}).get("primary_muscle"))] += len(e["sets"])
+
+    def surplus(e: dict[str, Any]) -> float:
+        m = str((catalog.get(e.get("movement_key") or "") or {}).get("primary_muscle"))
+        return week[m] - float((marks.get(m) or {}).get("MEV") or week[m])
+
+    def order(exposures: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        acc = [e for e in exposures if e.get("kind") == "accessory"]
+        ranked = sorted(acc, key=lambda e: (-surplus(e), -acc.index(e)))
+        return [e for e in ranked for _ in range(max(1, len(e.get("sets") or []) - 1))]  # drain the top surplus first
+
+    return order
 
 
 def _refit(rx: dict[str, Any]) -> None:
@@ -304,8 +330,21 @@ def rotation_lines(rotation: dict[str, Any]) -> list[str]:
     lines = list(rotation.get("rationale") or [])
     if not is_live(rotation) or rotation.get("source") != "selection":
         return lines
-    served = {s.get("slot_id") for s in rotation.get("slots") or [] if s.get("source") in ("selection", "ledger", "owner_approved")}
-    return [ln for ln in lines if not (ln.startswith(POOL_LINE_PREFIXES) and any(f"[{sid}," in ln for sid in served))]
+    slots = rotation.get("slots") or []
+    served = {s.get("slot_id") for s in slots if s.get("source") in ("selection", "ledger", "owner_approved")}
+    lines = [ln for ln in lines if not (ln.startswith(POOL_LINE_PREFIXES) and any(f"[{sid}," in ln for sid in served))]
+    # a phase the ledger already decided (its first draft, before the library was approved) keeps its movement until the next
+    # phase: the selection's line then names what WILL serve, so it says what serves NOW
+    picks = {s["slot_id"]: (s.get("pick") or {}).get("catalog_key") for s in (rotation.get("selection") or {}).get("slots") or []}
+    kept = {s["slot_id"]: s["variant"] for s in slots if s.get("source") == "ledger" and s.get("variant") != picks.get(s.get("slot_id"))}
+    return [
+        (
+            ln + f" — THIS phase serves {kept[sid]} (the rotation ledger: a phase's first draft decides it); the pick serves from the next"
+            if ln.startswith("selection:") and (sid := next((k for k in kept if f" for {k} " in ln or ln.endswith(f" for {k}")), None))
+            else ln
+        )
+        for ln in lines
+    ]
 
 
 def rationale_lines(rx: dict[str, Any]) -> list[str]:
@@ -318,6 +357,7 @@ def rationale_lines(rx: dict[str, Any]) -> list[str]:
         sig = ", ".join(fat.get("strain_signals") or []) or "none"
         out.append(
             f"fatigue (live): {fat.get('state')} — strain signals: {sig}; {fat.get('action')}"
+            + (f" ({'; '.join(fat.get('reduce_reasons') or [])})" if fat.get("reduce_reasons") else "")
             + (f", {fat.get('sets_removed')} accessory set(s) off, anchors held" if fat.get("sets_removed") else "")
             + ("; a deload is RECOMMENDED — it applies only on your word" if (fat.get("deload") or {}).get("recommended") else "")
         )

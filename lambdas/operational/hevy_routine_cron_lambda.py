@@ -252,7 +252,8 @@ def _live_inputs(target_date: str, read=None) -> dict[str, Any]:
         from training import steps_resolver
 
         sr = steps_resolver.steps_range(shift_day_key(target_date, -7), shift_day_key(target_date, -1), fetch=read, derived=False)
-        out["steps_by_day"] = {d["date"]: d["steps"] for d in sr.get("days") or [] if d.get("steps") is not None}
+        resolved = [d for d in sr.get("days") or [] if d.get("steps") is not None]  # steps-truth: steps_range output
+        out["steps_by_day"] = {d["date"]: d["steps"] for d in resolved}  # steps-truth: steps_resolver.steps_range output
     except Exception as e:  # noqa: BLE001 — unread steps keep the walking dose out of the cardio load, said so in the model
         logger.warning(f"live input read failed for steps: {type(e).__name__}")
     hevy = _safe("hevy", 7)
