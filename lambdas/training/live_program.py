@@ -674,7 +674,6 @@ def plan(rx: dict[str, Any], rotation: dict[str, Any], ctx: dict[str, Any], work
     lines += live_week.kb_slot(rx, ctx)  # the kettlebell slot names its implement, capped at RPE 7-8 (before stacking)
     lines += lb.allocate(rx, ctx)  # volume by priority: at/over-MAV isolation gives, priority muscles at MEV + 2 take (FIX4)
     lines += live_week.press_sets(rx, ctx)  # FIX4: the week's allocation already counted the press option's sets
-    lines += live_rulings.arms_top_up(rx, ctx, workouts)  # FIX6 ruling 3: the short week's arms counted from the record
     lines += avoid_stacking(rx, ctx, rotation, pinned)
     lines += mark_retreats(rx, ctx, workouts, trends)
     lines += stall_scheme(rx, ctx, trends)

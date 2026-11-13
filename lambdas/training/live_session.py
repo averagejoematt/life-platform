@@ -271,6 +271,9 @@ def for_live_draft(
         lines += live_week.novel_start(out, ctx, block_workouts)  # a movement new to him never starts at 4-6 reps
         behind = live_balance.adherence_response(block_workouts, ctx["target_date"], lib)  # FIX3: a dip changes the week
         lines += live_week.keep_the_anchors(out, ctx, behind) + live_balance.lighter_week(out, ctx, behind)
+        from training import live_rulings  # #5861 FIX6 ruling 3: AFTER the dip's lighter week, so it is never undone
+
+        lines += live_rulings.arms_top_up(out, ctx, block_workouts)
         _refit(out)
     except Exception as e:  # noqa: BLE001 — the live fit never blocks a draft
         lines.append(f"live session fit failed ({type(e).__name__}) — the prescription is unchanged")
@@ -329,7 +332,12 @@ def _week_ctx(week: dict[str, Any] | None, inputs: Any) -> dict[str, Any]:
     from training.live_program import SHORT_WEEK_SKIP
 
     if week:
-        return {"short_week_host": week.get("host"), "week_skip": tuple(week.get("skip") or ()), "partner": week.get("partner")}
+        return {
+            "short_week_host": week.get("host"),
+            "week_skip": tuple(week.get("skip") or ()),
+            "partner": week.get("partner"),
+            "week_mode": week.get("mode"),  # #5861 FIX6: short (fewer mornings) or the dip's own mode — the arms top-up's target
+        }
     host = getattr(inputs, "short_week", None)
     return {"short_week_host": host, "week_skip": (SHORT_WEEK_SKIP,) if host else (), "partner": None}
 

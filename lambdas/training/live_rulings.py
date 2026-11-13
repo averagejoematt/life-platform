@@ -248,7 +248,8 @@ def arms_top_up(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[
     the hard sets the week has logged since Monday (`fatigue_model.hard_sets_by_muscle`, direct 1.0 + indirect 0.5) plus today's
     planned sets — and one under its MEV takes sets on today's isolation slot for it (at most ARMS_FLOOR add_per_slot). The plan
     count (`short_week_floor`) reads the templates; this reads the record, so an earlier morning's time trim is made up here.
-    Returns the rationale lines."""
+    The floor is MEV in a short week (ruling 3) and MV (maintenance) in an adherence-dip week, a recovery week by ruling 2. It
+    runs AFTER the dip's lighter week (`live_session.for_live_draft`), so nothing undoes it. Returns the rationale lines."""
     if "shoulders_arms" not in set(ctx.get("week_skip") or ()) or rx.get("session_role") != TOP_UP_ROLE:
         return []
     from training import block_model, fatigue_model as fm, live_balance as lb, live_week
@@ -269,8 +270,9 @@ def arms_top_up(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[
         for sec in {live_week.LANDMARK_OF.get(str(s), str(s)) for s in (entry.get("target") or {}).get("secondary") or []} - {prim}:
             today[sec] = today.get(sec, 0.0) + n * 0.5
     marks, cap, lines = block_model.load_landmarks() or {}, int(ARMS_FLOOR["add_per_slot"]["value"]), []
+    level = "MEV" if ctx.get("week_mode") in (None, "short") else "MV"  # a dip week is a recovery week: maintenance is the floor
     for m in ARMS_FLOOR["muscles"]["value"]:
-        mev = float((marks.get(m) or {}).get("MEV") or 0)
+        mev = float((marks.get(m) or {}).get(level) or 0)
         have = done.get(m, 0.0) + today.get(m, 0.0)
         slot = next(
             (
@@ -286,7 +288,7 @@ def arms_top_up(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[
         slot["sets"].extend(dict(slot["sets"][-1]) for _ in range(add))
         title = (cat.get(slot.get("movement_key")) or {}).get("title") or slot.get("movement_key")
         lines.append(
-            f"top-up (live): {m} {done.get(m, 0.0):g} logged this week + {today.get(m, 0.0):g} today < MEV {mev:g} — {title} +{add} "
+            f"top-up (live): {m} {done.get(m, 0.0):g} logged this week + {today.get(m, 0.0):g} today < {level} {mev:g} — {title} +{add} "
             "set(s), counted from the record (ARMS_FLOOR, heuristic)"
         )
     return lines
