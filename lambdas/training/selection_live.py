@@ -269,9 +269,9 @@ def family(movement_id: Any, catalog_key: Any, lib: dict[str, Any] | None) -> st
     """The movement's CANONICAL family (L1's alias layer, `exercise_library.canonical_of`): the within-week repetition rule
     compares families, so an alias or a grip variant of a movement already served is a repeat, not a peer. Falls back to
     the catalog key when the library cannot place it."""
-    from training import exercise_library as xl
+    from training import selection_engine as se  # the ONE sanctioned library reader (tests/test_exercise_library_5769.py)
 
-    return str((xl.canonical_of(lib or {}, str(movement_id)) if movement_id else None) or catalog_key or movement_id or "")
+    return str((se.xl.canonical_of(lib or {}, str(movement_id)) if movement_id else None) or catalog_key or movement_id or "")
 
 
 def _fam(c: dict[str, Any]) -> str:
