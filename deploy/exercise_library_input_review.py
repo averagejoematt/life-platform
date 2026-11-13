@@ -343,6 +343,12 @@ REVIEW: dict[str, dict[str, Any]] = {
     # ── the cuff / scapular class (no range trained): joints rated so the row reads whole ────────────────────────────
     "prone_w_raise": _r("a prone W raise: cuff external rotation with lower-trap control. " + _NO_RANGE, {"joint_stress": _LOW}),
     "db_ucv_raise": _r("a UCV raise: lower-trap and serratus upward rotation. " + _NO_RANGE, {"joint_stress": _LOW}),
+    # ── #5861 FIX4 (fourth red team) ──
+    "pull_up_band": _r(
+        "Hevy's built-in band-assisted pull-up: the lats at long length on a bar, the band taking a share of bodyweight (the band's "
+        "thickness is the load step); a regression rung of the pull-up ladder, so its ceiling is the unassisted pull-up (moderate)",
+        inputs={"ladder": True},
+    ),
 }
 
 EVIDENCE_FORMS: dict[str, dict[str, Any]] = {
@@ -401,18 +407,82 @@ SPINE_AT_SIDES = {
 """Squat-pattern work with dumbbells/kettlebells at the sides: spinal load `level` for the whole class."""
 
 
+# ── #5861 FIX4 (fourth red team): the knee and hip PAIN MAP ───────────────────────────────────────────────────────────
+KNEE_HIP: dict[str, Any] = {
+    "knee": (
+        # (rule name, level, pattern set or None, title regex or None) — first match wins, in order
+        ("knee_regression", _M, None, r"box squat|wall squat|wall sit|spanish squat"),
+        ("knee_dominant", _H, ("squat", "leg_extension", "step_down"), None),
+        (
+            "knee_lower_other",
+            _H,
+            ("other", "olympic", "cardio"),
+            r"lunge|split squat|step ?ups?|stepup|squat|pistol|skater|jump|hop|bound|pogo|thruster|burpee|tuck",
+        ),
+        ("knee_hinge_soft", _L, ("hinge",), r"romanian|\brdl\b|stiff|good ?morning|single leg deadlift"),
+        ("knee_off_floor", _M, ("hinge", "olympic"), r"deadlift|trap bar|hex bar|sumo|clean|snatch"),
+        ("knee_flexion", _M, ("leg_curl",), None),
+        ("knee_locomotion", _M, None, r"\bsled\b|\brun|jog|sprint|stair|step ?mill|jump rope|\brow(?:er|ing)\b|hik(?:e|ing)"),
+        (
+            "knee_quiet",
+            _L,
+            ("hinge", "hip_extension", "calf", "hip_abduction", "hip_adduction", "carry", "cardio", "ankle_dorsiflexion"),
+            None,
+        ),
+    ),
+    "hip": (
+        ("hip_hinge", _H, ("hinge", "olympic"), None),
+        ("hip_flexion_loaded", _M, ("squat", "hip_extension", "hip_abduction", "hip_adduction"), None),
+        ("hip_flexor", _M, ("core_flexion", "core_anti"), r"leg raise|knee raise|v[- ]?up|toes to bar|hanging|l[- ]?sit"),
+        ("hip_locomotion", _M, None, r"\bsled\b|\brun|jog|sprint|stair|step ?mill|lunge|split squat|step ?ups?"),
+        ("hip_quiet", _L, ("calf", "leg_curl", "leg_extension", "step_down", "carry", "cardio", "ankle_dorsiflexion"), None),
+    ),
+    "lower_regions": ("lower", "full_body", "cardio"),
+    "why": "fourth red team (2026-11-12): a knee-pain note on the squat was routed as a SPINAL-LOAD flag (the joint model had no "
+    "knee), which cut a row and a calf raise and left three lunge patterns at RPE 8-9 in a week the knee hurt. Knee and hip join "
+    "the joint-stress map as a PAIN-MAP rating, by class: knee-dominant squat, lunge, split-squat, step-up and knee-extension "
+    "work high (the box / wall / Spanish squat regressions a physio uses moderate); a pull off the floor, a leg curl and "
+    "loaded locomotion moderate; hinges high for the hip, loaded hip flexion and hip-dominant isolation moderate; upper-body "
+    "work low; a lower-body row no rule recognises stays unknown (never read as safe). Practitioner consensus, not a trial; "
+    "never read by the rubric's joint cost (quality_rubric.RUBRIC_JOINTS).",
+}
+"""Knee and hip pain-map ratings by class (`apply_class_rules`): first matching (pattern, title) rule; else low for an upper-
+body / core row, unknown for a lower-body row no rule recognises."""
+
+
+def knee_hip(e: dict[str, Any]) -> dict[str, tuple[str, str]]:
+    """{joint: (level, rule)} for one movement by KNEE_HIP."""
+    import re
+
+    title, pattern = str(e.get("title") or ""), e.get("pattern")
+    region = str((e.get("target") or {}).get("region") or "")
+    out: dict[str, tuple[str, str]] = {}
+    for joint in ("knee", "hip"):
+        for name, level, patterns, rx in KNEE_HIP[joint]:
+            if (patterns is None or pattern in patterns) and (rx is None or re.search(rx, title, re.I)):
+                out[joint] = (level, name)
+                break
+        else:
+            out[joint] = ("unknown", "unrecognised_lower") if region in KNEE_HIP["lower_regions"] else (_L, "upper_or_core")
+    return out
+
+
 def _rank(level: str) -> int:
     return {"low": 0, "moderate": 1, "high": 2}.get(str(level), -1)
 
 
 def apply_class_rules(movements: dict[str, dict[str, Any]]) -> dict[str, list[str]]:
-    """The two class rules, in place, AFTER the canonical layer (each row's pattern and attributes are final) and before any
+    """The class rules (#5861 FIX3 two, FIX4 the knee/hip map), in place, AFTER the canonical layer (each row's pattern and attributes are final) and before any
     tier is derived; each change is recorded on the row (`attribute_audit.class_rule`). Returns {rule: [keys changed]}."""
     import re
 
-    out: dict[str, list[str]] = {"shoulder_provoking": [], "spine_at_sides": []}
+    out: dict[str, list[str]] = {"shoulder_provoking": [], "spine_at_sides": [], "knee_hip": []}
     for key, e in sorted(movements.items()):
         js_ = dict(e.get("joint_stress") or {})
+        dup = (e.get("variant") or {}).get("duplicate_of") if isinstance(e.get("variant"), dict) else None
+        for joint, (level, _rule) in knee_hip(movements.get(str(dup)) or e).items():  # #5861 FIX4: the pain map; an alias = its head
+            js_[joint] = level
+        out["knee_hip"].append(key)
         title = str(e.get("title") or "")
         hit = e.get("pattern") in SHOULDER_PROVOKING["patterns"] or re.search(SHOULDER_PROVOKING["title"], title, re.I)
         if hit and _rank(js_.get("shoulder", "unknown")) < _rank(SHOULDER_PROVOKING["floor"]):

@@ -419,6 +419,30 @@ by ONE definition (`live_balance.spine_loading`), shared by the stacking rule, t
 raise at B, pull-up A vs pulldown S (the S quota now leaves one pulldown S), and per-row evidence labels for the strength and
 functional rubrics (still the rule-level `consensus`). Each is named on the PR as open.
 
+## Fourth red team: the knee/hip pain map and four input corrections (#5861 FIX4, library 0.3.2 — PROPOSED)
+
+The fourth red team (2026-11-12) graded the engine B- (safety C). Its data findings, fixed in the generator (never by hand):
+
+1. **Knee and hip in the joint-stress map** (`deploy/exercise_library_input_review.KNEE_HIP`, a class rule). A knee-pain note on
+   the squat was routed as a spinal-load flag because the map had no knee. Every movement now carries `knee` and `hip`:
+   knee-dominant squat, lunge, split-squat, step-up and knee-extension work is `high` for the knee; the regressions a physio uses
+   (box, wall, Spanish squat) `moderate`; a pull off the floor, a leg curl and loaded locomotion `moderate`; the RDL family `low`.
+   Hinges are `high` for the hip; loaded hip flexion and hip-dominant isolation `moderate`. Upper-body and trunk rows read `low`; a
+   lower-body row no rule recognises stays `unknown` (never read as safe). An alias takes its head's rating. **This is a PAIN-MAP
+   rating, practitioner consensus, not a trial** — the live pain rule reads it (`live_program.joint_flags`); the rubric's joint
+   cost does NOT (`quality_rubric.RUBRIC_JOINTS`, the five original joints), so no tier moved on it. Adding the knee and hip to the
+   joint cost would re-tier the lower body: a separate, reviewed change (owner decision).
+2. **The band rung of the pull-up ladder.** Hevy's built-in "Pull Up (Band)" (template 56808FD2, `is_custom: false` in the
+   template index) is now a library movement (`pull_up_band`, no gate: the band is the on-ramp) and a catalog `coach_added` entry of
+   the vertical-pull family — a garage with a bar serves it instead of the dumbbell pull-over.
+3. **Generous tiers, corrected at the input that was wrong** (`exercise_library_targets.INPUT_OVERRIDES`): the landmine press (both
+   forms) and the trap pulldown read a `moderate` load ceiling (hypertrophy S -> A: the bar's arc and one bar end cap the press;
+   the trap pulldown is a short-range scapular-depression pull); the sled push and pull are `submaximal` (strength A -> B: loaded
+   locomotion is not a maximal-strength lift). Walking C vs the incline treadmill A was rechecked and KEPT: the incline is what
+   gives the treadmill its high stimulus and fine control; outdoor walking is moderate stimulus, low control.
+4. **Trunk drills are not strength lifts** (`CATEGORY_OVERRIDES`): the Pallof press family is `rehab_control` (anti-rotation, rated
+   on functional) and the ab wheel `hypertrophy` (anti-extension for the abs).
+
 ## Target-label audit (#5857, owner-approved on PR #5858)
 
 A movement's `target.primary` came through raw from Hevy's own muscle label, and the rubric grades a movement against that

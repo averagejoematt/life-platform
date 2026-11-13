@@ -349,7 +349,7 @@ def _not_prescribable(ck: str | None, spec: dict[str, Any], catalog: dict[str, A
 def _exclusion(lid: str, e: dict[str, Any], ck: str | None, ctx: dict[str, Any]) -> tuple[str, str] | None:
     """(C-reason code, why) for a library movement this slot cannot serve, or None."""
     why = pain_exclusion(e, ctx["overlay"])
-    if why:
+    if why and str(e.get("template_id") or "").upper() not in ((ctx.get("policy") or {}).get("mild_pain") or ()):  # FIX4, live only
         return "pain_swap", why
     why = not_for_you_now(e)
     if why:

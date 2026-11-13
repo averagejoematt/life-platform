@@ -327,6 +327,9 @@ def gate_draft(ideal: Any, target_date: str, adapt: Callable[[dict[str, Any] | N
     )
     if live is not None:
         ideal.rationale = list(getattr(ideal, "rationale", None) or []) + list((pick or {}).get("live") or [])
+        from training.live_shape import walk_note
+
+        walk_note(ideal, (pick or {}).get("live"))  # #5861 FIX4: the week's optional walk, on exercise 1 (live only)
     if cardio is not None:
         ideal.exercises.append(cardio)
         _refresh_session_shape(ideal)

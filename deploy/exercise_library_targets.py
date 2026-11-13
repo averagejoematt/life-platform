@@ -481,14 +481,46 @@ CATEGORY_OVERRIDES: dict[str, tuple[str, str]] = {
     "sled_drag": ("carry", "a sled pull is loaded locomotion (the carry family), rated on functional, strength and conditioning"),
     "dead_arm_hang": ("rehab_control", "a hang is the dead hang's variant: shoulder and grip control, not a growth movement"),
     "dead_arm_switch_grip_hang": ("rehab_control", "a hang is the dead hang's variant: shoulder and grip control, not a growth movement"),
+    # ── #5861 FIX4 (fourth red team): trunk drills are not strength lifts ──
+    "cable_pallof_press": (
+        "rehab_control",
+        "the Pallof press (its aliases follow the head) is anti-rotation trunk control (trunk_function anti_rotation), rated on functional — not a strength lift",
+    ),
+    "ab_wheel": (
+        "hypertrophy",
+        "an ab-wheel rollout is loaded anti-extension for the abs (trunk_function anti_extension, rated on hypertrophy and "
+        "functional) — not a strength lift",
+    ),
 }
 
 # library key -> (objective_inputs fields, reason): where the input rule is wrong for the movement
 INPUT_OVERRIDES: dict[str, tuple[dict, str]] = {
     "ab_wheel": ({"ceiling": "moderate", "ladder": True}, "progresses kneeling -> standing and by range: a ladder, not a fixed load"),
     "side_plank": ({"ceiling": "moderate"}, "progresses by lever, a top-leg raise and added load"),
-    "sled_push": ({"functional": ["locomotion", "trunk_stability"]}, "pushing a loaded sled braces the trunk against the load"),
-    "sled_drag": ({"functional": ["locomotion", "trunk_stability"]}, "dragging a loaded sled braces the trunk against the load"),
+    "sled_push": (
+        {"functional": ["locomotion", "trunk_stability"], "resistance_class": "submaximal"},
+        "pushing a loaded sled braces the trunk against the load; #5861 FIX4: a sled is loaded locomotion, not a maximal-strength "
+        "lift (the plate-loaded rule read it 'maximal' -> strength A): submaximal -> strength B",
+    ),
+    "sled_drag": (
+        {"functional": ["locomotion", "trunk_stability"], "resistance_class": "submaximal"},
+        "dragging a loaded sled braces the trunk against the load; #5861 FIX4: loaded locomotion, not a maximal-strength lift",
+    ),
+    # ── #5861 FIX4 (fourth red team): two generous S tiers, corrected at the input that was wrong ──
+    "landmine_press": (
+        {"ceiling": "moderate"},
+        "the bar's arc unloads toward lockout and one bar end held in the hand caps the load (a dumbbell-class press): the front "
+        "delts cannot be overloaded to a high ceiling -> A, not S (fourth red team)",
+    ),
+    "landmine_press_single_arm": (
+        {"ceiling": "moderate"},
+        "one bar end in one hand, the arc unloading toward lockout: a moderate load ceiling -> A, not S (fourth red team)",
+    ),
+    "trap_pulldown": (
+        {"ceiling": "moderate"},
+        "Hevy's 'Trap Pulldown' reads as a scapular-depression pulldown (short range, the lower traps lead): it cannot load the lats "
+        "to a lat pulldown's ceiling -> A, not S (fourth red team; the title is ambiguous, so the target is left as logged)",
+    ),
     "db_cossack_squats": ({"mobility": "loaded"}, "a cossack squat is loaded end-range hip abduction: strength through range"),
     "hip_thrust_machine": ({"limiter": "target"}, "the glutes end a hip-thrust set; the trunk is supported"),
     "kettlebell_turkish_get_up": (
@@ -497,6 +529,7 @@ INPUT_OVERRIDES: dict[str, tuple[dict, str]] = {
     ),
     "landmine_squat": ({"ceiling": "moderate"}, "the bar end is held at the chest: the hands and upper back cap the load, like a goblet"),
     "pull_up_assisted": ({"ceiling": "moderate"}, "an assisted pull-up is a regression: its ceiling is the unassisted pull-up"),
+    "pull_up_band": ({"ceiling": "moderate"}, "a band-assisted pull-up is a regression: its ceiling is the unassisted pull-up"),
     "chin_up_assisted": ({"ceiling": "moderate"}, "an assisted chin-up is a regression: its ceiling is the unassisted chin-up"),
     "triceps_dip_assisted": ({"ceiling": "moderate"}, "an assisted dip is a regression: its ceiling is the unassisted dip"),
     # ── #5861 FIX-DATA ──

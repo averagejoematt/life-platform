@@ -683,4 +683,8 @@ def test_a_generated_draft_serves_the_selection_once_approved():
     role = snap["calendar"]["session_role"]
     want = snap["selection"]["variants_by_role"][role]
     keys = [b.movement_key for b in ideal.exercises]
-    assert snap["rotation"]["variants"] == want and all(v in keys for v in want.values())
+    # #5861 FIX4 (drop, don't shave): a short morning's time fit may DROP a whole selected accessory (it never shaves one to a
+    # single set) — the selection still served it, and the time line names it
+    timed = " ".join(ln for ln in ideal.rationale if ln.startswith("time (live)") and "dropped " in ln)
+    titles = {k: (CAT0.get(k) or {}).get("title") or k for k in want.values()}
+    assert snap["rotation"]["variants"] == want and all(v in keys or titles[v] in timed for v in want.values())

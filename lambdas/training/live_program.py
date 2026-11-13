@@ -145,7 +145,7 @@ until the library builder carries the key: the shoulders+arms press above one se
 MIN_CARDIO_MINUTES = 10  # heuristic: a cardio block shorter than this under the shared cap is dropped, not served as a stub
 
 STRESS = {"low": 0, "moderate": 1, "high": 2}
-JOINTS = ("shoulder", "elbow", "wrist", "spinal_load", "shear")
+JOINTS = ("shoulder", "elbow", "wrist", "spinal_load", "shear", "knee", "hip")  # #5861 FIX4: knee + hip (the pain map)
 PATTERN_GROUPS = {
     "press": ("horizontal_press", "vertical_press", "press", "chest_fly", "triceps_extension"),
     "pull": ("vertical_pull", "horizontal_pull", "rear_delt", "curl"),
@@ -165,9 +165,11 @@ def is_live(rx: dict[str, Any] | None) -> bool:
 def settings(lib: dict[str, Any] | None) -> dict[str, Any]:
     """The library's programming settings over SETTINGS_DEFAULTS (a missing key reads its default)."""
     from training.live_balance import SETTINGS_DEFAULTS as FIX3  # #5861 FIX3: the third red team's settings
+    from training.live_safety import SETTINGS_DEFAULTS as FIX4_SAFETY  # #5861 FIX4: the fourth red team's settings
+    from training.live_shape import SETTINGS_DEFAULTS as FIX4_SHAPE
 
     got = (lib or {}).get(SETTINGS_KEY) or {}
-    return {k: got.get(k, v) for k, v in {**SETTINGS_DEFAULTS, **FIX3}.items()}
+    return {k: got.get(k, v) for k, v in {**SETTINGS_DEFAULTS, **FIX3, **FIX4_SAFETY, **FIX4_SHAPE}.items()}
 
 
 def _entry(key: str | None, ctx: dict[str, Any]) -> dict[str, Any]:
@@ -209,7 +211,7 @@ def mark_costs(rx: dict[str, Any], ctx: dict[str, Any]) -> None:
     reduce_min_sets) — what `fatigue_model.apply_to_session` reads to cut high-fatigue work first."""
     for e in rx.get("exposures") or []:
         e["live_cost"] = fatigue_cost(e, ctx)
-        if e["live_cost"] != "low":
+        if e["live_cost"] != "low" or e.get("intensity") != "carry":  # #5861 FIX4: isolation too — drop, don't shave
             e["live_min_sets"] = int(DELOAD_SHAPE["reduce_min_sets"]["value"])
 
 
@@ -280,14 +282,10 @@ def joint_flags(ctx: dict[str, Any], workouts: list[dict[str, Any]] | None, disc
     the joint(s) it loads hardest, its pattern group, and the tier the pain-monitoring rule gives (`avoid` | `reduce`).
     Severity is the latest stated n/10 on that movement's notes (training_notes_pain.stated_severity); 'sharp' or no number
     on a pain flag reads `avoid` (the conservative side), a discomfort flag reads `reduce`."""
-    from training import selection_engine as se
+    from training import live_safety, selection_engine as se
     from training.training_notes_pain import stated_severity
 
-    notes: dict[str, str] = {}
-    for w in sorted(workouts or [], key=lambda w: str(w.get("date") or w.get("sk") or "")):
-        for ex in w.get("exercises") or []:
-            if ex.get("notes"):
-                notes[str(ex.get("template_id") or "").upper()] = str(ex["notes"])
+    notes = live_safety.latest_notes(workouts)
     out = []
     for mid, entry in sorted((ctx["lib"].get("movements") or {}).items()):
         tid = str(entry.get("template_id") or "").upper()
@@ -295,22 +293,25 @@ def joint_flags(ctx: dict[str, Any], workouts: list[dict[str, Any]] | None, disc
         if not pain and tid not in discomfort:
             continue
         worst = max((STRESS.get(str((entry.get("joint_stress") or {}).get(j)), -1) for j in JOINTS), default=-1)
-        joints = [j for j in JOINTS if worst >= 1 and _stress(entry, j) == worst]
+        note = notes.get(tid, "")
+        # #5861 FIX4: the joint the NOTE names (knee, hip, low back, …) first; the movement's worst joint only as the fallback
+        joints, group, site = live_safety.flag_joints(
+            note, [j for j in JOINTS if worst >= 1 and _stress(entry, j) == worst], _group(entry.get("pattern"))
+        )
         if not joints:
             continue
-        note = notes.get(tid, "")
         sev = stated_severity(note) if note else None
-        mild = sev is not None and sev <= float(PAIN_RULE["mild_max"]["value"]) and "sharp" not in note.lower()
-        tier = "avoid" if pain and not mild else "reduce"
+        tier = "avoid" if pain and not live_safety.mild(note) else "reduce"
         out.append(
             {
                 "movement_id": mid,
                 "title": entry.get("title"),
                 "joints": joints,
-                "group": _group(entry.get("pattern")),
+                "group": group,
                 "tier": tier,
                 "severity": sev,
                 "source": "pain" if pain else "discomfort",
+                "site": site,
             }
         )
     return out
@@ -334,7 +335,7 @@ def apply_joint_rule(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str
     """IN PLACE: every exposure that loads a flagged joint (module doc 3). `avoid`: swapped for a member that loads that joint
     less than moderate (`live_session._replacement` with the joint cap), else skipped; `reduce`: kept, marked for a load cut
     (`live_load`) and an RPE cap. Returns the rationale lines."""
-    from training import live_session as ls
+    from training import live_safety, live_session as ls
 
     if not flags:
         return []
@@ -349,15 +350,31 @@ def apply_joint_rule(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str
             keep.append(e)
             continue
         tier, f, joint = hit
+        if tier == "avoid" and (e.get("live_swap") or {}).get("code") == "pain" and _stress(entry, joint) < STRESS["high"]:
+            tier = "reduce"  # #5861 FIX4: the session fit already swapped in the lower-stress regression — keep it, lighter
         name = entry.get("title") or e.get("movement_key")
         why = f"{f['source']} flag on {f['title']} ({joint.replace('_', ' ')}" + (f", {f['severity']:g}/10" if f["severity"] else "") + ")"
+        stop = live_safety.stop_line(f["severity"])  # #5861 FIX4: every lift the pain rule touches carries an in-set stop line
         if tier == "avoid":
             new = ls._replacement(e, "joint", ctx, rotation, taken, limit=(joint, level))
+            lighter = None
+            if not new and _stress(entry, joint) >= STRESS["high"]:  # FIX4: no low member -> a moderate one, reduced
+                new = lighter = ls._replacement(e, "joint", ctx, rotation, taken, limit=(joint, STRESS["high"]))
             if new:
                 taken.add(new)
-                keep.append(e | {"movement_key": new, "template_id": None, "live_swap": {"from": e["movement_key"], "code": "joint"}})
+                swapped = e | {"movement_key": new, "template_id": None, "live_swap": {"from": e["movement_key"], "code": "joint"}}
+                swapped["live_stop"] = stop
+                if lighter:
+                    swapped["live_load"] = {"pct": int(PAIN_RULE["reduce_pct"]["value"]), "why": f"{joint.replace('_', ' ')} flag"}
+                    swapped["live_effort"] = min(int(PAIN_RULE["reduce_rpe"]["value"]), int(e.get("live_effort") or 99))
+                keep.append(swapped)
                 lines.append(
                     f"swapped (live): {name} -> {(ctx['catalog'].get(new) or {}).get('title') or new} — {why}: same pattern, avoided"
+                    + (
+                        f"; no member loads the {joint.replace('_', ' ')} low — a moderate one, {PAIN_RULE['reduce_pct']['value']}% lighter, RPE <= 7"
+                        if lighter
+                        else ""
+                    )
                 )
             else:
                 lines.append(f"skipped (live): {name} — {why}: same pattern, no member loads that joint less — nothing fills it")
@@ -368,6 +385,7 @@ def apply_joint_rule(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str
             "why": f"{joint.replace('_', ' ')} flag",
         }
         e["live_effort"] = min(int(PAIN_RULE["reduce_rpe"]["value"]), int(e.get("live_effort") or 99))
+        e["live_stop"] = stop
         keep.append(e)
         lines.append(f"reduced (live): {name} — {why}: loads that joint, {PAIN_RULE['reduce_pct']['value']}% lighter, RPE <= 7")
     rx["exposures"] = [{k: v for k, v in e.items() if not (k == "template_id" and v is None)} for e in keep]
@@ -653,17 +671,23 @@ def plan(rx: dict[str, Any], rotation: dict[str, Any], ctx: dict[str, Any], work
     sel = (rotation.get("selection") or {}).get("slots") or []
     pinned = {str(s.get("incumbent")) for s in sel if (s.get("owner_pin") or {}).get("state") == "held"}
     pinned |= {sid.split(".", 1)[1] for sid in selection_live.SLOT_OBJECTIVES if sid.startswith(f"{rx.get('session_role')}.")}
-    from training import live_balance as lb  # #5861 FIX3
+    from training import (
+        live_balance as lb,  # #5861 FIX3
+        live_shape,  # #5861 FIX4
+    )
 
+    lines = live_shape.add_slots(rx, ctx)  # the quadriceps slot, BEFORE the pain rule so a knee flag reaches it
+    lines += lb.place_kb(rx, ctx, workouts)  # FIX4: placed first, so a pain flag reaches the slot where it lands
     flags = joint_flags(ctx, workouts, ctx.get("discomfort") or set())
-    lines = apply_joint_rule(rx, ctx, rotation, flags) + lb.pain_assess(rx, ctx, flags, workouts) + lb.place_kb(rx, ctx, workouts)
+    lines += apply_joint_rule(rx, ctx, rotation, flags) + lb.pain_assess(rx, ctx, flags, workouts)
     lines += live_week.kb_slot(rx, ctx)  # the kettlebell slot names its implement, capped at RPE 7-8 (before stacking)
-    lines += lb.allocate(rx, ctx)  # volume by priority: over-MAV isolation gives, priority muscles at MEV + 1 take
-    lines += live_week.press_sets(rx, ctx)  # the press option takes its sets from the delt isolation left after it
+    lines += lb.allocate(rx, ctx)  # volume by priority: at/over-MAV isolation gives, priority muscles at MEV + 2 take (FIX4)
+    lines += live_week.press_sets(rx, ctx)  # FIX4: the week's allocation already counted the press option's sets
     lines += avoid_stacking(rx, ctx, rotation, pinned)
     lines += mark_retreats(rx, ctx, workouts, trends)
     lines += stall_scheme(rx, ctx, trends)
     lines += short_week_carry(rx, ctx)
+    lines += live_shape.deadlift_shape(rx, ctx["lib"]) + live_shape.order_lower_volume(rx)  # FIX4: the heavy pull, squat first
     mark_costs(rx, ctx)
     return lines
 
@@ -852,6 +876,12 @@ def annotate(blocks: list[Any], rx: dict[str, Any]) -> None:
         if e.get("live_kb"):
             b.notes = live_week.kb_note(b.notes or "")
         b.notes = live_balance.assess_note(live_balance.one_effort(b.notes), str(e.get("live_assess") or ""))  # FIX3
+        b.notes = live_balance.assess_note(b.notes, str(e.get("live_stop") or ""))  # FIX4: the in-set stop line
+    from training import live_safety, selection_engine as se  # #5861 FIX4: no load step on a held lift; one effort; stop line
+
+    rx[ls.MARK].setdefault("lines", []).extend(live_safety.no_step(blocks, rx))
+    live_safety.coherent_effort(blocks, rx)
+    live_safety.lifting_day_symptom(blocks, settings(se.load_library_failsoft()))
 
 
 # ── 5. cardio ─────────────────────────────────────────────────────────────────
@@ -953,9 +983,14 @@ def cardio_fit(menu: dict[str, Any], live: dict[str, Any] | None) -> tuple[dict[
             "credited (cardio_model.aerobic_plan: steps first, no cardio added without a purpose)"
         )
         return None, lines
+    from training import live_shape  # #5861 FIX4: a small gap is the walk's, never a silent shortfall
+
+    covered = live_shape.walk_covers(kind, live)
+    if covered:
+        return None, lines + covered + live_shape.walk_prompt(live)
     keep, gap = live_balance.easy_gap(kind, live)  # FIX3: an easy block closes the week's gap after the walking credit, no more
     if not keep:
-        return None, lines + gap
+        return None, lines + gap + live_shape.walk_prompt(live)
     lines += gap
     minutes, prog = live_week.cardio_progress(kind, live, cardio_menu.block_minutes(kind))  # week to week: cardio_model.progress
     lines += prog
@@ -963,11 +998,11 @@ def cardio_fit(menu: dict[str, Any], live: dict[str, Any] | None) -> tuple[dict[
         room = int(float(live["cap"]) - float(live["lifting_minutes"]))
         if room < live_balance.min_block(kind, MIN_CARDIO_MINUTES):  # an easy stub under 20 min is worthless
             lines.append(f"cardio (live): no block — the shared {live['cap']}-min cap leaves {max(room, 0)} min after lifting")
-            return None, lines
+            return None, lines + live_shape.walk_prompt(live)
         if room < minutes:
             lines.append(f"cardio (live): {minutes} -> {room} min — the shared {live['cap']}-min cap (session_cap_includes_cardio)")
             minutes = room
-    return {**menu, "kind": kind, "live_minutes": minutes}, lines
+    return {**menu, "kind": kind, "live_minutes": minutes}, lines + live_shape.walk_prompt(live, minutes)
 
 
 def cardio_note(notes: str, live: dict[str, Any] | None, kind: str) -> str:
@@ -981,7 +1016,9 @@ def cardio_note(notes: str, live: dict[str, Any] | None, kind: str) -> str:
         notes = live_balance.machine_label(notes, se.load_library_failsoft())  # FIX3: no "Recumbent" without one
     if not live or kind not in HARD_KINDS:
         return notes
-    line = str((live.get("settings") or {}).get("symptom_line") or "").strip()
+    from training.live_safety import symptom_text
+
+    line = symptom_text(live.get("settings"))  # #5861 FIX4: a preset name (`extended`) or the owner's literal wording
     return f"{notes}\n{line}".strip() if line and line not in notes else notes
 
 

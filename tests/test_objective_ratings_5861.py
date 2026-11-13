@@ -221,8 +221,10 @@ def test_an_alias_never_scores_differently_from_its_canonical():
 PINNED = {
     "PATTERN_OVERRIDES": 23,  # #5861 FIX-DATA: +9 (side bends, the title-regex misses)
     "STRENGTH_LIFTS": 9,
-    "CATEGORY_OVERRIDES": 14,  # +2 (the dead-hang variants)
-    "INPUT_OVERRIDES": 19,  # +10 (shrug grip limiter, kickback ceilings, cuff mobility n/a, the dead-hang variants); FIX2-DATA -2 (cuff mobility is the class rule now)
+    "CATEGORY_OVERRIDES": 16,  # +2 (the dead-hang variants); FIX4 +2 (the Pallof press and the ab wheel are not strength lifts)
+    # +10 (shrug grip limiter, kickback ceilings, cuff mobility n/a, the dead-hang variants); FIX2-DATA -2 (cuff mobility is the class
+    # rule now); FIX4 +4 (the landmine presses and the trap pulldown at a moderate ceiling, the band pull-up a regression)
+    "INPUT_OVERRIDES": 23,
     "SECONDARY_ROWS": 6,
     "CANONICAL_FAMILIES": 49,  # +5 (one machine, one rating)
 }
@@ -305,8 +307,8 @@ ANOMALIES = {  # key: (hypertrophy, strength, functional, conditioning, mobility
     "walking_lunge_dumbbell": ("B", "B", "S", None, None),
     "farmers_walk": (None, "B", "S", "C", None),
     "farmers_walk_8d414b80": (None, "B", "S", "C", None),
-    "sled_push": (None, "A", "A", "B", None),
-    "sled_drag": (None, "A", "A", "B", None),
+    "sled_push": (None, "B", "A", "B", None),  # FIX4: a sled is loaded locomotion, not a maximal-strength lift (strength A -> B)
+    "sled_drag": (None, "B", "A", "B", None),
     "ab_wheel": ("A", None, "B", None, None),
     "bird_dog": (None, None, "C", None, "B"),
     "side_plank": (None, None, "B", None, None),

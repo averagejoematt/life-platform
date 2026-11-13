@@ -46,6 +46,7 @@ from training import (  # noqa: E402
     live_balance as lb,
     live_program as lp,
     live_session as ls,
+    live_shape,
     live_week as lw,
     program_structure as ps,
     selection_engine as se,
@@ -620,6 +621,9 @@ def test_c4_volume_comes_down_when_recovery_worsens_compounds_first_and_loads_ne
     assert all(s["fatigue"]["action"] == "deload_recommended" for s in f["sessions"])  # recommended — applied only on his word
     assert rising_loads(ws["f_high_fatigue_poor_sleep"]) == [] and rising_loads(ws["b_shoulder_flag_low_recovery"]) == []
     assert not any("Heavier" in (x["hevy_note"] or "") for x in _lifts(f))
+    # #5861 FIX4 (fourth red team): "loads never rise" reads the NOTE too — the session rule's "+10 lb on later sets" on a
+    # deload-recommended day undid the cut it sat under (control: tests/test_programming_fix4_5861.py, the rule fitted to nothing)
+    assert not any("on later sets" in (x["hevy_note"] or "") for x in _lifts(f))
     assert all(n <= 2 for n in _anchor_sets(f).values())  # compounds cut first
     hi_cut = _lift_sets(f, "high", lib, cat) / _lift_sets(a, "high", lib, cat)
     lo_kept = _lift_sets(f, "low", lib, cat) / _lift_sets(a, "low", lib, cat)
@@ -1001,6 +1005,7 @@ def filled(week: dict, lib: dict, catalog: dict) -> list[str]:
         expected = len(tmpl["anchors"]) + len(tmpl["accessories"])
         rat = s["rationale"]
         expected -= sum(1 for ln in rat if ln.startswith(("skipped (live)", "dropped (live)")))
+        expected -= sum(1 for ln in rat if ln.startswith("allocation (live)") and " -> 0 sets" in ln)  # FIX4: the weekly redline
         added_titles = {
             re.sub(r" \d+ x \d+-\d+$", "", ln[len("added (live): ") :].split(" — ")[0]) for ln in rat if ln.startswith("added (live): ")
         }
@@ -1021,7 +1026,10 @@ def filled(week: dict, lib: dict, catalog: dict) -> list[str]:
             t = (sw._lib_entry(lib, catalog, x["key"]).get("target") or {}).get("primary")
             mu = sw.LANDMARK_OF.get(str(t), str(t))
             lm = m["landmarks"].get(mu)
-            if not lm or lm["sets"] - x["working_sets"] >= lm["MEV"]:
+            # #5861 FIX4: a priority muscle at or under MEV + live_shape VOLUME priority_margin without it takes freed sets (the
+            # allocation's own rule: sets MOVED from a muscle at MAV, never new volume — the weekly redline holds the total)
+            room = int(live_shape.VOLUME["priority_margin"]["value"]) if mu in PRIORITY else 0
+            if not lm or lm["sets"] - x["working_sets"] > lm["MEV"] + room or (not room and lm["sets"] - x["working_sets"] >= lm["MEV"]):
                 out.append(f"{s['role']}: {x['key']} added for {mu}, already at MEV without it")
     out += [f"{mu} over MRV" for mu, v in m["landmarks"].items() if v["verdict"] == "over MRV"]
     # third red team: the template's OWN accessories could never be "filling" (the delt spread passed). An outcome now: a muscle
@@ -1050,8 +1058,14 @@ def test_d5_no_training_is_added_to_fill_slots(weeks):
 
 
 def exercise_count_problems(week: dict) -> list[str]:
+    """#5861 FIX4: an adherence-dip / behind-schedule session (its own ~60 / ~45-min cap) may be its anchors alone — the time fit
+    drops whole accessories, never shaves one to a single set (drop, don't shave)."""
     lo, hi = EXERCISES_PER_SESSION
-    return [f"{s['role']}: {len(s['lifts'])}" for s in week["sessions"] if not lo <= len(s["lifts"]) <= hi]
+
+    def floor(s: dict) -> int:
+        return 3 if any(ln.startswith(("adherence dip (live)", "behind schedule (live")) for ln in s["rationale"]) else lo
+
+    return [f"{s['role']}: {len(s['lifts'])}" for s in week["sessions"] if not floor(s) <= len(s["lifts"]) <= hi]
 
 
 def test_d6_each_session_has_a_sensible_number_of_exercises(weeks):

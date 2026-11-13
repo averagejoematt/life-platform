@@ -550,7 +550,14 @@ def build_policy(
         "position": position,
         "week_counts": Counter(),
         "recent_tids": recent,  # #5861 second red team: what he performed in RECENT_DAYS (the novelty budget's "new to him")
+        "mild_pain": _mild_pain(block_workouts),  # #5861 FIX4: a mild (<= 3/10, not sharp) pain note keeps the movement
     }
+
+
+def _mild_pain(block_workouts: list[dict[str, Any]] | None) -> set[str]:
+    from training.live_safety import mild_pain_tids
+
+    return mild_pain_tids(block_workouts) if block_workouts else set()
 
 
 def _recent_tids(block_workouts: list[dict[str, Any]], as_of: str) -> set[str]:

@@ -48,7 +48,7 @@ def test_the_proposed_drafts_serve_exactly_what_the_base_tree_served():
 
 
 def _poisoned():
-    from training import live_balance, live_session, live_week, selection_live
+    from training import live_balance, live_safety, live_session, live_shape, live_week, selection_live
 
     def boom(name):
         def _f(*a, **k):
@@ -89,6 +89,23 @@ def _poisoned():
         (live_balance, "cardio_machine"),
         (live_balance, "machine_label"),
         (live_balance, "rate_band"),
+        # #5861 FIX4: the fourth red team's live rules never run in shadow (why_effort's fix_block is reached only past its live mark)
+        (live_safety, "flag_joints"),
+        (live_safety, "mild_pain_tids"),
+        (live_safety, "no_step"),
+        (live_safety, "coherent_effort"),
+        (live_safety, "fix_block"),
+        (live_safety, "lifting_day_symptom"),
+        (live_shape, "reallocate"),
+        (live_shape, "week_ceiling"),
+        (live_shape, "add_slots"),
+        (live_shape, "no_single_sets"),
+        (live_shape, "next_drop"),
+        (live_shape, "order_lower_volume"),
+        (live_shape, "deadlift_shape"),
+        (live_shape, "walk_prompt"),
+        (live_shape, "walk_note"),
+        (live_shape, "kb_under_strain"),
     ]
     return [patch.object(mod, name, boom(f"{mod.__name__}.{name}")) for mod, name in targets]
 

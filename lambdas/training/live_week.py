@@ -249,9 +249,9 @@ def make_cardio_room(blocks: list[Any], rx: dict[str, Any], movements: dict[str,
     taken: Counter = Counter()
     before = shape["lifting_minutes"]
     paired = _pair_antagonists(blocks, rx) if shape["lifting_minutes"] > cap - reserve else []  # charter: pair before cutting
-    # #5861 FIX3: a second pass to ONE set (isolation surplus over MEV only) before the minimum block is cut short — the third
-    # red team: "let the room come from delt-isolation surplus, not from the intervals"
-    for floor in (int(CARDIO_ROOM["min_sets"]["value"]), 1):
+    # #5861 FIX3 ran a second pass to ONE set here; FIX4 (fourth red team: "drop, don't shave") stops at two sets and lets
+    # `_drop_for_room` take whole isolation accessories instead — the room still comes from isolation, never the intervals
+    for floor in (int(CARDIO_ROOM["min_sets"]["value"]),):  # #5861 FIX4: never to one set — whole accessories go next
         while True:
             now = routine_minutes(blocks, movements)["lifting_minutes"]
             # sets over a muscle's MAV buy the WHOLE block (they add little); a surplus over MEV buys only the minimum block
@@ -282,8 +282,9 @@ def _drop_for_room(blocks: list[Any], rx: dict[str, Any], movements: dict[str, A
 
     week, marks, taken = env
     out = []
+    priority = {str(m) for m in _settings().get("priority_muscles") or []}
     while routine_minutes(blocks, movements)["lifting_minutes"] > limit:
-        cands = []
+        cands, late = [], []
         for i, b in enumerate(blocks):
             tag = str(b.rationale_tag or "")
             if not tag.startswith("accessory:") or tag.endswith(":carry") or b.movement_key in _fixed(rx):
@@ -293,6 +294,11 @@ def _drop_for_room(blocks: list[Any], rx: dict[str, Any], movements: dict[str, A
             lm = marks.get(m) or {}
             if lm and m != "abs" and week[m] - taken[m] - n >= float(lm["MEV"]):
                 cands.append((week[m] - taken[m] - float(lm["MEV"]), i, b, m, n))
+            elif lm and m != "abs" and m not in priority:
+                late.append((week[m] - taken[m] - float(lm["MEV"]), i, b, m, n))
+        # #5861 FIX4 (drop, don't shave): no one-set pass any more, so as the LAST resort before the minimum aerobic block is cut a
+        # NON-priority isolation accessory may go even under its MEV (the shared cap is the owner's choice of conditioning)
+        cands = cands or late
         if not cands:
             break
         _s, i, b, m, n = max(cands, key=lambda c: c[:2])
@@ -352,9 +358,9 @@ def trim_sets_for_time(blocks: list[Any], rx: dict[str, Any], movements: dict[st
     lib = se.load_library_failsoft() or {}
     taken: Counter = Counter()
     week, marks = week_sets(movements, lib), block_model.load_landmarks() or {}
-    # two passes: every accessory down to CARDIO_ROOM min_sets first, then (still over) to ONE hard set — a one-set accessory
-    # still holds the muscle's weekly dose better than dropping the exercise (red team: the triceps fell under MEV)
-    for floor in (int(CARDIO_ROOM["min_sets"]["value"]), 1):
+    # every accessory down to CARDIO_ROOM min_sets; #5861 FIX4 retired the second pass to ONE set (one-set accessories and
+    # superset halves are noise) — `fit_routine` then drops whole accessories, the largest surplus over MEV first
+    for floor in (int(CARDIO_ROOM["min_sets"]["value"]),):  # #5861 FIX4: drop, don't shave — then whole accessories (fit_routine)
         env = (week, marks, taken, floor, _fixed(rx))
         while routine_minutes(blocks, movements)["lifting_minutes"] > cap and _trim_one(blocks, movements, lib, env, (0, 1)):
             pass
@@ -576,8 +582,8 @@ def novel_start(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[
 
 def press_sets(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
     """IN PLACE, the live option `programming_settings.press_sets` (default 1 = the charter's `overhead_press_per_wk`, #5162):
-    above 1, the shoulders+arms overhead-press anchor gets that many working sets, each extra one taken from the face-pull
-    slot (rear delts — the week's largest delt surplus), never below two there. Returns the rationale lines."""
+    above 1, the shoulders+arms overhead-press anchor gets that many working sets. #5861 FIX4: the week's allocation counts them
+    (`live_balance._template_rows`), so the trade lands on the week's delt isolation there. Returns the rationale lines."""
     from training import selection_engine as se
 
     want = int(((se.load_library_failsoft() or {}).get("programming_settings") or {}).get("press_sets") or 1)  # absent = 1
@@ -587,17 +593,13 @@ def press_sets(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
     if press is None:
         return []
     added = 0
-    while len(press["sets"]) < want:  # FIX3: the face pull first; once the week's allocation left it at two, the lateral raise
-        donor = next(
-            (e for slot in ("face_pull", "db_lateral_raise") for e in rx["exposures"] if e.get("slot") == slot and len(e["sets"]) > 2), None
-        )
-        if donor is None:
-            break
-        press["sets"].append(dict(press["sets"][-1]))
-        donor["sets"].pop()
+    while len(press["sets"]) < want:  # #5861 FIX4: the week's allocation counted these sets (live_balance._template_rows) and took
+        press["sets"].append(dict(press["sets"][-1]))  # them from the delt isolation already — no second donor here
         added += 1
     return (
-        [f"press (live option): overhead press {len(press['sets'])} sets, {added} taken from the delt isolation (press_sets)"]
+        [
+            f"press (live option): overhead press {len(press['sets'])} sets, traded from the delt isolation by the week's allocation (press_sets)"
+        ]
         if added
         else []
     )

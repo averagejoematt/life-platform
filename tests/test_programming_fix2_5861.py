@@ -328,9 +328,19 @@ def test_a_ledger_carried_rotation_is_inside_the_weekly_novelty_budget():
     assert len(served) <= sl.MAX_NEW_PER_WEEK, served
     assert len(sw.measure(week, world["lib"], world["catalog"]["movements"], LANDMARKS)["new_this_week"]) <= sl.MAX_NEW_PER_WEEK
     assert any("novelty budget" in ln for s in week["sessions"] for ln in s["selection"])
-    with patch.object(sl, "enforce_novelty", lambda picked, policy, catalog=None: []):  # control
+    # control (FIX4: with the weekly redline, which may drop a whole slot, off too)
+    with (
+        patch.object(sl, "enforce_novelty", lambda picked, policy, catalog=None: []),
+        patch("training.live_shape.week_ceiling", lambda env, adds: []),
+    ):
         off = sw.generate_week(prof, "approved", world)
-    assert len(_carried_served(off, world)) == n
+    # FIX4 (drop, don't shave): four new movements each add a find-the-load warm-up, so the time fit may DROP a whole carried
+    # accessory rather than shave it to one set — it was still served by the selection, and the time line names it
+    cat = world["catalog"]["movements"]
+    timed = " ".join(ln for s in off["sessions"] for ln in s["rationale"] if ln.startswith("time (live)"))
+    carried = [(r.get("phase_2") or {}).get("variant") for r in world["rows"] if (r.get("phase_2") or {}).get("variant")]
+    dropped = [k for k in carried if k not in _carried_served(off, world) and "dropped " in timed and cat[k]["title"] in timed]
+    assert len(_carried_served(off, world)) + len(dropped) == n
 
 
 # ── 3. cardio ─────────────────────────────────────────────────────────────────
@@ -420,15 +430,28 @@ def _vertical_pulls(week: dict, lib: dict, cat: dict) -> int:
 
 
 def test_the_garage_week_keeps_a_vertical_pull_through_the_fallback_order(weeks):
-    """Red team: profile (c) has a pull-up bar but no pulldown station, and served no vertical pull all week. The fallback order
-    takes the first servable vertical pull — the bodyweight pull-up family is gate-locked for this lifter (fail-closed), so the
-    dumbbell pull-over serves. Control: the fallback off -> no vertical pull."""
+    """Red team: profile (c) has a pull-up bar but no pulldown station, and served no vertical pull all week. The bodyweight
+    pull-up family is gate-locked for this lifter (fail-closed). FOURTH red team (#5861 FIX4): the dumbbell pull-over is not a
+    vertical pull — Hevy's built-in "Pull Up (Band)" is now a library and catalog movement of the vertical-pull family, so the
+    garage serves the band rung. Controls: without the band rung the fallback order serves the pull-over (the old answer);
+    without the band rung AND the fallback -> no vertical pull."""
+    from training import live_session as ls
+
     c = weeks["c_equipment_limited"]
     lib, cat = c["world"]["lib"], c["world"]["catalog"]["movements"]
     assert _vertical_pulls(c["week"], lib, cat) >= 2
+    served = {x["key"] for s in c["week"]["sessions"] for x in s["lifts"]}
+    assert "pull_up_band" in served and "db_lat_pullovers" not in served
     gated = {"pull_up", "chin_up", "pull_up_negative", "pull_up_weighted", "chin_up_weighted"}
-    assert not gated & {x["key"] for s in c["week"]["sessions"] for x in s["lifts"]}  # a locked gate is never opened here
-    off = _week("c_equipment_limited", {(lw, "vertical_pull_fallback"): lambda e, ctx, taken: None})
+    assert not gated & served  # a locked gate is never opened here
+    real = ls._anchor_candidates
+    no_band = {(ls, "_anchor_candidates"): lambda e, ctx, role: [k for k in real(e, ctx, role) if k != "pull_up_band"]}
+    no_band[(lw, "VERTICAL_PULL_FALLBACK")] = tuple(k for k in lw.VERTICAL_PULL_FALLBACK if k != "pull_up_band")
+    old = _week("c_equipment_limited", no_band)
+    assert _vertical_pulls(old["week"], lib, cat) >= 2 and "pull_up_band" not in {
+        x["key"] for s in old["week"]["sessions"] for x in s["lifts"]
+    }
+    off = _week("c_equipment_limited", no_band | {(lw, "vertical_pull_fallback"): lambda e, ctx, taken: None})
     assert _vertical_pulls(off["week"], lib, cat) == 0
 
 
@@ -454,7 +477,10 @@ def test_the_press_sets_option_is_off_by_default_and_trades_a_face_pull_set():
 
     press = next(k for k in sa(a) if "press" in k)
     assert sa(a)[press] == 1  # control: the charter's one set
-    assert sa(on)[press] == 2 and sum(sa(on).values()) == sum(sa(a).values())
+    # #5861 FIX4: the week's allocation counts the press option, so the trade lands on the week's delt isolation (whichever
+    # day holds the surplus), not only this morning's face pull: the WEEK's sets and its shoulders stay put
+    week_sets = lambda w: sum(x["working_sets"] for s in w["sessions"] for x in s["lifts"])  # noqa: E731
+    assert sa(on)[press] == 2 and week_sets(on) <= week_sets(a)
 
 
 # ── 7. behind schedule ───────────────────────────────────────────────────────

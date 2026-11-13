@@ -1,6 +1,6 @@
 {
  "_README": "The owner's exercise library (#5769). PROPOSED — nothing in the drafting path reads it until the owner approves it. Public half only: no bodyweight, no loads, no note text — the N=1 half (best set per bodyweight band, coded note signals, gate threshold values) is the owner-private overlay s3://matthew-life-platform/config/coaching/exercise_library.private.json, joined at selection time by lambdas/training/exercise_library.py (fail-closed). Built by deploy/build_exercise_library.py from the full Hevy history + deploy/exercise_library_curation.py. Doc: docs/coaching/EXERCISE_LIBRARY.md.",
- "version": "0.3.1",
+ "version": "0.3.2",
  "status": "proposed",
  "change_log": [
   {
@@ -36,6 +36,13 @@
    "by": "#5861 FIX2-DATA (second red team 2026-11-12, PROPOSAL for the owner's review with the library)",
    "what": "Unreviewed is not poor (rubric 3.2.0): an unknown input scores its term's NEUTRAL value (a fully unknown movement lands at B), never helps reach S (`inputs_known`), and every rating on unreviewed or unknown inputs carries `provisional: true` (+ `provisional_why`). A reviewed-input pass (deploy/exercise_library_input_review.py) covers every movement logged on 3+ days in the window, every S/A movement and the red team's named rows (Glute Ham Raise, Shrug (Machine)); a one-field input override no longer implies a full review. Evidence ordering: an untested form of a trial-backed movement ties it at best (the machine hip thrust no longer outranks the barbell hip thrust). Cuff, face-pull and pull-apart work leave loaded mobility (joint capacity, on functional). `programming_settings` carries the programming lane's owner-pending defaults.",
    "rule": "rubric 3.2.0 and the review pass are PROPOSED — owner to confirm; status stays proposed"
+  },
+  {
+   "version": "0.3.2",
+   "date": "2026-11-13",
+   "by": "#5861 FIX4 (fourth red team 2026-11-12, PROPOSAL for the owner's review with the library)",
+   "what": "The joint-stress map gains `knee` and `hip`, a PAIN-MAP rating by class (deploy/exercise_library_input_review.KNEE_HIP: knee-dominant squat, lunge, split-squat, step-up and knee-extension work high for the knee, the box / wall / Spanish squat regressions moderate, hinges high for the hip; an alias takes its head's rating; a lower-body row no rule recognises stays unknown) — read by the live pain rule, never by the rubric's joint cost (quality_rubric.RUBRIC_JOINTS: no tier moves on it). Hevy's built-in band-assisted pull-up (`pull_up_band`, template 56808FD2) joins the library and the catalog. Inputs corrected where the fourth red team found them wrong: the landmine presses and the trap pulldown at a moderate load ceiling (hypertrophy S -> A), the sled push and pull submaximal (strength A -> B); the Pallof press is rehab_control and the ab wheel hypertrophy (trunk drills, not strength lifts). Walking C vs the treadmill A was rechecked and kept: the incline is the difference (outdoor walking: moderate stimulus, low control).",
+   "rule": "the knee/hip class rule and the input corrections are PROPOSED — owner to confirm; status stays proposed"
   }
  ],
  "_provenance": {
@@ -50,14 +57,14 @@
   },
   "untagged_exercises": 0,
   "distinct_template_ids": 539,
-  "movements": 625,
+  "movements": 626,
   "by_source": {
-   "expansion": 86,
+   "expansion": 87,
    "history": 539
   },
   "hypertrophy_rows_by_tier": {
-   "S": 34,
-   "A": 137,
+   "S": 31,
+   "A": 141,
    "B": 217,
    "C": 63,
    "D": 0,
@@ -65,8 +72,8 @@
   },
   "ratings_by_objective": {
    "hypertrophy": {
-    "S": 33,
-    "A": 132,
+    "S": 30,
+    "A": 136,
     "B": 189,
     "C": 61,
     "D": 0,
@@ -74,8 +81,8 @@
    },
    "strength": {
     "S": 10,
-    "A": 37,
-    "B": 129,
+    "A": 36,
+    "B": 131,
     "C": 30,
     "D": 8,
     "not_applicable": 411
@@ -86,7 +93,7 @@
     "B": 92,
     "C": 61,
     "D": 0,
-    "not_applicable": 400
+    "not_applicable": 401
    },
    "conditioning": {
     "S": 0,
@@ -94,7 +101,7 @@
     "B": 11,
     "C": 40,
     "D": 0,
-    "not_applicable": 568
+    "not_applicable": 569
    },
    "mobility": {
     "S": 0,
@@ -102,7 +109,7 @@
     "B": 40,
     "C": 4,
     "D": 0,
-    "not_applicable": 576
+    "not_applicable": 577
    }
   },
   "s_census": {
@@ -115,8 +122,8 @@
      ]
     },
     "back": {
-     "s": 8,
-     "families": 7,
+     "s": 7,
+     "families": 6,
      "movements": [
       "chin_up_weighted",
       "db_chest_supported_rows",
@@ -124,8 +131,7 @@
       "lat_pulldown_cable",
       "meadows_row",
       "pull_up_weighted",
-      "pullover_machine",
-      "trap_pulldown"
+      "pullover_machine"
      ]
     },
     "biceps": {
@@ -148,14 +154,6 @@
       "cable_fly_crossovers",
       "chest_fly_machine",
       "incline_bench_press_dumbbell"
-     ]
-    },
-    "front_delts": {
-     "s": 2,
-     "families": 2,
-     "movements": [
-      "landmine_press",
-      "landmine_press_single_arm"
      ]
     },
     "gastrocnemius": {
@@ -315,7 +313,7 @@
    "rct_direct": 15,
    "rct_characteristic": 7,
    "consensus": 0,
-   "none_reviewed": 639
+   "none_reviewed": 640
   },
   "expansion_candidates_already_in_history": [
    "back_extension_45",
@@ -360,6 +358,7 @@
    "overhead_curl_cable",
    "pendulum_squat",
    "pike_pushup",
+   "pull_up_band",
    "pull_up_negative",
    "pullover_machine",
    "reverse_crunch",
@@ -2275,7 +2274,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "moderate",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -2419,7 +2420,9 @@
     "shear": "moderate",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -2615,7 +2618,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -2773,7 +2778,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "high"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -2920,7 +2927,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -3070,7 +3079,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -3237,7 +3248,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "moderate",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -3377,7 +3390,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -3518,7 +3533,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -3673,7 +3690,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -3821,7 +3840,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -3967,7 +3988,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -4103,7 +4126,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "moderate",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -4238,7 +4263,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -4393,7 +4420,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -4539,7 +4568,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -4721,7 +4752,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "moderate",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -4859,7 +4892,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -5012,7 +5047,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -5154,7 +5191,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -5295,7 +5334,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -5450,7 +5491,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -5590,7 +5633,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -5733,7 +5778,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -5888,7 +5935,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -6026,7 +6075,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -6174,7 +6225,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "high"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -6341,7 +6394,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -6504,7 +6559,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -6654,7 +6711,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -6810,7 +6869,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -6964,7 +7025,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -7131,7 +7194,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "moderate",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -7284,7 +7349,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -7452,7 +7519,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -7600,7 +7669,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -7766,7 +7837,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -7924,7 +7997,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -8084,7 +8159,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -8226,7 +8303,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -8386,7 +8465,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "high"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -8531,7 +8612,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -8687,7 +8770,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -8849,7 +8934,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -9005,7 +9092,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -9139,7 +9228,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "moderate",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -9272,7 +9363,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -9407,7 +9500,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -9573,7 +9668,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -9736,7 +9833,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -9876,7 +9975,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -10027,7 +10128,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -10189,7 +10292,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "high"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -10342,7 +10447,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "high",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -10481,7 +10588,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -10647,7 +10756,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -10805,7 +10916,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -10958,7 +11071,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -11095,7 +11210,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -11244,7 +11361,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -11399,7 +11518,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -11579,7 +11700,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -11725,7 +11848,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -11879,7 +12004,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "moderate",
-    "shoulder": "high"
+    "shoulder": "high",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -12032,7 +12159,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -12183,7 +12312,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -12346,7 +12477,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -12503,7 +12636,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -12662,7 +12797,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -12820,7 +12957,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -12988,7 +13127,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -13165,7 +13306,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -13321,7 +13464,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -13470,7 +13615,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "high",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -13613,7 +13760,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "moderate",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -13750,7 +13899,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -13936,7 +14087,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "high"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -14095,7 +14248,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "moderate",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -14260,7 +14415,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -14413,7 +14570,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -14600,7 +14759,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -14752,7 +14913,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -14933,7 +15096,9 @@
     "shear": "moderate",
     "wrist": "high",
     "elbow": "moderate",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "moderate",
+    "hip": "high"
    },
    "skill_complexity": "high",
    "equipment": [
@@ -15075,7 +15240,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -15235,7 +15402,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -15386,7 +15555,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -15545,7 +15716,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -15698,7 +15871,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -15883,7 +16058,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -16029,7 +16206,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "moderate",
-    "shoulder": "high"
+    "shoulder": "high",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -16197,7 +16376,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -16340,7 +16521,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -16489,7 +16672,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -16639,7 +16824,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -16793,7 +16980,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "moderate",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -16953,7 +17142,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -17113,7 +17304,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -17280,7 +17473,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -17432,7 +17627,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -17589,7 +17786,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "moderate",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -17751,7 +17950,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -17900,7 +18101,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -18062,7 +18265,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -18221,7 +18426,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -18382,7 +18589,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -18542,13 +18751,15 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
     "cable_stack"
    ],
-   "category": "strength",
+   "category": "rehab_control",
    "trunk_function": "anti_rotation",
    "canonical": "cable_pallof_press",
    "hypertrophy": [
@@ -18560,7 +18771,7 @@
      "points_tier": null,
      "applicable": false,
      "basis": [
-      "not applicable: anti_rotation is trunk control, rated on functional"
+      "not applicable: category rehab_control is rated on its own objective, never on muscle growth"
      ],
      "evidence_confidence": "none_reviewed",
      "citations": [],
@@ -18576,7 +18787,7 @@
       "abs": null
      },
      "basis": [
-      "not applicable: anti_rotation is trunk control, rated on functional"
+      "not applicable: category rehab_control is rated on its own objective, never on muscle growth"
      ],
      "evidence_confidence": null,
      "provisional": null
@@ -18584,7 +18795,7 @@
     "strength": {
      "tier": null,
      "basis": [
-      "not applicable: a single-joint movement is rated on hypertrophy"
+      "not applicable: category rehab_control"
      ],
      "evidence_confidence": null,
      "provisional": null
@@ -18686,7 +18897,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -18849,7 +19062,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -19004,7 +19219,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -19184,7 +19401,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -19345,7 +19564,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -19501,7 +19722,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -19645,7 +19868,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -19804,7 +20029,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "high"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -19957,7 +20184,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -20112,7 +20341,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -20269,7 +20500,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "moderate",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -20433,7 +20666,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "moderate",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -20585,7 +20820,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -20771,7 +21008,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -20923,7 +21162,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -21072,7 +21313,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -21236,13 +21479,15 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
     "ab_wheel"
    ],
-   "category": "strength",
+   "category": "hypertrophy",
    "trunk_function": "anti_extension",
    "canonical": "ab_wheel",
    "hypertrophy": [
@@ -21397,7 +21642,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -21563,7 +21810,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -21738,7 +21987,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -21895,7 +22146,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -22069,7 +22322,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -22225,7 +22480,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "high"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -22374,7 +22631,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -22534,7 +22793,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -22692,7 +22953,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -22859,7 +23122,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -23012,7 +23277,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -23173,7 +23440,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -23322,7 +23591,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -23468,7 +23739,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -23617,7 +23890,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -23767,7 +24042,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -23902,7 +24179,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -24045,7 +24324,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -24188,7 +24469,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -24327,7 +24610,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -24488,7 +24773,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -24651,7 +24938,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -24794,7 +25083,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -24944,7 +25235,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -25090,7 +25383,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -25252,7 +25547,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -25402,7 +25699,9 @@
     "shear": "moderate",
     "wrist": "high",
     "elbow": "moderate",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "moderate",
+    "hip": "high"
    },
    "skill_complexity": "high",
    "equipment": [
@@ -25543,7 +25842,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -25703,7 +26004,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -25849,7 +26152,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -26009,7 +26314,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -26162,7 +26469,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -26324,7 +26633,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "high",
    "equipment": [
@@ -26479,7 +26790,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -26627,7 +26940,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -26774,7 +27089,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -26921,7 +27238,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -27080,7 +27399,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -27239,7 +27560,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -27403,7 +27726,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -27564,7 +27889,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -27722,7 +28049,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -27868,7 +28197,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -28041,7 +28372,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -28194,7 +28527,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -28356,7 +28691,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -28506,7 +28843,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -28657,7 +28996,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "high"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -28807,7 +29148,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -28969,7 +29312,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -29120,7 +29465,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -29265,7 +29612,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -29413,7 +29762,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -29569,7 +29920,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -29725,7 +30078,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -29880,7 +30235,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -30028,7 +30385,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -30174,7 +30533,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -30337,7 +30698,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -30497,7 +30860,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -30702,7 +31067,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -30859,7 +31226,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -31023,7 +31392,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -31186,7 +31557,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -31341,7 +31714,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -31507,7 +31882,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -31668,7 +32045,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -31823,7 +32202,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -31971,7 +32352,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -32130,7 +32513,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "high"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -32301,7 +32686,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -32465,7 +32852,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -32627,7 +33016,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -32789,7 +33180,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -32950,7 +33343,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -33100,7 +33495,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -33249,7 +33646,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -33401,7 +33800,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -33539,7 +33940,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "unknown",
+    "hip": "high"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -33686,7 +34089,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -33848,7 +34253,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -34009,7 +34416,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -34173,7 +34582,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -34358,7 +34769,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -34542,7 +34955,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -34695,7 +35110,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -34857,7 +35274,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -34995,7 +35414,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -35152,7 +35573,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -35321,7 +35744,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -35485,7 +35910,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -35633,7 +36060,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -35792,7 +36221,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -35952,7 +36383,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "high"
    },
    "skill_complexity": "high",
    "equipment": [
@@ -36105,7 +36538,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -36267,7 +36702,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -36434,7 +36871,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -36599,7 +37038,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -36761,7 +37202,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -36917,7 +37360,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -37070,7 +37515,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -37221,7 +37668,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -37373,7 +37822,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -37553,7 +38004,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -37702,7 +38155,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -37862,7 +38317,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -38017,7 +38474,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -38172,7 +38631,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -38334,7 +38795,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "high"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -38493,7 +38956,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "moderate",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -38635,7 +39100,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -38791,7 +39258,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -38933,7 +39402,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -39097,7 +39568,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -39254,7 +39727,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -39394,7 +39869,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -39552,7 +40029,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -39711,7 +40190,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -39851,7 +40332,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "high"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -40009,7 +40492,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -40172,7 +40657,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -40326,7 +40813,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -40486,7 +40975,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -40624,7 +41115,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -40764,7 +41257,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "high",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -40910,7 +41405,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "moderate",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -41060,7 +41557,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "high",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -41202,7 +41701,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -41364,7 +41865,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -41523,7 +42026,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -41664,7 +42169,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -41816,7 +42323,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "high",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -41957,7 +42466,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -42105,7 +42616,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -42243,7 +42756,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -42386,7 +42901,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -42551,7 +43068,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -42700,7 +43219,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "high"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -42856,7 +43377,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -43009,7 +43532,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "moderate",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -43171,7 +43696,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -43327,7 +43854,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -43465,7 +43994,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "high"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -43627,7 +44158,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -43784,7 +44317,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -43937,7 +44472,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -44097,7 +44634,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -44235,7 +44774,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -44376,7 +44917,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -44517,7 +45060,9 @@
     "shear": "moderate",
     "wrist": "high",
     "elbow": "moderate",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "moderate",
+    "hip": "high"
    },
    "skill_complexity": "high",
    "equipment": [
@@ -44659,7 +45204,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -44794,7 +45341,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -44934,7 +45483,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -45076,7 +45627,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -45232,7 +45785,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -45379,7 +45934,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "high",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -45529,7 +46086,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -45673,7 +46232,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "high"
+    "shoulder": "high",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "high",
    "equipment": [
@@ -45824,7 +46385,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -45983,7 +46546,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -46144,7 +46709,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -46286,7 +46853,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -46469,7 +47038,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -46618,7 +47189,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -46755,7 +47328,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -46895,13 +47470,15 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
     "cable_stack"
    ],
-   "category": "strength",
+   "category": "rehab_control",
    "trunk_function": "anti_rotation",
    "canonical": "cable_pallof_press",
    "variant": {
@@ -46916,7 +47493,7 @@
      "points_tier": null,
      "applicable": false,
      "basis": [
-      "not applicable: anti_rotation is trunk control, rated on functional"
+      "not applicable: category rehab_control is rated on its own objective, never on muscle growth"
      ],
      "evidence_confidence": "none_reviewed",
      "citations": [],
@@ -46932,7 +47509,7 @@
       "abs": null
      },
      "basis": [
-      "not applicable: anti_rotation is trunk control, rated on functional"
+      "not applicable: category rehab_control is rated on its own objective, never on muscle growth"
      ],
      "evidence_confidence": null,
      "provisional": null
@@ -46940,7 +47517,7 @@
     "strength": {
      "tier": null,
      "basis": [
-      "not applicable: a single-joint movement is rated on hypertrophy"
+      "not applicable: category rehab_control"
      ],
      "evidence_confidence": null,
      "provisional": null
@@ -47036,7 +47613,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -47197,7 +47776,9 @@
     "shear": "low",
     "wrist": "high",
     "elbow": "moderate",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -47335,7 +47916,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -47477,7 +48060,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -47638,7 +48223,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "moderate",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -47784,7 +48371,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -47946,7 +48535,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "high",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -48090,7 +48681,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -48259,7 +48852,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -48425,7 +49020,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -48584,7 +49181,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -48771,7 +49370,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -48934,7 +49535,9 @@
     "shear": "high",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "high"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -49079,7 +49682,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "moderate",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -49222,7 +49827,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -49376,7 +49983,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -49577,7 +50186,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -49726,7 +50337,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "moderate",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -49871,7 +50484,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -50012,7 +50627,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "high",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -50158,7 +50775,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "moderate",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -50311,7 +50930,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -50469,7 +51090,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -50650,7 +51273,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "moderate",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -50800,7 +51425,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -50955,7 +51582,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -51092,7 +51721,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -51233,7 +51864,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "high",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -51382,7 +52015,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "high"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -51546,7 +52181,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -51724,7 +52361,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -51884,7 +52523,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "moderate",
-    "shoulder": "high"
+    "shoulder": "high",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -52027,7 +52668,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -52179,7 +52822,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -52335,7 +52980,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -52491,7 +53138,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -52635,7 +53284,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -52820,7 +53471,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -52976,7 +53629,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "moderate",
+    "hip": "high"
    },
    "skill_complexity": "high",
    "equipment": [
@@ -53117,7 +53772,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -53283,7 +53940,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "moderate",
+    "hip": "high"
    },
    "skill_complexity": "high",
    "equipment": [
@@ -53421,7 +54080,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "moderate",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -53568,7 +54229,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "moderate",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -53711,7 +54374,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -53841,7 +54506,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -53972,7 +54639,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -54110,7 +54779,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -54256,7 +54927,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -54421,7 +55094,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -54555,7 +55230,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -54692,7 +55369,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -54850,7 +55529,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -55008,7 +55689,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -55195,7 +55878,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -55350,7 +56035,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -55504,7 +56191,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -55644,7 +56333,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -55796,7 +56487,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "high"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -55933,7 +56626,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -56087,7 +56782,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -56243,7 +56940,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -56402,7 +57101,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -56570,7 +57271,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -56721,7 +57424,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -56875,7 +57580,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -57020,7 +57727,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -57177,7 +57886,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "moderate",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -57324,7 +58035,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -57481,7 +58194,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -57640,7 +58355,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -57799,7 +58516,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -57948,7 +58667,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -58094,7 +58815,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -58239,7 +58962,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -58395,7 +59120,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "moderate",
+    "hip": "high"
    },
    "skill_complexity": "high",
    "equipment": [
@@ -58532,7 +59259,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "moderate",
+    "hip": "high"
    },
    "skill_complexity": "high",
    "equipment": [
@@ -58670,7 +59399,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -58855,7 +59586,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -58996,7 +59729,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -59160,7 +59895,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -59313,7 +60050,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -59450,7 +60189,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -59607,7 +60348,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -59764,7 +60507,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -59906,7 +60651,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -60067,7 +60814,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -60205,7 +60954,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -60358,7 +61109,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -60500,7 +61253,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -60652,7 +61407,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -60808,7 +61565,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "high"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -60972,7 +61731,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -61133,7 +61894,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -61267,7 +62030,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -61423,7 +62188,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -61581,7 +62348,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "high",
    "equipment": [
@@ -61738,7 +62507,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -61910,7 +62681,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -62061,7 +62834,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "high",
    "equipment": [
@@ -62218,7 +62993,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -62374,7 +63151,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -62526,7 +63305,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "high",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -62667,7 +63448,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -62811,7 +63594,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -62970,7 +63755,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "high",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -63120,7 +63907,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -63301,7 +64090,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -63444,7 +64235,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -63601,7 +64394,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -63740,7 +64535,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -63884,7 +64681,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -64026,7 +64825,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -64174,7 +64975,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -64336,7 +65139,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -64489,7 +65294,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -64646,7 +65453,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -64796,7 +65605,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "moderate",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -64964,7 +65775,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -65122,7 +65935,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -65262,7 +66077,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -65403,7 +66220,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -65565,7 +66384,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -65714,7 +66535,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "high",
    "equipment": [
@@ -65876,7 +66699,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "high",
    "equipment": [
@@ -66032,7 +66857,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "moderate",
+    "hip": "high"
    },
    "skill_complexity": "high",
    "equipment": [
@@ -66173,7 +67000,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -66314,7 +67143,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -66459,7 +67290,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -66610,7 +67443,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -66752,7 +67587,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -66897,7 +67734,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -67037,7 +67876,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -67176,7 +68017,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -67318,7 +68161,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -67457,7 +68302,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -67614,7 +68461,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "moderate",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -67763,7 +68612,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -67916,7 +68767,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -68073,7 +68926,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -68229,7 +69084,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -68378,7 +69235,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "high",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -68524,7 +69383,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "high",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -68665,7 +69526,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -68807,7 +69670,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -68949,7 +69814,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -69102,7 +69969,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -69237,7 +70106,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -69371,7 +70242,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -69520,7 +70393,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -69668,7 +70543,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -69827,7 +70704,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "moderate",
+    "hip": "high"
    },
    "skill_complexity": "high",
    "equipment": [
@@ -69966,7 +70845,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -70118,7 +70999,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -70260,7 +71143,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -70422,7 +71307,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -70580,7 +71467,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -70727,7 +71616,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -70739,12 +71630,13 @@
    "hypertrophy": [
     {
      "target": "front_delts",
-     "tier": "S",
-     "rubric_tier": "S",
+     "tier": "A",
+     "rubric_tier": "A",
      "rubric_score": 12,
      "points_tier": "S",
      "basis": [
       "points 12/14 -> S: stretch 3, stability 2, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
+      "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
      "provisional": false,
@@ -70755,13 +71647,14 @@
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "S",
+     "tier": "A",
      "target": "front_delts",
      "by_target": {
-      "front_delts": "S"
+      "front_delts": "A"
      },
      "basis": [
       "points 12/14 -> S: stretch 3, stability 2, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
+      "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
      "evidence_confidence": "none_reviewed",
@@ -70806,7 +71699,7 @@
     }
    },
    "objective_inputs": {
-    "ceiling": "high",
+    "ceiling": "moderate",
     "limiter": "target",
     "systemic_fatigue": "moderate",
     "resistance_class": "submaximal",
@@ -70838,7 +71731,17 @@
      "movement_id": "arnold_press_dumbbell",
      "reason": "same_stimulus"
     }
-   ]
+   ],
+   "attribute_audit": {
+    "fields": [],
+    "reason": "",
+    "inputs": {
+     "fields": [
+      "ceiling"
+     ],
+     "reason": "the bar's arc unloads toward lockout and one bar end held in the hand caps the load (a dumbbell-class press): the front delts cannot be overloaded to a high ceiling -> A, not S (fourth red team)"
+    }
+   }
   },
   "landmine_pushaway_presses": {
    "title": "Landmine Pushaway Presses",
@@ -70869,7 +71772,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -71029,7 +71934,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -71167,7 +72074,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -71335,7 +72244,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -71475,7 +72386,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "high",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -71613,7 +72526,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -71767,7 +72682,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -71950,7 +72867,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -72130,7 +73049,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -72283,7 +73204,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -72422,7 +73345,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -72566,7 +73491,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -72709,7 +73636,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "high",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -72846,7 +73775,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "high",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -72986,7 +73917,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -73142,7 +74075,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -73301,7 +74236,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -73482,7 +74419,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -73650,7 +74589,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -73813,7 +74754,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -73962,7 +74905,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -74147,7 +75092,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -74306,7 +75253,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -74460,7 +75409,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -74615,7 +75566,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -74758,7 +75711,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "high",
    "equipment": [
@@ -74922,7 +75877,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -75063,7 +76020,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -75201,7 +76160,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -75338,7 +76299,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -75477,7 +76440,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "moderate",
+    "hip": "high"
    },
    "skill_complexity": "high",
    "equipment": [
@@ -75615,7 +76580,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "moderate",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -75753,7 +76720,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -75919,7 +76888,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -76084,7 +77055,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -76226,7 +77199,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -76387,7 +77362,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -76519,7 +77496,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -76669,7 +77648,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -76835,7 +77816,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -77025,7 +78008,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -77183,7 +78168,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -77366,7 +78353,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "high",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -77506,7 +78495,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "high",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -77643,7 +78634,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -77793,7 +78786,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "high",
    "equipment": [
@@ -77952,7 +78947,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -78104,7 +79101,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -78264,7 +79263,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -78408,7 +79409,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -78566,7 +79569,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -78711,7 +79716,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -78871,7 +79878,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -79005,7 +80014,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -79155,7 +80166,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -79304,7 +80317,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "moderate",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -79456,7 +80471,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -79618,7 +80635,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -79771,7 +80790,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -79925,7 +80946,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -80091,7 +81114,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -80245,7 +81270,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -80257,12 +81284,13 @@
    "hypertrophy": [
     {
      "target": "front_delts",
-     "tier": "S",
-     "rubric_tier": "S",
+     "tier": "A",
+     "rubric_tier": "A",
      "rubric_score": 12,
      "points_tier": "S",
      "basis": [
       "points 12/14 -> S: stretch 3, stability 2, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
+      "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
      "provisional": false,
@@ -80273,13 +81301,14 @@
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "S",
+     "tier": "A",
      "target": "front_delts",
      "by_target": {
-      "front_delts": "S"
+      "front_delts": "A"
      },
      "basis": [
       "points 12/14 -> S: stretch 3, stability 2, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
+      "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
      "evidence_confidence": "none_reviewed",
@@ -80326,7 +81355,7 @@
     }
    },
    "objective_inputs": {
-    "ceiling": "high",
+    "ceiling": "moderate",
     "limiter": "target",
     "systemic_fatigue": "moderate",
     "resistance_class": "submaximal",
@@ -80360,7 +81389,17 @@
      "movement_id": "arnold_press_dumbbell",
      "reason": "same_stimulus"
     }
-   ]
+   ],
+   "attribute_audit": {
+    "fields": [],
+    "reason": "",
+    "inputs": {
+     "fields": [
+      "ceiling"
+     ],
+     "reason": "one bar end in one hand, the arc unloading toward lockout: a moderate load ceiling -> A, not S (fourth red team)"
+    }
+   }
   },
   "single_db_split_squats": {
    "title": "Single DB Split Squats",
@@ -80391,7 +81430,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -80572,7 +81613,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "high"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -80732,7 +81775,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -80890,7 +81935,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -81043,7 +82090,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -81203,7 +82252,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -81338,7 +82389,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "high",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -81479,7 +82532,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "high"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -81637,7 +82692,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "moderate",
+    "hip": "high"
    },
    "skill_complexity": "high",
    "equipment": [
@@ -81775,7 +82832,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -81933,7 +82992,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -82067,7 +83128,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -82218,7 +83281,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -82365,7 +83430,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -82530,7 +83597,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -82702,7 +83771,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "high"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -82861,7 +83932,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -83007,7 +84080,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -83142,7 +84217,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -83290,7 +84367,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -83301,12 +84380,13 @@
    "hypertrophy": [
     {
      "target": "back",
-     "tier": "S",
-     "rubric_tier": "S",
+     "tier": "A",
+     "rubric_tier": "A",
      "rubric_score": 12,
      "points_tier": "S",
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
      "provisional": false,
@@ -83317,13 +84397,14 @@
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "S",
+     "tier": "A",
      "target": "back",
      "by_target": {
-      "back": "S"
+      "back": "A"
      },
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
      "evidence_confidence": "none_reviewed",
@@ -83368,7 +84449,7 @@
     }
    },
    "objective_inputs": {
-    "ceiling": "high",
+    "ceiling": "moderate",
     "limiter": "target",
     "systemic_fatigue": "low",
     "resistance_class": "submaximal",
@@ -83413,6 +84494,12 @@
       "wrist"
      ],
      "rule": "a pull from overhead loads the shoulder in flexion"
+    },
+    "inputs": {
+     "fields": [
+      "ceiling"
+     ],
+     "reason": "Hevy's 'Trap Pulldown' reads as a scapular-depression pulldown (short range, the lower traps lead): it cannot load the lats to a lat pulldown's ceiling -> A, not S (fourth red team; the title is ambiguous, so the target is left as logged)"
     }
    }
   },
@@ -83441,7 +84528,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -83578,7 +84667,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -83727,7 +84818,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -83876,7 +84969,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -84028,7 +85123,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -84170,7 +85267,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -84330,7 +85429,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "high",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -84467,7 +85568,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -84622,7 +85725,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -84763,7 +85868,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -84917,7 +86024,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -85074,7 +86183,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -85212,7 +86323,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -85408,7 +86521,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -85629,7 +86744,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -85760,7 +86877,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -85895,13 +87014,15 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
     "cable_stack"
    ],
-   "category": "strength",
+   "category": "rehab_control",
    "trunk_function": "anti_rotation",
    "canonical": "cable_pallof_press",
    "variant": {
@@ -85916,7 +87037,7 @@
      "points_tier": null,
      "applicable": false,
      "basis": [
-      "not applicable: anti_rotation is trunk control, rated on functional"
+      "not applicable: category rehab_control is rated on its own objective, never on muscle growth"
      ],
      "evidence_confidence": "none_reviewed",
      "citations": [],
@@ -85932,7 +87053,7 @@
       "abs": null
      },
      "basis": [
-      "not applicable: anti_rotation is trunk control, rated on functional"
+      "not applicable: category rehab_control is rated on its own objective, never on muscle growth"
      ],
      "evidence_confidence": null,
      "provisional": null
@@ -85940,7 +87061,7 @@
     "strength": {
      "tier": null,
      "basis": [
-      "not applicable: a single-joint movement is rated on hypertrophy"
+      "not applicable: category rehab_control"
      ],
      "evidence_confidence": null,
      "provisional": null
@@ -86033,7 +87154,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -86165,7 +87288,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -86301,7 +87426,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -86533,7 +87660,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "moderate",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -86672,7 +87801,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -86809,7 +87940,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -87008,7 +88141,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -87154,7 +88289,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -87301,7 +88438,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -87512,7 +88651,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -87716,7 +88857,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -87851,7 +88994,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -87994,7 +89139,9 @@
     "shear": "moderate",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "moderate",
+    "hip": "high"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -88131,7 +89278,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "high"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -88280,7 +89429,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "moderate",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -88419,7 +89570,9 @@
     "shear": "moderate",
     "wrist": "moderate",
     "elbow": "moderate",
-    "shoulder": "high"
+    "shoulder": "high",
+    "knee": "moderate",
+    "hip": "high"
    },
    "skill_complexity": "high",
    "equipment": [
@@ -88552,7 +89705,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -88696,7 +89851,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -88839,7 +89996,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -88975,7 +90134,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -89115,7 +90276,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -89325,7 +90488,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "moderate",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -89466,7 +90631,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "low"
    },
    "skill_complexity": "high",
    "equipment": [
@@ -89603,7 +90770,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -89733,7 +90902,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -89872,7 +91043,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -90006,6 +91179,164 @@
     }
    }
   },
+  "pull_up_band": {
+   "title": "Pull Up (Band)",
+   "source": "expansion",
+   "template_id": "56808FD2",
+   "expansion_origin": "movement_catalog:pull_up_band",
+   "target": {
+    "primary": "back",
+    "secondary": [
+     "biceps"
+    ],
+    "region": "upper"
+   },
+   "family": "hypertrophy",
+   "job": "compound",
+   "pattern": "vertical_pull",
+   "length_bias": "lengthened",
+   "resistance_profile": "bodyweight",
+   "stability": "moderate",
+   "joint_stress": {
+    "spinal_load": "low",
+    "shear": "low",
+    "wrist": "low",
+    "elbow": "moderate",
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
+   },
+   "skill_complexity": "moderate",
+   "equipment": [
+    "pullup_bar",
+    "resistance_band"
+   ],
+   "category": "hypertrophy",
+   "canonical": "pull_up_band",
+   "hypertrophy": [
+    {
+     "target": "back",
+     "tier": "A",
+     "rubric_tier": "A",
+     "rubric_score": 10,
+     "points_tier": "A",
+     "basis": [
+      "points 10/14 -> A: stretch 5, stability 2, resistance_profile 2, progressability 2, carryover 0, joint_stress -1",
+      "cap A: S needs ceiling_high",
+      "evidence none_reviewed"
+     ],
+     "provisional": false,
+     "evidence_confidence": "none_reviewed",
+     "citations": [],
+     "last_reviewed": "unreviewed"
+    }
+   ],
+   "ratings": {
+    "hypertrophy": {
+     "tier": "A",
+     "target": "back",
+     "by_target": {
+      "back": "A"
+     },
+     "basis": [
+      "points 10/14 -> A: stretch 5, stability 2, resistance_profile 2, progressability 2, carryover 0, joint_stress -1",
+      "cap A: S needs ceiling_high",
+      "evidence none_reviewed"
+     ],
+     "evidence_confidence": "none_reviewed",
+     "provisional": false
+    },
+    "strength": {
+     "tier": "A",
+     "basis": [
+      "overload bodyweight",
+      "primary strength lift: no",
+      "transfer: self-stabilised",
+      "bilateral",
+      "systemic fatigue moderate (weighed by selection)",
+      "rule: S = primary lift + maximal overload + self-stabilised + bilateral; A = maximal, or a bodyweight pull/dip ladder"
+     ],
+     "evidence_confidence": "consensus",
+     "provisional": false
+    },
+    "functional": {
+     "tier": null,
+     "basis": [
+      "not applicable: no functional quality (unilateral, balance, carry, locomotion, trunk_stability, multiplanar, power, joint_capacity)"
+     ],
+     "evidence_confidence": null,
+     "provisional": null
+    },
+    "conditioning": {
+     "tier": null,
+     "basis": [
+      "not applicable: not a conditioning modality"
+     ],
+     "evidence_confidence": null,
+     "provisional": null
+    },
+    "mobility": {
+     "tier": null,
+     "basis": [
+      "not applicable: not a mobility or joint-function movement"
+     ],
+     "evidence_confidence": null,
+     "provisional": null
+    }
+   },
+   "objective_inputs": {
+    "ceiling": "moderate",
+    "limiter": "target",
+    "systemic_fatigue": "moderate",
+    "resistance_class": "bodyweight",
+    "strength_lift": false,
+    "ladder": true,
+    "functional": [],
+    "conditioning": null,
+    "mobility": null,
+    "reviewed": true
+   },
+   "gates": [],
+   "not_for_you_now": null,
+   "availability": {
+    "home_gym": {
+     "state": "available",
+     "source": "rule: every equipment id available at home_gym"
+    }
+   },
+   "fallbacks": [
+    {
+     "movement_id": "lat_pulldown_cable",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "lat_pulldown_close_grip_cable",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "pullover_dumbbell",
+     "reason": "same_stimulus"
+    }
+   ],
+   "attribute_audit": {
+    "fields": [],
+    "reason": "",
+    "inputs": {
+     "fields": [
+      "ceiling"
+     ],
+     "reason": "a band-assisted pull-up is a regression: its ceiling is the unassisted pull-up"
+    },
+    "review": {
+     "attrs": [],
+     "inputs": [
+      "ladder"
+     ],
+     "why": "Hevy's built-in band-assisted pull-up: the lats at long length on a bar, the band taking a share of bodyweight (the band's thickness is the load step); a regression rung of the pull-up ladder, so its ceiling is the unassisted pull-up (moderate)",
+     "pass": "#5861 FIX2-DATA"
+    }
+   }
+  },
   "pullover_machine": {
    "title": "Pullover (Machine)",
    "source": "expansion",
@@ -90029,7 +91360,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -90158,7 +91491,9 @@
     "shear": "unknown",
     "wrist": "unknown",
     "elbow": "unknown",
-    "shoulder": "unknown"
+    "shoulder": "unknown",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -90372,7 +91707,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -90566,7 +91903,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -90780,7 +92119,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "high"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -90929,7 +92270,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -91077,7 +92420,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -91223,7 +92568,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -91368,7 +92715,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -91524,7 +92873,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -91664,7 +93015,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -91813,7 +93166,9 @@
     "shear": "high",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -92024,7 +93379,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -92236,7 +93593,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -92275,9 +93634,9 @@
      "provisional": null
     },
     "strength": {
-     "tier": "A",
+     "tier": "B",
      "basis": [
-      "overload maximal",
+      "overload submaximal",
       "primary strength lift: no",
       "transfer: guided",
       "bilateral",
@@ -92322,7 +93681,7 @@
     "ceiling": "high",
     "limiter": "grip",
     "systemic_fatigue": "moderate",
-    "resistance_class": "maximal",
+    "resistance_class": "submaximal",
     "strength_lift": false,
     "ladder": false,
     "functional": [
@@ -92367,9 +93726,10 @@
     "reason": "",
     "inputs": {
      "fields": [
-      "functional"
+      "functional",
+      "resistance_class"
      ],
-     "reason": "dragging a loaded sled braces the trunk against the load"
+     "reason": "dragging a loaded sled braces the trunk against the load; #5861 FIX4: loaded locomotion, not a maximal-strength lift"
     }
    }
   },
@@ -92397,7 +93757,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -92436,9 +93798,9 @@
      "provisional": null
     },
     "strength": {
-     "tier": "A",
+     "tier": "B",
      "basis": [
-      "overload maximal",
+      "overload submaximal",
       "primary strength lift: no",
       "transfer: guided",
       "bilateral",
@@ -92483,7 +93845,7 @@
     "ceiling": "high",
     "limiter": "grip",
     "systemic_fatigue": "moderate",
-    "resistance_class": "maximal",
+    "resistance_class": "submaximal",
     "strength_lift": false,
     "ladder": false,
     "functional": [
@@ -92529,9 +93891,10 @@
     "reason": "",
     "inputs": {
      "fields": [
-      "functional"
+      "functional",
+      "resistance_class"
      ],
-     "reason": "pushing a loaded sled braces the trunk against the load"
+     "reason": "pushing a loaded sled braces the trunk against the load; #5861 FIX4: a sled is loaded locomotion, not a maximal-strength lift (the plate-loaded rule read it 'maximal' -> strength A): submaximal -> strength B"
     }
    }
   },
@@ -92558,7 +93921,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -92733,7 +94098,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "moderate",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -92934,7 +94301,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -93155,7 +94524,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -93371,7 +94742,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -93570,7 +94943,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -93761,7 +95136,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -93960,7 +95337,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -94155,7 +95534,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -94359,7 +95740,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -94576,7 +95959,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -94796,7 +96181,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -95026,7 +96413,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -95261,7 +96650,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "moderate",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -95482,7 +96873,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -95725,7 +97118,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -95931,7 +97326,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -96136,7 +97533,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -96331,7 +97730,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -96497,7 +97898,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -96696,7 +98099,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "high",
+    "hip": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -96847,7 +98252,9 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -97075,7 +98482,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -97279,7 +98688,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "moderate",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -97493,7 +98904,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -97704,7 +99117,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -97902,7 +99317,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -98111,7 +99528,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -98337,7 +99756,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -98543,7 +99964,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -98744,7 +100167,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -98957,7 +100382,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -99183,7 +100610,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "unknown",
+    "hip": "unknown"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -99415,7 +100844,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "moderate",
+    "hip": "high"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -99623,7 +101054,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -99824,7 +101257,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "moderate"
+    "shoulder": "moderate",
+    "knee": "low",
+    "hip": "high"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -99959,7 +101394,9 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -100184,7 +101621,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -100392,7 +101831,9 @@
     "shear": "low",
     "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "low",
+    "knee": "low",
+    "hip": "low"
    },
    "skill_complexity": "low",
    "equipment": [
