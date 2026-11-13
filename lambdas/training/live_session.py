@@ -298,6 +298,9 @@ def for_live_draft(
             lines.append(f"trunk floor failed ({type(e).__name__}) — nothing added")
     lines += live_rules.fit_set_cap(out, set_cap)  # FIX5: every live session within the session set ceiling (a crash before)
     _refit(out)
+    from training import live_rulings  # #5861 FIX6 ruling 16: evidence confidence + data completeness, visible
+
+    lines += live_rulings.evidence_line(out, ctx) if ctx is not None else []
     trends = {tid: str(v.get("trend")) for tid, v in (sig or {}).items()}
     extra = {
         "aerobic": live_program.aerobic(inputs),
@@ -308,7 +311,7 @@ def for_live_draft(
         ),
         "conditioning_host": live_balance.conditioning_host((ctx or {}).get("week_skip") or _week_ctx(week, inputs)["week_skip"]),
     }
-    rate = live_program.rate_line(out.get("fatigue"), getattr(inputs, "sleep_hours", None))
+    rate = live_rulings.rate_line(inputs, out.get("fatigue"), out.get("session_role"))  # FIX6 ruling 11: once a week, advisory
     band = live_balance.rate_band(out.get("fatigue"), getattr(inputs, "sleep_hours", None))  # FIX3: rate_band_mode=structured
     extra |= {"rate_band": band} if band["mode"] == "structured" else {}
     out[MARK] = {"issue": ISSUE, "lines": lines + ([rate] if rate else []), **extra}

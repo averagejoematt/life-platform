@@ -129,8 +129,8 @@ STALL_RULE: dict[str, dict[str, Any]] = {
 }
 SETTINGS_KEY = "programming_settings"
 SETTINGS_DEFAULTS: dict[str, Any] = {
-    "session_cap_includes_cardio": False,
-    "symptom_line": "Chest, breathing, dizzy? Stop, log it.",
+    "session_cap_includes_cardio": True,  # #5861 FIX6: owner ruling 1 (2026-11-13), was False
+    "symptom_line": "",  # #5861 FIX6: owner ruling 10 — no symptom warning line (the `extended` preset stays available)
     "short_week_rule": "skip_shoulders_arms",
     "behind_schedule_week": False,
 }
@@ -169,7 +169,9 @@ def settings(lib: dict[str, Any] | None) -> dict[str, Any]:
     from training.live_shape import SETTINGS_DEFAULTS as FIX4_SHAPE
 
     got = (lib or {}).get(SETTINGS_KEY) or {}
-    return {k: got.get(k, v) for k, v in {**SETTINGS_DEFAULTS, **FIX3, **FIX4_SAFETY, **FIX4_SHAPE}.items()}
+    from training.live_rulings import SETTINGS_DEFAULTS as FIX6  # #5861 FIX6: the owner's rulings of 2026-11-13
+
+    return {k: got.get(k, v) for k, v in {**SETTINGS_DEFAULTS, **FIX3, **FIX4_SAFETY, **FIX4_SHAPE, **FIX6}.items()}
 
 
 def _entry(key: str | None, ctx: dict[str, Any]) -> dict[str, Any]:
@@ -654,10 +656,12 @@ def plan(rx: dict[str, Any], rotation: dict[str, Any], ctx: dict[str, Any], work
     pinned |= {sid.split(".", 1)[1] for sid in selection_live.SLOT_OBJECTIVES if sid.startswith(f"{rx.get('session_role')}.")}
     from training import (
         live_balance as lb,  # #5861 FIX3
+        live_rulings,  # #5861 FIX6: the owner's rulings of 2026-11-13
         live_shape,  # #5861 FIX4
     )
 
     lines = live_shape.add_slots(rx, ctx)  # the quadriceps slot, BEFORE the pain rule so a knee flag reaches it
+    lines += live_rulings.stimulus_gate(rx, ctx, trends)  # ruling 9: added only when stimulus AND performance ask for it
     lines += lb.place_kb(rx, ctx, workouts)  # FIX4: placed first, so a pain flag reaches the slot where it lands
     from training import live_rules  # #5861 FIX5
 
@@ -673,6 +677,7 @@ def plan(rx: dict[str, Any], rotation: dict[str, Any], ctx: dict[str, Any], work
     lines += stall_scheme(rx, ctx, trends)
     lines += short_week_carry(rx, ctx)
     lines += live_shape.deadlift_shape(rx, ctx["lib"]) + live_shape.order_lower_volume(rx)  # FIX4: the heavy pull, squat first
+    lines += live_rulings.lead_lift(rx, ctx)  # FIX6 ruling 5: squat and deadlift never both maximal in one session
     mark_costs(rx, ctx)
     return lines
 
@@ -886,16 +891,24 @@ def annotate(blocks: list[Any], rx: dict[str, Any]) -> None:
 
 # ── 5. cardio ─────────────────────────────────────────────────────────────────
 def aerobic(inputs: Any) -> dict[str, Any] | None:
-    """The cardio model's steps-first plan for the draft's week (`cardio_model.aerobic_plan` over the steps the cron read
-    through the one steps-truth resolver). None when no steps were read (unknown is never 'covered')."""
+    """The week's aerobic credit for the draft (#5861 FIX6, owner ruling 12): recorded outside-the-gym minutes with intensity
+    evidence (`cardio_model.recorded_aerobic`, read by the cron as `aerobic_record`), cadence-qualified minutes where a source
+    has them, and the steps REPORTED (never credited). None when neither steps nor a record were read (unknown is never
+    'covered')."""
     from training import cardio_model
 
-    steps = getattr(inputs, "steps_by_day", None)
-    if not steps:
+    steps = getattr(inputs, "steps_by_day", None) or {}
+    rec = getattr(inputs, "aerobic_record", None) or {}
+    if not steps and not rec:
         return None
+    walked = rec.get("minutes_by_day") or None
     cadence = getattr(inputs, "cadence_minutes_by_day", None)  # FIX3: cadence-qualified minutes count first, where a source has them
-    plan_ = cardio_model.aerobic_plan(steps, cadence_minutes_by_day=cadence, purposes=("intensity_domain",))
-    return {"volume_covered": plan_["volume_covered"], "walking_min_per_wk": plan_["walking"]["moderate_min_per_wk"]}
+    plan_ = cardio_model.aerobic_plan(steps, walk_minutes_by_day=walked, cadence_minutes_by_day=cadence, purposes=("intensity_domain",))
+    w = plan_["walking"]
+    line = rec.get("line") or "no recorded walks read: intensity unknown, nothing credited"
+    if w.get("steps_per_day") is not None:
+        line += f"; steps ~{w['steps_per_day']}/day reported as activity, not aerobic credit"
+    return {"volume_covered": plan_["volume_covered"], "walking_min_per_wk": w["moderate_min_per_wk"], "line": line}
 
 
 def rate_line(fatigue: dict[str, Any] | None, sleep_hours: Any) -> str | None:
@@ -976,11 +989,19 @@ def cardio_fit(menu: dict[str, Any], live: dict[str, Any] | None) -> tuple[dict[
             easy = "easy" if cardio_menu.fits_machine("easy", menu["machine"]) else "incline_treadmill_walk"
             lines.append(f"cardio (live): {kind} -> {easy} — {why}")
             kind = easy
+    from training import live_rulings  # #5861 FIX6 ruling 4: a gym block only for a named purpose
+
+    keep_, why_ = live_rulings.purposeful_cardio(kind, live, HARD_KINDS)
+    if not keep_:
+        from training import live_shape
+
+        return None, lines + why_ + live_shape.walk_prompt(live)
+    lines += why_
     aer = live.get("aerobic") or {}
     if kind not in HARD_KINDS and aer.get("volume_covered"):
         lines.append(
-            f"cardio (live): no easy block — steps already give ~{aer.get('walking_min_per_wk')} moderate min/wk, conservatively "
-            "credited (cardio_model.aerobic_plan: steps first, no cardio added without a purpose)"
+            f"cardio (live): no easy block — recorded walking already gives ~{aer.get('walking_min_per_wk')} moderate min/wk "
+            "(cardio_model.aerobic_plan: recorded activity first, no cardio added without a purpose)"
         )
         return None, lines
     from training import live_shape  # #5861 FIX4: a small gap is the walk's, never a silent shortfall

@@ -204,6 +204,9 @@ def _gather_inputs(target_date: str, add_load_enabled: bool) -> "GeneratorInputs
         setattr(inputs, "sleep_hours", live["sleep_hours"])  # read by fatigue_model.for_live_draft (live only)
     if live.get("steps_by_day"):
         setattr(inputs, "steps_by_day", live["steps_by_day"])  # #5861 L6: the walking dose, into cardio_model.cardio_load (live only)
+    for key in ("aerobic_record", "weights_by_day"):  # #5861 FIX6: rulings 11 + 12 (live only)
+        if live.get(key):
+            setattr(inputs, key, live[key])
     if live.get("medical_stop_lines"):
         setattr(inputs, "medical_stop_lines", live["medical_stop_lines"])  # #5861: tripped -> no hard cardio (live_week.symptom_gate)
     return inputs
@@ -284,6 +287,31 @@ def _live_inputs(target_date: str, read=None) -> dict[str, Any]:
     if hevy is not None:
         sets = fatigue_model.hard_sets_by_muscle(hevy, fatigue_model.library_index(lib), as_of=target_date)
         out["volume_7d"] = {m: int(round(n)) for m, n in sets.items() if m != "unplaced"}
+    out |= _live_activity_inputs(target_date, _safe, hevy)
+    return out
+
+
+RATE_WEIGH_IN_DAYS = 35  # #5861 FIX6: five weeks of weigh-ins — the advisory ceiling's sustained-trend guard reads 4 weekly rates
+
+
+def _live_activity_inputs(target_date: str, safe: Any, hevy: list[dict[str, Any]] | None) -> dict[str, Any]:
+    """#5861 FIX6 (owner rulings 11 and 12), live only — `_live_inputs` returns before this while the library is proposed:
+    the week's RECORDED aerobic sessions (Apple workouts + Strava + the Hevy record, one workout identity counted once:
+    `cardio_model.recorded_aerobic`) and the weigh-ins the advisory loss-rate ceiling reads. Each read fail-soft; an unread
+    input adds no key."""
+    from training import cardio_model
+
+    out: dict[str, Any] = {}
+    apple, strava = safe("apple_health", 7), safe("strava", 7)
+    if apple is not None or strava is not None:
+        try:
+            out["aerobic_record"] = cardio_model.recorded_aerobic(apple=apple or [], strava=strava or [], hevy=hevy or [])
+        except Exception as e:  # noqa: BLE001 — an unresolved record is unknown, never a blocked draft
+            logger.warning(f"recorded aerobic failed: {type(e).__name__}")
+    withings = safe("withings", RATE_WEIGH_IN_DAYS)
+    weights = {str(r.get("date") or str(r.get("sk") or "")[5:15]): float(r["weight_lbs"]) for r in withings or [] if r.get("weight_lbs")}
+    if weights:
+        out["weights_by_day"] = weights
     return out
 
 

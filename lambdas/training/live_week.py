@@ -246,6 +246,7 @@ def make_cardio_room(blocks: list[Any], rx: dict[str, Any], movements: dict[str,
 
     lib = se.load_library_failsoft() or {}
     week, marks = week_sets(movements, lib), (block_model.load_landmarks() or {})
+    over_mav_only = _settings().get("cardio_room_takes") == "over_mav_only"  # #5861 FIX6, owner ruling 1
     taken: Counter = Counter()
     before = shape["lifting_minutes"]
     paired = _pair_antagonists(blocks, rx) if shape["lifting_minutes"] > cap - reserve else []  # charter: pair before cutting
@@ -256,9 +257,10 @@ def make_cardio_room(blocks: list[Any], rx: dict[str, Any], movements: dict[str,
             now = routine_minutes(blocks, movements)["lifting_minutes"]
             # sets over a muscle's MAV buy the WHOLE block (they add little); a surplus over MEV buys only the minimum block
             tiers = (0, 1) if now > cap - reserve else ((0,) if now > cap - full and floor > 1 else ())
+            tiers = tuple(t for t in tiers if t == 0) if over_mav_only else tiers  # FIX6 ruling 1: never sets a muscle needs
             if not tiers or not _trim_one(blocks, movements, lib, (week, marks, taken, floor, _fixed(rx)), tiers):
                 break
-    dropped = _drop_for_room(blocks, rx, movements, lib, (week, marks, taken), cap - reserve)  # FIX3: then a whole isolation
+    dropped = [] if over_mav_only else _drop_for_room(blocks, rx, movements, lib, (week, marks, taken), cap - reserve)  # FIX3
     if not taken and not paired:
         return shape
     new = program_structure.enforce_session_shape(blocks, movements) | {
@@ -591,8 +593,9 @@ def press_sets(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
     above 1, the shoulders+arms overhead-press anchor gets that many working sets. #5861 FIX4: the week's allocation counts them
     (`live_balance._template_rows`), so the trade lands on the week's delt isolation there. Returns the rationale lines."""
     from training import selection_engine as se
+    from training.live_balance import _press_sets  # #5861 FIX6: the ruled default (3) when the library omits the key
 
-    want = int(((se.load_library_failsoft() or {}).get("programming_settings") or {}).get("press_sets") or 1)  # absent = 1
+    want = _press_sets(se.load_library_failsoft())
     if want <= 1 or rx.get("session_role") != "shoulders_arms":
         return []
     press = next((e for e in rx["exposures"] if e.get("kind") == "anchor" and e.get("pattern") == "overhead_press"), None)

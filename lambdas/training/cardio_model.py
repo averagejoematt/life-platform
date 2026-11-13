@@ -17,8 +17,9 @@ WHAT IT PROVIDES
   * `PROTOCOLS` + `protocol(name)`: easy recovery, moderate continuous, tempo/threshold, structured intervals,
     progressive endurance, incline/resistance progression. Intensity is RPE + talk test + level/incline/speed on a
     wrist-clock rule, never heart rate. `progress(name, state)`: duration, then frequency, then intensity.
-  * `aerobic_plan(...)`: steps first. Daily walking is counted toward the week's aerobic dose before any added
-    cardio; structured cardio is added only for a named purpose, never to fill a slot.
+  * `aerobic_plan(...)`: recorded activity first. Recorded walking with intensity evidence counts toward the week's aerobic
+    dose before any added cardio (steps alone are reported, never credited — #5861 FIX6, ruling 12); structured cardio is
+    added only for a named purpose, never to fill a slot. `recorded_aerobic(...)`: that credit, one workout counted once.
   * `cardio_load(...)`: the documented load interface the fatigue model (lane L3) reads.
   * `conditioning_session(request)`: the conditioning-day seam (a 4+1 split needs one): a request in, one session out.
 
@@ -524,21 +525,36 @@ def progress(name: str, state: dict[str, Any]) -> dict[str, Any]:
     return {**out, "action": "add_intensity", "level_step": 1, "reason": "duration and frequency at their caps: one level, same RPE"}
 
 
-# ── steps first ──────────────────────────────────────────────────────────────────────────────────────────────
-# HEURISTIC (practitioner consensus, labelled): about 100 steps a minute marks moderate-intensity walking for most
-# adults; the first INCIDENTAL_STEPS of a day are treated as incidental living movement, not aerobic exercise. A walk
-# with recorded minutes replaces the estimate. The weekly moderate range is the public-health guideline band.
-# #5861 FIX3 (third red team): ">= 100 steps a minute" describes a CADENCE, it does not convert a step count into minutes —
-# most incidental steps are slower, so crediting every step over 5,000 at 100 a minute read 344-630 "moderate min/wk" for a
-# 12-15k walker. Now: minutes measured at a qualifying cadence count as they are (`cadence_minutes_by_day`, where a source
-# records them); otherwise only STEPS_CREDIT_SHARE of the steps over the incidental floor is credited, labelled.
+# ── steps are reported, never credited (#5861 FIX6, owner ruling 12, 2026-11-13) ─────────────────────────────────
+# The fifth round credited 25 % of each day's steps over 5,000 as moderate walking. The owner REJECTED that formula: a step
+# count says nothing about intensity. Aerobic credit now comes only from RECORDED sessions with intensity evidence
+# (`recorded_aerobic`: Apple Health / Watch workouts, Strava, Hevy cardio blocks — one workout identity counted once,
+# `training.workout_identity`), then cadence-qualified minutes where a source records cadence; otherwise NO credit and an
+# explicit "intensity unknown" line. Total steps are still reported, as their own activity metric.
 STEPS_PER_MODERATE_MIN = 100
-INCIDENTAL_STEPS = 5000
-STEPS_CREDIT_SHARE = 0.25
-"""HEURISTIC (labelled, conservative): the share of a day's steps over INCIDENTAL_STEPS credited as moderate walking when no
-cadence-qualified minutes are recorded — a quarter, so a 14k-step day credits ~22 min, not 90. Owner-adjustable; not measured."""
+"""HEURISTIC (population, labelled): about 100 steps a minute marks moderate walking for MOST adults — a population figure,
+not a threshold for one person (`CADENCE_MODERATE_SPM` reads the same number for a recorded walk's mean cadence)."""
+CADENCE_MODERATE_SPM = STEPS_PER_MODERATE_MIN
+MODERATE_METS = 3.0
+"""HEURISTIC (practitioner consensus, labelled): a recorded workout whose intensity is at least 3 METs is moderate-to-vigorous
+(the conventional moderate floor). Apple's workout `intensity` is reported in kcal/hr/kg — numerically METs."""
+RPE_MODERATE = 4
+"""HEURISTIC (labelled): a cardio block he logged at RPE 4 or more (0-10) is moderate-to-vigorous — the talk test's "full
+sentences, a little effort" sits around RPE 3-4; below 4 is light and not credited."""
 WEEKLY_MODERATE_MIN = (150, 300)
 PURPOSES = ("intensity_domain", "fitness_test_progression", "conditioning_goal")
+AEROBIC_FAMILIES = ("walking", "cycling", "running")
+AEROBIC_OTHER = ("rowing", "elliptical", "stair", "swimming", "hiit", "mixed cardio", "cross country skiing")
+"""`workout_identity` families an aerobic session can carry, and `other:<name>` names that are aerobic modalities."""
+
+
+def _qty(v: Any) -> float | None:
+    """A Health Auto Export `{qty, units}` dict, or a bare number; None when absent or not a number."""
+    v = v.get("qty") if isinstance(v, dict) else v
+    try:
+        return float(v) if v is not None else None
+    except (TypeError, ValueError):
+        return None
 
 
 def _walking_dose(
@@ -546,34 +562,107 @@ def _walking_dose(
     walk_minutes_by_day: dict[str, Any] | None = None,
     cadence_minutes_by_day: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    """The week's CREDITED aerobic minutes outside the structured blocks: recorded walk minutes with intensity evidence
+    (`walk_minutes_by_day`, from `recorded_aerobic`), else minutes at a qualifying cadence where a source records it. Steps
+    alone are NEVER credited (ruling 12): they are reported (`steps_per_day`) and a day with only steps is `intensity_unknown`."""
     days = sorted(set(steps_by_day or {}) | set(walk_minutes_by_day or {}) | set(cadence_minutes_by_day or {}))
     if not days:
-        return {"days": 0, "moderate_min_per_wk": 0, "source": "none", "basis": ["no steps or walks read"]}
+        return {"days": 0, "moderate_min_per_wk": 0, "source": "none", "basis": ["no steps or recorded sessions read"]}
     total, kinds = 0.0, Counter[str]()
     for d in days:
         walk = (walk_minutes_by_day or {}).get(d)
         cadence = (cadence_minutes_by_day or {}).get(d)
         if walk is not None:
             total += float(walk)
-            kinds["walk_minutes"] += 1
+            kinds["recorded_minutes"] += 1
         elif cadence is not None:
             total += float(cadence)
             kinds["cadence_minutes"] += 1
         else:
-            over = max(0.0, float((steps_by_day or {}).get(d) or 0) - INCIDENTAL_STEPS)
-            total += over * STEPS_CREDIT_SHARE / STEPS_PER_MODERATE_MIN
-            kinds["steps_heuristic"] += 1
-    per_wk = round(total / len(days) * 7)
-    source = next(iter(kinds)) if len(kinds) == 1 else "mixed"
+            kinds["intensity_unknown"] += 1
+    steps = [float(v) for v in (steps_by_day or {}).values() if v is not None]
     return {
         "days": len(days),
-        "moderate_min_per_wk": per_wk,
-        "source": source,
-        "credited": "conservative",
+        "moderate_min_per_wk": round(total / len(days) * 7),
+        "source": next(iter(kinds)) if len(kinds) == 1 else "mixed",
+        "credited": "recorded_only",
+        "intensity_unknown_days": kinds["intensity_unknown"],
+        "steps_per_day": round(sum(steps) / len(steps)) if steps else None,
         "basis": [
-            f"heuristic: recorded walk minutes, else minutes at a qualifying cadence, else {STEPS_CREDIT_SHARE:.0%} of the steps over "
-            f"{INCIDENTAL_STEPS} a day at {STEPS_PER_MODERATE_MIN} steps a minute (most incidental steps are slower)",
+            "recorded minutes with intensity evidence, else minutes at a qualifying cadence; steps alone earn no aerobic credit "
+            f"(owner ruling 12) — they are reported as activity; ~{STEPS_PER_MODERATE_MIN} steps a minute is a population heuristic"
         ],
+    }
+
+
+def _apple_intensity(w: dict[str, Any]) -> tuple[str, str] | None:
+    """(class, basis) from an Apple workout summary's own intensity evidence: METs, else mean step cadence; None = unknown."""
+    mets = _qty(w.get("intensity"))
+    if mets is not None:
+        return ("moderate" if mets >= MODERATE_METS else "light"), f"intensity {mets:.1f} METs"
+    cad = _qty(w.get("stepCadence"))
+    if cad is not None:
+        return ("moderate" if cad >= CADENCE_MODERATE_SPM else "light"), f"cadence {cad:.0f} spm (population heuristic)"
+    return None
+
+
+def _aerobic_family(family: str) -> bool:
+    f = str(family or "")
+    return f in AEROBIC_FAMILIES or (f.startswith("other:") and any(n in f for n in AEROBIC_OTHER))
+
+
+def recorded_aerobic(
+    *,
+    apple: Iterable[dict[str, Any]] | None = None,
+    strava: Iterable[dict[str, Any]] | None = None,
+    hevy: Iterable[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Moderate-to-vigorous minutes OUTSIDE the gym blocks, each workout identity counted ONCE (`workout_identity`): an
+    identity holding a Hevy member is the gym's (its blocks are counted by the draft's own block history), never credited
+    here. An Apple member's METs or mean cadence classifies the identity; a Strava-only record carries no intensity the
+    engine uses (heart rate is not effort evidence — owner rulings), so its minutes are `unknown_min`, reported, not
+    credited. Returns {credited_min, light_min, unknown_min, sessions, minutes_by_day, line}."""
+    from training import workout_identity as wi
+
+    apple_by_id = {str(w.get("id") or k): w for row in apple or () for k, w in ((row.get("apple_workouts") or {}).items())}
+    idents = wi.resolve_workout_identities(apple=apple, strava=strava, hevy=hevy)
+    credited = light = unknown = 0.0
+    by_day: dict[str, float] = {}
+    sessions = []
+    for i in idents:
+        if "hevy" in i["members"] or not _aerobic_family(i["family"]):
+            continue
+        minutes = float(i["seconds"]) / 60.0
+        evidence = next(
+            (
+                _apple_intensity(apple_by_id[x])
+                for src, ids in i["members"].items()
+                if src.startswith("apple")
+                for x in ids
+                if x in apple_by_id
+            ),
+            None,
+        )
+        klass, basis = evidence or ("unknown", "no intensity recorded (heart rate is not used)")
+        day = str(i.get("start") or "")[:10]
+        if klass == "moderate":
+            credited += minutes
+            by_day[day] = by_day.get(day, 0.0) + minutes
+        elif klass == "light":
+            light += minutes
+        else:
+            unknown += minutes
+        sessions.append({"date": day, "family": i["family"], "minutes": round(minutes), "class": klass, "basis": basis})
+    line = f"recorded outside the gym: {round(credited)} min credited (intensity evidence), {round(light)} min light"
+    line += f", {round(unknown)} min intensity unknown (not credited)" if unknown else ""
+    return {
+        "credited_min": round(credited),
+        "light_min": round(light),
+        "unknown_min": round(unknown),
+        "minutes_by_day": {d: round(m) for d, m in sorted(by_day.items())},
+        "sessions": sessions,
+        "line": line,
+        "hr_used": False,
     }
 
 
@@ -586,7 +675,7 @@ def aerobic_plan(
     purposes: Iterable[str] = (),
     recovery: str = "ok",
 ) -> dict[str, Any]:
-    """Steps first. The week's walking dose (`_walking_dose`) is counted toward the aerobic volume BEFORE any added
+    """Recorded activity first. The week's credited walking (`_walking_dose`) is counted toward the aerobic volume BEFORE any added
     cardio; structured cardio is added only for a named purpose (`PURPOSES`): an intensity domain the week does not
     reach, a fitness-test progression, a conditioning goal. No purpose, no addition: cardio never fills a slot. Hard
     additions stay inside the menu's conditioning sessions a week and never land on poor recovery."""
@@ -607,7 +696,9 @@ def aerobic_plan(
     additions: list[dict[str, Any]] = []
     declined: list[str] = []
     if not volume_ok:
-        additions.append({"what": "walking", "purpose": "weekly_aerobic_volume", "why": "raise daily steps before any added cardio"})
+        additions.append(
+            {"what": "walking", "purpose": "weekly_aerobic_volume", "why": "more recorded brisk walking before any added cardio"}
+        )
     wanted: list[tuple[str, str]] = []
     for purpose in purposes:
         if purpose == "intensity_domain" and "threshold" not in covered:
@@ -658,8 +749,8 @@ def cardio_load(sessions: Iterable[dict[str, Any]], *, steps_by_day: dict[str, A
     minutes, rpe?, protocol?}`; an unlogged RPE reads the protocol's band midpoint (`rpe_source: protocol_band`), and
     with neither the minutes are counted apart (`unknown_effort_minutes`), never guessed. Returns arbitrary units:
     `session_rpe_au` (minutes x RPE), `lower_body_au` (the same weighted by lower-body interference), `impact_minutes`
-    (moderate or high impact), `hard_minutes` (RPE >= HARD_RPE), `walking` (steps first, `_walking_dose`, with its own
-    `walking_au`). Heart rate is never read."""
+    (moderate or high impact), `hard_minutes` (RPE >= HARD_RPE), `walking` (`_walking_dose`: steps reported, never credited). Heart rate is never read.
+    """
     total = srpe = lower = 0.0
     impact = hard = unknown = 0.0
     rows = []
@@ -682,9 +773,7 @@ def cardio_load(sessions: Iterable[dict[str, Any]], *, steps_by_day: dict[str, A
         lower += minutes * float(rpe) * weight
         hard += minutes if float(rpe) >= HARD_RPE else 0
         rows.append({"modality": modality, "minutes": minutes, "rpe": float(rpe), "rpe_source": source})
-    walking = _walking_dose(steps_by_day) if steps_by_day else None
-    if walking:
-        walking["walking_au"] = round(walking["moderate_min_per_wk"] / 7 * walking["days"] * WALK_RPE)
+    walking = _walking_dose(steps_by_day) if steps_by_day else None  # #5861 FIX6: steps reported, never credited (ruling 12)
     return {
         "version": CARDIO_MODEL_VERSION,
         "minutes": round(total),

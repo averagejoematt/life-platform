@@ -1,6 +1,6 @@
 {
  "_README": "The owner's exercise library (#5769). PROPOSED — nothing in the drafting path reads it until the owner approves it. Public half only: no bodyweight, no loads, no note text — the N=1 half (best set per bodyweight band, coded note signals, gate threshold values) is the owner-private overlay s3://matthew-life-platform/config/coaching/exercise_library.private.json, joined at selection time by lambdas/training/exercise_library.py (fail-closed). Built by deploy/build_exercise_library.py from the full Hevy history + deploy/exercise_library_curation.py. Doc: docs/coaching/EXERCISE_LIBRARY.md.",
- "version": "0.3.2",
+ "version": "0.3.3",
  "status": "proposed",
  "change_log": [
   {
@@ -43,6 +43,13 @@
    "by": "#5861 FIX4 (fourth red team 2026-11-12, PROPOSAL for the owner's review with the library)",
    "what": "The joint-stress map gains `knee` and `hip`, a PAIN-MAP rating by class (deploy/exercise_library_input_review.KNEE_HIP: knee-dominant squat, lunge, split-squat, step-up and knee-extension work high for the knee, the box / wall / Spanish squat regressions moderate, hinges high for the hip; an alias takes its head's rating; a lower-body row no rule recognises stays unknown) — read by the live pain rule, never by the rubric's joint cost (quality_rubric.RUBRIC_JOINTS: no tier moves on it). Hevy's built-in band-assisted pull-up (`pull_up_band`, template 56808FD2) joins the library and the catalog. Inputs corrected where the fourth red team found them wrong: the landmine presses and the trap pulldown at a moderate load ceiling (hypertrophy S -> A), the sled push and pull submaximal (strength A -> B); the Pallof press is rehab_control and the ab wheel hypertrophy (trunk drills, not strength lifts). Walking C vs the treadmill A was rechecked and kept: the incline is the difference (outdoor walking: moderate stimulus, low control).",
    "rule": "the knee/hip class rule and the input corrections are PROPOSED — owner to confirm; status stays proposed"
+  },
+  {
+   "version": "0.3.3",
+   "date": "2026-11-13",
+   "by": "#5861 FIX6 (the owner's rulings of 2026-11-13 on the decision register — configuration, not activation)",
+   "what": "`programming_settings` carries the owner's ruled values (build_exercise_library.OWNER_RULED_SETTINGS): the shared 75-min cap, the 4-session short week, purposeful cardio only, top set + one back-off with a weekly lead lift, overhead press 3 sets, no KB hinge under strain, chest + quadriceps priority by stimulus and performance, the advisory loss-rate ceiling, no symptom warning line. Rubric 3.4.0: the glute stretch term at its top for any known length (ruling 17: the same S standard as other muscles, no exercise-specific trial required); a provisional rating never reaches S on any objective (ruling 16).",
+   "rule": "rulings are configuration only — status stays proposed until the owner approves the library"
   }
  ],
  "_provenance": {
@@ -63,19 +70,19 @@
    "history": 539
   },
   "hypertrophy_rows_by_tier": {
-   "S": 30,
-   "A": 141,
-   "B": 218,
-   "C": 63,
+   "S": 32,
+   "A": 145,
+   "B": 215,
+   "C": 60,
    "D": 0,
    "not_applicable": 210
   },
   "ratings_by_objective": {
    "hypertrophy": {
-    "S": 29,
-    "A": 136,
-    "B": 190,
-    "C": 61,
+    "S": 31,
+    "A": 139,
+    "B": 186,
+    "C": 60,
     "D": 0,
     "not_applicable": 210
    },
@@ -161,6 +168,14 @@
      "movements": [
       "calf_press_machine",
       "standing_calf_raise_machine"
+     ]
+    },
+    "glutes": {
+     "s": 2,
+     "families": 2,
+     "movements": [
+      "hip_thrust_barbell",
+      "hip_thrust_machine"
      ]
     },
     "hamstrings": {
@@ -374,7 +389,7 @@
   "attribute_rule": "derived by rule unless deploy/exercise_library_curation.py overrides; `unknown` = the rule cannot say"
  },
  "quality_rubric": {
-  "version": "3.3.0",
+  "version": "3.4.0",
   "provenance": "owner ruling 2026-11-12 on #5857: rubric v2, all eight board recommendations adopted",
   "job": {
    "field": "job",
@@ -394,9 +409,9 @@
     },
     "fixed": {
      "glutes": {
-      "at": "mid",
+      "at": "lengthened",
       "citation": "plotkin2023_hip_thrust_vs_squat",
-      "why": "no stretch premium and no shortened penalty for the glutes: the hip thrust (shortened) matched the back squat (lengthened) for glute growth"
+      "why": "length does not decide glute growth (the hip thrust, shortened, matched the back squat, lengthened): the stretch term is held at its top for any known glute length — no premium between glute movements and no cost against other muscles"
      }
     },
     "not_established": {
@@ -1753,10 +1768,24 @@
   }
  },
  "programming_settings": {
-  "session_cap_includes_cardio": false,
-  "symptom_line": "Chest, breathing, dizzy? Stop, log it.",
+  "session_cap_includes_cardio": true,
+  "symptom_line": "",
   "short_week_rule": "skip_shoulders_arms",
-  "behind_schedule_week": false
+  "behind_schedule_week": false,
+  "adherence_response": "short_week",
+  "cardio_purpose_only": true,
+  "heavy_day_deadlift_shape": "top_plus_backoff",
+  "lead_lift_rule": "alternate_weekly",
+  "press_sets": 3,
+  "kb_slot_under_strain": "drop",
+  "priority_muscles": [
+   "chest",
+   "quadriceps"
+  ],
+  "priority_add_rule": "stimulus_and_performance",
+  "rate_band_mode": "advisory",
+  "rate_ceiling_pct_bw": 1.0,
+  "symptom_line_on_lifting_days": false
  },
  "canonical_families": {
   "triceps_pushdown": {
@@ -2463,12 +2492,12 @@
     },
     {
      "target": "glutes",
-     "tier": "B",
-     "rubric_tier": "B",
-     "rubric_score": 8,
-     "points_tier": "B",
+     "tier": "A",
+     "rubric_tier": "A",
+     "rubric_score": 10,
+     "points_tier": "A",
      "basis": [
-      "points 8/14 -> B: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -2",
+      "points 10/14 -> A: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -2",
       "cap A: S needs stable_to_failure, stimulus_to_fatigue, no_high_joint_stress",
       "evidence rct_direct"
      ],
@@ -2507,7 +2536,7 @@
      "target": "quadriceps",
      "by_target": {
       "quadriceps": "A",
-      "glutes": "B",
+      "glutes": "A",
       "adductors": "A"
      },
      "basis": [
@@ -2801,12 +2830,12 @@
    "hypertrophy": [
     {
      "target": "glutes",
-     "tier": "B",
-     "rubric_tier": "B",
-     "rubric_score": 8,
-     "points_tier": "B",
+     "tier": "A",
+     "rubric_tier": "A",
+     "rubric_score": 10,
+     "points_tier": "A",
      "basis": [
-      "points 8/14 -> B: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -2",
+      "points 10/14 -> A: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -2",
       "cap A: S needs stable_to_failure, stimulus_to_fatigue, no_high_joint_stress",
       "evidence none_reviewed"
      ],
@@ -2818,13 +2847,13 @@
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "B",
+     "tier": "A",
      "target": "glutes",
      "by_target": {
-      "glutes": "B"
+      "glutes": "A"
      },
      "basis": [
-      "points 8/14 -> B: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -2",
+      "points 10/14 -> A: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -2",
       "cap A: S needs stable_to_failure, stimulus_to_fatigue, no_high_joint_stress",
       "evidence none_reviewed"
      ],
@@ -4638,10 +4667,10 @@
      "target": "glutes",
      "tier": "A",
      "rubric_tier": "A",
-     "rubric_score": 10,
-     "points_tier": "A",
+     "rubric_score": 12,
+     "points_tier": "S",
      "basis": [
-      "points 10/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
+      "points 12/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
       "cap A: S needs ceiling_high, stable_to_failure",
       "evidence none_reviewed"
      ],
@@ -6792,10 +6821,10 @@
      "target": "glutes",
      "tier": "A",
      "rubric_tier": "A",
-     "rubric_score": 12,
+     "rubric_score": 14,
      "points_tier": "S",
      "basis": [
-      "points 12/14 -> S: stretch 3, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
+      "points 14/14 -> S: stretch 5, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
@@ -6813,7 +6842,7 @@
       "glutes": "A"
      },
      "basis": [
-      "points 12/14 -> S: stretch 3, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
+      "points 14/14 -> S: stretch 5, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
@@ -8544,12 +8573,12 @@
    "hypertrophy": [
     {
      "target": "glutes",
-     "tier": "B",
-     "rubric_tier": "B",
-     "rubric_score": 8,
-     "points_tier": "B",
+     "tier": "A",
+     "rubric_tier": "A",
+     "rubric_score": 10,
+     "points_tier": "A",
      "basis": [
-      "points 8/14 -> B: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -2",
+      "points 10/14 -> A: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -2",
       "cap A: S needs stable_to_failure, stimulus_to_fatigue, no_high_joint_stress",
       "evidence none_reviewed"
      ],
@@ -8561,13 +8590,13 @@
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "B",
+     "tier": "A",
      "target": "glutes",
      "by_target": {
-      "glutes": "B"
+      "glutes": "A"
      },
      "basis": [
-      "points 8/14 -> B: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -2",
+      "points 10/14 -> A: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -2",
       "cap A: S needs stable_to_failure, stimulus_to_fatigue, no_high_joint_stress",
       "evidence none_reviewed"
      ],
@@ -10239,12 +10268,12 @@
    "hypertrophy": [
     {
      "target": "glutes",
-     "tier": "B",
-     "rubric_tier": "B",
-     "rubric_score": 9,
-     "points_tier": "B",
+     "tier": "A",
+     "rubric_tier": "A",
+     "rubric_score": 11,
+     "points_tier": "A",
      "basis": [
-      "points 9/14 -> B: stretch 3, stability 2, resistance_profile 2, progressability 3, carryover 0, joint_stress -1",
+      "points 11/14 -> A: stretch 5, stability 2, resistance_profile 2, progressability 3, carryover 0, joint_stress -1",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
@@ -10256,13 +10285,13 @@
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "B",
+     "tier": "A",
      "target": "glutes",
      "by_target": {
-      "glutes": "B"
+      "glutes": "A"
      },
      "basis": [
-      "points 9/14 -> B: stretch 3, stability 2, resistance_profile 2, progressability 3, carryover 0, joint_stress -1",
+      "points 11/14 -> A: stretch 5, stability 2, resistance_profile 2, progressability 3, carryover 0, joint_stress -1",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
@@ -10403,12 +10432,12 @@
    "hypertrophy": [
     {
      "target": "glutes",
-     "tier": "B",
-     "rubric_tier": "B",
-     "rubric_score": 9,
-     "points_tier": "B",
+     "tier": "A",
+     "rubric_tier": "A",
+     "rubric_score": 11,
+     "points_tier": "A",
      "basis": [
-      "points 9/14 -> B: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -1",
+      "points 11/14 -> A: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -1",
       "cap A: S needs ceiling_high, stable_to_failure",
       "evidence none_reviewed"
      ],
@@ -10420,13 +10449,13 @@
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "B",
+     "tier": "A",
      "target": "glutes",
      "by_target": {
-      "glutes": "B"
+      "glutes": "A"
      },
      "basis": [
-      "points 9/14 -> B: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -1",
+      "points 11/14 -> A: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -1",
       "cap A: S needs ceiling_high, stable_to_failure",
       "evidence none_reviewed"
      ],
@@ -11027,13 +11056,13 @@
    "hypertrophy": [
     {
      "target": "glutes",
-     "tier": "A",
-     "rubric_tier": "A",
-     "rubric_score": 12,
+     "tier": "S",
+     "rubric_tier": "S",
+     "rubric_score": 14,
      "points_tier": "S",
      "basis": [
-      "points 12/14 -> S: stretch 3, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
-      "cap A: evidence ordering: an untested form of hip_thrust_barbell (direct trial plotkin2023_hip_thrust_vs_squat, A) ties it at best, never outranks it",
+      "points 14/14 -> S: stretch 5, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
+      "cap S: evidence ordering: an untested form of hip_thrust_barbell (direct trial plotkin2023_hip_thrust_vs_squat, S) ties it at best, never outranks it",
       "evidence none_reviewed"
      ],
      "provisional": false,
@@ -11042,7 +11071,7 @@
      "last_reviewed": "unreviewed",
      "note": "machine form of the hip thrust; the trial used a barbell",
      "evidence_ceiling": {
-      "tier": "A",
+      "tier": "S",
       "movement": "hip_thrust_barbell",
       "citation": "plotkin2023_hip_thrust_vs_squat"
      }
@@ -11050,14 +11079,14 @@
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "A",
+     "tier": "S",
      "target": "glutes",
      "by_target": {
-      "glutes": "A"
+      "glutes": "S"
      },
      "basis": [
-      "points 12/14 -> S: stretch 3, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
-      "cap A: evidence ordering: an untested form of hip_thrust_barbell (direct trial plotkin2023_hip_thrust_vs_squat, A) ties it at best, never outranks it",
+      "points 14/14 -> S: stretch 5, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
+      "cap S: evidence ordering: an untested form of hip_thrust_barbell (direct trial plotkin2023_hip_thrust_vs_squat, S) ties it at best, never outranks it",
       "evidence none_reviewed"
      ],
      "evidence_confidence": "none_reviewed",
@@ -11662,10 +11691,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 11,
-     "points_tier": "A",
+     "rubric_score": 13,
+     "points_tier": "S",
      "basis": [
-      "points 11/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
+      "points 13/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
       "evidence none_reviewed"
@@ -14046,10 +14075,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 8,
-     "points_tier": "B",
+     "rubric_score": 10,
+     "points_tier": "A",
      "basis": [
-      "points 8/14 -> B: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -2",
+      "points 10/14 -> A: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -2",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs target_is_limiter, stable_to_failure, stimulus_to_fatigue, no_high_joint_stress",
       "evidence none_reviewed"
@@ -15058,10 +15087,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 10,
-     "points_tier": "A",
+     "rubric_score": 12,
+     "points_tier": "S",
      "basis": [
-      "points 10/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
+      "points 12/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
       "evidence none_reviewed"
@@ -16043,10 +16072,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 10,
-     "points_tier": "A",
+     "rubric_score": 12,
+     "points_tier": "S",
      "basis": [
-      "points 10/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
+      "points 12/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
       "evidence none_reviewed"
@@ -18772,10 +18801,10 @@
      "target": "glutes",
      "tier": "A",
      "rubric_tier": "A",
-     "rubric_score": 10,
-     "points_tier": "A",
+     "rubric_score": 12,
+     "points_tier": "S",
      "basis": [
-      "points 10/14 -> A: stretch 3, stability 2, resistance_profile 2, progressability 3, carryover 0, joint_stress 0",
+      "points 12/14 -> S: stretch 5, stability 2, resistance_profile 2, progressability 3, carryover 0, joint_stress 0",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
@@ -18793,7 +18822,7 @@
       "glutes": "A"
      },
      "basis": [
-      "points 10/14 -> A: stretch 3, stability 2, resistance_profile 2, progressability 3, carryover 0, joint_stress 0",
+      "points 12/14 -> S: stretch 5, stability 2, resistance_profile 2, progressability 3, carryover 0, joint_stress 0",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
@@ -19419,10 +19448,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 10,
-     "points_tier": "A",
+     "rubric_score": 12,
+     "points_tier": "S",
      "basis": [
-      "points 10/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
+      "points 12/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
       "evidence none_reviewed"
@@ -21036,12 +21065,12 @@
     },
     {
      "target": "glutes",
-     "tier": "C",
-     "rubric_tier": "C",
-     "rubric_score": 7,
-     "points_tier": "C",
+     "tier": "B",
+     "rubric_tier": "B",
+     "rubric_score": 9,
+     "points_tier": "B",
      "basis": [
-      "points 7/14 -> C: stretch 3, stability 1, resistance_profile 2, progressability 1, carryover 0, joint_stress 0",
+      "points 9/14 -> B: stretch 5, stability 1, resistance_profile 2, progressability 1, carryover 0, joint_stress 0",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
@@ -21061,7 +21090,7 @@
      "target": "quadriceps",
      "by_target": {
       "quadriceps": "C",
-      "glutes": "C"
+      "glutes": "B"
      },
      "basis": [
       "points 7/14 -> C: stretch 3, stability 1, resistance_profile 2, progressability 1, carryover 0, joint_stress 0",
@@ -22841,14 +22870,14 @@
    "hypertrophy": [
     {
      "target": "glutes",
-     "tier": "B",
-     "rubric_tier": "B",
-     "rubric_score": 9,
-     "points_tier": "B",
+     "tier": "A",
+     "rubric_tier": "A",
+     "rubric_score": 11,
+     "points_tier": "A",
      "basis": [
-      "points 9/14 -> B: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 0, joint_stress 0",
+      "points 11/14 -> A: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 0, joint_stress 0",
       "cap A: S needs stable_to_failure",
-      "cap A: evidence ordering: an untested form of hip_thrust_barbell (direct trial plotkin2023_hip_thrust_vs_squat, A) ties it at best, never outranks it",
+      "cap S: evidence ordering: an untested form of hip_thrust_barbell (direct trial plotkin2023_hip_thrust_vs_squat, S) ties it at best, never outranks it",
       "evidence none_reviewed"
      ],
      "provisional": false,
@@ -22856,7 +22885,7 @@
      "citations": [],
      "last_reviewed": "unreviewed",
      "evidence_ceiling": {
-      "tier": "A",
+      "tier": "S",
       "movement": "hip_thrust_barbell",
       "citation": "plotkin2023_hip_thrust_vs_squat"
      }
@@ -22864,15 +22893,15 @@
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "B",
+     "tier": "A",
      "target": "glutes",
      "by_target": {
-      "glutes": "B"
+      "glutes": "A"
      },
      "basis": [
-      "points 9/14 -> B: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 0, joint_stress 0",
+      "points 11/14 -> A: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 0, joint_stress 0",
       "cap A: S needs stable_to_failure",
-      "cap A: evidence ordering: an untested form of hip_thrust_barbell (direct trial plotkin2023_hip_thrust_vs_squat, A) ties it at best, never outranks it",
+      "cap S: evidence ordering: an untested form of hip_thrust_barbell (direct trial plotkin2023_hip_thrust_vs_squat, S) ties it at best, never outranks it",
       "evidence none_reviewed"
      ],
      "evidence_confidence": "none_reviewed",
@@ -31205,10 +31234,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 11,
-     "points_tier": "A",
+     "rubric_score": 13,
+     "points_tier": "S",
      "basis": [
-      "points 11/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
+      "points 13/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
       "evidence none_reviewed"
@@ -33669,10 +33698,10 @@
      "target": "glutes",
      "tier": "A",
      "rubric_tier": "A",
-     "rubric_score": 12,
+     "rubric_score": 14,
      "points_tier": "S",
      "basis": [
-      "points 12/14 -> S: stretch 3, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
+      "points 14/14 -> S: stretch 5, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
@@ -33690,7 +33719,7 @@
       "glutes": "A"
      },
      "basis": [
-      "points 12/14 -> S: stretch 3, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
+      "points 14/14 -> S: stretch 5, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
@@ -34122,12 +34151,12 @@
    "hypertrophy": [
     {
      "target": "glutes",
-     "tier": "A",
-     "rubric_tier": "A",
-     "rubric_score": 10,
-     "points_tier": "A",
+     "tier": "S",
+     "rubric_tier": "S",
+     "rubric_score": 12,
+     "points_tier": "S",
      "basis": [
-      "points 10/14 -> A: stretch 3, stability 2, resistance_profile 3, progressability 2, carryover 0, joint_stress 0",
+      "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 2, carryover 0, joint_stress 0",
       "evidence rct_direct"
      ],
      "provisional": false,
@@ -34141,13 +34170,13 @@
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "A",
+     "tier": "S",
      "target": "glutes",
      "by_target": {
-      "glutes": "A"
+      "glutes": "S"
      },
      "basis": [
-      "points 10/14 -> A: stretch 3, stability 2, resistance_profile 3, progressability 2, carryover 0, joint_stress 0",
+      "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 2, carryover 0, joint_stress 0",
       "evidence rct_direct"
      ],
      "evidence_confidence": "rct_direct",
@@ -34412,10 +34441,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 8,
-     "points_tier": "B",
+     "rubric_score": 10,
+     "points_tier": "A",
      "basis": [
-      "points 8/14 -> B: stretch 3, stability 2, resistance_profile 1, progressability 2, carryover 0, joint_stress 0",
+      "points 10/14 -> A: stretch 5, stability 2, resistance_profile 1, progressability 2, carryover 0, joint_stress 0",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
@@ -34434,7 +34463,7 @@
       "glutes": "B"
      },
      "basis": [
-      "points 8/14 -> B: stretch 3, stability 2, resistance_profile 1, progressability 2, carryover 0, joint_stress 0",
+      "points 10/14 -> A: stretch 5, stability 2, resistance_profile 1, progressability 2, carryover 0, joint_stress 0",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
@@ -34924,10 +34953,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 10,
-     "points_tier": "A",
+     "rubric_score": 12,
+     "points_tier": "S",
      "basis": [
-      "points 10/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
+      "points 12/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
       "evidence none_reviewed"
@@ -35110,10 +35139,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 11,
-     "points_tier": "A",
+     "rubric_score": 13,
+     "points_tier": "S",
      "basis": [
-      "points 11/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
+      "points 13/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
       "evidence none_reviewed"
@@ -36384,10 +36413,10 @@
      "target": "glutes",
      "tier": "A",
      "rubric_tier": "A",
-     "rubric_score": 10,
-     "points_tier": "A",
+     "rubric_score": 12,
+     "points_tier": "S",
      "basis": [
-      "points 10/14 -> A: stretch 3, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
@@ -36405,7 +36434,7 @@
       "glutes": "A"
      },
      "basis": [
-      "points 10/14 -> A: stretch 3, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
@@ -38162,10 +38191,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 11,
-     "points_tier": "A",
+     "rubric_score": 13,
+     "points_tier": "S",
      "basis": [
-      "points 11/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
+      "points 13/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
       "evidence none_reviewed"
@@ -44345,10 +44374,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 8,
-     "points_tier": "B",
+     "rubric_score": 10,
+     "points_tier": "A",
      "basis": [
-      "points 8/14 -> B: stretch 3, stability 2, resistance_profile 2, progressability 2, carryover 0, joint_stress -1",
+      "points 10/14 -> A: stretch 5, stability 2, resistance_profile 2, progressability 2, carryover 0, joint_stress -1",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
@@ -44367,7 +44396,7 @@
       "glutes": "B"
      },
      "basis": [
-      "points 8/14 -> B: stretch 3, stability 2, resistance_profile 2, progressability 2, carryover 0, joint_stress -1",
+      "points 10/14 -> A: stretch 5, stability 2, resistance_profile 2, progressability 2, carryover 0, joint_stress -1",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
@@ -47236,10 +47265,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 8,
-     "points_tier": "B",
+     "rubric_score": 10,
+     "points_tier": "A",
      "basis": [
-      "points 8/14 -> B: stretch 3, stability 1, resistance_profile 2, progressability 2, carryover 0, joint_stress 0",
+      "points 10/14 -> A: stretch 5, stability 1, resistance_profile 2, progressability 2, carryover 0, joint_stress 0",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
@@ -49569,10 +49598,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 10,
-     "points_tier": "A",
+     "rubric_score": 12,
+     "points_tier": "S",
      "basis": [
-      "points 10/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
+      "points 12/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
       "evidence none_reviewed"
@@ -50387,10 +50416,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 10,
-     "points_tier": "A",
+     "rubric_score": 12,
+     "points_tier": "S",
      "basis": [
-      "points 10/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
+      "points 12/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
       "evidence none_reviewed"
@@ -51475,10 +51504,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 8,
-     "points_tier": "B",
+     "rubric_score": 10,
+     "points_tier": "A",
      "basis": [
-      "points 8/14 -> B: stretch 3, stability 1, resistance_profile 2, progressability 2, carryover 0, joint_stress 0",
+      "points 10/14 -> A: stretch 5, stability 1, resistance_profile 2, progressability 2, carryover 0, joint_stress 0",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
@@ -52565,10 +52594,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 10,
-     "points_tier": "A",
+     "rubric_score": 12,
+     "points_tier": "S",
      "basis": [
-      "points 10/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
+      "points 12/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
       "evidence none_reviewed"
@@ -53711,10 +53740,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 10,
-     "points_tier": "A",
+     "rubric_score": 12,
+     "points_tier": "S",
      "basis": [
-      "points 10/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
+      "points 12/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
       "evidence none_reviewed"
@@ -55337,10 +55366,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 11,
-     "points_tier": "A",
+     "rubric_score": 13,
+     "points_tier": "S",
      "basis": [
-      "points 11/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
+      "points 13/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
       "evidence none_reviewed"
@@ -55359,7 +55388,7 @@
       "glutes": "B"
      },
      "basis": [
-      "points 11/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
+      "points 13/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
       "evidence none_reviewed"
@@ -56133,12 +56162,12 @@
     },
     {
      "target": "glutes",
-     "tier": "C",
-     "rubric_tier": "C",
-     "rubric_score": 6,
-     "points_tier": "C",
+     "tier": "B",
+     "rubric_tier": "B",
+     "rubric_score": 8,
+     "points_tier": "B",
      "basis": [
-      "points 6/14 -> C: stretch 3, stability 1, resistance_profile 1, progressability 1, carryover 0, joint_stress 0",
+      "points 8/14 -> B: stretch 5, stability 1, resistance_profile 1, progressability 1, carryover 0, joint_stress 0",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
@@ -56158,7 +56187,7 @@
      "target": "quadriceps",
      "by_target": {
       "quadriceps": "B",
-      "glutes": "C"
+      "glutes": "B"
      },
      "basis": [
       "points 8/14 -> B: stretch 5, stability 1, resistance_profile 1, progressability 1, carryover 0, joint_stress 0",
@@ -59925,10 +59954,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 8,
-     "points_tier": "B",
+     "rubric_score": 10,
+     "points_tier": "A",
      "basis": [
-      "points 8/14 -> B: stretch 3, stability 1, resistance_profile 2, progressability 2, carryover 0, joint_stress 0",
+      "points 10/14 -> A: stretch 5, stability 1, resistance_profile 2, progressability 2, carryover 0, joint_stress 0",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
@@ -64460,10 +64489,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 11,
-     "points_tier": "A",
+     "rubric_score": 13,
+     "points_tier": "S",
      "basis": [
-      "points 11/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
+      "points 13/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
       "evidence none_reviewed"
@@ -65989,10 +66018,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 8,
-     "points_tier": "B",
+     "rubric_score": 10,
+     "points_tier": "A",
      "basis": [
-      "points 8/14 -> B: stretch 3, stability 2, resistance_profile 1, progressability 2, carryover 0, joint_stress 0",
+      "points 10/14 -> A: stretch 5, stability 2, resistance_profile 1, progressability 2, carryover 0, joint_stress 0",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
@@ -66011,7 +66040,7 @@
       "glutes": "B"
      },
      "basis": [
-      "points 8/14 -> B: stretch 3, stability 2, resistance_profile 1, progressability 2, carryover 0, joint_stress 0",
+      "points 10/14 -> A: stretch 5, stability 2, resistance_profile 1, progressability 2, carryover 0, joint_stress 0",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
@@ -73305,10 +73334,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 8,
-     "points_tier": "B",
+     "rubric_score": 10,
+     "points_tier": "A",
      "basis": [
-      "points 8/14 -> B: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -2",
+      "points 10/14 -> A: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -2",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs target_is_limiter, stable_to_failure, stimulus_to_fatigue, no_high_joint_stress",
       "evidence none_reviewed"
@@ -73490,10 +73519,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 10,
-     "points_tier": "A",
+     "rubric_score": 12,
+     "points_tier": "S",
      "basis": [
-      "points 10/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
+      "points 12/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
       "evidence none_reviewed"
@@ -74887,10 +74916,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 11,
-     "points_tier": "A",
+     "rubric_score": 13,
+     "points_tier": "S",
      "basis": [
-      "points 11/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
+      "points 13/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
       "evidence none_reviewed"
@@ -75556,10 +75585,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 10,
-     "points_tier": "A",
+     "rubric_score": 12,
+     "points_tier": "S",
      "basis": [
-      "points 10/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
+      "points 12/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
       "evidence none_reviewed"
@@ -77842,10 +77871,10 @@
      "target": "glutes",
      "tier": "A",
      "rubric_tier": "A",
-     "rubric_score": 12,
+     "rubric_score": 14,
      "points_tier": "S",
      "basis": [
-      "points 12/14 -> S: stretch 3, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
+      "points 14/14 -> S: stretch 5, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
@@ -77863,7 +77892,7 @@
       "glutes": "A"
      },
      "basis": [
-      "points 12/14 -> S: stretch 3, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
+      "points 14/14 -> S: stretch 5, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
      ],
@@ -78494,10 +78523,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 8,
-     "points_tier": "B",
+     "rubric_score": 10,
+     "points_tier": "A",
      "basis": [
-      "points 8/14 -> B: stretch 3, stability 1, resistance_profile 2, progressability 2, carryover 0, joint_stress 0",
+      "points 10/14 -> A: stretch 5, stability 1, resistance_profile 2, progressability 2, carryover 0, joint_stress 0",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
@@ -78845,10 +78874,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 8,
-     "points_tier": "B",
+     "rubric_score": 10,
+     "points_tier": "A",
      "basis": [
-      "points 8/14 -> B: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -2",
+      "points 10/14 -> A: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -2",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs target_is_limiter, stable_to_failure, stimulus_to_fatigue, no_high_joint_stress",
       "evidence none_reviewed"
@@ -82120,10 +82149,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 10,
-     "points_tier": "A",
+     "rubric_score": 12,
+     "points_tier": "S",
      "basis": [
-      "points 10/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
+      "points 12/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
       "evidence none_reviewed"
@@ -90009,10 +90038,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 11,
-     "points_tier": "A",
+     "rubric_score": 13,
+     "points_tier": "S",
      "basis": [
-      "points 11/14 -> A: stretch 3, stability 2, resistance_profile 3, progressability 3, carryover 1, joint_stress -1",
+      "points 13/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 1, joint_stress -1",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
@@ -90031,7 +90060,7 @@
       "glutes": "B"
      },
      "basis": [
-      "points 11/14 -> A: stretch 3, stability 2, resistance_profile 3, progressability 3, carryover 1, joint_stress -1",
+      "points 13/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 1, joint_stress -1",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap A: S needs ceiling_high",
       "evidence none_reviewed"
@@ -93474,12 +93503,12 @@
    "hypertrophy": [
     {
      "target": "glutes",
-     "tier": "C",
-     "rubric_tier": "C",
-     "rubric_score": 7,
-     "points_tier": "C",
+     "tier": "B",
+     "rubric_tier": "B",
+     "rubric_score": 9,
+     "points_tier": "B",
      "basis": [
-      "points 7/14 -> C: stretch 3, stability 1, resistance_profile 1, progressability 2, carryover 0, joint_stress 0",
+      "points 9/14 -> B: stretch 5, stability 1, resistance_profile 1, progressability 2, carryover 0, joint_stress 0",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap A: S needs ceiling_high, stable_to_failure, reviewed_inputs",
       "evidence none_reviewed"
@@ -93495,13 +93524,13 @@
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "C",
+     "tier": "B",
      "target": "glutes",
      "by_target": {
-      "glutes": "C"
+      "glutes": "B"
      },
      "basis": [
-      "points 7/14 -> C: stretch 3, stability 1, resistance_profile 1, progressability 2, carryover 0, joint_stress 0",
+      "points 9/14 -> B: stretch 5, stability 1, resistance_profile 1, progressability 2, carryover 0, joint_stress 0",
       "cap B: load ceiling low: the target cannot be overloaded progressively",
       "cap A: S needs ceiling_high, stable_to_failure, reviewed_inputs",
       "evidence none_reviewed"
@@ -94698,10 +94727,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 11,
-     "points_tier": "A",
+     "rubric_score": 13,
+     "points_tier": "S",
      "basis": [
-      "points 11/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
+      "points 13/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
       "evidence none_reviewed"

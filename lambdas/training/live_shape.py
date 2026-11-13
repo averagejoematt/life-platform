@@ -19,8 +19,8 @@ WHY IT EXISTS. A fourth independent red team (2026-11-12, programming C+) read t
      top set + one back-off).
   4. THE AEROBIC GAP UNDER THE SHARED CAP (`walk_prompt`, `walk_note`). The engine reported "~64 min short" and served
      nothing. One optional, concrete walk now closes the gap on the conditioning host's morning; under the default cap an easy
-     ride is no longer added when one walk covers what is left (WALK_PROMPT). The steps credit stays a labelled heuristic
-     (`cardio_model.STEPS_CREDIT_SHARE`).
+     ride is no longer added when one walk covers what is left (WALK_PROMPT). #5861 FIX6 (ruling 12): the gap is measured
+     against RECORDED walking with intensity evidence (`cardio_model.recorded_aerobic`); steps alone earn no credit.
   5. THE KETTLEBELL SLOT UNDER STRAIN (`kb_under_strain`): `kb_slot_under_strain` `as_today` (the slot follows its placement)
      or `drop` — the red team's recommendation: an overreached or deload-recommended week drops the KB hinge.
 
@@ -36,8 +36,8 @@ ISSUE = "#5861"
 HEURISTIC = "heuristic"
 
 SETTINGS_DEFAULTS: dict[str, Any] = {
-    "heavy_day_deadlift_shape": "as_today",
-    "kb_slot_under_strain": "as_today",
+    "heavy_day_deadlift_shape": "top_plus_backoff",  # #5861 FIX6: owner ruling 5 (2026-11-13), was as_today
+    "kb_slot_under_strain": "drop",  # #5861 FIX6: owner ruling 7, was as_today
 }
 """OWNER DECISIONS, today's behaviour by default. `heavy_day_deadlift_shape` `as_today` (the heavy exposure's top set + two
 back-offs) | `top_plus_backoff` (top set + one back-off: the fourth red team's recommendation for a heavy trainee in a deficit).
@@ -75,7 +75,7 @@ WALK_PROMPT: dict[str, dict[str, Any]] = {
         "basis": "one optional brisk walk covers a weekly aerobic gap up to this size (a 30-45 min walk is an ordinary day's "
         "addition); under the default cap a larger gap still earns an easy ride, a smaller one is the walk's",
     },
-    "min_minutes": {"value": 15, "label": HEURISTIC, "basis": "a gap under 15 minutes is noise against the steps credit: no prompt"},
+    "min_minutes": {"value": 15, "label": HEURISTIC, "basis": "a gap under 15 minutes is noise against the recorded walking: no prompt"},
 }
 
 
@@ -358,7 +358,7 @@ def walk_covers(kind: str, live: dict[str, Any]) -> list[str] | None:
         return None
     return [
         f"cardio (live): no easy ride — ~{max(gap, 0)} min short of the weekly aerobic floor: one optional walk covers it "
-        f"(WALK_PROMPT, heuristic; the steps credit is a heuristic too)"
+        f"(WALK_PROMPT, heuristic)"
     ]
 
 
@@ -371,7 +371,9 @@ def walk_prompt(live: dict[str, Any] | None, today_minutes: int = 0) -> list[str
     if gap is None or gap < int(WALK_PROMPT["min_minutes"]["value"]):
         return []
     minutes = min(int(WALK_PROMPT["max_minutes"]["value"]), int(-(-gap // 5) * 5))
-    return [f"walk (live): optional brisk walk {minutes} min today — the week is ~{gap} min short after steps and blocks (WALK_PROMPT)"]
+    return [
+        f"walk (live): optional brisk walk {minutes} min today — the week is ~{gap} min short after recorded walking and blocks (WALK_PROMPT)"
+    ]
 
 
 WALK_LINE = "Optional today: brisk walk {m} min, any time."
