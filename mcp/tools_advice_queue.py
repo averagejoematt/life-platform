@@ -32,7 +32,7 @@ import json
 from datetime import date, timedelta
 
 from boto3.dynamodb.conditions import Key
-from coach import coach_checkin as cc
+from coach import ask_outcomes, coach_checkin as cc
 from coach.persona_registry import OPERATIONAL_COACH_IDS, RETIRED_COACH_IDS, short_id_names
 from common import activity_publication as AP
 from common.pacific_time import pacific_today, parse_day_key
@@ -69,13 +69,13 @@ CONTEXT_LABEL = (
     "that Matthew acted on it (#5612, ruling F); never pass anything here to log_advice_link as evidence."
 )
 HOW_TO_RECORD = (
-    "Ask Matthew, one ask at a time, what he did with it, and record only what he says, in his words. An entry under "
-    "same_window_ids shares the ask's dates; it is not a link and is not evidence on its own. To record his answer: "
-    "log it with log_decision (his words) — or use a decision he already logged that answers it — then call "
-    "log_advice_link with that decision_sk, ref_kind='commitment', ref_id=<ask_id>, coach_id=<coach_id>, the state "
-    "he names, and his own words as evidence_text; that tool refuses an ask's "
-    "state without them. If he does not say, record nothing: the ask stays unknown. Never pass the grader_status or "
-    "anything under context_not_evidence as evidence."
+    "Ask Matthew, one ask at a time, what he did with it, and record only the answer he gives. An entry under "
+    "same_window_ids shares the ask's dates; it is not a link and is not evidence on its own. To record his answer call "
+    "log_advice_link with ref_kind='commitment', ref_id=<ask_id>, coach_id=<coach_id> and the state HE names: "
+    "acted_on, declined, partially_followed or not_yet_decided (no decision_sk needed). evidence_text is an optional "
+    "private note in his words — never published. To change an answer call it again with the new state; to take one "
+    "back, withdraw=true. If he does not answer, record nothing: the ask stays 'not recorded' — never 'declined'. "
+    "Never take a state from the grader_status or anything under context_not_evidence."
 )
 
 ADVICE_QUEUE_DESCRIPTION = (
@@ -280,9 +280,14 @@ def _habit_registry() -> dict:
 # ── shaping ────────────────────────────────────────────────────────────────────────────────────────
 
 
-def rank_asks(asks: list, decisions: list, notes: list, checkins: list) -> list:
-    """Attach each ask's same-window ids and its answerability, then order most answerable first."""
+def rank_asks(asks: list, decisions: list, notes: list, checkins: list, answers: dict | None = None) -> list:
+    """Attach each ask's same-window ids, its answerability and his current answer (if any), then order: unanswered
+    first, most answerable first within each group."""
+    answers = answers or {}
     for a in asks:
+        mine = answers.get((a["coach_id"], a["ask_id"]))
+        # his OWN current answer (owner-side: not_yet_decided shows here; the note never does). None = not answered.
+        a["your_answer"] = {"state": mine["state"], "recorded_at": mine["recorded_at"], "revisions": mine["revisions"]} if mine else None
         lo, hi = a["asked_on"] or a["due"], a["due"]
         ids = {
             "checkin_answers": [c["id"] for c in checkins if c["coach_id"] == a["coach_id"] and lo <= c["answered_on"] <= hi],
@@ -291,7 +296,13 @@ def rank_asks(asks: list, decisions: list, notes: list, checkins: list) -> list:
         }
         a["same_window_ids"] = {k: v for k, v in ids.items() if v}
         a["answerability"] = 3 * len(ids["checkin_answers"]) + 2 * len(ids["decisions"]) + len(ids["owner_notes"])
-    return sorted(asks, key=lambda a: (-a["answerability"], _neg_day(a["due"]), a["coach_id"], a["ask_id"]))
+    return sorted(asks, key=lambda a: (_answered(a), -a["answerability"], _neg_day(a["due"]), a["coach_id"], a["ask_id"]))
+
+
+def _answered(a: dict) -> bool:
+    """True when his current answer is a decided one; an unanswered, withdrawn or not-yet-decided ask leads."""
+    state = (a.get("your_answer") or {}).get("state")
+    return bool(state) and state not in ask_outcomes.UNSETTLED_STATES
 
 
 def _neg_day(day: str) -> int:
@@ -347,7 +358,11 @@ def tool_get_advice_link_queue(args):
     notes = notes[:MAX_NOTES]
     checkins = _checkin_answers(coach_ids, words_from, today)[:MAX_CHECKINS]
 
-    ranked = rank_asks(asks, decisions, notes, checkins)
+    try:
+        answers = ask_outcomes.owner_answers(_table_ref, USER_ID, coach_ids)
+    except Exception:  # noqa: BLE001 — the queue still serves; asks then show no answer
+        answers = {}
+    ranked = rank_asks(asks, decisions, notes, checkins, answers)
     out = {
         "read_only": True,
         "window": {"days": days, "asks_due_from": start, "asks_due_to": today, "his_words_from": words_from},

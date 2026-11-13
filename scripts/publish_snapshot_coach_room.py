@@ -33,8 +33,12 @@ What it never carries, by design:
   * any string that names a private family (``PRIVATE_FAMILY``: the journal, State of Mind, the video diary) — a
     belt behind the server's gates: a hit empties the string (a text) or drops the element (a list item / a check).
 
-"What Matt did" is NOT here: an advice link (``coach/advice_links.py``) is owner-asserted, evidence-only and served by
-no public route, so every ask reads "not recorded" on the page; nothing is inferred from timing or correlation.
+"What Matt did" (owner 2026-11-12): an ask Matthew answered himself carries ``did`` = exactly ``{state, responded_on,
+self_reported: true}``, from the ask row's ``what_matt_did`` as ``/api/coach/<id>`` serves it (``coach/ask_outcomes.py``:
+acted_on / declined / partially_followed only). Its ``ask_id`` is dropped like every other id, and any other key, a
+state that is not a lowercase word, an undated answer or one not marked self-reported makes ``did`` null — the page
+then reads "not recorded", as it does for every unanswered ask. Nothing is inferred from timing or correlation, and an
+advice link (``coach/advice_links.py``, decision-linked) is still served by no public route.
 """
 
 from __future__ import annotations
@@ -215,6 +219,24 @@ def _latest_read(payload: dict) -> dict | None:
     }
 
 
+#: The complete key set of a published answer — the private note, the decision pointer and the history never cross.
+DID_KEYS = ("state", "responded_on", "self_reported")
+_DID_STATE = re.compile(r"^[a-z]+(?:_[a-z]+)*$")
+
+
+def _did(v: Any) -> dict | None:
+    """What Matt said he did with one ask, as served — or None ("not recorded"). Strict: the served object may carry
+    only ``ask_id`` beside the three published keys; anything else (a note, a history) voids the whole answer."""
+    if not isinstance(v, dict) or set(v) - {"ask_id", *DID_KEYS}:
+        return None
+    state, day = v.get("state"), _day(v.get("responded_on"))
+    if v.get("self_reported") is not True or not isinstance(state, str) or not _DID_STATE.match(state) or not day:
+        return None
+    if day != v.get("responded_on"):
+        return None
+    return {"state": state, "responded_on": day, "self_reported": True}
+
+
 def _asks(dossier: dict) -> dict:
     rows = []
     for c in dossier.get("commitments") or []:
@@ -235,6 +257,7 @@ def _asks(dossier: dict) -> dict:
                 "outcome_notes": _text(c.get("outcome_notes")),
                 "check": check,
                 "withheld_text": _withheld(c),
+                "did": _did(c.get("what_matt_did")),
             }
         )
     counts = dossier.get("commitment_counts") if isinstance(dossier.get("commitment_counts"), dict) else None
@@ -762,6 +785,10 @@ def resolve_and_validate(payload: dict, public: dict[str, list[dict]], cr3: bool
             if isinstance(d, dict) and isinstance(d.get("id"), str) and d.get("coach_a") in public_ids and d.get("coach_b") in public_ids
         ]
     for pid, c in payload["coaches"].items():
+        for row in (c.get("asks") or {}).get("rows") or []:
+            did = row.get("did") if isinstance(row, dict) else None
+            if did is not None and _did(did) != did:
+                raise ValueError(f"coach_room.json: coaches[{pid}].asks.rows[].did must be exactly {{{', '.join(DID_KEYS)}}} or null")
         counts = (c.get("asks") or {}).get("commitment_counts")
         if counts is not None and not all(isinstance(counts.get(k), int) for k in counts):
             raise ValueError(f"coach_room.json: coaches[{pid}].asks.commitment_counts must be integers")
