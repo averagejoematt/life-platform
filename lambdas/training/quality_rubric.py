@@ -44,7 +44,7 @@ from typing import Any
 
 from training import cardio_model
 
-RUBRIC_VERSION = "3.0.0"  # 3.0.0: #5861 per-objective rubrics + hypertrophy caps (PROPOSED); 2.0.0: owner ruling 2026-11-12
+RUBRIC_VERSION = "3.1.0"  # 3.1.0: #5861 FIX-DATA (S needs reviewed inputs; traps stretch neutral; joint-capacity never S; one cardio rating per family); 3.0.0: #5861 per-objective rubrics + hypertrophy caps (PROPOSED); 2.0.0: owner ruling 2026-11-12
 QUALITY_TIERS = ("S", "A", "B", "C", "D")
 EVIDENCE_CONFIDENCE = ("rct_direct", "rct_characteristic", "consensus", "none_reviewed")
 EVIDENCE_ADJUSTERS = ("rct_direct",)  # the only confidence that may move a row off its rubric tier
@@ -99,6 +99,12 @@ STRETCH_CAPS: dict[str, tuple[str, str, str]] = {
         "(lengthened) for glute growth",
     ),
 }
+# target -> why. 3.1.0 (#5861 FIX-DATA, red team: "shrugs at C: the stretch term penalises a movement whose short ROM is inherent"):
+# a muscle whose length bias is not an established driver of growth (and whose movements are short by nature) scores the stretch term
+# at mid, no premium and no penalty. A HEURISTIC, labelled as one: no trial is claimed. Unknown length still scores 0.
+STRETCH_NOT_ESTABLISHED: dict[str, str] = {
+    "traps": "a shrug's range is short by nature and length bias is not established for the traps: no stretch premium, no penalty",
+}
 BANDS: tuple[tuple[int, str], ...] = ((12, "S"), (10, "A"), (8, "B"), (5, "C"))
 
 # A major muscle whose PROGRAMMABLE pool (S and A, owner ruling 2026-11-12) holds fewer than two selectable movements, and
@@ -127,6 +133,8 @@ def job(entry: dict[str, Any]) -> str:
 def _stretch(entry: dict[str, Any], target: str) -> int:
     points = STRETCH.get(str(entry.get("length_bias")), 0)
     cap = next((c for m, c in STRETCH_CAPS.items() if str(target or "").lower().startswith(m)), None)
+    if not cap and any(str(target or "").lower().startswith(m) for m in STRETCH_NOT_ESTABLISHED):
+        return STRETCH["mid"] if points else 0
     return STRETCH[cap[0]] if cap and points else points
 
 
@@ -200,7 +208,15 @@ def adjustment_problems(row: dict[str, Any]) -> list[str]:
 # every categorical S criterion (`s_criteria`) — no quota, but no S on points alone.
 OBJECTIVES = ("hypertrophy", "strength", "functional", "conditioning", "mobility")
 CATEGORIES = ("hypertrophy", "strength", "conditioning", "athletic", "mobility", "rehab_control", "carry")
-TRUNK_FUNCTIONS = ("loaded_flexion", "anti_extension", "anti_rotation", "anti_lateral_flexion", "rotation", "loaded_stabilisation")
+TRUNK_FUNCTIONS = (
+    "loaded_flexion",
+    "lateral_flexion",
+    "anti_extension",
+    "anti_rotation",
+    "anti_lateral_flexion",
+    "rotation",
+    "loaded_stabilisation",
+)
 FUNCTIONS = ("hip_flexion", "grip", "wrist_flexion", "wrist_extension", "forearm_rotation")
 LEVELS = ("low", "moderate", "high")
 LIMITERS = ("target", "balance", "grip", "mobility", "trunk", "other_muscle", "technique", "cardio")
@@ -234,6 +250,7 @@ S_CRITERIA = {
     "stable_to_failure": "stable enough (stability high or moderate) to take the target close to failure",
     "stimulus_to_fatigue": "systemic fatigue is not high for the stimulus",
     "no_high_joint_stress": "no joint is rated high",
+    "reviewed_inputs": "the inputs the criteria read were checked by hand (`objective_inputs.reviewed`), not only derived by a title rule",
 }
 
 
@@ -267,6 +284,7 @@ def s_criteria(entry: dict[str, Any], row: dict[str, Any]) -> dict[str, bool]:
         "stable_to_failure": entry.get("stability") in ("high", "moderate"),
         "stimulus_to_fatigue": inp.get("systemic_fatigue") in ("low", "moderate"),
         "no_high_joint_stress": "high" not in [str(v) for v in (entry.get("joint_stress") or {}).values()],
+        "reviewed_inputs": bool(inp.get("reviewed")),
     }
 
 
@@ -387,20 +405,30 @@ def functional_rating(entry: dict[str, Any]) -> tuple[str | None, list[str]]:
     loadable = inp.get("ceiling") in ("moderate", "high")
     core = "carry" in q or ("unilateral" in q and bool({"locomotion", "trunk_stability"} & set(q)))
     safe = entry.get("skill_complexity") != "high" and "high" not in [str(v) for v in (entry.get("joint_stress") or {}).values()]
-    if len(q) >= 3 and loadable and safe and core:
+    if len(q) >= 3 and loadable and safe and core and "joint_capacity" not in q:  # control work for one joint is never S
         tier = "S"
     elif (len(q) >= 2 and loadable) or len(q) >= 3:
         tier = "A"
     else:
         tier = "B" if len(q) >= 2 or loadable else "C"
     basis = ["qualities: " + ", ".join(q), f"loadable: {'yes' if loadable else 'no'}"]
-    return tier, basis + ["rule: S = 3+ qualities, loadable, safe, a carry or single-leg under travel/trunk load; A = 2+ loadable"]
+    return tier, basis + [
+        "rule: S = 3+ qualities, loadable, safe, a carry or single-leg under travel/trunk load; A = 2+ loadable; joint-capacity work never S"
+    ]
+
+
+def _cardio_view(entry: dict[str, Any]) -> dict[str, Any]:
+    """The entry as the cardio model reads it: ONE rating per canonical family (#5861 FIX-DATA). The model reads the row's own
+    session count (N=1 sustainability); a second row for the same machine (the recumbent bike and Hevy's "Cycling") must not rate
+    apart on it, so the family's `family_sustainability` (a category the builder writes) stands in for the row's own."""
+    fam = {"established": cardio_model.ESTABLISHED_EXPOSURES, "tried": 1, "untried": 0}.get(str(entry.get("family_sustainability")))
+    return {**entry, "history": {**dict(entry.get("history") or {}), "exposures": fam}} if fam is not None else entry
 
 
 def _cardio(entry: dict[str, Any]) -> dict[str, Any] | None:
     """Lane L4's cardio model rating for this movement (it owns cardio), keyed by the canonical id; None = not a modality
     it models."""
-    return cardio_model.conditioning_rating(entry, str(entry.get("canonical") or "") or None)
+    return cardio_model.conditioning_rating(_cardio_view(entry), str(entry.get("canonical") or "") or None)
 
 
 def conditioning_rating(entry: dict[str, Any]) -> tuple[str | None, list[str]]:
@@ -525,6 +553,7 @@ def rubric_doc() -> dict[str, Any]:
                 "field": "length_bias",
                 "points": STRETCH,
                 "fixed": {m: {"at": c[0], "citation": c[1], "why": c[2]} for m, c in STRETCH_CAPS.items()},
+                "not_established": {m: {"at": "mid", "why": w, "basis": "heuristic, no trial"} for m, w in STRETCH_NOT_ESTABLISHED.items()},
             },
             "stability": {"field": "stability", "isolation": STABILITY, "compound": COMPOUND_STABILITY},
             "resistance_profile": {
@@ -565,8 +594,8 @@ def rubric_doc() -> dict[str, Any]:
             "inputs": {k: list(v) for k, v in OBJECTIVE_INPUTS.items()},
             "strength": (strength_rating.__doc__ or "").split(".")[0] + ". S = primary lift + maximal overload + self-stabilised"
             " + bilateral; A = maximal overload or a bodyweight ladder; B submaximal; C bodyweight; D light.",
-            "functional": "S = 3+ qualities, loadable, not high-skill, no high joint, and a carry or single-leg work under "
-            "travel or trunk load; A = 2+ qualities loadable (or 3+); B = 2 qualities or 1 loadable; C = 1.",
+            "functional": "S = 3+ qualities, loadable, not high-skill, no high joint, not joint-capacity work, and a carry or "
+            "single-leg work under travel or trunk load; A = 2+ qualities loadable (or 3+); B = 2 qualities or 1 loadable; C = 1.",
             "conditioning": "S = aerobic high + control high + impact low + recovery low; A = aerobic high + impact low, or "
             "aerobic moderate + impact low + recovery low; B = aerobic high, or moderate without high impact; C otherwise.",
             "mobility": "loaded A, active or motor_control B, passive C; S only against a recorded (N=1) limitation.",

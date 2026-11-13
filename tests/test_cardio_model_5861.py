@@ -23,7 +23,7 @@ import pathlib
 import re
 
 import pytest
-from training import cardio_menu, cardio_model as cm, cardio_note, hevy_note_grammar, wrist_clock
+from training import cardio_menu, cardio_model as cm, cardio_note, hevy_note_grammar, quality_rubric as qr, wrist_clock
 
 _REPO = pathlib.Path(__file__).resolve().parent.parent
 _LIB = json.loads((_REPO / "config" / "exercise_library.json").read_text(encoding="utf-8"))
@@ -98,7 +98,12 @@ def test_a_cardio_row_rated_d_for_hypertrophy_can_be_top_rated_for_conditioning(
     # and the library's own conditioning rating is this model's
     assert all(e["hypertrophy"][0]["tier"] in (None, "D") for mid, e in rows.items() if mid in tops)
     assert all(e["ratings"]["hypertrophy"]["tier"] is None for mid, e in rows.items() if mid in tops)
-    assert all(e["ratings"]["conditioning"]["tier"] == cm.conditioning_rating(e, mid)["tier"] for mid, e in rows.items() if mid in tops)
+    # (a canonical family of one machine reads the family's sustainability — #5861 FIX-DATA, `qr._cardio_view`)
+    assert all(
+        e["ratings"]["conditioning"]["tier"] == cm.conditioning_rating(qr._cardio_view(e), mid)["tier"]
+        for mid, e in rows.items()
+        if mid in tops
+    )
 
 
 def test_the_cardio_model_never_imports_the_hypertrophy_rubric():

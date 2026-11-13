@@ -219,12 +219,12 @@ def test_an_alias_never_scores_differently_from_its_canonical():
 
 # ── the reviewed layer cannot vanish ──────────────────────────────────────────────────────────────────────────────────
 PINNED = {
-    "PATTERN_OVERRIDES": 14,
+    "PATTERN_OVERRIDES": 23,  # #5861 FIX-DATA: +9 (side bends, the title-regex misses)
     "STRENGTH_LIFTS": 9,
-    "CATEGORY_OVERRIDES": 12,
-    "INPUT_OVERRIDES": 11,
+    "CATEGORY_OVERRIDES": 14,  # +2 (the dead-hang variants)
+    "INPUT_OVERRIDES": 21,  # +10 (shrug grip limiter, kickback ceilings, cuff mobility n/a, the dead-hang variants)
     "SECONDARY_ROWS": 6,
-    "CANONICAL_FAMILIES": 44,
+    "CANONICAL_FAMILIES": 49,  # +5 (one machine, one rating)
 }
 
 
@@ -308,7 +308,7 @@ ANOMALIES = {  # key: (hypertrophy, strength, functional, conditioning, mobility
     "bird_dog": (None, None, "C", None, "B"),
     "side_plank": (None, None, "B", None, None),
     # #5861 L6: cuff rotation is loaded joint-capacity work (FUNCTIONAL_QUALITIES `joint_capacity`) — functional B, never S
-    "rotator_cuff_external_rotation": (None, None, "B", None, "A"),
+    "rotator_cuff_external_rotation": (None, None, "B", None, None),  # FIX-DATA: joint capacity, not mobility (red team)
     "db_cossack_squats": ("B", "B", "A", None, "A"),
     "offset_lunges": ("B", "B", "S", None, None),
     "3_way_lunge": ("B", "B", "A", None, None),
@@ -392,7 +392,7 @@ def test_conditioning_has_one_rule_per_movement_and_cardio_is_the_cardio_models(
 
     off = []
     for k, e in MV.items():
-        r = cm.conditioning_rating(e, e.get("canonical"))
+        r = cm.conditioning_rating(qr._cardio_view(e), e.get("canonical"))
         if r is not None and (e["ratings"]["conditioning"]["tier"], e["ratings"]["conditioning"]["evidence_confidence"]) != (
             r["tier"],
             r["evidence_confidence"],

@@ -291,6 +291,63 @@ ATTRIBUTE_OVERRIDES: dict[str, tuple[dict, str]] = {
         "re-checked: a standing dumbbell lateral raise is light, the trunk is braced and the side delt is the limiter "
         "(moderate, not low); no joint is loaded hard",
     ),
+    # ── #5861 FIX-DATA: the red-team data errors (2026-11-12) and the same classes found by the systematic pass ──
+    "spider_curl": (
+        {"stability": "high"},
+        "a spider curl is chest-supported on an incline bench: the trunk is fixed, so stability is high, not low (red team)",
+    ),
+    "shrug_barbell": (
+        {"stability": "moderate"},
+        "a standing, bilateral shrug on a fixed bar path: the trunk is braced, stability is moderate, not low (red team)",
+    ),
+    "shrug_dumbbell": (
+        {"stability": "moderate"},
+        "a standing, bilateral shrug with the load at the sides: the trunk is braced, stability is moderate, not low (red team)",
+    ),
+    "incline_chest_fly_dumbbell": (
+        {"stability": "moderate"},
+        "a bench-supported dumbbell fly: the back is supported, stability is moderate, not low (same class as the spider curl)",
+    ),
+    "chest_fly_dumbbell": (
+        {"stability": "moderate"},
+        "a bench-supported dumbbell fly: the back is supported, stability is moderate, not low (same class as the spider curl)",
+    ),
+    "incline_db_skull_crushers": (
+        {"stability": "moderate"},
+        "a bench-supported extension: the back is supported, stability is moderate, not low (same class as the spider curl)",
+    ),
+    "prone_leg_curl": (
+        {"resistance_profile": "machine_selectorized", "equipment": ["leg_curl_lying"], "stability": "high"},
+        "a prone leg curl IS the lying leg-curl machine (a curl needs a loaded lever; Hevy's custom template carries no equipment, which read as bodyweight): one machine, one rating",
+    ),
+    "overhead_tricep_extension": (
+        {"resistance_profile": "unknown", "equipment": ["other_unspecified"]},
+        "a custom template with no equipment recorded (Hevy 'none') is not bodyweight: an overhead extension needs a load; equipment unknown until the owner names it",
+    ),
+    "tricep_extension": (
+        {"resistance_profile": "unknown", "equipment": ["other_unspecified"]},
+        "a custom template with no equipment recorded (Hevy 'none') is not bodyweight: a triceps extension needs a load; equipment unknown until the owner names it",
+    ),
+    "shoulder_press": (
+        {"resistance_profile": "unknown", "equipment": ["other_unspecified"]},
+        "a custom template with no equipment recorded (Hevy 'none') is not bodyweight: a shoulder press needs a load; equipment unknown until the owner names it",
+    ),
+    "seated_bicep_curls": (
+        {"resistance_profile": "unknown", "equipment": ["other_unspecified"]},
+        "a custom template with no equipment recorded (Hevy 'none') is not bodyweight: a curl needs a load; equipment unknown until the owner names it",
+    ),
+    "21s": (
+        {"resistance_profile": "unknown", "equipment": ["other_unspecified"]},
+        "a custom template with no equipment recorded (Hevy 'none') is not bodyweight: 21s (a loaded curl) needs a load; equipment unknown until the owner names it",
+    ),
+    "one_arm_bench_press": (
+        {"resistance_profile": "unknown", "equipment": ["other_unspecified"]},
+        "a custom template with no equipment recorded (Hevy 'none') is not bodyweight: a bench press needs a load; equipment unknown until the owner names it",
+    ),
+    "gorilla_row_kettlebell": (
+        {"skill_complexity": "low"},
+        "a gorilla row with kettlebells is the dumbbell gorilla row with another handle: the same skill demand, one rating",
+    ),
 }
 
 # (pattern, title regex or None, joint ratings, reason) — the first matching row wins
@@ -370,6 +427,25 @@ PATTERN_OVERRIDES: dict[str, tuple[str, str, str]] = {
     "shoulder_pushdown": ("vertical_pull", "isolation", "a straight-arm pushdown is a lat movement, not a triceps extension"),
     "rowing_machine": ("cardio", "isolation", "a rowing machine is conditioning, not a cable row"),
     "upright_row_barbell": ("lateral_raise", "compound", "an upright row is a side-delt raise pattern, not a horizontal pull"),
+    # ── #5861 FIX-DATA: the title regex read "other" (a hyphen, a missing word) or the wrong pattern ──
+    "side_bend_dumbbell": ("core_lateral_flexion", "isolation", "a side bend is lateral spinal flexion, not a crunch (red team)"),
+    "saxon_side_bends": ("core_lateral_flexion", "isolation", "a side bend is lateral spinal flexion, not a crunch"),
+    "side_crunch_slow_cadence": ("core_lateral_flexion", "isolation", "a side crunch is lateral spinal flexion"),
+    "knee_push_up": ("horizontal_press", "compound", "a knee push-up is a push-up regression: a horizontal press (the hyphen hid it)"),
+    "elbows_tucked_db_bench": ("horizontal_press", "compound", "a dumbbell bench press with the elbows tucked: a horizontal press"),
+    "glute_ham_raise": ("leg_curl", "isolation", "a glute-ham raise is knee flexion against the body (a bodyweight leg curl)"),
+    "physio_ball_glute_ham_raise": ("leg_curl", "isolation", "a physio-ball glute-ham raise is knee flexion (a bodyweight leg curl)"),
+    "db_cheat_laterals": ("lateral_raise", "isolation", "a cheat lateral is a lateral raise (a family variant)"),
+    "front_raise_dumbbell": ("lateral_raise", "isolation", "a front raise is a shoulder-raise pattern: single-joint, front delts"),
+}
+
+# P0/P1 ADDITIONS (#5861 L2) the title regex could not name — `other` can never match a slot's patterns, so each publishes its own
+# pattern. Soft table: a build WITHOUT the additions simply has no such key (`exercise_library_objectives.evaluate_entry`); a
+# test holds every key present in the committed library.
+ADDITION_PATTERNS: dict[str, tuple[str, str, str]] = {
+    "tibialis_raise": ("ankle_dorsiflexion", "isolation", "a tibialis raise is loaded ankle dorsiflexion (P0)"),
+    "cable_serratus_punch": ("scapular_protraction", "isolation", "a serratus punch is loaded scapular protraction (P1)"),
+    "controlled_forward_step_down": ("step_down", "compound", "a controlled step-down is an eccentric single-leg knee pattern (P1)"),
 }
 
 # library key -> reason: the primary strength lifts (squat, hinge, bench, overhead press, row, weighted pull) — the only
@@ -400,6 +476,8 @@ CATEGORY_OVERRIDES: dict[str, tuple[str, str]] = {
     "sandbag_shouldering": ("athletic", "sandbag shouldering is a strongman power lift from the floor"),
     "sled_push": ("carry", "a sled push is loaded locomotion (the carry family), rated on functional, strength and conditioning"),
     "sled_drag": ("carry", "a sled pull is loaded locomotion (the carry family), rated on functional, strength and conditioning"),
+    "dead_arm_hang": ("rehab_control", "a hang is the dead hang's variant: shoulder and grip control, not a growth movement"),
+    "dead_arm_switch_grip_hang": ("rehab_control", "a hang is the dead hang's variant: shoulder and grip control, not a growth movement"),
 }
 
 # library key -> (objective_inputs fields, reason): where the input rule is wrong for the movement
@@ -418,6 +496,39 @@ INPUT_OVERRIDES: dict[str, tuple[dict, str]] = {
     "pull_up_assisted": ({"ceiling": "moderate"}, "an assisted pull-up is a regression: its ceiling is the unassisted pull-up"),
     "chin_up_assisted": ({"ceiling": "moderate"}, "an assisted chin-up is a regression: its ceiling is the unassisted chin-up"),
     "triceps_dip_assisted": ({"ceiling": "moderate"}, "an assisted dip is a regression: its ceiling is the unassisted dip"),
+    # ── #5861 FIX-DATA ──
+    "rotator_cuff_external_rotation": (
+        {"mobility": None},
+        "cuff external rotation is loaded JOINT CAPACITY (rated on functional), not a mobility movement: it trains no range (red team)",
+    ),
+    "db_external_rotation": (
+        {"mobility": None},
+        "cuff external rotation is loaded JOINT CAPACITY (rated on functional), not a mobility movement: it trains no range (red team)",
+    ),
+    "dead_arm_hang": ({"mobility": "loaded"}, "the dead hang's variant: loaded shoulder and grip control (the head is rated loaded)"),
+    "dead_arm_switch_grip_hang": (
+        {"mobility": "loaded"},
+        "the dead hang's variant: loaded shoulder and grip control (the head is rated loaded)",
+    ),
+    "glute_kickback_machine": (
+        {"ceiling": "moderate"},
+        "a single-leg lever stack caps the absolute load far below the glutes' capacity — the hip thrust carries the heavy glute "
+        "loading — so the target cannot be overloaded to a high ceiling: A, not S (red team)",
+    ),
+    "cable_kickback": ({"ceiling": "moderate"}, "a single-leg cable kickback caps the absolute load far below the glutes' capacity"),
+    "rear_kick_machine": ({"ceiling": "moderate"}, "a single-leg lever stack caps the absolute load far below the glutes' capacity"),
+    "shrug_barbell": (
+        {"limiter": "grip"},
+        "a heavy shrug ends on grip before the traps tire (practitioner consensus; straps are the usual fix)",
+    ),
+    "seated_shrugs": (
+        {"limiter": "grip"},
+        "a heavy shrug ends on grip before the traps tire (practitioner consensus; straps are the usual fix)",
+    ),
+    "shrug_dumbbell": (
+        {"limiter": "grip"},
+        "a heavy shrug ends on grip before the traps tire (practitioner consensus; straps are the usual fix)",
+    ),
 }
 
 # library key -> [(second target, limiter for that target, reason)]: the reviewed attribution beyond the primary
@@ -446,6 +557,12 @@ CANONICAL_FAMILIES: dict[str, tuple[tuple[str, ...], dict[str, dict[str, str]]]]
     ),
     "tricep_pushaway": (("tricep_pushaways",), {"kneeling_tricep_pushaway": {"stance": "kneeling"}}),
     "glute_kickback_machine": (("glute_machine_kickback",), {}),
+    # #5861 FIX-DATA: one machine, one rating
+    "lying_leg_curl_machine": (("prone_leg_curl",), {}),
+    "seated_incline_curl_dumbbell": (("db_incline_curls",), {}),
+    "gorilla_rows": ((), {"gorilla_row_kettlebell": {"equipment": "kettlebell"}}),
+    "db_step_up": ((), {"step_up": {"resistance": "bodyweight"}}),
+    "goblet_squat": ((), {"kettlebell_goblet_squat": {"equipment": "kettlebell"}}),
     "farmers_walk": (("farmers_walk_8d414b80",), {}),
     "overhead_press_barbell": (("military_press",), {}),
     "db_reverse_lunge": (
@@ -548,6 +665,13 @@ CANONICAL_FAMILIES: dict[str, tuple[tuple[str, ...], dict[str, dict[str, str]]]]
     "triceps_dip": ((), {"triceps_dip_assisted": {"resistance": "assisted"}}),
 }
 
+# Canonical families whose members include an L2 ADDITION (soft: a build WITHOUT the additions has no such member, so the
+# family is skipped rather than a hard stop). `tests/test_data_fixes_5861.py` holds each present.
+ADDITION_FAMILIES: dict[str, tuple[tuple[str, ...], dict[str, dict[str, str]]]] = {
+    # the machine he rides IS Hevy's "Cycling": one family, one rating
+    "cycling": (("recumbent_bike",), {}),
+}
+
 # The movements whose objective inputs were checked by hand in the #5861 pass (every movement in a hypertrophy S/A/B band
 # or S/A on another objective after the pass, and every movement in the owner's anomaly list). Their non-hypertrophy ratings
 # read `consensus`; the rest stay `none_reviewed`. `tests/test_objective_ratings_5861.py` holds that no S/A/B row is unreviewed.
@@ -625,6 +749,7 @@ REVIEWED_KEYS: frozenset[str] = frozenset(
         "db_floor_flyes",
         "db_gun_carries",
         "db_heel_touch_squats",
+        "db_haney_shrugs",
         "db_hip_thrust",
         "db_incline_curls",
         "db_lat_pullovers",
@@ -827,6 +952,7 @@ REVIEWED_KEYS: frozenset[str] = frozenset(
         "sled_drag",
         "sled_push",
         "snatch",
+        "spider_curl",
         "split_squat_dumbbell",
         "split_squat_jumps",
         "split_squat_switches",
