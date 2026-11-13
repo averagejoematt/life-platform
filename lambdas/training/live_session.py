@@ -179,10 +179,13 @@ def fit_exposures(rx: dict[str, Any], rotation: dict[str, Any], ctx: dict[str, A
         new = _replacement(e, code, ctx, rotation, taken)
         name = (ctx["catalog"].get(old) or {}).get("title") or old
         if not new and code == "equipment":  # a trunk slot keeps direct trunk work (live_program.TRUNK_FALLBACK_ORDER, heuristic)
-            from training import live_program
+            from training import live_program, live_week
 
             new = live_program.trunk_fallback(e, ctx, taken)
             why = f"{why}; no same-function member — the nearest trunk job (TRUNK_FALLBACK_ORDER, heuristic)" if new else why
+            if not new:  # a vertical pull keeps a vertical pull (live_week.VERTICAL_PULL_FALLBACK, heuristic; gates fail-closed)
+                new = live_week.vertical_pull_fallback(e, ctx, taken)
+                why = f"{why}; no pulldown — the first servable vertical pull (VERTICAL_PULL_FALLBACK, heuristic)" if new else why
         if new:
             taken.add(new)
             keep.append(e | {"movement_key": new, "template_id": None, "live_swap": {"from": old, "code": code}})
@@ -215,11 +218,12 @@ def for_live_draft(
     model (`fatigue_model.for_live_draft`, its one graded reduction). In shadow: `rx` itself, nothing read. Never raises."""
     if not is_live(rotation):
         return rx
-    from training import fatigue_model, live_program
+    from training import fatigue_model, live_program, live_week
 
     out = copy.deepcopy(rx)
     lines: list[str] = []
     ctx: dict[str, Any] | None = None
+    behind = None
     try:
         from training import selection_engine as se
 
@@ -240,9 +244,13 @@ def for_live_draft(
             "role": rx.get("session_role"),
             "discomfort": hurts,
             "short_week_host": getattr(inputs, "short_week", None),  # live_program.short_week_roles: the host session's role
+            "target_date": str(getattr(inputs, "target_date", "") or ""),
         }
         lines += fit_exposures(out, rotation or {}, ctx)
         lines += live_program.plan(out, rotation or {}, ctx, block_workouts, sig)  # joint pain, stacking, stalls, fatigue cost
+        lines += live_week.novel_start(out, ctx, block_workouts)  # a movement new to him never starts at 4-6 reps
+        behind = live_week.behind_schedule(block_workouts, ctx["target_date"], lib)  # an OFF-by-default live option
+        lines += live_week.keep_the_anchors(out, ctx, behind)
         _refit(out)
     except Exception as e:  # noqa: BLE001 — the live fit never blocks a draft
         lines.append(f"live session fit failed ({type(e).__name__}) — the prescription is unchanged")
@@ -250,6 +258,8 @@ def for_live_draft(
         sig = {}
     before = [len(x["sets"]) for x in out["exposures"]]
     order = live_program.trim_order(surplus_first(catalog_movements or {}))  # high-fatigue work first, then surplus isolation
+    if behind:  # the keep-the-anchors week IS the adherence answer: no further set trim for adherence on top of it
+        order.adherence = lambda exposures: []
     out = fatigue_model.for_live_draft(out, rotation, inputs, block_workouts, trim_order=order)
     for x, n in zip(out["exposures"], before):
         if len(x["sets"]) < n:
@@ -261,7 +271,11 @@ def for_live_draft(
         except Exception as e:  # noqa: BLE001 — never blocks a draft
             lines.append(f"trunk floor failed ({type(e).__name__}) — nothing added")
     trends = {tid: str(v.get("trend")) for tid, v in (sig or {}).items()}
-    extra = {"aerobic": live_program.aerobic(inputs), "trends": trends}
+    extra = {
+        "aerobic": live_program.aerobic(inputs),
+        "trends": trends,
+        "symptom_tripwire": live_week.symptom_gate(getattr(inputs, "medical_stop_lines", None)),  # the medical stop line, read
+    }
     rate = live_program.rate_line(out.get("fatigue"), getattr(inputs, "sleep_hours", None))
     out[MARK] = {"issue": ISSUE, "lines": lines + ([rate] if rate else []), **extra}
     return out
@@ -273,16 +287,22 @@ def surplus_first(catalog: dict[str, Any]) -> Any:
     its minimum effective dose (the crunch, the calves) below it while the delts sit near MAV. Heuristic over existing data."""
     from collections import Counter
 
-    from training import block_model, program_structure as ps
+    from training import block_model, live_week, program_structure as ps, selection_engine as se
 
     marks = block_model.load_landmarks() or {}
+    lib = se.load_library_failsoft()
+
+    def muscle(key: Any) -> str:  # a catalog `other` (the kettlebell slot) reads the library's target (second red team)
+        m = (catalog.get(key or "") or {}).get("primary_muscle")
+        return live_week.landmark_muscle(key, catalog, lib) if m in (None, "other") else str(m)
+
     week: Counter = Counter()
     for role in ps.SPLIT_ROLES:
         for e in ps.session_prescription_for_role(role, catalog_movements=catalog)["exposures"]:
-            week[str((catalog.get(e.get("movement_key") or "") or {}).get("primary_muscle"))] += len(e["sets"])
+            week[muscle(e.get("movement_key"))] += len(e["sets"])
 
     def surplus(e: dict[str, Any]) -> float:
-        m = str((catalog.get(e.get("movement_key") or "") or {}).get("primary_muscle"))
+        m = muscle(e.get("movement_key"))
         return week[m] - float((marks.get(m) or {}).get("MEV") or week[m])
 
     def order(exposures: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -333,12 +353,19 @@ def _unpair(blocks: list[Any], sid: Any) -> None:
 def fit_routine(blocks: list[Any], rx: dict[str, Any], cap: int, movements: dict[str, Any], rationale: list[str], shape: dict) -> dict:
     """IN PLACE: under live, drop accessory blocks, last-listed first, until the routine's minutes as written (warm-ups
     included) fit `cap`; anchors never. Returns the session shape (re-measured when anything went). Shadow: `shape`."""
-    if MARK not in rx or shape.get("lifting_minutes") is None or shape["lifting_minutes"] <= cap:
+    if MARK not in rx or shape.get("lifting_minutes") is None:
+        return shape
+    from training import live_week
+
+    cap = min(int(cap), int(rx.get("live_session_cap") or cap))  # a behind-schedule session's ~45 min (live option)
+    shape = live_week.make_cardio_room(blocks, rx, movements, cap, shape)  # shared cap: lifting gives sets for an aerobic block
+    if shape["lifting_minutes"] <= cap:
         return shape
     from training import program_structure
     from training.session_shape import routine_minutes
 
     before, dropped = shape["lifting_minutes"], []
+    trimmed = live_week.trim_sets_for_time(blocks, rx, movements, cap)  # second red team: sets before exercises
     while routine_minutes(blocks, movements)["lifting_minutes"] > cap:
         idx = next((i for i in range(len(blocks) - 1, -1, -1) if str(blocks[i].rationale_tag or "").startswith("accessory:")), None)
         if idx is None:
@@ -351,7 +378,9 @@ def fit_routine(blocks: list[Any], rx: dict[str, Any], cap: int, movements: dict
     new = program_structure.enforce_session_shape(blocks, movements) | {
         "working_sets": sum(warmup_sets.working_set_count(b.sets) for b in blocks)
     }
-    line = f"time (live): ~{before} min as written (warm-ups included) > the {cap}-min lifting cap — dropped {', '.join(dropped)} -> ~{new['lifting_minutes']} min"
+    how = [", ".join(f"{n} {m}" for m, n in sorted(trimmed.items())) + " set(s) off (surplus over MEV first)"] if trimmed else []
+    how += [f"dropped {', '.join(dropped)}"] if dropped else []
+    line = f"time (live): ~{before} min as written (warm-ups included) > the {cap}-min lifting cap — {'; '.join(how)} -> ~{new['lifting_minutes']} min"
     rx[MARK]["lines"].append(line)  # `rationale_lines` writes it
     rationale[:] = [r for r in rationale if not r.startswith(f"OVER the {cap}-min lifting cap")]
     return new

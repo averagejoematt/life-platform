@@ -204,6 +204,8 @@ def _gather_inputs(target_date: str, add_load_enabled: bool) -> "GeneratorInputs
         setattr(inputs, "sleep_hours", live["sleep_hours"])  # read by fatigue_model.for_live_draft (live only)
     if live.get("steps_by_day"):
         setattr(inputs, "steps_by_day", live["steps_by_day"])  # #5861 L6: the walking dose, into cardio_model.cardio_load (live only)
+    if live.get("medical_stop_lines"):
+        setattr(inputs, "medical_stop_lines", live["medical_stop_lines"])  # #5861: tripped -> no hard cardio (live_week.symptom_gate)
     return inputs
 
 
@@ -213,6 +215,25 @@ def _gather_inputs(target_date: str, add_load_enabled: bool) -> "GeneratorInputs
 # proposed the three values stay exactly as they were.
 ACWR_ZONE_TO_AUTOREG = {"safe": "safe", "caution": "caution", "danger": "high"}  # anything else (detraining, re-baselining) = safe
 RECOVERY_BANDS = (67, 34)  # green >= 67, yellow >= 34 — the bands `mcp/tools_plan._recovery_tier` maps the score with
+
+
+MEDICAL_RHR_NIGHTS = 14  # `health.tripwire_readers._rhr_arm`: the latest night against the mean of the nights before it
+
+
+def _medical_stop_lines(whoop: list[dict[str, Any]], target_date: str) -> dict[str, Any] | None:
+    """`owner_redlines` `medical_stop_lines` through its ONE reader (`health.tripwire_readers.medical_stop_lines`) over the
+    whoop rows the cron already read: the RHR arm is measured; the labs arms read unknown (no labs read here); palpitations and
+    syncope are self-report with no input on the platform (unknown, never clear). Live only; the draft acts on `tripped`."""
+    try:
+        from health import tripwire_readers
+
+        rows = sorted((r for r in whoop if r.get("resting_heart_rate") is not None), key=lambda r: str(r.get("sk") or r.get("date") or ""))
+        return tripwire_readers.medical_stop_lines(
+            {"rhr_by_day": [r["resting_heart_rate"] for r in rows], "lab_draws": None, "window_end": target_date}
+        )
+    except Exception as e:  # noqa: BLE001 — an unread stop line is unknown, never a blocked draft
+        logger.warning(f"medical stop line read failed: {type(e).__name__}")
+        return None
 
 
 def _latest(rows: list[dict[str, Any]] | None, field: str) -> Any:
@@ -240,10 +261,13 @@ def _live_inputs(target_date: str, read=None) -> dict[str, Any]:
 
     from health import hr_regime
 
-    whoop = _safe("whoop", 1)
+    whoop = _safe("whoop", MEDICAL_RHR_NIGHTS)  # one read: the latest night + the RHR stop line's 14-night baseline
     score = _latest(whoop, "recovery_score")
-    if score is not None and not hr_regime.is_rebaselining(target_date):  # HR-derived tiers are not evidence in the window
+    rebaselining = hr_regime.is_rebaselining(target_date)
+    if score is not None and not rebaselining:  # HR-derived tiers are not evidence in the window
         out["recovery_tier"] = "green" if float(score) >= RECOVERY_BANDS[0] else ("yellow" if float(score) >= RECOVERY_BANDS[1] else "red")
+    if whoop is not None and not rebaselining:  # #5861 second red team: the medical stop line, read (report-only reader)
+        out["medical_stop_lines"] = _medical_stop_lines(whoop, target_date)
     sleep = _latest(whoop, "sleep_duration_hours")
     out["sleep_hours"] = float(sleep) if sleep is not None else None
     zone = _latest(_safe("computed_metrics", 2), "acwr_zone")
