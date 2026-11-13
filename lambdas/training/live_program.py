@@ -59,9 +59,10 @@ LOAD_POLICY: dict[str, dict[str, Any]] = {
     "evidence_rpe": {
         "value": 9.0,
         "label": HEURISTIC,
-        "basis": "second red team (2026-11-13): an e1RM 'regression' on an isolation, accessory or machine/cable lift is noisy (a "
-        "stack, an attachment, a grip, a 2.5-lb dumbbell jump), so it cuts the load only with EFFORT evidence — the last top set "
-        "at RPE 9+ or under the rep range's floor, or a joint flag; a trend alone HOLDS. A free-weight compound's trend stands",
+        "basis": "second red team (2026-11-13): an e1RM 'regression' is noisy — a stack, an attachment, a grip, a 2.5-lb dumbbell "
+        "jump on an isolation lift; heavy and volume rep ranges mixed in one e1RM trend on a compound (the owner run's volume squat "
+        "read 'sliding' after a top set at RPE 8.5) — so a regression cuts the load only with EFFORT evidence: the last top set at "
+        "RPE 9+ or under the rep range's floor, or a joint flag. A trend alone HOLDS (no step up), never cuts",
     },
     "one_retreat_per_week": {
         "value": 6,
@@ -139,7 +140,6 @@ SETTINGS_DEFAULTS: dict[str, Any] = {
     "symptom_line": "Chest, breathing, dizzy? Stop, log it.",
     "short_week_rule": "skip_shoulders_arms",
     "behind_schedule_week": False,
-    "press_sets": 1,
 }
 """Library-carried settings (`config/exercise_library.json` `programming_settings`), read with these defaults when absent.
 `session_cap_includes_cardio` False keeps today's 75-min LIFTING cap with the cardio block apart; True makes the cap cover lifting
@@ -147,7 +147,8 @@ SETTINGS_DEFAULTS: dict[str, Any] = {
 note stays inside its 6-line budget (hevy_note_lint L7) — a longer wording still prints, safety over the line budget.
 `short_week_rule` `skip_shoulders_arms` (L5's rule) or `slide` (today's sequence) — `short_week_roles`. Second red team (2026-11-13),
 both OWNER DECISIONS, both off by default: `behind_schedule_week` (live_week.behind_schedule: a shorter 'keep the anchors' week
-after a run of missed sessions) and `press_sets` (live_week.press_sets: the shoulders+arms press above the charter's one set)."""
+after a run of missed sessions) and `press_sets` (live_week.press_sets, read there with its default 1 — the charter's one set —
+until the library builder carries the key: the shoulders+arms press above one set)."""
 MIN_CARDIO_MINUTES = 10  # heuristic: a cardio block shorter than this under the shared cap is dropped, not served as a stub
 
 STRESS = {"low": 0, "moderate": 1, "high": 2}
@@ -646,7 +647,11 @@ def mark_retreats(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any, trends
             continue
         lo = ((e.get("sets") or [{}])[0].get("reps") or [None])[0]
         judged = e | {"live_cost": fatigue_cost(e, ctx), "live_retreated": False}
-        cut = (load_decision(judged, trends.get(tid), previous_load(hist, tid, week[0]), None, lo) or {}).get("mode") == "down"
+        prior, done = previous_load(hist, tid, week[0]), previous_load(hist, tid, shift_day_key(week[0], 1))
+        cut = (load_decision(judged, trends.get(tid), prior, None, lo) or {}).get("mode") == "down"
+        # the cut must have HAPPENED: the earlier exposure's top load sits under the session before it (a guard cut the engine's
+        # own lower load already met changed nothing, and holds nothing now)
+        cut = cut and prior is not None and done is not None and float(done["lb"]) < float(prior["lb"]) - 0.5
         if cut or (e.get("kind") == "anchor" and trends.get(tid) == "stalled"):
             e["live_retreated"] = True
             lines.append(
@@ -690,7 +695,7 @@ def load_decision(
 ) -> dict[str, Any] | None:
     """What the guard does to one exposure's load: {mode: down|hold, pct, why, clause} or None (the engine's load stands).
     `previous` is Hevy's PREVIOUS (`exercise_history.previous_load`): lb, reps, rpe. Second red team (2026-11-13): a regression
-    cuts a non-free-weight-compound lift only with effort evidence (`effort_evidence`); a lift already cut once this week
+    cuts only with effort evidence (`effort_evidence`) — a trend alone holds; a lift already cut once this week
     (`live_retreated`, `mark_retreats`) holds."""
     if not previous or not previous.get("lb"):
         return None
@@ -701,8 +706,7 @@ def load_decision(
         return {"mode": "hold", "pct": 0, "why": "cut once already this week"}
     pct, why, noisy = 0, None, False
     if trend == "regressing":
-        cost = e.get("live_cost") or ("high" if e.get("kind") == "anchor" else "low")
-        if cost == "high" or effort_evidence(previous, rep_lo):
+        if effort_evidence(previous, rep_lo):
             pct, why = int(LOAD_POLICY["regress_down_pct"]["value"]), "strength sliding"
         else:
             noisy = True  # a trend alone on an isolation / machine lift: hold, never cut

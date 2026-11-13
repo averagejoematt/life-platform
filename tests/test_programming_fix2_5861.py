@@ -125,6 +125,24 @@ def test_the_kettlebell_slot_loads_only_a_bell_on_file_and_counts_toward_glutes_
     sets = sw.sets_by_muscle(week, LIB0, CAT0)
     assert sets.get("glutes") == 2 and sets.get("hamstrings") == 1.0
     assert lw.landmark_muscle("kettlebell_deadlift", CAT0, None) == "other"  # control: the catalog alone hides the sets
+    # the engine's own weekly count (fatigue_model, read by the live fatigue model and the cron's 7-day volume) credits the
+    # KB slot's logged sets through the library (template D20D7BBE), never the catalog's `other`; the catalog stays as ruled
+    rec = [{"date": "2026-11-12", "exercises": [_ex("D20D7BBE", [(35, 8, 7.0), (35, 8, 7.0)])]}]
+    hard = fm.hard_sets_by_muscle(rec, fm.library_index(LIB0), as_of="2026-11-13")
+    assert hard.get("glutes") == 2 and hard.get("hamstrings") == 1.0 and "other" not in hard and "unplaced" not in hard
+    assert fm.hard_sets_by_muscle(rec, {}, as_of="2026-11-13") == {"unplaced": 2.0}  # control: no library -> not placed
+
+
+def test_a_reviewed_rating_ranks_ahead_of_a_provisional_one_at_an_equal_tier():
+    """Rubric 3.2.0 (FIX2-DATA): unreviewed ratings carry `provisional: true`. Inside the live rank, at an equal tier and fit,
+    the reviewed row wins. Control: with the flag ignored the order falls to the next key (variety / the movement id)."""
+    base = {"tier": "A", "n1": {"score": 0}, "fatigue_cost": 1, "novel": False, "exposures": 0, "evidence": None}
+    rev = base | {"catalog_key": "z_reviewed", "movement_id": "z_reviewed", "provisional": False}
+    prov = base | {"catalog_key": "a_provisional", "movement_id": "a_provisional", "provisional": True}
+    ranked = sorted([prov, rev], key=lambda c: sl.rank_key(c, set(), {}, ("S", "A")))
+    assert ranked[0]["catalog_key"] == "z_reviewed"
+    flat = [c | {"provisional": False} for c in (prov, rev)]  # control
+    assert sorted(flat, key=lambda c: sl.rank_key(c, set(), {}, ("S", "A")))[0]["catalog_key"] == "a_provisional"
 
 
 # ── 4. load cuts need evidence; one cut a week ────────────────────────────────
@@ -158,8 +176,9 @@ def test_an_isolation_load_cut_needs_effort_evidence_not_a_trend_alone():
     assert lp.load_decision(acc, "regressing", prev | {"reps": 7, "rpe": 9.5}, "normal", 8)["mode"] == "down"  # real evidence cuts
     cable = {"kind": "anchor", "live_cost": "moderate"}  # the lat pulldown: a cable compound reads the same rule
     assert lp.load_decision(cable, "regressing", {"lb": 120.0, "reps": 9, "rpe": 7.5}, "normal", 6)["mode"] == "hold"
-    barbell = {"kind": "anchor", "live_cost": "high"}  # a free-weight compound's trend still stands
-    assert lp.load_decision(barbell, "regressing", {"lb": 185.0, "reps": 5, "rpe": 8.0}, "normal", 4)["mode"] == "down"
+    barbell = {"kind": "anchor", "live_cost": "high"}  # a barbell trend mixing rep ranges holds too; a grind still cuts
+    assert lp.load_decision(barbell, "regressing", {"lb": 185.0, "reps": 9, "rpe": 8.5}, "normal", 8)["mode"] == "hold"
+    assert lp.load_decision(barbell, "regressing", {"lb": 185.0, "reps": 4, "rpe": 9.0}, "normal", 4)["mode"] == "down"
     with patch.object(lp, "effort_evidence", lambda previous, rep_lo: True):  # control: the trend alone cuts again
         cut = lp.load_decision(acc, "regressing", prev, "normal", 8)
         assert cut["mode"] == "down"
@@ -468,5 +487,5 @@ def test_every_live_week_constant_is_a_labelled_heuristic():
     for name in ("evidence_rpe", "one_retreat_per_week"):
         assert lp.LOAD_POLICY[name]["label"] == "heuristic"
     assert lp.STACK_RULE["pinned_light_rpe"]["label"] == "heuristic"
-    assert lp.SETTINGS_DEFAULTS["behind_schedule_week"] is False and lp.SETTINGS_DEFAULTS["press_sets"] == 1
+    assert lp.SETTINGS_DEFAULTS["behind_schedule_week"] is False and "press_sets" not in (LIB0.get("programming_settings") or {})
     assert lp.SETTINGS_DEFAULTS["symptom_line"] == "Chest, breathing, dizzy? Stop, log it."  # the owner's wording decision is open

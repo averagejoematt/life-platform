@@ -546,7 +546,9 @@ def press_sets(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
     """IN PLACE, the live option `programming_settings.press_sets` (default 1 = the charter's `overhead_press_per_wk`, #5162):
     above 1, the shoulders+arms overhead-press anchor gets that many working sets, each extra one taken from the face-pull
     slot (rear delts — the week's largest delt surplus), never below two there. Returns the rationale lines."""
-    want = int(_settings().get("press_sets") or 1)
+    from training import selection_engine as se
+
+    want = int(((se.load_library_failsoft() or {}).get("programming_settings") or {}).get("press_sets") or 1)  # absent = 1
     if want <= 1 or rx.get("session_role") != "shoulders_arms":
         return []
     press = next((e for e in rx["exposures"] if e.get("kind") == "anchor" and e.get("pattern") == "overhead_press"), None)

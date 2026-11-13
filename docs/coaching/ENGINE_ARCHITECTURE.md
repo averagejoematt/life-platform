@@ -183,10 +183,10 @@ warm-ups): under live a load never steps UP on a regressing lift, a lift whose l
 of its range, a stalled lift, or on a strained/overreached day — it holds at the last top set (where that set reached the top
 of the range at RPE ≤ 8.5, the session's own in-session step line stays: start where you were, step only if set 1 is easy).
 It steps DOWN 10 % on a regression, 5 % on an anchor whose last top set overshot its band (RPE ≥ 9.5), 10 % under a joint
-flag or a stall reset, rounded DOWN to the implement. **A regression cut needs effort evidence** on anything but a free-weight
-compound (`LOAD_POLICY evidence_rpe`, second red team): an isolation, accessory or machine/cable lift cuts only when its last
-top set was RPE 9+ or under the rep range's floor (or a joint flag stands); a trend alone HOLDS ("Same load: trend down,
-effort fine."). On the owner's real run a dumbbell lateral raise read "strength sliding" and dropped a dumbbell step after
+flag or a stall reset, rounded DOWN to the implement. **A regression cut needs effort evidence** on every lift (`LOAD_POLICY
+evidence_rpe`, second red team): a lift cuts for a regression only when its last top set was RPE 9+ or under the rep range's
+floor (or a joint flag stands); a trend alone HOLDS ("Same load: trend down, effort fine."). The e1RM trend is noisy on an
+isolation lift (a dumbbell jump, a stack) and on a compound trained in two rep ranges (the heavy and the volume day). On the owner's real run a dumbbell lateral raise read "strength sliding" and dropped a dumbbell step after
 a top set well inside its range at a moderate RPE — one session on the next dumbbell made the e1RM noisy; a cable pulldown
 did the same on a stack. The guarded load is written onto the floor audit row the commit gate
 reuses (`live_guard`, `floor_kg`), so a down-step is a recorded, sanctioned reduction — never a silent one. Shadow: untouched.

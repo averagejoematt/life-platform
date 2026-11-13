@@ -74,7 +74,7 @@ FATIGUE_COST_BASIS = (
     "heuristic: +1 compound, +1 free weight or bodyweight (stability + systemic cost), +1 moderate/high spinal load; "
     "+2 more on a high spinal load while the fatigue model flags axial stacking"
 )
-LIVE_PICK_KEYS = ("objective", "canonical", "fatigue_cost", "discomfort", "trend", "rotation", "repeat")
+LIVE_PICK_KEYS = ("objective", "canonical", "fatigue_cost", "discomfort", "trend", "rotation", "repeat", "provisional")
 LIVE_GATES_SOURCE = "#5772's stored evaluation (#5861, live): only `unlocked` opens; no fresh evaluation = locked"
 
 
@@ -133,6 +133,8 @@ def decorate(c: dict[str, Any], entry: dict[str, Any], ctx: dict[str, Any]) -> d
         "objective": objective,
         "canonical": family(c.get("movement_id"), c.get("catalog_key"), ctx["lib"]),
         "fatigue_cost": fatigue_cost(entry, bool(policy.get("stacking"))),
+        # rubric 3.2.0 (FIX2-DATA): an unreviewed rating is `provisional` — at an equal tier a reviewed row ranks first
+        "provisional": bool(((entry.get("ratings") or {}).get(objective) or {}).get("provisional")),
         "discomfort": hurts,
         "trend": sig.get("trend") or "unknown",
     }
@@ -214,6 +216,7 @@ def rank_key(c: dict[str, Any], recent: set[str], slot_last: dict[str, int], poo
         c.get("fatigue_cost", 0),
         slot_last.get(ck, -1),
         tier,
+        c.get("provisional", False),
         ck in recent,
         c["novel"],
         -c["exposures"],
