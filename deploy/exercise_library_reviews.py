@@ -118,8 +118,71 @@ def finalize_tiers(movements: dict[str, dict[str, Any]]) -> None:
     for e in movements.values():
         e["hypertrophy"] = [quality_rubric.finalize_row(e, r) for r in e.get("hypertrophy") or []]
     apply_evidence_ordering(movements)
+    apply_s_quota(movements)
     for e in movements.values():
         e["ratings"] = quality_rubric.objective_ratings(e)
+
+
+def _holder(keys: list[str], family: str, movements: dict[str, dict[str, Any]]) -> str:
+    """The member that keeps a family's S: the canonical movement itself when it earned S, else the one he has done most
+    (history exposures), else the first by key — deterministic."""
+    if family in keys:
+        return family
+    return sorted(keys, key=lambda k: (-int(((movements[k].get("history") or {}).get("exposures")) or 0), k))[0]
+
+
+def _is_variant(e: dict[str, Any]) -> bool:
+    """A real variant of its family (a grip, stance, range, implement or laterality difference) — not an exact duplicate."""
+    v = e.get("variant")
+    return isinstance(v, dict) and bool(v) and "duplicate_of" not in v
+
+
+def apply_s_quota(movements: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """#5861 FIX3 (third red team: 49 hypertrophy S, every lat-pulldown grip S): ONE S per canonical family per objective (per
+    target muscle for hypertrophy). An exact duplicate (another Hevy template of the same movement) shares its canonical's
+    rating; every other member — a real variant — that earned S carries an `s_quota` {holder, family} — on its hypertrophy
+    row, or under `s_quota[objective]` on the entry — and the rubric caps it at A with the line naming the holder
+    (`quality_rubric.s_quota_why`): a grip or stance variant is shown as the holder's variant, not a second S. Re-derived from
+    scratch on every build (idempotent). Returns {objective|family|target: {holder, demoted}} — the report."""
+    from training import quality_rubric
+
+    for e in movements.values():
+        e.pop("s_quota", None)
+        e["hypertrophy"] = [
+            quality_rubric.finalize_row(e, {k: v for k, v in r.items() if k != "s_quota"}) for r in e.get("hypertrophy") or []
+        ]
+    groups: dict[tuple[str, str, str], list[str]] = {}
+    for key, e in sorted(movements.items()):
+        fam = str(e.get("canonical") or key)
+        for r in e.get("hypertrophy") or []:
+            if r.get("tier") == "S":
+                groups.setdefault(("hypertrophy", fam, str(r.get("target"))), []).append(key)
+        rated = quality_rubric.objective_ratings(e)
+        for obj in quality_rubric.OBJECTIVES:
+            if obj != "hypertrophy" and (rated.get(obj) or {}).get("tier") == "S":
+                groups.setdefault((obj, fam, ""), []).append(key)
+    report: dict[str, dict[str, Any]] = {}
+    for (obj, fam, target), keys in sorted(groups.items()):
+        if len(keys) < 2:
+            continue
+        same = [k for k in keys if not _is_variant(movements[k])]  # the canonical and its exact duplicates: one movement
+        holder = fam if fam in keys else (same[0] if same else _holder(keys, fam, movements))
+        quota = {"holder": holder, "family": fam}
+        for k in keys:
+            if k == holder or (k in same and holder in same):
+                continue  # an exact duplicate (another Hevy template of the same movement) carries its canonical's rating
+            e = movements[k]
+            if obj == "hypertrophy":
+                e["hypertrophy"] = [
+                    quality_rubric.finalize_row(e, r | {"s_quota": dict(quota)}) if str(r.get("target")) == target else r
+                    for r in e["hypertrophy"]
+                ]
+            else:
+                e.setdefault("s_quota", {})[obj] = dict(quota)
+        demoted = sorted(k for k in keys if k != holder and not (k in same and holder in same))
+        if demoted:
+            report["|".join(x for x in (obj, fam, target) if x)] = {"holder": holder, "demoted": demoted}
+    return report
 
 
 def apply_evidence_ordering(movements: dict[str, dict[str, Any]]) -> None:

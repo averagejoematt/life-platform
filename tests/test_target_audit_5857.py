@@ -119,8 +119,11 @@ def _attribute_offenders(movements: dict) -> list[str]:
         e = movements[key]
         if (e.get("attribute_audit") or {}).get("reason") != reason:
             off.append(f"{key}: attribute_audit does not record the reviewed reason")
+        floor = e.get("provocation_floor") or {}  # #5861 FIX3: a pain-map floor keeps the reviewed rating as its `from`
         for field, value in attrs.items():
             have = e.get(field)
+            if field == "joint_stress":
+                have = {j: (floor[j]["from"] if j in floor else v) for j, v in (have or {}).items()}
             joints = field == "joint_stress" and any((have or {}).get(j) != v for j, v in value.items())
             if joints or (field != "joint_stress" and have != value):
                 off.append(f"{key}.{field}: {have!r} != {value!r}")

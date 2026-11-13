@@ -375,3 +375,68 @@ def inputs_for(key: str) -> dict[str, Any]:
 def audit_record(key: str) -> dict[str, Any]:
     row = REVIEW[key]
     return {"attrs": sorted(row["attrs"]), "inputs": sorted(row["inputs"]), "why": row["why"], "pass": "#5861 FIX2-DATA"}
+
+
+# ── #5861 FIX3 (third red team): two CLASS rules over the reviewed attributes ─────────────────────────────────────────
+SHOULDER_PROVOKING = {
+    "patterns": ("lateral_raise", "rear_delt", "shoulder_rotation"),
+    "title": r"face ?pulls?|upright row|reverse fly|rear delt|external rotation|internal rotation|scaption|\by[- ]raise",
+    "floor": _M,
+    "why": "third red team (2026-11-13): abduction toward 90 degrees, horizontal abduction and loaded rotation are the classic "
+    "painful-arc provocations a physio protects first under a shoulder flag; 'light, no joint loaded hard' rated them low, so a "
+    "6/10 sharp shoulder note left lateral raises and face pulls at RPE 9-10. The shoulder is rated at least moderate: the pain "
+    "rule (live_program.PAIN_RULE) then caps or avoids them. Practitioner consensus, not a trial.",
+}
+"""Shoulder-provoking work: the shoulder joint stress is raised to at least `floor` (never lowered from high)."""
+SPINE_AT_SIDES = {
+    "pattern": "squat",
+    "equipment": ("dumbbell", "kettlebell"),
+    "not_title": r"goblet|front|zercher|overhead|rack|barbell|landmine|jump|hop|plyo",
+    "level": _L,
+    "why": "third red team (2026-11-13): one spine-loading definition — a split squat, lunge or step-up with the load hanging at "
+    "the sides loads the legs, not the spine; two such rows read moderate and the rest low, so the stacking rule 'swapped' a "
+    "Bulgarian split squat for a reverse lunge that loads the spine the same (a label moved, not the fatigue). Every row of the "
+    "class reads low, the pattern table's own rating for it (exercise_library_targets.JOINT_RATINGS_BY_PATTERN).",
+}
+"""Squat-pattern work with dumbbells/kettlebells at the sides: spinal load `level` for the whole class."""
+
+
+def _rank(level: str) -> int:
+    return {"low": 0, "moderate": 1, "high": 2}.get(str(level), -1)
+
+
+def apply_class_rules(movements: dict[str, dict[str, Any]]) -> dict[str, list[str]]:
+    """The two class rules, in place, AFTER the canonical layer (each row's pattern and attributes are final) and before any
+    tier is derived; each change is recorded on the row (`attribute_audit.class_rule`). Returns {rule: [keys changed]}."""
+    import re
+
+    out: dict[str, list[str]] = {"shoulder_provoking": [], "spine_at_sides": []}
+    for key, e in sorted(movements.items()):
+        js_ = dict(e.get("joint_stress") or {})
+        title = str(e.get("title") or "")
+        hit = e.get("pattern") in SHOULDER_PROVOKING["patterns"] or re.search(SHOULDER_PROVOKING["title"], title, re.I)
+        if hit and _rank(js_.get("shoulder", "unknown")) < _rank(SHOULDER_PROVOKING["floor"]):
+            # the healthy-joint rating stays the rubric's joint-cost input (quality_rubric.joint_penalty): a pain-map floor
+            e["provocation_floor"] = {"shoulder": {"from": str(js_.get("shoulder", "unknown")), "rule": "shoulder_provoking"}}
+            js_["shoulder"] = SHOULDER_PROVOKING["floor"]
+            out["shoulder_provoking"].append(key)
+            _record(e, "shoulder_provoking", "shoulder", SHOULDER_PROVOKING["floor"])
+        eq = set(e.get("equipment") or [])
+        at_sides = (
+            e.get("pattern") == SPINE_AT_SIDES["pattern"]
+            and e.get("job") == "compound"
+            and eq & set(SPINE_AT_SIDES["equipment"])
+            and "barbell" not in eq
+            and not re.search(SPINE_AT_SIDES["not_title"], title, re.I)
+        )
+        if at_sides and js_.get("spinal_load") not in (SPINE_AT_SIDES["level"], "unknown"):
+            js_["spinal_load"] = SPINE_AT_SIDES["level"]
+            out["spine_at_sides"].append(key)
+            _record(e, "spine_at_sides", "spinal_load", SPINE_AT_SIDES["level"])
+        e["joint_stress"] = js_
+    return out
+
+
+def _record(e: dict[str, Any], rule: str, joint: str, level: str) -> None:
+    audit = e.setdefault("attribute_audit", {"fields": [], "reason": ""})
+    audit.setdefault("class_rule", []).append({"rule": rule, "joint": joint, "level": level, "pass": "#5861 FIX3"})

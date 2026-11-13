@@ -56,17 +56,17 @@
    "history": 539
   },
   "hypertrophy_rows_by_tier": {
-   "S": 49,
-   "A": 121,
-   "B": 218,
+   "S": 34,
+   "A": 137,
+   "B": 217,
    "C": 63,
    "D": 0,
    "not_applicable": 210
   },
   "ratings_by_objective": {
    "hypertrophy": {
-    "S": 48,
-    "A": 117,
+    "S": 33,
+    "A": 132,
     "B": 189,
     "C": 61,
     "D": 0,
@@ -81,8 +81,8 @@
     "not_applicable": 411
    },
    "functional": {
-    "S": 10,
-    "A": 62,
+    "S": 9,
+    "A": 63,
     "B": 92,
     "C": 61,
     "D": 0,
@@ -115,25 +115,17 @@
      ]
     },
     "back": {
-     "s": 16,
+     "s": 8,
      "families": 7,
      "movements": [
       "chin_up_weighted",
       "db_chest_supported_rows",
-      "dual_handle_underhand_pulldowns",
       "front_lat_pulldown",
       "lat_pulldown_cable",
-      "lat_pulldown_close_grip_cable",
-      "lat_pulldown_machine",
-      "lat_pulldown_wide_grip_cable",
       "meadows_row",
-      "prone_grip_dual_handle_pulldowns",
       "pull_up_weighted",
       "pullover_machine",
-      "reverse_grip_lat_pulldown_cable",
-      "rocking_pulldown",
-      "trap_pulldown",
-      "underhand_lat_pulldowns"
+      "trap_pulldown"
      ]
     },
     "biceps": {
@@ -149,18 +141,13 @@
      ]
     },
     "chest": {
-     "s": 9,
+     "s": 4,
      "families": 3,
      "movements": [
       "butterfly_pec_deck",
-      "cable_3d_crossovers",
       "cable_fly_crossovers",
-      "cable_low_to_high_crossovers",
-      "cavaliere_crossover",
       "chest_fly_machine",
-      "incline_bench_press_dumbbell",
-      "low_cable_fly",
-      "x_crossovers"
+      "incline_bench_press_dumbbell"
      ]
     },
     "front_delts": {
@@ -172,11 +159,10 @@
      ]
     },
     "gastrocnemius": {
-     "s": 3,
+     "s": 2,
      "families": 2,
      "movements": [
       "calf_press_machine",
-      "single_leg_standing_calf_raise_machine",
       "standing_calf_raise_machine"
      ]
     },
@@ -211,11 +197,10 @@
      ]
     },
     "quadriceps_rectus_femoris": {
-     "s": 2,
+     "s": 1,
      "families": 1,
      "movements": [
-      "leg_extension_machine",
-      "single_leg_extension"
+      "leg_extension_machine"
      ]
     },
     "rear_delts": {
@@ -291,11 +276,10 @@
    },
    "functional": {
     "abs": {
-     "s": 3,
+     "s": 2,
      "families": 2,
      "movements": [
       "front_rack_carry_kettlebell",
-      "kettlebell_suitcase_carry",
       "suitcase_carry"
      ]
     },
@@ -392,7 +376,7 @@
   "attribute_rule": "derived by rule unless deploy/exercise_library_curation.py overrides; `unknown` = the rule cannot say"
  },
  "quality_rubric": {
-  "version": "3.2.0",
+  "version": "3.3.0",
   "provenance": "owner ruling 2026-11-12 on #5857: rubric v2, all eight board recommendations adopted",
   "job": {
    "field": "job",
@@ -2631,7 +2615,7 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -2740,7 +2724,25 @@
      "movement_id": "band_pullaparts",
      "reason": "same_stimulus"
     }
-   ]
+   ],
+   "attribute_audit": {
+    "fields": [],
+    "reason": "",
+    "class_rule": [
+     {
+      "rule": "shoulder_provoking",
+      "joint": "shoulder",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "shoulder": {
+     "from": "low",
+     "rule": "shoulder_provoking"
+    }
+   }
   },
   "deadlift_barbell": {
    "title": "Deadlift (Barbell)",
@@ -3516,7 +3518,7 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -3627,7 +3629,21 @@
      "joint_stress",
      "stability"
     ],
-    "reason": "re-checked: a standing dumbbell lateral raise is light, the trunk is braced and the side delt is the limiter (moderate, not low); no joint is loaded hard"
+    "reason": "re-checked: a standing dumbbell lateral raise is light, the trunk is braced and the side delt is the limiter (moderate, not low); no joint is loaded hard",
+    "class_rule": [
+     {
+      "rule": "shoulder_provoking",
+      "joint": "shoulder",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "shoulder": {
+     "from": "low",
+     "rule": "shoulder_provoking"
+    }
    }
   },
   "bicep_curl_dumbbell": {
@@ -4519,7 +4535,7 @@
    "resistance_profile": "free_weight",
    "stability": "low",
    "joint_stress": {
-    "spinal_load": "moderate",
+    "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
@@ -4537,10 +4553,10 @@
      "target": "quadriceps",
      "tier": "A",
      "rubric_tier": "A",
-     "rubric_score": 11,
-     "points_tier": "A",
+     "rubric_score": 12,
+     "points_tier": "S",
      "basis": [
-      "points 11/14 -> A: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -1",
+      "points 12/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
       "cap A: S needs ceiling_high, stable_to_failure",
       "evidence none_reviewed"
      ],
@@ -4551,12 +4567,12 @@
     },
     {
      "target": "glutes",
-     "tier": "B",
-     "rubric_tier": "B",
-     "rubric_score": 9,
-     "points_tier": "B",
+     "tier": "A",
+     "rubric_tier": "A",
+     "rubric_score": 10,
+     "points_tier": "A",
      "basis": [
-      "points 9/14 -> B: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -1",
+      "points 10/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
       "cap A: S needs ceiling_high, stable_to_failure",
       "evidence none_reviewed"
      ],
@@ -4574,10 +4590,10 @@
      "target": "quadriceps",
      "by_target": {
       "quadriceps": "A",
-      "glutes": "B"
+      "glutes": "A"
      },
      "basis": [
-      "points 11/14 -> A: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress -1",
+      "points 12/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 2, carryover 1, joint_stress 0",
       "cap A: S needs ceiling_high, stable_to_failure",
       "evidence none_reviewed"
      ],
@@ -4660,7 +4676,19 @@
      "movement_id": "reverse_lunge_barbell",
      "reason": "same_stimulus"
     }
-   ]
+   ],
+   "attribute_audit": {
+    "fields": [],
+    "reason": "",
+    "class_rule": [
+     {
+      "rule": "spine_at_sides",
+      "joint": "spinal_load",
+      "level": "low",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   }
   },
   "shoulder_press_dumbbell": {
    "title": "Shoulder Press (Dumbbell)",
@@ -6330,29 +6358,35 @@
    "hypertrophy": [
     {
      "target": "back",
-     "tier": "S",
-     "rubric_tier": "S",
+     "tier": "A",
+     "rubric_tier": "A",
      "rubric_score": 12,
      "points_tier": "S",
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (lat_pulldown_cable) per objective — lat_pulldown_cable holds it; a variant",
       "evidence none_reviewed"
      ],
      "provisional": false,
      "evidence_confidence": "none_reviewed",
      "citations": [],
-     "last_reviewed": "unreviewed"
+     "last_reviewed": "unreviewed",
+     "s_quota": {
+      "holder": "lat_pulldown_cable",
+      "family": "lat_pulldown_cable"
+     }
     }
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "S",
+     "tier": "A",
      "target": "back",
      "by_target": {
-      "back": "S"
+      "back": "A"
      },
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (lat_pulldown_cable) per objective — lat_pulldown_cable holds it; a variant",
       "evidence none_reviewed"
      ],
      "evidence_confidence": "none_reviewed",
@@ -7250,7 +7284,7 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -7373,6 +7407,20 @@
      "inputs": [],
      "why": "confirmed: a front raise, short, light; no joint loaded hard",
      "pass": "#5861 FIX2-DATA"
+    },
+    "class_rule": [
+     {
+      "rule": "shoulder_provoking",
+      "joint": "shoulder",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "shoulder": {
+     "from": "low",
+     "rule": "shoulder_provoking"
     }
    }
   },
@@ -7552,7 +7600,7 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -7672,6 +7720,20 @@
       "wrist"
      ],
      "rule": "a reverse fly or face pull: light, no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "shoulder_provoking",
+      "joint": "shoulder",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "shoulder": {
+     "from": "low",
+     "rule": "shoulder_provoking"
     }
    }
   },
@@ -9362,29 +9424,35 @@
    "hypertrophy": [
     {
      "target": "back",
-     "tier": "S",
-     "rubric_tier": "S",
+     "tier": "A",
+     "rubric_tier": "A",
      "rubric_score": 12,
      "points_tier": "S",
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (lat_pulldown_cable) per objective — lat_pulldown_cable holds it; a variant",
       "evidence none_reviewed"
      ],
      "provisional": false,
      "evidence_confidence": "none_reviewed",
      "citations": [],
-     "last_reviewed": "unreviewed"
+     "last_reviewed": "unreviewed",
+     "s_quota": {
+      "holder": "lat_pulldown_cable",
+      "family": "lat_pulldown_cable"
+     }
     }
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "S",
+     "tier": "A",
      "target": "back",
      "by_target": {
-      "back": "S"
+      "back": "A"
      },
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (lat_pulldown_cable) per objective — lat_pulldown_cable holds it; a variant",
       "evidence none_reviewed"
      ],
      "evidence_confidence": "none_reviewed",
@@ -12435,7 +12503,7 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -12552,6 +12620,20 @@
       "wrist"
      ],
      "rule": "a lateral raise: light, no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "shoulder_provoking",
+      "joint": "shoulder",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "shoulder": {
+     "from": "low",
+     "rule": "shoulder_provoking"
     }
    }
   },
@@ -12906,7 +12988,7 @@
     "shear": "moderate",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "moderate"
    },
    "skill_complexity": "moderate",
    "equipment": [
@@ -13037,6 +13119,20 @@
      "inputs": [],
      "why": "confirmed: an upright row, short for the side delts, the shoulder loaded in internal rotation",
      "pass": "#5861 FIX2-DATA"
+    },
+    "class_rule": [
+     {
+      "rule": "shoulder_provoking",
+      "joint": "shoulder",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "shoulder": {
+     "from": "low",
+     "rule": "shoulder_provoking"
     }
    }
   },
@@ -17017,7 +17113,7 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -17142,6 +17238,20 @@
       "wrist"
      ],
      "rule": "a supported, seated or cable row: the trunk is braced on a pad or seat"
+    },
+    "class_rule": [
+     {
+      "rule": "shoulder_provoking",
+      "joint": "shoulder",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "shoulder": {
+     "from": "low",
+     "rule": "shoulder_provoking"
     }
    }
   },
@@ -17790,7 +17900,7 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -17910,6 +18020,20 @@
      "pattern": "shoulder_rotation",
      "job": "isolation",
      "reason": "a cuff external rotation, not trunk flexion"
+    },
+    "class_rule": [
+     {
+      "rule": "shoulder_provoking",
+      "joint": "shoulder",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "shoulder": {
+     "from": "low",
+     "rule": "shoulder_provoking"
     }
    }
   },
@@ -18562,7 +18686,7 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -18683,6 +18807,20 @@
       "wrist"
      ],
      "rule": "a reverse fly or face pull: light, no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "shoulder_provoking",
+      "joint": "shoulder",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "shoulder": {
+     "from": "low",
+     "rule": "shoulder_provoking"
     }
    }
   },
@@ -21259,7 +21397,7 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -21379,6 +21517,20 @@
       "wrist"
      ],
      "rule": "a reverse fly or face pull: light, no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "shoulder_provoking",
+      "joint": "shoulder",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "shoulder": {
+     "from": "low",
+     "rule": "shoulder_provoking"
     }
    }
   },
@@ -21411,7 +21563,7 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -21540,6 +21692,20 @@
      "pattern": "rear_delt",
      "job": "isolation",
      "reason": "a bent-over raise is a reverse fly"
+    },
+    "class_rule": [
+     {
+      "rule": "shoulder_provoking",
+      "joint": "shoulder",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "shoulder": {
+     "from": "low",
+     "rule": "shoulder_provoking"
     }
    }
   },
@@ -21729,7 +21895,7 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -21857,6 +22023,20 @@
      "inputs": [],
      "why": "a cheat lateral is the dumbbell lateral raise (its family head) with a deliberate swing: the head's short length and stance, less control (low stability), the swing loading the spine",
      "pass": "#5861 FIX2-DATA"
+    },
+    "class_rule": [
+     {
+      "rule": "shoulder_provoking",
+      "joint": "shoulder",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "shoulder": {
+     "from": "low",
+     "rule": "shoulder_provoking"
     }
    }
   },
@@ -22512,7 +22692,7 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -22637,6 +22817,20 @@
       "wrist"
      ],
      "rule": "a reverse fly or face pull: light, no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "shoulder_provoking",
+      "joint": "shoulder",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "shoulder": {
+     "from": "low",
+     "rule": "shoulder_provoking"
     }
    }
   },
@@ -27847,7 +28041,7 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -27952,7 +28146,25 @@
      "movement_id": "chest_supported_reverse_fly_dumbbell",
      "reason": "same_stimulus"
     }
-   ]
+   ],
+   "attribute_audit": {
+    "fields": [],
+    "reason": "",
+    "class_rule": [
+     {
+      "rule": "shoulder_provoking",
+      "joint": "shoulder",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "shoulder": {
+     "from": "low",
+     "rule": "shoulder_provoking"
+    }
+   }
   },
   "seated_cable_row": {
    "title": "Seated Cable Row",
@@ -30811,7 +31023,7 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -30932,6 +31144,20 @@
      "pattern": "shoulder_rotation",
      "job": "isolation",
      "reason": "a cuff external rotation, not trunk flexion"
+    },
+    "class_rule": [
+     {
+      "rule": "shoulder_provoking",
+      "joint": "shoulder",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "shoulder": {
+     "from": "low",
+     "rule": "shoulder_provoking"
     }
    }
   },
@@ -32075,7 +32301,7 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -32193,6 +32419,20 @@
      "pattern": "shoulder_rotation",
      "job": "isolation",
      "reason": "a cuff external rotation, not trunk flexion"
+    },
+    "class_rule": [
+     {
+      "rule": "shoulder_provoking",
+      "joint": "shoulder",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "shoulder": {
+     "from": "low",
+     "rule": "shoulder_provoking"
     }
    }
   },
@@ -33783,29 +34023,35 @@
    "hypertrophy": [
     {
      "target": "back",
-     "tier": "S",
-     "rubric_tier": "S",
+     "tier": "A",
+     "rubric_tier": "A",
      "rubric_score": 12,
      "points_tier": "S",
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (lat_pulldown_cable) per objective — lat_pulldown_cable holds it; a variant",
       "evidence none_reviewed"
      ],
      "provisional": false,
      "evidence_confidence": "none_reviewed",
      "citations": [],
-     "last_reviewed": "unreviewed"
+     "last_reviewed": "unreviewed",
+     "s_quota": {
+      "holder": "lat_pulldown_cable",
+      "family": "lat_pulldown_cable"
+     }
     }
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "S",
+     "tier": "A",
      "target": "back",
      "by_target": {
-      "back": "S"
+      "back": "A"
      },
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (lat_pulldown_cable) per objective — lat_pulldown_cable holds it; a variant",
       "evidence none_reviewed"
      ],
      "evidence_confidence": "none_reviewed",
@@ -34923,29 +35169,35 @@
    "hypertrophy": [
     {
      "target": "back",
-     "tier": "S",
-     "rubric_tier": "S",
+     "tier": "A",
+     "rubric_tier": "A",
      "rubric_score": 12,
      "points_tier": "S",
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (lat_pulldown_cable) per objective — lat_pulldown_cable holds it; a variant",
       "evidence none_reviewed"
      ],
      "provisional": false,
      "evidence_confidence": "none_reviewed",
      "citations": [],
-     "last_reviewed": "unreviewed"
+     "last_reviewed": "unreviewed",
+     "s_quota": {
+      "holder": "lat_pulldown_cable",
+      "family": "lat_pulldown_cable"
+     }
     }
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "S",
+     "tier": "A",
      "target": "back",
      "by_target": {
-      "back": "S"
+      "back": "A"
      },
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (lat_pulldown_cable) per objective — lat_pulldown_cable holds it; a variant",
       "evidence none_reviewed"
      ],
      "evidence_confidence": "none_reviewed",
@@ -35554,29 +35806,35 @@
    "hypertrophy": [
     {
      "target": "back",
-     "tier": "S",
-     "rubric_tier": "S",
+     "tier": "A",
+     "rubric_tier": "A",
      "rubric_score": 12,
      "points_tier": "S",
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (lat_pulldown_cable) per objective — lat_pulldown_cable holds it; a variant",
       "evidence none_reviewed"
      ],
      "provisional": false,
      "evidence_confidence": "none_reviewed",
      "citations": [],
-     "last_reviewed": "unreviewed"
+     "last_reviewed": "unreviewed",
+     "s_quota": {
+      "holder": "lat_pulldown_cable",
+      "family": "lat_pulldown_cable"
+     }
     }
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "S",
+     "tier": "A",
      "target": "back",
      "by_target": {
-      "back": "S"
+      "back": "A"
      },
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (lat_pulldown_cable) per objective — lat_pulldown_cable holds it; a variant",
       "evidence none_reviewed"
      ],
      "evidence_confidence": "none_reviewed",
@@ -36341,7 +36599,7 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -36461,6 +36719,20 @@
       "wrist"
      ],
      "rule": "a lateral raise: light, no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "shoulder_provoking",
+      "joint": "shoulder",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "shoulder": {
+     "from": "low",
+     "rule": "shoulder_provoking"
     }
    }
   },
@@ -37759,29 +38031,35 @@
    "hypertrophy": [
     {
      "target": "chest",
-     "tier": "S",
-     "rubric_tier": "S",
+     "tier": "A",
+     "rubric_tier": "A",
      "rubric_score": 12,
      "points_tier": "S",
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (cable_fly_crossovers) per objective — cable_fly_crossovers holds it; a variant",
       "evidence none_reviewed"
      ],
      "provisional": false,
      "evidence_confidence": "none_reviewed",
      "citations": [],
-     "last_reviewed": "unreviewed"
+     "last_reviewed": "unreviewed",
+     "s_quota": {
+      "holder": "cable_fly_crossovers",
+      "family": "cable_fly_crossovers"
+     }
     }
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "S",
+     "tier": "A",
      "target": "chest",
      "by_target": {
-      "chest": "S"
+      "chest": "A"
      },
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (cable_fly_crossovers) per objective — cable_fly_crossovers holds it; a variant",
       "evidence none_reviewed"
      ],
      "evidence_confidence": "none_reviewed",
@@ -41100,29 +41378,35 @@
    "hypertrophy": [
     {
      "target": "chest",
-     "tier": "S",
-     "rubric_tier": "S",
+     "tier": "A",
+     "rubric_tier": "A",
      "rubric_score": 12,
      "points_tier": "S",
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (cable_fly_crossovers) per objective — cable_fly_crossovers holds it; a variant",
       "evidence none_reviewed"
      ],
      "provisional": false,
      "evidence_confidence": "none_reviewed",
      "citations": [],
-     "last_reviewed": "unreviewed"
+     "last_reviewed": "unreviewed",
+     "s_quota": {
+      "holder": "cable_fly_crossovers",
+      "family": "cable_fly_crossovers"
+     }
     }
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "S",
+     "tier": "A",
      "target": "chest",
      "by_target": {
-      "chest": "S"
+      "chest": "A"
      },
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (cable_fly_crossovers) per objective — cable_fly_crossovers holds it; a variant",
       "evidence none_reviewed"
      ],
      "evidence_confidence": "none_reviewed",
@@ -43667,29 +43951,35 @@
    "hypertrophy": [
     {
      "target": "back",
-     "tier": "S",
-     "rubric_tier": "S",
+     "tier": "A",
+     "rubric_tier": "A",
      "rubric_score": 12,
      "points_tier": "S",
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (lat_pulldown_cable) per objective — lat_pulldown_cable holds it; a variant",
       "evidence none_reviewed"
      ],
      "provisional": false,
      "evidence_confidence": "none_reviewed",
      "citations": [],
-     "last_reviewed": "unreviewed"
+     "last_reviewed": "unreviewed",
+     "s_quota": {
+      "holder": "lat_pulldown_cable",
+      "family": "lat_pulldown_cable"
+     }
     }
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "S",
+     "tier": "A",
      "target": "back",
      "by_target": {
-      "back": "S"
+      "back": "A"
      },
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (lat_pulldown_cable) per objective — lat_pulldown_cable holds it; a variant",
       "evidence none_reviewed"
      ],
      "evidence_confidence": "none_reviewed",
@@ -47800,7 +48090,7 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -47923,6 +48213,20 @@
       "wrist"
      ],
      "rule": "a reverse fly or face pull: light, no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "shoulder_provoking",
+      "joint": "shoulder",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "shoulder": {
+     "from": "low",
+     "rule": "shoulder_provoking"
     }
    }
   },
@@ -47955,7 +48259,7 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -48076,6 +48380,20 @@
       "wrist"
      ],
      "rule": "a reverse fly or face pull: light, no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "shoulder_provoking",
+      "joint": "shoulder",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "shoulder": {
+     "from": "low",
+     "rule": "shoulder_provoking"
     }
    }
   },
@@ -56084,7 +56402,7 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -56210,6 +56528,20 @@
       "wrist"
      ],
      "rule": "a lateral raise: light, no joint loaded hard"
+    },
+    "class_rule": [
+     {
+      "rule": "shoulder_provoking",
+      "joint": "shoulder",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "shoulder": {
+     "from": "low",
+     "rule": "shoulder_provoking"
     }
    }
   },
@@ -57322,29 +57654,35 @@
    "hypertrophy": [
     {
      "target": "chest",
-     "tier": "S",
-     "rubric_tier": "S",
+     "tier": "A",
+     "rubric_tier": "A",
      "rubric_score": 12,
      "points_tier": "S",
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (cable_fly_crossovers) per objective — cable_fly_crossovers holds it; a variant",
       "evidence none_reviewed"
      ],
      "provisional": false,
      "evidence_confidence": "none_reviewed",
      "citations": [],
-     "last_reviewed": "unreviewed"
+     "last_reviewed": "unreviewed",
+     "s_quota": {
+      "holder": "cable_fly_crossovers",
+      "family": "cable_fly_crossovers"
+     }
     }
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "S",
+     "tier": "A",
      "target": "chest",
      "by_target": {
-      "chest": "S"
+      "chest": "A"
      },
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (cable_fly_crossovers) per objective — cable_fly_crossovers holds it; a variant",
       "evidence none_reviewed"
      ],
      "evidence_confidence": "none_reviewed",
@@ -57916,29 +58254,35 @@
    "hypertrophy": [
     {
      "target": "chest",
-     "tier": "S",
-     "rubric_tier": "S",
+     "tier": "A",
+     "rubric_tier": "A",
      "rubric_score": 12,
      "points_tier": "S",
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (cable_fly_crossovers) per objective — cable_fly_crossovers holds it; a variant",
       "evidence none_reviewed"
      ],
      "provisional": false,
      "evidence_confidence": "none_reviewed",
      "citations": [],
-     "last_reviewed": "unreviewed"
+     "last_reviewed": "unreviewed",
+     "s_quota": {
+      "holder": "cable_fly_crossovers",
+      "family": "cable_fly_crossovers"
+     }
     }
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "S",
+     "tier": "A",
      "target": "chest",
      "by_target": {
-      "chest": "S"
+      "chest": "A"
      },
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (cable_fly_crossovers) per objective — cable_fly_crossovers holds it; a variant",
       "evidence none_reviewed"
      ],
      "evidence_confidence": "none_reviewed",
@@ -76342,29 +76686,35 @@
    "hypertrophy": [
     {
      "target": "back",
-     "tier": "S",
-     "rubric_tier": "S",
+     "tier": "A",
+     "rubric_tier": "A",
      "rubric_score": 12,
      "points_tier": "S",
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (lat_pulldown_cable) per objective — lat_pulldown_cable holds it; a variant",
       "evidence none_reviewed"
      ],
      "provisional": false,
      "evidence_confidence": "none_reviewed",
      "citations": [],
-     "last_reviewed": "unreviewed"
+     "last_reviewed": "unreviewed",
+     "s_quota": {
+      "holder": "lat_pulldown_cable",
+      "family": "lat_pulldown_cable"
+     }
     }
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "S",
+     "tier": "A",
      "target": "back",
      "by_target": {
-      "back": "S"
+      "back": "A"
      },
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (lat_pulldown_cable) per objective — lat_pulldown_cable holds it; a variant",
       "evidence none_reviewed"
      ],
      "evidence_confidence": "none_reviewed",
@@ -83834,29 +84184,35 @@
    "hypertrophy": [
     {
      "target": "back",
-     "tier": "S",
-     "rubric_tier": "S",
+     "tier": "A",
+     "rubric_tier": "A",
      "rubric_score": 12,
      "points_tier": "S",
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (lat_pulldown_cable) per objective — lat_pulldown_cable holds it; a variant",
       "evidence none_reviewed"
      ],
      "provisional": false,
      "evidence_confidence": "none_reviewed",
      "citations": [],
-     "last_reviewed": "unreviewed"
+     "last_reviewed": "unreviewed",
+     "s_quota": {
+      "holder": "lat_pulldown_cable",
+      "family": "lat_pulldown_cable"
+     }
     }
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "S",
+     "tier": "A",
      "target": "back",
      "by_target": {
-      "back": "S"
+      "back": "A"
      },
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (lat_pulldown_cable) per objective — lat_pulldown_cable holds it; a variant",
       "evidence none_reviewed"
      ],
      "evidence_confidence": "none_reviewed",
@@ -85945,7 +86301,7 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -86055,6 +86411,18 @@
      "reason": "same_target"
     }
    ],
+   "attribute_audit": {
+    "fields": [],
+    "reason": "",
+    "class_rule": [
+     {
+      "rule": "shoulder_provoking",
+      "joint": "shoulder",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
    "expansion_profile": {
     "section": "§3",
     "priority": "P1",
@@ -86119,6 +86487,12 @@
      "kind": "builtin",
      "needs_custom_template": false,
      "prescribable": true
+    }
+   },
+   "provocation_floor": {
+    "shoulder": {
+     "from": "low",
+     "rule": "shoulder_provoking"
     }
    },
    "variants": [
@@ -88615,29 +88989,35 @@
    "hypertrophy": [
     {
      "target": "chest",
-     "tier": "S",
-     "rubric_tier": "S",
+     "tier": "A",
+     "rubric_tier": "A",
      "rubric_score": 12,
      "points_tier": "S",
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (cable_fly_crossovers) per objective — cable_fly_crossovers holds it; a variant",
       "evidence none_reviewed"
      ],
      "provisional": false,
      "evidence_confidence": "none_reviewed",
      "citations": [],
-     "last_reviewed": "unreviewed"
+     "last_reviewed": "unreviewed",
+     "s_quota": {
+      "holder": "cable_fly_crossovers",
+      "family": "cable_fly_crossovers"
+     }
     }
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "S",
+     "tier": "A",
      "target": "chest",
      "by_target": {
-      "chest": "S"
+      "chest": "A"
      },
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (cable_fly_crossovers) per objective — cable_fly_crossovers holds it; a variant",
       "evidence none_reviewed"
      ],
      "evidence_confidence": "none_reviewed",
@@ -90697,7 +91077,7 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -90802,7 +91182,25 @@
      "movement_id": "side_lateral_raises",
      "reason": "same_stimulus"
     }
-   ]
+   ],
+   "attribute_audit": {
+    "fields": [],
+    "reason": "",
+    "class_rule": [
+     {
+      "rule": "shoulder_provoking",
+      "joint": "shoulder",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
+   "provocation_floor": {
+    "shoulder": {
+     "from": "low",
+     "rule": "shoulder_provoking"
+    }
+   }
   },
   "single_leg_extension": {
    "title": "Single Leg Extensions",
@@ -90839,12 +91237,13 @@
    "hypertrophy": [
     {
      "target": "quadriceps_rectus_femoris",
-     "tier": "S",
-     "rubric_tier": "S",
+     "tier": "A",
+     "rubric_tier": "A",
      "rubric_score": 12,
      "points_tier": "S",
      "basis": [
       "points 12/14 -> S: stretch 3, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
+      "cap A: S quota: one S per canonical family (leg_extension_machine) per objective — leg_extension_machine holds it; a variant",
       "evidence rct_characteristic"
      ],
      "provisional": false,
@@ -90852,18 +91251,23 @@
      "citations": [
       "ema2013_knee_extension"
      ],
-     "last_reviewed": "2026-11-11"
+     "last_reviewed": "2026-11-11",
+     "s_quota": {
+      "holder": "leg_extension_machine",
+      "family": "leg_extension_machine"
+     }
     }
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "S",
+     "tier": "A",
      "target": "quadriceps_rectus_femoris",
      "by_target": {
-      "quadriceps_rectus_femoris": "S"
+      "quadriceps_rectus_femoris": "A"
      },
      "basis": [
       "points 12/14 -> S: stretch 3, stability 3, resistance_profile 3, progressability 3, carryover 0, joint_stress 0",
+      "cap A: S quota: one S per canonical family (leg_extension_machine) per objective — leg_extension_machine holds it; a variant",
       "evidence rct_characteristic"
      ],
      "evidence_confidence": "rct_characteristic",
@@ -91274,12 +91678,13 @@
    "hypertrophy": [
     {
      "target": "gastrocnemius",
-     "tier": "S",
-     "rubric_tier": "S",
+     "tier": "A",
+     "rubric_tier": "A",
      "rubric_score": 12,
      "points_tier": "S",
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (standing_calf_raise_machine) per objective — standing_calf_raise_machine holds it; a variant",
       "evidence rct_direct, +1 band"
      ],
      "provisional": false,
@@ -91293,18 +91698,23 @@
       "bands": 1,
       "citation": "kinoshita2023_standing_calf",
       "why": "standing grew the gastrocnemius more than seated (Kinoshita 2023)"
+     },
+     "s_quota": {
+      "holder": "standing_calf_raise_machine",
+      "family": "standing_calf_raise_machine"
      }
     }
    ],
    "ratings": {
     "hypertrophy": {
-     "tier": "S",
+     "tier": "A",
      "target": "gastrocnemius",
      "by_target": {
-      "gastrocnemius": "S"
+      "gastrocnemius": "A"
      },
      "basis": [
       "points 12/14 -> S: stretch 5, stability 2, resistance_profile 3, progressability 3, carryover 0, joint_stress -1",
+      "cap A: S quota: one S per canonical family (standing_calf_raise_machine) per objective — standing_calf_raise_machine holds it; a variant",
       "evidence rct_direct, +1 band"
      ],
      "evidence_confidence": "rct_direct",
@@ -92144,7 +92554,7 @@
    "resistance_profile": "free_weight",
    "stability": "low",
    "joint_stress": {
-    "spinal_load": "moderate",
+    "spinal_load": "low",
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
@@ -92161,10 +92571,10 @@
      "target": "quadriceps",
      "tier": "A",
      "rubric_tier": "A",
-     "rubric_score": 12,
+     "rubric_score": 13,
      "points_tier": "S",
      "basis": [
-      "points 12/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress -1",
+      "points 13/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
       "cap A: S needs ceiling_high, stable_to_failure",
       "evidence none_reviewed"
      ],
@@ -92177,10 +92587,10 @@
      "target": "glutes",
      "tier": "B",
      "rubric_tier": "B",
-     "rubric_score": 10,
+     "rubric_score": 11,
      "points_tier": "A",
      "basis": [
-      "points 10/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress -1",
+      "points 11/14 -> A: stretch 3, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
       "cap B: limiter balance: the target muscle is not what ends the set",
       "cap A: S needs ceiling_high, target_is_limiter, stable_to_failure",
       "evidence none_reviewed"
@@ -92202,7 +92612,7 @@
       "glutes": "B"
      },
      "basis": [
-      "points 12/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress -1",
+      "points 13/14 -> S: stretch 5, stability 1, resistance_profile 3, progressability 3, carryover 1, joint_stress 0",
       "cap A: S needs ceiling_high, stable_to_failure",
       "evidence none_reviewed"
      ],
@@ -92285,7 +92695,19 @@
      "movement_id": "reverse_lunge_barbell",
      "reason": "same_stimulus"
     }
-   ]
+   ],
+   "attribute_audit": {
+    "fields": [],
+    "reason": "",
+    "class_rule": [
+     {
+      "rule": "spine_at_sides",
+      "joint": "spinal_load",
+      "level": "low",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   }
   },
   "stability_ball_stir_the_pot": {
    "title": "Stability Ball Stir The Pot",
@@ -93937,7 +94359,7 @@
     "shear": "low",
     "wrist": "low",
     "elbow": "low",
-    "shoulder": "low"
+    "shoulder": "moderate"
    },
    "skill_complexity": "low",
    "equipment": [
@@ -94049,6 +94471,18 @@
      "reason": "same_family"
     }
    ],
+   "attribute_audit": {
+    "fields": [],
+    "reason": "",
+    "class_rule": [
+     {
+      "rule": "shoulder_provoking",
+      "joint": "shoulder",
+      "level": "moderate",
+      "pass": "#5861 FIX3"
+     }
+    ]
+   },
    "expansion_profile": {
     "section": "§4",
     "priority": "P3",
@@ -94108,6 +94542,12 @@
      "kind": null,
      "needs_custom_template": true,
      "prescribable": false
+    }
+   },
+   "provocation_floor": {
+    "shoulder": {
+     "from": "low",
+     "rule": "shoulder_provoking"
     }
    }
   },
@@ -95949,11 +96389,12 @@
      "provisional": false
     },
     "functional": {
-     "tier": "S",
+     "tier": "A",
      "basis": [
       "qualities: unilateral, carry, locomotion, trunk_stability",
       "loadable: yes",
-      "rule: S = 3+ qualities, loadable, safe, a carry or single-leg under travel/trunk load; A = 2+ loadable; joint-capacity work never S"
+      "rule: S = 3+ qualities, loadable, safe, a carry or single-leg under travel/trunk load; A = 2+ loadable; joint-capacity work never S",
+      "cap A: S quota: one S per canonical family (suitcase_carry) per objective — suitcase_carry holds it; a variant"
      ],
      "evidence_confidence": "consensus",
      "provisional": false
@@ -96024,7 +96465,13 @@
      "movement_id": "bridge_and_reach_over",
      "reason": "same_target"
     }
-   ]
+   ],
+   "s_quota": {
+    "functional": {
+     "holder": "suitcase_carry",
+     "family": "suitcase_carry"
+    }
+   }
   },
   "knee_to_wall_dorsiflexion": {
    "title": "Knee-to-Wall Ankle Dorsiflexion",

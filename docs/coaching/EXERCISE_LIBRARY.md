@@ -65,7 +65,7 @@ rated hypertrophy row also `provisional` and, when true, `provisional_why`). A h
 objective does not apply to carries `tier: null`, `applicable: false` and its reason. The top level carries
 `canonical_families`.
 
-## Quality tiers — the hypertrophy objective (#5857 rubric v2.0.0, owner ruling 2026-11-12; #5861 rubric v3.2.0, PROPOSED)
+## Quality tiers — the hypertrophy objective (#5857 rubric v2.0.0, owner ruling 2026-11-12; #5861 rubric v3.3.0, PROPOSED)
 
 The tier grades **quality, not evidence**. The first tiers (A/B/C) graded evidence directness: A was a direct trial
 of this exact movement, B a trial of a close one, C `none_reviewed` — 561 of 582 ratings were C, and most muscles' top
@@ -384,6 +384,40 @@ weighted pull-up, which is S beside the pulldown — the criteria rank the forms
 **5. `programming_settings`** (top level): the programming lane's library-carried settings with their owner-pending defaults
 (`session_cap_includes_cardio: false`, `symptom_line`, `short_week_rule: skip_shoulders_arms`, `behind_schedule_week: false`).
 Written once by the builder; a value on disk (an owner's ruling) survives every rebuild.
+
+## Third red team: the S quota and two class rules (#5861 FIX3, rubric v3.3.0 — PROPOSED)
+
+The third red team (2026-11-13) graded the integrated engine B-. Its data findings, fixed in the generator (never by hand):
+
+**1. One S per canonical family per objective** (`deploy/exercise_library_reviews.apply_s_quota`, read by
+`quality_rubric.hypertrophy_caps` / `objective_ratings`). "S is not rare": every lat-pulldown grip was S (16 back S), five cable-fly
+variants were S, the single-leg calf and leg extension shared their bilateral form's S. Now, per objective (per target muscle for
+hypertrophy), ONE member of a canonical family holds S — the canonical movement itself when it earned S, else the variant he has
+done most — and every other real variant that earned S carries `s_quota {holder, family}` and is capped at A with the line
+`S quota: one S per canonical family (…) — … holds it; a variant`. An exact duplicate (another Hevy template of the same movement,
+`variant.duplicate_of`) shares its canonical's rating: it is the same movement. A direct trial cannot re-open a capped S (3.3.0).
+S counts, before -> after: **hypertrophy 49 -> 34** (= one per family-and-target, plus the exact duplicates), **strength 10 -> 10**
+(the one second S is `military_press`, an exact duplicate of the barbell overhead press), **functional 10 -> 9**, conditioning and
+mobility 0 -> 0. Guard: `tests/test_programming_fix3_5861.py::test_one_s_per_canonical_family_per_objective` (its control removes one
+variant's quota and the family shows two S).
+
+**2. Shoulder-provoking work loads the shoulder** (`deploy/exercise_library_input_review.SHOULDER_PROVOKING`, applied after the
+canonical layer). Lateral raises, face pulls, reverse flies, rear-delt rows, upright rows, Y raises and cuff rotation work read shoulder
+`low` ("light, no joint loaded hard"), so a 6/10 sharp shoulder note left them at RPE 9–10. Abduction toward 90 degrees, horizontal
+abduction and loaded rotation are the classic painful-arc provocations: their shoulder rating is now at least `moderate` (23 rows), so
+the live pain rule reaches them. It is a PAIN-MAP floor, not a joint cost for a healthy shoulder: the row records
+`provocation_floor {shoulder: {from, rule}}` and the hypertrophy rubric's joint term reads the reviewed `from` rating — no tier moved
+(the DB lateral raise stays B, the machine A, the single-arm cable S). Practitioner consensus, labelled; no trial is claimed.
+
+**3. One spine-loading class** (`SPINE_AT_SIDES`). A split squat, lunge or step-up with dumbbells or a kettlebell at the sides read two
+ways (the Bulgarian split squat and the dumbbell split squat `moderate`, every other lunge `low`), so the stacking rule "swapped" a
+split squat for a reverse lunge that loads the spine the same — a label moved, not the fatigue. The whole class reads `low` (the
+pattern table's own rating for it); barbell, front-rack, goblet and overhead forms keep their own. The engine counts spine-loading lifts
+by ONE definition (`live_balance.spine_loading`), shared by the stacking rule, the acceptance gates and the sample-week generator.
+
+**Not changed here (rating policy, not a data error):** the 14-point additive hypertrophy sum and its stretch weight, the DB lateral
+raise at B, pull-up A vs pulldown S (the S quota now leaves one pulldown S), and per-row evidence labels for the strength and
+functional rubrics (still the rule-level `consensus`). Each is named on the PR as open.
 
 ## Target-label audit (#5857, owner-approved on PR #5858)
 

@@ -138,6 +138,10 @@ def _replacement(
     ceiling = int(ruling["effective_ceiling"]) if exempt else ctx["ceiling"]
     worst = _worst_joint(_entry(e.get("movement_key"), ctx)) if code in ("pain", "discomfort") else limit
     pool = _anchor_candidates(e, ctx, ctx.get("role")) if anchor else _slot_fallbacks(e, rotation)
+    if not anchor:  # #5861 FIX3: then the library's same-pattern, same-muscle members (a banded curl for a garage leg curl)
+        from training.live_balance import library_fallbacks
+
+        pool = list(dict.fromkeys(pool + library_fallbacks(e, ctx)))
     if unilateral:
         uni = [k for k in pool if "unilateral" in (((_entry(k, ctx) or {}).get("objective_inputs") or {}).get("functional") or [])]
         pool = uni + [k for k in pool if k not in uni]
@@ -218,7 +222,7 @@ def for_live_draft(
     model (`fatigue_model.for_live_draft`, its one graded reduction). In shadow: `rx` itself, nothing read. Never raises."""
     if not is_live(rotation):
         return rx
-    from training import fatigue_model, live_program, live_week
+    from training import fatigue_model, live_balance, live_program, live_week
 
     out = copy.deepcopy(rx)
     lines: list[str] = []
@@ -249,8 +253,8 @@ def for_live_draft(
         lines += fit_exposures(out, rotation or {}, ctx)
         lines += live_program.plan(out, rotation or {}, ctx, block_workouts, sig)  # joint pain, stacking, stalls, fatigue cost
         lines += live_week.novel_start(out, ctx, block_workouts)  # a movement new to him never starts at 4-6 reps
-        behind = live_week.behind_schedule(block_workouts, ctx["target_date"], lib)  # an OFF-by-default live option
-        lines += live_week.keep_the_anchors(out, ctx, behind)
+        behind = live_balance.adherence_response(block_workouts, ctx["target_date"], lib)  # FIX3: a dip changes the week
+        lines += live_week.keep_the_anchors(out, ctx, behind) + live_balance.lighter_week(out, ctx, behind)
         _refit(out)
     except Exception as e:  # noqa: BLE001 — the live fit never blocks a draft
         lines.append(f"live session fit failed ({type(e).__name__}) — the prescription is unchanged")
@@ -275,8 +279,11 @@ def for_live_draft(
         "aerobic": live_program.aerobic(inputs),
         "trends": trends,
         "symptom_tripwire": live_week.symptom_gate(getattr(inputs, "medical_stop_lines", None)),  # the medical stop line, read
+        "conditioning_host": live_balance.conditioning_host(getattr(inputs, "short_week", None)),  # FIX3: the shared cap's host
     }
     rate = live_program.rate_line(out.get("fatigue"), getattr(inputs, "sleep_hours", None))
+    band = live_balance.rate_band(out.get("fatigue"), getattr(inputs, "sleep_hours", None))  # FIX3: rate_band_mode=structured
+    extra |= {"rate_band": band} if band["mode"] == "structured" else {}
     out[MARK] = {"issue": ISSUE, "lines": lines + ([rate] if rate else []), **extra}
     return out
 

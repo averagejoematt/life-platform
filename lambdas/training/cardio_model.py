@@ -33,6 +33,7 @@ No citation was verified for this module, so none is claimed (`evidence_confiden
 from __future__ import annotations
 
 import re
+from collections import Counter
 from typing import Any, Iterable
 
 CARDIO_MODEL_VERSION = "cardio-model@0.1.0"
@@ -527,32 +528,51 @@ def progress(name: str, state: dict[str, Any]) -> dict[str, Any]:
 # HEURISTIC (practitioner consensus, labelled): about 100 steps a minute marks moderate-intensity walking for most
 # adults; the first INCIDENTAL_STEPS of a day are treated as incidental living movement, not aerobic exercise. A walk
 # with recorded minutes replaces the estimate. The weekly moderate range is the public-health guideline band.
+# #5861 FIX3 (third red team): ">= 100 steps a minute" describes a CADENCE, it does not convert a step count into minutes —
+# most incidental steps are slower, so crediting every step over 5,000 at 100 a minute read 344-630 "moderate min/wk" for a
+# 12-15k walker. Now: minutes measured at a qualifying cadence count as they are (`cadence_minutes_by_day`, where a source
+# records them); otherwise only STEPS_CREDIT_SHARE of the steps over the incidental floor is credited, labelled.
 STEPS_PER_MODERATE_MIN = 100
 INCIDENTAL_STEPS = 5000
+STEPS_CREDIT_SHARE = 0.25
+"""HEURISTIC (labelled, conservative): the share of a day's steps over INCIDENTAL_STEPS credited as moderate walking when no
+cadence-qualified minutes are recorded — a quarter, so a 14k-step day credits ~22 min, not 90. Owner-adjustable; not measured."""
 WEEKLY_MODERATE_MIN = (150, 300)
 PURPOSES = ("intensity_domain", "fitness_test_progression", "conditioning_goal")
 
 
-def _walking_dose(steps_by_day: dict[str, Any] | None, walk_minutes_by_day: dict[str, Any] | None = None) -> dict[str, Any]:
-    days = sorted(set(steps_by_day or {}) | set(walk_minutes_by_day or {}))
+def _walking_dose(
+    steps_by_day: dict[str, Any] | None,
+    walk_minutes_by_day: dict[str, Any] | None = None,
+    cadence_minutes_by_day: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    days = sorted(set(steps_by_day or {}) | set(walk_minutes_by_day or {}) | set(cadence_minutes_by_day or {}))
     if not days:
         return {"days": 0, "moderate_min_per_wk": 0, "source": "none", "basis": ["no steps or walks read"]}
-    total, recorded = 0.0, 0
+    total, kinds = 0.0, Counter[str]()
     for d in days:
         walk = (walk_minutes_by_day or {}).get(d)
+        cadence = (cadence_minutes_by_day or {}).get(d)
         if walk is not None:
             total += float(walk)
-            recorded += 1
+            kinds["walk_minutes"] += 1
+        elif cadence is not None:
+            total += float(cadence)
+            kinds["cadence_minutes"] += 1
         else:
-            total += max(0.0, float((steps_by_day or {}).get(d) or 0) - INCIDENTAL_STEPS) / STEPS_PER_MODERATE_MIN
+            over = max(0.0, float((steps_by_day or {}).get(d) or 0) - INCIDENTAL_STEPS)
+            total += over * STEPS_CREDIT_SHARE / STEPS_PER_MODERATE_MIN
+            kinds["steps_heuristic"] += 1
     per_wk = round(total / len(days) * 7)
-    source = "walk_minutes" if recorded == len(days) else ("steps_heuristic" if not recorded else "mixed")
+    source = next(iter(kinds)) if len(kinds) == 1 else "mixed"
     return {
         "days": len(days),
         "moderate_min_per_wk": per_wk,
         "source": source,
+        "credited": "conservative",
         "basis": [
-            f"heuristic: steps over {INCIDENTAL_STEPS} a day at {STEPS_PER_MODERATE_MIN} steps a minute, unless a walk's minutes are recorded",
+            f"heuristic: recorded walk minutes, else minutes at a qualifying cadence, else {STEPS_CREDIT_SHARE:.0%} of the steps over "
+            f"{INCIDENTAL_STEPS} a day at {STEPS_PER_MODERATE_MIN} steps a minute (most incidental steps are slower)",
         ],
     }
 
@@ -561,6 +581,7 @@ def aerobic_plan(
     steps_by_day: dict[str, Any] | None,
     *,
     walk_minutes_by_day: dict[str, Any] | None = None,
+    cadence_minutes_by_day: dict[str, Any] | None = None,
     recent_protocols: Iterable[str] = (),
     purposes: Iterable[str] = (),
     recovery: str = "ok",
@@ -574,7 +595,7 @@ def aerobic_plan(
     unknown = [p for p in purposes if p not in PURPOSES]
     if unknown:
         raise ValueError(f"unknown purpose(s) {unknown}; known: {PURPOSES}")
-    walking = _walking_dose(steps_by_day, walk_minutes_by_day)
+    walking = _walking_dose(steps_by_day, walk_minutes_by_day, cadence_minutes_by_day)
     recent = list(recent_protocols)
     covered = {DOMAINS_BY_PROTOCOL[p] for p in recent if p in DOMAINS_BY_PROTOCOL}
     volume_ok = walking["moderate_min_per_wk"] >= WEEKLY_MODERATE_MIN[0]

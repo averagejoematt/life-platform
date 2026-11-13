@@ -49,7 +49,7 @@ from typing import Any
 
 from training import cardio_model
 
-RUBRIC_VERSION = "3.2.0"  # 3.2.0: #5861 FIX2-DATA (unknown scores neutral, provisional rows, evidence ordering); 3.1.0: #5861 FIX-DATA (S needs reviewed inputs; traps stretch neutral; joint-capacity never S; one cardio rating per family); 3.0.0: #5861 per-objective rubrics + hypertrophy caps (PROPOSED); 2.0.0: owner ruling 2026-11-12
+RUBRIC_VERSION = "3.3.0"  # 3.3.0: #5861 FIX3 (one S per canonical family per objective: the S quota); 3.2.0: #5861 FIX2-DATA (unknown scores neutral, provisional rows, evidence ordering); 3.1.0: #5861 FIX-DATA (S needs reviewed inputs; traps stretch neutral; joint-capacity never S; one cardio rating per family); 3.0.0: #5861 per-objective rubrics + hypertrophy caps (PROPOSED); 2.0.0: owner ruling 2026-11-12
 QUALITY_TIERS = ("S", "A", "B", "C", "D")
 EVIDENCE_CONFIDENCE = ("rct_direct", "rct_characteristic", "consensus", "none_reviewed")
 EVIDENCE_ADJUSTERS = ("rct_direct",)  # the only confidence that may move a row off its rubric tier
@@ -162,7 +162,12 @@ def _ladder(entry: dict[str, Any]) -> bool:
 
 
 def joint_penalty(entry: dict[str, Any]) -> int:
-    js = [str(v) for v in (entry.get("joint_stress") or {}).values()] or ["unknown"]
+    """The joint-cost term. A joint raised only as a PAIN-MAP floor (`provocation_floor`, #5861 FIX3: abduction and rotation
+    work rated at least moderate for the shoulder so a shoulder flag reaches it) is scored at its reviewed healthy-joint rating
+    (`from`): the floor says what a painful shoulder should avoid, not that the movement costs a healthy one more."""
+    floor = entry.get("provocation_floor") or {}
+    stress = {j: (floor[j].get("from") if isinstance(floor.get(j), dict) else v) for j, v in (entry.get("joint_stress") or {}).items()}
+    js = [str(v) for v in stress.values()] or ["unknown"]
     raw = JOINT_HIGH * js.count("high") + (JOINT_MODERATE if ("moderate" in js or "unknown" in js) else 0)
     return max(raw, JOINT_FLOOR)
 
@@ -353,6 +358,9 @@ def hypertrophy_caps(entry: dict[str, Any], row: dict[str, Any]) -> list[tuple[s
     unmet = [k for k, ok in s_criteria(entry, row).items() if not ok]
     if unmet:
         caps.append(("A", "S needs " + ", ".join(unmet)))
+    quota = row.get("s_quota")
+    if isinstance(quota, dict) and quota.get("holder"):
+        caps.append(("A", s_quota_why(quota)))
     ceiling_row = row.get("evidence_ceiling")
     if isinstance(ceiling_row, dict) and ceiling_row.get("tier") in QUALITY_TIERS:
         caps.append(
@@ -363,6 +371,12 @@ def hypertrophy_caps(entry: dict[str, Any], row: dict[str, Any]) -> list[tuple[s
             )
         )
     return caps
+
+
+def s_quota_why(quota: dict[str, Any]) -> str:
+    """3.3.0 (#5861 FIX3, third red team: "S is not rare — every lat-pulldown grip is S"): the cap line a non-holding member of a
+    canonical family carries for an objective whose S another member holds."""
+    return f"S quota: one S per canonical family ({quota.get('family')}) per objective — {quota.get('holder')} holds it; a variant"
 
 
 def evidence_ceiling(tested_row: dict[str, Any], tested_key: str) -> dict[str, Any] | None:
@@ -397,7 +411,8 @@ def quality_tier(entry: dict[str, Any], row: dict[str, Any]) -> str | None:
     base = capped_tier(entry, row)
     adj = row.get("evidence_adjustment")
     moved = shift(base, int(adj["bands"])) if isinstance(adj, dict) and not adjustment_problems(row) else base
-    return "A" if moved == "S" and not all(s_criteria(entry, row).values()) else moved
+    quota = isinstance(row.get("s_quota"), dict) and bool(row["s_quota"].get("holder"))  # 3.3.0: evidence never re-opens it
+    return "A" if moved == "S" and (quota or not all(s_criteria(entry, row).values())) else moved
 
 
 def _hyp_basis(entry: dict[str, Any], row: dict[str, Any]) -> list[str]:
@@ -568,6 +583,9 @@ def objective_ratings(entry: dict[str, Any]) -> dict[str, dict[str, Any]]:
     why = bool(provisional_why(entry, hypertrophy=False))
     for obj, rate in _RATERS.items():
         tier, basis = rate(entry)
+        quota = (entry.get("s_quota") or {}).get(obj)
+        if tier == "S" and isinstance(quota, dict) and quota.get("holder"):
+            tier, basis = "A", list(basis) + [f"cap A: {s_quota_why(quota)}"]
         cm = _cardio(entry) if obj == "conditioning" else None
         conf = cm["evidence_confidence"] if cm is not None else _confidence(entry, tier)
         out[obj] = {"tier": tier, "basis": basis, "evidence_confidence": conf, "provisional": why if tier else None}
