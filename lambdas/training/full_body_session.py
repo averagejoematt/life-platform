@@ -27,6 +27,7 @@ from typing import Any
 from training import (
     in_block_variant,
     lift_note,
+    live_program,
     live_session,
     load_ramp,
     program_structure,
@@ -270,11 +271,14 @@ def _session_loads(
     week_cfg: dict[str, Any],
     rationale: list[str],
     ramp_week: int,
-    ramp_p: dict[str, Any],
+    rx: dict[str, Any],
     deload: bool,
 ) -> dict[str, Any]:
     """The floor (#4107: the ONE v0.3 load path, `load_ramp.v03_floor`) and then the double
-    progression (#5052) — held on a deload the owner applied, whose loads are held as written."""
+    progression (#5052) — held on a deload the owner applied, whose loads are held as written. Then (#5861 red team, LIVE
+    only, `live_program.guard_loads`): no load steps up on a regressing / grinding / stalled lift or a strained day, and
+    down-steps on regression, overshoot, a joint flag or a stall reset — before the back-offs and warm-ups, which follow
+    the top set. Shadow: the guard returns before reading anything."""
     load_floors = _enforce_load_floors(
         blocks,
         load_catalog,
@@ -287,7 +291,8 @@ def _session_loads(
         floor_fn=functools.partial(load_ramp.v03_floor, week=ramp_week),
         hold_reason="a deload the owner applied holds every load" if deload else None,
     )
-    load_floors["load_rule"] = {"rule": "v0.3 §3 entry ramp", "week": ramp_week, "params": ramp_p}
+    load_floors["load_rule"] = {"rule": "v0.3 §3 entry ramp", "week": ramp_week, "params": load_ramp.params()}
+    live_program.guard_loads(blocks, rx, load_floors, history_index, load_catalog.get("movements") or {}, inputs.target_date, rationale)
     return load_floors
 
 
@@ -392,7 +397,7 @@ def full_body_routines(
         "a load already moved at the set's rep floor at this band this cycle, no layoff, is held — never ramped under (#4408); "
         "back-offs −10 % of the top set"
     )
-    load_floors = _session_loads(blocks, load_catalog, history_index, weight_index, inputs, week_cfg, rationale, ramp_week, ramp_p, deload)
+    load_floors = _session_loads(blocks, load_catalog, history_index, weight_index, inputs, week_cfg, rationale, ramp_week, rx, deload)
     warmups = _back_offs_then_warmups(blocks, used, rationale, load_floors, load_catalog.get("movements") or {})
     # #5428: the Hevy note is composed LAST, from what every load and warm-up pass decided — the effort, at most one
     # reason (a row more than one step from PREVIOUS, or a scheme change), at most one cue; the passes' own text is kept

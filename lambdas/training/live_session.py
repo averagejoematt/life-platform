@@ -115,19 +115,32 @@ def _slot_fallbacks(e: dict[str, Any], rotation: dict[str, Any]) -> list[str]:
     return [str(f["catalog_key"]) for f in hit.get("fallbacks") or [] if f.get("catalog_key")]
 
 
-def _replacement(e: dict[str, Any], code: str, ctx: dict[str, Any], rotation: dict[str, Any], taken: set[str]) -> str | None:
+def _replacement(
+    e: dict[str, Any],
+    code: str,
+    ctx: dict[str, Any],
+    rotation: dict[str, Any],
+    taken: set[str],
+    limit: tuple[str, int] | None = None,
+    unilateral: bool = False,
+) -> str | None:
     """The first usable replacement: for an anchor its pattern's members (`_anchor_candidates`) at the ceiling the anchor
     resolves at (the #4080 exemption for the four core families only); for an accessory the slot's selection fallbacks.
     After a PAIN or DISCOMFORT flag the replacement must load the flagged movement's worst joint strictly less (the library's
-    joint-stress ratings) — another press with the same shoulder stress is not an answer to a shoulder pain note."""
+    joint-stress ratings) — another press with the same shoulder stress is not an answer to a shoulder pain note. `limit`
+    (live_program: a joint flag, axial stacking) caps one joint below a stress level; `unilateral` prefers a unilateral member
+    (a single-leg slot stays single-leg) before any other."""
     from training import program_conflicts
 
     anchor = e.get("kind") == "anchor"
     ruling = program_conflicts.ANCHOR_SKILL_CEILING_RULING
     exempt = anchor and e.get("pattern") in ruling["exempt_families"]
     ceiling = int(ruling["effective_ceiling"]) if exempt else ctx["ceiling"]
-    worst = _worst_joint(_entry(e.get("movement_key"), ctx)) if code in ("pain", "discomfort") else None
+    worst = _worst_joint(_entry(e.get("movement_key"), ctx)) if code in ("pain", "discomfort") else limit
     pool = _anchor_candidates(e, ctx, ctx.get("role")) if anchor else _slot_fallbacks(e, rotation)
+    if unilateral:
+        uni = [k for k in pool if "unilateral" in (((_entry(k, ctx) or {}).get("objective_inputs") or {}).get("functional") or [])]
+        pool = uni + [k for k in pool if k not in uni]
     for k in pool:
         c = ctx["catalog"].get(k) or {}
         if k in taken or int(c.get("skill_tier", 99)) > ceiling or c.get("hevy_type") in NOT_LIFTS:
@@ -197,16 +210,19 @@ def for_live_draft(
     model (`fatigue_model.for_live_draft`, its one graded reduction). In shadow: `rx` itself, nothing read. Never raises."""
     if not is_live(rotation):
         return rx
-    from training import fatigue_model
+    from training import fatigue_model, live_program
 
     out = copy.deepcopy(rx)
     lines: list[str] = []
+    ctx: dict[str, Any] | None = None
     try:
         from training import selection_engine as se
 
         lib = se.load_library_failsoft() or {}
         catalog = catalog_movements or {}
-        sig = fatigue_model.movement_signals(block_workouts, as_of=str(getattr(inputs, "target_date", ""))) if block_workouts else {}
+        sig: dict[str, Any] = (
+            fatigue_model.movement_signals(block_workouts, as_of=str(getattr(inputs, "target_date", ""))) if block_workouts else {}
+        )
         hurts = {
             tid for tid, v in sig.items() if v.get("discomfort_sessions", 0) >= fatigue_model.THRESHOLDS["discomfort_sessions"]["value"]
         }
@@ -218,18 +234,31 @@ def for_live_draft(
             "ceiling": SKILL_CEILING,
             "role": rx.get("session_role"),
             "discomfort": hurts,
+            "short_week_host": getattr(inputs, "short_week", None),  # live_program.short_week_roles: the host session's role
         }
         lines += fit_exposures(out, rotation or {}, ctx)
+        lines += live_program.plan(out, rotation or {}, ctx, block_workouts, sig)  # joint pain, stacking, stalls, fatigue cost
         _refit(out)
     except Exception as e:  # noqa: BLE001 — the live fit never blocks a draft
         lines.append(f"live session fit failed ({type(e).__name__}) — the prescription is unchanged")
         out = copy.deepcopy(rx)
+        sig = {}
     before = [len(x["sets"]) for x in out["exposures"]]
-    out = fatigue_model.for_live_draft(out, rotation, inputs, block_workouts, trim_order=surplus_first(catalog_movements or {}))
+    order = live_program.trim_order(surplus_first(catalog_movements or {}))  # high-fatigue work first, then surplus isolation
+    out = fatigue_model.for_live_draft(out, rotation, inputs, block_workouts, trim_order=order)
     for x, n in zip(out["exposures"], before):
         if len(x["sets"]) < n:
             x["live_reduced"] = n - len(x["sets"])
-    out[MARK] = {"issue": ISSUE, "lines": lines}
+    if ctx is not None:
+        try:  # the week's trunk-stability floor: purpose-driven, never on a strained day (live_program.trunk_floor)
+            lines += live_program.trunk_floor(out, ctx, (out.get("fatigue") or {}).get("state"))
+            _refit(out)
+        except Exception as e:  # noqa: BLE001 — never blocks a draft
+            lines.append(f"trunk floor failed ({type(e).__name__}) — nothing added")
+    trends = {tid: str(v.get("trend")) for tid, v in (sig or {}).items()}
+    extra = {"aerobic": live_program.aerobic(inputs), "trends": trends}
+    rate = live_program.rate_line(out.get("fatigue"), getattr(inputs, "sleep_hours", None))
+    out[MARK] = {"issue": ISSUE, "lines": lines + ([rate] if rate else []), **extra}
     return out
 
 
@@ -370,9 +399,11 @@ def annotate_blocks(blocks: list[Any], rx: dict[str, Any]) -> None:
     Shadow: nothing."""
     if MARK not in rx:
         return
-    from training import session_block, warmup_sets
+    from training import live_program, session_block, warmup_sets
 
-    cut = {e.get("movement_key") for e in rx.get("exposures") or [] if e.get("live_reduced")}
+    live_program.annotate(blocks, rx)  # #5861 red team: the load guard's reason, the deload / joint-flag effort caps
+    guarded = {d["key"] for d in rx[MARK].get("load_guard") or []}  # one reason per lift: the load line outranks the count
+    cut = {e.get("movement_key") for e in rx.get("exposures") or [] if e.get("live_reduced") and e.get("kind") == "accessory"} - guarded
     for b in blocks:
         if b.movement_key in cut:
             clause = session_block.applied_clause("set_count", working_sets=warmup_sets.working_set_count(b.sets), reason="recovery")

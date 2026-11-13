@@ -151,14 +151,33 @@ def test_dry_run_script_runs_on_synthetic_profiles():
     assert all(p["applied"] is False for p in got.values())
 
 
-# premerge-gate: sweeps lambdas/ and mcp/ for any import of the proposal — the "no live change" proof (#5861 L5)
-def test_no_live_path_reads_the_proposal():
-    """No Lambda or MCP module imports `rate_policy`: the live rate band, titration and kcal targets are untouched."""
-    offenders = []
+ADVISORY_READERS = {"lambdas/training/live_program.py"}
+"""The ONE module allowed to read the proposal (#5861 red team, fix 7): `live_program.rate_line` renders the band as ADVISORY
+text in a LIVE draft's rationale. It never feeds the rate band, titration or a kcal target — wiring the band into nutrition
+stays the owner's decision (WEEKLY_STRUCTURE.md, `health.titration.band_for`)."""
+
+
+def _readers() -> list[str]:
+    out = []
     for root in ("lambdas", "mcp"):
         for path in sorted((REPO / root).rglob("*.py")):
             if path.name == "rate_policy.py":
                 continue
             if "rate_policy" in path.read_text(encoding="utf-8", errors="ignore"):
-                offenders.append(str(path.relative_to(REPO)))
+                out.append(str(path.relative_to(REPO)))
+    return out
+
+
+# premerge-gate: sweeps lambdas/ and mcp/ for any import of the proposal — the "no live change" proof (#5861 L5)
+def test_no_live_path_reads_the_proposal():
+    """No Lambda or MCP module imports `rate_policy` but the one advisory reader: the live rate band, titration and kcal
+    targets are untouched. The advisory reader only renders a rationale line (asserted on its source)."""
+    offenders = [p for p in _readers() if p not in ADVISORY_READERS]
     assert offenders == [], f"a live module reads the rate proposal (owner decision first): {offenders}"
+    src = (REPO / "lambdas/training/live_program.py").read_text()
+    use = [ln.strip() for ln in src.splitlines() if "rate_policy." in ln]
+    assert use and all("propose_band" in ln for ln in use), use  # the band proposal only
+    imports = [ln for ln in src.splitlines() if ln.strip().startswith(("import ", "from "))]
+    assert not [ln for ln in imports if "calorie_target" in ln or "titration" in ln], imports  # no kcal, no titration
+    # control: a second reader planted in the set the sweep sees -> red
+    assert [p for p in _readers() + ["lambdas/health/calorie_target.py"] if p not in ADVISORY_READERS]
