@@ -201,6 +201,7 @@ def test_1803_missing_sk_reproduces_the_pre_fix_bug(monkeypatch):
         "week_number": 1,
         "date": "2026-07-01",
         # no "sk" key — the pre-fix shape
+        "status": "published",
         "stats_line": "Weight 298 lb",
         "word_count": 10,
         "content_markdown": "It was a quiet week.",

@@ -54,6 +54,7 @@ def _inst(title, date, sk, unlisted=False):
         "word_count": 100,
         "content_markdown": "body",
         "phase": "experiment",
+        "status": "published",
     }
     if unlisted:
         it["unlisted"] = True
