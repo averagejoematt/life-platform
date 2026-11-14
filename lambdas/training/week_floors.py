@@ -112,7 +112,13 @@ def library_status(path: str | None = None, data: Any = ...) -> str | None:
     """The exercise library's `status`, or None when the file is absent or unreadable — which reads as NOT approved (owner
     ruling 2026-11-11). `data`: an already-read `library()` (#5774 reads the file once for both its rows)."""
     data = library(path) if data is ... else data
-    return str(data.get("status")) if isinstance(data, dict) and data.get("status") is not None else None
+    status = str(data.get("status")) if isinstance(data, dict) and data.get("status") is not None else None
+    if status == LIBRARY_APPROVED:  # #5861 fix round 11, fail-closed: approved without its `approved_on` day reads as proposed
+        from common.pacific_time import parse_day_key  # the rule of `exercise_library.approved_stamp` (never imports the library)
+
+        raw = str(data.get("approved_on") or "")
+        return status if len(raw) == 10 and parse_day_key(raw) else "proposed"
+    return status
 
 
 def kettlebell_enforced(on: str | None, status: str | None) -> str | None:

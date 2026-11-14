@@ -40,6 +40,7 @@ from training import (  # noqa: E402
     live_session as ls,
     live_settings,
     live_volume,
+    selection_engine as se,
 )
 
 PROFILES = sw.load_profiles()
@@ -87,6 +88,8 @@ REPLACED = {
     "fix8: every session of every fixture fits 75 minutes": "test_every_session_of_every_fixture_fits_the_75_minute_ceiling",
     "fix8: a sharp low-back flag reaches every spine-loading lift": "test_a_sharp_low_back_flag_reaches_every_spine_loading_lift",
     "fix8: sequence rules start the Monday after approval": "test_sequence_rules_start_the_monday_after_approval",
+    "fix10: a cut, regressing or capped lift never leads (lead_blocked)": "deleted with the mechanism (fix round 11: the squat "
+    "always leads) — test_fix11_5861::test_the_heavy_lower_lifts_progress_over_weeks_with_no_ratchet",
 }
 
 
@@ -204,13 +207,15 @@ def test_a_step_down_needs_two_exposures_under_the_floor_and_no_hold_blocks_it()
 
 def test_a_systemic_decline_blocks_every_step_up_and_trims_accessories():
     ath: list = []
-    rows = _run("drop", 6, athlete=ath)
+    # fix round 11: the one performance read is noise-robust (median, two exposures, 5%) — a 3 %/week decliner is a systemic
+    # decline within its run; a -1 %/week drift is the load model's to answer lift by lift (reps under the floor), not a slump
+    rows = _run("d3_honest", 6, athlete=ath)
     held = [r["week"] for r in rows if any(ln.startswith("today: no load steps up") for v in r["rationale"].values() for ln in v)]
-    assert held, "a -1 %/wk athlete reads as a systemic decline"
+    assert held, "a -3 %/wk athlete reads as a systemic decline"
     ups = [r["week"] for r in rows if r["week"] in held for v in r["rationale"].values() for ln in v if ln.startswith("today: heavier")]
     assert ups == []  # the slump blocks every step up that week
     assert max(sim.floor_runs(ath[0]).values(), default=0) <= 2  # ... and never a step down for reps under the floor
-    off = _run("drop", 6, {(live_load, "slump"): lambda *a, **k: None})  # control: no slump rule
+    off = _run("d3_honest", 6, {(live_load, "slump"): lambda *a, **k: None})  # control: no slump rule
     assert not any(ln.startswith("today: no load steps up") for r in off for v in r["rationale"].values() for ln in v)
 
 
@@ -284,7 +289,7 @@ def test_every_session_of_every_fixture_fits_the_75_minute_ceiling(shared):
         )
     assert bad == {}
     if shared:
-        off = _week(PROFILES["e_short_week"], {(live_volume, "time_fit"): lambda *a, **k: []})
+        off = _week(PROFILES["c_equipment_limited"], {(live_volume, "time_fit"): lambda *a, **k: []})
         assert any(float(s["lifting_minutes"]) > 75.05 for s in off["week"]["sessions"]), "control: no time fit -> over the cap"
 
 
@@ -351,7 +356,9 @@ def test_sequence_rules_start_the_monday_after_approval():
     lib = {"status": "approved", "approved_on": "2026-11-18", "programming_settings": {}}
     assert live_sequence.rule_from(lib) == "2026-11-23"
     assert live_sequence.rule_from(lib | {"programming_settings": {"sequence_rule_from": "2026-12-02"}}) == "2026-11-30"
-    assert live_sequence.rule_from({"status": "approved"}) is None  # control: no stamp -> from the block start
+    # fix round 11 (E6): no stamp is not live at all — the library behaves as proposed, so no rule ever judges from the block start
+    assert live_sequence.rule_from({"status": "approved"}) is None and se.mode({"status": "approved"}) == se.MODE_SHADOW
+    assert se.mode(lib) == se.MODE_LIVE and se.mode(lib | {"approved_on": "2026-13-40"}) == se.MODE_SHADOW
 
 
 # ── 5. simplicity ratchets ───────────────────────────────────────────────────────────────────────────────────────────────────
@@ -390,21 +397,10 @@ def test_a_slump_trims_about_a_third_of_each_accessory_never_an_anchor():
     ]}  # fmt: skip
     lines = live_load.slump_trim(rx)
     assert [len(e["sets"]) for e in rx["exposures"]] == [3, 2, 3, 2] and lines
-    rows = _run("drop", 4)
-    off = _run("drop", 4, {(live_load, "slump_trim"): lambda rx, keep=None: []})
+    rows = _run("d3_honest", 6)
+    off = _run("d3_honest", 6, {(live_load, "slump_trim"): lambda rx, keep=None: []})
     acc = lambda rr: sum(sum(len(v) for v in r["loads"].values()) for r in rr)  # noqa: E731 — exposures served
     held = [r["week"] for r in rows if any(ln.startswith("today: no load steps up") for v in r["rationale"].values() for ln in v)]
     assert held
     sets = lambda rr: sum(n for r in rr for n in r["hard"].values())  # noqa: E731
     assert sets(rows) < sets(off) and acc(rows) <= acc(off)
-
-
-def test_a_cut_regressing_or_capped_lift_never_leads_the_heavy_lower_day():
-    """Ruling 5's lead by state (the red team's N12 survivor): a pain-touched lift, a regressing trend or an effort cap at RPE 7
-    blocks the lead; a clean lift may lead. Control: the same clean exposure is never blocked."""
-    from training import live_rulings
-
-    assert live_rulings.lead_blocked({"live_stop": "Pain past 3/10", "live_load": {"hold": True, "why": "knee flag"}}, None) == "knee flag"
-    assert live_rulings.lead_blocked({}, "regressing") == "regressing"
-    assert live_rulings.lead_blocked({"live_effort": 7}, None) == "effort capped"
-    assert live_rulings.lead_blocked({"live_effort": 9}, "progressing") is None

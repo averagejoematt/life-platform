@@ -225,6 +225,7 @@ def joint_flags(ctx: dict[str, Any], workouts: list[dict[str, Any]] | None, disc
                 "severity": sev,
                 "source": "pain" if pain else "discomfort",
                 "site": site,
+                "sharp": "sharp" in note.lower(),
             }
         )
         from training import live_pain  # #5861 FIX7: the flag's reach — the flagged lift, or the provoking pattern
@@ -297,9 +298,6 @@ def apply_joint_rule(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str
         keep.append(e)
         lines.append(f"held (live): {name} — {why}: loads that joint, load held, RPE <= {PAIN_RULE['pain_rpe']['value']}, the stop line on")
     rx["exposures"] = [{k: v for k, v in e.items() if not (k == "template_id" and v is None)} for e in keep]
-    from training import live_volume  # fix round 10: a pain-skipped lift's time goes to reviewed, pain-free work
-
-    lines += live_volume.refill(rx, ctx, flags, sum(1 for ln in lines if ln.startswith("skipped (live)")))
     return lines
 
 
@@ -391,11 +389,56 @@ def avoid_stacking(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str, 
     return lines
 
 
-def plan(rx: dict[str, Any], rotation: dict[str, Any], ctx: dict[str, Any], workouts: Any, sig: dict[str, Any]) -> list[str]:
+def axial_yesterday(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str, Any], workouts: Any) -> list[str]:
+    """IN PLACE (fix round 11, the tenth red team: a 3-morning week on consecutive days stacked squat, squat + deadlift, RDL): on a
+    full-body morning, a GUEST squat/hinge anchor that loads the spine is swapped for a low-spinal-load member of its pattern when
+    yesterday's session already loaded the spine with a squat or hinge (the host's own anchors never move). No such member:
+    it stays, said plainly. Returns the lines."""
+    from common.pacific_time import shift_day_key
+
+    from training import fatigue_model, live_session as ls
+
+    guests = [
+        e for e in rx["exposures"] if e.get("live_full_body") and e.get("pattern") in AXIAL and _axial(_entry(e.get("movement_key"), ctx))
+    ]
+    if not guests:
+        return []
+    idx = fatigue_model.library_index(ctx.get("lib"))
+    yesterday = shift_day_key(str(ctx.get("target_date") or ""), -1)
+    loaded = any(
+        (idx.get(str(x.get("template_id") or "").upper()) or {}).get("pattern") in AXIAL
+        and (idx.get(str(x.get("template_id") or "").upper()) or {}).get("spinal_load") in ("moderate", "high")
+        for w in workouts or []
+        if str(w.get("date") or "")[:10] == yesterday
+        for x in w.get("exercises") or []
+    )
+    if not loaded:
+        return []
+    taken = {str(e.get("movement_key")) for e in rx["exposures"]}
+    lines = []
+    for e in guests:
+        name = _entry(e.get("movement_key"), ctx).get("title") or e.get("movement_key")
+        new = ls._replacement(e, "stacking", ctx, rotation, taken, limit=("spinal_load", 1))
+        if not new:
+            lines.append(f"kept (live): {name} — yesterday loaded the spine too, and no low-spinal-load member is servable")
+            continue
+        taken.add(new)
+        i = rx["exposures"].index(e)
+        rx["exposures"][i] = {k: v for k, v in e.items() if k not in ("template_id", "live_load")} | {
+            "movement_key": new,
+            "live_swap": {"from": e["movement_key"], "code": "axial_yesterday"},
+        }
+        lines.append(
+            f"swapped (live): {name} -> {(ctx['catalog'].get(new) or {}).get('title') or new} — yesterday's session loaded the "
+            "spine with a squat or hinge (consecutive mornings: STACK_RULE across days)"
+        )
+    return lines
+
+
+def plan(rx: dict[str, Any], rotation: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> list[str]:
     """The pre-load live programming pass (`live_session.for_live_draft`), IN PLACE, in this order: pain by joint, axial
     stacking, the heavy pull's shape and the lower-volume order, the lead lift (ruling 5), then each exposure's fatigue cost
     (read by the fatigue model that runs next). Returns the rationale lines."""
-    trends = {tid: str(v.get("trend")) for tid, v in (sig or {}).items()}
     from training import live_balance as lb, live_rules, live_rulings, live_shape, selection_live
 
     sel = (rotation.get("selection") or {}).get("slots") or []
@@ -403,10 +446,13 @@ def plan(rx: dict[str, Any], rotation: dict[str, Any], ctx: dict[str, Any], work
     pinned |= {sid.split(".", 1)[1] for sid in selection_live.SLOT_OBJECTIVES if sid.startswith(f"{rx.get('session_role')}.")}
     flags = joint_flags(ctx, workouts, (ctx.get("discomfort") or set()) | (ctx.get("light_discomfort") or set()))
     lines = apply_joint_rule(rx, ctx, rotation, flags) + lb.pain_assess(rx, ctx, flags, workouts)
+    from training import live_volume  # fix round 11: what the gym or the pain rule took goes back through the ONE spend step
+
+    lines += live_volume.spend_session(rx, ctx, flags)
     lines += live_rules.isolation_joint_cap(rx, ctx, flags)  # every isolation lift on a flagged joint: RPE <= 7, stop line
-    lines += avoid_stacking(rx, ctx, rotation, pinned)
+    lines += avoid_stacking(rx, ctx, rotation, pinned) + axial_yesterday(rx, ctx, rotation, workouts)
     lines += live_shape.deadlift_shape(rx) + live_shape.order_lower_volume(rx)  # ruling 5: the heavy pull; squat first
-    lines += live_rulings.lead_lift(rx, ctx, trends)  # ruling 5: squat and deadlift never both maximal in one session
+    lines += live_rulings.lead_lift(rx, ctx)  # ruling 5: the squat leads, the deadlift top + back-off at RPE <= 8
     mark_costs(rx, ctx)
     return lines
 
@@ -414,15 +460,15 @@ def plan(rx: dict[str, Any], rotation: dict[str, Any], ctx: dict[str, Any], work
 # ── 1. load safety ────────────────────────────────────────────────────────────
 
 
-def _cap_effort(note: str, rpe_max: int, clause: str | None, band: Any = None) -> str:
+def _cap_effort(note: str, rpe_max: int, clause: str | None) -> str:
     """Line 1 capped at RPE `rpe_max` (inserted when the lift's own note opens without an effort line — the first lift's
-    effort sits in the session block) and `clause` as the one reason line. `band` (lo, hi) renders the cap as a range."""
+    effort sits in the session block) and `clause` as the one reason line."""
     from training import hevy_note_grammar as g, session_block as sb
     from training.lift_note import keep_stricter
 
     block, own = sb.split(note)
     lines = sb._own_lines(block, own)
-    cap = g.effort_line(tuple(band) if band and int(band[-1]) <= rpe_max else rpe_max)
+    cap = g.effort_line(rpe_max)
     if lines and g.EFFORT_RE.match(lines[0]):
         lines[0] = keep_stricter(lines[0], cap) if _top(lines[0]) > rpe_max else lines[0]
     else:
@@ -452,15 +498,16 @@ def annotate(blocks: list[Any], rx: dict[str, Any]) -> None:
         d, cap = guard.get(b.movement_key), e.get("live_effort")
         clause = d.get("clause") if d else None
         if cap:
-            b.notes = _cap_effort(b.notes or "", int(cap), clause, e.get("live_effort_band"))
+            b.notes = _cap_effort(b.notes or "", int(cap), clause)
         elif clause:
             b.notes = session_block.add_reason(b.notes, clause)
         b.notes = live_balance.assess_note(live_balance.one_effort(b.notes), str(e.get("live_assess") or ""))
         b.notes = live_balance.assess_note(b.notes, str(e.get("live_stop") or ""))  # the in-set stop line under a pain flag
     from training import live_safety
 
-    rx[ls.MARK].setdefault("lines", []).extend(live_safety.no_step(blocks, rx))
+    rx[ls.MARK].setdefault("lines", []).extend(live_safety.no_step(blocks, rx) + live_safety.r3_lines(blocks, rx))
     live_safety.coherent_effort(blocks, rx)
+    rx[ls.MARK]["lines"] += live_safety.cap_lines(blocks)
 
 
 # ── 5. cardio ─────────────────────────────────────────────────────────────────

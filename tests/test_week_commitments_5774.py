@@ -206,7 +206,12 @@ def test_the_kettlebell_switch_warns_the_day_before_blocks_on_the_date_and_on_ap
     rot, days = _week(7), _days(_ir("lower_volume", NO_KB_LOWER_VOLUME))
     assert _verdicts(wc.evaluate(rot, CATALOG, on=BEFORE, library=None, days=days))["kettlebell"] == "warn"
     assert _verdicts(wc.evaluate(rot, CATALOG, on=ON, library=None, days=days))["kettlebell"] == "block"
-    assert _verdicts(wc.evaluate(rot, CATALOG, on="2026-11-12", library={"status": "approved"}, days=days))["kettlebell"] == "block"
+    assert (
+        _verdicts(wc.evaluate(rot, CATALOG, on="2026-11-12", library={"status": "approved", "approved_on": "2026-01-02"}, days=days))[
+            "kettlebell"
+        ]
+        == "block"
+    )
     assert _verdicts(wc.evaluate(rot, CATALOG, on="2026-11-12", library={"status": "proposed"}, days=days))["kettlebell"] == "warn"
 
 
@@ -215,7 +220,12 @@ def test_control_a_moved_date_or_an_ignored_approval_breaks_the_switch():
     with patch.object(wf, "KETTLEBELL_BLOCK_FROM", "2026-12-21"):
         assert _verdicts(wc.evaluate(rot, CATALOG, on=ON, library=None, days=days))["kettlebell"] == "warn"
     with patch.object(wf, "LIBRARY_APPROVED", "never"):
-        assert _verdicts(wc.evaluate(rot, CATALOG, on="2026-11-12", library={"status": "approved"}, days=days))["kettlebell"] == "warn"
+        assert (
+            _verdicts(wc.evaluate(rot, CATALOG, on="2026-11-12", library={"status": "approved", "approved_on": "2026-01-02"}, days=days))[
+                "kettlebell"
+            ]
+            == "warn"
+        )
 
 
 # ── departures count toward AND against (owner ruling 2026-11-11, item 2) ─────────────────────────────────────────────
@@ -308,8 +318,16 @@ def test_a_recorded_gate_on_a_family_only_warns(family, cid):
 # ── stretch-position: measured from the library, report-only ────────────────────────────────────────────────────────
 def test_stretch_position_reads_the_library_and_never_blocks():
     rot = _week(7)
-    lengthened = {"status": "approved", "movements": {"bulgarian_split_squat_dumbbell": {"title": "BSS", "length_bias": "lengthened"}}}
-    none = {"status": "approved", "movements": {"bulgarian_split_squat_dumbbell": {"title": "BSS", "length_bias": "mid"}}}
+    lengthened = {
+        "status": "approved",
+        "approved_on": "2026-01-02",
+        "movements": {"bulgarian_split_squat_dumbbell": {"title": "BSS", "length_bias": "lengthened"}},
+    }
+    none = {
+        "status": "approved",
+        "approved_on": "2026-01-02",
+        "movements": {"bulgarian_split_squat_dumbbell": {"title": "BSS", "length_bias": "mid"}},
+    }
     assert _verdicts(wc.evaluate(rot, CATALOG, on=BEFORE, library=lengthened))["stretch_position"] == "met"
     missed = wc.evaluate(rot, CATALOG, on=BEFORE, library=none)
     assert _verdicts(missed)["stretch_position"] == "warn" and "stretch_position" not in missed["blocking"], missed["lines"]
@@ -324,7 +342,7 @@ def _fw_lib(status: str, *, pull_profile: str = "free_weight") -> dict:
         "machine_row": {"title": "Row", "job": "compound", "pattern": "horizontal_pull", "resistance_profile": pull_profile},
     }
     targets = {"barbell_bench_press": "chest", "squat_barbell": "quadriceps", "deadlift_barbell": "glutes", "machine_row": "back"}
-    return {"status": status, "movements": {k: e | {"target": {"primary": targets[k]}} for k, e in mv.items()}}
+    return {"status": status, "approved_on": "2026-01-02", "movements": {k: e | {"target": {"primary": targets[k]}} for k, e in mv.items()}}
 
 
 def test_free_weight_compound_floor_needs_a_press_pull_squat_and_hinge_and_arms_on_approval():

@@ -4,12 +4,12 @@
 
   1. SCOPE BY CLASS (`scope`). A discomfort flag at or under `lift_only_max` (2/10) — the light-discomfort class, or a discomfort
      note with no score — touches ONLY the flagged lift. Any other flag is scoped by its JOINT.
-  2. ONE JOINT RULE (`hit`, fix round 10 — the ninth red team: a hip flag on the split squat removed every squat while a
-     high-hip-stress deadlift stepped up). A joint-scoped flag reaches every lift that loads the flagged joint at moderate or more,
-     whatever its pattern. Above the mild line (`avoid`) the flagged lift, its pattern group and every lift loading the joint HIGH
-     are ROUTED (below); every other lift it reaches HOLDS its load at RPE <= `pain_rpe` with the in-set stop line. At or under
-     the mild line every lift it reaches holds the same way. The low back is this rule on `spinal_load` (the squat flag reaches the
-     deadlift, the RDL and the bent-over row) — no separate spine rule.
+  2. ONE JOINT RULE (`hit`; fix round 11 — the tenth red team: a 4/10 hip flag on the split squat removed every lower compound in
+     a garage). A joint-scoped flag reaches every lift that loads the flagged joint at moderate or more, whatever its pattern.
+     Above the mild line (`avoid`) with a STATED score only the provoking lift is ROUTED (below); a sharp or unscored flag also
+     routes its pattern group and every lift loading the joint HIGH. Every other lift it reaches — pain-free compounds included — HOLDS its load at
+     RPE <= `pain_rpe` with the in-set stop line. At or under the mild line every lift it reaches
+     holds the same way. The low back is this rule on `spinal_load` — no separate spine rule.
   3. ROUTES (`variant`, `muscle_route`). A routed lift is replaced by a pain-free same-family member first, else by any movement
      for the muscle it trained, each loading every flagged joint LOW — and REVIEWED: a movement whose joint stress is defaulted or
      unreviewed (`reviewed`) is never a pain route (owner ruling 16: missing data is not proof of suitability). For a PRIORITY
@@ -88,7 +88,10 @@ def hit(
         for j in f["joints"]:
             if not (own or (f.get("scope") != "lift" and _stress(entry, j) >= level)):
                 continue
-            route = own or _group(entry.get("pattern")) == f["group"] or _stress(entry, j) >= STRESS["high"]
+            # fix round 11: a STATED score routes only the provoking lift; a sharp or unscored flag stays conservative — its
+            # pattern group and every lift loading that joint HIGH are routed too (the low back's deadlift under a sharp note)
+            severe = f.get("severity") is None or f.get("sharp")
+            route = own or (severe and (_group(entry.get("pattern")) == f["group"] or _stress(entry, j) >= STRESS["high"]))
             tier = "avoid" if f["tier"] == "avoid" and route else "hold"
             if best is None or (tier == "avoid" and best[0] != "avoid"):
                 best = (tier, f, j)

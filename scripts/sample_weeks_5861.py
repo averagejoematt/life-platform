@@ -60,6 +60,9 @@ SECONDARY_CREDIT = 0.5  # the fatigue model's own fractional-set convention (fat
 SYNTHETIC_LOAD_LB = {"barbell": 175, "machine": 120, "cable": 65, "dumbbell": 50, "kettlebell": 53, "other": 70}
 """Invented starting loads for the synthetic record (no person's numbers), by catalog equipment, in 5-lb implement steps."""
 LB_PER_KG = 2.20462
+SYNTHETIC_APPROVED_ON = "2026-01-02"
+"""The synthetic approval day an in-memory approved library carries (live mode needs `approved_on`, fix round 11): before every
+synthetic week, so the sequence rules judge them all (the Monday after it is 2026-01-05)."""
 
 
 # ── the profile and its synthetic world ──────────────────────────────────────
@@ -84,6 +87,8 @@ def approved_library(lib: dict[str, Any], profile: dict[str, Any], status: str =
     """An in-memory copy with the live switch flipped and the profile's missing equipment marked unavailable."""
     out = copy.deepcopy(lib)
     out["status"] = status
+    if status == "approved":  # live needs the approval day too (fix round 11); synthetic, before every synthetic week
+        out.setdefault("approved_on", SYNTHETIC_APPROVED_ON)
     if SETTINGS:
         out["programming_settings"] = {**(out.get("programming_settings") or {}), **SETTINGS}
     items = (out.get("gym_inventory") or {}).get("items") or {}
@@ -113,10 +118,17 @@ def _trend_for(profile: dict[str, Any], key: str, kind: str, role: str) -> str:
     return str(over.get(key) or over.get(f"*{kind}_{role}*") or profile.get("trend") or "progressing")
 
 
-def _sets(load_lb: int, trend: str, week: int, kind: str) -> list[dict[str, Any]]:
+ROLE_ANCHOR_REPS = {"upper_volume": 10, "lower_volume": 10, "shoulders_arms": 8}
+"""Fix round 11 (the tenth red team: the harness logged every anchor at 6 reps, so a volume day's 8-12 anchors read 'under the
+floor' and printed spurious 'Lighter today' lines): a volume-day anchor is logged inside its own range. Live worlds only — the
+proposed world keeps the base tree's record (its digests are pinned)."""
+
+
+def _sets(load_lb: int, trend: str, week: int, kind: str, role: str | None = None) -> list[dict[str, Any]]:
     """Three working sets for one synthetic exposure: progressing adds a 5-lb step a week, stalled repeats, regressing
-    drops two steps a week with fewer reps. Loads are 5-lb implement steps, stored in kg as Hevy stores them."""
-    reps = 6 if kind == "anchor" else 10
+    drops two steps a week with fewer reps. Loads are 5-lb implement steps, stored in kg as Hevy stores them. `role`: the
+    session's role, read only by a live world (`ROLE_ANCHOR_REPS`)."""
+    reps = (ROLE_ANCHOR_REPS.get(str(role), 6) if role else 6) if kind == "anchor" else 10
     if trend == "progressing":
         lb, r, rpe = load_lb + 5 * week, reps, 8.0
     elif trend == "stalled":
@@ -133,7 +145,9 @@ def _note(profile: dict[str, Any], key: str, last: bool) -> str:
     return ""
 
 
-def synthetic_record(profile: dict[str, Any], served: dict[str, list[tuple[str, str]]], catalog: dict[str, Any]) -> list[dict[str, Any]]:
+def synthetic_record(
+    profile: dict[str, Any], served: dict[str, list[tuple[str, str]]], catalog: dict[str, Any], role_reps: bool = False
+) -> list[dict[str, Any]]:
     """The prior phase's Hevy record: every role on its weekday, `served` = {role: [(catalog key, kind)]}, the profile's
     trends, its discomfort/pain notes on the last two exposures, its recent hard cardio, and its adherence."""
     start = _day(profile["as_of"], -7 * HISTORY_WEEKS)
@@ -155,7 +169,7 @@ def synthetic_record(profile: dict[str, Any], served: dict[str, list[tuple[str, 
                 continue
             load = SYNTHETIC_LOAD_LB.get(str((catalog.get(key) or {}).get("equipment")), 70)
             note = _note(profile, key, w >= HISTORY_WEEKS - 2)
-            sets = _sets(load, _trend_for(profile, key, kind, role), w, kind)
+            sets = _sets(load, _trend_for(profile, key, kind, role), w, kind, role if role_reps else None)
             exercises.append({"name": catalog[key]["title"], "template_id": tid, "notes": note, "sets": sets})
         out.append(_workout(day, role, exercises))
     _with_cardio(out, profile, start)
@@ -427,7 +441,9 @@ def build_world(profile: dict[str, Any], mode: str = "approved", prior: str = "l
     lib = approved_library(json.loads((REPO / "config" / "exercise_library.json").read_text()), profile, status="approved")
     profile = profile | {"defaults_roles": list(_all_roles())}
     picks = _phase_one_picks(lib, catalog["movements"], profile) if prior == "live" else _phase_one_pools(catalog["movements"], profile)
-    record = synthetic_record(profile, _prior_served(picks, catalog["movements"], list(_all_roles())), catalog["movements"])
+    record = synthetic_record(
+        profile, _prior_served(picks, catalog["movements"], list(_all_roles())), catalog["movements"], role_reps=mode == "approved"
+    )
     lib["status"] = mode
     return {
         "profile": profile,
@@ -492,6 +508,7 @@ def generate_week(
             record.append(done)  # the next morning's draft reads this session as done
             prev = {"session_role": role, "date": day, "title": role, "was": "synthetic"}
     out = {"profile": p["name"], "label": p.get("label"), "story": p.get("story"), "mode": mode, "sessions": sessions}
+    out["live_switch"] = switch_line(world["lib"])
     from training import cardio_model
 
     recorded = (p.get("aerobic_record") or {}).get("minutes_by_day") or None  # #5861 FIX6 (ruling 12): recorded minutes only
@@ -838,8 +855,20 @@ def _session_effort_conflicts(week: dict[str, Any]) -> list[str]:
 
 
 # ── markdown ──────────────────────────────────────────────────────────────────
+def switch_line(lib: dict[str, Any]) -> str:
+    """The visible live-switch line (fix round 11): live needs `status: approved` AND a valid `approved_on`."""
+    from training import live_sequence, selection_engine as se
+
+    stamp = se.approved_stamp(lib)
+    if lib.get("status") == "approved" and stamp:
+        return f"live switch: approved on {stamp} — the sequence rules judge weeks from {live_sequence.rule_from(lib)}"
+    if lib.get("status") == "approved":
+        return "live switch: status approved WITHOUT a valid approved_on — this library runs exactly as proposed"
+    return f"live switch: {lib.get('status')} — shadow"
+
+
 def render(week: dict[str, Any], m: dict[str, Any]) -> str:
-    lines = [f"### {week['label']} — mode `{week['mode']}`", "", f"_{week['story']}_", ""]
+    lines = [f"### {week['label']} — mode `{week['mode']}`", "", f"_{week.get('live_switch') or ''}_", "", f"_{week['story']}_", ""]
     if week.get("short_week"):
         lines += [f"_{week['short_week']}_", ""]
     for s, ps_ in zip(week["sessions"], m["per_session"]):
@@ -927,7 +956,8 @@ LIVE_PREFIXES = (
     "full body (live)",
     "capped (live)",
     "short week (live",
-    "lead lift (live)",  # #5861 FIX6
+    "heavy lower (live)",  # #5861 fix round 11 (ruling 5: the squat leads)
+    "in-session step (live)",  # #5861 fix round 11 (R3)
     "top-up (live)",
     "priority (live)",
     "evidence (live)",

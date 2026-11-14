@@ -150,7 +150,8 @@ def knee_breaches(w: dict) -> list[str]:
             e = _entry(w, x["key"])
             knee = str((e.get("joint_stress") or {}).get("knee"))
             squat = lp._group(e.get("pattern")) == "squat"
-            if knee == "high" or (squat and knee == "moderate" and _top_rpe(x["hevy_note"]) > 8):
+            held = _top_rpe(x["hevy_note"]) <= 8 and "stop this lift" in (x["hevy_note"] or "")  # fix round 11: held, not routed
+            if (knee == "high" and not held) or (squat and knee == "moderate" and _top_rpe(x["hevy_note"]) > 8):
                 out.append(f"{s['role']}: {x['key']} knee {knee} @ RPE {_top_rpe(x['hevy_note']):g}")
     return out
 
@@ -167,9 +168,11 @@ def test_a_knee_flag_reduces_or_avoids_every_knee_dominant_pattern(weeks):
         assert quads > 0, (cap, quads)
     old = _week("g_knee_pain_garage_short", {(lp, "apply_joint_rule"): lambda rx, ctx, rot, flags: []})
     assert knee_breaches(old)
-    from training import live_pain
+    from training import live_pain, live_volume
 
-    none = _week("g_knee_pain_garage_short", {(live_pain, "priority_ceiling"): lambda *a: None})  # control: no priority route
+    none = _week(  # control: no priority route and no spend step after the pain rule
+        "g_knee_pain_garage_short", {(live_pain, "priority_ceiling"): lambda *a: None, (live_volume, "spend_session"): lambda *a: []}
+    )
     assert sw.hard_sets_by_muscle(none["week"], none["world"]["lib"], none["world"]["catalog"]["movements"]).get("quadriceps", 0) < quads
 
 
@@ -219,12 +222,14 @@ def _held(s: dict) -> set[str]:
 
 
 def stepping(week: dict) -> list[str]:
-    """Any in-session load-step line on any lift (fix round 10: double progression is the one progression system under live)."""
+    """Any in-session load-step line on any lift other than the ONE bounded R3 line (fix round 10: double progression is the one
+    progression system under live; fix round 11: the owner's R3 restored in one bounded form, `live_safety.R3_LINE`)."""
+    r3 = re.compile("^" + re.escape(lsafe.R3_LINE).replace(re.escape("{step}"), ".+") + "$")
     return [
         f"{s['role']}: {x['key']}"
         for s in week["sessions"]
         for x in s["lifts"]
-        if any(lsafe._step_line(ln) for ln in (x["hevy_note"] or "").split("\n"))
+        if any(lsafe._step_line(ln) and not r3.match(ln.strip()) for ln in (x["hevy_note"] or "").split("\n"))
     ]
 
 
@@ -258,9 +263,8 @@ def test_the_session_line_never_contradicts_a_big_lift(weeks):
         (lsafe, "coherent_effort"): lambda blocks, rx: None,
         (lsafe, "fix_block"): lambda block, rx, blocks: lsafe.block_rule(block),
     }
-    assert session_conflicts(
-        _week("a_large_deficit_experienced", off)["week"]
-    )  # control: the per-lift guard only — the second lift's RPE 7-8 under a session line of 8-9 (fix round 9: a hold day caps all)
+    with patch.dict(lset.HEURISTICS["deadlift_rpe"], {"value": 7}):  # control: the per-lift guard only, a lift capped at 7
+        assert session_conflicts(_week("a_large_deficit_experienced", off)["week"])
 
 
 # ── 5. volume ────────────────────────────────────────────────────────────────
@@ -324,8 +328,8 @@ def test_the_week_plan_holds_the_priority_muscles_and_fills_the_quadriceps_when_
     lm = a["m"]["landmarks"]
     assert lm["chest"]["sets"] >= lm["chest"]["MEV"] and lm["quadriceps"]["sets"] >= lm["quadriceps"]["MEV"]
     plan = lvol.week_plan(CAT0, copy.deepcopy(LIB0), 5)
-    assert not [r for r in plan["rows"] if r.get("fill") == "quadriceps"]  # the template's squats + leg press reach the aim
-    with patch.object(lvol, "targets", lambda lib, m, hf=False, monday=None: {"quadriceps": {"floor": 14.0, "aim": 14.0, "cap": 16.0}}):
+    assert plan["counts"]["quadriceps"] >= plan["targets"]["quadriceps"]["aim"]  # fix round 11: the aim is above MEV
+    with patch.object(lvol, "targets", lambda lib, m: {"quadriceps": {"floor": 14.0, "aim": 14.0, "cap": 16.0}}):
         high = lvol.week_plan(CAT0, copy.deepcopy(LIB0), 5)
     fills = [r for r in high["rows"] if r.get("fill") == "quadriceps"]
     assert fills and fills[0]["key"] in lvol.FILL["quadriceps"] and fills[0]["role"].startswith("lower")  # control
@@ -442,7 +446,8 @@ def test_the_band_pull_up_is_a_built_in_vertical_pull():
     assert CAT0["pull_up_band"]["hevy_template_id_hint"] == "56808FD2" and CAT0["pull_up_band"]["is_custom"] is False
     assert CAT0["pull_up_band"]["anchor_family"] == "vertical_pull"
     e = LIB0["movements"]["pull_up_band"]
-    assert e["template_id"] == "56808FD2" and e["gates"] == [] and e["objective_inputs"]["reviewed"]
+    # fix round 11 (owner ruling #3: the band pull-up gate stays LOCKED): the pull-up negative's locked gates, never ungated
+    assert e["template_id"] == "56808FD2" and e["gates"] == ["bw_pull", "chain_pull_negative"] and e["objective_inputs"]["reviewed"]
 
 
 def test_the_generous_tiers_and_the_trunk_categories_are_corrected_at_their_inputs():

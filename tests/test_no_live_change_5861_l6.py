@@ -168,7 +168,7 @@ def test_the_crons_session_sequence_is_unchanged_while_the_library_is_proposed()
         served = [rg._schedule_entry_for_date(d, week_cfg, "module", record, []) for d in days]
     assert served == [ss.next_session(d, record, []) for d in days]
     assert all("live_week" not in e for e in served)
-    live = copy.deepcopy(lib) | {"status": "approved"}
+    live = copy.deepcopy(lib) | {"status": "approved", "approved_on": "2026-01-02"}  # fix round 11: live needs the stamp
     with patch.object(se, "load_library_failsoft", lambda: live):
         roles = [rg._schedule_entry_for_date(d, week_cfg, "module", record, []).get("live_week") for d in days]
     assert all(r and "shoulders_arms" in r["skip"] for r in roles)  # control: live, the dip week skips shoulders+arms

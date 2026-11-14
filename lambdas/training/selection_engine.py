@@ -170,11 +170,15 @@ def library_version(lib: dict[str, Any] | None = None) -> str | None:
     return str(lib.get("version")) if isinstance(lib, dict) and lib.get("version") else None
 
 
+approved_stamp = xl.approved_stamp
+
+
 def mode(lib: dict[str, Any] | None) -> str:
-    """`live` only for an APPROVED library; `shadow` for any other status; `no_library` when none was read."""
+    """`live` only for an APPROVED library with a valid `approved_on` day (#5861 fix round 11, fail-closed: an approval without
+    its day runs exactly as `proposed`); `shadow` otherwise; `no_library` when none was read."""
     if not isinstance(lib, dict):
         return MODE_NO_LIBRARY
-    return MODE_LIVE if lib.get("status") == APPROVED else MODE_SHADOW
+    return MODE_LIVE if lib.get("status") == APPROVED and approved_stamp(lib) else MODE_SHADOW
 
 
 # ── the library <-> catalog join ─────────────────────────────────────────────

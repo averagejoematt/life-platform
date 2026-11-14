@@ -177,7 +177,13 @@ def test_the_week_is_planned_by_priority_and_no_non_priority_muscle_grows_over_m
     other["programming_settings"] = {**(lib.get("programming_settings") or {}), "priority_muscles": ["back"]}
     assert lvol.week_plan(CAT0, other, 5)["targets"]["chest"]["floor"] == marks["chest"]["MV"]  # a setting he owns
     assert c["shoulders"] <= marks["shoulders"]["MAV"]  # ruling 9: total shoulder volume never forced over MAV
-    with patch.object(lvol, "_spare", lambda r, rows, tg: False):  # control: no slot may go whole -> the delts sit over MAV
+    # control (fix round 11): no surplus trim and no donation in the one spend step -> the template's delts sit over MAV
+    with (
+        patch.object(lvol, "_surplus", lambda rows, tg, prio, lines: (lambda: None)),
+        patch.object(
+            lvol, "_make_room", lambda rows, tg, lead, role, m, need, room, budget, gave, slot=False: room(role) >= need and not slot
+        ),
+    ):
         assert lvol.week_plan(CAT0, lib, 5)["counts"]["shoulders"] > marks["shoulders"]["MAV"]
 
 
@@ -251,8 +257,16 @@ def test_every_generated_note_states_one_effort_target_per_lift(weeks):
     assert lb.effort_targets("Upper heavy · RPE 8–9 on big lifts\nLow energy → first 2 lifts + easy cardio.\n\nRPE 6–7") == ["8–9", "6–7"]
     assert lb.effort_targets("RPE 8–9, last set RPE 9–10\nSet 1: 6 reps at RPE 7 or less → +10 lb.") == ["8–9"]  # a rule is no target
     # control: the WHY header left as composed -> the red team's first phone note ("RPE 8–9 on big lifts" ... "RPE 6–7")
-    raw = _week("b_shoulder_flag_low_recovery", {(lb, "why_effort"): lambda why, ir_: why})
-    assert contradictory(raw["week"])  # FIX5: (b)'s upper heavy now serves no press; its lower heavy squat (RPE 7) carries it
+    from training import live_rulings
+
+    def cap_first(rx, ctx):  # fix round 11: the lower-heavy morning's FIRST lift (the squat) capped under the session band
+        for e in rx["exposures"]:
+            if rx.get("session_role") == "lower_heavy" and e.get("kind") == "anchor" and e.get("pattern") == "squat":
+                e["live_effort"] = 7
+        return []
+
+    raw = _week("a_large_deficit_experienced", {(lb, "why_effort"): lambda why, ir_: why, (live_rulings, "lead_lift"): cap_first})
+    assert contradictory(raw["week"])
 
 
 # ── 7. the adherence dip, on a realistic history ─────────────────────────────

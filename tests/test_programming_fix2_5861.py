@@ -67,6 +67,7 @@ KG = 0.45359237
 def _lib() -> dict:
     lib = copy.deepcopy(LIB0)
     lib["status"] = "approved"
+    lib["approved_on"] = "2026-01-02"  # fix round 11: live needs the approval day
     return lib
 
 
@@ -154,7 +155,9 @@ def test_an_isolation_load_cut_needs_effort_evidence_not_a_trend_alone():
     holds it (reps inside the range are no evidence). Control: two sessions running under the range floor -> a step-down,
     floored to the dumbbell (fix round 10: reps under the floor, never a trend or an RPE, move a load down)."""
     rec = _lateral_record()
-    assert fm.movement_signals(rec, as_of="2026-11-16")[LATERAL]["trend"] == "regressing"  # the real-data trigger, reproduced
+    # fix round 11: the old best-before read called this 'regressing' (one heavier dumbbell day set the best); the one
+    # performance read (`fatigue_model.declined`, median of the earlier exposures) does not — and the load holds either way
+    assert fm.movement_signals(rec, as_of="2026-11-16")[LATERAL]["trend"] == "stalled"
     d = ll.decide(_rows(rec, LATERAL), 8, 15, "dumbbell")
     assert d["mode"] == "hold" and abs(d["kg"] - 25 * KG) < 0.05
     grind = rec + [
@@ -366,34 +369,27 @@ def test_the_cardio_block_progresses_week_to_week_by_the_cardio_model():
 
 
 # ── 6. coverage ───────────────────────────────────────────────────────────────
-def _vertical_pulls(week: dict, lib: dict, cat: dict) -> int:
-    return sum(1 for s in week["sessions"] for x in s["lifts"] if sw._lib_entry(lib, cat, x["key"]).get("pattern") == "vertical_pull")
-
-
-def test_the_garage_week_keeps_a_vertical_pull_through_the_fallback_order(weeks):
-    """Red team: profile (c) has a pull-up bar but no pulldown station, and served no vertical pull all week. The bodyweight
-    pull-up family is gate-locked for this lifter (fail-closed). FOURTH red team (#5861 FIX4): the dumbbell pull-over is not a
-    vertical pull — Hevy's built-in "Pull Up (Band)" is now a library and catalog movement of the vertical-pull family, so the
-    garage serves the band rung. Controls: without the band rung the fallback order serves the pull-over (the old answer);
-    without the band rung AND the fallback -> no vertical pull."""
-    from training import live_session as ls
+def test_the_garage_week_never_opens_a_locked_pull_and_falls_back_in_order(weeks):
+    """Red team: profile (c) has a pull-up bar but no pulldown station. The bodyweight pull-up family is gate-locked for this
+    lifter (fail-closed). Fix round 11 (owner ruling #3 of fix round 8: the band pull-up gate stays LOCKED): Hevy's built-in
+    "Pull Up (Band)" carries the pull-up negative's locked gates, so the garage is never served it — the fallback order
+    (`live_week.VERTICAL_PULL_FALLBACK`, fail-closed) serves the dumbbell pull-over. Controls: the band rung's gate opened ->
+    it is served again; no fallback at all -> no pull-over."""
+    from training import selection_engine as se_
 
     c = weeks["c_equipment_limited"]
-    lib, cat = c["world"]["lib"], c["world"]["catalog"]["movements"]
-    assert _vertical_pulls(c["week"], lib, cat) >= 2
     served = {x["key"] for s in c["week"]["sessions"] for x in s["lifts"]}
-    assert "pull_up_band" in served and "db_lat_pullovers" not in served
-    gated = {"pull_up", "chin_up", "pull_up_negative", "pull_up_weighted", "chin_up_weighted"}
+    gated = {"pull_up", "chin_up", "pull_up_negative", "pull_up_weighted", "chin_up_weighted", "pull_up_band"}
     assert not gated & served  # a locked gate is never opened here
-    real = ls._anchor_candidates
-    no_band = {(ls, "_anchor_candidates"): lambda e, ctx, role: [k for k in real(e, ctx, role) if k != "pull_up_band"]}
-    no_band[(lw, "VERTICAL_PULL_FALLBACK")] = tuple(k for k in lw.VERTICAL_PULL_FALLBACK if k != "pull_up_band")
-    old = _week("c_equipment_limited", no_band)
-    assert _vertical_pulls(old["week"], lib, cat) >= 2 and "pull_up_band" not in {
-        x["key"] for s in old["week"]["sessions"] for x in s["lifts"]
-    }
-    off = _week("c_equipment_limited", no_band | {(lw, "vertical_pull_fallback"): lambda e, ctx, taken: None})
-    assert _vertical_pulls(off["week"], lib, cat) == 0
+    assert "db_lat_pullovers" in served  # the fallback order's first servable member
+    real = se_.locked_gates
+    opened = _week(
+        "c_equipment_limited",
+        {(se_, "locked_gates"): lambda entry, lib: [] if entry.get("template_id") == "56808FD2" else real(entry, lib)},
+    )
+    assert "pull_up_band" in {x["key"] for s in opened["week"]["sessions"] for x in s["lifts"]}  # control: the gate is what bites
+    off = _week("c_equipment_limited", {(lw, "vertical_pull_fallback"): lambda e, ctx, taken: None})
+    assert "db_lat_pullovers" not in {x["key"] for s in off["week"]["sessions"] for x in s["lifts"]}  # control: no fallback
 
 
 def test_a_new_pattern_runs_rpe_7_once_a_familiar_one_works_at_target():

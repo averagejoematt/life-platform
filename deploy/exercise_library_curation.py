@@ -1607,6 +1607,9 @@ EXPANSION: list[dict] = [
         joint_stress=js(_L, _L, _L, _M, _M),
         skill_complexity="moderate",
         equipment=["pullup_bar", "resistance_band"],
+        # #5861 fix round 11 (owner ruling #3 of fix round 8: the band pull-up gate stays LOCKED): the same locked gates as the
+        # pull-up negative — a band changes the bottom of the rep, not the top, so it opens on the same standard, never ungated.
+        gates=["bw_pull", "chain_pull_negative"],
     ),
     _x(
         "pull_up",

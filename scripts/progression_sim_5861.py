@@ -171,6 +171,35 @@ class Physiological:
         return sw._workout(day, role, exercises)
 
 
+@dataclass
+class Scripted(Physiological):
+    """#5861 fix round 11 — the tenth red team's athletes, ported: a `Physiological` lifter whose true strength follows a per-week
+    `schedule` (week -> fractional change, e.g. -0.02 then +0.015: a decline that recovers), with optional one-off `jump`s (week ->
+    multiplier: a detraining layoff 0.92, a hidden 15 % strength) and logged rep `noise` (a repeating list of rep offsets applied
+    to every exercise in turn, AFTER the honest RPE — a flat lifter whose reps swing +-2)."""
+
+    schedule: dict[int, float] = field(default_factory=dict)
+    jump: dict[int, float] = field(default_factory=dict)
+    noise: list[int] = field(default_factory=list)
+    _n: int = 0
+    _wk: int = 0
+
+    def next_week(self) -> None:
+        self._wk += 1
+        mult = (1 + self.schedule.get(self._wk, 0.0)) * self.jump.get(self._wk, 1.0)
+        for k in self.true:
+            self.true[k] *= mult
+
+    def perform(self, session: dict[str, Any], day: str, role: str) -> dict[str, Any]:
+        w = super().perform(session, day, role)
+        for x in w["exercises"] if self.noise else []:
+            z = self.noise[self._n % len(self.noise)]
+            self._n += 1
+            for st in x["sets"]:
+                st["reps"] = max(1, int(st["reps"]) + z)
+        return w
+
+
 def floor_runs(athlete: Physiological, keys: tuple[str, ...] | None = None) -> dict[tuple[str, str], int]:
     """Fix round 10 (the ninth red team): (key, role) -> the longest run of consecutive exposures whose top set sat under the
     prescribed rep floor. A real decline answered by the load model never runs past `below_floor_exposures`."""

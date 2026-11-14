@@ -7,7 +7,8 @@ The owner runs it after reviewing the library. It refuses (exit 1, file untouche
   2. `scripts/check_library_gates_private.py` passes — every gate resolves to a complete private row
      (default: the S3 overlay; `--overlay FILE` for a local copy).
 
-On success it sets `status: "approved"`, bumps the minor version and appends a `change_log` line naming the
+On success it sets `status: "approved"` and `approved_on` (the day; live mode requires both, and the sequence rules start the
+Monday after it), bumps the minor version and appends a `change_log` line naming the
 approver — in the working tree; committing it is a normal reviewed PR.
 
     python3 scripts/approve_exercise_library.py --by "owner ruling YYYY-MM-DD" [--overlay FILE]
@@ -44,6 +45,7 @@ def approve(by: str, library_path: str | None = None, overlay_path: str | None =
     major, minor, _patch = (int(x) for x in str(lib["version"]).split("."))
     lib["version"] = f"{major}.{minor + 1}.0"
     lib["status"] = "approved"
+    lib["approved_on"] = today or _dt.date.today().isoformat()  # #5861 fix round 11: live mode needs the approval day
     lib["change_log"].append(
         {
             "version": lib["version"],

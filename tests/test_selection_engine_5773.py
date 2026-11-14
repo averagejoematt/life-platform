@@ -55,6 +55,7 @@ def _offline(monkeypatch):
 def _lib(status: str = "proposed") -> dict:
     lib = copy.deepcopy(LIB0)
     lib["status"] = status
+    lib["approved_on"] = "2026-01-02"  # #5861 fix round 11: live needs the approval day (inert while proposed)
     return lib
 
 
@@ -705,5 +706,7 @@ def test_a_generated_draft_serves_the_selection_once_approved():
     from training import live_volume
 
     planned = {r["slot"] for r in live_volume.week_plan(CAT0, LIB0, 5)["rows"] if r["role"] == role}
+    # fix round 11: the one spend step may also give a slot's time to a muscle under its aim (said in the plan's lines)
+    planned &= {str(e.get("slot")) for e in snap["session_prescription"].get("exposures") or []}
     gone = lambda slot, v: f"{v} dropped" in live or slot not in planned  # noqa: E731
     assert snap["rotation"]["variants"] == want and all(v in keys or gone(slot, v) for slot, v in want.items())

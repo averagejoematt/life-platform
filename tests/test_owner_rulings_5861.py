@@ -84,7 +84,7 @@ def test_ruling_1_the_whole_morning_fits_and_no_needed_set_is_cut_for_cardio(wee
     for name, w in weeks.items():
         assert all(p["morning_minutes"] <= 75.05 for p in w["m"]["per_session"]), name
         assert not any(ln.startswith("cardio room") for s in w["week"]["sessions"] for ln in s["live_fit"] or []), name
-    off = _week("e_short_week", {(live_volume, "time_fit"): lambda *a, **k: []})  # control: no time fit -> over the cap
+    off = _week("c_equipment_limited", {(live_volume, "time_fit"): lambda *a, **k: []})  # control: no time fit -> over the cap
     assert any(p["lifting_minutes"] > 75.05 for p in off["m"]["per_session"])
 
 
@@ -132,18 +132,19 @@ def _effort_top(note: str | None) -> float | None:
     return sw.lift_effort(note)
 
 
-def test_ruling_5_squat_and_deadlift_are_never_both_maximal_and_the_lead_alternates(weeks):
-    assert lr.lead_of("2026-11-16") == "hinge" and lr.lead_of("2026-11-23") == "squat"  # ISO weeks 47 / 48
+def test_ruling_5_the_squat_leads_and_the_deadlift_runs_a_notch_lower_every_week(weeks):
+    """Fix round 11 (the tenth red team's simpler rule): the squat always leads at the session's effort; the deadlift is a top set
+    + one back-off at RPE <= deadlift_rpe (8) — every week, no ISO-week alternation. Control: the rule off -> both at RPE 9."""
     a = weeks["a_large_deficit_experienced"]["week"]
     lh = {x["key"]: x for x in _lifts(a, "lower_heavy")}
     squat, dl = _effort_top(lh["squat_barbell"]["hevy_note"]), _effort_top(lh["deadlift_barbell"]["hevy_note"])
-    assert dl == 9 and squat == live_settings.value("second_lift_band")[1]  # the deadlift leads this (odd) week
+    assert squat == 9 and dl == live_settings.value("deadlift_rpe") == 8
     assert lh["deadlift_barbell"]["working_sets"] == 2  # top set + one back-off
     prof = PROFILES["a_large_deficit_experienced"]
     nxt = _week("a", profile=prof | {"days": [sw._day(d, 7) for d in prof["days"]]} | {"as_of": sw._day(prof["as_of"], 7)})
     lh2 = {x["key"]: x for x in _lifts(nxt["week"], "lower_heavy")}
-    assert _effort_top(lh2["squat_barbell"]["hevy_note"]) == 9 and _effort_top(lh2["deadlift_barbell"]["hevy_note"]) == 8  # alternates
-    both = _week("a_large_deficit_experienced", {(lr, "lead_lift"): lambda rx, ctx, trends=None: []})["week"]  # control
+    assert _effort_top(lh2["squat_barbell"]["hevy_note"]) == 9 and _effort_top(lh2["deadlift_barbell"]["hevy_note"]) == 8  # no swap
+    both = _week("a_large_deficit_experienced", {(lr, "lead_lift"): lambda rx, ctx: []})["week"]  # control
     lh = {x["key"]: x for x in _lifts(both, "lower_heavy")}
     assert _effort_top(lh["squat_barbell"]["hevy_note"]) == _effort_top(lh["deadlift_barbell"]["hevy_note"]) == 9
 
@@ -152,7 +153,7 @@ def test_ruling_5_a_swapped_out_deadlift_is_not_a_second_maximal_lift(weeks):
     f = weeks["f_high_fatigue_poor_sleep"]["week"]  # discomfort swaps the deadlift for a hip thrust
     lines = [ln for s in f["sessions"] if s["role"] == "lower_heavy" for ln in s["live_fit"] or []]
     assert "deadlift_barbell" not in {x["key"] for x in _lifts(f, "lower_heavy")}
-    assert not any(ln.startswith("lead lift (live)") for ln in lines)
+    assert not any(ln.startswith("heavy lower (live)") for ln in lines)
 
 
 # ── ruling 6: overhead press 3 sets, from the lateral raises ────────────────────────────────────────────────────────────────
@@ -203,18 +204,15 @@ def test_ruling_9_priority_muscles_at_or_over_mev_and_each_delt_head_has_its_aim
     heads = a["m"]["delt_heads"]
     assert heads["side_delts"] >= live_settings.value("delt_heads")["side_delts"] and heads["rear_delts"] >= 4, heads
     assert "shoulders" not in live_settings.settings(LIB0)["priority_muscles"]
-    # fix round 10 (the ninth red team: chest 9 under biceps 11, and naming back + glutes changed nothing): the plan holds each
-    # priority muscle at or over the arms and calves, and the setting moves the week
+    # fix round 11 (the tenth red team: 'priority' meant MEV + 1): the plan aims each priority muscle a quarter of the way to
+    # MAV and reaches it by spending free minutes; the served-week outcomes are tests/test_fix11_5861.py
     cat, lib = a["world"]["catalog"]["movements"], a["world"]["lib"]
-    for n in (5, 4):  # the plan, within its one-set tolerance (the served weeks: tests/test_fix10_5861.py)
-        c = live_volume.week_plan(cat, lib, n)["counts"]
-        tol = live_volume.PARITY_TOLERANCE + (1.0 if n == 4 else 0.0)  # 4 mornings: ruling 3 holds the arms a set over MEV
-        assert all(c.get(p, 0) + tol >= c.get(r, 0) for p in ("chest", "quadriceps") for r in live_volume.PARITY_RIVALS), (n, c)
-    other = lib | {"programming_settings": {**(lib.get("programming_settings") or {}), "priority_muscles": ["back", "glutes"]}}
-    assert live_volume.week_plan(cat, other, 5)["counts"] != live_volume.week_plan(cat, lib, 5)["counts"]
-    with patch.object(live_volume, "_priority_parity", lambda *a: []):  # control: no parity -> a rival over a priority muscle
-        c = live_volume.week_plan(cat, lib, 5)["counts"]
-    assert any(c.get(r, 0) > c.get(p, 0) for p in ("chest", "quadriceps") for r in live_volume.PARITY_RIVALS), c
+    plan = live_volume.week_plan(cat, lib, 5)
+    for p in ("chest", "quadriceps"):
+        assert plan["targets"][p]["aim"] > LANDMARKS["muscles"][p]["MEV"] and plan["counts"][p] >= plan["targets"][p]["aim"], p
+    with patch.dict(live_settings.HEURISTICS["priority_aim_share"], {"value": 0.0}), patch.object(live_volume, "ARMS", ()):
+        flat = live_volume.week_plan(cat, lib, 5)["counts"]  # control: the aim at MEV, no arm reference -> fewer priority sets
+    assert flat["chest"] + flat["quadriceps"] < plan["counts"]["chest"] + plan["counts"]["quadriceps"]
 
 
 # ── ruling #10 (fix round 8): a familiar swap works at target; the first session back after 10+ days is conservative ───────
@@ -229,7 +227,7 @@ def _later(name: str, weeks_later: int) -> dict:
 
 def test_ruling_10_familiar_patterns_have_no_reentry_cap_and_the_first_session_back_runs_rpe_8(weeks):
     a = weeks["a_large_deficit_experienced"]["week"]
-    notes = [x["hevy_note"] or "" for x in _lifts(a)]
+    notes = [x["hevy_note"] or "" for x in _lifts(a) if str(x["tag"]).startswith("anchor:")]
     assert not any("session back after" in n or "first time in" in n for n in notes)  # he trains these patterns weekly
     back = _later("a_large_deficit_experienced", 2)  # 14+ days with no session
     seen: set = set()  # each lift's FIRST exposure after the gap (later ones are its second session back)
@@ -337,7 +335,7 @@ def test_ruling_12_the_cron_reads_the_record_only_when_live(monkeypatch):
 
     monkeypatch.setattr(se, "load_library_failsoft", lambda: LIB0)
     assert cron._live_inputs("2026-11-16", read=lambda *a: pytest.fail("no read while proposed")) == {}
-    live = copy.deepcopy(LIB0) | {"status": "approved"}
+    live = copy.deepcopy(LIB0) | {"status": "approved", "approved_on": "2026-01-02"}
     monkeypatch.setattr(se, "load_library_failsoft", lambda: live)
     rows = {
         "apple_health": [_apple("A1", "2026-11-10T15:00:00+00:00", 40, mets=3.6)],

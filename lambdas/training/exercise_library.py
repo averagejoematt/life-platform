@@ -216,6 +216,16 @@ def _hypertrophy_row_errors(errors: list[str], w: str, e: dict[str, Any], row: d
         _err(errors, w, "an unreviewed row never moves off its rubric tier")
 
 
+def approved_stamp(lib: dict[str, Any] | None) -> str | None:
+    """The library's `approved_on` day (YYYY-MM-DD) when it is a real calendar date, else None (#5861 fix round 11: live mode
+    needs it — `selection_engine.mode`, `week_floors.library_status`)."""
+    from common.pacific_time import parse_day_key  # THE calendar-day parse (#3741)
+
+    raw = str((lib or {}).get("approved_on") or "") if isinstance(lib, dict) else ""
+    day = parse_day_key(raw) if len(raw) == 10 else None
+    return day.isoformat() if day else None
+
+
 def validate(lib: dict[str, Any]) -> list[str]:
     """Every schema violation in the library, as readable strings. Empty list = valid."""
     errors: list[str] = []
@@ -236,6 +246,9 @@ def validate(lib: dict[str, Any]) -> list[str]:
         return errors
     if lib["status"] not in ("proposed", "approved", "retired"):
         _err(errors, "library", f"status {lib['status']!r} not in proposed|approved|retired")
+    if lib["status"] == "approved":  # #5861 fix round 11: approval needs its day — without it the library runs as proposed
+        if not approved_stamp(lib):
+            _err(errors, "library", "status approved without a valid `approved_on` (YYYY-MM-DD): it behaves exactly as proposed")
     if not re.match(r"^\d+\.\d+\.\d+$", str(lib["version"])):
         _err(errors, "library", "version must be semver")
     if not lib["change_log"] or not all({"version", "date", "by", "what"} <= set(c) for c in lib["change_log"]):

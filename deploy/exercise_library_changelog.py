@@ -104,4 +104,13 @@ BUILDER_CHANGE_LOG = [
         "arithmetic (rubric 3.6.0: the basis states each term's categorical input, the tiers and S criteria unchanged).",
         "rule": "configuration and data only — status stays proposed until the owner approves the library",
     },
+    {
+        "version": "0.3.7",
+        "date": "2026-11-13",
+        "by": "#5861 fix round 11 (the tenth red team; owner ruling #3 of fix round 8)",
+        "what": "`pull_up_band` (Pull Up (Band)) gated behind `bw_pull` + `chain_pull_negative`, the pull-up negative's locked gates "
+        "(owner ruling #3: all six bodyweight progressions AND the band pull-up gate stay LOCKED) — it was served ungated in a "
+        "garage week. `unknown_input: locked`; it opens only on an approved readiness standard.",
+        "rule": "data only — status stays proposed until the owner approves the library",
+    },
 ]
