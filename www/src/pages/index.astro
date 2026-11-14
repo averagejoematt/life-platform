@@ -64,6 +64,14 @@ const openDisagreements = all.byType.disagreement.filter((d) => d.status === "op
 const coachById = (id: string) => all.get("coach", id) || all.get("coach", `${id}_coach`);
 const status = edition ? [dayLine(edition), dayInWords(edition.as_of)].filter(Boolean).join(" · ") : null;
 const weekOrder: string[] = week?.order || [];
+// "Since your last visit" (islands/since.js): the dated events this page already publishes, as day numbers (no ISO
+// date reaches the HTML); the browser remembers only the last edition day it saw.
+const dayNo = (iso: string | null | undefined) => (iso && /^\d{4}-\d{2}-\d{2}/.test(iso) ? Math.round(Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) / 864e5) : null);
+const sinceEvents = [
+  ...published.map((c) => ({ d: dayNo(c.date), k: "chapter", t: c.title, u: href(pathOf("chapter", c.id)) })),
+  ...all.byType.prediction.filter((p) => p.status === "confirmed" || p.status === "refuted").map((p) => ({ d: dayNo(p.settled_date), k: p.status })),
+].filter((e) => e.d != null);
+const sinceAsOf = dayNo(edition?.as_of);
 const weekLabel: Record<string, string> = { weight: "Weight", training: "Training", sleep: "Sleep", food: "Food" };
 
 // The week a chapter covers: its explicit interval from the snapshot (/api/chapters), never re-derived here.
@@ -297,6 +305,14 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
         <h2>What's alive right now</h2>
         <span class="label">A reason to come back · rebuilt every morning</span>
       </div>
+      {
+        sinceAsOf != null && (
+          <p class="since" data-since hidden data-asof={String(sinceAsOf)} data-events={JSON.stringify(sinceEvents)}>
+            <span data-since-text />
+            <a data-since-link hidden href={href("/story/")}>Read it →</a>
+          </p>
+        )
+      }
       <div class="grid cols3">
         <div>
           <p class="label" style="margin-bottom:10px">The last seven days</p>
@@ -461,3 +477,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
     </div>
   </section>
 </Base>
+
+<script>
+  import "../islands/since.js";
+</script>
