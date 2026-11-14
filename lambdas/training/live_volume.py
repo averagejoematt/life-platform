@@ -67,6 +67,8 @@ FILL: dict[str, tuple[str, ...]] = {
 }
 """A muscle under its aim with no slot left to grow takes the first of these the gym serves (familiar movements first; the
 time fit and the pain rule still apply). Practitioner consensus: low-fatigue isolation for the target muscle."""
+ARM_MUSCLES = ("biceps", "triceps")
+"""Owner ruling 2026-11-14: effective arm work is never cut for another muscle's minutes or for parity (`_make_room`)."""
 FOUR_DAY_MEV = ("shoulders", "biceps", "triceps")
 """Owner ruling 3: a 4-morning week drops shoulders+arms but holds these at MEV, direct + indirect, counted."""
 ANYWHERE = ("abs", "calves")
@@ -224,16 +226,17 @@ def _row(role: str, e: dict[str, Any], catalog: dict[str, Any], lib: dict[str, A
         "credit": credits(entry, e.get("movement_key"), catalog),
         "guest": guest,
         "isolation": entry.get("job") != "compound",
-        "barbell": (catalog.get(str(e.get("movement_key"))) or {}).get("equipment") == "barbell",
+        "equipment": str((catalog.get(str(e.get("movement_key"))) or {}).get("equipment") or ""),
         "rep_top": max((int(st["reps"][-1]) for st in e.get("sets") or [] if isinstance(st, dict) and st.get("reps")), default=0),
     }
 
 
-def day_rows(role: str, week: dict[str, Any], catalog: dict[str, Any], lib: dict[str, Any]) -> list[dict[str, Any]]:
-    """One morning's template rows this week: the role's template, or on a full-body morning its anchors plus the partners'."""
+def day_rows(role: str, week: dict[str, Any], catalog: dict[str, Any], lib: dict[str, Any], in_block: Any = None) -> list[dict[str, Any]]:
+    """One morning's template rows this week: the role's template, or on a full-body morning its anchors plus the partners'.
+    `in_block`: each anchor as the variant he trains in this block (the plan then counts the warm-ups that lift will take)."""
     from training import program_structure as ps
 
-    rx = ps.session_prescription_for_role(role, catalog_movements=catalog)
+    rx = ps.session_prescription_for_role(role, catalog_movements=catalog, in_block=in_block)
     rows = [_row(role, e, catalog, lib) for e in rx["exposures"] if not _kb_slot(e)]
     hi = int(cfg.value("slot_max_sets"))
     for r in rows:  # fix round 10: a template slot written at 4 sets is served at the slot cap (the calf slots)
@@ -243,7 +246,7 @@ def day_rows(role: str, week: dict[str, Any], catalog: dict[str, Any], lib: dict
         return [r for r in rows if not (r["role"] == "shoulders_arms" and r["intensity"] == "carry" and week["mornings"] < 5)]
     rows = [r for r in rows if r["kind"] == "anchor"]
     for prole, patterns in partners:
-        for e in ps.session_prescription_for_role(prole, catalog_movements=catalog)["exposures"]:
+        for e in ps.session_prescription_for_role(prole, catalog_movements=catalog, in_block=in_block)["exposures"]:
             if e.get("kind") == "anchor" and e.get("pattern") in patterns and e.get("movement_key") not in {r["key"] for r in rows}:
                 r = _row(role, e, catalog, lib, guest=True)
                 r["sets"] = max(FULL_BODY_SETS[0], min(FULL_BODY_SETS[1], r["sets"]))
@@ -325,26 +328,29 @@ def _rest_seconds(intensity: Any) -> int:
 
 def plan_minutes(rows: list[dict[str, Any]]) -> float:
     """A morning's planned lifting minutes from its plan rows, by the one time model's arithmetic (`session_shape`: sets x (set
-    time + rest)) with the warm-ups the routine will actually WRITE (`warmup_sets`, fix round 12): a barbell anchor climbs — the
-    first 3 sets, a later one 1 (2 at 10+ reps); any other anchor one set when it is the morning's first compound, else none; a
-    slot the plan added with no load on file one "find the load" set. The generic estimate assumed a full climb on every upper morning and read a
-    52-minute session as 63: the plan then saw no room and a muscle stayed under its floor beside 20 free minutes."""
+    time + rest)) with the warm-ups the routine will actually WRITE (`warmup_sets.WARMUP_PRESCRIPTION`, fix round 12): among the
+    big-lift families, the first barbell or machine anchor climbs 3 sets and a later one 1 (a barbell at 10+ reps: 2); the first
+    dumbbell anchor takes one row and a later one none; a vertical pull none; a slot the plan added with no load on file one
+    "find the load" set. The generic estimate assumed a full climb on every morning and read a 52-minute session as 63: the
+    plan saw no room and a muscle stayed under its floor beside 20 free minutes."""
     from training.session_shape import SESSION_TIME_MODEL
+    from training.warmup_sets import WARMUP_PRESCRIPTION
 
     set_s = int(SESSION_TIME_MODEL["set_seconds"])
+    families = set(WARMUP_PRESCRIPTION["compound_families"])
     paired = set()
     if any(r.get("guest") for r in rows):  # a full-body morning's paired anchors rest once per pair (`FULL_BODY_PAIRS`)
         pats = {str(r["pattern"]) for r in rows if r["kind"] == "anchor"}
         paired = {a for a, b in FULL_BODY_PAIRS if a in pats and b in pats}
-    seconds, warmed = 0.0, False
+    seconds, climbed, dumbbell = 0.0, False, False
     for r in rows:
         warm = int(bool(r.get("feeler")))
-        if r["kind"] == "anchor":
-            if r.get("barbell"):
-                warm = (2 if int(r.get("rep_top") or 0) >= 10 else 1) if warmed else 3
+        if r["kind"] == "anchor" and str(r["pattern"]) in families:
+            if r.get("equipment") == "dumbbell":
+                warm, dumbbell = (0 if dumbbell else 1), True
             else:
-                warm = 0 if warmed else 1
-            warmed = True
+                later = 2 if r.get("equipment") == "barbell" and int(r.get("rep_top") or 0) >= 10 else 1
+                warm, climbed = (later if climbed else 3), True
         rest = 0 if (r["kind"] == "anchor" and str(r["pattern"]) in paired) else _rest_seconds(r["intensity"])
         seconds += (int(r["sets"]) + warm) * (set_s + rest)
     return round(seconds / 60.0, 1)
@@ -396,7 +402,8 @@ def spend(
     else `add(muscle, role)` places a new 2-set slot (a second movement only once the first is full). Never past the movement
     cap. Time or the week's set `budget` short: a muscle OVER its own aim gives the set (`_make_room`) — never under its aim.
     `first`: the priority muscles — under its own aim, a priority muscle has first call on the free minutes (fix round 12:
-    priority means reaching its own target, never a count above the arms). Returns the lines."""
+    priority means reaching its own target, never a count above the arms). When another muscle's set may move: `_make_room`.
+    Returns the lines."""
     lo, hi = int(cfg.value("slot_min_sets")), int(cfg.value("slot_max_sets"))
     one = plan_minutes([{"kind": "accessory", "pattern": None, "sets": 1, "intensity": "accessory"}])
     blocked: set[str] = set()
@@ -404,41 +411,58 @@ def spend(
     gave: list[str] = []
     for _ in range(96):
         c = _count(rows)
-        need = sorted(  # under its FLOOR first (a ruled hold, ruling 3), then the furthest under its aim
+        need = sorted(  # a priority muscle first (first call on free minutes), then one under its FLOOR (a ruled hold), then by share
             (m for m in tg if m not in blocked and c[m] + 1e-9 < tg[m]["aim"]),
-            key=lambda m: (c[m] + 1e-9 >= tg[m]["floor"], m not in first, -round(1 - c[m] / tg[m]["aim"], 2), (last or {}).get(m, ""), m),
+            key=lambda m: (m not in first, c[m] + 1e-9 >= tg[m]["floor"], -round(1 - c[m] / tg[m]["aim"], 2), (last or {}).get(m, ""), m),
         )
         if not need:
             break
-        m, placed = need[0], False
-        for role in sorted((r for r in roles if _half_ok(m, r, full.get(r, False))), key=lambda r: (-room(r, m), roles.index(r))):
+        m = need[0]
+        low = c[m] + 1e-9 < (tg[m]["floor"] if m in first else tg[m]["aim"])  # under its MEV / ruled floor: may take minutes
+        order = sorted((r for r in roles if _half_ok(m, r, full.get(r, False))), key=lambda r: (-room(r, m), roles.index(r)))
+        spread = m in FILL_FIRST and _spread(m, rows, roles, full, room, lo)  # owner ruling #8: abs over the mornings
+        # fix round 12, three tries in this order (owner ruling 9: low-fatigue exercises for the added sets; no needless slot):
+        # an ISOLATION slot the muscle already has grows one set; else a 2-set isolation fill joins a morning with the minutes;
+        # only then does a compound accessory (a split squat, a leg press) take the set
+        placed = _grow(m, order, rows, tg, one, hi, room, budget, gave, low, isolation=True) if not spread else False
+        for role in order if not placed else ():
             here = [r for r in rows if r["role"] == role]
-            grow = [r for r in _iso(m, here) if r["sets"] < hi]
-            # fix round 12 (owner ruling 9: low-fatigue exercises for the added sets): an ISOLATION slot grows first; where the
-            # muscle's only slot is a compound accessory (a split squat, a leg press), a 2-set isolation fill joins when the
-            # morning has the minutes, and only without them does the compound take the set
-            iso = [r for r in grow if r.get("isolation")]
-            spread = m in FILL_FIRST and _spread(m, rows, roles, full, room, lo)  # owner ruling #8: abs over the mornings
-            if iso and not spread and _make_room(rows, tg, role, m, one, 1, room, budget, gave):
-                max(iso, key=lambda r: (r.get("fill") == m, -r["sets"]))["sets"] += 1
-                placed = True
-                break
             full_up = len(here) >= (FULL_BODY_MAX_MOVEMENTS if full.get(role) else MAX_MOVEMENTS)
-            feeler = add(m, role, probe=True) if len(_iso(m, here)) < 2 and not iso and not full_up else 0
-            if feeler:  # 1: a movement with a load on file; 2: one more "find the load" set to make room for
-                if _make_room(rows, tg, role, m, (lo + feeler - 1) * one, lo, room, budget, gave):
-                    new = add(m, role)
-                    rows.append(new)
-                    lines.append(f"spend: {role} + {new['key']} x{lo} ({m} under its aim of {tg[m]['aim']:g})")
-                    placed = True
-                    break
-            if grow and not iso and not spread and _make_room(rows, tg, role, m, one, 1, room, budget, gave):
-                max(grow, key=lambda r: -r["sets"])["sets"] += 1
+            feeler = add(m, role, probe=True) if len(_iso(m, here)) < 2 and not full_up else 0
+            # 1: a movement with a load on file; 2: one more "find the load" set to make room for
+            if feeler and _make_room(rows, tg, role, m, (lo + feeler - 1) * one, lo, room, budget, gave, low):
+                new = add(m, role)
+                rows.append(new)
+                lines.append(f"spend: {role} + {new['key']} x{lo} ({m} under its aim of {tg[m]['aim']:g})")
                 placed = True
                 break
+        placed = placed or (not spread and _grow(m, order, rows, tg, one, hi, room, budget, gave, low, isolation=False))
         if not placed:
             blocked.add(m)
-    return lines + [f"redline: the week is at the owner's set ceiling — {g}" for g in gave]
+    return lines + [f"moved: {g}" for g in gave]
+
+
+def _grow(
+    m: str,
+    order: list[str],
+    rows: list[dict[str, Any]],
+    tg: dict[str, dict[str, float]],
+    one: float,
+    hi: int,
+    room: Any,
+    budget: float | None,
+    gave: list[str],
+    low: bool,
+    isolation: bool,
+) -> bool:
+    """One more set on a slot `m` already has (never past `slot_max_sets`), on the first morning in `order` with room: an
+    isolation slot, or (`isolation` False) a compound accessory."""
+    for role in order:
+        grow = [r for r in _iso(m, [r for r in rows if r["role"] == role]) if r["sets"] < hi and bool(r.get("isolation")) == isolation]
+        if grow and _make_room(rows, tg, role, m, one, 1, room, budget, gave, low):
+            max(grow, key=lambda r: (r.get("fill") == m, -r["sets"]))["sets"] += 1
+            return True
+    return False
 
 
 def _make_room(
@@ -451,19 +475,33 @@ def _make_room(
     room: Any,
     budget: float | None,
     gave: list[str],
+    under_minimum: bool = False,
 ) -> bool:
-    """Room for `need` minutes (and `n` working sets) on `role`, inside the week's set `budget`. Minutes: the morning's FREE minutes only — no set is
-    ever taken from another muscle to buy time or a movement place (owner ruling 2026-11-14; fix round 12). The budget (the
-    owner's 75-set weekly redline): only there may sets move, from the isolation slot whose main muscle sits furthest OVER its
-    own aim — every muscle and delt head it trains stays at or over its aim, never the muscle being served; a slot above 2 sets
-    gives one, a 2-set slot goes whole unless it is its muscle's last isolation slot of the week. All or nothing, and the week
-    names every set that moved (`gave`). Never for parity."""
+    """Room for `need` minutes (and `n` working sets) on `role`, inside the week's set `budget` — free minutes first, always.
+    A set moves from another muscle in two cases only (owner ruling 2026-11-14; fix round 12), never for parity:
+      * MINUTES, when `m` sits `under_minimum` (its MEV or ruled floor — minimum effective volume outranks another muscle's
+        surplus; an aim above it, a priority aim included, never takes a set for time): from a slot on that morning;
+      * the owner's 75-set weekly REDLINE: from any morning.
+    The donor is the isolation slot whose main muscle sits furthest OVER its own aim (an arm slot never buys another muscle minutes — only
+    the other arm's ruled hold — and goes last at the redline) — every muscle and delt head it
+    trains stays at or over its aim, never the muscle being served; a slot above 2 sets gives one, a 2-set slot goes whole unless
+    it is its muscle's last isolation slot of the week. All or nothing, and the week names every set that moved (`gave`)."""
     lo = int(cfg.value("slot_min_sets"))
-    if room(role, m) < need:
-        return False
     before = [(r, r["sets"]) for r in rows]
     moved: list[str] = []
-    while budget is not None and sum(r["sets"] for r in rows) + n > budget:
+
+    def undo() -> bool:
+        for r, sets in before:
+            r["sets"] = sets
+        return False
+
+    for _ in range(24):
+        minutes = room(role, m) < need
+        over = budget is not None and sum(r["sets"] for r in rows) + n > budget
+        if not (minutes or over):
+            break
+        if minutes and not under_minimum:
+            return undo()
         c = _count(rows)
 
         def take(r: dict[str, Any]) -> int:
@@ -472,19 +510,28 @@ def _make_room(
         give = [
             r
             for r in rows
-            if r["kind"] == "accessory" and r["intensity"] != "carry" and r["credit"] and r["sets"]
-            and _main(r) != m and m not in r["credit"] and not r.get("fill")
+            if (r["role"] == role or not minutes) and r["kind"] == "accessory" and r["intensity"] != "carry" and r["credit"]
+            and r["sets"] and _main(r) != m and m not in r["credit"] and not r.get("fill")
+            and not (minutes and _main(r) in ARM_MUSCLES and m not in ARM_MUSCLES)  # an arm set never buys another muscle minutes
             and (r["sets"] > lo or len([x for x in _iso(_main(r), rows) if x["sets"]]) > 1)
             and all(c[k] - v * take(r) >= tg[k]["aim"] if k in tg else True for k, v in r["credit"].items())
         ]  # fmt: skip
         if not give:
-            for r, sets in before:
-                r["sets"] = sets
-            return False
-        r = max(give, key=lambda r: (c[_main(r)] - tg[_main(r)]["aim"] if _main(r) in tg else 0.0, r["sets"] > lo, rows.index(r)))
+            return undo()
+        r = max(
+            give,
+            key=lambda r: (
+                _main(r) not in ("biceps", "triceps"),
+                c[_main(r)] - tg[_main(r)]["aim"] if _main(r) in tg else 0.0,
+                rows.index(r),
+            ),
+        )
         k = take(r)
         r["sets"] -= k
-        moved.append(f"{r['key']} -{k} on {r['role']} for {m} ({_main(r)} stays at or over its aim of {tg[_main(r)]['aim']:g})")
+        why = "minutes: no free ones that morning" if minutes else "the weekly set redline"
+        moved.append(f"{r['key']} -{k} on {r['role']} for {m} ({why}; {_main(r)} stays at or over its aim of {tg[_main(r)]['aim']:g})")
+    else:
+        return undo()
     rows[:] = [r for r in rows if r["sets"]]
     gave += moved
     return True
@@ -528,6 +575,25 @@ def last_trained(workouts: Any, catalog: dict[str, Any], lib: dict[str, Any], da
     return out
 
 
+def week_sets_logged(workouts: Any, day: str) -> int:
+    """The working sets he has LOGGED this week before `day` (rep-counted, warm-ups out): what the session's spend step counts
+    against the weekly redline."""
+    from common.pacific_time import parse_day_key, shift_day_key
+
+    d = parse_day_key(str(day)[:10])
+    if d is None:
+        return 0
+    monday = shift_day_key(str(day)[:10], -d.weekday())
+    return sum(
+        1
+        for w in workouts or []
+        if monday <= str(w.get("date") or str(w.get("sk") or "")[5:15])[:10] < str(day)[:10]
+        for x in w.get("exercises") or []
+        for st in x.get("sets") or []
+        if st.get("reps") and str(st.get("type") or "normal") != "warmup"
+    )
+
+
 def week_plan(
     catalog: dict[str, Any],
     lib: dict[str, Any],
@@ -536,11 +602,12 @@ def week_plan(
     last: dict[str, str] | None = None,
     overlay: Any = None,
     logged: frozenset[str] = frozenset(),
+    in_block: Any = None,
 ) -> dict[str, Any]:
     """The week's plan (module doc 1): {week, rows (every drafted morning's rows, sized), targets, counts, under, host, lines}.
     Pure over the catalog, the library, the mornings and the weekly memory (`last`); the same for every morning of the week."""
     week = week_shape(mornings)
-    rows = [r for role in week["roles"] for r in day_rows(role, week, catalog, lib)]
+    rows = [r for role in week["roles"] for r in day_rows(role, week, catalog, lib, in_block)]
     lines = _press_trade(rows, lib, press_source)
     tg = targets(lib, week["mornings"])
     lo = int(cfg.value("slot_min_sets"))
@@ -707,9 +774,11 @@ def spend_session(rx: dict[str, Any], ctx: dict[str, Any], flags: list[dict[str,
         return free_minutes(rows, role, str(plan.get("host") or ""), ctx["lib"])
 
     full = bool(((plan.get("week") or {}).get("partners") or {}).get(role))  # a split morning keeps its half of the body
-    # fix round 12 (the final review: 76-79 working sets on pain and equipment weeks): what the morning puts back never exceeds
-    # the sets its plan gave it, so the week's redline holds whatever the gym or the pain rule took
-    budget = sum(r["sets"] for r in plan.get("rows") or [] if r["role"] == role)
+    # fix round 12 (the final review: 76-79 working sets on pain and equipment weeks): what the morning puts back stays inside
+    # the owner's weekly redline — the sets he has logged this week, this morning's, and the plan's for the mornings still to come
+    order = list((plan.get("week") or {}).get("roles") or [])
+    later = sum(r["sets"] for r in plan.get("rows") or [] if role in order and r["role"] in order[order.index(role) + 1 :])
+    budget = _redline_sets() - int(ctx.get("week_sets_logged") or 0) - later
     lines = spend(rows, tg, [role], {role: full}, room, add, budget=budget)
     by_key = {str(e.get("movement_key")): e for e in rx["exposures"]}
     for r in rows:

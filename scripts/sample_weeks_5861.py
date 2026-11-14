@@ -313,7 +313,7 @@ def _entry(role: str, week: int, block: int, n: int, prev: dict[str, Any] | None
     }
 
 
-def _inputs(profile: dict[str, Any], day: str, record: list[dict[str, Any]], rows: list[dict[str, Any]], live: bool = False) -> Any:
+def _inputs(profile: dict[str, Any], day: str, record: list[dict[str, Any]], rows: list[dict[str, Any]]) -> Any:
     from training import routine_generator as rg
 
     acwr = {"safe": "safe", "caution": "caution", "danger": "high"}.get(str(profile.get("acwr")), "safe")  # the cron's live map
@@ -323,9 +323,7 @@ def _inputs(profile: dict[str, Any], day: str, record: list[dict[str, Any]], row
         acwr_flag=acwr,
         block_workouts=record,
         rotation_rows=rows,
-        # fix round 12 (owner ruling 12): a live world passes NO steps-derived zone-2 minutes — unknown is unknown (None); the
-        # proposed world keeps the base tree's figure (its digests are pinned)
-        z2_minutes_7d=None if live else walk_minutes_7d(profile),
+        z2_minutes_7d=walk_minutes_7d(profile),
     )
     setattr(inp, "sleep_hours", profile.get("sleep_hours"))
     setattr(inp, "steps_by_day", steps_by_day(profile))  # the cron's live input (steps_resolver), into cardio_model.cardio_load
@@ -506,7 +504,11 @@ def generate_week(
                 from training import live_sequence
 
                 entry["live_week"] = live_sequence.for_role(plan, role)  # what the cron's entry carries (live_sequence.serve)
-            inp = _inputs(p, day, record, world["rows"], live=mode == "approved")
+            inp = _inputs(p, day, record, world["rows"])
+            if mode == "approved":
+                # fix round 12 (owner ruling 12): a live world passes NO steps-derived zone-2 minutes — unknown is unknown; the
+                # proposed world keeps the base tree's figure (its digests are pinned)
+                inp.z2_minutes_7d = None
             out = fbs.full_body_routines(inp, entry, rw.week, landmarks, catalog, rw, [], block_workouts=record)
             ideal = out[0]
             cardio = _cardio(ideal, p, day, cardio_index)

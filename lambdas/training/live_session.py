@@ -276,13 +276,17 @@ def for_live_draft(
             str(x.get("template_id") or "").upper() for w in block_workouts or [] for x in w.get("exercises") or [] if x.get("sets")
         )
         ctx["no_new"] = fatigue_model.strained_inputs(inputs, block_workouts, lib)  # a high-fatigue day adds nothing new
-        plan = live_volume.week_plan(catalog, lib, mornings, last=last, overlay=ctx["overlay"], logged=ctx["logged_tids"])
+        ctx["week_sets_logged"] = live_volume.week_sets_logged(block_workouts, target)
+        plan = live_volume.week_plan(
+            catalog, lib, mornings, last=last, overlay=ctx["overlay"], logged=ctx["logged_tids"], in_block=ctx["in_block"]
+        )
         ctx["volume_plan"] = plan
         role_rows = [r for r in plan["rows"] if r["role"] == rx.get("session_role")]
         plan_rows = dict(live_volume._count(role_rows))
         lines += [str((week or {})["line"])] if (week or {}).get("line") else []
-        if plan.get("priority_line") and rx.get("session_role") == plan["week"]["roles"][0]:  # once a week, its first morning
-            lines.append(str(plan["priority_line"]))
+        if rx.get("session_role") == plan["week"]["roles"][0]:  # once a week, on its first morning
+            lines += [str(plan["priority_line"])] if plan.get("priority_line") else []
+            lines += [f"moved (live): {ln[len('moved: ') :]}" for ln in plan["lines"] if ln.startswith("moved: ")]
         lines += live_volume.apply(out, ctx, plan)
         lines += fit_exposures(out, rotation or {}, ctx) + _no_new_on_a_strained_day(out, rotation or {}, ctx)
         live_load.mark_novelty(out, ctx, block_workouts)
@@ -317,7 +321,7 @@ def for_live_draft(
         # lift there. Never under it: an anchor's top set stays a hard set unless a deload is confirmed (the deload shape's own cap)
         for x in out["exposures"]:
             if x.get("intensity") != "carry" and (strained or x.get("live_cost") in ("high", "moderate")):
-                x["live_effort"] = min(int(live_settings.value("hard_rpe")), int(x.get("live_effort") or 99))
+                x["live_effort"] = min(int(live_settings.value("first_back_rpe")), int(x.get("live_effort") or 99))
     slack = live_volume.floor_slack(plan, str(rx.get("session_role") or "")) if ctx is not None else {}
     lines += live_volume.fit_sets(out, set_cap, catalog, lib, slack)
     _refit(out)
@@ -657,7 +661,11 @@ def rationale_lines(rx: dict[str, Any]) -> list[str]:
         return []
     out = list(rx[MARK].get("summary") or [])
     # ruling 16 (evidence and completeness VISIBLE) and ruling 11 (the advisory loss-rate line) stay on the rationale
-    out += [ln for ln in rx[MARK].get("lines") or [] if ln.startswith(("evidence (live): ", "loss rate (advisory", "priority (live): "))]
+    out += [
+        ln
+        for ln in rx[MARK].get("lines") or []
+        if ln.startswith(("evidence (live): ", "loss rate (advisory", "priority (live): ", "moved (live): "))
+    ]
     fat = rx.get("fatigue") or {}
     if fat:
         sig = ", ".join(fat.get("strain_signals") or []) or "none"
