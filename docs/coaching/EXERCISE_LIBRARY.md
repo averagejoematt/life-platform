@@ -22,6 +22,9 @@ records `inputs_snapshot.library_version`. Gate evaluation is #5772; note render
 | `deploy/exercise_library_additions.py` | #5861 lane L2 (optional): new canonical movements, read through `build_exercise_library.library_additions()`. |
 | `lambdas/training/quality_rubric.py` | The rubrics: hypertrophy (points + caps + S criteria, #5857/#5861), strength, functional, conditioning, mobility; `objective_tier()`. Pure. |
 | `lambdas/training/exercise_library.py` | Loader, schema check, gate rules, fallbacks, swap-note classifier, private-overlay join (fail-closed), private gate check. |
+| `lambdas/training/library_integrity.py` | #5861 fix round 13: the four integrity rules the schema check runs (loggable, availability evidence, the fallback equivalence rule, gate chains). Pure. |
+| `deploy/exercise_library_integrity.py` + `deploy/exercise_library_templates.json` | The builder's half: Hevy template facts (created ids, canonical mappings, released ids, candidate titles) and the five availability states. |
+| `scripts/gen_tier_review_5861.py` | The tier review, generated from the library's own rated taxonomy (reads only the library and the charter). |
 | `deploy/write_exercise_library_overlay.py` | Writer for the OWNER-PRIVATE overlay. Dry-run by default (counts only); `--out FILE`; `--apply` PUTs to S3. |
 | `scripts/check_library_gates_private.py` | Private-side gate completeness check (prints ids + missing field names only). |
 | `scripts/approve_exercise_library.py` | The only sanctioned `proposed -> approved` flip. |
@@ -517,18 +520,74 @@ Shape in `gate_schema`; kinds: `bodyweight_threshold` (value private), `chain_pr
 = locked. `exercise_library.requires_*` say which movements must carry which kind; the tests hold every
 entry to them.
 
-## Availability (`home_gym`; the gym is never named)
+## Library integrity (#5861 fix round 13, owner rulings 2026-11-14 — PROPOSED)
 
-Owner ruling 2026-11-11: equipment used by a movement logged in the last 5 years is `available`;
-equipment seen only in older history or only in expansion candidates is `unknown`. A "the gym doesn't
-have X" note marks X `unavailable` (owner-confirmable); "X was taken" / "no bench free" is contention and
-never changes a state. Seed: no preacher curl machine (owner note 2026-11-08).
+`lambdas/training/library_integrity.py` states four rules; `exercise_library.validate` runs them on every build, so a
+library that breaks one is refused. Tests and must-fail controls: `tests/test_library_integrity_5861.py`.
 
-## Fallbacks
+### Availability (`home_gym`; the gym is never named)
 
-Every movement carries up to three ranked substitutes (`exercise_library.fallback_candidates`):
-same target + pattern (`same_stimulus`) first, then same target, then same family; ungated before gated;
-equipment-disjoint from the primary first, so a missing item is a swap, not a hole.
+Every equipment id and every movement carries one of five EVIDENCE states, and the engine's `state` follows from it:
+
+| `evidence` | means | `state` |
+|---|---|---|
+| `owner_confirmed` | the owner said the gym has it | `available` |
+| `recent_inferred` | HEURISTIC: used by a movement logged in the last 12 months of the Hevy history | `available` |
+| `historical_only` | used only by movements logged before that window | `unknown` (not served) |
+| `unknown` | never logged; or deferred by an owner ruling | `unknown` (not served) |
+| `confirmed_unavailable` | an owner note or ruling says the gym does not have it | `unavailable` |
+
+A movement's evidence is the worst of its equipment's. The basic classes (`library_integrity.BASIC_EQUIPMENT`: free
+weights, flat and adjustable benches, the rack, cable stations, the pull-up bar, bands, bodyweight) are inferred as a
+class and never confirmed one by one. A seed in `exercise_library_curation.SEEDED_AVAILABILITY` (an owner note, ruling
+or confirmation) wins over the logs: the preacher curl machine is confirmed unavailable (owner note 2026-11-08) and the
+six machines the owner deferred on 2026-11-13 stay `unknown`. "X was taken" / "no bench free" is contention and never
+changes a state. To confirm a machine, add one seed row `{"evidence": "owner_confirmed", "source": "..."}` and rebuild.
+
+The evidence is read from the owner's history, so it says nothing about a synthetic lifter's gym: the sample-week harness
+gives every committed synthetic profile a full club (`sample_weeks_5861.FULL_CLUB`: the `historical_only` machines
+present; never-logged, deferred and unavailable equipment unchanged). A private profile file reads the library's own
+states, so the owner's weeks swap a historical-only machine and say so until he confirms it.
+
+### Fallbacks: one equivalence rule
+
+A fallback serves the same training function in the slot (`library_integrity.fallback_problems`):
+
+- **purpose** — the same category. One crossing: a strength lift may fall back to a hypertrophy lift that is itself
+  strength-rated; never the reverse.
+- **function** — the same named movement pattern, a recognised substitute pattern (`SUBSTITUTE_PATTERNS`), or another
+  member of the same canonical family. A movement whose pattern is not named matches only on its declared function.
+  Conditioning modalities substitute for each other.
+- **stimulus** — the same primary target, the same job (compound or isolation), the same trunk function and, for
+  mobility and rehab work, the same kind of work.
+- **valid in itself** — equipment `available`, no locking gate, no `not_for_you_now`, loggable.
+- **suitable** — not high-skill unless the primary is, no joint two levels worse, no higher impact and no less
+  controllable (conditioning), not ballistic unless the primary is.
+
+A shared family label, or a shared muscle alone, is not equivalence. Up to three are kept, ranked: the same named
+pattern, the same laterality, no shared equipment, the same length bias, then the more familiar. **An empty list is
+valid** — nothing is added to fill one. When a served movement is unavailable and nothing equivalent is usable, the live
+session fit skips the exposure and says so (`skipped (live): … nothing fills it`).
+
+### Loggable
+
+A movement is selectable only when the Hevy record can represent it: its own `template_id`, or a verified canonical
+mapping (`logs_as`: logged under another member of its own canonical family). Anything else carries
+`not_for_you_now: needs_custom_hevy_template` AND is refused structurally by `selection_engine.not_for_you_now`,
+whatever its flags say. `deploy/exercise_library_templates.json` is the one data file for template facts: `created`
+(a new custom template's id: add a row, rebuild), `canonical_mappings`, `released` (the kettlebell deadlift left Hevy's
+Sumo Deadlift template) and `hevy_titles` (the title each expansion candidate's template carries in Hevy; a candidate
+whose title differs must say why). Check it against a copy of the live index with `--template-index`.
+
+### Gate chains
+
+`library_integrity.gate_audit` refuses a cycle (direct or through other gates), a chain gate with no prerequisite, a
+prerequisite that is not a library movement, that the Hevy record cannot measure (no template id and no title rule) or
+whose equipment is confirmed unavailable, a standard that needs what no Hevy set records, and a non-global gate no
+movement carries. The hanging chain is three ordered steps: assisted pull-up (the ungated entry) -> `chain_dead_hang`
+-> `chain_hanging_knee_raise` -> `chain_hanging_leg_raise`. A lowering tempo is not measurable in Hevy, so the pull-up
+negative's 5 s is an owner-confirmed item, not part of the machine standard. A movement logged under a second template
+(the dead hang's and the kettlebell swing's other forms) carries the same gates. Nothing here opens a gate.
 
 ## Rebuild
 
@@ -570,10 +629,13 @@ It PROPOSES; the owner accepts by merging the PR it opens; it never merges and n
 
 ## Approval (the owner's step)
 
-1. The owner sets the bodyweight threshold values in the private overlay (`gates.<id>.value`) and the
-   driver writes it (`deploy/write_exercise_library_overlay.py --apply`; a re-run keeps owner-set values).
+1. The driver writes the private overlay (`deploy/write_exercise_library_overlay.py --apply`; a re-run keeps owner-set
+   values, and is needed whenever the library gains a gate id). The six bodyweight thresholds stay UNSET: by owner ruling
+   (2026-11-13) no bodyweight cut-off is derived, an unset threshold is LOCKED, and that is a valid state.
 2. Run the private check — it must pass:
-   `python3 scripts/check_library_gates_private.py` (or `--overlay FILE`).
+   `python3 scripts/check_library_gates_private.py` (or `--overlay FILE`). It lists the gates that are locked with no
+   threshold set and never fails them; a threshold that IS set must be a number, and every other gate needs its
+   complete row.
 3. Approve — this re-runs the schema check and the private check and refuses on any failure:
    `python3 scripts/approve_exercise_library.py --by "owner ruling YYYY-MM-DD"`, then commit via a PR.
 
@@ -601,9 +663,13 @@ cues}` — every "not for you now" carries its reason and its unlock condition.
   `deploy/write_exercise_library_overlay.py::OWNER_TECHNIQUE_CONFIRMATIONS`, never dropped on a re-run) meets the
   `owner_confirmation` gate for that movement only — its chain and bodyweight gates still apply. Owner ruling 2026-11-11:
   `clean` and `hang_power_clean` confirmed.
-- **Progression standards** (every chain and performance gate) are owner-approved as proposed (ruling 2026-11-11); the six
-  owner-set bodyweight values stay null, so those gates stay locked and the library stays `proposed`.
-- **KB swing (owner ruling 2026-11-11):** `chain_kb_swing` opens on exactly 2 logged KB-deadlift sessions.
+- **Progression standards** (every chain gate) are owner-approved as proposed (ruling 2026-11-11), except the hanging
+  chain's entry step (`chain_dead_hang`, platform-proposed 2026-11-14, pending his ruling); the six owner-set bodyweight
+  values stay null, so those gates stay locked. Each carries the readiness standard the owner accepted as the criteria
+  (`readiness_standard`), stated and not yet evaluated.
+- **KB swing (owner ruling 2026-11-11):** `chain_kb_swing` opens on exactly 2 logged KB-deadlift sessions. The kettlebell
+  deadlift has no Hevy template of its own yet (fix round 13), so the gate waits on that template; a path that does not
+  depend on the kettlebell deadlift is with the owner as a proposal. The swing stays locked.
 - **Chain order:** a chain gate opens only when each prerequisite met its standard AND that prerequisite's own chain
   gates are open.
 - **A clinical cue never locks** and is never an intensity gate; it rides the movement's `cues`.

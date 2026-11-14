@@ -22,6 +22,10 @@ import pytest
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "lambdas"))
+sys.path.insert(0, str(REPO / "scripts"))
+
+from sample_weeks_5861 import full_club_library  # noqa: E402
+
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
 from training import (  # noqa: E402
@@ -74,7 +78,10 @@ def _lib(status: str = "approved") -> dict:
     lib = copy.deepcopy(LIB0)
     lib["status"] = status
     lib["approved_on"] = "2026-01-02"  # #5861 fix round 11: live needs the approval day
-    return lib
+    # #5861 fix round 13: this file tests the selection critic, not availability. Its world is a synthetic full club — the machines
+    # the library only knows from the owner's older logs are present (`sample_weeks_5861.full_club_library`); never-logged,
+    # deferred and unavailable equipment stay as the library has them.
+    return full_club_library(lib)
 
 
 def _ohe_alone(lib: dict | None = None) -> dict:

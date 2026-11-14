@@ -244,8 +244,9 @@ def pain_source_state(overlay: dict[str, Any] | None) -> str:
 
 
 def not_for_you_now(entry: dict[str, Any]) -> str | None:
-    """The library's curated `not_for_you_now` verdict, or None."""
-    nfy = entry.get("not_for_you_now")
+    """The curated `not_for_you_now` verdict, or None; an unloggable movement always has one (#5861 fix round 13, structural)."""
+    why = xl.integrity.unloggable(entry)
+    nfy = entry.get("not_for_you_now") or ({"reason_code": "not loggable", "unlock_condition": why} if why else None)
     return f"not_for_you_now ({nfy.get('reason_code')}; unlock: {nfy.get('unlock_condition')})" if nfy else None
 
 
@@ -257,16 +258,7 @@ def pain_exclusion(entry: dict[str, Any], overlay: dict[str, Any] | None) -> str
     return None
 
 
-def _target_matches(target: str, muscle: str) -> bool:
-    t, m = str(target or "").lower(), str(muscle or "").lower()
-    if not t or not m:
-        return False
-    sub = {"calves": ("gastrocnemius", "soleus")}
-    return t == m or t.startswith(m) or m.startswith(t) or t.startswith(sub.get(m, ("\0",)))
-
-
-def _rows_for(entry: dict[str, Any], muscle: str) -> list[dict[str, Any]]:
-    return [r for r in entry.get("hypertrophy") or [] if _target_matches(r.get("target"), muscle)]
+_rows_for = xl.rows_for  # the entry's hypertrophy rows for a muscle: a library helper (moved at the #5861 round-12/13 merge)
 
 
 def tier_for(entry: dict[str, Any], muscle: str) -> str:

@@ -155,6 +155,13 @@ def test_control_cardio_pushed_through_hypertrophy_or_a_carry_left_unrated_goes_
 
 
 # ── the canonical layer ───────────────────────────────────────────────────────────────────────────────────────────────
+RELEASED = {"kettlebell_deadlift": "D20D7BBE"}
+CREATED = {k: r["template_id"] for k, r in json.loads((REPO / "deploy" / "exercise_library_templates.json").read_text())["created"].items()}
+"""Fix round 13 (owner ruling 2026-11-14): a pre-#5861 key with NO template id may gain exactly its created custom template."""
+"""#5861 fix round 13 (owner ruling 2026-11-14): the kettlebell deadlift left Hevy's Sumo Deadlift template (never logged
+there) and waits for its own. Every other pre-#5861 key keeps its template id exactly."""
+
+
 def _id_offenders(lib: dict) -> list[str]:
     out = []
     for key, tid in PRE.items():
@@ -162,7 +169,11 @@ def _id_offenders(lib: dict) -> list[str]:
         if e is None:
             out.append(f"{key}: key gone")
             continue
-        if e.get("template_id") != tid:
+        if key in RELEASED:  # the id was released by an owner ruling: the key stays, never on that id, and resolves to itself
+            if str(e.get("template_id") or "").upper() == RELEASED[key] or xl.canonical_of(lib, key) != key:
+                out.append(f"{key}: a released template id must leave the key in place, off that id")
+            continue
+        if e.get("template_id") != tid and not (tid is None and e.get("template_id") == CREATED.get(key)):
             out.append(f"{key}: template id {e.get('template_id')} != {tid}")
         head = xl.canonical_of(lib, key)
         if head not in lib["movements"] or (tid and xl.canonical_of(lib, tid) != head):
@@ -171,8 +182,11 @@ def _id_offenders(lib: dict) -> list[str]:
 
 
 def test_every_pre_5861_key_and_template_id_still_resolves():
-    assert len(PRE) == 578
+    assert len(PRE) == 578 and all(PRE[k] == t for k, t in RELEASED.items())
     assert _id_offenders(LIB) == []
+    moved = copy.deepcopy(LIB)  # control: a second key losing its template id is red
+    moved["movements"]["landmine_press"]["template_id"] = None
+    assert any(o.startswith("landmine_press:") for o in _id_offenders(moved))
     fams = LIB["canonical_families"]
     assert LIB["_provenance"]["canonical"] == {
         "families": len(fams),

@@ -303,18 +303,89 @@ _PROPOSED = "platform-proposed 2026-11-11 (#5769), pending owner ruling"
 # Owner ruling 2026-11-11 (#5772): the progression standards (every chain_prerequisite and performance_threshold gate)
 # are APPROVED as proposed. The bodyweight thresholds stay owner-to-set; the other gates keep `_PROPOSED`.
 _APPROVED_STANDARD = "owner-approved 2026-11-11 (progression standards approved as proposed, ruling on #5772)"
+_HANGING_SPLIT = (
+    "owner-approved standard of 2026-11-11 (dead hang >= 30 s, hanging knee raise 3 x 10, two sessions), split into ordered "
+    "steps 2026-11-14 (#5861 fix round 13)"
+)
+_HANGING_ENTRY = (
+    "platform-proposed 2026-11-14 (#5861 fix round 13) from the readiness criteria the owner accepted 2026-11-13; the entry "
+    "movement is pending his ruling"
+)
+
+
+_BW_COMMON = "each in two separate sessions at least 48 hours apart, with no pain flag on the movement or its joint in the last 14 days"
+# The movement-specific readiness standards the owner accepted as the criteria (2026-11-13). Practitioner heuristics, no
+# citation. They are STATED here and not yet evaluated: the gate stays a locked threshold until they are built as measured
+# chains (a follow-up after the shadow week) and then demonstrated. `demonstrate` is logged in Hevy; `confirm` is his word.
+READINESS_STANDARDS: dict[str, dict[str, list[str]]] = {
+    "bw_pull": {
+        "demonstrate": [
+            "assisted pull-up 3 x 6 at the machine's lightest usable assistance, RPE <= 8",
+            "3 x 3 negatives, each lowered for 4 to 5 seconds to a dead hang",
+        ],
+        "confirm": ["shoulders set before the elbows bend, chin over the bar, no kip, a full hang between reps"],
+    },
+    "bw_dip": {
+        "demonstrate": [
+            "assisted dip 3 x 8 at the machine's lightest usable assistance, RPE <= 8",
+            "straight-arm support hold on the bars 3 x 20 s",
+        ],
+        "confirm": ["forearms vertical, a slight forward lean, descent to upper arm parallel and no deeper"],
+    },
+    "bw_pushup": {
+        "demonstrate": [
+            "incline push-up 3 x 12 at RPE <= 8 at each lower step, down to a knee-height step",
+            "plank 3 x 30 s with the ribs down and no sag",
+        ],
+        "confirm": ["a rigid line from head to heel on every rep"],
+    },
+    "bw_nordic": {
+        "demonstrate": [
+            "a seated or lying leg curl that progressed over its last three exposures",
+            "45-degree back extension 3 x 12",
+            "assisted Nordic lowering 3 x 4, each over 3 seconds or longer",
+        ],
+        "confirm": ["no hamstring cramp on the lowering, the knees padded"],
+    },
+    "bw_hanging": {
+        "demonstrate": [
+            "dead hang 3 x 20 s, then 3 x 30 s, with active shoulders",
+            "supported (captain's chair) knee raise 3 x 10 without a swing",
+        ],
+        "confirm": ["the pelvis tilts at the top of the raise; no swing"],
+    },
+    "bw_advanced": {
+        "demonstrate": [
+            "pistol squat: box pistol to a knee-height box 3 x 5 per leg at RPE <= 8",
+            "handstand push-up: pike push-up with the feet on a bench 3 x 8 at RPE <= 8, and a wall handstand hold 3 x 20 s",
+        ],
+        "confirm": ["heel down with the knee tracking the toes (pistol)", "a full overhead reach without a back arch (handstand)"],
+    },
+}
 
 
 def _bw(gid_key: str, what: str) -> dict:
+    """A bodyweight gate. Owner ruling 19 (2026-11-13): no bodyweight cut-off is ever derived, so the private threshold stays
+    unset and UNSET IS LOCKED (`threshold_unset`; `exercise_gates.bodyweight_verdict` reads it so, and the private check
+    counts it valid). What he would have to show is the accepted readiness standard, stated on the gate."""
     return {
         "kind": "bodyweight_threshold",
         "locks": True,
         "measured_input": "7-day mean bodyweight (Withings), the same reading the charter's bodyweight gates use",
         "threshold": {"ref": f"overlay:gate_thresholds.{gid_key}", "comparison": "at_or_under"},
-        "unlock_condition": f"7-day mean bodyweight at or under the private threshold for {what}, AND every chain prerequisite met",
+        "threshold_unset": "locked",  # said on the gate: no threshold is a LOCKED gate, and a valid one
+        "unlock_condition": f"LOCKED for {what}: the private threshold is unset, and by owner ruling (2026-11-13) no bodyweight "
+        "cut-off is derived, so it stays unset. What opens this is the readiness standard below, shown in logged sessions, once "
+        "that standard is built as a measured chain — a follow-up; until then nothing opens it.",
+        "readiness_standard": {
+            "status": "accepted by the owner 2026-11-13 as the criteria; practitioner heuristics; stated here, not yet evaluated",
+            "demonstrate": list(READINESS_STANDARDS[gid_key]["demonstrate"]),
+            "how": _BW_COMMON,
+            "confirm": list(READINESS_STANDARDS[gid_key]["confirm"]),
+        },
         "chain_prerequisites": [],
         "unknown_input": "locked",
-        "provenance": _PROPOSED + "; the threshold value is owner-set in the private overlay (absent => locked)",
+        "provenance": _PROPOSED + "; owner rulings 2026-11-13 (19, and the readiness standards accepted as criteria): no threshold is set",
     }
 
 
@@ -390,21 +461,17 @@ GATES: dict[str, dict] = {
         "unknown_input": "locked",
         "provenance": "training charter gated_movements.power_clean (owner rulings 2026-10-18)",
     },
-    # bodyweight on-ramps (relative / performance, non-identifying)
-    "perf_assisted_pull": {
-        "kind": "performance_threshold",
-        "locks": True,
-        "measured_input": "assisted pull-up: logged assistance as a fraction of the same day's bodyweight, and reps",
-        "unlock_condition": "3 x 6 on the assisted machine with assistance <= 25% of bodyweight, two sessions, RPE <= 8",
-        "standard": {"sets": 3, "reps_min": 6, "assistance_fraction_max": 0.25, "sessions_min": 2, "rpe_max": 8},
-        "chain_prerequisites": [],
-        "unknown_input": "locked",
-        "provenance": _APPROVED_STANDARD,
-    },
+    # bodyweight on-ramps (relative / performance, non-identifying). Fix round 13: `perf_assisted_pull` (carried by no movement;
+    # its 3 x 6 / 25 % standard is `chain_pull_negative`'s own) was removed — a gate nothing carries gates nothing.
+    # Fix round 13: the 5 s lowering left the machine standard — Hevy's Negative Pull Up template records reps and added
+    # weight, never time, so `eccentric_seconds_min` could not be met by any logged set. The tempo is now a stated,
+    # owner-confirmed item; the measured part is the sets, reps and sessions.
     "chain_pull": _chain(
         ["key:pull_up_negative"],
-        "3 x 3 negatives of >= 5 s each in two sessions, and the assisted-pull standard met",
-        params={"sets": 3, "reps_min": 3, "eccentric_seconds_min": 5, "sessions_min": 2},
+        "3 x 3 negatives in two sessions, each lowered for 5 s or longer (the tempo is owner-confirmed: Hevy records reps, not "
+        "time, on this template), and the assisted-pull standard met (the negative's own step)",
+        provenance=_APPROVED_STANDARD + "; 2026-11-14 (#5861 fix round 13): the tempo is an owner-confirmed item, not a measured one",
+        params={"sets": 3, "reps_min": 3, "sessions_min": 2},
     ),
     "chain_pull_negative": _chain(
         ["tid:2C37EC5E"],
@@ -424,10 +491,28 @@ GATES: dict[str, dict] = {
     "chain_nordic": _chain(
         ["tid:4F5866F8", "tid:11A123F3"], "45-degree back extension and seated leg curl each logged " + _STD_3x + "; band-assisted first"
     ),
-    "chain_hanging": _chain(
-        ["tid:B9380898", "tid:08590920"],
-        "dead hang >= 30 s and hanging knee raise 3 x 10 without swing, two sessions",
-        params={"hang_seconds_min": 30, "sets": 3, "reps_min": 10, "sessions_min": 2},
+    # The hanging chain (fix round 13, owner ruling 2026-11-14): `chain_hanging` required the hanging knee raise AND gated it,
+    # so it could never open. Three ordered steps, each measured on the movement before it: an ungated entry (the assisted
+    # pull-up: a controlled hang with part of the bodyweight supported) -> dead hang -> hanging knee raise -> hanging leg raise.
+    # Every one stays LOCKED until demonstrated; `bw_hanging` still rides all three movements.
+    "chain_dead_hang": _chain(
+        ["tid:2C37EC5E"],
+        "assisted pull-up logged at 3 x 6 at RPE <= 8 in two sessions, at any assistance: a controlled hang from the bar with "
+        "part of the bodyweight supported, before the full hang (practitioner heuristic)",
+        provenance=_HANGING_ENTRY,
+        params={"sets": 3, "reps_min": 6, "rpe_max": 8, "sessions_min": 2},
+    ),
+    "chain_hanging_knee_raise": _chain(
+        ["tid:B9380898"],
+        "dead hang 3 x 30 s with active shoulders in two sessions",
+        provenance=_HANGING_SPLIT,
+        params={"hang_seconds_min": 30, "sets": 3, "sessions_min": 2},
+    ),
+    "chain_hanging_leg_raise": _chain(
+        ["tid:08590920"],
+        "hanging knee raise 3 x 10 without a swing in two sessions",
+        provenance=_HANGING_SPLIT,
+        params={"sets": 3, "reps_min": 10, "sessions_min": 2},
     ),
     # kettlebell chain
     # owner ruling 2026-11-11 (#5810): the kettlebell slot is the SWING, entered via 2 exposures of the KB deadlift — exactly
@@ -442,7 +527,8 @@ GATES: dict[str, dict] = {
     "chain_kb_overhead": _chain(["tid:F99C211D"], "kettlebell clean " + _STD_3x + ", rack position owner-confirmed"),
     # Olympic-bar chain
     "chain_hang_high_pull": _chain(["key:tall_high_pull"], "tall high pull " + _STD_3x),
-    "chain_hang_power_clean": _chain(["key:hang_high_pull"], "hang high pull " + _STD_3x),
+    # fix round 13: measured on the real hang high pull (Barbell High Pulls), not on the jump the key `hang_high_pull` holds
+    "chain_hang_power_clean": _chain(["key:barbell_high_pulls"], "hang high pull (Barbell High Pulls) " + _STD_3x),
     "chain_full_clean": _chain(["tid:BD4E7E53"], "hang power clean " + _STD_3x + ", technique owner-confirmed"),
     "owner_confirmation_skill": {
         "kind": "owner_confirmation",
@@ -477,8 +563,20 @@ GATES: dict[str, dict] = {
 }
 
 # ── home_gym availability seeds (owner ruling 2026-11-11). The location is never named. ──
+# Each seed names its EVIDENCE state (`training.library_integrity.AVAILABILITY_EVIDENCE`); the builder derives `state` from
+# it. A seed wins over the logs, so an owner confirmation, exclusion or deferral is never overwritten by an inference.
+_DEFERRED = {
+    "evidence": "unknown",
+    "source": "owner ruling 2026-11-13 (13): deferred — unconfirmed, never assumed or served until he confirms it",
+}
 SEEDED_AVAILABILITY: dict[str, dict] = {
-    "preacher_machine": {"state": "unavailable", "source": "owner note 2026-11-08", "owner_confirmable": True},
+    "preacher_machine": {"evidence": "confirmed_unavailable", "source": "owner note 2026-11-08", "owner_confirmable": True},
+    "hip_abduction_machine": dict(_DEFERRED),
+    "hip_adduction_machine": dict(_DEFERRED),
+    "stair_climber": dict(_DEFERRED),
+    "belt_squat_machine": dict(_DEFERRED),
+    "pendulum_squat_machine": dict(_DEFERRED),
+    "incline_press_machine": dict(_DEFERRED),
 }
 
 # ── hand-curated attributes ─────────────────────────────────────────────────────────────────────────────────────────
@@ -1008,6 +1106,14 @@ CURATED: dict[str, dict] = {
     "2C37EC5E": {"family": "hypertrophy", "skill_complexity": "low", "equipment": ["assisted_pullup_dip_machine"], "gates": []},
     "4B4BF8C2": {"family": "hypertrophy", "skill_complexity": "low", "equipment": ["assisted_pullup_dip_machine"], "gates": []},
     "D23C609B": {"family": "hypertrophy", "skill_complexity": "low", "equipment": ["assisted_pullup_dip_machine"], "gates": []},
+    # fix round 13: the dead hang's two other logged forms are the same full-bodyweight hang — they carry its gates, so a
+    # locked dead hang is never served under another name
+    "50C6F8E4-F219-4B4D-9D93-6F56208F2B78": {"gates": ["bw_hanging", "chain_dead_hang"]},
+    "1211F57C-AB54-4489-9DAF-514337DECEDE": {"gates": ["bw_hanging", "chain_dead_hang"]},
+    # fix round 13: the kettlebell swing's two other logged forms are the same ballistic hinge — they carry its chain step, so
+    # a locked swing is never served under another name (owner ruling: the swing is never auto-unlocked)
+    "2CFA90EB-D60C-4AE1-BAD9-FB242EC4BFB1": {"gates": ["chain_kb_swing"]},
+    "D8EECEDA-FF22-42BC-8023-44E4F05B9CF5": {"gates": ["chain_kb_swing"]},
 }
 
 # ── expansion candidates (#5769 owner spec) ─────────────────────────────────────────────────────────────────────────
@@ -1027,12 +1133,14 @@ EXPANSION: list[dict] = [
     _x(
         "kettlebell_deadlift",
         "Kettlebell Deadlift",
-        "D20D7BBE",
+        None,
         template_note=(
-            "#5774 owner ruling 2026-11-11: no Hevy Kettlebell Deadlift template exists, and Deadlift (Dumbbell) 5F4E6DD3 is catalogued already (deadlift_dumbbell), so the kettlebell slot's entry logs under Hevy's Sumo Deadlift D20D7BBE (never logged before) until a custom 'Kettlebell Deadlift' template exists"
+            "owner ruling 2026-11-14: it gets its OWN custom Hevy template (on the creation list). It no longer logs under Hevy's "
+            "Sumo Deadlift D20D7BBE — a barbell lift's template, so the two histories would have mixed (nothing was ever logged "
+            "there). Not selectable until the template id is recorded in deploy/exercise_library_templates.json"
         ),
-        # #5772: the evaluator counts the template id's sessions, PLUS any logged exercise whose title carries both words
-        # (a custom "Kettlebell Deadlift" template he may create later) — training.exercise_gates.sessions_for.
+        # #5772: the evaluator counts any logged exercise whose title carries both words (the custom template, once it
+        # exists) — training.exercise_gates.sessions_for.
         template_match={"title_all": ["kettlebell", "deadlift"]},
         target={"primary": "glutes", "secondary": ["hamstrings", "back"], "region": "lower"},
         family="strength_anchor",
@@ -1234,7 +1342,9 @@ EXPANSION: list[dict] = [
         "tall_high_pull",
         "Tall High Pull (Barbell)",
         None,
-        template_note="no Hevy template; create a custom 'Tall High Pull' (Barbell High Pulls d5ac3808 in his account is the hang version)",
+        template_note="no Hevy template; on the creation list (`barbell_high_pulls` in his account is the hang version)",
+        # fix round 13: a title rule, so the gate that names it as its prerequisite can measure it once the template exists
+        template_match={"title_all": ["tall", "high", "pull"]},
         target={"primary": "back", "secondary": ["shoulders", "traps"], "region": "upper"},
         family="skill_athletic",
         length_bias="not_applicable",
@@ -1246,10 +1356,15 @@ EXPANSION: list[dict] = [
         gates=["owner_confirmation_skill"],
         curation_note="first link of the Olympic-bar chain (tall high pull -> hang high pull -> hang power clean)",
     ),
+    # Fix round 13: the hang high pull IS his "Barbell High Pulls" template, d5ca687b-…. Until now this candidate named
+    # d5ac3808-… — a near-identical custom id that is "180 Squat Jumps" in Hevy — so a barbell pull's attributes and the
+    # tall-high-pull gate were merged into a jump, and the hang-power-clean gate measured the jump's sessions. Both library
+    # keys and both template ids are kept exactly as they were (history and ids are never rewritten): `barbell_high_pulls`
+    # is the hang high pull; `hang_high_pull` stays, as a LEGACY KEY, on the jump it has always pointed at.
     _x(
-        "hang_high_pull",
+        "barbell_high_pulls",
         "Barbell High Pulls",
-        "d5ac3808-b3a8-4044-ba20-53ddb08702d5",
+        "d5ca687b-c387-4f5b-a5b5-ea7a4bf8e8d6",
         target={"primary": "back", "secondary": ["glutes", "traps"], "region": "full_body"},
         family="skill_athletic",
         length_bias="not_applicable",
@@ -1259,6 +1374,13 @@ EXPANSION: list[dict] = [
         skill_complexity="moderate",
         equipment=["barbell"],
         gates=["chain_hang_high_pull"],
+        curation_note="the hang high pull: second link of the Olympic-bar chain (tall high pull -> hang high pull -> hang power clean)",
+    ),
+    _x(
+        "hang_high_pull",
+        "180 Squat Jumps",
+        "d5ac3808-b3a8-4044-ba20-53ddb08702d5",
+        curation_note="LEGACY KEY: this template is '180 Squat Jumps' (a jump). The hang high pull is `barbell_high_pulls`",
     ),
     _x(
         "hang_power_clean",
@@ -1699,8 +1821,8 @@ EXPANSION: list[dict] = [
         joint_stress=js(_L, _L, _M, _L, _M),
         skill_complexity="low",
         equipment=["pullup_bar"],
-        gates=["bw_hanging"],
-        curation_note="a bodyweight hang: gated on the hanging threshold, and the hanging-raise chain's first link",
+        gates=["bw_hanging", "chain_dead_hang"],
+        curation_note="a bodyweight hang: gated on the hanging threshold and its own entry step; the hanging-raise chain's first link",
     ),
     _x(
         "hanging_knee_raise",
@@ -1728,7 +1850,7 @@ EXPANSION: list[dict] = [
         joint_stress=js(_L, _L, _M, _L, _M),
         skill_complexity="moderate",
         equipment=["pullup_bar"],
-        gates=["bw_hanging", "chain_hanging"],
+        gates=["bw_hanging"],
     ),
     _x(
         "captains_chair_knee_raise",

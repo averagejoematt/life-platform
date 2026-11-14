@@ -213,14 +213,22 @@ def test_each_addition_landed_in_the_library_once():
 
 
 def test_an_addition_with_no_hevy_template_is_never_prescribable():
-    null = {k: e for k, e in MINE.items() if e["template_id"] is None}
-    assert null and set(null) == set(adds.OWNER_TEMPLATE_APPROVALS)
-    for k, e in null.items():
-        h = e["expansion_profile"]["hevy"]
-        assert h == {"template": None, "kind": None, "needs_custom_template": True, "prescribable": False}, k
-        assert e["not_for_you_now"]["reason_code"] == "needs_custom_hevy_template", k
-        assert se.not_for_you_now(e), k  # the selection engine excludes it as the library's own verdict
+    """#5861 fix round 13 (owner ruling 2026-11-14): every addition that had no Hevy template got a custom one, recorded in
+    deploy/exercise_library_templates.json `created`. Each now logs under it, and its own `hevy` record says so; none is left
+    template-less. Control: a created id taken away again leaves the row excluded by the selection engine."""
+    import exercise_library_integrity as ii
+
+    created = ii.load_templates()["created"]
+    approvals = set(adds.OWNER_TEMPLATE_APPROVALS)
+    assert approvals and approvals <= set(created) and not [k for k, e in MINE.items() if e["template_id"] is None]
+    for k in approvals:
+        e, h = MINE[k], MINE[k]["expansion_profile"]["hevy"]
+        assert e["template_id"] == created[k]["template_id"] == h["template"], k
+        assert (h["kind"], h["needs_custom_template"], h["prescribable"]) == ("custom_existing", False, True), k
+        assert (e.get("not_for_you_now") or {}).get("reason_code") != "needs_custom_hevy_template", k
         assert e["template_note"], k
+    gone = copy.deepcopy(MINE[sorted(approvals)[0]]) | {"template_id": None, "not_for_you_now": None}
+    assert se.not_for_you_now(gone), "a template-less addition is never selectable"
     # control: claim a template-less movement prescribable -> red
     bad = copy.deepcopy(next(a for a in adds.ADDITIONS if a["template_id"] is None))
     bad["expansion_profile"]["hevy"]["prescribable"] = True

@@ -67,10 +67,12 @@ synthetic week, so the sequence rules judge them all (the Monday after it is 202
 
 # ── the profile and its synthetic world ──────────────────────────────────────
 def load_profiles(path: Path | None = None) -> dict[str, Any]:
-    raw = json.loads((path or PROFILES_PATH).read_text())
+    src = Path(path or PROFILES_PATH)
+    raw = json.loads(src.read_text())
+    club = {"gym": FULL_CLUB} if src.resolve().parent == PROFILES_PATH.resolve().parent else {}  # a committed fixture is synthetic
     out = {}
     for name, p in raw["profiles"].items():
-        out[name] = copy.deepcopy(raw["defaults"]) | p | {"name": name, "as_of": raw["as_of"], "position": raw["position"]}
+        out[name] = club | copy.deepcopy(raw["defaults"]) | p | {"name": name, "as_of": raw["as_of"], "position": raw["position"]}
     return out
 
 
@@ -83,9 +85,36 @@ SETTINGS: dict[str, Any] = {}
 both values of an owner-choice setting can be shown side by side; the committed file is never touched."""
 
 
+FULL_CLUB = "full_club"
+"""A SYNTHETIC profile's gym (#5861 fix round 13): every profile loaded from a committed fixture (`tests/fixtures/`) trains in a
+full commercial club unless it sets `gym` itself. The library's availability evidence is read from the OWNER's Hevy history, so
+`historical_only` says only that HE has not logged a machine in the last 12 months — nothing about a synthetic lifter's club.
+Under `full_club` those machines are present (owner_confirmed, synthetic). `unknown` (never logged, or deferred by an owner
+ruling) and `confirmed_unavailable` stay exactly as the library has them, and a profile's own `unavailable_equipment` still
+wins. A `--profile-file` outside the repo (the owner's private run) gets no `gym`: it reads the library's states unchanged."""
+
+
+def full_club_library(lib: dict[str, Any], source: str = "synthetic full club") -> dict[str, Any]:
+    """`lib`, in place and returned: every `historical_only` equipment id confirmed (`FULL_CLUB`), and each movement's
+    availability re-derived from its equipment by the library's own rule (`library_integrity.worst_evidence`)."""
+    from training import library_integrity as li
+
+    items = (lib.get("gym_inventory") or {}).get("items") or {}
+    for row in items.values():
+        if (row.get(li.LOCATION) or {}).get("evidence") == "historical_only":
+            row[li.LOCATION] = {"state": li.EVIDENCE_STATE["owner_confirmed"], "evidence": "owner_confirmed", "source": source}
+    for e in (lib.get("movements") or {}).values():
+        evidence = li.worst_evidence([str(((items.get(x) or {}).get(li.LOCATION) or {}).get("evidence")) for x in e.get("equipment") or []])
+        e["availability"] = {li.LOCATION: {"state": li.EVIDENCE_STATE[evidence], "evidence": evidence, "source": source}}
+    return lib
+
+
 def approved_library(lib: dict[str, Any], profile: dict[str, Any], status: str = "approved") -> dict[str, Any]:
-    """An in-memory copy with the live switch flipped and the profile's missing equipment marked unavailable."""
+    """An in-memory copy with the live switch flipped, a synthetic profile's club confirmed (`FULL_CLUB`) and the profile's
+    missing equipment marked unavailable."""
     out = copy.deepcopy(lib)
+    if profile.get("gym") == FULL_CLUB:
+        full_club_library(out, f"synthetic profile {profile.get('name')}: a full commercial club")
     out["status"] = status
     if status == "approved":  # live needs the approval day too (fix round 11); synthetic, before every synthetic week
         out.setdefault("approved_on", SYNTHETIC_APPROVED_ON)

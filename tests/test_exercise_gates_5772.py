@@ -440,7 +440,9 @@ def test_the_owners_clean_confirmation_meets_its_gate_and_nothing_else():
 
 def test_progression_standards_are_owner_approved_and_bodyweight_values_stay_unset():
     for gid, g in _LIB["gates"].items():
-        if g["kind"] in ("chain_prerequisite", "performance_threshold"):
+        if gid == "chain_dead_hang":  # #5861 fix round 13: the hanging chain's ENTRY step is platform-proposed, and says so
+            assert g["provenance"].startswith("platform-proposed") and "pending his ruling" in g["provenance"]
+        elif g["kind"] in ("chain_prerequisite", "performance_threshold"):
             assert g["provenance"].startswith("owner"), gid
             assert "pending owner ruling" not in g["provenance"], gid
         if g["kind"] == "bodyweight_threshold" and "ref" in (g.get("threshold") or {}):
