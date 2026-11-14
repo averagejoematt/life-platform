@@ -7,6 +7,7 @@
 import Base from "../layouts/Base.astro";
 import Provenance from "../components/Provenance.astro";
 import StatusTag from "../components/StatusTag.astro";
+import VersusGuess from "../components/VersusGuess.astro";
 import { headline, weeklyBars } from "../lib/chart.js";
 import { dayInWords, domainWords, num, kOfN, clip } from "../lib/format.js";
 import { connectedTo, loadAll, loadSeries, latestEdition, dayLine } from "../lib/snapshot.js";
@@ -349,38 +350,42 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
   </section>
 
   <section class="section inv">
-    <div class="wrap" style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
-      <div style="flex:0 0 240px;display:flex;flex-direction:column;gap:10px">
+    <div class="wrap" style="display:flex;flex-wrap:wrap;gap:40px 56px;align-items:flex-start">
+      <div style="flex:1 1 520px;min-width:0;display:flex;flex-direction:column;gap:18px">
         {/* #5615: the record is every checked call since day one, not a week — the label says so */}
         <span class="label">The coaches' record{startDate ? `, since ${dayInWords(startDate, { short: true })}` : ", this cycle"}</span>
-        <span class="big" style="font-size:56px;line-height:.9">{record ? kOfN(record.right, record.decided) : "—"}</span>
-        <span style="font-size:13px;line-height:1.5;color:var(--inkmuted)">{record?.comparison_text || record?.count_text || "No coach call has been checked yet."} Code grades them. I can't.</span>
+        <h2 style="color:var(--paper)">Are the AI coaches better than a guess?</h2>
+        <p class="serif" style="font-size:18px;line-height:1.5;color:var(--inkmuted);max-width:56ch">
+          Every coach forecast is written down with a date, then graded by code against the same readings as a guess that nothing changes. Code grades them. I can't.
+        </p>
+        <VersusGuess record={record ? { right: record.right, decided: record.decided } : null} inverse links={false} />
       </div>
-      <div style="flex:1 1 520px;min-width:0">
+      <div style="flex:1 1 320px;min-width:0">
         {
-          lines.length ? (
-            <div class="rows inv-rows">
-              {lines.map((l) => {
-                const c = coachById(l.coach_id || "");
-                return (
-                  <span style="align-items:flex-start">
-                    <span style="display:flex;flex-direction:column;gap:4px;min-width:0">
-                      <span class="serif" style="font-size:16px;line-height:1.45">
-                        {l.text}
-                      </span>
-                      <span class="mono" style="font-size:12px;color:var(--inkmuted)">
-                        {l.coach || c?.name || l.coach_id}
-                        {c?.domain || l.domain ? ` · ${domainWords(c?.domain || l.domain)}` : ""}
-                        {l.move_label ? ` · ${l.move_label}` : ""}
-                        {l.as_of && dayInWords(l.as_of) ? ` · said ${dayInWords(l.as_of, { weekday: true, short: true })}` : ""}
+          lines.length > 0 && (
+            <>
+              <p class="label" style="margin-bottom:10px">What they said today</p>
+              <div class="rows inv-rows">
+                {lines.map((l) => {
+                  const c = coachById(l.coach_id || "");
+                  return (
+                    <span style="align-items:flex-start">
+                      <span style="display:flex;flex-direction:column;gap:4px;min-width:0">
+                        <span class="serif" style="font-size:16px;line-height:1.45">
+                          {l.text}
+                        </span>
+                        <span class="mono" style="font-size:12px;color:var(--inkmuted)">
+                          {l.coach || c?.name || l.coach_id}
+                          {c?.domain || l.domain ? ` · ${domainWords(c?.domain || l.domain)}` : ""}
+                          {l.move_label ? ` · ${l.move_label}` : ""}
+                          {l.as_of && dayInWords(l.as_of) ? ` · said ${dayInWords(l.as_of, { weekday: true, short: true })}` : ""}
+                        </span>
                       </span>
                     </span>
-                  </span>
-                );
-              })}
-            </div>
-          ) : (
-            <p style="color:var(--inkmuted)">{blocks.coach_lines?.absent_text || "No coach line today."}</p>
+                  );
+                })}
+              </div>
+            </>
           )
         }
         <p style="margin-top:14px;font-size:13px;color:var(--inkmuted)">The coaches are software built with Claude, not people. They read real data and speak in their own voices — correlative, never causal.</p>

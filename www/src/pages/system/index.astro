@@ -47,7 +47,7 @@ const steps = [
         </ol>
       </div>
       <div>
-        <div class="between" style="padding-bottom:10px"><span class="label">The coaches · the record</span></div>
+        <div class="between" style="padding-bottom:10px"><span class="label">The coaches · the record</span><span class="label">right, as first graded</span></div>
         <div class="rows">
           {
             coaches.map((c) => (
@@ -56,9 +56,11 @@ const steps = [
                   <b style="font-size:16px">
                     {c.name} <span class="muted" style="font-weight:400">· {domainWords(c.domain)}</span>
                   </b>
-                  <span class="mono muted" style="font-size:12px">
-                    {c.retired ? "Retired." : c.instrument_absent?.absent ? c.instrument_absent.reason || "No instrument." : c.tier === "lead" ? "The lead: no calls of its own." : c.comparison_text || ""}
-                  </span>
+                  {(c.retired || c.instrument_absent?.absent || c.tier === "lead") && (
+                    <span class="mono muted" style="font-size:12px">
+                      {c.retired ? "Retired." : c.instrument_absent?.absent ? c.instrument_absent.reason || "No instrument." : "The lead: no calls of its own."}
+                    </span>
+                  )}
                 </span>
                 <span class="mono" style="font-size:14px;white-space:nowrap">{c.record ? kOfN(c.record.right, c.record.n) : "—"}</span>
               </a>
@@ -83,6 +85,7 @@ const steps = [
         record ? (
           <>
             <h2 style="font-size:36px">{record.count_text || kOfN(record.right, record.decided)}</h2>
+            <p class="muted" style="font-size:14px">As first graded: every call the ledger checked, each grade kept as the grader first wrote it. The re-verified comparison against a guess is below.</p>
             {record.counted_text && <p class="muted">{record.counted_text}</p>}
             {record.comparison_text && <p class="serif" style="font-size:18px">{record.comparison_text}</p>}
           </>

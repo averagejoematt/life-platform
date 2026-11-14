@@ -1,0 +1,161 @@
+---
+// The coaches against a simple guess, drawn (2026-11-14). The record was a sentence, and the front page led with the
+// as-first-graded count (49 of 95) while the Coaching Room led with the re-verified one (37 of 73) — two denominators,
+// neither labelled where the reader met it. This draws the room's verified lead: the coaches and a guess that nothing
+// changes on EXACTLY the same calls, the producer's own verdict on the difference, and the as-first-graded count as a
+// labelled footnote. Every figure is carried from the snapshot (calibration.json via verifiedLead, the edition's
+// record block); nothing is computed here. With the room off (no calibration.json), it falls back to the edition's
+// record, labelled as first graded.
+import { verifiedLead } from "../lib/calibration.js";
+import { kOfN } from "../lib/format.js";
+import { roomPublic } from "../lib/room.js";
+import { loadCalibration } from "../lib/snapshot.js";
+import { href } from "../lib/url.js";
+
+interface Props {
+  record?: { right: number; decided: number } | null;
+  inverse?: boolean;
+  links?: boolean;
+}
+const { record = null, inverse = false, links = true } = Astro.props as Props;
+let lead: ReturnType<typeof verifiedLead> = null;
+if (roomPublic()) {
+  try {
+    const file: any = await loadCalibration();
+    lead = file?.state === "ok" ? verifiedLead(file.calibration || {}) : null;
+  } catch {
+    lead = null;
+  }
+}
+const bars = lead && lead.baseline ? [
+  { who: "The coaches", right: lead.k, n: lead.n, cls: "coach" },
+  { who: "A guess that nothing changes", right: lead.baseline.right, n: lead.baseline.n, cls: "guess" },
+] : null;
+const verdict = lead?.sign?.words || null;
+---
+
+<div class={`vs ${inverse ? "vs-inv" : ""}`} data-versus-guess>
+  {
+    bars ? (
+      <>
+        <p class="label">The coaches against a simple guess · the same {lead!.n} forecasts</p>
+        <div class="vs-bars" role="img" aria-label={`The coaches got ${lead!.k} of ${lead!.n} right; a guess that nothing changes got ${lead!.baseline!.right} of the same ${lead!.n}.`}>
+          {bars.map((b) => (
+            <div class={`vs-row ${b.cls}`}>
+              <span class="vs-who">{b.who}</span>
+              <span class="vs-track" aria-hidden="true">
+                <span class="vs-fill" style={`width:${((b.right / b.n) * 100).toFixed(1)}%`} />
+              </span>
+              <span class="vs-n num">{kOfN(b.right, b.n)}</span>
+            </div>
+          ))}
+        </div>
+        <p class="vs-verdict">
+          {verdict ? <b>{verdict[0].toUpperCase() + verdict.slice(1)}.</b> : null} Forecasts that could be checked under the current rules, each grade re-verified.
+          {record && record.decided ? ` As first graded, before the rules were corrected: ${kOfN(record.right, record.decided)}.` : ""}
+        </p>
+        {links && (
+          <p class="vs-links">
+            <a href={href("/system/calibration/")}>How they were checked →</a>
+            <a href={href("/system/ledger/refuted/")}>What they got wrong this month →</a>
+          </p>
+        )}
+      </>
+    ) : record && record.decided ? (
+      <>
+        <p class="label">The coaches' record · as first graded</p>
+        <p class="vs-big num">{kOfN(record.right, record.decided)}</p>
+      </>
+    ) : (
+      <p class="label">No coach call has been checked yet.</p>
+    )
+  }
+</div>
+
+<style>
+  .vs {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+  }
+  .vs-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .vs-row {
+    display: grid;
+    grid-template-columns: minmax(120px, 210px) minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 14px;
+  }
+  .vs-who {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .vs-track {
+    height: 14px;
+    background: var(--rule2);
+    position: relative;
+  }
+  .vs-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: var(--ink);
+  }
+  .vs-row.coach .vs-fill {
+    background: var(--cobalt);
+  }
+  .vs-n {
+    font-family: var(--mono);
+    font-size: 14px;
+    min-width: 8ch;
+    text-align: right;
+  }
+  .vs-verdict {
+    font-size: 14px;
+    line-height: 1.5;
+    max-width: 62ch;
+  }
+  .vs-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 22px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .vs-big {
+    font-size: 56px;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 0.9;
+  }
+  .vs-inv .vs-track {
+    background: #3a3a37;
+  }
+  .vs-inv .vs-fill {
+    background: var(--inkmuted);
+  }
+  .vs-inv .vs-row.coach .vs-fill {
+    background: #8fa4ff;
+  }
+  .vs-inv .vs-verdict {
+    color: var(--inkmuted);
+  }
+  .vs-inv .vs-verdict b {
+    color: var(--paper);
+  }
+  .vs-inv a {
+    color: var(--paper);
+  }
+  @media (max-width: 560px) {
+    .vs-row {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+    .vs-track {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+  }
+</style>
