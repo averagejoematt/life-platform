@@ -341,9 +341,8 @@ def plan_minutes(rows: list[dict[str, Any]]) -> float:
 def free_minutes(rows: list[dict[str, Any]], role: str, host: str | None, lib: dict[str, Any], reserve: bool = True) -> float:
     """The minutes this morning's lifting may still take: the lifting ceiling less the plan's minutes (an upper bound: every
     anchor's warm-ups assumed, no paired-set saving), less the conditioning dose's reserve on its host morning under the shared
-    cap (owner ruling 1: the dose takes only what lifting leaves, so the plan leaves it room rather than filling it with
-    non-priority isolation). No reserve on a 1-2 morning week, or (`reserve` False) for a priority muscle under its aim —
-    lifting first, the ruling's own order."""
+    cap (owner ruling 1 + the ruled one hard dose a week: the dose takes only what lifting leaves, so the plan leaves it room
+    rather than filling it with isolation). No reserve on a 1-2 morning week (lifting first) or with `reserve` False."""
     from training.session_shape import lifting_minutes_cap
 
     cap = float(lifting_minutes_cap())
@@ -552,7 +551,7 @@ def week_plan(
         return _row(role, new, catalog, lib) | {"fill": m}
 
     lead = frozenset(m for m in prio if m in tg) if week["mornings"] >= 5 else frozenset()
-    room = lambda role, m=None: free_minutes(rows, role, host, lib, reserve=m not in lead)  # noqa: E731
+    room = lambda role, m=None: free_minutes(rows, role, host, lib)  # noqa: E731 — the ruled dose keeps its minutes (ruling 1)
     lines += spend(rows, tg, roles, full, room, add, last, _redline_sets(), lead)  # 2. the one step
     surplus()  # 3. again: a head's aim may have grown its muscle past MAV (ruling 9)
     lines += _redline(rows, tg, prio)

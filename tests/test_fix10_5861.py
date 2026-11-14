@@ -5,12 +5,12 @@ ported). The load rule's decline athletes live in tests/test_consolidation_5861.
   * 2  a pain-flagged lift never steps up (the discomfort "lift" scope held nothing);
   * 3  an unreviewed movement is never a pain route (Banded Row UPS, defaulted all-low joint stress);
   * 4  one joint rule: a flag holds or routes every lift loading its joint at moderate+, the muscle keeps a route;
-  * 5  priority muscles are not under the arms and calves, the setting moves the week, the slump trim spares them;
+  * 5  the priority setting moves the week, the slump trim spares them (the served aims: tests/test_fix11_5861.py);
   * 6  one set-credit table (overhead press -> side delts, no hip-thrust quads, no leg-curl calves, rated secondaries);
   * 8  `same_role`: a new untitled session is not ignored for older titled rows; heavy rows never leak into the volume band;
-  * 9  pain-skipped time is refilled with reviewed work; consecutive short weeks rotate what is under target;
+  * 9  (fix round 11: the refill and the short-week rotation became the one spend step — tests/test_fix11_5861.py);
   * 10 the hard conditioning dose on the freest morning; no template slot over the 3-set cap;
-  * the two surviving mutants of the ninth red team: indirect delt credit removed (M3), the second lift at its last load (M5).
+  * the ninth red team's surviving mutant M3: indirect delt credit removed (M5's second lift is gone with the mechanism).
 """
 
 from __future__ import annotations

@@ -197,12 +197,12 @@ def r3_lines(blocks: list[Any], rx: dict[str, Any]) -> list[str]:
 def cap_lines(blocks: list[Any]) -> list[str]:
     """IN PLACE, live only (fix round 11, the tenth red team: 58 notes past 4 phone lines at 5 am): each lift's own note held to
     `hevy_note_grammar.LIFT_MAX_LINES` phone lines — a form cue goes first, then the fallback ("If taken:"), then the R3 line;
-    the effort line, the load reason and the pain stop line always stay. Returns the line."""
+    the effort line, the load reason, the pain stop line and the pain assess line always stay. Returns the line."""
     from training import hevy_note_grammar as g, session_block as sb
 
     def rank(ln: str) -> int:  # lower goes first
         t = ln.strip()
-        if t.startswith(("Pain past", "Heavier", "Lighter", "Same load", "Assess")) or g.EFFORT_RE.match(t):
+        if t.startswith(("Pain past", "Heavier", "Lighter", "Same load", "Still hurts")) or g.EFFORT_RE.match(t):
             return 9
         if _step_line(t):
             return 2
