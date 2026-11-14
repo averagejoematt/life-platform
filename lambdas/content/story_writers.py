@@ -326,6 +326,10 @@ Hold EVERY factual statement in the text against the dossier. Report only real p
 Ordinary common knowledge is not invented detail: how a named device is worn or works, what a named metric means,
 what a plan term means. Do not report style. Do not report rounding that stays honest. Do not report a statement you checked and found
 correct — return ONLY claims that must change. If the installment is clean, return an empty list.
+In a dossier prediction entry `made` is the day the call was filed, `target` is the day the call was about and the
+day its evidence was read from, and `graded` is only when scoring ran - never the morning the call targeted. A sentence
+about the call's target morning is checked against `target`; with no `target` in the entry, do not infer one from `graded`.
+A wrong target day against `target` is still a finding.
 For each finding give the exact claim, the problem, and the corrected wording."""
 
 
