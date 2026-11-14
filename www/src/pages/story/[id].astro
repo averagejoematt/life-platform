@@ -8,7 +8,7 @@ import Provenance from "../../components/Provenance.astro";
 import StatusTag from "../../components/StatusTag.astro";
 import Quote from "../../components/Quote.astro";
 import { isDisputed } from "../../lib/disputed.js";
-import { clip, dayInWords, heldCallWords, num } from "../../lib/format.js";
+import { chapterCovers, chapterPublished, chapterWindow, clip, dayInWords, heldCallWords, num } from "../../lib/format.js";
 import { loadAll } from "../../lib/snapshot.js";
 import { hasPage, href, pathOf } from "../../lib/url.js";
 
@@ -24,7 +24,13 @@ const ordered = [...all.byType.chapter].filter((x) => hasPage("chapter", x)).sor
 const i = ordered.findIndex((x) => x.id === c.id);
 const prev = i > 0 ? ordered[i - 1] : null;
 const next = i >= 0 && i < ordered.length - 1 ? ordered[i + 1] : null;
-const weekDays = all.byType.day.filter((d) => d.chapter_id === c.id).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+// The days the chapter is about (2026-11-14): its covered days when served ("Day 60 to Day 66" — Week 10 covers 4–10
+// November, not its program week 8–14 November), else the program week; never a span read off its data date.
+const win = chapterWindow(c);
+const covered = c.status === "published" && c.covers_start && c.covers_end;
+const weekDays = all.byType.day
+  .filter((d) => (covered ? d.date >= c.covers_start && d.date <= c.covers_end : d.chapter_id === c.id))
+  .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 const dayRow = (d: any) => {
   const r = d.readings || {};
   const bits = [
@@ -38,9 +44,9 @@ const dayRow = (d: any) => {
 // only connection was the day's edition. Every row is a ledger object as served; a call whose words are withheld shows
 // its frozen test, as its own page does.
 const weekCalls =
-  c.status === "published" && c.week_start && c.week_end
+  c.status === "published" && win
     ? all.byType.prediction
-        .filter((p) => (p.status === "confirmed" || p.status === "refuted") && p.settled_date && p.settled_date.slice(0, 10) >= c.week_start && p.settled_date.slice(0, 10) <= c.week_end)
+        .filter((p) => (p.status === "confirmed" || p.status === "refuted") && p.settled_date && p.settled_date.slice(0, 10) >= win[0] && p.settled_date.slice(0, 10) <= win[1])
         .sort((a, b) => (a.settled_date < b.settled_date ? -1 : 1))
     : [];
 const callWords = (p: any) => heldCallWords(p) || p.claim;
@@ -51,7 +57,11 @@ const stateCopy: Record<string, string> = {
 };
 // The calendar week and the address can disagree by design: published chapters keep the journal's post ids
 // (week-04 is program Week 1), which are permanent URLs. The page says which week it is, by its interval.
-const span = c.week_start && c.week_end ? `${(dayInWords(c.week_start) || "").replace(/ \d{4}$/, "")} to ${dayInWords(c.week_end)}` : null;
+// A published chapter shows the days it covers and the day Matthew approved it (2026-11-14: Week 10 read "8 November to
+// 14 November 2026 · Published 10 November 2026" — its program week and its DATA date — while it covers 4–10 November and
+// was approved on 13 November). Without the served dates: the program week, and the data date said as one.
+const span = (c.status === "published" && chapterCovers(c)) || (c.week_start && c.week_end ? `${(dayInWords(c.week_start) || "").replace(/ \d{4}$/, "")} to ${dayInWords(c.week_end)}` : null);
+const publishedWords = chapterPublished(c, { lower: true });
 const legacyNo = /^week-(\d+)$/.exec(c.id);
 const idNote = legacyNo && c.week != null && Number(legacyNo[1]) !== c.week ? `This page's address keeps the journal's post number (${legacyNo[1]}); the chapter is program ${c.week >= 1 ? `week ${c.week}` : "prologue"}.` : null;
 // The body as published, with two presentation-only touches (2026-11-14): the narrator's opening "signature" lines are
@@ -76,7 +86,7 @@ const body = bodyForPage(c.body_html, c.excerpt);
 const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
 ---
 
-<Base title={c.title} top="story" description={c.excerpt || c.title} status={dayInWords(c.date)}>
+<Base title={c.title} top="story" description={c.excerpt || c.title} status={dayInWords(c.published_at || c.date)}>
   <section class="section" style="padding-bottom:24px">
     <div class="wrap" style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-end">
       <div style="flex:0 0 150px">
@@ -88,10 +98,10 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
           <span>{c.week_label}</span>
           <span>·</span>
           {span ? <span>{span}</span> : <span>{dayInWords(c.date)}</span>}
-          {span && c.status === "published" && (
+          {span && publishedWords && (
             <>
               <span>·</span>
-              <span>published {dayInWords(c.date)}</span>
+              <span data-published>{publishedWords}</span>
             </>
           )}
           <Provenance object={c} />
@@ -191,7 +201,7 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
       </article>
       <aside style="flex:0 1 300px;min-width:260px">
         {
-          c.status === "published" && c.week_start && (
+          c.status === "published" && win && (
             <section aria-label="Calls graded this week" style="margin-bottom:28px" data-week-calls>
               <p class="label" style="margin-bottom:8px">Calls graded this week · {weekCalls.length}</p>
               {weekCalls.length ? (
