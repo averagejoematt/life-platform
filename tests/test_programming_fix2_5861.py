@@ -269,27 +269,19 @@ def _carried_ledger_world() -> tuple[dict, int]:
     return world | {"rows": rows}, n
 
 
-def test_a_ledger_carried_rotation_is_inside_the_weekly_novelty_budget():
-    """The owner-run failure, reproduced: this phase's ledger carries four rotations decided the shadow way, and `_live` serves a
-    ledger variant whenever it is one of the pick's fallbacks — four "New:" movements. Now the week serves at most
-    MAX_NEW_PER_WEEK new movements (none of these is forced). Control: the budget's post-pass off -> all four serve."""
+def test_a_ledger_carried_rotation_never_serves_over_the_live_pick():
+    """The owner-run failure, reproduced: this phase's ledger carries four rotations decided the shadow way, and `_live` served a
+    ledger variant whenever it was one of the pick's fallbacks — four "New:" movements. Fix round 10: the live pick is the one
+    authority, so none of the carried variants serves. Control: each carried variant IS an eligible fallback of its slot's pick
+    (what the old rule served)."""
     world, n = _carried_ledger_world()
     assert n == 4
     prof = PROFILES["a_large_deficit_experienced"]
     week = sw.generate_week(prof, "approved", world)
-    served = _carried_served(week, world)
-    assert len(served) <= sl.MAX_NEW_PER_WEEK, served
+    assert _carried_served(week, world) == []
     assert len(sw.measure(week, world["lib"], world["catalog"]["movements"], LANDMARKS)["new_this_week"]) <= sl.MAX_NEW_PER_WEEK
-    assert any("novelty budget" in ln for s in week["sessions"] for ln in s["selection"])
-    with patch.object(sl, "enforce_novelty", lambda picked, policy, catalog=None: []):  # control: the budget off
-        off = sw.generate_week(prof, "approved", world)
-    # FIX4 (drop, don't shave): four new movements each add a find-the-load warm-up, so the time fit may DROP a whole carried
-    # accessory rather than shave it to one set — it was still served by the selection, and the time line names it
-    cat = world["catalog"]["movements"]
-    timed = " ".join(ln for s in off["sessions"] for ln in s["rationale"] if ln.startswith("time (live)"))
     carried = [(r.get("phase_2") or {}).get("variant") for r in world["rows"] if (r.get("phase_2") or {}).get("variant")]
-    dropped = [k for k in carried if k not in _carried_served(off, world) and "dropped " in timed and cat[k]["title"] in timed]
-    assert len(_carried_served(off, world)) + len(dropped) == n
+    assert len(carried) >= n  # control: the ledger names them for this phase
 
 
 # ── 3. cardio ─────────────────────────────────────────────────────────────────

@@ -420,17 +420,11 @@ NOVELTY_HOLD = "novelty budget: the week already changes its quota of movements 
 
 
 def served_key(p: dict[str, Any], policy: dict[str, Any]) -> str | None:
-    """What the slot SERVES this week under live (`selection_engine._live`): a budget hold (`novelty_serve`), else the rotation
-    ledger's variant for this phase when it is still one of the pick's eligible movements (the phase's first draft decided it —
-    possibly a shadow-era #5075 calendar rotation), else the pick; an approved pick is served as approved."""
-    from training import variant_rotation as vr
-
-    pick = p.get("pick") or {}
-    key, pos = pick.get("catalog_key"), policy.get("position") or {}
-    if not key or p.get("novelty_serve"):
-        return p.get("novelty_serve") or key
-    held = vr._ledger_variant(policy.get("rows"), int(pos.get("block") or 0), p["slot_id"], int(pos.get("phase") or 0)) if pos else None
-    return held if held and held in _eligible(p) else key
+    """What the slot SERVES this week under live (`selection_engine._live`): a budget hold (`novelty_serve`), else the pick — ONE
+    authority (fix round 10, the ninth red team: "selection X — THIS phase serves Y" was the rotation ledger overriding the live
+    pick; the ledger now only records what served)."""
+    key = (p.get("pick") or {}).get("catalog_key")
+    return p.get("novelty_serve") or key
 
 
 def _eligible(p: dict[str, Any]) -> set[str]:

@@ -890,9 +890,9 @@ def _live(
     skill_ceiling: int,
     target_date: str | None,
 ) -> dict[str, Any]:
-    """The approved library serves: each of the served role's slots takes its selection pick — or the ledger's variant for
-    this phase when that is still an eligible candidate (the first draft of a phase decides it). A selection that would
-    move the week's counts is refused and the pools serve, said so."""
+    """The approved library serves: each of the served role's slots takes its selection pick (fix round 10: the one authority —
+    the rotation ledger records what served and never overrides the pick). A selection that would move the week's counts is
+    refused and the pools serve, said so."""
     from training import variant_rotation as vr
 
     pos = rotation.get("position") or {}
@@ -920,12 +920,11 @@ def _live(
             continue
         held = vr._ledger_variant(rows, pos["block"], s["slot_id"], pos["phase"])
         fb = [f.get("catalog_key") for f in chosen.get("fallbacks") or []]
-        eligible = {pick} if op.get("state") == "held" else {pick} | set(fb)  # an approved pick is served as approved
         # #5861 second red team: a ledger change past the week's novelty budget waits — the pick (the held movement) serves
-        variant = chosen.get("novelty_serve") or (held if held and held in eligible else pick)
+        variant = chosen.get("novelty_serve") or pick  # fix round 10: ONE authority — the live pick (the ledger records it)
         by_role.setdefault(s["role"], {})[s["incumbent"]] = variant
         pool = [k for k in [pick] + fb if k]
-        source = "ledger" if variant == held else ("owner_approved" if op.get("state") == "held" else "selection")
+        source = "owner_approved" if op.get("state") == "held" else "selection"
         extra = {"experiment": op["experiment"]} if op.get("experiment") else {}
         if chosen.get("top_band") and variant == pick:
             extra["top_band"] = chosen["top_band"]  # ruling B (#5856): the rotation commitment reads the band's size

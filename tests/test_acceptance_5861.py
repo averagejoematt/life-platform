@@ -1137,17 +1137,20 @@ def test_d7_a_trunk_slot_keeps_its_function_even_when_his_fit_favours_another():
     assert off["movement_id"] == "torso_rotation"
 
 
-def test_d8_the_rationale_names_what_serves_when_the_ledger_already_decided_the_phase():
+def test_d8_the_rationale_has_one_selection_authority():
+    """Fix round 10 (the ninth red team): the rationale read "selection X — THIS phase serves Y" — the live pick and the rotation
+    ledger as two authorities. The pick is the one authority: its selection line stands as written, and a #5075 pool line for a
+    slot the selection served is dropped. Control: shadow lines are never rewritten."""
     rot = {
         "selection": {
             "mode": "live",
             "slots": [{"slot_id": "upper_heavy.db_lateral_raise", "pick": {"catalog_key": "lateral_raise_machine"}}],
         },
         "source": "selection",
-        "slots": [{"slot_id": "upper_heavy.db_lateral_raise", "source": "ledger", "variant": "db_lateral_raise"}],
+        "slots": [{"slot_id": "upper_heavy.db_lateral_raise", "source": "selection", "variant": "lateral_raise_machine"}],
         "rationale": ["selection: Lateral Raise (Machine) [tier A] for upper_heavy.db_lateral_raise — hold: progressing"],
     }
-    assert "THIS phase serves db_lateral_raise" in ls.rotation_lines(rot)[0]
+    assert ls.rotation_lines(rot) == rot["rationale"] and "THIS phase" not in " ".join(ls.rotation_lines(rot))
     shadow = rot | {"selection": rot["selection"] | {"mode": "shadow"}}  # control: shadow lines are never rewritten
     assert ls.rotation_lines(shadow) == _all(rot)
 

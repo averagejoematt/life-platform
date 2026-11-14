@@ -536,20 +536,8 @@ def rotation_lines(rotation: dict[str, Any]) -> list[str]:
     if not is_live(rotation) or rotation.get("source") != "selection":
         return lines
     slots = rotation.get("slots") or []
-    served = {s.get("slot_id") for s in slots if s.get("source") in ("selection", "ledger", "owner_approved")}
-    lines = [ln for ln in lines if not (ln.startswith(POOL_LINE_PREFIXES) and any(f"[{sid}," in ln for sid in served))]
-    # a phase the ledger already decided (its first draft, before the library was approved) keeps its movement until the next
-    # phase: the selection's line then names what WILL serve, so it says what serves NOW
-    picks = {s["slot_id"]: (s.get("pick") or {}).get("catalog_key") for s in (rotation.get("selection") or {}).get("slots") or []}
-    kept = {s["slot_id"]: s["variant"] for s in slots if s.get("source") == "ledger" and s.get("variant") != picks.get(s.get("slot_id"))}
-    return [
-        (
-            ln + f" — THIS phase serves {kept[sid]} (the rotation ledger: a phase's first draft decides it); the pick serves from the next"
-            if ln.startswith("selection:") and (sid := next((k for k in kept if f" for {k} " in ln or ln.endswith(f" for {k}")), None))
-            else ln
-        )
-        for ln in lines
-    ]
+    served = {s.get("slot_id") for s in slots if s.get("source") in ("selection", "owner_approved")}
+    return [ln for ln in lines if not (ln.startswith(POOL_LINE_PREFIXES) and any(f"[{sid}," in ln for sid in served))]
 
 
 def rationale_lines(rx: dict[str, Any]) -> list[str]:
