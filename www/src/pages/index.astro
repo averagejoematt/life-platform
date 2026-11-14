@@ -81,6 +81,13 @@ const sinceEvents = [
   ...all.byType.prediction.filter((p) => p.status === "confirmed" || p.status === "refuted").map((p) => ({ d: dayNo(p.settled_date), k: p.status })),
 ].filter((e) => e.d != null);
 const sinceAsOf = dayNo(edition?.as_of);
+// The front page's share description (2026-11-14, sprint II): the premise plus where it stands, from the edition.
+const ogDescription = [
+  `An ordinary man started${today?.start_weight_lbs ? ` at ${num(today.start_weight_lbs, 0)} pounds` : ""}${startDate ? ` on ${dayInWords(startDate)}` : ""} and is using AI coaches, his own data and public grades to find out whether getting healthier and getting happier are the same thing.`,
+  edition?.day_n != null && today?.change_lbs != null ? `Day ${edition.day_n}: ${num(Math.abs(today.change_lbs), 1)} lb ${today.change_lbs <= 0 ? "down" : "up"}.` : null,
+]
+  .filter(Boolean)
+  .join(" ");
 const weekLabel: Record<string, string> = { weight: "Weight", training: "Training", sleep: "Sleep", food: "Food" };
 
 // The week a chapter covers: its explicit interval from the snapshot (/api/chapters), never re-derived here.
@@ -173,7 +180,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
 }
 ---
 
-<Base title="Average Joe Matt" top="start" status={status}>
+<Base title="Average Joe Matt" top="start" status={status} card="home" description={ogDescription}>
   <section class="section" style="padding-bottom:40px">
     <div class="wrap hero">
       <div class="premise">

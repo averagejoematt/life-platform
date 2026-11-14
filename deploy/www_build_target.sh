@@ -12,6 +12,11 @@ TARGET="${1:?Usage: www_build_target.sh preview|root}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/.." && pwd)"
 
+# The share cards (scripts/v9_og_images.py) are drawn from the same snapshot before the build, so the build points each
+# page's og:image at its own card. Pillow is pinned to requirements-dev.txt; without it the pages keep the wordmark.
+python3 -m pip install --quiet --disable-pip-version-check "pillow==$(sed -n 's/^pillow==//p' "$REPO/requirements-dev.txt")" || echo "www_build_target: Pillow unavailable — no share cards" >&2
+python3 "$REPO/scripts/v9_og_images.py"
+
 case "$TARGET" in
   preview)
     (cd "$REPO/www" && npm run build:preview)
