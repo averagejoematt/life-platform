@@ -71,7 +71,7 @@ def _facts(date="2026-09-12", **over) -> DayFacts:
         readiness=58.0,
         workouts=[WorkoutFact("Foundation - Pull - 2 - 6", 6, 27, 18910.0, "Lat Pulldown (Cable)", ["Lat Pulldown (Cable)", "Face Pull"])],
         missed_tier0=["Walk 5k"],
-        vice_streaks={"No sweets": 7.0, "No alcohol": 7.0},
+        vice_streaks={"Restraint A": 7.0, "No alcohol": 7.0},
         tier0_done=5,
         tier0_total=7,
         tier0_pct=0.714,
@@ -158,10 +158,15 @@ def test_vice_streaks_are_a_count_and_never_a_name():
     *never name substances/vices (… alcohol, etc.)*. The first render of the scorecard
     printed "7d no alcohol" and the vocabulary did not catch it, correctly — that list
     covers one category. So no card names a vice at all."""
-    summary = L._vice_summary(_facts())
+    facts = _facts()
+    summary = L._vice_summary(facts)
     assert summary is not None
-    for name in ("alcohol", "sweets", "marijuana"):
-        assert name not in summary.lower(), f"the vice summary named {name!r}"
+    # Every name the card was handed, and every word of each (#5948: the tokens come from the fixture,
+    # so this file spells no category it does not need to).
+    tokens = {name.lower() for name in facts.vice_streaks} | {w.lower() for name in facts.vice_streaks for w in name.split() if len(w) > 2}
+    assert tokens >= {"no alcohol", "alcohol", "restraint a", "restraint"}
+    for token in sorted(tokens):
+        assert token not in summary.lower(), f"the vice summary named {token!r}"
     assert "2 of 2 holding" in summary
 
 
