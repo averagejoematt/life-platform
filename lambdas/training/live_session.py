@@ -324,7 +324,7 @@ def for_live_draft(
         # 8: a heavy lift's last-set allowance goes) before isolation changes; two or more — a hold day, loads held — hold every
         # lift there. Never under it: an anchor's top set stays a hard set unless a deload is confirmed (the deload shape's own cap)
         for x in out["exposures"]:
-            if x.get("intensity") != "carry" and (strained or x.get("live_cost") in ("high", "moderate")):
+            if strained or (x.get("intensity") != "carry" and x.get("live_cost") in ("high", "moderate")):  # a carry too, on a hold day
                 x["live_effort"] = min(int(live_settings.value("first_back_rpe")), int(x.get("live_effort") or 99))
     slack = live_volume.floor_slack(plan, str(rx.get("session_role") or "")) if ctx is not None else {}
     lines += live_volume.fit_sets(out, set_cap, catalog, lib, slack)

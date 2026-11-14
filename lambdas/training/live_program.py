@@ -487,6 +487,21 @@ def _top(effort: str) -> float:
     return max(nums) if nums else 99.0
 
 
+def _cap_carry(note: str, rpe_max: int) -> str:
+    """A carry's line 1 (`RPE a–b · N lb per hand to start`) at RPE `rpe_max` when its band runs higher; else unchanged."""
+    import re
+
+    from training import hevy_note_grammar as g
+
+    lines = note.split("\n")
+    for i, ln in enumerate(lines):
+        m = g.CARRY_LINE1_RE.match(ln.strip())
+        if m and _top(f"RPE {m.group('rpe')}") > rpe_max:
+            lines[i] = re.sub(r"^RPE [\d.–]+", f"RPE {rpe_max}", ln.strip())
+            break
+    return "\n".join(lines)
+
+
 def _has_reason(note: str | None) -> bool:
     from training import hevy_note_grammar as g
 
@@ -513,7 +528,9 @@ def annotate(blocks: list[Any], rx: dict[str, Any]) -> None:
             hi = max((int(getattr(st, "rep_range_end", 0) or 0) for st in work), default=0)
             clause = f"Same load: all sets to {hi} reps, then up." if hi else None
         line = live_load.effort_line(e) if e and e.get("intensity") != "carry" else None  # the role's own effort (effort_targets)
-        if cap or line:
+        if cap and e.get("intensity") == "carry":  # fix round 12: a hold day caps the carry too — its own line 1 grammar
+            b.notes = _cap_carry(b.notes or "", int(cap))
+        elif cap or line:
             b.notes = _cap_effort(b.notes or "", int(cap or 0), clause, line)
         elif clause:
             b.notes = session_block.add_reason(b.notes, clause)
