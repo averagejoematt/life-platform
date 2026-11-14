@@ -52,7 +52,7 @@ const verdict = lead?.sign?.words || null;
         </div>
         <p class="vs-verdict">
           {verdict ? <b>{verdict[0].toUpperCase() + verdict.slice(1)}.</b> : null} Forecasts that could be checked under the current rules, each grade re-verified.
-          {record && record.decided ? ` As first graded, before the rules were corrected: ${kOfN(record.right, record.decided)}.` : ""}
+          {record && record.decided ? ` The ledger's own count — every graded call it holds, on its grades as first written: ${kOfN(record.right, record.decided)}.` : ""}
         </p>
         {links && (
           <p class="vs-links">
