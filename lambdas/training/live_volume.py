@@ -635,9 +635,14 @@ def spend_session(rx: dict[str, Any], ctx: dict[str, Any], flags: list[dict[str,
 
     if not any(m not in HEADS and now[m] + 1.0 <= v for m, v in planned.items()):
         return []
-    # every planned muscle keeps its planned share (none donates under it); only a muscle a full set short is served
+
+    def keep(m: str, v: float) -> float:  # what this morning must hold so the WEEK stays at its aim (a donor never goes under)
+        other = float(week_c.get(m, 0.0)) - float(v)
+        return min(now[m], max(0.0, float((week_t.get(m) or {}).get("aim", 0.0)) - other))
+
+    # a muscle a full set short of its planned share is served; every other muscle may give only what the week can spare
     tg = {
-        m: {"floor": ruled(m, v), "aim": float(v) if now[m] + 1.0 <= v else min(float(v), now[m]), "cap": 99.0}
+        m: {"floor": ruled(m, v), "aim": float(v) if now[m] + 1.0 <= v else keep(m, v), "cap": 99.0}
         for m, v in planned.items()
         if m not in HEADS
     }
