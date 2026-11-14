@@ -348,3 +348,14 @@ def test_a_slump_trims_about_a_third_of_each_accessory_never_an_anchor():
     assert held
     sets = lambda rr: sum(n for r in rr for n in r["hard"].values())  # noqa: E731
     assert sets(rows) < sets(off) and acc(rows) <= acc(off)
+
+
+def test_a_cut_regressing_or_capped_lift_never_leads_the_heavy_lower_day():
+    """Ruling 5's lead by state (the red team's N12 survivor): a joint-flag cut, a regressing trend or an effort cap at RPE 7
+    blocks the lead; a clean lift may lead. Control: the same clean exposure is never blocked."""
+    from training import live_rulings
+
+    assert live_rulings.lead_blocked({"live_load": {"pct": 10, "why": "knee flag"}}, None) == "knee flag"
+    assert live_rulings.lead_blocked({}, "regressing") == "regressing"
+    assert live_rulings.lead_blocked({"live_effort": 7}, None) == "effort capped"
+    assert live_rulings.lead_blocked({"live_effort": 9}, "progressing") is None
