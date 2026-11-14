@@ -31,7 +31,13 @@ export function habitsKeystone(corrs) {
   const dir = k.correlation_r >= 0 ? "moves up with" : "moves against";
   const strength = Math.abs(k.correlation_r) >= 0.6 ? "strong" : Math.abs(k.correlation_r) >= 0.3 ? "moderate" : "faint";
   const machine = `${ttl(k.group)} ${dir} the day grade · ${strength} direction · n=${fmt(n)} days — early signal, not proven${ready ? "" : " · coefficient withheld until 2 weeks"}`;
-  const serif = `Of everything tracked, ${ttl(k.group)} is the group most pulling the day up so far. On ~${fmt(n)} days that's a lead, not a law — the number to trust here is n, not a coefficient. ${ready ? "It now has the overlap to carry a real correlation, below." : "It earns a real coefficient once there are two weeks of overlap."}`;
+  // #5956 (2026-11-14): this sentence said "most pulling the day up" whatever the sign — so a group whose own card read
+  // "moves against the day grade" (r = −0.57) was called the one lifting it — and "pulling" claimed a cause. The words
+  // now follow the sign the card shows, and stay correlative: which group's adherence moves most with the grade.
+  const together = k.correlation_r >= 0
+    ? `on days it is held more, the day grade tends to be higher`
+    : `on days it is held more, the day grade tends to be lower`;
+  const serif = `Of everything tracked, ${ttl(k.group)} is the group whose adherence moves most closely with the day grade so far — ${together}. That is a correlation, not a cause. On ~${fmt(n)} days it is a lead, not a law — the number to trust here is n, not a coefficient. ${ready ? "It now has the overlap to carry a real correlation, below." : "It earns a real coefficient once there are two weeks of overlap."}`;
   // P2.1 — keystone calibration, honesty-gated. Below 2 weeks of overlap: direction only,
   // no Pearson, no chip (P0.1). At n>=14 the coefficient surfaces inside the sleep board's
   // own confidence-card DNA — n + overlap weeks + a confidence tier + a "likely noise" guard
