@@ -429,7 +429,7 @@ def test_additive_deploy_step_evaluates_then_deploys_the_evaluated_assembly(wf):
     assert "DEPLOY_STACKS=$(grep '^iam_additive_stacks='" in body, "deploy ONLY what the apply-time evaluation still admits"
     assert "|| true" not in body and "continue-on-error" not in step
     assert "aws s3 cp /tmp/iam_gate_2834_apply.json" in body and "aws s3 cp /tmp/iam_gate_2834_converged.json" in body
-    # the deploy role's existing grants cover this step: sts:AssumeRole on cdk-* + s3:PutObject on the bucket
+    # the deploy role's existing grants cover this step: sts:AssumeRole on the named CDK bootstrap roles + s3:PutObject on the bucket
     assert "role/github-actions-deploy-role" in _step(deploy, "Configure AWS credentials (OIDC)")
 
 
@@ -471,16 +471,48 @@ def test_deploy_role_needs_no_new_grant_for_the_additive_deploy():
     """The staged IAM diff for #2834 is EMPTY — pinned here so a future reviewer can see why.
 
     `cdk deploy` runs entirely through the CDK bootstrap roles: the caller needs only
-    sts:AssumeRole on cdk-* (held since the role was codified, #401) and s3:PutObject on the
+    sts:AssumeRole on them (held since the role was codified, #401) and s3:PutObject on the
     platform bucket for the ledger (held). Both statements are asserted from the committed
     policy document, the source of truth for live IAM (infra/iam/README.md).
+
+    #5513 (d): the assume grant was `role/cdk-*` until 2026-11-13. It is now the bootstrap
+    roles `cdk deploy` actually assumes — deploy, file-publishing, image-publishing, lookup —
+    in every region a stack deploys to, and nothing else. The region set is DERIVED from
+    `drift_sentinel.STACKS` (pinned to cdk/app.py by tests/test_drift_checker_stack_regions.py),
+    so a stack in a new region reds here until its four roles are named: the alternative is an
+    AccessDenied on sts:AssumeRole in the middle of the first deploy to that region.
     """
     import json
+
+    sys.path.insert(0, str(ROOT / "deploy"))
+    import drift_sentinel  # noqa: PLC0415 — the region map the drift checker itself deploys against
 
     with open(ROOT / "infra" / "iam" / "github-actions-deploy-role.permissions.json", encoding="utf-8") as fh:
         stmts = {s["Sid"]: s for s in json.load(fh)["Statement"]}
     assume = stmts["CDKBootstrapRoleAssume"]
-    assert assume["Action"] == "sts:AssumeRole" and assume["Resource"] == f"arn:aws:iam::{constants.ACCT}:role/cdk-*"
+    regions = set(drift_sentinel.STACKS.values())
+    assert {"us-west-2", "us-east-1", "us-east-2"} <= regions, f"the region derivation went thin: {sorted(regions)}"
+    want = {
+        f"arn:aws:iam::{constants.ACCT}:role/cdk-hnb659fds-{kind}-role-{constants.ACCT}-{region}"
+        for region in regions
+        for kind in ("deploy", "file-publishing", "image-publishing", "lookup")
+    }
+    assert assume["Action"] == "sts:AssumeRole" and assume.get("Condition") is None
+    assert set(assume["Resource"]) == want, (
+        "CDKBootstrapRoleAssume must name exactly the bootstrap roles CI assumes, per deployed region (#5513):\n"
+        f"  missing: {sorted(want - set(assume['Resource']))}\n  extra:   {sorted(set(assume['Resource']) - want)}"
+    )
+    assert not any("*" in arn or "cfn-exec" in arn for arn in assume["Resource"]), "no wildcard, and never the admin cfn-exec role"
+    # #5513 (a): no job on this role reads a secret's VALUE (enumerated in infra/iam/README.md);
+    # the role keeps existence/metadata reads only. This is the review's registry assertion.
+    actions = {
+        a for s in stmts.values() if s["Effect"] == "Allow" for a in ([s["Action"]] if isinstance(s["Action"], str) else s["Action"])
+    }
+    assert set(stmts["SecretsManager"]["Action"]) == {"secretsmanager:DescribeSecret", "secretsmanager:ListSecrets"}
+    leaked = sorted(
+        a for a in actions if a.lower() in ("secretsmanager:getsecretvalue", "secretsmanager:batchgetsecretvalue", "secretsmanager:*")
+    )
+    assert not leaked, f"the CI deploy role must not read secret values (#5513): {leaked}"
     s3 = stmts["S3DeployArtifacts"]
     assert "s3:PutObject" in s3["Action"] and f"arn:aws:s3:::{constants.S3_BUCKET}/*" in s3["Resource"]
     cfn = stmts["CloudFormationDiff"]
