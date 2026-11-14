@@ -316,3 +316,17 @@ def test_one_settings_table_and_the_per_round_mechanisms_are_gone():
     assert not [(n, g) for n, t in src.items() for g in gone if f"\n{g}: dict" in t or f"\n{g} = " in t]
     assert len(live_settings.SETTINGS) <= 7
     assert all(row.get("label") == "heuristic" and row.get("basis") and row.get("retune") for row in live_settings.HEURISTICS.values())
+
+
+def test_a_hold_day_holds_every_load_and_stops_every_lift_at_rpe_8():
+    """A strained or overreached day (two or more strain signals): every load holds and no lift grinds — RPE 8 everywhere (the
+    red team's praised high-fatigue week: hard work kept, nothing past RPE 8). Control: the cap lifted -> a lift at RPE 9+."""
+    w = _week(PROFILES["b_shoulder_flag_low_recovery"])
+    assert all((s["fatigue"] or {}).get("state") in ("strained", "overreached") for s in w["week"]["sessions"])
+    lifts = lambda wk: [
+        x for s in wk["week"]["sessions"] for x in s["lifts"] if "walk" not in x["key"]
+    ]  # noqa: E731 — a carry: load per hand
+    assert all((sw.lift_effort(x["hevy_note"]) or 0) <= 8 for x in lifts(w))
+    with patch.dict(live_settings.HEURISTICS["first_back_rpe"], {"value": 10}):
+        off = _week(PROFILES["b_shoulder_flag_low_recovery"])
+    assert any((sw.lift_effort(x["hevy_note"]) or 0) > 8 for x in lifts(off))

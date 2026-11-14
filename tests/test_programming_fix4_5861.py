@@ -268,8 +268,8 @@ def test_the_session_line_never_contradicts_a_big_lift(weeks):
         (lsafe, "fix_block"): lambda block, rx, blocks: lsafe.block_rule(block, rx, blocks),
     }
     assert session_conflicts(
-        _week("b_shoulder_flag_low_recovery", off)["week"]
-    )  # control: the per-lift guard only (FIX7: the knee case no longer caps the hinge)
+        _week("a_large_deficit_experienced", off)["week"]
+    )  # control: the per-lift guard only — the second lift's RPE 7-8 under a session line of 8-9 (fix round 9: a hold day caps all)
 
 
 # ── 5. volume ────────────────────────────────────────────────────────────────
@@ -485,7 +485,10 @@ def test_the_deload_caps_every_compound_at_rpe_7(weeks):
     assert all(s["fatigue"]["action"] == "deload_recommended" for s in f["sessions"]) and over(f) == []
     assert lp.DELOAD_SHAPE["compound_rpe"]["value"] == 7 and cap == 8
     assert any(str(x["tag"]).startswith("anchor:") and _top_rpe(x["hevy_note"]) == 8 for s in f["sessions"] for x in s["lifts"])
-    with patch.dict(lp.DELOAD_SHAPE, {"anchor_top_rpe": {"value": 9, "label": "heuristic", "basis": "mutated"}}):
+    with (
+        patch.dict(lp.DELOAD_SHAPE, {"anchor_top_rpe": {"value": 9, "label": "heuristic", "basis": "mutated"}}),
+        patch.dict(lset.HEURISTICS["first_back_rpe"], {"value": 10}),  # fix round 9: the hold day's own RPE 8 cap, lifted too
+    ):
         moved = _week("f_high_fatigue_poor_sleep")["week"]
     assert over(moved)  # control: the mutated cap lets an anchor past RPE 8
 

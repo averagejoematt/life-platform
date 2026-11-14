@@ -231,7 +231,7 @@ def for_live_draft(
     `week`: the served day's week plan (`live_sequence.entry_week`, on the day entry); `set_cap` the session set ceiling."""
     if not is_live(rotation):
         return rx
-    from training import fatigue_model, live_load, live_program, live_volume
+    from training import fatigue_model, live_load, live_program, live_settings, live_volume
 
     out = copy.deepcopy(rx)
     lines: list[str] = []
@@ -295,6 +295,10 @@ def for_live_draft(
     for x, n in zip(out["exposures"], before):
         if len(x["sets"]) < n:
             x["live_reduced"] = n - len(x["sets"])
+    if (out.get("fatigue") or {}).get("state") in ("strained", "overreached"):  # a hold day: loads held AND no grinding —
+        for x in out["exposures"]:  # every lift stops at RPE 8 (the deload shape caps lower still when one is recommended)
+            if x.get("intensity") != "carry":
+                x["live_effort"] = min(int(live_settings.value("first_back_rpe")), int(x.get("live_effort") or 99))
     slack = live_volume.floor_slack(plan, str(rx.get("session_role") or "")) if ctx is not None else {}
     lines += live_volume.fit_sets(out, set_cap, catalog, lib, slack)
     _refit(out)
