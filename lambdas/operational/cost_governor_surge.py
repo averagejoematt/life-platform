@@ -29,6 +29,7 @@ from __future__ import annotations
 import math
 import os
 import statistics
+from datetime import timedelta
 
 # 900 is now the FLOOR, not the rule — kept so a COLLAPSE in traffic can never make surge
 # mode cheap to enter, and kept env-overridable (ADR-133's "one env var" property).
@@ -83,6 +84,36 @@ def surge_threshold_from_baseline(readings) -> tuple[int, str]:
         f"(n={len(vals)} weekly readings over {SURGE_BASELINE_WEEKS}w, floor {SURGE_UNIQUES_THRESHOLD})"
     )
     return threshold, rule
+
+
+# #5936: the reading under test is the newest weekly point no older than this. The digest
+# emits weekly (Mondays), so a window wider than the cadence tolerates one missed run.
+SURGE_RECENT_LOOKBACK_DAYS = 14
+
+
+def split_reading_and_baseline(points, now, lookback_days: int = SURGE_RECENT_LOOKBACK_DAYS) -> tuple[int | None, list]:
+    """(recent_uniques, baseline) from ONE read of the weekly `UniqueVisitors7d` series.
+
+    PURE. `points` is ``[(timestamp, value), ...]`` in any order. The reading under test
+    is the newest point inside the trailing `lookback_days` (None when there is none —
+    "no signal", never 0). The baseline is the `SURGE_BASELINE_WEEKS` points STRICTLY
+    OLDER than that reading, oldest first.
+
+    #5936, the defect: the baseline used to be read up to `now`, so it held the reading
+    under test — a traffic jump raised its own bar. On the live series
+    1116, 1158, 1255, 1032, 977, 1278, 1547, 2603 the bar was 2955 with 2603 inside it
+    and 1765 without; the reader arrival never engaged. Splitting one read here, rather
+    than two windows that merely happen to line up, makes "the baseline never contains
+    the reading under test" true by construction.
+    """
+    pts = sorted(((ts, int(v)) for ts, v in (points or []) if v is not None), key=lambda p: p[0])
+    if not pts:
+        return None, []
+    latest_ts, latest_val = pts[-1]
+    if latest_ts < now - timedelta(days=lookback_days):
+        return None, [v for _, v in pts[-SURGE_BASELINE_WEEKS:]]
+    prior = [v for ts, v in pts if ts < latest_ts]
+    return latest_val, prior[-SURGE_BASELINE_WEEKS:]
 
 
 def engaged(recent_uniques, threshold: int | None, prev_surge_active: bool) -> bool:

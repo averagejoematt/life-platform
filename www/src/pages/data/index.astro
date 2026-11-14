@@ -30,6 +30,9 @@ const latestDay = days[days.length - 1] || null;
 const journey = await loadJourney();
 const hasJourney = journey && journey.state !== "absent";
 
+// The series whose day is a running total (logged through the day), so the newest day can still be filling up.
+const DAILY_TOTALS = new Set(["total_calories_kcal", "total_protein_g"]);
+
 function bars(days: any[]) {
   const b = weeklyBars(days, 8);
   const vals = b.filter((v) => v != null) as number[];
@@ -112,7 +115,9 @@ function bars(days: any[]) {
           // 2026-11-14: a behavioral series' newest day is often partial ("13 Nov, so far" read 80 kcal and 15 g of
           // protein at breakfast), and the tile set it as the headline. The headline is the last FULL day; the partial
           // day stays in the caption, labelled.
-          const partial = Boolean(s && h && h.last != null && s.behavioral && h.lastDate === s.window.to);
+          // Only a DAILY TOTAL can be partial (2026-11-14, sprint II): the rule first read every behavioral series that
+          // way, so the weight tile led with yesterday and called this morning's complete weigh-in "so far".
+          const partial = Boolean(s && h && h.last != null && s.behavioral && DAILY_TOTALS.has(m.id) && h.lastDate === s.window.to);
           const full = partial ? [...s.days].reverse().find((d: any) => d.date < h.lastDate && d.value != null && !d.gap) : null;
           return (
             <a class="tile" href={href(pathOf("metric", m.id))}>

@@ -374,7 +374,7 @@ def handle_protocols() -> dict:
 
 def handle_domains() -> dict:
     """GET /api/domains — thin entrypoint; logic in protocols split module."""
-    return _protocols.domains()
+    return _protocols.domains(_g=globals())
 
 
 def handle_habit_registry() -> dict:

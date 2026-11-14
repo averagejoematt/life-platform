@@ -58,6 +58,7 @@ __all__ = [
     "_scheduled_share_pct",
     "_typical_day",
     "inference_receipt",
+    "last_closed_month_cost",
     "receipts",
 ]
 
@@ -779,6 +780,84 @@ def _typical_day(cw, now) -> tuple:
         "above_typical_usd": round(total - usd * len(high), 2),
     }
     return typical, high_days
+
+
+# ── #5952: the public running cost = the last CLOSED month, read, never typed ──────────────
+# `/api/platform_stats` served `monthly_cost: "~$100"` — a literal pinned to July 2026 under a
+# comment that stated the rule ("the LAST CLOSED MONTH is the honest trailing run-rate") which
+# the literal then broke for three months running: Cost Explorer billed 2026-08 $180.58,
+# 2026-09 $137.15 and 2026-10 $218.99 while the cost page said ~$100. The rule was right; a
+# hand-typed number cannot follow it. So the figure is now READ, at request time, from the
+# governor's own running month-to-date total (LifePlatform/Budget::EstimatedMonthToDateSpend —
+# the series /api/receipts already draws, under the read this role already holds): a closed
+# month's total is that counter's highest reading inside the month.
+#
+# What the number is: the governor's buffered whole-bill estimate, not the invoice. Measured
+# 2026-11-14 against Cost Explorer UnblendedCost it reads within ~2% (Aug 181.11 v 180.58,
+# Sep 136.36 v 137.15, Oct 222.49 v 218.99), and the display rounds to $10, so the two agree
+# on every closed month to date. A month whose last reading is not inside its final
+# `_CLOSED_MONTH_TAIL_DAYS` is not a closed total (the governor stopped writing early) and is
+# withheld rather than published short.
+_CLOSED_MONTH_TAIL_DAYS = 2
+_CLOSED_MONTH_ROUND_USD = 10
+
+
+def _previous_month_bounds(now) -> tuple:
+    """(start, end_exclusive) of the calendar month before `now`'s, as UTC midnights."""
+    # utc-exempt(#2414): the AWS billing month is a UTC calendar month.
+    this_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+    prev_last_day = this_start - timedelta(days=1)
+    return datetime(prev_last_day.year, prev_last_day.month, 1, tzinfo=timezone.utc), this_start
+
+
+def last_closed_month_cost(cw, now):
+    """The last closed calendar month's whole-platform bill, or None when there is no honest answer.
+
+    Returns {"usd", "month", "display", "basis"} — `display` is the reader string ("~$220",
+    rounded to the nearest $`_CLOSED_MONTH_ROUND_USD`), `usd` the unrounded reading it came
+    from, `month` the YYYY-MM it describes. Never raises: any read failure is None, and None
+    is published as a gap, never as a remembered figure.
+    """
+    start, end = _previous_month_bounds(now)
+    try:
+        r = cw.get_metric_statistics(
+            Namespace="LifePlatform/Budget",
+            MetricName="EstimatedMonthToDateSpend",
+            StartTime=start,
+            EndTime=end,
+            Period=86400,
+            Statistics=["Maximum"],
+        )
+    except Exception as e:  # noqa: BLE001 — a display figure, never a dependency of the page
+        logger.warning(f"[platform_stats] last closed month cost unavailable: {e}")
+        return None
+    points = [
+        (p["Timestamp"].astimezone(timezone.utc), float(p["Maximum"]))
+        for p in (r or {}).get("Datapoints", [])
+        if p.get("Maximum") is not None and p.get("Timestamp") is not None
+    ]
+    points = [(t, v) for t, v in points if start <= t < end]
+    if not points:
+        return None
+    last_seen = max(t for t, _ in points)
+    if last_seen < end - timedelta(days=_CLOSED_MONTH_TAIL_DAYS):
+        return None
+    usd = max(v for _, v in points)
+    if usd <= 0:
+        return None
+    rounded = int(usd / _CLOSED_MONTH_ROUND_USD + 0.5) * _CLOSED_MONTH_ROUND_USD
+    month = start.strftime("%Y-%m")
+    return {
+        "usd": round(usd, 2),
+        "month": month,
+        "display": f"~${rounded}",
+        "basis": (
+            f"The whole platform's bill for {start.strftime('%B %Y')}, the last closed month, read from "
+            "the cost governor's running month-to-date total (AI and everything else), rounded to the "
+            f"nearest ${_CLOSED_MONTH_ROUND_USD}. The governor's figure is a buffered estimate; the "
+            "invoice can differ by a few dollars."
+        ),
+    }
 
 
 def _scheduled_share_pct(breakdown):

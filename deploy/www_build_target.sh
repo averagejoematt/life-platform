@@ -12,6 +12,11 @@ TARGET="${1:?Usage: www_build_target.sh preview|root}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/.." && pwd)"
 
+# The share cards (scripts/v9_og_images.py) are drawn from the same snapshot before the build, so the build points each
+# page's og:image at its own card. The deploy job installs the pinned Pillow; without it (a local run) the script
+# draws nothing and the pages keep the wordmark.
+python3 "$REPO/scripts/v9_og_images.py"
+
 case "$TARGET" in
   preview)
     (cd "$REPO/www" && npm run build:preview)

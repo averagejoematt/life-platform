@@ -6,12 +6,21 @@
 // is one link away. Only approved, published installments (scripts/publish_snapshot_story.py); no audio.
 import { soFar } from "../lib/story.js";
 import { STORY_MARKER, storyEnabled, storyPrivate } from "../lib/story_dark.js";
-import { latestEdition, loadStory } from "../lib/snapshot.js";
+import { latestEdition, loadAll, loadStory } from "../lib/snapshot.js";
+import { chapterPublished } from "../lib/format.js";
 import { href, pathOf } from "../lib/url.js";
 
 const on = storyEnabled();
 const so = on ? soFar(await loadStory(), await latestEdition()) : null;
 const story = { [STORY_MARKER]: "entry" };
+// 2026-11-14: the story index dates an installment by its DATA date ("The latest · 10 November 2026" for a chapter
+// approved on 13 November). The line now reads the chapter object's own publication words (format.js
+// chapterPublished: "Published 13 November 2026", or "Data through …" when no approval time is served).
+const all = on && so ? await loadAll() : null;
+const when = (r: any) => {
+  const c = all && r ? all.get("chapter", r.id) : null;
+  return (c && chapterPublished(c)) || (r ? r.dateWords : "");
+};
 ---
 
 {
@@ -33,7 +42,7 @@ const story = { [STORY_MARKER]: "entry" };
                       <span class="label">Start at the beginning · {so.first.weekLabel}</span>
                       <b style="font-size:18px;letter-spacing:-.02em;line-height:1.15">{so.first.title}</b>
                     </span>
-                    <span class="mono muted" style="font-size:12px">{so.first.dateWords}</span>
+                    <span class="mono muted" style="font-size:12px">{when(so.first)}</span>
                   </a>
                 )}
                 {so.latest && (
@@ -42,7 +51,7 @@ const story = { [STORY_MARKER]: "entry" };
                       <span class="label">The latest · {so.latest.weekLabel}</span>
                       <b style="font-size:18px;letter-spacing:-.02em;line-height:1.15">{so.latest.title}</b>
                     </span>
-                    <span class="mono muted" style="font-size:12px">{so.latest.dateWords}</span>
+                    <span class="mono muted" style="font-size:12px">{when(so.latest)}</span>
                   </a>
                 )}
               </nav>
