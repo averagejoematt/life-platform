@@ -3,7 +3,7 @@ import Base from "../../layouts/Base.astro";
 import StatusTag from "../../components/StatusTag.astro";
 import StoryEntry from "../../components/StoryEntry.astro"; // the Human Story (HS1): renders nothing unless WEB_STORY=1
 import { chapterCovers, chapterPublished, chapterWindow, dayInWords, num, rangeInWords } from "../../lib/format.js";
-import { loadAll, loadSeries } from "../../lib/snapshot.js";
+import { loadAll, loadJourney, loadSeries } from "../../lib/snapshot.js";
 import { weekStrip } from "../../lib/theline.js";
 import { hasPage, href, pathOf } from "../../lib/url.js";
 
@@ -18,6 +18,14 @@ const episodes = all.byType.episode.length;
 const weight = (await loadSeries())["weight_lbs"];
 const readings = weight ? weight.days.filter((d: any) => d.value != null && !d.gap) : [];
 const scale = readings.length ? { lo: Math.min(...readings.map((d: any) => d.value)) - 1, hi: Math.max(...readings.map((d: any) => d.value)) + 1 } : null;
+// The ten-pound marks the platform published (journey.json `rungs`), named on the row whose own days contain the
+// crossing — the list's milestones, each with its real date; a crossing outside every row's days is not placed.
+const journey: any = await loadJourney();
+const rungs: { lb: number; date: string | null }[] = journey && journey.state !== "absent" ? (journey.rungs || []).filter((r: any) => r.date) : [];
+const rungsOf = (c: any) => {
+  const w = (c.week ?? 0) >= 1 ? chapterWindow(c) : null;
+  return w ? rungs.filter((r) => r.date! >= w[0] && r.date! <= w[1]) : [];
+};
 const stripOf = (c: any) => {
   const w = scale && (c.week ?? 0) >= 1 ? chapterWindow(c) : null;
   return w ? weekStrip({ days: weight.days, from: w[0], to: w[1], ...scale, muted: c.status !== "published", latest: readings[readings.length - 1].date }) : null;
@@ -76,6 +84,11 @@ const stripOf = (c: any) => {
                     {strip.missing > 0 ? ` · ${strip.missing} blank` : ""}
                   </span>
                 )}
+                {rungsOf(c).map((r) => (
+                  <span class="mono cobalt" style="font-size:12px" data-rung>
+                    crossed {r.lb} lb · {dayInWords(r.date, { short: true })}
+                  </span>
+                ))}
                 {c.status === "published" && c.published_at && (
                   <span class="mono muted" style="font-size:12px" data-published>
                     {chapterPublished(c)}
