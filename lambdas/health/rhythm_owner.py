@@ -7,9 +7,12 @@ WHAT IT IS
 
     * ``summarize``   — counts per family/kind in the current window against the window before it, the dated
                         episodes in the current window, ECG results by the device's own label;
-    * ``owner_lines`` — the daily brief's owner-only section (``emails.brief_lines.rhythm_lines``);
-    * ``coach_block`` — the same lines with the no-advice instruction, shaped for the owner's own Telegram coach
-                        thread (the wiring into ``coach.coach_domain_facts`` is a hand-off — see #4972);
+    * ``owner_lines`` — the daily brief's owner-only section (``emails.brief_lines.rhythm_lines`` via
+                        ``brief_section``, which turns a failed read into one "could not be read" line);
+    * ``coach_block`` — the same lines with the no-advice instruction, shaped for a coach prompt. NOT WIRED and
+                        not authorised: ``TIER_OWNER_ONLY`` means never quoted into an AI narrative context, and the
+                        owner's coach thread goes to Bedrock + Telegram — feeding it needs an owner ruling on the
+                        tier first (#4972);
     * ``burden_change`` — the reader a later burden-rise alert consumes (the hypothesis engine, a follow-up): a
                         window-vs-window count with n, both windows' bounds, worn-day coverage when supplied and
                         the stated confounders. It decides nothing; the alert's threshold is the caller's.
@@ -19,12 +22,15 @@ WHAT IT IS
 
 PRIVACY (owner ruling (c), 2026-10-17: heart-rhythm data is owner-only)
   The input is ``rhythm_channel.read_events`` — neutral events with no medication name or dose, no device and no
-  reading. The ONLY importers are the owner surfaces in ``tests/test_rhythm_owner_4972.py::PERMITTED_IMPORTERS``;
-  no public route, generated file, published prompt or log line ever carries an output of this module. Logs name
+  reading. The ONLY importer is the daily brief's owner section (``PERMITTED_IMPORTERS``, leg 4 of
+  ``tests/test_rhythm_channel_privacy_4972.py``); no public route, generated file, AI prompt or log line ever
+  carries an output of this module. Logs name
   the exception class only.
 
 WORDING (ADR-104/105)
-  Events and trends are reported as data — counts with their window, dates, the device's own result label. Never
+  Events and trends are reported as data — "{n} recorded" with its window, dates, the device's own result label
+  (capped at ``MAX_LABEL_CHARS``). A count is of STORED records: a day without the watch records nothing, so a
+  lower count is never worded as "fewer events" (``COVERAGE_LINE`` rides every non-empty section). Never
   an interpretation, a diagnosis, a dose comment or reassurance. The one advice string is ``CLINICIAN_LINE``.
 
 Pure core (no I/O, no clock — ``today`` is always passed in) + one fail-soft read (``read_summary``).
@@ -45,6 +51,11 @@ MAX_EPISODES = 6
 # clinician'"). tests/test_rhythm_owner_4972.py holds every rendered line to it.
 ADVICE = "discuss with your clinician"
 CLINICIAN_LINE = f"Questions about these records: {ADVICE}."
+COVERAGE_LINE = "Counts are stored records; days without the watch record nothing."
+UNREAD_LINE = "Heart-rhythm records could not be read today."
+MAX_LABEL_CHARS = 40
+# Medication-log statuses rendered by name; anything else is counted as "other status" (no free text reaches a line).
+MED_STATUSES = ("taken", "skipped", "missed", "snoozed", "scheduled", "logged")
 HEADER = "HEART RHYTHM EVENTS (owner-only device records — never repeat them in anything that may be published)"
 COACH_INSTRUCTION = (
     "Report these as data only: counts, dates and the device's own result labels. Do not interpret them, diagnose, "
@@ -84,6 +95,16 @@ def _d(text: Any) -> Optional[date]:
         return None
 
 
+def _label(result: Any) -> str:
+    """The device's own result label, verbatim but capped (an escaped renderer still shows it)."""
+    text = " ".join(str(result or "").split()) or "no result label"
+    return text if len(text) <= MAX_LABEL_CHARS else text[: MAX_LABEL_CHARS - 1].rstrip() + "…"
+
+
+def _plural(n: int, one: str, many: str) -> str:
+    return f"{n} {one if n == 1 else many}"
+
+
 def _window(end: date, window_days: int, offset: int = 0) -> tuple[date, date]:
     """(start, end) inclusive, ``offset`` whole windows before the one ending on ``end``."""
     last = end - timedelta(days=window_days * offset)
@@ -112,7 +133,7 @@ def _counts(events: Iterable[dict], bounds: tuple[date, date]) -> dict:
         family = e.get("family")
         if family == "ecg":
             out["ecg"] += 1
-            label = e.get("result") or "no result label"
+            label = _label(e.get("result"))
             out["ecg_results"][label] = out["ecg_results"].get(label, 0) + 1
         elif family == "notification":
             kind = e.get("kind") if e.get("kind") in KIND_LABELS else "unknown"
@@ -122,6 +143,7 @@ def _counts(events: Iterable[dict], bounds: tuple[date, date]) -> dict:
             out["medication_log"] += 1
             status = e.get("status")
             if status:
+                status = status if status in MED_STATUSES else "other status"
                 out["medication_status"][status] = out["medication_status"].get(status, 0) + 1
     return out
 
@@ -142,12 +164,9 @@ def summarize(events: Optional[list], today: str, window_days: int = WINDOW_DAYS
     }
 
 
-def _trend(now: int, before: int) -> str:
-    if now > before:
-        return f"up from {before}"
-    if now < before:
-        return f"down from {before}"
-    return f"the same as the {before} before"
+def _recorded(now: int, before: int, span: str, w: int) -> str:
+    """'{n} recorded <span> ({m} recorded in the w days before)' — counts of stored records, never 'fewer events'."""
+    return f"{now} recorded {span} ({before} recorded in the {w} days before)"
 
 
 def _results_text(results: dict) -> str:
@@ -157,7 +176,7 @@ def _results_text(results: dict) -> str:
 def _episode_text(e: dict) -> str:
     when = str(e.get("at") or e.get("day")).replace("T", " ")[:16]
     if e.get("family") == "ecg":
-        return f"{when} ECG recording, device result '{e.get('result') or 'no result label'}'"
+        return f"{when} ECG recording, device result '{_label(e.get('result'))}'"
     kind = str(e.get("kind"))
     label = KIND_LABELS.get(kind, KIND_LABELS["unknown"])[: -len("s")]  # singular
     return f"{when} {label}" + (" (kind inferred from the reading, not named by the device)" if e.get("kind_inferred") else "")
@@ -177,28 +196,32 @@ def owner_lines(summary: Optional[dict]) -> list:
     for kind in _KIND_ORDER:
         now, before = cur["notifications"].get(kind, 0), pri["notifications"].get(kind, 0)
         if now or before:
-            lines.append(f"{KIND_LABELS[kind].capitalize()}: {now} {span}, {_trend(now, before)} in the {w} days before.")
+            lines.append(f"{KIND_LABELS[kind].capitalize()}: {_recorded(now, before, span, w)}.")
     if cur["inferred"]:
-        lines.append(f"{cur['inferred']} of this window's notification kinds were inferred from the reading, not named by the device.")
+        verb = "was" if cur["inferred"] == 1 else "were"
+        lines.append(f"{cur['inferred']} of this window's notification kinds {verb} inferred from the reading, not named by the device.")
     if cur["ecg"] or pri["ecg"]:
-        line = f"ECG recordings: {cur['ecg']} {span}, {_trend(cur['ecg'], pri['ecg'])} in the {w} days before"
+        line = f"ECG recordings: {_recorded(cur['ecg'], pri['ecg'], span, w)}"
         lines.append(line + (f"; device results: {_results_text(cur['ecg_results'])}." if cur["ecg_results"] else "."))
     if cur["medication_log"] or pri["medication_log"]:
-        line = f"Medication log: {cur['medication_log']} entries {span}, {_trend(cur['medication_log'], pri['medication_log'])}"
+        now, before = cur["medication_log"], pri["medication_log"]
+        line = f"Medication log: {_plural(now, 'entry', 'entries')} recorded {span} ({_plural(before, 'entry', 'entries')} in the {w} days before)"
         statuses = ", ".join(f"{s} {n}" for s, n in sorted(cur["medication_status"].items()))
-        lines.append(line + f" in the {w} days before" + (f" ({statuses})." if statuses else "."))
+        lines.append(line + (f"; statuses: {statuses}." if statuses else "."))
     episodes = summary.get("episodes") or []
     if episodes:
         shown = episodes[:MAX_EPISODES]
         more = f" (+{len(episodes) - len(shown)} more)" if len(episodes) > len(shown) else ""
         lines.append(f"Events {span}, newest first{more}: " + "; ".join(_episode_text(e) for e in shown) + ".")
+    lines.append(COVERAGE_LINE)
     if n_cur:
         lines.append(CLINICIAN_LINE)
     return lines
 
 
 def coach_block(summary: Optional[dict]) -> str:
-    """The prompt block for the owner's own coach thread, or "" — the instruction always rides with the data."""
+    """A prompt block, or "" — the instruction always rides with the data. NOT WIRED to any model: the channel is
+    TIER_OWNER_ONLY (never quoted into an AI narrative context) until the owner rules on the tier (#4972)."""
     lines = owner_lines(summary)
     if not lines:
         return ""
@@ -260,6 +283,13 @@ def read_events(table, *, user_id: str = "matthew") -> Optional[list]:
     except Exception as e:  # noqa: BLE001 — owner surfaces run without the channel
         logger.warning("rhythm_owner read failed: %s", type(e).__name__)
         return None
+
+
+def brief_section(table, data_day: str, *, user_id: str = "matthew") -> list:
+    """The daily brief's lines for the window ending on the brief's DATA day (yesterday — never a partial today).
+    A failed read is one honest line (``UNREAD_LINE``), never silence and never "zero events"."""
+    summary = read_summary(table, data_day, user_id=user_id)
+    return owner_lines(summary) if summary is not None else [UNREAD_LINE]
 
 
 def read_summary(table, today: str, *, window_days: int = WINDOW_DAYS, user_id: str = "matthew") -> Optional[dict]:

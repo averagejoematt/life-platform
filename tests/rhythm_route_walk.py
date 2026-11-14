@@ -13,7 +13,10 @@ with the channel row, whatever partition it asked for. S3, HTTP and Bedrock are 
 
 `--plant` is the mutation control: it re-binds ONE real public route (`/api/vitals`) to a
 reader that also serves the first row its table query returns — the shape of a reader that
-forgot to pick fields. The test asserts the walk catches it.
+forgot to pick fields. The test asserts the walk catches it. `--plant-renderer` (#4972 part 2)
+re-binds it to serve the owner renderer's lines instead — the rendered form carries no field
+name, so only RENDERED_TOKENS can see it; one fixture row is dated by the walk's own clock
+(the brief's data day) so those lines carry real counts.
 """
 
 from __future__ import annotations
@@ -38,7 +41,11 @@ for k, v in (
 ):
     os.environ.setdefault(k, v)
 
+from datetime import date, timedelta  # noqa: E402
+
+from common.pacific_time import pacific_today  # noqa: E402
 from health.rhythm_channel import CHANNEL_FIELDS  # noqa: E402
+from health.rhythm_owner import CLINICIAN_LINE, COVERAGE_LINE, UNREAD_LINE  # noqa: E402
 
 # Sentinel VALUES as well as field names: a leak under a renamed key still reds.
 SENTINELS = ("RHYTHMSENTINELCLASS", "RHYTHMSENTINELMED", "RHYTHMSENTINELDOSE", "RHYTHMSENTINELDEVICE")
@@ -68,7 +75,36 @@ FIXTURE_ROWS = [
         "rhythm_med_status": "taken",
     }
 ]
+# A second row dated by the WALK's clock — the brief's data day (Pacific yesterday) — so a route that serves the
+# owner renderer's output (whose window always ends on that day) renders real counts, not just the absence line.
+# The 2026-10-17 row above falls outside every live window, so on its own it could only ever prove the absence form.
+_DATA_DAY = (date.fromisoformat(pacific_today()) - timedelta(days=1)).isoformat()
+FIXTURE_ROWS.append(
+    {
+        "pk": "USER#matthew#SOURCE#clinical",
+        "sk": f"RHYTHM#HRNOTIF#{_DATA_DAY}T03:00:00#irregular",
+        "source": "clinical",
+        "channel": "rhythm",
+        "event_kind": "hr_notification",
+        "event_date": _DATA_DAY,
+        "rhythm_notification_kind": "irregular",
+        "rhythm_notification_kind_inferred": False,
+        "rhythm_notification_at": f"{_DATA_DAY}T03:00:00-07:00",
+        "rhythm_notification_device": "RHYTHMSENTINELDEVICE",
+    }
+)
 TOKENS = tuple(CHANNEL_FIELDS) + SENTINELS + ("RHYTHM#",)
+# The owner renderer's fixed strings (health.rhythm_owner): its output carries no field name, sentinel or prefix,
+# so a route serving it would pass TOKENS. Matched case-insensitively.
+RENDERED_TOKENS = (
+    "heart-rhythm records",
+    "rhythm notifications",
+    "ECG recordings",
+    "Medication log:",
+    CLINICIAN_LINE,
+    COVERAGE_LINE,
+    UNREAD_LINE,
+)
 
 
 STATS = {"queries": 0, "index_queries": 0, "unparsed_queries": 0, "partitions": set()}
@@ -215,8 +251,23 @@ def route_paths(L) -> list:
     return sorted(paths)
 
 
-def walk(plant: bool = False) -> dict:
+def walk(plant: bool = False, plant_renderer: bool = False) -> dict:
     L, table = _wire()
+    if plant_renderer:
+        # Mutation control for the RENDERED form: /api/vitals also serves the owner renderer's lines for the
+        # brief's data day — no field name, sentinel or prefix in it; only RENDERED_TOKENS can see it.
+        real_r = L.ROUTES["/api/vitals"]
+
+        def handle_vitals_rendered(*a, **k):
+            from health import rhythm_owner
+
+            resp = real_r(*a, **k)
+            body = json.loads(resp["body"]) if isinstance(resp, dict) and isinstance(resp.get("body"), str) else {}
+            body["planted"] = rhythm_owner.brief_section(table, _DATA_DAY)
+            return {"statusCode": 200, "body": json.dumps(body, default=str)}
+
+        L.ROUTES["/api/vitals"] = handle_vitals_rendered
+        L._SIMPLE_ROUTES.pop("/api/vitals", None)
     if plant:
         real = L.ROUTES["/api/vitals"]
 
@@ -268,7 +319,8 @@ def _one(L, path, qs, result):
         return
     result["answered"] += 1
     blob = json.dumps(resp, default=str)
-    hits = sorted({t for t in TOKENS if t in blob})
+    low = blob.lower()
+    hits = sorted({t for t in TOKENS if t in blob} | {t for t in RENDERED_TOKENS if t.lower() in low})
     if hits:
         result["leaks"][key] = hits
 
@@ -281,7 +333,7 @@ if __name__ == "__main__":
     _real_stdout = sys.stdout
     sys.stdout = io.StringIO()  # handlers print; keep stdout for the one JSON line
     try:
-        out = walk(plant="--plant" in sys.argv)
+        out = walk(plant="--plant" in sys.argv, plant_renderer="--plant-renderer" in sys.argv)
         out["queries"] = STATS["queries"]
         out["unparsed_queries"] = STATS["unparsed_queries"]
         out["index_queries"] = STATS["index_queries"]

@@ -7,6 +7,9 @@ What this holds:
     count carries its n and window (ADR-104/105); no events in either window is an ABSENCE line, not a zero claim;
   * THE PROMPT TEST (box 3): the coach block always carries the no-advice instruction, the one advice string is
     "discuss with your clinician", and no rendered line interprets, diagnoses, reassures or comments on a dose;
+    the coach block is NOT wired to any model in this PR (TIER_OWNER_ONLY: no AI narrative context until the owner
+    rules on the tier); counts are "{n} recorded", never "fewer events", with the coverage line beside them;
+  * the brief's window ends on its DATA day (yesterday), and a failed read is one "could not be read" line;
   * the burden-rise reader (`burden_change`) states n, both windows, coverage and the confounders, and decides
     nothing;
   * PRIVACY (box 4): the renderer's importer set is the channel privacy gate's leg 4
@@ -177,18 +180,43 @@ def test_the_summary_counts_each_window_by_family_and_kind():
 def test_owner_lines_report_counts_with_n_and_window():
     lines = ro.owner_lines(_summary())
     text = "\n".join(lines)
-    assert "Irregular-rhythm notifications: 3 in the 7 days to 2026-11-20, up from 1 in the 7 days before." in lines
-    assert "High heart-rate notifications: 1 in the 7 days to 2026-11-20, up from 0 in the 7 days before." in lines
-    assert "1 of this window's notification kinds were inferred from the reading, not named by the device." in lines
+    assert "Irregular-rhythm notifications: 3 recorded in the 7 days to 2026-11-20 (1 recorded in the 7 days before)." in lines
+    assert "High heart-rate notifications: 1 recorded in the 7 days to 2026-11-20 (0 recorded in the 7 days before)." in lines
+    assert "1 of this window's notification kinds was inferred from the reading, not named by the device." in lines
     assert (
-        "ECG recordings: 2 in the 7 days to 2026-11-20, up from 1 in the 7 days before; device results: 'result_a' x1, 'result_b' x1."
+        "ECG recordings: 2 recorded in the 7 days to 2026-11-20 (1 recorded in the 7 days before); "
+        "device results: 'result_a' x1, 'result_b' x1." in lines
+    )
+    assert (
+        "Medication log: 2 entries recorded in the 7 days to 2026-11-20 (3 entries in the 7 days before); statuses: skipped 1, taken 1."
         in lines
     )
-    assert "Medication log: 2 entries in the 7 days to 2026-11-20, down from 3 in the 7 days before (skipped 1, taken 1)." in lines
-    assert lines[-1] == ro.CLINICIAN_LINE
+    # ADR-104: a count is of stored records — never worded as fewer events; the coverage line rides every section.
+    assert lines[-2:] == [ro.COVERAGE_LINE, ro.CLINICIAN_LINE]
+    for trend_word in ("up from", "down from", "the same as", "fewer", "more than"):
+        assert trend_word not in text
     assert "2026-11-01" not in text  # outside both windows
     for sentinel in (MED_SENTINEL, DOSE_SENTINEL, DEVICE_SENTINEL):
         assert sentinel not in text
+
+
+def test_singulars_label_cap_and_status_allowlist():
+    long_label = "L" * 80
+    rows = [
+        _med_row("2026-11-19T08:00:00", status="free text the vendor might send"),
+        _notif_row("2026-11-19T01:00:00", inferred=True),
+        _notif_row("2026-11-18T01:00:00", inferred=True),
+        _ecg_row("2026-11-19T09:00:00", long_label),
+    ]
+    lines = ro.owner_lines(ro.summarize(rc.read_events(FakeTable(rows)), TODAY))
+    text = "\n".join(lines)
+    assert (
+        "Medication log: 1 entry recorded in the 7 days to 2026-11-20 (0 entries in the 7 days before); statuses: other status 1." in lines
+    )
+    assert "2 of this window's notification kinds were inferred" in text
+    assert "free text" not in text and long_label not in text
+    capped = "L" * (ro.MAX_LABEL_CHARS - 1) + "…"
+    assert f"'{capped}' x1" in text and f"device result '{capped}'" in text
 
 
 def test_no_events_is_an_absence_line_with_its_window_and_no_advice():
@@ -330,6 +358,8 @@ def test_in_the_daily_brief_the_lines_reach_the_email_renderer_alone_and_never_a
     assert isinstance(value, ast.IfExp) and isinstance(value.test, ast.Name) and value.test.id == "demo_mode"
     assert isinstance(value.body, ast.Constant) and value.body.value is None
     assert ast.unparse(value.orelse.func) == "brief_lines.rhythm_lines"
+    # The window ends on the brief's DATA day (`yesterday`), never a partial today.
+    assert ast.unparse(value.orelse.args[1]) == "yesterday", ast.unparse(value.orelse)
     kw = parents[loads[0]]
     assert isinstance(kw, ast.keyword) and kw.arg == "rhythm_lines"
     assert ast.unparse(parents[kw].func) == "html_builder.build_html"
@@ -390,13 +420,14 @@ def test_brief_lines_never_raise_and_never_log_a_value(caplog):
     with caplog.at_level(logging.DEBUG):
         lines = brief_lines.rhythm_lines(FakeTable(_rows()), TODAY, log)
         assert lines and lines[-1] == ro.CLINICIAN_LINE
-        assert brief_lines.rhythm_lines(FakeTable(fail=True), TODAY, log) is None
+        # A failed read is ONE honest line — never silence, never "zero events" (still fail-soft: no raise).
+        assert brief_lines.rhythm_lines(FakeTable(fail=True), TODAY, log) == [ro.UNREAD_LINE]
 
         class Exploding:
             def query(self, **_kw):
                 raise ValueError(MED_SENTINEL)
 
-        assert brief_lines.rhythm_lines(Exploding(), TODAY, log) is None
+        assert brief_lines.rhythm_lines(Exploding(), TODAY, log) == [ro.UNREAD_LINE]
     for sentinel in (MED_SENTINEL, DOSE_SENTINEL, DEVICE_SENTINEL, "result_a"):
         assert sentinel not in caplog.text
 

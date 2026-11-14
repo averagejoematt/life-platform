@@ -29,13 +29,15 @@ def steps_line(table, date, logger):
 
 def rhythm_lines(table, date, logger):
     """#4972: the owner-only heart-rhythm section (health.rhythm_owner) — data lines, n and window on every count.
+    `date` is the brief's DATA day (yesterday), so the window never holds a partial day; a failed read is one
+    "could not be read" line (rhythm_owner.brief_section). Only an import failure here returns None.
 
     The email goes to the owner alone; the lines reach `html_builder.build_html` and nothing else (never `data`,
     an AI prompt, a generated file or a log line — tests/test_rhythm_owner_4972.py). None = render nothing."""
     try:
         from health import rhythm_owner
 
-        return rhythm_owner.owner_lines(rhythm_owner.read_summary(table, date)) or None
+        return rhythm_owner.brief_section(table, date) or None
     except Exception as err:
         logger.warning("rhythm lines failed (non-fatal): " + type(err).__name__)
         return None

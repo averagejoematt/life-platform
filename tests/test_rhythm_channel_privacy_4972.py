@@ -17,8 +17,9 @@ THE SET, NOT THE INSTANCE. Two independent legs, each proved able to fail:
 A third, structural leg: every channel field is TIER_OWNER_ONLY, so the MCP row dumpers
 strip it (`strip_map`) and `tests/privacy_tier_wiring.py` reds any new module that names one.
 
-A fourth (#4972 part 2): the owner-only renderer `health/rhythm_owner.py` has exactly its permitted
-owner-surface importers (the daily brief's owner section; the owner's own coach thread once wired).
+A fourth (#4972 part 2): the owner-only renderer `health/rhythm_owner.py` and the daily brief's doors to it
+(`rhythm_lines`, `_brief_rhythm`) are named only by the brief's three owner-only files. Accepted limit: a
+string-built importlib path names no token and is caught only at runtime (leg 2).
 """
 
 from __future__ import annotations
@@ -165,6 +166,14 @@ def test_the_route_walk_catches_a_public_reader_that_serves_the_channel():
     assert "RHYTHMSENTINELCLASS" in out["leaks"]["/api/vitals"]
 
 
+def test_the_route_walk_catches_a_public_route_serving_the_rendered_section():
+    """Mutation control for the renderer's output (#4972 part 2): no field name, sentinel or prefix in it — the
+    walk sees it by the renderer's fixed strings, with real counts from the row dated by the walk's own clock."""
+    out = _walk("--plant-renderer")
+    hits = out["leaks"].get("/api/vitals", [])
+    assert "rhythm notifications" in hits and "Questions about these records: discuss with your clinician." in hits, hits
+
+
 # ── leg 3: the structure ──────────────────────────────────────────────────────
 def test_every_channel_field_is_owner_only_and_stripped_by_the_row_dumpers():
     from privacy.field_tiers import FIELD_TIERS, TIER_OWNER_ONLY, strip_map
@@ -175,17 +184,32 @@ def test_every_channel_field_is_owner_only_and_stripped_by_the_row_dumpers():
 
 # ── leg 4: the owner-only renderer's importer set (#4972 part 2) ──────────────
 # `health/rhythm_owner.py` reads the channel back (as neutral events) and renders it for the owner. It names no
-# channel token on its import line, so legs 1-2 cannot see who calls it: this leg holds its importers to the owner
-# surfaces below, across every source tree INCLUDING www/ (the v9 site build). Behaviour + the daily brief's
-# email-only wiring + the prompt test: tests/test_rhythm_owner_4972.py.
-# The modules that may import the renderer, each an owner-only surface. A new entry is a review.
-REQUIRED_IMPORTERS = {
-    "lambdas/emails/brief_lines.py": "the daily brief's owner-only section (the email to the owner alone)",
+# channel token on its import line, so legs 1-2 cannot see who calls it: this leg holds every file naming the
+# renderer — OR the brief's own doors to it (`rhythm_lines`, the helper in emails/brief_lines.py, and
+# `_brief_rhythm`, the section renderer in content/html_builder.py) — to the owner surfaces below, across every
+# source tree INCLUDING www/ (the v9 site build). A public route calling `brief_lines.rhythm_lines(...)` names a
+# token and reds. ACCEPTED LIMIT: a module path built from strings (`importlib.import_module("health." + x)`) or a
+# `getattr` by a computed name names no token; that shape is caught only at runtime (the route walk, leg 2, which
+# answers every GET with a channel row dated inside the brief's window). Behaviour + the daily brief's email-only
+# wiring + the prompt test: tests/test_rhythm_owner_4972.py.
+# The token -> the files that may name it, each an owner-only surface. A new entry is a review — and feeding the
+# renderer to a coach or any model is NOT on this list: the channel is TIER_OWNER_ONLY (never quoted into an AI
+# narrative context) until the owner rules on the tier.
+_BRIEF_DOORS = {
+    "lambdas/emails/brief_lines.py": "the daily brief's owner-only section helper (the email to the owner alone)",
+    "lambdas/emails/daily_brief_lambda.py": "computes the section (demo brief excluded) and hands it to build_html only",
+    "lambdas/content/html_builder.py": "renders the section into the owner's email, escaped, inside S:rhythm markers",
 }
-PERMITTED_IMPORTERS = {
-    **REQUIRED_IMPORTERS,
-    # Pre-authorised for the hand-off: the owner's own Telegram coach thread (owner-channel form, published=False).
-    "lambdas/coach/coach_domain_facts.py": "the owner's own coach-thread fact pack (#4972 hand-off; owner channel only)",
+PERMITTED_MENTIONS = {
+    "rhythm_owner": {"lambdas/emails/brief_lines.py": _BRIEF_DOORS["lambdas/emails/brief_lines.py"]},
+    "rhythm_lines": _BRIEF_DOORS,
+    "_brief_rhythm": _BRIEF_DOORS,
+}
+# Non-vacuity: the live wiring each token must still have (a guard over a door nobody uses is decoration).
+REQUIRED_MENTIONS = {
+    ("lambdas/emails/brief_lines.py", "rhythm_owner"),
+    ("lambdas/emails/daily_brief_lambda.py", "rhythm_lines"),
+    ("lambdas/content/html_builder.py", "_brief_rhythm"),
 }
 # The renderer itself and its producer (whose docstring points at its one reader; it imports nothing from it).
 _RENDERER_SELF = {"lambdas/health/rhythm_owner.py", "lambdas/health/rhythm_channel.py"}
@@ -194,8 +218,9 @@ _RENDERER_SUFFIXES = {".py", ".js", ".mjs", ".ts", ".astro", ".html", ".json", "
 _RENDERER_SKIP = {"__pycache__", "node_modules", "cdk.out", ".venv", "site-packages", "_bundle_staging", "_mcp_staging", "dist", ".astro"}
 
 
-def renderer_importers(root: Path = ROOT) -> set:
-    out = set()
+def renderer_importers(root: Path = ROOT) -> dict:
+    """{repo-relative path: set of renderer/door tokens it names}."""
+    out: dict = {}
     for top in _RENDERER_TREES:
         for dirpath, dirnames, filenames in os.walk(root / top):
             dirnames[:] = [d for d in dirnames if d not in _RENDERER_SKIP and not d.startswith(".")]
@@ -207,17 +232,21 @@ def renderer_importers(root: Path = ROOT) -> set:
                 if rel in _RENDERER_SELF:
                     continue
                 try:
-                    if "rhythm_owner" in p.read_text(encoding="utf-8"):
-                        out.add(rel)
+                    text = p.read_text(encoding="utf-8")
                 except (UnicodeDecodeError, OSError):
                     continue
+                hits = {t for t in PERMITTED_MENTIONS if t in text}
+                if hits:
+                    out[rel] = hits
     return out
 
 
 def test_only_permitted_owner_surfaces_import_the_renderer():
     found = renderer_importers()
-    assert found <= set(PERMITTED_IMPORTERS), f"a non-owner surface names the rhythm renderer: {sorted(found - set(PERMITTED_IMPORTERS))}"
-    assert set(REQUIRED_IMPORTERS) <= found, "the daily brief no longer reads the rhythm section"
+    bad = sorted((rel, t) for rel, toks in found.items() for t in toks if rel not in PERMITTED_MENTIONS[t])
+    assert not bad, f"a non-owner surface names the rhythm renderer or one of the brief's doors to it: {bad}"
+    have = {(rel, t) for rel, toks in found.items() for t in toks}
+    assert REQUIRED_MENTIONS <= have, f"the daily brief no longer wires the rhythm section: {sorted(REQUIRED_MENTIONS - have)}"
 
 
 def test_the_importer_sweep_catches_a_planted_public_reader(tmp_path):
@@ -225,7 +254,20 @@ def test_the_importer_sweep_catches_a_planted_public_reader(tmp_path):
     (tmp_path / "lambdas" / "web" / "site_api_sneaky.py").write_text("from health import rhythm_owner\n", encoding="utf-8")
     (tmp_path / "www" / "src").mkdir(parents=True)
     (tmp_path / "www" / "src" / "page.astro").write_text("rhythm_owner.owner_lines\n", encoding="utf-8")
-    assert renderer_importers(tmp_path) == {"lambdas/web/site_api_sneaky.py", "www/src/page.astro"}
+    assert set(renderer_importers(tmp_path)) == {"lambdas/web/site_api_sneaky.py", "www/src/page.astro"}
+
+
+def test_the_sweep_catches_a_public_route_calling_the_brief_helper(tmp_path):
+    """The indirect door: a public route that never names the renderer but calls the brief's helper."""
+    (tmp_path / "lambdas" / "web").mkdir(parents=True)
+    (tmp_path / "lambdas" / "web" / "site_api_indirect.py").write_text(
+        "from emails import brief_lines\n\ndef handle(table):\n    return brief_lines.rhythm_lines(table, '2026-01-01', None)\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "lambdas" / "content").mkdir(parents=True)
+    (tmp_path / "lambdas" / "content" / "site_writer.py").write_text("from content.html_builder import _brief_rhythm\n", encoding="utf-8")
+    found = renderer_importers(tmp_path)
+    assert set(found) == {"lambdas/web/site_api_indirect.py", "lambdas/content/site_writer.py"}, found
 
 
 # premerge-gate: #4972: os.walk sweep of lambdas/ mcp/ site/ scripts/ deploy/ cdk/ (+ www/ for the renderer's importer set) + a route walk of every /api/* GET handler — no public reader reaches the owner-only rhythm channel
