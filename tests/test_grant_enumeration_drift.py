@@ -723,6 +723,11 @@ _PENDING_PERMISSIONS_APPLY: dict[str, str] = {
     # zoned-schedule leg) was applied by the owner ~04:48Z with the same put-role-policy command;
     # post-apply `deploy/verify_oidc_iam.py --strict` reported CLEAN across all 17 targets.
     # Removed here per the same #2824 rule.
+    "github-actions-readonly-role": "2026-11-14 (#5934): CloudWatchAlarmHistoryRead (cloudwatch:DescribeAlarmHistory) + "
+    "QaSmokeCauseLogRead (logs:FilterLogEvents on the qa-smoke log group) for wrap-nightly's alarm-citations leg — "
+    "OWNER apply: aws iam put-role-policy --role-name github-actions-readonly-role --policy-name readonly-permissions "
+    "--policy-document file://infra/iam/github-actions-readonly-role.permissions.json, then "
+    "python3 deploy/verify_oidc_iam.py --strict",
 }
 
 
