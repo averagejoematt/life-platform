@@ -113,4 +113,18 @@ BUILDER_CHANGE_LOG = [
         "garage week. `unknown_input: locked`; it opens only on an approved readiness standard.",
         "rule": "data only — status stays proposed until the owner approves the library",
     },
+    {
+        "version": "0.3.8",
+        "date": "2026-11-14",
+        "by": "#5861 fix round 13 (library integrity, owner rulings 2026-11-14)",
+        "what": "One integrity pass, enforced at build time (`training.library_integrity`). Fallbacks follow ONE equivalence rule "
+        "(same purpose, movement function and stimulus; available, ungated, loggable, suitable) and an empty list is valid. "
+        "Readiness chains are acyclic and measurable: the hanging chain is three ordered steps, the pull-up negative's tempo is "
+        "owner-confirmed, an unused gate is gone, and the dead hang's and the kettlebell swing's other logged forms carry their "
+        "gates. A movement with no Hevy template (or verified canonical mapping) is never selectable; the kettlebell deadlift "
+        "left Hevy's Sumo Deadlift template and waits for its own; the hang high pull points at its real template. Availability "
+        "carries five evidence states and only owner-confirmed or recently logged equipment is served. Bodyweight gates say "
+        "plainly that an unset threshold is locked, and carry the accepted readiness standard. Nothing is unlocked.",
+        "rule": "data and build-time validation only — status stays proposed until the owner approves the library",
+    },
 ]

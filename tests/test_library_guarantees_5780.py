@@ -382,7 +382,7 @@ def _absent_equipment(keys: set[str], lib: dict, cat: dict, missing: list[str]) 
             out.append(f"{k}: no library entry — its equipment cannot be checked")
             continue
         if ((e.get("availability") or {}).get(xl.LOCATION_ID) or {}).get("state") != "available":
-            out.append(f"{k}: library availability at {xl.LOCATION_ID} is not available")
+            out.append(f"{k}: library availability at {xl.LOCATION_ID} is {e['availability'][xl.LOCATION_ID]['state']}")
         for eid in e.get("equipment") or []:
             st = ((items.get(eid) or {}).get(xl.LOCATION_ID) or {}).get("state")
             if st != "available":
@@ -390,6 +390,23 @@ def _absent_equipment(keys: set[str], lib: dict, cat: dict, missing: list[str]) 
             if hit is None and vr._unavailable(eid, {}, missing):
                 out.append(f"{k}: equipment {eid} on the charter's equipment.not_available")
     return out
+
+
+UNCONFIRMED_TODAY = {"machine_row", "machine_shoulder_press", "standing_calf_raise_machine"}
+"""#5861 fix round 13 (owner ruling 2026-11-14: a machine known only from old logs is `unknown`, never assumed). Today's #5075
+pools and anchor lists do not read the library, and they still name three machines the library now holds as
+`historical_only` — logged, but not in the last 12 months. That is today's behaviour and this lane does not change it; the
+three are on the owner's confirm list, and under an APPROVED library the session fit swaps or skips them
+(tests/test_library_integrity_5861.py holds every served week to `available`). The set is pinned: a fourth is red."""
+
+
+def _absent(offenders: list[str]) -> list[str]:
+    """The offenders that are ABSENT (unavailable, missing from the inventory, or charter-listed) — never just unconfirmed."""
+    return [o for o in offenders if not o.endswith("is unknown at home_gym") and not o.endswith(f"at {xl.LOCATION_ID} is unknown")]
+
+
+def _unconfirmed(offenders: list[str]) -> set[str]:
+    return {o.split(":")[0] for o in offenders if o not in _absent(offenders)}
 
 
 def _selection_keys(sel: dict) -> set[str]:
@@ -402,14 +419,19 @@ def _selection_keys(sel: dict) -> set[str]:
 def test_g3_no_prescription_names_equipment_absent_from_the_inventory():
     missing = vr.not_available()
     assert "preacher_curl_machine" in missing  # the shipped charter's list
+    unconfirmed: set[str] = set()
     for kb in KB_EXPOSURES:
         for pos, rot in _shipped(kb):
             served = _served_keys(rot, CAT0)
-            assert served and _absent_equipment(served, LIB0, CAT0, missing) == [], pos
-            assert _absent_equipment(_selection_keys(rot["selection"]), LIB0, CAT0, missing) == [], pos
+            offenders = _absent_equipment(served, LIB0, CAT0, missing)
+            assert served and _absent(offenders) == [], pos
+            unconfirmed |= _unconfirmed(offenders)
+            assert _absent_equipment(_selection_keys(rot["selection"]), LIB0, CAT0, missing) == [], pos  # the selection never names one
+    assert unconfirmed == UNCONFIRMED_TODAY, "the pools' unconfirmed machines are a pinned set (a new one is red)"
     for pos, rot in _serve_program(_lib("approved"), CAT0, kb=kb_entry.ENTRY_EXPOSURES):  # what serves once approved
         assert rot.get("source") == "selection" or pos["step"] == 0
-        assert _absent_equipment(_served_keys(rot, CAT0), LIB0, CAT0, missing) == [], pos
+        offenders = _absent_equipment(_served_keys(rot, CAT0), LIB0, CAT0, missing)  # the anchors: the session fit swaps them
+        assert _absent(offenders) == [] and _unconfirmed(offenders) <= UNCONFIRMED_TODAY, pos
     ov = _synthetic_overlay()  # learned unavailability: the rear-delt machine is never named
     for pos, sel in _selections(_lib(), CAT0, ov):
         assert "reverse_pec_deck" not in _selection_keys(sel), pos
@@ -419,7 +441,11 @@ def test_g3_control_absent_equipment_or_a_charter_listed_movement_goes_red():
     missing = vr.not_available()
     pos, rot = _shipped(0)[1]
     served = _served_keys(rot, CAT0)
-    assert _absent_equipment(served, LIB0, CAT0, missing) == []
+    assert _absent(_absent_equipment(served, LIB0, CAT0, missing)) == []
+    # control 0 (#5861 fix round 13): an unconfirmed machine outside the pinned set is named, so the pin can go red
+    lib = _lib()
+    lib["gym_inventory"]["items"]["cable_stack"]["home_gym"]["state"] = "unknown"
+    assert _unconfirmed(_absent_equipment(served, lib, CAT0, missing)) - UNCONFIRMED_TODAY
     # control 1: the inventory loses an item the served week needs (the pools do not read the inventory — this guard does)
     lib = _lib()
     lib["gym_inventory"]["items"]["cable_stack"]["home_gym"]["state"] = "unavailable"

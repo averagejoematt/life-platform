@@ -706,12 +706,29 @@ def note_signal_tags(text: str) -> list[str]:
 PRIVATE_GATE_FIELDS = ("measured_input", "comparator", "value")
 
 
+def threshold_unset(g: dict[str, Any], row: Any) -> bool:
+    """A bodyweight gate whose private threshold the owner has not set: LOCKED, and VALID (owner ruling 19, 2026-11-13 — no
+    bodyweight cut-off is ever derived, so `null` is the correct state and `exercise_gates.bodyweight_verdict` reads it
+    locked). Only the overlay-owned thresholds: a charter-owned number that cannot be read is a gap, not a choice."""
+    thr = g.get("threshold") or {}
+    owned = g.get("kind") == "bodyweight_threshold" and str(thr.get("ref") or "").startswith("overlay:gate_thresholds.")
+    return owned and isinstance(row, dict) and row.get("value") is None
+
+
+def unset_thresholds(lib: dict[str, Any], overlay: Optional[dict[str, Any]]) -> list[str]:
+    """The gate ids that are locked with no threshold set (ids only) — reported by the private check, never an error."""
+    rows = (overlay or {}).get("gates") if isinstance(overlay, dict) else None
+    return sorted(gid for gid, g in (lib.get("gates") or {}).items() if isinstance(rows, dict) and threshold_unset(g, rows.get(gid)))
+
+
 def private_gate_gaps(lib: dict[str, Any], overlay: Optional[dict[str, Any]]) -> list[dict[str, Any]]:
     """Pure. Every public gate must resolve in the private overlay to a complete row.
 
     Returns one finding per incomplete gate: {gate_id, movement_ids, missing: [field names]}. Field names and ids
     only — NEVER a threshold value, because this output may land in logs. Empty list = complete.
-    A missing / unreadable overlay fails every gate (`missing: ["overlay"]`) — fail closed.
+    A missing / unreadable overlay fails every gate (`missing: ["overlay"]`) — fail closed. A bodyweight gate with no
+    threshold set is LOCKED and complete (`threshold_unset`, #5861 fix round 13): its row still needs its measured input
+    and comparator, and a threshold that IS set must be a number — a gate that could open is never under-specified.
     """
     mv = movements(lib)
     carriers: dict[str, list[str]] = {}
@@ -731,9 +748,11 @@ def private_gate_gaps(lib: dict[str, Any], overlay: Optional[dict[str, Any]]) ->
             row = rows[gid]
             for f in PRIVATE_GATE_FIELDS:
                 v = row.get(f)
+                if f == "value" and threshold_unset(g, row):
+                    continue  # locked, valid: no threshold is the owner's ruling, not a gap
                 if v is None or v == "" or v == {} or v == []:
                     missing.append(f)
-            if g.get("kind") == "bodyweight_threshold" and "value" not in missing:
+            if g.get("kind") == "bodyweight_threshold" and "value" not in missing and not threshold_unset(g, row):
                 if not isinstance(row.get("value"), (int, float)) or isinstance(row.get("value"), bool):
                     missing.append("value_numeric")
             for p in list(g.get("chain_prerequisites") or []) + list(row.get("chain_prerequisites") or []):

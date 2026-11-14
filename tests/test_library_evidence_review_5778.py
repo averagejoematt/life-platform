@@ -404,9 +404,8 @@ def test_a_new_candidate_enters_valid_with_rule_fallbacks():
     ), "the rubric derives a candidate's tier"
     assert qr.rubric_tier(e, "triceps_long_head") == "S" and row["tier"] == "A", "the points alone say S; the S criteria cap it"
     assert xl.validate(after) == []
-    fidx = xl.fallback_index(after)
     for k, mv in after["movements"].items():
-        want = [{"movement_id": m, "reason": r} for m, r in xl.fallback_candidates(after, k, fidx)[: len(mv["fallbacks"])]]
+        want = [{"movement_id": m, "reason": r} for m, r in xl.fallback_candidates(after, k)[: xl.integrity.MAX_FALLBACKS]]
         assert mv["fallbacks"] == want, k
     # must-fail: an unverified citation or no citation keeps the candidate out
     bad_http = FakeHttp.for_library()  # NEW is not served -> does not verify

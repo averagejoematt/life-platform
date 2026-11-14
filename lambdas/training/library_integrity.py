@@ -27,7 +27,8 @@ on every build and in CI, so a library that breaks a rule here is refused. Four 
                 mobility and rehab work, the same kind of work. A shared family label, or a shared muscle alone, is not
                 equivalence.
    and B is valid in itself: equipment `available` at home_gym; no locking gate and no `not_for_you_now`; loggable; and
-   suitable (skill no higher than A's, no joint rated two levels worse, no higher impact, not ballistic unless A is).
+   suitable (not high-skill unless A is, no joint rated two levels worse, for conditioning no higher impact and no less
+   controllable, not ballistic unless A is).
    Nothing is added to fill a list: a movement with no equivalent has NO fallbacks, and the served week drops the slot.
 
 4. GATES. A readiness chain is acyclic and reachable (`gate_audit`): every chain gate names a prerequisite that is a
@@ -165,6 +166,7 @@ FALLBACK_CLAUSES = (
     "skill",
     "joint_stress",
     "impact",
+    "control",
     "ballistic",
 )
 
@@ -235,7 +237,7 @@ def _equivalence_breaks(a: dict[str, Any], b: dict[str, Any], same_family: bool)
 
 def _suitability_breaks(a: dict[str, Any], b: dict[str, Any]) -> list[str]:
     out: list[str] = []
-    if LEVEL.get(str(b.get("skill_complexity")), 0) > LEVEL.get(str(a.get("skill_complexity")), 0):
+    if b.get("skill_complexity") == "high" and a.get("skill_complexity") != "high":
         out.append("skill")
     ja, jb = a.get("joint_stress") or {}, b.get("joint_stress") or {}
     if any(j in LEVEL and i in LEVEL and LEVEL[j] - LEVEL[i] >= 2 for i, j in ((str(ja.get(x)), str(jb.get(x))) for x in JOINTS)):
@@ -243,6 +245,9 @@ def _suitability_breaks(a: dict[str, Any], b: dict[str, Any]) -> list[str]:
     ia, ib = (_inputs(a).get("conditioning") or {}).get("impact"), (_inputs(b).get("conditioning") or {}).get("impact")
     if ia in LEVEL and ib in LEVEL and LEVEL[ib] > LEVEL[ia]:
         out.append("impact")
+    ka, kb = (_inputs(a).get("conditioning") or {}).get("control"), (_inputs(b).get("conditioning") or {}).get("control")
+    if ka in LEVEL and kb in LEVEL and LEVEL[kb] < LEVEL[ka]:
+        out.append("control")  # a steady, controllable modality is not replaced by one whose effort is harder to hold
     if _ballistic(b) and not _ballistic(a):
         out.append("ballistic")
     return out
@@ -267,12 +272,14 @@ def fallback_problems(lib: dict[str, Any], key: str, fb: str) -> list[str]:
 
 
 def fallback_candidates(lib: dict[str, Any], key: str) -> list[tuple[str, str]]:
-    """Every valid fallback for `key` as (movement id, reason), ranked: the same named pattern first, then no equipment
-    shared with `key` (a missing item must be a swap, not the same hole), then the same length bias, then the more
-    familiar (history exposures). The builder keeps the first `MAX_FALLBACKS`; fewer, or none, is correct."""
+    """Every valid fallback for `key` as (movement id, reason), ranked: the same named pattern first, then the same
+    laterality (a two-leg lift's first swap is two-leg), then no equipment shared with `key` (a missing item must be a
+    swap, not the same hole), then the same length bias, then the more familiar (history exposures). The builder keeps the
+    first `MAX_FALLBACKS`; fewer, or none, is correct."""
     mv = lib.get("movements") or {}
     me = mv[key]
     my_eq = set(me.get("equipment") or [])
+    one_sided = "unilateral" in (_inputs(me).get("functional") or [])
     ranked = []
     for k, e in mv.items():
         if k == key or fallback_problems(lib, key, k):
@@ -280,7 +287,8 @@ def fallback_candidates(lib: dict[str, Any], key: str) -> list[tuple[str, str]]:
         reason = _function_match(me, e, _family(mv, key) == _family(mv, k)) or "same_function"
         shares = bool(set(e.get("equipment") or []) & my_eq)
         exposures = int(((e.get("history") or {}).get("exposures")) or 0)
-        ranked.append(((reason != "same_stimulus", shares, e.get("length_bias") != me.get("length_bias"), -exposures, k), k, reason))
+        sided = ("unilateral" in (_inputs(e).get("functional") or [])) != one_sided
+        ranked.append(((reason != "same_stimulus", sided, shares, e.get("length_bias") != me.get("length_bias"), -exposures, k), k, reason))
     return [(k, reason) for _, k, reason in sorted(ranked)]
 
 

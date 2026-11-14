@@ -1,6 +1,6 @@
 {
  "_README": "The owner's exercise library (#5769). PROPOSED — nothing in the drafting path reads it until the owner approves it. Public half only: no bodyweight, no loads, no note text — the N=1 half (best set per bodyweight band, coded note signals, gate threshold values) is the owner-private overlay s3://matthew-life-platform/config/coaching/exercise_library.private.json, joined at selection time by lambdas/training/exercise_library.py (fail-closed). Built by deploy/build_exercise_library.py from the full Hevy history + deploy/exercise_library_curation.py. Doc: docs/coaching/EXERCISE_LIBRARY.md.",
- "version": "0.3.7",
+ "version": "0.3.8",
  "status": "proposed",
  "change_log": [
   {
@@ -78,6 +78,13 @@
    "by": "#5861 fix round 11 (the tenth red team; owner ruling #3 of fix round 8)",
    "what": "`pull_up_band` (Pull Up (Band)) gated behind `bw_pull` + `chain_pull_negative`, the pull-up negative's locked gates (owner ruling #3: all six bodyweight progressions AND the band pull-up gate stay LOCKED) — it was served ungated in a garage week. `unknown_input: locked`; it opens only on an approved readiness standard.",
    "rule": "data only — status stays proposed until the owner approves the library"
+  },
+  {
+   "version": "0.3.8",
+   "date": "2026-11-14",
+   "by": "#5861 fix round 13 (library integrity, owner rulings 2026-11-14)",
+   "what": "One integrity pass, enforced at build time (`training.library_integrity`). Fallbacks follow ONE equivalence rule (same purpose, movement function and stimulus; available, ungated, loggable, suitable) and an empty list is valid. Readiness chains are acyclic and measurable: the hanging chain is three ordered steps, the pull-up negative's tempo is owner-confirmed, an unused gate is gone, and the dead hang's and the kettlebell swing's other logged forms carry their gates. A movement with no Hevy template (or verified canonical mapping) is never selectable; the kettlebell deadlift left Hevy's Sumo Deadlift template and waits for its own; the hang high pull points at its real template. Availability carries five evidence states and only owner-confirmed or recently logged equipment is served. Bodyweight gates say plainly that an unset threshold is locked, and carry the accepted readiness standard. Nothing is unlocked.",
+   "rule": "data and build-time validation only — status stays proposed until the owner approves the library"
   }
  ],
  "_provenance": {
@@ -125,8 +132,8 @@
    "functional": {
     "S": 9,
     "A": 63,
-    "B": 91,
-    "C": 62,
+    "B": 92,
+    "C": 61,
     "D": 0,
     "not_applicable": 401
    },
@@ -350,8 +357,8 @@
    "none_reviewed": 640
   },
   "integrity": {
-   "fallback_links": 1097,
-   "movements_without_fallbacks": 233,
+   "fallback_links": 1114,
+   "movements_without_fallbacks": 235,
    "template_id_null": 35,
    "not_loggable": 34,
    "movements_by_availability_evidence": {
@@ -372,6 +379,7 @@
   "expansion_candidates_already_in_history": [
    "back_extension_45",
    "back_extension_weighted",
+   "barbell_high_pulls",
    "dead_bug",
    "dead_hang",
    "decline_chest_press_machine",
@@ -564,6 +572,13 @@
     "consensus",
     "none_reviewed"
    ],
+   "meaning": {
+    "rct_direct": "a controlled trial tested THIS movement for THIS target (cited on the row)",
+    "rct_characteristic": "a controlled trial tested the characteristic the row relies on (a range, a position), not this movement",
+    "consensus": "practitioner consensus over inputs checked by hand; no trial is claimed",
+    "none_reviewed": "no study was reviewed for this rating: the tier is a biomechanical and practical judgment made from the rubric's categorical inputs. It is not scientifically validated and claims no trial"
+   },
+   "separate_from_tier": "the tier is a quality judgment from the rubric; evidence confidence is its own field and says what the judgment rests on. A `none_reviewed` tier is never demoted for lacking a trial and never reads as validated",
    "may_adjust": [
     "rct_direct"
    ],
@@ -582,7 +597,7 @@
     "target_is_limiter": "the target muscle, not balance, grip, mobility or another muscle, ends the set",
     "stable_to_failure": "stable enough (stability high or moderate) to take the target close to failure",
     "stimulus_to_fatigue": "systemic fatigue is not high for the stimulus",
-    "no_high_joint_stress": "no joint is rated high",
+    "no_high_joint_stress": "none of the joints the rubric costs (spine load, shear, wrist, elbow, shoulder) is rated high; the knee and hip ratings are a pain map for a painful joint, not a cost on a healthy one (owner ruling 10, 2026-11-13)",
     "reviewed_inputs": "the inputs the criteria read were checked by hand (`objective_inputs.reviewed`), not only derived by a title rule",
     "inputs_known": "no input the rubric reads is unknown (an unknown scores neutral, so it can never carry a row to S)"
    },
@@ -1532,12 +1547,24 @@
    "measured_input": "7-day mean bodyweight (Withings), the same reading the charter's bodyweight gates use",
    "threshold": {
     "ref": "overlay:gate_thresholds.bw_pull",
-    "comparison": "at_or_under"
+    "comparison": "at_or_under",
+    "unset": "locked"
    },
-   "unlock_condition": "7-day mean bodyweight at or under the private threshold for bodyweight pull-ups / chin-ups, AND every chain prerequisite met",
+   "unlock_condition": "LOCKED for bodyweight pull-ups / chin-ups: the private threshold is unset, and by owner ruling (2026-11-13) no bodyweight cut-off is derived, so it stays unset. What opens this is the readiness standard below, shown in logged sessions, once that standard is built as a measured chain — a follow-up; until then nothing opens it.",
+   "readiness_standard": {
+    "status": "accepted by the owner 2026-11-13 as the criteria; practitioner heuristics; stated here, not yet evaluated",
+    "demonstrate": [
+     "assisted pull-up 3 x 6 at the machine's lightest usable assistance, RPE <= 8",
+     "3 x 3 negatives, each lowered for 4 to 5 seconds to a dead hang"
+    ],
+    "how": "each in two separate sessions at least 48 hours apart, with no pain flag on the movement or its joint in the last 14 days",
+    "confirm": [
+     "shoulders set before the elbows bend, chin over the bar, no kip, a full hang between reps"
+    ]
+   },
    "chain_prerequisites": [],
    "unknown_input": "locked",
-   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling; the threshold value is owner-set in the private overlay (absent => locked)"
+   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling; owner rulings 2026-11-13 (19, and the readiness standards accepted as criteria): no threshold is set"
   },
   "bw_dip": {
    "kind": "bodyweight_threshold",
@@ -1545,12 +1572,24 @@
    "measured_input": "7-day mean bodyweight (Withings), the same reading the charter's bodyweight gates use",
    "threshold": {
     "ref": "overlay:gate_thresholds.bw_dip",
-    "comparison": "at_or_under"
+    "comparison": "at_or_under",
+    "unset": "locked"
    },
-   "unlock_condition": "7-day mean bodyweight at or under the private threshold for bodyweight dips, AND every chain prerequisite met",
+   "unlock_condition": "LOCKED for bodyweight dips: the private threshold is unset, and by owner ruling (2026-11-13) no bodyweight cut-off is derived, so it stays unset. What opens this is the readiness standard below, shown in logged sessions, once that standard is built as a measured chain — a follow-up; until then nothing opens it.",
+   "readiness_standard": {
+    "status": "accepted by the owner 2026-11-13 as the criteria; practitioner heuristics; stated here, not yet evaluated",
+    "demonstrate": [
+     "assisted dip 3 x 8 at the machine's lightest usable assistance, RPE <= 8",
+     "straight-arm support hold on the bars 3 x 20 s"
+    ],
+    "how": "each in two separate sessions at least 48 hours apart, with no pain flag on the movement or its joint in the last 14 days",
+    "confirm": [
+     "forearms vertical, a slight forward lean, descent to upper arm parallel and no deeper"
+    ]
+   },
    "chain_prerequisites": [],
    "unknown_input": "locked",
-   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling; the threshold value is owner-set in the private overlay (absent => locked)"
+   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling; owner rulings 2026-11-13 (19, and the readiness standards accepted as criteria): no threshold is set"
   },
   "bw_pushup": {
    "kind": "bodyweight_threshold",
@@ -1558,12 +1597,24 @@
    "measured_input": "7-day mean bodyweight (Withings), the same reading the charter's bodyweight gates use",
    "threshold": {
     "ref": "overlay:gate_thresholds.bw_pushup",
-    "comparison": "at_or_under"
+    "comparison": "at_or_under",
+    "unset": "locked"
    },
-   "unlock_condition": "7-day mean bodyweight at or under the private threshold for floor push-up volume, AND every chain prerequisite met",
+   "unlock_condition": "LOCKED for floor push-up volume: the private threshold is unset, and by owner ruling (2026-11-13) no bodyweight cut-off is derived, so it stays unset. What opens this is the readiness standard below, shown in logged sessions, once that standard is built as a measured chain — a follow-up; until then nothing opens it.",
+   "readiness_standard": {
+    "status": "accepted by the owner 2026-11-13 as the criteria; practitioner heuristics; stated here, not yet evaluated",
+    "demonstrate": [
+     "incline push-up 3 x 12 at RPE <= 8 at each lower step, down to a knee-height step",
+     "plank 3 x 30 s with the ribs down and no sag"
+    ],
+    "how": "each in two separate sessions at least 48 hours apart, with no pain flag on the movement or its joint in the last 14 days",
+    "confirm": [
+     "a rigid line from head to heel on every rep"
+    ]
+   },
    "chain_prerequisites": [],
    "unknown_input": "locked",
-   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling; the threshold value is owner-set in the private overlay (absent => locked)"
+   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling; owner rulings 2026-11-13 (19, and the readiness standards accepted as criteria): no threshold is set"
   },
   "bw_nordic": {
    "kind": "bodyweight_threshold",
@@ -1571,12 +1622,25 @@
    "measured_input": "7-day mean bodyweight (Withings), the same reading the charter's bodyweight gates use",
    "threshold": {
     "ref": "overlay:gate_thresholds.bw_nordic",
-    "comparison": "at_or_under"
+    "comparison": "at_or_under",
+    "unset": "locked"
    },
-   "unlock_condition": "7-day mean bodyweight at or under the private threshold for the Nordic hamstring curl, AND every chain prerequisite met",
+   "unlock_condition": "LOCKED for the Nordic hamstring curl: the private threshold is unset, and by owner ruling (2026-11-13) no bodyweight cut-off is derived, so it stays unset. What opens this is the readiness standard below, shown in logged sessions, once that standard is built as a measured chain — a follow-up; until then nothing opens it.",
+   "readiness_standard": {
+    "status": "accepted by the owner 2026-11-13 as the criteria; practitioner heuristics; stated here, not yet evaluated",
+    "demonstrate": [
+     "a seated or lying leg curl that progressed over its last three exposures",
+     "45-degree back extension 3 x 12",
+     "assisted Nordic lowering 3 x 4, each over 3 seconds or longer"
+    ],
+    "how": "each in two separate sessions at least 48 hours apart, with no pain flag on the movement or its joint in the last 14 days",
+    "confirm": [
+     "no hamstring cramp on the lowering, the knees padded"
+    ]
+   },
    "chain_prerequisites": [],
    "unknown_input": "locked",
-   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling; the threshold value is owner-set in the private overlay (absent => locked)"
+   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling; owner rulings 2026-11-13 (19, and the readiness standards accepted as criteria): no threshold is set"
   },
   "bw_hanging": {
    "kind": "bodyweight_threshold",
@@ -1584,12 +1648,24 @@
    "measured_input": "7-day mean bodyweight (Withings), the same reading the charter's bodyweight gates use",
    "threshold": {
     "ref": "overlay:gate_thresholds.bw_hanging",
-    "comparison": "at_or_under"
+    "comparison": "at_or_under",
+    "unset": "locked"
    },
-   "unlock_condition": "7-day mean bodyweight at or under the private threshold for hanging knee / leg raises, AND every chain prerequisite met",
+   "unlock_condition": "LOCKED for hanging knee / leg raises: the private threshold is unset, and by owner ruling (2026-11-13) no bodyweight cut-off is derived, so it stays unset. What opens this is the readiness standard below, shown in logged sessions, once that standard is built as a measured chain — a follow-up; until then nothing opens it.",
+   "readiness_standard": {
+    "status": "accepted by the owner 2026-11-13 as the criteria; practitioner heuristics; stated here, not yet evaluated",
+    "demonstrate": [
+     "dead hang 3 x 20 s, then 3 x 30 s, with active shoulders",
+     "supported (captain's chair) knee raise 3 x 10 without a swing"
+    ],
+    "how": "each in two separate sessions at least 48 hours apart, with no pain flag on the movement or its joint in the last 14 days",
+    "confirm": [
+     "the pelvis tilts at the top of the raise; no swing"
+    ]
+   },
    "chain_prerequisites": [],
    "unknown_input": "locked",
-   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling; the threshold value is owner-set in the private overlay (absent => locked)"
+   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling; owner rulings 2026-11-13 (19, and the readiness standards accepted as criteria): no threshold is set"
   },
   "bw_advanced": {
    "kind": "bodyweight_threshold",
@@ -1597,12 +1673,25 @@
    "measured_input": "7-day mean bodyweight (Withings), the same reading the charter's bodyweight gates use",
    "threshold": {
     "ref": "overlay:gate_thresholds.bw_advanced",
-    "comparison": "at_or_under"
+    "comparison": "at_or_under",
+    "unset": "locked"
    },
-   "unlock_condition": "7-day mean bodyweight at or under the private threshold for advanced bodyweight skills (pistol, handstand, lever, flag), AND every chain prerequisite met",
+   "unlock_condition": "LOCKED for advanced bodyweight skills (pistol, handstand, lever, flag): the private threshold is unset, and by owner ruling (2026-11-13) no bodyweight cut-off is derived, so it stays unset. What opens this is the readiness standard below, shown in logged sessions, once that standard is built as a measured chain — a follow-up; until then nothing opens it.",
+   "readiness_standard": {
+    "status": "accepted by the owner 2026-11-13 as the criteria; practitioner heuristics; stated here, not yet evaluated",
+    "demonstrate": [
+     "pistol squat: box pistol to a knee-height box 3 x 5 per leg at RPE <= 8",
+     "handstand push-up: pike push-up with the feet on a bench 3 x 8 at RPE <= 8, and a wall handstand hold 3 x 20 s"
+    ],
+    "how": "each in two separate sessions at least 48 hours apart, with no pain flag on the movement or its joint in the last 14 days",
+    "confirm": [
+     "heel down with the knee tracking the toes (pistol)",
+     "a full overhead reach without a back arch (handstand)"
+    ]
+   },
    "chain_prerequisites": [],
    "unknown_input": "locked",
-   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling; the threshold value is owner-set in the private overlay (absent => locked)"
+   "provenance": "platform-proposed 2026-11-11 (#5769), pending owner ruling; owner rulings 2026-11-13 (19, and the readiness standards accepted as criteria): no threshold is set"
   },
   "bw_power_clean": {
    "kind": "bodyweight_threshold",
@@ -1826,9 +1915,9 @@
    "kind": "chain_prerequisite",
    "locks": true,
    "measured_input": "logged Hevy sessions of the prerequisite movement(s), with RPE and the private overlay's pain flags",
-   "unlock_condition": "hang high pull the prerequisite logged in at least 3 sessions across at least 2 weeks at RPE <= 7, with no pain flag on it in the last 28 days",
+   "unlock_condition": "hang high pull (Barbell High Pulls) the prerequisite logged in at least 3 sessions across at least 2 weeks at RPE <= 7, with no pain flag on it in the last 28 days",
    "chain_prerequisites": [
-    "hang_high_pull"
+    "barbell_high_pulls"
    ],
    "unknown_input": "locked",
    "provenance": "owner-approved 2026-11-11 (progression standards approved as proposed, ruling on #5772)"
@@ -2549,7 +2638,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "one_arm_bench_press",
+     "movement_id": "incline_bench_press_dumbbell",
      "reason": "same_stimulus"
     }
    ]
@@ -2737,15 +2826,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "bulgarian_split_squat_dumbbell",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "goblet_squat",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "db_bench_front_squats",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "db_crush_grip_squats",
      "reason": "same_stimulus"
     }
    ]
@@ -3189,15 +3278,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "ez_bar_biceps_curl",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "bicep_curl_barbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "bicep_curl_machine",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "21s",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "bicep_curl_cable",
      "reason": "same_stimulus"
     }
    ],
@@ -3983,15 +4072,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "ez_bar_biceps_curl",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "bicep_curl_barbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "bicep_curl_machine",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "21s",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "bicep_curl_cable",
      "reason": "same_stimulus"
     }
    ],
@@ -4905,7 +4994,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_bodyweight",
+     "movement_id": "reverse_lunge",
      "reason": "same_stimulus"
     }
    ],
@@ -5364,11 +5453,11 @@
      "reason": "same_function"
     },
     {
-     "movement_id": "walking",
+     "movement_id": "elliptical_trainer",
      "reason": "same_function"
     },
     {
-     "movement_id": "elliptical_trainer",
+     "movement_id": "rowing_machine",
      "reason": "same_function"
     }
    ],
@@ -5504,15 +5593,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "gorilla_row_kettlebell",
+     "movement_id": "seated_cable_row_bar_grip",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "landmine_row",
+     "movement_id": "seated_cable_row_v_grip_cable",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_chest_supported_rows",
+     "movement_id": "underhand_barbell_dead_rows",
      "reason": "same_stimulus"
     }
    ]
@@ -5955,11 +6044,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "standing_calf_raise_dumbbell",
+     "movement_id": "standing_calf_raise_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "single_leg_standing_calf_raise_dumbbell",
+     "movement_id": "standing_calf_raise_dumbbell",
      "reason": "same_stimulus"
     }
    ]
@@ -6103,7 +6192,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "one_arm_bench_press",
+     "movement_id": "knee_push_up",
      "reason": "same_stimulus"
     }
    ],
@@ -6253,15 +6342,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "bench_press_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "chest_press_machine",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "one_arm_bench_press",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "incline_push_up",
+     "movement_id": "underhand_bench_press",
      "reason": "same_stimulus"
     }
    ]
@@ -6573,16 +6662,7 @@
      "source": "the worst of its equipment: kettlebell"
     }
    },
-   "fallbacks": [
-    {
-     "movement_id": "swing",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "double_swings",
-     "reason": "same_stimulus"
-    }
-   ],
+   "fallbacks": [],
    "attribute_audit": {
     "fields": [],
     "reason": "",
@@ -7058,11 +7138,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "kneeling_banded_hip_thrusts",
+     "movement_id": "db_hip_thrust",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "glute_bridge",
+     "movement_id": "hip_thrust_barbell",
      "reason": "same_stimulus"
     }
    ],
@@ -7220,11 +7300,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_chest_supported_rows",
+     "movement_id": "seated_cable_row_bar_grip",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_tripod_rows",
+     "movement_id": "seated_cable_row_v_grip_cable",
      "reason": "same_stimulus"
     }
    ],
@@ -7374,6 +7454,10 @@
     }
    },
    "fallbacks": [
+    {
+     "movement_id": "shrug_barbell",
+     "reason": "same_stimulus"
+    },
     {
      "movement_id": "seated_shrugs",
      "reason": "same_stimulus"
@@ -8496,11 +8580,11 @@
      "reason": "same_function"
     },
     {
-     "movement_id": "walking",
+     "movement_id": "elliptical_trainer",
      "reason": "same_function"
     },
     {
-     "movement_id": "elliptical_trainer",
+     "movement_id": "rowing_machine",
      "reason": "same_function"
     }
    ]
@@ -9436,11 +9520,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "bicep_curl_machine",
+     "movement_id": "ez_bar_biceps_curl",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "21s",
+     "movement_id": "bicep_curl_barbell",
      "reason": "same_stimulus"
     }
    ],
@@ -9724,11 +9808,11 @@
    },
    "fallbacks": [
     {
-     "movement_id": "standing_calf_raise_dumbbell",
+     "movement_id": "standing_calf_raise_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "single_leg_standing_calf_raise_dumbbell",
+     "movement_id": "standing_calf_raise_dumbbell",
      "reason": "same_stimulus"
     },
     {
@@ -10341,11 +10425,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "bicep_curl_machine",
+     "movement_id": "ez_bar_biceps_curl",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "21s",
+     "movement_id": "bicep_curl_barbell",
      "reason": "same_stimulus"
     }
    ],
@@ -10511,11 +10595,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "glute_machine_kickback",
+     "movement_id": "db_hip_thrust",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "kneeling_banded_hip_thrusts",
+     "movement_id": "glute_machine_kickback",
      "reason": "same_stimulus"
     }
    ],
@@ -11298,7 +11382,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "glute_machine_kickback",
+     "movement_id": "db_hip_thrust",
      "reason": "same_stimulus"
     }
    ],
@@ -11443,15 +11527,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "leaning_step_ups",
+     "movement_id": "goblet_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "leaning_speed_step_ups",
+     "movement_id": "db_bench_front_squats",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "crossover_stepup",
+     "movement_id": "db_crush_grip_squats",
      "reason": "same_stimulus"
     }
    ]
@@ -11586,7 +11670,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_no_money_curls",
+     "movement_id": "ez_bar_biceps_curl",
      "reason": "same_stimulus"
     }
    ],
@@ -11931,7 +12015,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_bodyweight",
+     "movement_id": "reverse_lunge",
      "reason": "same_stimulus"
     }
    ],
@@ -12852,11 +12936,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "reverse_lunge_barbell",
+     "movement_id": "squat_bodyweight",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "1_legged_squat",
+     "movement_id": "box_squat_barbell",
      "reason": "same_stimulus"
     }
    ],
@@ -13171,15 +13255,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "leaning_step_ups",
+     "movement_id": "goblet_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "leaning_speed_step_ups",
+     "movement_id": "db_bench_front_squats",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "crossover_stepup",
+     "movement_id": "db_crush_grip_squats",
      "reason": "same_stimulus"
     }
    ],
@@ -13660,15 +13744,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "bulgarian_split_squat_dumbbell",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "goblet_squat",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "db_bench_front_squats",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "db_crush_grip_squats",
      "reason": "same_stimulus"
     }
    ],
@@ -14279,7 +14363,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "goblet_squat",
+     "movement_id": "db_cossack_squats",
      "reason": "same_stimulus"
     }
    ],
@@ -14433,15 +14517,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "single_leg_rdl_dumbbell",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "3_way_rdl",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "banded_good_mornings",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "db_stiff_legged_deadlift",
      "reason": "same_stimulus"
     }
    ],
@@ -14594,8 +14678,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "elbows_tucked_db_bench",
-     "reason": "substitute_pattern"
+     "movement_id": "bench_dip",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "db_jm_press",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "db_diamond_press",
+     "reason": "same_stimulus"
     }
    ],
    "attribute_audit": {
@@ -14930,7 +15022,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_bodyweight",
+     "movement_id": "reverse_lunge",
      "reason": "same_stimulus"
     }
    ],
@@ -15267,15 +15359,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "leg_press_machine",
+     "movement_id": "single_leg_press",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "linear_leg_press",
+     "movement_id": "1_legged_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "leg_press_horizontal_machine",
+     "movement_id": "split_squat_switches",
      "reason": "same_stimulus"
     }
    ],
@@ -16241,7 +16333,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_bodyweight",
+     "movement_id": "reverse_lunge",
      "reason": "same_stimulus"
     }
    ],
@@ -17131,11 +17223,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "bicep_curl_machine",
+     "movement_id": "ez_bar_biceps_curl",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "21s",
+     "movement_id": "bicep_curl_barbell",
      "reason": "same_stimulus"
     }
    ],
@@ -17463,15 +17555,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "ez_bar_biceps_curl",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "bicep_curl_barbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "bicep_curl_machine",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "21s",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "bicep_curl_cable",
      "reason": "same_stimulus"
     }
    ],
@@ -17949,15 +18041,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "bulgarian_split_squat_dumbbell",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "goblet_squat",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "db_bench_front_squats",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "db_crush_grip_squats",
      "reason": "same_stimulus"
     }
    ],
@@ -18112,7 +18204,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "skullcrusher_dumbbell",
+     "movement_id": "skullcrusher_barbell",
      "reason": "same_stimulus"
     }
    ],
@@ -18895,11 +18987,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "glute_machine_kickback",
+     "movement_id": "db_hip_thrust",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "kneeling_banded_hip_thrusts",
+     "movement_id": "glute_machine_kickback",
      "reason": "same_stimulus"
     }
    ],
@@ -19367,15 +19459,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "gorilla_row_kettlebell",
+     "movement_id": "seated_cable_row_bar_grip",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "landmine_row",
+     "movement_id": "seated_cable_row_v_grip_cable",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "dumbbell_row",
+     "movement_id": "underhand_barbell_dead_rows",
      "reason": "same_stimulus"
     }
    ],
@@ -19561,7 +19653,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_bodyweight",
+     "movement_id": "reverse_lunge",
      "reason": "same_stimulus"
     }
    ],
@@ -19704,15 +19796,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "ez_bar_biceps_curl",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "bicep_curl_barbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "bicep_curl_machine",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "21s",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "bicep_curl_cable",
      "reason": "same_stimulus"
     }
    ],
@@ -19885,7 +19977,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "bench_press_close_grip_barbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "triceps_dip_assisted",
+     "reason": "substitute_pattern"
+    },
+    {
+     "movement_id": "bench_dip",
      "reason": "substitute_pattern"
     }
    ],
@@ -20801,7 +20901,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "skullcrusher_dumbbell",
+     "movement_id": "skullcrusher_barbell",
      "reason": "same_stimulus"
     }
    ],
@@ -21124,15 +21224,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "leg_press_machine",
+     "movement_id": "single_leg_press",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "linear_leg_press",
+     "movement_id": "bulgarian_split_squat_dumbbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "leg_press_horizontal_machine",
+     "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_stimulus"
     }
    ],
@@ -21582,7 +21682,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "bicep_curl_machine",
+     "movement_id": "ez_bar_biceps_curl",
      "reason": "same_stimulus"
     }
    ],
@@ -23013,15 +23113,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "gorilla_row_kettlebell",
+     "movement_id": "seated_cable_row_bar_grip",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "landmine_row",
+     "movement_id": "seated_cable_row_v_grip_cable",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "dumbbell_row",
+     "movement_id": "underhand_barbell_dead_rows",
      "reason": "same_stimulus"
     }
    ],
@@ -23343,15 +23443,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "gorilla_row_kettlebell",
+     "movement_id": "seated_cable_row_bar_grip",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "landmine_row",
+     "movement_id": "seated_cable_row_v_grip_cable",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "dumbbell_row",
+     "movement_id": "underhand_barbell_dead_rows",
      "reason": "same_stimulus"
     }
    ],
@@ -24108,6 +24208,10 @@
     {
      "movement_id": "dumbbell_twists",
      "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "landmine_power_twists",
+     "reason": "same_stimulus"
     }
    ],
    "attribute_audit": {
@@ -24253,11 +24357,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "standing_calf_raise_dumbbell",
+     "movement_id": "standing_calf_raise_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "single_leg_standing_calf_raise_dumbbell",
+     "movement_id": "standing_calf_raise_dumbbell",
      "reason": "same_stimulus"
     }
    ]
@@ -24403,7 +24507,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "single_leg_standing_calf_raise_dumbbell",
+     "movement_id": "seated_calf_raise",
      "reason": "same_stimulus"
     }
    ]
@@ -24817,15 +24921,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "landmine_offset_underhand_row",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "landmine_1_arm_dead_row",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "dumbbell_row",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "underhand_barbell_dead_rows",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "db_chest_supported_rows",
      "reason": "same_stimulus"
     }
    ],
@@ -24844,7 +24948,7 @@
     }
    }
   },
-  "180_squat_jumps": {
+  "hang_high_pull": {
    "title": "180 Squat Jumps",
    "source": "history",
    "template_id": "D5AC3808-B3A8-4044-BA20-53DDB08702D5",
@@ -24878,7 +24982,7 @@
     "bodyweight"
    ],
    "category": "athletic",
-   "canonical": "180_squat_jumps",
+   "canonical": "hang_high_pull",
    "hypertrophy": [
     {
      "target": "hamstrings",
@@ -24917,14 +25021,14 @@
      "provisional": null
     },
     "functional": {
-     "tier": "C",
+     "tier": "B",
      "basis": [
-      "qualities: power",
+      "qualities: multiplanar, power",
       "loadable: no",
       "rule: S = 3+ qualities, loadable, safe, a carry or single-leg under travel/trunk load; A = 2+ loadable; joint-capacity work never S"
      ],
-     "evidence_confidence": "none_reviewed",
-     "provisional": true
+     "evidence_confidence": "consensus",
+     "provisional": false
     },
     "conditioning": {
      "tier": null,
@@ -24946,16 +25050,17 @@
    "objective_inputs": {
     "ceiling": "low",
     "limiter": "target",
-    "systemic_fatigue": "high",
+    "systemic_fatigue": "moderate",
     "resistance_class": "bodyweight",
     "strength_lift": false,
     "ladder": false,
     "functional": [
-     "power"
+     "power",
+     "multiplanar"
     ],
     "conditioning": null,
     "mobility": null,
-    "reviewed": false
+    "reviewed": true
    },
    "gates": [
     "charter_plyometric",
@@ -24970,18 +25075,25 @@
     }
    },
    "fallbacks": [],
+   "curation_note": "LEGACY KEY: this template is '180 Squat Jumps' (a jump). The hang high pull is `barbell_high_pulls`",
    "attribute_audit": {
     "fields": [],
     "reason": "",
-    "joints_rated": {
-     "joints": [
-      "elbow",
-      "shear",
-      "shoulder",
-      "spinal_load",
-      "wrist"
+    "review": {
+     "attrs": [
+      "equipment",
+      "joint_stress",
+      "resistance_profile",
+      "stability"
      ],
-     "rule": "a dumbbell, kettlebell or bodyweight squat, lunge or step-up: load hangs at the sides"
+     "inputs": [
+      "ceiling",
+      "functional",
+      "resistance_class",
+      "systemic_fatigue"
+     ],
+     "why": "the template now reads '180 Squat Jumps' (the key is its older name): a bodyweight jump with a half turn — power, multiplanar landing",
+     "pass": "#5861 FIX2-DATA"
     }
    }
   },
@@ -25391,7 +25503,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "bicep_curl_machine",
+     "movement_id": "ez_bar_biceps_curl",
      "reason": "same_stimulus"
     }
    ],
@@ -25716,15 +25828,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "bench_press_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "decline_chest_press_machine",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "one_arm_bench_press",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "incline_push_up",
+     "movement_id": "underhand_bench_press",
      "reason": "same_stimulus"
     }
    ],
@@ -25997,15 +26109,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "ez_bar_biceps_curl",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "bicep_curl_barbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "bicep_curl_machine",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "21s",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "bicep_curl_cable",
      "reason": "same_stimulus"
     }
    ],
@@ -26310,15 +26422,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "ez_bar_biceps_curl",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "bicep_curl_barbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "bicep_curl_machine",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "21s",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "bicep_curl_cable",
      "reason": "same_stimulus"
     }
    ],
@@ -27358,15 +27470,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "1_arm_high_cable_row",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "landmine_1_arm_dead_row",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "dumbbell_row",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "seated_cable_row_bar_grip",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "seated_cable_row_v_grip_cable",
      "reason": "same_stimulus"
     }
    ],
@@ -28271,15 +28383,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "bench_press_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "decline_chest_press_machine",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "chest_press_machine",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "one_arm_bench_press",
      "reason": "same_stimulus"
     }
    ],
@@ -28760,15 +28872,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "shoulder_press",
+     "movement_id": "shoulder_press_dumbbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "landmine_press",
+     "movement_id": "arnold_press_dumbbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "landmine_press_single_arm",
+     "movement_id": "overhead_press_dumbbell",
      "reason": "same_stimulus"
     }
    ],
@@ -29063,15 +29175,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "straight_leg_deadlift",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "banded_good_mornings",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "single_leg_cable_rdl",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "db_reach_across_single_leg_rdl",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "straight_leg_deadlift",
      "reason": "same_stimulus"
     }
    ]
@@ -30417,6 +30529,10 @@
     {
      "movement_id": "dumbbell_twists",
      "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "landmine_power_twists",
+     "reason": "same_stimulus"
     }
    ],
    "attribute_audit": {
@@ -30572,7 +30688,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "triceps_dip_assisted",
+     "movement_id": "bench_press_close_grip_barbell",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "db_jm_press",
      "reason": "substitute_pattern"
     }
    ],
@@ -30719,15 +30839,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "ez_bar_biceps_curl",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "bicep_curl_barbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "bicep_curl_machine",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "21s",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "bicep_curl_cable",
      "reason": "same_stimulus"
     }
    ],
@@ -30957,7 +31077,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_bodyweight",
+     "movement_id": "reverse_lunge",
      "reason": "same_stimulus"
     }
    ],
@@ -31109,15 +31229,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "1_legged_squat",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "split_squat_switches",
+     "movement_id": "zercher_squat",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "squat_bodyweight",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "box_squat_barbell",
      "reason": "same_stimulus"
     }
    ],
@@ -31272,15 +31392,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "1_legged_squat",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "split_squat_switches",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "squat_bodyweight",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "kettlebell_goblet_squat",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "wall_squat",
      "reason": "same_stimulus"
     }
    ],
@@ -31596,11 +31716,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "bicep_curl_machine",
+     "movement_id": "ez_bar_biceps_curl",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "21s",
+     "movement_id": "bicep_curl_barbell",
      "reason": "same_stimulus"
     }
    ],
@@ -32392,7 +32512,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "triceps_dip_assisted",
+     "movement_id": "bench_press_close_grip_barbell",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "db_jm_press",
      "reason": "substitute_pattern"
     }
    ],
@@ -32533,7 +32657,9 @@
     "mobility": null,
     "reviewed": true
    },
-   "gates": [],
+   "gates": [
+    "chain_kb_swing"
+   ],
    "not_for_you_now": null,
    "availability": {
     "home_gym": {
@@ -32542,12 +32668,7 @@
      "source": "the worst of its equipment: kettlebell"
     }
    },
-   "fallbacks": [
-    {
-     "movement_id": "swing",
-     "reason": "same_stimulus"
-    }
-   ],
+   "fallbacks": [],
    "attribute_audit": {
     "fields": [],
     "reason": "",
@@ -33357,11 +33478,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "kneeling_banded_hip_thrusts",
+     "movement_id": "db_hip_thrust",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "glute_bridge",
+     "movement_id": "hip_thrust_barbell",
      "reason": "same_stimulus"
     }
    ],
@@ -34079,7 +34200,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "glute_machine_kickback",
+     "movement_id": "db_hip_thrust",
      "reason": "same_stimulus"
     }
    ],
@@ -34606,7 +34727,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_bodyweight",
+     "movement_id": "reverse_lunge",
      "reason": "same_stimulus"
     }
    ],
@@ -34786,15 +34907,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "leg_press_machine",
+     "movement_id": "single_leg_press",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "linear_leg_press",
+     "movement_id": "1_legged_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "leg_press_horizontal_machine",
+     "movement_id": "split_squat_switches",
      "reason": "same_stimulus"
     }
    ],
@@ -34946,15 +35067,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "leaning_step_ups",
+     "movement_id": "goblet_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "leaning_speed_step_ups",
+     "movement_id": "db_bench_front_squats",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "crossover_stepup",
+     "movement_id": "db_crush_grip_squats",
      "reason": "same_stimulus"
     }
    ],
@@ -35886,15 +36007,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "bench_press_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "decline_chest_press_machine",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "chest_press_machine",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "one_arm_bench_press",
      "reason": "same_stimulus"
     }
    ]
@@ -36499,6 +36620,10 @@
    },
    "fallbacks": [
     {
+     "movement_id": "shrug_barbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "shrug_dumbbell",
      "reason": "same_stimulus"
     },
@@ -36665,11 +36790,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "landmine_press",
+     "movement_id": "shoulder_press_dumbbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "landmine_press_single_arm",
+     "movement_id": "arnold_press_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "overhead_press_dumbbell",
      "reason": "same_stimulus"
     }
    ],
@@ -37292,15 +37421,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "1_legged_squat",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "split_squat_switches",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "squat_bodyweight",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "kettlebell_goblet_squat",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "wall_squat",
      "reason": "same_stimulus"
     }
    ],
@@ -37588,11 +37717,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "seated_calf_raise",
+     "movement_id": "standing_calf_raise_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "solo_donkey_calf_raise",
+     "movement_id": "seated_calf_raise",
      "reason": "same_stimulus"
     }
    ],
@@ -37779,7 +37908,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_bodyweight",
+     "movement_id": "reverse_lunge",
      "reason": "same_stimulus"
     }
    ],
@@ -38546,15 +38675,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "bulgarian_split_squat_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "db_cossack_squats",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "db_alt_side_lunges",
      "reason": "same_stimulus"
     }
    ],
@@ -38708,15 +38837,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "straight_leg_deadlift",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "banded_good_mornings",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "single_leg_cable_rdl",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "db_reach_across_single_leg_rdl",
+     "movement_id": "db_stiff_legged_deadlift",
      "reason": "same_stimulus"
     }
    ],
@@ -39763,11 +39892,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_incline_variable_curls",
+     "movement_id": "barbell_cheat_curls",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_shovel_curls",
+     "movement_id": "db_incline_variable_curls",
      "reason": "same_stimulus"
     }
    ],
@@ -39947,7 +40076,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "goblet_squat",
      "reason": "same_stimulus"
     }
    ],
@@ -40234,11 +40363,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_reach_across_single_leg_rdl",
+     "movement_id": "db_stiff_legged_deadlift",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "single_leg_cable_rdl",
+     "movement_id": "romanian_deadlift_dumbbell",
      "reason": "same_stimulus"
     }
    ],
@@ -40544,11 +40673,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "single_leg_slick_floor_bridge_curl",
+     "movement_id": "banded_bridge_curls",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "banded_bridge_curls",
+     "movement_id": "single_leg_slick_floor_bridge_curl",
      "reason": "same_stimulus"
     }
    ],
@@ -42238,6 +42367,10 @@
    },
    "fallbacks": [
     {
+     "movement_id": "shrug_barbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "shrug_dumbbell",
      "reason": "same_stimulus"
     },
@@ -42656,15 +42789,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "1_legged_squat",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "split_squat_switches",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "squat_bodyweight",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "kettlebell_goblet_squat",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "wall_squat",
      "reason": "same_stimulus"
     }
    ],
@@ -42974,7 +43107,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "single_leg_cable_rdl",
+     "movement_id": "3_way_rdl",
      "reason": "same_stimulus"
     }
    ],
@@ -43122,15 +43255,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "gorilla_row_kettlebell",
+     "movement_id": "seated_cable_row_bar_grip",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "landmine_row",
+     "movement_id": "seated_cable_row_v_grip_cable",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "dumbbell_row",
+     "movement_id": "underhand_barbell_dead_rows",
      "reason": "same_stimulus"
     }
    ],
@@ -43735,7 +43868,12 @@
      "source": "the worst of its equipment: bodyweight"
     }
    },
-   "fallbacks": [],
+   "fallbacks": [
+    {
+     "movement_id": "deadlift_dumbbell",
+     "reason": "same_stimulus"
+    }
+   ],
    "attribute_audit": {
     "fields": [],
     "reason": "",
@@ -44050,15 +44188,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "1_legged_squat",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "split_squat_switches",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "squat_bodyweight",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "kettlebell_goblet_squat",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "wall_squat",
      "reason": "same_stimulus"
     }
    ],
@@ -44505,7 +44643,7 @@
      "reason": "same_function"
     },
     {
-     "movement_id": "walking",
+     "movement_id": "rowing_machine",
      "reason": "same_function"
     }
    ]
@@ -44639,15 +44777,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "goblet_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_cossack_squats",
+     "movement_id": "zercher_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_alt_side_lunges",
+     "movement_id": "db_bench_front_squats",
      "reason": "same_stimulus"
     }
    ]
@@ -46052,7 +46190,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "triceps_dip_assisted",
+     "movement_id": "bench_press_close_grip_barbell",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "db_jm_press",
      "reason": "substitute_pattern"
     }
    ],
@@ -46209,15 +46351,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "incline_bench_press_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "bench_press_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "decline_chest_press_machine",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "chest_press_machine",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "one_arm_bench_press",
      "reason": "same_stimulus"
     }
    ],
@@ -46526,15 +46668,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "leg_press_machine",
+     "movement_id": "single_leg_press",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "linear_leg_press",
+     "movement_id": "bulgarian_split_squat_dumbbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "leg_press_horizontal_machine",
+     "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_stimulus"
     }
    ],
@@ -47685,7 +47827,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "goblet_squat",
      "reason": "same_stimulus"
     }
    ],
@@ -48824,7 +48966,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_bodyweight",
+     "movement_id": "reverse_lunge",
      "reason": "same_stimulus"
     }
    ],
@@ -48987,11 +49129,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_chest_supported_rows",
+     "movement_id": "seated_cable_row_bar_grip",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_tripod_rows",
+     "movement_id": "seated_cable_row_v_grip_cable",
      "reason": "same_stimulus"
     }
    ],
@@ -49148,15 +49290,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "single_leg_rdl_dumbbell",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "3_way_rdl",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "banded_good_mornings",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "db_stiff_legged_deadlift",
      "reason": "same_stimulus"
     }
    ]
@@ -49645,7 +49787,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_bodyweight",
+     "movement_id": "reverse_lunge",
      "reason": "same_stimulus"
     }
    ],
@@ -50692,15 +50834,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "bulgarian_split_squat_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "db_cossack_squats",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "db_alt_side_lunges",
      "reason": "same_stimulus"
     }
    ],
@@ -50990,15 +51132,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "goblet_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_cossack_squats",
+     "movement_id": "db_bench_front_squats",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_alt_side_lunges",
+     "movement_id": "db_crush_grip_squats",
      "reason": "same_stimulus"
     }
    ],
@@ -51571,7 +51713,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "single_leg_cable_rdl",
+     "movement_id": "3_way_rdl",
      "reason": "same_stimulus"
     }
    ],
@@ -51756,7 +51898,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_bodyweight",
+     "movement_id": "reverse_lunge",
      "reason": "same_stimulus"
     }
    ],
@@ -52234,7 +52376,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "triceps_pushdown",
+     "movement_id": "triceps_extension_barbell",
      "reason": "same_stimulus"
     }
    ],
@@ -52576,7 +52718,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "one_arm_bench_press",
+     "movement_id": "knee_push_up",
      "reason": "same_stimulus"
     }
    ],
@@ -52898,7 +53040,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_bodyweight",
+     "movement_id": "reverse_lunge",
      "reason": "same_stimulus"
     }
    ],
@@ -53340,15 +53482,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "one_arm_bench_press",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "bench_press_dumbbell",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "decline_chest_press_machine",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "chest_press_machine",
      "reason": "same_stimulus"
     }
    ],
@@ -54823,11 +54965,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_incline_variable_curls",
+     "movement_id": "barbell_cheat_curls",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_shovel_curls",
+     "movement_id": "db_incline_variable_curls",
      "reason": "same_stimulus"
     }
    ],
@@ -54998,11 +55140,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "single_leg_slick_floor_bridge_curl",
+     "movement_id": "banded_static_bridge_curls",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "banded_static_bridge_curls",
+     "movement_id": "single_leg_slick_floor_bridge_curl",
      "reason": "same_stimulus"
     }
    ],
@@ -55196,7 +55338,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_bodyweight",
+     "movement_id": "reverse_lunge",
      "reason": "same_stimulus"
     }
    ],
@@ -55350,11 +55492,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "inverted_chin_curls",
+     "movement_id": "barbell_cheat_curls",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "seated_bicep_curls",
+     "movement_id": "inverted_chin_curls",
      "reason": "same_stimulus"
     }
    ],
@@ -55843,7 +55985,7 @@
     }
    }
   },
-  "hang_high_pull": {
+  "barbell_high_pulls": {
    "title": "Barbell High Pulls",
    "source": "history",
    "template_id": "D5CA687B-C387-4F5B-A5B5-EA7A4BF8E8D6",
@@ -55864,23 +56006,23 @@
    "job": "compound",
    "pattern": "olympic",
    "length_bias": "not_applicable",
-   "resistance_profile": "bodyweight",
-   "stability": "moderate",
+   "resistance_profile": "free_weight",
+   "stability": "low",
    "joint_stress": {
-    "spinal_load": "low",
-    "shear": "low",
-    "wrist": "low",
+    "spinal_load": "moderate",
+    "shear": "moderate",
+    "wrist": "moderate",
     "elbow": "low",
-    "shoulder": "low",
+    "shoulder": "moderate",
     "knee": "unknown",
     "hip": "high"
    },
    "skill_complexity": "moderate",
    "equipment": [
-    "bodyweight"
+    "barbell"
    ],
    "category": "athletic",
-   "canonical": "hang_high_pull",
+   "canonical": "barbell_high_pulls",
    "hypertrophy": [
     {
      "target": "back",
@@ -55922,12 +56064,12 @@
     "functional": {
      "tier": "B",
      "basis": [
-      "qualities: multiplanar, power",
-      "loadable: no",
+      "qualities: power",
+      "loadable: yes",
       "rule: S = 3+ qualities, loadable, safe, a carry or single-leg under travel/trunk load; A = 2+ loadable; joint-capacity work never S"
      ],
-     "evidence_confidence": "consensus",
-     "provisional": false
+     "evidence_confidence": "none_reviewed",
+     "provisional": true
     },
     "conditioning": {
      "tier": null,
@@ -55947,19 +56089,18 @@
     }
    },
    "objective_inputs": {
-    "ceiling": "low",
+    "ceiling": "high",
     "limiter": "target",
-    "systemic_fatigue": "moderate",
-    "resistance_class": "bodyweight",
+    "systemic_fatigue": "high",
+    "resistance_class": "maximal",
     "strength_lift": false,
     "ladder": false,
     "functional": [
-     "power",
-     "multiplanar"
+     "power"
     ],
     "conditioning": null,
     "mobility": null,
-    "reviewed": true
+    "reviewed": false
    },
    "gates": [
     "chain_hang_high_pull",
@@ -55970,30 +56111,11 @@
     "home_gym": {
      "state": "available",
      "evidence": "recent_inferred",
-     "source": "the worst of its equipment: bodyweight"
+     "source": "the worst of its equipment: barbell"
     }
    },
    "fallbacks": [],
-   "attribute_audit": {
-    "fields": [],
-    "reason": "",
-    "review": {
-     "attrs": [
-      "equipment",
-      "joint_stress",
-      "resistance_profile",
-      "stability"
-     ],
-     "inputs": [
-      "ceiling",
-      "functional",
-      "resistance_class",
-      "systemic_fatigue"
-     ],
-     "why": "the template now reads '180 Squat Jumps' (the key is its older name): a bodyweight jump with a half turn — power, multiplanar landing",
-     "pass": "#5861 FIX2-DATA"
-    }
-   }
+   "curation_note": "the hang high pull: second link of the Olympic-bar chain (tall high pull -> hang high pull -> hang power clean)"
   },
   "barbell_plyo_curls": {
    "title": "Barbell Plyo Curls",
@@ -56458,7 +56580,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "one_arm_bench_press",
+     "movement_id": "knee_push_up",
      "reason": "same_stimulus"
     }
    ],
@@ -56779,15 +56901,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "ez_bar_biceps_curl",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "bicep_curl_barbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "bicep_curl_machine",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "21s",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "bicep_curl_cable",
      "reason": "same_stimulus"
     }
    ],
@@ -57260,15 +57382,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "bulgarian_split_squat_dumbbell",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "goblet_squat",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "db_bench_front_squats",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "db_crush_grip_squats",
      "reason": "same_stimulus"
     }
    ],
@@ -57713,7 +57835,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_bodyweight",
+     "movement_id": "reverse_lunge",
      "reason": "same_stimulus"
     }
    ],
@@ -58163,7 +58285,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "seated_incline_curl_dumbbell",
+     "movement_id": "ez_bar_biceps_curl",
      "reason": "same_stimulus"
     }
    ],
@@ -58910,15 +59032,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "leg_press_machine",
+     "movement_id": "single_leg_press",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "linear_leg_press",
+     "movement_id": "bulgarian_split_squat_dumbbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "leg_press_horizontal_machine",
+     "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_stimulus"
     }
    ],
@@ -60092,15 +60214,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "1_legged_squat",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "split_squat_switches",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "squat_bodyweight",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "kettlebell_goblet_squat",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "wall_squat",
      "reason": "same_stimulus"
     }
    ],
@@ -60999,15 +61121,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "banded_good_mornings",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "single_leg_cable_rdl",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "3_way_rdl",
+     "movement_id": "single_leg_rdl_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "banded_good_mornings",
      "reason": "same_stimulus"
     }
    ],
@@ -61625,15 +61747,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "landmine_press_single_arm",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "landmine_shoulder_press",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "shoulder_press",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "landmine_press",
      "reason": "same_stimulus"
     }
    ],
@@ -61947,15 +62069,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "1_legged_squat",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "split_squat_switches",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "squat_bodyweight",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "kettlebell_goblet_squat",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "wall_squat",
      "reason": "same_stimulus"
     }
    ],
@@ -62547,7 +62669,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "one_arm_bench_press",
+     "movement_id": "incline_push_up",
      "reason": "same_stimulus"
     }
    ],
@@ -62966,15 +63088,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "bench_press_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "decline_chest_press_machine",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "chest_press_machine",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "one_arm_bench_press",
      "reason": "same_stimulus"
     }
    ],
@@ -63298,7 +63420,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_bodyweight",
+     "movement_id": "reverse_lunge",
      "reason": "same_stimulus"
     }
    ],
@@ -63738,6 +63860,10 @@
     }
    },
    "fallbacks": [
+    {
+     "movement_id": "landmine_power_twists",
+     "reason": "same_stimulus"
+    },
     {
      "movement_id": "russian_twist_bodyweight",
      "reason": "same_stimulus"
@@ -64295,15 +64421,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "bench_press_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "decline_chest_press_machine",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "chest_press_machine",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "one_arm_bench_press",
      "reason": "same_stimulus"
     }
    ],
@@ -64768,7 +64894,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "glute_machine_kickback",
+     "movement_id": "db_hip_thrust",
      "reason": "same_stimulus"
     }
    ],
@@ -65094,11 +65220,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_chest_supported_rows",
+     "movement_id": "seated_cable_row_bar_grip",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_tripod_rows",
+     "movement_id": "seated_cable_row_v_grip_cable",
      "reason": "same_stimulus"
     }
    ],
@@ -65531,15 +65657,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "bench_press_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "decline_chest_press_machine",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "chest_press_machine",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "one_arm_bench_press",
      "reason": "same_stimulus"
     }
    ],
@@ -67689,7 +67815,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "triceps_pushdown",
+     "movement_id": "skullcrusher_barbell",
      "reason": "same_stimulus"
     }
    ],
@@ -67847,7 +67973,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "triceps_pushdown",
+     "movement_id": "triceps_extension_barbell",
      "reason": "same_stimulus"
     }
    ],
@@ -68778,15 +68904,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "goblet_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_cossack_squats",
+     "movement_id": "zercher_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_alt_side_lunges",
+     "movement_id": "db_bench_front_squats",
      "reason": "same_stimulus"
     }
    ]
@@ -69767,15 +69893,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "1_arm_high_cable_row",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "landmine_offset_underhand_row",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "dumbbell_row",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "seated_cable_row_bar_grip",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "seated_cable_row_v_grip_cable",
      "reason": "same_stimulus"
     }
    ],
@@ -70790,11 +70916,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "shoulder_press",
+     "movement_id": "shoulder_press_dumbbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "landmine_press_single_arm",
+     "movement_id": "arnold_press_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "overhead_press_dumbbell",
      "reason": "same_stimulus"
     }
    ],
@@ -71108,11 +71238,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_chest_supported_rows",
+     "movement_id": "seated_cable_row_bar_grip",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_tripod_rows",
+     "movement_id": "seated_cable_row_v_grip_cable",
      "reason": "same_stimulus"
     }
    ]
@@ -71855,7 +71985,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "goblet_squat",
+     "movement_id": "db_cossack_squats",
      "reason": "same_stimulus"
     }
    ],
@@ -72040,7 +72170,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_bodyweight",
+     "movement_id": "reverse_lunge",
      "reason": "same_stimulus"
     }
    ],
@@ -73382,7 +73512,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_bodyweight",
+     "movement_id": "reverse_lunge",
      "reason": "same_stimulus"
     }
    ],
@@ -73539,15 +73669,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "bench_press_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "decline_chest_press_machine",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "chest_press_machine",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "incline_push_up",
      "reason": "same_stimulus"
     }
    ],
@@ -73711,15 +73841,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "one_arm_bench_press",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "bench_press_dumbbell",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "decline_chest_press_machine",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "chest_press_machine",
      "reason": "same_stimulus"
     }
    ],
@@ -74042,7 +74172,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_bodyweight",
+     "movement_id": "reverse_lunge",
      "reason": "same_stimulus"
     }
    ],
@@ -74200,15 +74330,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "shoulder_press",
+     "movement_id": "shoulder_press_dumbbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "landmine_press",
+     "movement_id": "arnold_press_dumbbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "landmine_press_single_arm",
+     "movement_id": "overhead_press_dumbbell",
      "reason": "same_stimulus"
     }
    ],
@@ -74823,7 +74953,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "goblet_squat",
+     "movement_id": "db_cossack_squats",
      "reason": "same_stimulus"
     }
    ],
@@ -75623,11 +75753,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "bicep_curl_machine",
+     "movement_id": "ez_bar_biceps_curl",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "21s",
+     "movement_id": "bicep_curl_barbell",
      "reason": "same_stimulus"
     }
    ]
@@ -75771,15 +75901,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "bench_press_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "decline_chest_press_machine",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "chest_press_machine",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "one_arm_bench_press",
      "reason": "same_stimulus"
     }
    ],
@@ -75945,15 +76075,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "bench_press_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "decline_chest_press_machine",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "chest_press_machine",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "one_arm_bench_press",
      "reason": "same_stimulus"
     }
    ],
@@ -76241,7 +76371,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "kneeling_banded_hip_thrusts",
+     "movement_id": "db_hip_thrust",
      "reason": "same_stimulus"
     }
    ],
@@ -76519,15 +76649,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "ez_bar_biceps_curl",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "bicep_curl_barbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "bicep_curl_machine",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "21s",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "bicep_curl_cable",
      "reason": "same_stimulus"
     }
    ],
@@ -76893,15 +77023,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "bulgarian_split_squat_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "db_cossack_squats",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "db_alt_side_lunges",
      "reason": "same_stimulus"
     }
    ],
@@ -77240,7 +77370,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "goblet_squat",
+     "movement_id": "db_cossack_squats",
      "reason": "same_stimulus"
     }
    ],
@@ -77646,11 +77776,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_chest_supported_rows",
+     "movement_id": "seated_cable_row_bar_grip",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_tripod_rows",
+     "movement_id": "seated_cable_row_v_grip_cable",
      "reason": "same_stimulus"
     }
    ],
@@ -78406,7 +78536,7 @@
      "reason": "same_function"
     },
     {
-     "movement_id": "walking",
+     "movement_id": "elliptical_trainer",
      "reason": "same_function"
     }
    ],
@@ -79761,11 +79891,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_chest_supported_rows",
+     "movement_id": "seated_cable_row_bar_grip",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_tripod_rows",
+     "movement_id": "seated_cable_row_v_grip_cable",
      "reason": "same_stimulus"
     }
    ],
@@ -79916,15 +80046,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "shrug_barbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "shrug_dumbbell",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "seated_shrugs",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "db_haney_shrugs",
      "reason": "same_stimulus"
     }
    ],
@@ -80234,11 +80364,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "shoulder_press",
+     "movement_id": "db_single_arm_overhead_press",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "landmine_press",
+     "movement_id": "shoulder_press_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "arnold_press_dumbbell",
      "reason": "same_stimulus"
     }
    ],
@@ -80422,7 +80556,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_bodyweight",
+     "movement_id": "reverse_lunge",
      "reason": "same_stimulus"
     }
    ],
@@ -80577,15 +80711,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "3_way_rdl",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "banded_good_mornings",
+     "movement_id": "single_leg_rdl_dumbbell",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "db_reach_across_single_leg_rdl",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "3_way_rdl",
      "reason": "same_stimulus"
     }
    ],
@@ -81044,11 +81178,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "seated_calf_raise",
+     "movement_id": "standing_calf_raise_barbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "solo_donkey_calf_raise",
+     "movement_id": "seated_calf_raise",
      "reason": "same_stimulus"
     }
    ],
@@ -81741,7 +81875,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "standing_calf_raise_dumbbell",
+     "movement_id": "standing_calf_raise_barbell",
      "reason": "same_stimulus"
     }
    ],
@@ -82304,15 +82438,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "leg_press_machine",
+     "movement_id": "single_leg_press",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "linear_leg_press",
+     "movement_id": "bulgarian_split_squat_dumbbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "leg_press_horizontal_machine",
+     "movement_id": "db_alt_reverse_sprinter_lunges",
      "reason": "same_stimulus"
     }
    ],
@@ -82482,15 +82616,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "1_legged_squat",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "split_squat_switches",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "squat_bodyweight",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "kettlebell_goblet_squat",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "wall_squat",
      "reason": "same_stimulus"
     }
    ],
@@ -82632,6 +82766,7 @@
     "reviewed": false
    },
    "gates": [
+    "chain_kb_swing",
     "clinical_cue_breathing"
    ],
    "not_for_you_now": null,
@@ -82642,12 +82777,7 @@
      "source": "the worst of its equipment: bodyweight"
     }
    },
-   "fallbacks": [
-    {
-     "movement_id": "double_swings",
-     "reason": "same_stimulus"
-    }
-   ],
+   "fallbacks": [],
    "attribute_audit": {
     "fields": [],
     "reason": "",
@@ -84405,15 +84535,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "goblet_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_cossack_squats",
+     "movement_id": "db_bench_front_squats",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_alt_side_lunges",
+     "movement_id": "db_crush_grip_squats",
      "reason": "same_stimulus"
     }
    ],
@@ -84694,11 +84824,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_chest_supported_rows",
+     "movement_id": "seated_cable_row_bar_grip",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_tripod_rows",
+     "movement_id": "seated_cable_row_v_grip_cable",
      "reason": "same_stimulus"
     }
    ],
@@ -85013,11 +85143,11 @@
      "reason": "same_function"
     },
     {
-     "movement_id": "walking",
+     "movement_id": "elliptical_trainer",
      "reason": "same_function"
     },
     {
-     "movement_id": "elliptical_trainer",
+     "movement_id": "rowing_machine",
      "reason": "same_function"
     }
    ]
@@ -85705,15 +85835,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "goblet_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_cossack_squats",
+     "movement_id": "db_bench_front_squats",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_alt_side_lunges",
+     "movement_id": "db_crush_grip_squats",
      "reason": "same_stimulus"
     }
    ],
@@ -86119,11 +86249,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_chest_supported_rows",
+     "movement_id": "seated_cable_row_bar_grip",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_tripod_rows",
+     "movement_id": "seated_cable_row_v_grip_cable",
      "reason": "same_stimulus"
     }
    ]
@@ -87653,15 +87783,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "bench_press_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "decline_chest_press_machine",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "chest_press_machine",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "one_arm_bench_press",
      "reason": "same_stimulus"
     }
    ]
@@ -87806,7 +87936,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "one_arm_bench_press",
+     "movement_id": "incline_bench_press_dumbbell",
      "reason": "same_stimulus"
     }
    ],
@@ -89527,15 +89657,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "goblet_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_cossack_squats",
+     "movement_id": "db_bench_front_squats",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_alt_side_lunges",
+     "movement_id": "db_crush_grip_squats",
      "reason": "same_stimulus"
     }
    ]
@@ -89677,15 +89807,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "shoulder_press",
+     "movement_id": "shoulder_press_dumbbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "landmine_press",
+     "movement_id": "arnold_press_dumbbell",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "landmine_press_single_arm",
+     "movement_id": "overhead_press_dumbbell",
      "reason": "same_stimulus"
     }
    ],
@@ -90132,11 +90262,11 @@
      "reason": "same_function"
     },
     {
-     "movement_id": "walking",
+     "movement_id": "elliptical_trainer",
      "reason": "same_function"
     },
     {
-     "movement_id": "elliptical_trainer",
+     "movement_id": "rowing_machine",
      "reason": "same_function"
     }
    ],
@@ -90537,6 +90667,10 @@
    },
    "fallbacks": [
     {
+     "movement_id": "forearm_curl",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "db_wrist_curl",
      "reason": "same_stimulus"
     }
@@ -90756,7 +90890,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "single_leg_cable_rdl",
+     "movement_id": "3_way_rdl",
      "reason": "same_stimulus"
     }
    ],
@@ -90895,6 +91029,10 @@
     }
    },
    "fallbacks": [
+    {
+     "movement_id": "forearm_curl",
+     "reason": "same_stimulus"
+    },
     {
      "movement_id": "wrist_extension_dumbbell",
      "reason": "same_stimulus"
@@ -91345,7 +91483,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "glute_machine_kickback",
+     "movement_id": "db_hip_thrust",
      "reason": "same_stimulus"
     }
    ],
@@ -91496,15 +91634,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "db_step_up",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "step_up",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "leaning_step_ups",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "leaning_speed_step_ups",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "crossover_stepup",
      "reason": "same_stimulus"
     }
    ]
@@ -91648,15 +91786,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "single_leg_standing_calf_raise_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "calf_press_machine",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "standing_calf_raise_dumbbell",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "single_leg_standing_calf_raise_dumbbell",
+     "movement_id": "standing_calf_raise_barbell",
      "reason": "same_stimulus"
     }
    ]
@@ -92006,7 +92144,7 @@
      "reason": "same_function"
     },
     {
-     "movement_id": "walking",
+     "movement_id": "elliptical_trainer",
      "reason": "same_function"
     }
    ],
@@ -92548,7 +92686,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "squat_bodyweight",
+     "movement_id": "reverse_lunge",
      "reason": "same_stimulus"
     }
    ],
@@ -92903,7 +93041,7 @@
      "reason": "same_function"
     },
     {
-     "movement_id": "walking",
+     "movement_id": "elliptical_trainer",
      "reason": "same_function"
     }
    ],
@@ -96167,7 +96305,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "deadlift_twist",
+     "movement_id": "deadlift_barbell",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "deadlift_trap_bar",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "deadlift_dumbbell",
      "reason": "same_stimulus"
     }
    ],
@@ -96676,15 +96822,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "db_alt_reverse_sprinter_lunges",
+     "movement_id": "goblet_squat",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_cossack_squats",
+     "movement_id": "db_bench_front_squats",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_alt_side_lunges",
+     "movement_id": "db_crush_grip_squats",
      "reason": "same_stimulus"
     }
    ],
@@ -98047,7 +98193,7 @@
      "reason": "same_function"
     },
     {
-     "movement_id": "walking",
+     "movement_id": "elliptical_trainer",
      "reason": "same_function"
     }
    ],
@@ -98861,15 +99007,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "bench_press_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "decline_chest_press_machine",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "chest_press_machine",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "one_arm_bench_press",
      "reason": "same_stimulus"
     }
    ],
@@ -99568,7 +99714,7 @@
    "title": "Tall High Pull (Barbell)",
    "source": "expansion",
    "template_id": null,
-   "template_note": "no Hevy template; on the creation list (Barbell High Pulls in his account is the hang version)",
+   "template_note": "no Hevy template; on the creation list (`barbell_high_pulls` in his account is the hang version)",
    "target": {
     "primary": "back",
     "secondary": [

@@ -83,7 +83,8 @@ def apply_templates(movements: dict[str, dict[str, Any]], tid_to_key: dict[str, 
     the Hevy record cannot represent. A row that does not fit is a hard stop — a template fact never vanishes silently."""
     for key, row in templates["created"].items():
         e = movements.get(key)
-        if e is None or e.get("template_id") or not row.get("template_id") or not row.get("title"):
+        taken = e is not None and e.get("template_id") and str(e["template_id"]) != str(row.get("template_id"))
+        if e is None or taken or not row.get("template_id") or not row.get("title"):
             raise SystemExit(f"templates.created.{key}: needs a template-less library movement, a template_id and its Hevy title")
         e["template_id"] = str(row["template_id"])
         e["template_note"] = f"custom Hevy template {row['title']!r}, created after the owner ruling of 2026-11-14"

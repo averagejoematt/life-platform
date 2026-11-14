@@ -27,7 +27,6 @@ with open(os.path.join(ROOT, "config", "movement_catalog.json"), encoding="utf-8
 with open(os.path.join(ROOT, "config", "training_charter.json"), encoding="utf-8") as _f:
     CHARTER = json.load(_f)
 TIDS = {str(e["template_id"]).upper(): k for k, e in MV.items() if e.get("template_id")}
-FIDX = xl.fallback_index(LIB)
 
 
 # ── schema ──────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -50,7 +49,7 @@ def test_validator_catches_a_broken_entry():
     k = next(iter(bad["movements"]))
     bad["movements"][k]["family"] = "vibes"
     bad["movements"][k]["equipment"] = ["a_gym_named_thing"]
-    bad["movements"][k]["fallbacks"] = []
+    bad["movements"][k]["fallbacks"] = [{"movement_id": k, "reason": "same_stimulus"}]  # itself: never a fallback
     errs = xl.validate(bad)
     assert any("family" in e for e in errs) and any("equipment" in e for e in errs) and any("fallback" in e for e in errs)
 
@@ -64,7 +63,11 @@ def test_every_movement_catalog_template_is_in_the_library():
         for k, v in CATALOG["movements"].items()
         if v.get("hevy_template_id_hint") and str(v["hevy_template_id_hint"]).upper() not in TIDS
     ]
-    assert missing == []
+    # #5861 fix round 13 (owner ruling 2026-11-14): the kettlebell deadlift no longer logs under Hevy's Sumo Deadlift. The
+    # catalog (today's path) still carries that hint until its own template exists; the library has RELEASED the id
+    # (deploy/exercise_library_templates.json) and keeps the movement, template-less and not selectable.
+    assert missing == [("kettlebell_deadlift", "D20D7BBE")]
+    assert MV["kettlebell_deadlift"]["template_id"] is None and MV["kettlebell_deadlift"]["not_for_you_now"]
 
 
 def test_every_logged_template_is_a_history_entry():
@@ -288,7 +291,9 @@ def test_named_gate_chains():
     assert "chain_kb_swing" in MV["kettlebell_swing"]["gates"] and g["chain_kb_swing"]["chain_prerequisites"] == ["kettlebell_deadlift"]
     assert g["chain_kb_clean"]["chain_prerequisites"] == ["kettlebell_swing"]
     assert g["chain_hang_high_pull"]["chain_prerequisites"] == ["tall_high_pull"]
-    assert g["chain_hang_power_clean"]["chain_prerequisites"] == ["hang_high_pull"]
+    assert g["chain_hang_power_clean"]["chain_prerequisites"] == ["barbell_high_pulls"]  # fix round 13: the real hang high pull
+    assert MV["barbell_high_pulls"]["title"] == "Barbell High Pulls" and "chain_hang_high_pull" in MV["barbell_high_pulls"]["gates"]
+    assert MV["hang_high_pull"]["title"] == "180 Squat Jumps" and "chain_hang_high_pull" not in MV["hang_high_pull"]["gates"]
     assert "chain_hang_power_clean" in MV["hang_power_clean"]["gates"]
     for k in ("triceps_dip", "nordic_hamstring_curl", "hanging_leg_raise", "push_up"):
         assert "bodyweight_threshold" in _kinds(MV[k]), k
@@ -336,42 +341,35 @@ def test_not_for_you_now_entries_carry_reason_and_unlock():
 # ── fallbacks + availability ───────────────────────────────────────────────────────────────────────────────────
 
 
-def test_every_movement_has_a_ranked_fallback_matching_the_rule():
+def test_every_fallback_list_is_the_rules_own_ranking():
+    """#5861 fix round 13: a movement's fallbacks are the first candidates THE equivalence rule ranks (`library_integrity`),
+    at most three, and an empty list is valid — nothing is added to fill it. The rule itself, clause by clause, is held in
+    tests/test_library_integrity_5861.py."""
     for k, e in MV.items():
-        assert len(e["fallbacks"]) >= 1, k
-        want = [{"movement_id": m, "reason": r} for m, r in xl.fallback_candidates(LIB, k, FIDX)[: len(e["fallbacks"])]]
+        want = [{"movement_id": m, "reason": r} for m, r in xl.fallback_candidates(LIB, k)[: xl.integrity.MAX_FALLBACKS]]
         assert e["fallbacks"] == want, k
-
-
-def test_first_fallback_avoids_the_primarys_equipment_where_avoidable():
-    """If the first fallback shares equipment with the primary, no candidate of the same reason was equipment-disjoint."""
-    offenders = []
-    for k, e in MV.items():
-        first = e["fallbacks"][0]
-        if not set(MV[first["movement_id"]]["equipment"]) & set(e["equipment"]):
-            continue
-        same_reason = [m for m, r in xl.fallback_candidates(LIB, k, FIDX) if r == first["reason"]]
-        if any(not set(MV[m]["equipment"]) & set(e["equipment"]) for m in same_reason):
-            gated_first = bool(xl._locking_gate_kinds(LIB, MV[first["movement_id"]]) & {"bodyweight_threshold", "chain_prerequisite"})
-            if not gated_first:
-                offenders.append(k)
-    assert offenders == []
+    assert any(not e["fallbacks"] for e in MV.values())
 
 
 def test_availability_follows_the_owner_rule():
+    """Owner rulings 2026-11-11 and 2026-11-14: five evidence states; `state` follows from the evidence; an owner note wins."""
     inv = LIB["gym_inventory"]["items"]
-    assert inv["preacher_machine"]["home_gym"] == {"state": "unavailable", "source": "owner note 2026-11-08", "owner_confirmable": True}
+    assert inv["preacher_machine"]["home_gym"] == {
+        "state": "unavailable",
+        "evidence": "confirmed_unavailable",
+        "source": "owner note 2026-11-08",
+        "owner_confirmable": True,
+    }
     for k, e in MV.items():
         if "preacher_machine" in e["equipment"]:
             assert e["availability"]["home_gym"]["state"] == "unavailable", k
-    m = re.search(r"on or after (\d{4}-\d{2}-\d{2})", LIB["gym_inventory"]["rule"])
-    cutoff = m.group(1)
-    for k, e in MV.items():
-        bad = any(inv[x]["home_gym"]["state"] == "unavailable" for x in e["equipment"])
-        recent = (e.get("history") or {}).get("last_done", "") >= cutoff
-        if recent and not bad:
-            assert e["availability"]["home_gym"]["state"] == "available", k
-    assert all(inv[x]["home_gym"]["state"] in xl.AVAILABILITY_STATES for x in inv)
+    for x, row in inv.items():
+        st = row["home_gym"]
+        assert st["state"] in xl.AVAILABILITY_STATES and st["evidence"] in xl.integrity.AVAILABILITY_EVIDENCE, x
+        assert st["state"] == xl.integrity.EVIDENCE_STATE[st["evidence"]], x
+    assert not re.search(
+        r"\d{4}-\d{2}-\d{2}", LIB["gym_inventory"]["rule"].split("owner rulings")[1].split(":")[1]
+    ), "no log date in the rule"
 
 
 # ── pure classifiers (synthetic sentences — never his notes) ───────────────────────────────────────────────────
@@ -458,8 +456,8 @@ def test_private_check_passes_on_a_complete_overlay():
 @pytest.mark.parametrize("mutation", ["null_value", "missing_gate", "dangling_chain", "no_overlay", "non_numeric_bodyweight"])
 def test_private_check_fails_each_incomplete_shape(mutation):
     ov = _complete_overlay()
-    if mutation == "null_value":
-        ov["gates"]["bw_pull"]["value"] = None
+    if mutation == "null_value":  # a chain gate with no standard (an unset BODYWEIGHT threshold is valid: fix round 13)
+        ov["gates"]["chain_pull"]["value"] = None
     elif mutation == "missing_gate":
         del ov["gates"]["chain_kb_swing"]
     elif mutation == "dangling_chain":
@@ -476,7 +474,7 @@ def test_private_check_script_prints_no_values(tmp_path):
     import check_library_gates_private as chk
 
     ov = _complete_overlay()
-    ov["gates"]["bw_pull"]["value"] = None
+    ov["gates"]["bw_pull"]["value"] = "soon"  # set, but not a number (an UNSET threshold is valid and locked: fix round 13)
     p = tmp_path / "ov.json"
     p.write_text(json.dumps(ov))
     lines: list[str] = []
@@ -498,7 +496,7 @@ def test_approval_refuses_without_a_complete_private_check(tmp_path):
     lib_path.write_text(json.dumps(LIB))
     bad = tmp_path / "bad.json"
     ov = _complete_overlay()
-    ov["gates"]["bw_nordic"]["value"] = None
+    ov["gates"]["chain_nordic"]["value"] = None  # a chain gate with no standard
     bad.write_text(json.dumps(ov))
     before = lib_path.read_text()
     assert appr.approve("test", str(lib_path), str(bad), today="2026-11-11", out=lambda *_: None) == 1

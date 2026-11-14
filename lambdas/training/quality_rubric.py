@@ -53,6 +53,16 @@ RUBRIC_VERSION = "3.6.0"  # 3.6.0: #5861 fix round 9 (bases state categorical in
 QUALITY_TIERS = ("S", "A", "B", "C", "D")
 EVIDENCE_CONFIDENCE = ("rct_direct", "rct_characteristic", "consensus", "none_reviewed")
 EVIDENCE_ADJUSTERS = ("rct_direct",)  # the only confidence that may move a row off its rubric tier
+EVIDENCE_MEANING = {
+    "rct_direct": "a controlled trial tested THIS movement for THIS target (cited on the row)",
+    "rct_characteristic": "a controlled trial tested the characteristic the row relies on (a range, a position), not this movement",
+    "consensus": "practitioner consensus over inputs checked by hand; no trial is claimed",
+    "none_reviewed": "no study was reviewed for this rating: the tier is a biomechanical and practical judgment made from the "
+    "rubric's categorical inputs. It is not scientifically validated and claims no trial",
+}
+"""What each evidence confidence says, in plain words (#5861 fix round 13, owner ruling 2026-11-14: no implied scientific
+validation). The TIER is a quality judgment; the confidence beside it says what that judgment rests on. Most ratings are
+`none_reviewed`, and that never demotes a row — it is shown, not scored."""
 EVIDENCE_MAX_BANDS = 1
 PROVENANCE = "owner ruling 2026-11-12 on #5857: rubric v2, all eight board recommendations adopted"
 
@@ -311,7 +321,8 @@ S_CRITERIA = {
     "target_is_limiter": "the target muscle, not balance, grip, mobility or another muscle, ends the set",
     "stable_to_failure": "stable enough (stability high or moderate) to take the target close to failure",
     "stimulus_to_fatigue": "systemic fatigue is not high for the stimulus",
-    "no_high_joint_stress": "no joint is rated high",
+    "no_high_joint_stress": "none of the joints the rubric costs (spine load, shear, wrist, elbow, shoulder) is rated high; the knee "
+    "and hip ratings are a pain map for a painful joint, not a cost on a healthy one (owner ruling 10, 2026-11-13)",
     "reviewed_inputs": "the inputs the criteria read were checked by hand (`objective_inputs.reviewed`), not only derived by a title rule",
     "inputs_known": "no input the rubric reads is unknown (an unknown scores neutral, so it can never carry a row to S)",
 }
@@ -727,6 +738,9 @@ def rubric_doc() -> dict[str, Any]:
         "bands": {tier: floor for floor, tier in BANDS} | {"D": "below C"},
         "evidence": {
             "confidence": list(EVIDENCE_CONFIDENCE),
+            "meaning": dict(EVIDENCE_MEANING),
+            "separate_from_tier": "the tier is a quality judgment from the rubric; evidence confidence is its own field and says what "
+            "the judgment rests on. A `none_reviewed` tier is never demoted for lacking a trial and never reads as validated",
             "may_adjust": list(EVIDENCE_ADJUSTERS),
             "max_bands": EVIDENCE_MAX_BANDS,
             "rule": "+1 when a direct trial found this movement grew the target more than a compared movement or range, -1 when "
