@@ -141,7 +141,6 @@
       "Effect": "Allow",
       "Action": [
         "secretsmanager:DescribeSecret",
-        "secretsmanager:GetSecretValue",
         "secretsmanager:ListSecrets"
       ],
       "Resource": [
@@ -167,7 +166,20 @@
       "Sid": "CDKBootstrapRoleAssume",
       "Effect": "Allow",
       "Action": "sts:AssumeRole",
-      "Resource": "arn:aws:iam::205930651321:role/cdk-*"
+      "Resource": [
+        "arn:aws:iam::205930651321:role/cdk-hnb659fds-deploy-role-205930651321-us-west-2",
+        "arn:aws:iam::205930651321:role/cdk-hnb659fds-file-publishing-role-205930651321-us-west-2",
+        "arn:aws:iam::205930651321:role/cdk-hnb659fds-image-publishing-role-205930651321-us-west-2",
+        "arn:aws:iam::205930651321:role/cdk-hnb659fds-lookup-role-205930651321-us-west-2",
+        "arn:aws:iam::205930651321:role/cdk-hnb659fds-deploy-role-205930651321-us-east-1",
+        "arn:aws:iam::205930651321:role/cdk-hnb659fds-file-publishing-role-205930651321-us-east-1",
+        "arn:aws:iam::205930651321:role/cdk-hnb659fds-image-publishing-role-205930651321-us-east-1",
+        "arn:aws:iam::205930651321:role/cdk-hnb659fds-lookup-role-205930651321-us-east-1",
+        "arn:aws:iam::205930651321:role/cdk-hnb659fds-deploy-role-205930651321-us-east-2",
+        "arn:aws:iam::205930651321:role/cdk-hnb659fds-file-publishing-role-205930651321-us-east-2",
+        "arn:aws:iam::205930651321:role/cdk-hnb659fds-image-publishing-role-205930651321-us-east-2",
+        "arn:aws:iam::205930651321:role/cdk-hnb659fds-lookup-role-205930651321-us-east-2"
+      ]
     },
     {
       "Sid": "CloudFrontInvalidate",

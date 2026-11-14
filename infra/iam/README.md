@@ -44,6 +44,69 @@ future trust change into a reviewable PR with `git revert` as the rollback.
 > any-ref trust) live for ≈6 minutes — `docs/INCIDENT_LOG.md`. `tests/test_iam_twin_free_3336.py`
 > fails the suite if an inline policy document for any role listed here reappears under `deploy/`.
 
+### PENDING APPLY — the deploy role sheds `GetSecretValue` and names its CDK bootstrap roles (#5513, 2026-11-13)
+
+> **Status: the checked-in JSON is AHEAD of live — two NARROWINGS, no new grant.** Until the
+> apply below runs, `python3 deploy/verify_oidc_iam.py --strict` reports one deploy-role DRIFT
+> (expected), and `_PENDING_PERMISSIONS_APPLY` in `tests/test_grant_enumeration_drift.py`
+> carries the role. Owner-attended: `bash deploy/setup_github_oidc.sh`.
+
+`github-actions-deploy-role.permissions.json` changes in two statements:
+
+| Statement | before | after |
+| --- | --- | --- |
+| `SecretsManager` | `DescribeSecret`, `GetSecretValue`, `ListSecrets` on `secret:life-platform/*` | `DescribeSecret`, `ListSecrets` — **no job on this role can read a secret's value** |
+| `CDKBootstrapRoleAssume` | `sts:AssumeRole` on `role/cdk-*` | the 12 named roles: `cdk-hnb659fds-{deploy,file-publishing,image-publishing,lookup}-role-<acct>-{us-west-2,us-east-1,us-east-2}` |
+
+**Why `GetSecretValue` can go (measured 2026-11-13, not assumed).** The only reason on record
+was I5, and I5 (`test_i5_required_secrets_exist`) calls `describe_secret` only — and has run on
+`github-actions-readonly-role` since #4257, not on this role at all. The enumeration behind the
+shed: every workflow job whose credential step assumes this role (`ci-cd.yml` `deploy-iam`,
+`deploy`, `rollback-on-smoke-failure`; `site-deploy.yml` `deploy-site`,
+`rollback-site-on-failure`; `web-preview-deploy.yml` `deploy`, `record-previous`,
+`rollback-v9-on-failure` — `tests/grant_enumeration.py::ci_jobs()`), every shell script those
+jobs run and every script those scripts run, and every Python file any of them names, each
+walked with `grant_enumeration.consumer_refs` for a reachable `_SECRET_CALLS` member
+(`get_secret_value` / `get_secret` / `get_secret_json`). Result: **zero** reachable secret
+reads and zero `aws secretsmanager get-secret-value` in any of the shell. Two files name a
+secret and neither runs here: `mcp_server.py` appears only as a `git diff` pathspec and a file
+`build_bundle.py` copies (never executed), and `tests/test_integration_aws.py` reads
+`life-platform/mcp-api-key` in `test_i12_…`, which no workflow selects (`post-deploy-checks`
+runs I1/I2/I4–I9/I22–I24, on the readonly role). After this change no checked-in CI role
+document grants `secretsmanager:GetSecretValue`.
+`DescribeSecret`/`ListSecrets` are kept as-is; whether this role needs them at all is #5544's
+question, not this change's.
+
+**Why the twelve role names.** `cdk deploy` (the #2834 additive-IAM step, `deploy-iam`) assumes
+the bootstrap **deploy**, **file-publishing** and **lookup** roles of the target stack's region
+(**image-publishing** only if a stack ever ships a container asset — none does today; it is
+listed so that adding one is not a silent AccessDenied in the middle of a deploy). The regions
+are the three `cdk/app.py` deploys to — `us-west-2`, `us-east-1` (`LifePlatformWeb`) and
+`us-east-2` (`LifePlatformBackup`) — and
+`tests/test_iam_additive_gate_guards_2834.py::test_deploy_role_needs_no_new_grant_for_the_additive_deploy`
+derives that set from `deploy/drift_sentinel.py::STACKS` (itself pinned to `app.py` by
+`tests/test_drift_checker_stack_regions.py`), so a stack in a fourth region reds there until
+its four roles are added. What `cdk-*` allowed and this does not: the
+`cdk-hnb659fds-cfn-exec-role-*` (it trusts only `cloudformation.amazonaws.com`, so the wildcard
+was never usable against it — but the policy no longer says otherwise) and any future role that
+happens to be named `cdk-…`.
+
+**Apply (owner, attended), then prove it:**
+
+```bash
+bash deploy/setup_github_oidc.sh                 # put-role-policy file://…deploy-role.permissions.json, ends with the verifier
+python3 deploy/verify_oidc_iam.py --strict       # deploy-role: CLEAN
+aws iam get-role-policy --role-name github-actions-deploy-role --policy-name life-platform-cicd-permissions \
+  --query 'PolicyDocument.Statement[?Sid==`SecretsManager` || Sid==`CDKBootstrapRoleAssume`]'
+```
+
+Then delete the `github-actions-deploy-role` entry from `_PENDING_PERMISSIONS_APPLY`, and watch
+ONE full CI deploy (`plan → deploy → smoke → post-deploy-checks`) plus one site deploy go green.
+A stripped-too-much mistake surfaces as `AccessDenied` on `sts:AssumeRole` in `deploy-iam`
+(only when an additive-IAM stack is admitted) or on `secretsmanager:GetSecretValue` anywhere.
+**Rollback:** `git checkout <previous-sha> -- infra/iam/github-actions-deploy-role.permissions.json`
+and re-run `bash deploy/setup_github_oidc.sh`.
+
 ### PENDING APPLY — the deploy role trusts only its environments; a read-only role for everything else (#4257, 2026-10-01)
 
 > Steps 1–3 below were applied by the owner on 2026-10-12 ~03:15Z (environment `ungated-deploy` with a main-only branch policy; `github-actions-readonly-role` live with 17 statements; the transitional deploy-role trust with three subjects, snapshot kept outside the repo). Steps 4–5 follow the merge.
@@ -314,6 +377,9 @@ dynamodb.us-west-2.amazonaws.com` so CI can decrypt only through a DynamoDB read
 already granted, never the key directly), `EventBridge` (I6),
 `CloudWatch DescribeAlarms` (I7), `SecretsManager` (I5), `CloudFormationDiff` (plan `cdk
 diff`), `CDKBootstrapRoleAssume`, `CloudFrontInvalidate` (site-deploy).
+(Since then: I5 moved to the readonly role with #4257, and #5513 dropped `GetSecretValue` from
+`SecretsManager` and replaced `CDKBootstrapRoleAssume`'s `role/cdk-*` with the twelve named
+bootstrap roles — see the #5513 PENDING APPLY section above.)
 
 ---
 
@@ -666,9 +732,9 @@ mutation):
 
 | Hop | Principal | What it needs | Held? |
 | --- | --- | --- | --- |
-| CI → CDK deploy role | `github-actions-deploy-role` | `sts:AssumeRole` on `arn:aws:iam::<acct>:role/cdk-*` (statement `CDKBootstrapRoleAssume`) | **yes**, since #401 |
+| CI → CDK deploy role | `github-actions-deploy-role` | `sts:AssumeRole` on the named bootstrap roles `cdk-hnb659fds-{deploy,file-publishing,image-publishing,lookup}-role-<acct>-{us-west-2,us-east-1,us-east-2}` (statement `CDKBootstrapRoleAssume`; `role/cdk-*` until #5513) | **yes**, since #401 |
 | CDK deploy role → CloudFormation | `cdk-hnb659fds-deploy-role-<acct>-<region>` (trusts the account root) | `cloudformation:CreateChangeSet/ExecuteChangeSet/…`, `iam:PassRole` on the cfn-exec role, `ssm:GetParameter` on `/cdk-bootstrap/hnb659fds/version` — all in its bootstrap `default` policy | yes (bootstrap) |
-| asset upload | `cdk-hnb659fds-file-publishing-role-*` (assumed, same `cdk-*` grant) | S3 put to the bootstrap assets bucket | yes (bootstrap) |
+| asset upload | `cdk-hnb659fds-file-publishing-role-<acct>-<region>` (assumed, same `CDKBootstrapRoleAssume` statement) | S3 put to the bootstrap assets bucket | yes (bootstrap) |
 | CloudFormation → resources | `cdk-hnb659fds-cfn-exec-role-<acct>-<region>` | **`AdministratorAccess`** (the CDK bootstrap default) | yes (bootstrap) |
 | the gate's read side | `github-actions-deploy-role` | `cloudformation:GetTemplate` (statement `CloudFormationDiff`) | yes |
 | the ledger | `github-actions-deploy-role` | `s3:PutObject` on `matthew-life-platform/*` (statement `S3DeployArtifacts`) — writes `remediation-log/iam-additive-gate/YYYY/MM/DD/` | yes |
