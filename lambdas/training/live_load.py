@@ -49,7 +49,11 @@ KG_PER_LB = 0.45359237
 def effort_role(e: dict[str, Any]) -> str:
     """An exposure's row of the ONE effort table (`effort_targets`, fix round 12): a heavy-day anchor is a `heavy_compound`, any
     other anchor a `volume_compound`, every accessory slot (machine and isolation work) an `accessory`. The deadlift beside the
-    squat takes its own row through its cap (`live_rulings.lead_lift`)."""
+    squat takes its own row through its cap (`live_rulings.lead_lift`); fix round 14 (amended A1(f)): every compound on the heavy
+    lower morning but the squat (a split squat in an accessory slot, a full-body guest press) carries the row `lead_lift` marks on
+    it, `heavy_lower_other`."""
+    if e.get("live_effort_role"):
+        return str(e["live_effort_role"])
     if e.get("kind") != "anchor":
         return "accessory"
     return "heavy_compound" if e.get("intensity") == "heavy" else "volume_compound"
@@ -64,17 +68,18 @@ def step_rpe(e: dict[str, Any] | None = None) -> float:
 
 
 def effort_line(e: dict[str, Any]) -> str | None:
-    """The note's effort line for a role whose target is not the composer's band: a heavy compound's `RPE 8, last set RPE 8–9`
-    (None: the composer's line, or the lift's cap, stands)."""
+    """The note's effort line for a role whose target is not the composer's band: a heavy compound's `RPE 8, last set RPE 8–9`,
+    the heavy lower morning's other compounds' `RPE 8` (None: the composer's line, or the lift's cap, stands)."""
     from training import hevy_note_grammar as g
 
-    if effort_role(e) != "heavy_compound":
+    role = effort_role(e)
+    if role not in ("heavy_compound", "heavy_lower_other"):
         return None
-    work, last = cfg.value("effort_targets")["heavy_compound"]
+    work, last = cfg.value("effort_targets")[role]
     cap = e.get("live_effort")
     if cap and float(cap) < float(last):
         return None  # a capped lift reads its cap (`live_program._cap_effort`)
-    return g.effort_line(work, (work, last))
+    return g.effort_line(work) if float(last) == float(work) else g.effort_line(work, (work, last))
 
 
 def _day(w: dict[str, Any]) -> str:

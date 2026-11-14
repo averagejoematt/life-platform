@@ -51,9 +51,13 @@ def lead_lift(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
     day. A squat already capped (a pain flag) leaves both under the top effort — never both maximal. Returns the line."""
     if rx.get("session_role") != "lower_heavy":
         return []
-    from training import live_balance, live_settings
+    from training import live_balance, live_program, live_settings
 
     idx, movs = ctx.get("idx") or {}, (ctx.get("lib") or {}).get("movements") or {}
+    for e in rx["exposures"]:  # fix round 14 (amended A1(f)): the squat alone leads; no other compound that morning above RPE 8
+        squat = e.get("kind") == "anchor" and e.get("pattern") == "squat" and e.get("intensity") == "heavy"
+        if not squat and e.get("intensity") != "carry" and live_program._compound(_lib_entry(e, ctx)):
+            e["live_effort_role"] = "heavy_lower_other"
     anchors = {
         e.get("pattern"): e
         for e in rx["exposures"]

@@ -942,6 +942,7 @@ def _live(
     return rotation | {
         "variants": by_role.get(role, rotation.get("variants") or {}),
         "variants_by_role": by_role,
+        "week_variants": _week_variants(by_role, sel, role, gated),
         "slots": slots,
         "ledger_writes": [],  # fix round 12 (rollback): a live draft's picks are their own list, never read by the proposed path
         "live_ledger_writes": writes,
@@ -949,6 +950,18 @@ def _live(
         "source": "selection",
         "rationale": list(rotation.get("rationale") or []) + [_line(s) for s in sel["slots"] if s["role"] == role],
     }
+
+
+def _week_variants(by_role: dict[str, dict[str, str]], sel: dict[str, Any], role: Any, gated: bool) -> dict[str, dict[str, str]]:
+    """Fix round 14 (the weekly plan counted the template's accessories, not the picks the mornings serve): every role's
+    accessory as THIS selection serves it — the served role's own variants, each other slot its pick (or the pick the novelty
+    budget held) under the same approval rule as the served role; the pools elsewhere. Read by the week plan only."""
+    out = {r: dict(v) for r, v in by_role.items()}
+    for c in sel.get("slots") or []:
+        pick, op = (c.get("pick") or {}).get("catalog_key"), c.get("owner_pin") or {}
+        if c.get("role") != role and pick and not c.get("pinned") and not (gated and op.get("state") != "held"):
+            out.setdefault(str(c["role"]), {})[str(c["incumbent"])] = c.get("novelty_serve") or pick
+    return out
 
 
 def _line(s: dict[str, Any]) -> str:

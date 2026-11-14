@@ -125,11 +125,18 @@ HEURISTICS: dict[str, dict[str, Any]] = {
         "retune": "block retro: recovery markers in the weeks after a slump hold",
     },
     "effort_targets": {
-        "value": {"heavy_compound": [8, 9], "deadlift": [8, 8], "volume_compound": [9, 9], "accessory": [9, 10]},
+        "value": {
+            "heavy_compound": [8, 9],
+            "deadlift": [8, 8],
+            "heavy_lower_other": [8, 8],
+            "volume_compound": [9, 9],
+            "accessory": [9, 10],
+        },
         "group": "progression",
         "basis": "owner ruling 2026-11-14 (fix round 12: not RPE 9 on everything): each role's [top RPE of a working set, top RPE "
         "of the LAST set]. A heavy-day barbell or dumbbell anchor (squat, bench, the heavy row) works at RPE 8 and only its last "
-        "set may reach 9; the deadlift beside the squat stays at 8 throughout (owner ruling 5: never both maximal); a volume-day "
+        "set may reach 9; the deadlift beside the squat stays at 8 throughout (owner ruling 5: never both maximal), and so does every "
+        "other compound on the heavy lower morning (a split squat, a lunge: `heavy_lower_other`, amended A1(f)); a volume-day "
         "compound works at 8-9; machine and isolation accessories at 8-9 with the last set 9-10 (low systemic cost, where "
         "proximity to failure pays). The load steps up when the top of the range is reached at or under the role's working "
         "RPE. Recovery-aware: ONE strain signal (the fatigue model's) holds every compound at RPE 8 — the last-set allowance "

@@ -282,7 +282,14 @@ def for_live_draft(
         )
         ctx["no_new"] = fatigue_model.strained_inputs(inputs, block_workouts, lib)  # a high-fatigue day adds nothing new
         plan = live_volume.week_plan(
-            catalog, lib, mornings, last=last, overlay=ctx["overlay"], logged=ctx["logged_tids"], in_block=ctx["in_block"]
+            catalog,
+            lib,
+            mornings,
+            last=last,
+            overlay=ctx["overlay"],
+            logged=ctx["logged_tids"],
+            in_block=ctx["in_block"],
+            variants=(rotation or {}).get("week_variants"),  # fix round 14: the plan counts the accessories the week serves
         )
         ctx["volume_plan"] = plan
         role_rows = [r for r in plan["rows"] if r["role"] == rx.get("session_role")]
