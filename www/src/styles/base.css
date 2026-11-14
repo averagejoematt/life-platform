@@ -1813,3 +1813,161 @@ span.gloss[data-quote-gloss] {
     margin-top: 6px !important;
   }
 }
+
+/* The opening (2026-11-14, sprint II): the question and the premise side by side, then The Line across the full
+   width — the experiment seen happening before it is read about. */
+.opening {
+  padding-bottom: 36px;
+}
+.opening-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 24px 56px;
+  align-items: end;
+  margin-top: 14px;
+}
+.opening-grid h1 {
+  font-size: clamp(36px, 5.4vw, 72px);
+  line-height: 0.98;
+}
+.opening .premise {
+  gap: 16px;
+}
+@media (max-width: 900px) {
+  .opening-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.theline {
+  margin: 40px 0 0;
+  border-top: 2px solid var(--ink);
+  padding-top: 14px;
+}
+.theline-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 8px 24px;
+}
+.theline-stat {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+.theline-stat .big {
+  font-size: clamp(56px, 8vw, 104px);
+  line-height: 0.8;
+  color: var(--cobalt);
+  letter-spacing: -0.02em;
+}
+.theline-unit {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.15;
+}
+.theline-unit .muted {
+  font-weight: 400;
+  font-size: 15px;
+}
+.theline-chart {
+  position: relative;
+  margin-top: 10px;
+}
+.theline-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.theline-key {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 32px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  border-top: 1px solid var(--rule);
+  padding-top: 10px;
+}
+.theline-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 22px;
+}
+.theline-legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.theline-key a {
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.opening .sofar {
+  margin-top: 22px;
+}
+/* the portrait, demoted to a band under the figure: six across on a desktop, three on a phone */
+.portrait-band {
+  padding-top: 40px;
+  padding-bottom: 40px;
+}
+.portrait-band .portrait-tiles {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+.portrait-band .portrait-tiles .tile .v {
+  font-size: 30px;
+}
+.portrait-ratio {
+  font-size: 16px;
+  line-height: 1.5;
+}
+@media (max-width: 1100px) {
+  .portrait-band .portrait-tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .theline {
+    margin-top: 28px;
+  }
+  .theline-key a {
+    white-space: normal;
+  }
+  .portrait-band .portrait-tiles .tile {
+    padding: 10px 8px;
+    gap: 4px;
+  }
+  .portrait-band .portrait-tiles .tile .label {
+    font-size: 12px;
+    letter-spacing: 0.02em;
+  }
+  .portrait-band .portrait-tiles .tile .v {
+    font-size: 22px;
+  }
+  .portrait-band .portrait-tiles .tile .spark svg {
+    width: 64px;
+    height: 24px;
+  }
+  .portrait-band .portrait-tiles .tile .note {
+    display: none;
+  }
+}
+@media (max-width: 640px) {
+  /* the chapter section starts one screen below; on a phone the jump button only repeated the scroll */
+  .opening .btn.ghost {
+    display: none;
+  }
+  .portrait-band {
+    padding-top: 28px;
+    padding-bottom: 28px;
+  }
+  .portrait-band figcaption .verified {
+    display: none;
+  }
+}
