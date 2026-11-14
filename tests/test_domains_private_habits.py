@@ -24,9 +24,20 @@ def _config() -> dict:
         return json.load(f)
 
 
+class _NoRestraints:
+    """A table that knows no restraint habit: every read answers empty, so the restraint screen (#5948,
+    tests/test_restraint_labels_5948.py) passes every name and this file tests the private-habit rule alone."""
+
+    def query(self, **_kw):
+        return {"Items": []}
+
+    def get_item(self, **_kw):
+        return {}
+
+
 def _served(config: dict, monkeypatch) -> dict:
     monkeypatch.setattr(P, "_domains_cache", config)
-    return json.loads(P.domains()["body"])
+    return json.loads(P.domains(_g={"table": _NoRestraints()})["body"])
 
 
 def test_the_config_names_no_private_habit_and_no_private_source():

@@ -12,9 +12,13 @@ import {
   GROUP_WORDS,
   byPillar,
   experimentHasPage,
-  findingText,
   labCounts,
   findingsOverTime,
+  armsFigure,
+  findingCaption,
+  forestAxis,
+  forestFigure,
+  pairTitle,
   latestFindings,
   pillarWords,
   testHasPage,
@@ -122,8 +126,8 @@ const plural = (n: number, one: string, many: string) => `${num(n)} ${n === 1 ? 
                 {open.map((t) => {
                   const v = verdictOf(t);
                   return (
-                    <a href={href(`/data/lab/tests/${t.id}/`)}>
-                      <span style="font-size:15px">
+                    <a class="lab-test" href={href(`/data/lab/tests/${t.id}/`)}>
+                      <span style="font-size:15px;min-width:0">
                         <b>{testSentence(t)}</b>
                         <br />
                         <span class="muted" style="font-size:13px">
@@ -132,7 +136,10 @@ const plural = (n: number, one: string, many: string) => `${num(n)} ${n === 1 ? 
                           {v.reason ? ` · ${v.reason}` : ""}
                         </span>
                       </span>
-                      <span class={`status ${VCLASS[v.key] || "inconclusive"}`}>{v.word}</span>
+                      <span class="lab-test-side">
+                        <span class={`status ${VCLASS[v.key] || "inconclusive"}`}>{v.word}</span>
+                        {armsFigure(t) && <span class="lab-arms" set:html={armsFigure(t)} />}
+                      </span>
                     </a>
                   );
                 })}
@@ -189,11 +196,21 @@ const plural = (n: number, one: string, many: string) => `${num(n)} ${n === 1 ? 
             )}
             {learned.items.length ? (
               <>
-                <div class="rows">
+                <div class="forest" data-forest>
+                  <div class="forest-row forest-head" aria-hidden="true">
+                    <span class="label">Fig. — each pair's correlation, with its 95% interval</span>
+                    <span set:html={forestAxis()} />
+                    <span />
+                  </div>
                   {learned.items.slice(0, 6).map((f) => (
-                    <div>
-                      <span style="font-size:14px">{findingText(f)}</span>
-                      <span class="mono" style="font-size:12px">
+                    <div class="forest-row">
+                      <span>
+                        <b style="font-size:15px">{pairTitle(f)}</b>
+                        <br />
+                        <span class="mono muted" style="font-size:12px">{findingCaption(f)}</span>
+                      </span>
+                      <span set:html={forestFigure(f)} />
+                      <span class="mono muted" style="font-size:12px;white-space:nowrap">
                         listed {num(f.seen)} of {num(f.of)} {f.of === 1 ? "week" : "weeks"}
                       </span>
                     </div>
@@ -204,11 +221,16 @@ const plural = (n: number, one: string, many: string) => `${num(n)} ${n === 1 ? 
                     <summary style="cursor:pointer;min-height:44px;display:flex;align-items:center">
                       <b>The other {num(learned.items.length - 6)} from that week</b>
                     </summary>
-                    <div class="rows" style="margin-top:8px">
+                    <div class="forest" style="margin-top:8px">
                       {learned.items.slice(6).map((f) => (
-                        <div>
-                          <span style="font-size:14px">{findingText(f)}</span>
-                          <span class="mono" style="font-size:12px">
+                        <div class="forest-row">
+                          <span>
+                            <b style="font-size:15px">{pairTitle(f)}</b>
+                            <br />
+                            <span class="mono muted" style="font-size:12px">{findingCaption(f)}</span>
+                          </span>
+                          <span set:html={forestFigure(f)} />
+                          <span class="mono muted" style="font-size:12px;white-space:nowrap">
                             listed {num(f.seen)} of {num(f.of)} {f.of === 1 ? "week" : "weeks"}
                           </span>
                         </div>
@@ -216,6 +238,10 @@ const plural = (n: number, one: string, many: string) => `${num(n)} ${n === 1 ? 
                     </div>
                   </details>
                 )}
+                <p class="muted" style="font-size:13px;margin-top:10px;max-width:74ch">
+                  The dot is the correlation over the run's window; the band is its 95% interval. A band that stays clear of the centre line is drawn in cobalt.
+                  Left of centre the two moved in opposite directions, right of it together.
+                </p>
               </>
             ) : (
               <div class="empty">

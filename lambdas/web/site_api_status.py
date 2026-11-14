@@ -24,12 +24,18 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import boto3
-from boto3.dynamodb.conditions import Key
+from boto3.dynamodb.conditions import Attr, Key
 from common import activity_publication as _activity_publication  # owner ruling 2026-11-03: private sources off the board
-from common.macrofactor_fields import latest_day_condition  # #5431: intake reads bounded at the Pacific today
+from common.macrofactor_fields import latest_day_condition, latest_sk_ceiling  # #5431: intake reads bounded at the Pacific today
 from common.pacific_time import anchor_day_key  # #3913: a DATE# day key is aged in the calendar that NAMED it — never a hardcoded tz
 from common.subscriber_cadence import cron_hour, cron_minute, required_weekday, sender, weekday_name  # #3619 (#3564 registry)
-from ingestion.source_registry import AVAILABILITY_PAUSED, availability_facet, due_months  # #3669 cadence, #3615 absence facets
+from ingestion.source_registry import (  # #3669 cadence, #3615 absence facets, #5930 the board's membership
+    AVAILABILITY_PAUSED,
+    DEFAULT_STALE_HOURS,
+    SOURCE_REGISTRY,
+    availability_facet,
+    due_months,
+)
 
 from web.site_api_common import (
     DDB_REGION,
@@ -86,7 +92,9 @@ DUE_MONTHS_DEFAULT = 6
 def _absence_comment(facet: dict, rel: str) -> str:
     """The comment a PAUSED source gets, built from ITS OWN registry facet."""
     low = str(rel or "").strip().lower()
-    if low and low not in ("never", "not imported"):
+    if low == LAST_SYNC_UNREADABLE:  # #5930: a failed read states neither a duration nor an absence
+        duration = "Its records could not be read just now."
+    elif low and low not in ("never", "not imported"):
         duration = f"Last record: {rel}."
     else:
         duration = "No record has ever arrived on this feed."
@@ -101,6 +109,481 @@ def _status_row_is_public(row: tuple) -> bool:
         return False
     field_check = row[9] if len(row) > 9 else None
     return field_check is None or _activity_publication.field_is_public(row[0], field_check)
+
+
+# ── The data-source board: PRESENTATION copy over a registry-derived SET (#5930) ──
+#
+# (source_id, name, description, yellow_h, red_h, category, group, activity_dependent, source_app, field_check)
+# name is the DATA type, the source app is separate. field_check: if set, _last_sync / the uptime bars
+# count only records carrying that field (the sub-feeds of a shared partition like apple_health).
+# category: "auto" (default), "manual" (blue — infrequent file imports), "onetime" (green — never
+# changes), "archive" (blue — a FROZEN partition nothing writes any more; its age is not a fault).
+#
+# This table is the board's WORDING, not its membership. Which sources the board must show is
+# `board_source_ids()` below, derived from the registry's facets: a registered source that is not
+# paused, has a partition, is not a social channel and is public gets a row whether or not it is
+# typed here — `_board_rows()` appends a registry-worded row for any it finds missing. Before #5930
+# this list was the membership too, and it drifted: the live strength source `hevy` had no row while
+# the frozen pre-Hevy `macrofactor_workouts` archive was typed as an "auto" feed and told readers to
+# "Check auth/webhook" on a pipe that was retired on purpose. A row whose source is NOT a registry
+# source must be a dispositioned `UNREGISTERED_PARTITIONS` entry rendered "onetime" or "archive"
+# (tests/test_status_board_registry_5930.py holds both directions).
+_DATA_SOURCES = [
+    # ── API-Based (fully automated) ──
+    (
+        "whoop",
+        "Recovery & Sleep Data",
+        "HRV \u00b7 recovery score \u00b7 sleep staging",
+        25,
+        49,
+        "auto",
+        "API-Based",
+        False,
+        "Whoop",
+        None,
+    ),
+    (
+        "withings",
+        "Weight Data",
+        "Weight \u00b7 body composition \u00b7 blood pressure",
+        25,
+        49,
+        "auto",
+        "API-Based",
+        True,
+        "Withings",
+        None,
+    ),
+    (
+        "eightsleep",
+        "Sleep Environment Data",
+        "Sleep staging \u00b7 bed temperature \u00b7 HRV",
+        25,
+        49,
+        "auto",
+        "API-Based",
+        False,
+        "Eight Sleep",
+        None,
+    ),
+    ("todoist", "To Do Task Data", "Tasks \u00b7 projects \u00b7 completion rate", 25, 49, "auto", "API-Based", True, "Todoist", None),
+    (
+        "weather",
+        "Weather Data",
+        "Daily temperature \u00b7 conditions \u00b7 humidity",
+        25,
+        49,
+        "auto",
+        "API-Based",
+        False,
+        "OpenWeather",
+        None,
+    ),
+    (
+        "garmin",
+        "Activity Tracking (1 of 2)",
+        "Walks \u00b7 runs \u00b7 GPS routes \u2014 delivered through Strava (direct feed retired, #4640)",
+        25,
+        49,
+        "auto",
+        "API-Based",
+        True,
+        "Garmin",
+        None,
+    ),
+    (
+        "strava",
+        "Activity Tracking (2 of 2)",
+        "Activities \u00b7 segments \u00b7 training load",
+        25,
+        49,
+        "auto",
+        "API-Based",
+        True,
+        "Strava",
+        None,
+    ),
+    ("notion", "Journal Data", "Journal entries \u00b7 mood \u00b7 reflections", 25, 49, "auto", "API-Based", True, "Notion", None),
+    # ── User-Driven (requires user to log/sync) ──
+    ("habitify", "Habit Tracking Data", "Daily habits \u00b7 day grades", 25, 49, "auto", "User-Driven", True, "Habitify", None),
+    (
+        "macrofactor",
+        "Nutrition Data",
+        "Calories \u00b7 macros \u00b7 meal timing",
+        25,
+        49,
+        "auto",
+        "User-Driven",
+        True,
+        "MacroFactor via Dropbox",
+        None,
+    ),
+    (
+        "supplements",
+        "Supplement Adherence",
+        "Daily supplement tracking & compliance",
+        25,
+        49,
+        "auto",
+        "User-Driven",
+        True,
+        "Habitify",
+        None,
+    ),
+    # #5930: the live strength source. Behavioral (a record exists only when he lifts), so a quiet
+    # day is awaiting activity, not a fault — the same activity-dependent handling as the rows above.
+    (
+        "hevy",
+        "Strength Training Data",
+        "Strength sets · reps · load · rest times",
+        25,
+        49,
+        "auto",
+        "User-Driven",
+        True,
+        "Hevy",
+        None,
+    ),
+    # State of Mind tracked via apple_health partition field check (som_avg_valence) in Periodic Uploads section
+    # ── Periodic Uploads (file drops, webhooks, device sync) ──
+    # #5930: a FROZEN archive (source_registry.UNREGISTERED_PARTITIONS — no writer since Hevy replaced it),
+    # so "archive": it renders its age as history, never as a broken pipe to go and fix.
+    (
+        "macrofactor_workouts",
+        "Exercise Log Archive",
+        "Historical strength log (pre-Hevy) — live strength data is the Hevy row",
+        48,
+        168,
+        "archive",
+        "Periodic Uploads",
+        True,
+        "MacroFactor via Dropbox",
+        None,
+    ),
+    (
+        "apple_health",
+        "CGM Glucose Data",
+        "Continuous glucose monitor readings",
+        25,
+        49,
+        "auto",
+        "Periodic Uploads",
+        True,
+        "Dexcom Stelo via Health Exporter",
+        "blood_glucose_avg",
+    ),
+    (
+        "apple_health",
+        "Water Intake Data",
+        "Daily water consumption tracking",
+        25,
+        49,
+        "auto",
+        "Periodic Uploads",
+        True,
+        "Apple Health via Health Exporter",
+        "water_intake_ml",
+    ),
+    (
+        "apple_health",
+        "Blood Pressure Data",
+        "Systolic \u00b7 diastolic \u00b7 pulse",
+        168,
+        336,
+        "manual",
+        "Periodic Uploads",
+        True,
+        "Apple Health via Health Exporter",
+        "blood_pressure_systolic",
+    ),
+    (
+        "apple_health",
+        "Breathwork Data",
+        "Breathwork sessions logged as workouts",
+        48,
+        168,
+        "auto",
+        "Periodic Uploads",
+        True,
+        "Breathwrk via Apple Health",
+        # #5930: was `mindful_minutes`, the Mindful Minutes row's field \u2014 two rows tracking one field.
+        # `breathwork_minutes` is the HAE workouts aggregate (source_registry hae_datatypes "workouts").
+        "breathwork_minutes",
+    ),
+    (
+        "apple_health",
+        "Stretching Data",
+        "Flexibility sessions \u00b7 recovery",
+        48,
+        168,
+        "auto",
+        "Periodic Uploads",
+        True,
+        "Pliability via Health Exporter",
+        "flexibility_minutes",
+    ),
+    (
+        "apple_health",
+        "Mindful Minutes Data",
+        "Meditation & mindfulness sessions",
+        48,
+        168,
+        "auto",
+        "Periodic Uploads",
+        True,
+        "Apple Health via Health Exporter",
+        "mindful_minutes",
+    ),
+    (
+        "apple_health",
+        "State of Mind Data (Health Export)",
+        "How We Feel mood check-ins via Health Exporter",
+        48,
+        168,
+        "auto",
+        "Periodic Uploads",
+        True,
+        "Apple Health via Health Exporter",
+        "som_avg_valence",
+    ),
+    (
+        "apple_health",
+        "Apple Health Import",
+        "Steps \u00b7 activity \u00b7 walking metrics",
+        25,
+        49,
+        "auto",
+        "Periodic Uploads",
+        True,
+        "Health Auto Export",
+        "steps",
+    ),
+    (
+        "food_delivery",
+        "Food Delivery Index",
+        "6-monthly CSV upload \u00b7 delivery index 0-10",
+        2160,
+        2880,
+        "manual",
+        "Periodic Uploads",
+        True,
+        "CSV upload",
+    ),
+    (
+        "measurements",
+        "Body Tape Measurements",
+        "Periodic body measurements \u00b7 waist-to-height ratio",
+        1440,
+        2880,
+        "manual",
+        "Periodic Uploads",
+        True,
+        "CSV upload (Partner)",
+    ),
+    # ── Lab & Clinical (infrequent) ──
+    (
+        "labs",
+        "Blood Test Results",
+        "Lab work \u00b7 biomarkers \u00b7 lipid panel",
+        4320,
+        8760,
+        "manual",
+        "Lab & Clinical",
+        True,
+        "Function Health",
+    ),
+    (
+        "dexa",
+        "Bone Density & Body Comp",
+        "DEXA scan \u00b7 bone density \u00b7 lean mass",
+        4320,
+        8760,
+        "manual",
+        "Lab & Clinical",
+        True,
+        "Clinical (manual)",
+    ),
+    (
+        "genome",
+        "Genome Data",
+        "Genetic variants \u00b7 risk scores \u00b7 SNPs",
+        999999,
+        999999,
+        "onetime",
+        "Lab & Clinical",
+        False,
+        "23andMe (one-time)",
+    ),
+]
+
+#: The board group a registry-derived row lands in, from the registry's own `category` facet.
+_GROUP_OF_REGISTRY_CATEGORY = {"Wearables": "API-Based", "Inputs": "API-Based", "Manual logs": "User-Driven", "Clinical": "Lab & Clinical"}
+
+
+def board_source_ids(registry=None) -> set:
+    """The registered sources the data-source board MUST show (#5930) — derived, never typed.
+
+    A source qualifies when it is not `paused` (a paused source may keep a row — garmin and
+    food_delivery do, narrated by `_absence_comment` — but is not owed one), has a DDB partition
+    (`partition: False` is a transport pipe: there is nothing to age), is not a `social_channel`
+    (inbound engagement channels have their own surfaces and no health-feed freshness), and is
+    public under `common.activity_publication` (owner rulings 2026-11-03/05: an owner-only source's
+    sync state is private activity, so it never newly appears here). `registry` is injectable so a
+    test runs THIS rule over a planted row."""
+    rows = SOURCE_REGISTRY if registry is None else registry
+    return {
+        k
+        for k, v in rows.items()
+        if not v.get("paused")
+        and v.get("partition", True) is not False
+        and not v.get("social_channel")
+        and _activity_publication.source_is_public(k)
+    }
+
+
+def _registry_row(sid: str) -> tuple:
+    """A board row worded from the registry alone, for a board source the presentation table lacks."""
+    v = SOURCE_REGISTRY[sid]
+    stale = v.get("stale_hours") or DEFAULT_STALE_HOURS
+    category = "manual" if v.get("cadence_months") else "auto"
+    group = _GROUP_OF_REGISTRY_CATEGORY.get(str(v.get("category")), "User-Driven")
+    return (
+        sid,
+        str(v["label"]),
+        str(v.get("desc") or ""),
+        stale,
+        2 * stale,
+        category,
+        group,
+        bool(v.get("behavioral")),
+        str(v["label"]),
+        None,
+    )
+
+
+def _board_rows() -> list:
+    """Every published board row: the presentation table, plus a registry-worded row for any
+    `board_source_ids()` member it lacks, minus the private rows (`_status_row_is_public`)."""
+    rows = list(_DATA_SOURCES)
+    typed = {r[0] for r in rows}
+    rows += [_registry_row(sid) for sid in sorted(board_source_ids() - typed)]
+    return [r for r in rows if _status_row_is_public(r)]
+
+
+def _component_id(sid: str, field_check) -> str:
+    """#5527/#5930: ONE id per board row. A sub-feed of a shared partition is `<source>:<field>` — the
+    seven apple_health rows used to all publish `apple_health`, so any consumer keyed on id kept one of
+    them. The partition stays on the component as `source`, which is what a per-source reader keys on."""
+    return f"{sid}:{field_check}" if field_check else sid
+
+
+# ── #5930: the two freshness readers page to the END of what they asked for ───
+#
+# `_last_sync` made ONE query (Limit=200 plus a FilterExpression) and `_uptime_90d` one more. A
+# DynamoDB page stops at Limit items OR 1 MB, whichever is first, and the FilterExpression runs
+# after — so page 1 of a sub-feed read could be empty while the record sat on page 2. Measured
+# read-only on 2026-11-14 against the apple_health partition: blood_glucose_avg's page 1 returned
+# Count 0 / ScannedCount 26 (the 1 MB ceiling, recent rows are large) and its last record,
+# DATE#2026-08-27, was on page 2; the board printed CGM, Breathwork and Mindful Minutes as "never".
+# And every exception collapsed to None, which the board also rendered "never".
+#
+# Now: "never" is emitted only once the partition is EXHAUSTED (no LastEvaluatedKey); a read that
+# raises, or that runs past the page cap, is LAST_SYNC_UNREADABLE and renders "unreadable".
+# The cap: the largest partition the board reads (apple_health, 4,132 DATE# rows) exhausts in 13
+# 1 MB pages / ~1.4 s / ~1,620 RCU, measured the same day for a field no row carries
+# (breathwork_minutes); 40 pages is 3x that inside the site API's 30 s timeout.
+LAST_SYNC_UNREADABLE = "unreadable"
+_UNREADABLE_COMMENT = "Freshness unreadable \u2014 this feed's records could not be read just now (not a claim that nothing has arrived)"
+_STATUS_MAX_PAGES = 40
+
+
+def _is_day(last) -> bool:
+    """True when `_last_sync` returned an actual day — not None ("never") and not LAST_SYNC_UNREADABLE."""
+    return bool(last) and last != LAST_SYNC_UNREADABLE
+
+
+# An exhaustive "never" read costs the whole partition (~1,620 RCU for apple_health), and /api/status
+# rebuilds every STATUS_CACHE_TTL. So the verdict is remembered per (table, source, field) for
+# _EXHAUSTED_MEMO_TTL_S, with a watermark day: inside the TTL only rows keyed on/after the watermark
+# are re-read (a new record still shows on the next build); past it the full search runs again.
+# The watermark sits _EXHAUSTED_WATERMARK_DAYS before the day of the search so a UTC-keyed partition's
+# late-evening row and a same-week upsert are both still inside the re-read.
+_EXHAUSTED_MEMO_TTL_S = 6 * 3600
+_EXHAUSTED_WATERMARK_DAYS = 2
+_exhausted_memo: dict = {}
+
+
+class _PageCapExceeded(Exception):
+    """A read ran past `_STATUS_MAX_PAGES` without exhausting what it asked for."""
+
+
+def _paged_items(table, query: dict):
+    """Yield each page's Items until LastEvaluatedKey is exhausted; raise past the page cap."""
+    kw = dict(query)
+    for _ in range(_STATUS_MAX_PAGES):
+        resp = table.query(**kw)
+        yield resp.get("Items", [])
+        lek = resp.get("LastEvaluatedKey")
+        if not lek:
+            return
+        kw["ExclusiveStartKey"] = lek
+    raise _PageCapExceeded(f"{_STATUS_MAX_PAGES} pages without reaching the end of the partition")
+
+
+def _last_sync(table, source_id, field_check=None):
+    """The newest `DATE#` day of a source — or of the rows carrying `field_check`, for the sub-feeds of a
+    shared partition. Returns the day string, None ONLY when the partition was read to its end and holds
+    no such record ("never"), or LAST_SYNC_UNREADABLE when the read failed or hit the page cap."""
+    pk = f"{USER_PREFIX}{source_id}"
+    query: dict = {
+        "KeyConditionExpression": latest_day_condition(pk, source_id),
+        "ScanIndexForward": False,
+        "ProjectionExpression": "sk",
+    }  # #5431
+    if field_check:
+        query["FilterExpression"] = Attr(field_check).exists()  # no Limit: 1 MB pages, paged below
+    else:
+        query["Limit"] = 1  # unfiltered: the first item IS the answer, an empty page IS the end
+    memo_key = (source_id, field_check)
+    memo = _exhausted_memo.get(memo_key)
+    floor = memo[1] if memo and memo[0] is table and time.time() - memo[2] < _EXHAUSTED_MEMO_TTL_S else None
+    if floor:
+        ceiling = latest_sk_ceiling(source_id)
+        query["KeyConditionExpression"] = Key("pk").eq(pk) & Key("sk").between(f"DATE#{floor}", f"{ceiling or 'DATE#'}~")
+    try:
+        for items in _paged_items(table, query):
+            if items:
+                _exhausted_memo.pop(memo_key, None)
+                return items[0]["sk"].replace("DATE#", "")[:10]
+    except Exception as e:  # noqa: BLE001 — an unreadable feed is reported as unreadable, never as "never"
+        logger.warning(f"[status] last-sync read failed for {source_id}/{field_check}: {e}")
+        return LAST_SYNC_UNREADABLE
+    if not floor:
+        watermark = (datetime.now(PT).date() - timedelta(days=_EXHAUSTED_WATERMARK_DAYS)).isoformat()
+        _exhausted_memo[memo_key] = (table, watermark, time.time())
+    return None
+
+
+def _window_presence(table, source_id, fields, start: str, end: str) -> dict:
+    """{day: set of `fields` present} for every DATE# row of `source_id` in [start, end], paged to the end.
+
+    ONE paged read per partition per build serves every sub-feed's bars (#5930): the per-row filtered
+    query this replaces read the same 90-day apple_health window once per sub-feed, and paging each of
+    those to the end would have multiplied the read cost by the sub-feed count. Raises on a failed read
+    or past the page cap — the caller degrades to a neutral bar."""
+    query: dict = {
+        "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}{source_id}") & Key("sk").between(f"DATE#{start}", f"DATE#{end}~"),
+        "ProjectionExpression": "sk",
+    }
+    if fields:
+        names = {f"#f{i}": f for i, f in enumerate(fields)}
+        query["ProjectionExpression"] = "sk, " + ", ".join(names)
+        query["ExpressionAttributeNames"] = names
+    out: dict = {}
+    for items in _paged_items(table, query):
+        for item in items:
+            out.setdefault(item["sk"].replace("DATE#", "")[:10], set()).update(f for f in fields if f in item)
+    return out
 
 
 # ── Module-owned cache state for /api/status ─────────────────────────────────
@@ -245,280 +728,6 @@ def status(*, _g) -> dict:
         if src:
             alarming_sources.add(src)
 
-    # (source_id, display_name, description, yellow_h, red_h, category)
-    # category: "auto" (default), "manual" (blue — infrequent file imports), "onetime" (green — never changes)
-    # Restructured: name is the DATA type, source app is separate
-    # (source_id, name, description, yellow_h, red_h, category, group, activity_dependent, source_app, field_check)
-    # field_check: if set, _last_sync filters by this field existing (for shared partitions like apple_health)
-    _DATA_SOURCES = [
-        # ── API-Based (fully automated) ──
-        (
-            "whoop",
-            "Recovery & Sleep Data",
-            "HRV \u00b7 recovery score \u00b7 sleep staging",
-            25,
-            49,
-            "auto",
-            "API-Based",
-            False,
-            "Whoop",
-            None,
-        ),
-        (
-            "withings",
-            "Weight Data",
-            "Weight \u00b7 body composition \u00b7 blood pressure",
-            25,
-            49,
-            "auto",
-            "API-Based",
-            True,
-            "Withings",
-            None,
-        ),
-        (
-            "eightsleep",
-            "Sleep Environment Data",
-            "Sleep staging \u00b7 bed temperature \u00b7 HRV",
-            25,
-            49,
-            "auto",
-            "API-Based",
-            False,
-            "Eight Sleep",
-            None,
-        ),
-        ("todoist", "To Do Task Data", "Tasks \u00b7 projects \u00b7 completion rate", 25, 49, "auto", "API-Based", True, "Todoist", None),
-        (
-            "weather",
-            "Weather Data",
-            "Daily temperature \u00b7 conditions \u00b7 humidity",
-            25,
-            49,
-            "auto",
-            "API-Based",
-            False,
-            "OpenWeather",
-            None,
-        ),
-        (
-            "garmin",
-            "Activity Tracking (1 of 2)",
-            "Walks \u00b7 runs \u00b7 GPS routes \u2014 delivered through Strava (direct feed retired, #4640)",
-            25,
-            49,
-            "auto",
-            "API-Based",
-            True,
-            "Garmin",
-            None,
-        ),
-        (
-            "strava",
-            "Activity Tracking (2 of 2)",
-            "Activities \u00b7 segments \u00b7 training load",
-            25,
-            49,
-            "auto",
-            "API-Based",
-            True,
-            "Strava",
-            None,
-        ),
-        ("notion", "Journal Data", "Journal entries \u00b7 mood \u00b7 reflections", 25, 49, "auto", "API-Based", True, "Notion", None),
-        # ── User-Driven (requires user to log/sync) ──
-        ("habitify", "Habit Tracking Data", "Daily habits \u00b7 day grades", 25, 49, "auto", "User-Driven", True, "Habitify", None),
-        (
-            "macrofactor",
-            "Nutrition Data",
-            "Calories \u00b7 macros \u00b7 meal timing",
-            25,
-            49,
-            "auto",
-            "User-Driven",
-            True,
-            "MacroFactor via Dropbox",
-            None,
-        ),
-        (
-            "supplements",
-            "Supplement Adherence",
-            "Daily supplement tracking & compliance",
-            25,
-            49,
-            "auto",
-            "User-Driven",
-            True,
-            "Habitify",
-            None,
-        ),
-        # State of Mind tracked via apple_health partition field check (som_avg_valence) in Periodic Uploads section
-        # ── Periodic Uploads (file drops, webhooks, device sync) ──
-        (
-            "macrofactor_workouts",
-            "Exercise Log Data",
-            "Workout CSV via file drop",
-            48,
-            168,
-            "auto",
-            "Periodic Uploads",
-            True,
-            "MacroFactor via Dropbox",
-            None,
-        ),
-        (
-            "apple_health",
-            "CGM Glucose Data",
-            "Continuous glucose monitor readings",
-            25,
-            49,
-            "auto",
-            "Periodic Uploads",
-            True,
-            "Dexcom Stelo via Health Exporter",
-            "blood_glucose_avg",
-        ),
-        (
-            "apple_health",
-            "Water Intake Data",
-            "Daily water consumption tracking",
-            25,
-            49,
-            "auto",
-            "Periodic Uploads",
-            True,
-            "Apple Health via Health Exporter",
-            "water_intake_ml",
-        ),
-        (
-            "apple_health",
-            "Blood Pressure Data",
-            "Systolic \u00b7 diastolic \u00b7 pulse",
-            168,
-            336,
-            "manual",
-            "Periodic Uploads",
-            True,
-            "Apple Health via Health Exporter",
-            "blood_pressure_systolic",
-        ),
-        (
-            "apple_health",
-            "Breathwork Data",
-            "Breathwork mindful minutes \u00b7 sessions",
-            48,
-            168,
-            "auto",
-            "Periodic Uploads",
-            True,
-            "Breathwrk via Apple Health",
-            "mindful_minutes",
-        ),
-        (
-            "apple_health",
-            "Stretching Data",
-            "Flexibility sessions \u00b7 recovery",
-            48,
-            168,
-            "auto",
-            "Periodic Uploads",
-            True,
-            "Pliability via Health Exporter",
-            "flexibility_minutes",
-        ),
-        (
-            "apple_health",
-            "Mindful Minutes Data",
-            "Meditation & mindfulness sessions",
-            48,
-            168,
-            "auto",
-            "Periodic Uploads",
-            True,
-            "Apple Health via Health Exporter",
-            "mindful_minutes",
-        ),
-        (
-            "apple_health",
-            "State of Mind Data (Health Export)",
-            "How We Feel mood check-ins via Health Exporter",
-            48,
-            168,
-            "auto",
-            "Periodic Uploads",
-            True,
-            "Apple Health via Health Exporter",
-            "som_avg_valence",
-        ),
-        (
-            "apple_health",
-            "Apple Health Import",
-            "Steps \u00b7 activity \u00b7 walking metrics",
-            25,
-            49,
-            "auto",
-            "Periodic Uploads",
-            True,
-            "Health Auto Export",
-            "steps",
-        ),
-        (
-            "food_delivery",
-            "Food Delivery Index",
-            "6-monthly CSV upload \u00b7 delivery index 0-10",
-            2160,
-            2880,
-            "manual",
-            "Periodic Uploads",
-            True,
-            "CSV upload",
-        ),
-        (
-            "measurements",
-            "Body Tape Measurements",
-            "Periodic body measurements \u00b7 waist-to-height ratio",
-            1440,
-            2880,
-            "manual",
-            "Periodic Uploads",
-            True,
-            "CSV upload (Partner)",
-        ),
-        # ── Lab & Clinical (infrequent) ──
-        (
-            "labs",
-            "Blood Test Results",
-            "Lab work \u00b7 biomarkers \u00b7 lipid panel",
-            4320,
-            8760,
-            "manual",
-            "Lab & Clinical",
-            True,
-            "Function Health",
-        ),
-        (
-            "dexa",
-            "Bone Density & Body Comp",
-            "DEXA scan \u00b7 bone density \u00b7 lean mass",
-            4320,
-            8760,
-            "manual",
-            "Lab & Clinical",
-            True,
-            "Clinical (manual)",
-        ),
-        (
-            "genome",
-            "Genome Data",
-            "Genetic variants \u00b7 risk scores \u00b7 SNPs",
-            999999,
-            999999,
-            "onetime",
-            "Lab & Clinical",
-            False,
-            "23andMe (one-time)",
-        ),
-    ]
     _COMPUTE_SOURCES = [
         ("character_sheet", "Character Sheet", "Pillar scores \u00b7 level \u00b7 XP", 25, 49),
         ("computed_metrics", "Daily Metrics", "Cross-domain computed signals", 25, 49),
@@ -548,39 +757,14 @@ def status(*, _g) -> dict:
         ("anomaly_detector", "Anomaly detector", "9:05 AM daily · 15 metrics", -1, 25, 49),
     ]
 
-    def _last_sync(source_id, field_check=None):
-        """Get the latest date for a source. If field_check is set, only count records
-        that have that specific field (for shared partitions like apple_health)."""
-        try:
-            if field_check:
-                # Must scan with filter — more expensive but necessary for sub-source tracking
-                from boto3.dynamodb.conditions import Attr
-
-                resp = table.query(
-                    KeyConditionExpression=latest_day_condition(f"{USER_PREFIX}{source_id}", source_id),  # #5431
-                    FilterExpression=Attr(field_check).exists(),
-                    ScanIndexForward=False,
-                    ProjectionExpression="sk",
-                    Limit=200,  # scan recent records to find one with the field
-                )
-                items = resp.get("Items", [])
-                return items[0]["sk"].replace("DATE#", "")[:10] if items else None
-            else:
-                resp = table.query(
-                    KeyConditionExpression=latest_day_condition(f"{USER_PREFIX}{source_id}", source_id),  # #5431
-                    ScanIndexForward=False,
-                    Limit=1,
-                    ProjectionExpression="sk",
-                )
-                items = resp.get("Items", [])
-                return items[0]["sk"].replace("DATE#", "")[:10] if items else None
-        except Exception:
-            return None
-
     # Sources where data is inherently 1 day behind (keyed by wake date / previous day)
     _LAGGED_SOURCES = {"eightsleep", "whoop"}
 
     def _comp_status(last_date_str, yellow_h, red_h, source_id=None):
+        # #5930: a failed read is not an absence, so it never says "never" — but it is not a pass
+        # either: red, so a DynamoDB outage turns the traffic light instead of reading as calm.
+        if last_date_str == LAST_SYNC_UNREADABLE:
+            return "red", LAST_SYNC_UNREADABLE, _UNREADABLE_COMMENT
         if not last_date_str:
             return "green" if source_id == "genome" else "red", "never", "No records found in DynamoDB" if source_id != "genome" else None
         # #2221 / ADR-104: a freshness check that could not EVALUATE must read as
@@ -641,8 +825,12 @@ def status(*, _g) -> dict:
         one partition (apple_health is written by cgm, water, steps, mindful minutes and
         more), and without the filter every sub-source drew the SAME bars — a CGM feed
         with no glucose reading in 90 days showed a fully green uptime chart built from
-        other sub-sources' rows. The filter runs server-side, before the projection, so
-        `ProjectionExpression="sk"` still returns only what the bars need.
+        other sub-sources' rows.
+
+        #5930: the window is read ONCE per partition per build (`_window_presence`, paged to
+        the end — one page stopped at 1 MB, ~26 days of apple_health) and each sub-feed's
+        bars are the days whose row carries its field. A failed read is cached as None so
+        every sub-feed of that partition degrades to the neutral bar without re-querying.
         """
         try:
             epoch_start = datetime(2026, 3, 28, tzinfo=timezone.utc).date()
@@ -651,17 +839,17 @@ def status(*, _g) -> dict:
             if window_days < 1:
                 return [2]  # pre-epoch: neutral
 
-            _q = {
-                "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}{source_id}")
-                & Key("sk").between(f"DATE#{epoch_start.isoformat()}", f"DATE#{today.isoformat()}~"),
-                "ProjectionExpression": "sk",
-            }
-            if field_check:
-                from boto3.dynamodb.conditions import Attr
-
-                _q["FilterExpression"] = Attr(field_check).exists()
-            resp = table.query(**_q)
-            present = {item["sk"].replace("DATE#", "")[:10] for item in resp.get("Items", [])}
+            if source_id not in _windows:
+                try:
+                    fields = sorted(_fields_by_source.get(source_id, ()))
+                    _windows[source_id] = _window_presence(table, source_id, fields, epoch_start.isoformat(), today.isoformat())
+                except Exception as e:  # noqa: BLE001 — bars degrade to neutral, never to invented red
+                    logger.warning(f"[status] uptime window read failed for {source_id}: {e}")
+                    _windows[source_id] = None
+            window = _windows[source_id]
+            if window is None:
+                return [2]
+            present = {d for d, fields_on_day in window.items() if field_check is None or field_check in fields_on_day}
             bars = []
             for i in range(window_days - 1, -1, -1):
                 d = (today - timedelta(days=i)).isoformat()
@@ -711,19 +899,29 @@ def status(*, _g) -> dict:
     # Build data source components
     now = datetime.now(PT)
     ds_components = []
+    board_rows = _board_rows()
+    # #5930: per-build state for the shared uptime-window read — the fields each partition's rows
+    # are tracked by, and {source: {day: fields present} | None} once read.
+    _fields_by_source: dict = {}
+    for _r in board_rows:
+        if len(_r) > 9 and _r[9]:
+            _fields_by_source.setdefault(_r[0], set()).add(_r[9])
+    _windows: dict = {}
     # Owner ruling 2026-11-03: a PRIVATE source's sync state (the journal's last sync, its uptime
     # bars, its status colour, its alarm) is private activity — the row is omitted, not marked, and
     # so is its share of the rollup below (common.activity_publication; unclassified fails closed).
     # Owner ruling 2026-11-05: a row tracked by a PRIVATE FIELD of a public source (the State-of-Mind
     # row's `som_avg_valence` inside apple_health) is that private sub-stream's sync state — omitted too.
-    for row in [r for r in _DATA_SOURCES if _status_row_is_public(r)]:
+    # #5930: the rows come from `_board_rows()` — the presentation table plus any registry board
+    # source it lacks — already filtered to the public ones.
+    for row in board_rows:
         sid, name, desc, yh, rh = row[0], row[1], row[2], row[3], row[4]
         category = row[5] if len(row) > 5 else "auto"
         group = row[6] if len(row) > 6 else "API-Based"
         activity_dep = row[7] if len(row) > 7 else False
         source_app = row[8] if len(row) > 8 else ""
         field_check = row[9] if len(row) > 9 else None
-        last = _last_sync(sid, field_check=field_check)
+        last = _last_sync(table, sid, field_check=field_check)
 
         if category == "onetime":
             # Genome — one-time import, no recurring tracking
@@ -733,13 +931,27 @@ def status(*, _g) -> dict:
                     Limit=1,
                     ProjectionExpression="sk",
                 )
-                has_data = len(_gene_resp.get("Items", [])) > 0
+                has_data: bool | None = len(_gene_resp.get("Items", [])) > 0
             except Exception:
-                has_data = False
-            status = "green" if has_data else "blue"
-            rel = "imported" if has_data else "not imported"
-            comment = "One-time import \u2014 data on file" if has_data else "Awaiting initial import"
+                has_data = None  # #5930: unreadable — never "Awaiting initial import" on a failed read
             uptime: list[Any] = []  # No daily bars for one-time sources
+            if has_data is None:
+                status, rel, comment = "yellow", LAST_SYNC_UNREADABLE, _UNREADABLE_COMMENT
+            else:
+                status = "green" if has_data else "blue"
+                rel = "imported" if has_data else "not imported"
+                comment = "One-time import \u2014 data on file" if has_data else "Awaiting initial import"
+        elif category == "archive":
+            # #5930: a FROZEN partition (source_registry.UNREGISTERED_PARTITIONS) that nothing writes any
+            # more. Its age is history, not a fault: blue (out of the rollup), no bars, no auth to check.
+            _, rel, _ = _comp_status(last, yh, rh, source_id=sid)
+            status = "blue" if rel != LAST_SYNC_UNREADABLE else "yellow"
+            comment = (
+                _UNREADABLE_COMMENT
+                if rel == LAST_SYNC_UNREADABLE
+                else f"Frozen archive \u2014 nothing writes this feed any more, so its silence is not a fault. Last record: {rel}."
+            )
+            uptime = []
         elif category == "manual":
             # Labs / DEXA / Food Delivery — due-date tracking.
             # Cadences come from the module-level DUE_MONTHS above, whose registered rows
@@ -753,7 +965,9 @@ def status(*, _g) -> dict:
                 last_dt = datetime.strptime(last[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc) if last else None
             except (ValueError, TypeError):
                 last_dt = None
-            if last_dt is not None:
+            if last == LAST_SYNC_UNREADABLE:
+                status, rel, comment = "yellow", LAST_SYNC_UNREADABLE, _UNREADABLE_COMMENT
+            elif last_dt is not None:
                 days_ago = (datetime.now(PT).date() - last_dt.date()).days
                 months_ago = days_ago / 30.0
                 due_date = last_dt + timedelta(days=due_mo * 30)
@@ -793,7 +1007,7 @@ def status(*, _g) -> dict:
             # never produced a single record is not "ready, awaiting activity" — nothing
             # has ever been observed from it, so _comp_status's red stands rather than
             # being rewritten green on the basis of nothing (ADR-104).
-            if activity_dep and last and status in ("red", "yellow") and sid not in alarming_sources:
+            if activity_dep and _is_day(last) and status in ("red", "yellow") and sid not in alarming_sources:
                 # Check if this source had a consistent history that suddenly stopped
                 _was_regular = False
                 if last:
@@ -834,7 +1048,7 @@ def status(*, _g) -> dict:
                 else:
                     status = "green"
                     comment = f"Pipeline ready \u2014 awaiting user activity. Last data: {rel}"
-            elif activity_dep and not last:
+            elif activity_dep and last is None:  # #5930: None now means the partition was read to its end
                 comment = "No record has ever arrived on this feed"
 
         # #3615/#3516: before any alarm override, a source the REGISTRY calls paused or
@@ -860,7 +1074,10 @@ def status(*, _g) -> dict:
 
         ds_components.append(
             {
-                "id": sid,
+                # #5527/#5930: unique per row; `source` keeps the partition id a per-source reader keys on.
+                "id": _component_id(sid, field_check),
+                "source": sid,
+                "field_check": field_check,
                 "name": name,
                 "description": desc,
                 "status": status,
@@ -875,7 +1092,7 @@ def status(*, _g) -> dict:
     # Compute components
     compute_components = []
     for sid, name, desc, yh, rh in _COMPUTE_SOURCES:
-        last = _last_sync(sid)
+        last = _last_sync(table, sid)
         status, rel, comment = _comp_status(last, yh, rh, source_id=sid)
         uptime = _uptime_90d(sid, activity_dependent=True)  # compute depends on ingestion — missing days aren't system failures
         # Compute sources depend on ingestion data — if no new input, no new output is
@@ -885,7 +1102,7 @@ def status(*, _g) -> dict:
         # ever is no longer rewritten green — the old branch published rel="verified"
         # and "Smoke-tested OK", which asserts a pre-launch smoke run rather than
         # reporting an observation of this component (ADR-104).
-        if status == "yellow" and last and sid not in alarming_sources:
+        if status == "yellow" and _is_day(last) and sid not in alarming_sources:
             status = "green"
             comment = f"Last computed: {rel} \u2014 runs daily when new data arrives"
         elif not last:
@@ -912,7 +1129,7 @@ def status(*, _g) -> dict:
             # #3619: the table literal above is a fallback the AST-reading test
             # harness can see; the real, cadence-derived label is substituted here.
             desc = _chronicle_send_label()
-        last = _last_sync(f"email_log#{lid}")
+        last = _last_sync(table, f"email_log#{lid}")
         status, rel, comment = _comp_status(last, yh, rh, source_id=lid)
         uptime = _uptime_90d(f"email_log#{lid}", activity_dependent=True)  # scheduled emails — gaps aren't system failures
         # Weekly/scheduled emails: if they've run within their expected window, they're
@@ -921,7 +1138,7 @@ def status(*, _g) -> dict:
         # between "sent this week" and the ~17-day red threshold of a 400h red_h read
         # "next run scheduled" for a sender that had already skipped a week.
         _missed, _next_day = _missed_scheduled_run(last, exp_dow)
-        if status in ("yellow",) and last and lid not in alarming_sources and not _missed:
+        if status in ("yellow",) and _is_day(last) and lid not in alarming_sources and not _missed:
             status = "green"
             comment = f"Last sent: {rel} \u2014 next run scheduled"
         elif _missed and lid not in alarming_sources and status != "red":

@@ -842,7 +842,7 @@
       grid.innerHTML = vices.map(function(v) {
         var why = getViceWhy(v.name);
         return '<div class="m-vice-card' + (v.holding ? '' : ' is-broken') + '">' +
-            '<div class="m-vice-card__name">' + v.name + '</div>' +
+            '<div class="m-vice-card__name">' + (v.name || 'Private commitment') + '</div>' +
             '<div class="m-vice-card__streak">' + v.current_streak + '</div>' +
             '<div class="m-vice-card__unit">' + (v.holding ? 'days' : 'broken') + '</div>' +
             '<div class="m-vice-card__why">' + why + '</div>' +

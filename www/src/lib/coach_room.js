@@ -266,14 +266,14 @@ export function correctionArrow(c) {
 
 /**
  * The record a reader meets on the coach's record page: the calibration file's entry for this coach (its Wilson
- * interval, its comparison with a simple guess), labelled AS FIRST GRADED — no re-verified split is served per coach,
+ * interval, its comparison with a simple guess), labelled AS GRADED NOW (corrections applied, #5951: 22 of the 95 decided calls carry a correction, so it is not the first grading) — no re-verified split is served per coach,
  * so this is never a validated headline. Falls back to the coach page's served record line; null when neither exists.
  */
 export function coachRecord(calCoach, card) {
   if (calCoach && Number.isInteger(calCoach.n)) {
     return {
       from: "calibration",
-      line: `${kOfN(calCoach.confirmed, calCoach.n)}, as first graded`,
+      line: `${kOfN(calCoach.confirmed, calCoach.n)}, as graded now`,
       pct: pct(calCoach.accuracy_pct),
       interval: intervalText(calCoach.accuracy_ci95) || "no interval served",
       skill: (((calCoach.comparison || {}).skill) || {}).sentence || null,
@@ -287,7 +287,7 @@ export function coachRecord(calCoach, card) {
   if (card && Number.isInteger(card.n)) {
     return {
       from: "coach",
-      line: `${kOfN(card.right, card.n)}, as first graded`,
+      line: `${kOfN(card.right, card.n)}, as graded now`,
       pct: null,
       interval: "no interval served",
       skill: card.skill_sentence || null,

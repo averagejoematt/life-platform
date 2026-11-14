@@ -309,6 +309,9 @@ def check_week_agreement(Check, tier, *, site_base_url: str, budget: Optional[Pr
 # renders one component PER apple_health sub-feed (CGM, Water, BP, Breathwork, …), all
 # carrying the partition id `apple_health`, and the dict-per-id shape kept only the last
 # one: seven of eight components were never judged. Every row is now judged.
+# #5930: the components now carry UNIQUE ids (`apple_health:blood_glucose_avg`) and the
+# partition as `source`; the status extractor groups by `source` (falling back to `id` for
+# a payload from before that change), so every sub-feed still lands under its registry id.
 def _extract_freshness_rows(payload: dict) -> dict:
     out: dict = {}
     for row in (payload or {}).get("sources") or []:
@@ -344,10 +347,13 @@ def _extract_status_components(payload: dict) -> dict:
             # "never" / "not imported" is an HONEST terminal rendering, not a missing
             # duration: nothing has ever arrived, so there is no elapsed time to state.
             explicit_never = rel.strip().lower() in ("never", "not imported", "no data")
-            out.setdefault(str(comp["id"]), []).append(
+            # #5930: "unreadable" is the panel saying its OWN read failed — it narrates no absence
+            # (no duration, no cause), so there is nothing here for the absence story to judge.
+            unreadable = rel.strip().lower() == "unreadable"
+            out.setdefault(str(comp.get("source") or comp["id"]), []).append(
                 {
                     "label": str(comp.get("name") or comp["id"]),
-                    "narrating_absence": str(comp.get("status") or "") in ("yellow", "red", "blue"),
+                    "narrating_absence": str(comp.get("status") or "") in ("yellow", "red", "blue") and not unreadable,
                     "duration_days": rel_days,
                     "duration_rendered": bool(rel) and (rel_days is not None or explicit_never),
                     "cause_text": f"{comment} {comp.get('description') or ''}",

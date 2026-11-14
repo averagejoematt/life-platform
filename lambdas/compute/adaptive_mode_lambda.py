@@ -386,6 +386,20 @@ def _engagement_reference_today():
     return pacific_today()
 
 
+def _query_all(**kwargs):
+    """Every page of a query (#5955). DynamoDB's 1 MB page limit is measured on the WHOLE item
+    before the projection, and a MacroFactor row carries its full diary — a single-page read of a
+    35-day window drops the NEWEST days first (ascending sort), exactly the days presence is about."""
+    items = []
+    while True:
+        resp = table.query(**kwargs)
+        items.extend(resp.get("Items", []))
+        lek = resp.get("LastEvaluatedKey")
+        if not lek:
+            return items
+        kwargs = dict(kwargs, ExclusiveStartKey=lek)
+
+
 def _log_dates(source, today, window_days=35, attrs=(), predicate=None, floor=None):
     """Trailing-window list of days `source` logged (high-water-mark widened).
     Deduped 'YYYY-MM-DD', newest first. BETWEEN spans suffixed SKs (hevy
@@ -410,7 +424,7 @@ def _log_dates(source, today, window_days=35, attrs=(), predicate=None, floor=No
     if floor:
         lo = max(lo, str(floor)[:10])
     try:
-        resp = table.query(
+        items = _query_all(
             KeyConditionExpression="pk = :pk AND sk BETWEEN :lo AND :hi",
             ExpressionAttributeValues={":pk": pk, ":lo": f"DATE#{lo}", ":hi": f"DATE#{today}~"},
             ProjectionExpression=", ".join(["sk"] + list(attrs)),
@@ -419,7 +433,7 @@ def _log_dates(source, today, window_days=35, attrs=(), predicate=None, floor=No
         logger.warning("engagement _log_dates(%s) query failed: %s", source, e)
         return []
     out = set()
-    for it in resp.get("Items", []):
+    for it in items:
         if predicate is not None and not predicate(it):
             continue
         d = it.get("sk", "").replace("DATE#", "")[:10]
@@ -445,7 +459,7 @@ def _weight_series(today, window_days=60):
     base = datetime.strptime(today, "%Y-%m-%d").date()
     lo = (base - _td(days=window_days)).isoformat()
     try:
-        resp = table.query(
+        items = _query_all(
             KeyConditionExpression="pk = :pk AND sk BETWEEN :lo AND :hi",
             ExpressionAttributeValues={":pk": pk, ":lo": f"DATE#{lo}", ":hi": f"DATE#{today}~"},
             ProjectionExpression="sk, weight_lbs",
@@ -454,7 +468,7 @@ def _weight_series(today, window_days=60):
         logger.warning("engagement _weight_series query failed: %s", e)
         return []
     series = []
-    for it in resp.get("Items", []):
+    for it in items:
         w = it.get("weight_lbs")
         d = it.get("sk", "").replace("DATE#", "")[:10]
         if w is not None:

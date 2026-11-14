@@ -10,7 +10,7 @@ import StatusTag from "../components/StatusTag.astro";
 import VersusGuess from "../components/VersusGuess.astro";
 import OpenQuestions from "../components/OpenQuestions.astro";
 import { headline, weeklyBars } from "../lib/chart.js";
-import { dayInWords, domainWords, num, kOfN, clip, heldCallWords } from "../lib/format.js";
+import { chapterCovers, chapterPublished, chapterWindow, dayInWords, domainWords, num, kOfN, clip, heldCallWords } from "../lib/format.js";
 import { connectedTo, loadAll, loadSeries, latestEdition, dayLine, loadCalibration, loadJourney } from "../lib/snapshot.js";
 import { lineCounts, theLine } from "../lib/theline.js";
 import { verifiedLead } from "../lib/calibration.js";
@@ -32,10 +32,14 @@ const startDate: string | null = today?.start_date || edition?.start_date || nul
 // "So far", in one line above the fold (2026-11-14): on a phone the first screen carried the premise and no progress.
 // Day, pounds, chapters, the coaches against a guess — each carried from the edition / the room's verified lead.
 let soFarLead: ReturnType<typeof verifiedLead> = null;
+// #5950: the ledger's own count of dated forecasts (every record that is not an observation), as the producer serves
+// it; the snapshot's prediction objects are only the records served with an id, so counting them undercounted.
+let ledgerForecasts: number | null = null;
 if (roomPublic()) {
   try {
     const f: any = await loadCalibration();
     soFarLead = f?.state === "ok" ? verifiedLead(f.calibration || {}) : null;
+    ledgerForecasts = f?.state === "ok" && Number.isInteger(f.record?.total) && Number.isInteger(f.record?.observational) ? f.record.total - f.record.observational : null;
   } catch {
     soFarLead = null;
   }
@@ -58,14 +62,19 @@ const nextChapterNo = String((latestChapter?.week ?? 0) + 1).padStart(2, "0");
 const inChapterAll = latestChapter ? await connectedTo("chapter", latestChapter.id, { cap: 6 }) : null;
 const inChapter = inChapterAll ? { ...inChapterAll, items: inChapterAll.items.filter((e) => e.type !== "edition").slice(0, 4) } : null;
 // The latest chapter's week in two lines (2026-11-14): its graded calls and its days, both on the chapter page.
-const chWeekCalls =
-  latestChapter?.week_start && latestChapter?.week_end
-    ? all.byType.prediction.filter(
-        (p) => (p.status === "confirmed" || p.status === "refuted") && p.settled_date && p.settled_date.slice(0, 10) >= latestChapter.week_start && p.settled_date.slice(0, 10) <= latestChapter.week_end,
-      )
-    : [];
+// Read over the chapter's covered days when served (lib/format.js::chapterWindow), as the chapter page does.
+const chWindow = chapterWindow(latestChapter);
+const chWeekCalls = chWindow
+  ? all.byType.prediction.filter(
+      (p) => (p.status === "confirmed" || p.status === "refuted") && p.settled_date && p.settled_date.slice(0, 10) >= chWindow[0] && p.settled_date.slice(0, 10) <= chWindow[1],
+    )
+  : [];
 const chWeekRight = chWeekCalls.filter((p) => p.status === "confirmed").length;
-const chWeekDays = latestChapter ? all.byType.day.filter((d) => d.chapter_id === latestChapter.id).length : 0;
+const chWeekDays = latestChapter
+  ? all.byType.day.filter((d) =>
+      latestChapter.covers_start && latestChapter.covers_end ? d.date >= latestChapter.covers_start && d.date <= latestChapter.covers_end : d.chapter_id === latestChapter.id,
+    ).length
+  : 0;
 const pending = all.byType.prediction
   .filter((p) => p.status === "pending")
   .sort((a, b) => ((a.due_date || "9999") < (b.due_date || "9999") ? -1 : 1))
@@ -78,14 +87,24 @@ const weekOrder: string[] = week?.order || [];
 // date reaches the HTML); the browser remembers only the last edition day it saw.
 const dayNo = (iso: string | null | undefined) => (iso && /^\d{4}-\d{2}-\d{2}/.test(iso) ? Math.round(Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) / 864e5) : null);
 const sinceEvents = [
-  ...published.map((c) => ({ d: dayNo(c.date), k: "chapter", t: c.title, u: href(pathOf("chapter", c.id)) })),
+  ...published.map((c) => ({ d: dayNo(c.published_at || c.date), k: "chapter", t: c.title, u: href(pathOf("chapter", c.id)) })),
   ...all.byType.prediction.filter((p) => p.status === "confirmed" || p.status === "refuted").map((p) => ({ d: dayNo(p.settled_date), k: p.status })),
 ].filter((e) => e.d != null);
 const sinceAsOf = dayNo(edition?.as_of);
+// The front page's share description (2026-11-14, sprint II): the premise plus where it stands, from the edition.
+const ogDescription = [
+  `An ordinary man started${today?.start_weight_lbs ? ` at ${num(today.start_weight_lbs, 0)} pounds` : ""}${startDate ? ` on ${dayInWords(startDate)}` : ""} and is using AI coaches, his own data and public grades to find out whether getting healthier and getting happier are the same thing.`,
+  edition?.day_n != null && today?.change_lbs != null ? `Day ${edition.day_n}: ${num(Math.abs(today.change_lbs), 1)} lb ${today.change_lbs <= 0 ? "down" : "up"}.` : null,
+]
+  .filter(Boolean)
+  .join(" ");
 const weekLabel: Record<string, string> = { weight: "Weight", training: "Training", sleep: "Sleep", food: "Food" };
 
-// The week a chapter covers: its explicit interval from the snapshot (/api/chapters), never re-derived here.
+// The days a chapter covers: its served covered days ("Days 60–66 · 4–10 Nov"), else its explicit program-week interval
+// from the snapshot (/api/chapters), never re-derived here.
 function weekRange(c: any): string | null {
+  const covers = chapterCovers(c, { short: true });
+  if (covers) return covers;
   const a = c?.week_start ? dayInWords(c.week_start, { short: true }) : null;
   const b = c?.week_end ? dayInWords(c.week_end, { short: true }) : null;
   return a && b ? `${a} – ${b}` : null;
@@ -135,11 +154,12 @@ const dims: Dim[] = [
   seriesDim("sleep", "sleep_duration_hours", "Sleep", 1, "h", (h, bars) => {
     const f = firstBar(bars);
     const l = lastBar(bars);
-    return f != null && l != null ? `This week's mean. Week one was ${num(f, 1)} h.` : `${h.n} nights measured.`;
+    // #5953: the figure is the latest night; the note used to call it "this week's mean" (8.1 h beside a 7.6 h mean).
+    return f != null && l != null ? `Last night. The last seven nights average ${num(l, 1)} h; the first of the eight weeks drawn, ${num(f, 1)} h.` : `${h.n} nights measured.`;
   }),
   seriesDim("recovery", "hrv", "Recovery", 0, "ms", (h, bars) => {
     const f = firstBar(bars);
-    return f != null ? `Heart-rate variability. Week one averaged ${num(f, 0)} ms.` : `${h.n} mornings measured.`;
+    return f != null ? `Heart-rate variability, the latest morning. The first of the eight weeks drawn averaged ${num(f, 0)} ms.` : `${h.n} mornings measured.`;
   }),
   {
     // Owner ruling 2026-11-03: journal activity is private — whether, when and how often he writes.
@@ -202,7 +222,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
 }
 ---
 
-<Base title="Average Joe Matt" top="start" status={status}>
+<Base title="Average Joe Matt" top="start" status={status} card="home" description={ogDescription}>
   <section class="section opening">
     <div class="wrap">
       <p class="label">
@@ -309,8 +329,13 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
         <div class="wrap" style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
           <div style="flex:0 0 160px;display:flex;flex-direction:column;gap:6px">
             <span class="label">Chapter</span>
-            <span class="big cobalt" style="font-size:130px;display:block;line-height:.85">{String(latestChapter.week ?? 0).padStart(2, "0")}</span>
+            <span class="big cobalt ch-numeral" style="display:block;line-height:.85">{String(latestChapter.week ?? 0).padStart(2, "0")}</span>
             <span class="mono muted" style="font-size:12px">{weekRange(latestChapter) || dayInWords(latestChapter.date, { short: true })}</span>
+            {chapterPublished(latestChapter) && (
+              <span class="mono muted" style="font-size:12px" data-published>
+                {chapterPublished(latestChapter)}
+              </span>
+            )}
           </div>
           <article style="flex:1 1 480px;min-width:0;display:flex;flex-direction:column;gap:16px">
             <div class="row">
@@ -334,7 +359,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
                 </span>
               ) : null}
             </div>
-            <p class="muted" style="font-size:13px">Written by the platform's narrator from the week's data; published after I approved it. The figures in it are explorable in the data room.</p>
+            <p class="muted ch-byline" style="font-size:13px">Written by the platform's narrator from the week's data; published after I approved it. The figures in it are explorable in the data room.</p>
           </article>
           <aside style="flex:1 1 240px;min-width:0">
             <p class="label" style="margin-bottom:8px">In this chapter</p>
@@ -357,8 +382,8 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
                   <a href={href(pathOf("chapter", latestChapter.id))}>
                     <span style="font-size:14px;line-height:1.35">
                       {chWeekCalls.length
-                        ? `${chWeekCalls.length} coach ${chWeekCalls.length === 1 ? "call" : "calls"} graded that week`
-                        : "No coach call graded that week"}
+                        ? `${chWeekCalls.length} graded coach ${chWeekCalls.length === 1 ? "call" : "calls"} listed for its days`
+                        : "No graded coach call listed for its days"}
                     </span>
                     {chWeekCalls.length > 0 && <span class="mono muted" style="font-size:11px">{chWeekRight} right · {chWeekCalls.length - chWeekRight} wrong</span>}
                   </a>
@@ -535,7 +560,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
         </a>
         <a class="door" href={href("/system/")}>
           <span class="between mono muted" style="font-size:12px"><span class="cobalt">03</span><span>Inspect · as deep as you want</span></span>
-          <span><span class="t">The system</span><p class="serif muted" style="font-size:17px;margin-top:10px">The AI coaches, {all.byType.prediction.filter((p) => p.status !== "observation").length} dated forecasts, every grade public — beside what a simple guess would have scored.</p></span>
+          <span><span class="t">The system</span><p class="serif muted" style="font-size:17px;margin-top:10px">The AI coaches, {ledgerForecasts ?? all.byType.prediction.filter((p) => p.status !== "observation").length} dated forecasts, every grade public — beside what a simple guess would have scored.</p></span>
         </a>
       </div>
     </div>
