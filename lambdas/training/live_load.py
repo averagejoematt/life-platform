@@ -268,11 +268,9 @@ def decide(
 
 def r3_eligible(e: dict[str, Any], d: dict[str, Any] | None, held_day: bool) -> bool:
     """Rule 8: the bounded in-session step may ride this lift — a loaded, straight-set, non-carry lift that is not new, not a first session
-    back, not pain-touched or held for a reason, not stepped down, not capped at RPE 7 or under, on a day that holds nothing
+    back, not pain-touched (its stop line) or held for a reason, not stepped down, on a day that holds nothing
     (`held_day`: a slump, a strained or deload-recommended day). `d`: the lift's load decision (None: no same-role history)."""
     if e.get("intensity") == "carry" or e.get("live_new") or e.get("live_first_back") or e.get("live_stop") or held_day:
-        return False
-    if (e.get("live_load") or {}).get("hold") or (e.get("live_effort") is not None and int(e["live_effort"]) <= 7):
         return False
     if any(x.get("kind") in ("top", "back_off") for x in e.get("sets") or []):  # a top set + back-offs is not "the later sets"
         return False
