@@ -172,3 +172,47 @@ export function lineCounts(days, from, to) {
   const n = w.filter((d) => d.value != null && !d.gap).length;
   return { days: w.length, readings: n, missing: w.length - n };
 }
+
+/**
+ * One week of The Line, for a row of the chapter list (2026-11-14, sprint II): the week's weigh-ins placed on the WHOLE
+ * journey's weight scale (`lo`..`hi`), so reading down the list the line steps through the weeks — the story's
+ * continuity, including the weeks that have no chapter. Readings are dots joined by a line (dashed across a missing
+ * morning); a missing morning is an open tick on the baseline. No value is drawn that the series does not carry.
+ * Returns { svg, first, last, n } or null when the week has no reading.
+ */
+export function weekStrip(o) {
+  const W = o.width || 200;
+  const H = o.height || 56;
+  const pad = { l: 5, r: 5, t: 6, b: 8 };
+  const days = (o.days || []).filter((d) => d && d.date >= o.from && d.date <= o.to);
+  const readings = days.filter((d) => d.value != null && !d.gap);
+  if (!readings.length) return null;
+  const span = Math.max(1, (t(o.to) - t(o.from)) / DAY_MS);
+  const X = (iso) => pad.l + ((t(iso) - t(o.from)) / DAY_MS / span) * (W - pad.l - pad.r);
+  const Y = (v) => pad.t + (1 - (v - o.lo) / (o.hi - o.lo || 1)) * (H - pad.t - pad.b);
+  const base = H - 2;
+  let g = `<line x1="0" y1="${base}" x2="${W}" y2="${base}" stroke="${RULE}" stroke-width="1"/>`;
+  days.forEach((d) => {
+    if (d.value == null || d.gap) g += `<rect x="${(X(d.date) - 1.5).toFixed(1)}" y="${base - 6}" width="3" height="6" fill="none" stroke="${MUTED}" stroke-width="1"/>`;
+  });
+  let solid = "";
+  let dashed = "";
+  for (let i = 1; i < readings.length; i++) {
+    const a = readings[i - 1];
+    const b = readings[i];
+    const seg = `M${X(a.date).toFixed(1)},${Y(a.value).toFixed(1)} L${X(b.date).toFixed(1)},${Y(b.value).toFixed(1)}`;
+    if ((t(b.date) - t(a.date)) / DAY_MS > 1) dashed += seg;
+    else solid += seg;
+  }
+  const ink = o.muted ? MUTED : INK;
+  if (dashed) g += `<path d="${dashed}" fill="none" stroke="${ink}" stroke-width="1.2" stroke-dasharray="2 3"/>`;
+  if (solid) g += `<path d="${solid}" fill="none" stroke="${ink}" stroke-width="1.5"/>`;
+  readings.forEach((d, i) => {
+    const lastOne = i === readings.length - 1;
+    g += `<circle cx="${X(d.date).toFixed(1)}" cy="${Y(d.value).toFixed(1)}" r="${lastOne ? 3.2 : 2}" fill="${lastOne && !o.muted ? COBALT : ink}"/>`;
+  });
+  const first = readings[0];
+  const last = readings[readings.length - 1];
+  const aria = `${readings.length} weigh-ins from ${dayInWords(o.from, { short: true })} to ${dayInWords(o.to, { short: true })}: ${num(first.value, 1)} to ${num(last.value, 1)} pounds.`;
+  return { svg: `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(aria)}">${g}</svg>`, first, last, n: readings.length, missing: days.length - readings.length };
+}
