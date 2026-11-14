@@ -2111,3 +2111,9 @@ span.gloss[data-quote-gloss] {
     align-items: flex-start;
   }
 }
+
+@media (max-width: 640px) {
+  .foot-coaches {
+    display: none;
+  }
+}

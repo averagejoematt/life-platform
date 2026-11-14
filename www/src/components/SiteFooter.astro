@@ -11,10 +11,11 @@ const fixture = (await snapshotMode()) === "fixture";
       <span class="verified">Every figure from the platform, dated</span>
       {fixture && <span class="chip">Sample content, for layout only</span>}
     </p>
-    <p style="max-width:520px">
-      Only information I've deliberately approved appears here. Selected health measurements are public, some blood-test results among them;
-      journals, progress photos, genetic findings, my age and other sensitive records stay private. The coaches are software built with Claude,
-      not people.
+    {/* The owner's approved wording (2026-11-14). On a phone the coaches line is dropped: the front page says it in its
+        coaching band, and the page's phone-height budget (tests/web_preview_gate.py) has no line to spare. */}
+    <p style="max-width:540px">
+      Only information I've deliberately approved appears here. Selected health measurements are public; journals, genetic findings and other
+      sensitive records remain private.<span class="foot-coaches"> The coaches are software built with Claude, not people.</span>
     </p>
     <p style="display:flex;flex-wrap:wrap;gap:18px">
       <a href={href("/system/everything-else/")}>Everything else on the site</a>
