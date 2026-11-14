@@ -240,7 +240,12 @@ def decide(
     if second_band:  # rule 6: its own e1RM at the lower band (a logged 9.5-10 read as 9: never a collapse on unreliable RPE)
         lo, hi = second_band
         kg = min(_floor_to_implement(read_e1rm(rows[0]) / (1 + (rep_lo + 10.0 - (lo + hi) / 2) / 30.0), equipment), last)
-        return {"kg": kg, "mode": "second", "why": f"the second lift: RPE {lo}-{hi}", "clause": "The second lift today: one band lower."}
+        return {
+            "kg": kg,
+            "mode": "second",
+            "why": f"the second lift: RPE {lo}-{hi}",
+            "clause": "The second lift today: the other lift leads.",
+        }
     if not hold and topped(rows[0], rep_hi, TARGET_RPE, effort_unknown(rows)):
         return {
             "kg": _step_up(last, equipment),

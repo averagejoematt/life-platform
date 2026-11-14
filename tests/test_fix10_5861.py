@@ -259,3 +259,19 @@ def test_the_second_lift_is_loaded_one_band_lower_not_at_its_last_load():
     for ln in second:  # served below the last same-role top load it names
         served, last = float(ln.split(" lb — ")[0].rsplit(" ", 1)[1]), float(ln.split("(last ")[1].split(" lb")[0].rsplit(" ", 1)[1])
         assert served <= last, ln
+
+
+# ── 7. the notes: no blocking lint problem on any live week ─────────────────────────────────────────────────────────────────
+def test_no_live_note_carries_a_blocking_lint_problem():
+    """Fix round 10's note changes (one load rule, the second lift's clause) never trip the blocking note lint (L1 banned jargon,
+    L6/L12 the session line). Control: the second lift's clause written with the load-model jargon ('band') -> L1."""
+    w = _week(PROFILES["a_large_deficit_experienced"])
+    assert sw.lint_problems(w["week"]) == []
+    decide = live_load.decide
+
+    def jargon(*a, **k):
+        d = decide(*a, **k)
+        return d | {"clause": "The second lift today: one band lower."} if d and d["mode"] == "second" else d
+
+    off = _week(PROFILES["a_large_deficit_experienced"], {(live_load, "decide"): jargon})
+    assert any(" L1 " in p or p.startswith("L1") or "L1" in p for p in sw.lint_problems(off["week"]))
