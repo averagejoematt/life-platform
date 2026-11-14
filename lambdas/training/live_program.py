@@ -297,6 +297,9 @@ def apply_joint_rule(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str
         keep.append(e)
         lines.append(f"held (live): {name} — {why}: loads that joint, load held, RPE <= {PAIN_RULE['pain_rpe']['value']}, the stop line on")
     rx["exposures"] = [{k: v for k, v in e.items() if not (k == "template_id" and v is None)} for e in keep]
+    from training import live_volume  # fix round 10: a pain-skipped lift's time goes to reviewed, pain-free work
+
+    lines += live_volume.refill(rx, ctx, flags, sum(1 for ln in lines if ln.startswith("skipped (live)")))
     return lines
 
 

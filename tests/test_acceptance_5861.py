@@ -759,7 +759,11 @@ def test_d1_weekly_sets_per_muscle_sit_inside_the_volume_landmarks(weeks):
     # control 2: the plan's surplus step off (no slot gives, none goes whole) -> the delts sit over MAV beside chest near MEV
     raw = _week_of(
         "a_large_deficit_experienced",
-        {(live_volume, "_spare"): lambda r, rows, tg: False, (live_volume, "_head_needs"): lambda r, rows, tg: True},
+        {
+            (live_volume, "_spare"): lambda r, rows, tg: False,
+            (live_volume, "_head_needs"): lambda r, rows, tg: True,
+            (live_volume, "_priority_parity"): lambda *a: [],  # fix round 10: the parity alone would lift chest past MEV + 1
+        },
     )
     lib, cat = raw["world"]["lib"], raw["world"]["catalog"]["movements"]
     assert misallocated(raw["m"], movable=accessory_sets(raw["week"], lib, cat))
@@ -998,17 +1002,20 @@ def morning_over_cap(week: dict) -> list[tuple[str, float]]:
     ]
 
 
-def test_d3b_with_the_shared_cap_the_whole_morning_fits_and_conditioning_sits_on_shoulders_arms():
+def test_d3b_with_the_shared_cap_the_whole_morning_fits_and_conditioning_sits_on_the_freest_morning():
     """`session_cap_includes_cardio` (library setting, owner's choice; default False = today's lifting cap + a separate block):
     True makes the 75 minutes cover lifting AND cardio — every session of every profile fits, and hard conditioning lands only
-    on shoulders+arms. Default: lifting still fits (d3), and an easy block the steps already cover is not added."""
+    on the week's host: fix round 10, the morning with the most free minutes (`live_volume.conditioning_host`, never the heavy
+    lower day or the one before it). Default: lifting still fits (d3), and an easy block the steps already cover is not added."""
     with patch.dict(sw.SETTINGS, {"session_cap_includes_cardio": True}):
         for name, prof in PROFILES.items():
             world = sw.build_world(prof, "approved")
             week = sw.generate_week(prof, "approved", world)
             assert morning_over_cap(week) == [] and over_cap(week, shared=True) == [], name
             roles = {s["role"] for s in week["sessions"]}
-            host = live_volume.week_shape(len(roles))["host"]  # the declared / dip week's own host (fix round 9)
+            plan = live_volume.week_plan(world["catalog"]["movements"], world["lib"], len(roles))
+            host = live_volume.conditioning_host(plan)  # fix round 10: the morning with the most free minutes
+            assert len(roles) < 3 or host not in ("lower_heavy", "upper_heavy"), name  # never heavy lower or the morning before
             assert {s["role"] for s in week["sessions"] if s["cardio"].get("kind") in lp.HARD_KINDS} <= {host}, name
             if name in ("a_large_deficit_experienced", "c_equipment_limited", "d_stalled_anchor_adherence_dip"):
                 # second red team: lifting gives over-MAV sets (after the charter's antagonist supersets) so the week keeps a
@@ -1042,17 +1049,19 @@ def test_d4_progression_is_trackable(weeks):
 
 def filled(week: dict, lib: dict, catalog: dict) -> list[str]:
     """Training added to fill a slot (fix round 9, against the ONE weekly plan): (1) every session serves exactly its morning's
-    planned rows minus what the live fit says it skipped or dropped for time; (2) every fill (`added (live)`) targets a muscle the
-    week leaves under its aim without it — a purpose, not a slot; (3) no muscle over MAV or MRV."""
+    planned rows minus what the live fit says it skipped or dropped for time, plus a pain refill per skipped lift (fix round 10,
+    `refill (live)`); (2) every fill (`added (live)`) targets a muscle the week leaves under its aim without it — a purpose, not a
+    slot; (3) no muscle over MAV or MRV."""
     out = []
     m = sw.measure(week, lib, catalog, LANDMARKS)
     mornings = len(week["sessions"])
-    plan = live_volume.week_plan(catalog, lib, mornings)
+    plan = live_volume.week_plan(catalog, lib, mornings, monday=week["sessions"][0].get("day"))
     for s in week["sessions"]:
         rat = _all(s)
         expected = sum(1 for r in plan["rows"] if r["role"] == s["role"])
         expected -= sum(1 for ln in rat if ln.startswith(("skipped (live)", "dropped (live)")))
         expected -= sum(ln.count(" dropped") for ln in rat if ln.startswith("time (live)"))
+        expected += sum(1 for ln in rat if ln.startswith("refill (live)"))
         if len(s["lifts"]) != expected:
             out.append(f"{s['role']}: {len(s['lifts'])} exercises, expected {expected} (the plan's rows less skips and time drops)")
         for ln in rat:
@@ -1078,7 +1087,11 @@ def test_d5_no_training_is_added_to_fill_slots(weeks):
     # control 2: the plan's surplus step off -> the template's own delt spread fills the shoulders past MAV
     raw = _week_of(
         "a_large_deficit_experienced",
-        {(live_volume, "_spare"): lambda r, rows, tg: False, (live_volume, "_head_needs"): lambda r, rows, tg: True},
+        {
+            (live_volume, "_spare"): lambda r, rows, tg: False,
+            (live_volume, "_head_needs"): lambda r, rows, tg: True,
+            (live_volume, "_priority_parity"): lambda *a: [],  # fix round 10: the parity alone would lift chest past MEV + 1
+        },
     )
     assert any(p.startswith("shoulders over") for p in filled(raw["week"], raw["world"]["lib"], raw["world"]["catalog"]["movements"]))
 

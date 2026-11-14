@@ -19,7 +19,7 @@ them with ONE model, keyed by SESSION ROLE (a heavy day and a volume day are two
   3. EFFORT UNKNOWN. RPE missing on every set, or >= 9.5 on every set: the step up rides on reps alone (rule 1); effort can never
      move a load down on its own (rule 2 reads reps only).
   4. SYSTEMIC SLUMP. Four or more anchors declining together (or, in a deficit, half or more): every load HOLDS (rule 1) and
-     non-priority accessories lose about a third of their sets (`slump_trim`).
+     non-priority accessories lose about a third of their sets (`slump_trim`); priority muscles keep theirs.
   5. FIRST SESSION BACK (owner ruling #10). 10+ days with no session: each lift's first session back runs at RPE 8 at its last
      same-role load (a hold, rule 1).
   6. THE SECOND LIFT (owner ruling 5). The heavy-lower lift that does not lead runs at RPE 7-8, loaded from its own same-role
@@ -240,7 +240,7 @@ def decide(
     if second_band:  # rule 6: its own e1RM at the lower band (a logged 9.5-10 read as 9: never a collapse on unreliable RPE)
         lo, hi = second_band
         kg = min(_floor_to_implement(read_e1rm(rows[0]) / (1 + (rep_lo + 10.0 - (lo + hi) / 2) / 30.0), equipment), last)
-        return {"kg": kg, "mode": "second", "why": f"the second lift: RPE {lo}-{hi}", "clause": f"RPE {lo}–{hi} today: the second lift."}
+        return {"kg": kg, "mode": "second", "why": f"the second lift: RPE {lo}-{hi}", "clause": "The second lift today: one band lower."}
     if not hold and topped(rows[0], rep_hi, TARGET_RPE, effort_unknown(rows)):
         return {
             "kg": _step_up(last, equipment),
@@ -398,16 +398,18 @@ def _lb(kg: float) -> str:
     return f"{round(kg / KG_PER_LB * 2) / 2:g}"
 
 
-def slump_trim(rx: dict[str, Any]) -> list[str]:
-    """IN PLACE, rule 4's volume answer: each accessory loses about a third of its working sets (never under 2). Returns the line."""
+def slump_trim(rx: dict[str, Any], keep: set[str] | None = None) -> list[str]:
+    """IN PLACE, rule 4's volume answer: each NON-PRIORITY accessory loses about a third of its working sets (never under 2); an
+    accessory for a priority muscle (`keep`, its movement keys) keeps its sets (fix round 10: the ninth red team's slump trimmed
+    the priority chest fly harder than the curls). Returns the line."""
     cut = float(cfg.value("slump_accessory_cut"))
     floor = int(cfg.value("slot_min_sets"))
     taken = 0
     for e in rx["exposures"]:
-        if e.get("kind") != "accessory":
+        if e.get("kind") != "accessory" or str(e.get("movement_key")) in (keep or set()):
             continue
         n = len(e.get("sets") or [])
-        keep = max(floor, n - int(round(n * cut)))
-        taken += max(0, n - keep)
-        e["sets"] = list(e["sets"])[:keep] if n > keep else e["sets"]
-    return [f"slump (live): accessories -{taken} set(s) (about a third), no load steps up"] if taken else []
+        keep_n = max(floor, n - int(round(n * cut)))
+        taken += max(0, n - keep_n)
+        e["sets"] = list(e["sets"])[:keep_n] if n > keep_n else e["sets"]
+    return [f"slump (live): non-priority accessories -{taken} set(s) (about a third), no load steps up"] if taken else []

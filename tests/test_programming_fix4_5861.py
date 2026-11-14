@@ -218,34 +218,24 @@ def _held(s: dict) -> set[str]:
     return out
 
 
-def stepping_held(week: dict) -> list[str]:
-    """A "+N on later sets" line that reaches a held lift: on its own note, or — on exercise 1 — the session rule not addressed to
-    the OTHER lifts; on a hold day (strain, overreach, a recommended deload) any step line at all."""
-    out = []
-    for s in week["sessions"]:
-        fat = s.get("fatigue") or {}
-        hold = fat.get("state") in ("strained", "overreached") or fat.get("action") == "deload_recommended"
-        held = _held(s)
-        for i, x in enumerate(s["lifts"]):
-            block, own = sb.split(x["hevy_note"])
-            if hold and "on later sets" in (x["hevy_note"] or ""):
-                out.append(f"{s['role']}: {x['key']} steps on a hold day")
-            elif x["title"] in held and "on later sets" in own:
-                out.append(f"{s['role']}: {x['key']} held, own step line")
-            elif i == 0 and x["title"] in held and sb.LOAD_RULE_HEAD in block:
-                out.append(f"{s['role']}: {x['key']} held under the session's step rule")
-    return out
+def stepping(week: dict) -> list[str]:
+    """Any in-session load-step line on any lift (fix round 10: double progression is the one progression system under live)."""
+    return [
+        f"{s['role']}: {x['key']}"
+        for s in week["sessions"]
+        for x in s["lifts"]
+        if any(lsafe._step_line(ln) for ln in (x["hevy_note"] or "").split("\n"))
+    ]
 
 
-def test_no_held_lift_or_hold_day_carries_an_in_session_load_step(weeks):
+def test_no_lift_carries_an_in_session_load_step(weeks):
     """Fourth red team: the session rule ("Top reps at RPE 7 or less → +10 lb on later sets") headed exercise 1 on deload days,
-    stall resets and pain cuts — undoing the cut it sat under. Control: the rule fitted to nothing -> back on the held lifts."""
+    stall resets and pain cuts — undoing the cut it sat under. The ninth red team: it is a second progression system next to
+    "Same load: build to 12 reps". Fix round 10: no note carries it. Control: the rule left in -> back on the notes."""
     for key, w in weeks.items():
-        assert stepping_held(w["week"]) == [], key
-    f = weeks[("f_high_fatigue_poor_sleep", False)]["week"]
-    assert all(lsafe.HOLD_DAY_LINE in s["lifts"][0]["hevy_note"] for s in f["sessions"])
-    off = {(lsafe, "no_step"): lambda blocks, rx: [], (lsafe, "block_rule"): lambda block, rx, blocks: block}
-    assert stepping_held(_week("f_high_fatigue_poor_sleep", off)["week"])
+        assert stepping(w["week"]) == [], key
+    off = {(lsafe, "no_step"): lambda blocks, rx: [], (lsafe, "block_rule"): lambda block: block}
+    assert stepping(_week("f_high_fatigue_poor_sleep", off)["week"])
 
 
 # ── 4. one effort across the session ────────────────────────────────────────
@@ -266,7 +256,7 @@ def test_the_session_line_never_contradicts_a_big_lift(weeks):
     assert lsafe.big_lift_conflicts(two, "Lower heavy · RPE 7–9 on big lifts") == []
     off = {
         (lsafe, "coherent_effort"): lambda blocks, rx: None,
-        (lsafe, "fix_block"): lambda block, rx, blocks: lsafe.block_rule(block, rx, blocks),
+        (lsafe, "fix_block"): lambda block, rx, blocks: lsafe.block_rule(block),
     }
     assert session_conflicts(
         _week("a_large_deficit_experienced", off)["week"]
@@ -335,7 +325,7 @@ def test_the_week_plan_holds_the_priority_muscles_and_fills_the_quadriceps_when_
     assert lm["chest"]["sets"] >= lm["chest"]["MEV"] and lm["quadriceps"]["sets"] >= lm["quadriceps"]["MEV"]
     plan = lvol.week_plan(CAT0, copy.deepcopy(LIB0), 5)
     assert not [r for r in plan["rows"] if r.get("fill") == "quadriceps"]  # the template's squats + leg press reach the aim
-    with patch.object(lvol, "targets", lambda lib, m, hf=False: {"quadriceps": {"floor": 14.0, "aim": 14.0, "cap": 16.0}}):
+    with patch.object(lvol, "targets", lambda lib, m, hf=False, monday=None: {"quadriceps": {"floor": 14.0, "aim": 14.0, "cap": 16.0}}):
         high = lvol.week_plan(CAT0, copy.deepcopy(LIB0), 5)
     fills = [r for r in high["rows"] if r.get("fill") == "quadriceps"]
     assert fills and fills[0]["key"] in lvol.FILL["quadriceps"] and fills[0]["role"].startswith("lower")  # control
@@ -392,12 +382,12 @@ def test_an_uncovered_aerobic_gap_becomes_one_optional_walk_never_silence(weeks)
     ALL["h_low_steps"] = ALL["h_heavy_walker"] | {"steps_per_day": 5000}
     try:
         low = _week("h_low_steps", settings={"session_cap_includes_cardio": True})["week"]
-        assert _walks(low) == ["shoulders_arms"]
+        assert len(_walks(low)) == 1 and _walks(low)[0] not in ("lower_heavy", "upper_heavy")  # the week's host (fix round 10)
         assert any(ln.startswith("walk (live): optional brisk walk") for s in low["sessions"] for ln in _lines(s))
         off = _week("h_low_steps", {(lshape, "walk_prompt"): lambda live, today_minutes=0: []}, {"session_cap_includes_cardio": True})
         assert _walks(off["week"]) == []
         unknown = _week("h_heavy_walker", {(lshape, "intensity_unknown"): lambda aer: False}, {"session_cap_includes_cardio": True})
-        assert _walks(unknown["week"]) == ["shoulders_arms"]  # control: the old reading manufactures the gap
+        assert len(_walks(unknown["week"])) == 1  # control: the old reading manufactures the gap
     finally:
         ALL.pop("h_low_steps", None)
 

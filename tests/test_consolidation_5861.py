@@ -315,8 +315,16 @@ def test_a_note_never_contradicts_its_routine():
     blk.notes = "RPE 8\nSame load: first time in 19 weeks."
     rx[ls.MARK]["load_guard"] = []
     assert ls.contradictions([blk], rx)  # a layoff line on a familiar pattern
-    blk.notes = "RPE 8\nLighter today: 3 grinding sessions."
+    blk.notes = "RPE 8\nLighter today: under 4 reps 2 sessions running."
     rx[ls.MARK]["load_guard"] = [{"key": "x", "mode": "down"}]
+    assert ls.contradictions([blk], rx) == []
+    # fix round 10 (the ninth red team): a second load rule in the note — red on fix round 9, whose lint passed this note
+    blk.notes = "RPE 8–9\nTop reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.\n\nSame load: build to 12 reps."
+    rx[ls.MARK]["load_guard"] = [{"key": "x", "mode": "hold"}]
+    assert ls.contradictions([blk], rx)
+    blk.notes = "RPE 8\nSet 1: 6 reps at RPE 8.5 or less → +5 lb on later sets.\nSame load: knee flag."
+    assert ls.contradictions([blk], rx)
+    blk.notes = "RPE 8–9\nSame load: build to 12 reps."
     assert ls.contradictions([blk], rx) == []
 
 
@@ -383,7 +391,7 @@ def test_a_slump_trims_about_a_third_of_each_accessory_never_an_anchor():
     lines = live_load.slump_trim(rx)
     assert [len(e["sets"]) for e in rx["exposures"]] == [3, 2, 3, 2] and lines
     rows = _run("drop", 4)
-    off = _run("drop", 4, {(live_load, "slump_trim"): lambda rx: []})
+    off = _run("drop", 4, {(live_load, "slump_trim"): lambda rx, keep=None: []})
     acc = lambda rr: sum(sum(len(v) for v in r["loads"].values()) for r in rr)  # noqa: E731 — exposures served
     held = [r["week"] for r in rows if any(ln.startswith("today: no load steps up") for v in r["rationale"].values() for ln in v)]
     assert held

@@ -15,8 +15,9 @@ WHY IT EXISTS. A fourth independent red team (2026-11-12) graded the engine B- (
   2. MILD PAIN KEEPS THE LIFT (`mild`, `mild_pain_tids`). PAIN_RULE says a stated score at or under 3/10, not sharp, keeps the
      movement lighter; the session fit and the selection swapped it anyway (any pain-class note). Both layers now keep it, and
      every lift the pain rule touched carries an in-set stop line (`stop_line`).
-  3. NO LOAD STEP ON A HELD LIFT (`no_step`). The session block's "Top reps at RPE 7 or less → +10 lb on later sets" headed
-     every exercise 1 — on deload-recommended days, stall resets, pain cuts and load holds — and undid the cut it sat under.
+  3. ONE LOAD RULE IN THE NOTES (`no_step`, fix round 10). Double progression (`live_load`) is the one progression system under
+     live: the in-session RPE load step ("Top reps at RPE 7 or less → +10 lb on later sets") is a second one — it sat next to
+     "Same load: build to 12 reps" on one lift (the ninth red team) — so it is dropped from every note, held lift or not.
   4. ONE EFFORT ACROSS THE SESSION (`coherent_effort`, `big_lift_conflicts`). "Lower heavy · RPE 7 on big lifts" sat two lines
      above a deadlift's own "RPE 8–9": the guard read one lift at a time.
   5. THE STOP LINE (`symptom_text`, `lifting_day_symptom`). A second wording preset (`symptom_line: "extended"`) adds "heart
@@ -54,7 +55,6 @@ STOP_LINE: dict[str, Any] = {
     "basis": "fourth red team (physio): a pain-flagged lift needs an in-set rule. The pain-monitoring line is PAIN_RULE mild_max "
     "(3/10) or the stated score when lower: pain above it, or turning sharp, ends that lift for the day (practitioner consensus)",
 }
-HOLD_DAY_LINE = "No load steps today."  # #5861 FIX7: lint L1 bans "as written"
 
 
 # ── 1. the pain site ─────────────────────────────────────────────────────────
@@ -125,80 +125,37 @@ def pain_limit(entry: dict[str, Any] | None, ctx: dict[str, Any]) -> tuple[str, 
     return (str(site), int(level)) if site and level is not None else None
 
 
-# ── 3. no load step on a held lift ───────────────────────────────────────────
-def _hold_day(rx: dict[str, Any]) -> bool:
-    from training import live_session as ls
-
-    fat = rx.get("fatigue") or {}
-    held = bool((rx.get(ls.MARK) or {}).get("hold_all"))
-    return held or fat.get("state") in ("strained", "overreached") or fat.get("action") == "deload_recommended"
+# ── 3. one load rule in the notes ────────────────────────────────────────────
+_LATER_SETS = re.compile(r"on later sets|: \+\d+(?:\.\d+)? lb per hand")  # a carry's in-session step too
 
 
-def no_step_keys(rx: dict[str, Any]) -> set[str]:
-    """Movements whose load must not step inside the session: a guard decision (cut or hold), a joint flag, a stall reset, the
-    deload shape, a lift already cut this week, a pain swap."""
-    from training import live_session as ls
+def _step_line(line: str) -> bool:
+    """An in-session load-step line: the session block's rule (its if/then and its limits) or a lift's own "on later sets"."""
+    from training import hevy_note_grammar as g
 
-    out = {
-        str(d["key"])
-        for d in (rx.get(ls.MARK) or {}).get("load_guard") or []
-        if d.get("mode") in ("down", "second") or (d.get("mode") == "hold" and d.get("why") != "reps first")
-    }
-    for e in rx.get("exposures") or []:
-        swap = (e.get("live_swap") or {}).get("code")
-        if e.get("live_load") or e.get("live_stop") or e.get("live_first_back") or swap in ("joint", "pain"):
-            out.add(str(e.get("movement_key")))
-    return out
+    s = line.strip()
+    return bool(_LATER_SETS.search(s)) or s.startswith((g.LOAD_RULE_HEAD, g.OTHER_LIFTS_HEAD)) or s == g.LOAD_RULE_LIMITS
 
 
-_LATER_SETS = re.compile(r"on later sets|: \+\d+(?:\.\d+)? lb per hand")  # FIX7: a carry's in-session step too
-
-
-def _drop_step_lines(lines: list[str]) -> list[str]:
-    return [ln for ln in lines if not _LATER_SETS.search(ln)]
-
-
-def block_rule(block: str, rx: dict[str, Any], blocks: list[Any]) -> str:
-    """The session block (exercise 1's, or the compiler's WHY line) with its load rule fitted to the held lifts (module doc 3):
-    a hold day drops it; a held exercise 1 turns it to "Other lifts: …", or drops it when no other lift may step."""
-    from training import hevy_note_grammar as g, session_block as sb
-
-    lines = (block or "").split("\n")
-    if len(lines) < 3 or not blocks:
-        return block
-    keys, ex1 = no_step_keys(rx), blocks[0]
-    others = any(x is not ex1 and x.movement_key not in keys for x in blocks if sb.steppable(x))
-    if _hold_day(rx) or (ex1.movement_key in keys and not others):
-        return "\n".join(lines[:2])
-    if ex1.movement_key in keys and not lines[2].startswith(g.OTHER_LIFTS_HEAD):
-        return "\n".join(lines[:2] + sb.load_rule_line(sb.step_lb(), other_lifts=True).split("\n"))
-    return block
+def block_rule(block: str) -> str:
+    """The session block (exercise 1's, or the compiler's WHY line) without the in-session load rule (module doc 3)."""
+    return "\n".join(ln for ln in (block or "").split("\n") if not _step_line(ln))
 
 
 def no_step(blocks: list[Any], rx: dict[str, Any]) -> list[str]:
-    """IN PLACE, live only (module doc 3): no "+N on later sets" line on a held lift or on a hold day. A held lift's own
-    "Set 1: … on later sets" line goes; the session block's rule is fitted by `block_rule` (here when exercise 1 carries the
-    block, else on the compiler's WHY line, `live_balance.why_effort`); a hold day says HOLD_DAY_LINE on exercise 1; any other
-    held lift (exercise 1 aside — the rule addresses the OTHER lifts then) says NO_STEP_LINE. Returns the rationale lines."""
+    """IN PLACE, live only (module doc 3): no in-session load step on any lift — the session block's rule and every lift's own
+    "on later sets" line go. Returns the rationale line."""
     from training import session_block as sb
-    from training.live_balance import assess_note
 
-    if not blocks:
-        return []
-    keys, hold = no_step_keys(rx), _hold_day(rx)
-    for i, b in enumerate(blocks):
-        if not (hold or b.movement_key in keys):
-            continue
+    dropped = 0
+    for b in blocks:
         block, own = sb.split(b.notes or "")
-        lines = _drop_step_lines([ln for ln in own.split("\n") if ln.strip()])
-        block = block_rule(block, rx, blocks) if i == 0 and block else block
-        b.notes = block + ("\n\n" + "\n".join(lines) if lines else "") if block else "\n".join(lines)
-        if i == 0 and hold:
-            b.notes = assess_note(b.notes, HOLD_DAY_LINE)
-    here = keys & {b.movement_key for b in blocks}
-    if hold:
-        return [f"no step (live): a hold day ({(rx.get('fatigue') or {}).get('state')}) — no in-session load step on any lift"]
-    return [f"no step (live): {len(here)} held / cut / flagged lift(s) keep their load all session"] if here else []
+        lines = [ln for ln in own.split("\n") if ln.strip()]
+        kept = [ln for ln in lines if not _step_line(ln)]
+        new = block_rule(block) if block else block
+        dropped += len(lines) - len(kept) + (block or "").count("\n") - (new or "").count("\n")
+        b.notes = new + ("\n\n" + "\n".join(kept) if kept else "") if new else "\n".join(kept)
+    return [f"one load rule (live): {dropped} in-session load-step line(s) dropped — double progression only"] if dropped else []
 
 
 # ── 4. one effort across the session ─────────────────────────────────────────
@@ -305,7 +262,7 @@ def coherent_effort(blocks: list[Any], rx: dict[str, Any]) -> None:
 
 def fix_block(block: str, rx: dict[str, Any], blocks: list[Any]) -> str:
     """The compiler's WHY block (live): `block_rule` then the coherent session line."""
-    out = block_rule(block, rx, blocks)
+    out = block_rule(block)
     head = out.split("\n", 1)[0]
     new = coherent_head(head, blocks)
     return new + out[len(head) :] if new != head else out

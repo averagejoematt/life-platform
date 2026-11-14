@@ -36,7 +36,8 @@ SETTINGS: dict[str, dict[str, Any]] = {
     "priority_muscles": {
         "default": ["chest", "quadriceps"],
         "ruling": "owner ruling 9 (2026-11-13)",
-        "what": "muscles planned toward the middle of MEV-MAV (never under MEV in a normal week) and trimmed last for time",
+        "what": "muscles planned at MEV at least and never under the non-priority arm and calf muscles' weekly hard sets (the "
+        "plan pays them from those isolation slots); trimmed last for time and by a slump",
     },
     "abs_direct_sets_per_week": {
         "default": 4,
@@ -150,23 +151,30 @@ HEURISTICS: dict[str, dict[str, Any]] = {
         "basis": "a working set prescribed at RPE >= 8 (the top of its effort line) is a hard set; the ONE counter",
         "retune": "block retro: logged RPE of prescribed hard sets",
     },
-    "secondary_credit": {
-        "value": 0.5,
+    "set_credit": {
+        "value": {
+            "secondary": 0.5,
+            "delt": {
+                "horizontal_press": {"front_delts": 0.5},
+                "vertical_press": {"front_delts": 1.0, "side_delts": 0.5},
+                "horizontal_pull": {"rear_delts": 0.5},
+            },
+            "never": {"*": ["abs"], "hip_extension": ["quadriceps"], "leg_curl": ["calves"]},
+        },
         "group": "volume",
-        "basis": "a lift's secondary muscle takes half a set (the fatigue model's convention)",
+        "basis": "THE one set-credit table (fix round 10): a working set credits its target's landmark muscle 1.0 and each "
+        "secondary — the library's secondaries and every other muscle it is RATED for — `secondary` (half a set, the fatigue "
+        "model's convention); each delt head direct 1.0, or by `delt` from the lift's pattern (pressing -> front and, overhead, "
+        "half a side; rowing -> rear — practitioner consensus, explicit so it can be argued with); `never` drops a credit the "
+        "anatomy does not support (indirect trunk loading is never an ab set, owner ruling #8; a hip thrust trains no quadriceps; "
+        "a leg curl no calves)",
         "retune": "none (convention)",
-    },
-    "priority_aim": {
-        "value": 0.25,
-        "group": "volume",
-        "basis": "a priority muscle aims a quarter of the way from MEV to MAV (chest and quadriceps 8 -> 10): more than the "
-        "minimum, never mechanical volume maximisation (ruling 9)",
-        "retune": "block retro: priority muscles' anchor progression",
     },
     "slot_max_sets": {
         "value": 3,
         "group": "volume",
-        "basis": "an accessory slot takes at most 3 working sets; 4+ in one slot is junk volume",
+        "basis": "an accessory slot takes at most 3 working sets — a template slot written at 4 is served at 3 (fix round 10: "
+        "the calf slots); 4+ in one slot is junk volume",
         "retune": "none",
     },
     "slot_min_sets": {
@@ -181,17 +189,6 @@ HEURISTICS: dict[str, dict[str, Any]] = {
         "basis": "owner ruling #9: each delt head assessed apart, direct + indirect; the side delt (no compound trains it much) "
         "aims at 6 hard sets, the rear at 4",
         "retune": "block retro: lateral-raise and rear-delt progression",
-    },
-    "delt_credit": {
-        "value": {
-            "horizontal_press": {"front_delts": 0.5},
-            "vertical_press": {"front_delts": 1.0, "side_delts": 0.5},
-            "horizontal_pull": {"rear_delts": 0.5},
-        },
-        "group": "volume",
-        "basis": "indirect delt-head credit by library pattern: pressing -> front (and, overhead, half a side), rowing -> rear "
-        "(practitioner consensus; explicit so it can be argued with)",
-        "retune": "none (convention)",
     },
     "short_week_floor": {
         "value": 3,

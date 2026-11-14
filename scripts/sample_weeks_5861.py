@@ -785,7 +785,7 @@ def _press_trade_numbers(lib: dict[str, Any], catalog: dict[str, Any]) -> dict[s
 
 def delt_heads(week: dict[str, Any], lib: dict[str, Any], catalog: dict[str, Any]) -> dict[str, float]:
     """Per delt head, the week's HARD sets — THE engine counter (`live_volume.hard_sets`, fix round 9): direct 1.0, indirect by
-    `live_settings` delt_credit (pressing -> front and, overhead, half a side; rowing -> rear)."""
+    `live_settings` set_credit (pressing -> front and, overhead, half a side; rowing -> rear)."""
     from training import live_volume
 
     got = live_volume.hard_sets(_hard_items(week, lib, catalog))
@@ -886,7 +886,7 @@ def render(week: dict[str, Any], m: dict[str, Any]) -> str:
     lines.append(f"Session lines contradicting a big lift: {', '.join(m['session_effort_conflicts']) or 'none'}")
     total = sum(p["working_sets"] for p in m["per_session"])
     dh = m.get("delt_heads") or {}
-    lines.append("Delt heads (hard sets, direct + delt_credit indirect): " + ", ".join(f"{h.split('_')[0]} {v:g}" for h, v in dh.items()))
+    lines.append("Delt heads (hard sets, direct + set_credit indirect): " + ", ".join(f"{h.split('_')[0]} {v:g}" for h, v in dh.items()))
     lines.append(f"Working sets this week: {total} (redline {_redline()})")
     return "\n".join(lines) + "\n"
 

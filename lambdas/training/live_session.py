@@ -266,7 +266,7 @@ def for_live_draft(
             "pain_notes": live_safety.latest_notes(block_workouts),
         } | _week_ctx(week, inputs)
         mornings = int((week or {}).get("days") or 5)
-        plan = live_volume.week_plan(catalog, lib, mornings)
+        plan = live_volume.week_plan(catalog, lib, mornings, monday=target or None)  # any day: its ISO week
         ctx["volume_plan"] = plan
         role_rows = [r for r in plan["rows"] if r["role"] == rx.get("session_role")]
         plan_rows = dict(live_volume._count(role_rows))
@@ -283,7 +283,8 @@ def for_live_draft(
         if slump:
             hold_all = "slump week"
             lines += [f"slump (live): {slump['declining']} of {slump['judged']} anchors declining together — no load steps up"]
-            lines += live_load.slump_trim(out)
+            prio = {str(e.get("movement_key")) for e in out["exposures"] if live_volume._prio(e.get("movement_key"), catalog, lib)}
+            lines += live_load.slump_trim(out, prio)
         _refit(out)
     except Exception as e:  # noqa: BLE001 — the live fit never blocks a draft
         lines.append(f"live session fit failed ({type(e).__name__}) — the prescription is unchanged")
@@ -316,7 +317,9 @@ def for_live_draft(
         "symptom_tripwire": live_week.symptom_gate(
             getattr(inputs, "medical_stop_lines", None), block_workouts, getattr(inputs, "target_date", None)
         ),
-        "conditioning_host": (week or {}).get("host") or live_balance.conditioning_host(skip),  # the declared week's own host
+        "conditioning_host": (
+            live_volume.conditioning_host(plan) if ctx is not None else (week or {}).get("host") or live_balance.conditioning_host(skip)
+        ),  # fix round 10: the morning with the most free minutes
         "week_skip": list(skip),
         "hist": hist,
         "hold_all": hold_all,
@@ -500,9 +503,10 @@ def _zero_by_design(blocks: list[Any], rx: dict[str, Any], movements: dict[str, 
 
 def contradictions(blocks: list[Any], rx: dict[str, Any]) -> list[str]:
     """Where a lift's note says something its own rows or the live decision contradict (fix round 9, G): a heavier/lighter
-    reason against the decision, a "find the load" over a written load, a layoff line on a lift of a familiar pattern.
-    [] = consistent. (The low-energy line's cardio promise is fitted on the WHY block, `live_balance.why_effort`.)"""
-    from training import hevy_note_grammar as g
+    reason against the decision, a "find the load" over a written load, a layoff line on a lift of a familiar pattern, a held or
+    lightened lift whose note still steps it in-session (fix round 10: one load rule). [] = consistent. (The low-energy line's cardio promise is fitted on the WHY block, `live_balance.why_effort`.)
+    """
+    from training import hevy_note_grammar as g, live_safety
 
     guard = {d["key"]: d for d in (rx.get(MARK) or {}).get("load_guard") or []}
     exp = {e.get("movement_key"): e for e in rx.get("exposures") or []}
@@ -518,6 +522,8 @@ def contradictions(blocks: list[Any], rx: dict[str, Any]) -> list[str]:
             out.append(f"{b.movement_key}: 'find the load' over a written load")
         if (e.get("live_familiar") or e.get("live_first_back")) and ("first time in" in note or "session back after" in note):
             out.append(f"{b.movement_key}: a layoff line on a familiar pattern")
+        if ("Same load" in note or "Lighter today" in note) and any(live_safety._step_line(ln) for ln in note.split("\n")):
+            out.append(f"{b.movement_key}: holds or lightens its load but the note steps it on later sets (two load rules)")
     return out
 
 
