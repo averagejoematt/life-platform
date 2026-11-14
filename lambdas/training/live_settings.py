@@ -211,7 +211,8 @@ HEURISTICS: dict[str, dict[str, Any]] = {
         "value": 20,
         "group": "volume",
         "basis": "owner ruling 1: under the shared cap the week's conditioning dose takes only what lifting leaves — so the plan "
-        "leaves this many minutes free on its host morning instead of filling them with isolation",
+        "leaves this many minutes free on its host morning instead of filling them with isolation (a 1-2 morning week spends its "
+        "few minutes on lifting first; the dose takes what is left)",
         "retune": "block retro: the conditioning minutes delivered",
     },
     "min_session_minutes": {

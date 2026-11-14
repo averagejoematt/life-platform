@@ -177,7 +177,13 @@ def test_the_week_is_planned_by_priority_and_no_non_priority_muscle_grows_over_m
     other["programming_settings"] = {**(lib.get("programming_settings") or {}), "priority_muscles": ["back"]}
     assert lvol.week_plan(CAT0, other, 5)["targets"]["chest"]["floor"] == marks["chest"]["MV"]  # a setting he owns
     assert c["shoulders"] <= marks["shoulders"]["MAV"]  # ruling 9: total shoulder volume never forced over MAV
-    with patch.object(lvol, "_spare", lambda r, rows, tg: False):  # control: no slot may go whole -> the delts sit over MAV
+    # control (fix round 11): no surplus trim and no donation in the one spend step -> the template's delts sit over MAV
+    with (
+        patch.object(lvol, "_surplus", lambda rows, tg, prio, lines: (lambda: None)),
+        patch.object(
+            lvol, "_make_room", lambda rows, tg, lead, role, m, need, room, budget, gave, slot=False: room(role) >= need and not slot
+        ),
+    ):
         assert lvol.week_plan(CAT0, lib, 5)["counts"]["shoulders"] > marks["shoulders"]["MAV"]
 
 

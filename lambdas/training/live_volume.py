@@ -187,7 +187,7 @@ def targets(lib: dict[str, Any], mornings: int) -> dict[str, dict[str, float]]:
         if m == "abs":  # owner ruling #8: ~4 direct sets a week; a 1-3 morning week halves it
             n = float(s.get("abs_direct_sets_per_week") or 0)
             n = math.ceil(n / 2) if short else n
-            out[m] = {"floor": n, "aim": n, "cap": mav}
+            out[m] = {"floor": 0.0 if short else n, "aim": n, "cap": mav}  # a short week: no floor, the rotation takes its turn
         elif short:  # a 1-3 morning week holds maintenance pro rata; a priority muscle aims at MEV pro rata
             floor = max(float(cfg.value("slot_min_sets")), math.ceil(mv * mornings / per)) if (m in prio or m in MAJOR) else 0.0
             aim = max(floor, math.ceil((mev if m in prio else mv) * mornings / per))
@@ -238,8 +238,6 @@ def day_rows(role: str, week: dict[str, Any], catalog: dict[str, Any], lib: dict
     hi = int(cfg.value("slot_max_sets"))
     for r in rows:  # fix round 10: a template slot written at 4 sets is served at the slot cap (the calf slots)
         r["sets"] = min(r["sets"], hi) if r["kind"] == "accessory" and r["intensity"] != "carry" else r["sets"]
-        if role == "lower_heavy" and r["kind"] == "anchor" and r["pattern"] == "hinge" and r["intensity"] == "heavy":
-            r["sets"] = min(r["sets"], 2)  # ruling 5: the heavy deadlift is a top set + one back-off (`live_shape.deadlift_shape`)
     partners = (week.get("partners") or {}).get(role)
     if not partners:
         return [r for r in rows if not (r["role"] == "shoulders_arms" and r["intensity"] == "carry" and week["mornings"] < 5)]
@@ -319,13 +317,24 @@ def _rest_seconds(intensity: Any) -> int:
 
 def plan_minutes(rows: list[dict[str, Any]]) -> float:
     """A morning's planned lifting minutes from its plan rows — the one time model (`session_shape.session_minutes_estimate`,
-    warm-ups assumed for the compound anchors), so the plan spends the minutes the time fit will measure."""
+    warm-ups assumed for the compound anchors and for every slot the plan added), so the plan spends the minutes the time fit
+    will measure."""
     from training.session_shape import session_minutes_estimate
 
-    ex = [
-        {"kind": r["kind"], "pattern": r["pattern"], "sets": [{}] * int(r["sets"]), "rest_seconds": _rest_seconds(r["intensity"])}
+    ex = [  # a slot the plan added may be new to him: its "find the load" warm-up set is counted (an upper bound)
+        {
+            "kind": r["kind"],
+            "pattern": r["pattern"],
+            "sets": [{}] * (int(r["sets"]) + bool(r.get("fill"))),
+            "rest_seconds": _rest_seconds(r["intensity"]),
+        }
         for r in rows
     ]
+    if any(r.get("guest") for r in rows):  # a full-body morning's paired anchors rest once per pair (`FULL_BODY_PAIRS`)
+        pats = {str(e["pattern"]): e for e in ex if e["kind"] == "anchor"}
+        for a, b in FULL_BODY_PAIRS:
+            if a in pats and b in pats:
+                pats[a]["rest_seconds"] = 0
     return float(session_minutes_estimate(ex)["lifting_minutes"]) if ex else 0.0
 
 
@@ -336,7 +345,9 @@ def free_minutes(rows: list[dict[str, Any]], role: str, host: str | None, lib: d
     from training.session_shape import lifting_minutes_cap
 
     cap = float(lifting_minutes_cap())
-    if role == host and _settings(lib).get("session_cap_includes_cardio"):
+    if (
+        role == host and _settings(lib).get("session_cap_includes_cardio") and len({r["role"] for r in rows}) >= 3
+    ):  # 1-2 mornings: lifting first
         cap -= float(cfg.value("conditioning_reserve_minutes"))
     return cap - plan_minutes([r for r in rows if r["role"] == role])
 
@@ -360,13 +371,13 @@ def spend(
     full: dict[str, bool],
     room: Any,
     add: Any,
-    owed: dict[str, float] | None = None,
+    last: dict[str, str] | None = None,
     budget: float | None = None,
     lead: frozenset[str] = frozenset(),
 ) -> list[str]:
     """THE ONE STEP that spends free minutes (fix round 11 — it replaces the grow/fill rules, the priority parity, the short-week
-    rotation and the pain refill): while a muscle sits under its aim, the one FURTHEST under it (one under its floor first; its shortfall plus what last
-    week left it short — `owed`, the weekly memory that rotates 2- and 3-morning weeks) takes one more set on the morning with
+    rotation and the pain refill): while a muscle sits under its aim, the one FURTHEST under it as a share of its aim (one under its floor first; on a
+    tie the one he trained longest ago — `last`, the weekly memory that rotates short weeks) takes one more set on the morning with
     the most free minutes (`room(role)`) that may hold it: an isolation slot it already has grows (never past `slot_max_sets`),
     else `add(muscle, role)` places a new 2-set slot (a second movement only once the first is full). Never past the movement
     cap. Time or the week's set `budget` short: a muscle OVER its own aim gives the set (`_make_room`) — never under its aim.
@@ -380,7 +391,7 @@ def spend(
         c = _count(rows)
         need = sorted(  # under its FLOOR first (a ruled hold, ruling 3), then the furthest under its aim
             (m for m in tg if m not in blocked and c[m] + 1e-9 < _aim(m, c, tg, lead)),
-            key=lambda m: (c[m] + 1e-9 >= tg[m]["floor"], -(_aim(m, c, tg, lead) - c[m] + float((owed or {}).get(m, 0.0))), m),
+            key=lambda m: (c[m] + 1e-9 >= tg[m]["floor"], -round(1 - c[m] / _aim(m, c, tg, lead), 2), (last or {}).get(m, ""), m),
         )
         if not need:
             break
@@ -482,27 +493,29 @@ def _spread(m: str, rows: list[dict[str, Any]], roles: list[str], full: dict[str
     )
 
 
-def done_last_week(workouts: Any, catalog: dict[str, Any], lib: dict[str, Any], day: str) -> dict[str, float]:
-    """The weekly memory: muscle -> working sets he LOGGED in the calendar week before `day`'s week (the set-credit table). It
-    only orders `spend` — never a catch-up set (owner ruling 2: a missed week is not recovered set for set)."""
+def last_trained(workouts: Any, catalog: dict[str, Any], lib: dict[str, Any], day: str) -> dict[str, str]:
+    """The weekly memory: muscle (and delt head) -> the last day before `day`'s week he LOGGED a working set crediting it (the
+    set-credit table). It only breaks ties in `spend` — the muscle trained longest ago takes the free slot first, so consecutive
+    short weeks rotate — never a catch-up set (owner ruling 2: a missed week is not recovered set for set)."""
     from common.pacific_time import parse_day_key, shift_day_key
 
     d = parse_day_key(str(day)[:10])
     if d is None or not workouts:
         return {}
     monday = shift_day_key(str(day)[:10], -d.weekday())
-    since = shift_day_key(monday, -7)
     by_tid = {str(e.get("template_id") or "").upper(): e for e in (lib.get("movements") or {}).values() if e.get("template_id")}
-    out: Counter = Counter()
+    out: dict[str, str] = {}
     for w in workouts:
-        if not since <= str(w.get("date") or str(w.get("sk") or "")[5:15])[:10] < monday:
+        date = str(w.get("date") or str(w.get("sk") or "")[5:15])[:10]
+        if date >= monday:
             continue
         for x in w.get("exercises") or []:
-            entry = by_tid.get(str(x.get("template_id") or "").upper())
-            n = sum(1 for st in x.get("sets") or [] if str(st.get("type") or "normal") != "warmup")
-            for m, v in (credits(entry) if entry else {}).items():
-                out[m] += v * n
-    return dict(out)
+            entry = by_tid.get(str(x.get("template_id") or "").upper()) or lib_entry(x.get("template_id"), catalog, lib)
+            if not any(str(st.get("type") or "normal") != "warmup" for st in x.get("sets") or []):
+                continue
+            for m in credits(entry) if entry else {}:
+                out[m] = max(out.get(m, ""), date)
+    return out
 
 
 def week_plan(
@@ -510,11 +523,11 @@ def week_plan(
     lib: dict[str, Any],
     mornings: int,
     press_source: str = "lateral_raise",
-    done: dict[str, float] | None = None,
+    last: dict[str, str] | None = None,
     overlay: Any = None,
 ) -> dict[str, Any]:
     """The week's plan (module doc 1): {week, rows (every drafted morning's rows, sized), targets, counts, under, host, lines}.
-    Pure over the catalog, the library, the mornings and last week's logged sets (`done`); the same for every morning of the week."""
+    Pure over the catalog, the library, the mornings and the weekly memory (`last`); the same for every morning of the week."""
     week = week_shape(mornings)
     rows = [r for role in week["roles"] for r in day_rows(role, week, catalog, lib)]
     lines = _press_trade(rows, lib, press_source)
@@ -527,7 +540,6 @@ def week_plan(
     roles = list(week["roles"])
     full = {r: bool((week.get("partners") or {}).get(r)) for r in roles}
     taken = {str(r["key"]) for r in rows}
-    owed = {m: max(0.0, t["aim"] - float((done or {}).get(m, 0.0))) for m, t in tg.items()} if done is not None else None
 
     def add(m: str, role: str, probe: bool = False) -> Any:
         here = {lib_entry(r["key"], catalog, lib).get("pattern") for r in rows if r["role"] == role}  # never the same pattern twice
@@ -540,7 +552,7 @@ def week_plan(
 
     lead = frozenset(m for m in prio if m in tg) if week["mornings"] >= 5 else frozenset()
     room = lambda role: free_minutes(rows, role, host, lib)  # noqa: E731
-    lines += spend(rows, tg, roles, full, room, add, owed, _redline_sets(), lead)  # 2. the one step
+    lines += spend(rows, tg, roles, full, room, add, last, _redline_sets(), lead)  # 2. the one step
     surplus()  # 3. again: a head's aim may have grown its muscle past MAV (ruling 9)
     lines += _redline(rows, tg, prio)
     counts = _count(rows)
@@ -602,8 +614,9 @@ def conditioning_host(plan: dict[str, Any]) -> str:
 
 
 def spend_session(rx: dict[str, Any], ctx: dict[str, Any], flags: list[dict[str, Any]]) -> list[str]:
-    """IN PLACE, live only — the same ONE step on this morning after the pain rule (fix round 11: it replaces the refill): each
-    muscle this morning's planned share lost (a routed or skipped lift) is a shortfall, and this morning's free minutes go to the
+    """IN PLACE, live only — the same ONE step on this morning after the session fit and the pain rule (fix round 11: it replaces
+    the refill): each muscle this morning's planned share lost (a lift the gym cannot serve, a routed or skipped lift, a swap
+    that trains it less) is a shortfall, and this morning's free minutes go to the
     one furthest under first, from REVIEWED movements the gym serves that load every flagged joint LOW (FILL first, then the
     muscle's reviewed route, `live_pain.muscle_route`). With none, the muscle is zero here by design. Returns the lines."""
     from training import live_pain

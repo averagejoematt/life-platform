@@ -84,7 +84,7 @@ def test_ruling_1_the_whole_morning_fits_and_no_needed_set_is_cut_for_cardio(wee
     for name, w in weeks.items():
         assert all(p["morning_minutes"] <= 75.05 for p in w["m"]["per_session"]), name
         assert not any(ln.startswith("cardio room") for s in w["week"]["sessions"] for ln in s["live_fit"] or []), name
-    off = _week("e_short_week", {(live_volume, "time_fit"): lambda *a, **k: []})  # control: no time fit -> over the cap
+    off = _week("c_equipment_limited", {(live_volume, "time_fit"): lambda *a, **k: []})  # control: no time fit -> over the cap
     assert any(p["lifting_minutes"] > 75.05 for p in off["m"]["per_session"])
 
 
@@ -204,18 +204,15 @@ def test_ruling_9_priority_muscles_at_or_over_mev_and_each_delt_head_has_its_aim
     heads = a["m"]["delt_heads"]
     assert heads["side_delts"] >= live_settings.value("delt_heads")["side_delts"] and heads["rear_delts"] >= 4, heads
     assert "shoulders" not in live_settings.settings(LIB0)["priority_muscles"]
-    # fix round 10 (the ninth red team: chest 9 under biceps 11, and naming back + glutes changed nothing): the plan holds each
-    # priority muscle at or over the arms and calves, and the setting moves the week
+    # fix round 11 (the tenth red team: 'priority' meant MEV + 1): the plan aims each priority muscle a quarter of the way to
+    # MAV and reaches it by spending free minutes; the served-week outcomes are tests/test_fix11_5861.py
     cat, lib = a["world"]["catalog"]["movements"], a["world"]["lib"]
-    for n in (5, 4):  # the plan, within its one-set tolerance (the served weeks: tests/test_fix10_5861.py)
-        c = live_volume.week_plan(cat, lib, n)["counts"]
-        tol = live_volume.PARITY_TOLERANCE + (1.0 if n == 4 else 0.0)  # 4 mornings: ruling 3 holds the arms a set over MEV
-        assert all(c.get(p, 0) + tol >= c.get(r, 0) for p in ("chest", "quadriceps") for r in live_volume.PARITY_RIVALS), (n, c)
-    other = lib | {"programming_settings": {**(lib.get("programming_settings") or {}), "priority_muscles": ["back", "glutes"]}}
-    assert live_volume.week_plan(cat, other, 5)["counts"] != live_volume.week_plan(cat, lib, 5)["counts"]
-    with patch.object(live_volume, "_priority_parity", lambda *a: []):  # control: no parity -> a rival over a priority muscle
-        c = live_volume.week_plan(cat, lib, 5)["counts"]
-    assert any(c.get(r, 0) > c.get(p, 0) for p in ("chest", "quadriceps") for r in live_volume.PARITY_RIVALS), c
+    plan = live_volume.week_plan(cat, lib, 5)
+    for p in ("chest", "quadriceps"):
+        assert plan["targets"][p]["aim"] > LANDMARKS["muscles"][p]["MEV"] and plan["counts"][p] >= plan["targets"][p]["aim"], p
+    with patch.dict(live_settings.HEURISTICS["priority_aim_share"], {"value": 0.0}), patch.object(live_volume, "ARMS", ()):
+        flat = live_volume.week_plan(cat, lib, 5)["counts"]  # control: the aim at MEV, no arm reference -> fewer priority sets
+    assert flat["chest"] + flat["quadriceps"] < plan["counts"]["chest"] + plan["counts"]["quadriceps"]
 
 
 # ── ruling #10 (fix round 8): a familiar swap works at target; the first session back after 10+ days is conservative ───────
@@ -230,7 +227,7 @@ def _later(name: str, weeks_later: int) -> dict:
 
 def test_ruling_10_familiar_patterns_have_no_reentry_cap_and_the_first_session_back_runs_rpe_8(weeks):
     a = weeks["a_large_deficit_experienced"]["week"]
-    notes = [x["hevy_note"] or "" for x in _lifts(a)]
+    notes = [x["hevy_note"] or "" for x in _lifts(a) if str(x["tag"]).startswith("anchor:")]
     assert not any("session back after" in n or "first time in" in n for n in notes)  # he trains these patterns weekly
     back = _later("a_large_deficit_experienced", 2)  # 14+ days with no session
     seen: set = set()  # each lift's FIRST exposure after the gap (later ones are its second session back)

@@ -758,12 +758,13 @@ def test_d1_weekly_sets_per_muscle_sit_inside_the_volume_landmarks(weeks):
     lop["landmarks"]["quadriceps"]["sets"] = 12  # FIX6: the ruled week holds a progressing quadriceps at MEV + 1 (ruling 9)
     assert misallocated(lop) == ["shoulders over MAV while chest is at or under MEV + 1"]
     # control 2: the plan's surplus step off (no slot gives, none goes whole) -> the delts sit over MAV beside chest near MEV
-    raw = _week_of(
+    raw = _week_of(  # fix round 11: no surplus step and no donation in the one spend step
         "a_large_deficit_experienced",
         {
-            (live_volume, "_spare"): lambda r, rows, tg: False,
-            (live_volume, "_head_needs"): lambda r, rows, tg: True,
-            (live_volume, "_priority_parity"): lambda *a: [],  # fix round 10: the parity alone would lift chest past MEV + 1
+            (live_volume, "_surplus"): lambda rows, tg, prio, lines: (lambda: None),
+            (live_volume, "_make_room"): lambda rows, tg, lead, role, m, need, room, budget, gave, slot=False: room(role) >= need
+            and not slot,
+            (live_volume, "ARMS"): (),
         },
     )
     lib, cat = raw["world"]["lib"], raw["world"]["catalog"]["movements"]
@@ -1048,21 +1049,23 @@ def test_d4_progression_is_trackable(weeks):
     assert untrackable(bad, weeks["a_large_deficit_experienced"]["world"]["catalog"]["movements"])
 
 
-def filled(week: dict, lib: dict, catalog: dict) -> list[str]:
+def filled(week: dict, lib: dict, catalog: dict, world: dict | None = None) -> list[str]:
     """Training added to fill a slot (fix round 9, against the ONE weekly plan): (1) every session serves exactly its morning's
-    planned rows minus what the live fit says it skipped or dropped for time, plus a pain refill per skipped lift (fix round 10,
-    `refill (live)`); (2) every fill (`added (live)`) targets a muscle the week leaves under its aim without it — a purpose, not a
+    planned rows minus what the live fit says it skipped or dropped for time, plus each slot the one spend step put back in the
+    morning's free minutes (fix round 11, `added (live)` ... `free minutes`); (2) every fill (`added (live)`) targets a muscle the week leaves under its aim without it — a purpose, not a
     slot; (3) no muscle over MAV or MRV."""
     out = []
     m = sw.measure(week, lib, catalog, LANDMARKS)
     mornings = len(week["sessions"])
-    plan = live_volume.week_plan(catalog, lib, mornings, monday=week["sessions"][0].get("day"))
+    day = week["sessions"][0].get("day")
+    last = live_volume.last_trained((world or {}).get("record"), catalog, lib, day) if world else None
+    plan = live_volume.week_plan(catalog, lib, mornings, last=last, overlay=(world or {}).get("overlay"))
     for s in week["sessions"]:
         rat = _all(s)
         expected = sum(1 for r in plan["rows"] if r["role"] == s["role"])
         expected -= sum(1 for ln in rat if ln.startswith(("skipped (live)", "dropped (live)")))
         expected -= sum(ln.count(" dropped") for ln in rat if ln.startswith("time (live)"))
-        expected += sum(1 for ln in rat if ln.startswith("refill (live)"))
+        expected += sum(1 for ln in rat if ln.startswith("added (live)") and ln.endswith("free minutes"))
         if len(s["lifts"]) != expected:
             out.append(f"{s['role']}: {len(s['lifts'])} exercises, expected {expected} (the plan's rows less skips and time drops)")
         for ln in rat:
@@ -1079,22 +1082,26 @@ def filled(week: dict, lib: dict, catalog: dict) -> list[str]:
 
 def test_d5_no_training_is_added_to_fill_slots(weeks):
     for name, w in weeks.items():
-        assert filled(w["week"], w["world"]["lib"], w["world"]["catalog"]["movements"]) == [], name
+        assert filled(w["week"], w["world"]["lib"], w["world"]["catalog"]["movements"], w["world"]) == [], name
     w = weeks["c_equipment_limited"]
     lib, cat = w["world"]["lib"], w["world"]["catalog"]["movements"]
     bad = copy.deepcopy(w["week"])  # control 1: a slot "refilled" with an extra movement and no line saying why
     bad["sessions"][1]["lifts"] += [dict(bad["sessions"][1]["lifts"][-1], key="extra")]
-    assert filled(bad, lib, cat)
+    assert filled(bad, lib, cat, w["world"])
     # control 2: the plan's surplus step off -> the template's own delt spread fills the shoulders past MAV
     raw = _week_of(
         "a_large_deficit_experienced",
         {
             (live_volume, "_spare"): lambda r, rows, tg: False,
             (live_volume, "_head_needs"): lambda r, rows, tg: True,
-            (live_volume, "_priority_parity"): lambda *a: [],  # fix round 10: the parity alone would lift chest past MEV + 1
+            (live_volume, "_surplus"): lambda rows, tg, prio, lines: (lambda: None),  # fix round 11: no surplus step
+            (live_volume, "_make_room"): lambda rows, tg, lead, role, m, need, room, budget, gave, slot=False: room(role) >= need
+            and not slot,
         },
     )
-    assert any(p.startswith("shoulders over") for p in filled(raw["week"], raw["world"]["lib"], raw["world"]["catalog"]["movements"]))
+    assert any(
+        p.startswith("shoulders over") for p in filled(raw["week"], raw["world"]["lib"], raw["world"]["catalog"]["movements"], raw["world"])
+    )
 
 
 def exercise_count_problems(week: dict) -> list[str]:

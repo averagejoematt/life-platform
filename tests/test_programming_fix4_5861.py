@@ -325,8 +325,8 @@ def test_the_week_plan_holds_the_priority_muscles_and_fills_the_quadriceps_when_
     lm = a["m"]["landmarks"]
     assert lm["chest"]["sets"] >= lm["chest"]["MEV"] and lm["quadriceps"]["sets"] >= lm["quadriceps"]["MEV"]
     plan = lvol.week_plan(CAT0, copy.deepcopy(LIB0), 5)
-    assert not [r for r in plan["rows"] if r.get("fill") == "quadriceps"]  # the template's squats + leg press reach the aim
-    with patch.object(lvol, "targets", lambda lib, m, hf=False, monday=None: {"quadriceps": {"floor": 14.0, "aim": 14.0, "cap": 16.0}}):
+    assert plan["counts"]["quadriceps"] >= plan["targets"]["quadriceps"]["aim"]  # fix round 11: the aim is above MEV
+    with patch.object(lvol, "targets", lambda lib, m: {"quadriceps": {"floor": 14.0, "aim": 14.0, "cap": 16.0}}):
         high = lvol.week_plan(CAT0, copy.deepcopy(LIB0), 5)
     fills = [r for r in high["rows"] if r.get("fill") == "quadriceps"]
     assert fills and fills[0]["key"] in lvol.FILL["quadriceps"] and fills[0]["role"].startswith("lower")  # control

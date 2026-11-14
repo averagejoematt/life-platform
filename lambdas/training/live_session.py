@@ -267,8 +267,8 @@ def for_live_draft(
             "pain_notes": live_safety.latest_notes(block_workouts),
         } | _week_ctx(week, inputs)
         mornings = int((week or {}).get("days") or 5)
-        done = live_volume.done_last_week(block_workouts, catalog, lib, target)  # the weekly memory: its calendar week before
-        plan = live_volume.week_plan(catalog, lib, mornings, done=done, overlay=ctx["overlay"])
+        last = live_volume.last_trained(block_workouts, catalog, lib, target)  # the weekly memory (ties: longest ago first)
+        plan = live_volume.week_plan(catalog, lib, mornings, last=last, overlay=ctx["overlay"])
         ctx["volume_plan"] = plan
         role_rows = [r for r in plan["rows"] if r["role"] == rx.get("session_role")]
         plan_rows = dict(live_volume._count(role_rows))
