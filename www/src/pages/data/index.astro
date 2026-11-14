@@ -5,6 +5,7 @@
 import Base from "../../layouts/Base.astro";
 import Provenance from "../../components/Provenance.astro";
 import LabEntry from "../../components/LabEntry.astro"; // the Laboratory (L1): renders nothing unless WEB_LAB=1
+import { labEnabled } from "../../lib/lab.js";
 import { headline, weeklyBars } from "../../lib/chart.js";
 import { dayInWords, num } from "../../lib/format.js";
 import { loadAll, loadJourney, loadPairs, loadSeries } from "../../lib/snapshot.js";
@@ -14,6 +15,8 @@ const all = await loadAll();
 const series = await loadSeries();
 const pairs = await loadPairs();
 const metrics = [...all.byType.metric].sort((a, b) => (a.series_url && !b.series_url ? -1 : !a.series_url && b.series_url ? 1 : a.label < b.label ? -1 : 1));
+const served = metrics.filter((m) => series[m.id]);
+const namedOnly = metrics.filter((m) => !series[m.id]);
 const insights = [...all.byType.insight].sort((a, b) => (a.date < b.date ? 1 : -1));
 const experiments = all.byType.experiment;
 const withSeries = metrics.filter((m) => series[m.id]);
@@ -48,7 +51,7 @@ function bars(days: any[]) {
 }
 ---
 
-<Base title="The data room" top="data" description="One dimension at a time: one series, one source, one method.">
+<Base title="The data room" top="data" description="Every public measurement behind the experiment — weight, sleep, recovery, food, movement — each with its source, and what is not measured.">
   <section class="section" style="padding-bottom:20px">
     <div class="wrap between" style="align-items:flex-end">
       <div style="max-width:760px">
@@ -102,10 +105,15 @@ function bars(days: any[]) {
   {/* the Laboratory entry (L1) sits flush against the next tag: with WEB_LAB off the page's bytes are unchanged */}<LabEntry /><section class="wrap" style="padding-bottom:40px">
     <div class="tiles" style="grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr))">
       {
-        metrics.map((m) => {
+        served.map((m) => {
           const s = series[m.id];
           const h = s ? headline(s.days) : null;
           const spark = s ? bars(s.days) : null;
+          // 2026-11-14: a behavioral series' newest day is often partial ("13 Nov, so far" read 80 kcal and 15 g of
+          // protein at breakfast), and the tile set it as the headline. The headline is the last FULL day; the partial
+          // day stays in the caption, labelled.
+          const partial = Boolean(s && h && h.last != null && s.behavioral && h.lastDate === s.window.to);
+          const full = partial ? [...s.days].reverse().find((d: any) => d.date < h.lastDate && d.value != null && !d.gap) : null;
           return (
             <a class="tile" href={href(pathOf("metric", m.id))}>
               <span class="label">
@@ -114,7 +122,7 @@ function bars(days: any[]) {
               </span>
               {h && h.last != null ? (
                 <span class="v num" style="font-size:30px">
-                  {num(h.last, m.decimals)} <small>{m.unit}</small>
+                  {num(full ? full.value : h.last, m.decimals)} <small>{m.unit}</small>
                 </span>
               ) : (
                 <span class="v num muted" style="font-size:22px">
@@ -124,7 +132,9 @@ function bars(days: any[]) {
               {spark && <span class="spark" set:html={spark} />}
               <span class="muted" style="font-size:13px;line-height:1.4">
                 {h && h.last != null
-                  ? `${dayInWords(h.lastDate, { short: true })}${s.behavioral && h.lastDate === s.window.to ? ", so far" : ""} · ${h.n} of ${s.days.length} days · eight weekly means`
+                  ? full
+                    ? `${dayInWords(full.date, { short: true })}, the last full day · ${dayInWords(h.lastDate, { short: true })} so far: ${num(h.last, m.decimals)} · ${h.n} of ${s.days.length} days · eight weekly means`
+                    : `${dayInWords(h.lastDate, { short: true })}${partial ? ", so far" : ""} · ${h.n} of ${s.days.length} days · eight weekly means`
                   : m.absent_text || "No series yet."}
               </span>
               <Provenance object={m} />
@@ -133,8 +143,27 @@ function bars(days: any[]) {
         })
       }
     </div>
+    {/* 2026-11-14: a metric a coach's call names but no public series backs read as a full tile of dashes; it is a
+        footnote now, each still linked to its page. */}
+    {
+      namedOnly.length > 0 && (
+        <p class="muted" style="font-size:13px;margin-top:12px" data-named-only>
+          Named in a coach's call, with no public series behind it:{" "}
+          {namedOnly.map((m, i) => (
+            <>
+              {i > 0 && ", "}
+              <a href={href(pathOf("metric", m.id))}>{m.label}</a>
+            </>
+          ))}
+          .
+        </p>
+      )
+    }
   </section>
-  <section class="wrap" style="padding-bottom:56px">
+  {/* 2026-11-14: with the Laboratory on, two empty boxes here ("Insights · 0", "Experiments · 0 — None running.") sat
+      under the Lab's own line (6 tests being checked, 2 ready) and read as a contradiction. They render only when they
+      carry something, or when there is no Lab to say it. */}
+  {(insights.length > 0 || experiments.length > 0 || !labEnabled()) && <section class="wrap" style="padding-bottom:56px">
     <div class="grid cols2" style="gap:48px;align-items:start">
       <div>
         <p class="label" style="margin-bottom:8px">Insights · {insights.length}</p>
@@ -180,5 +209,5 @@ function bars(days: any[]) {
         }
       </div>
     </div>
-  </section>
+  </section>}
 </Base>

@@ -41,3 +41,19 @@ def test_a_feed_summary_cut_mid_word_ends_on_its_last_sentence():
     assert whole_sentence_summary("The flag is lit. Webb has been wrong every time until n") == "The flag is lit."
     assert whole_sentence_summary("Day 1 is tomorrow. Eight calls \\\\ \\\\ — on record.") == "Day 1 is tomorrow. Eight calls — on record."
     assert whole_sentence_summary("No ending punctuation at all") == "No ending punctuation at all"
+
+
+def test_versus_guess_carries_each_kind_as_served_and_never_adds_them():
+    from publish_snapshot_chapters import versus_guess
+
+    comp = {
+        "records": {
+            "number": {"scored": 24, "coach_right_on_scored": 13, "rule_right": 9, "verdict": "no_clear_difference"},
+            "direction": {"scored": 6, "coach_right_on_scored": 0, "rule_right": 6, "verdict": "too_few"},
+            "yes_no": {"scored": 0, "coach_right_on_scored": 0, "rule_right": 0, "verdict": "none_scored"},
+        }
+    }
+    out = versus_guess(comp)
+    assert [k["kind"] for k in out["kinds"]] == ["number", "direction"]  # a kind with nothing scored is left out
+    assert out["kinds"][0] == {"kind": "number", "scored": 24, "coach_right": 13, "rule_right": 9, "verdict": "no_clear_difference"}
+    assert versus_guess(None) is None and versus_guess({"records": {}}) is None

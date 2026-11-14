@@ -8,9 +8,12 @@ import Base from "../layouts/Base.astro";
 import Provenance from "../components/Provenance.astro";
 import StatusTag from "../components/StatusTag.astro";
 import VersusGuess from "../components/VersusGuess.astro";
+import OpenQuestions from "../components/OpenQuestions.astro";
 import { headline, weeklyBars } from "../lib/chart.js";
-import { dayInWords, domainWords, num, kOfN, clip } from "../lib/format.js";
-import { connectedTo, loadAll, loadSeries, latestEdition, dayLine } from "../lib/snapshot.js";
+import { dayInWords, domainWords, num, kOfN, clip, heldCallWords } from "../lib/format.js";
+import { connectedTo, loadAll, loadSeries, latestEdition, dayLine, loadCalibration } from "../lib/snapshot.js";
+import { verifiedLead } from "../lib/calibration.js";
+import { roomPublic } from "../lib/room.js";
 import { href, pathOf } from "../lib/url.js";
 
 const all = await loadAll();
@@ -25,6 +28,22 @@ const week = ok("week");
 const portrait = ok("portrait") || {};
 const lines: any[] = (ok("coach_lines")?.lines || []).slice(0, 3);
 const startDate: string | null = today?.start_date || edition?.start_date || null;
+// "So far", in one line above the fold (2026-11-14): on a phone the first screen carried the premise and no progress.
+// Day, pounds, chapters, the coaches against a guess — each carried from the edition / the room's verified lead.
+let soFarLead: ReturnType<typeof verifiedLead> = null;
+if (roomPublic()) {
+  try {
+    const f: any = await loadCalibration();
+    soFarLead = f?.state === "ok" ? verifiedLead(f.calibration || {}) : null;
+  } catch {
+    soFarLead = null;
+  }
+}
+const COACH_VS_GUESS: Record<string, string> = {
+  no_clear_difference: "the coaches no better than a simple guess yet",
+  rule_better: "a simple guess ahead of the coaches",
+  coach_better: "the coaches ahead of a simple guess",
+};
 
 const chapters = [...all.byType.chapter].sort((a, b) => (a.date < b.date ? 1 : -1));
 const published = chapters.filter((c) => c.status === "published");
@@ -37,6 +56,15 @@ const withAudio = published.filter((c) => c.episode_id && all.get("episode", c.e
 const nextChapterNo = String((latestChapter?.week ?? 0) + 1).padStart(2, "0");
 const inChapterAll = latestChapter ? await connectedTo("chapter", latestChapter.id, { cap: 6 }) : null;
 const inChapter = inChapterAll ? { ...inChapterAll, items: inChapterAll.items.filter((e) => e.type !== "edition").slice(0, 4) } : null;
+// The latest chapter's week in two lines (2026-11-14): its graded calls and its days, both on the chapter page.
+const chWeekCalls =
+  latestChapter?.week_start && latestChapter?.week_end
+    ? all.byType.prediction.filter(
+        (p) => (p.status === "confirmed" || p.status === "refuted") && p.settled_date && p.settled_date.slice(0, 10) >= latestChapter.week_start && p.settled_date.slice(0, 10) <= latestChapter.week_end,
+      )
+    : [];
+const chWeekRight = chWeekCalls.filter((p) => p.status === "confirmed").length;
+const chWeekDays = latestChapter ? all.byType.day.filter((d) => d.chapter_id === latestChapter.id).length : 0;
 const pending = all.byType.prediction
   .filter((p) => p.status === "pending")
   .sort((a, b) => ((a.due_date || "9999") < (b.due_date || "9999") ? -1 : 1))
@@ -45,6 +73,14 @@ const openDisagreements = all.byType.disagreement.filter((d) => d.status === "op
 const coachById = (id: string) => all.get("coach", id) || all.get("coach", `${id}_coach`);
 const status = edition ? [dayLine(edition), dayInWords(edition.as_of)].filter(Boolean).join(" · ") : null;
 const weekOrder: string[] = week?.order || [];
+// "Since your last visit" (islands/since.js): the dated events this page already publishes, as day numbers (no ISO
+// date reaches the HTML); the browser remembers only the last edition day it saw.
+const dayNo = (iso: string | null | undefined) => (iso && /^\d{4}-\d{2}-\d{2}/.test(iso) ? Math.round(Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) / 864e5) : null);
+const sinceEvents = [
+  ...published.map((c) => ({ d: dayNo(c.date), k: "chapter", t: c.title, u: href(pathOf("chapter", c.id)) })),
+  ...all.byType.prediction.filter((p) => p.status === "confirmed" || p.status === "refuted").map((p) => ({ d: dayNo(p.settled_date), k: p.status })),
+].filter((e) => e.d != null);
+const sinceAsOf = dayNo(edition?.as_of);
 const weekLabel: Record<string, string> = { weight: "Weight", training: "Training", sleep: "Sleep", food: "Food" };
 
 // The week a chapter covers: its explicit interval from the snapshot (/api/chapters), never re-derived here.
@@ -151,6 +187,16 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
           body, a team of AI coaches, one honest journal, and a question I can't answer yet — whether getting healthier and getting happier are the
           same thing. The weight is the catalyst. It isn't the point.
         </p>
+        <p class="sofar mono" data-so-far>
+          {[
+            edition?.day_n != null ? `Day ${edition.day_n}` : null,
+            today?.change_lbs != null ? `${num(Math.abs(today.change_lbs), 1)} lb ${today.change_lbs <= 0 ? "down" : "up"}` : null,
+            published.length ? `${published.length} ${published.length === 1 ? "chapter" : "chapters"}` : null,
+            soFarLead?.sign?.verdict && COACH_VS_GUESS[soFarLead.sign.verdict] ? COACH_VS_GUESS[soFarLead.sign.verdict] : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
         <div class="row">
           {firstChapter && <a class="btn" href={href(pathOf("chapter", firstChapter.id))}>Start with chapter one</a>}
           {latestChapter && <a class="btn ghost" href="#week">Latest published chapter ↓</a>}
@@ -162,7 +208,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
       <figure class="portrait">
         <figcaption class="between">
           <span class="label">Fig. 1 — The portrait{edition?.day_n != null && `, day ${edition.day_n}`} · eight weekly means</span>
-          <span class="verified" style="font-size:11px">Verified where filled{edition && ` · ${dayInWords(edition.as_of, { short: true })}`}</span>
+          <span class="verified" style="font-size:11px">{edition ? `As of ${dayInWords(edition.as_of, { short: true })}` : "From the platform"} · blank where nothing is measured in public</span>
         </figcaption>
         <div class="tiles portrait-tiles">
           {
@@ -237,9 +283,22 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
                   </a>
                 ))
               ) : (
-                <span>
-                  <span class="muted">Its figures, in the data room.</span>
-                </span>
+                <>
+                  {chWeekDays > 0 && (
+                    <a href={`${href(pathOf("chapter", latestChapter.id))}#days`}>
+                      <span style="font-size:14px;line-height:1.35">The week, day by day</span>
+                      <span class="mono muted" style="font-size:11px">{chWeekDays} days</span>
+                    </a>
+                  )}
+                  <a href={href(pathOf("chapter", latestChapter.id))}>
+                    <span style="font-size:14px;line-height:1.35">
+                      {chWeekCalls.length
+                        ? `${chWeekCalls.length} coach ${chWeekCalls.length === 1 ? "call" : "calls"} graded that week`
+                        : "No coach call graded that week"}
+                    </span>
+                    {chWeekCalls.length > 0 && <span class="mono muted" style="font-size:11px">{chWeekRight} right · {chWeekCalls.length - chWeekRight} wrong</span>}
+                  </a>
+                </>
               )}
               {next?.chapter?.state === "ok" && next.chapter.data?.date && (
                 <span style="flex-direction:column;align-items:flex-start;gap:3px">
@@ -260,13 +319,23 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
     )
   }
 
+  <OpenQuestions measured={measured} foodText={week?.measures?.food?.state === "ok" ? week.measures.food.data?.text : null} />
+
   <section class="section hair">
     <div class="wrap">
       <div class="between" style="margin-bottom:24px">
         <h2>What's alive right now</h2>
         <span class="label">A reason to come back · rebuilt every morning</span>
       </div>
-      <div class="grid cols3">
+      {
+        sinceAsOf != null && (
+          <p class="since" data-since hidden data-asof={String(sinceAsOf)} data-events={JSON.stringify(sinceEvents)}>
+            <span data-since-text />
+            <a data-since-link hidden href={href("/story/")}>Read it →</a>
+          </p>
+        )
+      }
+      <div class={`grid ${openDisagreements.length > 0 ? "cols3" : "cols2"}`}>
         <div>
           <p class="label" style="margin-bottom:10px">The last seven days</p>
           {
@@ -304,7 +373,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
                 {pending.map((p) => (
                   <a href={href(pathOf("prediction", p.id))}>
                     <span style="font-size:14px;line-height:1.35">
-                      <b>{p.coach_name}</b> · {p.claim_withheld && p.grading?.how ? <>the test: {clip(p.grading.how.replace(/\b1 days\b/, "1 day"), 80)}</> : clip(p.claim, 88)}
+                      <b>{p.coach_name}</b> · {(p.claim_withheld && heldCallWords(p, 80)) || clip(p.claim, 88)}
                     </span>
                     <StatusTag status="pending" date={p.due_date} call />
                   </a>
@@ -318,33 +387,24 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
           }
           <a href={href("/system/ledger/")} style="display:inline-block;margin-top:12px;font-size:13px;font-weight:700">All calls →</a>
         </div>
-        <div>
-          <p class="label" style="margin-bottom:10px">On the table</p>
-          <div class="rows">
-            {openDisagreements.slice(0, 2).map((d) => (
-              <a href={href(pathOf("disagreement", d.id))}>
-                <span style="font-size:14px;line-height:1.35">
-                  <b>Two coaches disagree</b> · {clip(d.topic, 70)}
-                </span>
-                <span class="status open">open</span>
-              </a>
-            ))}
-            {next?.chapter?.state === "ok" && next.chapter.data?.date && (
-              <span>
-                <span style="font-size:14px">
-                  <b>Chapter {nextChapterNo}</b> · {dayInWords(next.chapter.data.date, { weekday: true, short: true })}
-                </span>
-                <span class="mono muted" style="font-size:12px">{next.chapter.data.drafted_not_promised ? "drafted, not promised" : "due"}</span>
-              </span>
-            )}
-            {!openDisagreements.length && !(next?.chapter?.state === "ok") && (
-              <span>
-                <span class="muted">Nothing on the table today.</span>
-              </span>
-            )}
+        {/* "On the table" (2026-11-14): only when two coaches openly disagree. It used to repeat the next chapter's draft
+            date — already in the chapter's rail and the closing line — and otherwise said "Nothing on the table today." */}
+        {openDisagreements.length > 0 && (
+          <div>
+            <p class="label" style="margin-bottom:10px">On the table</p>
+            <div class="rows">
+              {openDisagreements.slice(0, 2).map((d) => (
+                <a href={href(pathOf("disagreement", d.id))}>
+                  <span style="font-size:14px;line-height:1.35">
+                    <b>Two coaches disagree</b> · {clip(d.topic, 70)}
+                  </span>
+                  <span class="status open">open</span>
+                </a>
+              ))}
+            </div>
+            <a href={href("/system/")} style="display:inline-block;margin-top:12px;font-size:13px;font-weight:700">How the coaches work →</a>
           </div>
-          <a href={href("/system/")} style="display:inline-block;margin-top:12px;font-size:13px;font-weight:700">How the coaches work →</a>
-        </div>
+        )}
       </div>
     </div>
   </section>
@@ -407,11 +467,11 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
         </a>
         <a class="door" href={href("/data/")}>
           <span class="between mono muted" style="font-size:12px"><span class="cobalt">02</span><span>Explore · an hour, if you like</span></span>
-          <span><span class="t">The data</span><p class="serif muted" style="font-size:17px;margin-top:10px">Six dimensions, {all.byType.source.length} live sources, every method on show. Compare anything with anything, and see what the platform found when it did.</p></span>
+          <span><span class="t">The data</span><p class="serif muted" style="font-size:17px;margin-top:10px">Six dimensions, {all.byType.source.filter((x) => x.status === "live").length} live sources, every method on show. Compare anything with anything, and see what the platform found when it did.</p></span>
         </a>
         <a class="door" href={href("/system/")}>
           <span class="between mono muted" style="font-size:12px"><span class="cobalt">03</span><span>Inspect · as deep as you want</span></span>
-          <span><span class="t">The system</span><p class="serif muted" style="font-size:17px;margin-top:10px">The AI coaches, {all.byType.prediction.length} dated predictions, every grade public — beside what a simple guess would have scored.</p></span>
+          <span><span class="t">The system</span><p class="serif muted" style="font-size:17px;margin-top:10px">The AI coaches, {all.byType.prediction.filter((p) => p.status !== "observation").length} dated forecasts, every grade public — beside what a simple guess would have scored.</p></span>
         </a>
       </div>
     </div>
@@ -430,3 +490,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
     </div>
   </section>
 </Base>
+
+<script>
+  import "../islands/since.js";
+</script>

@@ -60,6 +60,8 @@ from publish_snapshot_chapters import (
     CALL_OUTCOME,
     apply_week_intervals,
     chapter_summary,
+    quality_counts as _quality_counts,
+    versus_guess,
     week_id as _week_id,  # None for a withdrawn installment: never a chapter (owner ruling 2026-11-10)
     whole_sentence_summary,
 )  # noqa: E402 — one vocabulary for weeks, excerpts and calls
@@ -363,7 +365,7 @@ def _live_week_states(ctx: LiveContext) -> None:
             "pending": "No chapter yet for this week.",
         }[status]
         if st.get("reason"):
-            text = str(st["reason"])
+            text = str(st["reason"])[:1].upper() + str(st["reason"])[1:].rstrip(".") + "."  # a sentence, like its siblings
         ctx.objs["chapter"].append(
             envelope(
                 id=f"program-week-{n:02d}",
@@ -440,14 +442,6 @@ def _live_chapters(ctx: LiveContext) -> None:
             e["chapter_id"] = ctx.chapter_by_week[e["number"]]
 
 
-def _quality_counts(q: Any) -> dict | None:
-    """The grader's per-coach quality counts (#5533), as served: clean + flagged + unassessed == n."""
-    if not isinstance(q, dict) or not all(isinstance(q.get(k), int) for k in ("clean", "flagged", "unassessed", "n")):
-        return None
-    by_flag = {str(k): int(v) for k, v in (q.get("by_flag") or {}).items() if isinstance(v, int)}
-    return {"clean": q["clean"], "flagged": q["flagged"], "unassessed": q["unassessed"], "n": q["n"], "by_flag": by_flag}
-
-
 def _live_coaches(ctx: LiveContext) -> None:
     by_coach = (ctx.fetched.get("predictions") or {}).get("by_coach") or {}
     for c in ctx.rows("coaches", "coaches"):
@@ -474,6 +468,7 @@ def _live_coaches(ctx: LiveContext) -> None:
                 short_bio=c.get("short_bio"),
                 record=record,
                 comparison_text=comp if isinstance(comp, str) and comp else None,
+                versus_guess=versus_guess(bc.get("comparison")),
                 quality=_quality_counts(bc.get("quality")),
                 instrument_absent={"absent": bool(c.get("absent")), "reason": c.get("reason")} if c.get("absent") else None,
             )
@@ -552,6 +547,7 @@ def _retired_coach(ctx: LiveContext, pid: str, short: str, name: str) -> None:
             short_bio="A retired seat: off the active roster, its calls kept under its own byline.",
             record={"right": bc.get("confirmed"), "n": int(decided), "through": rec.get("through")} if isinstance(decided, int) else None,
             comparison_text=None,
+            versus_guess=None,
             quality=_quality_counts(bc.get("quality")),
             instrument_absent=None,
         )

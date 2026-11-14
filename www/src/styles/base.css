@@ -1729,3 +1729,87 @@ span.gloss[data-quote-gloss] {
 .sets-table td.sets .set {
   white-space: nowrap;
 }
+
+/* The front page's one-line "so far" (2026-11-14): progress above the fold on a phone. */
+.sofar {
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--rule);
+  padding: 9px 0;
+  color: var(--ink);
+}
+/* A phone reads facts two to a row (2026-11-14): one per row stacked the ledger's six counts ~650px deep before the
+   first record. Hairlines follow the 2-column grid. */
+@media (max-width: 560px) {
+  .facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .facts > div {
+    border-right: 0;
+    border-bottom: 1px solid var(--rule);
+    min-width: 0;
+  }
+  .facts > div:nth-child(odd) {
+    border-right: 1px solid var(--rule);
+  }
+  .facts > div:nth-child(odd):last-child {
+    grid-column: 1 / -1;
+    border-right: 0;
+  }
+  .facts .v {
+    overflow-wrap: anywhere;
+  }
+}
+
+/* "Since your last visit" (islands/since.js): one quiet line, shown only to a returning browser. */
+.since {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  align-items: baseline;
+  margin: -8px 0 22px;
+  padding: 10px 14px;
+  border-left: 3px solid var(--cobalt);
+  background: var(--rule2);
+  font-size: 15px;
+  line-height: 1.45;
+}
+.since[hidden] {
+  display: none;
+}
+.since a {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+/* A row of counts (the Laboratory's five): two to a row on a phone, not five stacked (2026-11-14). */
+.tiles.counts {
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+}
+@media (max-width: 560px) {
+  .tiles.counts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .tiles.counts > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+
+/* The three doors on a phone (2026-11-14): the masthead's tab bar already carries them, so here they are a compact
+   recap — the front page stays inside its phone-length budget with the open questions above. */
+@media (max-width: 560px) {
+  .door {
+    min-height: 0;
+    padding: 16px 18px;
+    gap: 8px;
+  }
+  .door .t {
+    font-size: 26px;
+  }
+  .door p {
+    font-size: 15px !important;
+    margin-top: 6px !important;
+  }
+}
