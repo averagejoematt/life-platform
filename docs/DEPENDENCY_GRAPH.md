@@ -186,7 +186,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `health_check` | pipeline_health_check_lambda.py | site_api_status.py |
 | `hevy` | hevy_common.py | ai_expert_analyzer_lambda.py, authoring_input_age.py, cardio_hr_store.py, coach_packet_today.py, daily_metrics_compute_lambda.py, field_notes_lambda.py, labelled_facts.py, plan_draft_evidence.py, plan_hevy_windows.py, recap_data.py, site_api_autonomic.py, site_api_nutrition.py, site_api_pulse.py, site_api_training.py, tools_advice_queue.py, tools_coach_packet.py, tools_correlation.py, tools_health.py, tools_nutrition.py, tools_plan.py, tools_strength.py, tools_training.py, tools_training_notes.py, training_notes.py, vacation_fund.py |
 | `hevy_id_map` | routine_repo.py | routine_repo.py |
-| `hypotheses` | hypothesis_engine_lambda.py | challenge_generator_lambda.py, hypothesis_engine_lambda.py, state_of_matthew_lambda.py, tools_lifestyle.py |
+| `hypotheses` | hypothesis_engine_lambda.py | challenge_generator_lambda.py, state_of_matthew_lambda.py, tools_lifestyle.py |
 | `ingest_liveness` | pipeline_health_check_lambda.py | — |
 | `insights` | insight_email_parser_lambda.py, tools_lifestyle.py | site_api_ledger.py, tools_lifestyle.py |
 | `intelligence_quality` | — | site_api_foresight.py, tools_data.py |
@@ -286,7 +286,7 @@ traced through the stack, the factory body under that call's own arguments, or t
 helper the alarm variable is handed to. `via-composite` = the member routes nowhere
 itself; its composite does. `unresolved` is stated, never guessed.
 
-Routing: digest 106 · digest+paging 2 · digest+urgent 10 · paging 2 · urgent 27 · via-composite 3 — of 150 alarms (4 composite)
+Routing: digest 107 · digest+paging 2 · digest+urgent 10 · paging 2 · urgent 27 · via-composite 3 — of 151 alarms (4 composite)
 
 | Alarm | Stack | Kind | Routing | Via | Audience |
 |-------|-------|------|---------|-----|----------|
@@ -408,6 +408,7 @@ Routing: digest 106 · digest+paging 2 · digest+urgent 10 · paging 2 · urgent
 | `permanence-errors` | operational_stack | metric | digest | constructor:create_platform_lambda |  |
 | `permanence-heartbeat` | operational_stack | metric | digest | declaration |  |
 | `prediction-gradable-share-low` | monitoring_prediction_alarms | metric | digest | declaration |  |
+| `prereg-overdue` | monitoring_prediction_alarms | metric | digest | declaration |  |
 | `progress-viewer-errors` | web_stack | metric | urgent | helper:add_web_alarms |  |
 | `qa-paused-by-budget` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `qa-smoke-failures` | monitoring_stack | metric | digest | factory:_alarm |  |
@@ -593,7 +594,7 @@ Field-level rulings (only non-default fields are declared):
 
 - Edge sites: 1391 total · 996 resolved · 395 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 80 resolved · 0 dynamic of 80 scheduled lambdas (107 lambdas total)
-- Alarms: 150 literal-named declarations across three idioms, 4 composite; routing digest 106 · digest+paging 2 · digest+urgent 10 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
+- Alarms: 151 literal-named declarations across three idioms, 4 composite; routing digest 107 · digest+paging 2 · digest+urgent 10 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 25 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only
 - Schedules: 97 (lambda, cron) rows; UTC clock on fixed rows, zone + wall-clock if zoned (#4284)
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
@@ -610,7 +611,7 @@ baseline in the same diff, so a new cost-bearing surface cannot appear silently.
 | Surface | Count | Registry |
 |---------|-------|----------|
 | ai_features | 30 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
-| alarms | 150 | this model's alarms plane (CDK AST) |
+| alarms | 151 | this model's alarms plane (CDK AST) |
 | emf_namespaces | 34 | `deploy/emf_namespace_ledger.py::LEDGER` |
 | schedules | 97 | this model's schedules plane (CDK AST) |
 | secrets | 30 | `tests/test_secret_references.py::KNOWN_SECRETS` |

@@ -738,6 +738,12 @@
       "stack": "monitoring_prediction_alarms",
       "via": "declaration"
     },
+    "prereg-overdue": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "monitoring_prediction_alarms",
+      "via": "declaration"
+    },
     "progress-viewer-errors": {
       "kind": "metric",
       "routing": "urgent",
@@ -1118,7 +1124,7 @@
   ],
   "cost_surface": {
     "ai_features": 30,
-    "alarms": 150,
+    "alarms": 151,
     "emf_namespaces": 34,
     "schedules": 97,
     "secrets": 30
@@ -1318,6 +1324,13 @@
       "lambda": "coach-prediction-evaluator",
       "module": "lambdas/coach/coach_prediction_evaluator.py",
       "partition": "habit_scores",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "coach-prediction-evaluator",
+      "module": "lambdas/coach/coach_prediction_evaluator.py",
+      "partition": "hypotheses",
       "via": "pk"
     },
     {
@@ -1962,13 +1975,6 @@
       "lambda": "hypothesis-engine",
       "module": "lambdas/compute/hypothesis_engine_lambda.py",
       "partition": "character_sheet",
-      "via": "pk"
-    },
-    {
-      "direction": "read",
-      "lambda": "hypothesis-engine",
-      "module": "lambdas/compute/hypothesis_engine_lambda.py",
-      "partition": "hypotheses",
       "via": "pk"
     },
     {
@@ -8318,9 +8324,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time UTC cron; a zoned row (#4284) carries tz + local instead"
     },
     "counts": {
-      "alarms": 150,
+      "alarms": 151,
       "alarms_by_routing": {
-        "digest": 106,
+        "digest": 107,
         "digest+paging": 2,
         "digest+urgent": 10,
         "paging": 2,
