@@ -115,21 +115,21 @@ own (`rate_policy`'s `body_fat_tier` is a function input, not a library setting)
 | Setting | Default | Provenance | What it does |
 |---|---|---|---|
 | `session_cap_includes_cardio` | `True` | owner ruling 1 (2026-11-13) | lifting and gym cardio share the 75-minute cap; the conditioning dose takes only the minutes lifting leaves (no strength work is cut for cardio). False: the cap is lifting only and the cardio block sits apart |
-| `press_sets` | `3` | owner ruling 6 (2026-11-13) | overhead-press working sets on the shoulders+arms morning (2-3), taken from the side-delt (lateral raise) sets |
+| `press_sets` | `3` | owner ruling 6 (2026-11-13) | overhead-press working sets a week (2 or 3), taken from the side-delt (lateral raise) sets |
 | `priority_muscles` | `['chest', 'quadriceps']` | owner ruling 9 (2026-11-13) | muscles planned toward the middle of MEV-MAV (never under MEV in a normal week) and trimmed last for time |
 | `abs_direct_sets_per_week` | `4` | owner ruling #8 (fix round 8) | challenging DIRECT ab sets a week, spread over the mornings; indirect trunk loading never counts; halved on a short or high-fatigue week |
-| `hard_conditioning_doses` | `1` | owner follow-up ruling (2026-11-13) | hard conditioning blocks a week (the shoulders+arms morning hosts the first; 2 adds the upper-volume morning) |
+| `hard_conditioning_doses` | `1` | owner follow-up ruling (2026-11-13) | hard conditioning blocks a week (the week's conditioning host takes the first; 2 adds `live_rulings.SECOND_HOST`) |
 | `rate_ceiling_pct_bw` | `1.0` | owner ruling 11 (2026-11-13) | the ADVISORY upper planning reference for weekly loss, % of current bodyweight; never applied to a target |
 | `sequence_rule_from` | `None` | owner ruling #4 (fix round 8) | the first Monday the week rules judge; None = the Monday after the library's approval; earlier history is kept, never re-sequenced |
 
 | Heuristic | Value | Rule | Basis | Re-tuned on |
 |---|---|---|---|---|
 | `history_days` | `56` | progression | a same-role exposure in the last 8 weeks is a load reference; older, the engine's own ramp load stands | block retro: how often a lift returns after >8 weeks |
-| `step_down_exposures` | `3` | progression | a step-down needs three same-role exposures in a row under the previous best e1RM, each with its top set logged ABOVE the target RPE (one set at or under target vetoes it) — so a lift steps down at most once per three exposures | block retro: step-downs that were followed by a new best within 3 weeks (too eager) vs grinding sessions |
+| `step_down_exposures` | `3` | progression | a step-down needs three same-role exposures in a row under the previous best e1RM, each with its top set logged ABOVE the target RPE (one set at or under target vetoes it) — so a lift steps down at most once per `step_down_exposures` | block retro: step-downs that were followed by a new best within 3 weeks (too eager) vs grinding sessions |
 | `step_down_pct` | `5` | progression | one step-down is 5% under the last top load (one implement step on most lifts), never 10%: a 3% e1RM drift is not answered with a 10% intensity cut | block retro: e1RM a month after each step-down |
 | `implausible_rpe` | `9.5` | progression | RPE missing on every set, or >= 9.5 on every set while reps at the load rise, is EFFORT UNKNOWN: the lift progresses on reps and load only and never steps down on effort | block retro: RPE calibration report (rpe_calibration) |
 | `slump_anchors` | `4` | progression | four or more anchors declining together (or, in a deficit, at least half of them) is systemic — sleep, recovery or the deficit, not the lifts: every load HOLDS and accessory volume comes down about a third | block retro: anchor e1RM across the block vs sleep and loss rate |
-| `decline_pct` | `0.02` | progression | an anchor is DECLINING when its same-role e1RM fell 2%+ over its last three exposures with no recovery between (a level under an old best is not a decline: the one-rep-short lifter holds steady) | block retro: slump calls vs the next block's anchor e1RM |
+| `decline_pct` | `0.02` | progression | an anchor is DECLINING when its same-role e1RM fell 2%+ across its latest same-role exposures (newest vs two back) with no recovery between (a level under an old best is not a decline: the one-rep-short lifter holds steady) | block retro: slump calls vs the next block's anchor e1RM |
 | `slump_accessory_cut` | `0.34` | progression | the slump's volume answer: about a third of each accessory's working sets (never under 2); anchors keep theirs | block retro: recovery markers in the weeks after a slump hold |
 | `second_lift_band` | `[7, 8]` | progression | owner ruling 5: squat and deadlift never both maximal in one session; the lift that does not lead runs one band lower, loaded from its own same-role e1RM at that band | block retro: both lifts' e1RM trend under alternation |
 | `familiar_days` | `56` | novelty | a movement pattern logged in the last ~8 weeks is familiar (a biomechanically similar swap included): normal effort, no re-entry cap | block retro: first-exposure RPE vs the cap |

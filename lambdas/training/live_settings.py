@@ -31,7 +31,7 @@ SETTINGS: dict[str, dict[str, Any]] = {
     "press_sets": {
         "default": 3,
         "ruling": "owner ruling 6 (2026-11-13)",
-        "what": "overhead-press working sets on the shoulders+arms morning (2-3), taken from the side-delt (lateral raise) sets",
+        "what": "overhead-press working sets a week (2 or 3), taken from the side-delt (lateral raise) sets",
     },
     "priority_muscles": {
         "default": ["chest", "quadriceps"],
@@ -47,7 +47,7 @@ SETTINGS: dict[str, dict[str, Any]] = {
     "hard_conditioning_doses": {
         "default": 1,
         "ruling": "owner follow-up ruling (2026-11-13)",
-        "what": "hard conditioning blocks a week (the shoulders+arms morning hosts the first; 2 adds the upper-volume morning)",
+        "what": "hard conditioning blocks a week (the week's conditioning host takes the first; 2 adds `live_rulings.SECOND_HOST`)",
     },
     "rate_ceiling_pct_bw": {
         "default": 1.0,
@@ -75,7 +75,7 @@ HEURISTICS: dict[str, dict[str, Any]] = {
         "value": 3,
         "group": "progression",
         "basis": "a step-down needs three same-role exposures in a row under the previous best e1RM, each with its top set logged "
-        "ABOVE the target RPE (one set at or under target vetoes it) — so a lift steps down at most once per three exposures",
+        "ABOVE the target RPE (one set at or under target vetoes it) — so a lift steps down at most once per `step_down_exposures`",
         "retune": "block retro: step-downs that were followed by a new best within 3 weeks (too eager) vs grinding sessions",
     },
     "step_down_pct": {
@@ -102,7 +102,7 @@ HEURISTICS: dict[str, dict[str, Any]] = {
     "decline_pct": {
         "value": 0.02,
         "group": "progression",
-        "basis": "an anchor is DECLINING when its same-role e1RM fell 2%+ over its last three exposures with no recovery between "
+        "basis": "an anchor is DECLINING when its same-role e1RM fell 2%+ across its latest same-role exposures (newest vs two back) with no recovery between "
         "(a level under an old best is not a decline: the one-rep-short lifter holds steady)",
         "retune": "block retro: slump calls vs the next block's anchor e1RM",
     },

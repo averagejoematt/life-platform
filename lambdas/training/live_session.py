@@ -453,7 +453,7 @@ def summary(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any]) ->
     exp = {e.get("movement_key"): e for e in rx.get("exposures") or [] if e.get("movement_key") in here}
     out = [ln for ln in mark.get("lines") or [] if ln.startswith(("short week (live", "adherence dip week (live"))][:1]
     guard = [d for d in mark.get("load_guard") or [] if d["key"] in here]
-    for mode, head in (("up", "heavier"), ("down", "lighter"), ("second", "RPE 7-8 (the second lift)")):
+    for mode, head in (("up", "heavier"), ("down", "lighter"), ("second", "the second lift, one band lower")):
         names = [_title(d["key"], movements) + (f" ({d['why']})" if mode == "down" else "") for d in guard if d["mode"] == mode]
         if names:
             out.append(f"today: {head}: {', '.join(names)}")

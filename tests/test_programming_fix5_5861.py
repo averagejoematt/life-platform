@@ -369,7 +369,12 @@ def test_the_deload_shape_caps_isolation_effort():
     iso = [x for x in _lifts(f["week"]) if _entry(f, x["key"]).get("job") == "isolation" and not str(x["tag"]).endswith(":carry")]
     cap = lp.DELOAD_SHAPE["isolation_rpe"]["value"]
     assert iso and all(_top_rpe(x["hevy_note"]) <= cap for x in iso)
-    with patch.dict(lp.DELOAD_SHAPE, {"isolation_rpe": {**lp.DELOAD_SHAPE["isolation_rpe"], "value": 10}}):  # control (M10)
+    from training import live_settings
+
+    with (
+        patch.dict(lp.DELOAD_SHAPE, {"isolation_rpe": {**lp.DELOAD_SHAPE["isolation_rpe"], "value": 10}}),  # control (M10)
+        patch.dict(live_settings.HEURISTICS["first_back_rpe"], {"value": 10}),  # fix round 9: and the hold day's RPE 8 cap
+    ):
         raw = _week("f_high_fatigue_poor_sleep")
     assert any(_top_rpe(x["hevy_note"]) > cap for x in _lifts(raw["week"]) if _entry(raw, x["key"]).get("job") == "isolation")
 
