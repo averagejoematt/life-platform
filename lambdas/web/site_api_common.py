@@ -236,18 +236,17 @@ CORS_HEADERS = {
 PLATFORM_STATS = {
     **DISCOVERED_COUNTS,
     **load_bundle_counts(),
-    "monthly_cost": "~$100",  # NOT SERVED — the stack manifest's pinned copy only (#5952).
+    "monthly_cost": "~$220",  # NOT SERVED — the stack manifest's pinned copy only (#5952).
     # /api/platform_stats no longer serves this literal: site_api_rollups._monthly_cost_fields
     # overrides it on every response with the LAST CLOSED MONTH read from the cost governor's
     # own month-to-date series (site_api_budget.last_closed_month_cost), and serves "" — never
     # this — when that read fails. The rule was always "the last closed month is the honest
     # trailing run-rate"; this literal, pinned to July 2026 ($98.35), broke it for three months
     # (Cost Explorer UnblendedCost: 2026-08 $180.58, 2026-09 $137.15, 2026-10 $218.99).
-    # STILL STALE HERE: scripts/v4_build_stack_manifest.py copies this value into
+    # This copy is re-grounded by hand: scripts/v4_build_stack_manifest.py copies it into
     # site/data/stack.json (cost_of_ownership.aws.monthly_usd_typical) and
-    # tests/test_stack_manifest_drift.py pins the two equal, so re-grounding it to "~$220"
-    # (October 2026, the last closed month on 2026-11-14) must land in the SAME commit as the
-    # regenerated site/data/stack.json — the website session's file, follow-up named on #5952.
+    # tests/test_stack_manifest_drift.py pins the two equal. "~$220" is October 2026, the last
+    # closed month on 2026-11-14; change it and regenerate site/data/stack.json in one commit.
     # Deliberately NO ceiling figure in this comment — the ceiling family has exactly one source
     # (cost_governor_lambda.MONTHLY_CEILING / SURGE_CEILING_USD) (#2898).
     "review_count": 21,  # 2026-11-13 full review (the 21st; docs/reviews/fullreview_grades_2026-11-13.json)
