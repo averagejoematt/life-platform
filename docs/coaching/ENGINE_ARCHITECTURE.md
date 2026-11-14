@@ -1,7 +1,8 @@
 # The training engine: how a session is chosen, progressed and kept recoverable (#5861)
 
 > **Status:** describes the integrated engine of epic #5861. **Everything new runs only once the owner approves the exercise
-> library** (`config/exercise_library.json` `"status": "approved"`). Until then today's drafts are served unchanged, byte for
+> library** (`config/exercise_library.json` `"status": "approved"` AND a valid `"approved_on"` day — fix round 11, fail-closed:
+> an approved library without its day behaves exactly as proposed). Until then today's drafts are served unchanged, byte for
 > byte (`tests/test_no_live_change_5861_l6.py`, `tests/test_no_live_change_5861_l3.py`).
 > **Current state (fix round 9, consolidation):** eight fix rounds stacked rules on rules; round 9 replaced them with one
 > progression model (`live_load`, §5), one weekly volume plan and one time fit (`live_volume`, §4b) and one settings table
@@ -122,18 +123,21 @@ What the selection cannot see, because it ranks slots:
 - **Pain by joint, one rule** (`live_program.joint_flags` / `apply_joint_rule`, `live_pain`, `live_safety`; fix round 10). A pain
   flag or two discomfort notes on one movement reach every lift that loads the same joint at moderate or more, whatever its
   pattern. Every lift reached HOLDS its load (no step up while a flag stands), runs at RPE <= `PAIN_RULE` pain_rpe with the in-set
-  stop line. Above the mild line (`PAIN_RULE` mild_max), "sharp" or with no number, the flagged lift, its pattern group and any
-  lift loading the joint HIGH are ROUTED: a pain-free same-family member, else a movement for the same muscle, each REVIEWED and
-  LOW on the flagged joint (a defaulted, unreviewed row is never a route — ruling 16); with none the muscle is said to be zero
-  this week by design, and the skipped lift's time goes to reviewed, pain-free work (`live_volume.refill`). Discomfort at or under
+  stop line. Above the mild line (`PAIN_RULE` mild_max) with a STATED score only the provoking lift is ROUTED (fix round 11, the
+  tenth red team: a 4/10 hip flag on the split squat had removed every lower compound); a "sharp" note or one with no number
+  also routes its pattern group and any lift loading the joint HIGH. A route is a pain-free same-family member, else a movement for the
+  same muscle, each REVIEWED and LOW on the flagged joint (a defaulted, unreviewed row is never a route — ruling 16); with none
+  the muscle is said to be zero this week by design. What the gym or the pain rule took goes back through the ONE spend step
+  (`live_volume.spend_session`), from reviewed, low-stress movements only; a morning still under `min_session_minutes` says why. Discomfort at or under
   `PAIN_RULE` lift_only_max changes only that lift. The low back is the `spinal_load` case of the same rule. No symptom warning
   line on any session (owner ruling 10).
 - **Axial stacking, a real limit** (`live_program.avoid_stacking`, `STACK_RULE`): past two spine-loading squat/hinge compounds in
   one session (`live_balance.spine_loading`, the one definition) an accessory is swapped for a member that is not spine-loading,
   else dropped; then a non-heavy anchor — never the session's only squat or only hinge.
 - **The heavy lower day** (owner ruling 5): the deadlift is a top set + one back-off (`live_shape.deadlift_shape`); squat and
-  deadlift are never both maximal — one LEADS at the session's effort, the other runs at RPE 7-8 (`live_rulings.lead_lift`).
-  The lead is chosen by state (a lift that is cut, regressing or pain-capped cannot lead), otherwise it alternates by ISO week.
+  deadlift are never both maximal — the squat always LEADS at the session's effort, the deadlift is capped at `deadlift_rpe`
+  (`live_rulings.lead_lift`; fix round 11: the ISO-week alternation and the lead by state made a ratchet and are gone). On a
+  full-body morning after a spine-loading day, a guest squat/hinge takes a low-spinal-load member (`live_program.axial_yesterday`).
   The squat comes before the hinge whenever both are in one session (`live_shape.order_lower_volume`).
 - **One graded reducer** (`fatigue_model`, §6): readiness and ACWR are one vote among independent strain signals.
 - **The session set ceiling** (`live_volume.fit_sets`) and **the 75-minute ceiling on the routine as written**, warm-ups
@@ -144,26 +148,28 @@ What the selection cannot see, because it ranks slots:
 **One weekly hard-set plan per muscle** (`week_plan`), computed from the five templates and the mornings declared this week —
 the same for every morning of that week:
 
-- **Targets** (`targets`): a priority muscle (`priority_muscles`, ruling 9) has a floor and aim of MEV and is held at or over the
-  arms and calves (`_priority_parity`, fix round 10: the rival pays from its isolation slots first, never under MEV + half a set;
-  then the priority muscle grows or, on a full week, takes its fill slot); every other muscle a floor of its maintenance volume
+- **Targets** (`targets`): a priority muscle (`priority_muscles`, ruling 9) has a floor of MEV and an aim ABOVE it —
+  `priority_aim_share` of the way to MAV, and on a full week at least one set over the busier arm (`ARMS`); every other muscle a floor of its maintenance volume
   (MV), an aim of MEV on a full week, and a cap of MAV; direct abs `abs_direct_sets_per_week`
-  (ruling #8; halved on a 1-3 morning or high-fatigue week; indirect trunk loading never counts); on a 4-morning week the
+  (ruling #8; halved on a 1-3 morning week; indirect trunk loading never counts); on a 4-morning week the
   shoulders, biceps and triceps are held at MEV (ruling 3). Each delt head is counted apart (ruling #9) with explicit credit by
   library pattern (`set_credit` delt: pressing -> front, overhead pressing -> half a side, rowing -> rear); the side and rear
   heads have their own aims (`delt_heads`).
-- **Sizing**: isolation surplus over the cap gives first (largest slot, never under 2 sets, never a delt head under its aim);
-  a muscle under its aim grows its own isolation slots (never past 3 sets), then — two or more sets short — takes its FILL
-  movement as a 2-set slot on the drafted morning of its half of the body with the least planned time (`_morning_load`; abs and
-  calves anywhere; no split morning past 8 movements). Every template slot is served at the 3-set slot cap at most. The overhead press runs `press_sets` (ruling 6); its extra sets come off the lateral raises.
+- **Sizing — the ONE spend step** (`spend`, fix round 11): isolation surplus over the cap gives first (largest slot, never under
+  2 sets, never a delt head under its aim); then, while a muscle sits under its aim, the one furthest under it (a share of its
+  aim; under its floor first; on a tie the one trained longest ago — `last_trained`, the weekly memory that rotates short weeks)
+  takes a set on the morning of its half of the body with the most free minutes (`plan_minutes` / `free_minutes`, the one time
+  model; the conditioning host keeps `conditioning_reserve_minutes` for non-priority work): its isolation slot grows (never past
+  3 sets), else a 2-set FILL movement joins (reviewed, served by the gym). Time or the owner's weekly set redline short, a muscle
+  OVER its own aim gives the set — never under its aim, never a muscle's last isolation slot of the week. Nothing is cut to make
+  a priority look bigger. Every template slot is served at the 3-set slot cap at most. The overhead press runs `press_sets` (ruling 6); its extra sets come off the lateral raises.
   `press_trade_alternative` reports the rear-delt alternative in numbers (not applied).
 - **No kettlebell hinge slot** (owner rulings #2/#6/#7): the swing stays gated and optional and never fills a hinge slot.
 - **Short weeks** (`SHORT_WEEKS`, owner ruling #5; 1-5 declared mornings): four mornings skip shoulders+arms; one to three are
   FULL-BODY mornings — the host role's anchors plus a partner role's named anchors, 4-6 movements at 2-3 working sets, never a
   1-set anchor, the anchors paired as antagonist / upper-lower sets (`FULL_BODY_PAIRS`) so the work fits the morning. Each
   priority muscle and each major pattern holds maintenance (MV x mornings / `short_week_floor`, at least 2 sets); a priority
-  muscle aims at MEV pro rata. Consecutive short weeks rotate one muscle under target into a slot (`SHORT_ROTATION`, by ISO
-  week; on one morning the direct ab sets take their turn). An adherence dip (5+ of the fortnight's 10 planned sessions missed, `live_sequence.DIP_MISSED`) is one 4-morning
+  muscle aims at MEV pro rata; the rest aim at MV pro rata with no floor, so the few free slots rotate through the weekly memory. An adherence dip (5+ of the fortnight's 10 planned sessions missed, `live_sequence.DIP_MISSED`) is one 4-morning
   week, never two in a row for one gap (ruling 2).
 - **The ONE hard-set counter** (`hard_sets`) over THE one set-credit table (`set_credit`): a working set prescribed at
   `hard_rpe`+ counts, primary 1.0, each secondary (library secondaries plus every other rated muscle) half a set unless `never`
@@ -188,33 +194,37 @@ LEAD STATE (a lead progresses from its own lead days, never from the capped seco
 2. **Down, under the floor** (`below_floor`, fix round 10): the top set under the rep range's floor in the last
    `below_floor_exposures` same-role exposures — down at least `step_down_pct`, and as far as the last exposure says reaches the
    floor with three in reserve (`floor_load`). NOTHING blocks it: a slump, strain, pain or first-back hold stops only a step up.
-   A heavy-lower lead (judged on its own lead days, a week apart) steps down after one lead exposure under the floor.
+   Every lift, the capped deadlift included, needs two exposures under the floor (fix round 11).
 3. **Effort unknown** (`effort_unknown`): no RPE logged, or every logged set at `implausible_rpe`+ — the step up rides on reps
    alone; a load moves down only on reps under the floor, never on effort.
-4. **Systemic slump** (`slump`): `slump_anchors` or more anchors declining together (`decline_pct` over their last three
-   same-role exposures; in a deficit, half of them) — no load steps up and non-priority accessories lose about a third of their
-   sets (`slump_accessory_cut`); a lift under its floor still steps down.
+4. **Systemic slump — the ONE performance signal** (`slump`): `slump_anchors` or more anchors declining together (each read by
+   `fatigue_model.declined`: the latest two same-role exposures both more than 5 % under the median of the earlier ones; in a
+   deficit, half of them) — no load steps up, non-priority accessories lose about a third of their sets (`slump_accessory_cut`),
+   and it is the fatigue model's one `strength` vote (no separate effort-drift vote); a lift under its floor still steps down.
 5. **First session back** (owner ruling #10): `layoff_days`+ with no session — each lift's first session back runs at
-   `first_back_rpe` at its last same-role load, no step; normal progression from its next exposure.
-6. **The second lift** (ruling 5): the heavy-lower lift that does not lead runs at `second_lift_band`, loaded from its own e1RM
-   at that band (a logged 9.5-10 read as 9), never above its last load.
+   `first_back_rpe` at its last same-role load, no step; after `long_layoff_days`+ it starts `long_layoff_pct` under it.
+6. **The capped deadlift** (ruling 5): an ordinary lift of this model — up at the top of its range at or under its cap.
 7. **Novelty, three rules** (`mark_novelty`): a NEW pattern (none logged in `familiar_days`) runs one exposure at
    `new_pattern_rpe`; a FAMILIAR pattern (a biomechanically similar swap included) works at normal effort with no re-entry cap
    (the note composer's OD1 cap and layoff line are dropped for it under live); the layoff rule is rule 5.
+8. **One bounded in-session step** (R3, pending the owner's confirmation; `r3_eligible`, `live_safety.r3_lines`): set 1 at RPE 7
+   or easier on a straight-set lift the load model neither holds for a reason, steps down, caps at 7 nor treats as new -> one
+   load step on the later sets; never down in-session.
 
 Strain, a recommended deload, a slump, a first session back and a joint flag are each a HOLD through the same decision
 (`decide`): they stop a step up, never a step down under the floor. Each lift's note carries ONE reason line, and only where
-it changes what he reads; there is no in-session load step in any note (`live_safety.no_step`: double progression is the one
-progression system). The decision is written onto the floor audit row the commit
+it changes what he reads (a hold for a reason always says it); the engine's in-session load-step lines are dropped
+(`live_safety.no_step`) and only the bounded R3 line returns where rule 8 allows; each lift note fits four phone lines
+(`live_safety.cap_lines`). The decision is written onto the floor audit row the commit
 gate reuses (`live_load`), so a down-step is a recorded, sanctioned reduction. Shadow: untouched.
 
 The engine's **trend** (`fatigue_model.movement_signals`, live only, read by selection and the fatigue model) is judged within
 the latest exposure's session role: progressing (a new best e1RM in 14 days, or a heavier top load), stalled (none over three
-exposures), regressing (the latest two both more than 5 % under the best before them).
+exposures), regressing (`declined`: the latest two both more than 5 % under the median before them).
 ## 6. Fatigue and recovery (`fatigue_model`, live only)
 
 Signals (each with a labelled threshold, all **heuristic**): readiness tier (+ ACWR, one vote), sleep < 6.5 h, hard cardio
-minutes over the conditioning budget, weekly hard sets over MRV, strength regressing, effort drift; discomfort notes; axial
+minutes over the conditioning budget, weekly hard sets over MRV, the ONE performance vote (the systemic slump); discomfort notes; axial
 and hinge stacking; adherence. Walking from steps is counted (L4's `cardio_load(steps_by_day)`, read through the one
 steps-truth resolver) and reported, but is not a strain vote — a high daily step count is this trainee's baseline.
 
@@ -322,7 +332,11 @@ consolidated rules' metrics are the generated table's last column (`live_setting
 
 ## 9. What flipping `status: approved` turns on — the approval checklist
 
-Flipping the status is the owner's act and the only switch. It turns on, at once: accessory slots served from the library by the
+Flipping the status is the owner's act and the only switch — `scripts/approve_exercise_library.py` sets `status: approved` AND
+`approved_on` (the day); live mode needs both (an approved library with no valid day runs exactly as proposed, and
+`exercise_library.validate` / the builder refuse it). The sequence rules start the Monday after `approved_on` (ruling #4); earlier
+weeks are never re-judged. Rolling back: set `status` back to `proposed` (or remove the stamp) — every draft is then the
+shadow draft again, byte for byte. It turns on, at once: accessory slots served from the library by the
 live policy; the session fit (equipment and pain on every exposure, the weekly volume plan, the time fit); the load model; the
 fatigue model's graded reduction in place of the red-day accessory drop; the cron's real readiness, sleep, ACWR, sets and
 steps; the week rule in the nightly sequence from `sequence_rule_from` (ruling #4).
