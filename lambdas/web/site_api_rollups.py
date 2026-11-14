@@ -186,7 +186,7 @@ def tools_baseline(*, _g) -> dict:
 _CLOSED_MONTH_MEMO: dict = {}
 
 
-def _monthly_cost_fields(now=None) -> dict:
+def _monthly_cost_fields(at=None) -> dict:
     """The served running-cost fields, derived from the last closed month (#5952).
 
     `monthly_cost` is the reader string the cost page prints. When the governor's series
@@ -198,8 +198,9 @@ def _monthly_cost_fields(now=None) -> dict:
 
     from web.site_api_budget import _previous_month_bounds, last_closed_month_cost
 
-    now = now or datetime.now(timezone.utc)
-    month = _previous_month_bounds(now)[0].strftime("%Y-%m")
+    # utc-exempt(#2414): the AWS billing month is a UTC calendar month, not the reader's Pacific day.
+    at = at or datetime.now(timezone.utc)
+    month = _previous_month_bounds(at)[0].strftime("%Y-%m")
     got = _CLOSED_MONTH_MEMO.get(month)
     if got is None:
         try:
@@ -207,7 +208,7 @@ def _monthly_cost_fields(now=None) -> dict:
         except Exception as e:  # noqa: BLE001 — display-only
             logger.warning(f"[platform_stats] cloudwatch client unavailable: {e}")
             cw = None
-        got = last_closed_month_cost(cw, now) if cw is not None else None
+        got = last_closed_month_cost(cw, at) if cw is not None else None
         if got is not None:
             _CLOSED_MONTH_MEMO.clear()
             _CLOSED_MONTH_MEMO[month] = got
