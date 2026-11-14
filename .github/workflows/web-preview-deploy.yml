@@ -5,10 +5,7 @@
 #            disallows /next/). Runs on every push to main touching the build, as since #5530.
 #   root     s3://matthew-life-platform/site/           (WEB_BASE=/, sitemap on, self-canonical).
 #            ONLY when www/owned_paths.json carries `live_at_root: true` — the committed cut-over
-#            switch. deploy/www_deploy_target.py resolves the target: a push deploys root once the
-#            switch is on; a `workflow_dispatch` with target=root is REFUSED while it is off, so a
-#            dispatch cannot launch ahead of the repo. Flipping `/` is therefore ONE merge
-#            (scripts/www_cutover_switch.py --live, then a PR); the owner's go is that merge.
+#            switch (deploy/www_deploy_target.py resolves it; a dispatch can't launch ahead of the repo).
 #
 # What makes a root deploy safe (#5534): the site/ deploy excludes every path this build writes
 # (www/owned_paths.json via deploy/www_owned_paths.py, in sync_site_to_s3.sh AND rollback_site.sh),
@@ -40,6 +37,8 @@ on:
       - 'scripts/publish_snapshot.py'
       - 'deploy/www_preview_sync.sh'
       - '.github/workflows/web-preview-deploy.yml'
+  schedule:  # daily rebuild from the live API (2026-11-14): 15:30 UTC, after overnight ingestion; targets like a push
+    - cron: "30 15 * * *"
   workflow_dispatch:
     inputs:
       target:
