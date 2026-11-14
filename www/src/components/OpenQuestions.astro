@@ -149,4 +149,18 @@ const questions = [
       border-left: 0;
     }
   }
+  /* a phone: the same three questions, tighter (the front page has a 7.5-screen budget) */
+  @media (max-width: 560px) {
+    .oq li,
+    .oq li + li {
+      gap: 7px;
+      padding: 14px 0 16px;
+    }
+    .oq h3 {
+      font-size: 20px;
+    }
+    .oq-have {
+      font-size: 16px;
+    }
+  }
 </style>
