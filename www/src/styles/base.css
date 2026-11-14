@@ -1783,3 +1783,16 @@ span.gloss[data-quote-gloss] {
   font-weight: 700;
   font-size: 13px;
 }
+
+/* A row of counts (the Laboratory's five): two to a row on a phone, not five stacked (2026-11-14). */
+.tiles.counts {
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+}
+@media (max-width: 560px) {
+  .tiles.counts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .tiles.counts > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
