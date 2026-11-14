@@ -47,6 +47,7 @@ OWNER_NAMED = {
     "stretch_position": {"nippard"},
     "rotation": {"nippard"},
     "side_rear_delt_band": {"rp_israetel"},
+    "free_weight_compounds": {"dan_john"},  # owner ruling 2026-11-12 on #5857 (board rec 4)
 }
 
 
@@ -196,7 +197,7 @@ def test_a_week_with_no_kettlebell_fails_on_the_date_and_the_same_week_with_one_
     rot = _week(13, date=ON)
     no_kb = wc.evaluate(rot, CATALOG, on=ON, library=None, days=_days(_ir("lower_volume", NO_KB_LOWER_VOLUME)))
     assert no_kb["verdict"] == "fail" and no_kb["blocking"] == ["kettlebell"], no_kb["blocking"]
-    assert any("dan_john: 'carries and kettlebell work weekly'" in x for x in no_kb["lines"]), no_kb["lines"]
+    assert any("dan_john: 'carries and kettlebell work weekly" in x for x in no_kb["lines"]), no_kb["lines"]
     with_kb = wc.evaluate(rot, CATALOG, on=ON, library=None, days=_days(_ir("lower_volume", NO_KB_LOWER_VOLUME + ["kettlebell_swing"])))
     assert with_kb["verdict"] == "pass" and _verdicts(with_kb)["kettlebell"] == "met", with_kb["lines"]
 
@@ -311,7 +312,32 @@ def test_stretch_position_reads_the_library_and_never_blocks():
     none = {"status": "approved", "movements": {"bulgarian_split_squat_dumbbell": {"title": "BSS", "length_bias": "mid"}}}
     assert _verdicts(wc.evaluate(rot, CATALOG, on=BEFORE, library=lengthened))["stretch_position"] == "met"
     missed = wc.evaluate(rot, CATALOG, on=BEFORE, library=none)
-    assert _verdicts(missed)["stretch_position"] == "warn" and missed["verdict"] == "pass", missed["lines"]
+    assert _verdicts(missed)["stretch_position"] == "warn" and "stretch_position" not in missed["blocking"], missed["lines"]
+
+
+def _fw_lib(status: str, *, pull_profile: str = "free_weight") -> dict:
+    """A synthetic library: the week's anchors as free-weight compounds, its machine row as the only pull."""
+    mv = {
+        "barbell_bench_press": {"title": "Bench", "job": "compound", "pattern": "horizontal_press", "resistance_profile": "free_weight"},
+        "squat_barbell": {"title": "Squat", "job": "compound", "pattern": "squat", "resistance_profile": "free_weight"},
+        "deadlift_barbell": {"title": "Deadlift", "job": "compound", "pattern": "hinge", "resistance_profile": "free_weight"},
+        "machine_row": {"title": "Row", "job": "compound", "pattern": "horizontal_pull", "resistance_profile": pull_profile},
+    }
+    targets = {"barbell_bench_press": "chest", "squat_barbell": "quadriceps", "deadlift_barbell": "glutes", "machine_row": "back"}
+    return {"status": status, "movements": {k: e | {"target": {"primary": targets[k]}} for k, e in mv.items()}}
+
+
+def test_free_weight_compound_floor_needs_a_press_pull_squat_and_hinge_and_arms_on_approval():
+    """Owner ruling 2026-11-12 on #5857 (board rec 4): every program week serves a free-weight compound press, pull, squat
+    and hinge; anchors count. It BLOCKS once the library is approved and WARNS before."""
+    rot = _week(7)
+    assert _verdicts(wc.evaluate(rot, CATALOG, on=BEFORE, library=_fw_lib("approved")))["free_weight_compounds"] == "met"
+    # control: the only pull is a machine -> blocks when approved, warns while proposed
+    no_pull = wc.evaluate(rot, CATALOG, on=BEFORE, library=_fw_lib("approved", pull_profile="machine_selectorized"))
+    assert _verdicts(no_pull)["free_weight_compounds"] == "block" and "free_weight_compounds" in no_pull["blocking"]
+    assert "pull" in next(r["detail"] for r in no_pull["rows"] if r["id"] == "free_weight_compounds")
+    proposed = wc.evaluate(rot, CATALOG, on=BEFORE, library=_fw_lib("proposed", pull_profile="machine_selectorized"))
+    assert _verdicts(proposed)["free_weight_compounds"] == "warn" and "free_weight_compounds" not in proposed["blocking"]
 
 
 # ── no week, the stage-1 surface, the commit refusal ──────────────────────────────────────────────────────────────

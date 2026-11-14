@@ -269,7 +269,10 @@ def why_note_for(ir: Any, fallback: str) -> str:
     load rule onto a one-set exercise 1 and "+ easy cardio" onto an intervals-only session)."""
     if block_of(ir):
         return ""
-    return conform_block(fallback, ir) if split(fallback)[0] == fallback.strip() and fallback.strip() else fallback
+    out = conform_block(fallback, ir) if split(fallback)[0] == fallback.strip() and fallback.strip() else fallback
+    from training.live_balance import why_effort
+
+    return why_effort(out, ir)  # #5861 FIX3, live only (the live mark): one effort target on exercise 1 — shadow: `out`
 
 
 def conform_block(block: str, ir: Any) -> str:

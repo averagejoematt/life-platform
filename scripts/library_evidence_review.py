@@ -10,18 +10,20 @@ WHAT IT DOES
   1. Re-verifies every citation already in `config/exercise_library.json` LIVE: the DOI through Crossref
      (`api.crossref.org/works/<doi>`), the PMID through PubMed E-utilities (`esummary`), each record's title, first
      author and year matched, the PMID's DOI cross-checked, a retraction / erratum / comment pubtype flagged. A
-     citation that is gone (`not_found`) or retracted, and that alone backs a tier A/B row, becomes a proposed
-     downgrade of that row to C. A `mismatch` is reported for a `correct_citation`, never auto-downgraded. A
+     citation that is gone (`not_found`) or retracted, and that alone backs a reviewed row (evidence above
+     `none_reviewed`), becomes a proposed downgrade of that row's evidence to `none_reviewed` — its quality tier
+     then falls back to the rubric's (#5857). A `mismatch` is reported for a `correct_citation`, never auto-downgraded. A
      network failure is `unreachable` and changes nothing.
-  2. Reads `--proposals FILE`: the changes the reviewer wants (new citations, corrected citations, tier changes,
+  2. Reads `--proposals FILE`: the changes the reviewer wants (new citations, corrected citations, evidence changes,
      new expansion candidates), authored in the training-review session from the ALLOW-LISTED source set
      `config/evidence_source_allowlist.json` — peer-reviewed trials and meta-analyses by DOI/PMID, and papers
      surfaced by the named evidence-based reviewers listed there. No social media, no blogs, no bare URLs: a
      proposal citing one is rejected with the reason.
   3. Verifies every proposed citation live the same way before it can register. A citation that does not verify
-     is rejected, and so is every tier change and candidate that leaned on it — an unverifiable citation never
-     raises a tier; the row stays C. Tier A/B backing additionally needs a verified PMID, `abstract_read: true` and
-     a study design the allowlist lets back that tier (the library's own rule, curation module docstring).
+     is rejected, and so is every evidence change and candidate that leaned on it — an unverifiable citation never
+     raises evidence; the row stays `none_reviewed`. Evidence backing additionally needs a verified PMID,
+     `abstract_read: true` and a study design the allowlist lets back that confidence (`may_back`); a one-band
+     `adjust` off the rubric tier needs `rct_direct` (#5857). The QUALITY tier is never proposed: the rubric derives it.
   4. `--discover` searches PubMed for trials / meta-analyses published since the last review that mention a
      library target and hypertrophy. That list is READING, never a change: a human reads the abstract and writes a
      proposal. No model is used anywhere in this script, and nothing it finds bypasses step 3.
@@ -51,8 +53,9 @@ PROPOSAL FILE
        "found_via": {"kind": "pubmed"}},                       # or {"kind": "reviewer", "name": "Schoenfeld BJ"}
       {"op": "correct_citation", "citation_id": "<existing id>", "citation": {... the corrected record ...},
        "found_via": {"kind": "crossref"}},
-      {"op": "set_tier", "movement": "<library key>", "target": "<hypertrophy target>", "tier": "B",
-       "citations": ["smith2026_x"], "evidence_quality": "rct_characteristic", "rationale": "...", "abstract_read": true},
+      {"op": "set_evidence", "movement": "<library key>", "target": "<hypertrophy target>",
+       "evidence_confidence": "rct_direct", "citations": ["smith2026_x"], "rationale": "...", "abstract_read": true,
+       "adjust": {"bands": 1, "citation": "smith2026_x", "why": "grew the target more than <compared movement>"}},
       {"op": "add_candidate", "candidate": {<the curation module's _x(...) shape: key, title, template_id or
        template_note, target, family, length_bias, resistance_profile, stability, joint_stress, skill_complexity,
        equipment, hypertrophy?, gates?, curation_note?>}, "citations": ["smith2026_x"], "rationale": "..."}]}
@@ -86,7 +89,10 @@ for _p in (os.path.join(REPO_ROOT, "lambdas"), os.path.join(REPO_ROOT, "deploy")
         sys.path.insert(0, _p)
 
 import exercise_library_reviews as reviews  # noqa: E402
-from training import exercise_library as xl  # noqa: E402
+from training import (
+    exercise_library as xl,  # noqa: E402
+    quality_rubric,  # noqa: E402
+)
 
 ALLOWLIST_REL = os.path.join("config", "evidence_source_allowlist.json")
 LIBRARY_REL = os.path.join("config", "exercise_library.json")
@@ -312,14 +318,14 @@ def verify_citation(claimed: dict[str, Any], http: HttpGet, allow: dict[str, Any
     }
 
 
-def tiers_it_may_back(citation: dict[str, Any], ver: dict[str, Any], allow: dict[str, Any]) -> list[str]:
-    """The tiers a REGISTERED citation may back: none unless the PMID verified and the abstract was read."""
-    req = allow["tier_backing_requires"]
+def confidence_it_may_back(citation: dict[str, Any], ver: dict[str, Any], allow: dict[str, Any]) -> list[str]:
+    """The evidence confidences a REGISTERED citation may back: none unless the PMID verified and the abstract was read."""
+    req = allow["evidence_backing_requires"]
     if ver.get("status") != VERIFIED or not ver.get("pmid_verified"):
         return []
     if req.get("abstract_read") and citation.get("abstract_read") is not True:
         return []
-    return list(allow["designs"].get(citation.get("study_design"), {}).get("may_back_tiers") or [])
+    return list(allow["designs"].get(citation.get("study_design"), {}).get("may_back") or [])
 
 
 def _existing_design(c: dict[str, Any]) -> str:
@@ -360,7 +366,7 @@ def _registered_record(cid: str, c: dict[str, Any], ver: dict[str, Any], found_v
         "evidence_review": review_id,
     }
     if not ver["pmid_verified"]:
-        rec["finding"] = c["finding"] + " (DOI-only record: registered, backs no tier)"
+        rec["finding"] = c["finding"] + " (DOI-only record: registered, backs no evidence)"
     return rec
 
 
@@ -375,16 +381,16 @@ def review(
     """Decide every proposal. Pure over `lib` (never mutated); all network goes through `http`."""
     review_id = str(proposals.get("review_id") or f"evidence-review-{today}")
     reverified = reverified if reverified is not None else {}
-    accepted: dict[str, Any] = {"citations": {}, "tier_changes": [], "candidates": []}
+    accepted: dict[str, Any] = {"citations": {}, "evidence_changes": [], "candidates": []}
     rejected: list[dict[str, Any]] = []
-    backing: dict[str, list[str]] = {}  # citation id -> tiers it may back in THIS review
+    backing: dict[str, list[str]] = {}  # citation id -> evidence confidences it may back in THIS review
     ops = list(proposals.get("proposals") or [])
 
     # existing citations: may back what their design allows if they re-verified with a PMID this run
     for cid, c in lib["citations"].items():
         ver = reverified.get(cid)
         if ver and ver["status"] == VERIFIED and ver["pmid_verified"]:
-            backing[cid] = list(allow["designs"].get(_existing_design(c), {}).get("may_back_tiers") or [])
+            backing[cid] = list(allow["designs"].get(_existing_design(c), {}).get("may_back") or [])
 
     for op in [o for o in ops if o.get("op") in ("add_citation", "correct_citation")]:
         cid = str(op.get("citation_id") or "")
@@ -415,15 +421,15 @@ def review(
             rejected.append({"op": op["op"], "id": cid, "reasons": why})
             continue
         accepted["citations"][cid] = _registered_record(cid, c, ver, fv, review_id, today)
-        backing[cid] = tiers_it_may_back(c, ver, allow)
+        backing[cid] = confidence_it_may_back(c, ver, allow)
 
     registered = set(lib["citations"]) | set(accepted["citations"])
-    for op in [o for o in ops if o.get("op") == "set_tier"]:
-        why = _tier_problems(op, lib, registered, backing)
+    for op in [o for o in ops if o.get("op") == "set_evidence"]:
+        why = _evidence_problems(op, lib, registered, backing)
         if why:
-            rejected.append({"op": "set_tier", "id": f"{op.get('movement')}:{op.get('target')}", "reasons": why})
+            rejected.append({"op": "set_evidence", "id": f"{op.get('movement')}:{op.get('target')}", "reasons": why})
             continue
-        accepted["tier_changes"].append(_tier_change(op, review_id, today))
+        accepted["evidence_changes"].append(_evidence_change(op, review_id, today))
 
     for op in [o for o in ops if o.get("op") == "add_candidate"]:
         x = copy.deepcopy(op.get("candidate") or {})
@@ -434,11 +440,11 @@ def review(
         x["curation_note"] = (x.get("curation_note") + "; " if x.get("curation_note") else "") + (
             f"evidence review {review_id} ({today}): " + str(op.get("rationale") or "") + f" [{', '.join(op['citations'])}]"
         )
-        x["hypertrophy"] = [reviews.hypertrophy_row(_row_with_review_date(r, today)) for r in x.get("hypertrophy") or []]
+        x["hypertrophy"] = [reviews.evidence_row(_row_with_review_date(r, today)) for r in x.get("hypertrophy") or []]
         accepted["candidates"].append(x)
 
     for op in ops:
-        if op.get("op") not in ("add_citation", "correct_citation", "set_tier", "add_candidate"):
+        if op.get("op") not in ("add_citation", "correct_citation", "set_evidence", "add_candidate"):
             rejected.append({"op": str(op.get("op")), "id": None, "reasons": ["unknown op"]})
 
     return {
@@ -451,55 +457,64 @@ def review(
 
 def _row_with_review_date(r: dict[str, Any], today: str) -> dict[str, Any]:
     r = dict(r)
-    r.setdefault("evidence_quality", "none_reviewed" if r.get("tier") == "C" else "rct_characteristic")
-    r["last_reviewed"] = today if r.get("tier") in ("A", "B") or r.get("citations") else "unreviewed"
+    r.setdefault("evidence_confidence", "none_reviewed")
+    r["last_reviewed"] = today if r["evidence_confidence"] != "none_reviewed" or r.get("citations") else "unreviewed"
     return r
 
 
-def _backing_problems(tier: str, cites: list[str], registered: set[str], backing: dict[str, list[str]]) -> list[str]:
+def _backing_problems(confidence: str, cites: list[str], registered: set[str], backing: dict[str, list[str]]) -> list[str]:
     why = [f"citation {c} is not registered (or was rejected in this review)" for c in cites if c not in registered]
-    if tier in ("A", "B") and not why and not any(tier in backing.get(c, []) for c in cites):
+    if confidence != "none_reviewed" and not why and not any(confidence in backing.get(c, []) for c in cites):
         why.append(
-            f"no cited reference may back tier {tier}: it needs a citation that verified live with a PMID this run, "
-            "abstract_read, and a study design the allowlist lets back that tier — the row stays C"
+            f"no cited reference may back evidence {confidence}: it needs a citation that verified live with a PMID this run, "
+            "abstract_read, and a study design the allowlist lets back that confidence — the row stays none_reviewed"
         )
     return why
 
 
-def _tier_problems(op: dict[str, Any], lib: dict[str, Any], registered: set[str], backing: dict[str, list[str]]) -> list[str]:
+def _adjust_problems(op: dict[str, Any], confidence: Any, cites: list[str]) -> list[str]:
+    """A one-band move off the rubric tier (#5857): only a direct trial, only +/-1, citing one of the op's citations."""
+    adj = op.get("adjust")
+    if adj is None:
+        return []
+    row = {"evidence_confidence": confidence, "citations": cites, "evidence_adjustment": adj}
+    return [f"adjust: {w}" for w in quality_rubric.adjustment_problems(row)]
+
+
+def _evidence_problems(op: dict[str, Any], lib: dict[str, Any], registered: set[str], backing: dict[str, list[str]]) -> list[str]:
     why: list[str] = []
     mv = lib["movements"].get(op.get("movement"))
-    tier = op.get("tier")
+    confidence = op.get("evidence_confidence")
     cites = list(op.get("citations") or [])
     if mv is None:
         why.append(f"movement {op.get('movement')!r} is not in the library")
-    if tier not in xl.TIERS:
-        why.append(f"tier {tier!r}")
+    if "tier" in op:
+        why.append("the quality tier is derived by the rubric (#5857), never proposed — propose evidence_confidence / adjust")
+    if confidence not in xl.EVIDENCE_CONFIDENCE:
+        why.append(f"evidence_confidence {confidence!r} not in {xl.EVIDENCE_CONFIDENCE}")
     if not op.get("target"):
         why.append("no target")
     if not cites:
         why.append("every proposed change carries its citation")
     if not op.get("rationale"):
         why.append("no rationale")
-    if tier in ("A", "B") and op.get("abstract_read") is not True:
-        why.append("a tier A/B change needs abstract_read: true")
-    eq = op.get("evidence_quality") or ("none_reviewed" if tier == "C" else None)
-    if eq not in xl.EVIDENCE_QUALITY:
-        why.append(f"evidence_quality {eq!r} not in {xl.EVIDENCE_QUALITY}")
-    return why + _backing_problems(str(tier), cites, registered, backing)
+    if confidence != "none_reviewed" and op.get("abstract_read") is not True:
+        why.append("a reviewed evidence change needs abstract_read: true")
+    return why + _adjust_problems(op, confidence, cites) + _backing_problems(str(confidence), cites, registered, backing)
 
 
-def _tier_change(op: dict[str, Any], review_id: str, today: str) -> dict[str, Any]:
-    tier = op["tier"]
-    return {
+def _evidence_change(op: dict[str, Any], review_id: str, today: str) -> dict[str, Any]:
+    out = {
         "movement": op["movement"],
         "target": op["target"],
-        "tier": tier,
+        "evidence_confidence": op["evidence_confidence"],
         "citations": list(op["citations"]),
-        "evidence_quality": op.get("evidence_quality") or "none_reviewed",
         "last_reviewed": today,
         "note": f"evidence review {review_id}: {op['rationale']}",
     }
+    if op.get("adjust"):
+        out["evidence_adjustment"] = {k: op["adjust"][k] for k in ("bands", "citation", "why")}
+    return out
 
 
 def _candidate_problems(op: dict[str, Any], x: dict[str, Any], lib: dict[str, Any], registered: set[str], backing: dict) -> list[str]:
@@ -520,11 +535,15 @@ def _candidate_problems(op: dict[str, Any], x: dict[str, Any], lib: dict[str, An
         why.append("every proposed change carries its citation")
     if not op.get("rationale"):
         why.append("no rationale")
-    why += [p for p in _backing_problems("C", list(op.get("citations") or []), registered, backing)]
+    why += [p for p in _backing_problems("none_reviewed", list(op.get("citations") or []), registered, backing)]
     for r in x.get("hypertrophy") or []:
-        why += _backing_problems(str(r.get("tier")), list(r.get("citations") or []), registered, backing)
-        if r.get("tier") in ("A", "B") and op.get("abstract_read") is not True:
-            why.append("a tier A/B row needs abstract_read: true")
+        conf = str(r.get("evidence_confidence") or "none_reviewed")
+        if "tier" in r:
+            why.append("a candidate row's quality tier is derived by the rubric (#5857), never proposed")
+        why += _backing_problems(conf, list(r.get("citations") or []), registered, backing)
+        why += _adjust_problems({"adjust": r.get("evidence_adjustment")}, conf, list(r.get("citations") or []))
+        if conf != "none_reviewed" and op.get("abstract_read") is not True:
+            why.append("a reviewed evidence row needs abstract_read: true")
     for k in ("source", "history", "fallbacks", "availability"):
         if k in x:
             why.append(f"`{k}` is derived by the builder, never proposed")
@@ -532,21 +551,22 @@ def _candidate_problems(op: dict[str, Any], x: dict[str, Any], lib: dict[str, An
 
 
 def auto_downgrades(lib: dict[str, Any], reverified: dict[str, dict[str, Any]], review_id: str, today: str) -> list[dict[str, Any]]:
-    """Tier A/B rows whose EVERY citation definitively failed re-verification -> C. A mismatch or an unreachable
-    registry never downgrades (the first is a correction to propose, the second is the network)."""
+    """Reviewed rows whose EVERY citation definitively failed re-verification -> `none_reviewed` (any evidence band
+    dropped; the quality tier falls back to the rubric's). A mismatch or an unreachable registry never downgrades (the
+    first is a correction to propose, the second is the network)."""
     out = []
     for key, e in lib["movements"].items():
         for r in e.get("hypertrophy") or []:
             cites = r.get("citations") or []
-            if r.get("tier") in ("A", "B") and cites and all((reverified.get(c) or {}).get("status") in DEFINITIVE_FAILURES for c in cites):
+            reviewed = r.get("evidence_confidence") not in (None, "none_reviewed")
+            if reviewed and cites and all((reverified.get(c) or {}).get("status") in DEFINITIVE_FAILURES for c in cites):
                 why = "; ".join(f"{c}: {reverified[c]['status']}" for c in cites)
                 out.append(
                     {
                         "movement": key,
                         "target": r["target"],
-                        "tier": "C",
+                        "evidence_confidence": "none_reviewed",
                         "citations": [],
-                        "evidence_quality": "none_reviewed",
                         "last_reviewed": "unreviewed",
                         "note": f"evidence review {review_id} ({today}): downgraded — its citation no longer verifies ({why})",
                     }
@@ -586,10 +606,13 @@ def apply_review(lib: dict[str, Any], decided: dict[str, Any]) -> dict[str, Any]
         gates = list(dict.fromkeys(gates + b.auto_gates(e)))
         e["gates"] = [g for g in gates if g in b.cur.GATES and b.cur.GATES[g].get("applies_to") != "all"]
         e.setdefault("not_for_you_now", None)
+        e["job"], e["pattern"] = b.job_and_pattern(e)  # rubric v2 scores by job (#5857)
+        b.objectives.evaluate_entry(x["key"], e, b.cur.hyp)  # #5861: category + objective inputs the rubrics read
         mv[x["key"]] = e
-    missing = reviews.apply_tier_changes(mv, acc["tier_changes"])
+    missing = reviews.apply_evidence_changes(mv, acc["evidence_changes"])
     if missing:
-        raise ValueError(f"tier change for a movement not in the library: {missing}")
+        raise ValueError(f"evidence change for a movement not in the library: {missing}")
+    reviews.finalize_tiers(mv)  # the quality tier re-derived from the rubric (+ at most one recorded band, #5857)
     if acc["candidates"]:
         last = (out.get("_provenance") or {}).get("history_through") or "1970-01-01"
         used_eq = sorted({x for e in mv.values() for x in e["equipment"]})
@@ -605,15 +628,18 @@ def apply_review(lib: dict[str, Any], decided: dict[str, Any]) -> dict[str, Any]
     prov = out.setdefault("_provenance", {})
     prov["movements"] = len(mv)
     prov["by_source"] = dict(sorted(_count(e["source"] for e in mv.values()).items()))
-    prov["hypertrophy_rows_by_tier"] = dict(sorted(_count(r["tier"] for e in mv.values() for r in e["hypertrophy"]).items()))
-    n = len(acc["citations"]), len(acc["tier_changes"]), len(acc["candidates"])
+    tiers = _count(r["tier"] for e in mv.values() for r in e["hypertrophy"])
+    conf = _count(r["evidence_confidence"] for e in mv.values() for r in e["hypertrophy"])
+    prov["hypertrophy_rows_by_tier"] = {t: tiers.get(t, 0) for t in quality_rubric.QUALITY_TIERS}
+    prov["hypertrophy_rows_by_evidence_confidence"] = {c: conf.get(c, 0) for c in quality_rubric.EVIDENCE_CONFIDENCE}
+    n = len(acc["citations"]), len(acc["evidence_changes"]), len(acc["candidates"])
     out["version"] = _bump_patch(out["version"])
     out["change_log"] = list(out["change_log"]) + [
         {
             "version": out["version"],
             "date": decided["date"],
             "by": f"evidence review {decided['review_id']} (scripts/library_evidence_review.py, #5778; accepted by the owner's merge)",
-            "what": f"{n[0]} citation(s) registered or corrected, {n[1]} tier change(s), {n[2]} new candidate(s); every "
+            "what": f"{n[0]} citation(s) registered or corrected, {n[1]} evidence change(s), {n[2]} new candidate(s); every "
             "citation verified live (Crossref DOI / PubMed PMID) on the review date.",
         }
     ]
@@ -636,14 +662,14 @@ def ledger_record(decided: dict[str, Any]) -> dict[str, Any]:
         "review_id": decided["review_id"],
         "date": decided["date"],
         "citations": acc["citations"],
-        "tier_changes": acc["tier_changes"],
+        "evidence_changes": acc["evidence_changes"],
         "candidates": acc["candidates"],
     }
 
 
 def has_changes(decided: dict[str, Any]) -> bool:
     acc = decided["accepted"]
-    return bool(acc["citations"] or acc["tier_changes"] or acc["candidates"])
+    return bool(acc["citations"] or acc["evidence_changes"] or acc["candidates"])
 
 
 def _dump(obj: Any) -> str:
@@ -734,10 +760,12 @@ def pr_body(decided: dict[str, Any], issue: int, downgrades: list[dict[str, Any]
         f"- `{cid}` — {c['authors'].split(',')[0]} {c['year']}, doi:{c['doi']}, pmid:{c['pmid']} ({c['verified_on']})"
         for cid, c in acc["citations"].items()
     ] or ["- none"]
-    lines += ["", "## Tier changes"]
+    lines += ["", "## Evidence changes (the quality tier is re-derived by the rubric, #5857)"]
     lines += [
-        f"- `{t['movement']}` / {t['target']} -> **{t['tier']}** [{', '.join(t['citations']) or 'no citation'}] — {t['note']}"
-        for t in acc["tier_changes"]
+        f"- `{t['movement']}` / {t['target']} -> **{t['evidence_confidence']}**"
+        + (f" (moves {t['evidence_adjustment']['bands']:+d} band)" if t.get("evidence_adjustment") else "")
+        + f" [{', '.join(t['citations']) or 'no citation'}] — {t['note']}"
+        for t in acc["evidence_changes"]
     ] or ["- none"]
     lines += ["", "## New candidates"]
     lines += [f"- `{x['key']}` — {x['title']}" for x in acc["candidates"]] or ["- none"]
@@ -746,7 +774,10 @@ def pr_body(decided: dict[str, Any], issue: int, downgrades: list[dict[str, Any]
     lines += ["", "## Existing citations re-verified"]
     lines += [f"- `{cid}`: {v['status']}" + (f" — {'; '.join(v['problems'])}" if v["problems"] else "") for cid, v in reverified.items()]
     if downgrades:
-        lines += ["", f"{len(downgrades)} row(s) above were auto-downgraded to C because every citation behind them is gone or retracted."]
+        lines += [
+            "",
+            f"{len(downgrades)} row(s) above were auto-downgraded to none_reviewed because every citation behind them is gone or retracted.",
+        ]
     lines += [
         "",
         "## Post-merge",
@@ -859,8 +890,8 @@ def run(
     reverified = reverify_existing(lib, http, allow)
     decided = review(lib, proposals, allow, http, today, reverified)
     downgrades = auto_downgrades(lib, reverified, decided["review_id"], today)
-    proposed = {(t["movement"], t["target"]) for t in decided["accepted"]["tier_changes"]}
-    decided["accepted"]["tier_changes"] += [d for d in downgrades if (d["movement"], d["target"]) not in proposed]
+    proposed = {(t["movement"], t["target"]) for t in decided["accepted"]["evidence_changes"]}
+    decided["accepted"]["evidence_changes"] += [d for d in downgrades if (d["movement"], d["target"]) not in proposed]
     if args.discover:
         decided["literature_to_read"] = discover(lib, args.since or _last_review_date(ledger), http)
     decided["reverification"] = reverified
@@ -871,7 +902,7 @@ def run(
         out(f"  {c}: {v['status']} — {'; '.join(v['problems'])}")
     acc = decided["accepted"]
     out(
-        f"accepted: {len(acc['citations'])} citation(s), {len(acc['tier_changes'])} tier change(s) "
+        f"accepted: {len(acc['citations'])} citation(s), {len(acc['evidence_changes'])} evidence change(s) "
         f"({len(downgrades)} auto-downgrade), {len(acc['candidates'])} candidate(s); rejected: {len(decided['rejected'])}"
     )
     for r in decided["rejected"]:

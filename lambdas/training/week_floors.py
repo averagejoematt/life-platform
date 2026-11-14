@@ -190,3 +190,43 @@ def lines(check: dict[str, Any]) -> list[str]:
         else f"kettlebell weekly {'BLOCKED' if kb['blocking'] else 'NOT met (warning)'}: {kb['note']}"
     )
     return out
+
+
+# ── free-weight compound floor (owner ruling 2026-11-12 on #5857, board recommendation 4) ─────────────────────────────
+# Every program week serves at least one FREE-WEIGHT COMPOUND for each of press, pull, squat and hinge; anchors count. It
+# reads the exercise library's own `job` / `pattern` / `resistance_profile` (rubric v2), never a second classifier.
+# group -> the audited primary targets a member must train (a rear-delt row is a pull pattern but not the back's pull)
+FREE_WEIGHT_TARGETS: dict[str, tuple[str, ...]] = {
+    "press": ("chest", "front_delts", "triceps"),
+    "pull": ("back",),
+    "squat": ("quadriceps", "glutes", "adductors"),
+    "hinge": ("hamstrings", "glutes"),
+}
+FREE_WEIGHT_GROUPS: dict[str, tuple[str, ...]] = {
+    "press": ("horizontal_press", "vertical_press", "press"),
+    "pull": ("horizontal_pull", "vertical_pull"),
+    "squat": ("squat",),
+    "hinge": ("hinge",),
+}
+
+
+def _library_entry(key: str, lib: dict[str, Any], catalog: dict[str, Any]) -> dict[str, Any] | None:
+    mv = (lib or {}).get("movements") or {}
+    if key in mv:
+        return mv[key]
+    tid = str((catalog.get(key) or {}).get("hevy_template_id_hint") or "").upper()
+    return next((e for e in mv.values() if tid and str(e.get("template_id") or "").upper() == tid), None)
+
+
+def free_weight_compounds(served: list[dict[str, Any]], lib: dict[str, Any] | None, catalog: dict[str, Any]) -> dict[str, list[str]]:
+    """Group -> the week's served free-weight compounds in it (library titles). Pure."""
+    out: dict[str, list[str]] = {g: [] for g in FREE_WEIGHT_GROUPS}
+    for s in served:
+        e = _library_entry(str(s.get("key") or ""), lib or {}, catalog)
+        if not e or e.get("job") != "compound" or e.get("resistance_profile") != "free_weight":
+            continue
+        for group, patterns in FREE_WEIGHT_GROUPS.items():
+            target = str((e.get("target") or {}).get("primary") or "")
+            if e.get("pattern") in patterns and target in FREE_WEIGHT_TARGETS[group] and str(e.get("title")) not in out[group]:
+                out[group].append(str(e.get("title")))
+    return out

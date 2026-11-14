@@ -1,5 +1,5 @@
-"""#5773 — the selection engine: per slot, rank the exercise library by tier, then N=1 fit, then variety; C only with a
-recorded reason; absent equipment never served; pain-excluded never served; a novelty budget; SHADOW while the library is
+"""#5773 — the selection engine: per slot, rank the exercise library by QUALITY tier (S-D, the library's rubric tier,
+#5857), then N=1 fit, then variety, evidence confidence a tie-break; C/D only with a recorded reason; absent equipment never served; pain-excluded never served; a novelty budget; SHADOW while the library is
 `proposed`, LIVE only once it is `approved`; `library_version` on every plan; the pure `selection_critic.evaluate`.
 
 Every must-fail control flips one input and asserts the outcome flips with it. Real library + real catalog, deep-copied
@@ -27,6 +27,7 @@ from training import (
     routine_repo,  # noqa: E402
     selection_critic as critic,  # noqa: E402
     selection_engine as se,  # noqa: E402
+    selection_live,  # noqa: E402
     training_charter as tc,  # noqa: E402
     variant_rotation as vr,  # noqa: E402
 )
@@ -61,6 +62,12 @@ def _cat() -> dict:
     return copy.deepcopy(CAT0)
 
 
+def _cat_before_l6() -> dict:
+    """The catalog without #5861 L6's coach_added library movements (deploy/movement_catalog_additions.py) — the candidate
+    set these band-order tests were written against; a new S movement in the band is L6's, held by its own tests."""
+    return {k: v for k, v in _cat().items() if not str(v.get("notes") or "").startswith("coach_added #5861 L6")}
+
+
 def _pos() -> dict:
     return vr.position(WEEK7)
 
@@ -86,56 +93,70 @@ def _served_anywhere(sel: dict) -> set:
 
 
 # ── tier order (must-fail controls) ──────────────────────────────────────────
-def test_tier_a_beats_b_and_c_for_the_slot_muscle():
+def test_the_best_quality_tier_wins_for_the_slot_muscle():
     s = _slot(_week(), "lower_heavy.calf_raise_machine")
-    assert s["pick"]["tier"] == "A"
+    assert s["pick"]["tier"] == "S"
     assert s["pick"]["c_reason"] is None
-    # control: strip every A row in the library -> the pick drops to B, never stays on a now-C movement
+    # control: strip every S row in the library -> the pick drops to A, never stays on a now-D movement
     lib = _lib()
     for e in xl.movements(lib).values():
         for r in e["hypertrophy"]:
-            if r["tier"] == "A":
-                r["tier"] = "C"
+            if r["tier"] == "S":
+                r["tier"] = "D"
     s2 = _slot(_week(lib=lib), "lower_heavy.calf_raise_machine")
-    assert s2["pick"]["tier"] == "B"
+    assert s2["pick"]["tier"] == "A"
+
+
+def test_evidence_confidence_breaks_a_tie_and_never_outranks_the_tier():
+    """#5857: evidence is a tie-break only — after tier, N=1 fit and variety."""
+    a = {"tier": "S", "n1": {"score": 0}, "novel": False, "exposures": 5, "movement_id": "a", "catalog_key": "a"}
+    direct = a | {"evidence": "rct_direct", "movement_id": "z", "catalog_key": "z"}
+    plain = a | {"evidence": "none_reviewed"}
+    assert sorted([plain, direct], key=lambda c: se.rank_key(c, set()))[0] is direct
+    # control: a higher tier with no evidence still beats a lower tier with a direct trial
+    assert sorted([direct | {"tier": "A"}, plain], key=lambda c: se.rank_key(c, set()))[0] is plain
+    # control: variety outranks evidence
+    assert sorted([direct, plain], key=lambda c: se.rank_key(c, {"z"}))[0] is plain
 
 
 def test_the_overhead_triceps_extension_wins_now_the_catalog_writes_it():
-    """The owner's specimen: the A-tier overhead extension outranks every C triceps movement the pool held — for real,
-    on the shipped catalog, since the 2026-11-11 split gave it its own entry (B5EFBF9C)."""
+    """The owner's specimen: the S-tier overhead extension (rubric S, a direct trial recorded beside it) outranks every
+    triceps movement the pool held — for real, on the shipped catalog, since the 2026-11-11 split gave it its own entry."""
     assert CAT0["overhead_triceps_extension_cable"]["hevy_template_id_hint"] == "B5EFBF9C"
     s = _slot(_week(), "upper_heavy.cable_tricep_pushdown")
-    assert s["pick"]["movement_id"] == "overhead_triceps_extension_cable" and s["pick"]["tier"] == "A"
-    assert s["pick"]["c_reason"] is None
-    # control: without the catalog entry it is ranked but never served (the pre-split state)
+    assert s["pick"]["movement_id"] == "overhead_triceps_extension_cable" and s["pick"]["tier"] == "S"
+    assert s["pick"]["evidence"] == "rct_direct" and s["pick"]["c_reason"] is None
+    # control: without the catalog entry it is ranked but never served (the pre-split state); the next band serves
     cat = _cat()
     del cat["overhead_triceps_extension_cable"]
     s2 = _slot(_week(cat=cat), "upper_heavy.cable_tricep_pushdown")
-    assert s2["pick"]["tier"] == "C" and s2["pick"]["c_reason"]["code"] == "not_prescribable"
-    assert s2["above_pick"][0]["movement_id"] == "overhead_triceps_extension_cable"
-    # control: demote it to C -> it no longer wins on tier
+    assert s2["pick"]["movement_id"] != "overhead_triceps_extension_cable" and s2["pick"]["tier"] != "S"
+    hit = next(x for x in s2["above_pick"] if x["movement_id"] == "overhead_triceps_extension_cable")
+    assert hit["code"] == "not_prescribable"
+    # control: demote it to D -> it no longer wins on tier
     lib = _lib()
     for r in lib["movements"]["overhead_triceps_extension_cable"]["hypertrophy"]:
-        r["tier"] = "C"
-    assert _slot(_week(lib=lib), "upper_heavy.cable_tricep_pushdown")["pick"]["tier"] == "C"
+        r["tier"] = "D"
+    assert _slot(_week(lib=lib), "upper_heavy.cable_tricep_pushdown")["pick"]["movement_id"] != "overhead_triceps_extension_cable"
 
 
 def test_tier_for_reads_the_slot_muscle_and_its_sub_targets():
     e = LIB0["movements"]["overhead_triceps_extension_cable"]
-    assert se.tier_for(e, "triceps") == "A"
-    assert se.tier_for(e, "biceps") == "C"
-    assert se.tier_for(LIB0["movements"]["standing_calf_raise_machine"], "calves") == "A"
+    assert se.tier_for(e, "triceps") == "S" and se.evidence_for(e, "triceps") == "rct_direct"
+    assert se.tier_for(e, "biceps") == se.UNRATED_TIER == "D" and se.evidence_for(e, "biceps") == "none_reviewed"
+    assert se.tier_for(LIB0["movements"]["standing_calf_raise_machine"], "calves") == "S"
 
 
 # ── C only with a recorded reason ────────────────────────────────────────────
-def test_every_c_pick_in_the_week_carries_a_recorded_reason():
+def test_every_pick_outside_s_and_a_carries_a_recorded_reason():
+    """Owner ruling 2026-11-12 (board rec 2): S and A are both programmable; a pick outside S∪A needs a recorded reason."""
     sel = _week()
-    c_picks = [s for s in sel["slots"] if s.get("pick") and s["pick"]["tier"] == "C"]
-    assert c_picks, "the live library has C-only slots; this test must see them"
-    for s in c_picks:
+    reasoned = [s for s in sel["slots"] if s.get("pick") and s["pick"]["tier"] in se.REASONED_TIERS]
+    assert reasoned, "the live library has slots served outside S∪A (owner pins at least); this test must see them"
+    for s in reasoned:
         assert s["pick"]["c_reason"] and s["pick"]["c_reason"]["code"] in se.C_REASONS, s["slot_id"]
     for s in sel["slots"]:
-        if s.get("pick") and s["pick"]["tier"] != "C":
+        if s.get("pick") and s["pick"]["tier"] in se.PROGRAMMABLE_TIERS:
             assert s["pick"]["c_reason"] is None
 
 
@@ -145,7 +166,10 @@ def test_c_reason_names_the_blocked_higher_tier_or_the_gap():
     blocked = [{"tier": "B", "movement_id": "b", "title": "B one", "code": "equipment", "why": "x unavailable"}]
     assert se.c_reason(pick, blocked)["code"] == "equipment"
     assert se.c_reason(pick, [], pinned=True)["code"] == "owner_pin"
-    assert se.c_reason({"tier": "B", "movement_id": "y"}, blocked) is None
+    assert se.c_reason({"tier": "A", "movement_id": "y"}, blocked) is None  # S and A are programmable: no reason owed
+    # a pick outside S∪A below an eligible pool member names it as `pool_fit`, never a false library gap
+    peer = [{"tier": "A", "movement_id": "a", "title": "A one"}]
+    assert se.c_reason({"tier": "B", "movement_id": "y"}, [], pooled=peer)["code"] == "pool_fit"
 
 
 def test_critic_changes_a_c_pick_served_where_an_a_is_selectable():
@@ -227,7 +251,9 @@ def test_discomfort_and_form_notes_never_exclude():
     assert "pain_flag" not in form
     for tags in (discomfort, form):
         sig = {t: 1 for t in tags}
-        assert base in _served_anywhere(_week(overlay=_pain_overlay(tid, sig))), tags
+        s = _slot(_week(overlay=_pain_overlay(tid, sig)), "upper_heavy.db_curl")
+        # never EXCLUDED (discomfort is an N=1 demotion, which inside the S∪A pool may move the pick — owner ruling 2026-11-12)
+        assert s["excluded_counts"] == _slot(_week(), "upper_heavy.db_curl")["excluded_counts"], tags
 
 
 def test_a_stale_overlay_pain_tag_is_not_trusted_to_exclude():
@@ -238,25 +264,25 @@ def test_a_stale_overlay_pain_tag_is_not_trusted_to_exclude():
 
 
 def test_not_for_you_now_excludes_as_its_own_verdict():
-    lib = _lib()
+    lib = _preacher_s_lib()  # #5861 FIX5: the preacher family's S is the machine's; the dumbbell is planted back to the slot's S
     e = lib["movements"]["preacher_curl_dumbbell"]
     e["not_for_you_now"] = {"reason_code": "planted", "unlock_condition": "a test"}
     assert se.not_for_you_now(e) and se.pain_exclusion(e, None) is None
     assert "preacher_curl_dumbbell" not in _served_anywhere(_week(lib=lib))
-    assert "preacher_curl_dumbbell" in _served_anywhere(_week())  # control: unplanted, it serves
+    assert "preacher_curl_dumbbell" in _served_anywhere(_week(lib=_preacher_s_lib()))  # control: unplanted, it serves
 
 
 def test_preacher_curl_barbell_is_unlocked_by_the_owner_ruling():
     """Owner ruling 2026-11-11: the library's only not_for_you_now is lifted; a real pain-class note still excludes it."""
     e = LIB0["movements"]["preacher_curl_barbell"]
-    assert e["not_for_you_now"] is None and LIB0["change_log"][-1]["by"].startswith("owner ruling 2026-11-11")
+    assert e["not_for_you_now"] is None and any(x["by"].startswith("owner ruling 2026-11-11") for x in LIB0["change_log"])
     assert se.not_for_you_now(e) is None
     # first logged 2026-10-26; the 2026-11-12 catalog rebuild (history through 2026-11-11) writes it under its own id.
     # Like every barbell movement it is skill tier 3, so the week grid's skill ceiling 2 (program_conflicts: tier-3
     # barbell accessories wait on the Sports Medicine seat) keeps it off drafts, as it does the barbell and EZ-bar curls.
     assert CAT0["preacher_curl_barbell"]["hevy_template_id_hint"] == e["template_id"]
     assert CAT0["preacher_curl_barbell"]["skill_tier"] == 3
-    cat = _cat()
+    cat = _cat_before_l6()
     assert "preacher_curl_barbell" not in _served_anywhere(_week(cat=cat))  # ceiling 2: held by the tier rule, not the library
     sel = _week(cat=cat, skill_ceiling=3)
     assert "preacher_curl_barbell" in _served_anywhere(sel)  # the library and catalog no longer block it
@@ -285,8 +311,10 @@ def test_overlay_missing_is_unknown_never_an_error():
 
 
 def test_n1_fit_breaks_a_tier_tie_and_swap_outs_demote():
-    s = _slot(_week(), "upper_heavy.reverse_pec_deck")
+    s = _slot(_week(), "upper_heavy.db_curl")
     first, second = s["ranked_top"][0], s["ranked_top"][1]
+    mv = LIB0["movements"]
+    assert se.tier_for(mv[first], "biceps") == se.tier_for(mv[second], "biceps"), "the specimen must be a tier tie"
     tid1, tid2 = LIB0["movements"][first]["template_id"], LIB0["movements"][second]["template_id"]
     overlay = {
         "per_template": {
@@ -294,20 +322,52 @@ def test_n1_fit_breaks_a_tier_tie_and_swap_outs_demote():
             tid2: {"note_signals": {"sentiment_positive": 2}},
         }
     }
-    s2 = _slot(_week(overlay=overlay), "upper_heavy.reverse_pec_deck")
+    s2 = _slot(_week(overlay=overlay), "upper_heavy.db_curl")
     assert s2["pick"]["movement_id"] == second
     assert se.n1_fit(LIB0["movements"][first], overlay)["components"]["swap_out"] == -1
 
 
 # ── variety ──────────────────────────────────────────────────────────────────
 def test_variety_demotes_a_movement_served_in_the_lookback():
-    s = _slot(_week(), "upper_heavy.reverse_pec_deck")
+    s = _slot(_week(), "upper_heavy.db_curl")
     pick = s["pick"]["catalog_key"]
-    rows = [{"sk": vr.ledger_sk(1, "upper_heavy.reverse_pec_deck"), "block": 1, "phase_2": {"variant": pick}}]
-    s2 = _slot(_week(rows=rows), "upper_heavy.reverse_pec_deck")
+    rows = [{"sk": vr.ledger_sk(1, "upper_heavy.db_curl"), "block": 1, "phase_2": {"variant": pick}}]
+    s2 = _slot(_week(rows=rows, cat=_cat_before_l6()), "upper_heavy.db_curl")
     assert s2["pick"]["catalog_key"] != pick and s2["pick"]["tier"] == s["pick"]["tier"]
     # the current phase's own row is this draft's held pick, never a "recent use"
     assert se.recent_uses([{"block": 2, "phase_1": {"variant": pick}}], _pos()) == set()
+
+
+def test_variety_rotates_a_slot_within_its_band_by_its_own_history():
+    """#5857: slots sharing one band (three curl slots, one S curl band) each served one member last phase, so a global
+    `recent` ranks every member alike. The slot's OWN least-recently-served member leads, so each slot rotates."""
+    s = _slot(_week(cat=_cat_before_l6()), "upper_heavy.db_curl")
+    band = [m for m in s["ranked_top"] if se.tier_for(LIB0["movements"][m], "biceps") == s["pick"]["tier"]]
+    assert len(band) >= 3, band
+    keys = {m: se.key_index(LIB0, CAT0)["to_cat"][m] for m in band}
+    # this slot served band[0] last phase and band[1] the phase before; other slots served band[1] and band[2] last phase
+    rows = [
+        {
+            "sk": vr.ledger_sk(1, "upper_heavy.db_curl"),
+            "block": 1,
+            "phase_1": {"variant": keys[band[1]]},
+            "phase_2": {"variant": keys[band[0]]},
+        },
+        {"sk": vr.ledger_sk(1, "shoulders_arms.db_curl"), "block": 1, "phase_2": {"variant": keys[band[1]]}},
+        {"sk": vr.ledger_sk(1, "upper_volume.db_curl"), "block": 1, "phase_2": {"variant": keys[band[2]]}},
+        # any further band member (a duplicate such as the DB incline curl, #5861 FIX-DATA) was served by some other slot
+        *[{"sk": vr.ledger_sk(1, f"other.curl_{i}"), "block": 1, "phase_2": {"variant": keys[m]}} for i, m in enumerate(band[3:])],
+    ]
+    assert se.slot_last_served(rows, _pos(), "upper_heavy.db_curl") == {keys[band[1]]: 101, keys[band[0]]: 102}
+    s2 = _slot(_week(rows=rows, cat=_cat_before_l6()), "upper_heavy.db_curl")
+    assert s2["pick"]["movement_id"] == band[2], "the member this slot never served leads"
+    # control: without the slot term (global recency only) every member is `recent` and the slot holds band[0]
+    real = se.rank_key
+    try:
+        se.rank_key = lambda c, recent, slot_last=None, pool=None: real(c, recent, None, pool)  # type: ignore[assignment]
+        assert _slot(_week(rows=rows, cat=_cat_before_l6()), "upper_heavy.db_curl")["pick"]["movement_id"] == band[0]
+    finally:
+        se.rank_key = real
 
 
 def test_each_muscle_gets_a_lengthened_movement_or_says_why():
@@ -319,10 +379,25 @@ def test_each_muscle_gets_a_lengthened_movement_or_says_why():
 
 
 # ── novelty budget ───────────────────────────────────────────────────────────
-def _novel_curl_lib() -> dict:
+def _preacher_s_lib() -> dict:
+    """The dumbbell preacher curl planted as the only S-tier curl (#5861 FIX5: its family's S is now the machine's)."""
     lib = _lib()
+    for k, other in lib["movements"].items():
+        if other["target"]["primary"] == "biceps":
+            for r in other["hypertrophy"]:
+                r["tier"] = "S" if k == "preacher_curl_dumbbell" else ("A" if r["tier"] == "S" else r["tier"])
+    return lib
+
+
+def _novel_curl_lib() -> dict:
+    """The dumbbell preacher curl as new to him AND the slot's only S-tier curl (the other S curls planted down to A)."""
+    lib = _preacher_s_lib()
     e = lib["movements"]["preacher_curl_dumbbell"]
     e["source"], e["history"] = "expansion", None
+    for k, other in lib["movements"].items():
+        if k != "preacher_curl_dumbbell" and other["target"]["primary"] == "biceps":
+            for r in other["hypertrophy"]:
+                r["tier"] = "A" if r["tier"] == "S" else r["tier"]
     return lib
 
 
@@ -484,7 +559,10 @@ def test_proposed_library_runs_in_shadow_and_serves_the_pools():
 def test_approved_library_serves_the_selection_live():
     cat = _cat()
     rot = vr.plan(WEEK7, cat, role="upper_heavy", rows=[], ledger_state="injected")
-    sel = _week(lib=_lib("approved"))
+    # #5861 L3: live selection runs the live policy (no ledger, no Hevy record, no gate evaluation read: fail-closed)
+    lib = _lib("approved")
+    policy = selection_live.build_policy(lib, position=_pos(), rows=[], block_workouts=None, as_of="2026-11-12", gate_eval=None)
+    sel = _week(lib=lib, rows=[], policy=policy)
     out = se.apply(copy.deepcopy(rot), cat, rows=[], lib=_lib("approved"), overlay=None, target_date="2026-11-12")
     want = sel["variants_by_role"]["upper_heavy"]
     assert out["variants"] == want != rot["variants"]
@@ -495,15 +573,19 @@ def test_approved_library_serves_the_selection_live():
     assert se.apply(copy.deepcopy(rot), cat, rows=[], lib=_lib("proposed"), overlay=None)["variants"] == rot["variants"]
 
 
-def test_live_keeps_the_ledgers_held_variant_when_still_eligible():
+def test_live_serves_the_pick_and_the_ledger_never_overrides_it():
+    """#5861 fix round 10 (the ninth red team: "selection X — THIS phase serves Y", two authorities): under live the pick serves;
+    a ledger row naming an eligible fallback for this phase is a record, not an override. Control: the ledger's variant is an
+    eligible fallback the old rule would have served."""
     cat = _cat()
     sel = _week(lib=_lib("approved"))
     s = _slot(sel, "upper_heavy.reverse_pec_deck")
     held = s["fallbacks"][0]["catalog_key"]
+    assert held != s["pick"]["catalog_key"]  # control: the old rule served `held` (an eligible fallback)
     rows = [{"sk": vr.ledger_sk(2, "upper_heavy.reverse_pec_deck"), "block": 2, "phase_1": {"variant": held}}]
     rot = vr.plan(WEEK7, cat, role="upper_heavy", rows=rows, ledger_state="injected")
     out = se.apply(rot, cat, rows=rows, lib=_lib("approved"), overlay=None)
-    assert out["variants"]["reverse_pec_deck"] == held
+    assert out["variants"]["reverse_pec_deck"] == s["pick"]["catalog_key"]
 
 
 def test_no_library_serves_the_pools_and_says_so():
@@ -615,4 +697,13 @@ def test_a_generated_draft_serves_the_selection_once_approved():
     role = snap["calendar"]["session_role"]
     want = snap["selection"]["variants_by_role"][role]
     keys = [b.movement_key for b in ideal.exercises]
-    assert snap["rotation"]["variants"] == want and all(v in keys for v in want.values())
+    # #5861 FIX4 (drop, don't shave): a short morning's time fit may DROP a whole selected accessory (it never shaves one to a
+    # single set) — the selection still served it, and the time line names it
+    # #5861 fix round 9: the live lines live on the record (`session_prescription.live_session.lines`); the weekly plan may also
+    # take a slot off the morning (no KB hinge slot; a delt slot the shoulders' MAV does not need) — said there, by key
+    live = " ".join((snap["session_prescription"].get("live_session") or {}).get("lines") or [])
+    from training import live_volume
+
+    planned = {r["slot"] for r in live_volume.week_plan(CAT0, LIB0, 5)["rows"] if r["role"] == role}
+    gone = lambda slot, v: f"{v} dropped" in live or slot not in planned  # noqa: E731
+    assert snap["rotation"]["variants"] == want and all(v in keys or gone(slot, v) for slot, v in want.items())

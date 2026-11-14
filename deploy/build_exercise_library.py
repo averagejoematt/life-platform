@@ -16,7 +16,7 @@ WHAT IT READS (all read-only)
   3. `deploy/exercise_library_curation.py` — the hand-authored half (vocabulary, verified
      citations, gates, per-template overrides, expansion candidates).
   4. `deploy/exercise_library_reviews.json` — the accepted evidence-review ledger (#5778): citations,
-     tier changes and candidates the owner merged from `scripts/library_evidence_review.py`, re-applied
+     evidence changes and candidates the owner merged from `scripts/library_evidence_review.py`, re-applied
      on top of the curation so a rebuild keeps them.
 
 WHAT IT WRITES
@@ -27,8 +27,10 @@ those go to the owner-private overlay (`deploy/write_exercise_library_overlay.py
 is keyed by RAW template id — the alias registry is not folded here, so an alias id (B5EFBF9C,
 Overhead Triceps Extension (Cable)) stays its own movement and records `alias_of`.
 
-Attributes a rule cannot know are `unknown` and the hypertrophy tier is C/unreviewed, unless the
-curation module says otherwise. `version`, `change_log` and `status` are preserved from the file
+Attributes a rule cannot know are `unknown` and each hypertrophy row's evidence is `none_reviewed`, unless the
+curation module says otherwise. Each row's QUALITY tier (S-D) is derived last, by the written rubric
+(`training.quality_rubric`, #5857) from the final attributes, moved at most one band by a recorded direct-trial
+adjustment — never authored. `version`, `change_log` and `status` are preserved from the file
 on disk, so an owner approval is never overwritten by a rebuild.
 
     python3 deploy/build_exercise_library.py                       # dry-run summary, writes nothing
@@ -52,8 +54,16 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path[:0] = [os.path.join(REPO_ROOT, "lambdas"), REPO_ROOT, os.path.dirname(os.path.abspath(__file__))]
 
 import exercise_library_curation as cur  # noqa: E402
+import exercise_library_input_review as input_review  # noqa: E402
+import exercise_library_objectives as objectives  # noqa: E402
 import exercise_library_reviews as reviews  # noqa: E402
-from training import exercise_library as lib_rules  # noqa: E402
+import exercise_library_targets as targets  # noqa: E402
+from exercise_library_changelog import BUILDER_CHANGE_LOG  # noqa: E402
+from training import (
+    exercise_library as lib_rules,  # noqa: E402
+    live_settings,  # noqa: E402
+    quality_rubric,  # noqa: E402
+)
 
 LIBRARY_PATH = os.path.join(REPO_ROOT, "config", "exercise_library.json")
 CATALOG_PATH = os.path.join(REPO_ROOT, "config", "movement_catalog.json")
@@ -77,6 +87,27 @@ INITIAL_HEADER = {
         }
     ],
 }
+
+# Change-log lines the BUILDER owns: deploy/exercise_library_changelog.py (#5861 FIX4: extracted on the module-size seam).
+
+# #5861 fix round 9: `programming_settings` is THE one live settings table (`training.live_settings.SETTINGS`, each row with its
+# ruling and provenance) — written whole by every rebuild; a later ruling edits that table, never this file.
+
+
+def with_builder_changes(head: dict[str, Any]) -> dict[str, Any]:
+    """The header with every builder-owned change-log line present once (a line with the builder's version AND `by` is the
+    builder's own, so it is rewritten to the current text; any other line is never touched) and `version` at the highest."""
+    own = {(x["version"], x["by"]): x for x in BUILDER_CHANGE_LOG}
+    log = [dict(own.get((str(x.get("version")), str(x.get("by"))), x)) for x in head.get("change_log") or []]
+    have = {str(x.get("version")) for x in log}
+    log += [dict(x) for x in BUILDER_CHANGE_LOG if x["version"] not in have]
+
+    def _v(v: str) -> tuple[int, ...]:
+        return tuple(int(p) for p in str(v).split("."))
+
+    top = max([str(head.get("version") or "0.0.0")] + [str(x["version"]) for x in log], key=_v)
+    return head | {"change_log": log, "version": top}
+
 
 # ── history ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -171,8 +202,10 @@ _LENGTH_RULES: list[tuple[str, str]] = [
     ),
     (r"preacher|bayesian|behind the back curl|seated leg curl|romanian|\brdl\b|stiff leg|straight leg deadlift|good morning", "lengthened"),
     (r"deficit|split squat|bulgarian|lunge|cossack|\bfly\b|flyes?|crossover|pullover|standing calf|sissy|nordic", "lengthened"),
+    (r"pec deck|butterfly", "lengthened"),  # #5857: the pec deck is a fly (it read `unknown` before)
     (r"hyperextension|back extension|pull ?up|chin ?up|pulldown|\bdips?\b|jefferson|zercher|goblet|front squat|\bsquat\b", "lengthened"),
     (r"bench press|chest press|shoulder press|overhead press|military press|\brow\b|rows\b|leg press|leg extension|curl\b|deadlift", "mid"),
+    (r"push ?ups?|pushups?|step ?ups?|stepup", "mid"),  # #5861: a push-up is a press; a step-up a knee-dominant squat (mid)
 ]
 
 
@@ -185,8 +218,16 @@ def _length_bias(title: str, family: str) -> str:
     return "unknown"
 
 
+_NOT_CARDIO_RE = re.compile(r"lunge|squat|hip circles?|carry|carries|farmers", re.I)
+
+
+def _is_cardio(title: str) -> bool:
+    """A cardio word, unless the title is a strength movement that happens to say "walking" (#5861: the walking lunge)."""
+    return bool(_CARDIO_RE.search(title)) and not _NOT_CARDIO_RE.search(title)
+
+
 def _family(title: str, meta: dict[str, Any]) -> str:
-    if (meta.get("primary_muscle") == "cardio") or _CARDIO_RE.search(title):
+    if (meta.get("primary_muscle") == "cardio") or _is_cardio(title):
         return "carry_conditioning"
     if lib_rules.requires_impact_gate({"title": title}) or _OLY_RE.search(title) or re.search(r"\b(slams?|throws?|toss)\b", title, re.I):
         return "skill_athletic"
@@ -210,7 +251,7 @@ def _equipment(title: str, hevy_eq: str | None, family: str) -> list[str]:
             if i not in out:
                 out.append(i)
 
-    if family == "carry_conditioning" and _CARDIO_RE.search(title):
+    if family == "carry_conditioning" and _is_cardio(title):
         for pat, eid in (
             (r"treadmill", "treadmill"),
             (r"cycling|bike|spinning", "stationary_bike"),
@@ -318,9 +359,40 @@ def _equipment(title: str, hevy_eq: str | None, family: str) -> list[str]:
     return out
 
 
+# A named pin-stack (or unspecified-loading) machine: selectorized unless the curation says plate-loaded. `machine_unspecified`
+# stays `unknown` — the rule cannot say what it is.
+_SELECTORIZED = {
+    "leg_extension_machine",
+    "leg_curl_seated",
+    "leg_curl_lying",
+    "calf_raise_standing_machine",
+    "calf_raise_seated_machine",
+    "hip_thrust_machine",
+    "glute_kickback_machine",
+    "hip_abduction_machine",
+    "hip_adduction_machine",
+    "incline_press_machine",
+    "decline_press_machine",
+    "chest_press_machine",
+    "pec_deck",
+    "shoulder_press_machine",
+    "lateral_raise_machine",
+    "rear_delt_machine",
+    "seated_row_machine",
+    "pullover_machine",
+    "preacher_machine",
+    "biceps_curl_machine",
+    "triceps_machine",
+    "ab_crunch_machine",
+    "torso_rotation_machine",
+    "back_extension_machine",
+    "assisted_pullup_dip_machine",
+}
+
+
 def _resistance(equipment: list[str], hevy_eq: str | None, family: str, title: str) -> str:
     eq = set(equipment)
-    if family == "carry_conditioning" and _CARDIO_RE.search(title):
+    if family == "carry_conditioning" and _is_cardio(title):
         return "cardio_machine" if eq - {"bodyweight"} else "not_applicable"
     if "sled" in eq:
         return "sled"
@@ -338,6 +410,8 @@ def _resistance(equipment: list[str], hevy_eq: str | None, family: str, title: s
         "t_bar_row_machine",
     }:
         return "machine_plate_loaded"
+    if eq & _SELECTORIZED:
+        return "machine_selectorized"  # #5857: a named machine read `unknown` before, so the rubric scored it as nothing
     if eq & {"bodyweight", "pullup_bar", "dip_station", "plyo_box", "ab_wheel", "back_extension_45"}:
         return "bodyweight"
     return "unknown"
@@ -422,14 +496,14 @@ def derive(tid: str, title: str, meta: dict[str, Any]) -> dict[str, Any]:
     primary = meta.get("primary_muscle") or "unknown"
     if primary in ("unknown", "other"):
         # Hevy files many custom templates under "other"; the movement pattern names the target honestly enough to
-        # find a same-stimulus fallback. Still tier C — this is a label, not an evidence claim.
+        # find a same-stimulus fallback. Still `none_reviewed` — this is a label, not an evidence claim.
         primary = _PATTERN_TARGET.get(lib_rules.movement_pattern(title), primary)
     return {
         "title": title,
         "target": {
             "primary": primary,
             "secondary": list(meta.get("secondary_muscles") or []),
-            "region": "cardio" if family == "carry_conditioning" and _CARDIO_RE.search(title) else _REGION.get(primary, "full_body"),
+            "region": "cardio" if family == "carry_conditioning" and _is_cardio(title) else _REGION.get(primary, "full_body"),
         },
         "family": family,
         "length_bias": _length_bias(title, family),
@@ -444,7 +518,7 @@ def derive(tid: str, title: str, meta: dict[str, Any]) -> dict[str, Any]:
         },
         "skill_complexity": _skill(title, family, meta.get("skill_tier")),
         "equipment": equipment,
-        "hypertrophy": [cur.hyp(primary, "C")],
+        "hypertrophy": [cur.hyp(primary)],
     }
 
 
@@ -479,7 +553,7 @@ def auto_gates(entry: dict[str, Any]) -> list[str]:
         "carry_conditioning",
         "skill_athletic",
     ) or lib_rules.requires_bodyweight_gate(entry):
-        if not (entry.get("family") == "carry_conditioning" and _CARDIO_RE.search(t)):
+        if not (entry.get("family") == "carry_conditioning" and _is_cardio(t)):
             g.append("clinical_cue_breathing")
     return g
 
@@ -504,11 +578,37 @@ def _ledger() -> dict[str, Any]:
     return _LEDGER
 
 
+ADDITIONS_MODULE = "exercise_library_additions"  # deploy/exercise_library_additions.py (epic #5861 lane L2), optional
+
+
+def library_additions() -> list[dict[str, Any]]:
+    """THE library-expansion hook (#5861): new canonical movements from `deploy/exercise_library_additions.py`.
+
+    Contract: that module exposes `ADDITIONS: list[dict]`, each entry in the curation's `EXPANSION` shape (built the way
+    `exercise_library_curation._x` builds one: `key`, `title`, `template_id` or None + `template_note`, and any attribute
+    the rules cannot know — `target`, `family`, `length_bias`, `resistance_profile`, `stability`, `joint_stress`,
+    `skill_complexity`, `equipment`, `gates`), plus the #5861 evaluation fields the objective rubrics read when present:
+    `category`, `trunk_function`, `functions`, `canonical`, `variant`, `objective_inputs` (see
+    `training.quality_rubric.OBJECTIVE_INPUTS`). An absent module is no additions. A key that is already a curated
+    candidate is a hard stop — an addition never silently replaces a reviewed entry."""
+    import importlib.util
+
+    if importlib.util.find_spec(ADDITIONS_MODULE) is None:
+        return []
+    mod = importlib.import_module(ADDITIONS_MODULE)
+    adds = [dict(x) for x in getattr(mod, "ADDITIONS", [])]
+    clash = sorted({x["key"] for x in adds} & {x["key"] for x in cur.EXPANSION})
+    if clash:
+        raise SystemExit(f"library additions: keys already curated in EXPANSION: {clash}")
+    return adds
+
+
 def _expansion_list() -> list[dict[str, Any]]:
-    """The curation's candidates, then the ledger's accepted ones (a ledger key already curated is a replacement)."""
+    """The curation's candidates, then the #5861 additions, then the ledger's accepted ones (a ledger key already listed
+    is a replacement)."""
     extra = reviews.ledger_candidates(_ledger())
     keys = {x["key"] for x in extra}
-    return [x for x in cur.EXPANSION if x["key"] not in keys] + extra
+    return [x for x in cur.EXPANSION + library_additions() if x["key"] not in keys] + extra
 
 
 def library_citations() -> dict[str, dict[str, Any]]:
@@ -576,7 +676,8 @@ def _expansion_entries(entries: dict[str, dict[str, Any]], merged_into_history: 
     no_template: list[dict[str, Any]] = []
     for x in _expansion_list():
         tid = str(x.get("template_id") or "").upper()
-        if tid and tid in entries:
+        twin = tid in entries and str(entries[tid].get("expansion_origin") or "").startswith("movement_catalog:")
+        if tid and tid in entries and not (twin and x.get("expansion_profile")):  # #5861 L6: an addition owns its catalog twin
             if entries[tid]["source"] == "expansion" and x["key"] not in merged_into_history:
                 entries[tid] = _merge(entries[tid], x)
                 entries[tid]["gates"] = list(entries[tid].get("gates") or []) + list(x.get("gates") or [])
@@ -641,6 +742,104 @@ def _resolved_gates(movements: dict[str, dict[str, Any]], tid_to_key: dict[str, 
     return gates_out
 
 
+COMPOUND_PATTERNS = ("horizontal_press", "vertical_press", "squat", "hinge", "vertical_pull", "horizontal_pull", "olympic", "carry")
+_ISOLATION_TITLE = re.compile(r"pullover|straight arm|press ?outs?|calf|pallof", re.I)  # a pullover / straight-arm pull is single-joint
+_PRESS_TITLE = re.compile(r"\bpress(es)?\b|\bdips?\b|thruster|push ?ups?|pushups?", re.I)
+
+
+def job_and_pattern(e: dict[str, Any]) -> tuple[str, str]:
+    """The movement's JOB (compound | isolation) and pattern, by what it does (owner ruling 2026-11-12, board rec 1):
+    `exercise_library.movement_pattern` over the title; a press, dip, push-up or thruster whose title the pattern table
+    misses is a compound `press`; a pullover or straight-arm pull is isolation. Never by muscle name."""
+    title = str(e.get("title") or "")
+    pattern = lib_rules.movement_pattern(title)
+    if _ISOLATION_TITLE.search(title):
+        return "isolation", pattern
+    if pattern in COMPOUND_PATTERNS:
+        return "compound", pattern
+    if _PRESS_TITLE.search(title):
+        return "compound", pattern if pattern in ("horizontal_press", "vertical_press") else "press"
+    return "isolation", pattern
+
+
+def apply_attribute_audit(movements: dict[str, dict[str, Any]]) -> None:
+    """The reviewed attribute audit (`deploy/exercise_library_targets.py`, owner ruling 2026-11-12, board rec 5), in place:
+    each `ATTRIBUTE_OVERRIDES` row replaces the named attributes (a joint_stress map merges joint by joint); then every
+    joint still `unknown` on a movement whose pattern has a reviewed `JOINT_RATINGS_BY_PATTERN` row takes that rating — a
+    rated joint is never overwritten. Each change is recorded on the entry as `attribute_audit`. A missing key is a hard stop."""
+    missing = sorted(k for k in targets.ATTRIBUTE_OVERRIDES if k not in movements)
+    if missing:
+        raise SystemExit(f"attribute audit: overrides for movements not in the library: {missing}")
+    for key, (attrs, reason) in targets.ATTRIBUTE_OVERRIDES.items():
+        e = movements[key]
+        for field, value in attrs.items():
+            e[field] = {**(e.get(field) or {}), **value} if field == "joint_stress" else value
+        e["attribute_audit"] = {"fields": sorted(attrs), "reason": reason}
+    input_review.apply_attributes(movements)  # #5861 FIX2-DATA: the reviewed-input pass (attributes half)
+    for e in movements.values():
+        rule = targets.joint_rating(e, lib_rules.movement_pattern(str(e.get("title") or "")))
+        if not rule:
+            continue
+        js = dict(e.get("joint_stress") or {})
+        filled = sorted(j for j, v in js.items() if v == "unknown" and j in rule[0])
+        if filled:
+            e["joint_stress"] = {j: (rule[0][j] if j in filled else v) for j, v in js.items()}
+            e.setdefault("attribute_audit", {"fields": [], "reason": ""})
+            e["attribute_audit"]["joints_rated"] = {"joints": filled, "rule": rule[1]}
+
+
+def apply_press_family(movements: dict[str, dict[str, Any]]) -> None:
+    """#5861 FIX7: the press family rated by implement, consistently (input_review.PRESS_FAMILY_JOINTS), after the class rules — a
+    rated joint the family rule names is overwritten (and recorded on `attribute_audit.press_family`)."""
+    for e in movements.values():
+        fam = input_review.press_family_joints(e)
+        js = dict(e.get("joint_stress") or {})
+        changed = sorted(j for j, v in (fam or ({}, ""))[0].items() if js.get(j) != v)
+        if fam and changed:
+            e["joint_stress"] = {**js, **{j: fam[0][j] for j in changed}}
+            e.setdefault("attribute_audit", {"fields": [], "reason": ""})
+            e["attribute_audit"]["press_family"] = {"joints": changed, "rule": fam[1]}
+    for key, e in movements.items():  # an alias (variant.duplicate_of) carries its head's ratings — the schema's alias rule
+        head = movements.get(str((e.get("variant") or {}).get("duplicate_of") or ""))
+        rated = (head or {}).get("attribute_audit", {}).get("press_family")
+        if rated and e.get("joint_stress") != head["joint_stress"]:
+            e["joint_stress"] = dict(head["joint_stress"])
+            e.setdefault("attribute_audit", {"fields": [], "reason": ""})
+            e["attribute_audit"]["press_family"] = {"joints": rated["joints"], "rule": f"an alias of {e['variant']['duplicate_of']}"}
+
+
+def apply_target_audit(movements: dict[str, dict[str, Any]], overrides: dict[str, tuple[str, str]] | None = None) -> None:
+    """The reviewed target-label audit (`deploy/exercise_library_targets.py`, #5857), in place: the audited primary and its
+    region, every hypertrophy row whose target was the old primary moved with it (a sub-target row is left alone), and
+    `target.audit` {from, reason} recorded. A key not in the library is a hard stop — an override never vanishes silently."""
+    table = targets.TARGET_OVERRIDES if overrides is None else overrides
+    missing = sorted(k for k in table if k not in movements)
+    if missing:
+        raise SystemExit(f"target audit: overrides for movements not in the library: {missing}")
+    for key, (primary, reason) in table.items():
+        e = movements[key]
+        old = str((e.get("target") or {}).get("primary") or "unknown")
+        region = _REGION.get(primary) or targets.AUDIT_REGIONS.get(primary, "full_body")
+        e["target"] = {**(e.get("target") or {}), "primary": primary, "region": region, "audit": {"from": old, "reason": reason}}
+        e["hypertrophy"] = [r | {"target": primary} if r.get("target") == old else r for r in e.get("hypertrophy") or []]
+
+
+def apply_evaluation_layer(movements: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """#5861, in place, before any tier is derived: the reviewed pattern fixes, category / trunk function / functions, the
+    objective inputs, the reviewed secondary target rows, then the canonical layer (aliases take their canonical's
+    attributes). Returns the canonical-family index (`canonical_families`)."""
+    return objectives.apply(movements, cur.hyp)
+
+
+def rating_counts(movements: dict[str, dict[str, Any]]) -> dict[str, dict[str, int]]:
+    """Per objective, how many movements sit in each tier (and how many it does not apply to)."""
+    out: dict[str, dict[str, int]] = {}
+    for o in quality_rubric.OBJECTIVES:
+        c = Counter(str(e["ratings"][o]["tier"] or "not_applicable") for e in movements.values())
+        out[o] = {t: c.get(t, 0) for t in quality_rubric.QUALITY_TIERS + ("not_applicable",)}
+    return out
+
+
 def build_library(
     current: dict[str, Any] | None, history: dict[str, Any], catalog: dict[str, Any], aliases: dict[str, str]
 ) -> dict[str, Any]:
@@ -649,9 +848,17 @@ def build_library(
     no_template = _expansion_entries(entries, merged_into_history)
     movements, tid_to_key = _keyed_movements(entries, no_template)
     gates_out = _resolved_gates(movements, tid_to_key)
-    missing = reviews.apply_tier_changes(movements, reviews.ledger_tier_changes(_ledger()))
+    apply_target_audit(movements)  # #5857: Hevy's raw muscle label -> the reviewed target, before any tier is derived
+    apply_attribute_audit(movements)  # #5857 rubric v2 (board rec 5): reviewed attribute fixes + joint ratings
+    for e in movements.values():
+        e["job"], e["pattern"] = job_and_pattern(e)
+    families = apply_evaluation_layer(movements)  # #5861: category, objective inputs, secondary rows, canonical layer
+    input_review.apply_class_rules(movements)  # #5861 FIX3: shoulder-provoking work >= moderate; one spine-loading class
+    apply_press_family(movements)  # #5861 FIX7: elbow / wrist by implement across the press family (pain outcomes consistent)
+    missing = reviews.apply_evidence_changes(movements, reviews.ledger_evidence_changes(_ledger()))
     if missing:
-        raise SystemExit(f"evidence-review ledger: tier change for a movement not in the library: {missing}")
+        raise SystemExit(f"evidence-review ledger: evidence change for a movement not in the library: {missing}")
+    reviews.finalize_tiers(movements)  # #5857 + #5861: every row's tier (+ at most one recorded band) and every objective rating
 
     used_eq = sorted({x for e in movements.values() for x in e["equipment"]})
     inventory, cutoff = home_gym_inventory(movements, history, used_eq)
@@ -664,8 +871,9 @@ def build_library(
         e["fallbacks"] = [{"movement_id": k, "reason": r} for k, r in fbs]
     for key in list(movements):
         movements[key] = _ordered(movements[key])
-    head = {k: (current or {}).get(k, v) for k, v in INITIAL_HEADER.items()}
-    tiers = Counter(r["tier"] for e in movements.values() for r in e["hypertrophy"])
+    head = with_builder_changes({k: (current or {}).get(k, v) for k, v in INITIAL_HEADER.items()})
+    tiers = Counter(r["tier"] or "not_applicable" for e in movements.values() for r in e["hypertrophy"])
+    confidence = Counter(r["evidence_confidence"] for e in movements.values() for r in e["hypertrophy"])
     src = Counter(e["source"] for e in movements.values())
     return {
         "_README": (
@@ -688,11 +896,20 @@ def build_library(
             "distinct_template_ids": len(history["templates"]),
             "movements": len(movements),
             "by_source": dict(sorted(src.items())),
-            "hypertrophy_rows_by_tier": dict(sorted(tiers.items())),
+            "hypertrophy_rows_by_tier": {t: tiers.get(t, 0) for t in quality_rubric.QUALITY_TIERS + ("not_applicable",)},
+            "ratings_by_objective": rating_counts(movements),
+            "s_census": quality_rubric.s_census(movements),
+            "canonical": {
+                "families": len(families),
+                "aliases": sum(len(f["aliases"]) for f in families.values()),
+                "variants": sum(len(f["variants"]) for f in families.values()),
+            },
+            "hypertrophy_rows_by_evidence_confidence": {c: confidence.get(c, 0) for c in quality_rubric.EVIDENCE_CONFIDENCE},
             "expansion_candidates_already_in_history": sorted(merged_into_history),
             "catalog_movements_not_in_current_history": sorted(catalog_only),
             "attribute_rule": "derived by rule unless deploy/exercise_library_curation.py overrides; `unknown` = the rule cannot say",
         },
+        "quality_rubric": quality_rubric.rubric_doc(),
         "equipment_vocabulary": cur.EQUIPMENT_VOCABULARY,
         "gym_inventory": {
             "location_id": lib_rules.LOCATION_ID,
@@ -719,6 +936,8 @@ def build_library(
             "evaluated_by": "#5772 (next story); v0.1 only defines gates",
         },
         "gates": gates_out,
+        "programming_settings": live_settings.defaults(),
+        "canonical_families": families,
         "movements": movements,
     }
 
@@ -733,13 +952,22 @@ _ORDER = (
     "history",
     "target",
     "family",
+    "job",
+    "pattern",
     "length_bias",
     "resistance_profile",
     "stability",
     "joint_stress",
     "skill_complexity",
     "equipment",
+    "category",
+    "trunk_function",
+    "functions",
+    "canonical",
+    "variant",
     "hypertrophy",
+    "ratings",
+    "objective_inputs",
     "other_evidence",
     "gates",
     "not_for_you_now",

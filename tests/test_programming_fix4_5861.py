@@ -1,0 +1,505 @@
+"""#5861 fourth red team (graded B-; safety C, programming C+) — the CODE/DATA fixes, gated on the GENERATED weeks.
+
+Every gate here has a MUST-FAIL CONTROL in the same test (the guarded behaviour patched out, or the data put back as it was ->
+red). Live mode = an IN-MEMORY approved copy of the library (the committed file stays `proposed`; acceptance e3 holds that).
+The stress profiles (g: garage + knee pain 5/10 on the squat + a 4-day week; h: a heavy walker; i: low-back pain 2/10 on the
+deadlift) are SYNTHETIC (`tests/fixtures/sample_week_stress_profiles_5861.json`). Owner decisions keep today's defaults; every
+alternative is exercised here.
+
+  1. the pain site from the note, knee + hip in the joint model     6. squat before the hinge; the heavy pull's shape setting
+  2. mild pain keeps the lift lighter; an in-set stop line          7. the aerobic gap: one optional walk, fewer bolt-on rides
+  3. no "+N on later sets" on a held lift or a hold day             8. the stop line: the extended wording, lifting days, the wire
+  4. one effort across the session                                  9. the kettlebell slot under strain
+  5. the weekly redline, at-MAV donors, the quadriceps slot, drop   10. data: band pull-up, tiers, trunk categories, the deload
+     don't shave                                                        RPE cap, the cron's template lookup
+
+FIX ROUND 9 (consolidation): the live lines a test reads are the session's debug view now (`live_fit`), next to the 3-5
+summary lines of the rationale (`_lines` reads both). Deleted or rewritten here:
+  test_the_week_never_passes_the_weekly_hard_set_redline -> rewritten: the redline stays a CHECK on every drafted week; its
+      control-2 needed the deleted week_ceiling / parity / priority_add settings
+  test_trims_drop_whole_accessories_never_leaving_one_set -> rewritten on the ONE trim order (`live_volume.next_cut`)
+  test_priority_muscles_take_sets_from_muscles_at_mav_and_the_quadriceps_get_their_isolation -> rewritten on the weekly plan;
+      the QUAD_SLOT / at-MAV donors / stimulus gate are deleted (the quadriceps fill is `live_volume.FILL`)
+  test_the_heavy_day_deadlift_shape_is_a_setting -> rewritten: ruling 5's shape is the rule (the `as_today` setting is deleted)
+  test_under_the_default_cap_a_small_gap_is_the_walks_not_another_ride -> rewritten: the `cardio_purpose_only: False` rides
+      are a dead alternative; the ruled no-ride and the walk_covers rule are kept
+  test_the_stop_line_is_off_by_default_and_a_wording_set_explicitly_reaches_the_hevy_payload -> rewritten: ruling 10 — no
+      symptom line exists to set (presets and the lifting-day switch deleted); only "none anywhere" is asserted
+  test_the_kettlebell_slot_under_strain_is_a_setting -> deleted: KB slot machinery (rulings #2/#6/#7: no KB hinge slot)
+  test_the_deload_caps_every_compound_at_rpe_7 -> rewritten: DELOAD_TOP_SET moved into `live_program.DELOAD_SHAPE`
+  test_every_fix4_constant_is_labelled_and_every_default_is_todays -> rewritten onto the surviving tables
+"""
+
+from __future__ import annotations
+
+import copy
+import json
+import pathlib
+import re
+import sys
+from types import SimpleNamespace
+from unittest.mock import patch
+
+import pytest
+
+REPO = pathlib.Path(__file__).resolve().parents[1]
+for _p in (REPO, REPO / "lambdas", REPO / "scripts", REPO / "deploy"):
+    sys.path.insert(0, str(_p))
+
+import exercise_library_input_review as ir  # noqa: E402
+import sample_weeks_5861 as sw  # noqa: E402
+from training import (  # noqa: E402
+    live_balance as lb,
+    live_program as lp,
+    live_safety as lsafe,
+    live_settings as lset,
+    live_shape as lshape,
+    live_volume as lvol,
+    session_block as sb,
+)
+
+LIB0 = json.loads((REPO / "config" / "exercise_library.json").read_text())
+CAT0 = json.loads((REPO / "config" / "movement_catalog.json").read_text())["movements"]
+LANDMARKS = json.loads((REPO / "config" / "training_landmarks.json").read_text())
+PROFILES = sw.load_profiles()
+STRESS = sw.load_profiles(REPO / "tests" / "fixtures" / "sample_week_stress_profiles_5861.json")
+ALL = PROFILES | STRESS
+
+
+def _week(name: str, patches: dict | None = None, settings: dict | None = None) -> dict:
+    prof = ALL[name]
+    with patch.dict(sw.SETTINGS, settings or {}):
+        world = sw.build_world(prof, "approved")
+        ps_ = [patch.object(m, a, v) for (m, a), v in (patches or {}).items()]
+        for p in ps_:
+            p.start()
+        try:
+            week = sw.generate_week(prof, "approved", world)
+        finally:
+            for p in ps_:
+                p.stop()
+    return {"world": world, "week": week, "m": sw.measure(week, world["lib"], world["catalog"]["movements"], LANDMARKS)}
+
+
+@pytest.fixture(scope="module")
+def weeks() -> dict:
+    return {(n, cap): _week(n, settings={"session_cap_includes_cardio": cap}) for n in ALL for cap in (False, True)}
+
+
+def _lines(s: dict) -> list[str]:
+    """A session's rationale plus its live debug lines (fix round 9: the rationale carries only the 3-5 summary lines)."""
+    return list(s.get("rationale") or []) + list(s.get("live_fit") or [])
+
+
+def _lifts(week: dict) -> list[dict]:
+    return [x for s in week["sessions"] for x in s["lifts"]]
+
+
+def _entry(w: dict, key: str) -> dict:
+    return sw._lib_entry(w["world"]["lib"], w["world"]["catalog"]["movements"], key)
+
+
+def _top_rpe(note: str | None) -> float:
+    """The highest RPE a lift's note asks of it (its own effort target, else the session band it inherits)."""
+    targets = lb.effort_targets(note)
+    nums = [float(x) for t in targets for x in re.findall(r"\d+(?:\.\d+)?", t)]
+    return max(nums) if nums else 0.0
+
+
+# ── 1. the pain site, knee + hip ─────────────────────────────────────────────
+def test_the_pain_note_names_the_joint():
+    assert lsafe.note_site("knee pain 5/10 on the squat") == "knee"
+    assert lsafe.note_site("low back pain 2/10 on the deadlift") == "spinal_load"
+    assert lsafe.note_site("sharp pain in the front of the shoulder") == "shoulder"
+    assert lsafe.note_site("elbow a bit sore 2/10") == "elbow"
+    assert lsafe.note_site("hip pinch at the bottom") == "hip"
+    assert lsafe.note_site("upper back tight, grip slipped") is None  # no named site -> the movement's worst joint (fallback)
+    assert lsafe.flag_joints("felt it 4/10", ["spinal_load"], "squat") == (["spinal_load"], "squat", "inferred")
+    assert lsafe.flag_joints("knee 5/10", ["spinal_load"], "hinge") == (["knee"], "squat", "note")  # a knee flag: knee group
+
+
+def test_knee_and_hip_are_in_the_library_by_class_and_never_in_the_rubric():
+    mv = LIB0["movements"]
+    assert all({"knee", "hip"} <= set(e["joint_stress"]) for e in mv.values())
+    for k in ("squat_barbell", "bulgarian_split_squat_dumbbell", "split_squat_dumbbell", "step_up", "leg_extension_machine"):
+        assert mv[k]["joint_stress"]["knee"] == "high", k
+    assert mv["box_squat_barbell"]["joint_stress"]["knee"] == "moderate"  # the regression a physio uses
+    assert mv["romanian_deadlift_barbell"]["joint_stress"] == mv["romanian_deadlift_barbell"]["joint_stress"] | {
+        "knee": "low",
+        "hip": "high",
+    }
+    assert mv["bench_press_barbell"]["joint_stress"]["knee"] == "low"
+    from training import quality_rubric as qr
+
+    lunge = mv["bulgarian_split_squat_dumbbell"]
+    assert qr.joint_penalty(lunge) == qr.joint_penalty({**lunge, "joint_stress": {**lunge["joint_stress"], "knee": "low"}})
+    # control: a knee rating that reached the rubric would move the lunge's joint cost (re-tier the lower body)
+    with patch.object(qr, "RUBRIC_JOINTS", qr.RUBRIC_JOINTS + ("knee",)):
+        assert qr.joint_penalty(lunge) != qr.joint_penalty({**lunge, "joint_stress": {**lunge["joint_stress"], "knee": "low"}})
+    toy = {"x": {"title": "Reverse Lunge (Dumbbell)", "pattern": "squat", "job": "compound", "target": {"region": "lower"}}}
+    assert ir.apply_class_rules(toy)["knee_hip"] == ["x"] and toy["x"]["joint_stress"]["knee"] == "high"
+
+
+def knee_breaches(w: dict) -> list[str]:
+    """A knee-pain week's breaches (#5861 FIX7: the PROVOKING pattern, not every knee-loading lift): a high-knee-stress lift served
+    at all, or a squat-pattern (knee-dominant, the flag's group) lift loading the knee at moderate above RPE 8 — the pain-free /
+    priority route's cap. A hinge that loads the knee moderately is not the provoking pattern and keeps its effort."""
+    out = []
+    for s in w["week"]["sessions"]:
+        for x in s["lifts"]:
+            e = _entry(w, x["key"])
+            knee = str((e.get("joint_stress") or {}).get("knee"))
+            squat = lp._group(e.get("pattern")) == "squat"
+            if knee == "high" or (squat and knee == "moderate" and _top_rpe(x["hevy_note"]) > 8):
+                out.append(f"{s['role']}: {x['key']} knee {knee} @ RPE {_top_rpe(x['hevy_note']):g}")
+    return out
+
+
+def test_a_knee_flag_reduces_or_avoids_every_knee_dominant_pattern(weeks):
+    """Stress case g (knee pain 5/10 on the squat): no high-knee pattern served, the knee-dominant (squat-pattern) work only as a
+    lower-knee-stress route at RPE <= 8 with the stop line; the quadriceps (a priority muscle) keep a route (#5861 FIX7: never zero
+    for a week on one flag). Control: the pain rule itself off -> knee-loading lifts at RPE 8-9."""
+    for cap in (False, True):
+        g = weeks[("g_knee_pain_garage_short", cap)]
+        assert knee_breaches(g) == [], cap
+        assert any("(knee, 5/10)" in ln for s in g["week"]["sessions"] for ln in _lines(s))
+        quads = sw.hard_sets_by_muscle(g["week"], g["world"]["lib"], g["world"]["catalog"]["movements"]).get("quadriceps", 0)
+        assert quads > 0, (cap, quads)
+    old = _week("g_knee_pain_garage_short", {(lp, "apply_joint_rule"): lambda rx, ctx, rot, flags: []})
+    assert knee_breaches(old)
+    from training import live_pain
+
+    none = _week("g_knee_pain_garage_short", {(live_pain, "priority_ceiling"): lambda *a: None})  # control: no priority route
+    assert sw.hard_sets_by_muscle(none["week"], none["world"]["lib"], none["world"]["catalog"]["movements"]).get("quadriceps", 0) < quads
+
+
+# ── 2. mild pain keeps the lift lighter; the in-set stop line ────────────────
+def test_mild_pain_keeps_the_movement_lighter_with_a_stop_line(weeks):
+    """Stress case i (low back 2/10 on the deadlift): PAIN_RULE's mild line keeps the deadlift — load held (fix round 10: no step
+    up while a flag stands), RPE <= 8 — and its note says when to stop. Control: the old exclusion (any pain-class note swaps) ->
+    the deadlift is not served."""
+    i = weeks[("i_mild_pain_low_back", False)]["week"]
+    lh = next(s for s in i["sessions"] if s["role"] == "lower_heavy")
+    dl = next(x for x in lh["lifts"] if x["key"] == "deadlift_barbell")
+    assert _top_rpe(dl["hevy_note"]) <= 8 and "Pain past 2/10 or sharp → stop this lift." in dl["hevy_note"]
+    assert any(ln.startswith("load (live): Deadlift (Barbell)") and " — hold: " in ln for ln in _lines(lh))
+    old = _week("i_mild_pain_low_back", {(lsafe, "blocked_pain_is_mild"): lambda entry, ctx: False})
+    assert "deadlift_barbell" not in {x["key"] for x in next(s for s in old["week"]["sessions"] if s["role"] == "lower_heavy")["lifts"]}
+
+
+def unstopped(week: dict) -> list[str]:
+    """Lifts the pain rule touched (reduced or swapped in under a flag) whose note carries no in-set stop line."""
+    out = []
+    for s in week["sessions"]:
+        touched = {ln.split("(live): ", 1)[1].split(" — ")[0] for ln in _lines(s) if ln.startswith("held (live): ")}
+        touched |= {ln.split(" -> ", 1)[1].split(" — ")[0] for ln in _lines(s) if ln.startswith("swapped (live): ") and " flag on " in ln}
+        out += [
+            f"{s['role']}: {x['key']}" for x in s["lifts"] if x["title"] in touched and "→ stop this lift." not in (x["hevy_note"] or "")
+        ]
+    return out
+
+
+def test_every_pain_flagged_lift_carries_an_in_set_stop_line(weeks):
+    for key in [k for k in weeks if k[0] in ("b_shoulder_flag_low_recovery", "g_knee_pain_garage_short", "i_mild_pain_low_back")]:
+        assert unstopped(weeks[key]["week"]) == [], key
+    off = _week("g_knee_pain_garage_short", {(lsafe, "stop_line"): lambda severity: ""})  # control: no stop line
+    assert unstopped(off["week"])
+
+
+# ── 3. no load step on a held lift or a hold day ─────────────────────────────
+def _held(s: dict) -> set[str]:
+    out = set()
+    for ln in _lines(s):
+        for head in ("load (live): ", "reduced (live): ", "stall (live): ", "one cut a week (live): "):
+            if ln.startswith(head):
+                out.add(re.split(r" \d[\d.]* lb -> | — ", ln[len(head) :])[0])
+        if ln.startswith("swapped (live): ") and " flag on " in ln:
+            out.add(ln.split(" -> ", 1)[1].split(" — ")[0])
+    return out
+
+
+def stepping(week: dict) -> list[str]:
+    """Any in-session load-step line on any lift (fix round 10: double progression is the one progression system under live)."""
+    return [
+        f"{s['role']}: {x['key']}"
+        for s in week["sessions"]
+        for x in s["lifts"]
+        if any(lsafe._step_line(ln) for ln in (x["hevy_note"] or "").split("\n"))
+    ]
+
+
+def test_no_lift_carries_an_in_session_load_step(weeks):
+    """Fourth red team: the session rule ("Top reps at RPE 7 or less → +10 lb on later sets") headed exercise 1 on deload days,
+    stall resets and pain cuts — undoing the cut it sat under. The ninth red team: it is a second progression system next to
+    "Same load: build to 12 reps". Fix round 10: no note carries it. Control: the rule left in -> back on the notes."""
+    for key, w in weeks.items():
+        assert stepping(w["week"]) == [], key
+    off = {(lsafe, "no_step"): lambda blocks, rx: [], (lsafe, "block_rule"): lambda block: block}
+    assert stepping(_week("f_high_fatigue_poor_sleep", off)["week"])
+
+
+# ── 4. one effort across the session ────────────────────────────────────────
+def session_conflicts(week: dict) -> list[str]:
+    """The session line's band against every big lift's (anchor's) own effort target, across the WHOLE session — the generator's
+    own measure (`sample_weeks_5861._session_effort_conflicts`, over `live_safety.big_lift_conflicts`)."""
+    return sw._session_effort_conflicts(week)
+
+
+def test_the_session_line_never_contradicts_a_big_lift(weeks):
+    for key, w in weeks.items():
+        assert session_conflicts(w["week"]) == [], key
+    head = "Lower heavy · RPE 7 on big lifts"
+    two = [SimpleNamespace(movement_key="a", notes=f"{head}\n{sb.LOW_ENERGY_LINE}", rationale_tag="anchor:squat:heavy")]
+    two.append(SimpleNamespace(movement_key="b", notes="RPE 8–9", rationale_tag="anchor:hinge:heavy"))
+    # the red team's own morning; #5861 FIX7: the line spans the big lifts' bands (lint L3/L6/L12 need its effort) — no conflict
+    assert lsafe.big_lift_conflicts(two) and lsafe.coherent_head(head, two) == "Lower heavy · RPE 7–9 on big lifts"
+    assert lsafe.big_lift_conflicts(two, "Lower heavy · RPE 7–9 on big lifts") == []
+    off = {
+        (lsafe, "coherent_effort"): lambda blocks, rx: None,
+        (lsafe, "fix_block"): lambda block, rx, blocks: lsafe.block_rule(block),
+    }
+    assert session_conflicts(
+        _week("a_large_deficit_experienced", off)["week"]
+    )  # control: the per-lift guard only — the second lift's RPE 7-8 under a session line of 8-9 (fix round 9: a hold day caps all)
+
+
+# ── 5. volume ────────────────────────────────────────────────────────────────
+def over_redline(week: dict) -> int:
+    """Working sets over the owner's weekly redline (owner_redlines total_hard_sets_wk); 0 = inside it."""
+    from training import owner_redlines
+
+    return max(
+        0, sum(x["working_sets"] for x in _lifts(week)) - int(owner_redlines.REDLINES["lifting_sessions_per_wk"]["total_hard_sets_wk"][1])
+    )
+
+
+def test_the_week_never_passes_the_weekly_hard_set_redline(weeks):
+    """The owner's weekly hard-set redline stays a CHECK on every drafted week (round 9 keeps the redline guards as checks).
+    Control: a week one set over -> red."""
+    from training import owner_redlines
+
+    assert int(owner_redlines.REDLINES["lifting_sessions_per_wk"]["total_hard_sets_wk"][1]) == 75
+    for key, w in weeks.items():
+        assert over_redline(w["week"]) == 0, key
+    one_over = copy.deepcopy(weeks[("a_large_deficit_experienced", False)]["week"])  # control: 76 must fail
+    total = sum(x["working_sets"] for x in _lifts(one_over))
+    one_over["sessions"][0]["lifts"][0]["working_sets"] += 76 - total
+    assert over_redline(one_over) == 1
+
+
+def singles(week: dict) -> list[str]:
+    return [
+        f"{s['role']}: {x['key']}"
+        for s in week["sessions"]
+        for x in s["lifts"]
+        if str(x["tag"]).startswith("accessory:") and not str(x["tag"]).endswith(":carry") and x["working_sets"] == 1
+    ]
+
+
+def test_trims_drop_whole_accessories_never_leaving_one_set(weeks):
+    """Drop, don't shave: no accessory is ever left at one working set — the ONE trim order (`live_volume.next_cut`) takes a
+    set only above `slot_min_sets`, then drops the accessory whole; an anchor is never dropped. Control: the floor at 1 -> the
+    same 2-set accessory is shaved to one."""
+    for key, w in weeks.items():
+        assert singles(w["week"]) == [], key
+    acc2 = [(False, False, False, 2)]
+    assert lvol.next_cut(acc2) == (0, "drop") and lvol.next_cut([(True, False, False, 2)]) is None
+    with patch.dict(lset.HEURISTICS["slot_min_sets"], {"value": 1}):
+        assert lvol.next_cut(acc2) == (0, "set")  # control
+
+
+def test_the_one_trim_order_takes_non_priority_back_offs_first_and_priority_last():
+    """THE order: non-priority accessory back-offs, non-priority anchor back-offs, priority back-offs, then whole accessories.
+    Control: reversed priorities -> the other item goes first."""
+    items = [(False, False, True, 3), (True, False, False, 3), (False, False, False, 3)]  # prio acc, anchor, non-prio acc
+    assert lvol.next_cut(items) == (2, "set")
+    assert lvol.next_cut(items[:2]) == (1, "set")  # the anchor's back-off before the priority accessory's
+    assert lvol.next_cut([items[0]]) == (0, "set")
+
+
+def test_the_week_plan_holds_the_priority_muscles_and_fills_the_quadriceps_when_short(weeks):
+    """Ruling 9: the priority muscles at or over MEV; a quadriceps week short of its aim takes its low-fatigue FILL (the leg
+    extension first) on a lower morning. Control: the aim out of reach of the template -> a fill row appears."""
+    a = weeks[("a_large_deficit_experienced", False)]
+    lm = a["m"]["landmarks"]
+    assert lm["chest"]["sets"] >= lm["chest"]["MEV"] and lm["quadriceps"]["sets"] >= lm["quadriceps"]["MEV"]
+    plan = lvol.week_plan(CAT0, copy.deepcopy(LIB0), 5)
+    assert not [r for r in plan["rows"] if r.get("fill") == "quadriceps"]  # the template's squats + leg press reach the aim
+    with patch.object(lvol, "targets", lambda lib, m, hf=False, monday=None: {"quadriceps": {"floor": 14.0, "aim": 14.0, "cap": 16.0}}):
+        high = lvol.week_plan(CAT0, copy.deepcopy(LIB0), 5)
+    fills = [r for r in high["rows"] if r.get("fill") == "quadriceps"]
+    assert fills and fills[0]["key"] in lvol.FILL["quadriceps"] and fills[0]["role"].startswith("lower")  # control
+
+
+def test_ruling_9_total_shoulder_volume_is_not_forced_over_mav():
+    """Owner ruling 9: 'preserve rear delt WITHOUT forcing total shoulder volume'. The plan's 5-morning week must keep the
+    shoulders (all three heads, direct + indirect) at or under MAV while each head holds its aim."""
+    plan = lvol.week_plan(CAT0, copy.deepcopy(LIB0), 5)
+    assert plan["counts"]["shoulders"] <= LANDMARKS["muscles"]["shoulders"]["MAV"], plan["counts"]
+
+
+# ── 6. order and the heavy pull ──────────────────────────────────────────────
+def test_lower_volume_squats_before_the_hinge(weeks):
+    for key, w in weeks.items():
+        for s in w["week"]["sessions"]:
+            if s["role"] != "lower_volume":
+                continue
+            pats = [_entry(w, x["key"]).get("pattern") for x in s["lifts"] if str(x["tag"]).startswith("anchor:")]
+            if "squat" in pats and "hinge" in pats:
+                assert pats.index("squat") < pats.index("hinge"), key
+    off = _week("a_large_deficit_experienced", {(lshape, "order_lower_volume"): lambda rx: []})  # control: the template order
+    lv = next(s for s in off["week"]["sessions"] if s["role"] == "lower_volume")
+    assert lv["lifts"][0]["key"] == "romanian_deadlift_barbell"
+
+
+def test_the_heavy_day_deadlift_is_a_top_set_and_one_back_off(weeks):
+    """Owner ruling 5: the heavy deadlift is a top set + ONE back-off, the squat pairing stays. Control: the shape off -> two
+    back-offs."""
+
+    def dl(week):
+        lh = next(s for s in week["sessions"] if s["role"] == "lower_heavy")
+        return next(x for x in lh["lifts"] if x["key"] == "deadlift_barbell"), {x["key"] for x in lh["lifts"]}
+
+    ruled, keys = dl(weeks[("a_large_deficit_experienced", False)]["week"])
+    assert ruled["working_sets"] == 2 and "squat_barbell" in keys  # the pairing stays (#5694)
+    old, _keys2 = dl(_week("a_large_deficit_experienced", {(lshape, "deadlift_shape"): lambda rx: []})["week"])
+    assert old["working_sets"] == 3
+
+
+# ── 7. the aerobic gap ───────────────────────────────────────────────────────
+def _walks(week: dict) -> list[str]:
+    return [s["role"] for s in week["sessions"] if any("Optional today: brisk walk" in (x["hevy_note"] or "") for x in s["lifts"][:1])]
+
+
+def test_an_uncovered_aerobic_gap_becomes_one_optional_walk_never_silence(weeks):
+    """Shared cap, a heavy walker (h): the gap after steps and the one block is closed by ONE optional walk on the conditioning
+    host's morning (exercise 1's note), never a lifting cut. Control: the prompt off -> a silent shortfall.
+    #5861 FIX8 (owner ruling 12; the seventh red team): steps of UNKNOWN intensity are reported, never a manufactured gap — a
+    10.5k-step walker with no recorded walks gets no prompt; the same week at LOW steps does."""
+    h = weeks[("h_heavy_walker", True)]["week"]
+    assert _walks(h) == [] and not any(ln.startswith("walk (live)") for s in h["sessions"] for ln in _lines(s))
+    assert any("intensity unknown" in ln for s in h["sessions"] for ln in _lines(s))
+    ALL["h_low_steps"] = ALL["h_heavy_walker"] | {"steps_per_day": 5000}
+    try:
+        low = _week("h_low_steps", settings={"session_cap_includes_cardio": True})["week"]
+        assert len(_walks(low)) == 1 and _walks(low)[0] not in ("lower_heavy", "upper_heavy")  # the week's host (fix round 10)
+        assert any(ln.startswith("walk (live): optional brisk walk") for s in low["sessions"] for ln in _lines(s))
+        off = _week("h_low_steps", {(lshape, "walk_prompt"): lambda live, today_minutes=0: []}, {"session_cap_includes_cardio": True})
+        assert _walks(off["week"]) == []
+        unknown = _week("h_heavy_walker", {(lshape, "intensity_unknown"): lambda aer: False}, {"session_cap_includes_cardio": True})
+        assert len(_walks(unknown["week"])) == 1  # control: the old reading manufactures the gap
+    finally:
+        ALL.pop("h_low_steps", None)
+
+
+def test_under_the_default_cap_a_small_gap_is_the_walks_not_another_ride(weeks):
+    def easy(week):
+        return sum(1 for s in week["sessions"] if s["cardio"].get("kind") and s["cardio"]["kind"] not in lp.HARD_KINDS)
+
+    # ruling 4: an easy block needs a NAMED purpose — the record's aerobic gap; a record that covers the week (synthetic 140
+    # recorded min: a 10-min gap, under the walk prompt floor) serves no easy ride. Control: a 40-min-short week -> a purpose.
+    ruled = _week("h_heavy_walker", {(lp, "aerobic"): lambda inputs: {"volume_covered": False, "walking_min_per_wk": 140, "line": "x"}})
+    assert easy(ruled["week"]) == 0
+    assert lshape.walk_covers("easy", {"settings": {"session_cap_includes_cardio": True}, "aerobic": {"walking_min_per_wk": 140}}) is None
+    short = {"volume_covered": False, "walking_min_per_wk": 60, "line": "x"}
+    from training import live_rulings
+
+    keep, _lines_ = live_rulings.purposeful_cardio("easy", {"aerobic": short, "target_date": "2026-11-18"}, lp.HARD_KINDS)
+    assert keep  # control
+    import inspect
+
+    from training import cardio_model
+
+    assert "HEURISTIC" in inspect.getsource(cardio_model).split("CADENCE_MODERATE_SPM = ", 1)[0][-600:]  # the cadence stays labelled
+
+
+# ── 8. the stop line ─────────────────────────────────────────────────────────
+def _cardio_wire_notes(week: dict, hard_only: bool = True) -> list[str]:
+    """The conditioning notes as COMPILED for Hevy (`hevy_compiler.to_create_body`, the payload the nightly cron and the MCP write
+    path send — the generator compiles with the cron's own template lookup); `hard_only`: the hard (conditioning) blocks."""
+    out = []
+    for s in week["sessions"]:
+        if hard_only and s["cardio"].get("kind") not in lp.HARD_KINDS:
+            continue
+        out += [e.get("notes") or "" for e in s["wire"] if any(st.get("duration_seconds") for st in e.get("sets") or [])]
+    return out
+
+
+def test_no_symptom_warning_line_reaches_any_hevy_payload():
+    """#5861 FIX6, owner ruling 10 ("we do not need to post symptom warnings"): no symptom line on any session — round 9 deleted
+    the presets and the lifting-day switch, so there is nothing to set. Control: the words do reach the check when planted."""
+    words = ("Stop, log it", "dizzy", "heart racing", "medical help")
+    a = _week("a_large_deficit_experienced")["week"]
+    hard = _cardio_wire_notes(a)
+    assert hard and not any(w in n for n in hard for w in words)
+    assert not any(w in (e.get("notes") or "") for s in a["sessions"] for e in s["wire"] for w in words)
+    assert not {"symptom_line", "symptom_line_on_lifting_days"} & set(lset.SETTINGS)
+    assert any(w in "dizzy? Stop, log it." for w in words)  # control: the scan sees a planted line
+
+
+# ── 10. data and test fidelity ───────────────────────────────────────────────
+def test_the_band_pull_up_is_a_built_in_vertical_pull():
+    assert CAT0["pull_up_band"]["hevy_template_id_hint"] == "56808FD2" and CAT0["pull_up_band"]["is_custom"] is False
+    assert CAT0["pull_up_band"]["anchor_family"] == "vertical_pull"
+    e = LIB0["movements"]["pull_up_band"]
+    assert e["template_id"] == "56808FD2" and e["gates"] == [] and e["objective_inputs"]["reviewed"]
+
+
+def test_the_generous_tiers_and_the_trunk_categories_are_corrected_at_their_inputs():
+    mv = LIB0["movements"]
+    tier = lambda k, o: (mv[k]["ratings"][o] or {}).get("tier")  # noqa: E731
+    assert tier("landmine_press", "hypertrophy") == "A" and tier("landmine_press_single_arm", "hypertrophy") == "A"
+    assert tier("trap_pulldown", "hypertrophy") == "A"
+    assert tier("sled_push", "strength") == "B" and tier("sled_drag", "strength") == "B"
+    assert tier("walking", "conditioning") == "C" and tier("treadmill", "conditioning") == "A"  # rechecked: incline is the difference
+    assert mv["pallof_press"]["category"] == "rehab_control" and mv["pallof_press"]["trunk_function"] == "anti_rotation"
+    assert mv["ab_wheel"]["category"] == "hypertrophy" and mv["ab_wheel"]["trunk_function"] == "anti_extension"
+
+
+def test_the_deload_caps_every_compound_at_rpe_7(weeks):
+    """The third red team's M3 survivor: DELOAD_SHAPE compound_rpe 7 -> 9 passed every test. Control: the cap moved -> red.
+    #5861 FIX7: until the owner confirms the deload, each anchor keeps a top set at RPE 8 (never past it)."""
+
+    def over(week):
+        return [
+            f"{s['role']}: {x['key']}"
+            for s in week["sessions"]
+            for x in s["lifts"]
+            if str(x["tag"]).startswith("anchor:") and _top_rpe(x["hevy_note"]) > cap
+        ]
+
+    # #5861 FIX7: a RECOMMENDED (unconfirmed) deload keeps one top set per anchor at RPE 8 (DELOAD_SHAPE anchor_top_rpe); the
+    # RPE-7 cap is for a deload he confirmed
+    cap = lp.DELOAD_SHAPE["anchor_top_rpe"]["value"]
+
+    f = weeks[("f_high_fatigue_poor_sleep", False)]["week"]
+    assert all(s["fatigue"]["action"] == "deload_recommended" for s in f["sessions"]) and over(f) == []
+    assert lp.DELOAD_SHAPE["compound_rpe"]["value"] == 7 and cap == 8
+    assert any(str(x["tag"]).startswith("anchor:") and _top_rpe(x["hevy_note"]) == 8 for s in f["sessions"] for x in s["lifts"])
+    with (
+        patch.dict(lp.DELOAD_SHAPE, {"anchor_top_rpe": {"value": 9, "label": "heuristic", "basis": "mutated"}}),
+        patch.dict(lset.HEURISTICS["first_back_rpe"], {"value": 10}),  # fix round 9: the hold day's own RPE 8 cap, lifted too
+    ):
+        moved = _week("f_high_fatigue_poor_sleep")["week"]
+    assert over(moved)  # control: the mutated cap lets an anchor past RPE 8
+
+
+def test_the_sample_wire_uses_the_nightly_jobs_template_lookup(weeks):
+    """The generator compiles with the cron's lookup (`hevy_template_cache.resolve_movement` behind the KB template setting), so
+    no catalog KEY reaches the wire as a template id. Control: the base harness's simplified lookup -> 'reverse_pec_deck' does."""
+    ids = {e.get("exercise_template_id") for w in weeks.values() for s in w["week"]["sessions"] for e in s["wire"]}
+    assert ids and not ids & set(CAT0)
+    sw.RESOLVER["mode"] = "legacy"
+    try:
+        old = _week("a_large_deficit_experienced")["week"]
+    finally:
+        sw.RESOLVER["mode"] = "cron"
+    assert {e.get("exercise_template_id") for s in old["sessions"] for e in s["wire"]} & set(CAT0)
+
+
+def test_every_fix4_constant_is_labelled_and_every_default_is_todays():
+    for table in (lshape.WALK_PROMPT, lp.DELOAD_SHAPE):
+        assert all(v["label"] == "heuristic" and v["basis"] for v in table.values())
+    assert lsafe.STOP_LINE["label"] == "heuristic"
+    assert not {"heavy_day_deadlift_shape", "kb_slot_under_strain"} & set(lset.SETTINGS)  # rulings 5 and 7 are the rule now
+    assert LIB0["status"] == "proposed"

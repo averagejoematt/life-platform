@@ -1,0 +1,174 @@
+"""#5861 L6 — THE NO-LIVE-CHANGE PROOF for the validation lane: while the exercise library is `proposed`, every drafted week
+SERVES exactly what the base tree served (base: the integration branch at ea3906604, before any L6 commit).
+
+Two halves:
+  1. PINNED DIGESTS — `scripts/sample_weeks_5861.served_digest("proposed")`: per synthetic profile, sha256 of everything a
+     drafted week serves (titles, every lift's sets, reps and Hevy note, the compiled Hevy body, the cardio block, the
+     rationale, the minutes). The world is built from the #5075 pools (`prior="pools"`), so it does not move when the library
+     or the catalog is regenerated. The pins were computed by running this same harness against a `git archive` export of
+     ea3906604 and against this branch: identical. The selection's SHADOW record (`inputs_snapshot.selection_shadow`) is not
+     served and is not pinned — L6's catalog entries and cue sheets change what the shadow ranks, by design.
+  2. LIVE CODE NEVER RUNS IN SHADOW — L6's live-only entry points are replaced by functions that FAIL the test, and every
+     profile's week drafts clean in proposed mode.
+
+Must-fail controls (run on the lane, recorded on the PR): `live_session.drop_accessories` ignoring its live mark (the
+shadow red-day rule changed) -> half 1 red for the red-readiness profiles and half 2 red; `live_session.for_live_draft`
+skipping its mode check -> half 2 red.
+"""
+
+from __future__ import annotations
+
+import pathlib
+import sys
+from contextlib import ExitStack
+from unittest.mock import patch
+
+import pytest
+
+REPO = pathlib.Path(__file__).resolve().parents[1]
+for _p in (REPO, REPO / "lambdas", REPO / "scripts"):
+    sys.path.insert(0, str(_p))
+
+import sample_weeks_5861 as sw  # noqa: E402
+
+PINNED = {
+    "a_large_deficit_experienced": "482036aa60a4ad1e",
+    "b_shoulder_flag_low_recovery": "c44c886a72aa40c0",
+    "c_equipment_limited": "482036aa60a4ad1e",
+    "d_stalled_anchor_adherence_dip": "f9f775a9435653f1",
+    "e_short_week": "8ae572edb08aac5c",
+    "f_high_fatigue_poor_sleep": "696de7e8a021a19a",
+}
+"""Computed on the base tree (ea3906604) and on this branch — identical. (a) and (c) agree because today's path ignores the
+equipment profile: the gap the live session fit closes."""
+
+
+def test_the_proposed_drafts_serve_exactly_what_the_base_tree_served():
+    assert sw.served_digest("proposed") == PINNED
+
+
+def _poisoned():
+    from health import rate_policy
+    from training import (
+        cardio_model,
+        live_balance,
+        live_load,
+        live_rules,
+        live_rulings,
+        live_safety,
+        live_sequence,
+        live_session,
+        live_settings,
+        live_shape,
+        live_volume,
+        live_week,
+        selection_live,
+    )
+
+    def boom(name):
+        def _f(*a, **k):
+            pytest.fail(f"live-only {name} ran while the library is proposed")
+
+        return _f
+
+    targets = [
+        (live_session, "fit_exposures"),
+        (live_session, "_replacement"),
+        (live_session, "_refit"),
+        (live_session, "_unpair"),
+        (live_session, "summary"),
+        (live_session, "contradictions"),
+        (selection_live, "build_policy"),
+        (selection_live, "select_slot"),
+        (selection_live, "changes_served"),
+        (live_week, "cardio_progress"),
+        (live_week, "vertical_pull_fallback"),
+        (live_week, "symptom_gate"),
+        (live_balance, "pain_assess"),
+        (live_balance, "library_fallbacks"),
+        (live_balance, "one_effort"),
+        (live_balance, "cardio_machine"),
+        (live_balance, "machine_label"),
+        (live_safety, "flag_joints"),
+        (live_safety, "mild_pain_tids"),
+        (live_safety, "no_step"),
+        (live_safety, "coherent_effort"),
+        (live_safety, "fix_block"),
+        (live_shape, "order_lower_volume"),
+        (live_shape, "deadlift_shape"),
+        (live_shape, "walk_prompt"),
+        (live_shape, "walk_note"),
+        (live_rules, "isolation_joint_cap"),
+        (live_rules, "note_class"),
+        (live_rules, "self_report"),
+        (live_sequence, "week_plan"),
+        (live_sequence, "plan_for_days"),
+        (live_sequence, "days_available"),
+        (live_sequence, "entry_week"),
+        (live_rulings, "lead_lift"),
+        (live_rulings, "purposeful_cardio"),
+        (live_rulings, "evidence_line"),
+        (live_rulings, "rate_line"),
+        # #5861 fix round 9: the consolidated rules never run in shadow (set_loads / familiar_keys are reached and return first)
+        (live_settings, "settings"),
+        (live_volume, "week_plan"),
+        (live_volume, "apply"),
+        (live_volume, "pair_anchors"),
+        (live_volume, "fit_sets"),
+        (live_volume, "time_fit"),
+        (live_load, "decide"),
+        (live_load, "history"),
+        (live_load, "mark_novelty"),
+        (live_load, "slump"),
+        (live_load, "slump_trim"),
+        (cardio_model, "recorded_aerobic"),
+        (rate_policy, "advisory_ceiling"),
+    ]
+    return [patch.object(mod, name, boom(f"{mod.__name__}.{name}")) for mod, name in targets]
+
+
+def test_no_l6_live_only_code_runs_in_shadow():
+    with ExitStack() as stack:
+        for p in _poisoned():
+            stack.enter_context(p)
+        for name, prof in sw.load_profiles().items():
+            world = sw.build_world(prof, "proposed", prior="pools")
+            week = sw.generate_week(prof, "proposed", world)
+            for s in week["sessions"]:
+                assert s["live_fit"] is None and s["fatigue"] is None, name
+                assert not any(
+                    ln.startswith(("swapped (live)", "skipped (live)", "time (live)", "fatigue (live)")) for ln in s["rationale"]
+                )
+
+
+def test_the_crons_session_sequence_is_unchanged_while_the_library_is_proposed():
+    """#5861 FIX5: the week rule is wired into the cron's sequence (`routine_generator._schedule_entry_for_date` ->
+    `session_sequence.next_session(skip=...)`, `live_sequence`) behind `mode() == "live"`. With the committed (proposed) library
+    the served entry is exactly `next_session` without a skip, on every day of a DIP week (the case the live rule changes) —
+    and the live week plan never runs. Control: the same record under an approved copy serves a different week (no
+    shoulders+arms) and carries `live_week`."""
+    import copy
+    import json
+
+    from training import live_sequence, routine_generator as rg, selection_engine as se, session_sequence as ss
+
+    prof = sw.load_profiles()["a_large_deficit_experienced"]
+    world = sw.build_world(prof, "proposed")
+    start = sw._day(prof["as_of"], -14)
+    keep = {sw._day(start, d) for d in (0, 3, 7, 8, 11)}  # five of ten mornings: a dip (tests/test_programming_fix3_5861.py)
+    record = [w for w in world["record"] if w["date"] < start or w["date"] in keep]
+    lib = json.loads((REPO / "config" / "exercise_library.json").read_text())
+    assert lib["status"] == "proposed"
+    week_cfg = {"schedule": {}}
+    days = [sw._day(prof["as_of"], n) for n in range(5)]
+    with (
+        patch.object(se, "load_library_failsoft", lambda: lib),
+        patch.object(live_sequence, "week_plan", lambda *a, **k: pytest.fail("the live week plan ran while the library is proposed")),
+    ):
+        served = [rg._schedule_entry_for_date(d, week_cfg, "module", record, []) for d in days]
+    assert served == [ss.next_session(d, record, []) for d in days]
+    assert all("live_week" not in e for e in served)
+    live = copy.deepcopy(lib) | {"status": "approved"}
+    with patch.object(se, "load_library_failsoft", lambda: live):
+        roles = [rg._schedule_entry_for_date(d, week_cfg, "module", record, []).get("live_week") for d in days]
+    assert all(r and "shoulders_arms" in r["skip"] for r in roles)  # control: live, the dip week skips shoulders+arms

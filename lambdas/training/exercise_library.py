@@ -6,8 +6,10 @@ WHAT IT IS
 movement Matthew has logged in Hevy (all years, all phases, tombstones excluded) plus expansion
 candidates he has not done, each tagged with what it trains, how (length bias, resistance
 profile, stability), what it costs (joint stress, skill) and what it needs (equipment ids from a
-controlled vocabulary). A hypertrophy tier above C needs a citation verified to exist (DOI or
-PMID) — an unreviewed entry is tier C, never a guess.
+controlled vocabulary). Each per-target hypertrophy row carries a QUALITY tier S-D that the written rubric
+(`training.quality_rubric`, #5857) derives from those attributes, and its evidence confidence as a separate field: evidence
+above `none_reviewed` needs a citation verified to exist (DOI or PMID), and only a direct trial may move a row one band off
+its rubric tier, recorded with its citation.
 
 It ships `status: "proposed"`. Only the selection engine (#5773, `selection_engine` / `selection_critic`)
 reads it, and it changes no live draft until the owner approves the library: while `proposed` the engine
@@ -47,6 +49,8 @@ from typing import Any, Optional
 
 from common import repo_config
 
+from training import quality_rubric
+
 logger = logging.getLogger("exercise_library")
 
 LIBRARY_BASENAME = "exercise_library.json"
@@ -73,9 +77,12 @@ RESISTANCE_PROFILES = (
 STABILITY = ("high", "moderate", "low", "unknown")
 STRESS_LEVELS = ("low", "moderate", "high", "unknown")
 JOINT_STRESS_KEYS = ("spinal_load", "shear", "wrist", "elbow", "shoulder")
+PAIN_MAP_JOINTS = ("knee", "hip")
+"""#5861 FIX4: the knee and hip ratings the live pain rule reads (`deploy/exercise_library_input_review.KNEE_HIP`, a class rule);
+optional per entry, never read by the rubric's joint cost (`quality_rubric.RUBRIC_JOINTS`)."""
 SKILL = ("low", "moderate", "high")
-TIERS = ("A", "B", "C")
-EVIDENCE_QUALITY = ("rct_direct", "rct_characteristic", "meta_analysis", "none_reviewed")
+TIERS = quality_rubric.QUALITY_TIERS  # the QUALITY tier S-D, derived by the rubric (#5857) — never an evidence grade
+EVIDENCE_CONFIDENCE = quality_rubric.EVIDENCE_CONFIDENCE  # evidence strength, its own field beside the tier
 LIBRARY_GATE_KINDS = (
     "bodyweight_threshold",  # measured: the 7-day mean Withings bodyweight; threshold value lives in the private overlay
     "chain_prerequisite",  # measured: logged sessions of the prerequisite movement(s) meeting the stated standard
@@ -162,6 +169,51 @@ def movements(lib: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 def _err(errors: list[str], where: str, msg: str) -> None:
     errors.append(f"{where}: {msg}")
+
+
+def _equivalence_errors(lib: dict[str, Any]) -> list[str]:
+    """An equivalence adjustment (#5857 rubric v2, board rec 6) names a comparator whose tier for the same target sits
+    ABOVE this row's rubric tier — parity with a higher-tier movement is what earns the +1."""
+    out: list[str] = []
+    mv = lib["movements"]
+    for mid, e in mv.items():
+        for row in e.get("hypertrophy") or []:
+            adj = row.get("evidence_adjustment") or {}
+            if adj.get("basis") != "equivalence":
+                continue
+            comp = next(
+                (r for r in (mv.get(adj.get("comparator")) or {}).get("hypertrophy") or [] if r.get("target") == row.get("target")), None
+            )
+            order = quality_rubric.QUALITY_TIERS
+            if (
+                comp is None
+                or comp.get("tier") not in order
+                or row.get("rubric_tier") not in order
+                or order.index(str(comp.get("tier"))) >= order.index(str(row.get("rubric_tier")))
+            ):
+                out.append(
+                    f"movements.{mid}: equivalence with {adj.get('comparator')!r} needs a higher-tier comparator for {row.get('target')}"
+                )
+    return out
+
+
+def _hypertrophy_row_errors(errors: list[str], w: str, e: dict[str, Any], row: dict[str, Any], citations: Any) -> None:
+    """One per-target row (#5857): a quality tier S-D the rubric derives (plus at most one recorded evidence band), and
+    its evidence confidence beside it. Evidence above `none_reviewed` cites a registered reference and carries a date."""
+    if row.get("tier") not in TIERS and not (row.get("tier") is None and row.get("applicable") is False):
+        _err(errors, w, f"tier {row.get('tier')!r} (S-D, or None only on a not-applicable row, #5861)")
+    for why in quality_rubric.derivation_problems(e, row):
+        _err(errors, w, f"{row.get('target')}: {why}")
+    if row.get("evidence_confidence") not in EVIDENCE_CONFIDENCE:
+        _err(errors, w, f"evidence_confidence {row.get('evidence_confidence')!r}")
+    if row.get("evidence_confidence") not in (None, "none_reviewed"):
+        cites = row.get("citations") or []
+        if not cites or any(c not in citations for c in cites):
+            _err(errors, w, f"evidence {row.get('evidence_confidence')} for {row.get('target')} needs >=1 registered citation")
+        if not _DATE_RE.match(str(row.get("last_reviewed"))):
+            _err(errors, w, "a reviewed row carries a dated last_reviewed")
+    elif row.get("evidence_adjustment"):
+        _err(errors, w, "an unreviewed row never moves off its rubric tier")
 
 
 def validate(lib: dict[str, Any]) -> list[str]:
@@ -252,6 +304,8 @@ def validate(lib: dict[str, Any]) -> list[str]:
                 _err(errors, w, "a history entry carries its logged template_id")
         if e.get("family") not in FAMILIES:
             _err(errors, w, f"family {e.get('family')!r}")
+        if e.get("job") not in quality_rubric.JOBS:
+            _err(errors, w, f"job {e.get('job')!r} (compound | isolation, #5857 rubric v2)")
         if e.get("length_bias") not in LENGTH_BIAS:
             _err(errors, w, f"length_bias {e.get('length_bias')!r}")
         if e.get("resistance_profile") not in RESISTANCE_PROFILES:
@@ -261,8 +315,8 @@ def validate(lib: dict[str, Any]) -> list[str]:
         if e.get("skill_complexity") not in SKILL:
             _err(errors, w, f"skill_complexity {e.get('skill_complexity')!r}")
         js = e.get("joint_stress") or {}
-        if set(js) != set(JOINT_STRESS_KEYS) or any(v not in STRESS_LEVELS for v in js.values()):
-            _err(errors, w, "joint_stress needs exactly spinal_load/shear/wrist/elbow/shoulder in low|moderate|high|unknown")
+        if set(js) - set(PAIN_MAP_JOINTS) != set(JOINT_STRESS_KEYS) or any(v not in STRESS_LEVELS for v in js.values()):
+            _err(errors, w, "joint_stress needs exactly spinal_load/shear/wrist/elbow/shoulder (+ knee/hip) in low|moderate|high|unknown")
         tgt = e.get("target") or {}
         if not tgt.get("primary") or not tgt.get("region"):
             _err(errors, w, "target needs primary + region")
@@ -273,18 +327,7 @@ def validate(lib: dict[str, Any]) -> list[str]:
         if not isinstance(hyp, list) or not hyp:
             _err(errors, w, "hypertrophy needs at least one per-target row")
         for row in hyp or []:
-            if row.get("tier") not in TIERS:
-                _err(errors, w, f"tier {row.get('tier')!r}")
-            if row.get("evidence_quality") not in EVIDENCE_QUALITY:
-                _err(errors, w, f"evidence_quality {row.get('evidence_quality')!r}")
-            if row.get("tier") in ("A", "B"):
-                cites = row.get("citations") or []
-                if not cites or any(c not in citations for c in cites):
-                    _err(errors, w, f"tier {row['tier']} for {row.get('target')} needs >=1 registered citation")
-                if row.get("last_reviewed") == "unreviewed" or not _DATE_RE.match(str(row.get("last_reviewed"))):
-                    _err(errors, w, "a tier A/B row carries a dated last_reviewed")
-            if row.get("last_reviewed") == "unreviewed" and row.get("tier") != "C":
-                _err(errors, w, "unreviewed => tier C")
+            _hypertrophy_row_errors(errors, w, e, row, citations)
         fbs = e.get("fallbacks")
         if not isinstance(fbs, list) or len(fbs) < MIN_FALLBACKS:
             _err(errors, w, "needs >= 1 ranked fallback")
@@ -309,6 +352,62 @@ def validate(lib: dict[str, Any]) -> list[str]:
             _err(errors, w, "impact movement without its charter gate")
         if requires_skill_gate(e) and not kinds & {"chain_prerequisite", "owner_confirmation", "charter_gate"}:
             _err(errors, w, "skill movement without a chain / owner-confirmation / charter gate")
+    errors += _equivalence_errors(lib)
+    errors += _evaluation_errors(lib)
+    return errors
+
+
+def canonical_of(lib: dict[str, Any], ref: str) -> Optional[str]:
+    """The canonical movement key for a library key OR a Hevy template id (#5861 alias layer); None when unknown. Every
+    pre-existing key and template id resolves: aliases and variants keep their own entries and name their canonical."""
+    mv = movements(lib)
+    e = mv.get(ref) or next((x for x in mv.values() if str(x.get("template_id") or "").upper() == str(ref).upper()), None)
+    return None if e is None else str(e.get("canonical") or next(k for k, x in mv.items() if x is e))
+
+
+def _input_ok(k: str, v: Any) -> bool:
+    """One objective input against its vocabulary: `functional` a list of qualities, `conditioning` None or a
+    {aerobic, control, impact, recovery} map of levels, every other input a single allowed value."""
+    allowed = quality_rubric.OBJECTIVE_INPUTS[k]
+    if k == "functional":
+        return isinstance(v, list) and all(x in allowed for x in v)
+    if k == "conditioning":
+        return v is None or (isinstance(v, dict) and set(v) == set(allowed) and all(x in quality_rubric.LEVELS for x in v.values()))
+    return v in allowed
+
+
+_ALIAS_SAME = ("family", "job", "pattern", "length_bias", "resistance_profile", "stability", "joint_stress", "skill_complexity")
+
+
+def _evaluation_errors(lib: dict[str, Any]) -> list[str]:
+    """#5861: category / trunk_function / functions in vocabulary, objective inputs well-formed, every rating what the
+    objective rubrics derive, and the canonical layer coherent (each canonical resolves; an alias carries its canonical's
+    attributes; the index and the entries agree)."""
+    errors: list[str] = []
+    qr = quality_rubric
+    mv = movements(lib)
+    for mid, e in mv.items():
+        w = f"movements.{mid}"
+        if e.get("category") not in qr.CATEGORIES:
+            _err(errors, w, f"category {e.get('category')!r}")
+        if "trunk_function" in e and e["trunk_function"] not in qr.TRUNK_FUNCTIONS:
+            _err(errors, w, f"trunk_function {e.get('trunk_function')!r}")
+        if any(f not in qr.FUNCTIONS for f in e.get("functions") or []):
+            _err(errors, w, f"functions {e.get('functions')!r}")
+        inp = e.get("objective_inputs") or {}
+        for k in qr.OBJECTIVE_INPUTS:
+            if k not in inp or not _input_ok(k, inp.get(k)):
+                _err(errors, w, f"objective_inputs.{k} {inp.get(k)!r}")
+        errors += [f"{w}: {why}" for why in qr.rating_problems(e)]
+        head = canonical_of(lib, mid)
+        if head not in mv:
+            _err(errors, w, f"canonical {e.get('canonical')!r} is not a library movement")
+        elif (e.get("variant") or {}).get("duplicate_of") and any(e.get(f) != mv[head].get(f) for f in _ALIAS_SAME):
+            _err(errors, w, f"an alias of {head} carries different attributes")
+    for head, fam in (lib.get("canonical_families") or {}).items():
+        for k in list(fam.get("aliases") or []) + list(fam.get("variants") or {}):
+            if (mv.get(k) or {}).get("canonical") != head:
+                _err(errors, f"canonical_families.{head}", f"{k} does not name {head} as its canonical")
     return errors
 
 
@@ -491,14 +590,21 @@ def classify_availability_note(text: str) -> list[dict[str, str]]:
 # ── fallbacks ────────────────────────────────────────────────────────────────────────────────────────────────────
 _PATTERNS: tuple[tuple[str, str], ...] = (
     ("calf", r"calf"),
+    # #5861 L6: a reverse Nordic is a knee EXTENSION (it was read as a leg curl); internal/external rotation is the cuff (it
+    # was read as trunk rotation); a curl-up is trunk flexion (it was read as a biceps curl); a band walk is hip abduction
+    # (any "walk" was read as cardio)
+    ("leg_extension", r"leg extension|sissy|reverse nordic|spanish squat"),
     ("leg_curl", r"leg curl|nordic|hamstring curl"),
-    ("leg_extension", r"leg extension|sissy"),
+    ("shoulder_rotation", r"(?:external|internal) rotation|rotator cuff"),
+    ("hip_abduction", r"hip abduction|band walks?|monster walk|lateral (?:band )?steps?|clam ?shell"),
+    ("hip_adduction", r"hip adduction|copenhagen"),
     ("hip_extension", r"hip thrust|glute bridge|back extension|hyperextension|pull through|kickback|rear kick|reverse hyper"),
     ("hinge", r"deadlift|\brdl\b|good morning|swing"),
     ("squat", r"squat|leg press|lunge|step up|split"),
     ("vertical_pull", r"pull ?up|chin ?up|pulldown|pullover"),
     ("horizontal_pull", r"\brows?\b|rowing|t bar"),
     ("triceps_extension", r"tricep|triceps|skull|pushdown|push ?away|kickback|jm press|dip"),
+    ("core_flexion_curl_up", r"curl[- ]ups?\b"),
     ("curl", r"curl|21s"),
     ("vertical_press", r"overhead press|shoulder press|military press|arnold|landmine press|pike|handstand"),
     ("lateral_raise", r"lateral raise|upright row|y raise"),
@@ -508,7 +614,7 @@ _PATTERNS: tuple[tuple[str, str], ...] = (
     ("carry", r"carry|carries|farmers|suitcase|sled|prowler"),
     ("core_anti", r"plank|pallof|dead bug|bird dog|ab wheel|rollout"),
     ("core_flexion", r"crunch|sit up|v up|leg raise|knee raise|rotation|twist|side bend|oblique"),
-    ("cardio", r"treadmill|cycling|bike|elliptical|rowing machine|stair|walk"),
+    ("cardio", r"treadmill|cycling|bike|elliptical|rowing machine|stair|\bwalk(?:ing|s)?\b"),
     ("olympic", r"clean|snatch|jerk|high pull"),
     ("shrug", r"shrug"),
 )
@@ -518,7 +624,7 @@ def movement_pattern(title: str) -> str:
     t = (title or "").lower()
     for name, pat in _PATTERNS:
         if re.search(pat, t):
-            return name
+            return "core_flexion" if name == "core_flexion_curl_up" else name
     return "other"
 
 

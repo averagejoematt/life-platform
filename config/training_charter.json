@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.47.0",
+  "version": "1.49.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -322,6 +322,20 @@
       "date": "2026-11-11",
       "by": "owner goal 2026-11-11 (#5799: measure lifting minutes against the 75-min ceiling; over it, antagonist supersets for accessories; drop sets only as an owner-selectable short-on-time variant) and owner ruling 2026-11-11 on PR #5811: GO, provided every pair is two non-competing accessories and no main lift is paired; no pair beyond these two without his approval",
       "what": "Adds split.session_minutes.measured_min_sessions (10, platform-proposed: two passes of the five-session sequence) and measured_rule: the per-set time model is re-derived from his measured Hevy sessions and the platform's 45 s constant retires. Adds split.supersets: the antagonist pairs (curl + triceps; lateral raise + rear delt), applied ahead of the accessory time trim when a draft runs over the lifting ceiling, anchors never; drop sets only as an owner-selectable short-on-time variant.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.48.0",
+      "date": "2026-11-12",
+      "by": "owner ruling 2026-11-12 on #5856 (option B), carried by #5857",
+      "what": "The concession ledger's nippard `rotation` promise (stage 1's weekly rotation commitment, training/week_commitments.py) accepts a pick held at a phase boundary only when it is the single servable member of its slot's best quality band (selection_engine.top_band, the exercise library's S-D quality tiers, #5857); the hold is recorded on the rotation row. A slot whose best band has two or more members still rotates, and the selection ranks the member that slot served least recently first. No key or number in this file changes.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.49.0",
+      "date": "2026-11-12",
+      "by": "owner ruling 2026-11-12 on #5857 (all eight board recommendations adopted)",
+      "what": "concession_ledger.dan_john.in_return gains 'a free-weight press, pull, squat and hinge weekly': stage 1's weekly commitments (training/week_commitments.py, row free_weight_compounds) BLOCK a program week that serves no free-weight compound in any one of the four patterns (anchors count), read from the exercise library's job / pattern / resistance profile. Ruling B (1.48.0) is amended: a pick held at a phase boundary is accepted only when it is the single servable member of the slot's S and A bands (both programmable). No number changes.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -1484,7 +1498,7 @@
     },
     "dan_john": {
       "concedes": "machines and isolation in the mix",
-      "in_return": "carries and kettlebell work weekly"
+      "in_return": "carries and kettlebell work weekly; a free-weight press, pull, squat and hinge weekly"
     },
     "hollywood_transformation_trainer": {
       "concedes": "nothing",

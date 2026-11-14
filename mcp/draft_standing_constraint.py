@@ -120,8 +120,13 @@ def cardio_block(
     layer: Any = None,
     cardio_index: dict[str, list] | None = None,
     previous: dict[str, Any] | None = None,
+    live: dict[str, Any] | None = None,
 ) -> tuple[Any, dict[str, Any]]:
     """(ExerciseBlock | None, pick) — the day's block from the charter's cardio menu (#5076).
+
+    `live` (#5861, `live_program.cardio_context(ideal)` — None in shadow, so the block is built exactly as before): the live
+    cardio fit (`live_program.cardio_fit`: steps first, conditioning placement, the shared-cap setting, strain) and the
+    symptom line on a conditioning note (`live_program.cardio_note`). A dropped block returns (None, {"state": "live_dropped"}).
 
     The kind and the machine are `cardio_menu.choose_kind` over this week's performed cardio
     (`cardio_index`, None = unread: no conditioning is counted, so the placement starts the week) and the
@@ -154,6 +159,14 @@ def cardio_block(
     except Exception as e:  # noqa: BLE001 — named, never a lost draft
         logger.warning("cardio block: pick failed: %s", e)
         return None, {"state": "failed", "error": type(e).__name__}
+    from training import live_program
+
+    if live is not None:  # #5861 second red team: the week-to-week progression reads his performed blocks (live only)
+        live = {**live, "by_machine": hist["by_machine"], "target_date": target_date}
+    fitted, live_lines = live_program.cardio_fit(menu, live)  # shadow: (menu, [])
+    if fitted is None:
+        return None, {"state": "live_dropped", "live": live_lines}
+    menu = fitted
     key, kind = menu["machine"], menu["kind"]
     compose = lambda k, m: cardio_note.compose(  # noqa: E731 — one call shape, used twice below
         movement_key=key,
@@ -168,12 +181,13 @@ def cardio_block(
         placement_why=menu["why"],
         previous=previous,
     )
-    minutes = cardio_menu.block_minutes(kind)
+    minutes = min(cardio_menu.block_minutes(kind), int(menu.get("live_minutes") or 10**6))
     notes, audit = compose(kind, minutes)
     if audit["kind"] != kind:  # the no-push gate demoted a hard kind: the minutes and the pick follow the kind the note carries
         kind = audit["kind"]
-        minutes = cardio_menu.block_minutes(kind)
+        minutes = min(cardio_menu.block_minutes(kind), int(menu.get("live_minutes") or 10**6))
         notes, audit = compose(kind, minutes)
+    notes = live_program.cardio_note(notes, live, audit["kind"])  # shadow: unchanged
     pick = cardio_menu.align_pick(pick, kind, key)  # #5201: pick, block and note name one modality and one cue
     block = ExerciseBlock(
         movement_key=key,
@@ -182,7 +196,7 @@ def cardio_block(
         rationale_tag=f"cardio:{key}:menu:{audit['kind']}",
     )
     menu_out = {"kind": audit["kind"], "machine": key, "minutes": minutes, "why": menu["why"], "previous_session": previous}
-    return block, {**pick, "menu": menu_out}
+    return block, {**pick, "menu": menu_out, **({"live": live_lines} if live else {})}
 
 
 def _catalog() -> dict[str, Any]:
@@ -305,9 +319,17 @@ def gate_draft(ideal: Any, target_date: str, adapt: Callable[[dict[str, Any] | N
     from training.cardio_cues import previous_of
 
     previous = previous_of(ideal, target_date)  # #5076: the session the Hevy sequence last credited, from the calendar
+    from training import live_program
+
+    live = live_program.cardio_context(ideal)  # #5861: None in shadow
     cardio, pick = cardio_block(
-        target_date, getattr(ideal, "archetype", "") or "", constraint, layer=layer, cardio_index=cardio_index, previous=previous
+        target_date, getattr(ideal, "archetype", "") or "", constraint, layer=layer, cardio_index=cardio_index, previous=previous, live=live
     )
+    if live is not None:
+        ideal.rationale = list(getattr(ideal, "rationale", None) or []) + list((pick or {}).get("live") or [])
+        from training.live_shape import walk_note
+
+        walk_note(ideal, (pick or {}).get("live"))  # #5861 FIX4: the week's optional walk, on exercise 1 (live only)
     if cardio is not None:
         ideal.exercises.append(cardio)
         _refresh_session_shape(ideal)

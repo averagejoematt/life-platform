@@ -197,6 +197,23 @@ def _version_on(day: str) -> Any:
     return program_v04.SESSION_SEQUENCE["program_version"] if day < cutover_day() else _seq().get("program_version")
 
 
+def _skip_roles(every: list[str], n_pre: int, skip: Any) -> list[str]:
+    """#5861 FIX5 (LIVE only): the role of each session in `every` when `skip(day)` names roles a calendar week does not draft —
+    the charter's order, stepping over a skipped role (each step moves every later session one place on, so the order resumes
+    where it left off once the week is whole again). Before the cut-over the v0.4 order is untouched."""
+    offset, out = 0, []
+    n_roles = len(_seq()["session_roles"])
+    for i, d in enumerate(every):
+        role = _role_at(i + offset, d, n_pre)
+        banned = frozenset(skip(d) or ()) if d >= cutover_day() else frozenset()
+        tries = 0
+        while role in banned and tries < n_roles:
+            offset, tries = offset + 1, tries + 1
+            role = _role_at(i + offset, d, n_pre)
+        out.append(role)
+    return out
+
+
 # ── #4312: what a loaded log must be to be credited as a PROGRAM session ─────────────
 def program_archetypes() -> set[str]:
     """The archetypes of the program's own sessions — `SESSION_TEMPLATES[role]['archetype']` over
@@ -277,7 +294,9 @@ def _rec(w: dict[str, Any], day: str) -> dict[str, Any]:
     }
 
 
-def classify_sessions(workouts: Iterable[dict[str, Any]] | None, before_day: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def classify_sessions(
+    workouts: Iterable[dict[str, Any]] | None, before_day: str, skip: Any = None
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Every loaded Hevy log in [block start, `before_day`) sorted into (credited sessions, oldest
     first, one per day; the logs NOT credited, each with `credited: False` and its `reason`).
 
@@ -323,7 +342,8 @@ def classify_sessions(workouts: Iterable[dict[str, Any]] | None, before_day: str
             )
         if not program:
             continue
-        role = _role_at(len(credited), d, sum(1 for c in credited if c["date"] < cutover_day()))
+        n_pre = sum(1 for c in credited if c["date"] < cutover_day())
+        role = _role_at(len(credited), d, n_pre) if skip is None else _skip_roles([c["date"] for c in credited] + [d], n_pre, skip)[-1]
         check = content_check(program, role)
         if check["matched"] is False:
             logged = "/".join(check["logged_muscles"]) or "none"
@@ -399,17 +419,22 @@ def structure_state() -> dict[str, Any]:
 
 
 # ── the ledger: every session's week, in order ─────────────────────────────────────────
-def ledger(dates: list[str], day: str | None = None, deload_records: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+def ledger(
+    dates: list[str], day: str | None = None, deload_records: list[dict[str, Any]] | None = None, skip: Any = None
+) -> list[dict[str, Any]]:
     """The program position of each completed session (`dates`, oldest first, one per day) and —
     when `day` is given — of the NEXT session served on `day`, as the last element. Pure.
 
-    THE one place a week, a deload and a block are computed (#4161); every reader goes through it."""
+    THE one place a week, a deload and a block are computed (#4161); every reader goes through it.
+    `skip` (#5861 FIX5, LIVE only — `live_sequence.sequence_skip`): a callable day -> the roles that day's calendar week does
+    not draft (a short or dip week); the order steps over them (`_skip_roles`). None (every caller today): the old formula."""
     seq = _seq()
     floor = _floor_days()
     week, opened, in_week = 1, block_start(), 0
     out: list[dict[str, Any]] = []
     every = list(dates) + ([day] if day is not None else [])
     n_pre = sum(1 for d in every if d < cutover_day())  # #5069: the sessions that keep their v0.4 role
+    roles_by_index = _skip_roles(every, n_pre, skip) if skip is not None else None
     for i, d in enumerate(every):
         per = _per_week(d)
         prev_opened, since, before = opened, _days(opened, d), in_week
@@ -423,7 +448,7 @@ def ledger(dates: list[str], day: str | None = None, deload_records: list[dict[s
         # #5070: a deload is the owner's recorded word covering this day — never the week counter, never a date
         dl_rec = deload_word.active_record(deload_records, d)
         deload = dl_rec is not None
-        role = _role_at(i, d, n_pre)
+        role = roles_by_index[i] if roles_by_index is not None else _role_at(i, d, n_pre)
         label = program_structure._ROLE_LABEL[role].lower()
         if in_week <= per:
             pos_label = f"week {week} · session {in_week} of {per} · {label}"
@@ -514,7 +539,7 @@ def _spacing(completed: list[dict[str, Any]], day: str) -> dict[str, Any]:
 
 
 def next_session(
-    day: str, workouts: Iterable[dict[str, Any]] | None, deload_records: list[dict[str, Any]] | None = None
+    day: str, workouts: Iterable[dict[str, Any]] | None, deload_records: list[dict[str, Any]] | None = None, skip: Any = None
 ) -> dict[str, Any] | None:
     """The next UNDONE session as of `day`, or None before the block start.
 
@@ -539,8 +564,8 @@ def next_session(
     from training.routine_title import ROUTINE_ARCHETYPE_KEY
 
     rows = list(workouts)
-    done, refused = classify_sessions(rows, day)
-    led = ledger([c["date"] for c in done], day, deload_records)
+    done, refused = classify_sessions(rows, day, skip)  # `skip`: #5861 FIX5, the live week rule (`ledger`); None today
+    led = ledger([c["date"] for c in done], day, deload_records, skip)
     pos = {k: v for k, v in led[-1].items() if k != "date"}
     last = done[-1] if done else None
     basis = pos["week_basis"]

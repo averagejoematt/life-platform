@@ -190,15 +190,129 @@ def _gather_inputs(target_date: str, add_load_enabled: bool) -> "GeneratorInputs
     """
     from training.routine_generator import GeneratorInputs
 
-    return GeneratorInputs(
+    live = _live_inputs(target_date)  # #5861 L3: {} unless the exercise library is approved — then the real values
+    inputs = GeneratorInputs(
         target_date=target_date,
-        recovery_tier="yellow",
-        acwr_flag="safe",
-        volume_7d={},
+        recovery_tier=live.get("recovery_tier") or "yellow",
+        acwr_flag=live.get("acwr_flag") or "safe",
+        volume_7d=live.get("volume_7d") or {},
         z2_minutes_7d=_z2_minutes_7d(target_date),
         days_since_last_workout=2,
         add_load_enabled=add_load_enabled,
     )
+    if live.get("sleep_hours") is not None:
+        setattr(inputs, "sleep_hours", live["sleep_hours"])  # read by fatigue_model.for_live_draft (live only)
+    if live.get("steps_by_day"):
+        setattr(inputs, "steps_by_day", live["steps_by_day"])  # #5861 L6: the walking dose, into cardio_model.cardio_load (live only)
+    for key in ("aerobic_record", "weights_by_day"):  # #5861 FIX6: rulings 11 + 12 (live only)
+        if live.get(key):
+            setattr(inputs, key, live[key])
+    if live.get("medical_stop_lines"):
+        setattr(inputs, "medical_stop_lines", live["medical_stop_lines"])  # #5861: tripped -> no hard cardio (live_week.symptom_gate)
+    return inputs
+
+
+# #5861 L3 — the audit's live-wiring bug (gap 4): the cron typed recovery "yellow", ACWR "safe" and an empty 7-day volume
+# for every draft, and the ACWR writer's zones (`safe | caution | danger`) never matched the generator's autoreg keys
+# (`high | very_high`), so "danger" could not reach the 0.6 multiplier. Behind THE SWITCH only: while the library is
+# proposed the three values stay exactly as they were.
+ACWR_ZONE_TO_AUTOREG = {"safe": "safe", "caution": "caution", "danger": "high"}  # anything else (detraining, re-baselining) = safe
+RECOVERY_BANDS = (67, 34)  # green >= 67, yellow >= 34 — the bands `mcp/tools_plan._recovery_tier` maps the score with
+
+
+MEDICAL_RHR_NIGHTS = 14  # `health.tripwire_readers._rhr_arm`: the latest night against the mean of the nights before it
+
+
+def _medical_stop_lines(whoop: list[dict[str, Any]], target_date: str) -> dict[str, Any] | None:
+    """`owner_redlines` `medical_stop_lines` through its ONE reader (`health.tripwire_readers.medical_stop_lines`) over the
+    whoop rows the cron already read: the RHR arm is measured; the labs arms read unknown (no labs read here); palpitations and
+    syncope are self-report with no input on the platform (unknown, never clear). Live only; the draft acts on `tripped`."""
+    try:
+        from health import tripwire_readers
+
+        rows = sorted((r for r in whoop if r.get("resting_heart_rate") is not None), key=lambda r: str(r.get("sk") or r.get("date") or ""))
+        return tripwire_readers.medical_stop_lines(
+            {"rhr_by_day": [r["resting_heart_rate"] for r in rows], "lab_draws": None, "window_end": target_date}
+        )
+    except Exception as e:  # noqa: BLE001 — an unread stop line is unknown, never a blocked draft
+        logger.warning(f"medical stop line read failed: {type(e).__name__}")
+        return None
+
+
+def _latest(rows: list[dict[str, Any]] | None, field: str) -> Any:
+    hits = sorted((r for r in rows or [] if r.get(field) is not None), key=lambda r: str(r.get("sk") or r.get("date") or ""))
+    return hits[-1].get(field) if hits else None
+
+
+def _live_inputs(target_date: str, read=None) -> dict[str, Any]:
+    """The real recovery tier, ACWR flag, 7-day hard sets per muscle and sleep — ONLY when the exercise library is approved
+    (`selection_engine.mode`). Each read is fail-soft: an unread value keeps the conservative default."""
+    from training import fatigue_model, selection_engine as se
+
+    lib = se.load_library_failsoft()  # the same cached read the draft's selection makes
+    if se.mode(lib) != se.MODE_LIVE:
+        return {}
+    read = read or _read_partition
+    out: dict[str, Any] = {}
+
+    def _safe(source: str, days: int) -> list[dict[str, Any]] | None:
+        try:
+            return read(source, shift_day_key(target_date, -days), target_date)
+        except Exception as e:  # noqa: BLE001 — unread keeps the default
+            logger.warning(f"live input read failed for {source}: {type(e).__name__}")
+            return None
+
+    from health import hr_regime
+
+    whoop = _safe("whoop", MEDICAL_RHR_NIGHTS)  # one read: the latest night + the RHR stop line's 14-night baseline
+    score = _latest(whoop, "recovery_score")
+    rebaselining = hr_regime.is_rebaselining(target_date)
+    if score is not None and not rebaselining:  # HR-derived tiers are not evidence in the window
+        out["recovery_tier"] = "green" if float(score) >= RECOVERY_BANDS[0] else ("yellow" if float(score) >= RECOVERY_BANDS[1] else "red")
+    if whoop is not None and not rebaselining:  # #5861 second red team: the medical stop line, read (report-only reader)
+        out["medical_stop_lines"] = _medical_stop_lines(whoop, target_date)
+    sleep = _latest(whoop, "sleep_duration_hours")
+    out["sleep_hours"] = float(sleep) if sleep is not None else None
+    zone = _latest(_safe("computed_metrics", 2), "acwr_zone")
+    out["acwr_flag"] = ACWR_ZONE_TO_AUTOREG.get(str(zone), "safe") if zone is not None else None
+    try:  # #5861 L6: the week's steps through the one steps-truth resolver, so the fatigue model counts the walking dose
+        from training import steps_resolver
+
+        sr = steps_resolver.steps_range(shift_day_key(target_date, -7), shift_day_key(target_date, -1), fetch=read, derived=False)
+        resolved = [d for d in sr.get("days") or [] if d.get("steps") is not None]  # steps-truth: steps_range output
+        out["steps_by_day"] = {d["date"]: d["steps"] for d in resolved}  # steps-truth: steps_resolver.steps_range output
+    except Exception as e:  # noqa: BLE001 — unread steps keep the walking dose out of the cardio load, said so in the model
+        logger.warning(f"live input read failed for steps: {type(e).__name__}")
+    hevy = _safe("hevy", 7)
+    if hevy is not None:
+        sets = fatigue_model.hard_sets_by_muscle(hevy, fatigue_model.library_index(lib), as_of=target_date)
+        out["volume_7d"] = {m: int(round(n)) for m, n in sets.items() if m != "unplaced"}
+    out |= _live_activity_inputs(target_date, _safe, hevy)
+    return out
+
+
+RATE_WEIGH_IN_DAYS = 35  # #5861 FIX6: five weeks of weigh-ins — the advisory ceiling's sustained-trend guard reads 4 weekly rates
+
+
+def _live_activity_inputs(target_date: str, safe: Any, hevy: list[dict[str, Any]] | None) -> dict[str, Any]:
+    """#5861 FIX6 (owner rulings 11 and 12), live only — `_live_inputs` returns before this while the library is proposed:
+    the week's RECORDED aerobic sessions (Apple workouts + Strava + the Hevy record, one workout identity counted once:
+    `cardio_model.recorded_aerobic`) and the weigh-ins the advisory loss-rate ceiling reads. Each read fail-soft; an unread
+    input adds no key."""
+    from training import cardio_model
+
+    out: dict[str, Any] = {}
+    apple, strava = safe("apple_health", 7), safe("strava", 7)
+    if apple is not None or strava is not None:
+        try:
+            out["aerobic_record"] = cardio_model.recorded_aerobic(apple=apple or [], strava=strava or [], hevy=hevy or [])
+        except Exception as e:  # noqa: BLE001 — an unresolved record is unknown, never a blocked draft
+            logger.warning(f"recorded aerobic failed: {type(e).__name__}")
+    withings = safe("withings", RATE_WEIGH_IN_DAYS)
+    weights = {str(r.get("date") or str(r.get("sk") or "")[5:15]): float(r["weight_lbs"]) for r in withings or [] if r.get("weight_lbs")}
+    if weights:
+        out["weights_by_day"] = weights
+    return out
 
 
 def lambda_handler(event, context):
@@ -254,7 +368,9 @@ def lambda_handler(event, context):
             try:
                 title_ctx = build_title_context(ir)
                 why = session_block.why_note_for(ir, format_why_note(ir))  # #5428: no second session line over the block
-                body = to_create_body(ir, resolve_movement, title_context=title_ctx, why_note=why)
+                from training.live_balance import template_resolver  # #5861 FIX3: the KB template setting (approved only)
+
+                body = to_create_body(ir, template_resolver(resolve_movement), title_context=title_ctx, why_note=why)
                 resp = wc.create_routine(body)
                 from training.hevy_compiler import from_hevy_response
 
