@@ -7,6 +7,8 @@ Moved out of `owner_redlines` unchanged (#4387, the #1665 size ratchet — the #
 
 from __future__ import annotations
 
+from typing import Any
+
 CHANGELOG_V1_TO_V2: list[str] = [
     "rate: the 0.5–1.0 %BW band is kept as the envelope; a scheduled absolute target replaces the unresolved "
     "'top of band vs widen' question — 3.0 lb/wk (cap 3.5) above 295 lb, then 2.5 / 2.0 / 1.5 stepping at 260 / 230 "
@@ -56,4 +58,20 @@ CHANGELOG_V2_TO_V3: list[str] = [
     "action', so its sentence is folded into anchor_lift_strength_drop's note; post_goal_walking KEPT, dormant until the "
     "maintenance phase (`dormant_until`); deletion VETOED for medical_stop_lines, mood_declared, joy and lean_mass — readers "
     "built instead (mood_declared and joy over the check-in lane's input, #5819)",
+    "2026-11-13 (#5916, owner ruling): the walking heart-rate cap and target (OD2, 2026-09-30) are RETIRED. Easy walking is "
+    "prescribed and judged by the talk test plus RPE (`walking_floor_hr_wk.easy_rpe_max`); heart rate stays a recorded "
+    "measurement and is never graded against a fixed ceiling. The walking hours, the walk count and the walk-length lines are unchanged",
 ]
+
+
+RETIRED_WALKING_HR_LINE: dict[str, Any] = {
+    "hr_ceiling_bpm": 120,  # drift-ok: a heart-rate ceiling in bpm, not a budget ceiling (ADR-133 scanner false-positive)
+    "hr_target_bpm": 105,
+    "stated": "2026-09-30",
+    "retired": "2026-11-13",
+    "by": "owner ruling 2026-11-13 (#5916): the talk test plus RPE replace the cap and the target",
+}
+"""History (#5916). The OD2 walking heart-rate cap and target, retired by the owner on 2026-11-13. Nothing prescribes or
+grades against them: `owner_redlines.REDLINES["walking_floor_hr_wk"]` carries `intensity_by` and `easy_rpe_max` instead, and
+this record is NOT part of `owner_redlines.summary()`. The one remaining reader is `training.recent_aerobic`'s two legacy
+names, kept only for `coach.critics_aerobic`'s swap sentence until that file's own lane retires it."""
