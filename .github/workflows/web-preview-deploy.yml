@@ -141,6 +141,9 @@ jobs:
           WWW_TARGET_INPUT: ${{ github.event.inputs.target }}
         run: python3 deploy/www_deploy_target.py --event "${{ github.event_name }}"
 
+      - name: Install the pinned Pillow (the share cards, scripts/v9_og_images.py, drawn inside www_build_target.sh)
+        run: pip install $(python3 scripts/ci_pins.py pillow)
+
       - name: Export the LIVE publication snapshot (public API, no credentials)
         run: python3 scripts/publish_snapshot.py --mode live --out www/content/snapshot
 

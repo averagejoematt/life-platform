@@ -76,7 +76,7 @@ const body = bodyForPage(c.body_html, c.excerpt);
 const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
 ---
 
-<Base title={c.title} top="story" description={c.excerpt || c.title} status={dayInWords(c.date)}>
+<Base title={c.title} top="story" description={c.excerpt || c.title} status={dayInWords(c.date)} card={c.status === "published" ? c.id : null} ogType={c.status === "published" ? "article" : "website"}>
   <section class="section" style="padding-bottom:24px">
     <div class="wrap" style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-end">
       <div style="flex:0 0 150px">
