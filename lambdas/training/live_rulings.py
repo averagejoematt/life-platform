@@ -1,38 +1,16 @@
-"""live_rulings.py — the owner's rulings of 2026-11-13 on the decision register, as LIVE-only programming rules (#5861 FIX6).
+"""live_rulings.py — the owner's rulings that remain their own rules (#5861). LIVE only; their values are library-carried
+through the ONE settings table (`live_settings`).
 
-Configuration, not activation: every rule here runs only past `selection_engine.mode() == "live"` (the library is `proposed`
-today, so nothing here runs — tests/test_no_live_change_5861_l6.py poisons each entry point and pins the proposed digests).
-The rulings' values are library-carried (`programming_settings`, written by `deploy/build_exercise_library.py` from the ONE
-settings table, `live_settings.SETTINGS`, fix round 9).
+  1. THE LEAD LIFT (`lead_lift`, `lead_of`, `lead_blocked`; ruling 5): squat and deadlift share the heavy lower morning but are
+     never both maximal — one leads at the session's top effort, the other runs at `second_lift_band` (RPE 7-8). The lead
+     alternates by ISO week; a lift that is cut, regressing or pain-capped cannot lead (the lead by state).
+  2. PURPOSEFUL CARDIO (`purposeful_cardio`, ruling 4): a gym block only for a named purpose — the week's conditioning dose, or the
+     RECORD's aerobic gap.
+  3. EVIDENCE AND COMPLETENESS, VISIBLE (`evidence_line`, ruling 16).
+  4. THE LOSS-RATE CEILING, ADVISORY (`rate_line`, ruling 11), never applied to a kcal target.
+  5. The hard-conditioning hosts (`conditioning_hosts`, `hard_conditioning_doses`).
 
-  1. THE LEAD LIFT (`lead_lift`, ruling 5). Heavy squat and heavy deadlift share the lower-heavy morning (#5694), but both are
-     never maximal in one session: one LEADS at the session's top effort and the other is capped one RPE band lower
-     (LEAD_LIFT). The lead alternates by ISO week (`lead_lift_rule: alternate_weekly`): even weeks the squat leads, odd weeks
-     the deadlift. Why alternation, not a fixed order: each lift gets a top-effort exposure every other week (the
-     strength-preservation signal stays readable for both), the pairing stays, and the second lift's fatigue cost falls on
-     the week it is not the lead. The deadlift's shape (top set + one back-off, ruling 5) is `live_shape.deadlift_shape`.
-  2. PRIORITY BY STIMULUS AND PERFORMANCE (`stimulus_gate`, ruling 9). A priority muscle's ADDED isolation slot (the
-     quadriceps slot) stays only when the stimulus and the performance both ask for it: when the week already holds the
-     muscle at or over MEV AND its anchor is progressing, nothing is added (more volume is not the goal; a progressing lift
-     at MEV is a working stimulus). A stalled, regressing or unread anchor, or a week under MEV, keeps the low-fatigue slot —
-     and so does a week whose squat is the SECOND lift (the lead-lift rule caps it at RPE 7-8: less stimulus, so the
-     low-fatigue quadriceps work stands).
-  3. THE SHORT WEEK'S ARMS AND SHOULDERS (`short_week_floor`, ruling 3). When a week drops shoulders+arms, the shoulders,
-     biceps and triceps are COUNTED (direct sets 1.0, indirect 0.5 — the fatigue model's convention) over the sessions left;
-     a muscle under its MEV takes sets on its isolation slots in those sessions until it reaches MEV (ARMS_FLOOR).
-  4. PURPOSEFUL CARDIO (`purposeful_cardio`, ruling 4). Under `cardio_purpose_only` a gym cardio block exists only when it
-     serves a named purpose — the week's conditioning dose on the conditioning host. No easy block fills a slot or a time
-     gap; easy aerobic is the walking outside the gym, tracked apart (`cardio_model.recorded_aerobic`). Under the shared cap
-     (ruling 1) the host's cardio room comes from supersets and from sets OVER a muscle's MAV only, never from strength work a
-     muscle needs (`live_week.make_cardio_room`, `cardio_room_takes: over_mav_only`).
-  5. EVIDENCE AND COMPLETENESS, VISIBLE (`evidence_line`, ruling 16). Each served movement's rationale line names its
-     objective tier, its evidence confidence and its data completeness (the rubric inputs known / read), with `provisional`
-     spelled out — missing information is never shown as proof of suitability.
-  6. THE LOSS-RATE CEILING, ADVISORY (`rate_line`, ruling 11): `health.rate_policy.advisory_ceiling` once a week (the
-     upper-heavy morning), never applied to a kcal target.
-
-Every threshold is a labelled HEURISTIC (ruling 18), registered with the metric that should re-tune it at a block retro in
-`HEURISTIC_HOOKS` (docs/coaching/ENGINE_ARCHITECTURE.md "Block-retro hooks")."""
+Ruling 18: every labelled table is registered with its block-retro metric in `HEURISTIC_HOOKS`."""
 
 from __future__ import annotations
 

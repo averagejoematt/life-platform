@@ -276,10 +276,9 @@ def _session_loads(
     deload: bool,
 ) -> dict[str, Any]:
     """The floor (#4107: the ONE v0.3 load path, `load_ramp.v03_floor`) and then the double
-    progression (#5052) — held on a deload the owner applied, whose loads are held as written. Then (#5861 red team, LIVE
-    only, `live_program.guard_loads`): no load steps up on a regressing / grinding / stalled lift or a strained day, and
-    down-steps on regression, overshoot, a joint flag or a stall reset — before the back-offs and warm-ups, which follow
-    the top set. Shadow: the guard returns before reading anything."""
+    progression (#5052) — held on a deload the owner applied, whose loads are held as written. Then (#5861, LIVE only,
+    `live_load.set_loads`): the one load model — double progression keyed by session role, one evidence-gated step-down — sets the
+    top load before the back-offs and warm-ups, which follow it. Shadow: it returns before reading anything."""
     load_floors = _enforce_load_floors(
         blocks,
         load_catalog,

@@ -1,30 +1,12 @@
-"""live_sequence.py — the week's sessions in the nightly SEQUENCE: the short week and the adherence dip (#5861 FIX5). LIVE only:
-every entry point checks `selection_engine.mode(lib) == "live"` first and returns None otherwise, so the sequence the cron
-serves while the library is `proposed` is today's, byte for byte (`tests/test_no_live_change_5861_l6.py`).
+"""live_sequence.py — the week's sessions in the nightly SEQUENCE: declared mornings and the adherence dip (#5861). LIVE only:
+every entry point checks `selection_engine.mode(lib) == "live"` first, so the sequence served while the library is `proposed` is
+today's, byte for byte (tests/test_no_live_change_5861_l6.py).
 
-WHY IT EXISTS. A fifth independent red team (2026-11-13) found the short-week and adherence-dip role choices only in the
-sample-week generator: production never set `short_week` and never skipped a role, so the samples showed weeks the nightly job
-would never draft — and a 3-day week crashed the draft (`total_sets 23 > cap 20`). This module is the ONE decision both read:
-
-  * `week_plan` — for a calendar week (Monday to Sunday, Pacific): which roles it does NOT draft, which session takes a
-    partner role's anchors (a full-body day), and which session hosts the week's carry and trunk floor. A SHORT week (fewer
-    lifting mornings than roles: `SHORT_WEEK_PLANS`) or an ADHERENCE DIP (`live_balance.adherence_response`, judged on the
-    record before the Monday) gives a plan; a normal week gives None.
-  * `sequence_skip` — the plan as the callable `session_sequence.ledger` / `next_session` step over (`_skip_roles`), so the
-    order SKIPS a role that week instead of sliding, and the credit check reads the role the plan served.
-  * `entry_week` — the plan for the served day, carried on the day entry (`live_week`) into the draft
-    (`live_session.for_live_draft`).
-
-THE SHORT WEEK'S INPUT. Production has no "mornings this week" record; `days_available` counts the nominal lifting days
-(`program_structure.NOMINAL_LIFTING_DAYS`) not covered by a dated charter travel window (`travel.windows`). The sample
-generator passes its profile's day count. A per-week declared count would be better — the owner's call (named on the PR).
-
-`sequence_rule_from` (library `programming_settings`) or, by default, the Monday AFTER the library's `approved_on` stamp
-(owner ruling #4, fix round 8: `rule_from`): the first Monday the rule judges — never applied retroactively. Approving the
-library stamps `approved_on` (an OWNER ACTION with the status flip); with neither, the rule judges from the block start.
-
-Every rule is a labelled PLATFORM HEURISTIC (practitioner consensus at best), owner-adjustable; none is validated.
-"""
+  * `week_plan` — for a calendar week: the mornings declared (`days_available`: the nominal lifting days no dated charter travel
+    window covers) -> `live_volume.SHORT_WEEKS` (1-3: full-body mornings; 4: shoulders+arms skipped). An ADHERENCE DIP (5+ of the
+    fortnight's 10 planned sessions missed, `DIP_MISSED`) is one 4-morning week (owner ruling 2) — never two in a row.
+  * `sequence_skip` / `entry_week` / `serve` / `cron_*` — the plan as the sequence's skip and on the served day entry.
+  * `rule_from` — owner ruling #4: the rules judge from the Monday after approval; earlier history is never re-sequenced."""
 
 from __future__ import annotations
 

@@ -1,47 +1,16 @@
-"""live_balance.py — the third red team's programming fixes (#5861 FIX3). LIVE only: every entry point is reached from a live
-hook (`live_program.plan` / `annotate` / `cardio_fit` / `cardio_note` / `rate_line`, `live_session.for_live_draft` /
-`_replacement`, `live_week.week_sets`), each of which returns before reading anything unless the draft ran the live session
-fit (`live_session.MARK`, which exists only when the exercise library is `approved`) — or, for `template_resolver`, unless the
-library is approved AND the owner set `kb_deadlift_template_id`. tests/test_no_live_change_5861_l6.py pins the served
-proposed-mode drafts byte for byte.
+"""live_balance.py — pain persistence, the library fallback, one effort per lift and the cardio host/machine (#5861). LIVE only:
+every function is reached from a live hook that checks the live mark first; `why_effort` and `template_resolver` are reached in
+shadow and return their input there (tests/test_no_live_change_5861_l6.py).
 
-WHY IT EXISTS. A third independent red team (2026-11-13) graded the integrated engine B- and named what an elite coach would
-not sign in the GENERATED weeks. Each rule below answers one of its findings, measured on the generated weeks:
+  * `spine_loading`: THE one spine-loading definition (a squat/hinge compound at moderate+ spinal load).
+  * `pain_assess` (PAIN_ASSESS_LINE): while a pain flag stands, the flagged lift carries one neutral "get it assessed" line.
+  * `library_fallbacks`: an accessory's last resort — same pattern, same muscle, best tier first.
+  * `effort_targets` / `one_effort` / `why_effort`: one effort target per lift; a morning with no cardio block never promises
+    "easy cardio" (ruling 4).
+  * The cardio host and machine (`conditioning_host`, `easy_gap`, `min_block`, `cardio_machine`, `machine_label`).
 
-  1. ONE SPINE-LOADING DEFINITION (`spine_loading`), used by the stacking rule, the acceptance gates and the sample-week
-     generator. The rule counted library spinal stress, the generator counted free-weight squat/hinge compounds (so a
-     dumbbell reverse lunge read "axial" there and "low" here), and the stacking fix swapped a split squat for a reverse
-     lunge that loads the spine the same — a label moved, not the fatigue (the data now rates the whole dumbbell-at-the-sides
-     class low: `deploy/exercise_library_input_review.SPINE_AT_SIDES`).
-  2. A REAL STACKING LIMIT AND THE KETTLEBELL SLOT (`kb_placement`, `place_kb`). Lower volume served RDL + back squat + the
-     owner-pinned KB deadlift "kept light": three spine-loading lifts every week. The pinned slot is the movable one: its home
-     (`kb_slot_role`, default the template's lower volume) keeps it unless that session already holds the limit, then it
-     MOVES (`kb_slot_when_stacked`, default `move`, to `kb_slot_move_to`, default shoulders+arms) or is dropped (`drop`).
-  3. PAIN THAT PERSISTS (`pain_assess`). A 6/10 sharp shoulder flag was routed around indefinitely. While a pain flag stands,
-     the session carries one neutral line (`pain_assess_line`, on by default; "" turns it off): if it persists two sessions,
-     get it assessed. No diagnosis, no number.
-  4. VOLUME BY PRIORITY (`allocation_plan`, `allocate`). Delts sat at 18 (MAV 16) beside chest at its MEV. The week is
-     allocated before it is drafted: every muscle over its MAV gives isolation sets (largest slot first, never under two
-     sets) until it sits at MAV, and the freed sets go first to the priority muscles (`priority_muscles`, default chest,
-     back, quadriceps, hamstrings — retention first) sitting at or under MEV + 1, one set per accessory slot.
-  5. THE ADHERENCE DIP (`adherence_response`, `lighter_week`). Five of fourteen sessions done and the plan was a full week
-     minus two sets. The default response is now fewer, shorter sessions focused on the anchors (`adherence_response`
-     `short_week`: four mornings — shoulders+arms skipped, as in the short week — each fitted to ADHERENCE_DIP minutes, every
-     accessory at two sets, anchors whole); the stricter keep-the-anchors week stays behind `behind_schedule_week`.
-  6. THE LIBRARY FALLBACK (`library_fallbacks`). A garage week dropped the hamstring curl ("no member of its pattern is
-     available") with a banded curl in the library: an accessory now searches the library's same-pattern, same-muscle members
-     after its slot's ranked fallbacks.
-  7. ONE EFFORT TARGET PER LIFT (`one_effort`, `effort_targets`). The first lift's note said "RPE 8–9 on big lifts" and then
-     "RPE 6–7" for the same lift. When the first lift's own effort differs, the session line names the day only.
-  8. CARDIO EQUIPMENT AND THE SHORT WEEK (`conditioning_host`, `cardio_machine`, `machine_label`). An equipment-limited week
-     named a "Recumbent" with no recumbent; a short week under the shared cap had no conditioning host at all.
-  9. THE OWNER'S OPEN DECISIONS AS SETTINGS, each with today's default: `kb_deadlift_template_id` (a custom "Kettlebell
-     Deadlift" Hevy template, when he creates one, stops the KB pulls landing in the barbell Sumo Deadlift history),
-     `body_fat_tier` (the rate band's starting rung; unknown today) and `rate_band_mode` (`advisory` text, or `structured` —
-     the band recorded on the draft for a nutrition reader; nothing reads it back today).
-
-Every number here is a labelled PLATFORM HEURISTIC (practitioner consensus at best), owner-adjustable; none is validated.
-"""
+Deleted in fix round 9: the allocation, the kettlebell slot placement and template setting (the resolver is an identity seam kept
+for the cron and MCP call sites), the adherence dip's lighter week and the structured rate band."""
 
 from __future__ import annotations
 

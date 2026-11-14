@@ -1,31 +1,12 @@
-"""live_shape.py — the fourth red team's WEEK-SHAPE fixes (#5861 FIX4). LIVE only: every entry point is reached from a live hook
-(`live_program.plan` / `cardio_fit`, `live_session.for_live_draft` / `fit_routine`, `live_balance.allocation_plan`,
-`mcp.draft_standing_constraint.gate_draft` through `live_program.cardio_context`), each of which returns before reading anything
-unless the draft ran the live session fit (`live_session.MARK`, which exists only when the exercise library is `approved`).
-tests/test_no_live_change_5861_l6.py pins the served proposed-mode drafts byte for byte.
+"""live_shape.py — the heavy pull's shape, the lower-volume order and the aerobic walk (#5861). LIVE only.
 
-WHY IT EXISTS. A fourth independent red team (2026-11-12, programming C+) read the generated weeks as a coach would:
+  * `deadlift_shape` (owner ruling 5): the heavy-day hinge anchor is its top set + ONE back-off.
+  * `order_lower_volume`: the squat before the hinge (the RDL tires the erectors the squat needs), a full-body day too.
+  * The aerobic walk (`aerobic_gap`, `walk_covers`, `walk_prompt`, `walk_note`, WALK_PROMPT; owner ruling 12): a week the RECORD
+    shows short gets one optional walk prompt; steps of unknown intensity are reported, never turned into a gap.
 
-  1. VOLUME (`reallocate`, `week_ceiling`, `quad_slot`). The live additions put the week at 76 working sets (the owner's
-     redline is 75: `owner_redlines` total_hard_sets_wk); chest and quadriceps — priority muscles — sat at MEV+1 while the
-     shoulders sat at MAV; a leg extension (rated S for the rectus femoris, logged often) was never served because the
-     selection only swaps like for like. Now muscles AT their MAV give isolation sets too (not only those over it), the
-     priority muscles at or under MEV + PRIORITY_MARGIN take them, a quadriceps isolation slot is added on the lower-volume
-     day when the quads sit there and his history shows the movement, and the week is held to the redline.
-  2. DROP, DON'T SHAVE (`no_single_sets`). Time trims left one-set accessories and one-set superset halves.
-  3. ORDER AND THE HEAVY PULL (`order_lower_volume`, `deadlift_shape`). The lower-volume day put the RDL before the back squat
-     (the erectors tire first). The heavy-day squat + deadlift pairing is the owner's ruling (#5694) and stays; the
-     deadlift's shape is a setting (`heavy_day_deadlift_shape`: `as_today` = top set + two back-offs, `top_plus_backoff` =
-     top set + one back-off).
-  4. THE AEROBIC GAP UNDER THE SHARED CAP (`walk_prompt`, `walk_note`). The engine reported "~64 min short" and served
-     nothing. One optional, concrete walk now closes the gap on the conditioning host's morning; under the default cap an easy
-     ride is no longer added when one walk covers what is left (WALK_PROMPT). #5861 FIX6 (ruling 12): the gap is measured
-     against RECORDED walking with intensity evidence (`cardio_model.recorded_aerobic`); steps alone earn no credit.
-  5. THE KETTLEBELL SLOT UNDER STRAIN (`kb_under_strain`): `kb_slot_under_strain` `as_today` (the slot follows its placement)
-     or `drop` — the red team's recommendation: an overreached or deload-recommended week drops the KB hinge.
-
-Every number here is a labelled PLATFORM HEURISTIC (practitioner consensus at best), owner-adjustable; none is validated.
-"""
+The volume rules this module carried (VOLUME, QUAD_SLOT, the weekly ceiling, drop-don't-shave, TIME_FIT) are `live_volume`'s one
+weekly plan and one time fit since fix round 9."""
 
 from __future__ import annotations
 

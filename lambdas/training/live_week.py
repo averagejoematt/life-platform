@@ -1,34 +1,10 @@
-"""live_week.py — the WEEK-shaped half of the live programming policy (#5861, second red team). LIVE only: every entry point
-is reached from a live hook (`live_program.plan`, `live_program.guard_loads` / `annotate` / `cardio_fit`, `live_session.
-for_live_draft` / `fit_exposures` / `fit_routine`), each of which returns before reading anything unless the draft ran the live
-session fit (`live_session.MARK`, which exists only when the exercise library is `approved`). tests/test_no_live_change_5861_l6.py
-pins the served proposed-mode drafts byte for byte.
+"""live_week.py — the week-shaped live helpers that survived fix round 9 (#5861). LIVE only (reached from live hooks that check
+the live mark first): the conditioning block's week-to-week progression (`cardio_progress`, `cardio_model.progress`), the medical
+stop line and his own logged symptoms (`symptom_gate`, `review_line`: no hard cardio until reviewed), and a vertical pull that
+survives a garage (`vertical_pull_fallback`, VERTICAL_PULL_FALLBACK: the first servable vertical pull, gates fail-closed).
 
-WHY IT EXISTS. A second independent red team (2026-11-13) read the integrated engine's GENERATED weeks and the owner's real-data
-run as a coach would and graded the programming C+. Each rule below answers one of its findings in the generated week:
-
-  1. THE KETTLEBELL SLOT (`kb_slot`, `kb_note`, `kb_seed`). The owner-pinned KB deadlift logs under Hevy's "Sumo Deadlift"
-     (template D20D7BBE, an owner-ruled stand-in — the template stays). The note never said "kettlebell", asked RPE 9-10 and
-     "find the load": a reader at 5 am could load a barbell sumo pull as a second heavy hinge. Now the note names the
-     implement, the effort is capped at RPE 7-8 (an entry drill into the swing), and the bell he swings loads it.
-  2. CARDIO ROOM (`make_cardio_room`, `cardio_progress`). Under the shared 75-minute cap the engine never traded lifting for
-     cardio: the week's only conditioning was a 13-minute stub while the delts sat over MAV. Now sets come off the muscles
-     furthest over MAV first (then the largest surplus over MEV, never below it) until a CARDIO_ROOM minimum block fits; and
-     the block's minutes follow `cardio_model.progress` week to week (duration, then frequency, then intensity).
-  3. THE MEDICAL STOP LINE (`symptom_gate`, `review_line`). `owner_redlines.TRIPWIRES` `medical_stop_lines` is evaluated by
-     `health.tripwire_readers.medical_stop_lines` (report-only). The draft now reads that row: tripped -> no hard cardio, a
-     review line. Traced, not grepped: its palpitations and syncope arms are SELF-REPORT with no input on the platform
-     (they read `unknown` until the check-in lane, #5819, supplies one); the measured arms (labs, the RHR rise) can trip.
-  4. BEHIND SCHEDULE (`behind_schedule`, `keep_the_anchors`, `behind_schedule_roles`) — an OFF-by-default live option
-     (`programming_settings.behind_schedule_week`, owner decision pending): when BEHIND_SCHEDULE missed_min of the last
-     fortnight's planned sessions were missed, the week is offered as fewer, shorter sessions that keep the anchors (anchors
-     + one accessory per major muscle, ~45 min) instead of trimming sets off five long ones.
-  5. COVERAGE (`vertical_pull_fallback`, `novel_start`, `press_sets`). A garage week with a pull-up bar served no vertical
-     pull; a movement new to him entered a deload at 4-6 reps; the week's only vertical press is one set (a charter decision —
-     an off-by-default option here).
-
-Every number here is a labelled PLATFORM HEURISTIC (practitioner consensus at best), owner-adjustable; none is validated.
-"""
+Deleted in round 9 (consolidation): the kettlebell slot machinery, the cardio-room trims, the behind-schedule week, the novelty
+start and familiar-swap rules (`live_load`'s three novelty rules replace them) and the press-set option (`live_volume`)."""
 
 from __future__ import annotations
 

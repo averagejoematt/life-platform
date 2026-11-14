@@ -1,36 +1,13 @@
-"""live_rules.py — the fifth red team's SESSION fixes (#5861 FIX5). LIVE only: every entry point is reached from a live hook
-(`live_session.for_live_draft`, `live_program.plan` / `annotate`, `live_week.symptom_gate`, `fatigue_model.movement_signals`
-through `live_session`), each of which returns before reading anything unless the draft ran the live session fit
-(`live_session.MARK`, which exists only when the exercise library is `approved`). tests/test_no_live_change_5861_l6.py pins the
-served proposed-mode drafts byte for byte.
+"""live_rules.py — joint-located isolation caps and the self-report gate (#5861). LIVE only.
 
-WHY IT EXISTS. A fifth independent red team (2026-11-13, B-) read the generated weeks as a coach would:
+  * `isolation_joint_cap` (JOINT_ISOLATION): under a flag on a joint, every isolation lift that works it is capped at PAIN_RULE's
+    reduce RPE with the stop line.
+  * `note_class` (DISCOMFORT_WORDS, LIGHT): a joint-located "sore" at or under the mild line is light discomfort — kept, lighter.
+  * `self_report` (SELF_REPORT): his own Hevy note in the last fortnight naming palpitations or fainting trips the no-hard-cardio
+    gate (owner ruling 10 follow-up: the behaviour stays; no warning line is printed).
 
-  1. THE SET CAP (`fit_set_cap`). The short week piled the carry, the trunk floor and the kettlebell slot onto one session with
-     no set guard, and `full_body_session` asserted (`total_sets 23 > cap 20`) — a crash. Every live session is now held to the
-     week grid's session set ceiling: added work goes first, then accessory sets (drop, don't shave), never an anchor's top set.
-  2. FULL-BODY DAYS (`full_body`). A 3-day or 2-day week (`live_sequence.SHORT_WEEK_PLANS`) gives a session its partner role's
-     anchors, so legs and the upper body each train twice — not an upper half and a lower half.
-  3. NO ADDED WORK ON A BAD DAY (`no_added_work`). The quadriceps slot (a leg extension "first time in 18 weeks") was added on a
-     deload-recommended week and on a red, short-sleep morning; the kettlebell slot moved onto another session the same day.
-     On a strained, overreached or deload-recommended day nothing is ADDED: the quadriceps slot, the trunk floor and a relocated
-     kettlebell slot wait. (`kb_slot_under_strain` — today's default `as_today` — still governs the slot in its HOME session;
-     the fourth and fifth red teams both recommend `drop`.)
-  4. SAME-JOINT ISOLATION (`isolation_joint_cap`). Under a pain or discomfort flag, every isolation lift working the flagged joint
-     is capped at RPE 7 with the in-set stop line, whatever the joint data says (triceps work served to RPE 9-10 under an
-     elbow flag).
-  5. "SORE" IS DISCOMFORT (`note_class`). The note layer's net leaves out burn / sore / tight on purpose (#5800), so "elbow a bit
-     sore 2/10" read as nothing at all. The ENGINE reads a joint-located sore / achy / tight note at or under the mild line as
-     discomfort — kept, lighter (the joint rule's reduce tier). The note layer's own class is unchanged.
-  6. THE KETTLEBELL DEADLIFT AS FILLER (`kb_filler`). One bell between the feet sits far under a working effort for a lifter who
-     already deadlifts a barbell: the slot serves the swing when it is servable, else it is dropped.
-  7. THE SELF-REPORTED STOP LINES (`self_report`). The symptom line says "Stop, log it." — a Hevy note naming a racing or
-     irregular heartbeat, or fainting / near-fainting / dizziness, in the last fortnight now trips the draft's symptom gate (no
-     hard cardio, a review line). The platform tripwire's own palpitations / syncope arms stay `unknown` (their input is the
-     check-in lane's, #5819).
-
-Every number here is a labelled PLATFORM HEURISTIC (practitioner consensus at best), owner-adjustable; none is validated.
-"""
+Deleted in fix round 9: the session set cap, the full-body partner rule, the no-added-work rule and the KB-deadlift filler —
+`live_volume` (the set ceiling, the full-body weeks) and the plan (nothing is added on a bad day: no addition exists) replace them."""
 
 from __future__ import annotations
 

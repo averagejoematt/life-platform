@@ -1,35 +1,18 @@
-"""live_program.py — the PROGRAMMING half of the live policy (#5861, red-team fixes). LIVE only: every entry point returns its
-input untouched (or None) unless the draft ran the live session fit (`live_session.MARK` on the prescription, which exists
-only when `selection_engine.mode() == "live"`, i.e. the library is `approved`). tests/test_no_live_change_5861_l6.py pins the
-served proposed-mode drafts byte for byte.
+"""live_program.py — the programming pass of the live policy (#5861). LIVE only: every entry point returns its input untouched
+(or None) unless the draft ran the live session fit (`live_session.MARK` on the prescription, which exists only when
+`selection_engine.mode() == "live"`). tests/test_no_live_change_5861_l6.py pins the served proposed-mode drafts byte for byte.
 
-WHY IT EXISTS. An independent red team (2026-11-12) read the integrated engine's generated weeks as a coach would and graded
-them C+: the architecture was right, the weeks were not. Every rule below answers one of its findings, against the GENERATED
-week (`scripts/sample_weeks_5861.py`), not the architecture:
+What it owns after fix round 9 (the load model moved to `live_load`, the volume to `live_volume`):
+  * PAIN BY JOINT (`joint_flags`, `apply_joint_rule`, PAIN_RULE): a pain or discomfort flag reaches every movement that loads the
+    same joint at moderate or more; at or under the mild line the lift is reduced (10% lighter, RPE <= 7, the stop line), above it
+    the flagged pattern is avoided (a lower-stress member, else skipped).
+  * AXIAL STACKING (`avoid_stacking`, STACK_RULE): at most two spine-loading squat/hinge compounds a session.
+  * THE DELOAD SHAPE (`deload_shape`, DELOAD_SHAPE) and the fatigue cost the fatigue model's one reducer reads (`fatigue_cost`).
+  * NOTES (`annotate`): each lift's one load reason (`live_load`) and each effort cap on its own Hevy note.
+  * CARDIO (`cardio_context`, `cardio_fit`, `cardio_note`): purposeful blocks only (owner ruling 4), the hard dose on the week's host,
+    under the shared cap the minutes lifting leaves (ruling 1), no symptom warning line (ruling 10).
 
-  1. LOAD SAFETY (`guard_loads`). The load floor and the double progression only ever raise, so a regressing squat (last
-     exposure 4 reps at RPE 9, e1RM sliding) in an overreached week read "Heavier" +20 lb. Under live a load never steps UP on
-     a regressing lift, a lift whose last top set was a grind at the bottom of its range, a stalled lift, or on a day the
-     fatigue model reads strain or overreach; it HOLDS at the last top set, and steps DOWN (LOAD_POLICY) when the
-     e1RM regresses or an anchor's last top set overshot its RPE band. The commit gate reuses the generator's floor audit, so
-     the guarded load is written into that audit row (`live_guard`) — a recorded, sanctioned reduction, never a silent one.
-  2. DELOAD SHAPE (`fatigue_cost`, read by `fatigue_model.apply_to_session`). A recommended deload cuts the heavy compounds
-     first (sets and effort), keeps isolation work, and turns a hard cardio block easy (`cardio_fit`). Under `reduce` the
-     trim takes high-fatigue work before low-cost isolation.
-  3. PAIN BY JOINT (`joint_flags`, `apply_joint_rule`). A pain or discomfort flag on one movement reaches every movement that
-     loads the same joint at moderate or more (the library's joint-stress ratings), for every session while the flag stands —
-     not only the named exercise. The pain-monitoring rule (PAIN_RULE) is a labelled heuristic for the owner to confirm.
-  4. STACKING AND STALLS (`avoid_stacking`, `stall_scheme`). Past AXIAL_PER_SESSION spinal-loading squat/hinge compounds in
-     one session the lowest-priority one is swapped for a low-spinal-load member (a unilateral one for a unilateral slot) or
-     dropped; a stalled anchor changes its rep scheme (and its load with it), the stall machinery's own call.
-  5. CARDIO (`cardio_context`, `cardio_fit`, `cardio_note`). The cardio model is wired: steps first (an easy block on top of a
-     week the steps already cover is dropped), conditioning never on the heavy lower day nor the session before it, hard work
-     turned easy under strain or a recommended deload, the `session_cap_includes_cardio` setting (default False: today's
-     separate cap), a generic symptom line on conditioning (wording a library setting), and the loss-rate band shown as
-     advisory text only (`rate_line` — nothing about nutrition changes).
-
-Every number here is a labelled PLATFORM HEURISTIC (practitioner consensus at best), owner-adjustable; none is validated.
-"""
+Every number is a labelled PLATFORM HEURISTIC (practitioner consensus at best), owner-adjustable; none is validated."""
 
 from __future__ import annotations
 
