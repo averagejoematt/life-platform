@@ -302,7 +302,7 @@ def test_the_sweep_itself_catches_each_retired_sentence():
         "easy recommendation": "Light walk, mobility work, or gentle yoga. Keep HR below 60% max.",
         "interval recommendation": "VO2max work: 4-6 intervals of 3-4 minutes at 85-90% max HR with equal rest.",
         "zone description": "Classifies activities into 5 HR zones based on average heartrate as a percentage of max HR (from profile).",
-        "a bare bpm on a prescription line": "hold 132 bpm for the block",
+        "a bare bpm on a prescription line": "hold 141 bpm for the block",
         "packet description": "plus walking hours so far and a flag on any walk over the HR ceiling;",
     }
     for name, text in retired.items():
@@ -477,7 +477,7 @@ def test_the_served_recommendation_view_carries_no_heart_rate_prescription(monke
     land an aerobic recommendation — the branch that printed a floor and a ceiling once the window lapsed."""
     from mcp import tools_training as tt
 
-    rows = {"whoop": [{"date": DAY, "recovery_score": 82, "hrv": 60, "resting_heart_rate": 50, "strain": 8}]}
+    rows = {"whoop": [{"date": DAY, "recovery_score": 82, "hrv": 70, "resting_heart_rate": 61, "strain": 8}]}
 
     def reader(source, start_date, end_date, lean=False, include_pilot=None):
         return [dict(r) for r in rows.get(source, []) if start_date <= r["date"] <= end_date]
