@@ -839,3 +839,24 @@ aws cloudformation delete-stack --region us-west-2 --stack-name boundary-probe-3
 Paste both verdicts — the `AccessDenied` line and the `CREATE_COMPLETE` — into the #3340
 acceptance box. One without the other proves half of it: a fence that denies everything and
 a fence that denies nothing look identical from one probe.
+
+## `laptop-memory-backup` (IAM user, interim) — added 2026-11-01
+
+The daily Claude-memory backup on the owner's Mac (`setup/claude_memory_backup.sh`, launchd
+`com.matthewwalker.claude-memory-backup`) runs under a dedicated IAM user instead of the
+administrator key (Life OS M0A, change C2). Its only policy is
+`laptop-memory-backup-user.permissions.json`: `s3:ListBucket` limited by `s3:prefix` to
+`claude-memory-backup/` and `datadrops-archive/`, and `s3:PutObject` on those two prefixes.
+No reads of object bodies, no deletes, no other bucket. The access key lives in the macOS login
+Keychain (service `aws-laptop-memory-backup`) and is read by a `credential_process` script for
+profile `memory-backup`; nothing is stored in `~/.aws/credentials`.
+
+Operate it:
+- Rotate (every 90 days): `aws iam create-access-key --user-name laptop-memory-backup` → store the
+  new pair in the Keychain with `security add-generic-password -U …` → run the backup once →
+  `aws iam delete-access-key` for the old id. Never print the secret.
+- Monitor: `aws iam get-access-key-last-used` should advance daily; the heartbeat object
+  `claude-memory-backup/_backup_heartbeat.json` is the liveness signal. Unused access → Access Analyzer.
+- Revoke: `aws iam update-access-key --status Inactive`, then delete the key and the user.
+- Verify live == repo: `aws iam get-user-policy --user-name laptop-memory-backup --policy-name memory-backup-s3`.
+- Exit: this user is retired when the backup moves to the Life OS account (separately approved).
