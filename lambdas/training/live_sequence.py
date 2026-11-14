@@ -106,7 +106,9 @@ def plan_for_days(days: Any, lib: dict[str, Any] | None, mode: str = "short") ->
     )
     if partners:
         left = _left_out(shape)
-        line += f"; left out this week: {', '.join(left)} — a short week keeps every pattern, not every anchor" if left else ""
+        line += (
+            f"; left out this week: {', '.join(left)} — every morning still carries a squat, a hinge, a press and a pull" if left else ""
+        )
         line += "" if dates is not None or n == 1 else "; spacing not declared: consecutive days assumed"
     return {
         "skip": skip,
