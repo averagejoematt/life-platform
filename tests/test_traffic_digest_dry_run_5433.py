@@ -3,8 +3,8 @@
 Before this fix a dry run suppressed only the SES send (common/send_guard). Both
 `cw.put_metric_data` calls still ran: the weekly UniqueVisitors7d / PageViews7d /
 SyndicatedReferrals7d put and `_emit_no_logs_alert`'s LogSourceEmpty. UniqueVisitors7d
-is read by cost_governor_lambda (`_recent_unique_visitors` takes the latest datapoint
-for the surge-ceiling decision; `_weekly_uniques_baseline` expects one point per week),
+is read by cost_governor_lambda (`_surge_reading_and_baseline` takes the latest datapoint
+for the surge-ceiling decision and expects one point per week for the baseline),
 so a dry-run invoke — the way the #5433 timing proof is taken — silently moved budget
 state. These tests pin both metric paths and the SES path under a dry run, with the
 non-dry run as the mutation control (metrics still emitted, mail still sent).
