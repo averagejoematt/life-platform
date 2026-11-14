@@ -1,6 +1,6 @@
 {
  "_README": "The owner's exercise library (#5769). PROPOSED — nothing in the drafting path reads it until the owner approves it. Public half only: no bodyweight, no loads, no note text — the N=1 half (best set per bodyweight band, coded note signals, gate threshold values) is the owner-private overlay s3://matthew-life-platform/config/coaching/exercise_library.private.json, joined at selection time by lambdas/training/exercise_library.py (fail-closed). Built by deploy/build_exercise_library.py from the full Hevy history + deploy/exercise_library_curation.py. Doc: docs/coaching/EXERCISE_LIBRARY.md.",
- "version": "0.3.6",
+ "version": "0.3.7",
  "status": "proposed",
  "change_log": [
   {
@@ -71,6 +71,13 @@
    "by": "#5861 fix round 9 (consolidation, PROPOSAL for the owner's review with the library)",
    "what": "Fix round 9: `programming_settings` reduced to the one live settings table (`training.live_settings.SETTINGS`, 7 keys, each with its ruling) — the dead alternatives the owner had ruled out are gone; rating bases drop the points arithmetic (rubric 3.6.0: the basis states each term's categorical input, the tiers and S criteria unchanged).",
    "rule": "configuration and data only — status stays proposed until the owner approves the library"
+  },
+  {
+   "version": "0.3.7",
+   "date": "2026-11-13",
+   "by": "#5861 fix round 11 (the tenth red team; owner ruling #3 of fix round 8)",
+   "what": "`pull_up_band` (Pull Up (Band)) gated behind `bw_pull` + `chain_pull_negative`, the pull-up negative's locked gates (owner ruling #3: all six bodyweight progressions AND the band pull-up gate stay LOCKED) — it was served ungated in a garage week. `unknown_input: locked`; it opens only on an approved readiness standard.",
+   "rule": "data only — status stays proposed until the owner approves the library"
   }
  ],
  "_provenance": {
@@ -92130,7 +92137,10 @@
     "mobility": null,
     "reviewed": true
    },
-   "gates": [],
+   "gates": [
+    "bw_pull",
+    "chain_pull_negative"
+   ],
    "not_for_you_now": null,
    "availability": {
     "home_gym": {
