@@ -2,7 +2,7 @@
 import Base from "../../layouts/Base.astro";
 import StatusTag from "../../components/StatusTag.astro";
 import StoryEntry from "../../components/StoryEntry.astro"; // the Human Story (HS1): renders nothing unless WEB_STORY=1
-import { dayInWords } from "../../lib/format.js";
+import { chapterCovers, chapterPublished, dayInWords, rangeInWords } from "../../lib/format.js";
 import { loadAll } from "../../lib/snapshot.js";
 import { hasPage, href, pathOf } from "../../lib/url.js";
 
@@ -45,8 +45,13 @@ const episodes = all.byType.episode.length;
               </span>
               <span style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;white-space:nowrap">
                 <span class="mono muted" style="font-size:12px">
-                  {dayInWords(c.date, { short: true })}
+                  {(c.status === "published" && (chapterCovers(c, { short: true }) || rangeInWords(c.week_start, c.week_end, { short: true }))) || dayInWords(c.date, { short: true })}
                 </span>
+                {c.status === "published" && c.published_at && (
+                  <span class="mono muted" style="font-size:12px" data-published>
+                    {chapterPublished(c)}
+                  </span>
+                )}
                 {c.status !== "published" && <StatusTag status={c.status} />}
                 {c.status === "published" && c.episode_id && (
                   <span class="mono muted" style="font-size:12px">

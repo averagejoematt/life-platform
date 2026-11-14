@@ -2,12 +2,14 @@
  {
   "absent_text": null,
   "approved": {
-   "at": "2026-10-13T18:00:00Z",
+   "at": "2026-10-17",
    "by": "owner",
    "via": "chronicle-approve"
   },
   "as_of": "2026-10-31",
   "body_html": "<p>Sample chapter body, for layout only. The published chronicle text moves here in Phase 1.</p><h2>What Lisa got wrong</h2><p>Two weeks later the evaluator looked at the window and graded it.</p>",
+  "covers_end": "2026-10-12",
+  "covers_start": "2026-10-06",
   "data_through": "2026-10-13",
   "date": "2026-10-13",
   "edges": [
@@ -31,6 +33,7 @@
   "excerpt": "Lisa and Marcus go on the record. The ledger will decide.",
   "id": "week-06",
   "method_ids": [],
+  "published_at": "2026-10-17",
   "read_minutes": 8,
   "sample": true,
   "source": [
@@ -54,6 +57,8 @@
   "approved": null,
   "as_of": "2026-10-31",
   "body_html": null,
+  "covers_end": null,
+  "covers_start": null,
   "data_through": null,
   "date": "2026-10-20",
   "edges": [],
@@ -61,6 +66,7 @@
   "excerpt": null,
   "id": "week-07",
   "method_ids": [],
+  "published_at": null,
   "read_minutes": null,
   "sample": true,
   "source": [
@@ -84,6 +90,8 @@
   "approved": null,
   "as_of": "2026-10-31",
   "body_html": null,
+  "covers_end": null,
+  "covers_start": null,
   "data_through": null,
   "date": "2026-10-27",
   "edges": [
@@ -97,6 +105,7 @@
   "excerpt": null,
   "id": "week-08",
   "method_ids": [],
+  "published_at": null,
   "read_minutes": null,
   "sample": true,
   "source": [
@@ -120,6 +129,8 @@
   "approved": null,
   "as_of": "2026-10-31",
   "body_html": "<p>HELD-SENTINEL-DO-NOT-PUBLISH</p>",
+  "covers_end": null,
+  "covers_start": null,
   "data_through": null,
   "date": "2026-11-10",
   "edges": [],
@@ -127,6 +138,7 @@
   "excerpt": "HELD-SENTINEL-DO-NOT-PUBLISH",
   "id": "week-10",
   "method_ids": [],
+  "published_at": null,
   "read_minutes": 1,
   "sample": true,
   "source": [
@@ -150,6 +162,8 @@
   "approved": null,
   "as_of": "2026-10-31",
   "body_html": null,
+  "covers_end": null,
+  "covers_start": null,
   "data_through": null,
   "date": "2026-11-03",
   "edges": [],
@@ -157,6 +171,7 @@
   "excerpt": null,
   "id": "program-week-09",
   "method_ids": [],
+  "published_at": null,
   "read_minutes": null,
   "sample": true,
   "source": [

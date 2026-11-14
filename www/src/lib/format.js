@@ -15,6 +15,59 @@ export function dayInWords(iso, opts = {}) {
   return opts.weekday ? `${DAYS[dt.getUTCDay()]} ${core}` : core;
 }
 
+const ISO_DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const dayMs = (iso) => Date.parse(`${iso}T00:00:00Z`);
+
+/** Two days as one range in words: "4 to 10 November" (the year when {year:true}), "30 September to 6 October",
+ * "29 December 2026 to 4 January 2027"; {short:true} gives "4–10 Nov". null unless both are ISO days, in order. */
+export function rangeInWords(a, b, opts = {}) {
+  if (!ISO_DAY_RE.test(a || "") || !ISO_DAY_RE.test(b || "") || a > b) return null;
+  const [ya, ma] = a.split("-").map(Number);
+  const [yb, mb] = b.split("-").map(Number);
+  const da = Number(a.slice(8));
+  const db = Number(b.slice(8));
+  const month = (m) => (opts.short ? MONTHS[m - 1].slice(0, 3) : MONTHS[m - 1]);
+  const year = opts.year && !opts.short ? ` ${yb}` : "";
+  if (ya !== yb) return opts.short ? `${dayInWords(a, { short: true })} – ${dayInWords(b, { short: true })}` : `${dayInWords(a)} to ${dayInWords(b)}`;
+  if (a === b) return `${da} ${month(ma)}${year}`;
+  if (ma === mb) return opts.short ? `${da}–${db} ${month(mb)}` : `${da} to ${db} ${month(mb)}${year}`;
+  return opts.short ? `${da} ${month(ma)} – ${db} ${month(mb)}` : `${da} ${month(ma)} to ${db} ${month(mb)}${year}`;
+}
+
+/** A published chapter's covered days (`covers_start`..`covers_end`, its own "Day A to Day B" stats line) in words:
+ * "Days 60–66 · 4 to 10 November". The day numbers count from genesis, which is the chapter's own program-week start
+ * less 7·(week−1) (the exporter's explicit interval). null when the snapshot carries no covered days — the caller then
+ * shows the program week (`week_start`..`week_end`), never a span inferred from `date`. */
+export function chapterCovers(c, opts = {}) {
+  if (!c || !ISO_DAY_RE.test(c.covers_start || "") || !ISO_DAY_RE.test(c.covers_end || "")) return null;
+  const range = rangeInWords(c.covers_start, c.covers_end, opts);
+  if (!range) return null;
+  const genesis = ISO_DAY_RE.test(c.week_start || "") && Number.isInteger(c.week) && c.week >= 1 ? dayMs(c.week_start) - 7 * (c.week - 1) * 864e5 : null;
+  if (genesis == null) return range;
+  const n = (iso) => Math.round((dayMs(iso) - genesis) / 864e5) + 1;
+  const [a, b] = [n(c.covers_start), n(c.covers_end)];
+  if (a < 1) return range;
+  return `${a === b ? `Day ${a}` : `Days ${a}–${b}`} · ${range}`;
+}
+
+/** The days a chapter's week-scoped lists read: the covered days when served, else the program week. */
+export function chapterWindow(c) {
+  if (c && ISO_DAY_RE.test(c.covers_start || "") && ISO_DAY_RE.test(c.covers_end || "") && c.covers_start <= c.covers_end) return [c.covers_start, c.covers_end];
+  if (c && ISO_DAY_RE.test(c.week_start || "") && ISO_DAY_RE.test(c.week_end || "")) return [c.week_start, c.week_end];
+  return null;
+}
+
+/** When a published chapter was published, in words: "Published 13 November 2026" from the owner's approval day
+ * (`published_at`). When that is not served the chapter's `date` is a DATA date, so it is never called the publication:
+ * "Data through 10 November 2026" ({lower:true} for a mid-line form). null for an unpublished week. */
+export function chapterPublished(c, opts = {}) {
+  if (!c || c.status !== "published") return null;
+  const lead = (w) => (opts.lower ? w.toLowerCase() : w);
+  if (ISO_DAY_RE.test(c.published_at || "")) return `${lead("Published")} ${dayInWords(c.published_at)}`;
+  const through = c.data_through || c.date;
+  return ISO_DAY_RE.test(through || "") ? `${lead("Data through")} ${dayInWords(through)}` : null;
+}
+
 /** A number with a fixed number of decimals and en-GB grouping; null -> "—". */
 export function num(v, decimals = 0) {
   if (v == null || Number.isNaN(Number(v))) return "—";

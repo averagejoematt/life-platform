@@ -11,10 +11,18 @@ story already has — the chronicle partition and the published manifest — one
 experiment, ADR-077):
 
     {genesis, as_of, week_length_days: 7,
-     weeks: [{week, start, end, status, date, title, url, label, drafted_at, reason}]}
+     weeks: [{week, start, end, status, date, title, url, label, drafted_at, reason,
+              + published_at, covers_start, covers_end on a published week only}]}
 
   * ``published``  — the manifest carries a post for the week dated on or before today:
-                     ``date``, ``title``, ``url``, ``label`` are the manifest's.
+                     ``date``, ``title``, ``url``, ``label`` are the manifest's. A published week ALSO
+                     serves (and only a published week does) ``published_at`` — the chronicle row's
+                     ``approved_at``, the moment the owner approved it, null when the row has none —
+                     and ``covers_start`` / ``covers_end``, the days the chapter is about, read off the
+                     post's ``stats_line`` ("Day 60 to Day 66 · …", day N = genesis + N−1), null when
+                     the line names no day span (the old "Weight: … | …" header). ``date`` is the
+                     chronicle's DATA date, not the publication date (2026-11-14: Week 10 is dated 10 November,
+                     covers 4–10 November and was approved on 13 November Pacific).
   * ``held``       — a chronicle row exists for the week in a non-published status
                      (``draft`` / ``changes_requested``): ONLY ``status`` and ``drafted_at``
                      (the row's ``generated_at``) are served. No title, excerpt or body — a
@@ -38,6 +46,7 @@ per-week ``held`` state from the row is this route's.
 
 from __future__ import annotations
 
+import re
 from datetime import timedelta
 from typing import Any, Callable
 
@@ -52,8 +61,11 @@ MANIFEST_KEY = "generated/journal/posts.json"
 NO_CHAPTER = "no chapter was published"
 UNAVAILABLE = "The chapter list is not served right now."
 HELD_STATUSES = ("draft", "changes_requested")
-#: The chronicle row attributes this route reads — never the title or body of an unpublished week.
-ROW_PROJECTION = ("date", "week_number", "status", "generated_at")
+#: The chronicle row attributes this route reads — never the title or body of an unpublished week. ``approved_at``
+#: is served for a published week only.
+ROW_PROJECTION = ("date", "week_number", "status", "generated_at", "approved_at")
+#: The covered-days span a stats_line opens with ("Day 60 to Day 66 · 292.6 lbs …").
+_DAY_SPAN = re.compile(r"^\s*Day\s+(\d+)\s+to\s+Day\s+(\d+)\b")
 
 
 def held_marker(journal: dict | None) -> dict | None:
@@ -108,6 +120,28 @@ def row_week(row: dict, genesis: str) -> int | None:
     return week_of_day(day, genesis)
 
 
+def covered_days(stats_line: Any, genesis: str) -> tuple[str | None, str | None]:
+    """``(covers_start, covers_end)`` — the ISO days a chapter's ``stats_line`` says it covers ("Day A to Day B",
+    day N = genesis + N−1), else ``(None, None)``: no span is guessed from the chapter's date."""
+    m = _DAY_SPAN.match(stats_line) if isinstance(stats_line, str) else None
+    g = parse_day_key(genesis)
+    if m is None or g is None:
+        return None, None
+    a, b = int(m.group(1)), int(m.group(2))
+    if a < 1 or b < a:
+        return None, None
+    return (g + timedelta(days=a - 1)).isoformat(), (g + timedelta(days=b - 1)).isoformat()
+
+
+def _approved_at(row: dict | None) -> str | None:
+    value = (row or {}).get("approved_at")
+    return value.strip() if isinstance(value, str) and value.strip() else None
+
+
+def _newer(row: dict, prev: dict | None) -> bool:
+    return prev is None or str(row.get("generated_at") or "") > str(prev.get("generated_at") or "")
+
+
 def _published_posts(journal: dict | None, today: str) -> dict[int, dict]:
     """``{week: post}`` for the manifest's program-week posts dated on or before today (the newest per week)."""
     out: dict[int, dict] = {}
@@ -128,15 +162,17 @@ def compose(rows: list, journal: dict | None, genesis: str, today: str) -> dict:
     marker = held_marker(journal)
     marker_week = _int((marker or {}).get("week")) if marker else None
     by_week: dict[int, dict] = {}
+    published_rows: dict[int, dict] = {}  # the newest PUBLISHED row per week: its approved_at is the publication
     for row in rows or []:
         if not isinstance(row, dict):
             continue
         wk = row_week(row, genesis)
         if wk is None:
             continue
-        prev = by_week.get(wk)
-        if prev is None or str(row.get("generated_at") or "") > str(prev.get("generated_at") or ""):
+        if _newer(row, by_week.get(wk)):
             by_week[wk] = row
+        if str(row.get("status") or "").strip().lower() == "published" and _newer(row, published_rows.get(wk)):
+            published_rows[wk] = row
     weeks = []
     for bin_ in program_weeks(genesis, today):
         wk = bin_["week"]
@@ -154,6 +190,8 @@ def compose(rows: list, journal: dict | None, genesis: str, today: str) -> dict:
         row_status = str((row or {}).get("status") or "").strip().lower()
         if post is not None:
             entry.update(status="published", date=post.get("date"), title=post.get("title"), url=post.get("url"), label=post.get("label"))
+            covers = covered_days(post.get("stats_line"), genesis)
+            entry.update(published_at=_approved_at(published_rows.get(wk)), covers_start=covers[0], covers_end=covers[1])
         elif row is not None and row_status in HELD_STATUSES:
             entry.update(status="held", drafted_at=row.get("generated_at"))
             if marker_week == wk and marker:
@@ -161,6 +199,7 @@ def compose(rows: list, journal: dict | None, genesis: str, today: str) -> dict:
         elif row is not None and row_status == "published":
             # Published in the store, not yet in the manifest (a publish in flight): the state is the store's.
             entry.update(status="published", date=str(row.get("date") or "")[:10] or None)
+            entry.update(published_at=_approved_at(row), covers_start=None, covers_end=None)
         elif bin_["end"] >= today:
             entry["status"] = "pending"
         else:
