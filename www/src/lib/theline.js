@@ -174,45 +174,56 @@ export function lineCounts(days, from, to) {
 }
 
 /**
- * One week of The Line, for a row of the chapter list (2026-11-14, sprint II): the week's weigh-ins placed on the WHOLE
- * journey's weight scale (`lo`..`hi`), so reading down the list the line steps through the weeks — the story's
- * continuity, including the weeks that have no chapter. Readings are dots joined by a line (dashed across a missing
- * morning); a missing morning is an open tick on the baseline. No value is drawn that the series does not carry.
- * Returns { svg, first, last, n } or null when the week has no reading.
+ * One week of The Line, for a row of the chapter list (2026-11-14, sprint II), drawn DOWN the page: time runs along
+ * the row's height (the week's last day at the top, the list being newest first) and weight across its width on the
+ * WHOLE journey's scale (`lo`..`hi`). The svg stretches to its row (preserveAspectRatio none; strokes and dots do not
+ * scale), so the segments of consecutive rows meet at the row borders and the list carries one line through every
+ * week — the weeks with no chapter included. A reading is a dot, consecutive mornings are joined solid, a missing
+ * morning is bridged dashed and marked with a short tick at the edge. Nothing is drawn the series does not carry.
+ * Returns { svg, first, last, n, missing } or null when the week has no reading.
  */
 export function weekStrip(o) {
   const W = o.width || 200;
-  const H = o.height || 56;
-  const pad = { l: 5, r: 5, t: 6, b: 8 };
+  const H = 100; // a unit box: the row's CSS height decides the pixels
+  const pad = 8;
   const days = (o.days || []).filter((d) => d && d.date >= o.from && d.date <= o.to);
   const readings = days.filter((d) => d.value != null && !d.gap);
   if (!readings.length) return null;
-  const span = Math.max(1, (t(o.to) - t(o.from)) / DAY_MS);
-  const X = (iso) => pad.l + ((t(iso) - t(o.from)) / DAY_MS / span) * (W - pad.l - pad.r);
-  const Y = (v) => pad.t + (1 - (v - o.lo) / (o.hi - o.lo || 1)) * (H - pad.t - pad.b);
-  const base = H - 2;
-  let g = `<line x1="0" y1="${base}" x2="${W}" y2="${base}" stroke="${RULE}" stroke-width="1"/>`;
+  const n = Math.max(1, Math.round((t(o.to) - t(o.from)) / DAY_MS) + 1);
+  const Y = (iso) => (((t(o.to) - t(iso)) / DAY_MS + 0.5) / n) * H;
+  const X = (v) => pad + ((v - o.lo) / (o.hi - o.lo || 1)) * (W - 2 * pad);
+  const ink = o.muted ? "#8A8A85" : INK;
+  const ns = 'vector-effect="non-scaling-stroke"';
+  let g = "";
   days.forEach((d) => {
-    if (d.value == null || d.gap) g += `<rect x="${(X(d.date) - 1.5).toFixed(1)}" y="${base - 6}" width="3" height="6" fill="none" stroke="${MUTED}" stroke-width="1"/>`;
+    if (d.value == null || d.gap) g += `<line x1="0" y1="${Y(d.date).toFixed(2)}" x2="9" y2="${Y(d.date).toFixed(2)}" stroke="${MUTED}" stroke-width="1" ${ns}/>`;
   });
   let solid = "";
   let dashed = "";
   for (let i = 1; i < readings.length; i++) {
     const a = readings[i - 1];
     const b = readings[i];
-    const seg = `M${X(a.date).toFixed(1)},${Y(a.value).toFixed(1)} L${X(b.date).toFixed(1)},${Y(b.value).toFixed(1)}`;
+    const seg = `M${X(a.value).toFixed(1)},${Y(a.date).toFixed(2)} L${X(b.value).toFixed(1)},${Y(b.date).toFixed(2)}`;
     if ((t(b.date) - t(a.date)) / DAY_MS > 1) dashed += seg;
     else solid += seg;
   }
-  const ink = o.muted ? MUTED : INK;
-  if (dashed) g += `<path d="${dashed}" fill="none" stroke="${ink}" stroke-width="1.2" stroke-dasharray="2 3"/>`;
-  if (solid) g += `<path d="${solid}" fill="none" stroke="${ink}" stroke-width="1.5"/>`;
+  if (dashed) g += `<path d="${dashed}" fill="none" stroke="${ink}" stroke-width="1.3" stroke-dasharray="2 3" ${ns}/>`;
+  if (solid) g += `<path d="${solid}" fill="none" stroke="${ink}" stroke-width="1.8" ${ns}/>`;
+  // a dot is a zero-length round-capped stroke, so it stays round however the row stretches the box
   readings.forEach((d, i) => {
-    const lastOne = i === readings.length - 1;
-    g += `<circle cx="${X(d.date).toFixed(1)}" cy="${Y(d.value).toFixed(1)}" r="${lastOne ? 3.2 : 2}" fill="${lastOne && !o.muted ? COBALT : ink}"/>`;
+    const now = Boolean(o.latest) && d.date === o.latest; // only the journey's latest morning is the cobalt dot
+    const x = X(d.value).toFixed(1);
+    const y = Y(d.date).toFixed(2);
+    g += `<path d="M${x},${y} L${x},${y}" stroke="${now ? COBALT : ink}" stroke-width="${now ? 9 : 5}" stroke-linecap="round" ${ns}/>`;
   });
   const first = readings[0];
   const last = readings[readings.length - 1];
   const aria = `${readings.length} weigh-ins from ${dayInWords(o.from, { short: true })} to ${dayInWords(o.to, { short: true })}: ${num(first.value, 1)} to ${num(last.value, 1)} pounds.`;
-  return { svg: `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(aria)}">${g}</svg>`, first, last, n: readings.length, missing: days.length - readings.length };
+  return {
+    svg: `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(aria)}">${g}</svg>`,
+    first,
+    last,
+    n: readings.length,
+    missing: days.length - readings.length,
+  };
 }
