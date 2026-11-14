@@ -120,6 +120,9 @@ WATCH_POLICY: dict[str, dict[str, Any]] = {
     "web-preview-deploy.yml": {
         "watched": True,
         "grace_hours": 30.0,
+        # #5921: the FILE was born 2026-10-31, the CRON on 2026-11-14 (#5912). Without this the newborn rule
+        # dates the first-run deadline from the file and reads `never-fired` hours after the cron was added.
+        "registered_at": "2026-11-14T07:48:00+00:00",
         "basis": "declared 15:30Z daily (2026-11-14); no observed history yet, so the grace is one full "
         "cadence plus six hours: a merely-late or deferred-then-resumed run never reports, a "
         "wholly missed day does.",
