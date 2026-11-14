@@ -5,13 +5,12 @@ What this holds:
     text, a device name or a reading — and a failed read is None (render nothing), never "zero events";
   * the summary counts each family/kind in the current window against the window before it, and every rendered
     count carries its n and window (ADR-104/105); no events in either window is an ABSENCE line, not a zero claim;
-  * THE PROMPT TEST (box 3): the coach block always carries the no-advice instruction, the one advice string is
-    "discuss with your clinician", and no rendered line interprets, diagnoses, reassures or comments on a dose;
-    the coach block is NOT wired to any model in this PR (TIER_OWNER_ONLY: no AI narrative context until the owner
-    rules on the tier); counts are "{n} recorded", never "fewer events", with the coverage line beside them;
+  * NO ADVICE (box 3, for the rendered lines): the one advice string is "discuss with your clinician", and no
+    rendered line interprets, diagnoses, reassures or comments on a dose. No coach/model prompt carries the channel
+    in this PR (TIER_OWNER_ONLY: no AI narrative context until the owner rules on the tier); the prompt-block and
+    burden-change follow-ups are described in `health/rhythm_owner.py`'s docstring. Counts are "{n} recorded",
+    never "fewer events", with the coverage line beside them;
   * the brief's window ends on its DATA day (yesterday), and a failed read is one "could not be read" line;
-  * the burden-rise reader (`burden_change`) states n, both windows, coverage and the confounders, and decides
-    nothing;
   * PRIVACY (box 4): the renderer's importer set is the channel privacy gate's leg 4
     (`tests/test_rhythm_channel_privacy_4972.py`); here, inside the daily brief the lines go to
     the email renderer alone (never `data`, an AI prompt, a generated file, a log line or a demo brief), the
@@ -145,7 +144,7 @@ def test_a_failed_read_is_none_never_zero_and_logs_no_value(caplog):
         assert rc.read_events(FakeTable(fail=True)) is None
         assert ro.read_summary(FakeTable(fail=True), TODAY) is None
         assert ro.read_summary(None, TODAY) is None
-        assert ro.owner_lines(None) == [] and ro.coach_block(None) == ""
+        assert ro.owner_lines(None) == []
     assert MED_SENTINEL not in caplog.text
     assert "RuntimeError" in caplog.text
 
@@ -289,41 +288,6 @@ def test_no_rendered_line_carries_advice_or_interpretation():
 def test_the_one_advice_string_is_discuss_with_your_clinician():
     assert ro.ADVICE == "discuss with your clinician"
     assert ro.CLINICIAN_LINE.lower().endswith(ro.ADVICE + ".")
-    assert ro.COACH_INSTRUCTION.endswith("The only advice you may give about them is: discuss with your clinician.")
-    for word in ("interpret", "diagnose", "reassure", "medication or dose"):
-        assert word in ro.COACH_INSTRUCTION
-
-
-def test_the_coach_block_always_carries_the_instruction_with_the_data():
-    block = ro.coach_block(_summary())
-    head, instruction, *body = block.split("\n")
-    assert head == ro.HEADER and "never repeat them in anything that may be published" in head
-    assert instruction == ro.COACH_INSTRUCTION
-    assert body and all(b.startswith("- ") for b in body)
-    assert body[-1] == "- " + ro.CLINICIAN_LINE
-    # The absence form still carries the instruction; an unread channel is no block at all.
-    assert ro.coach_block(ro.summarize([], TODAY)).split("\n")[1] == ro.COACH_INSTRUCTION
-    assert ro.coach_block(None) == ""
-
-
-# ── the burden-rise reader (box 2's input; the alert itself is a follow-up) ──
-
-
-def test_burden_change_states_n_windows_coverage_and_confounders():
-    events = rc.read_events(FakeTable(_rows()))
-    worn = ["2026-11-14", "2026-11-15", "2026-11-20", "2026-11-08", "2026-10-01"]
-    b = ro.burden_change(events, TODAY, worn_days=worn)
-    assert b["family"] == "notification" and b["kind"] == "irregular" and b["window_days"] == 7
-    assert b["current"] == {"start": "2026-11-14", "end": "2026-11-20", "n": 3, "medication_log": 2, "worn_days": 3}
-    assert b["prior"] == {"start": "2026-11-07", "end": "2026-11-13", "n": 1, "medication_log": 3, "worn_days": 1}
-    assert (b["n"], b["delta"], b["rose"], b["medication_log_changed"]) == (4, 2, True, True)
-    assert b["confounders"] == list(ro.CONFOUNDERS) and len(b["confounders"]) >= 5
-    assert any("wear" in c for c in b["confounders"]) and any("medication" in c for c in b["confounders"])
-    # Every notification kind, ECGs, and no coverage key without a worn-day input.
-    assert ro.burden_change(events, TODAY, kind=None)["current"]["n"] == 4
-    ecg = ro.burden_change(events, TODAY, family="ecg")
-    assert (ecg["current"]["n"], ecg["prior"]["n"]) == (2, 1) and "worn_days" not in ecg["current"]
-    assert ro.burden_change(None, TODAY) is None
 
 
 # ── PRIVACY (box 4): never reachable from a public route or a public AI context ──

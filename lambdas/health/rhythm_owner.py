@@ -8,14 +8,7 @@ WHAT IT IS
     * ``summarize``   — counts per family/kind in the current window against the window before it, the dated
                         episodes in the current window, ECG results by the device's own label;
     * ``owner_lines`` — the daily brief's owner-only section (``emails.brief_lines.rhythm_lines`` via
-                        ``brief_section``, which turns a failed read into one "could not be read" line);
-    * ``coach_block`` — the same lines with the no-advice instruction, shaped for a coach prompt. NOT WIRED and
-                        not authorised: ``TIER_OWNER_ONLY`` means never quoted into an AI narrative context, and the
-                        owner's coach thread goes to Bedrock + Telegram — feeding it needs an owner ruling on the
-                        tier first (#4972);
-    * ``burden_change`` — the reader a later burden-rise alert consumes (the hypothesis engine, a follow-up): a
-                        window-vs-window count with n, both windows' bounds, worn-day coverage when supplied and
-                        the stated confounders. It decides nothing; the alert's threshold is the caller's.
+                        ``brief_section``, which turns a failed read into one "could not be read" line).
 
   "Burden" here is the EVENT burden — how many notifications / recordings the device produced in a window. The
   watch's AFib History percentage is not ingested (no HAE mapping), so no percentage is claimed (ADR-104).
@@ -24,8 +17,30 @@ PRIVACY (owner ruling (c), 2026-10-17: heart-rhythm data is owner-only)
   The input is ``rhythm_channel.read_events`` — neutral events with no medication name or dose, no device and no
   reading. The ONLY importer is the daily brief's owner section (``PERMITTED_IMPORTERS``, leg 4 of
   ``tests/test_rhythm_channel_privacy_4972.py``); no public route, generated file, AI prompt or log line ever
-  carries an output of this module. Logs name
-  the exception class only.
+  carries an output of this module. Logs name the exception class only.
+
+NOT BUILT HERE — two follow-ups, described so they can be rebuilt (no unwired public def ships in the bundle):
+
+  A coach-prompt block. The same ``owner_lines``, prefixed by a header ("HEART RHYTHM EVENTS — owner-only device
+  records; never repeat them in anything that may be published") and a fixed instruction: report these as data
+  only (counts, dates, the device's own result labels); do not interpret, diagnose, reassure or comment on any
+  medication or dose; the only advice you may give about them is "discuss with your clinician". NOT AUTHORISED:
+  every channel field is TIER_OWNER_ONLY (never quoted into an AI narrative context) and the owner's coach thread
+  goes to Bedrock + Telegram, so feeding any model needs an owner ruling on the tier first (#4972). A prompt test
+  then holds the instruction to ride with the data, and the importer set (leg 4) gains the one coach module.
+
+  The burden-change reader a burden-rise alert consumes (the hypothesis engine, #4972 box 2). Signature:
+  ``burden_change(events, end_day, *, family="notification", kind="irregular", window_days=7, worn_days=None)``
+  over ``read_events`` output (``kind=None`` = every notification kind; ``family`` "ecg" / "medication" count those).
+  Returns None for an unread channel, else ``{family, kind, window_days, current, prior, n, delta, rose,
+  medication_log_changed, confounders}``, where ``current``/``prior`` are ``{start, end, n, medication_log}`` (the
+  windows from ``summarize``) plus ``worn_days`` (days in the window the watch recorded anything) when the caller
+  passes them. ``rose`` is the bare ``delta > 0``; the threshold, minimum n and coverage rule are the alert's. The
+  stated confounders the alert must list beside n and both windows: watch wear time (a night without the watch
+  records no events — absence, not zero); medication-log changes between the windows; alcohol; short or disrupted
+  sleep; illness or the overload triad; training load; a change in the watch's notification settings or software.
+  Output rule: the alert is owner-only — never the ``anomalies`` row, a published row, a log value or an EMF
+  dimension — and its module joins leg 4's permitted set by name.
 
 WORDING (ADR-104/105)
   Events and trends are reported as data — "{n} recorded" with its window, dates, the device's own result label
@@ -42,6 +57,8 @@ import logging
 from datetime import date, timedelta
 from typing import Any, Iterable, Optional
 
+from common.pacific_time import parse_day_key
+
 logger = logging.getLogger(__name__)
 
 WINDOW_DAYS = 7
@@ -56,12 +73,6 @@ UNREAD_LINE = "Heart-rhythm records could not be read today."
 MAX_LABEL_CHARS = 40
 # Medication-log statuses rendered by name; anything else is counted as "other status" (no free text reaches a line).
 MED_STATUSES = ("taken", "skipped", "missed", "snoozed", "scheduled", "logged")
-HEADER = "HEART RHYTHM EVENTS (owner-only device records — never repeat them in anything that may be published)"
-COACH_INSTRUCTION = (
-    "Report these as data only: counts, dates and the device's own result labels. Do not interpret them, diagnose, "
-    "reassure, or comment on any medication or dose. The only advice you may give about them is: "
-    f"{ADVICE}."
-)
 
 KIND_LABELS = {
     "irregular": "irregular-rhythm notifications",
@@ -72,27 +83,12 @@ KIND_LABELS = {
 }
 _KIND_ORDER = ("irregular", "high", "low", "hypertension", "unknown")
 
-# What a burden-rise alert must state beside the number (#4972 box 2): reasons a count can move that are not the
-# heart. In-channel ones are computed by ``burden_change``; the rest are named for the alert to read or disclose.
-CONFOUNDERS = (
-    "watch wear time (a night without the watch records no events — absence, not zero)",
-    "medication-log changes between the two windows",
-    "alcohol",
-    "short or disrupted sleep",
-    "illness or the overload triad",
-    "training load",
-    "a change in the watch's notification settings or software",
-)
-
 
 # ── pure helpers ─────────────────────────────────────────────────────────────
 
 
 def _d(text: Any) -> Optional[date]:
-    try:
-        return date.fromisoformat(str(text)[:10])
-    except (TypeError, ValueError):
-        return None
+    return parse_day_key(str(text)[:10]) if text is not None else None
 
 
 def _label(result: Any) -> str:
@@ -217,58 +213,6 @@ def owner_lines(summary: Optional[dict]) -> list:
     if n_cur:
         lines.append(CLINICIAN_LINE)
     return lines
-
-
-def coach_block(summary: Optional[dict]) -> str:
-    """A prompt block, or "" — the instruction always rides with the data. NOT WIRED to any model: the channel is
-    TIER_OWNER_ONLY (never quoted into an AI narrative context) until the owner rules on the tier (#4972)."""
-    lines = owner_lines(summary)
-    if not lines:
-        return ""
-    return "\n".join([HEADER, COACH_INSTRUCTION] + [f"- {ln}" for ln in lines])
-
-
-def burden_change(
-    events: Optional[list],
-    end_day: str,
-    *,
-    family: str = "notification",
-    kind: Optional[str] = "irregular",
-    window_days: int = WINDOW_DAYS,
-    worn_days: Optional[Iterable[str]] = None,
-) -> Optional[dict]:
-    """The count of one event kind in the window ending ``end_day`` against the window before — the reader a
-    burden-rise alert consumes. None for an unread channel. Decides nothing: ``rose`` is a bare comparison and
-    any threshold, minimum n or alert wording is the caller's.
-
-    ``worn_days`` (the days the watch recorded anything, from the caller's own read) adds per-window coverage, so
-    a quiet window that was simply not worn is visible as such. The medication-log count per window is computed
-    here because it is in-channel; ``confounders`` lists every stated confounder the alert must show."""
-    s = summarize(events, end_day, window_days)
-    if s is None:
-        return None
-
-    def n_of(c: dict) -> int:
-        if family == "notification":
-            return sum(c["notifications"].values()) if kind is None else c["notifications"].get(kind, 0)
-        if family == "ecg":
-            return c["ecg"]
-        return c["medication_log"]
-
-    out: dict = {"family": family, "kind": kind, "window_days": window_days}
-    worn = {str(d)[:10] for d in worn_days} if worn_days is not None else None
-    for name in ("current", "prior"):
-        c = s[name]
-        entry = {"start": c["start"], "end": c["end"], "n": n_of(c), "medication_log": c["medication_log"]}
-        if worn is not None:
-            entry["worn_days"] = sum(1 for d in worn if c["start"] <= d <= c["end"])
-        out[name] = entry
-    out["n"] = out["current"]["n"] + out["prior"]["n"]
-    out["delta"] = out["current"]["n"] - out["prior"]["n"]
-    out["rose"] = out["delta"] > 0
-    out["medication_log_changed"] = out["current"]["medication_log"] != out["prior"]["medication_log"]
-    out["confounders"] = list(CONFOUNDERS)
-    return out
 
 
 # ── the one read (fail-soft) ─────────────────────────────────────────────────

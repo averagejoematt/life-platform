@@ -41,9 +41,7 @@ for k, v in (
 ):
     os.environ.setdefault(k, v)
 
-from datetime import date, timedelta  # noqa: E402
-
-from common.pacific_time import pacific_today  # noqa: E402
+from common.pacific_time import pacific_today, shift_day_key  # noqa: E402
 from health.rhythm_channel import CHANNEL_FIELDS  # noqa: E402
 from health.rhythm_owner import CLINICIAN_LINE, COVERAGE_LINE, UNREAD_LINE  # noqa: E402
 
@@ -75,24 +73,31 @@ FIXTURE_ROWS = [
         "rhythm_med_status": "taken",
     }
 ]
-# A second row dated by the WALK's clock — the brief's data day (Pacific yesterday) — so a route that serves the
-# owner renderer's output (whose window always ends on that day) renders real counts, not just the absence line.
-# The 2026-10-17 row above falls outside every live window, so on its own it could only ever prove the absence form.
-_DATA_DAY = (date.fromisoformat(pacific_today()) - timedelta(days=1)).isoformat()
-FIXTURE_ROWS.append(
-    {
+
+
+def _data_day() -> str:
+    """The brief's data day (Pacific yesterday) by the walk's clock, read at CALL time (#2223: no import-time clock)."""
+    return shift_day_key(pacific_today(), -1)
+
+
+def _data_day_row(day: str) -> dict:
+    """A second row dated on the brief's data day, so a route that serves the owner renderer's output (whose window
+    always ends on that day) renders real counts, not just the absence line. The 2026-10-17 row above falls outside
+    every live window, so on its own it could only ever prove the absence form."""
+    return {
         "pk": "USER#matthew#SOURCE#clinical",
-        "sk": f"RHYTHM#HRNOTIF#{_DATA_DAY}T03:00:00#irregular",
+        "sk": f"RHYTHM#HRNOTIF#{day}T03:00:00#irregular",
         "source": "clinical",
         "channel": "rhythm",
         "event_kind": "hr_notification",
-        "event_date": _DATA_DAY,
+        "event_date": day,
         "rhythm_notification_kind": "irregular",
         "rhythm_notification_kind_inferred": False,
-        "rhythm_notification_at": f"{_DATA_DAY}T03:00:00-07:00",
+        "rhythm_notification_at": f"{day}T03:00:00-07:00",
         "rhythm_notification_device": "RHYTHMSENTINELDEVICE",
     }
-)
+
+
 TOKENS = tuple(CHANNEL_FIELDS) + SENTINELS + ("RHYTHM#",)
 # The owner renderer's fixed strings (health.rhythm_owner): its output carries no field name, sentinel or prefix,
 # so a route serving it would pass TOKENS. Matched case-insensitively.
@@ -252,6 +257,8 @@ def route_paths(L) -> list:
 
 
 def walk(plant: bool = False, plant_renderer: bool = False) -> dict:
+    data_day = _data_day()  # one clock read per walk, at call time
+    FIXTURE_ROWS.append(_data_day_row(data_day))
     L, table = _wire()
     if plant_renderer:
         # Mutation control for the RENDERED form: /api/vitals also serves the owner renderer's lines for the
@@ -263,7 +270,7 @@ def walk(plant: bool = False, plant_renderer: bool = False) -> dict:
 
             resp = real_r(*a, **k)
             body = json.loads(resp["body"]) if isinstance(resp, dict) and isinstance(resp.get("body"), str) else {}
-            body["planted"] = rhythm_owner.brief_section(table, _DATA_DAY)
+            body["planted"] = rhythm_owner.brief_section(table, data_day)
             return {"statusCode": 200, "body": json.dumps(body, default=str)}
 
         L.ROUTES["/api/vitals"] = handle_vitals_rendered
