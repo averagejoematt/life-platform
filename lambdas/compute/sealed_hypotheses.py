@@ -164,7 +164,10 @@ def grade_closed_window(
     Returns the engine's update tuple ``(hyp, new_status, evidence, stats, resolution)``; pure apart from
     ``gather`` (a read)."""
     spec = hyp.get("test_spec") or {}
-    since, last, lag = window_bounds(hyp)
+    bounds = window_bounds(hyp)
+    if bounds is None:  # unreachable via the engine: only window_closed() rows are graded, and that needs dated bounds
+        raise ValueError(f"sealed row {hyp.get('hypothesis_id')!r} has no dated window to grade")
+    since, last, lag = bounds
     window_txt = f"window {since}..{last} (lag {lag}d)"
     marker = regime_marker(hyp)
     if marker:
