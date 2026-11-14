@@ -644,16 +644,19 @@ def test_i9_dlq_no_deploy_caused_messages():
 
 
 def test_i10_mcp_lambda_responds():
-    """I10: MCP Lambda must respond to a basic invocation without structural errors.
+    """I10: MCP Lambda must boot, and must refuse a privileged payload (#5540).
 
-    Tests that the MCP Lambda boots and its handler is reachable. A warmer
-    payload is used to avoid needing auth credentials in the test.
+    Tests that the MCP Lambda boots and its handler is reachable, with no auth credentials: it sends
+    the scheduled-event shape to the request-serving function, which the #5540 gate
+    (mcp/invoke_gate.py) refuses with a 403 BEFORE any privileged branch runs — privileged work
+    runs only on life-platform-mcp-warmer. The refusal is logged as `Rejected privileged invoke`
+    with the event's keys, so `__integration_test` in that log line attributes it to this test.
     """
     boto3 = _get_boto3()
     lc = boto3.client("lambda", region_name=REGION)
 
     try:
-        # Invoke with a minimal event that triggers the warmer path (no auth needed)
+        # The scheduled-event shape on the MAIN function: booting is proven by the gate answering.
         response = lc.invoke(
             FunctionName="life-platform-mcp",
             Payload=json.dumps({"source": "aws.events", "__integration_test": True}),
@@ -676,7 +679,13 @@ def test_i10_mcp_lambda_responds():
                 f"Error: {error_msg}\n"
                 f"Fix: bash deploy/deploy_lambda.sh life-platform-mcp lambdas/mcp_server.py"
             )
-        # Other functional errors (e.g. bad warmer step) are warnings, not failures
+        pytest.fail(f"I10 FAIL: MCP Lambda raised {payload.get('errorType', '')}: {str(payload.get('errorMessage', ''))[:150]}")
+
+    # #5540: the request-serving function must refuse the privileged shape, never run the warmer.
+    assert payload.get("statusCode") == 403, (
+        f"I10 FAIL: life-platform-mcp did not refuse a privileged scheduled-event payload "
+        f"(statusCode={payload.get('statusCode')!r}) — the #5540 invoke gate is not live on it"
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
