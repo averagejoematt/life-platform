@@ -12,7 +12,7 @@ const published = chapters.filter((c) => c.status === "published").length;
 const episodes = all.byType.episode.length;
 ---
 
-<Base title="The story" top="story" description="Every chapter of the experiment, in order, with its figures and audio.">
+<Base title="The story" top="story" description="Every weekly chapter of the experiment, in order: the ones published, and the weeks held or skipped, said plainly.">
   <section class="section">
     <div class="wrap">
       <p class="label">Story · {published} chapters published{episodes ? ` · ${episodes} with audio` : ""}</p>
