@@ -3,15 +3,22 @@ site_api_data.py (#1654): source_freshness / last_sync / presence / device_agree
 Handlers receive `_g` (the facade's globals()) from their thin delegator and read the
 facade's injectable/monkeypatched state via `_g["<name>"]` — same object the test patched."""
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
 from common import activity_publication as _activity_publication  # owner ruling 2026-11-05: private sub-streams off the board
 from common.pacific_time import (  # #1964/#3257: THE one Pacific frame + parser (the day-key anchor now runs inside instrument_presence.source_liveness)
     PACIFIC as PT,
+    pacific_today,
     parse_iso_utc,
 )
-from content.engagement_core import PUBLIC_PROJECTION_KEY  # owner ruling 2026-11-03: /api/presence serves the public projection only
+from content.engagement_core import (  # owner ruling 2026-11-03: /api/presence serves the public projection only
+    PRIMARY_CHANNEL,
+    PUBLIC_PROJECTION_KEY,
+    public_counts_as_logged,
+    public_presence_fields,
+    reconcile_presence_with_food_registry,
+)
 from experiment.phase_filter import singleton_visible, with_phase_filter
 from health import instrument_presence  # #4217: the ONE liveness derivation — the coach absence gate reads these same functions
 from ingestion.source_registry import SOURCE_REGISTRY, availability_facet, caveated_source_ids  # #3615/#3516: one absence story
@@ -29,6 +36,42 @@ _DEVICE_AGREEMENT_MIN_NIGHTS = 30
 
 
 _PRESENCE_LOUD = {"light", "quiet", "dark"}
+
+
+def _day_before(day: str) -> str:
+    try:
+        return (date.fromisoformat(str(day)[:10]) - timedelta(days=1)).isoformat()
+    except ValueError:
+        return str(day)[:10]
+
+
+def _food_log_dates_since(table, after, today) -> list[str] | None:
+    """#5955: the food-log days (primary channel, its public presence predicate — a stub row is not
+    a log) the registry holds after ``after`` up to ``today``, read at request time so a lull the
+    once-a-day presence record states can be checked against rows ingested since it was computed.
+    Every page is read (the 1 MB page limit counts the whole MacroFactor row, before projection).
+    None when the read fails — the caller treats that as "unverified", never as "no logs"."""
+    pk = USER_PREFIX + PRIMARY_CHANNEL
+    attrs = ["sk"] + [a for a in public_presence_fields(PRIMARY_CHANNEL) if a != "sk"]
+    kwargs = {
+        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{after}~", f"DATE#{today}~"),
+        "ProjectionExpression": ", ".join(attrs),
+    }
+    out = set()
+    try:
+        while True:
+            resp = table.query(**kwargs)
+            for it in resp.get("Items", []):
+                if public_counts_as_logged(PRIMARY_CHANNEL, it):
+                    out.add(str(it.get("sk", "")).replace("DATE#", "")[:10])
+            lek = resp.get("LastEvaluatedKey")
+            if not lek:
+                break
+            kwargs["ExclusiveStartKey"] = lek
+    except Exception as e:
+        logger.warning("presence food-registry check failed: %s", e)
+        return None
+    return sorted(out)
 
 
 def _latest_date_str(source: str, *, _g) -> str | None:
@@ -634,6 +677,16 @@ def presence(*, _g) -> dict:
     # honest "not available" state until the next engagement compute writes one (fail closed).
     pub = rec.get(PUBLIC_PROJECTION_KEY) if rec else None
     rec = pub if isinstance(pub, dict) else {}
+    # #5955: the record is a once-a-day snapshot and MacroFactor exports land later, back-filling
+    # days. Re-check the food registry from the record's last food log: a log inside the stated gap
+    # (or a failed read) fails closed to "present" — a lull is never stated over days with food rows.
+    if rec:
+        today = pacific_today()
+        after = rec.get("last_food_log_date") or rec.get("experiment_window_start") or rec.get("date") or today
+        # A record with no food log this cycle is contradicted by a log ON the window start too.
+        after = after if rec.get("last_food_log_date") else _day_before(after)
+        food_dates = _food_log_dates_since(table, after, today)
+        rec = reconcile_presence_with_food_registry(rec, food_dates, today)
     presence_class = rec.get("presence_class") or "present"
     returned = bool(rec.get("returned"))
     in_lull = presence_class in _PRESENCE_LOUD
