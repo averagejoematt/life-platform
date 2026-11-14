@@ -227,8 +227,11 @@ def test_findings_per_reset_is_a_rate_over_a_named_review_window():
     fpr = monthly_close.findings_per_reset()
     assert not fpr.get("error"), fpr
     assert fpr["review"].startswith("FULLREVIEW_")
-    assert fpr["findings"] > 0 and fpr["resets"] > 0
-    assert fpr["rate"] == round(fpr["findings"] / fpr["resets"], 1)
+    assert fpr["findings"] > 0 and fpr["resets"] >= 0
+    if fpr["resets"]:
+        assert fpr["rate"] == round(fpr["findings"] / fpr["resets"], 1)
+    else:
+        assert fpr["rate"] is None, "a window with no reset has no denominator — the rate is absent, never 0.0"
     assert "->" in fpr["window"], "a rate with no window is not a rate"
 
 
@@ -273,3 +276,20 @@ def test_the_rate_uses_the_reviews_OWN_window(tmp_path, monkeypatch):
     out = monthly_close.findings_per_reset()
     assert out["resets"] == 2 and out["reset_dates"] == ["2026-08-17", "2026-09-01"], out
     assert out["rate"] == 5.0
+
+
+def test_a_window_with_no_reset_reports_the_count_and_NO_rate(tmp_path, monkeypatch):
+    """The terminal cycle (ADR-077, 2026-09-21) makes this the normal state: every full
+    review after the first one inside the cycle bounds a window nothing was reset in. That
+    is not a parse failure, so it is not a close-failing problem — and it is not a zero."""
+    import monthly_close
+
+    geneses = 'CYCLE_GENESES = {\n    1: "2026-07-01",\n    2: "2026-08-01",\n}\n'
+    root = _fake_tree(tmp_path, "12 findings CONFIRMED\n", geneses)
+    monkeypatch.setattr(monthly_close, "_REPO_ROOT", str(root))
+    out = monthly_close.findings_per_reset()
+    assert "error" not in out and out["findings"] == 12 and out["resets"] == 0 and out["rate"] is None, out
+    lines, problems = monthly_close.reset_block_lines(datetime.date(2026, 9, 1), datetime.date(2026, 10, 1))
+    assert not [p for p in problems if p[0] == "RESET-FINDINGS"], problems
+    text = "\n".join(lines)
+    assert "12 confirmed / 0 resets" in text and "= no rate" in text and "= 0.0" not in text

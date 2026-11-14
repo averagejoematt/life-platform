@@ -435,7 +435,18 @@ def findings_per_reset() -> dict:
         return {"error": str(e)}
     resets = [g for _, g in pairs if prev_date < date.fromisoformat(g) <= latest_date]
     if not resets:
-        return {"error": f"no reset genesis in ({prev_date}, {latest_date}] — a per-reset rate needs at least one"}
+        # #5914: a window with no reset is a real state, not a parse failure — the cycle has
+        # been terminal since the 2026-09-21 ruling (ADR-077), so every full review after the
+        # first one inside it bounds a zero-reset window. The count is reported and the rate is
+        # None: no denominator, so no number, and never a 0.0.
+        return {
+            "review": latest,
+            "window": f"{prev_date.isoformat()} -> {latest_date.isoformat()}",
+            "findings": findings,
+            "resets": 0,
+            "reset_dates": [],
+            "rate": None,
+        }
     return {
         "review": latest,
         "window": f"{prev_date.isoformat()} -> {latest_date.isoformat()}",
@@ -495,6 +506,11 @@ def reset_block_lines(month_start: date, month_end_exclusive: date) -> tuple[lis
     fpr = findings_per_reset()
     if fpr.get("error"):
         problems.append(("RESET-FINDINGS", f"findings-per-reset: {fpr['error']}"))
+    elif fpr["rate"] is None:
+        lines.append(
+            f"  findings per reset            : {fpr['findings']} confirmed / 0 resets in {fpr['window']} "
+            f"= no rate  (nothing was reset inside {fpr['review']}'s window, so there is no denominator; not a zero)"
+        )
     else:
         lines.append(
             f"  findings per reset            : {fpr['findings']} confirmed / {fpr['resets']} resets in {fpr['window']} "
