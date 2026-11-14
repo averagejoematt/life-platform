@@ -316,7 +316,8 @@ def test_v3_floors_and_new_redlines_carry_the_plans_numbers():
     assert R["protein_floor_g"]["g_per_kg_dxa_lean"]["floor"] == 2.3
     assert R["fat_floor_g"]["value"] == 65 and R["carb_floor_g"]["value"] == 58  # #5212: lowered to ~60 g (owner 2026-10-23)
     w = R["walking_floor_hr_wk"]
-    # #4503 OD2 (owner 2026-09-30): 11–12 h by block-2 week 6 (was 13), 16 h retired, HR avg <= 120 with 105 the target
+    # #4503 OD2 (owner 2026-09-30): 11–12 h by block-2 week 6 (was 13), 16 h retired. #5916 (owner ruling 2026-11-13): OD2's
+    # heart-rate cap and target are retired — the redline carries the talk test plus an easy-effort RPE and no bpm field.
     assert (w["value"], w["target_hr_wk"], w["target_range_hr_wk"], w["target_by_week"], w["maintenance_floor_hr_wk"]) == (
         8.5,
         12,
@@ -325,7 +326,9 @@ def test_v3_floors_and_new_redlines_carry_the_plans_numbers():
         10,
     )
     assert "front_load_permitted_hr_wk" not in w and w["retired"]["front_load_permitted_hr_wk"] == 16
-    assert (w["hr_ceiling_bpm"], w["hr_target_bpm"], w["talk_test"], w["long_walk_slots_per_wk"]) == (120, 105, True, 1)
+    assert (w["easy_rpe_max"], w["talk_test"], w["long_walk_slots_per_wk"]) == (4, True, 1)
+    assert "hr_ceiling_bpm" not in w and "hr_target_bpm" not in w and w["intensity_by"].startswith("talk test + RPE")
+    assert "2026-11-13" in w["intensity_by"] and "2026-11-13" in w["note"] and "bpm" not in w["note"].split("Owner ruling 2026-11-13")[1]
     assert (
         w["standalone_walks"] == {"min_per_wk": 3, "min_minutes": 20, "outside": w["standalone_walks"]["outside"]}
         and w["permanent"] is True

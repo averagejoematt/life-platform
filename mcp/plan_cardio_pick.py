@@ -48,8 +48,9 @@ def draft_cardio_warnings(blocks: list[Any], archetype: str, target_date: str) -
         return shape + [f"cardio: the recent-aerobic pick could not be computed ({type(e).__name__}) — the modality is unchecked (#4387)"]
     if pick["movement_key"] == "treadmill":
         return shape
-    # #5000: under a standing constraint the pick carries the talk test, never an HR number
-    how = pick.get("intensity") or f"HR avg ≤ {pick['hr_ceiling_bpm']} bpm, target {pick['hr_target_bpm']}"
+    # #5916 (owner ruling 2026-11-13): the pick's intensity is the redline's line — the talk test plus RPE — on every
+    # day, constraint or not; no path prints a heart-rate number (#5000 dropped it under the constraint only)
+    how = pick.get("intensity") or recent_aerobic.EASY_EFFORT_CUE
     return shape + [
         f"cardio: {b.movement_key} drafted, but the pick from the last 3 days is {pick['modality']} ({how}) — "
         f"{pick['reason']}. Stage 2's joints_tendons critic swaps it when the legs are loaded (#4387)."
