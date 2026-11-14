@@ -349,14 +349,21 @@ def test_wrap_nightly_legs_cover_the_wrap_only_checks_it_claims():
     # degrade rule + per-leg tracker), but they are not wrap gates — they are the legs that
     # carry an aws-role, and only they may.
     aws_legs = {leg["slug"]: leg for leg in all_legs if leg.get("aws-role")}
-    assert set(aws_legs) == {"fleet-drift", "alarm-census"}, sorted(aws_legs)
-    for leg in aws_legs.values():
-        assert leg["aws-role"].endswith(":role/github-actions-readonly-role"), leg
+    assert set(aws_legs) == {"fleet-drift", "alarm-census", "wrap-alarm-citations"}, sorted(aws_legs)
+    for slug in ("fleet-drift", "alarm-census"):
+        assert aws_legs[slug]["aws-role"].endswith(":role/github-actions-readonly-role"), aws_legs[slug]
     assert aws_legs["fleet-drift"]["cmd"] == "python3 deploy/check_fleet_drift.py --expect-deploy-base"
     assert aws_legs["alarm-census"]["cmd"] == "python3 scripts/check_alarm_census.py"
-    legs = [leg for leg in all_legs if not leg.get("aws-role")]
+    # #5934: the alarm-citation gate needs DescribeAlarmHistory + the qa-smoke log read, which only
+    # the remediation (diagnosis) role holds today. It is the wrap's own (e10) gate, run unattended:
+    # the bare blocking invocation, and it stays in the interactive battery too.
+    cites = aws_legs["wrap-alarm-citations"]
+    assert cites["aws-role"].endswith(":role/github-actions-remediation-role"), cites
+    assert cites["cmd"] == "python3 scripts/check_alarm_citations.py"
     import wrap_gates
 
+    assert cites["cmd"] in {" ".join(g.cmd) for g in wrap_gates.GATHER}, "the leg must run the wrap's own e10 command"
+    legs = [leg for leg in all_legs if not leg.get("aws-role")]
     nightly = {" ".join(g.cmd) for g in wrap_gates.NIGHTLY}
     assert len({leg["slug"] for leg in legs}) == len(legs) == 5
     for leg in legs:
@@ -368,5 +375,5 @@ def test_wrap_nightly_legs_cover_the_wrap_only_checks_it_claims():
     interactive = {" ".join(g.cmd) for g in wrap_gates.GATHER + wrap_gates.VERIFY}
     moved = {" ".join(g.cmd) for g in wrap_gates.NIGHTLY if g.name not in ("handover-lines", "residual-queue")}
     assert moved and not (moved & interactive), f"#4262: moved to nightly but still in the wrap battery: {sorted(moved & interactive)}"
-    for left_out in ("proportionality-ledger", "alarm-citations"):
+    for left_out in ("proportionality-ledger",):  # alarm-citations left this list in #5934
         assert re.search(rf"{left_out}\s+NOT a leg", text), f"{left_out} must be named, with its reason, as deliberately left out"
