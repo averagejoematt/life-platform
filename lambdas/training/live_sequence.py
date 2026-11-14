@@ -30,16 +30,17 @@ def _live(lib: dict[str, Any] | None) -> bool:
 def rule_from(lib: dict[str, Any] | None) -> str | None:
     """The first Monday the sequence rules judge (owner ruling #4, fix round 8): `sequence_rule_from` when set, else the Monday
     AFTER the library's `approved_on` stamp (the approval day itself is never re-judged; earlier history is kept for baselines
-    and analysis, never re-sequenced). None (no stamp, no setting) = from the block start, the pre-ruling behaviour."""
+    and analysis, never re-sequenced). Live mode requires the stamp (`selection_engine.mode`, fix round 11), so there is no
+    "from the block start" fallback: None only for a library that is not live."""
     from common.pacific_time import shift_day_key
 
-    from training import live_settings
+    from training import live_settings, selection_engine as se
 
     since = live_settings.settings(lib).get("sequence_rule_from")
     if since:
         return monday_of(str(since))
-    stamp = (lib or {}).get("approved_on")
-    return shift_day_key(monday_of(str(stamp)), 7) if stamp else None
+    stamp = se.approved_stamp(lib)
+    return shift_day_key(monday_of(stamp), 7) if stamp else None
 
 
 def week_start(day: str) -> str:

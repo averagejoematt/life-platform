@@ -73,6 +73,7 @@ def _offline(monkeypatch):
 def _lib(status: str = "approved") -> dict:
     lib = copy.deepcopy(LIB0)
     lib["status"] = status
+    lib["approved_on"] = "2026-01-02"  # #5861 fix round 11: live needs the approval day
     return lib
 
 

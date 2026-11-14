@@ -60,6 +60,9 @@ SECONDARY_CREDIT = 0.5  # the fatigue model's own fractional-set convention (fat
 SYNTHETIC_LOAD_LB = {"barbell": 175, "machine": 120, "cable": 65, "dumbbell": 50, "kettlebell": 53, "other": 70}
 """Invented starting loads for the synthetic record (no person's numbers), by catalog equipment, in 5-lb implement steps."""
 LB_PER_KG = 2.20462
+SYNTHETIC_APPROVED_ON = "2026-01-02"
+"""The synthetic approval day an in-memory approved library carries (live mode needs `approved_on`, fix round 11): before every
+synthetic week, so the sequence rules judge them all (the Monday after it is 2026-01-05)."""
 
 
 # ── the profile and its synthetic world ──────────────────────────────────────
@@ -84,6 +87,8 @@ def approved_library(lib: dict[str, Any], profile: dict[str, Any], status: str =
     """An in-memory copy with the live switch flipped and the profile's missing equipment marked unavailable."""
     out = copy.deepcopy(lib)
     out["status"] = status
+    if status == "approved":  # live needs the approval day too (fix round 11); synthetic, before every synthetic week
+        out.setdefault("approved_on", SYNTHETIC_APPROVED_ON)
     if SETTINGS:
         out["programming_settings"] = {**(out.get("programming_settings") or {}), **SETTINGS}
     items = (out.get("gym_inventory") or {}).get("items") or {}
@@ -492,6 +497,7 @@ def generate_week(
             record.append(done)  # the next morning's draft reads this session as done
             prev = {"session_role": role, "date": day, "title": role, "was": "synthetic"}
     out = {"profile": p["name"], "label": p.get("label"), "story": p.get("story"), "mode": mode, "sessions": sessions}
+    out["live_switch"] = switch_line(world["lib"])
     from training import cardio_model
 
     recorded = (p.get("aerobic_record") or {}).get("minutes_by_day") or None  # #5861 FIX6 (ruling 12): recorded minutes only
@@ -838,8 +844,20 @@ def _session_effort_conflicts(week: dict[str, Any]) -> list[str]:
 
 
 # ── markdown ──────────────────────────────────────────────────────────────────
+def switch_line(lib: dict[str, Any]) -> str:
+    """The visible live-switch line (fix round 11): live needs `status: approved` AND a valid `approved_on`."""
+    from training import live_sequence, selection_engine as se
+
+    stamp = se.approved_stamp(lib)
+    if lib.get("status") == "approved" and stamp:
+        return f"live switch: approved on {stamp} — the sequence rules judge weeks from {live_sequence.rule_from(lib)}"
+    if lib.get("status") == "approved":
+        return "live switch: status approved WITHOUT a valid approved_on — this library runs exactly as proposed"
+    return f"live switch: {lib.get('status')} — shadow"
+
+
 def render(week: dict[str, Any], m: dict[str, Any]) -> str:
-    lines = [f"### {week['label']} — mode `{week['mode']}`", "", f"_{week['story']}_", ""]
+    lines = [f"### {week['label']} — mode `{week['mode']}`", "", f"_{week.get('live_switch') or ''}_", "", f"_{week['story']}_", ""]
     if week.get("short_week"):
         lines += [f"_{week['short_week']}_", ""]
     for s, ps_ in zip(week["sessions"], m["per_session"]):

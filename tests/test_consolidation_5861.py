@@ -40,6 +40,7 @@ from training import (  # noqa: E402
     live_session as ls,
     live_settings,
     live_volume,
+    selection_engine as se,
 )
 
 PROFILES = sw.load_profiles()
@@ -355,7 +356,9 @@ def test_sequence_rules_start_the_monday_after_approval():
     lib = {"status": "approved", "approved_on": "2026-11-18", "programming_settings": {}}
     assert live_sequence.rule_from(lib) == "2026-11-23"
     assert live_sequence.rule_from(lib | {"programming_settings": {"sequence_rule_from": "2026-12-02"}}) == "2026-11-30"
-    assert live_sequence.rule_from({"status": "approved"}) is None  # control: no stamp -> from the block start
+    # fix round 11 (E6): no stamp is not live at all — the library behaves as proposed, so no rule ever judges from the block start
+    assert live_sequence.rule_from({"status": "approved"}) is None and se.mode({"status": "approved"}) == se.MODE_SHADOW
+    assert se.mode(lib) == se.MODE_LIVE and se.mode(lib | {"approved_on": "2026-13-40"}) == se.MODE_SHADOW
 
 
 # ── 5. simplicity ratchets ───────────────────────────────────────────────────────────────────────────────────────────────────

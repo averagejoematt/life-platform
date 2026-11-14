@@ -67,6 +67,7 @@ KG = 0.45359237
 def _lib() -> dict:
     lib = copy.deepcopy(LIB0)
     lib["status"] = "approved"
+    lib["approved_on"] = "2026-01-02"  # fix round 11: live needs the approval day
     return lib
 
 

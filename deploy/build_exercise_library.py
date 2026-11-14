@@ -872,6 +872,8 @@ def build_library(
     for key in list(movements):
         movements[key] = _ordered(movements[key])
     head = with_builder_changes({k: (current or {}).get(k, v) for k, v in INITIAL_HEADER.items()})
+    if (current or {}).get("approved_on"):  # #5861 fix round 11: the approval day is kept with the status (live needs both)
+        head["approved_on"] = current["approved_on"]
     tiers = Counter(r["tier"] or "not_applicable" for e in movements.values() for r in e["hypertrophy"])
     confidence = Counter(r["evidence_confidence"] for e in movements.values() for r in e["hypertrophy"])
     src = Counter(e["source"] for e in movements.values())

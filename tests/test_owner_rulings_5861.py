@@ -338,7 +338,7 @@ def test_ruling_12_the_cron_reads_the_record_only_when_live(monkeypatch):
 
     monkeypatch.setattr(se, "load_library_failsoft", lambda: LIB0)
     assert cron._live_inputs("2026-11-16", read=lambda *a: pytest.fail("no read while proposed")) == {}
-    live = copy.deepcopy(LIB0) | {"status": "approved"}
+    live = copy.deepcopy(LIB0) | {"status": "approved", "approved_on": "2026-01-02"}
     monkeypatch.setattr(se, "load_library_failsoft", lambda: live)
     rows = {
         "apple_health": [_apple("A1", "2026-11-10T15:00:00+00:00", 40, mets=3.6)],

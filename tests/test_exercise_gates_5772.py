@@ -40,6 +40,7 @@ def _lib(status: str = "approved") -> dict[str, Any]:
     return {
         "version": "0.1.0",
         "status": status,
+        "approved_on": "2026-01-02",  # #5861 fix round 11: live needs the approval day
         "gym_inventory": {"items": {"bar": {"home_gym": {"state": "available"}}, "odd": {"home_gym": {"state": "unknown"}}}},
         "gates": {
             "pain_flag_exclusion": {"kind": "pain_flag_exclusion", "locks": True, "applies_to": "all", "unlock_condition": "no pain"},
