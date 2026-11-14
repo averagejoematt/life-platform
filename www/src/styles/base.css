@@ -1971,3 +1971,74 @@ span.gloss[data-quote-gloss] {
     display: none;
   }
 }
+
+/* Evidence in the margin (2026-11-14, sprint II): a chapter's figures and graded-call cards sit beside the paragraph
+   that first talks about them — floated into the column's right edge on a wide screen, inline on a phone. They are
+   machine evidence, so they read in the sans/mono voice, never the narrator's serif. */
+.article [data-published-body] .evidence {
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 1.4em 0;
+  padding: 10px 0 0;
+  border-top: 2px solid var(--ink);
+}
+.article [data-published-body] .evidence + p {
+  margin-top: 0;
+}
+.evidence .label {
+  display: block;
+  margin-bottom: 6px;
+}
+.evidence-chart {
+  position: relative;
+}
+.evidence-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.evidence-note {
+  color: var(--muted);
+  margin-top: 6px;
+}
+.evidence-note a,
+.callcard a {
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.callcard {
+  background: var(--rule2);
+  padding: 12px 14px 14px !important;
+  border-top-color: var(--cobalt) !important;
+}
+.callcard p + p {
+  margin-top: 8px;
+}
+.callcard-test {
+  font-weight: 600;
+  color: var(--ink);
+}
+.callcard-what {
+  color: var(--muted);
+}
+.callcard-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: center;
+}
+@media (min-width: 1000px) {
+  .article [data-published-body] .evidence {
+    float: right;
+    clear: right;
+    width: 330px;
+    margin: 0.35em 0 1.2em 32px;
+  }
+}
+.article [data-published-body]::after {
+  content: "";
+  display: block;
+  clear: both;
+}
