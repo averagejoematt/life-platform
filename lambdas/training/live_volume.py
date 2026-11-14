@@ -338,16 +338,17 @@ def plan_minutes(rows: list[dict[str, Any]]) -> float:
     return float(session_minutes_estimate(ex)["lifting_minutes"]) if ex else 0.0
 
 
-def free_minutes(rows: list[dict[str, Any]], role: str, host: str | None, lib: dict[str, Any]) -> float:
+def free_minutes(rows: list[dict[str, Any]], role: str, host: str | None, lib: dict[str, Any], reserve: bool = True) -> float:
     """The minutes this morning's lifting may still take: the lifting ceiling less the plan's minutes (an upper bound: every
     anchor's warm-ups assumed, no paired-set saving), less the conditioning dose's reserve on its host morning under the shared
-    cap (owner ruling 1: the dose takes only what lifting leaves, so the plan leaves it room rather than filling it)."""
+    cap (owner ruling 1: the dose takes only what lifting leaves, so the plan leaves it room rather than filling it with
+    non-priority isolation). No reserve on a 1-2 morning week, or (`reserve` False) for a priority muscle under its aim —
+    lifting first, the ruling's own order."""
     from training.session_shape import lifting_minutes_cap
 
     cap = float(lifting_minutes_cap())
-    if (
-        role == host and _settings(lib).get("session_cap_includes_cardio") and len({r["role"] for r in rows}) >= 3
-    ):  # 1-2 mornings: lifting first
+    shared = _settings(lib).get("session_cap_includes_cardio")
+    if reserve and shared and role == host and len({r["role"] for r in rows}) >= 3:
         cap -= float(cfg.value("conditioning_reserve_minutes"))
     return cap - plan_minutes([r for r in rows if r["role"] == role])
 
@@ -396,7 +397,7 @@ def spend(
         if not need:
             break
         m, placed = need[0], False
-        for role in sorted((r for r in roles if _half_ok(m, r, full.get(r, False))), key=lambda r: (-room(r), roles.index(r))):
+        for role in sorted((r for r in roles if _half_ok(m, r, full.get(r, False))), key=lambda r: (-room(r, m), roles.index(r))):
             here = [r for r in rows if r["role"] == role]
             grow = [r for r in _iso(m, here) if r["sets"] < hi]
             spread = m in FILL_FIRST and _spread(m, rows, roles, full, room, lo)  # owner ruling #8: abs over the mornings
@@ -448,12 +449,12 @@ def _make_room(
     nothing more."""
     lo = int(cfg.value("slot_min_sets"))
     one = plan_minutes([{"kind": "accessory", "pattern": None, "sets": 1, "intensity": "accessory"}])
-    if room(role) < 0:
+    if room(role, m) < 0:
         return False
     n = int(round(need / one))
-    while room(role) < need or slot or (budget is not None and sum(r["sets"] for r in rows) + n > budget):
+    while room(role, m) < need or slot or (budget is not None and sum(r["sets"] for r in rows) + n > budget):
         c = _count(rows)
-        here = room(role) < need or slot
+        here = room(role, m) < need or slot
 
         def ok(r: dict[str, Any]) -> bool:
             take = r["sets"] if (slot or r["sets"] <= lo) else 1
@@ -488,7 +489,7 @@ def _spread(m: str, rows: list[dict[str, Any]], roles: list[str], full: dict[str
     """Owner ruling #8: direct ab sets are spread over the mornings — another morning that may still take a new slot comes first."""
     one = plan_minutes([{"kind": "accessory", "pattern": None, "sets": 1, "intensity": "accessory"}])
     return any(
-        not _iso(m, [r for r in rows if r["role"] == role]) and room(role) >= lo * one and _half_ok(m, role, full.get(role, False))
+        not _iso(m, [r for r in rows if r["role"] == role]) and room(role, m) >= lo * one and _half_ok(m, role, full.get(role, False))
         for role in roles
     )
 
@@ -551,7 +552,7 @@ def week_plan(
         return _row(role, new, catalog, lib) | {"fill": m}
 
     lead = frozenset(m for m in prio if m in tg) if week["mornings"] >= 5 else frozenset()
-    room = lambda role: free_minutes(rows, role, host, lib)  # noqa: E731
+    room = lambda role, m=None: free_minutes(rows, role, host, lib, reserve=m not in lead)  # noqa: E731
     lines += spend(rows, tg, roles, full, room, add, last, _redline_sets(), lead)  # 2. the one step
     surplus()  # 3. again: a head's aim may have grown its muscle past MAV (ruling 9)
     lines += _redline(rows, tg, prio)
@@ -647,7 +648,7 @@ def spend_session(rx: dict[str, Any], ctx: dict[str, Any], flags: list[dict[str,
         new = {"kind": "accessory", "slot": f"spend_{m}", "intensity": "accessory", "movement_key": key, "sets": [{}] * lo}
         return _row(r, new, ctx["catalog"], ctx["lib"]) | {"fill": m}
 
-    def room(_r: str) -> float:
+    def room(_r: str, _m: str | None = None) -> float:
         return free_minutes(rows, role, str(plan.get("host") or ""), ctx["lib"])
 
     full = bool(((plan.get("week") or {}).get("partners") or {}).get(role))  # a split morning keeps its half of the body
