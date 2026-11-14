@@ -86,7 +86,7 @@ The stacks are `cdk/stacks/*_stack.py`, entry point `cdk/app.py`; each stack cre
 
 ## CI/CD
 
-`.github/workflows/ci-cd.yml`: Lint → Test → Plan → Deploy → Smoke → auto-rollback; OIDC auth, no long-lived keys. Code ships on green with no approval click (ADR-158, #4256); the one manual approval left is the additive-IAM CDK job `deploy-iam` (GitHub Environment `production`), and only when the push changed `cdk/` or `infra/`. Site QA (ADR-076) is `deploy/smoke_test_site.sh`, `lambdas/operational/qa_smoke_lambda.py` and the gating Playwright + AI-vision sweep `qa/visual_qa.py --screenshot --ai-qa` (the `/qa` skill); how the visual gate gates and when it rolls back is `docs/CONVENTIONS.md` §4b.
+`.github/workflows/ci-cd.yml`: Lint → Test → Plan → Deploy → Smoke → auto-rollback, OIDC auth. Code ships on green (ADR-158), only `deploy-iam` (IAM) waits on manual approval. Site QA (ADR-076) is `deploy/smoke_test_site.sh`, `lambdas/operational/qa_smoke_lambda.py` and the gating Playwright + AI-vision sweep `qa/visual_qa.py --screenshot --ai-qa` (the `/qa` skill); how the visual gate gates and rolls back is `docs/CONVENTIONS.md` §4b.
 
 ## AI Inference (Bedrock + Budget Guard)
 
