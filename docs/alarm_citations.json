@@ -63,11 +63,11 @@
   "updated": "2026-08-25"
  },
  "freshness-interior-gap": {
-  "added": "2026-09-21",
-  "cause": "eightsleep:2026-09-20",
-  "cause_observed": "2026-09-24T16:48:26Z",
-  "citation": "RE-OBSERVED 2026-09-24T16:48:26Z (Session AT wrap): freshness-checker logged `Interior gaps detected behind high-water mark: {'Eight Sleep': ['2026-09-20']}` — the SAME single night as the 2026-09-21 episode, no new gap. RE-CITED 2026-09-21 22:1xZ (Session AQ) — a NEW episode of the same class the 2026-08-30 entry closed. ALARM since 2026-09-21T16:46Z (1 datapoint >= 1). LIVE CAUSE: freshness-checker at 16:45:15Z logged `Interior gaps detected behind high-water mark: {'Eight Sleep': ['2026-09-20']}` — DATE#2026-09-19 and DATE#2026-09-21 exist, DATE#2026-09-20 does not. The vendor has no session for that night: eightsleep-data-ingestion's hourly gap-fill has re-asked since 2026-09-21T00:15Z and every run logs `No day matching 2026-09-20. Available: ['2026-09-19']` → `2026-09-20: no records after transform` (the owner sleeps downstairs some nights — ruling recorded 2026-09-05 on the prior episode; not re-confirmed for this night). Dated, self-clearing, no owner issue by design: the source is configured `record_gap_exhausted_absence=True` with `LOOKBACK_DAYS` 7, so the explicit absence marker for 2026-09-20 lands when the day leaves the gap-fill window (on or about 2026-09-27) and InteriorGapCount reads 0 from that run; the alarm evaluates a 24h count >= 1, so it stays ALARM until ~24h after that. EXPIRES 2026-09-29: if it is still lit then, the marker did not land and that is a NEW defect (the gap-exhausted absence-marker mechanism, pull request 3630's class), not this episode.",
-  "note": "Same shape as the 2026-08-30 episode — the mechanism that closes it already exists on this source and had not reached its boundary day yet. `added` is the day this episode was first cited; `cause_observed` the re-derivation date (#3501)."
+  "added": "2026-11-14",
+  "cause": "eightsleep:2026-11-10",
+  "cause_observed": "2026-11-14",
+  "citation": "NEW EPISODE, ALARM since 2026-11-11T17:46Z (1 datapoint >= 1). LIVE CAUSE, read 2026-11-14 from /aws/lambda/life-platform-freshness-checker (filter-log-events '\"Interior gaps\"'): every run through 16:26Z logs `Interior gaps detected behind high-water mark: {'Eight Sleep': ['2026-11-10']}` — DATE#2026-11-09 and DATE#2026-11-11 exist, DATE#2026-11-10 does not. The vendor has no session for that night: eightsleep-data-ingestion's gap-fill re-asks every run and logs `No day matching 2026-11-10. Available: ['2026-11-09']` -> `2026-11-10: no records after transform` (13:15Z 2026-11-13 and 15:15Z 2026-11-14 runs). Same class as the 2026-09-20 episode, which cleared on the mechanism below. Dated, self-clearing: the source runs `record_gap_exhausted_absence=True` with LOOKBACK_DAYS 7, so the absence marker for 2026-11-10 lands when the day leaves the gap-fill window (on or about 2026-11-17) and InteriorGapCount reads 0 from that run; the 24h count alarm stays lit about a day longer. EXPIRES 2026-11-19: if it is still lit then, the marker did not land and that is a NEW defect (the absence-marker mechanism), not this episode.",
+  "note": "Re-cited 2026-11-14 (#5934): the prior entry described the 2026-09-20 night and predated this episode."
  },
  "life-platform-budget-tier-escalation": {
   "added": "2026-10-21",
@@ -239,10 +239,10 @@
  },
  "qa-smoke-warnings": {
   "added": "2026-10-28",
-  "cause": "reader_truth:confirm,reader_truth:verdict",
-  "cause_observed": "2026-11-02",
-  "updated": "2026-11-02",
-  "citation": "NEW EPISODE 2026-11-02: the 06:37Z run reads `[QA] CAUSE warn c28c8975 reader_truth:confirm,reader_truth:verdict` — the Reader Truth rubric's HIGH temporal_contradiction on the v9 Start portrait (the Mind tile's journal count and last-entry date — private, withheld per the owner ruling of 2026-11-05 — read against the Connection tile 'The journal went quiet'), demoted to WARN when its second pass did not reproduce it (#2741 unconfirmed-high path). Owned by #5596 (Start is frozen until the owner's visual review, so filed, not fixed). The earlier data:orphan_routine_drafts warn cleared at the 04:13Z run (`warn none -`)."
+  "cause_observed": "2026-11-14",
+  "updated": "2026-11-14",
+  "citation": "#5928 — the 'no red without an owner' review epic owns this standing WARN until a narrower story is filed. RE-DERIVED 2026-11-14 from /aws/lambda/life-platform-qa-smoke (filter-log-events '\"[QA] CAUSE\"'): the 09:22Z run read `[QA] CAUSE warn 29659b98 reader_truth:verdict` — one Reader Truth low/med finding, `audience_violation` (med) on /now/: the rubric read the cockpit's second-person copy ('your read', 'your instinct against the board's') as addressing the owner outside the /coaching/ exception. The next run, 16:44Z, read `[QA] CAUSE warn none -`: the finding did not reproduce, so the alarm is lit on WarnCount's 24h count of the 09:22Z run alone and clears on or about 2026-11-15T09:30Z unless the verdict re-fires. No `cause` is declared because the live channel names none right now (a declared cause would read as contradicted); if `reader_truth:verdict` fires again, the undeclared-cause leg reds and this entry must be re-cited with it. The 2026-11-02 cause (`reader_truth:confirm,reader_truth:verdict` on the v9 Start portrait) is no longer the one firing; WarnCount is count-aggregated, so the episode that began 2026-11-01 spans both.",
+  "note": "Re-cited 2026-11-14 (#5934): the prior entry cited #2741 and #5596, both now closed, and a cause the live run no longer reports."
  },
  "field-notes-missing": {
   "added": "2026-10-25",
@@ -271,10 +271,11 @@
  },
  "calibration-deadman": {
   "added": "2026-10-27",
-  "cause_observed": "2026-10-27",
+  "cause_observed": "2026-11-14",
+  "updated": "2026-11-14",
   "cause": "no tape measurement or progress-photo set logged this cycle (the biweekly calibration prompt's dead-man)",
-  "citation": "#3759 — the owner's tape + photo sitting (deferred in session 2026-10-26 \"defer later in week\", 2026-10-27 \"15. defer\"); the alarm clears on his first logged tape/photo set. Not a code defect: the prompt + dead-man mechanism (the biweekly-prompt story, closed 2026-10-30) closed on this very firing.",
-  "note": "Cited by Session CJ wrap 2026-10-27; re-cited to the sitting's story on 2026-10-30 (owner ruling: the mechanism is proven, the sitting is the owner's act) — the PR that moved this entry is 5489."
+  "citation": "#5907 — the roadmap epic's row for issue 3759 (progress photos and the tape/photo calibration sitting), folded there when that story closed on 2026-11-14. The episode is unchanged since 2026-10-24 (describe-alarms, read 2026-11-14: StateTransitionedTimestamp 2026-10-23T21:46 PT, no transition since): no tape or progress-photo set has been logged, so the dead-man holds. Not a code defect — the prompt + dead-man mechanism closed on this very firing; the alarm clears on the owner's first logged tape/photo set.",
+  "note": "Cited by Session CJ wrap 2026-10-27; re-cited to the sitting's story on 2026-10-30 (PR 5489); re-pointed from the closed #3759 to its row on the open roadmap epic #5907 on 2026-11-14 (#5934)."
  },
  "life-platform-canary-mcp-failure": {
   "added": "2026-11-01",
@@ -282,5 +283,12 @@
   "updated": "2026-11-01",
   "citation": "One transition only: the MCP canary entered ALARM once around 2026-11-01T03:1xZ and cleared within the hour (the 04:16Z pre-flight read it as 'fired 1h04m ago, now cleared'). The window is the one in which main took the #5538 Site API merge and its fleet deploy; the canary's own log for that run was not re-read this session, so 'deploy-window transient' is a HYPOTHESIS, not a derived cause. No issue filed: a single cleared transition is below the filing bar. Whether it recurs is READ from the alarm's own history at each wrap (scripts/check_alarm_citations.py, the #2912 transition count), never asserted here; a second transition inside 7 days files an issue and re-cites this entry with the derived cause.",
   "note": "Session CR wrap 2026-11-01 — cited under the #2912 flap rule; the honest status is 'unexplained, cleared, watched by the transition count'."
+ },
+ "prereg-overdue": {
+  "added": "2026-11-14",
+  "cause_observed": "2026-11-14",
+  "cause": "dead-man born in ALARM: no PreRegisteredOverdue datapoint emitted yet (missing data breaches); its first emits will count the two genesis hypotheses until their voids are written",
+  "citation": "#5518 — the sealed-pre-registration dead-man shipped by PR 5898 (LifePlatformMonitoring deployed 2026-11-14 04:56Z). Read 2026-11-14 (describe-alarms + list-metrics): ALARM since 2026-11-14T05:12Z on 'no datapoints were received for 2 periods ... treated as [Breaching]' — LifePlatform/Predictions PreRegisteredOverdue had no datapoint yet; the coach-prediction-evaluator emits it on its daily 18:00 UTC run. Per #5518's dry run the overdue count is exactly the two genesis hypotheses (h1, h2), whose voids the scheduled hypothesis-engine run writes on Sun 2026-11-15 12:00 America/Los_Angeles; the first emit after that reads 0 and the alarm clears. EXPIRES 2026-11-17: if it is still lit then, the voids did not land or the emitter is not running — re-open on #5518.",
+  "note": "Added 2026-11-14 (#5934): the alarm went red within the hour of its creation and had no row."
  }
 }

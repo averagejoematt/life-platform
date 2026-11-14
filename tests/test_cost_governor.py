@@ -524,7 +524,7 @@ def test_tier_crossing_forecast_is_total(gov):
     assert gov._tier_crossing_forecast(None, None, None, None) == {"1": None, "2": None, "3": None}
 
 
-# ── _recent_unique_visitors: reads the traffic digest's CloudWatch metric ────
+# ── _surge_reading_and_baseline: reads the traffic digest's CloudWatch metric ────
 
 
 class _FakeCW:
@@ -537,27 +537,28 @@ class _FakeCW:
         return {"Datapoints": self._datapoints}
 
 
-def test_recent_unique_visitors_returns_latest_datapoint(gov, monkeypatch):
+def test_surge_reading_is_the_latest_datapoint(gov, monkeypatch):
     points = [
         {"Timestamp": datetime(2026, 6, 29, tzinfo=timezone.utc), "Maximum": 165},
         {"Timestamp": datetime(2026, 7, 6, tzinfo=timezone.utc), "Maximum": 288},
     ]
     monkeypatch.setattr(gov, "_cw", _FakeCW(points))
-    assert gov._recent_unique_visitors(datetime(2026, 7, 8, tzinfo=timezone.utc)) == 288
+    # #5936: the older point is the baseline; the reading under test is not in it.
+    assert gov._surge_reading_and_baseline(datetime(2026, 7, 8, tzinfo=timezone.utc)) == (288, [165])
 
 
-def test_recent_unique_visitors_no_datapoints_returns_none(gov, monkeypatch):
+def test_surge_reading_no_datapoints_returns_none(gov, monkeypatch):
     monkeypatch.setattr(gov, "_cw", _FakeCW([]))
-    assert gov._recent_unique_visitors(datetime(2026, 7, 8, tzinfo=timezone.utc)) is None
+    assert gov._surge_reading_and_baseline(datetime(2026, 7, 8, tzinfo=timezone.utc)) == (None, [])
 
 
-def test_recent_unique_visitors_read_failure_returns_none(gov, monkeypatch):
+def test_surge_reading_read_failure_returns_none(gov, monkeypatch):
     class _BrokenCW:
         def get_metric_statistics(self, **kwargs):
             raise RuntimeError("boom")
 
     monkeypatch.setattr(gov, "_cw", _BrokenCW())
-    assert gov._recent_unique_visitors(datetime(2026, 7, 8, tzinfo=timezone.utc)) is None
+    assert gov._surge_reading_and_baseline(datetime(2026, 7, 8, tzinfo=timezone.utc)) == (None, [])
 
 
 # ── #1998: _alert_surge must format from the ACTIVE ceiling pair ────────────
@@ -886,23 +887,25 @@ def test_alert_surge_quotes_the_derived_bar_not_the_floor(gov, monkeypatch):
     assert "(900)" not in body, f"the alert quoted the floor constant as the bar: {body!r}"
 
 
-def test_weekly_uniques_baseline_returns_the_series_oldest_first(gov, monkeypatch):
+def test_surge_baseline_is_the_prior_series_oldest_first(gov, monkeypatch):
     points = [
         {"Timestamp": datetime(2026, 8, 31, tzinfo=timezone.utc), "Maximum": 1011},
         {"Timestamp": datetime(2026, 7, 1, tzinfo=timezone.utc), "Maximum": 972},
         {"Timestamp": datetime(2026, 8, 1, tzinfo=timezone.utc), "Maximum": 973},
     ]
     monkeypatch.setattr(gov, "_cw", _FakeCW(points))
-    assert gov._weekly_uniques_baseline(datetime(2026, 9, 6, tzinfo=timezone.utc)) == [972, 973, 1011]
+    # #5936: 1011 is the reading under test (inside the 14-day lookback), so the baseline
+    # is the readings BEFORE it — never the reading itself.
+    assert gov._surge_reading_and_baseline(datetime(2026, 9, 6, tzinfo=timezone.utc)) == (1011, [972, 973])
 
 
-def test_weekly_uniques_baseline_read_failure_is_empty(gov, monkeypatch):
+def test_surge_baseline_read_failure_is_empty(gov, monkeypatch):
     class _BrokenCW:
         def get_metric_statistics(self, **kwargs):
             raise RuntimeError("boom")
 
     monkeypatch.setattr(gov, "_cw", _BrokenCW())
-    assert gov._weekly_uniques_baseline(datetime(2026, 9, 6, tzinfo=timezone.utc)) == []
+    assert gov._surge_reading_and_baseline(datetime(2026, 9, 6, tzinfo=timezone.utc)) == (None, [])
     # …and the empty series degrades to the documented floor, with the reason stated.
     threshold, rule = gov.surge_threshold_from_baseline([])
     assert threshold == gov.SURGE_UNIQUES_THRESHOLD and "floor" in rule

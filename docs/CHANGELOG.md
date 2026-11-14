@@ -440,7 +440,26 @@ Full suite creds-blanked: **2045 passed, 0 failed**; live CI Lint + Unit Tests b
 
 Reframed `/evidence/mind/` (the most sensitive page) on the spine **"the layer the machine can't see — awaiting its human."** Per `docs/specs/SPEC_MIND_PAGE_REDESIGN_2026-06-21.md`; **Phase 0 only** (P0.1–P0.4, front-end); the Phase-1 capture mechanics are DEFERRED pending the invitation-not-obligation UX sign-off (its explicit STOP-AND-ASK) — tracked as MIND-01..05. Deployed + live-verified. Seventh page redesign.
 
-**Fixed a live privacy leak:** the previous page rendered vice streaks by NAME ("No alcohol", "No sweets"…); Phase 0 renders them **unnamed** per the hard privacy rule — verified live (zero vice names on the page).
+**Fixed a live privacy leak:** the previous page rendered vice streaks by NAME ("No alcohol"…); Phase 0 renders them **unnamed** per the hard privacy rule — verified live (zero vice names on the page).
+
+> **Correction, 2026-11-14 (#5948) — this fix did not hold, and the leak was live the whole time.** It was a renderer
+> change on this one page: `mindRestraint` stopped printing `name`, while `/api/mind_overview` went on serving it (and a
+> per-day map keyed by it). The sibling page `/data/vices/` (`renderVices`) and four more payloads — `/api/vice_streaks`,
+> `/api/habits` `per_habit`, `/api/habit_registry`, `/api/domains` (and the static `config/domains.json` behind it) — all
+> predate this entry, were not touched by it, and kept naming every restraint habit. "Verified live" above was verified on
+> the Mind page only. No test read a payload, so nothing noticed for 144 days (2026-06-23 → 2026-11-14), until the
+> 2026-11-14 accuracy review read a page that said "named privately" above the names (finding data-behaviour-4).
+>
+> The rule (`docs/DATA_GOVERNANCE.md`: only the alcohol and food-delivery categories are ever named in public; every other
+> restraint category is aggregate-only) is now enforced where the data is served, not where it is drawn:
+> `lambdas/common/restraint_publication.py` is the one place that decides whether a restraint habit may be named — by its
+> exact name, fail closed, so a new or renamed habit is aggregate-only until it is ruled on — and every public reader of a
+> restraint name goes through it. The non-nameable habits reach the wire as unlabelled aggregates (a count, how many are
+> held, the longest streak, total resets; one adherence figure on `/api/habits`), with no name, id or slug.
+> `tests/test_restraint_labels_5948.py` reads the payloads: both endpoints at handler level with a must-fail control, and
+> every public GET route walked against a table planted with synthetic restraint names, which fails by route name the day
+> any of them serves one. Two lessons, both already house rules: a hide in a renderer leaves the label on the wire, and a
+> fix to one instance is not a fix to the set.
 
 - **P0.1** vice restraint, reset-honest: leads with **cumulative days held** (resilience across resets, never erased) over a fragile streak; streaks **unnamed** (counts only); resets read muted as restarts — **zero red, no shame**.
 - **P0.2** the inviting absence: empty mood/journal is a dignified invitation, never a hollow axis; a held one-tap affordance (mechanic is P1, gated).

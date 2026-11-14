@@ -11,6 +11,12 @@ Three pure pieces the owner's Journey/Day review asked to be one thing everywher
   (`week_start`..`week_end`), else genesis + 7·(n−1) .. +6; a prologue (week 0) carries none. Every page that
   places a date in a week reads these two fields — never a chapter's publication `date` (Week 1 is
   6–12 September and was published on the 8th; inferring the week from that date put 12 September in Week 2).
+* `apply_chapter_dates` (run by `apply_week_intervals`) — a published chapter's TRUE dates, as `/api/chapters` serves
+  them for a published week only: `published_at` (the owner's approval, as a Pacific day) and `covers_start`..
+  `covers_end` (the days the chapter is about, from its "Day A to Day B" stats line). A chapter's `date` is the
+  chronicle's DATA date — Week 10 is dated 10 November, covers 4–10 November and was approved on 13 November
+  (2026-11-14). All three are null when not served (an older Lambda, fixture mode, a held/skipped/pending week);
+  `approved.at` becomes the approval day when it is known and otherwise stays as it was.
 * `clean_excerpt` — a chapter's excerpt without the editor's note the body already opens with, and without the
   Markdown emphasis markers the feed carries literally. The body itself is never touched.
 """
@@ -20,8 +26,9 @@ from __future__ import annotations
 import os
 import re
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from publish_snapshot_contract import ISO_DAY  # noqa: E402
@@ -86,6 +93,50 @@ def apply_week_intervals(chapters: list[dict], chapters_api: dict | None, genesi
         n = c.get("week")
         a, b = week_interval(n, genesis, spans) if isinstance(n, int) and not isinstance(n, bool) and n >= 1 else (None, None)
         c["week_start"], c["week_end"] = a, b
+    apply_chapter_dates(chapters, chapters_api)
+
+
+PACIFIC = ZoneInfo("America/Los_Angeles")  # the site's clock (#2506)
+
+
+def pacific_day(ts: Any) -> str | None:
+    """The Pacific calendar day of an ISO timestamp ("2026-11-14T00:24:35Z" -> "2026-11-13"); a bare day is itself;
+    None when unreadable. A naive timestamp is read as UTC (the writers stamp UTC)."""
+    s = str(ts or "").strip()
+    if ISO_DAY.fullmatch(s):
+        return s
+    try:
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+    return dt.astimezone(PACIFIC).date().isoformat()
+
+
+def served_dates(chapters_api: dict | None) -> dict[int, dict]:
+    """``{week: {published_at, covers_start, covers_end}}`` for the PUBLISHED weeks `/api/chapters` serves — nothing
+    is read off a held, skipped or pending week."""
+    out: dict[int, dict] = {}
+    for w in (chapters_api or {}).get("weeks") or []:
+        n = w.get("week")
+        if not isinstance(n, int) or isinstance(n, bool) or w.get("status") != "published":
+            continue
+        a, b = str(w.get("covers_start") or ""), str(w.get("covers_end") or "")
+        span = (a, b) if ISO_DAY.fullmatch(a) and ISO_DAY.fullmatch(b) and a <= b else (None, None)
+        out[n] = {"published_at": pacific_day(w.get("published_at")), "covers_start": span[0], "covers_end": span[1]}
+    return out
+
+
+def apply_chapter_dates(chapters: list[dict], chapters_api: dict | None) -> None:
+    dates = served_dates(chapters_api)
+    for c in chapters:
+        n = c.get("week")
+        d = dates.get(n) if c.get("status") == "published" and isinstance(n, int) and not isinstance(n, bool) else None
+        d = d or {"published_at": None, "covers_start": None, "covers_end": None}
+        c.update(d)
+        if d["published_at"] and isinstance(c.get("approved"), dict):
+            c["approved"] = {**c["approved"], "at": d["published_at"]}
 
 
 _PARA = re.compile(r"<p(\s[^>]*)?>([\s\S]*?)</p>", re.IGNORECASE)

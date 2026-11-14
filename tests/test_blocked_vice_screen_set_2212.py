@@ -10,7 +10,8 @@ the food_delivery flag and #2211/#2230 used for a single function's screen set) 
 found the true count is 11, not 6 — five more call sites the original sweep never
 named: site_api_habits.py:87 (_absorb_reflection), site_api_social.py:1143 (challenge
 catalog overlay) and :1691 (board_question, already covered — see below),
-site_api_mind.py:182 and :300 (mind_overview's two vice surfaces).
+site_api_mind.py:182 and :300 (mind_overview's two vice surfaces; :300's surface — a per-day map
+keyed by habit name — was removed by #5948, and its screen with it: see the count pin below).
 
 Structure:
   AC1  guard the SET — every derived call site sits inside a real exclusion (an `if`
@@ -241,9 +242,14 @@ def test_blocked_vice_call_sites_derivation_is_non_vacuous():
     # 27 -> 28 by #4189: `_handle_morning_note` screens the owner's four words (joined) at
     # the door with an immediate `return _error(400, ...)`; behaviourally mutation-proved in
     # tests/test_e2e_write_paths.py (test_morning_note_a_blocked_vice_word_is_refused_with_no_write).
-    assert len(sites) == 28, (
-        f"expected 28 distinct _is_blocked_vice call sites (11 from #2212 + 2 from #2238 + 11 from #2240 + 2 from #2221 "
-        f"+ 1 from #4182 + 1 from #4189), "
+    # 28 -> 27 by #5948 (2026-11-14): mind_overview's `vice_timeline` no longer carries the per-day
+    # `streaks` map at all (it was keyed by habit NAME; restraint labels do not ride a public payload),
+    # so the screen inside that loop went with the surface it screened. The absence is pinned below
+    # (test_mind_overview_vice_timeline_carries_no_name_keyed_map) and, across every public route, by
+    # tests/test_restraint_labels_5948.py.
+    assert len(sites) == 27, (
+        f"expected 27 distinct _is_blocked_vice call sites (11 from #2212 + 2 from #2238 + 11 from #2240 + 2 from #2221 "
+        f"+ 1 from #4182 + 1 from #4189 - 1 from #5948), "
         f"got {len(sites)} — a call site was added or removed; update this pin AND give the changed "
         f"site the same mutation-proof treatment as the rest of this file"
     )
@@ -295,6 +301,11 @@ def test_absorb_reflection_keeps_a_clean_habit_name(monkeypatch):
 #    behavioral test existed at all, per the issue) ──────────────────────────
 
 
+# #5948: /api/vice_streaks names a restraint habit only when the governance doc allows its category
+# to be named (common.restraint_publication) — so the "clean" name in these fixtures is one of those.
+_NAMEABLE = "No alcohol"
+
+
 def _vice_streaks_g(items):
     table = FakeDdbTable(rows=items)
     return {"table": table, "_experiment_date": lambda days_back=30: "2020-01-01"}
@@ -311,14 +322,16 @@ def test_vice_streaks_excludes_a_blocked_vice_name(monkeypatch):
             "pk": f"USER#{USER_ID}#SOURCE#habit_scores",
             "sk": "DATE#2026-06-01",
             "date": "2026-06-01",
-            "vice_streaks": {"Alcohol-free": 5, blocked: 3},
+            "vice_streaks": {_NAMEABLE: 5, blocked: 3},
         }
     ]
     resp = habits_mod.vice_streaks(_g=_vice_streaks_g(items))
     body = json.loads(resp["body"])
     names = {v["name"] for v in body["vices"]}
-    assert names == {"Alcohol-free"}, f"blocked vice name leaked into /api/vice_streaks: {names}"
-    assert body["total_tracked"] == 1
+    assert names == {_NAMEABLE}, f"blocked vice name leaked into /api/vice_streaks: {names}"
+    # #5948: a habit that is not nameable is COUNTED in the unlabelled aggregate, so the blocked
+    # screen is what keeps a never-public category out of the counts too — not just out of `vices`.
+    assert body["total_tracked"] == 1 and body["unnamed"]["tracked"] == 0
 
 
 def test_vice_streaks_keeps_a_clean_vice_name(monkeypatch):
@@ -328,12 +341,12 @@ def test_vice_streaks_keeps_a_clean_vice_name(monkeypatch):
             "pk": f"USER#{USER_ID}#SOURCE#habit_scores",
             "sk": "DATE#2026-06-01",
             "date": "2026-06-01",
-            "vice_streaks": {"Alcohol-free": 5},
+            "vice_streaks": {_NAMEABLE: 5},
         }
     ]
     resp = habits_mod.vice_streaks(_g=_vice_streaks_g(items))
     body = json.loads(resp["body"])
-    assert {v["name"] for v in body["vices"]} == {"Alcohol-free"}
+    assert {v["name"] for v in body["vices"]} == {_NAMEABLE}
 
 
 # ── site_api_habits.py:325 — habits() per-habit aggregation (/api/habits) ────
@@ -567,12 +580,15 @@ def test_mind_overview_vice_streaks_excludes_a_blocked_vice(monkeypatch):
         "vices_total": 2,
     }
     body = json.loads(mind_mod.mind_overview(_g=_mind_overview_g(hs_item))["body"])
-    names = {v["name"] for v in body["vice_streaks"]}
-    assert names == {"Screen-free evenings"}, f"blocked vice name leaked into /api/mind_overview vice_streaks: {names}"
+    # #5948: the rows are nameless (a streak count and held/not), so the blocked category is proven
+    # absent by the COUNT — with the screen removed there are two rows here, not one.
+    assert body["vice_streaks"] == [{"current_streak": 4, "holding": True}], body["vice_streaks"]
+    assert blocked not in json.dumps(body)
 
 
-def test_mind_overview_vice_timeline_excludes_a_blocked_vice(monkeypatch):
-    """Kills :300."""
+def test_mind_overview_vice_timeline_carries_no_name_keyed_map(monkeypatch):
+    """#5948: the per-day `streaks` map (keyed by habit name) is gone from the timeline, and with it the
+    screen that used to sit at :300. A day is its date and two counts; no habit name, blocked or not."""
     _pin_content_filter(monkeypatch)
     blocked = _name_with_blocked_keyword("Habit:")
     hs_item = {
@@ -586,7 +602,8 @@ def test_mind_overview_vice_timeline_excludes_a_blocked_vice(monkeypatch):
     body = json.loads(mind_mod.mind_overview(_g=_mind_overview_g(hs_item))["body"])
     assert body["vice_timeline"], "fixture produced no vice_timeline day — test is not exercising the code under test"
     for day in body["vice_timeline"]:
-        assert blocked not in day.get("streaks", {}), f"blocked vice name leaked into /api/mind_overview vice_timeline: {day}"
+        assert set(day) == {"date", "held", "total"}, f"/api/mind_overview vice_timeline grew a key: {sorted(day)}"
+    assert blocked not in json.dumps(body) and "Screen-free evenings" not in json.dumps(body)
 
 
 # premerge-gate: structural gate that sweeps the repo tree (#2372)

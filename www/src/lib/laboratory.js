@@ -505,3 +505,85 @@ export function stabilityFigure(p, { width = 340 } = {}) {
   const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(aria)}" data-chart data-points="${esc(JSON.stringify(points))}">${g}</svg>`;
 }
+
+// ── the Laboratory's two index figures (2026-11-14, sprint II) ────────────────────────────────────────────────────
+// The index was sentences only. These place served numbers on an axis; neither computes a statistic.
+
+/**
+ * One finding as a forest-plot row: the correlation on a fixed −1..+1 axis, zero marked, the served 95% interval as a
+ * whisker and r as the dot. Cobalt when the interval excludes zero (every listed finding passed the run's correction;
+ * the colour only restates the served interval), ink otherwise. Null when r is not served.
+ */
+export function forestFigure(f, { width = 320 } = {}) {
+  if (!f || f.r == null) return null;
+  const W = width;
+  const H = 30;
+  const pad = 6;
+  const x = (v) => pad + ((Math.max(-1, Math.min(1, v)) + 1) / 2) * (W - 2 * pad);
+  const has = f.ci95_low != null && f.ci95_high != null;
+  const clear = has && (f.ci95_low > 0 || f.ci95_high < 0);
+  const c = clear ? "#1B3FD6" : "#121212";
+  let g = `<line x1="${pad}" y1="15" x2="${W - pad}" y2="15" stroke="#C9C9C3" stroke-width="1"/>`;
+  for (const v of [-1, -0.5, 0.5, 1]) g += `<line x1="${x(v).toFixed(1)}" y1="12" x2="${x(v).toFixed(1)}" y2="18" stroke="#C9C9C3" stroke-width="1"/>`;
+  g += `<line x1="${x(0).toFixed(1)}" y1="3" x2="${x(0).toFixed(1)}" y2="27" stroke="#121212" stroke-width="1"/>`;
+  if (has) g += `<line x1="${x(f.ci95_low).toFixed(1)}" y1="15" x2="${x(f.ci95_high).toFixed(1)}" y2="15" stroke="${c}" stroke-width="5" stroke-linecap="round" opacity="0.45"/>`;
+  g += `<circle cx="${x(f.r).toFixed(1)}" cy="15" r="5" fill="${c}"/>`;
+  const aria = `r ${signed(f.r, 2)}${has ? `, 95% interval ${signed(f.ci95_low, 2)} to ${signed(f.ci95_high, 2)}` : ""}, on an axis from minus one to plus one`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${aria}">${g}</svg>`;
+}
+
+/** The forest plot's shared axis header: −1, 0, +1 at the same x positions as forestFigure. */
+export function forestAxis({ width = 320 } = {}) {
+  const W = width;
+  const pad = 6;
+  const x = (v) => pad + ((v + 1) / 2) * (W - 2 * pad);
+  const t = (v, s, a) => `<text x="${x(v).toFixed(1)}" y="12" text-anchor="${a}" font-family="IBM Plex Mono,monospace" font-size="12.5" fill="#5C5C58">${s}</text>`;
+  return `<svg viewBox="0 0 ${W} 16" width="100%" aria-hidden="true">${t(-1, "−1 opposite", "start")}${t(0, "0", "middle")}${t(1, "together +1", "end")}</svg>`;
+}
+
+/** A finding's pair in words: "Resting HR × Recovery". */
+export function pairTitle(f) {
+  return `${labelWords(f.metric_a)} × ${labelWords(f.metric_b)}`;
+}
+
+/** A finding's numbers as a caption: "r −0.67 · 95% interval −0.81 to −0.44 · about 39 independent days of 90". */
+export function findingCaption(f) {
+  const ci = f.ci95_low != null && f.ci95_high != null ? ` · 95% interval ${signed(f.ci95_low, 2)} to ${signed(f.ci95_high, 2)}` : "";
+  const neff = f.n_eff != null ? ` · about ${num(f.n_eff)} independent days of ${num(f.n)}` : f.n != null ? ` · ${num(f.n)} days` : "";
+  return `r ${signed(f.r, 2)}${ci}${neff}`;
+}
+
+/**
+ * A pre-registered test's paired days against what each side needs, as two bars: the test side and the other side,
+ * each filled to the served count with the needed count marked. Before the engine splits the days (it serves 0 and 0
+ * until there are two sides' worth) one bar shows the paired days against the two sides' total. Null when the test
+ * has not been checked (no count is served) — nothing is drawn for a number that does not exist.
+ */
+export function armsFigure(t, { width = 200 } = {}) {
+  if (!t || t.min_days_per_arm == null || t.days_observed == null) return null;
+  const per = t.min_days_per_arm;
+  const W = width;
+  const split = Boolean(t.n_condition || t.n_comparison);
+  const rows = split
+    ? [
+        { label: "test side", n: t.n_condition || 0, need: per },
+        { label: "other side", n: t.n_comparison || 0, need: per },
+      ]
+    : [{ label: "paired days", n: t.days_observed, need: 2 * per }];
+  const max = Math.max(...rows.map((r) => Math.max(r.n, r.need))) * 1.1 || 1;
+  const lw = 86;
+  const x = (v) => lw + (v / max) * (W - lw - 30);
+  const H = rows.length * 18 + 2;
+  let g = "";
+  rows.forEach((r, i) => {
+    const y = i * 18 + 4;
+    const ok = r.n >= r.need;
+    g += `<text x="0" y="${y + 9}" font-family="IBM Plex Mono,monospace" font-size="12.5" fill="#5C5C58">${r.label}</text>`;
+    g += `<rect x="${lw}" y="${y}" width="${(x(max / 1.1) - lw).toFixed(1)}" height="10" fill="#E3E3DD"/>`;
+    g += `<rect x="${lw}" y="${y}" width="${(x(r.n) - lw).toFixed(1)}" height="10" fill="${ok ? "#1B3FD6" : "#121212"}"/>`;
+    g += `<line x1="${x(r.need).toFixed(1)}" y1="${y - 3}" x2="${x(r.need).toFixed(1)}" y2="${y + 13}" stroke="#121212" stroke-width="1.5" stroke-dasharray="2 2"/>`;
+    g += `<text x="${W}" y="${y + 9}" text-anchor="end" font-family="IBM Plex Mono,monospace" font-size="12.5" fill="#121212">${num(r.n)}/${num(r.need)}</text>`;
+  });
+  const aria = rows.map((r) => `${r.label}: ${num(r.n)} of the ${num(r.need)} days needed`).join("; ");
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${aria}">${g}</svg>`;
+}

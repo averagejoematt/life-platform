@@ -70,6 +70,22 @@
         "length_sample": 59,
         "type": "array"
       },
+      "restraints_unnamed": {
+        "keys": {
+          "by_group": {
+            "keys": {
+              "Vice": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "count": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "source": {
         "type": "string"
       },

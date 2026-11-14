@@ -7,7 +7,10 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
-from common import activity_publication as AP  # owner ruling 2026-11-04: private habits are not named publicly
+from common import (
+    activity_publication as AP,  # owner ruling 2026-11-04: private habits are not named publicly
+    restraint_publication as RP,  # #5948: nor is a restraint habit outside the nameable categories
+)
 from experiment.phase_filter import with_phase_filter
 
 from web.site_api_common import (
@@ -365,31 +368,53 @@ def protocols(*, _g) -> dict:
             item.pop("pk", None)
             item.pop("sk", None)
             protocols.append(item)
+        restraints = RP.load_restraint_names(table, USER_PREFIX, USER_ID)
+        protocols = [_public_protocol(p, restraints) for p in protocols]
         return _ok({"protocols": protocols, "count": len(protocols)}, cache_seconds=3600)
     except Exception as e:
         logger.warning("handle_protocols: DynamoDB query failed, falling back to S3: %s", e)
         global _protocols_cache
         if _protocols_cache is None:
             _protocols_cache = _load_s3_json("site/config/protocols.json", "protocols")
-        protocols = _protocols_cache.get("protocols", [])
+        # DynamoDB is what failed, so the restraint set is unknown: only nameable names are served.
+        protocols = [_public_protocol(p, None) for p in _protocols_cache.get("protocols", [])]
         return _ok({"protocols": protocols, "count": len(protocols)}, cache_seconds=3600, degraded=e)
 
 
-def _public_domain(domain: dict) -> dict:
-    """One domain with every habit the publication policy knows to be PRIVATE by identity removed (owner
-    ruling 2026-11-04: "Remove Morning Journal and Evening Journal from the public configuration").
+def _public_habit_names(names, restraints) -> list:
+    """A config's list of habit names as it may be served: no habit the publication policy knows to be
+    PRIVATE by identity (owner ruling 2026-11-04), and no restraint habit outside the categories the
+    governance doc allows to be named (#5948, ``common.restraint_publication``; ``restraints`` is the
+    known restraint set, or None when it could not be read — then only nameable names are served)."""
+    kept = [n for n in names if AP.NP.classify(AP.habit_family(n)) != AP.PRIVATE]
+    return RP.nameable_names(kept, restraints)
+
+
+def _public_domain(domain: dict, restraints=None) -> dict:
+    """One domain with every habit name that may not be served removed (owner ruling 2026-11-04: "Remove
+    Morning Journal and Evening Journal from the public configuration"; #5948: restraint labels).
     The config itself no longer names them; this is the policy's own check on whatever the config says."""
     if not isinstance(domain, dict) or not isinstance(domain.get("habit_names"), list):
         return domain
-    return {**domain, "habit_names": [n for n in domain["habit_names"] if AP.NP.classify(AP.habit_family(n)) != AP.PRIVATE]}
+    return {**domain, "habit_names": _public_habit_names(domain["habit_names"], restraints)}
 
 
-def domains() -> dict:
+def _public_protocol(protocol: dict, restraints=None) -> dict:
+    """One protocol with its ``related_habits`` screened the same way (#5948)."""
+    if not isinstance(protocol, dict) or not isinstance(protocol.get("related_habits"), list):
+        return protocol
+    return {**protocol, "related_habits": _public_habit_names(protocol["related_habits"], restraints)}
+
+
+def domains(*, _g=None) -> dict:
     """GET /api/domains — Return domain groupings from S3 config."""
     global _domains_cache
     if _domains_cache is None:
         _domains_cache = _load_s3_json("site/config/domains.json", "domains")
-    domains = [_public_domain(d) for d in _domains_cache.get("domains", [])]
+    restraints = RP.load_restraint_names((_g or {}).get("table"), USER_PREFIX, USER_ID)
+    domains = [_public_domain(d, restraints) for d in _domains_cache.get("domains", [])]
+    if restraints is None:  # the restraint set could not be read: served closed, and not cached for the hour
+        return _ok({"domains": domains, "count": len(domains)}, cache_seconds=300, degraded="restraint set unavailable")
     return _ok({"domains": domains, "count": len(domains)}, cache_seconds=3600)
 
 
