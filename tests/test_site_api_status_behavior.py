@@ -115,10 +115,12 @@ def _module_literal(name):
 # PUBLIC rows only (common.activity_publication — the journal's row is private activity, and since the
 # owner ruling of 2026-11-05 so is a row tracked by a private FIELD of a public source: State of Mind).
 from common import activity_publication as _AP  # noqa: E402
-from web.site_api_status import _status_row_is_public  # noqa: E402
 
 ALL_DATA_SOURCES = _module_literal("_DATA_SOURCES")
-DATA_SOURCES = [r for r in ALL_DATA_SOURCES if _status_row_is_public(r)]
+# #5930: the published rows are `_board_rows()` — the presentation literal above plus a registry-worded
+# row for any registry board source it lacks, already filtered to the public ones. Read THAT, so a source
+# the registry adds extends these tests the same way it extends the board.
+DATA_SOURCES = sas._board_rows()
 COMPUTE_SOURCES = _module_literal("_COMPUTE_SOURCES")
 EMAIL_LAMBDAS = _module_literal("_EMAIL_LAMBDAS")
 LAGGED_SOURCES = _module_literal("_LAGGED_SOURCES")
@@ -140,6 +142,7 @@ def _row(raw):
     """A `_DATA_SOURCES` tuple as a dict — the rows are 9 or 10 wide."""
     return {
         "id": raw[0],
+        "cid": sas._component_id(raw[0], raw[9] if len(raw) > 9 else None),  # #5930: the published, unique id
         "name": raw[1],
         "description": raw[2],
         "yellow_h": raw[3],
@@ -408,9 +411,11 @@ def _reset_status_cache():
     test in the file (and to any other test file that touches these handlers)."""
     sas._status_cache = {}
     sas._status_cache_ts = 0
+    sas._exhausted_memo.clear()  # #5930: the "never" memo is module state too
     yield
     sas._status_cache = {}
     sas._status_cache_ts = 0
+    sas._exhausted_memo.clear()
 
 
 class Harness:
@@ -514,8 +519,8 @@ def test_each_pipeline_component_reports_when_it_last_produced_data(monkeypatch)
 def test_the_data_source_panel_publishes_one_component_per_row_of_the_modules_table(monkeypatch):
     """Derived from the module's own table — never a frozen list of names."""
     body = Harness(monkeypatch, healthy_platform().build()).body()
-    published = [(c["id"], c["name"]) for c in components(body, "data_sources")]
-    assert published == [(r["id"], r["name"]) for r in DATA_ROWS]
+    published = [(c["id"], c["source"], c["name"]) for c in components(body, "data_sources")]
+    assert published == [(r["cid"], r["id"], r["name"]) for r in DATA_ROWS]
 
 
 def test_the_compute_and_email_panels_publish_one_component_per_table_row(monkeypatch):

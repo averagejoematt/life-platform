@@ -163,7 +163,7 @@ FUNCTION_LENGTH_COUNTS = {
     "lambdas/web/site_api_pulse.py::pulse": 432,
     "lambdas/web/site_api_rollups.py::observatory_week": 249,
     "lambdas/web/site_api_sleep.py::sleep_detail": 225,
-    "lambdas/web/site_api_status.py::status": 715,
+    "lambdas/web/site_api_status.py::status": 454,  # #5930: the board table + readers moved to module level
     "lambdas/web/site_api_training.py::training_overview": 389,
     "mcp/tools_cgm.py::_get_fasting_glucose_validation": 327,
     "mcp/tools_health.py::_get_hydration_score": 176,
