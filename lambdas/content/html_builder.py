@@ -1825,6 +1825,19 @@ def _brief_footer(compute_age_msg, compute_stale, data, date_str, budget_headroo
     return out
 
 
+def _brief_rhythm(lines):
+    """#4972: the owner-only heart-rhythm section — escaped data lines, wrapped in demo-hideable markers. "" when none."""
+    if not lines:
+        return ""
+    from html import escape  # noqa: PLC0415
+
+    body = "".join('<p style="font-size:12px;color:#475569;margin:0 0 4px;">' + escape(str(ln)) + "</p>" for ln in lines)
+    return (
+        '<!-- S:rhythm --><div style="padding:8px 24px 12px;"><p style="font-size:11px;font-weight:700;color:#334155;margin:0 0 6px;">'
+        "Heart rhythm (owner-only)</p>" + body + "</div><!-- /S:rhythm -->"
+    )
+
+
 def build_html(
     data,
     profile,
@@ -1862,6 +1875,7 @@ def build_html(
     intake_line=None,
     journal_coach_absent=False,
     steps_line=None,
+    rhythm_lines=None,
 ):
     """Build the full daily brief HTML email.
 
@@ -1870,6 +1884,8 @@ def build_html(
 
     intake_line (#1405: intake_response.brief_line, n + CI per ADR-105) and steps_line (#5056) are pre-formatted
     Matthew-private one-liners; they must never reach a public surface.
+    rhythm_lines (#4972, emails.brief_lines.rhythm_lines) are the owner-only heart-rhythm section's data lines —
+    the same rule: this email only.
     """
     date_str = data["date"]
     # #4182: the H1 names the morning the brief is read (data day + 1); the freshness line names the data day.
@@ -1913,5 +1929,6 @@ def build_html(
         html += '<div style="padding:4px 24px 4px;"><p style="font-size:12px;color:#475569;margin:0;">👣 ' + steps_line + "</p></div>"
     if intake_line:
         html += '<div style="padding:4px 24px 12px;"><p style="font-size:12px;color:#475569;margin:0;">🌙 ' + intake_line + "</p></div>"
+    html += _brief_rhythm(rhythm_lines)
     html += _brief_footer(compute_age_msg, compute_stale, data, date_str, budget_headroom_line=budget_headroom_line)
     return html
