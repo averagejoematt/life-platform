@@ -81,7 +81,7 @@ const plural = (n: number, one: string, many: string) => `${num(n)} ${n === 1 ? 
         </section>
 
         <section class="wrap" style="padding-bottom:32px" aria-label="The Laboratory in numbers">
-          <div class="tiles" style="grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr))">
+          <div class="tiles counts">
             <a class="tile" href="#tests">
               <span class="label">Tests being checked</span>
               <span class="v num" style="font-size:30px">{num(c.testsOpen)}</span>
