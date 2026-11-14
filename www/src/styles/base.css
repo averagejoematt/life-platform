@@ -616,8 +616,39 @@ th.r {
   line-height: 1.6;
   max-width: 760px;
 }
-.article > * + * {
+.article > * + *,
+.article [data-published-body] > * + * {
   margin-top: 26px;
+}
+/* A published chapter's body sits one level down (2026-11-14: its paragraphs had no space between them). The
+   narrator's opening lines carry class="signature": an editor's note reads as a dated note, a filed stat line as
+   evidence in mono — both as published, neither as prose. */
+.article [data-published-body] > * + * {
+  margin-top: 1.05em;
+}
+.article [data-published-body] p.signature {
+  font-style: italic;
+  color: var(--muted);
+}
+.article [data-published-body] p.signature.note {
+  font-family: var(--sans);
+  font-style: normal;
+  font-size: var(--fs-small);
+  line-height: 1.5;
+  border-left: 2px solid var(--verm);
+  padding-left: 12px;
+}
+.article [data-published-body] p.signature.note em {
+  font-style: normal;
+}
+.article [data-published-body] p.signature.filed {
+  font-family: var(--mono);
+  font-style: normal;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.article [data-published-body] p.signature.filed em {
+  font-style: normal;
 }
 .article p,
 .article li,

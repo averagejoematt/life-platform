@@ -30,6 +30,10 @@ const published = chapters.filter((c) => c.status === "published");
 const latestChapter = published[0] || null;
 const firstChapter = published[published.length - 1] || null;
 const latestEpisode = latestChapter?.episode_id ? all.get("episode", latestChapter.episode_id) : null;
+// 2026-11-14: the story door said "each with audio" while 2 of 8 published chapters had an episode (the rest are
+// held or never recorded). The count is read, never assumed.
+const withAudio = published.filter((c) => c.episode_id && all.get("episode", c.episode_id)).length;
+const nextChapterNo = String((latestChapter?.week ?? 0) + 1).padStart(2, "0");
 const inChapterAll = latestChapter ? await connectedTo("chapter", latestChapter.id, { cap: 6 }) : null;
 const inChapter = inChapterAll ? { ...inChapterAll, items: inChapterAll.items.filter((e) => e.type !== "edition").slice(0, 4) } : null;
 const pending = all.byType.prediction
@@ -106,7 +110,7 @@ const dims: Dim[] = [
 ];
 // The measured count never depends on the journal: Mind is never "measured" on a public page.
 const measured = dims.filter((d) => d.measured).length;
-const WORDS = ["none", "one", "two", "three", "four", "five", "six"];
+const WORDS = ["none", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
 function barSvg(bars: (number | null)[] | null, faint = false) {
   const W = 96;
   const H = 36;
@@ -259,7 +263,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
     <div class="wrap">
       <div class="between" style="margin-bottom:24px">
         <h2>What's alive right now</h2>
-        <span class="label">A reason to come back · updates nightly</span>
+        <span class="label">A reason to come back · rebuilt every morning</span>
       </div>
       <div class="grid cols3">
         <div>
@@ -299,7 +303,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
                 {pending.map((p) => (
                   <a href={href(pathOf("prediction", p.id))}>
                     <span style="font-size:14px;line-height:1.35">
-                      <b>{p.coach_name}</b> · {clip(p.claim, 88)}
+                      <b>{p.coach_name}</b> · {p.claim_withheld && p.grading?.how ? <>the test: {clip(p.grading.how.replace(/\b1 days\b/, "1 day"), 80)}</> : clip(p.claim, 88)}
                     </span>
                     <StatusTag status="pending" date={p.due_date} call />
                   </a>
@@ -327,7 +331,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
             {next?.chapter?.state === "ok" && next.chapter.data?.date && (
               <span>
                 <span style="font-size:14px">
-                  <b>Chapter {String((latestChapter?.week ?? 0) + 1).padStart(2, "0")}</b> · {dayInWords(next.chapter.data.date, { weekday: true, short: true })}
+                  <b>Chapter {nextChapterNo}</b> · {dayInWords(next.chapter.data.date, { weekday: true, short: true })}
                 </span>
                 <span class="mono muted" style="font-size:12px">{next.chapter.data.drafted_not_promised ? "drafted, not promised" : "due"}</span>
               </span>
@@ -394,7 +398,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
       <div class="doors">
         <a class="door" href={href("/story/")}>
           <span class="between mono muted" style="font-size:12px"><span class="cobalt">01</span><span>Follow · 10 min a week</span></span>
-          <span><span class="t">The story</span><p class="serif muted" style="font-size:17px;margin-top:10px">{published.length ? `${WORDS[published.length] ? WORDS[published.length][0].toUpperCase() + WORDS[published.length].slice(1) : published.length} chapters so far` : "A chapter a week"}, each with audio. Where I started, what's happened, how I'm doing — not just what I weigh.</p></span>
+          <span><span class="t">The story</span><p class="serif muted" style="font-size:17px;margin-top:10px">{published.length ? `${WORDS[published.length] ? WORDS[published.length][0].toUpperCase() + WORDS[published.length].slice(1) : published.length} chapters so far` : "A chapter a week"}{withAudio ? `, ${WORDS[withAudio] || withAudio} with audio` : ""}. Where I started, what's happened, how I'm doing — not just what I weigh.</p></span>
         </a>
         <a class="door" href={href("/data/")}>
           <span class="between mono muted" style="font-size:12px"><span class="cobalt">02</span><span>Explore · an hour, if you like</span></span>
@@ -411,9 +415,9 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
   <section class="section">
     <div class="wrap between">
       <div style="max-width:560px">
-        <h2 style="font-size:28px">A new chapter most Sundays. Audio soon after.</h2>
+        <h2 style="font-size:28px">A new chapter most weeks, once I've approved it.</h2>
         <p class="serif muted" style="font-size:17px;margin-top:8px">
-          {next?.chapter?.state === "ok" && next.chapter.data?.date ? `Chapter ${String((latestChapter?.week ?? 0) + 1).padStart(2, "0")} is due ${dayInWords(next.chapter.data.date)}. ` : ""}
+          {next?.chapter?.state === "ok" && next.chapter.data?.date ? `Chapter ${nextChapterNo} is drafted for ${dayInWords(next.chapter.data.date)}; a week can be held, and the page says so when it is. ` : ""}
           If the coaches are right, you'll read it there first. If they're wrong, you'll read that too.
         </p>
       </div>
