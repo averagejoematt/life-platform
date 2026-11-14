@@ -1,5 +1,5 @@
 {
- "_note": "USER#matthew#SOURCE#chronicle DATE# rows >= genesis 2026-09-06 as the read-only query returned them on 2026-10-31 (sk, date, week_number [a STRING on the wire], status, generated_at, phase); the draft row keeps its title here ONLY so the test can prove the route never serves it. Tombstoned pilot rows (DATE#2026-09-01, DATE#2026-09-04) are dropped by _query_source's phase filter and are not part of what the route reads.",
+ "_note": "USER#matthew#SOURCE#chronicle DATE# rows >= genesis 2026-09-06 as the read-only query returned them on 2026-10-31 (sk, date, week_number [a STRING on the wire], status, generated_at, phase); the draft row keeps its title here ONLY so the test can prove the route never serves it. Tombstoned pilot rows (DATE#2026-09-01, DATE#2026-09-04) are dropped by _query_source's phase filter and are not part of what the route reads. approved_at on the published program-week rows was added 2026-11-14 from the same read-only query (the publication moment).",
  "captured_on": "2026-10-31",
  "rows": [
   {
@@ -18,7 +18,8 @@
    "generated_at": "2026-09-09T15:02:50.077255+00:00",
    "phase": "experiment",
    "status": "published",
-   "week_number": "1"
+   "week_number": "1",
+   "approved_at": "2026-09-11T18:00:44.191941+00:00"
   },
   {
    "pk": "USER#matthew#SOURCE#chronicle",
@@ -27,7 +28,8 @@
    "generated_at": "2026-09-16T15:02:59.004166+00:00",
    "phase": "experiment",
    "status": "published",
-   "week_number": "2"
+   "week_number": "2",
+   "approved_at": "2026-09-18T18:00:44.273958+00:00"
   },
   {
    "pk": "USER#matthew#SOURCE#chronicle",
@@ -36,7 +38,8 @@
    "generated_at": "2026-09-23T15:02:57.510438+00:00",
    "phase": "experiment",
    "status": "published",
-   "week_number": "3"
+   "week_number": "3",
+   "approved_at": "2026-09-25T18:00:43.932235+00:00"
   },
   {
    "pk": "USER#matthew#SOURCE#chronicle",
@@ -45,7 +48,8 @@
    "generated_at": "2026-09-30T15:02:52.531645+00:00",
    "phase": "experiment",
    "status": "published",
-   "week_number": "4"
+   "week_number": "4",
+   "approved_at": "2026-10-02T18:31:37Z"
   },
   {
    "pk": "USER#matthew#SOURCE#chronicle",
@@ -54,7 +58,8 @@
    "generated_at": "2026-10-07T15:08:26.609062+00:00",
    "phase": "experiment",
    "status": "published",
-   "week_number": "5"
+   "week_number": "5",
+   "approved_at": "2026-10-09T18:00:45.541066+00:00"
   },
   {
    "pk": "USER#matthew#SOURCE#chronicle",
@@ -62,7 +67,8 @@
    "date": "2026-10-13",
    "generated_at": "2026-10-14T15:04:39.633571+00:00",
    "status": "published",
-   "week_number": "6"
+   "week_number": "6",
+   "approved_at": "2026-10-18T04:29:30.949081+00:00"
   },
   {
    "pk": "USER#matthew#SOURCE#chronicle",
