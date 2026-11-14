@@ -96,6 +96,7 @@ def _lib(status: str | None = None) -> dict:
     lib = copy.deepcopy(LIB0)
     if status:
         lib["status"] = status
+        lib["approved_on"] = "2026-01-02"  # #5861 fix round 11: live needs the approval day
     return lib
 
 

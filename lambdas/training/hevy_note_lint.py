@@ -210,10 +210,10 @@ R3_LINE_RE = re.compile(r"^Set 1 at RPE 7 or easier → (?:\+\d+(?:\.\d+)? lb(?:
 
 
 def _one_load_rule(rt: "LintRoutine") -> bool:
-    """The live grammar (#5861 fix round 11): no session-block load rule, because every in-session step the routine carries is the
-    bounded R3 line on a lift's own note (or there is none) — one load rule, never two."""
+    """The live grammar (#5861 fix round 11): no session-block load rule, because the routine's in-session steps are the bounded R3
+    lines on lifts' own notes (at least one) — one load rule, never two."""
     steps = [ln.strip() for e in rt.exercises for ln in (e.note or "").split("\n") if "on later sets" in ln]
-    return all(R3_LINE_RE.match(ln) for ln in steps)
+    return bool(steps) and all(R3_LINE_RE.match(ln) for ln in steps)
 
 
 def _steppable(ex: LintExercise) -> bool:

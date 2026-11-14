@@ -114,13 +114,10 @@ def library_status(path: str | None = None, data: Any = ...) -> str | None:
     data = library(path) if data is ... else data
     status = str(data.get("status")) if isinstance(data, dict) and data.get("status") is not None else None
     if status == LIBRARY_APPROVED:  # #5861 fix round 11, fail-closed: approved without its `approved_on` day reads as proposed
-        import datetime as _dt  # (the same rule as `exercise_library.approved_stamp`; this module never imports the library)
+        from common.pacific_time import parse_day_key  # the rule of `exercise_library.approved_stamp` (never imports the library)
 
-        try:
-            ok = len(str(data.get("approved_on") or "")) == 10 and bool(_dt.date.fromisoformat(str(data["approved_on"])))
-        except ValueError:
-            ok = False
-        return status if ok else "proposed"
+        raw = str(data.get("approved_on") or "")
+        return status if len(raw) == 10 and parse_day_key(raw) else "proposed"
     return status
 
 

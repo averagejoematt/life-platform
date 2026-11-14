@@ -219,13 +219,11 @@ def _hypertrophy_row_errors(errors: list[str], w: str, e: dict[str, Any], row: d
 def approved_stamp(lib: dict[str, Any] | None) -> str | None:
     """The library's `approved_on` day (YYYY-MM-DD) when it is a real calendar date, else None (#5861 fix round 11: live mode
     needs it — `selection_engine.mode`, `week_floors.library_status`)."""
-    import datetime as _dt
+    from common.pacific_time import parse_day_key  # THE calendar-day parse (#3741)
 
     raw = str((lib or {}).get("approved_on") or "") if isinstance(lib, dict) else ""
-    try:
-        return _dt.date.fromisoformat(raw).isoformat() if len(raw) == 10 else None
-    except ValueError:
-        return None
+    day = parse_day_key(raw) if len(raw) == 10 else None
+    return day.isoformat() if day else None
 
 
 def validate(lib: dict[str, Any]) -> list[str]:

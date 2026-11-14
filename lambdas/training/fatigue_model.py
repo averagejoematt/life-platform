@@ -64,7 +64,7 @@ THRESHOLDS: dict[str, dict[str, Any]] = {
         "label": HEURISTIC,
         "basis": "THE one performance read (`declined`, fix round 11): the latest pair of exposures both more than 5% under the "
         "MEDIAN of the earlier ones (Epley, effort-adjusted, so a set logged harder at the same load x reps reads lower — the old "
-        "effort-drift vote folded in). The median, not the best, and two exposures in a row, not one: a lifter whose reps swing "
+        "effort-drift vote folded in). The median, not the best, and the latest pair of exposures, not one: a lifter whose reps swing "
         "+-2 around a flat strength (about +-5% of e1RM) is noise, not a decline (the tenth red team) — the platform's practice "
         "line (critics_fatigue), not a citation and not his own variance",
     },
