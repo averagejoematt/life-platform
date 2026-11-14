@@ -5,7 +5,10 @@
 import Base from "../../layouts/Base.astro";
 import Connected from "../../components/Connected.astro";
 import Provenance from "../../components/Provenance.astro";
-import { dayInWords, num } from "../../lib/format.js";
+import StatusTag from "../../components/StatusTag.astro";
+import Quote from "../../components/Quote.astro";
+import { isDisputed } from "../../lib/disputed.js";
+import { clip, dayInWords, num } from "../../lib/format.js";
 import { loadAll } from "../../lib/snapshot.js";
 import { hasPage, href, pathOf } from "../../lib/url.js";
 
@@ -31,6 +34,17 @@ const dayRow = (d: any) => {
   ].filter(Boolean);
   return { href: href(pathOf("day", d.id)), words: (dayInWords(d.date, { weekday: true }) || "").replace(/ \d{4}$/, ""), text: bits.join(" · ") };
 };
+// The calls graded inside the chapter's week (2026-11-14): the story's link to the accountability record. The rail's
+// only connection was the day's edition. Every row is a ledger object as served; a call whose words are withheld shows
+// its frozen test, as its own page does.
+const weekCalls =
+  c.status === "published" && c.week_start && c.week_end
+    ? all.byType.prediction
+        .filter((p) => (p.status === "confirmed" || p.status === "refuted") && p.settled_date && p.settled_date.slice(0, 10) >= c.week_start && p.settled_date.slice(0, 10) <= c.week_end)
+        .sort((a, b) => (a.settled_date < b.settled_date ? -1 : 1))
+    : [];
+const testWords = (t: string) => t.replace(/\b1 days\b/, "1 day").replace(/\d{4}-\d{2}-\d{2}/g, (iso) => dayInWords(iso, { short: true }) || iso);
+const callWords = (p: any) => (p.grading?.how ? `the test: ${testWords(p.grading.how)}` : "its words are not published");
 const stateCopy: Record<string, string> = {
   held: "Held.",
   skipped: "Skipped.",
@@ -177,6 +191,27 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
         }
       </article>
       <aside style="flex:0 1 300px;min-width:260px">
+        {
+          c.status === "published" && c.week_start && (
+            <section aria-label="Calls graded this week" style="margin-bottom:28px" data-week-calls>
+              <p class="label" style="margin-bottom:8px">Calls graded this week · {weekCalls.length}</p>
+              {weekCalls.length ? (
+                <div class="rows">
+                  {weekCalls.map((p) => (
+                    <a href={href(pathOf("prediction", p.id))} style="align-items:flex-start">
+                      <span style="font-size:14px;line-height:1.35;min-width:0">
+                        <b>{p.coach_name}</b> · {p.claim_withheld ? callWords(p) : <Quote text={clip(p.claim, 110)} said={p.logged_date} />}
+                      </span>
+                      <StatusTag status={p.status} call disputed={isDisputed(p)} />
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <p class="muted" style="font-size:14px">No coach call was graded inside this week.</p>
+              )}
+            </section>
+          )
+        }
         <Connected type="chapter" id={c.id} heading="Connected to this chapter" />
       </aside>
     </div>
