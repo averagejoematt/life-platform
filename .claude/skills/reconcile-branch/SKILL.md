@@ -3,7 +3,7 @@ name: reconcile-branch
 description: "Merge a queue of concurrent PRs that each touch the doc-sync literals, without opening a red-main window. Use when several open PRs collide on generated counts, or a merge left the tree drifted."
 user-invocable: true
 argument-hint: "[PR numbers]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task, Agent, TodoWrite
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, TodoWrite
 ---
 
 Merge a queue of concurrent PRs that each touch the doc-sync literals
