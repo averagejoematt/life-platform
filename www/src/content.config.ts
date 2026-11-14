@@ -252,6 +252,19 @@ const coaches = defineCollection({
       })
       .nullable(),
     comparison_text: z.string().nullable(),
+    versus_guess: z
+      .object({
+        kinds: z.array(
+          z.object({
+            kind: z.enum(["number", "direction", "yes_no", "sealed"]),
+            scored: z.number().int(),
+            coach_right: z.number().int(),
+            rule_right: z.number().int(),
+            verdict: z.string(),
+          }),
+        ),
+      })
+      .nullable(),
     quality: z
       .object({ clean: z.number().int(), flagged: z.number().int(), unassessed: z.number().int(), n: z.number().int(), by_flag: z.record(z.number().int()) })
       .nullable(),

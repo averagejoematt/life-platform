@@ -131,5 +131,7 @@ export function heldCallWords(p, max = 90) {
   const how = p && p.grading && typeof p.grading.how === "string" ? p.grading.how.trim() : "";
   if (!how) return null;
   const t = how.replace(/\b1 days\b/, "1 day").replace(/\d{4}-\d{2}-\d{2}/g, (iso) => dayInWords(iso, { short: true }) || iso);
-  return `the test: ${clip(t, max)}`;
+  // An observation is never graded, so it has no test: its line reads as itself ("…: an observation, not graded").
+  const observation = p.status === "observation" || p.kind === "observation" || /observation, not graded/.test(t);
+  return observation ? clip(t, max) : `the test: ${clip(t, max)}`;
 }

@@ -12,3 +12,7 @@ test("no served test → null, so the caller keeps the ledger's one sentence", (
   assert.equal(heldCallWords({ claim_withheld: "no_words", grading: { how: null } }), null);
   assert.equal(heldCallWords(null), null);
 });
+
+test("an observation has no test: its line reads as itself", () => {
+  assert.equal(heldCallWords({ status: "observation", grading: { how: "morning recovery score: an observation, not graded" } }), "morning recovery score: an observation, not graded");
+});

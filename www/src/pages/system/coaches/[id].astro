@@ -6,7 +6,8 @@ import Provenance from "../../../components/Provenance.astro";
 import Quote from "../../../components/Quote.astro";
 import StatusTag from "../../../components/StatusTag.astro";
 import { isDisputed, verified } from "../../../lib/disputed.js";
-import { dayInWords, domainWords, kOfN, clip } from "../../../lib/format.js";
+import { dayInWords, domainWords, kOfN, clip, heldCallWords } from "../../../lib/format.js";
+import { KIND_WORDS, verdictWords } from "../../../lib/calibration.js";
 import { loadAll } from "../../../lib/snapshot.js";
 import { href, pathOf } from "../../../lib/url.js";
 
@@ -20,6 +21,10 @@ const mine = all.byType.prediction.filter((p) => p.coach_id === c.id).sort((a, b
 // Owner rulings 2026-11-03: a verdict under classification review is never counted right or wrong.
 const by = (s: string) => (s === "confirmed" || s === "refuted" ? verified(mine, s).length : mine.filter((p) => p.status === s).length);
 const disputed = mine.filter(isDisputed).length;
+// Against a guess that nothing changes, kind by kind (2026-11-14: one paragraph of sentences in a narrow cell).
+// The coach's record as first graded; counts and verdicts as served; kinds never added together.
+const vg = (c.versus_guess?.kinds || []) as { kind: string; scored: number; coach_right: number; rule_right: number; verdict: string }[];
+const coachWord = (v: string) => (v === "coach_better" ? `${c.name.split(" ")[0]} did better` : verdictWords(v));
 ---
 
 <Base title={c.name} top="system" description={c.short_bio || `${c.name} · ${domainWords(c.domain)}`}>
@@ -36,7 +41,7 @@ const disputed = mine.filter(isDisputed).length;
         <p class="muted" style="font-size:13px">An AI character: software built with Claude, not a person. It reads real data and speaks in its own voice — correlative, never causal.</p>
         <div class="facts">
           <div><span class="label">Record</span><span class="v num">{c.record ? kOfN(c.record.right, c.record.n) : "—"}</span><span class="muted" style="font-size:12px">{c.record?.through ? `through ${dayInWords(c.record.through, { short: true })}` : c.retired ? "retired" : "no checked call yet"}</span></div>
-          <div><span class="label">Beside a simple guess</span><span style="font-size:14px;line-height:1.5">{c.comparison_text || "Too few calls to compare yet."}</span></div>
+          {!vg.length && <div><span class="label">Beside a simple guess</span><span style="font-size:14px;line-height:1.5">{c.comparison_text || "Too few calls to compare yet."}</span></div>}
           {c.quality && (
             <div>
               <span class="label">Grade quality</span>
@@ -45,6 +50,31 @@ const disputed = mine.filter(isDisputed).length;
             </div>
           )}
         </div>
+        {
+          vg.length > 0 && (
+            <div data-versus-kinds>
+              <p class="label" style="margin-bottom:8px">Beside a guess that nothing changes · the same calls, as first graded</p>
+              <div class="scroll">
+                <table class="vk">
+                  <thead>
+                    <tr><th>Kind of call</th><th>{c.name.split(" ")[0]}</th><th>The guess</th><th>Verdict</th></tr>
+                  </thead>
+                  <tbody>
+                    {vg.map((k) => (
+                      <tr>
+                        <td>{KIND_WORDS[k.kind as keyof typeof KIND_WORDS] || k.kind}</td>
+                        <td class="mono">{k.coach_right} of {k.scored}</td>
+                        <td class="mono">{k.rule_right} of {k.scored}</td>
+                        <td class={k.verdict === "rule_better" ? "verm" : k.verdict === "coach_better" ? "cobalt" : "muted"}>{coachWord(k.verdict)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p class="muted" style="font-size:12px;margin-top:6px">Each kind is its own record; they are never added together. "Too few to tell" means too few scored calls for the grader to call a difference either way.</p>
+            </div>
+          )
+        }
       </div>
       <div style="display:flex;flex-direction:column;gap:22px">
         <div>
@@ -55,7 +85,7 @@ const disputed = mine.filter(isDisputed).length;
                 {mine.slice(0, 12).map((p) => (
                   <a href={href(pathOf("prediction", p.id))}>
                     <span class="mono" style="font-size:13px;line-height:1.45">
-                      {p.claim_withheld ? clip(p.claim, 110) : <Quote text={clip(p.claim, 110)} said={p.logged_date} />}
+                      {p.claim_withheld ? heldCallWords(p, 100) || clip(p.claim, 110) : <Quote text={clip(p.claim, 110)} said={p.logged_date} />}
                     </span>
                     <StatusTag status={p.status} date={p.settled_date} call disputed={isDisputed(p)} />
                   </a>
@@ -74,3 +104,29 @@ const disputed = mine.filter(isDisputed).length;
     </div>
   </section>{/* the Coaching Room entry (CR2) sits flush against the closing tag: with WEB_ROOM off the page's bytes are unchanged */}<CoachRoomEntry coach={c} />
 </Base>
+
+<style>
+  .vk {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  .vk th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 400;
+    border-bottom: 1px solid var(--ink);
+    padding: 6px 10px 6px 0;
+  }
+  .vk td {
+    padding: 9px 10px 9px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .vk .verm {
+    color: var(--verm-text);
+  }
+</style>
