@@ -8,7 +8,7 @@ follows a schedule, one-off jumps, and logged rep noise).
   5  the one spend step: what the gym or the pain rule took goes back; consecutive short weeks rotate the free slots;
   6  a stated pain score routes only the provoking lift; the other lifts loading the joint hold at RPE 8 with the stop line;
   7  the layoff dose: 21+ days off -> the first session back starts under the last load;
-  8  R3 restored in one bounded form, only where the session-to-session rule allows it;
+  8  (the bounded in-session step of this round is OFF and deleted since fix round 12: tests/test_fix12_5861.py);
   9  every lift note fits four phone lines;
   10 the harness, the docstring, the hip thrust in a hinge slot, the abs on a short week;
   E6 live needs status approved AND a valid approved_on; an approved library without one serves exactly what proposed serves.
@@ -100,7 +100,9 @@ def test_the_heavy_lower_lifts_progress_over_weeks_with_no_ratchet():
         assert all(b >= a for a, b in zip(seq, seq[1:])), (key, seq)
     week = _week(A)["week"]
     notes = {x["key"]: x["hevy_note"] or "" for x in _lifts(week, "lower_heavy")}
-    assert sw.lift_effort(notes["deadlift_barbell"]) == live_settings.value("deadlift_rpe") and sw.lift_effort(notes["squat_barbell"]) == 9
+    assert sw.lift_effort(notes["deadlift_barbell"]) == live_settings.value("effort_targets")["deadlift"][0] == 8
+    # fix round 12 (effort by role): the squat works at RPE 8 with only its last set to 9; the deadlift stays at 8 throughout
+    assert "last set RPE 8–9" in notes["squat_barbell"] and "last set" not in notes["deadlift_barbell"]
     assert not any(
         "Lighter today" in x["hevy_note"] for x in _lifts(week, "lower_heavy") if x["key"] in ("squat_barbell", "deadlift_barbell")
     )
@@ -111,7 +113,7 @@ def test_the_heavy_lower_lifts_progress_over_weeks_with_no_ratchet():
 
     def capped(rows, lo, hi, eq, **k):  # control: the round-10 second lift — never above its last load
         d = decide(rows, lo, hi, eq, **k)
-        if d and k.get("target_rpe", 9.0) < 9.0:
+        if d and k.get("top_set") and len(rows[0]["sets"]) <= 2:  # the deadlift: a top set + one back-off
             d = d | {"kg": min(d["kg"], live_load._top(rows[0])["kg"])}
         return d
 
@@ -152,8 +154,7 @@ def test_rep_noise_on_a_flat_lifter_is_not_strain_and_priority_muscles_keep_thei
 def test_priority_muscles_aim_above_mev_and_naming_others_raises_them():
     """The tenth red team: 'priority' meant MEV + 1 (chest 9 while back 14), reached by cutting the arms; naming back + glutes
     changed nothing for them. Now the served full week holds chest and quadriceps OVER MEV and the arms at or over their own MEV;
-    naming back + glutes raises both. Control (the red team's M7): the priority aim at MEV with no arm reference -> fewer
-    chest + quadriceps sets."""
+    naming back + glutes raises both. Control (the red team's M7): the priority aim at MEV -> fewer chest + quadriceps sets."""
     base = _week(A)
     h = base["hard"]
     assert all(h[m] > LANDMARKS[m]["MEV"] for m in ("chest", "quadriceps")), h
@@ -164,7 +165,7 @@ def test_priority_muscles_aim_above_mev_and_naming_others_raises_them():
     assert other["back"] >= named["back"]["aim"] > LANDMARKS["back"]["MEV"], (other, named)  # back reaches its priority aim
     assert other["back"] + other["glutes"] > h["back"] + h["glutes"], (other, h)  # (glutes: the lower mornings' time is the limit)
     with patch.dict(live_settings.HEURISTICS["priority_aim_share"], {"value": 0.0}):
-        flat = _week(A, {(live_volume, "ARMS"): ()})["hard"]
+        flat = _week(A)["hard"]
     assert flat["chest"] + flat["quadriceps"] < h["chest"] + h["quadriceps"], (flat, h)
 
 
@@ -231,12 +232,12 @@ def test_consecutive_short_weeks_rotate_the_free_slots_in_the_served_weeks():
 
 def test_squat_and_hinge_never_load_the_spine_three_mornings_running():
     """The tenth red team: a 3-morning week on consecutive days ran squat, squat + deadlift, RDL. A full-body morning's guest
-    hinge after a spine-loading day takes a low-spinal-load member (`live_program.axial_yesterday`). Control: off -> the RDL."""
+    hinge after a spine-loading day takes a low-spinal-load member (`live_program.axial_neighbours`). Control: off -> the RDL."""
     keys = {x["key"] for x in _lifts(_week(A, days=3)["week"], "upper_volume")}
     assert "romanian_deadlift_barbell" not in keys
     from training import live_program
 
-    off = _week(A, {(live_program, "axial_yesterday"): lambda *a: []}, days=3)
+    off = _week(A, {(live_program, "axial_neighbours"): lambda *a: []}, days=3)
     assert "romanian_deadlift_barbell" in {x["key"] for x in _lifts(off["week"], "upper_volume")}
 
 
@@ -278,31 +279,6 @@ def test_a_long_layoff_returns_under_the_last_load_a_short_one_at_it():
     week = sw.generate_week(later, "approved", world)
     first = next(s for s in week["sessions"] if s["role"] == "upper_heavy")
     assert any("first session back after" in (x["hevy_note"] or "") and "Lighter today" in x["hevy_note"] for x in first["lifts"])
-
-
-# ── 8. R3, bounded ───────────────────────────────────────────────────────────────────────────────────────────────────────────
-def test_r3_rides_only_where_the_session_to_session_rule_allows_it():
-    """The owner's 2026-10-27 R3 in-session rule, restored in ONE bounded form (pending his confirmation): 'Set 1 at RPE 7 or
-    easier -> one load step on later sets', never down, on a straight-set lift the load model does not hold for a reason, step
-    down, cap or treat as new. The served week carries it and contradicts nothing; a pain-held lift never carries it. Control: R3
-    on every lift -> the contradiction lint fires."""
-    a = _week(A)["week"]
-    r3 = [x for x in _lifts(a) if "Set 1 at RPE 7 or easier" in (x["hevy_note"] or "")]
-    assert r3 and not any(s.get("contradictions") for s in a["sessions"])
-    heavy = [x for s in a["sessions"] if s["role"] in ("upper_heavy", "lower_heavy") for x in s["lifts"] if x["tag"].endswith(":heavy")]
-    assert heavy and not any("Set 1 at RPE 7" in (x["hevy_note"] or "") for x in heavy)  # a top set + back-offs is not "later sets"
-    r5 = _week(FIX10["r5_garage_hip_knee"])["week"]
-    assert not any("stop this lift" in (x["hevy_note"] or "") and "Set 1 at RPE 7" in x["hevy_note"] for x in _lifts(r5))
-    from training import session_block as sb
-
-    def everywhere(blocks, rx):  # control: the R3 line on every loaded lift, eligible or not
-        for b in blocks:
-            if any(getattr(st, "weight_kg", None) for st in b.sets):
-                b.notes = sb.add_reason(b.notes, live_safety.r3_text([5.0, False]))
-        return []
-
-    off = _week(FIX10["r5_garage_hip_knee"], {(live_safety, "r3_lines"): everywhere})
-    assert any(s.get("contradictions") for s in off["week"]["sessions"])
 
 
 # ── 9. notes ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────

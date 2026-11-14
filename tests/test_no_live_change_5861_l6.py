@@ -103,7 +103,6 @@ def _poisoned():
         (live_rules, "self_report"),
         (live_sequence, "week_plan"),
         (live_sequence, "plan_for_days"),
-        (live_sequence, "days_available"),
         (live_sequence, "declared_days"),
         (live_sequence, "entry_week"),
         (live_rulings, "lead_lift"),

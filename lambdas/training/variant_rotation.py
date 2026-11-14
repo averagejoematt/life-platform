@@ -328,8 +328,24 @@ def _title(key: str | None, catalog: dict[str, Any]) -> str:
 
 # ── the ledger ───────────────────────────────────────────────────────────────
 LIVE_PHASE_PREFIX = "live_"
-"""A live draft's ledger attribute is `live_phase_N` (`record`); `selection_engine.ledger_view` lays it over `phase_N` for the
+"""A live draft's ledger attribute is `live_phase_N` (`record`); `ledger_view` lays it over `phase_N` for the
 live reader only. Every proposed-path reader matches `phase_` at the start of the key and never sees it."""
+
+
+def ledger_view(rows: list[dict[str, Any]], lib: Any = ...) -> list[dict[str, Any]]:
+    """The rotation ledger as THIS mode reads it (#5861 fix round 12, rollback safety). Shadow: `rows` itself — a live draft's
+    picks sit in `live_phase_N` attributes no proposed reader matches, so reverting the status serves what it would have served
+    had the library never been approved. Live: a copy with each `live_phase_N` laid over `phase_N` (the shadow history before
+    approval is kept for every phase the live engine has not decided)."""
+    from training import selection_engine as se
+
+    if se.mode(se.load_library_failsoft() if lib is ... else lib) != se.MODE_LIVE:
+        return rows
+    out = []
+    for r in rows:
+        over = {k[len(LIVE_PHASE_PREFIX) :]: v for k, v in r.items() if k.startswith(LIVE_PHASE_PREFIX + "phase_")}
+        out.append({k: v for k, v in r.items() if not k.startswith(LIVE_PHASE_PREFIX)} | over)
+    return out
 
 
 def ledger_sk(block: int, slot_id: str) -> str:
@@ -661,9 +677,7 @@ def for_session(
 
             approvals = block_design_review.load_failsoft(pos["block"])
     if select and rows:  # #5861 fix round 12: live reads its own phase rows over the shadow ones; in shadow `rows` itself
-        from training import selection_engine
-
-        rows = selection_engine.ledger_view(rows)
+        rows = ledger_view(rows)
     day = (day_entry or {}).get("date") or (day_entry or {}).get("target_date")
     # the planned session carries its own measured count (`program_structure.planned_session`); a generator passes the record
     n = kb_entry.exposures(block_workouts, day) if block_workouts is not None else (day_entry or {}).get("kb_entry_exposures")

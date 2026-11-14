@@ -487,9 +487,10 @@ def _top(effort: str) -> float:
     return max(nums) if nums else 99.0
 
 
-NO_LOAD_LINE = "No recent load on file for this one."
-"""A familiar movement with no load in the history window: the note says so beside its "find the load" set (the final review:
-"find the load" on a calf raise the week he logged calves read as if the engine had lost his record)."""
+def _has_reason(note: str | None) -> bool:
+    from training import hevy_note_grammar as g
+
+    return any(g.REASON_RE.match(ln.strip()) for ln in str(note or "").split("\n"))
 
 
 def annotate(blocks: list[Any], rx: dict[str, Any]) -> None:
@@ -497,7 +498,7 @@ def annotate(blocks: list[Any], rx: dict[str, Any]) -> None:
     capped effort (a first session back, a new pattern, the second lift, a deload shape, a joint flag) on its own Hevy note."""
     if not is_live(rx):
         return
-    from training import hevy_note_grammar as g, live_balance, live_load, live_session as ls, session_block
+    from training import live_balance, live_load, live_session as ls, session_block
 
     guard = {d["key"]: d for d in (rx.get(ls.MARK) or {}).get("load_guard") or []}
     by_key = {e.get("movement_key"): e for e in rx.get("exposures") or []}
@@ -505,13 +506,17 @@ def annotate(blocks: list[Any], rx: dict[str, Any]) -> None:
         e = by_key.get(b.movement_key) or {}
         d, cap = guard.get(b.movement_key), e.get("live_effort")
         clause = d.get("clause") if d else None
+        work = [st for st in b.sets if str(getattr(st, "type", "") or "normal") != "warmup"]
+        loaded = bool(work) and all(getattr(st, "weight_kg", None) for st in work)
+        if not d and loaded and e and e.get("intensity") != "carry" and not _has_reason(b.notes):
+            # fix round 12: a lift on the engine's own load (no same-role exposure in the window) still says what moves it
+            hi = max((int(getattr(st, "rep_range_end", 0) or 0) for st in work), default=0)
+            clause = f"Same load: all sets to {hi} reps, then up." if hi else None
         line = live_load.effort_line(e) if e and e.get("intensity") != "carry" else None  # the role's own effort (effort_targets)
         if cap or line:
             b.notes = _cap_effort(b.notes or "", int(cap or 0), clause, line)
         elif clause:
             b.notes = session_block.add_reason(b.notes, clause)
-        if e.get("live_familiar") and g.PICK_LOAD_OPEN_TAIL in (b.notes or "") and g.ROTATION_HEAD not in (b.notes or ""):
-            b.notes = session_block.add_reason(b.notes, NO_LOAD_LINE)  # fix round 12: say what is known
         b.notes = live_balance.assess_note(live_balance.one_effort(b.notes), str(e.get("live_assess") or ""))
         b.notes = live_balance.assess_note(b.notes, str(e.get("live_stop") or ""))  # the in-set stop line under a pain flag
     from training import live_safety
@@ -623,8 +628,8 @@ def cardio_fit(menu: dict[str, Any], live: dict[str, Any] | None) -> tuple[dict[
         why = "never on the heavy lower day or the session before it"
     elif not hosts:
         why = "hard_conditioning_doses is 0: the owner traded the week's dose for lifting minutes"
-    elif shared and role not in hosts:  # FIX7: hard_conditioning_doses (default 1: the host only)
-        why = f"the shared cap puts conditioning on {live.get('host', SHORT_WEEK_SKIP)}"
+    elif role not in hosts:  # hard_conditioning_doses (default 1: the host only) — under either cap setting (fix round 12)
+        why = f"the week's conditioning dose sits on {live.get('host', SHORT_WEEK_SKIP)}"
     if why:
         tracked = (live.get("aerobic") or {}).get("line") or "walking outside the gym is tracked apart"
         return None, lines + [f"cardio (live): no {kind} block — {why} ({tracked})"] + live_shape.walk_prompt(live)

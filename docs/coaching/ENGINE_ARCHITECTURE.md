@@ -141,7 +141,9 @@ What the selection cannot see, because it ranks slots:
   on a full-body morning a guest squat/hinge takes a low-spinal-load member when yesterday's session loaded the spine or when
   tomorrow is the heavy lower morning; with a rest day between, it stays as written.
   The squat comes before the hinge whenever both are in one session (`live_shape.order_lower_volume`).
-- **One graded reducer** (`fatigue_model`, §6): readiness and ACWR are one vote among independent strain signals.
+- **One graded reducer** (`fatigue_model`, §6): readiness and ACWR are one vote among independent strain signals. A day whose
+  inputs already read strained introduces NO movement new to him (`live_session._no_new_on_a_strained_day`, fix round 12): an
+  accessory he has not logged in this block goes back to the movement its slot served last phase, else is not served.
 - **The session set ceiling** (`live_volume.fit_sets`) and **the 75-minute ceiling on the routine as written**, warm-ups
   included (`live_volume.time_fit`) — both by the ONE trim order of §4b.
 
@@ -168,7 +170,11 @@ the same for every morning of that week:
   OVER its own aim gives the set — never under its aim, never a muscle's last isolation slot of the week. Nothing is cut to make
   a priority look bigger. A priority muscle that still cannot reach its aim is SAID in one line with the trade named
   (`_priority_trade`): a lower-body priority never takes the conditioning dose's minutes — that trade is the owner's
-  (`hard_conditioning_doses` 0), never automatic. Every template slot is served at the 3-set slot cap at most. The overhead press runs `press_sets` (ruling 6); its extra sets come off the lateral raises.
+  (`hard_conditioning_doses` 0), never automatic. A set moves between muscles ONLY at the owner's 75-set weekly redline, from a
+  muscle that stays at or over its own aim, and the week names it (`_make_room`) — never to buy a morning's minutes, never for
+  parity. An isolation slot grows before a compound accessory does; a fill is a movement he has logged in this block when one
+  exists. The plan counts the warm-ups the routine will write (`plan_minutes`). Every template slot is served at the 3-set
+  slot cap at most. The overhead press runs `press_sets` (ruling 6); its extra sets come off the lateral raises.
   `press_trade_alternative` reports the rear-delt alternative in numbers (not applied).
 - **No kettlebell hinge slot** (owner rulings #2/#6/#7): the swing stays gated and optional and never fills a hinge slot.
 - **Short weeks** (`SHORT_WEEKS`, owner ruling #5; 1-5 declared mornings — WHICH days, `live_sequence.declared_days`; a bare
@@ -201,9 +207,11 @@ LEAD STATE (a lead progresses from its own lead days, never from the capped seco
    lift's note says what moves it (`Same load: all sets to 12 reps, then up.`). With no same-role exposure in the window the
    engine's own ramp load stands.
 2. **Down, under the floor** (`below_floor`, fix round 10): the top set under the rep range's floor in the last
-   `below_floor_exposures` same-role exposures — down at least `step_down_pct`, and as far as the last exposure says reaches the
-   floor with three in reserve (`floor_load`). NOTHING blocks it: a slump, strain, pain or first-back hold stops only a step up.
-   Every lift, the capped deadlift included, needs two exposures under the floor (fix round 11).
+   `below_floor_exposures` same-role exposures AT THE CURRENT LOAD — down at least `step_down_pct`, as far as the last exposure
+   says reaches the floor with three in reserve (`floor_load`), never more than `step_down_max_pct`. NOTHING blocks it: a
+   slump, strain, pain or first-back hold stops only a step up. Fix round 12: after a step-down the count starts again (two
+   fresh exposures at the new load), and after `step_downs_per_window` step-downs inside the window the lift is HELD and
+   flagged — the load is no longer the likely cause.
 3. **Effort unknown** (`effort_unknown`): no RPE logged, or every logged set at `implausible_rpe`+ — the step up rides on reps
    alone; a load moves down only on reps under the floor, never on effort.
 4. **Systemic slump — the ONE performance signal** (`slump`): `slump_anchors` or more anchors declining together (each read by
@@ -347,6 +355,10 @@ consolidated rules' metrics are the generated table's last column (`live_setting
 | `quality_rubric.NEUTRAL` | how often a reviewed input moved a provisional row's tier |
 
 ## 9. What flipping `status: approved` turns on — the approval checklist
+
+**Rolling back is one flip** (fix round 12): a live draft's rotation picks are their own list (`live_ledger_writes`), recorded
+to `live_phase_N` attributes that no proposed-path reader matches (`variant_rotation.ledger_view` lays them over `phase_N` for
+the live reader only). After a revert the proposed path serves what it would have served had the library never been approved.
 
 Flipping the status is the owner's act and the only switch — `scripts/approve_exercise_library.py` sets `status: approved` AND
 `approved_on` (the day); live mode needs both (an approved library with no valid day runs exactly as proposed, and

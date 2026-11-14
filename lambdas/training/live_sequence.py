@@ -66,11 +66,6 @@ def declared_days(monday: str) -> list[str]:
     return [d for d in days if not any(str(w["start"]) <= d <= str(w["end"]) for w in windows)]
 
 
-def days_available(monday: str) -> int:
-    """How many mornings are declared this week (`declared_days`)."""
-    return len(declared_days(monday))
-
-
 LEFT_OUT_WORDS = {"hinge": "deadlift / RDL", "vertical_pull": "pulldown", "overhead_press": "overhead press"}
 
 
@@ -111,7 +106,7 @@ def plan_for_days(days: Any, lib: dict[str, Any] | None, mode: str = "short") ->
     )
     if partners:
         left = _left_out(shape)
-        line += f"; left out this week: {', '.join(left)} — {n} morning(s) carry a squat, a hinge, a press and a pull, not every anchor"
+        line += f"; left out this week: {', '.join(left)} — a short week keeps every pattern, not every anchor" if left else ""
         line += "" if dates is not None or n == 1 else "; spacing not declared: consecutive days assumed"
     return {
         "skip": skip,

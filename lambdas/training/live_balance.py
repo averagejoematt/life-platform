@@ -22,8 +22,6 @@ HEURISTIC = "heuristic"
 HOST_ROLE = "shoulders_arms"
 PAIN_ASSESS_LINE = "Still hurts 2 sessions? Get it assessed."
 """The one neutral line a standing pain flag puts on its flagged lift (no diagnosis, no number)."""
-EASY_MIN_BLOCK = 20
-"""Heuristic: the shortest easy aerobic block worth its warm-up (practitioner consensus: 20-30 min continuous)."""
 
 
 def _entry(key: str | None, ctx: dict[str, Any]) -> dict[str, Any]:
@@ -230,7 +228,12 @@ def _unavailable(key: str, lib: dict[str, Any] | None) -> bool:
     from training import selection_engine as se
 
     entry = ((lib or {}).get("movements") or {}).get(key)
-    return bool(entry) and bool(se.availability(entry, lib or {}, None))
+    if entry:
+        return bool(se.availability(entry, lib or {}, None))
+    # fix round 12: a cardio machine with no library movement (the elliptical) is judged by the inventory item of its name —
+    # it read as available whatever the gym had, and an unavailable elliptical was served
+    item = (((lib or {}).get("gym_inventory") or {}).get("items") or {}).get(key) or {}
+    return (item.get("home_gym") or {}).get("state") == "unavailable"
 
 
 def cardio_machine(menu: dict[str, Any], lib: dict[str, Any] | None) -> tuple[dict[str, Any], list[str]]:

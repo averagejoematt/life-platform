@@ -321,11 +321,11 @@ def test_the_crons_sequence_serves_the_generators_dip_and_short_weeks():
 
 
 def test_the_short_weeks_input_in_production_is_the_charters_travel_windows():
-    assert lseq.days_available("2026-11-16") == len(ps.NOMINAL_LIFTING_DAYS)
+    assert len(lseq.declared_days("2026-11-16")) == len(ps.NOMINAL_LIFTING_DAYS)
     with patch("training.training_charter.charter_value", lambda path, default=None: [{"start": "2026-11-18", "end": "2026-11-30"}]):
-        assert lseq.days_available("2026-11-16") == 2  # Mon + Tue only
+        assert len(lseq.declared_days("2026-11-16")) == 2  # Mon + Tue only
     with patch("training.training_charter.charter_value", lambda path, default=None: []):  # control: no window -> a full week
-        assert lseq.days_available("2026-11-16") == 5
+        assert len(lseq.declared_days("2026-11-16")) == 5
 
 
 # ── 6. the kettlebell deadlift as filler ─────────────────────────────────────

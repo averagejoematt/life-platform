@@ -174,7 +174,9 @@ def cap_lines(blocks: list[Any]) -> list[str]:
 
     def rank(ln: str) -> int:  # lower goes first
         t = ln.strip()
-        if t.startswith(("Pain past", "Heavier", "Lighter", "Same load", "Still hurts", "Both RPE")) or g.EFFORT_RE.match(t):
+        if t.startswith(("Pain past", "Heavier", "Lighter", "Same load", "Still hurts", "Both RPE", "W set", "W at ")) or g.EFFORT_RE.match(
+            t
+        ):
             return 9
         return 1 if t.startswith("If taken") else 0
 

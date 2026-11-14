@@ -419,19 +419,20 @@ def spend(
             # morning has the minutes, and only without them does the compound take the set
             iso = [r for r in grow if r.get("isolation")]
             spread = m in FILL_FIRST and _spread(m, rows, roles, full, room, lo)  # owner ruling #8: abs over the mornings
-            if iso and not spread and _make_room(rows, tg, role, m, one, room, budget, gave):
+            if iso and not spread and _make_room(rows, tg, role, m, one, 1, room, budget, gave):
                 max(iso, key=lambda r: (r.get("fill") == m, -r["sets"]))["sets"] += 1
                 placed = True
                 break
             full_up = len(here) >= (FULL_BODY_MAX_MOVEMENTS if full.get(role) else MAX_MOVEMENTS)
-            if len(_iso(m, here)) < 2 and not iso and not full_up and add(m, role, probe=True):
-                if _make_room(rows, tg, role, m, lo * one, room, budget, gave):
+            feeler = add(m, role, probe=True) if len(_iso(m, here)) < 2 and not iso and not full_up else 0
+            if feeler:  # 1: a movement with a load on file; 2: one more "find the load" set to make room for
+                if _make_room(rows, tg, role, m, (lo + feeler - 1) * one, lo, room, budget, gave):
                     new = add(m, role)
                     rows.append(new)
                     lines.append(f"spend: {role} + {new['key']} x{lo} ({m} under its aim of {tg[m]['aim']:g})")
                     placed = True
                     break
-            if grow and not iso and not spread and _make_room(rows, tg, role, m, one, room, budget, gave):
+            if grow and not iso and not spread and _make_room(rows, tg, role, m, one, 1, room, budget, gave):
                 max(grow, key=lambda r: -r["sets"])["sets"] += 1
                 placed = True
                 break
@@ -446,21 +447,20 @@ def _make_room(
     role: str,
     m: str,
     need: float,
+    n: int,
     room: Any,
     budget: float | None,
     gave: list[str],
 ) -> bool:
-    """Room for `need` minutes on `role`, inside the week's set `budget`. Minutes: the morning's FREE minutes only — no set is
+    """Room for `need` minutes (and `n` working sets) on `role`, inside the week's set `budget`. Minutes: the morning's FREE minutes only — no set is
     ever taken from another muscle to buy time or a movement place (owner ruling 2026-11-14; fix round 12). The budget (the
     owner's 75-set weekly redline): only there may sets move, from the isolation slot whose main muscle sits furthest OVER its
     own aim — every muscle and delt head it trains stays at or over its aim, never the muscle being served; a slot above 2 sets
     gives one, a 2-set slot goes whole unless it is its muscle's last isolation slot of the week. All or nothing, and the week
     names every set that moved (`gave`). Never for parity."""
     lo = int(cfg.value("slot_min_sets"))
-    one = plan_minutes([{"kind": "accessory", "pattern": None, "sets": 1, "intensity": "accessory"}])
     if room(role, m) < need:
         return False
-    n = int(round(need / one))
     before = [(r, r["sets"]) for r in rows]
     moved: list[str] = []
     while budget is not None and sum(r["sets"] for r in rows) + n > budget:
@@ -557,11 +557,11 @@ def week_plan(
         keys = [
             k for k in _fill_keys(m, catalog, lib, taken, overlay, logged=logged) if lib_entry(k, catalog, lib).get("pattern") not in here
         ]
+        known = bool(keys) and str(lib_entry(keys[0], catalog, lib).get("template_id") or "").upper() in logged
         if not keys or probe:
-            return bool(keys)
+            return (1 if known else 2) if keys else 0
         taken.add(keys[0])
         new = {"kind": "accessory", "slot": f"fill_{m}", "intensity": "accessory", "movement_key": keys[0], "sets": [{}] * lo}
-        known = str(lib_entry(keys[0], catalog, lib).get("template_id") or "").upper() in logged
         return _row(role, new, catalog, lib) | {"fill": m, "feeler": not known}  # no load on file: one "find the load" set
 
     room = lambda role, m=None: free_minutes(rows, role, host, lib)  # noqa: E731 — the ruled dose keeps its minutes (ruling 1)
@@ -698,7 +698,7 @@ def spend_session(rx: dict[str, Any], ctx: dict[str, Any], flags: list[dict[str,
         route = seed and not ctx.get("no_new") and live_pain.muscle_route({"movement_key": seed}, ctx, taken, joints)
         key = keys[0] if keys else (route or None)
         if not key or probe:
-            return bool(key)
+            return 2 if key else 0
         taken.add(key)
         new = {"kind": "accessory", "slot": f"spend_{m}", "intensity": "accessory", "movement_key": key, "sets": [{}] * lo}
         return _row(r, new, ctx["catalog"], ctx["lib"]) | {"fill": m, "feeler": True}
@@ -731,8 +731,9 @@ def spend_session(rx: dict[str, Any], ctx: dict[str, Any], flags: list[dict[str,
             }
         )
     out = [
-        f"added (live): {(ctx['catalog'].get(r['key']) or {}).get('title') or r['key']} {r['sets']} x 8-15 — {r['fill']}, reviewed "
-        "and low on the flagged joint, in this morning's free minutes"
+        f"added (live): {(ctx['catalog'].get(r['key']) or {}).get('title') or r['key']} {r['sets']} x 8-15 — {r['fill']}, reviewed"
+        + (" and low on the flagged joint" if flags else "")
+        + ", in this morning's free minutes"
         for r in rows
         if r.get("fill") and str(r["key"]) not in by_key
     ]
@@ -1037,6 +1038,15 @@ def _fit_to(
 
     done: list[str] = []
     while routine_minutes(blocks, movements)["lifting_minutes"] > cap:
+        # fix round 12: a slot the plan ADDED from free minutes goes first when the routine as written has none — a non-priority
+        # fill before a priority one, the last added first — so a fill never costs a template set (a curl) its place
+        fills = [b for b in blocks if str((kinds.get(b.movement_key) or {}).get("live_added") or "").startswith("fill_")]
+        if fills:
+            gone = min(reversed(fills), key=lambda b: _prio(b.movement_key, movements, lib))
+            blocks.remove(gone)
+            _unpair(blocks, getattr(gone, "superset_id", None))
+            done.append(f"{gone.movement_key} (added from free minutes) dropped")
+            continue
         lifts = [i for i, b in enumerate(blocks) if b.movement_key in kinds]
         items = [
             (

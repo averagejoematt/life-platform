@@ -685,3 +685,6 @@ def annotate_blocks(blocks: list[Any], rx: dict[str, Any]) -> None:
         if b.movement_key in cut:
             clause = session_block.applied_clause("set_count", working_sets=warmup_sets.working_set_count(b.sets), reason="recovery")
             b.notes = session_block.add_reason(b.notes, clause)
+    from training import live_safety
+
+    live_safety.cap_lines(blocks)  # fix round 12: the set-count clause never takes a note past four phone lines

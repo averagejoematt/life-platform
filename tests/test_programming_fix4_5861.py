@@ -222,14 +222,13 @@ def _held(s: dict) -> set[str]:
 
 
 def stepping(week: dict) -> list[str]:
-    """Any in-session load-step line on any lift other than the ONE bounded R3 line (fix round 10: double progression is the one
-    progression system under live; fix round 11: the owner's R3 restored in one bounded form, `live_safety.R3_LINE`)."""
-    r3 = re.compile("^" + re.escape(lsafe.R3_LINE).replace(re.escape("{step}"), ".+") + "$")
+    """Any in-session load-step line on any lift (fix round 10: double progression is the one progression system under live;
+    fix round 12: the bounded step of round 11 is off and deleted)."""
     return [
         f"{s['role']}: {x['key']}"
         for s in week["sessions"]
         for x in s["lifts"]
-        if any(lsafe._step_line(ln) and not r3.match(ln.strip()) for ln in (x["hevy_note"] or "").split("\n"))
+        if any(lsafe._step_line(ln) for ln in (x["hevy_note"] or "").split("\n"))
     ]
 
 
@@ -263,7 +262,8 @@ def test_the_session_line_never_contradicts_a_big_lift(weeks):
         (lsafe, "coherent_effort"): lambda blocks, rx: None,
         (lsafe, "fix_block"): lambda block, rx, blocks: lsafe.block_rule(block),
     }
-    with patch.dict(lset.HEURISTICS["deadlift_rpe"], {"value": 7}):  # control: the per-lift guard only, a lift capped at 7
+    seven = dict(lset.value("effort_targets")) | {"deadlift": [7, 7]}
+    with patch.dict(lset.HEURISTICS["effort_targets"], {"value": seven}):  # control: the per-lift guard only, a lift capped at 7
         assert session_conflicts(_week("a_large_deficit_experienced", off)["week"])
 
 
@@ -383,33 +383,35 @@ def test_an_uncovered_aerobic_gap_becomes_one_optional_walk_never_silence(weeks)
     h = weeks[("h_heavy_walker", True)]["week"]
     assert _walks(h) == [] and not any(ln.startswith("walk (live)") for s in h["sessions"] for ln in _lines(s))
     assert any("intensity unknown" in ln for s in h["sessions"] for ln in _lines(s))
-    ALL["h_low_steps"] = ALL["h_heavy_walker"] | {"steps_per_day": 5000}
+    # fix round 12: a gap needs the aerobic record READ (an unread record is unknown, never a gap) — here read, nothing recorded
+    read = {"aerobic_record": {"minutes_by_day": {}, "line": "recorded outside the gym: 0 min credited"}}
+    ALL["h_low_steps"] = ALL["h_heavy_walker"] | {"steps_per_day": 5000} | read
+    ALL["h_heavy_read"] = ALL["h_heavy_walker"] | read
     try:
         low = _week("h_low_steps", settings={"session_cap_includes_cardio": True})["week"]
         assert len(_walks(low)) == 1 and _walks(low)[0] not in ("lower_heavy", "upper_heavy")  # the week's host (fix round 10)
         assert any(ln.startswith("walk (live): optional brisk walk") for s in low["sessions"] for ln in _lines(s))
         off = _week("h_low_steps", {(lshape, "walk_prompt"): lambda live, today_minutes=0: []}, {"session_cap_includes_cardio": True})
         assert _walks(off["week"]) == []
-        unknown = _week("h_heavy_walker", {(lshape, "intensity_unknown"): lambda aer: False}, {"session_cap_includes_cardio": True})
+        unknown = _week("h_heavy_read", {(lshape, "intensity_unknown"): lambda aer: False}, {"session_cap_includes_cardio": True})
         assert len(_walks(unknown["week"])) == 1  # control: the old reading manufactures the gap
+        unread = _week("h_heavy_walker", {(lshape, "intensity_unknown"): lambda aer: False}, {"session_cap_includes_cardio": True})
+        assert _walks(unread["week"]) == []  # fix round 12: with no record read there is nothing to prompt on
     finally:
         ALL.pop("h_low_steps", None)
+        ALL.pop("h_heavy_read", None)
 
 
 def test_under_the_default_cap_a_small_gap_is_the_walks_not_another_ride(weeks):
     def easy(week):
         return sum(1 for s in week["sessions"] if s["cardio"].get("kind") and s["cardio"]["kind"] not in lp.HARD_KINDS)
 
-    # ruling 4: an easy block needs a NAMED purpose — the record's aerobic gap; a record that covers the week (synthetic 140
-    # recorded min: a 10-min gap, under the walk prompt floor) serves no easy ride. Control: a 40-min-short week -> a purpose.
-    ruled = _week("h_heavy_walker", {(lp, "aerobic"): lambda inputs: {"volume_covered": False, "walking_min_per_wk": 140, "line": "x"}})
+    # rulings 1 and 4 (fix round 12): no easy gym block on any morning — the week's hard conditioning dose is the only one. Even
+    # a record that shows the week 90 minutes short serves no easy ride (the answer is the optional walk, outside the gym).
+    short = {"volume_covered": False, "walking_min_per_wk": 60, "line": "x", "record_read": True, "steps_per_day": 3000}
+    ruled = _week("h_heavy_walker", {(lp, "aerobic"): lambda inputs: dict(short)})
     assert easy(ruled["week"]) == 0
-    assert lshape.walk_covers("easy", {"settings": {"session_cap_includes_cardio": True}, "aerobic": {"walking_min_per_wk": 140}}) is None
-    short = {"volume_covered": False, "walking_min_per_wk": 60, "line": "x"}
-    from training import live_rulings
-
-    keep, _lines_ = live_rulings.purposeful_cardio("easy", {"aerobic": short, "target_date": "2026-11-18"}, lp.HARD_KINDS)
-    assert keep  # control
+    assert lshape.aerobic_gap({"aerobic": short, "target_date": "2026-11-18"}) == 90  # the gap is real; no block fills it
     import inspect
 
     from training import cardio_model

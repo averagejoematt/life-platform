@@ -273,8 +273,10 @@ def decide(
             why = f"still under {rep_lo} reps after {steps_down(rows)} step-downs"
             return {"kg": last, "mode": "hold", "why": why, "clause": f"Same load: {why}.", "flag": True}
         # at least one step; as far as the last exposure's own read says reaches the floor — never more than step_down_max_pct
-        size = min(last * (1 - float(cfg.value("step_down_pct")) / 100.0), floor_load(rows[0], rep_lo))
-        kg = _floor_to_implement(max(size, last * (1 - float(cfg.value("step_down_max_pct")) / 100.0)), equipment)
+        size = _floor_to_implement(min(last * (1 - float(cfg.value("step_down_pct")) / 100.0), floor_load(rows[0], rep_lo)), equipment)
+        cap = _floor_to_implement(last * (1 - float(cfg.value("step_down_max_pct")) / 100.0), equipment)
+        cap = cap if cap >= last * (1 - float(cfg.value("step_down_max_pct")) / 100.0) - 1e-6 else _step_up(cap, equipment)
+        kg = max(size, min(cap, _floor_to_implement(last * 0.999, equipment)))  # the cap on the implement's grid, never the old load
         return {
             "kg": kg,
             "mode": "down",
@@ -428,8 +430,12 @@ def set_loads(
         tid = tid_of(b.movement_key, movements, lib, idx)
         # fix round 12: a lift the engine left UNLOADED is read too — a familiar movement the plan added (a curl he logged three
         # weeks ago) was served with empty rows and no instruction while its last load sat in the record
+        # — unless the engine holds NO history of it (its "find the load" set then stands as written)
         work = [s for s in b.sets if str(getattr(s, "type", "") or "normal") != "warmup"]
+        unloaded = all(getattr(s, "weight_kg", None) is None for s in work)
         if not e or not tid or e.get("intensity") == "carry" or not work or not any(getattr(s, "rep_range_end", None) for s in work):
+            continue
+        if unloaded and (rows_out.get(b.movement_key) or {}).get("status") == "no_history":
             continue
         lo = min(int(getattr(s, "rep_range_start", 0) or 0) or 99 for s in work)
         hi = max(int(getattr(s, "rep_range_end", 0) or 0) for s in work) or lo
@@ -452,7 +458,7 @@ def set_loads(
         shaped = any(x.get("kind") == "top" for x in e.get("sets") or [])
         d = decide(rows, lo, hi, entry.get("equipment"), hold=hold, target_rpe=target, layoff_days=gap, top_set=shaped)
         if d is None:
-            if hold:  # fix round 12: a lift held for a reason says it even with no same-role exposure in the window
+            if hold and not unloaded:  # fix round 12: a LOADED lift held for a reason says it with no same-role exposure too
                 out.append({"key": b.movement_key, "kg": None, "mode": "hold", "why": hold, "clause": f"Same load: {hold}."})
             continue
         for s in work:

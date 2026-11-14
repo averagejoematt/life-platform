@@ -181,22 +181,6 @@ def mode(lib: dict[str, Any] | None) -> str:
     return MODE_LIVE if lib.get("status") == APPROVED and approved_stamp(lib) else MODE_SHADOW
 
 
-def ledger_view(rows: list[dict[str, Any]], lib: dict[str, Any] | None = None) -> list[dict[str, Any]]:
-    """The rotation ledger as THIS mode reads it (#5861 fix round 12, rollback safety). Shadow: `rows` itself — a live draft's
-    picks sit in `live_phase_N` attributes no proposed reader matches, so reverting the status serves what it would have served
-    had the library never been approved. Live: a copy with each `live_phase_N` laid over `phase_N` (the shadow history before
-    approval is kept for every phase the live engine has not decided)."""
-    from training.variant_rotation import LIVE_PHASE_PREFIX
-
-    if mode(lib if lib is not None else load_library_failsoft()) != MODE_LIVE:
-        return rows
-    out = []
-    for r in rows:
-        over = {k[len(LIVE_PHASE_PREFIX) :]: v for k, v in r.items() if k.startswith(LIVE_PHASE_PREFIX + "phase_")}
-        out.append({k: v for k, v in r.items() if not k.startswith(LIVE_PHASE_PREFIX)} | over)
-    return out
-
-
 # ── the library <-> catalog join ─────────────────────────────────────────────
 def key_index(lib: dict[str, Any], catalog: dict[str, Any]) -> dict[str, dict[str, str]]:
     """`{"to_lib": catalog key -> library id, "to_cat": library id -> catalog key}` by Hevy template id (the catalog's
@@ -967,9 +951,7 @@ def _live(
         "variants": by_role.get(role, rotation.get("variants") or {}),
         "variants_by_role": by_role,
         "slots": slots,
-        # fix round 12 (rollback safety): a live draft's picks are their OWN list, recorded to `live_phase_N` — never among the
-        # `ledger_writes` the proposed path reads back
-        "ledger_writes": [],
+        "ledger_writes": [],  # fix round 12 (rollback): a live draft's picks are their own list, never read by the proposed path
         "live_ledger_writes": writes,
         "volume_check": check,
         "source": "selection",

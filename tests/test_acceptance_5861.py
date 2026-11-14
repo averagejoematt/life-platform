@@ -762,9 +762,7 @@ def test_d1_weekly_sets_per_muscle_sit_inside_the_volume_landmarks(weeks):
         "a_large_deficit_experienced",
         {
             (live_volume, "_surplus"): lambda rows, tg, prio, lines: (lambda: None),
-            (live_volume, "_make_room"): lambda rows, tg, lead, role, m, need, room, budget, gave, slot=False: room(role) >= need
-            and not slot,
-            (live_volume, "ARMS"): (),
+            (live_volume, "_make_room"): lambda rows, tg, role, m, need, n, room, budget, gave: room(role) >= need,
         },
     )
     lib, cat = raw["world"]["lib"], raw["world"]["catalog"]["movements"]
