@@ -158,10 +158,11 @@ def _merge_manifest(staged_json: str, post_key: str, failures: list | None = Non
     whose URL is this post's. Returns None (and records why) when that can't be done safely — the list is then left
     as it was, never rebuilt from the snapshot."""
 
-    def _refuse(why: str) -> None:
+    def _refuse(why: str) -> str | None:
         logger.warning("posts.json not written: %s", why)
         if failures is not None:
             failures.append(f"posts.json not written: {why}")
+        return None
 
     parts = (post_key or "").split("/")
     if len(parts) < 3 or parts[0] != "generated":
