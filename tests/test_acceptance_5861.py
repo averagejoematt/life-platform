@@ -467,7 +467,7 @@ def capped_at(note: str | None, rpe: float) -> bool:
 def joint_unprotected(week: dict, lib: dict, catalog: dict, joint: str, group: str) -> list[str]:
     """#5861 FIX7 (the pain rule narrowed to what provokes it): served lifts that breach an above-the-mild-line flag on `joint` in
     pattern group `group` — a member of the flagged pattern that still loads the joint at moderate or more (the provoking
-    pattern still served), or a `PROVOKING` same-joint isolation with no RPE 7 cap.
+    pattern still served), or a `PROVOKING` same-joint isolation with no pain-RPE cap (8, fix round 10) and stop line.
     Lifts of OTHER patterns that load the joint are not breaches any more (the sixth red team: one flag capped every row)."""
     out = []
     for x in _lifts(week):
@@ -476,7 +476,7 @@ def joint_unprotected(week: dict, lib: dict, catalog: dict, joint: str, group: s
             continue
         if lp._group(e.get("pattern")) == group and lp._stress(e, joint) >= 1:
             out.append(f"{x['key']}: same pattern")
-        elif e.get("pattern") in PROVOKING.get(joint, ()) and not capped_at(x["hevy_note"], 7):
+        elif e.get("pattern") in PROVOKING.get(joint, ()) and not (capped_at(x["hevy_note"], 8) and "stop this lift" in x["hevy_note"]):
             out.append(f"{x['key']}: no cap")
     return out
 
@@ -486,7 +486,7 @@ def test_c2c_a_pain_flag_acts_on_the_provoking_pattern_and_keeps_the_muscle_trai
     incline press, flies and overhead extensions at RPE 8-10. Then (FIX2-FIX6) every shoulder-loading lift was capped all week —
     the sixth red team: chest fell to 0 sets. #5861 FIX7: the PROVOKING pattern (the press group, loading the shoulder) is off;
     a pain-free same-family member (low on the shoulder) stands in at RPE <= 8 with the stop line, so the chest keeps hard sets;
-    above the mild line the same-joint isolation (raises, rear-delt work) stays capped at RPE 7."""
+    above the mild line the same-joint isolation (raises, rear-delt work) stays capped at the pain RPE (8) with the stop line."""
     b = weeks["b_shoulder_flag_low_recovery"]
     lib, cat = b["world"]["lib"], b["world"]["catalog"]["movements"]
     assert joint_unprotected(b["week"], lib, cat, "shoulder", "press") == []
@@ -503,8 +503,11 @@ def test_c2c_a_pain_flag_acts_on_the_provoking_pattern_and_keeps_the_muscle_trai
     )
     assert sw.hard_sets_by_muscle(nor["week"], lib, cat).get("chest", 0) < hard["chest"]  # control: no route -> chest falls
     raises = [x for x in _lifts(b["week"]) if sw._lib_entry(lib, cat, x["key"]).get("pattern") in PROVOKING["shoulder"]]
-    assert any("lateral_raise" in x["key"] for x in raises) and all(capped_at(x["hevy_note"], 7) for x in raises)
-    with patch.object(lrules, "isolation_joint_cap", lambda rx, ctx, flags: []):  # control: the isolation cap off -> uncapped
+    assert any("lateral_raise" in x["key"] for x in raises) and all(capped_at(x["hevy_note"], 8) for x in raises)
+    with (
+        patch.object(lrules, "isolation_joint_cap", lambda rx, ctx, flags: []),
+        patch.object(lp, "apply_joint_rule", lambda rx, ctx, rot, flags: []),
+    ):  # control: the isolation cap AND the joint rule (fix round 10: it holds every lift loading the joint) off -> uncapped
         prof = PROFILES["b_shoulder_flag_low_recovery"]
         was = sw.generate_week(prof, "approved", b["world"])
     assert any("lateral_raise" in p and "no cap" in p for p in joint_unprotected(was, lib, cat, "shoulder", "press"))
@@ -667,9 +670,9 @@ def test_c4_volume_comes_down_when_recovery_worsens_compounds_first_and_loads_ne
 
 
 def test_c4b_the_load_model_holds_and_steps_down_by_evidence_only():
-    """Fix round 9 (`live_load.decide`, one model): the last same-role top set that reached the range top steps up one implement
-    step; short of it, the load HOLDS (reps first); a hold day holds; only three grinding sessions at one load step it down 5%.
-    The old guard's regression/overshoot cuts are gone (tests/test_consolidation_5861.py holds the athletes)."""
+    """Fix round 10 (`live_load.decide`, two rules): the last same-role top set that reached the range top steps up one implement
+    step; short of it, the load HOLDS (reps first); a hold day blocks the step up; two exposures in a row under the range floor
+    step it down — and a hold day never blocks that (tests/test_consolidation_5861.py holds the athletes)."""
     row = lambda reps, rpe, kg=70.0: {
         "date": "2026-11-0",
         "role": "upper_heavy",
@@ -677,16 +680,16 @@ def test_c4b_the_load_model_holds_and_steps_down_by_evidence_only():
     }  # noqa: E731
     assert live_load.decide([row(6, 8)], 4, 6, "barbell")["mode"] == "up"
     assert live_load.decide([row(5, 9)], 4, 6, "barbell")["mode"] == "hold"
-    assert live_load.decide([row(6, 8)], 4, 6, "barbell", hold_all="recovery first")["mode"] == "hold"
-    grind = [row(4, 10), row(4, 10), row(4, 10), row(6, 9)]
-    assert live_load.decide(grind, 4, 6, "barbell")["mode"] == "down"
-    with patch.dict(live_settings.HEURISTICS["step_down_exposures"], {"value": 9}):  # control: no evidence ever enough -> hold
-        assert live_load.decide(grind, 4, 6, "barbell")["mode"] == "hold"
+    assert live_load.decide([row(6, 8)], 4, 6, "barbell", hold="recovery first")["mode"] == "hold"
+    under = [row(3, 10), row(3, 9), row(6, 9)]
+    assert live_load.decide(under, 4, 6, "barbell", hold="recovery first")["mode"] == "down"
+    with patch.dict(live_settings.HEURISTICS["below_floor_exposures"], {"value": 9}):  # control: no evidence ever enough -> hold
+        assert live_load.decide(under, 4, 6, "barbell")["mode"] == "hold"
 
 
 def test_c5_a_stalled_anchor_holds_its_load_and_scheme(weeks):
-    """Fix round 9: a stalled anchor HOLDS its load and rep range (double progression: the reps climb first); no stall reset, no
-    rep-scheme change — the eighth red team's ratchet came from the reset (a stall answered with a 10% cut, then judged again)."""
+    """A stalled anchor (reps inside the range, not climbing) HOLDS its load and rep range (double progression: the reps climb first);
+    no stall reset, no rep-scheme change — the eighth red team's ratchet came from the reset. Only reps under the floor step down."""
     d = weeks["d_stalled_anchor_adherence_dip"]["week"]
     bench = next(x for s in d["sessions"] for x in s["lifts"] if x["key"] == "barbell_bench_press")
     assert bench["reps"] == "4-6" and "Now aiming" not in bench["hevy_note"] and "Lighter" not in bench["hevy_note"]
@@ -694,7 +697,7 @@ def test_c5_a_stalled_anchor_holds_its_load_and_scheme(weeks):
     flat = sw.generate_week(prof, "approved", sw.build_world(prof, "approved"))
     bench = next(x for s in flat["sessions"] for x in s["lifts"] if x["key"] == "barbell_bench_press")
     assert bench["reps"] == "4-6" and "Now aiming" not in bench["hevy_note"]  # no deficit: still no reset
-    down = {(live_load, "step_down_due"): lambda rows, target_rpe=9.0: True}  # control: a step-down forced -> the note says so
+    down = {(live_load, "below_floor"): lambda *a: True}  # control: a step-down forced -> the note says so
     off = _week_of("d_stalled_anchor_adherence_dip", down)
     assert any("Lighter today" in (x["hevy_note"] or "") for s in off["week"]["sessions"] for x in s["lifts"])
 

@@ -23,7 +23,8 @@ them with ONE model, keyed by SESSION ROLE (a heavy day and a volume day are two
   5. FIRST SESSION BACK (owner ruling #10). 10+ days with no session: each lift's first session back runs at RPE 8 at its last
      same-role load (a hold, rule 1).
   6. THE SECOND LIFT (owner ruling 5). The heavy-lower lift that does not lead runs at RPE 7-8, loaded from its own same-role
-     e1RM at that band — never above its last load.
+     e1RM at that band — never above its last load. The lead progresses from its own lead exposures; one of them under the floor
+     steps it down at its next lead (its exposures are a week apart, the second-lift morning between).
   7. NOVELTY (three rules). A NEW pattern (none logged in ~8 weeks) runs one exposure at RPE <= 7; a FAMILIAR pattern (a
      biomechanically similar swap included) works at normal effort with no re-entry cap; the layoff rule is 5.
 
@@ -117,16 +118,17 @@ def effort_unknown(rows: list[dict[str, Any]]) -> bool:
     return not known or all(x >= float(cfg.value("implausible_rpe")) for x in known)
 
 
-def below_floor(rows: list[dict[str, Any]], rep_lo: int) -> bool:
-    """Rule 2: each of the last `below_floor_exposures` same-role exposures had its top set under `rep_lo` (reps only)."""
-    n = int(cfg.value("below_floor_exposures"))
+def below_floor(rows: list[dict[str, Any]], rep_lo: int, n: int | None = None) -> bool:
+    """Rule 2: each of the last `below_floor_exposures` (or `n`) same-role exposures had its top set under `rep_lo` (reps only)."""
+    n = int(cfg.value("below_floor_exposures")) if n is None else n
     return len(rows) >= n and all(_top(r)["reps"] < rep_lo for r in rows[:n])
 
 
 def floor_load(r: dict[str, Any], rep_lo: int) -> float:
-    """The load exposure `r` says reaches `rep_lo` reps with two in reserve (its decline read, `read_e1rm`): the step-down's size
-    when one 5% step would leave him under the floor again."""
-    return read_e1rm(r) / (1 + (rep_lo + 2.0) / 30.0)
+    """The load exposure `r` says reaches `rep_lo` reps with three in reserve (its decline read, `read_e1rm`): the step-down's size
+    when one 5% step would leave him under the floor again — the margin covers a week more of a fast decline (3 %/week is about
+    one rep), so a declining lift is not under the floor again at the next exposure."""
+    return read_e1rm(r) / (1 + (rep_lo + 3.0) / 30.0)
 
 
 def topped(r: dict[str, Any], rep_hi: int, target_rpe: float, unknown: bool) -> bool:
@@ -216,15 +218,17 @@ def decide(
     *,
     hold: str | None = None,
     second_band: tuple[int, int] | None = None,
+    lead: bool = False,
 ) -> dict[str, Any] | None:
     """One lift's load: {kg, mode: up|hold|down|second, why, clause} from its same-role exposures (most recent first), or None
     (no exposure in the window: the engine's own load stands). Two rules (module doc 1-2): DOWN when the top set sat under the
     floor in the last two exposures — first, so nothing blocks it; UP at the top of the range unless `hold` (the day's or the
-    lift's reason: a slump, a strained day, a pain flag, a first session back) stops it. Pure."""
+    lift's reason: a slump, a strained day, a pain flag, a first session back) stops it. `lead`: the heavy-lower lead judged on its
+    own lead exposures (rule 6), a week apart with the second-lift morning between — one under the floor is two exposures. Pure."""
     if not rows:
         return None
     last = _top(rows[0])["kg"]
-    if below_floor(rows, rep_lo):  # at least one step; enough to reach the floor again on the last exposure's own read
+    if below_floor(rows, rep_lo, 1 if lead else None):  # at least one step; enough to reach the floor again on the last exposure's own read
         kg = _floor_to_implement(min(last * (1 - float(cfg.value("step_down_pct")) / 100.0), floor_load(rows[0], rep_lo)), equipment)
         n = int(cfg.value("below_floor_exposures"))
         return {
@@ -352,7 +356,7 @@ def set_loads(
         led = lead_rows(rows, e) if e.get("live_lead") else rows  # rule 6: a lead progresses from its own LEAD exposures
         flag = e.get("live_load") or {}
         hold = "first session back" if e.get("live_first_back") else (str(flag.get("why") or "held") if flag.get("hold") else hold_all)
-        d = decide(rows if band else led, lo, hi, entry.get("equipment"), hold=hold, second_band=band)
+        d = decide(rows if band else led, lo, hi, entry.get("equipment"), hold=hold, second_band=band, lead=len(led) < len(rows))
         if d is None:
             continue
         engine = max(float(s.weight_kg) for s in work)

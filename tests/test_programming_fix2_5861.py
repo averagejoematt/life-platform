@@ -150,43 +150,41 @@ def _rows(record: list[dict], tid: str, role: str = "") -> list[dict]:
 
 def test_an_isolation_load_cut_needs_effort_evidence_not_a_trend_alone():
     """Second red team on the owner run: a dumbbell lateral raise read 'strength sliding' and dropped a dumbbell step after a
-    top set inside its range at a moderate RPE. The fixture reproduces the trigger (the trend IS 'regressing'); the one load
-    model holds it (no grind, no evidence). Control: three sessions at one load, fewer reps than his best there, every set over
-    RPE 9 -> the ONE step-down, 5% floored to the dumbbell."""
+    top set inside its range at a moderate RPE. The fixture reproduces the trigger (the trend IS 'regressing'); the load model
+    holds it (reps inside the range are no evidence). Control: two sessions running under the range floor -> a step-down,
+    floored to the dumbbell (fix round 10: reps under the floor, never a trend or an RPE, move a load down)."""
     rec = _lateral_record()
     assert fm.movement_signals(rec, as_of="2026-11-16")[LATERAL]["trend"] == "regressing"  # the real-data trigger, reproduced
     d = ll.decide(_rows(rec, LATERAL), 8, 15, "dumbbell")
     assert d["mode"] == "hold" and abs(d["kg"] - 25 * KG) < 0.05
     grind = rec + [
-        {"date": "2026-11-11", "exercises": [_ex(LATERAL, [(25, 9, 9.5), (25, 8, 10.0)])]},
-        {"date": "2026-11-12", "exercises": [_ex(LATERAL, [(25, 9, 9.5), (25, 8, 10.0)])]},
-        {"date": "2026-11-13", "exercises": [_ex(LATERAL, [(25, 9, 9.5), (25, 8, 10.0)])]},
+        {"date": "2026-11-12", "exercises": [_ex(LATERAL, [(25, 7, 9.5), (25, 7, 10.0)])]},
+        {"date": "2026-11-13", "exercises": [_ex(LATERAL, [(25, 7, 9.5), (25, 6, 10.0)])]},
     ]
     cut = ll.decide(_rows(grind, LATERAL), 8, 15, "dumbbell")
     assert cut["mode"] == "down" and round(cut["kg"] / KG, 1) == 22.5  # control: real evidence -> one dumbbell step
     bar = [{"date": f"2026-10-{d:02d}", "exercises": [_ex(ROW, [(185, r, rpe)] * 2)]} for d, r, rpe in ((20, 6, 8.5),)]
-    bar += [{"date": f"2026-10-{d:02d}", "exercises": [_ex(ROW, [(185, 4, 9.5)] * 2)]} for d in (23, 27, 30)]
+    bar += [{"date": f"2026-10-{d:02d}", "exercises": [_ex(ROW, [(185, 3, 9.5)] * 2)]} for d in (27, 30)]
     one = ll.decide(ll.same_role(ll.history(bar, {ROW})[ROW], "", "2026-11-03", 4, 6), 4, 6, "barbell")
-    assert one["mode"] == "down" and round(one["kg"] / KG) == 175  # 5% under 185, floored to the bar's step — never 10%
+    assert one["mode"] == "down" and 165 <= round(one["kg"] / KG) <= 175  # at least 5%, enough to reach the floor again
 
 
-def test_a_step_down_restarts_its_evidence_at_the_new_load():
-    """Second red team: a row was cut twice in one week. The one load model steps down only after three sessions at ONE load,
-    so the exposure right after a step-down (a new load) can never step down again. Control: three more grinds at the new load
-    -> a second step-down, three exposures later (at most one per three)."""
-    grind = [(80, 4, 9.5), (80, 4, 10.0)]
-    rec = [{"date": f"2026-10-{d:02d}", "exercises": [_ex(ROW, [(80, 6, 8.5), (80, 6, 9.0)])]} for d in (20,)]
-    rec += [{"date": f"2026-10-{d:02d}", "exercises": [_ex(ROW, grind)]} for d in (23, 27, 30)]
+def test_a_step_down_continues_only_while_the_reps_stay_under_the_floor():
+    """Second red team: a row was cut twice in one week on effort alone. Fix round 10: a step-down needs two exposures running
+    under the range floor; the exposure after it, at the new load, back inside the range HOLDS. Control: still under the floor
+    at the new load -> it steps down again (the ninth red team: a real decline never grinds under the floor for weeks)."""
+    rec = [{"date": "2026-10-20", "exercises": [_ex(ROW, [(80, 6, 8.5), (80, 6, 9.0)])]}]
+    rec += [{"date": f"2026-10-{d:02d}", "exercises": [_ex(ROW, [(80, 3, 9.5), (80, 3, 10.0)])]} for d in (27, 30)]
     rows = ll.same_role(ll.history(rec, {ROW})[ROW], "", "2026-11-03", 4, 6)
     first = ll.decide(rows, 4, 6, "machine")
     assert first["mode"] == "down"
-    after = rec + [{"date": "2026-11-03", "exercises": [_ex(ROW, [(first["kg"] / KG, 4, 10.0)])]}]
-    rows2 = ll.same_role(ll.history(after, {ROW})[ROW], "", "2026-11-06", 4, 6)
-    assert ll.decide(rows2, 4, 6, "machine")["mode"] != "down"  # the next exposure holds
     lb2 = first["kg"] / KG
-    more = after + [{"date": f"2026-11-{d:02d}", "exercises": [_ex(ROW, [(lb2, 3, 10.0)])]} for d in (6, 10, 13)]
-    rows3 = ll.same_role(ll.history(more, {ROW})[ROW], "", "2026-11-17", 4, 6)
-    assert ll.decide(rows3, 4, 6, "machine")["mode"] == "down"  # control: new evidence at the new load
+    after = rec + [{"date": "2026-11-03", "exercises": [_ex(ROW, [(lb2, 5, 9.0)])]}]
+    rows2 = ll.same_role(ll.history(after, {ROW})[ROW], "", "2026-11-06", 4, 6)
+    assert ll.decide(rows2, 4, 6, "machine")["mode"] == "hold"  # back in the range: it holds and the reps climb
+    still = rec + [{"date": "2026-11-03", "exercises": [_ex(ROW, [(lb2, 3, 10.0)])]}]
+    rows3 = ll.same_role(ll.history(still, {ROW})[ROW], "", "2026-11-06", 4, 6)
+    assert ll.decide(rows3, 4, 6, "machine")["mode"] == "down"  # control: still under the floor -> down again
 
 
 # ── 5. the novelty budget ─────────────────────────────────────────────────────
