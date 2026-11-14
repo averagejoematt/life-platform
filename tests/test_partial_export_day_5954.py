@@ -247,5 +247,4 @@ def test_the_predicates():
     whole = {"date": "2026-05-03", "entries_count": 4, "food_log": [{}]}
     assert nutrition_logging.complete_logs([stub, part, whole]) == [whole]
     assert nutrition_logging.incomplete_days([stub, part, whole]) == ["2026-05-01", "2026-05-02"]
-    assert nutrition_logging.stub_days([stub, part, whole]) == ["2026-05-01"]
     assert nutrition_logging.partial_days([stub, part, whole]) == ["2026-05-02"]

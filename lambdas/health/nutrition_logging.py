@@ -201,11 +201,6 @@ def complete_logs(items) -> list:
     return [i for i in items or () if not is_incomplete(i)]
 
 
-def stub_days(items) -> list:
-    """The days whose row is a stub, in row order (``date`` or the ``DATE#`` sort key)."""
-    return [row_date(i) for i in items or () if is_stub(i)]
-
-
 def partial_days(items) -> list:
     """The days whose row is a partial export (#5954), in row order."""
     return [row_date(i) for i in items or () if is_partial_export(i)]
