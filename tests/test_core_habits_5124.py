@@ -54,7 +54,7 @@ ISSUE_LIST = [
     "evening check-in",
     "no alcohol",
     "no solo takeout",
-    "no sweets or fried food",
+    "a food restraint (named privately)",
     "out of bed on time",
     "one connection",
 ]
@@ -143,7 +143,7 @@ def test_grade_day_reads_each_basis_and_never_counts_an_unknown_as_a_miss():
     assert st["no_sweets_or_fried"] == "missed" and st["one_connection"] == "unknown"
     assert st["steps_floor"] == "done" and st["out_of_bed_on_time"] == "done" and st["evening_checkin"] == "missed"
     assert (g["done"], g["missed"], g["unknown"], g["known"]) == (9, 2, 1, 11)
-    assert g["score"] == round(9 / 11 * 100) and g["missed_labels"] == ["evening check-in", "no sweets or fried food"]
+    assert g["score"] == round(9 / 11 * 100) and g["missed_labels"] == ["evening check-in", "a food restraint (named privately)"]
     # the wake grade IS health.wake_consistency's: 45 min off the 06:00 anchor is off
     late = core_habits.grade_day(reg, day=DAY, reading=lambda k, m: 1.0, wakes={**wakes, DAY: "06:45"})
     assert {r["id"]: r["state"] for r in late["habits"]}["out_of_bed_on_time"] == "missed"
