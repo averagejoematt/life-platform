@@ -262,8 +262,11 @@ def _kb_slot(e: dict[str, Any]) -> bool:
 
 
 def _count(rows: list[dict[str, Any]]) -> Counter:
+    """Planned hard sets per muscle. A `learning` fill (a movement new to him: one exposure at RPE 7) counts nothing this week."""
     out: Counter = Counter()
     for r in rows:
+        if r.get("learning"):
+            continue
         for m, c in r["credit"].items():
             out[m] += c * r["sets"]
     return out
@@ -356,6 +359,15 @@ def plan_minutes(rows: list[dict[str, Any]]) -> float:
     return round(seconds / 60.0, 1)
 
 
+def reserve_minutes() -> float:
+    """The minutes the plan leaves free on the conditioning host (fix round 12: the block's own minimum, `live_program.
+    MIN_CARDIO_MINUTES` — the separate 20-minute reserve heuristic is deleted). The dose takes only what lifting leaves (owner
+    ruling 1); the plan guarantees it the shortest block worth serving, no more."""
+    from training.live_program import MIN_CARDIO_MINUTES
+
+    return float(MIN_CARDIO_MINUTES)
+
+
 def free_minutes(rows: list[dict[str, Any]], role: str, host: str | None, lib: dict[str, Any], reserve: bool = True) -> float:
     """The minutes this morning's lifting may still take: the lifting ceiling less the plan's minutes (an upper bound: every
     anchor's warm-ups assumed, no paired-set saving), less the conditioning dose's reserve on its host morning under the shared
@@ -368,7 +380,7 @@ def free_minutes(rows: list[dict[str, Any]], role: str, host: str | None, lib: d
     from training import live_rulings
 
     if reserve and shared and role == host and len({r["role"] for r in rows}) >= 3 and live_rulings.doses(lib) >= 1:
-        cap -= float(cfg.value("conditioning_reserve_minutes"))
+        cap -= reserve_minutes()
     return cap - plan_minutes([r for r in rows if r["role"] == role])
 
 
@@ -413,7 +425,15 @@ def spend(
         c = _count(rows)
         need = sorted(  # a priority muscle first (first call on free minutes), then one under its FLOOR (a ruled hold), then by share
             (m for m in tg if m not in blocked and c[m] + 1e-9 < tg[m]["aim"]),
-            key=lambda m: (m not in first, c[m] + 1e-9 >= tg[m]["floor"], -round(1 - c[m] / tg[m]["aim"], 2), (last or {}).get(m, ""), m),
+            # direct abs after a muscle's MEV hold (owner ruling #8: abs are flexible on short weeks; ruling 3 holds the arms at MEV)
+            key=lambda m: (
+                m not in first,
+                c[m] + 1e-9 >= tg[m]["floor"],
+                m in FILL_FIRST,
+                -round(1 - c[m] / tg[m]["aim"], 2),
+                (last or {}).get(m, ""),
+                m,
+            ),
         )
         if not need:
             break
@@ -424,7 +444,7 @@ def spend(
         # fix round 12, three tries in this order (owner ruling 9: low-fatigue exercises for the added sets; no needless slot):
         # an ISOLATION slot the muscle already has grows one set; else a 2-set isolation fill joins a morning with the minutes;
         # only then does a compound accessory (a split squat, a leg press) take the set
-        placed = _grow(m, order, rows, tg, one, hi, room, budget, gave, low, isolation=True) if not spread else False
+        placed = not spread and _grow(m, order, rows, tg, one, hi, room, budget, gave, low, isolation=True)
         for role in order if not placed else ():
             here = [r for r in rows if r["role"] == role]
             full_up = len(here) >= (FULL_BODY_MAX_MOVEMENTS if full.get(role) else MAX_MOVEMENTS)
@@ -436,7 +456,8 @@ def spend(
                 lines.append(f"spend: {role} + {new['key']} x{lo} ({m} under its aim of {tg[m]['aim']:g})")
                 placed = True
                 break
-        placed = placed or (not spread and _grow(m, order, rows, tg, one, hi, room, budget, gave, low, isolation=False))
+        placed = placed or (spread and _grow(m, order, rows, tg, one, hi, room, budget, gave, low, isolation=True))
+        placed = placed or _grow(m, order, rows, tg, one, hi, room, budget, gave, low, isolation=False)
         if not placed:
             blocked.add(m)
     return lines + [f"moved: {g}" for g in gave]
@@ -458,7 +479,11 @@ def _grow(
     """One more set on a slot `m` already has (never past `slot_max_sets`), on the first morning in `order` with room: an
     isolation slot, or (`isolation` False) a compound accessory."""
     for role in order:
-        grow = [r for r in _iso(m, [r for r in rows if r["role"] == role]) if r["sets"] < hi and bool(r.get("isolation")) == isolation]
+        grow = [
+            r
+            for r in _iso(m, [r for r in rows if r["role"] == role])
+            if r["sets"] < hi and bool(r.get("isolation")) == isolation and not r.get("learning")
+        ]
         if grow and _make_room(rows, tg, role, m, one, 1, room, budget, gave, low):
             max(grow, key=lambda r: (r.get("fill") == m, -r["sets"]))["sets"] += 1
             return True
@@ -529,7 +554,9 @@ def _make_room(
         k = take(r)
         r["sets"] -= k
         why = "minutes: no free ones that morning" if minutes else "the weekly set redline"
-        moved.append(f"{r['key']} -{k} on {r['role']} for {m} ({why}; {_main(r)} stays at or over its aim of {tg[_main(r)]['aim']:g})")
+        moved.append(
+            f"{r['key']} -{k} on {r['role']} for {m} ({why}; {_main(r)} stays at or over its aim of {tg.get(_main(r), {}).get('aim', 0):g})"
+        )
     else:
         return undo()
     rows[:] = [r for r in rows if r["sets"]]
@@ -575,25 +602,6 @@ def last_trained(workouts: Any, catalog: dict[str, Any], lib: dict[str, Any], da
     return out
 
 
-def week_sets_logged(workouts: Any, day: str) -> int:
-    """The working sets he has LOGGED this week before `day` (rep-counted, warm-ups out): what the session's spend step counts
-    against the weekly redline."""
-    from common.pacific_time import parse_day_key, shift_day_key
-
-    d = parse_day_key(str(day)[:10])
-    if d is None:
-        return 0
-    monday = shift_day_key(str(day)[:10], -d.weekday())
-    return sum(
-        1
-        for w in workouts or []
-        if monday <= str(w.get("date") or str(w.get("sk") or "")[5:15])[:10] < str(day)[:10]
-        for x in w.get("exercises") or []
-        for st in x.get("sets") or []
-        if st.get("reps") and str(st.get("type") or "normal") != "warmup"
-    )
-
-
 def week_plan(
     catalog: dict[str, Any],
     lib: dict[str, Any],
@@ -618,17 +626,23 @@ def week_plan(
     roles = list(week["roles"])
     full = {r: bool((week.get("partners") or {}).get(r)) for r in roles}
     taken = {str(r["key"]) for r in rows}
+    by_tid = {str(e.get("template_id") or "").upper(): e for e in (lib.get("movements") or {}).values() if e.get("template_id")}
+    logged_patterns = {by_tid[t].get("pattern") for t in logged if t in by_tid} - {None}
 
     def add(m: str, role: str, probe: bool = False) -> Any:
         here = {lib_entry(r["key"], catalog, lib).get("pattern") for r in rows if r["role"] == role}  # never the same pattern twice
         keys = [
             k for k in _fill_keys(m, catalog, lib, taken, overlay, logged=logged) if lib_entry(k, catalog, lib).get("pattern") not in here
         ]
-        known = bool(keys) and str(lib_entry(keys[0], catalog, lib).get("template_id") or "").upper() in logged
+        entry = lib_entry(keys[0], catalog, lib) if keys else {}
+        # known: logged in this block, or its PATTERN is (the novelty rule's own reading, `live_load.mark_novelty`)
+        known = bool(keys) and (str(entry.get("template_id") or "").upper() in logged or entry.get("pattern") in logged_patterns)
         if not keys or probe:
             return (1 if known else 2) if keys else 0
         taken.add(keys[0])
         new = {"kind": "accessory", "slot": f"fill_{m}", "intensity": "accessory", "movement_key": keys[0], "sets": [{}] * lo}
+        if not known and logged:  # new to him: its first exposure runs at RPE 7 (novelty) — not a hard set this week
+            return _row(role, new, catalog, lib) | {"fill": m, "feeler": True, "learning": True}
         return _row(role, new, catalog, lib) | {"fill": m, "feeler": not known}  # no load on file: one "find the load" set
 
     room = lambda role, m=None: free_minutes(rows, role, host, lib)  # noqa: E731 — the ruled dose keeps its minutes (ruling 1)
@@ -663,7 +677,7 @@ def _priority_trade(
     reserved minutes (dropping the dose is the owner's choice, `hard_conditioning_doses`); any other is short of the 75-minute
     morning itself. Nothing is cut to close it."""
     parts = [f"{m} {counts[m]:g} of its aim {tg[m]['aim']:g}" for m in short_of]
-    reserve = int(cfg.value("conditioning_reserve_minutes"))
+    reserve = int(reserve_minutes())
     shared = _settings(lib).get("session_cap_includes_cardio")
     on_host = [m for m in short_of if shared and _half_ok(m, host, full.get(host, False))]
     trade = (
@@ -774,13 +788,13 @@ def spend_session(rx: dict[str, Any], ctx: dict[str, Any], flags: list[dict[str,
         return free_minutes(rows, role, str(plan.get("host") or ""), ctx["lib"])
 
     full = bool(((plan.get("week") or {}).get("partners") or {}).get(role))  # a split morning keeps its half of the body
-    # fix round 12 (the final review: 76-79 working sets on pain and equipment weeks): what the morning puts back stays inside
-    # the owner's weekly redline — the sets he has logged this week, this morning's, and the plan's for the mornings still to come
-    order = list((plan.get("week") or {}).get("roles") or [])
-    later = sum(r["sets"] for r in plan.get("rows") or [] if role in order and r["role"] in order[order.index(role) + 1 :])
-    budget = _redline_sets() - int(ctx.get("week_sets_logged") or 0) - later
+    # fix round 12 (the final review: 76-79 working sets on pain and equipment weeks): what the morning puts back never takes it
+    # past the sets its plan gave it — the week's plan is held to the owner's redline, so the week is too
+    budget = sum(r["sets"] for r in plan.get("rows") or [] if r["role"] == role)
     lines = spend(rows, tg, [role], {role: full}, room, add, budget=budget)
     by_key = {str(e.get("movement_key")): e for e in rx["exposures"]}
+    kept = {str(r["key"]) for r in rows}
+    rx["exposures"] = [e for e in rx["exposures"] if str(e.get("movement_key")) in kept]  # a whole donor slot that moved goes
     for r in rows:
         e = by_key.get(str(r["key"]))
         if e is not None:
@@ -806,7 +820,7 @@ def spend_session(rx: dict[str, Any], ctx: dict[str, Any], flags: list[dict[str,
         for r in rows
         if r.get("fill") and str(r["key"]) not in by_key
     ]
-    return out if lines else []
+    return (out + [f"moved (live): {ln[len('moved: ') :]}" for ln in lines if ln.startswith("moved: ")]) if lines else []
 
 
 def _unservable(key: str, ctx: dict[str, Any]) -> bool:

@@ -258,10 +258,15 @@ def test_short_and_normal_weeks_meet_their_floors():
             m: (w["hard"].get(m, 0), t["floor"]) for m, t in tg.items() if m not in live_volume.HEADS and w["hard"].get(m, 0) < t["floor"]
         }
         assert under == {}, (name, under)
-    plan = live_volume.week_plan(w["world"]["catalog"]["movements"], w["world"]["lib"], 4)
+    from training import in_block_variant
+
+    cat, rec = w["world"]["catalog"]["movements"], w["world"]["record"]
+    seen = {"logged": frozenset(str(x.get("template_id") or "").upper() for wk in rec for x in wk["exercises"])}
+    seen["in_block"] = in_block_variant.performed_in_block(rec, cat, w["world"]["profile"]["as_of"])  # what the draft reads
+    plan = live_volume.week_plan(cat, w["world"]["lib"], 4, **seen)
     assert plan["under"] == []
     with patch.dict(live_settings.HEURISTICS["slot_max_sets"], {"value": 2}):  # control: no slot may grow -> a floor unmet
-        assert live_volume.week_plan(w["world"]["catalog"]["movements"], w["world"]["lib"], 4)["under"]
+        assert live_volume.week_plan(cat, w["world"]["lib"], 4, **seen)["under"]
 
 
 # ── 3. the 75-minute morning, every fixture, both cap settings ───────────────────────────────────────────────────────────────

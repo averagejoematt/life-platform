@@ -165,7 +165,7 @@ the same for every morning of that week:
   first; then a priority muscle — first call on the free minutes, up to its own aim; then by share of the aim; on a tie the one
   trained longest ago — `last_trained`, the weekly memory that rotates short weeks)
   takes a set on the morning of its half of the body with the most free minutes (`plan_minutes` / `free_minutes`, the one time
-  model; the conditioning host keeps `conditioning_reserve_minutes` for non-priority work): its isolation slot grows (never past
+  model; the conditioning host keeps the block's own minimum free, `reserve_minutes`): its isolation slot grows (never past
   3 sets), else a 2-set FILL movement joins (reviewed, served by the gym). Time or the owner's weekly set redline short, a muscle
   OVER its own aim gives the set — never under its aim, never a muscle's last isolation slot of the week. Nothing is cut to make
   a priority look bigger. A priority muscle that still cannot reach its aim is SAID in one line with the trade named
@@ -326,7 +326,6 @@ library builder writes `programming_settings` from the same table.
 | `slot_min_sets` | `2` | volume | an accessory or anchor never runs one working set: drop, don't shave | none |
 | `delt_heads` | `{'side_delts': 6, 'rear_delts': 4}` | volume | owner ruling #9: each delt head assessed apart, direct + indirect; the side delt (no compound trains it much) aims at 6 hard sets, the rear at 4 | block retro: lateral-raise and rear-delt progression |
 | `priority_aim_share` | `0.25` | volume | fix round 11 (the tenth red team: 'priority' meant MEV + 1 while back and shoulders got 14-15): a priority muscle aims this share of the way from MEV to MAV (chest and quadriceps 8 -> 10 hard sets), filled from low-fatigue isolation in free minutes — never by cutting another muscle (practitioner consensus: priority = more stimulus) | block retro: priority muscles' performance and the time the plan spent on them |
-| `conditioning_reserve_minutes` | `15` | volume | owner ruling 1: under the shared cap the week's conditioning dose takes only what lifting leaves — so the plan leaves this many minutes free on its host morning instead of filling them with isolation (a 1-2 morning week spends its few minutes on lifting first; the dose takes what is left). 15, not 20, since fix round 12: the plan's time model now counts the warm-ups the routine writes, and at 20 the host morning's chest and calf sets fell under their floors | block retro: the conditioning minutes delivered |
 | `min_session_minutes` | `35` | volume | fix round 11 (the tenth red team's 16-minute pain morning): a morning under this many minutes is said plainly in the rationale with why (the pain rule took work and no reviewed low-stress option exists) — never a filler | block retro: short mornings and their reasons |
 | `short_week_floor` | `3` | volume | a 1-3 morning week holds each priority muscle and each major pattern at maintenance: MV x mornings / this value hard sets (at least 2), a priority muscle aiming at MEV x mornings / this value; full-body mornings of 4-6 movements at 2-3 sets — never a 1-set anchor | block retro: anchor e1RM after a short week |
 

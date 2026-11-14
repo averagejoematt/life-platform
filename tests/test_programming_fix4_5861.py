@@ -170,8 +170,13 @@ def test_a_knee_flag_reduces_or_avoids_every_knee_dominant_pattern(weeks):
     assert knee_breaches(old)
     from training import live_pain, live_volume
 
-    none = _week(  # control: no priority route and no spend step after the pain rule
-        "g_knee_pain_garage_short", {(live_pain, "priority_ceiling"): lambda *a: None, (live_volume, "spend_session"): lambda *a: []}
+    none = _week(  # control: no priority route, no spend step after the pain rule and (fix round 12) no slot grown by the plan
+        "g_knee_pain_garage_short",
+        {
+            (live_pain, "priority_ceiling"): lambda *a: None,
+            (live_volume, "spend_session"): lambda *a: [],
+            (live_volume, "_grow"): lambda *a, **k: False,
+        },
     )
     assert sw.hard_sets_by_muscle(none["week"], none["world"]["lib"], none["world"]["catalog"]["movements"]).get("quadriceps", 0) < quads
 

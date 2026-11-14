@@ -246,10 +246,8 @@ def test_no_served_week_prints_an_in_session_load_step(caplog):
         assert steps(w["week"]) == [], (name, steps(w["week"]))
         assert sw.lint_problems(w["week"]) == [], (name, sw.lint_problems(w["week"]))
     assert not hasattr(live_load, "r3_eligible") and not hasattr(live_safety, "r3_lines")
-    caplog.clear()
-    with caplog.at_level(logging.WARNING):
-        off = _week(A, {(live_safety, "no_step"): lambda blocks, rx: []})  # control
-    assert steps(off["week"]) and any("hevy note lint" in r.getMessage() for r in caplog.records)
+    off = _week(A, {(live_safety, "no_step"): lambda blocks, rx: []})  # control: the in-session lines left in
+    assert steps(off["week"]) and any("CONTRADICTION" in p for p in sw.lint_problems(off["week"]))
 
 
 # ── 5. the simulator and the step-down limits ────────────────────────────────────────────────────────────────────────────────
@@ -344,7 +342,10 @@ def test_every_loaded_lift_says_what_moves_it_and_the_carry_names_its_next_sessi
         return d | {"clause": None} if d and d["mode"] == "hold" else d
 
     off = _week(A, {(live_load, "decide"): quiet})
-    assert not any("Same load: " in (x["hevy_note"] or "") for x in _lifts(off["week"]))
+    said = lambda wk: sum(  # noqa: E731
+        1 for x in _lifts(wk) if any(ln.strip().startswith(heads) for ln in (x["hevy_note"] or "").splitlines())
+    )
+    assert said(off["week"]) < said(w["week"])
 
 
 def test_a_previous_load_from_the_other_day_is_said():
@@ -417,14 +418,13 @@ def test_a_priority_muscle_reaches_its_own_aim_and_no_arm_set_moves_for_it():
         assert w["hard"][arm] >= LANDMARKS[arm]["MEV"]
     plan = live_volume.week_plan(w["world"]["catalog"]["movements"], w["world"]["lib"], 5)
     assert sum(r["sets"] for r in plan["rows"]) <= live_volume._redline_sets()
-    moved = [ln for ln in plan["lines"] if ln.startswith("redline: ")]
+    moved = [ln for ln in plan["lines"] if ln.startswith("moved: ")]
     assert all("stays at or over its aim" in ln for ln in moved)
     assert not any(ln.startswith("spend: time short") for ln in plan["lines"])  # no set is taken to buy a morning's minutes
-    spend = live_volume.spend
-    off = _week(A, {(live_volume, "spend"): lambda *a, **k: spend(*a[:8], **{kk: v for kk, v in k.items() if kk != "first"})})
-    assert served(off["week"])["chest"] < tg["chest"]["aim"] or served(off["week"])["quadriceps"] < tg["quadriceps"]["aim"], served(
-        off["week"]
-    )
+    # control: the priority aim at MEV (no priority above it) -> chest and quadriceps take fewer sets
+    with patch.dict(live_settings.HEURISTICS["priority_aim_share"], {"value": 0.0}):
+        off = _week(A)
+    assert served(off["week"])["chest"] + served(off["week"])["quadriceps"] < served(w["week"])["chest"] + served(w["week"])["quadriceps"]
 
 
 def test_a_priority_that_cannot_reach_its_aim_says_so_and_never_takes_the_conditioning_dose():

@@ -228,15 +228,6 @@ HEURISTICS: dict[str, dict[str, Any]] = {
         "isolation in free minutes — never by cutting another muscle (practitioner consensus: priority = more stimulus)",
         "retune": "block retro: priority muscles' performance and the time the plan spent on them",
     },
-    "conditioning_reserve_minutes": {
-        "value": 15,
-        "group": "volume",
-        "basis": "owner ruling 1: under the shared cap the week's conditioning dose takes only what lifting leaves — so the plan "
-        "leaves this many minutes free on its host morning instead of filling them with isolation (a 1-2 morning week spends its "
-        "few minutes on lifting first; the dose takes what is left). 15, not 20, since fix round 12: the plan's time model now "
-        "counts the warm-ups the routine writes, and at 20 the host morning's chest and calf sets fell under their floors",
-        "retune": "block retro: the conditioning minutes delivered",
-    },
     "min_session_minutes": {
         "value": 35,
         "group": "volume",

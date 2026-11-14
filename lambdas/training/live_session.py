@@ -276,7 +276,6 @@ def for_live_draft(
             str(x.get("template_id") or "").upper() for w in block_workouts or [] for x in w.get("exercises") or [] if x.get("sets")
         )
         ctx["no_new"] = fatigue_model.strained_inputs(inputs, block_workouts, lib)  # a high-fatigue day adds nothing new
-        ctx["week_sets_logged"] = live_volume.week_sets_logged(block_workouts, target)
         plan = live_volume.week_plan(
             catalog, lib, mornings, last=last, overlay=ctx["overlay"], logged=ctx["logged_tids"], in_block=ctx["in_block"]
         )
@@ -511,6 +510,7 @@ def fit_routine(blocks: list[Any], rx: dict[str, Any], cap: int, movements: dict
     session shape (re-measured when anything went). Shadow: `shape`."""
     if MARK not in rx or shape.get("lifting_minutes") is None:
         return shape
+    cap = cap - _dose_reserve(rx)
     if shape["lifting_minutes"] > cap:
         from training import live_volume, program_structure, warmup_sets
 
@@ -522,6 +522,24 @@ def fit_routine(blocks: list[Any], rx: dict[str, Any], cap: int, movements: dict
     rx[MARK]["summary"] = summary(blocks, rx, movements)
     rx[MARK]["contradictions"] = contradictions(blocks, rx)
     return shape
+
+
+def _dose_reserve(rx: dict[str, Any]) -> int:
+    """The minutes the week's hard conditioning dose keeps on its host morning under the shared cap (owner rulings 1 and 8; fix
+    round 12): the plan leaves them free, and the time fit holds the routine as written to the rest — so no added lifting set
+    ever squeezes the dose out. 0 on any other morning, with the dose off, or on a day it is dropped (a strained read)."""
+    from training import live_rulings, live_settings, live_volume, selection_engine as se
+
+    lib = se.load_library_failsoft()
+    fat = rx.get("fatigue") or {}
+    host = str((rx.get(MARK) or {}).get("conditioning_host") or "")
+    if not live_settings.settings(lib).get("session_cap_includes_cardio") or rx.get("session_role") not in live_rulings.conditioning_hosts(
+        host, lib
+    ):
+        return 0
+    if fat.get("state") in ("strained", "overreached") or fat.get("action") == "deload_recommended" or fat.get("strain_signals"):
+        return 0
+    return int(live_volume.reserve_minutes())
 
 
 def _title(key: Any, movements: dict[str, Any]) -> str:
