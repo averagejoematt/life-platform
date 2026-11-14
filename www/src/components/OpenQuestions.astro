@@ -44,13 +44,15 @@ const decided = tests.filter((t: any) => {
 const rate = j && typeof j.weekly_rate_lbs === "number" ? Math.abs(j.weekly_rate_lbs) : null;
 const lo = j && typeof j.weekly_rate_ci_high === "number" ? Math.abs(j.weekly_rate_ci_high) : null;
 const hi = j && typeof j.weekly_rate_ci_low === "number" ? Math.abs(j.weekly_rate_ci_low) : null;
+// The interval's own confidence as served (the journey page reads the same field) — never a hard-coded level.
+const level = j && typeof j.projection_confidence === "number" ? Math.round(j.projection_confidence * 100) : null;
 
 const questions = [
   {
     q: "Can he keep this pace without losing strength?",
     have:
       rate != null
-        ? `Losing about ${num(rate, 1)} lb a week${lo != null && hi != null ? ` (95% interval ${num(lo, 1)}–${num(hi, 1)})` : ""} — the pace the platform's rate flag watches, and it fired in Week 10.${foodText ? ` ${foodText}` : ""}`
+        ? `Losing about ${num(rate, 1)} lb a week${lo != null && hi != null && level ? ` (${level}% interval ${num(lo, 1)}–${num(hi, 1)})` : ""} — the pace the platform's rate flag watches, and it fired in Week 10.${foodText ? ` ${foodText}` : ""}`
         : "The pace is not served in this snapshot.",
     missing: "No public strength trend yet, and the scale's body-composition reading is too noisy to settle it.",
     link: { to: "/data/", words: "The journey and the daily record" },
