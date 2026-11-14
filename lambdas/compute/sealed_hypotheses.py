@@ -39,10 +39,10 @@ Pure over injected I/O: ``grade_closed_window`` takes the engine's own fetch / n
 
 from __future__ import annotations
 
-from datetime import date, timedelta
 from typing import Any, Callable
 
 from common.constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE
+from common.pacific_time import parse_day_key, shift_day_key
 from experiment.phase_filter import with_phase_filter
 
 SEALED_ID_PREFIX = "genesis_prereg_"
@@ -59,7 +59,7 @@ def _day(value: Any) -> str:
 
 
 def _shift(day: str, days: int) -> str:
-    return (date.fromisoformat(day) + timedelta(days=days)).isoformat()
+    return shift_day_key(day, days)
 
 
 def phase_visible(item: dict) -> bool:
@@ -73,10 +73,7 @@ def is_sealed(item: dict, genesis: str = EXPERIMENT_START_DATE) -> bool:
     if not str(item.get("hypothesis_id") or "").startswith(SEALED_ID_PREFIX) or item.get("tombstone"):
         return False
     written = _day(item.get("created_at") or item.get("pre_registered_at"))
-    try:
-        return written >= _shift(genesis, -1)
-    except ValueError:
-        return False
+    return parse_day_key(written) is not None and written >= _shift(genesis, -1)
 
 
 def grader_visible(item: dict, genesis: str = EXPERIMENT_START_DATE) -> bool:
@@ -105,6 +102,8 @@ def load_visible(table, pk: str, decode: Callable[[list], list], genesis: str = 
 def window_bounds(hyp: dict) -> tuple[str, str, int] | None:
     """``(since, last_condition_day, lag_days)`` for a hypothesis's sealed window, or None when undated."""
     since = _day(hyp.get("created_at"))
+    if parse_day_key(since) is None:
+        return None
     try:
         window = int(float(hyp.get("monitoring_window_days") or 0))
         lag = int(float((hyp.get("test_spec") or {}).get("lag_days") or 0))
@@ -183,5 +182,6 @@ def grade_closed_window(
     else:
         new_status, resolution = "archived", "expired_undecided"
     gap = f"; {len(unlogged)} day(s) with nothing logged read as missing ({', '.join(unlogged)})" if unlogged else ""
-    evidence = f"{LATE_GRADE_TAG} graded on its sealed {window_txt}{gap}. {describe(spec, stats)}"
+    void = " Voided: archived expired-undecided — its own window's evidence cannot decide it." if resolution == "expired_undecided" else ""
+    evidence = f"{LATE_GRADE_TAG} graded on its sealed {window_txt}{gap}. {describe(spec, stats)}{void}"
     return hyp, new_status, evidence, stats, resolution

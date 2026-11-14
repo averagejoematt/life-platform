@@ -62,6 +62,7 @@ from compute import sealed_hypotheses  # noqa: E402
 from experiment.phase_filter import PHASE_FILTER_EXPRESSION  # noqa: E402
 from prereg_fixture_series import fixture_series  # noqa: E402
 
+# premerge-gate: 5518: the synthetic pre-registration is built by the seeder's own build_hypotheses over config/user_goals.json (a reset-regenerated artifact) — a goals change that broke the visibility contract must red BEFORE the merge, not after.
 GENESIS = EXPERIMENT_START_DATE
 EVE = (date.fromisoformat(GENESIS) - timedelta(days=1)).isoformat()
 #: The freeze ran the evening before genesis, Pacific — already genesis day in UTC (the 2026-09-06T02:13Z shape).
@@ -298,6 +299,10 @@ def test_the_window_is_the_sealed_one_and_closes_after_its_last_outcome_day():
     assert not sealed_hypotheses.window_closed(_hyp(), outcome_last)
     assert sealed_hypotheses.window_closed(_hyp(), (date.fromisoformat(outcome_last) + timedelta(days=1)).isoformat())
     assert not sealed_hypotheses.due_for_window_grade(_hyp(status="refuted"), "2026-12-31")
+    assert sealed_hypotheses.window_bounds(_hyp(created_at="")) is None and not sealed_hypotheses.window_closed(
+        _hyp(created_at=None), "2026-12-31"
+    )
+    assert not sealed_hypotheses.is_sealed(_hyp(created_at="not-a-day"))
 
 
 def _days(start: str, n: int):
@@ -365,7 +370,7 @@ def test_an_inconclusive_sealed_window_is_voided_with_its_arm_counts_as_the_reas
     data["withings"] = data["withings"][:6]  # almost no weigh-ins in the window
     (_h, status, evidence, stats, resolution), _ = _grade(data)
     assert (status, resolution) == ("archived", "expired_undecided")
-    assert f"{stats['n_condition']} " in evidence and "per arm" in evidence
+    assert f"{stats['n_condition']} " in evidence and "per arm" in evidence and "Voided" in evidence
 
 
 def test_a_day_with_nothing_logged_is_missing_not_an_under_target_day():
@@ -535,3 +540,27 @@ def test_decimal_rows_from_dynamodb_are_read_the_same():
     row = _pred(evaluation={"type": "directional", "metric": "steps", "evaluation_window_days": Decimal("21")})
     assert prereg_overdue.prediction_horizon(row) == prereg_overdue.prediction_horizon(_pred())
     assert prereg_overdue.hypothesis_horizon(_hyp(monitoring_window_days=Decimal("30"))) == _after(GENESIS, 30)
+
+
+def test_the_live_report_uses_the_graders_predicates_and_writes_nothing(table, monkeypatch):
+    """deploy/prereg_grader_visibility.py: the live half of the contract. Over the incident's rows it reports the
+    pilot-stamped sealed hypothesis as visible-but-overdue and the dry-run verdict, and issues only Queries."""
+    report = _load("prereg_grader_visibility", "deploy/prereg_grader_visibility.py")
+    data = _window_data(200.0, 202.0)
+    monkeypatch.setattr(
+        eng,
+        "gather_data",
+        lambda days=30, start_date=None, end_date=None: {k: [r for r in v if start_date <= r["date"] <= end_date] for k, v in data.items()},
+    )
+    monkeypatch.setattr(eng, "build_data_narrative", _narrate)
+    table.put_item(Item=_hyp())
+    table.put_item(Item=_pred())
+    table.put_item(Item=_pred(sk="PREDICTION#old", created_date="2026-08-17", tombstone=True))
+    members = report.survey(table, "2026-11-13", ev.GRADING_COACH_IDS, ev.HYPOTHESES_PK)
+    assert sorted((m["kind"], m["visible"], m["overdue"]) for m in members) == [("hypothesis", True, True), ("prediction", True, True)]
+    (grade,) = report.grade_dry_run(members, "2026-11-13")
+    assert (grade["current_status"], grade["would_be"], grade["resolution"]) == ("pending", "confirmed", "confirmed")
+    assert table.writes == [] and all(
+        set(q) <= {"KeyConditionExpression", "ExpressionAttributeValues", "ExclusiveStartKey"} for q in table.queries
+    )
+    assert len(table.items) == 3  # nothing put
