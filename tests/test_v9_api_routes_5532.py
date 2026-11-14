@@ -527,7 +527,7 @@ def test_a_skipped_week_carries_its_reason_and_a_held_week_exposes_no_title_exce
     assert eight["title"] is None and eight["url"] is None and eight["date"] is None and eight["reason"] is None
     assert not {"excerpt", "body", "content_markdown", "content_html", "stats_line"} & set(eight)
     # the fixture row carries the draft's title on purpose: the route must never serve it
-    assert "The Weight of 299" in json.dumps(_chronicle_rows()) and "The Weight of 299" not in json.dumps(body)
+    assert "Held draft title (redacted)" in json.dumps(_chronicle_rows()) and "Held draft title (redacted)" not in json.dumps(body)
     assert "title" not in chapters.ROW_PROJECTION and "content" not in " ".join(chapters.ROW_PROJECTION)
 
 
