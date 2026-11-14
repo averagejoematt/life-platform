@@ -129,3 +129,10 @@ condition = "AND"
 regexTarget = "match"
 regexes = ['''rt-SECRET-ID''', '''hv-SECRET''']
 paths = ['''tests/test_panel_rubric_5072\.py''']
+
+[[allowlists]]
+description = "tests/test_mcp_log_redaction_5542.py — the redaction test plants a synthetic prose string to assert it never reaches a log record (#5542). It was first committed as `SECRET = \"SYNTHETIC-PRIVATE-PROSE-zq81 ...\"` (commit c7d41e8dc on the paydown/5542 lane branch), which gitleaks' generic-api-key rule reads as a credential; renamed to `PROSE` with a low-entropy value in the tree. Scoped to the file and the one literal so that historical commit in the PR's range stays green."
+condition = "AND"
+regexTarget = "match"
+regexes = ['''SYNTHETIC-PRIVATE-PROSE-zq81''']
+paths = ['''tests/test_mcp_log_redaction_5542\.py''']

@@ -56,6 +56,7 @@ from mcp.core import (
     session_token_issue,
     session_token_valid,
 )
+from mcp.log_safe import describe_args  # #5542
 from mcp.registry import TOOLS
 from mcp.resources import RESOURCE_NOT_FOUND_CODE, ResourceNotFound, handle_resources_list, handle_resources_read  # #4286 box 3
 from mcp.tool_output_schemas import conformance_errors, is_error_payload, output_schema_for  # #4286 box 2
@@ -241,7 +242,7 @@ def handle_tools_call(params):
     if validation_error:
         logger.warning(f"[SEC-3] Input validation failed for '{name}': {validation_error}")
         raise ValueError(f"Invalid arguments for tool '{name}': {validation_error}")
-    logger.info(f"Calling tool '{name}' with args: {arguments}")
+    logger.info(f"Calling tool '{name}' {describe_args(arguments)}")  # #5542: never the raw values
     # R13-F12: Rate limit write tools before execution
     rate_err = _check_write_rate_limit(name)
     if rate_err:
@@ -510,7 +511,7 @@ def _refuse_tool_call_residue(name: str, arguments) -> dict | None:
         return None
     fields = [{"field": path, "residue": frag} for path, frag in hits]
     named = "; ".join(f"{path!s} carries {frag!r}" for path, frag in hits)
-    logger.warning(f"[#4190] tool-call XML residue refused on '{name}': {named}")
+    logger.warning(f"[#4190] tool-call XML residue refused on '{name}': fields={[path for path, _ in hits]}")  # #5542: no fragment
     _emit_residue_metric(name)
     return mcp_error(
         message=(
