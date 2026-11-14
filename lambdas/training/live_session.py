@@ -512,7 +512,7 @@ def contradictions(blocks: list[Any], rx: dict[str, Any]) -> list[str]:
             out.append(f"{b.movement_key}: steps down but the note says heavier")
         if g.PICK_LOAD_OPEN_TAIL in note and work and all(getattr(s, "weight_kg", None) for s in work):
             out.append(f"{b.movement_key}: 'find the load' over a written load")
-        if e.get("live_familiar") and not e.get("live_first_back") and ("first time in" in note or "session back after" in note):
+        if (e.get("live_familiar") or e.get("live_first_back")) and ("first time in" in note or "session back after" in note):
             out.append(f"{b.movement_key}: a layoff line on a familiar pattern")
     return out
 

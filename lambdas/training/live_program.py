@@ -153,19 +153,13 @@ def mark_costs(rx: dict[str, Any], ctx: dict[str, Any]) -> None:
 
 def trim_order(surplus: Any) -> Any:
     """The reduce trim: compounds first (high cost, then moderate; anchors included, never below 2 sets), then isolation in
-    the surplus-first order (`live_session.surplus_first`). One set per pass, so the cut spreads. `order.adherence` is the
-    adherence trim's order (a shorter session, not a recovery verdict): isolation only, surplus first — the compounds that
-    hold strength stay whole."""
-
-    def adherence(exposures: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        return [e for e in surplus(exposures) if e.get("live_cost") == "low"]
+    the surplus-first order (`live_session.surplus_first`). One set per pass, so the cut spreads."""
 
     def order(exposures: list[dict[str, Any]]) -> list[dict[str, Any]]:
         rank = {"high": 0, "moderate": 1}
         comp = sorted((e for e in exposures if e.get("live_cost") in rank), key=lambda e: (rank[e["live_cost"]], e.get("kind") == "anchor"))
-        return comp + adherence(exposures)
+        return comp + [e for e in surplus(exposures) if e.get("live_cost") == "low"]
 
-    order.adherence = adherence  # type: ignore[attr-defined]
     return order
 
 

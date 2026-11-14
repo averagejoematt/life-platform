@@ -614,8 +614,8 @@ def assess(
     reasons = [f"{len(strain)} strain signals"] if reduce else []
     strained = bool(reduce)  # the recovery STATE reads strain only; an adherence trim is not a recovery verdict
     state = "overreached" if deload else ("strained" if strained else ("normal" if strain or adh["state"] == "low" else "recovered"))
-    if adh["state"] == "low" and adh.get("window_covered") and not reduce:  # #5861 L6: `adherence_low`'s "keep it short"
-        reduce, reasons = step, ["adherence low: a shorter session is easier to keep; anchors held"]
+    # fix round 9: adherence is answered by the WEEK (owner ruling 2: one 4-morning week, `live_sequence`), never by a second
+    # set trim here — a first week back after a layoff is not shortened twice (the eighth red team's two dip weeks)
     over = session_minutes is not None and minutes_ceiling is not None and session_minutes > minutes_ceiling
     return {
         "issue": ISSUE,
@@ -678,9 +678,7 @@ def apply_to_session(
         return rx
     out = copy.deepcopy(rx)
     n = int(assessment.get("reduce_sets") or 0)
-    adh_only = any(str(r).startswith("adherence") for r in assessment.get("reduce_reasons") or [])
-    pick = getattr(trim_order, "adherence", None) if adh_only and callable(getattr(trim_order, "adherence", None)) else trim_order
-    order = pick(out["exposures"]) if callable(pick) else None  # #5861 L6: surplus-first, else last-listed first
+    order = trim_order(out["exposures"]) if callable(trim_order) else None  # #5861 L6: surplus-first, else last-listed first
     shaped = assessment.get("action") == "deload_recommended" and any(e.get("live_cost") for e in out["exposures"])
     if shaped:  # #5861 red team: a recommended deload cuts the compounds and keeps isolation (live_program.deload_shape)
         from training import live_program

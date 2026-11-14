@@ -311,13 +311,14 @@ def _lib(e: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
 
 
 def familiar_keys(rx: dict[str, Any] | None) -> set[str] | None:
-    """The movement keys whose re-entry (OD1) cap and layoff-return line the note composer drops under live (rule 7); None in
-    shadow (the composer is then exactly as before)."""
+    """The movement keys whose re-entry (OD1) cap and layoff-return line the note composer drops under live (rule 7: a familiar
+    pattern works at normal effort; rule 5: a first session back is this model's RPE 8 at the last load, never the OD1 ladder);
+    None in shadow (the composer is then exactly as before)."""
     from training import live_session as ls
 
     if not rx or ls.MARK not in rx:
         return None
-    return {str(e.get("movement_key")) for e in rx.get("exposures") or [] if e.get("live_familiar") and not e.get("live_first_back")}
+    return {str(e.get("movement_key")) for e in rx.get("exposures") or [] if e.get("live_familiar") or e.get("live_first_back")}
 
 
 # ── the draft hook ───────────────────────────────────────────────────────────
