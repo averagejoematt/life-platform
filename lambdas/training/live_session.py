@@ -267,7 +267,8 @@ def for_live_draft(
             "pain_notes": live_safety.latest_notes(block_workouts),
         } | _week_ctx(week, inputs)
         mornings = int((week or {}).get("days") or 5)
-        plan = live_volume.week_plan(catalog, lib, mornings, monday=target or None)  # any day: its ISO week
+        done = live_volume.done_last_week(block_workouts, catalog, lib, target)  # the weekly memory: its calendar week before
+        plan = live_volume.week_plan(catalog, lib, mornings, done=done, overlay=ctx["overlay"])
         ctx["volume_plan"] = plan
         role_rows = [r for r in plan["rows"] if r["role"] == rx.get("session_role")]
         plan_rows = dict(live_volume._count(role_rows))
@@ -471,7 +472,7 @@ def summary(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any]) ->
         )
     if new:
         out.append(f"today: new to you, RPE 7 once: {', '.join(new)}")
-    out += _zero_by_design(blocks, rx, movements)
+    out += _zero_by_design(blocks, rx, movements) + _short_morning(blocks, rx, movements)
     gone = [ln for ln in mark.get("lines") or [] if ln.startswith(("skipped (live)", "swapped (live)"))]
     out += [ln.split(" — ")[0].replace(" (live)", "") for ln in gone][:1]
     fat = rx.get("fatigue") or {}
@@ -501,6 +502,19 @@ def _zero_by_design(blocks: list[Any], rx: dict[str, Any], movements: dict[str, 
         f"today: {names} 0 here by design — the pain rule took that work off and no reviewed lower-stress option is available; "
         "it returns when the flag clears"
     ]
+
+
+def _short_morning(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any]) -> list[str]:
+    """A morning the pain rule left under `min_session_minutes` is said plainly, with why — never padded with a filler (fix round
+    11: the one spend step already put back every reviewed low-stress option the gym serves)."""
+    from training import live_settings
+    from training.session_shape import routine_minutes
+
+    pain = [ln for ln in (rx.get(MARK) or {}).get("lines") or [] if ln.startswith(("skipped (live)", "swapped (live)")) and "flag" in ln]
+    mins = float(routine_minutes(blocks, movements)["lifting_minutes"])
+    if not pain or mins >= float(live_settings.value("min_session_minutes")):
+        return []
+    return [f"today: a short morning (~{mins:.0f} min) — the pain rule took work and no reviewed low-stress option the gym serves fills it"]
 
 
 def contradictions(blocks: list[Any], rx: dict[str, Any]) -> list[str]:

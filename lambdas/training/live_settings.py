@@ -36,14 +36,14 @@ SETTINGS: dict[str, dict[str, Any]] = {
     "priority_muscles": {
         "default": ["chest", "quadriceps"],
         "ruling": "owner ruling 9 (2026-11-13)",
-        "what": "muscles planned at MEV at least and never under the non-priority arm and calf muscles' weekly hard sets (the "
-        "plan pays them from those isolation slots); trimmed last for time and by a slump",
+        "what": "muscles aimed above MEV — a quarter of the way to MAV (`priority_aim_share`) — filled from low-fatigue isolation "
+        "in the week's free minutes, never by cutting another muscle; trimmed last for time and by a slump",
     },
     "abs_direct_sets_per_week": {
         "default": 4,
         "ruling": "owner ruling #8 (fix round 8)",
         "what": "challenging DIRECT ab sets a week, spread over the mornings; indirect trunk loading never counts; halved on a "
-        "short or high-fatigue week",
+        "1-3 morning week (a high-fatigue day's trim is the fatigue model's)",
     },
     "hard_conditioning_doses": {
         "default": 1,
@@ -198,6 +198,28 @@ HEURISTICS: dict[str, dict[str, Any]] = {
         "basis": "owner ruling #9: each delt head assessed apart, direct + indirect; the side delt (no compound trains it much) "
         "aims at 6 hard sets, the rear at 4",
         "retune": "block retro: lateral-raise and rear-delt progression",
+    },
+    "priority_aim_share": {
+        "value": 0.25,
+        "group": "volume",
+        "basis": "fix round 11 (the tenth red team: 'priority' meant MEV + 1 while back and shoulders got 14-15): a priority "
+        "muscle aims this share of the way from MEV to MAV (chest and quadriceps 8 -> 10 hard sets), filled from low-fatigue "
+        "isolation in free minutes — never by cutting another muscle (practitioner consensus: priority = more stimulus)",
+        "retune": "block retro: priority muscles' performance and the time the plan spent on them",
+    },
+    "conditioning_reserve_minutes": {
+        "value": 20,
+        "group": "volume",
+        "basis": "owner ruling 1: under the shared cap the week's conditioning dose takes only what lifting leaves — so the plan "
+        "leaves this many minutes free on its host morning instead of filling them with isolation",
+        "retune": "block retro: the conditioning minutes delivered",
+    },
+    "min_session_minutes": {
+        "value": 35,
+        "group": "volume",
+        "basis": "fix round 11 (the tenth red team's 16-minute pain morning): a morning under this many minutes is said plainly "
+        "in the rationale with why (the pain rule took work and no reviewed low-stress option exists) — never a filler",
+        "retune": "block retro: short mornings and their reasons",
     },
     "short_week_floor": {
         "value": 3,
