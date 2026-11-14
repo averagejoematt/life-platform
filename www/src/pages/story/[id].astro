@@ -9,7 +9,10 @@ import StatusTag from "../../components/StatusTag.astro";
 import Quote from "../../components/Quote.astro";
 import { isDisputed } from "../../lib/disputed.js";
 import { clip, dayInWords, heldCallWords, num } from "../../lib/format.js";
-import { loadAll } from "../../lib/snapshot.js";
+import { latestEdition, loadAll, loadSeries } from "../../lib/snapshot.js";
+import { chapterWindow, dailyBars, placeEvidence, windowValues } from "../../lib/evidence.js";
+import { theLine } from "../../lib/theline.js";
+import { CALL_OUTCOME } from "../../lib/format.js";
 import { hasPage, href, pathOf } from "../../lib/url.js";
 
 export async function getStaticPaths() {
@@ -72,7 +75,72 @@ function bodyForPage(html: string | null | undefined, dek: string | null | undef
     return whole;
   });
 }
-const body = bodyForPage(c.body_html, c.excerpt);
+const rawBody = bodyForPage(c.body_html, c.excerpt);
+// Evidence in the margin (2026-11-14, sprint II): the week's weight, recovery and protein drawn beside the paragraph
+// that first talks about each, and a graded call's card beside the paragraph that names its coach. Every figure reads a
+// public series or ledger object; the chapter's words are untouched (lib/evidence.js places figures between paragraphs).
+const series = await loadSeries();
+const edition = await latestEdition();
+const startDate: string | null = edition?.start_date || edition?.blocks?.today?.data?.start_date || null;
+const win = chapterWindow(c, startDate);
+const dayById = new Map(all.byType.day.map((d: any) => [d.date, d]));
+const dayLink = (iso: string) => (dayById.get(iso) ? href(pathOf("day", (dayById.get(iso) as any).id)) : null);
+const winWords = win ? `${(dayInWords(win.from, { short: true }) || "").replace(/ \d{4}$/, "")} to ${dayInWords(win.to, { short: true })}` : "";
+function evidenceFigure(key: string, title: string, svg: string | null, note: string, link: string | null) {
+  if (!svg) return null;
+  return `<figure class="evidence" data-evidence="${key}"><figcaption class="label">Evidence · ${title}</figcaption><div class="evidence-chart">${svg}</div><p class="evidence-note">${note}${link ? ` <a href="${link}">The day →</a>` : ""}</p></figure>`;
+}
+const esc = (x: string) => String(x).replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch] as string);
+const figures: { key: string; match: RegExp; html: string }[] = [];
+if (win && c.status === "published" && rawBody) {
+  const w = series["weight_lbs"];
+  if (w) {
+    const before = new Date(Date.parse(`${win.from}T00:00:00Z`) - 21 * 864e5).toISOString().slice(0, 10);
+    const from = startDate && before < startDate ? startDate : before;
+    const inWin = windowValues(w, win.from, win.to).filter((d) => d.value != null);
+    const svg = inWin.length
+      ? theLine({ days: w.days.map((d: any) => ({ date: d.date, value: d.value, gap: d.gap })), from, to: win.to, focus: win, shade: false, mobile: true, width: 320, height: 170, aria: `Weigh-ins from ${dayInWords(from)} to ${dayInWords(win.to)}, the chapter's days shaded.` })
+      : null;
+    const a = inWin[0];
+    const b = inWin[inWin.length - 1];
+    const note = a && b && a !== b ? `The chapter's days are shaded, after the three weeks before them. In its days the scale went from ${num(a.value, 1)} lb (${dayInWords(a.date, { weekday: true, short: true })}) to ${num(b.value, 1)} lb (${dayInWords(b.date, { weekday: true, short: true })}). Withings.` : "The chapter's days are shaded, after the three weeks before them. Withings.";
+    const f = evidenceFigure("weight", `the scale, ${winWords}`, svg, esc(note), null);
+    if (f) figures.push({ key: "weight", match: /\b(pounds?|weigh(?:ed|s|-in|ing)?|scale)\b/i, html: f });
+  }
+  const r = series["recovery_score"];
+  if (r) {
+    const vals = windowValues(r, win.from, win.to);
+    const got = vals.filter((d) => d.value != null);
+    const low = got.length ? got.reduce((m, d) => (d.value < m.value ? d : m)) : null;
+    const svg = dailyBars({ values: vals, markLow: true, unit: "out of 100", aria: `Morning recovery, ${winWords}.` });
+    const note = low ? `Whoop's morning recovery score, out of 100; the lowest is in bold: ${num(low.value)} on ${dayInWords(low.date, { weekday: true, short: true })}.` : "";
+    const f = evidenceFigure("recovery", `morning recovery, ${winWords}`, svg, esc(note), low ? dayLink(low.date) : null);
+    if (f) figures.push({ key: "recovery", match: /\brecovery\b/i, html: f });
+  }
+  const pr = series["total_protein_g"];
+  if (pr) {
+    // the floor is the one the chapter's own sentence states ("a floor of 170"); with none stated, none is drawn
+    const stated = /floor of (\d{2,3})\b/i.exec((rawBody || "").replace(/<[^>]+>/g, " "));
+    const floor = stated ? Number(stated[1]) : null;
+    const vals = windowValues(pr, win.from, win.to);
+    const n = vals.filter((d) => d.value != null).length;
+    const met = floor != null ? vals.filter((d) => d.value != null && d.value >= floor).length : null;
+    const svg = dailyBars({ values: vals, floor, unit: "g", aria: `Protein logged each day, ${winWords}${floor != null ? `, against the stated floor of ${floor} g` : ""}.` });
+    const note = floor != null ? `Grams of protein logged each day; the dashed line is the ${floor} g floor the chapter names. ${met} of ${n} logged days reached it; hollow bars fell short. A day with no log is an open slot. MacroFactor.` : `Grams of protein logged each day; a day with no log is an open slot. MacroFactor.`;
+    const f = evidenceFigure("protein", `protein, ${winWords}`, svg, esc(note), null);
+    if (f) figures.push({ key: "protein", match: /\bprotein\b/i, html: f });
+  }
+  // a graded call, beside the paragraph that names its coach: the test it was held to, what happened, the grade
+  for (const p of all.byType.prediction.filter((x: any) => (x.status === "confirmed" || x.status === "refuted") && x.settled_date && x.settled_date.slice(0, 10) >= win.from && x.settled_date.slice(0, 10) <= win.to)) {
+    const name = String(p.coach_name || "");
+    if (!name || figures.some((f) => f.key === `call:${name}`)) continue;
+    const words = p.claim_withheld ? heldCallWords(p) || "" : `“${clip(p.claim, 140)}”`;
+    const outcome = CALL_OUTCOME[p.status] || p.status;
+    const html = `<aside class="evidence callcard" data-evidence="call"><p class="label">A graded call · ${esc(name)}</p><p class="callcard-test">${esc(words)}</p>${p.grading?.outcome_notes ? `<p class="callcard-what">${esc(p.grading.outcome_notes)}.</p>` : ""}<p class="callcard-foot"><span class="status ${p.status === "confirmed" ? "confirmed" : "refuted"}">${esc(outcome)}</span> <a href="${href(pathOf("prediction", p.id))}">The call and its grade →</a></p></aside>`;
+    figures.push({ key: `call:${name}`, match: new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), html });
+  }
+}
+const body = rawBody ? placeEvidence(rawBody, figures).html : rawBody;
 const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
 ---
 
