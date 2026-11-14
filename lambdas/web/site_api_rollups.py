@@ -181,9 +181,54 @@ def tools_baseline(*, _g) -> dict:
     )
 
 
+# #5952: a closed month's bill never changes, so one read per month per warm container is
+# enough. Keyed by the month it describes; a failed read is never memoised.
+_CLOSED_MONTH_MEMO: dict = {}
+
+
+def _monthly_cost_fields(now=None) -> dict:
+    """The served running-cost fields, derived from the last closed month (#5952).
+
+    `monthly_cost` is the reader string the cost page prints. When the governor's series
+    cannot answer it is "" — the page's own ADR-104 path omits the figure and says the feed
+    is not reporting — and NEVER the pinned PLATFORM_STATS literal: that literal is the stack
+    manifest's copy, and a remembered number served as a live one is the defect this replaced.
+    """
+    import boto3
+
+    from web.site_api_budget import _previous_month_bounds, last_closed_month_cost
+
+    now = now or datetime.now(timezone.utc)
+    month = _previous_month_bounds(now)[0].strftime("%Y-%m")
+    got = _CLOSED_MONTH_MEMO.get(month)
+    if got is None:
+        try:
+            cw = boto3.client("cloudwatch", region_name="us-west-2")
+        except Exception as e:  # noqa: BLE001 — display-only
+            logger.warning(f"[platform_stats] cloudwatch client unavailable: {e}")
+            cw = None
+        got = last_closed_month_cost(cw, now) if cw is not None else None
+        if got is not None:
+            _CLOSED_MONTH_MEMO.clear()
+            _CLOSED_MONTH_MEMO[month] = got
+    if got is None:
+        return {
+            "monthly_cost": "",
+            "monthly_cost_usd": None,
+            "monthly_cost_month": None,
+            "monthly_cost_basis": "The last closed month's bill could not be read from the cost governor just now.",
+        }
+    return {
+        "monthly_cost": got["display"],
+        "monthly_cost_usd": got["usd"],
+        "monthly_cost_month": got["month"],
+        "monthly_cost_basis": got["basis"],
+    }
+
+
 def platform_stats() -> dict:
     """GET /api/platform_stats — authoritative platform counts for all site pages."""
-    return _ok(PLATFORM_STATS, cache_seconds=3600)
+    return _ok({**PLATFORM_STATS, **_monthly_cost_fields()}, cache_seconds=3600)
 
 
 def changes_since(qs: dict = None, *, _g) -> dict:
