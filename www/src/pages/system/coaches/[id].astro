@@ -7,8 +7,10 @@ import Quote from "../../../components/Quote.astro";
 import StatusTag from "../../../components/StatusTag.astro";
 import { isDisputed, verified } from "../../../lib/disputed.js";
 import { dayInWords, domainWords, kOfN, clip, heldCallWords } from "../../../lib/format.js";
-import { KIND_WORDS, verdictWords } from "../../../lib/calibration.js";
-import { loadAll } from "../../../lib/snapshot.js";
+import { KIND_WORDS, coachLead, countedCalls, verdictWords } from "../../../lib/calibration.js";
+import { loadAll, loadCalibration } from "../../../lib/snapshot.js";
+import { roomPublic } from "../../../lib/room.js";
+import VersusGuess from "../../../components/VersusGuess.astro";
 import { href, pathOf } from "../../../lib/url.js";
 
 export async function getStaticPaths() {
@@ -25,6 +27,35 @@ const disputed = mine.filter(isDisputed).length;
 // The coach's record as first graded; counts and verdicts as served; kinds never added together.
 const vg = (c.versus_guess?.kinds || []) as { kind: string; scored: number; coach_right: number; rule_right: number; verdict: string }[];
 const coachWord = (v: string) => (v === "coach_better" ? `${c.name.split(" ")[0]} did better` : verdictWords(v));
+// Accountability first (2026-11-14, sprint II): the page used to open on the record as first graded (15 of 34 for the
+// sleep coach) and a flat list of twelve calls. It now opens on what the coach is responsible for and the coach's
+// VERIFIED record beside the guess on the same calls (verification_summary.by_coach, as served); then two checked
+// calls as cards — the latest counted one it got right and the latest it got wrong, a stated rule, not a pick; then
+// every call grouped by what happened; the ledger as first graded and the grade quality last, labelled as such.
+let calFile: any = null;
+if (roomPublic()) {
+  try {
+    calFile = await loadCalibration();
+  } catch {
+    calFile = null;
+  }
+}
+const cal = calFile?.state === "ok" ? calFile.calibration || {} : null;
+const lead = cal ? coachLead(cal, c.id) : null;
+const counted = cal ? countedCalls(cal) : null;
+const checked = (s: string) => mine.filter((p) => p.status === s && !isDisputed(p) && (!counted || counted.has(p.id))).sort((a, b) => ((a.settled_date || "") < (b.settled_date || "") ? 1 : -1));
+const examples = [checked("confirmed")[0], checked("refuted")[0]].filter(Boolean);
+const first = c.name.split(" ")[0];
+const GROUPS: { key: string; title: string; test: (p: any) => boolean; open?: boolean }[] = [
+  { key: "pending", title: "Still open", test: (p) => p.status === "pending", open: true },
+  { key: "confirmed", title: "Checked: right", test: (p) => p.status === "confirmed" },
+  { key: "refuted", title: "Checked: wrong", test: (p) => p.status === "refuted" },
+  { key: "unchecked", title: "Could not be checked", test: (p) => p.status === "expired" || p.status === "inconclusive" },
+  { key: "observation", title: "Observations, never graded", test: (p) => p.status === "observation" },
+];
+const groups = GROUPS.map((g) => ({ ...g, items: mine.filter(g.test) })).filter((g) => g.items.length);
+const withheld = mine.filter((p) => p.claim_withheld).length;
+const callWords = (p: any, max = 110) => (p.claim_withheld ? heldCallWords(p, max) || clip(p.claim, max) : null);
 ---
 
 <Base title={c.name} top="system" description={c.short_bio || `${c.name} · ${domainWords(c.domain)}`}>
@@ -39,25 +70,121 @@ const coachWord = (v: string) => (v === "coach_better" ? `${c.name.split(" ")[0]
           {c.short_bio || ""}
         </p>
         <p class="muted" style="font-size:13px">An AI character: software built with Claude, not a person. It reads real data and speaks in its own voice — correlative, never causal.</p>
-        <div class="facts">
-          <div><span class="label">Record</span><span class="v num">{c.record ? kOfN(c.record.right, c.record.n) : "—"}</span><span class="muted" style="font-size:12px">{c.record?.through ? `through ${dayInWords(c.record.through, { short: true })}` : c.retired ? "retired" : "no checked call yet"}</span></div>
-          {!vg.length && <div><span class="label">Beside a simple guess</span><span style="font-size:14px;line-height:1.5">{c.comparison_text || "Too few calls to compare yet."}</span></div>}
-          {c.quality && (
-            <div>
-              <span class="label">Grade quality</span>
-              <span class="v num" style="font-size:22px">{c.quality.clean} <small>clean of {c.quality.n}</small></span>
-              <span class="muted" style="font-size:12px">{c.quality.flagged} flagged · {c.quality.unassessed} graded before the flags existed, never counted as clean</span>
+        <ol class="acct-steps" aria-label="How to read this page">
+          <li><b>{c.record?.n ?? "—"}</b> calls graded in the ledger, on their grades as first written</li>
+          <li><b>{lead ? lead.n : "—"}</b> could be checked fairly under the current rules, each grade re-verified</li>
+          <li><b>{lead ? lead.k : "—"}</b> of those {first} got right{lead?.baseline ? `; a guess that nothing changes got ${lead.baseline.right}` : ""}</li>
+        </ol>
+      </div>
+      <div class="acct-lead">
+        {
+          lead ? (
+            <VersusGuess lead={lead} who={c.name} record={c.record ? { right: c.record.right, decided: c.record.n } : null} links={false} />
+          ) : (
+            <div class="facts">
+              <div>
+                <span class="label">Record, as first graded</span>
+                <span class="v num">{c.record ? kOfN(c.record.right, c.record.n) : "—"}</span>
+                <span class="muted" style="font-size:12px">{c.record?.n ? "not re-verified: no checked record is served for this coach" : c.retired ? "retired" : c.tier === "lead" ? "the lead makes no calls of its own" : "no checked call yet"}</span>
+              </div>
             </div>
-          )}
+          )
+        }
+        {lead && <a href={href("/system/calibration/")} style="font-size:13px;font-weight:700">How every call was checked, and which were left out →</a>}
+      </div>
+    </div>
+  </section>
+
+  {
+    examples.length > 0 && (
+      <section class="section hair">
+        <div class="wrap">
+          <div class="between" style="margin-bottom:18px">
+            <h2 style="font-size:28px">Two calls, checked</h2>
+            <span class="label">The latest checked call {first} got right, and the latest wrong</span>
+          </div>
+          <div class="acct-cards">
+            {examples.map((p) => (
+              <a class={`acct-card ${p.status}`} href={href(pathOf("prediction", p.id))}>
+                <span class="label">{KIND_WORDS[p.kind as keyof typeof KIND_WORDS]?.replace(/s$/, "") || "A call"} · made {dayInWords(p.logged_date, { short: true })}</span>
+                <span class="acct-said">{callWords(p, 160) || <Quote text={clip(p.claim, 160)} said={p.logged_date} />}</span>
+                {p.grading?.outcome_notes && (
+                  <span class="acct-what">
+                    <span class="label">What happened</span>
+                    {p.grading.outcome_notes}.
+                  </span>
+                )}
+                <span class="acct-foot">
+                  <StatusTag status={p.status} date={p.settled_date} call />
+                  <span class="acct-go">The call and its grade →</span>
+                </span>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  <section class="section hair">
+    <div class="wrap grid cols2" style="gap:56px;align-items:start">
+      <div>
+        <h2 style="font-size:28px;margin-bottom:6px">Everything {first} has called</h2>
+        <p class="muted" style="font-size:14px;margin-bottom:14px">
+          The {mine.length} calls published as pages, grouped by what happened, newest first. The counts above come from the whole ledger, which
+          also grades calls that have no published page here.{withheld ? ` The words of ${withheld} of these are not published; each shows the test it was held to instead.` : ""}
+        </p>
+        {
+          groups.length ? (
+            groups.map((g) => (
+              <details class="acct-group" open={g.open || undefined}>
+                <summary>
+                  <span>{g.title}</span>
+                  <span class="mono muted">{g.items.length}</span>
+                </summary>
+                <div class="rows">
+                  {g.items.slice(0, 12).map((p) => (
+                    <a href={href(pathOf("prediction", p.id))}>
+                      <span class="mono" style="font-size:13px;line-height:1.45">
+                        {callWords(p, 100) || <Quote text={clip(p.claim, 110)} said={p.logged_date} />}
+                      </span>
+                      <StatusTag status={p.status} date={p.status === "pending" ? p.due_date : p.settled_date} call disputed={isDisputed(p)} />
+                    </a>
+                  ))}
+                </div>
+                {g.items.length > 12 && <a href={`${href("/system/ledger/")}?coach=${c.id}`} style="display:inline-block;margin-top:8px;font-size:13px;font-weight:700">{g.items.length - 12} more in the ledger →</a>}
+              </details>
+            ))
+          ) : (
+            <div class="empty">
+              <span>{c.tier === "lead" ? "The lead makes no calls of its own." : "No prediction loaded for this coach."}</span>
+            </div>
+          )
+        }
+      </div>
+      <div style="display:flex;flex-direction:column;gap:22px">
+        <div>
+          <p class="label" style="margin-bottom:8px">The ledger as first graded · not re-verified</p>
+          <div class="facts">
+            <div><span class="label">Every graded call</span><span class="v num">{c.record ? kOfN(c.record.right, c.record.n) : "—"}</span><span class="muted" style="font-size:12px">{c.record?.through ? `right, through ${dayInWords(c.record.through, { short: true })}, on its grades as first written` : "no graded call yet"}</span></div>
+            {c.quality && (
+              <div>
+                <span class="label">Grade quality</span>
+                <span class="v num" style="font-size:22px">{c.quality.clean} <small>clean of {c.quality.n}</small></span>
+                <span class="muted" style="font-size:12px">{c.quality.flagged} flagged · {c.quality.unassessed} graded before the flags existed, never counted as clean</span>
+              </div>
+            )}
+          </div>
+          {lead && <p class="muted" style="font-size:12px;margin-top:8px">This count includes calls the current rules leave out of the checked record above — opinions, repeats, calls on a stand-in measure. It is the ledger, not the best evidence of skill.</p>}
         </div>
         {
           vg.length > 0 && (
             <div data-versus-kinds>
-              <p class="label" style="margin-bottom:8px">Beside a guess that nothing changes · the same calls, as first graded</p>
+              <p class="label" style="margin-bottom:8px">Beside a guess that nothing changes · by kind, as first graded</p>
               <div class="scroll">
                 <table class="vk">
                   <thead>
-                    <tr><th>Kind of call</th><th>{c.name.split(" ")[0]}</th><th>The guess</th><th>Verdict</th></tr>
+                    <tr><th>Kind of call</th><th>{first}</th><th>The guess</th><th>Verdict</th></tr>
                   </thead>
                   <tbody>
                     {vg.map((k) => (
@@ -75,31 +202,8 @@ const coachWord = (v: string) => (v === "coach_better" ? `${c.name.split(" ")[0]
             </div>
           )
         }
-      </div>
-      <div style="display:flex;flex-direction:column;gap:22px">
-        <div>
-          <p class="label" style="margin-bottom:8px">Predictions in the snapshot · {mine.length} · {by("confirmed")} right, {by("refuted")} wrong, {by("pending")} open{disputed ? `, ${disputed} disputed` : ""}</p>
-          {
-            mine.length ? (
-              <div class="rows">
-                {mine.slice(0, 12).map((p) => (
-                  <a href={href(pathOf("prediction", p.id))}>
-                    <span class="mono" style="font-size:13px;line-height:1.45">
-                      {p.claim_withheld ? heldCallWords(p, 100) || clip(p.claim, 110) : <Quote text={clip(p.claim, 110)} said={p.logged_date} />}
-                    </span>
-                    <StatusTag status={p.status} date={p.settled_date} call disputed={isDisputed(p)} />
-                  </a>
-                ))}
-              </div>
-            ) : (
-              <div class="empty">
-                <span>{c.tier === "lead" ? "The lead makes no calls of its own." : "No prediction loaded for this coach."}</span>
-              </div>
-            )
-          }
-          {mine.length > 12 && <a href={`${href("/system/ledger/")}?coach=${c.id}`} style="display:inline-block;margin-top:10px;font-size:13px;font-weight:700">{mine.length - 12} more in the ledger →</a>}
-        </div>
-        <Connected type="coach" id={c.id} cap={5} />
+        {!vg.length && !lead && c.comparison_text && <p style="font-size:14px;line-height:1.5">{c.comparison_text}</p>}
+        <Connected type="coach" id={c.id} cap={3} />
       </div>
     </div>
   </section>{/* the Coaching Room entry (CR2) sits flush against the closing tag: with WEB_ROOM off the page's bytes are unchanged */}<CoachRoomEntry coach={c} />
@@ -128,5 +232,96 @@ const coachWord = (v: string) => (v === "coach_better" ? `${c.name.split(" ")[0]
   }
   .vk .verm {
     color: var(--verm-text);
+  }
+  .acct-steps {
+    list-style: none;
+    margin: 6px 0 0;
+    padding: 0;
+    border-top: 1px solid var(--ink);
+  }
+  .acct-steps li {
+    padding: 9px 0;
+    border-bottom: 1px solid var(--rule);
+    font-size: 15px;
+  }
+  .acct-steps b {
+    font-family: var(--mono);
+    font-size: 17px;
+    display: inline-block;
+    min-width: 3ch;
+  }
+  .acct-lead {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    border-top: 2px solid var(--ink);
+    padding-top: 16px;
+  }
+  .acct-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr));
+    gap: 20px;
+  }
+  .acct-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px 20px;
+    border: 1px solid var(--ink);
+    border-top-width: 4px;
+    text-decoration: none;
+    color: var(--ink);
+  }
+  .acct-card.confirmed {
+    border-top-color: var(--cobalt);
+  }
+  .acct-card.refuted {
+    border-top-color: var(--verm);
+  }
+  .acct-said {
+    font-family: var(--serif);
+    font-size: 20px;
+    line-height: 1.35;
+  }
+  .acct-what {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+  .acct-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-top: auto;
+    font-size: 13px;
+  }
+  .acct-go {
+    font-weight: 700;
+    text-decoration: underline;
+  }
+  .acct-group {
+    border-top: 1px solid var(--ink);
+  }
+  .acct-group:last-of-type {
+    border-bottom: 1px solid var(--ink);
+  }
+  .acct-group summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 48px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 16px;
+  }
+  .acct-group[open] summary {
+    border-bottom: 1px solid var(--rule);
+  }
+  .acct-group .rows {
+    margin-bottom: 12px;
   }
 </style>
