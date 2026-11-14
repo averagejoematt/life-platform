@@ -161,9 +161,10 @@ def test_ruling_6_the_press_takes_three_sets_from_the_lateral_raises(weeks):
     press = next(x for k, x in sa.items() if "press" in k)
     assert press["working_sets"] == 3 and press["reps"] == "6-10"
     cat = sw.build_world(PROFILES["a_large_deficit_experienced"])["catalog"]["movements"]
-    alt = live_volume.press_trade_alternative(cat, LIB0)
-    assert alt["default"]["side_delts"] < alt["alternative"]["side_delts"]  # the laterals paid (the rear-delt option reported)
-    assert alt["default"]["rear_delts"] > alt["alternative"]["rear_delts"]
+    plan = live_volume.week_plan(cat, LIB0, 5)
+    assert any("from the lateral raises" in ln for ln in plan["lines"])  # the ruling: the laterals pay first
+    alt = live_volume.press_trade_alternative(cat, LIB0)  # the owner's alternative (the rear-delt surplus pays), reported
+    assert all(v["side_delts"] >= live_settings.value("delt_heads")["side_delts"] and v["shoulders"] <= 16 for v in alt.values())
     one = _week("a_large_deficit_experienced", settings={"press_sets": 1})["week"]  # control: the charter's one set
     assert next(x for x in _lifts(one, "shoulders_arms") if "press" in x["key"])["working_sets"] == 1
 

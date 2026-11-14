@@ -170,9 +170,11 @@ def targets(lib: dict[str, Any], mornings: int, high_fatigue: bool = False) -> d
             out[m] = {"floor": mev, "aim": mev, "cap": mav}
         else:
             out[m] = {"floor": mv, "aim": mv, "cap": mav}
-    if not short:
-        for head, aim in cfg.value("delt_heads").items():
+    for head, aim in cfg.value("delt_heads").items():  # a short week aims at the side delt pro rata (no floor: time decides)
+        if not short:
             out[head] = {"floor": float(aim), "aim": float(aim), "cap": 99.0}
+        elif head == "side_delts":
+            out[head] = {"floor": 0.0, "aim": float(math.ceil(float(aim) * mornings / 5)), "cap": 99.0}
     return out
 
 
@@ -234,21 +236,20 @@ def _count(rows: list[dict[str, Any]]) -> Counter:
     return out
 
 
-def _press_trade(rows: list[dict[str, Any]], lib: dict[str, Any]) -> list[str]:
-    """Ruling 6: the overhead press runs `press_sets`; the extra sets come off the lateral raises (shoulders+arms first)."""
+def _press_trade(rows: list[dict[str, Any]], lib: dict[str, Any], source: str = "lateral_raise") -> list[str]:
+    """Ruling 6: the overhead press runs `press_sets`; the extra sets come off the lateral raises (shoulders+arms first).
+    `source` "face_pull" is the owner's alternative (the rear-delt surplus pays), computed for the report only."""
     press = next((r for r in rows if r["role"] == "shoulders_arms" and r["pattern"] == "overhead_press"), None)
     if press is None:
         return []
     extra = max(0, int(_settings(lib).get("press_sets") or 1) - press["sets"])
     press["sets"] += extra
     gave = 0
-    for r in sorted(
-        (r for r in rows if r["kind"] == "accessory" and "lateral_raise" in str(r["key"])), key=lambda r: r["role"] != "shoulders_arms"
-    ):
+    for r in sorted((r for r in rows if r["kind"] == "accessory" and source in str(r["key"])), key=lambda r: r["role"] != "shoulders_arms"):
         while gave < extra and r["sets"] > int(cfg.value("slot_min_sets")):
             r["sets"] -= 1
             gave += 1
-    return [f"press: overhead press {press['sets']} sets, {gave} from the lateral raises (ruling 6)"] if extra else []
+    return [f"press: overhead press {press['sets']} sets, {gave} from the {source.replace('_', ' ')}s (ruling 6)"] if extra else []
 
 
 def _fill_key(muscle: str, catalog: dict[str, Any], lib: dict[str, Any], taken: set[str]) -> str | None:
@@ -283,12 +284,14 @@ def _fill_role(muscle: str, rows: list[dict[str, Any]], roles: tuple[str, ...], 
     return best[1] if best else None
 
 
-def week_plan(catalog: dict[str, Any], lib: dict[str, Any], mornings: int, high_fatigue: bool = False) -> dict[str, Any]:
+def week_plan(
+    catalog: dict[str, Any], lib: dict[str, Any], mornings: int, high_fatigue: bool = False, press_source: str = "lateral_raise"
+) -> dict[str, Any]:
     """The week's plan (module doc 1): {rows (every drafted morning's rows, sized), targets, counts, under, lines}. Pure over the
     catalog, the library and the mornings; the same for every morning of the week."""
     week = week_shape(mornings)
     rows = [r for role in week["roles"] for r in day_rows(role, week, catalog, lib)]
-    lines = _press_trade(rows, lib)
+    lines = _press_trade(rows, lib, press_source)
     tg = targets(lib, week["mornings"], high_fatigue)
     lo, hi = int(cfg.value("slot_min_sets")), int(cfg.value("slot_max_sets"))
     prio = {str(m) for m in _settings(lib).get("priority_muscles") or []}
@@ -321,7 +324,7 @@ def week_plan(catalog: dict[str, Any], lib: dict[str, Any], mornings: int, high_
 
     surplus()  # 1. surplus over the cap gives first
     # 2. under the aim: grow its isolation slots, then a fill slot (priority muscles, heads and abs first)
-    order = sorted(tg, key=lambda m: (m not in prio, m not in HEADS, m != "abs", m))
+    order = sorted(tg, key=lambda m: (m not in prio, m != "abs", m not in HEADS, m))
     taken = {str(r["key"]) for r in rows}
 
     def grow(m: str) -> None:
@@ -408,22 +411,14 @@ def _head_needs(r: dict[str, Any], rows: list[dict[str, Any]], tg: dict[str, dic
 
 
 def press_trade_alternative(catalog: dict[str, Any], lib: dict[str, Any]) -> dict[str, Any]:
-    """The owner's alternative to ruling 6 IN NUMBERS (reported, not applied): the press's extra sets from the rear-delt surplus
-    (face pulls) instead of the lateral raises. {default: heads, alternative: heads}."""
-    week = week_shape(5)
-    base = [r for role in week["roles"] for r in day_rows(role, week, catalog, lib)]
-    default = [dict(r) for r in base]
-    _press_trade(default, lib)
-    alt = [dict(r) for r in base]
-    press = next(r for r in alt if r["role"] == "shoulders_arms" and r["pattern"] == "overhead_press")
-    extra = max(0, int(_settings(lib).get("press_sets") or 1) - press["sets"])
-    press["sets"] += extra
-    for r in sorted((r for r in alt if "face_pull" in str(r["key"])), key=lambda r: r["role"] != "shoulders_arms"):
-        while extra and r["sets"] > 2:
-            r["sets"] -= 1
-            extra -= 1
-    pick = lambda rs: {h: round(_count(rs)[h], 1) for h in HEADS + ("shoulders",)}  # noqa: E731
-    return {"default": pick(default), "alternative": pick(alt)}
+    """The owner's alternative to ruling 6 IN NUMBERS (reported, never applied): the normal week's final plan with the press's
+    extra sets from the lateral raises (the ruling, served) and from the rear-delt surplus (face pulls) — each delt head, the
+    shoulders, and the plan's total sets."""
+    out = {}
+    for name, source in (("default", "lateral_raise"), ("alternative", "face_pull")):
+        plan = week_plan(catalog, lib, 5, press_source=source)
+        out[name] = {h: plan["counts"].get(h, 0.0) for h in HEADS + ("shoulders",)} | {"total_sets": sum(r["sets"] for r in plan["rows"])}
+    return out
 
 
 # ── the session's share ──────────────────────────────────────────────────────
