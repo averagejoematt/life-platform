@@ -71,32 +71,34 @@ HEURISTICS: dict[str, dict[str, Any]] = {
         "basis": "a same-role exposure in the last 8 weeks is a load reference; older, the engine's own ramp load stands",
         "retune": "block retro: how often a lift returns after >8 weeks",
     },
-    "step_down_exposures": {
-        "value": 3,
+    "below_floor_exposures": {
+        "value": 2,
         "group": "progression",
-        "basis": "a step-down needs three same-role exposures in a row under the previous best e1RM, each with its top set logged "
-        "ABOVE the target RPE (one set at or under target vetoes it) — so a lift steps down at most once per `step_down_exposures`",
-        "retune": "block retro: step-downs that were followed by a new best within 3 weeks (too eager) vs grinding sessions",
+        "basis": "fix round 10: the top set under the rep range's floor in two same-role exposures running steps the lift down "
+        "(at least step_down_pct; as far as the last exposure says reaches the floor with 2 in reserve) — nothing blocks it (a slump, strain, pain or first-back hold stops only a step up); RPE plays no part, so "
+        "missing or always-10 RPE never moves a load down on its own",
+        "retune": "block retro: exposures spent under the floor; step-downs followed by a new best within 3 weeks (too eager)",
     },
     "step_down_pct": {
         "value": 5,
         "group": "progression",
-        "basis": "one step-down is 5% under the last top load (one implement step on most lifts), never 10%: a 3% e1RM drift is "
-        "not answered with a 10% intensity cut",
+        "basis": "the smallest step-down: 5% under the last top load (one implement step on most lifts); a larger step only "
+        "when the last exposure says 5% still leaves him under the floor",
         "retune": "block retro: e1RM a month after each step-down",
     },
     "implausible_rpe": {
         "value": 9.5,
         "group": "progression",
-        "basis": "RPE missing on every set, or >= 9.5 on every set while reps at the load rise, is EFFORT UNKNOWN: the lift "
-        "progresses on reps and load only and never steps down on effort",
+        "basis": "RPE missing on every set, or >= 9.5 on every set, is EFFORT UNKNOWN: the step up rides on reps alone; a load "
+        "moves down only on reps under the floor, never on effort",
         "retune": "block retro: RPE calibration report (rpe_calibration)",
     },
     "slump_anchors": {
         "value": 4,
         "group": "progression",
         "basis": "four or more anchors declining together (or, in a deficit, at least half of them) is systemic — sleep, recovery "
-        "or the deficit, not the lifts: every load HOLDS and accessory volume comes down about a third",
+        "or the deficit, not the lifts: no load steps UP and non-priority accessory volume comes down about a third (a lift under its "
+        "floor still steps down)",
         "retune": "block retro: anchor e1RM across the block vs sleep and loss rate",
     },
     "decline_pct": {

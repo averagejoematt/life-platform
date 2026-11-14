@@ -7,20 +7,23 @@ AND a volume day: 160 -> 140 -> 125 -> 160 on real data), a collapse under unrel
 185 -> 105 in five weeks) and a cascade of six 10% cuts in one week on a lifter losing 0.5% a week. Round 9 replaces all of
 them with ONE model, keyed by SESSION ROLE (a heavy day and a volume day are two lifts, even on one template):
 
-  1. DOUBLE PROGRESSION. The load is the lift's last same-role top load. When every set at that load reached the top of the
+  1. DOUBLE PROGRESSION, UP. The load is the lift's last same-role top load. When every set at that load reached the top of the
      rep range (at or under the target RPE, or with effort unknown), it steps up one implement step; otherwise it HOLDS and the
-     reps climb. Nothing else moves a load up.
-  2. ONE EVIDENCE-GATED STEP-DOWN. Three same-role exposures in a row each under the previous best e1RM AND each with its sets
-     logged above the target RPE -> 5% down, once. Any set at or under the target RPE vetoes it. After a step-down the next
-     three exposures are new evidence, so a lift steps down at most once per three exposures.
-  3. EFFORT UNKNOWN. RPE missing on every set, or >= 9.5 on every set while reps at the load rise: the lift progresses on reps
-     and load only and NEVER steps down on effort.
-  4. SYSTEMIC SLUMP. Four or more anchors declining together (or, in a deficit, half or more): every load HOLDS (no step either
-     way) and accessories lose about a third of their sets (`slump_trim`). Never a cut on every anchor.
+     reps climb. Nothing else moves a load up. A HOLD (a slump, a strained or deload-recommended day, a pain flag on the lift, a
+     first session back) blocks only this step up.
+  2. DOWN, BELOW THE FLOOR (fix round 10, the ninth red team). The top set under the rep range's FLOOR in the last
+     `below_floor_exposures` same-role exposures in a row -> down at least `step_down_pct`, and as far as the last exposure says
+     reaches the floor with two in reserve (`floor_load`). Nothing blocks it: a hold may stop a step up, never a step down for reps
+     under the floor, so a real decline is answered within two exposures and a lift never grinds under its floor for weeks. RPE
+     never triggers it (it only sizes the step, read clamped like the slump's decline read).
+  3. EFFORT UNKNOWN. RPE missing on every set, or >= 9.5 on every set: the step up rides on reps alone (rule 1); effort can never
+     move a load down on its own (rule 2 reads reps only).
+  4. SYSTEMIC SLUMP. Four or more anchors declining together (or, in a deficit, half or more): every load HOLDS (rule 1) and
+     non-priority accessories lose about a third of their sets (`slump_trim`).
   5. FIRST SESSION BACK (owner ruling #10). 10+ days with no session: each lift's first session back runs at RPE 8 at its last
-     same-role load, no step.
+     same-role load (a hold, rule 1).
   6. THE SECOND LIFT (owner ruling 5). The heavy-lower lift that does not lead runs at RPE 7-8, loaded from its own same-role
-     e1RM at that band.
+     e1RM at that band — never above its last load.
   7. NOVELTY (three rules). A NEW pattern (none logged in ~8 weeks) runs one exposure at RPE <= 7; a FAMILIAR pattern (a
      biomechanically similar swap included) works at normal effort with no re-entry cap; the layoff rule is 5.
 
@@ -68,16 +71,22 @@ def history(workouts: Any, tids: set[str]) -> dict[str, list[dict[str, Any]]]:
 
 
 def same_role(rows: list[dict[str, Any]], role: str, target_date: str, rep_lo: int, rep_hi: int) -> list[dict[str, Any]]:
-    """The exposures of today's session role in the window (most recent first). A row whose role the title does not name counts
-    only when its top set's reps sit in today's band (two under its floor at most, never over its top)."""
+    """The exposures of today's session role in the window, most recent first (fix round 10: explicit role, then the band, then
+    recency). A row its title names today's role counts; a row whose title names NO role counts when its top set sits in today's
+    band (one under the floor at most, never over the top; a heavy day has no lower band to leak from, so any reps under its top).
+    Both kinds merge by date, so a new untitled session is never ignored for an older titled one."""
     from common.pacific_time import shift_day_key
 
     since = shift_day_key(target_date, -int(cfg.value("history_days")))
-    rows = [r for r in rows if since <= r["date"] < target_date]
-    same = [r for r in rows if role and r["role"] == role]
-    if same:
-        return same
-    return [r for r in rows if not r["role"] and rep_lo - 2 <= _top(r)["reps"] <= max(rep_hi, rep_lo)]
+    heavy = "heavy" in str(role or "")
+    out = []
+    for r in rows:
+        if not since <= r["date"] < target_date:
+            continue
+        reps = _top(r)["reps"]
+        if (role and r["role"] == role) or (not r["role"] and reps <= max(rep_hi, rep_lo) and (heavy or reps >= rep_lo - 1)):
+            out.append(r)
+    return sorted(out, key=lambda r: (r["date"], bool(r["role"])), reverse=True)
 
 
 def _top(r: dict[str, Any]) -> dict[str, Any]:
@@ -108,27 +117,16 @@ def effort_unknown(rows: list[dict[str, Any]]) -> bool:
     return not known or all(x >= float(cfg.value("implausible_rpe")) for x in known)
 
 
-def step_down_due(rows: list[dict[str, Any]], target_rpe: float = TARGET_RPE) -> bool:
-    """Rule 2: the last `step_down_exposures` same-role exposures, all at ONE load (a step-down or any load change restarts the
-    count), each with fewer top-set reps than the best done at that same load before them AND each with every set logged ABOVE the
-    target RPE. One set at or under it vetoes; effort unknown vetoes."""
-    n = int(cfg.value("step_down_exposures"))
-    if len(rows) < n + 1 or effort_unknown(rows):
-        return False
-    load = _top(rows[0])["kg"]
-    if any(abs(_top(r)["kg"] - load) > 0.2 for r in rows[:n]):
-        return False
-    base = [b for b in rows[n:] if abs(_top(b)["kg"] - load) <= 0.2]  # the best done AT THIS LOAD before the three
-    if not base:
-        return False
-    best = max(_top(b)["reps"] for b in base)
-    for i in range(n):
-        r = rows[i]
-        if _top(r)["reps"] >= best:
-            return False
-        if any(s["rpe"] is None or s["rpe"] <= target_rpe for s in r["sets"]):
-            return False
-    return True
+def below_floor(rows: list[dict[str, Any]], rep_lo: int) -> bool:
+    """Rule 2: each of the last `below_floor_exposures` same-role exposures had its top set under `rep_lo` (reps only)."""
+    n = int(cfg.value("below_floor_exposures"))
+    return len(rows) >= n and all(_top(r)["reps"] < rep_lo for r in rows[:n])
+
+
+def floor_load(r: dict[str, Any], rep_lo: int) -> float:
+    """The load exposure `r` says reaches `rep_lo` reps with two in reserve (its decline read, `read_e1rm`): the step-down's size
+    when one 5% step would leave him under the floor again."""
+    return read_e1rm(r) / (1 + (rep_lo + 2.0) / 30.0)
 
 
 def topped(r: dict[str, Any], rep_hi: int, target_rpe: float, unknown: bool) -> bool:
@@ -216,47 +214,38 @@ def decide(
     rep_hi: int,
     equipment: str | None,
     *,
-    hold_all: str | None = None,
+    hold: str | None = None,
     second_band: tuple[int, int] | None = None,
-    first_back: bool = False,
-    cut: tuple[int, str] | None = None,
 ) -> dict[str, Any] | None:
     """One lift's load: {kg, mode: up|hold|down|second, why, clause} from its same-role exposures (most recent first), or None
-    (no exposure in the window: the engine's own load stands). `hold_all`: the day's reason every load holds (a slump, a strained
-    day); `cut` (pct, why): a joint flag's reduction (the pain rule, not progression). Pure."""
+    (no exposure in the window: the engine's own load stands). Two rules (module doc 1-2): DOWN when the top set sat under the
+    floor in the last two exposures — first, so nothing blocks it; UP at the top of the range unless `hold` (the day's or the
+    lift's reason: a slump, a strained day, a pain flag, a first session back) stops it. Pure."""
     if not rows:
         return None
     last = _top(rows[0])["kg"]
-    if cut:
+    if below_floor(rows, rep_lo):  # at least one step; enough to reach the floor again on the last exposure's own read
+        kg = _floor_to_implement(min(last * (1 - float(cfg.value("step_down_pct")) / 100.0), floor_load(rows[0], rep_lo)), equipment)
+        n = int(cfg.value("below_floor_exposures"))
         return {
-            "kg": _floor_to_implement(last * (1 - cut[0] / 100.0), equipment),
+            "kg": kg,
             "mode": "down",
-            "why": cut[1],
-            "clause": f"Lighter today: {cut[1]}.",
+            "why": f"under {rep_lo} reps {n} sessions running",
+            "clause": f"Lighter today: under {rep_lo} reps {n} sessions running.",
         }
-    unknown = effort_unknown(rows)
     if second_band:  # rule 6: its own e1RM at the lower band (a logged 9.5-10 read as 9: never a collapse on unreliable RPE)
         lo, hi = second_band
-        t = _top(rows[0])
-        best = t["kg"] * (1 + (t["reps"] + 10.0 - min(9.0, max(6.0, t["rpe"] if t["rpe"] is not None else 8.0))) / 30.0)
-        kg = min(_floor_to_implement(best / (1 + (rep_lo + 10.0 - (lo + hi) / 2) / 30.0), equipment), last)
+        kg = min(_floor_to_implement(read_e1rm(rows[0]) / (1 + (rep_lo + 10.0 - (lo + hi) / 2) / 30.0), equipment), last)
         return {"kg": kg, "mode": "second", "why": f"the second lift: RPE {lo}-{hi}", "clause": f"RPE {lo}–{hi} today: the second lift."}
-    if first_back:
-        return {"kg": last, "mode": "hold", "why": "first session back", "clause": "Same load: first session back."}
-    if hold_all:
-        return {"kg": last, "mode": "hold", "why": hold_all, "clause": f"Same load: {hold_all}."}
-    if step_down_due(rows):
-        kg = _floor_to_implement(last * (1 - float(cfg.value("step_down_pct")) / 100.0), equipment)
-        n = int(cfg.value("step_down_exposures"))
-        return {"kg": kg, "mode": "down", "why": f"{n} sessions under best, all grinds", "clause": f"Lighter today: {n} grinding sessions."}
-    if topped(rows[0], rep_hi, TARGET_RPE, unknown):
+    if not hold and topped(rows[0], rep_hi, TARGET_RPE, effort_unknown(rows)):
         return {
             "kg": _step_up(last, equipment),
             "mode": "up",
             "why": f"{rep_hi} reps reached",
             "clause": f"Heavier: {rep_hi} reps reached.",
         }
-    return {"kg": last, "mode": "hold", "why": "reps first", "clause": f"Same load: build to {rep_hi} reps."}
+    why = hold or "reps first"
+    return {"kg": last, "mode": "hold", "why": why, "clause": f"Same load: {hold}." if hold else f"Same load: build to {rep_hi} reps."}
 
 
 # ── novelty ──────────────────────────────────────────────────────────────────
@@ -362,17 +351,8 @@ def set_loads(
         band = tuple(e["live_effort_band"]) if e.get("live_lead") == "second" and e.get("live_effort_band") else None
         led = lead_rows(rows, e) if e.get("live_lead") else rows  # rule 6: a lead progresses from its own LEAD exposures
         flag = e.get("live_load") or {}
-        cut = (int(flag["pct"]), str(flag.get("why") or "joint flag")) if flag.get("pct") else None
-        d = decide(
-            rows if band else led,
-            lo,
-            hi,
-            entry.get("equipment"),
-            hold_all=hold_all or flag.get("why") if flag.get("hold") else hold_all,
-            second_band=band,
-            first_back=bool(e.get("live_first_back")),
-            cut=cut,
-        )
+        hold = "first session back" if e.get("live_first_back") else (str(flag.get("why") or "held") if flag.get("hold") else hold_all)
+        d = decide(rows if band else led, lo, hi, entry.get("equipment"), hold=hold, second_band=band)
         if d is None:
             continue
         engine = max(float(s.weight_kg) for s in work)
@@ -426,4 +406,4 @@ def slump_trim(rx: dict[str, Any]) -> list[str]:
         keep = max(floor, n - int(round(n * cut)))
         taken += max(0, n - keep)
         e["sets"] = list(e["sets"])[:keep] if n > keep else e["sets"]
-    return [f"slump (live): accessories -{taken} set(s) (about a third), every load held"] if taken else []
+    return [f"slump (live): accessories -{taken} set(s) (about a third), no load steps up"] if taken else []

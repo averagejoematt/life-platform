@@ -281,8 +281,8 @@ def for_live_draft(
         hist = live_load.history(block_workouts, (tids | anchors) - {""})
         slump = live_load.slump(hist, anchors, fatigue_model.in_deficit(getattr(inputs, "weights_by_day", None)), target)
         if slump:
-            hold_all = "slump week, loads held"
-            lines += [f"slump (live): {slump['declining']} of {slump['judged']} anchors declining together — every load held"]
+            hold_all = "slump week"
+            lines += [f"slump (live): {slump['declining']} of {slump['judged']} anchors declining together — no load steps up"]
             lines += live_load.slump_trim(out)
         _refit(out)
     except Exception as e:  # noqa: BLE001 — the live fit never blocks a draft
@@ -458,7 +458,7 @@ def summary(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any]) ->
         if names:
             out.append(f"today: {head}: {', '.join(names)}")
     if mark.get("hold_all"):
-        out.append(f"today: every load held — {mark['hold_all']}")
+        out.append(f"today: no load steps up — {mark['hold_all']}")
     back = [_title(k, movements) for k, e in exp.items() if e.get("live_first_back")]
     new = [_title(k, movements) for k, e in exp.items() if e.get("live_new")]
     if back:
