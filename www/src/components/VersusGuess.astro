@@ -16,10 +16,13 @@ interface Props {
   record?: { right: number; decided: number } | null;
   inverse?: boolean;
   links?: boolean;
+  /** one coach's verified record (lib/calibration.js coachLead) instead of the whole room's; `who` names the coach */
+  lead?: { k: number; n: number; baseline: { right: number; n: number } | null; sign: { words: string } | null } | null;
+  who?: string;
 }
-const { record = null, inverse = false, links = true } = Astro.props as Props;
-let lead: ReturnType<typeof verifiedLead> = null;
-if (roomPublic()) {
+const { record = null, inverse = false, links = true, lead: given = null, who = "The coaches" } = Astro.props as Props;
+let lead: any = given;
+if (!given && roomPublic()) {
   try {
     const file: any = await loadCalibration();
     lead = file?.state === "ok" ? verifiedLead(file.calibration || {}) : null;
@@ -28,7 +31,7 @@ if (roomPublic()) {
   }
 }
 const bars = lead && lead.baseline ? [
-  { who: "The coaches", right: lead.k, n: lead.n, cls: "coach" },
+  { who, right: lead.k, n: lead.n, cls: "coach" },
   { who: "A guess that nothing changes", right: lead.baseline.right, n: lead.baseline.n, cls: "guess" },
 ] : null;
 const verdict = lead?.sign?.words || null;
@@ -38,8 +41,8 @@ const verdict = lead?.sign?.words || null;
   {
     bars ? (
       <>
-        <p class="label">The coaches against a simple guess · the same {lead!.n} forecasts</p>
-        <div class="vs-bars" role="img" aria-label={`The coaches got ${lead!.k} of ${lead!.n} right; a guess that nothing changes got ${lead!.baseline!.right} of the same ${lead!.n}.`}>
+        <p class="label">{given ? who : "The coaches"} against a simple guess · the same {lead!.n} forecasts</p>
+        <div class="vs-bars" role="img" aria-label={`${who} got ${lead!.k} of ${lead!.n} right; a guess that nothing changes got ${lead!.baseline!.right} of the same ${lead!.n}.`}>
           {bars.map((b) => (
             <div class={`vs-row ${b.cls}`}>
               <span class="vs-who">{b.who}</span>
@@ -53,6 +56,7 @@ const verdict = lead?.sign?.words || null;
         <p class="vs-verdict">
           {verdict ? <b>{verdict[0].toUpperCase() + verdict.slice(1)}.</b> : null} Forecasts that could be checked under the current rules, each grade re-verified.
           {record && record.decided ? ` The ledger's own count — every graded call it holds, on its grades as first written: ${kOfN(record.right, record.decided)}.` : ""}
+          {given && given.perCoachTests ? ` One coach's record is one of ${given.perCoachTests} per-coach comparisons of the same checked calls: exploratory, and optimistic, because calls that share a measure are not independent.` : ""}
         </p>
         {links && (
           <p class="vs-links">

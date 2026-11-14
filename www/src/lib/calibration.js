@@ -531,3 +531,24 @@ export function calibrationChart(coaches, o = {}) {
   const aria = o.aria || "Stated confidence against how often the calls came true, one dot per coach per confidence band, sized by the number of calls.";
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(aria)}" data-chart data-points="${esc(JSON.stringify(points))}">${g}${marks}</svg>`;
 }
+
+/**
+ * One coach's verified record beside the guess that nothing changes, on exactly the same calls (2026-11-14, sprint II):
+ * `verification_summary.by_coach[<calibration coach_id>]` as served — the coach's own page used to lead with the record
+ * as first graded. Shaped like verifiedLead so VersusGuess draws it; carried, never derived. The calibration row whose
+ * `persona` is the site's coach id names the by_coach key. Null when not served, or when the baseline is not over the
+ * same calls (sameCalls).
+ */
+export function coachLead(cal, personaId) {
+  const c = cal || {};
+  const row = (c.coaches || []).find((x) => x && x.persona === personaId);
+  const key = row && typeof row.coach_id === "string" ? row.coach_id : null;
+  const v = key ? ((verificationSummary(c) || {}).by_coach || {})[key] : null;
+  if (!v || typeof v !== "object" || !Number.isInteger(v.n) || !Number.isInteger(v.confirmed) || v.n < 1) return null;
+  const b = sameCalls(v.baseline, v.n);
+  if (!b || !Number.isInteger(b.right)) return null;
+  const s = v.sign_test && typeof v.sign_test === "object" ? v.sign_test : null;
+  const sign = s && typeof s.verdict === "string" ? { verdict: s.verdict, words: SIGN_VERDICT_WORDS[s.verdict] || verdictWords(s.verdict) } : null;
+  const tests = ((verificationSummary(c) || {}).subgroups || {}).per_coach_tests;
+  return { k: v.confirmed, n: v.n, baseline: { right: b.right, n: v.n, unscorable: Number.isInteger(b.unscorable) ? b.unscorable : 0 }, sign, perCoachTests: Number.isInteger(tests) ? tests : null };
+}
