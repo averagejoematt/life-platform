@@ -225,6 +225,7 @@ def joint_flags(ctx: dict[str, Any], workouts: list[dict[str, Any]] | None, disc
                 "severity": sev,
                 "source": "pain" if pain else "discomfort",
                 "site": site,
+                "sharp": "sharp" in note.lower(),
             }
         )
         from training import live_pain  # #5861 FIX7: the flag's reach — the flagged lift, or the provoking pattern
@@ -506,6 +507,7 @@ def annotate(blocks: list[Any], rx: dict[str, Any]) -> None:
 
     rx[ls.MARK].setdefault("lines", []).extend(live_safety.no_step(blocks, rx) + live_safety.r3_lines(blocks, rx))
     live_safety.coherent_effort(blocks, rx)
+    rx[ls.MARK]["lines"] += live_safety.cap_lines(blocks)
 
 
 # ── 5. cardio ─────────────────────────────────────────────────────────────────

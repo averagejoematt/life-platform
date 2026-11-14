@@ -650,7 +650,8 @@ def spend_session(rx: dict[str, Any], ctx: dict[str, Any], flags: list[dict[str,
     def room(_r: str) -> float:
         return free_minutes(rows, role, str(plan.get("host") or ""), ctx["lib"])
 
-    lines = spend(rows, tg, [role], {role: True}, room, add)
+    full = bool(((plan.get("week") or {}).get("partners") or {}).get(role))  # a split morning keeps its half of the body
+    lines = spend(rows, tg, [role], {role: full}, room, add)
     by_key = {str(e.get("movement_key")): e for e in rx["exposures"]}
     for r in rows:
         e = by_key.get(str(r["key"]))

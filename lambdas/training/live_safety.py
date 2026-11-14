@@ -194,6 +194,36 @@ def r3_lines(blocks: list[Any], rx: dict[str, Any]) -> list[str]:
     )
 
 
+def cap_lines(blocks: list[Any]) -> list[str]:
+    """IN PLACE, live only (fix round 11, the tenth red team: 58 notes past 4 phone lines at 5 am): each lift's own note held to
+    `hevy_note_grammar.LIFT_MAX_LINES` phone lines — a form cue goes first, then the fallback ("If taken:"), then the R3 line;
+    the effort line, the load reason and the pain stop line always stay. Returns the line."""
+    from training import hevy_note_grammar as g, session_block as sb
+
+    def rank(ln: str) -> int:  # lower goes first
+        t = ln.strip()
+        if t.startswith(("Pain past", "Heavier", "Lighter", "Same load", "Assess")) or g.EFFORT_RE.match(t):
+            return 9
+        if _step_line(t):
+            return 2
+        return 1 if t.startswith("If taken") else 0
+
+    cut = 0
+    for b in blocks:
+        block, own = sb.split(b.notes or "")
+        lines = [ln for ln in own.split("\n") if ln.strip()]
+        while g.phone_lines("\n".join(lines)) > g.LIFT_MAX_LINES:
+            drop = min((rank(ln), -i) for i, ln in enumerate(lines))
+            if drop[0] >= 9:
+                break
+            lines.pop(-drop[1])
+            cut += 1
+        new = "\n".join(lines)
+        if new != "\n".join(ln for ln in own.split("\n") if ln.strip()):
+            b.notes = (block + "\n\n" + new) if block else new
+    return [f"notes (live): {cut} line(s) cut so every lift note fits {g.LIFT_MAX_LINES} phone lines"] if cut else []
+
+
 # ── 4. one effort across the session ─────────────────────────────────────────
 def _own_effort(note: str | None) -> str | None:
     """The lift's own effort target (`RPE a–b`): its own first effort line, else None (it inherits the session band)."""

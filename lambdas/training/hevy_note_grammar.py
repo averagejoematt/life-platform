@@ -351,7 +351,12 @@ SET_1_HEAD = "Set 1: "
 
 
 # what a held-top reason must read as (lint L4): the in-session step on set 1, or the next-session step on a one-set lift
-HELD_TOP_RE = re.compile(r"^(?:Set 1: \d+ reps at RPE .* on later sets|Same load: \d+ reps again → .* next session\.)")
+HELD_TOP_RE = re.compile(
+    r"^(?:Set 1: \d+ reps at RPE .* on later sets|Same load: \d+ reps again → .* next session\."
+    # #5861 fix round 11: the live load model's held-top reasons (`live_load.decide`) — each names what moves it or why it waits
+    r"|Same load: (?:recovery first|slump week|first session back|[a-z ]+ flag|every set to \d+ reps, then up"
+    r"|\d+ reps at RPE [\d.]+ or less, then up)\.$)"
+)
 # #5428 re-grade #3: a one-set exercise 1 carries no load rule (nothing to step today), so its note names the gain rule's
 # next-session step instead — the live branch on the lift that most needs one
 ONE_SET_HEAD = "One set: "

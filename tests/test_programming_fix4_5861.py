@@ -150,7 +150,8 @@ def knee_breaches(w: dict) -> list[str]:
             e = _entry(w, x["key"])
             knee = str((e.get("joint_stress") or {}).get("knee"))
             squat = lp._group(e.get("pattern")) == "squat"
-            if knee == "high" or (squat and knee == "moderate" and _top_rpe(x["hevy_note"]) > 8):
+            held = _top_rpe(x["hevy_note"]) <= 8 and "stop this lift" in (x["hevy_note"] or "")  # fix round 11: held, not routed
+            if (knee == "high" and not held) or (squat and knee == "moderate" and _top_rpe(x["hevy_note"]) > 8):
                 out.append(f"{s['role']}: {x['key']} knee {knee} @ RPE {_top_rpe(x['hevy_note']):g}")
     return out
 
@@ -167,9 +168,11 @@ def test_a_knee_flag_reduces_or_avoids_every_knee_dominant_pattern(weeks):
         assert quads > 0, (cap, quads)
     old = _week("g_knee_pain_garage_short", {(lp, "apply_joint_rule"): lambda rx, ctx, rot, flags: []})
     assert knee_breaches(old)
-    from training import live_pain
+    from training import live_pain, live_volume
 
-    none = _week("g_knee_pain_garage_short", {(live_pain, "priority_ceiling"): lambda *a: None})  # control: no priority route
+    none = _week(  # control: no priority route and no spend step after the pain rule
+        "g_knee_pain_garage_short", {(live_pain, "priority_ceiling"): lambda *a: None, (live_volume, "spend_session"): lambda *a: []}
+    )
     assert sw.hard_sets_by_muscle(none["week"], none["world"]["lib"], none["world"]["catalog"]["movements"]).get("quadriceps", 0) < quads
 
 

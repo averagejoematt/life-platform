@@ -198,7 +198,12 @@ def test_same_joint_isolation_is_capped_with_the_stop_line_under_an_elbow_flag()
     """
     k = _week("k_elbow_pain_press")
     tri = [x for x in _lifts(k["week"]) if _entry(k, x["key"]).get("pattern") == "triceps_extension"]
-    assert all(_entry(k, x["key"])["joint_stress"]["elbow"] == "low" and _top_rpe(x["hevy_note"]) <= 8 for x in tri)  # FIX7
+    # FIX7; fix round 11: a stated 5/10 routes only the provoking bench — a triceps extension is LOW on the elbow or held (RPE <= 8,
+    # the stop line)
+    assert all(
+        _top_rpe(x["hevy_note"]) <= 8 and (_entry(k, x["key"])["joint_stress"]["elbow"] == "low" or "stop this lift" in x["hevy_note"])
+        for x in tri
+    )
     curls = [x for x in _lifts(k["week"]) if _entry(k, x["key"]).get("pattern") == "curl"]
     assert curls and all(_top_rpe(x["hevy_note"]) <= 8 and "stop this lift" in x["hevy_note"] for x in curls)
     old = copy.deepcopy(LIB0)

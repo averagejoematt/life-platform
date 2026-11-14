@@ -118,10 +118,17 @@ def _trend_for(profile: dict[str, Any], key: str, kind: str, role: str) -> str:
     return str(over.get(key) or over.get(f"*{kind}_{role}*") or profile.get("trend") or "progressing")
 
 
-def _sets(load_lb: int, trend: str, week: int, kind: str) -> list[dict[str, Any]]:
+ROLE_ANCHOR_REPS = {"upper_volume": 10, "lower_volume": 10, "shoulders_arms": 8}
+"""Fix round 11 (the tenth red team: the harness logged every anchor at 6 reps, so a volume day's 8-12 anchors read 'under the
+floor' and printed spurious 'Lighter today' lines): a volume-day anchor is logged inside its own range. Live worlds only — the
+proposed world keeps the base tree's record (its digests are pinned)."""
+
+
+def _sets(load_lb: int, trend: str, week: int, kind: str, role: str | None = None) -> list[dict[str, Any]]:
     """Three working sets for one synthetic exposure: progressing adds a 5-lb step a week, stalled repeats, regressing
-    drops two steps a week with fewer reps. Loads are 5-lb implement steps, stored in kg as Hevy stores them."""
-    reps = 6 if kind == "anchor" else 10
+    drops two steps a week with fewer reps. Loads are 5-lb implement steps, stored in kg as Hevy stores them. `role`: the
+    session's role, read only by a live world (`ROLE_ANCHOR_REPS`)."""
+    reps = (ROLE_ANCHOR_REPS.get(str(role), 6) if role else 6) if kind == "anchor" else 10
     if trend == "progressing":
         lb, r, rpe = load_lb + 5 * week, reps, 8.0
     elif trend == "stalled":
@@ -138,7 +145,9 @@ def _note(profile: dict[str, Any], key: str, last: bool) -> str:
     return ""
 
 
-def synthetic_record(profile: dict[str, Any], served: dict[str, list[tuple[str, str]]], catalog: dict[str, Any]) -> list[dict[str, Any]]:
+def synthetic_record(
+    profile: dict[str, Any], served: dict[str, list[tuple[str, str]]], catalog: dict[str, Any], role_reps: bool = False
+) -> list[dict[str, Any]]:
     """The prior phase's Hevy record: every role on its weekday, `served` = {role: [(catalog key, kind)]}, the profile's
     trends, its discomfort/pain notes on the last two exposures, its recent hard cardio, and its adherence."""
     start = _day(profile["as_of"], -7 * HISTORY_WEEKS)
@@ -160,7 +169,7 @@ def synthetic_record(profile: dict[str, Any], served: dict[str, list[tuple[str, 
                 continue
             load = SYNTHETIC_LOAD_LB.get(str((catalog.get(key) or {}).get("equipment")), 70)
             note = _note(profile, key, w >= HISTORY_WEEKS - 2)
-            sets = _sets(load, _trend_for(profile, key, kind, role), w, kind)
+            sets = _sets(load, _trend_for(profile, key, kind, role), w, kind, role if role_reps else None)
             exercises.append({"name": catalog[key]["title"], "template_id": tid, "notes": note, "sets": sets})
         out.append(_workout(day, role, exercises))
     _with_cardio(out, profile, start)
@@ -432,7 +441,9 @@ def build_world(profile: dict[str, Any], mode: str = "approved", prior: str = "l
     lib = approved_library(json.loads((REPO / "config" / "exercise_library.json").read_text()), profile, status="approved")
     profile = profile | {"defaults_roles": list(_all_roles())}
     picks = _phase_one_picks(lib, catalog["movements"], profile) if prior == "live" else _phase_one_pools(catalog["movements"], profile)
-    record = synthetic_record(profile, _prior_served(picks, catalog["movements"], list(_all_roles())), catalog["movements"])
+    record = synthetic_record(
+        profile, _prior_served(picks, catalog["movements"], list(_all_roles())), catalog["movements"], role_reps=mode == "approved"
+    )
     lib["status"] = mode
     return {
         "profile": profile,

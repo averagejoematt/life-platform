@@ -251,7 +251,19 @@ def decide(
             "clause": f"Heavier: {rep_hi} reps reached.",
         }
     why = hold or "reps first"
-    return {"kg": last, "mode": "hold", "why": why, "clause": f"Same load: {hold}." if hold else f"Same load: build to {rep_hi} reps."}
+    if hold:
+        return {"kg": last, "mode": "hold", "why": why, "clause": f"Same load: {hold}."}
+    top = _top(rows[0])
+    if top["reps"] >= rep_hi:  # fix round 11: a held top-of-range always says what moves it (the note lint's "no reason")
+        at = [st for st in rows[0]["sets"] if st["kg"] >= top["kg"] - 0.2]
+        why = "every set to the top first" if any(st["reps"] < rep_hi for st in at) else f"the top at RPE {target_rpe:g} first"
+        clause = (
+            f"Same load: every set to {rep_hi} reps, then up."
+            if why.startswith("every")
+            else f"Same load: {rep_hi} reps at RPE {target_rpe:g} or less, then up."
+        )
+        return {"kg": last, "mode": "hold", "why": why, "clause": clause}
+    return {"kg": last, "mode": "hold", "why": why, "clause": f"Same load: build to {rep_hi} reps."}
 
 
 def r3_eligible(e: dict[str, Any], d: dict[str, Any] | None, held_day: bool) -> bool:
@@ -264,7 +276,7 @@ def r3_eligible(e: dict[str, Any], d: dict[str, Any] | None, held_day: bool) -> 
         return False
     if any(x.get("kind") in ("top", "back_off") for x in e.get("sets") or []):  # a top set + back-offs is not "the later sets"
         return False
-    return not d or d.get("mode") == "up" or (d.get("mode") == "hold" and d.get("why") == "reps first")
+    return not d or d.get("mode") == "up" or (d.get("mode") == "hold" and d.get("why") in ("reps first", "every set to the top first"))
 
 
 # ── novelty ──────────────────────────────────────────────────────────────────
@@ -397,8 +409,9 @@ def set_loads(
         engine = max(float(s.weight_kg) for s in work)
         for s in work:
             s.weight_kg = d["kg"]
-        # the note's reason line only where it changes what he reads: the engine's own load and reason stand when they agree
-        quiet = abs(engine - float(d["kg"])) < 0.2 and d["mode"] in ("up", "hold") and not e.get("live_first_back")
+        # the note's reason line only where it changes what he reads: the engine's own load and reason stand when they agree —
+        # a hold for a reason (a flag, a hold day, the top reached at too high an effort) always says it (fix round 11)
+        quiet = abs(engine - float(d["kg"])) < 0.2 and (d["mode"] == "up" or d["why"] == "reps first") and not e.get("live_first_back")
         d = d | ({"clause": None} if quiet else {})
         rec = {"key": b.movement_key, **d, "last": {"date": rows[0]["date"], "role": rows[0]["role"], **_top(rows[0])}}
         out.append(rec)

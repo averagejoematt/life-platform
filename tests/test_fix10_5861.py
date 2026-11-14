@@ -19,8 +19,6 @@ import pathlib
 import sys
 from unittest.mock import patch
 
-import pytest
-
 REPO = pathlib.Path(__file__).resolve().parents[1]
 for p in (str(REPO), str(REPO / "lambdas"), str(REPO / "scripts"), str(REPO / "deploy")):
     if p not in sys.path:
@@ -89,17 +87,27 @@ def test_an_unreviewed_movement_is_never_a_pain_route():
 # ── 4. one joint rule ────────────────────────────────────────────────────────────────────────────────────────────────────────
 def test_a_joint_flag_reaches_every_lift_loading_that_joint_and_the_muscle_keeps_a_route():
     """The ninth red team (r5): hip 4/10 on the split squat removed every squat while the deadlift (hip stress HIGH) stepped up.
-    Now no lift loading the flagged joint at moderate or more steps up; one loading it HIGH is routed (a reviewed low-stress
-    member), the rest hold; the hamstrings keep a route. Control: the flag scoped to the flagged lift alone -> the deadlift
-    steps up again."""
+    No lift loading the flagged joint at moderate or more steps up. Fix round 11 (the tenth red team: the same flag then left
+    quads 0 and glutes 0 in a garage): a STATED score routes only the provoking lift — the squat and the deadlift stay, held at
+    RPE <= 8 with the stop line, and quads, glutes and hamstrings keep hard sets. Controls: the flag scoped to the flagged lift
+    alone -> the deadlift steps up again; the old reach (pattern group + HIGH stress routed) -> no deadlift, fewer quad sets."""
     w = _week(FIX10["r5_garage_hip_knee"])
     lib, cat = w["world"]["lib"], w["world"]["catalog"]["movements"]
     by_title = {(cat.get(k) or {}).get("title"): k for k in cat}
     for ln in _ups(w):
         title = ln[len("load (live): ") :].rsplit(" — ", 1)[0].rsplit(" ", 2)[0]
         assert live_program._stress(sw._lib_entry(lib, cat, by_title.get(title, "")), "hip") < 1, ln
-    assert "deadlift_barbell" not in {x["key"] for s in w["week"]["sessions"] for x in s["lifts"]}
-    assert w["hard"].get("hamstrings", 0) > 0
+    held = {x["key"]: x for s in w["week"]["sessions"] if s["role"] == "lower_heavy" for x in s["lifts"]}
+    assert "deadlift_barbell" in held and "stop this lift" in held["deadlift_barbell"]["hevy_note"]
+    assert all(w["hard"].get(m, 0) > 0 for m in ("hamstrings", "quadriceps", "glutes")), w["hard"]
+    real = live_pain.hit
+
+    def wide(entry, e, flags, ctx):  # control: the round-10 reach (a stated score routes the group and HIGH stress too)
+        return real(entry, e, [f | {"severity": None} for f in flags], ctx)
+
+    old = _week(FIX10["r5_garage_hip_knee"], {(live_pain, "hit"): wide})
+    assert "deadlift_barbell" not in {x["key"] for s in old["week"]["sessions"] for x in s["lifts"]}
+    assert old["hard"].get("quadriceps", 0) < w["hard"].get("quadriceps", 0)
     off = _week(FIX10["r5_garage_hip_knee"], {(live_pain, "scope"): lambda flag, light, tid: "lift"})
     assert any("Deadlift (Barbell)" in ln for ln in _ups(off))
 
@@ -108,7 +116,7 @@ def test_the_low_back_is_the_spinal_load_case_of_the_one_joint_rule():
     """No separate spine rule: a flag on the spine routes every lift loading it HIGH (squat, deadlift, RDL, bent-over row) and
     holds the moderate ones, by the same `live_pain.hit` as every joint. Control: a HIGH-stress lift of another pattern under a
     pattern-group-only reach stays unrouted."""
-    f = {"movement_id": "x", "joints": ["spinal_load"], "group": "squat", "tier": "avoid", "scope": "joint", "severity": 6.0}
+    f = {"movement_id": "x", "joints": ["spinal_load"], "group": "squat", "tier": "avoid", "scope": "joint", "severity": None}
     ctx = {"idx": {"to_lib": {}}}
     deadlift = {"pattern": "hinge", "joint_stress": {"spinal_load": "high"}}
     db_rdl = {"pattern": "hinge", "joint_stress": {"spinal_load": "moderate"}}
@@ -117,19 +125,15 @@ def test_the_low_back_is_the_spinal_load_case_of_the_one_joint_rule():
     assert live_pain.hit(db_rdl, {}, [f], ctx)[0] == "hold"
     assert live_pain.hit({"pattern": "curl", "joint_stress": {"spinal_load": "low"}}, {}, [f], ctx) is None
     assert live_pain.hit(deadlift, {}, [f | {"scope": "lift"}], ctx) is None  # control: the old pattern-only reach misses it
+    # fix round 11: a STATED score routes only the provoking lift — the deadlift and the row hold (RPE 8, the stop line)
+    assert (
+        live_pain.hit(deadlift, {}, [f | {"severity": 6.0}], ctx)[0] == "hold"
+        and live_pain.hit(row, {}, [f | {"severity": 6.0}], ctx)[0] == "hold"
+    )
+    assert live_pain.hit(deadlift, {}, [f | {"severity": 6.0, "sharp": True}], ctx)[0] == "avoid"  # sharp stays conservative
 
 
-# ── 5. priority muscles bite ─────────────────────────────────────────────────────────────────────────────────────────────────
-@pytest.mark.parametrize("name", ["a_large_deficit_experienced", "c_equipment_limited"])
-def test_priority_muscles_are_not_under_the_arms_and_calves_in_a_served_week(name):
-    """The ninth red team: priority chest 9 under biceps 11 (and delts 16). In a served normal week each priority muscle is at or
-    over biceps, triceps and calves. Control: the plan's parity off -> a rival over a priority muscle."""
-    w = _week(PROFILES[name])
-    assert all(w["hard"].get(p, 0) >= w["hard"].get(r, 0) for p in ("chest", "quadriceps") for r in live_volume.PARITY_RIVALS), w["hard"]
-    off = _week(PROFILES[name], {(live_volume, "_priority_parity"): lambda *a: []})
-    assert any(off["hard"].get(r, 0) > off["hard"].get(p, 0) for p in ("chest", "quadriceps") for r in live_volume.PARITY_RIVALS)
-
-
+# ── 5. priority muscles bite (the served-week outcomes: tests/test_fix11_5861.py) ────────────────────────────────────────────
 def test_changing_the_priority_setting_changes_the_served_week():
     """The ninth red team: naming back + glutes as the priority changed nothing (73 sets, identical counts). Control: the same
     setting -> the same week."""
@@ -194,32 +198,7 @@ def test_same_role_prefers_the_newest_rows_and_never_leaks_heavy_rows_into_the_v
     assert "2026-10-27" in [r["date"] for r in old([rows[0], rows[2]], "", "2026-11-14", 8, 12)]
 
 
-# ── 9. pain-week time and short-week memory ──────────────────────────────────────────────────────────────────────────────────
-def test_pain_skipped_time_is_refilled_with_reviewed_low_stress_work():
-    """The ninth red team: pain weeks left 30-40 free minutes beside untrained muscles. A lift the pain rule skips gives its time to
-    a reviewed movement LOW on the flagged joint. Control: the refill off -> fewer working sets that week."""
-    w = _week(FIX10["r1_knee_and_lowback_5day"])
-    refills = [ln for ln in _lines(w) if ln.startswith("refill (live): ")]
-    assert refills and all("reviewed and low on the flagged joint" in ln for ln in refills)
-    off = _week(FIX10["r1_knee_and_lowback_5day"], {(live_volume, "refill"): lambda *a: []})
-    sets = lambda wk: sum(x["working_sets"] for s in wk["week"]["sessions"] for x in s["lifts"])  # noqa: E731
-    assert sets(w) > sets(off)
-
-
-def test_consecutive_short_weeks_rotate_what_is_under_target():
-    """The ninth red team: three 1-morning weeks running served the identical session (calves 0, side delts 0, triceps 1.5). The
-    rotation names a different muscle each ISO week, and the plan aims it at a slot. Control: no rotation -> identical plans."""
-    lib = sw.build_world(FIX9["n8_one_morning_clean"], "approved")
-    cat, lib = lib["catalog"]["movements"], lib["lib"]
-    mondays = ("2026-11-16", "2026-11-23", "2026-11-30", "2026-12-07")
-    plans = [live_volume.week_plan(cat, lib, 1, monday=m)["counts"] for m in mondays]
-    assert len({tuple(sorted(p.items())) for p in plans}) == 4
-    for m in ("calves", "side_delts", "triceps"):  # each gets its slot in one of the four weeks
-        assert max(p.get(m, 0) for p in plans) >= 2, m
-    with patch.object(live_volume, "SHORT_ROTATION", ()):
-        assert len({tuple(sorted(live_volume.week_plan(cat, lib, 1, monday=m)["counts"].items())) for m in mondays}) == 1
-
-
+# ── 9. pain-week time and short-week memory: the one spend step, tests/test_fix11_5861.py ─────────────────────────────────────
 # ── 10. conditioning and the slot cap ────────────────────────────────────────────────────────────────────────────────────────
 def test_the_hard_conditioning_dose_sits_on_the_freest_morning_and_no_slot_runs_past_three_sets():
     """The ninth red team: the dose was squeezed to 12-16 min on the one morning without room while another had 20 free minutes,
@@ -230,15 +209,11 @@ def test_the_hard_conditioning_dose_sits_on_the_freest_morning_and_no_slot_runs_
     cat, lib = w["world"]["catalog"]["movements"], w["world"]["lib"]
     plan = live_volume.week_plan(cat, lib, 5)
     host = live_volume.conditioning_host(plan)
-    loads = {
-        r: live_volume._morning_load([x for x in plan["rows"] if x["role"] == r])
-        for r in ("shoulders_arms", "upper_volume", "lower_volume")
-    }
-    assert loads[host] == min(loads.values())
+    assert host == plan["host"] and host not in ("lower_heavy", "upper_heavy")  # never heavy lower nor the morning before it
     hard = {s["role"] for s in w["week"]["sessions"] if s["cardio"].get("kind") in live_program.HARD_KINDS}
     assert hard <= {host}
-    with patch.object(live_volume, "_morning_load", lambda rows: 0):
-        assert live_volume.conditioning_host(plan) == "shoulders_arms"  # control: the tie -> the template host
+    with patch.object(live_volume, "plan_minutes", lambda rows: 0.0):
+        assert live_volume._host(plan["week"], plan["rows"]) == "shoulders_arms"  # control: the tie -> the template host
     assert max(x["working_sets"] for s in w["week"]["sessions"] for x in s["lifts"] if x["tag"].startswith("accessory:")) <= 3
     with patch.dict(live_settings.HEURISTICS["slot_max_sets"], {"value": 9}):
         assert max(r["sets"] for r in live_volume.week_plan(cat, lib, 5)["rows"] if r["kind"] == "accessory") > 3

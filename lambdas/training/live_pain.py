@@ -6,8 +6,9 @@
      note with no score — touches ONLY the flagged lift. Any other flag is scoped by its JOINT.
   2. ONE JOINT RULE (`hit`; fix round 11 — the tenth red team: a 4/10 hip flag on the split squat removed every lower compound in
      a garage). A joint-scoped flag reaches every lift that loads the flagged joint at moderate or more, whatever its pattern.
-     Above the mild line (`avoid`) ONLY the provoking lift is ROUTED (below); every other lift it reaches — pain-free compounds
-     included — HOLDS its load at RPE <= `pain_rpe` with the in-set stop line. At or under the mild line every lift it reaches
+     Above the mild line (`avoid`) with a STATED score only the provoking lift is ROUTED (below); a sharp or unscored flag also
+     routes its pattern group and every lift loading the joint HIGH. Every other lift it reaches — pain-free compounds included — HOLDS its load at
+     RPE <= `pain_rpe` with the in-set stop line. At or under the mild line every lift it reaches
      holds the same way. The low back is this rule on `spinal_load` — no separate spine rule.
   3. ROUTES (`variant`, `muscle_route`). A routed lift is replaced by a pain-free same-family member first, else by any movement
      for the muscle it trained, each loading every flagged joint LOW — and REVIEWED: a movement whose joint stress is defaulted or
@@ -74,7 +75,7 @@ def hit(
     """(tier, flag, joint) for the strongest flag that reaches this exposure, else None (module doc 2). `variant`: the session
     fit's own pain swap already stands in, reviewed and LOW on the flagged joint; `avoid`: route it; `hold`: keep it, load held,
     RPE <= pain_rpe, the stop line."""
-    from training.live_program import STRESS
+    from training.live_program import STRESS, _group
 
     level = STRESS[str(_rule("joint_level"))]
     mid = (ctx.get("idx") or {}).get("to_lib", {}).get(str(e.get("movement_key")))
@@ -87,7 +88,11 @@ def hit(
         for j in f["joints"]:
             if not (own or (f.get("scope") != "lift" and _stress(entry, j) >= level)):
                 continue
-            tier = "avoid" if f["tier"] == "avoid" and own else "hold"  # fix round 11: only the provoking lift is routed
+            # fix round 11: a STATED score routes only the provoking lift; a sharp or unscored flag stays conservative — its
+            # pattern group and every lift loading that joint HIGH are routed too (the low back's deadlift under a sharp note)
+            severe = f.get("severity") is None or f.get("sharp")
+            route = own or (severe and (_group(entry.get("pattern")) == f["group"] or _stress(entry, j) >= STRESS["high"]))
+            tier = "avoid" if f["tier"] == "avoid" and route else "hold"
             if best is None or (tier == "avoid" and best[0] != "avoid"):
                 best = (tier, f, j)
     return best

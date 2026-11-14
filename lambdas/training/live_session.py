@@ -277,7 +277,7 @@ def for_live_draft(
         lines += fit_exposures(out, rotation or {}, ctx)
         live_load.mark_novelty(out, ctx, block_workouts)
         lines += live_program.plan(out, rotation or {}, ctx, block_workouts)
-        lines += live_volume.pair_anchors(out, plan)
+        lines += _reps_follow_the_movement(out, ctx) + live_volume.pair_anchors(out, plan)
         tids = {live_load.tid_of(e.get("movement_key"), catalog, lib, ctx["idx"]) for e in out["exposures"]}
         anchors = _anchor_tids(catalog)
         hist = live_load.history(block_workouts, (tids | anchors) - {""})
@@ -334,6 +334,24 @@ def for_live_draft(
     rate = live_rulings.rate_line(inputs, out.get("fatigue"), out.get("session_role"))
     out[MARK] = {"issue": ISSUE, "lines": lines + ([rate] if rate else []), **extra}
     return out
+
+
+def _reps_follow_the_movement(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
+    """IN PLACE (fix round 11, the tenth red team: a hip thrust swapped into the deadlift slot inherited its 4-6 reps): an exposure
+    swapped to a movement of ANOTHER pattern takes that movement's own rep range (the catalog's `default_rep_range`) — a slot's
+    reps belong to its movement, not to the slot. Returns the lines."""
+    lines = []
+    for e in rx["exposures"]:
+        frm = (e.get("live_swap") or {}).get("from")
+        new, old = _entry(e.get("movement_key"), ctx) or {}, _entry(frm, ctx) or {}
+        rr = (ctx["catalog"].get(str(e.get("movement_key"))) or {}).get("default_rep_range") or {}
+        if not frm or not new or new.get("pattern") == old.get("pattern") or not rr.get("start") or not rr.get("end"):
+            continue
+        reps = [int(rr["start"]), int(rr["end"])]
+        if any(st.get("reps") != reps for st in e.get("sets") or []):
+            e["sets"] = [st | {"reps": list(reps)} for st in e.get("sets") or []]
+            lines.append(f"reps (live): {new.get('title') or e.get('movement_key')} {reps[0]}-{reps[1]} — its own range, not the slot's")
+    return lines
 
 
 def _anchor_tids(catalog: dict[str, Any]) -> set[str]:

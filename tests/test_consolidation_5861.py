@@ -289,7 +289,7 @@ def test_every_session_of_every_fixture_fits_the_75_minute_ceiling(shared):
         )
     assert bad == {}
     if shared:
-        off = _week(PROFILES["e_short_week"], {(live_volume, "time_fit"): lambda *a, **k: []})
+        off = _week(PROFILES["c_equipment_limited"], {(live_volume, "time_fit"): lambda *a, **k: []})
         assert any(float(s["lifting_minutes"]) > 75.05 for s in off["week"]["sessions"]), "control: no time fit -> over the cap"
 
 
@@ -397,8 +397,8 @@ def test_a_slump_trims_about_a_third_of_each_accessory_never_an_anchor():
     ]}  # fmt: skip
     lines = live_load.slump_trim(rx)
     assert [len(e["sets"]) for e in rx["exposures"]] == [3, 2, 3, 2] and lines
-    rows = _run("d3_honest", 5)
-    off = _run("d3_honest", 5, {(live_load, "slump_trim"): lambda rx, keep=None: []})
+    rows = _run("d3_honest", 6)
+    off = _run("d3_honest", 6, {(live_load, "slump_trim"): lambda rx, keep=None: []})
     acc = lambda rr: sum(sum(len(v) for v in r["loads"].values()) for r in rr)  # noqa: E731 — exposures served
     held = [r["week"] for r in rows if any(ln.startswith("today: no load steps up") for v in r["rationale"].values() for ln in v)]
     assert held
