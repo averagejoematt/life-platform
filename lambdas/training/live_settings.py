@@ -92,7 +92,7 @@ HEURISTICS: dict[str, dict[str, Any]] = {
         "value": 10,
         "group": "progression",
         "basis": "fix round 12 (the final review: two noisy logs cut a flat lifter's bench 12.5 %): one step-down never takes more "
-        "than 10 % off the load; a real decline that needs more gets it from the next two exposures at the new load",
+        "than 10 % off the load; a real decline that needs more gets it from the exposures that follow, at the new load",
         "retune": "block retro: reps at the first exposure after each step-down (back inside the range?)",
     },
     "step_downs_per_window": {

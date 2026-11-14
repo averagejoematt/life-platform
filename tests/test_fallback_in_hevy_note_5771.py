@@ -213,5 +213,7 @@ def test_an_approved_library_draft_carries_the_line_and_adds_no_lint_problem():
     assert shadow.inputs_snapshot["note_fallbacks"]["mode"] == "shadow" and shadow.inputs_snapshot["note_fallbacks"]["by_key"]
     # the offline render reads no history, so its compounds carry the L4 "find the load" problem either way; the
     # fallback line adds none (same problem set with and without it), and every lift note stays inside its budget
-    assert sorted(_lint_lines(live)) == sorted(_lint_lines(shadow))
+    # (#5861 fix round 12: a live draft's machine compound with no load on file keeps its W-set feeler, which the live lint
+    # accepts — so the live set may be SMALLER than the shadow's, never larger)
+    assert set(_lint_lines(live)) <= set(_lint_lines(shadow))
     assert all(g.phone_lines(b.notes or "") <= g.EX1_MAX_LINES for b in live.exercises)

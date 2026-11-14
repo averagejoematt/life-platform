@@ -170,7 +170,12 @@ def render_for(ir: Any, band: Any = None, read: Callable[..., Any] | None = None
     day = day_label(cal.get("session_role"), getattr(ir, "archetype", None))
     exercises = getattr(ir, "exercises", None) or []
     first, others = rule_args(exercises)
-    return render(day, band if band is not None else compounds_band(read), step_lb(read), cardio_kinds_of(exercises), first, others)
+    out = render(day, band if band is not None else compounds_band(read), step_lb(read), cardio_kinds_of(exercises), first, others)
+    if "live_session" in ((getattr(ir, "inputs_snapshot", None) or {}).get("session_prescription") or {}):
+        from training.live_safety import block_rule  # #5861 fix round 12: a LIVE draft carries no in-session load rule
+
+        out = block_rule(out)
+    return out
 
 
 def split(note: str | None) -> tuple[str, str]:
