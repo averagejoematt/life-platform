@@ -335,7 +335,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
           </p>
         )
       }
-      <div class="grid cols3">
+      <div class={`grid ${openDisagreements.length > 0 ? "cols3" : "cols2"}`}>
         <div>
           <p class="label" style="margin-bottom:10px">The last seven days</p>
           {
@@ -387,33 +387,24 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
           }
           <a href={href("/system/ledger/")} style="display:inline-block;margin-top:12px;font-size:13px;font-weight:700">All calls →</a>
         </div>
-        <div>
-          <p class="label" style="margin-bottom:10px">On the table</p>
-          <div class="rows">
-            {openDisagreements.slice(0, 2).map((d) => (
-              <a href={href(pathOf("disagreement", d.id))}>
-                <span style="font-size:14px;line-height:1.35">
-                  <b>Two coaches disagree</b> · {clip(d.topic, 70)}
-                </span>
-                <span class="status open">open</span>
-              </a>
-            ))}
-            {next?.chapter?.state === "ok" && next.chapter.data?.date && (
-              <span>
-                <span style="font-size:14px">
-                  <b>Chapter {nextChapterNo}</b> · {dayInWords(next.chapter.data.date, { weekday: true, short: true })}
-                </span>
-                <span class="mono muted" style="font-size:12px">{next.chapter.data.drafted_not_promised ? "drafted, not promised" : "due"}</span>
-              </span>
-            )}
-            {!openDisagreements.length && !(next?.chapter?.state === "ok") && (
-              <span>
-                <span class="muted">Nothing on the table today.</span>
-              </span>
-            )}
+        {/* "On the table" (2026-11-14): only when two coaches openly disagree. It used to repeat the next chapter's draft
+            date — already in the chapter's rail and the closing line — and otherwise said "Nothing on the table today." */}
+        {openDisagreements.length > 0 && (
+          <div>
+            <p class="label" style="margin-bottom:10px">On the table</p>
+            <div class="rows">
+              {openDisagreements.slice(0, 2).map((d) => (
+                <a href={href(pathOf("disagreement", d.id))}>
+                  <span style="font-size:14px;line-height:1.35">
+                    <b>Two coaches disagree</b> · {clip(d.topic, 70)}
+                  </span>
+                  <span class="status open">open</span>
+                </a>
+              ))}
+            </div>
+            <a href={href("/system/")} style="display:inline-block;margin-top:12px;font-size:13px;font-weight:700">How the coaches work →</a>
           </div>
-          <a href={href("/system/")} style="display:inline-block;margin-top:12px;font-size:13px;font-weight:700">How the coaches work →</a>
-        </div>
+        )}
       </div>
     </div>
   </section>
