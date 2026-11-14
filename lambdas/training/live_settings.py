@@ -102,25 +102,19 @@ HEURISTICS: dict[str, dict[str, Any]] = {
         "floor still steps down)",
         "retune": "block retro: anchor e1RM across the block vs sleep and loss rate",
     },
-    "decline_pct": {
-        "value": 0.02,
-        "group": "progression",
-        "basis": "an anchor is DECLINING when its same-role e1RM fell 2%+ across its latest same-role exposures (newest vs two back) with no recovery between "
-        "(a level under an old best is not a decline: the one-rep-short lifter holds steady)",
-        "retune": "block retro: slump calls vs the next block's anchor e1RM",
-    },
     "slump_accessory_cut": {
         "value": 0.34,
         "group": "progression",
         "basis": "the slump's volume answer: about a third of each accessory's working sets (never under 2); anchors keep theirs",
         "retune": "block retro: recovery markers in the weeks after a slump hold",
     },
-    "second_lift_band": {
-        "value": [7, 8],
+    "deadlift_rpe": {
+        "value": 8,
         "group": "progression",
-        "basis": "owner ruling 5: squat and deadlift never both maximal in one session; the lift that does not lead runs one band "
-        "lower, loaded from its own same-role e1RM at that band",
-        "retune": "block retro: both lifts' e1RM trend under alternation",
+        "basis": "owner ruling 5 (fix round 11, the tenth red team's simpler rule): the squat always leads the heavy lower morning; "
+        "the deadlift is a top set + one back-off capped at this RPE — never both maximal — and steps up after a top set at the "
+        "top of its range at or under it, like every lift",
+        "retune": "block retro: squat and deadlift e1RM trend over the block",
     },
     # ── novelty (live_load) ──
     "familiar_days": {
@@ -144,6 +138,21 @@ HEURISTICS: dict[str, dict[str, Any]] = {
         "retune": "block retro: second-session performance after a layoff",
     },
     "first_back_rpe": {"value": 8, "group": "novelty", "basis": "see layoff_days", "retune": "see layoff_days"},
+    "long_layoff_days": {
+        "value": 21,
+        "group": "novelty",
+        "basis": "fix round 11 (the tenth red team: a 38-day layoff returned at the last load and ground under the floor): after "
+        "this many days with no session the first session back starts long_layoff_pct under the last same-role load; 10-20 "
+        "days stays the RPE-8 hold at the last load (owner ruling #10: no long deload either way)",
+        "retune": "block retro: first-back top-set reps vs the rep floor, by gap length",
+    },
+    "long_layoff_pct": {
+        "value": 7.5,
+        "group": "novelty",
+        "basis": "see long_layoff_days: the middle of a 5-10% return dose (practitioner consensus for 3+ weeks of detraining), "
+        "floored to the implement; normal progression from the next exposure",
+        "retune": "see long_layoff_days",
+    },
     # ── volume (live_volume) ──
     "hard_rpe": {
         "value": 8,

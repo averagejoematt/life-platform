@@ -244,34 +244,17 @@ def test_the_hard_conditioning_dose_sits_on_the_freest_morning_and_no_slot_runs_
         assert max(r["sets"] for r in live_volume.week_plan(cat, lib, 5)["rows"] if r["kind"] == "accessory") > 3
 
 
-# ── the ninth red team's surviving mutant M5: test the LOAD ──────────────────────────────────────────────────────────────────
-def test_the_second_lift_is_loaded_one_band_lower_not_at_its_last_load():
-    """Owner ruling 5 ("never both maximal"): the lift that does not lead runs at RPE 7-8, LOADED from its own e1RM at that band.
-    The red team's M5 (the second lift at its last load, only the note's RPE changed) survived because only text was tested.
-    Control: the band ignored -> the last load (or a step up)."""
-    rows = [{"date": "2026-11-10", "role": "lower_heavy", "sets": [{"kg": 100.0, "reps": 5, "rpe": 8.5}] * 2}]
-    d = live_load.decide(rows, 4, 6, "barbell", second_band=(7, 8))
-    assert d["mode"] == "second" and d["kg"] < 100.0 - 0.2
-    assert live_load.decide(rows, 4, 6, "barbell")["kg"] >= 100.0 - 0.2  # control: no band -> the last load holds
-    w = _week(PROFILES["a_large_deficit_experienced"])
-    second = [ln for ln in _lines(w) if ln.startswith("load (live): ") and " — second: " in ln]
-    assert second
-    for ln in second:  # served below the last same-role top load it names
-        served, last = float(ln.split(" lb — ")[0].rsplit(" ", 1)[1]), float(ln.split("(last ")[1].split(" lb")[0].rsplit(" ", 1)[1])
-        assert served <= last, ln
-
-
 # ── 7. the notes: no blocking lint problem on any live week ─────────────────────────────────────────────────────────────────
 def test_no_live_note_carries_a_blocking_lint_problem():
-    """Fix round 10's note changes (one load rule, the second lift's clause) never trip the blocking note lint (L1 banned jargon,
-    L6/L12 the session line). Control: the second lift's clause written with the load-model jargon ('band') -> L1."""
+    """The live note changes (one load rule, the R3 line, the load clauses) never trip the blocking note lint (L1 banned jargon,
+    L6/L12 the session line). Control: a load clause written with the load-model jargon ('band') -> L1."""
     w = _week(PROFILES["a_large_deficit_experienced"])
     assert sw.lint_problems(w["week"]) == []
     decide = live_load.decide
 
     def jargon(*a, **k):
         d = decide(*a, **k)
-        return d | {"clause": "The second lift today: one band lower."} if d and d["mode"] == "second" else d
+        return d | {"mode": "down", "clause": "Lighter today: one band lower."} if d else d
 
     off = _week(PROFILES["a_large_deficit_experienced"], {(live_load, "decide"): jargon})
     assert any(" L1 " in p or p.startswith("L1") or "L1" in p for p in sw.lint_problems(off["week"]))

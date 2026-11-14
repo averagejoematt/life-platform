@@ -1,9 +1,9 @@
 """live_rulings.py — the owner's rulings that remain their own rules (#5861). LIVE only; their values are library-carried
 through the ONE settings table (`live_settings`).
 
-  1. THE LEAD LIFT (`lead_lift`, `lead_of`, `lead_blocked`; ruling 5): squat and deadlift share the heavy lower morning but are
-     never both maximal — one leads at the session's top effort, the other runs at `second_lift_band` (RPE 7-8). The lead
-     alternates by ISO week; a lift that is cut, regressing or pain-capped cannot lead (the lead by state).
+  1. THE HEAVY LOWER MORNING (`lead_lift`, ruling 5): squat and deadlift share it but are never both maximal — the squat always
+     leads at the session's effort, the deadlift is a top set + one back-off at RPE <= `deadlift_rpe` (fix round 11: the ISO-week
+     alternation, the lead by state and the second-lift band are gone with the ratchet they made).
   2. PURPOSEFUL CARDIO (`purposeful_cardio`, ruling 4): a gym block only for a named purpose — the week's conditioning dose, or the
      RECORD's aerobic gap.
   3. EVIDENCE AND COMPLETENESS, VISIBLE (`evidence_line`, ruling 16).
@@ -37,37 +37,15 @@ def _settings(lib: dict[str, Any] | None = None) -> dict[str, Any]:
 
 
 # ── 1. the lead lift ──────────────────────────────────────────────────────────
-def lead_of(target_date: str) -> str:
-    """`squat` on an even ISO week, `hinge` on an odd one (`lead_lift_rule: alternate_weekly`)."""
-    from common.pacific_time import parse_day_key
-
-    d = parse_day_key(str(target_date)[:10])
-    if d is None:
-        return "squat"
-    return "squat" if d.isocalendar()[1] % 2 == 0 else "hinge"
-
-
-def lead_blocked(e: dict[str, Any], trend: str | None) -> str | None:
-    """#5861 FIX7 (sixth red team: a −10% reset 'led' while the squat was capped — no top-effort lift on the heavy day): why this
-    anchor cannot lead today — a load cut or reset on it (`live_load` pct), a rebuild after a reset, a regressing trend, a held
-    retreat, or a pain/discomfort effort cap at or under RPE 7 — else None."""
-    if e.get("live_stop"):  # fix round 10: a pain-touched lift (held, stop line) never leads
-        return str((e.get("live_load") or {}).get("why") or "pain flag")
-    if trend == "regressing":
-        return "regressing"
-    if e.get("live_effort") is not None and int(e["live_effort"]) <= 7:
-        return "effort capped"
-    return None
-
-
-def lead_lift(rx: dict[str, Any], ctx: dict[str, Any], trends: dict[str, str] | None = None) -> list[str]:
-    """IN PLACE, the lower-heavy morning holding both a squat and a hinge anchor: the non-lead lift is capped at LEAD_LIFT
-    second_band. #5861 FIX7: the lead is chosen by STATE — a lift that is cut, reset, rebuilding, regressing or pain-capped
-    (`lead_blocked`) cannot lead, so the other leads at the session's RPE 8-9; the ISO-week alternation is the tie-break when
-    both or neither are blocked. Returns the rationale lines."""
+def lead_lift(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
+    """IN PLACE, the lower-heavy morning holding both a spine-loading squat and a hinge anchor (owner ruling 5, fix round 11 — the
+    tenth red team's simpler rule): the SQUAT always leads at the session's effort; the deadlift runs its top set + one back-off
+    (`live_shape.deadlift_shape`) capped at `deadlift_rpe`. No week-by-week alternation, no lead by state: each is an ordinary
+    lift of the one load model (`live_load`), so a capped deadlift steps up after an easy top set and neither reads a stale lead
+    day. A squat already capped (a pain flag) leaves both under the top effort — never both maximal. Returns the line."""
     if rx.get("session_role") != "lower_heavy":
         return []
-    from training import live_balance
+    from training import live_balance, live_settings
 
     idx, movs = ctx.get("idx") or {}, (ctx.get("lib") or {}).get("movements") or {}
     anchors = {
@@ -79,31 +57,12 @@ def lead_lift(rx: dict[str, Any], ctx: dict[str, Any], trends: dict[str, str] | 
     }
     if len(anchors) < 2:  # a swapped-out deadlift (a hip thrust under discomfort) is not a second maximal lift
         return []
-    lead = lead_of(str(ctx.get("target_date") or ""))
-    tid = {p: str(_lib_entry(e, ctx).get("template_id") or "").upper() for p, e in anchors.items()}
-    blocked = {p: lead_blocked(e, (trends or {}).get(tid[p])) for p, e in anchors.items()}
-    by_state = None
-    if bool(blocked["squat"]) != bool(blocked["hinge"]):  # exactly one cannot lead: the other leads, whatever the week
-        by_state = "hinge" if blocked["squat"] else "squat"
-        lead = by_state
-    second = anchors["hinge" if lead == "squat" else "squat"]
-    from training import live_settings
-
-    lo, hi = (int(x) for x in live_settings.value("second_lift_band"))
-    second["live_effort"] = min(hi, int(second.get("live_effort") or 99))
-    second["live_effort_band"] = [lo, hi]
-    second["live_lead"] = "second"
-    anchors[lead]["live_lead"] = "lead"
-    names = {"squat": "the squat", "hinge": "the deadlift"}
-    other = "hinge" if lead == "squat" else "squat"
-    how = (
-        f"by state: {names[other]} is {blocked[other]}, so {names[lead]} carries the top effort"
-        if by_state
-        else "the lead alternates by ISO week (the tie-break)"
-    )
+    cap = int(live_settings.value("deadlift_rpe"))
+    dl = anchors["hinge"]
+    dl["live_effort"] = min(cap, int(dl.get("live_effort") or 99))
     return [
-        f"lead lift (live): {names[lead]} leads this week at the session's full effort, {names[other]} capped at RPE {lo}-{hi} — "
-        f"never both maximal in one session; {how} (second_lift_band, heuristic)"
+        f"heavy lower (live): the squat leads at the session's effort; the deadlift is a top set + one back-off at RPE <= {cap} "
+        "— never both maximal in one session (owner ruling 5; deadlift_rpe, heuristic)"
     ]
 
 

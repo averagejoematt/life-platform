@@ -189,10 +189,27 @@ def test_one_strain_signal_is_noise_two_reduce_three_recommend_a_deload():
     assert "owner-confirmed" in three["deload"]["applies"]
 
 
-def test_regressing_compound_on_a_red_day_recommends_a_deload_control_green_day():
+def test_a_systemic_decline_on_a_red_day_recommends_a_deload_control_green_day():
+    """Fix round 11 (the tenth red team): the ONE performance vote is the systemic slump the live session reads
+    (`live_load.slump`, each anchor read by `declined`); one lift's decline is the load model's, never a recovery vote."""
     rows = _series([70, 70, 60, 60])
-    assert _assess(workouts=rows, readiness="red")["deload"]["recommended"]
-    assert not _assess(workouts=rows, readiness="green")["deload"]["recommended"]
+    slump = {"declining": 4, "judged": 5}
+    assert _assess(workouts=rows, readiness="red", slump=slump)["deload"]["recommended"]
+    assert not _assess(workouts=rows, readiness="green", slump=slump)["deload"]["recommended"]  # control: a good day
+    assert not _assess(workouts=rows, readiness="red")["deload"]["recommended"]  # control: one lift's decline is no vote
+    sig = {s["signal"]: s["state"] for s in _assess(workouts=rows, slump=slump)["signals"]}
+    assert sig["strength"] == "strain" and "effort_drift" not in sig  # one performance signal, not two
+
+
+def test_the_one_performance_read_ignores_rep_noise_and_sees_a_decline():
+    """`declined`: the latest two both more than 5% under the MEDIAN of the earlier exposures. A flat lifter whose reps swing
+    +-2 (about +-5% of e1RM) never reads declined; a 3%/week decliner does within its third week; one bad day never does."""
+    flat_noisy = [100.0, 105.0, 95.5, 104.0, 96.0, 100.0, 104.5, 95.5]
+    assert not any(fm.declined(flat_noisy[: i + 1]) for i in range(len(flat_noisy)))
+    decline = [100.0 * 0.97**k for k in range(6)]
+    assert fm.declined(decline[:5]) and not fm.declined(decline[:3])
+    assert not fm.declined([100.0, 100.0, 100.0, 90.0])  # one bad day is not a decline
+    assert fm.declined([100.0, 100.0, 100.0, 90.0, 90.0])  # two in a row is
 
 
 def test_reduce_sets_is_never_positive_volume():

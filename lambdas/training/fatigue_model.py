@@ -62,8 +62,11 @@ THRESHOLDS: dict[str, dict[str, Any]] = {
     "e1rm_drop_pct": {
         "value": 0.05,
         "label": HEURISTIC,
-        "basis": "the latest pair of exposures of a compound both more than 5% under its best earlier e1RM (Epley) in the window "
-        "— the platform's existing practice line (critics_fatigue), not a citation and not his own variance",
+        "basis": "THE one performance read (`declined`, fix round 11): the latest pair of exposures both more than 5% under the "
+        "MEDIAN of the earlier ones (Epley, effort-adjusted, so a set logged harder at the same load x reps reads lower — the old "
+        "effort-drift vote folded in). The median, not the best, and two exposures in a row, not one: a lifter whose reps swing "
+        "+-2 around a flat strength (about +-5% of e1RM) is noise, not a decline (the tenth red team) — the platform's practice "
+        "line (critics_fatigue), not a citation and not his own variance",
     },
     "trend_recent_days": {
         "value": 14,
@@ -76,11 +79,6 @@ THRESHOLDS: dict[str, dict[str, Any]] = {
         "value": MIN_SESSIONS,
         "label": HEURISTIC,
         "basis": "the stall detector's own trend floor (stall_detector.MIN_SESSIONS)",
-    },
-    "rpe_drift": {
-        "value": 1.0,
-        "label": HEURISTIC,
-        "basis": "the same load x reps logged at least 1 RPE point harder than its first exposure in the window",
     },
     "discomfort_sessions": {
         "value": 2,
@@ -270,6 +268,18 @@ def session_role(workout: dict[str, Any]) -> str:
     return role if role in ("upper_heavy", "lower_heavy", "shoulders_arms", "upper_volume", "lower_volume", "full_body") else ""
 
 
+def declined(e1: list[float]) -> bool:
+    """THE one performance read (fix round 11; `e1rm_drop_pct`): an e1RM series, oldest first, whose latest two values are both
+    more than the noise band under the median of the earlier ones (at least one earlier). Read per lift by the trend
+    (`regressing`) and, over the anchors, by the systemic slump (`live_load.slump`) — the fatigue model's ONE strength vote."""
+    if len(e1) < 3:
+        return False
+    earlier = sorted(e1[:-2])
+    mid = len(earlier) // 2
+    median = earlier[mid] if len(earlier) % 2 else (earlier[mid - 1] + earlier[mid]) / 2
+    return all(v < median * (1 - THRESHOLDS["e1rm_drop_pct"]["value"]) for v in e1[-2:])
+
+
 def _judge(pts: list[tuple[str, float | None, float | None, float | None, int | None]]) -> dict[str, Any]:
     """The trend over readable points of one session role."""
     from training import stall_detector
@@ -278,9 +288,8 @@ def _judge(pts: list[tuple[str, float | None, float | None, float | None, int | 
         return {"trend": "unknown", "why": f"{len(pts)} exposure(s) with a readable top set"}
     drop = THRESHOLDS["e1rm_drop_pct"]["value"]
     e1 = [float(p[1] or 0.0) for p in pts]
-    best_before = max(e1[:-2]) if len(e1) > 2 else e1[0]
-    if len(e1) > 2 and all(v < best_before * (1 - drop) for v in e1[-2:]):
-        return {"trend": "regressing", "why": f"the latest pair of exposures are both more than {drop:.0%} under the best before them"}
+    if declined(e1):
+        return {"trend": "regressing", "why": f"the latest pair of exposures are both more than {drop:.0%} under the median before them"}
     if _recent_best(pts, e1):
         return {"trend": "progressing", "why": f"a new best e1RM in the last {THRESHOLDS['trend_recent_days']['value']} days"}
     if _load_pr(pts):  # a heavier top load at an equal e1RM is the double progression stepping, never a stall
@@ -344,7 +353,7 @@ def _recent_best(pts: list[tuple[str, float | None, float | None, float | None, 
 
 
 def movement_signals(workouts: list[dict[str, Any]] | None, *, as_of: str, window_days: int = 42) -> dict[str, dict[str, Any]]:
-    """Template id -> {exposures, trend, why, discomfort_sessions, pain_sessions, rpe_drift} over the window (the block)."""
+    """Template id -> {exposures, trend, why, discomfort_sessions, light_sessions, pain_sessions} over the window (the block)."""
     from training.live_rules import LIGHT, note_class  # #5861 FIX5: a joint-located "sore" at the mild line is light discomfort
     from training.training_notes_pain import DISCOMFORT, PAIN
 
@@ -377,7 +386,6 @@ def movement_signals(workouts: list[dict[str, Any]] | None, *, as_of: str, windo
             "discomfort_sessions": sum(1 for _d, c in classes if c == DISCOMFORT),
             "light_sessions": sum(1 for _d, c in classes if c == LIGHT),  # FIX5: kept, lighter (the joint rule) — never swapped
             "pain_sessions": sum(1 for _d, c in classes if c == PAIN),
-            "rpe_drift": _rpe_drift(points),
         }
     return out
 
@@ -385,21 +393,6 @@ def movement_signals(workouts: list[dict[str, Any]] | None, *, as_of: str, windo
 def _int(v: Any) -> int | None:
     n = _num(v)
     return int(n) if n is not None else None
-
-
-def _rpe_drift(points: list[tuple[str, float | None, float | None, float | None, int | None]]) -> bool | None:
-    """True when the same load x reps was logged `rpe_drift` points harder than its first logged exposure."""
-    seen: dict[tuple[float, int], float] = {}
-    drift = None
-    for _d, _e, rpe, load, reps in points:
-        if rpe is None or load is None or reps is None:
-            continue
-        key = (round(load, 1), reps)
-        if key in seen:
-            drift = bool(drift) or rpe - seen[key] >= THRESHOLDS["rpe_drift"]["value"]
-        else:
-            seen[key] = rpe
-    return drift
 
 
 def axial_stacking(workouts: list[dict[str, Any]] | None, index: dict[str, dict[str, Any]], *, as_of: str) -> list[dict[str, Any]]:
@@ -504,6 +497,7 @@ def _systemic(
     hard_sets: dict,
     landmarks: dict | None,
     movs: dict,
+    slump: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     out = []
     tier = str(readiness or "").lower()
@@ -542,16 +536,11 @@ def _systemic(
             "muscle_sets_over_mrv",
         )
     )
-    regress = sorted(t for t, s in movs.items() if s.get("trend") == "regressing")
-    out.append(
-        _signal(
-            "strength", "strain" if regress else ("ok" if movs else "unknown"), f"regressing: {len(regress)} movement(s)", "e1rm_drop_pct"
-        )
-    )
-    drift = sorted(t for t, s in movs.items() if s.get("rpe_drift"))
-    out.append(
-        _signal("effort_drift", "strain" if len(drift) >= 2 else ("ok" if movs else "unknown"), f"{len(drift)} drifting", "rpe_drift")
-    )
+    # fix round 11 (the tenth red team: rep noise fired a strength vote AND an effort-drift vote): ONE performance vote — the
+    # systemic slump over the anchors (`live_load.slump`, each anchor read by `declined`); a single lift's decline is the load
+    # model's (reps under its floor step it down), never a recovery vote
+    why = f"{slump['declining']} of {slump['judged']} anchors declining together" if slump else "no systemic decline"
+    out.append(_signal("strength", "strain" if slump else ("ok" if movs else "unknown"), why, "e1rm_drop_pct"))
     return out
 
 
@@ -597,14 +586,16 @@ def assess(
     planned_per_week: int = 5,
     session_minutes: float | None = None,
     minutes_ceiling: float | None = None,
+    slump: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """The recovery state and the recommended action (module doc). Pure; deterministic for its inputs."""
+    """The recovery state and the recommended action (module doc). Pure; deterministic for its inputs. `slump`: the live
+    session's systemic-decline read (`live_load.slump`), the one performance vote."""
     index = library_index(lib)
     movs = movement_signals(workouts, as_of=as_of)
     hard = hard_sets_by_muscle(workouts, index, as_of=as_of)
     stacking = axial_stacking(workouts, index, as_of=as_of)
     adh = adherence(workouts, as_of=as_of, planned_per_week=planned_per_week)
-    signals = _systemic(readiness, acwr, sleep_hours, cardio_load, hard, landmarks, movs)
+    signals = _systemic(readiness, acwr, sleep_hours, cardio_load, hard, landmarks, movs, slump)
     strain = [s["signal"] for s in signals if s["state"] == "strain"]
     regressing = any(s["signal"] == "strength" and s["state"] == "strain" for s in signals)
     bad_day = any(s["signal"] in ("readiness", "sleep") and s["state"] == "strain" for s in signals)
@@ -700,7 +691,12 @@ def apply_to_session(
 
 
 def for_live_draft(
-    rx: dict[str, Any], rotation: dict[str, Any] | None, inputs: Any, block_workouts: list[dict[str, Any]] | None, trim_order: Any = None
+    rx: dict[str, Any],
+    rotation: dict[str, Any] | None,
+    inputs: Any,
+    block_workouts: list[dict[str, Any]] | None,
+    trim_order: Any = None,
+    slump: dict[str, Any] | None = None,
 ) -> dict:
     """The draft path's hook (`full_body_session._prescription`): LIVE only — assess from what the draft already carries
     (the generator inputs' readiness tier, the block's Hevy record, the library, the landmarks, the session estimate) and
@@ -725,6 +721,7 @@ def for_live_draft(
             planned_per_week=len(program_structure.SPLIT_ROLES),
             session_minutes=(rx.get("session_minutes") or {}).get("lifting_minutes"),
             minutes_ceiling=charter_value("split.session_minutes.lifting_ceiling"),
+            slump=slump,
         )
     except Exception as e:  # noqa: BLE001 — the fatigue model never blocks a draft
         import logging

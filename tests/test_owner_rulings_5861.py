@@ -132,18 +132,19 @@ def _effort_top(note: str | None) -> float | None:
     return sw.lift_effort(note)
 
 
-def test_ruling_5_squat_and_deadlift_are_never_both_maximal_and_the_lead_alternates(weeks):
-    assert lr.lead_of("2026-11-16") == "hinge" and lr.lead_of("2026-11-23") == "squat"  # ISO weeks 47 / 48
+def test_ruling_5_the_squat_leads_and_the_deadlift_runs_a_notch_lower_every_week(weeks):
+    """Fix round 11 (the tenth red team's simpler rule): the squat always leads at the session's effort; the deadlift is a top set
+    + one back-off at RPE <= deadlift_rpe (8) — every week, no ISO-week alternation. Control: the rule off -> both at RPE 9."""
     a = weeks["a_large_deficit_experienced"]["week"]
     lh = {x["key"]: x for x in _lifts(a, "lower_heavy")}
     squat, dl = _effort_top(lh["squat_barbell"]["hevy_note"]), _effort_top(lh["deadlift_barbell"]["hevy_note"])
-    assert dl == 9 and squat == live_settings.value("second_lift_band")[1]  # the deadlift leads this (odd) week
+    assert squat == 9 and dl == live_settings.value("deadlift_rpe") == 8
     assert lh["deadlift_barbell"]["working_sets"] == 2  # top set + one back-off
     prof = PROFILES["a_large_deficit_experienced"]
     nxt = _week("a", profile=prof | {"days": [sw._day(d, 7) for d in prof["days"]]} | {"as_of": sw._day(prof["as_of"], 7)})
     lh2 = {x["key"]: x for x in _lifts(nxt["week"], "lower_heavy")}
-    assert _effort_top(lh2["squat_barbell"]["hevy_note"]) == 9 and _effort_top(lh2["deadlift_barbell"]["hevy_note"]) == 8  # alternates
-    both = _week("a_large_deficit_experienced", {(lr, "lead_lift"): lambda rx, ctx, trends=None: []})["week"]  # control
+    assert _effort_top(lh2["squat_barbell"]["hevy_note"]) == 9 and _effort_top(lh2["deadlift_barbell"]["hevy_note"]) == 8  # no swap
+    both = _week("a_large_deficit_experienced", {(lr, "lead_lift"): lambda rx, ctx: []})["week"]  # control
     lh = {x["key"]: x for x in _lifts(both, "lower_heavy")}
     assert _effort_top(lh["squat_barbell"]["hevy_note"]) == _effort_top(lh["deadlift_barbell"]["hevy_note"]) == 9
 
@@ -152,7 +153,7 @@ def test_ruling_5_a_swapped_out_deadlift_is_not_a_second_maximal_lift(weeks):
     f = weeks["f_high_fatigue_poor_sleep"]["week"]  # discomfort swaps the deadlift for a hip thrust
     lines = [ln for s in f["sessions"] if s["role"] == "lower_heavy" for ln in s["live_fit"] or []]
     assert "deadlift_barbell" not in {x["key"] for x in _lifts(f, "lower_heavy")}
-    assert not any(ln.startswith("lead lift (live)") for ln in lines)
+    assert not any(ln.startswith("heavy lower (live)") for ln in lines)
 
 
 # ── ruling 6: overhead press 3 sets, from the lateral raises ────────────────────────────────────────────────────────────────

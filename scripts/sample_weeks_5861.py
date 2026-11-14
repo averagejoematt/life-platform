@@ -927,7 +927,8 @@ LIVE_PREFIXES = (
     "full body (live)",
     "capped (live)",
     "short week (live",
-    "lead lift (live)",  # #5861 FIX6
+    "heavy lower (live)",  # #5861 fix round 11 (ruling 5: the squat leads)
+    "in-session step (live)",  # #5861 fix round 11 (R3)
     "top-up (live)",
     "priority (live)",
     "evidence (live)",

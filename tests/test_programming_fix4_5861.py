@@ -219,12 +219,14 @@ def _held(s: dict) -> set[str]:
 
 
 def stepping(week: dict) -> list[str]:
-    """Any in-session load-step line on any lift (fix round 10: double progression is the one progression system under live)."""
+    """Any in-session load-step line on any lift other than the ONE bounded R3 line (fix round 10: double progression is the one
+    progression system under live; fix round 11: the owner's R3 restored in one bounded form, `live_safety.R3_LINE`)."""
+    r3 = re.compile("^" + re.escape(lsafe.R3_LINE).replace(re.escape("{step}"), ".+") + "$")
     return [
         f"{s['role']}: {x['key']}"
         for s in week["sessions"]
         for x in s["lifts"]
-        if any(lsafe._step_line(ln) for ln in (x["hevy_note"] or "").split("\n"))
+        if any(lsafe._step_line(ln) and not r3.match(ln.strip()) for ln in (x["hevy_note"] or "").split("\n"))
     ]
 
 
@@ -258,9 +260,8 @@ def test_the_session_line_never_contradicts_a_big_lift(weeks):
         (lsafe, "coherent_effort"): lambda blocks, rx: None,
         (lsafe, "fix_block"): lambda block, rx, blocks: lsafe.block_rule(block),
     }
-    assert session_conflicts(
-        _week("a_large_deficit_experienced", off)["week"]
-    )  # control: the per-lift guard only — the second lift's RPE 7-8 under a session line of 8-9 (fix round 9: a hold day caps all)
+    with patch.dict(lset.HEURISTICS["deadlift_rpe"], {"value": 7}):  # control: the per-lift guard only, a lift capped at 7
+        assert session_conflicts(_week("a_large_deficit_experienced", off)["week"])
 
 
 # ── 5. volume ────────────────────────────────────────────────────────────────
@@ -442,7 +443,8 @@ def test_the_band_pull_up_is_a_built_in_vertical_pull():
     assert CAT0["pull_up_band"]["hevy_template_id_hint"] == "56808FD2" and CAT0["pull_up_band"]["is_custom"] is False
     assert CAT0["pull_up_band"]["anchor_family"] == "vertical_pull"
     e = LIB0["movements"]["pull_up_band"]
-    assert e["template_id"] == "56808FD2" and e["gates"] == [] and e["objective_inputs"]["reviewed"]
+    # fix round 11 (owner ruling #3: the band pull-up gate stays LOCKED): the pull-up negative's locked gates, never ungated
+    assert e["template_id"] == "56808FD2" and e["gates"] == ["bw_pull", "chain_pull_negative"] and e["objective_inputs"]["reviewed"]
 
 
 def test_the_generous_tiers_and_the_trunk_categories_are_corrected_at_their_inputs():

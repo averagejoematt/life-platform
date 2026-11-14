@@ -18,15 +18,23 @@ them with ONE model, keyed by SESSION ROLE (a heavy day and a volume day are two
      never triggers it (it only sizes the step, read clamped like the slump's decline read).
   3. EFFORT UNKNOWN. RPE missing on every set, or >= 9.5 on every set: the step up rides on reps alone (rule 1); effort can never
      move a load down on its own (rule 2 reads reps only).
-  4. SYSTEMIC SLUMP. Four or more anchors declining together (or, in a deficit, half or more): every load HOLDS (rule 1) and
-     non-priority accessories lose about a third of their sets (`slump_trim`); priority muscles keep theirs.
-  5. FIRST SESSION BACK (owner ruling #10). 10+ days with no session: each lift's first session back runs at RPE 8 at its last
-     same-role load (a hold, rule 1).
-  6. THE SECOND LIFT (owner ruling 5). The heavy-lower lift that does not lead runs at RPE 7-8, loaded from its own same-role
-     e1RM at that band — never above its last load. The lead progresses from its own lead exposures; one of them under the floor
-     steps it down at its next lead (its exposures are a week apart, the second-lift morning between).
+  4. SYSTEMIC SLUMP — THE ONE PERFORMANCE SIGNAL (fix round 11, the tenth red team: rep noise voted twice). Each anchor's
+     same-role e1RM is read by ONE rule (`fatigue_model.declined`: the latest two exposures both under the median of the earlier
+     ones by more than the noise band). Four or more anchors declined together (or, in a deficit, half or more): every load
+     HOLDS (rule 1), non-priority accessories lose about a third of their sets (`slump_trim`), and the fatigue model counts it as
+     its ONE performance strain vote (`strength`) — no separate effort-drift or per-lift regression vote reads the same series.
+  5. FIRST SESSION BACK (owner ruling #10). 10-20 days with no session: each lift's first session back runs at RPE 8 at its last
+     same-role load (a hold, rule 1). 21+ days (`long_layoff_days`, fix round 11): it starts `long_layoff_pct` under that load.
+  6. THE HEAVY LOWER MORNING (owner ruling 5; fix round 11 — the tenth red team's ratchet): the squat always leads at the
+     session's effort; the deadlift is a top set + one back-off capped at RPE 8 (`live_rulings.lead_lift`). Each is an ordinary
+     lift of this model: loaded from its NEWEST same-role exposure, down only after two exposures under the floor, up at the top
+     of the range at or under its own target (the deadlift's is its cap).
   7. NOVELTY (three rules). A NEW pattern (none logged in ~8 weeks) runs one exposure at RPE <= 7; a FAMILIAR pattern (a
      biomechanically similar swap included) works at normal effort with no re-entry cap; the layoff rule is 5.
+  8. ONE BOUNDED IN-SESSION STEP (fix round 11, the owner's 2026-10-27 R3 rule restored, pending his confirmation): when the
+     first working set of a straight-set lift lands at RPE <= 7, the remaining sets go up one load step — never down in-session, never on a lift that
+     is held for a reason (a pain flag, a first session back, a slump or strained day), stepped down, new, or capped at RPE 7
+     (`r3_eligible`; the note line is `live_safety.r3_lines`). It feeds double progression: the next session reads the new top.
 
 Every number is a labelled heuristic in `live_settings.HEURISTICS`. The engine's own load (the v0.3 ramp) stands only for a lift
 with no same-role exposure in the window. In shadow nothing here runs (the callers check the live mark first)."""
@@ -139,11 +147,10 @@ def topped(r: dict[str, Any], rep_hi: int, target_rpe: float, unknown: bool) -> 
 
 
 def declining(rows: list[dict[str, Any]]) -> bool:
-    """A lift whose same-role e1RM fell `decline_pct`+ over its last three exposures and did not recover in between."""
-    if len(rows) < 3:
-        return False
-    drop = float(cfg.value("decline_pct"))
-    return read_e1rm(rows[0]) <= read_e1rm(rows[1]) and read_e1rm(rows[0]) < read_e1rm(rows[2]) * (1 - drop)
+    """Rule 4: the ONE performance read (`fatigue_model.declined`) over this lift's same-role decline reads (most recent first)."""
+    from training.fatigue_model import declined
+
+    return declined([read_e1rm(r) for r in reversed(rows)])
 
 
 def slump(hist: dict[str, list[dict[str, Any]]], anchor_tids: set[str], deficit: bool | None, target_date: str) -> dict[str, Any] | None:
@@ -182,16 +189,6 @@ def layoff(workouts: Any, target_date: str) -> dict[str, Any] | None:
     return None
 
 
-def lead_rows(rows: list[dict[str, Any]], e: dict[str, Any]) -> list[dict[str, Any]]:
-    """The heavy-lower exposures in which this lift LED (owner ruling 5: the lead alternates by ISO week, `live_rulings.lead_of`):
-    a lead's load progresses from its own lead days, never from the capped second-lift day before it. All rows when none led."""
-    from training.live_rulings import lead_of
-
-    pattern = str(e.get("pattern") or "")
-    own = [r for r in rows if lead_of(r["date"]) == pattern]
-    return own or rows
-
-
 def _floor_to_implement(kg: float, equipment: str | None) -> float:
     from training.rep_scheme import implement_step_lb, load_step_kg
 
@@ -217,18 +214,19 @@ def decide(
     equipment: str | None,
     *,
     hold: str | None = None,
-    second_band: tuple[int, int] | None = None,
-    lead: bool = False,
+    target_rpe: float = TARGET_RPE,
+    layoff_days: int | None = None,
 ) -> dict[str, Any] | None:
-    """One lift's load: {kg, mode: up|hold|down|second, why, clause} from its same-role exposures (most recent first), or None
-    (no exposure in the window: the engine's own load stands). Two rules (module doc 1-2): DOWN when the top set sat under the
-    floor in the last two exposures — first, so nothing blocks it; UP at the top of the range unless `hold` (the day's or the
-    lift's reason: a slump, a strained day, a pain flag, a first session back) stops it. `lead`: the heavy-lower lead judged on its
-    own lead exposures (rule 6), a week apart with the second-lift morning between — one under the floor is two exposures. Pure."""
+    """One lift's load: {kg, mode: up|hold|down, why, clause} from its same-role exposures (most recent first, the NEWEST is the
+    reference), or None (no exposure in the window: the engine's own load stands). Two rules (module doc 1-2): DOWN when the top
+    set sat under the floor in the last two exposures — first, so nothing blocks it; UP at the top of the range at or under
+    `target_rpe` (the lift's own effort cap when it has one: the capped deadlift steps up after an easy top set) unless `hold`
+    (the day's or the lift's reason: a slump, a strained day, a pain flag, a first session back) stops it. `layoff_days`: a first
+    session back after `long_layoff_days`+ starts `long_layoff_pct` under the last load (rule 5). Pure."""
     if not rows:
         return None
     last = _top(rows[0])["kg"]
-    if below_floor(rows, rep_lo, 1 if lead else None):  # at least one step; enough to reach the floor again on the last exposure's own read
+    if below_floor(rows, rep_lo):  # at least one step; enough to reach the floor again on the last exposure's own read
         kg = _floor_to_implement(min(last * (1 - float(cfg.value("step_down_pct")) / 100.0), floor_load(rows[0], rep_lo)), equipment)
         n = int(cfg.value("below_floor_exposures"))
         return {
@@ -237,16 +235,15 @@ def decide(
             "why": f"under {rep_lo} reps {n} sessions running",
             "clause": f"Lighter today: under {rep_lo} reps {n} sessions running.",
         }
-    if second_band:  # rule 6: its own e1RM at the lower band (a logged 9.5-10 read as 9: never a collapse on unreliable RPE)
-        lo, hi = second_band
-        kg = min(_floor_to_implement(read_e1rm(rows[0]) / (1 + (rep_lo + 10.0 - (lo + hi) / 2) / 30.0), equipment), last)
+    if layoff_days is not None and layoff_days >= int(cfg.value("long_layoff_days")):  # rule 5: the dose scales with the gap
+        pct = float(cfg.value("long_layoff_pct"))
         return {
-            "kg": kg,
-            "mode": "second",
-            "why": f"the second lift: RPE {lo}-{hi}",
-            "clause": "The second lift today: the other lift leads.",
+            "kg": _floor_to_implement(last * (1 - pct / 100.0), equipment),
+            "mode": "down",
+            "why": f"first session back after {layoff_days} days off",
+            "clause": f"Lighter today: first session back after {layoff_days} days off.",
         }
-    if not hold and topped(rows[0], rep_hi, TARGET_RPE, effort_unknown(rows)):
+    if not hold and topped(rows[0], rep_hi, target_rpe, effort_unknown(rows)):
         return {
             "kg": _step_up(last, equipment),
             "mode": "up",
@@ -255,6 +252,19 @@ def decide(
         }
     why = hold or "reps first"
     return {"kg": last, "mode": "hold", "why": why, "clause": f"Same load: {hold}." if hold else f"Same load: build to {rep_hi} reps."}
+
+
+def r3_eligible(e: dict[str, Any], d: dict[str, Any] | None, held_day: bool) -> bool:
+    """Rule 8: the bounded in-session step may ride this lift — a loaded, straight-set, non-carry lift that is not new, not a first session
+    back, not pain-touched or held for a reason, not stepped down, not capped at RPE 7 or under, on a day that holds nothing
+    (`held_day`: a slump, a strained or deload-recommended day). `d`: the lift's load decision (None: no same-role history)."""
+    if e.get("intensity") == "carry" or e.get("live_new") or e.get("live_first_back") or e.get("live_stop") or held_day:
+        return False
+    if (e.get("live_load") or {}).get("hold") or (e.get("live_effort") is not None and int(e["live_effort"]) <= 7):
+        return False
+    if any(x.get("kind") in ("top", "back_off") for x in e.get("sets") or []):  # a top set + back-offs is not "the later sets"
+        return False
+    return not d or d.get("mode") == "up" or (d.get("mode") == "hold" and d.get("why") == "reps first")
 
 
 # ── novelty ──────────────────────────────────────────────────────────────────
@@ -283,8 +293,14 @@ def mark_novelty(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> None
     seen = familiar_patterns(workouts, ctx.get("lib"), target)
     gap = layoff(workouts, target)
     ctx["layoff"] = gap
-    since = {
-        str(x.get("template_id") or "").upper() for w in workouts or [] if gap and gap["end"] <= _day(w) for x in w.get("exercises") or []
+    from training.fatigue_model import session_role
+
+    role = str(rx.get("session_role") or "")
+    since = {  # fix round 11: keyed by session role — a heavy and a volume day of one template are two lifts (rule 5 per lift)
+        (str(x.get("template_id") or "").upper(), session_role(w))
+        for w in workouts or []
+        if gap and gap["end"] <= _day(w)
+        for x in w.get("exercises") or []
     }
     logged = {str(x.get("template_id") or "").upper() for w in workouts or [] for x in w.get("exercises") or [] if x.get("sets")}
     for e in rx.get("exposures") or []:
@@ -292,7 +308,7 @@ def mark_novelty(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> None
             continue
         entry = _lib(e, ctx)
         tid = tid_of(e.get("movement_key"), ctx["catalog"], ctx.get("lib"), ctx.get("idx"))
-        if gap and tid and tid in logged and tid not in since:
+        if gap and tid and tid in logged and (tid, role) not in since and (tid, "") not in since:
             e["live_first_back"] = True
             e["live_effort"] = min(int(cfg.value("first_back_rpe")), int(e.get("live_effort") or 99))
             e["live_familiar"] = True
@@ -354,14 +370,28 @@ def set_loads(
         lo = min(int(getattr(s, "rep_range_start", 0) or 0) or 99 for s in work)
         hi = max(int(getattr(s, "rep_range_end", 0) or 0) for s in work) or lo
         lo = lo if lo != 99 else hi
+        tmpl = [r for r in (x.get("reps") for x in e.get("sets") or []) if isinstance(r, list | tuple) and r]
+        if tmpl and (min(int(r[0]) for r in tmpl), max(int(r[-1]) for r in tmpl)) != (lo, hi):
+            # fix round 11: the ONE model judges the prescription's own range — the engine's rep step ("+2 reps to 6", #5052)
+            # moved the floor under it and the next session read 4 reps in a 4-6 range as "under 6" (a second rule, undone here)
+            lo, hi = min(int(r[0]) for r in tmpl), max(int(r[-1]) for r in tmpl)
+            for s in work:
+                s.rep_range_start, s.rep_range_end = lo, hi
+        from training.rep_scheme import DUMBBELL_KINDS, implement_step_lb
+
+        eq = str(entry.get("equipment") or "")
+        mark.setdefault("r3_step", {})[str(b.movement_key)] = [  # rule 8's step on this implement (None: a cable's next pin)
+            implement_step_lb(eq, max(float(s.weight_kg) for s in work) / KG_PER_LB),
+            eq.strip().lower() in DUMBBELL_KINDS,
+        ]
         rows = same_role(hist.get(tid) or [], role, target_date, lo, hi)
         if not rows and hold_all:  # a hold day holds a lift with no same-role exposure at its latest load of any role
             rows = same_role([r | {"role": ""} for r in hist.get(tid) or []], "", target_date, 0, 99)
-        band = tuple(e["live_effort_band"]) if e.get("live_lead") == "second" and e.get("live_effort_band") else None
-        led = lead_rows(rows, e) if e.get("live_lead") else rows  # rule 6: a lead progresses from its own LEAD exposures
         flag = e.get("live_load") or {}
         hold = "first session back" if e.get("live_first_back") else (str(flag.get("why") or "held") if flag.get("hold") else hold_all)
-        d = decide(rows if band else led, lo, hi, entry.get("equipment"), hold=hold, second_band=band, lead=len(led) < len(rows))
+        gap = int((mark.get("layoff") or {}).get("gap_days") or 0) if e.get("live_first_back") else None
+        target = min(TARGET_RPE, float(e["live_effort"])) if e.get("live_effort") else TARGET_RPE  # a capped lift's own target
+        d = decide(rows, lo, hi, entry.get("equipment"), hold=hold, target_rpe=target, layoff_days=gap)
         if d is None:
             continue
         engine = max(float(s.weight_kg) for s in work)

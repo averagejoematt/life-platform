@@ -15,9 +15,10 @@ WHY IT EXISTS. A fourth independent red team (2026-11-12) graded the engine B- (
   2. MILD PAIN KEEPS THE LIFT (`mild`, `mild_pain_tids`). PAIN_RULE says a stated score at or under 3/10, not sharp, keeps the
      movement lighter; the session fit and the selection swapped it anyway (any pain-class note). Both layers now keep it, and
      every lift the pain rule touched carries an in-set stop line (`stop_line`).
-  3. ONE LOAD RULE IN THE NOTES (`no_step`, fix round 10). Double progression (`live_load`) is the one progression system under
-     live: the in-session RPE load step ("Top reps at RPE 7 or less → +10 lb on later sets") is a second one — it sat next to
-     "Same load: build to 12 reps" on one lift (the ninth red team) — so it is dropped from every note, held lift or not.
+  3. ONE LOAD RULE IN THE NOTES (`no_step`, fix round 10; `r3_lines`, fix round 11). Double progression (`live_load`) is the
+     one progression system under live: the engine's in-session load-step lines are dropped from every note, and the ONE bounded
+     in-session step (`live_load` rule 8, the owner's R3: set 1 at RPE 7 or easier → one load step on later sets, never down) is
+     written back only on a lift the session-to-session rule does not hold, step down or cap.
   4. ONE EFFORT ACROSS THE SESSION (`coherent_effort`, `big_lift_conflicts`). "Lower heavy · RPE 7 on big lifts" sat two lines
      above a deadlift's own "RPE 8–9": the guard read one lift at a time.
   5. THE STOP LINE (`symptom_text`, `lifting_day_symptom`). A second wording preset (`symptom_line: "extended"`) adds "heart
@@ -156,6 +157,41 @@ def no_step(blocks: list[Any], rx: dict[str, Any]) -> list[str]:
         dropped += len(lines) - len(kept) + (block or "").count("\n") - (new or "").count("\n")
         b.notes = new + ("\n\n" + "\n".join(kept) if kept else "") if new else "\n".join(kept)
     return [f"one load rule (live): {dropped} in-session load-step line(s) dropped — double progression only"] if dropped else []
+
+
+R3_LINE = "Set 1 at RPE 7 or easier → {step} on later sets."
+"""Rule 8 of `live_load` (fix round 11: the owner's 2026-10-27 R3 in-session rule, ONE bounded form): never down in-session."""
+
+
+def r3_text(step: Any) -> str:
+    """The bounded in-session step's line for one lift (`R3_LINE`); `step` [lb or None, per hand]."""
+    from training import hevy_note_grammar as g
+
+    lb, per_hand = (list(step or []) + [None, False])[:2]
+    return R3_LINE.format(step=g._step_text(lb, bool(per_hand)) if lb else "the next pin")
+
+
+def r3_lines(blocks: list[Any], rx: dict[str, Any]) -> list[str]:
+    """IN PLACE, live only, after `no_step`: the ONE in-session step (`live_load` rule 8) on every eligible lift's own note — a
+    loaded lift whose session-to-session decision is a step up or a reps-first hold, never one held for a reason, stepped down,
+    new, first back, pain-touched or capped at RPE 7, never on a hold day (`live_load.r3_eligible`). Returns the line."""
+    from training import live_load, live_session as ls, session_block as sb
+
+    mark = rx.get(ls.MARK) or {}
+    guard = {d["key"]: d for d in mark.get("load_guard") or []}
+    by_key = {e.get("movement_key"): e for e in rx.get("exposures") or []}
+    held_day = bool(mark.get("hold_all")) or (rx.get("fatigue") or {}).get("state") in ("strained", "overreached")
+    steps = mark.get("r3_step") or {}
+    n = 0
+    for b in blocks:
+        e = by_key.get(b.movement_key)
+        if e is None or str(b.movement_key) not in steps or not live_load.r3_eligible(e, guard.get(b.movement_key), held_day):
+            continue
+        b.notes = sb.add_reason(b.notes, r3_text(steps[str(b.movement_key)]))
+        n += 1
+    return (
+        [f"in-session step (live): {n} lift(s) step up one load step on later sets when set 1 lands at RPE 7 or easier (R3)"] if n else []
+    )
 
 
 # ── 4. one effort across the session ─────────────────────────────────────────
