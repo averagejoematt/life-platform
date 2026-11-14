@@ -5,6 +5,7 @@
 import Base from "../../layouts/Base.astro";
 import Provenance from "../../components/Provenance.astro";
 import LabEntry from "../../components/LabEntry.astro"; // the Laboratory (L1): renders nothing unless WEB_LAB=1
+import { labEnabled } from "../../lib/lab.js";
 import { headline, weeklyBars } from "../../lib/chart.js";
 import { dayInWords, num } from "../../lib/format.js";
 import { loadAll, loadJourney, loadPairs, loadSeries } from "../../lib/snapshot.js";
@@ -134,7 +135,10 @@ function bars(days: any[]) {
       }
     </div>
   </section>
-  <section class="wrap" style="padding-bottom:56px">
+  {/* 2026-11-14: with the Laboratory on, two empty boxes here ("Insights · 0", "Experiments · 0 — None running.") sat
+      under the Lab's own line (6 tests being checked, 2 ready) and read as a contradiction. They render only when they
+      carry something, or when there is no Lab to say it. */}
+  {(insights.length > 0 || experiments.length > 0 || !labEnabled()) && <section class="wrap" style="padding-bottom:56px">
     <div class="grid cols2" style="gap:48px;align-items:start">
       <div>
         <p class="label" style="margin-bottom:8px">Insights · {insights.length}</p>
@@ -180,5 +184,5 @@ function bars(days: any[]) {
         }
       </div>
     </div>
-  </section>
+  </section>}
 </Base>

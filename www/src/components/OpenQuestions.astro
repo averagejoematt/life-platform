@@ -1,0 +1,161 @@
+---
+// The open questions (2026-11-14). The experiment's premise is a question it cannot answer yet, and the front page
+// showed progress and a record but never the tension. Four questions the owner set for the project — each answered only
+// with what the snapshot already publishes, and each saying plainly what is missing. Nothing here is a prediction, a
+// score of how he feels, or a new claim: every figure is carried from journey.json, calibration.json, lab.json or the
+// edition; a question whose evidence is not served says so instead of guessing.
+import { verifiedLead } from "../lib/calibration.js";
+import { kOfN, num } from "../lib/format.js";
+import { labEnabled } from "../lib/lab.js";
+import { labCounts } from "../lib/laboratory.js";
+import { roomPublic } from "../lib/room.js";
+import { loadCalibration, loadJourney, loadLab } from "../lib/snapshot.js";
+import { href } from "../lib/url.js";
+
+interface Props {
+  foodText?: string | null;
+  measured: number;
+}
+const { foodText = null, measured } = Astro.props as Props;
+const WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+const w = (n: number) => WORDS[n] || String(n);
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+async function safe<T>(f: () => Promise<T>): Promise<T | null> {
+  try {
+    return await f();
+  } catch {
+    return null;
+  }
+}
+const journey: any = await safe(loadJourney);
+const j = journey && journey.state === "ok" ? journey : null;
+const calFile: any = roomPublic() ? await safe(loadCalibration) : null;
+const lead = calFile && calFile.state === "ok" ? verifiedLead(calFile.calibration || {}) : null;
+const labFile: any = labEnabled() ? await safe(loadLab) : null;
+const lab = labFile && labFile.state === "ok" ? labFile : null;
+const counts = lab ? labCounts(lab) : null;
+const tests = lab ? (lab.lab_tests || []).filter((t: any) => t.status !== "archived") : [];
+const decided = tests.filter((t: any) => {
+  const v = t.verdict && typeof t.verdict === "object" ? t.verdict.result : t.verdict;
+  return v && v !== "inconclusive";
+}).length;
+
+const rate = j && typeof j.weekly_rate_lbs === "number" ? Math.abs(j.weekly_rate_lbs) : null;
+const lo = j && typeof j.weekly_rate_ci_high === "number" ? Math.abs(j.weekly_rate_ci_high) : null;
+const hi = j && typeof j.weekly_rate_ci_low === "number" ? Math.abs(j.weekly_rate_ci_low) : null;
+
+const questions = [
+  {
+    q: "Can he keep this pace without losing strength?",
+    have:
+      rate != null
+        ? `Losing about ${num(rate, 1)} lb a week${lo != null && hi != null ? ` (95% interval ${num(lo, 1)}–${num(hi, 1)})` : ""} — the pace the platform's rate flag watches, and it fired in Week 10.${foodText ? ` ${foodText}` : ""}`
+        : "The pace is not served in this snapshot.",
+    missing: "No public strength trend yet, and the scale's body-composition reading is too noisy to settle it.",
+    link: { to: "/data/", words: "The journey and the daily record" },
+  },
+  {
+    q: "Are the AI coaches any better than a guess?",
+    have: lead && lead.baseline
+      ? `Re-verified: the coaches ${kOfN(lead.k, lead.n)}, a guess that nothing changes ${kOfN(lead.baseline.right, lead.baseline.n)} of the same calls${lead.sign?.words ? ` — ${lead.sign.words}` : ""}.`
+      : "The re-verified record is not served in this snapshot.",
+    missing: "Too few calls of most kinds to tell a coach from luck; the record grows weekly.",
+    link: { to: "/system/", words: "The ledger and the grading" },
+  },
+  {
+    q: "Is getting healthier the same as getting happier?",
+    have: `${cap(w(measured))} of six dimensions ${measured === 1 ? "is" : "are"} measured in public every day${measured === 3 ? ": the body, sleep and recovery" : ""}.`,
+    missing: "Mind, connection and purpose have no public measure. The journal is private, and nothing here infers a feeling from a heartbeat.",
+    link: { to: "/privacy/", words: "What is measured, and what stays private" },
+  },
+  {
+    q: "Which experiments actually change anything?",
+    have: counts
+      ? `${cap(w(counts.testsOpen))} tests were written down before their data; ${decided ? `${w(decided)} ${decided === 1 ? "has" : "have"} a verdict` : "none has enough paired days for a verdict yet"}. ${counts.running ? `${cap(w(counts.running))} running` : "No experiment is running"}; ${w(counts.ready)} written and ready to start.`
+      : "The laboratory is not served in this snapshot.",
+    missing: "Nothing has run long enough to show a change it caused.",
+    link: { to: "/data/", words: "The laboratory, in the data room" },
+  },
+];
+---
+
+<section class="section hair" data-open-questions>
+  <div class="wrap">
+    <div class="between" style="margin-bottom:24px">
+      <h2>What nobody knows yet</h2>
+      <span class="label">The open questions · read from the record, never guessed</span>
+    </div>
+    <ol class="oq">
+      {
+        questions.map((x, i) => (
+          <li>
+            <span class="oq-n mono">0{i + 1}</span>
+            <h3>{x.q}</h3>
+            <p class="oq-have">{x.have}</p>
+            <p class="oq-missing">
+              <span class="label">Missing</span> {x.missing}
+            </p>
+            <a href={href(x.link.to)}>{x.link.words} →</a>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</section>
+
+<style>
+  .oq {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    border-top: 1px solid var(--ink);
+  }
+  .oq li {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 20px 22px 24px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .oq li + li {
+    padding-left: 22px;
+    border-left: 1px solid var(--rule);
+  }
+  .oq-n {
+    color: var(--cobalt);
+    font-size: 12px;
+  }
+  .oq h3 {
+    font-size: 22px;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+  .oq-have {
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.45;
+  }
+  .oq-missing {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+  .oq-missing .label {
+    margin-right: 4px;
+  }
+  .oq a {
+    margin-top: auto;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  @media (max-width: 820px) {
+    .oq li,
+    .oq li + li {
+      padding-left: 0;
+      border-left: 0;
+    }
+  }
+</style>
