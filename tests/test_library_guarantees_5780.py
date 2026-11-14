@@ -117,7 +117,7 @@ def _serve_program(lib: dict, cat: dict, *, kb: int, day: str = WARN_DAY, overla
         rows = [r for r in ledger.values() if r["block"] in (entry["block"], entry["block"] - 1)]
         rot = vr.plan(entry, cat, rows=rows, role="*", kb_exposures=kb, skill_ceiling=CEILING)
         served = se.apply(rot, cat, rows=rows, skill_ceiling=CEILING, target_date=day, lib=lib, overlay=overlay)
-        _record(ledger, served.get("ledger_writes"))
+        _record(ledger, (served.get("ledger_writes") or []) + (served.get("live_ledger_writes") or []))  # one in-memory ledger
         out.append((vr.position(entry), served))
     return out
 

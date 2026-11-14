@@ -32,6 +32,7 @@ class, home_gym availability); none is a new number.
 from __future__ import annotations
 
 import copy
+import re
 from collections import Counter
 from typing import Any
 
@@ -231,7 +232,7 @@ def for_live_draft(
     `week`: the served day's week plan (`live_sequence.entry_week`, on the day entry); `set_cap` the session set ceiling."""
     if not is_live(rotation):
         return rx
-    from training import fatigue_model, live_load, live_program, live_settings, live_volume
+    from training import fatigue_model, live_load, live_program, live_sequence, live_settings, live_volume
 
     out = copy.deepcopy(rx)
     lines: list[str] = []
@@ -266,15 +267,32 @@ def for_live_draft(
             "mild_pain": live_safety.mild_pain_tids(block_workouts),
             "pain_notes": live_safety.latest_notes(block_workouts),
         } | _week_ctx(week, inputs)
+        from training import in_block_variant
+
+        ctx["in_block"] = in_block_variant.performed_in_block(block_workouts, catalog, target)  # a guest anchor's variant
         mornings = int((week or {}).get("days") or 5)
         last = live_volume.last_trained(block_workouts, catalog, lib, target)  # the weekly memory (ties: longest ago first)
-        plan = live_volume.week_plan(catalog, lib, mornings, last=last, overlay=ctx["overlay"])
+        monday = live_sequence.week_start(target)  # before this week only: the plan is the same for every morning of the week
+        ctx["logged_tids"] = frozenset(
+            str(x.get("template_id") or "").upper()
+            for w in block_workouts or []
+            if str(w.get("date") or str(w.get("sk") or "")[5:15])[:10] < monday
+            for x in w.get("exercises") or []
+            if x.get("sets")
+        )
+        ctx["no_new"] = fatigue_model.strained_inputs(inputs, block_workouts, lib)  # a high-fatigue day adds nothing new
+        plan = live_volume.week_plan(
+            catalog, lib, mornings, last=last, overlay=ctx["overlay"], logged=ctx["logged_tids"], in_block=ctx["in_block"]
+        )
         ctx["volume_plan"] = plan
         role_rows = [r for r in plan["rows"] if r["role"] == rx.get("session_role")]
         plan_rows = dict(live_volume._count(role_rows))
         lines += [str((week or {})["line"])] if (week or {}).get("line") else []
+        if rx.get("session_role") == plan["week"]["roles"][0]:  # once a week, on its first morning
+            lines += [str(plan["priority_line"])] if plan.get("priority_line") else []
+            lines += [f"moved (live): {ln[len('moved: ') :]}" for ln in plan["lines"] if ln.startswith("moved: ")]
         lines += live_volume.apply(out, ctx, plan)
-        lines += fit_exposures(out, rotation or {}, ctx)
+        lines += fit_exposures(out, rotation or {}, ctx) + _no_new_on_a_strained_day(out, rotation or {}, ctx)
         live_load.mark_novelty(out, ctx, block_workouts)
         lines += live_program.plan(out, rotation or {}, ctx, block_workouts)
         lines += _reps_follow_the_movement(out, ctx) + live_volume.pair_anchors(out, plan)
@@ -285,22 +303,28 @@ def for_live_draft(
         if slump:
             hold_all = "slump week"
             lines += [f"slump (live): {slump['declining']} of {slump['judged']} anchors declining together — no load steps up"]
-            prio = {str(e.get("movement_key")) for e in out["exposures"] if live_volume._prio(e.get("movement_key"), catalog, lib)}
+            held = live_volume.floor_slack(plan, str(rx.get("session_role") or ""))  # fix round 12: a ruled floor is not trimmed
+            prio = {str(e.get("movement_key")) for e in out["exposures"] if live_volume._prio(e.get("movement_key"), catalog, lib, held)}
             lines += live_load.slump_trim(out, prio)
         _refit(out)
     except Exception as e:  # noqa: BLE001 — the live fit never blocks a draft
         lines.append(f"live session fit failed ({type(e).__name__}) — the prescription is unchanged")
         out = copy.deepcopy(rx)
-        sig, hist, slump = {}, {}, None
+        sig, hist, slump, ctx = {}, {}, None, None  # the fit is void: nothing of it is read below
     before = [len(x["sets"]) for x in out["exposures"]]
     order = live_program.trim_order(surplus_first(catalog))
     out = fatigue_model.for_live_draft(out, rotation, inputs, block_workouts, trim_order=order, slump=slump)
     for x, n in zip(out["exposures"], before):
         if len(x["sets"]) < n:
             x["live_reduced"] = n - len(x["sets"])
-    if (out.get("fatigue") or {}).get("state") in ("strained", "overreached"):  # a hold day: loads held AND no grinding —
-        for x in out["exposures"]:  # every lift stops at RPE 8 (the deload shape caps lower still when one is recommended)
-            if x.get("intensity") != "carry":
+    fat = out.get("fatigue") or {}
+    strained = fat.get("state") in ("strained", "overreached")
+    if strained or fat.get("strain_signals"):
+        # recovery-aware effort (fix round 12, `effort_targets`): ONE strain signal holds every compound at the hard-set line (RPE
+        # 8: a heavy lift's last-set allowance goes) before isolation changes; two or more — a hold day, loads held — hold every
+        # lift there. Never under it: an anchor's top set stays a hard set unless a deload is confirmed (the deload shape's own cap)
+        for x in out["exposures"]:
+            if strained or (x.get("intensity") != "carry" and x.get("live_cost") in ("high", "moderate")):  # a carry too, on a hold day
                 x["live_effort"] = min(int(live_settings.value("first_back_rpe")), int(x.get("live_effort") or 99))
     slack = live_volume.floor_slack(plan, str(rx.get("session_role") or "")) if ctx is not None else {}
     lines += live_volume.fit_sets(out, set_cap, catalog, lib, slack)
@@ -338,19 +362,59 @@ def for_live_draft(
 
 def _reps_follow_the_movement(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
     """IN PLACE (fix round 11, the tenth red team: a hip thrust swapped into the deadlift slot inherited its 4-6 reps): an exposure
-    swapped to a movement of ANOTHER pattern takes that movement's own rep range (the catalog's `default_rep_range`) — a slot's
-    reps belong to its movement, not to the slot. Returns the lines."""
+    swapped to a movement of ANOTHER pattern — or (fix round 12: a leg press and a wall squat at 4-6) to one whose own range does
+    not reach the slot's — takes that movement's own rep range (the catalog's `default_rep_range`): a slot's reps belong to its
+    movement, not to the slot. Returns the lines."""
     lines = []
     for e in rx["exposures"]:
         frm = (e.get("live_swap") or {}).get("from")
         new, old = _entry(e.get("movement_key"), ctx) or {}, _entry(frm, ctx) or {}
         rr = (ctx["catalog"].get(str(e.get("movement_key"))) or {}).get("default_rep_range") or {}
-        if not frm or not new or new.get("pattern") == old.get("pattern") or not rr.get("start") or not rr.get("end"):
+        if not frm or not new or not rr.get("start") or not rr.get("end"):
+            continue
+        slot = [int(x) for st in e.get("sets") or [] for x in (st.get("reps") or []) if isinstance(st.get("reps"), list | tuple)]
+        apart = bool(slot) and (int(rr["start"]) > max(slot) or int(rr["end"]) < min(slot))
+        if new.get("pattern") == old.get("pattern") and not apart:
             continue
         reps = [int(rr["start"]), int(rr["end"])]
         if any(st.get("reps") != reps for st in e.get("sets") or []):
             e["sets"] = [st | {"reps": list(reps)} for st in e.get("sets") or []]
             lines.append(f"reps (live): {new.get('title') or e.get('movement_key')} {reps[0]}-{reps[1]} — its own range, not the slot's")
+    return lines
+
+
+def _no_new_on_a_strained_day(rx: dict[str, Any], rotation: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
+    """IN PLACE (owner ruling: a bad day adds nothing; fix round 12 — the final review found two new movements in his
+    high-fatigue week): when the day's inputs read strained (`fatigue_model.strained_inputs`), an ACCESSORY he has not logged in
+    this block goes back to the movement its slot served last phase when he has logged that one; with no familiar movement to go
+    back to it is not served today. Anchors and forced pain / equipment routes (which run after this) are untouched."""
+    if not ctx.get("no_new"):
+        return []
+    logged = ctx.get("logged_tids") or frozenset()
+
+    def known(key: Any) -> bool:
+        return str((_entry(str(key), ctx) or {}).get("template_id") or "").upper() in logged
+
+    prev = {str(s.get("incumbent")): str(s.get("previous") or "") for s in rotation.get("slots") or []}
+    taken = {str(e.get("movement_key")) for e in rx["exposures"]}
+    keep, lines = [], []
+    for e in rx["exposures"]:
+        key = str(e.get("movement_key"))
+        if e.get("kind") != "accessory" or e.get("intensity") == "carry" or known(key) or _entry(key, ctx) is None:
+            keep.append(e)
+            continue
+        name = (ctx["catalog"].get(key) or {}).get("title") or key
+        back = prev.get(str(e.get("slot")))
+        if back and back not in taken and back in ctx["catalog"] and known(back) and _blocked(back, ctx, False) is None:
+            taken.add(back)
+            keep.append({k: v for k, v in e.items() if k != "template_id"} | {"movement_key": back})
+            lines.append(
+                f"kept (live): {(ctx['catalog'].get(back) or {}).get('title') or back} — a strained day introduces no movement new "
+                f"to you; {name} waits"
+            )
+        else:
+            lines.append(f"not served (live): {name} — a strained day introduces no movement new to you, and its slot has no familiar one")
+    rx["exposures"] = keep
     return lines
 
 
@@ -375,6 +439,7 @@ def _week_ctx(week: dict[str, Any] | None, inputs: Any) -> dict[str, Any]:
             "week_skip": tuple(week.get("skip") or ()),
             "partner": week.get("partner"),
             "week_mode": week.get("mode"),
+            "heavy_lower_tomorrow": bool(week.get("heavy_lower_tomorrow")),
         }
     return {"short_week_host": None, "week_skip": (), "partner": None}
 
@@ -429,8 +494,7 @@ def drop_accessories(autoreg: float, rx: dict[str, Any], rationale: list[str], d
         fat = rx.get("fatigue") or {}
         rationale.append(
             f"readiness/ACWR at the drop line (autoreg {autoreg:.2f}) — {GRADED_MARK} in the fatigue model, not a "
-            f"wholesale accessory drop; the model reads {fat.get('state') or 'unknown'} and took {fat.get('sets_removed') or 0} "
-            "accessory set(s), anchors held"
+            f"wholesale accessory drop; the model reads {fat.get('state') or 'unknown'}: {sets_off(rx)}"
         )
     return False
 
@@ -451,6 +515,7 @@ def fit_routine(blocks: list[Any], rx: dict[str, Any], cap: int, movements: dict
     session shape (re-measured when anything went). Shadow: `shape`."""
     if MARK not in rx or shape.get("lifting_minutes") is None:
         return shape
+    cap = cap - _dose_reserve(rx)
     if shape["lifting_minutes"] > cap:
         from training import live_volume, program_structure, warmup_sets
 
@@ -462,6 +527,24 @@ def fit_routine(blocks: list[Any], rx: dict[str, Any], cap: int, movements: dict
     rx[MARK]["summary"] = summary(blocks, rx, movements)
     rx[MARK]["contradictions"] = contradictions(blocks, rx)
     return shape
+
+
+def _dose_reserve(rx: dict[str, Any]) -> int:
+    """The minutes the week's hard conditioning dose keeps on its host morning under the shared cap (owner rulings 1 and 8; fix
+    round 12): the plan leaves them free, and the time fit holds the routine as written to the rest — so no added lifting set
+    ever squeezes the dose out. 0 on any other morning, with the dose off, or on a day it is dropped (a strained read)."""
+    from training import live_rulings, live_settings, live_volume, selection_engine as se
+
+    lib = se.load_library_failsoft()
+    fat = rx.get("fatigue") or {}
+    host = str((rx.get(MARK) or {}).get("conditioning_host") or "")
+    if not live_settings.settings(lib).get("session_cap_includes_cardio") or rx.get("session_role") not in live_rulings.conditioning_hosts(
+        host, lib
+    ):
+        return 0
+    if fat.get("state") in ("strained", "overreached") or fat.get("action") == "deload_recommended" or fat.get("strain_signals"):
+        return 0
+    return int(live_volume.reserve_minutes())
 
 
 def _title(key: Any, movements: dict[str, Any]) -> str:
@@ -480,6 +563,9 @@ def summary(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any]) ->
         names = [_title(d["key"], movements) + (f" ({d['why']})" if mode == "down" else "") for d in guard if d["mode"] == mode]
         if names:
             out.append(f"today: {head}: {', '.join(names)}")
+    flagged = [_title(d["key"], movements) for d in guard if d.get("flag")]
+    if flagged:  # fix round 12: two step-downs did not bring the reps back — held, and said so for a look
+        out.append(f"today: flagged, not cut again — {', '.join(flagged)}: check technique and recovery, or swap the lift")
     if mark.get("hold_all"):
         out.append(f"today: no load steps up — {mark['hold_all']}")
     back = [_title(k, movements) for k, e in exp.items() if e.get("live_first_back")]
@@ -493,10 +579,26 @@ def summary(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any]) ->
     out += _zero_by_design(blocks, rx, movements) + _short_morning(blocks, rx, movements)
     gone = [ln for ln in mark.get("lines") or [] if ln.startswith(("skipped (live)", "swapped (live)"))]
     out += [ln.split(" — ")[0].replace(" (live)", "") for ln in gone][:1]
+    waits = [
+        ln.split(": ", 1)[1].split(" — ")[0] for ln in mark.get("lines") or [] if ln.startswith(("not added (live)", "not served (live)"))
+    ]
+    out += [f"today: nothing new on a strained day — {', '.join(waits)} waits"] if waits else []  # fix round 12: said, once
     fat = rx.get("fatigue") or {}
     if fat.get("state") in ("strained", "overreached") or fat.get("sets_removed"):
-        out.append(f"today: recovery reads {fat.get('state')} — {fat.get('sets_removed') or 0} accessory set(s) off, anchors kept")
+        out.append(f"today: recovery reads {fat.get('state')} — {sets_off(rx)}")
     return out[:5]
+
+
+def sets_off(rx: dict[str, Any]) -> str:
+    """What the fatigue model took, as it was taken (fix round 12: the line said "accessory set(s) off, anchors kept" when the
+    sets were the anchors' back-offs): compound back-off sets first, every top set kept."""
+    ex = rx.get("exposures") or []
+    comp = sum(int(e.get("live_reduced") or 0) for e in ex if e.get("kind") == "anchor")
+    acc = sum(int(e.get("live_reduced") or 0) for e in ex if e.get("kind") != "anchor")
+    if not comp + acc:
+        return "no set taken off"
+    parts = ([f"{comp} anchor back-off set(s)"] if comp else []) + ([f"{acc} accessory set(s)"] if acc else [])
+    return f"{' and '.join(parts)} off, every top set kept"
 
 
 def _zero_by_design(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any]) -> list[str]:
@@ -537,18 +639,16 @@ def _short_morning(blocks: list[Any], rx: dict[str, Any], movements: dict[str, A
 
 def contradictions(blocks: list[Any], rx: dict[str, Any]) -> list[str]:
     """Where a lift's note says something its own rows or the live decision contradict (fix round 9, G): a heavier/lighter
-    reason against the decision, a "find the load" over a written load, a layoff line on a lift of a familiar pattern, a held or
-    lightened lift whose note still steps it in-session — only the bounded R3 line, only where `live_load.r3_eligible` (fix round 11). [] = consistent. (The low-energy line's cardio promise is fitted on the WHY block, `live_balance.why_effort`.)
-    """
-    from training import hevy_note_grammar as g, live_load, live_safety
+    reason against the decision, a "find the load" over a written load, a layoff line on a lift of a familiar pattern, or ANY
+    in-session load-step line (fix round 12: the in-session step is off — double progression is the one load rule). [] =
+    consistent. (The low-energy line's cardio promise is fitted on the WHY block, `live_balance.why_effort`.)"""
+    from training import hevy_note_grammar as g, live_safety
 
     mark = rx.get(MARK) or {}
     guard = {d["key"]: d for d in mark.get("load_guard") or []}
     exp = {e.get("movement_key"): e for e in rx.get("exposures") or []}
-    held_day = bool(mark.get("hold_all")) or (rx.get("fatigue") or {}).get("state") in ("strained", "overreached")
-    r3 = mark.get("r3_step") or {}
     out = []
-    for i, b in enumerate(blocks):
+    for b in blocks:
         note, d, e = str(getattr(b, "notes", "") or ""), guard.get(b.movement_key), exp.get(b.movement_key) or {}
         work = [s for s in b.sets or [] if str(getattr(s, "type", "") or "normal") != "warmup"]
         if d and d["mode"] == "up" and ("Lighter today" in note or "Same load" in note):
@@ -559,10 +659,8 @@ def contradictions(blocks: list[Any], rx: dict[str, Any]) -> list[str]:
             out.append(f"{b.movement_key}: 'find the load' over a written load")
         if (e.get("live_familiar") or e.get("live_first_back")) and ("first time in" in note or "session back after" in note):
             out.append(f"{b.movement_key}: a layoff line on a familiar pattern")
-        steps = [ln.strip() for ln in note.split("\n") if live_safety._step_line(ln)]
-        allowed = live_load.r3_eligible(e, d, held_day) if e else False
-        if steps and not (allowed and all(ln == live_safety.r3_text(r3.get(str(b.movement_key))) for ln in steps)):
-            out.append(f"{b.movement_key}: the note steps it on later sets but the session-to-session rule holds, lightens or caps it")
+        if any(live_safety._step_line(ln) for ln in note.split("\n")):
+            out.append(f"{b.movement_key}: the note steps the load in-session — double progression is the one load rule")
     return out
 
 
@@ -571,11 +669,16 @@ def rotation_lines(rotation: dict[str, Any]) -> list[str]:
     """The rotation's rationale. Live: the #5075 pool lines for slots the selection served are dropped (they name movements
     the session does not serve); the selection's own lines say what serves and why. Shadow: unchanged."""
     lines = list(rotation.get("rationale") or [])
+    if is_live(rotation):  # fix round 12: live serves no kettlebell slot (rulings #2/#6/#7) — its pool lines name nothing served
+        lines = [ln for ln in lines if not _KB_LINE.search(ln)]
     if not is_live(rotation) or rotation.get("source") != "selection":
         return lines
     slots = rotation.get("slots") or []
     served = {s.get("slot_id") for s in slots if s.get("source") in ("selection", "owner_approved")}
     return [ln for ln in lines if not (ln.startswith(POOL_LINE_PREFIXES) and any(f"[{sid}," in ln for sid in served))]
+
+
+_KB_LINE = re.compile(r"kettlebell slot|^kettlebell weekly:|\.kettlebell_swing\b")
 
 
 def rationale_lines(rx: dict[str, Any]) -> list[str]:
@@ -585,14 +688,18 @@ def rationale_lines(rx: dict[str, Any]) -> list[str]:
         return []
     out = list(rx[MARK].get("summary") or [])
     # ruling 16 (evidence and completeness VISIBLE) and ruling 11 (the advisory loss-rate line) stay on the rationale
-    out += [ln for ln in rx[MARK].get("lines") or [] if ln.startswith(("evidence (live): ", "loss rate (advisory"))]
+    out += [
+        ln
+        for ln in rx[MARK].get("lines") or []
+        if ln.startswith(("evidence (live): ", "loss rate (advisory", "priority (live): ", "moved (live): "))
+    ]
     fat = rx.get("fatigue") or {}
     if fat:
         sig = ", ".join(fat.get("strain_signals") or []) or "none"
         out.append(
             f"fatigue (live): {fat.get('state')} — strain signals: {sig}; {fat.get('action')}"
             + (f" ({'; '.join(fat.get('reduce_reasons') or [])})" if fat.get("reduce_reasons") else "")
-            + (f", {fat.get('sets_removed')} accessory set(s) off, anchors held" if fat.get("sets_removed") else "")
+            + (f", {sets_off(rx)}" if fat.get("sets_removed") else "")
             + ("; a deload is RECOMMENDED — it applies only on your word" if (fat.get("deload") or {}).get("recommended") else "")
         )
     return out
@@ -613,3 +720,6 @@ def annotate_blocks(blocks: list[Any], rx: dict[str, Any]) -> None:
         if b.movement_key in cut:
             clause = session_block.applied_clause("set_count", working_sets=warmup_sets.working_set_count(b.sets), reason="recovery")
             b.notes = session_block.add_reason(b.notes, clause)
+    from training import live_safety
+
+    live_safety.cap_lines(blocks)  # fix round 12: the set-count clause never takes a note past four phone lines

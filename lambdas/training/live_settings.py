@@ -48,7 +48,8 @@ SETTINGS: dict[str, dict[str, Any]] = {
     "hard_conditioning_doses": {
         "default": 1,
         "ruling": "owner follow-up ruling (2026-11-13)",
-        "what": "hard conditioning blocks a week (the week's conditioning host takes the first; 2 adds `live_rulings.SECOND_HOST`)",
+        "what": "hard conditioning blocks a week (the week's conditioning host takes the first; 2 adds `live_rulings.SECOND_HOST`; 0 "
+        "serves none and gives the host's reserved minutes back to lifting — the explicit trade for a lower-body priority)",
     },
     "rate_ceiling_pct_bw": {
         "default": 1.0,
@@ -87,6 +88,21 @@ HEURISTICS: dict[str, dict[str, Any]] = {
         "when the last exposure says 5% still leaves him under the floor",
         "retune": "block retro: e1RM a month after each step-down",
     },
+    "step_down_max_pct": {
+        "value": 10,
+        "group": "progression",
+        "basis": "fix round 12 (the final review: two noisy logs cut a flat lifter's bench 12.5 %): one step-down never takes more "
+        "than 10 % off the load; a real decline that needs more gets it from the exposures that follow, at the new load",
+        "retune": "block retro: reps at the first exposure after each step-down (back inside the range?)",
+    },
+    "step_downs_per_window": {
+        "value": 2,
+        "group": "progression",
+        "basis": "fix round 12 (the final review: a stalled deadlift ran 190, 170, 155, 140, 125, 110, 100): each step-down needs "
+        "two fresh exposures under the floor at the NEW load, and after two step-downs inside the history window the lift is "
+        "HELD and flagged — the load is no longer the likely cause (technique, recovery, the movement itself)",
+        "retune": "block retro: every flagged lift — what the cause turned out to be",
+    },
     "implausible_rpe": {
         "value": 9.5,
         "group": "progression",
@@ -108,13 +124,18 @@ HEURISTICS: dict[str, dict[str, Any]] = {
         "basis": "the slump's volume answer: about a third of each accessory's working sets (never under 2); anchors keep theirs",
         "retune": "block retro: recovery markers in the weeks after a slump hold",
     },
-    "deadlift_rpe": {
-        "value": 8,
+    "effort_targets": {
+        "value": {"heavy_compound": [8, 9], "deadlift": [8, 8], "volume_compound": [9, 9], "accessory": [9, 10]},
         "group": "progression",
-        "basis": "owner ruling 5 (fix round 11, the tenth red team's simpler rule): the squat always leads the heavy lower morning; "
-        "the deadlift is a top set + one back-off capped at this RPE — never both maximal — and steps up after a top set at the "
-        "top of its range at or under it, like every lift",
-        "retune": "block retro: squat and deadlift e1RM trend over the block",
+        "basis": "owner ruling 2026-11-14 (fix round 12: not RPE 9 on everything): each role's [top RPE of a working set, top RPE "
+        "of the LAST set]. A heavy-day barbell or dumbbell anchor (squat, bench, the heavy row) works at RPE 8 and only its last "
+        "set may reach 9; the deadlift beside the squat stays at 8 throughout (owner ruling 5: never both maximal); a volume-day "
+        "compound works at 8-9; machine and isolation accessories at 8-9 with the last set 9-10 (low systemic cost, where "
+        "proximity to failure pays). The load steps up when the top of the range is reached at or under the role's working "
+        "RPE. Recovery-aware: ONE strain signal (the fatigue model's) holds every compound at RPE 8 — the last-set allowance "
+        "goes — before isolation changes; two or more hold isolation at 8 too; an anchor's top set never goes under `hard_rpe` "
+        "unless a deload is confirmed. Practitioner consensus, not a measurement",
+        "retune": "block retro: logged RPE against the prescribed RPE by role; anchor e1RM trend; weekly hard sets per muscle",
     },
     # ── novelty (live_load) ──
     "familiar_days": {
@@ -206,14 +227,6 @@ HEURISTICS: dict[str, dict[str, Any]] = {
         "muscle aims this share of the way from MEV to MAV (chest and quadriceps 8 -> 10 hard sets), filled from low-fatigue "
         "isolation in free minutes — never by cutting another muscle (practitioner consensus: priority = more stimulus)",
         "retune": "block retro: priority muscles' performance and the time the plan spent on them",
-    },
-    "conditioning_reserve_minutes": {
-        "value": 20,
-        "group": "volume",
-        "basis": "owner ruling 1: under the shared cap the week's conditioning dose takes only what lifting leaves — so the plan "
-        "leaves this many minutes free on its host morning instead of filling them with isolation (a 1-2 morning week spends its "
-        "few minutes on lifting first; the dose takes what is left)",
-        "retune": "block retro: the conditioning minutes delivered",
     },
     "min_session_minutes": {
         "value": 35,

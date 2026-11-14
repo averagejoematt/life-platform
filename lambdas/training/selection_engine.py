@@ -952,7 +952,8 @@ def _live(
         "variants": by_role.get(role, rotation.get("variants") or {}),
         "variants_by_role": by_role,
         "slots": slots,
-        "ledger_writes": writes,
+        "ledger_writes": [],  # fix round 12 (rollback): a live draft's picks are their own list, never read by the proposed path
+        "live_ledger_writes": writes,
         "volume_check": check,
         "source": "selection",
         "rationale": list(rotation.get("rationale") or []) + [_line(s) for s in sel["slots"] if s["role"] == role],

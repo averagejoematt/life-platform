@@ -44,6 +44,7 @@ MODE_ENV = "HEVY_NOTE_LINT_MODE"
 MODES = ("off", "warn", "enforce")
 DEFAULT_MODE = "warn"
 PREVIOUS_LOADS_KEY = "previous_loads"
+LIVE_MARK = "live_session"  # `live_session.MARK`, as a literal: this module is the shadow path's too and imports nothing live
 RULES = {
     "L1": "no banned token",
     "L2": "no restated rows",
@@ -95,6 +96,7 @@ class LintRoutine:
     previous_supplied: bool = False  # inputs_snapshot carried previous_loads
     title: str = ""
     not_checked: list[str] = field(default_factory=list)
+    live: bool = False  # #5861: the draft ran the live session fit (`LIVE_MARK` on its prescription) — no in-session load rule
 
 
 @dataclass
@@ -166,7 +168,8 @@ def _lint_session(session: str, note: str, out: list[Problem], rt: Optional["Lin
     others = any(_steppable(e) for e in rt.exercises[1:]) if rt is not None else True
     mode = g.rule_mode(ex1_sets, others)
     fits = mode == "ex1"
-    want_rule = g.rule_lines(mode)
+    # #5861 fix round 12: a LIVE draft carries no in-session load rule at all (double progression, each lift's own line)
+    want_rule = [] if (rt is not None and rt.live) else g.rule_lines(mode)
     if is_test:
         if lines != [lines[0]]:
             out.append(Problem("L3", "session block", f"is {len(lines)} line(s); a test day's block is its session line"))
@@ -175,7 +178,7 @@ def _lint_session(session: str, note: str, out: list[Problem], rt: Optional["Lin
         if lines[1] != low and not (lines[1] == g.LOW_ENERGY_LIFTS_LINE and not (cardio_kinds(rt) if rt is not None else [])):
             # "+ easy cardio" over a session whose only cardio is intervals promises a block it lacks
             out.append(Problem("L3", "session block", f"the low-energy line for this session's cardio is {low!r}"))
-        if lines[2:] != want_rule and not (not lines[2:] and rt is not None and _one_load_rule(rt)):
+        if lines[2:] != want_rule:
             if mode == "others" and not lines[2:]:
                 # #5428 re-grade #4: dropping the rule for a one-set exercise 1 left the session with no in-session rule
                 out.append(Problem("L3", "session block", "no load rule for the session's multi-set lifts ('Other lifts: …')"))
@@ -203,17 +206,6 @@ def _lint_session(session: str, note: str, out: list[Problem], rt: Optional["Lin
                 f"exercise 1 note is {g.phone_lines(note)} phone lines > {g.EX1_MAX_LINES}: its set rows leave the first screen",
             )
         )
-
-
-R3_LINE_RE = re.compile(r"^Set 1 at RPE 7 or easier → (?:\+\d+(?:\.\d+)? lb(?: per hand)?|the next pin) on later sets\.$")
-"""#5861 fix round 11: the live engine's ONE bounded in-session step (`live_safety.R3_LINE`), written on a lift's own note."""
-
-
-def _one_load_rule(rt: "LintRoutine") -> bool:
-    """The live grammar (#5861 fix round 11): no session-block load rule, because the routine's in-session steps are the bounded R3
-    lines on lifts' own notes (at least one) — one load rule, never two."""
-    steps = [ln.strip() for e in rt.exercises for ln in (e.note or "").split("\n") if "on later sets" in ln]
-    return bool(steps) and all(R3_LINE_RE.match(ln) for ln in steps)
 
 
 def _steppable(ex: LintExercise) -> bool:
@@ -349,7 +341,7 @@ def _lint_test(body: str, where: str, out: list[Problem]) -> None:
         out.append(Problem("L7", where, f"test note {g.phone_lines(body)} phone lines > {g.TEST_MAX_LINES}"))
 
 
-def _lint_lift(ex: LintExercise, body: str, where: str, out: list[Problem]) -> None:
+def _lint_lift(ex: LintExercise, body: str, where: str, out: list[Problem], live: bool = False) -> None:
     lines = body.split("\n")
     l1 = lines[0]
     rx = g.CARRY_LINE1_RE if ex.kind == "carry" else g.EFFORT_RE
@@ -372,7 +364,10 @@ def _lint_lift(ex: LintExercise, body: str, where: str, out: list[Problem]) -> N
     if ex.kind != "carry" and any(r[1] is not None for r in work) and g.PICK_LOAD_OPEN_TAIL in body:
         # #5428 re-grade #2: "find the load" over rows that carry the start load reads as "ignore the rows"
         out.append(Problem("L4", where, f"the W line says {g.PICK_LOAD_OPEN_TAIL!r} but the working rows carry a load"))
-    if ex.kind in ("barbell", "machine") and ex.compound and work and all(r[1] is None for r in work) and g.PICK_LOAD_OPEN_TAIL in body:
+    # #5861 fix round 12: a LIVE draft never invents a load for a lift with no exposure in its window; on a MACHINE the W-set
+    # feeler is the instruction (stable, low skill) — the rule stays for a barbell, and for every shadow draft
+    kinds = ("barbell",) if live else ("barbell", "machine")
+    if ex.kind in kinds and ex.compound and work and all(r[1] is None for r in work) and g.PICK_LOAD_OPEN_TAIL in body:
         # #5428 re-grade #6 (2026-11-08, 4 of 4 voices): the 11-06 Romanian deadlift asked him to "find the load" at RPE 8–9
         # after heavy squats, with no load on any row. A barbell or machine compound carries the engine's start load
         # (§3.3); with no basis for one, the draft is not ready — this fails it rather than shipping the open form
@@ -694,7 +689,7 @@ def lint_routine(rt: LintRoutine) -> LintResult:
             if body and g.phone_lines(body) > g.MOBILITY_MAX_LINES:
                 out.append(Problem("L7", where, f"mobility note {g.phone_lines(body)} phone lines > {g.MOBILITY_MAX_LINES}"))
         else:
-            _lint_lift(ex, body, where, out)
+            _lint_lift(ex, body, where, out, live=rt.live)
         mw = g.W_TEXT_RE.search(body)
         if mw:
             wreps = {r[2] for r in ex.rows if r[0] == "W"}
@@ -895,7 +890,11 @@ def from_wire(
             )
         )
     return LintRoutine(
-        exercises=exs, previous_supplied=isinstance(prev_map, dict), title=str(routine.get("title") or ""), not_checked=not_checked
+        exercises=exs,
+        previous_supplied=isinstance(prev_map, dict),
+        title=str(routine.get("title") or ""),
+        not_checked=not_checked,
+        live=LIVE_MARK in (snap.get("session_prescription") or {}),
     )
 
 

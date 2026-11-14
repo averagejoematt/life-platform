@@ -178,8 +178,9 @@ def test_an_isolation_load_cut_needs_effort_evidence_not_a_trend_alone():
 
 def test_a_step_down_continues_only_while_the_reps_stay_under_the_floor():
     """Second red team: a row was cut twice in one week on effort alone. Fix round 10: a step-down needs two exposures running
-    under the range floor; the exposure after it, at the new load, back inside the range HOLDS. Control: still under the floor
-    at the new load -> it steps down again (the ninth red team: a real decline never grinds under the floor for weeks)."""
+    under the range floor; the exposure after it, at the new load, back inside the range HOLDS. Fix round 12: ONE exposure under
+    the floor at the new load holds too (the count starts again at the new load); a second one steps it down again (the ninth
+    red team: a real decline never grinds under the floor for weeks)."""
     rec = [{"date": "2026-10-20", "exercises": [_ex(ROW, [(80, 6, 8.5), (80, 6, 9.0)])]}]
     rec += [{"date": f"2026-10-{d:02d}", "exercises": [_ex(ROW, [(80, 3, 9.5), (80, 3, 10.0)])]} for d in (27, 30)]
     rows = ll.same_role(ll.history(rec, {ROW})[ROW], "", "2026-11-03", 4, 6)
@@ -191,7 +192,10 @@ def test_a_step_down_continues_only_while_the_reps_stay_under_the_floor():
     assert ll.decide(rows2, 4, 6, "machine")["mode"] == "hold"  # back in the range: it holds and the reps climb
     still = rec + [{"date": "2026-11-03", "exercises": [_ex(ROW, [(lb2, 3, 10.0)])]}]
     rows3 = ll.same_role(ll.history(still, {ROW})[ROW], "", "2026-11-06", 4, 6)
-    assert ll.decide(rows3, 4, 6, "machine")["mode"] == "down"  # control: still under the floor -> down again
+    assert ll.decide(rows3, 4, 6, "machine")["mode"] == "hold"  # one exposure under the floor at the NEW load: fresh evidence first
+    twice = still + [{"date": "2026-11-06", "exercises": [_ex(ROW, [(lb2, 3, 10.0)])]}]
+    rows4 = ll.same_role(ll.history(twice, {ROW})[ROW], "", "2026-11-09", 4, 6)
+    assert ll.decide(rows4, 4, 6, "machine")["mode"] == "down"  # control: two at the new load -> down again
 
 
 # ── 5. the novelty budget ─────────────────────────────────────────────────────

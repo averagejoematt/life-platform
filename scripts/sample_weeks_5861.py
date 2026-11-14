@@ -228,6 +228,14 @@ def _with_cardio(record: list[dict[str, Any]], profile: dict[str, Any], start: s
             )
 
 
+def _live_index(hidx: dict, catalog: dict[str, Any]) -> dict:
+    """A live world's history index holds no CARRY (fix round 12): the synthetic record logs a carry as a rep lift, a shape a
+    real carry (a distance-typed set) never has, and the note lint then read a PREVIOUS the carry's own start-load read could not
+    see (4 false "names no start" problems). The proposed world keeps the base tree's index (its digests are pinned)."""
+    carries = {_tid(catalog, k) for k, c in catalog.items() if c.get("hevy_type") == "short_distance_weight"}
+    return {tid: rows for tid, rows in hidx.items() if tid not in carries}
+
+
 def history_index(record: list[dict[str, Any]], catalog: dict[str, Any] | None = None, as_of: str | None = None) -> dict:
     """`exercise_history.load_history_indexes()[0]`'s shape, built from the synthetic record (most recent first). An
     experienced profile has also trained, months ago, every catalog movement the catalog records sessions for: one older
@@ -507,12 +515,17 @@ def generate_week(
     record = list(world["record"])
     sessions, cardio_index, prev = [], _cardio_index(record), None
     hidx = history_index(record, catalog["movements"], p["as_of"])
+    if mode == "approved":  # fix round 12: a live world's index holds no carry (`_live_index`)
+        hidx = _live_index(hidx, catalog["movements"])
     roles, short_line, plan = list(p["roles"]), None, None
     if mode == "approved":  # #5861 FIX5: the PRODUCTION week plan (`live_sequence`, the cron's sequence reads the same one)
         from training import live_sequence
 
         days = len(p["days"])
-        live_roles, plan = live_sequence.week_roles(days, live_sequence.monday_of(p["days"][0]), record, world["lib"])
+        declared = (
+            days if p.get("spacing") == "undeclared" else list(p["days"])
+        )  # fix round 12: WHICH mornings (a bare count: profile `spacing`)
+        live_roles, plan = live_sequence.week_roles(declared, live_sequence.monday_of(p["days"][0]), record, world["lib"])
         roles = live_roles if (plan or days < len(_all_roles())) else roles
         short_line = (plan or {}).get("line") or (
             f"short week (slide): {days} of {len(_all_roles())} sessions — the sequence slides" if days < len(_all_roles()) else None
@@ -525,6 +538,10 @@ def generate_week(
 
                 entry["live_week"] = live_sequence.for_role(plan, role)  # what the cron's entry carries (live_sequence.serve)
             inp = _inputs(p, day, record, world["rows"])
+            if mode == "approved":
+                # fix round 12 (owner ruling 12): a live world passes NO steps-derived zone-2 minutes — unknown is unknown; the
+                # proposed world keeps the base tree's figure (its digests are pinned)
+                inp.z2_minutes_7d = None
             out = fbs.full_body_routines(inp, entry, rw.week, landmarks, catalog, rw, [], block_workouts=record)
             ideal = out[0]
             cardio = _cardio(ideal, p, day, cardio_index)
@@ -986,7 +1003,6 @@ LIVE_PREFIXES = (
     "capped (live)",
     "short week (live",
     "heavy lower (live)",  # #5861 fix round 11 (ruling 5: the squat leads)
-    "in-session step (live)",  # #5861 fix round 11 (R3)
     "top-up (live)",
     "priority (live)",
     "evidence (live)",
