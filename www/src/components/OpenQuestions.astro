@@ -1,15 +1,14 @@
 ---
 // The open questions (2026-11-14). The experiment's premise is a question it cannot answer yet, and the front page
-// showed progress and a record but never the tension. Four questions the owner set for the project — each answered only
+// showed progress and a record but never the tension. Three of the questions the owner set for the project (the fourth,
+// "are the AI coaches any better than a guess?", is asked and answered by the coaches' band further down) — each answered only
 // with what the snapshot already publishes, and each saying plainly what is missing. Nothing here is a prediction, a
 // score of how he feels, or a new claim: every figure is carried from journey.json, calibration.json, lab.json or the
 // edition; a question whose evidence is not served says so instead of guessing.
-import { verifiedLead } from "../lib/calibration.js";
-import { kOfN, num } from "../lib/format.js";
+import { num } from "../lib/format.js";
 import { labEnabled } from "../lib/lab.js";
 import { labCounts } from "../lib/laboratory.js";
-import { roomPublic } from "../lib/room.js";
-import { loadCalibration, loadJourney, loadLab } from "../lib/snapshot.js";
+import { loadJourney, loadLab } from "../lib/snapshot.js";
 import { href } from "../lib/url.js";
 
 interface Props {
@@ -30,8 +29,6 @@ async function safe<T>(f: () => Promise<T>): Promise<T | null> {
 }
 const journey: any = await safe(loadJourney);
 const j = journey && journey.state === "ok" ? journey : null;
-const calFile: any = roomPublic() ? await safe(loadCalibration) : null;
-const lead = calFile && calFile.state === "ok" ? verifiedLead(calFile.calibration || {}) : null;
 const labFile: any = labEnabled() ? await safe(loadLab) : null;
 const lab = labFile && labFile.state === "ok" ? labFile : null;
 const counts = lab ? labCounts(lab) : null;
@@ -56,14 +53,6 @@ const questions = [
         : "The pace is not served in this snapshot.",
     missing: "No public strength trend yet, and the scale's body-composition reading is too noisy to settle it.",
     link: { to: "/data/", words: "The journey and the daily record" },
-  },
-  {
-    q: "Are the AI coaches any better than a guess?",
-    have: lead && lead.baseline
-      ? `Re-verified: the coaches ${kOfN(lead.k, lead.n)}, a guess that nothing changes ${kOfN(lead.baseline.right, lead.baseline.n)} of the same calls${lead.sign?.words ? ` — ${lead.sign.words}` : ""}.`
-      : "The re-verified record is not served in this snapshot.",
-    missing: "Too few calls of most kinds to tell a coach from luck; the record grows weekly.",
-    link: { to: "/system/", words: "The ledger and the grading" },
   },
   {
     q: "Is getting healthier the same as getting happier?",

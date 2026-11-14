@@ -1796,3 +1796,20 @@ span.gloss[data-quote-gloss] {
     grid-column: 1 / -1;
   }
 }
+
+/* The three doors on a phone (2026-11-14): the masthead's tab bar already carries them, so here they are a compact
+   recap — the front page stays inside its phone-length budget with the open questions above. */
+@media (max-width: 560px) {
+  .door {
+    min-height: 0;
+    padding: 16px 18px;
+    gap: 8px;
+  }
+  .door .t {
+    font-size: 26px;
+  }
+  .door p {
+    font-size: 15px !important;
+    margin-top: 6px !important;
+  }
+}
