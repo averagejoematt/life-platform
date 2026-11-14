@@ -255,6 +255,8 @@ def test_every_owned_route_is_a_static_route_or_matches_a_pattern():
     [
         ("push", "", False, "preview"),
         ("push", "", True, "root"),
+        ("schedule", "", False, "preview"),  # the daily rebuild follows the switch exactly like a push
+        ("schedule", "", True, "root"),
         ("workflow_dispatch", "preview", False, "preview"),
         ("workflow_dispatch", "", True, "preview"),
         ("workflow_dispatch", "root", True, "root"),
@@ -486,6 +488,8 @@ def test_workflow_has_one_target_input_and_root_only_sweeps_and_rollback():
     assert set(inputs) == {"target", "api_readiness"} and inputs["api_readiness"]["default"] == "enforce"
     assert inputs["target"]["options"] == ["preview", "root"] and inputs["target"]["default"] == "preview"
     assert set(on["push"]["paths"]) >= {"www/**", "deploy/www_preview_sync.sh"}
+    # the daily rebuild (2026-11-14): without it the pages only refreshed when unrelated code merged
+    assert [c["cron"] for c in on["schedule"]] == ["30 15 * * *"]
     jobs = WORKFLOW["jobs"]
     # api-readiness + deferred: tests/test_www_api_readiness.py owns their wiring.
     assert set(jobs) == {"api-readiness", "deferred", "deploy", "smoke", "visual-qa", "record-previous", "rollback-v9-on-failure"}
