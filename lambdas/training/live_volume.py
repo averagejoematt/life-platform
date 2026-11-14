@@ -627,9 +627,20 @@ def spend_session(rx: dict[str, Any], ctx: dict[str, Any], flags: list[dict[str,
     planned = _count([r for r in plan.get("rows") or [] if r["role"] == role])
     rows = [_row(role, e, ctx["catalog"], ctx["lib"]) for e in rx["exposures"]]
     now = _count(rows)
-    tg = {m: {"floor": 0.0, "aim": float(v), "cap": 99.0} for m, v in planned.items() if m not in HEADS and now[m] + 1.0 <= v}
-    if not tg:
+    week_t, week_c = plan.get("targets") or {}, plan.get("counts") or {}
+
+    def ruled(m: str, v: float) -> float:  # a muscle the loss takes under its WEEK floor (ruling 3's hold) is served first
+        short = float(week_c.get(m, 0.0)) - v + now[m] < float((week_t.get(m) or {}).get("floor", 0.0))
+        return float(v) if short else 0.0
+
+    if not any(m not in HEADS and now[m] + 1.0 <= v for m, v in planned.items()):
         return []
+    # every planned muscle keeps its planned share (none donates under it); only a muscle a full set short is served
+    tg = {
+        m: {"floor": ruled(m, v), "aim": float(v) if now[m] + 1.0 <= v else min(float(v), now[m]), "cap": 99.0}
+        for m, v in planned.items()
+        if m not in HEADS
+    }
     joints = sorted({j for f in flags for j in f["joints"]})
     taken = {str(e.get("movement_key")) for e in rx["exposures"]}
     lo = int(cfg.value("slot_min_sets"))
