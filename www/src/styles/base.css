@@ -2042,3 +2042,17 @@ span.gloss[data-quote-gloss] {
   display: block;
   clear: both;
 }
+
+/* The front page's latest chapter on a phone (2026-11-14): the numeral is a marker, not a poster, and the byline the
+   chapter page itself carries is not repeated — the page stays inside its phone-length budget. */
+.ch-numeral {
+  font-size: 130px;
+}
+@media (max-width: 640px) {
+  .ch-numeral {
+    font-size: 72px;
+  }
+  .ch-byline {
+    display: none;
+  }
+}
