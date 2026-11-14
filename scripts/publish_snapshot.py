@@ -363,7 +363,7 @@ def _live_week_states(ctx: LiveContext) -> None:
             "pending": "No chapter yet for this week.",
         }[status]
         if st.get("reason"):
-            text = str(st["reason"])
+            text = str(st["reason"])[:1].upper() + str(st["reason"])[1:].rstrip(".") + "."  # a sentence, like its siblings
         ctx.objs["chapter"].append(
             envelope(
                 id=f"program-week-{n:02d}",
