@@ -10,8 +10,9 @@ import StatusTag from "../components/StatusTag.astro";
 import VersusGuess from "../components/VersusGuess.astro";
 import OpenQuestions from "../components/OpenQuestions.astro";
 import { headline, weeklyBars } from "../lib/chart.js";
-import { dayInWords, domainWords, num, kOfN, clip, heldCallWords } from "../lib/format.js";
-import { connectedTo, loadAll, loadSeries, latestEdition, dayLine, loadCalibration } from "../lib/snapshot.js";
+import { chapterCovers, chapterPublished, chapterWindow, dayInWords, domainWords, num, kOfN, clip, heldCallWords } from "../lib/format.js";
+import { connectedTo, loadAll, loadSeries, latestEdition, dayLine, loadCalibration, loadJourney } from "../lib/snapshot.js";
+import { lineCounts, theLine } from "../lib/theline.js";
 import { verifiedLead } from "../lib/calibration.js";
 import { roomPublic } from "../lib/room.js";
 import { href, pathOf } from "../lib/url.js";
@@ -31,10 +32,14 @@ const startDate: string | null = today?.start_date || edition?.start_date || nul
 // "So far", in one line above the fold (2026-11-14): on a phone the first screen carried the premise and no progress.
 // Day, pounds, chapters, the coaches against a guess — each carried from the edition / the room's verified lead.
 let soFarLead: ReturnType<typeof verifiedLead> = null;
+// #5950: the ledger's own count of dated forecasts (every record that is not an observation), as the producer serves
+// it; the snapshot's prediction objects are only the records served with an id, so counting them undercounted.
+let ledgerForecasts: number | null = null;
 if (roomPublic()) {
   try {
     const f: any = await loadCalibration();
     soFarLead = f?.state === "ok" ? verifiedLead(f.calibration || {}) : null;
+    ledgerForecasts = f?.state === "ok" && Number.isInteger(f.record?.total) && Number.isInteger(f.record?.observational) ? f.record.total - f.record.observational : null;
   } catch {
     soFarLead = null;
   }
@@ -57,14 +62,19 @@ const nextChapterNo = String((latestChapter?.week ?? 0) + 1).padStart(2, "0");
 const inChapterAll = latestChapter ? await connectedTo("chapter", latestChapter.id, { cap: 6 }) : null;
 const inChapter = inChapterAll ? { ...inChapterAll, items: inChapterAll.items.filter((e) => e.type !== "edition").slice(0, 4) } : null;
 // The latest chapter's week in two lines (2026-11-14): its graded calls and its days, both on the chapter page.
-const chWeekCalls =
-  latestChapter?.week_start && latestChapter?.week_end
-    ? all.byType.prediction.filter(
-        (p) => (p.status === "confirmed" || p.status === "refuted") && p.settled_date && p.settled_date.slice(0, 10) >= latestChapter.week_start && p.settled_date.slice(0, 10) <= latestChapter.week_end,
-      )
-    : [];
+// Read over the chapter's covered days when served (lib/format.js::chapterWindow), as the chapter page does.
+const chWindow = chapterWindow(latestChapter);
+const chWeekCalls = chWindow
+  ? all.byType.prediction.filter(
+      (p) => (p.status === "confirmed" || p.status === "refuted") && p.settled_date && p.settled_date.slice(0, 10) >= chWindow[0] && p.settled_date.slice(0, 10) <= chWindow[1],
+    )
+  : [];
 const chWeekRight = chWeekCalls.filter((p) => p.status === "confirmed").length;
-const chWeekDays = latestChapter ? all.byType.day.filter((d) => d.chapter_id === latestChapter.id).length : 0;
+const chWeekDays = latestChapter
+  ? all.byType.day.filter((d) =>
+      latestChapter.covers_start && latestChapter.covers_end ? d.date >= latestChapter.covers_start && d.date <= latestChapter.covers_end : d.chapter_id === latestChapter.id,
+    ).length
+  : 0;
 const pending = all.byType.prediction
   .filter((p) => p.status === "pending")
   .sort((a, b) => ((a.due_date || "9999") < (b.due_date || "9999") ? -1 : 1))
@@ -77,18 +87,54 @@ const weekOrder: string[] = week?.order || [];
 // date reaches the HTML); the browser remembers only the last edition day it saw.
 const dayNo = (iso: string | null | undefined) => (iso && /^\d{4}-\d{2}-\d{2}/.test(iso) ? Math.round(Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) / 864e5) : null);
 const sinceEvents = [
-  ...published.map((c) => ({ d: dayNo(c.date), k: "chapter", t: c.title, u: href(pathOf("chapter", c.id)) })),
+  ...published.map((c) => ({ d: dayNo(c.published_at || c.date), k: "chapter", t: c.title, u: href(pathOf("chapter", c.id)) })),
   ...all.byType.prediction.filter((p) => p.status === "confirmed" || p.status === "refuted").map((p) => ({ d: dayNo(p.settled_date), k: p.status })),
 ].filter((e) => e.d != null);
 const sinceAsOf = dayNo(edition?.as_of);
+// The front page's share description (2026-11-14, sprint II): the premise plus where it stands, from the edition.
+const ogDescription = [
+  `An ordinary man started${today?.start_weight_lbs ? ` at ${num(today.start_weight_lbs, 0)} pounds` : ""}${startDate ? ` on ${dayInWords(startDate)}` : ""} and is using AI coaches, his own data and public grades to find out whether getting healthier and getting happier are the same thing.`,
+  edition?.day_n != null && today?.change_lbs != null ? `Day ${edition.day_n}: ${num(Math.abs(today.change_lbs), 1)} lb ${today.change_lbs <= 0 ? "down" : "up"}.` : null,
+]
+  .filter(Boolean)
+  .join(" ");
 const weekLabel: Record<string, string> = { weight: "Weight", training: "Training", sleep: "Sleep", food: "Food" };
 
-// The week a chapter covers: its explicit interval from the snapshot (/api/chapters), never re-derived here.
+// The days a chapter covers: its served covered days ("Days 60–66 · 4–10 Nov"), else its explicit program-week interval
+// from the snapshot (/api/chapters), never re-derived here.
 function weekRange(c: any): string | null {
+  const covers = chapterCovers(c, { short: true });
+  if (covers) return covers;
   const a = c?.week_start ? dayInWords(c.week_start, { short: true }) : null;
   const b = c?.week_end ? dayInWords(c.week_end, { short: true }) : null;
   return a && b ? `${a} – ${b}` : null;
 }
+
+// ── Fig. 1 — The Line (2026-11-14, sprint II): every published weigh-in since day one, the rungs the platform
+// published, the published chapters as numbered ticks. Drawn by lib/theline.js; the island redraws it on a phone.
+const weightSeries = series["weight_lbs"];
+const journeyObj: any = await loadJourney();
+const lineDays = weightSeries ? weightSeries.days.filter((d: any) => !startDate || d.date >= startDate) : [];
+const lineChapters = published
+  .filter((c) => (c.week ?? 0) >= 1)
+  .map((c) => ({ date: (c as any).covers_end || c.data_through || c.date, n: String(c.week) }))
+  .filter((c) => c.date);
+const lineData = lineDays.some((d: any) => d.value != null)
+  ? {
+      days: lineDays.map((d: any) => ({ date: d.date, value: d.value, gap: d.gap })),
+      startDate,
+      startValue: journeyObj?.start_weight_lbs ?? today?.start_weight_lbs ?? null,
+      rungs: (journeyObj?.rungs || []).filter((r: any) => r.date),
+      chapters: lineChapters,
+    }
+  : null;
+const lineCount = lineCounts(lineDays);
+const lineReadings = lineDays.filter((d: any) => d.value != null && !d.gap);
+const lineLost = lineReadings.length ? lineReadings[lineReadings.length - 1].value - (lineData?.startValue ?? lineReadings[0].value) : 0;
+const lineAria = lineReadings.length
+  ? `Every weigh-in since ${dayInWords(lineReadings[0].date)}: from ${num(lineReadings[0].value, 1)} pounds to ${num(lineReadings[lineReadings.length - 1].value, 1)} pounds on ${dayInWords(lineReadings[lineReadings.length - 1].date)}, ${lineCount.readings} weigh-ins in ${lineCount.days} days.`
+  : "";
+const lineSvg = lineData ? theLine({ ...lineData, aria: lineAria }) : "";
 
 // ── Fig. 1 — the portrait. Body, Sleep and Recovery read their series; Mind and Connection read
 // the edition's published counts; Purpose has no instrument. Bars are eight weekly means (or counts).
@@ -108,11 +154,12 @@ const dims: Dim[] = [
   seriesDim("sleep", "sleep_duration_hours", "Sleep", 1, "h", (h, bars) => {
     const f = firstBar(bars);
     const l = lastBar(bars);
-    return f != null && l != null ? `This week's mean. Week one was ${num(f, 1)} h.` : `${h.n} nights measured.`;
+    // #5953: the figure is the latest night; the note used to call it "this week's mean" (8.1 h beside a 7.6 h mean).
+    return f != null && l != null ? `Last night. The last seven nights average ${num(l, 1)} h; the first of the eight weeks drawn, ${num(f, 1)} h.` : `${h.n} nights measured.`;
   }),
   seriesDim("recovery", "hrv", "Recovery", 0, "ms", (h, bars) => {
     const f = firstBar(bars);
-    return f != null ? `Heart-rate variability. Week one averaged ${num(f, 0)} ms.` : `${h.n} mornings measured.`;
+    return f != null ? `Heart-rate variability, the latest morning. The first of the eight weeks drawn averaged ${num(f, 0)} ms.` : `${h.n} mornings measured.`;
   }),
   {
     // Owner ruling 2026-11-03: journal activity is private — whether, when and how often he writes.
@@ -145,6 +192,8 @@ const dims: Dim[] = [
   },
   { id: "purpose", label: "Purpose", instrument: "not yet", value: null, unit: "", bars: null, note: portrait.purpose?.text || "No instrument for this yet. Deliberately an empty frame.", href: null, measured: false },
 ];
+// The Body tile opens the Journey, the same door as The Line above it (one door, so the front page's reach is unchanged).
+if (lineData && dims[0].href) dims[0].href = "/data/journey/";
 // The measured count never depends on the journal: Mind is never "measured" on a public page.
 const measured = dims.filter((d) => d.measured).length;
 const WORDS = ["none", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
@@ -173,41 +222,76 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
 }
 ---
 
-<Base title="Average Joe Matt" top="start" status={status}>
-  <section class="section" style="padding-bottom:40px">
-    <div class="wrap hero">
-      <div class="premise">
-        <p class="label">
-          An experiment, in public{startDate && ` · began ${dayInWords(startDate)}`}{edition?.day_n != null && ` · day ${edition.day_n}`}
-        </p>
+<Base title="Average Joe Matt" top="start" status={status} card="home" description={ogDescription}>
+  <section class="section opening">
+    <div class="wrap">
+      <p class="label">
+        An experiment, in public{startDate && ` · began ${dayInWords(startDate)}`}{edition?.day_n != null && ` · day ${edition.day_n}`}
+      </p>
+      <div class="opening-grid">
         <h1>Can an ordinary person engineer an extraordinary life?</h1>
-        <p class="dek">
-          I'm Matt. British, in Seattle. On {startDate ? dayInWords(startDate, { short: true }) : "day one"} I weighed
-          {today?.start_weight_lbs ? ` ${num(today.start_weight_lbs, 0)} pounds` : " what the scale said"} and started this: the data sources on my
-          body, a team of AI coaches, one honest journal, and a question I can't answer yet — whether getting healthier and getting happier are the
-          same thing. The weight is the catalyst. It isn't the point.
-        </p>
-        <p class="sofar mono" data-so-far>
-          {[
-            edition?.day_n != null ? `Day ${edition.day_n}` : null,
-            today?.change_lbs != null ? `${num(Math.abs(today.change_lbs), 1)} lb ${today.change_lbs <= 0 ? "down" : "up"}` : null,
-            published.length ? `${published.length} ${published.length === 1 ? "chapter" : "chapters"}` : null,
-            soFarLead?.sign?.verdict && COACH_VS_GUESS[soFarLead.sign.verdict] ? COACH_VS_GUESS[soFarLead.sign.verdict] : null,
-          ]
-            .filter(Boolean)
-            .join(" · ")}
-        </p>
-        <div class="row">
-          {firstChapter && <a class="btn" href={href(pathOf("chapter", firstChapter.id))}>Start with chapter one</a>}
-          {latestChapter && <a class="btn ghost" href="#week">Latest published chapter ↓</a>}
+        <div class="premise">
+          <p class="dek">
+            I'm Matt. British, in Seattle. On {startDate ? dayInWords(startDate, { short: true }) : "day one"} I weighed
+            {today?.start_weight_lbs ? ` ${num(today.start_weight_lbs, 0)} pounds` : " what the scale said"} and started this: the data sources on my
+            body, a team of AI coaches, one honest journal, and a question I can't answer yet — whether getting healthier and getting happier are the
+            same thing. The weight is the catalyst. It isn't the point.
+          </p>
+          <p class="margin">
+            The "Average" is aspirational. Most of my numbers are currently above it, and I'm working on that in the only direction that counts.
+          </p>
         </div>
-        <p class="margin">
-          The "Average" is aspirational. Most of my numbers are currently above it, and I'm working on that in the only direction that counts.
-        </p>
       </div>
+      {
+        lineData && (
+          <figure class="theline" data-theline data-payload={JSON.stringify(lineData)} data-aria={lineAria}>
+            <figcaption class="theline-head">
+              <span class="theline-stat">
+                <span class="big num">{num(Math.abs(lineLost), 1)}</span>
+                <span class="theline-unit">
+                  lb {lineLost <= 0 ? "lighter" : "heavier"}
+                  <br />
+                  <span class="muted">in {lineCount.days} days</span>
+                </span>
+              </span>
+              <span class="label theline-fig">Fig. 1 — The Line · every morning on the scale since day one</span>
+            </figcaption>
+            <div class="theline-chart" data-theline-chart set:html={lineSvg} />
+            <div class="theline-key">
+              <ul class="theline-legend">
+                <li><svg viewBox="0 0 28 12" width="28" height="12" aria-hidden="true"><path d="M2,9 L14,4 L26,6" fill="none" stroke="#121212" stroke-width="1.6"/><circle cx="14" cy="4" r="2.6" fill="#121212"/></svg>a morning on the scale · {lineCount.readings} in {lineCount.days} days</li>
+                <li><svg viewBox="0 0 28 12" width="28" height="12" aria-hidden="true"><path d="M2,4 L26,8" fill="none" stroke="#121212" stroke-width="1.4" stroke-dasharray="2 3"/><rect x="12.5" y="4" width="3" height="7" fill="none" stroke="#5C5C58"/></svg>no weigh-in · {lineCount.missing} {lineCount.missing === 1 ? "morning" : "mornings"}, left blank</li>
+                <li><svg viewBox="0 0 28 12" width="28" height="12" aria-hidden="true"><rect x="1" y="1" width="26" height="10" fill="#1B3FD6" opacity="0.14"/></svg>below the first morning</li>
+                {lineChapters.length > 0 && <li><svg viewBox="0 0 28 12" width="28" height="12" aria-hidden="true"><line x1="14" y1="0" x2="14" y2="7" stroke="#1B3FD6" stroke-width="1.5"/></svg>a chapter, numbered</li>}
+              </ul>
+              <a href={href("/data/journey/")}>The journey: the pace, the milestones, every reading →</a>
+            </div>
+          </figure>
+        )
+      }
+      <p class="sofar mono" data-so-far>
+        {[
+          edition?.day_n != null ? `Day ${edition.day_n}` : null,
+          // the pounds are The Line's headline when it is drawn; the line carries them only when it is not
+          !lineData && today?.change_lbs != null ? `${num(Math.abs(today.change_lbs), 1)} lb ${today.change_lbs <= 0 ? "down" : "up"}` : null,
+          published.length ? `${published.length} ${published.length === 1 ? "chapter" : "chapters"}` : null,
+          soFarLead?.sign?.verdict && COACH_VS_GUESS[soFarLead.sign.verdict] ? COACH_VS_GUESS[soFarLead.sign.verdict] : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+      </p>
+      <div class="row" style="margin-top:20px">
+        {firstChapter && <a class="btn" href={href(pathOf("chapter", firstChapter.id))}>Start with chapter one</a>}
+        {latestChapter && <a class="btn ghost" href="#week">Latest published chapter ↓</a>}
+      </div>
+    </div>
+  </section>
+
+  <section class="section hair portrait-band">
+    <div class="wrap">
       <figure class="portrait">
         <figcaption class="between">
-          <span class="label">Fig. 1 — The portrait{edition?.day_n != null && `, day ${edition.day_n}`} · eight weekly means</span>
+          <span class="label">Fig. 2 — The portrait{edition?.day_n != null && `, day ${edition.day_n}`} · six dimensions, eight weekly means</span>
           <span class="verified" style="font-size:11px">{edition ? `As of ${dayInWords(edition.as_of, { short: true })}` : "From the platform"} · blank where nothing is measured in public</span>
         </figcaption>
         <div class="tiles portrait-tiles">
@@ -231,7 +315,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
             )
           }
         </div>
-        <p class="serif muted" style="font-size:16px;line-height:1.5">
+        <p class="serif muted portrait-ratio">
           {WORDS[measured] ? WORDS[measured][0].toUpperCase() + WORDS[measured].slice(1) : measured} {measured === 1 ? "dimension" : "dimensions"} measured,{" "}
           {WORDS[6 - measured] || 6 - measured} not yet. That ratio is the project: the body is the easy part to instrument.
         </p>
@@ -245,8 +329,13 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
         <div class="wrap" style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
           <div style="flex:0 0 160px;display:flex;flex-direction:column;gap:6px">
             <span class="label">Chapter</span>
-            <span class="big cobalt" style="font-size:130px;display:block;line-height:.85">{String(latestChapter.week ?? 0).padStart(2, "0")}</span>
+            <span class="big cobalt ch-numeral" style="display:block;line-height:.85">{String(latestChapter.week ?? 0).padStart(2, "0")}</span>
             <span class="mono muted" style="font-size:12px">{weekRange(latestChapter) || dayInWords(latestChapter.date, { short: true })}</span>
+            {chapterPublished(latestChapter) && (
+              <span class="mono muted" style="font-size:12px" data-published>
+                {chapterPublished(latestChapter)}
+              </span>
+            )}
           </div>
           <article style="flex:1 1 480px;min-width:0;display:flex;flex-direction:column;gap:16px">
             <div class="row">
@@ -270,7 +359,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
                 </span>
               ) : null}
             </div>
-            <p class="muted" style="font-size:13px">Written by the platform's narrator from the week's data; published after I approved it. The figures in it are explorable in the data room.</p>
+            <p class="muted ch-byline" style="font-size:13px">Written by the platform's narrator from the week's data; published after I approved it. The figures in it are explorable in the data room.</p>
           </article>
           <aside style="flex:1 1 240px;min-width:0">
             <p class="label" style="margin-bottom:8px">In this chapter</p>
@@ -293,8 +382,8 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
                   <a href={href(pathOf("chapter", latestChapter.id))}>
                     <span style="font-size:14px;line-height:1.35">
                       {chWeekCalls.length
-                        ? `${chWeekCalls.length} coach ${chWeekCalls.length === 1 ? "call" : "calls"} graded that week`
-                        : "No coach call graded that week"}
+                        ? `${chWeekCalls.length} graded coach ${chWeekCalls.length === 1 ? "call" : "calls"} listed for its days`
+                        : "No graded coach call listed for its days"}
                     </span>
                     {chWeekCalls.length > 0 && <span class="mono muted" style="font-size:11px">{chWeekRight} right · {chWeekCalls.length - chWeekRight} wrong</span>}
                   </a>
@@ -471,7 +560,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
         </a>
         <a class="door" href={href("/system/")}>
           <span class="between mono muted" style="font-size:12px"><span class="cobalt">03</span><span>Inspect · as deep as you want</span></span>
-          <span><span class="t">The system</span><p class="serif muted" style="font-size:17px;margin-top:10px">The AI coaches, {all.byType.prediction.filter((p) => p.status !== "observation").length} dated forecasts, every grade public — beside what a simple guess would have scored.</p></span>
+          <span><span class="t">The system</span><p class="serif muted" style="font-size:17px;margin-top:10px">The AI coaches, {ledgerForecasts ?? all.byType.prediction.filter((p) => p.status !== "observation").length} dated forecasts, every grade public — beside what a simple guess would have scored.</p></span>
         </a>
       </div>
     </div>
@@ -493,4 +582,5 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
 
 <script>
   import "../islands/since.js";
+  import "../islands/theline.js";
 </script>

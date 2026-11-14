@@ -315,7 +315,14 @@ def mutation_control(dist: str, base: str, snapshot: str = SNAPSHOT) -> bool:
     priv_idx = os.path.join(tmp, "privacy", "index.html")
     priv_html = open(priv_idx, encoding="utf-8").read()
     open(priv_idx, "w", encoding="utf-8").write(
-        priv_html.replace("</main>", '<p><q data-verbatim="coach">POISON-HELD inside a quote</q></p></main>', 1)
+        priv_html.replace(
+            "</main>",
+            '<p><q data-verbatim="coach">POISON-HELD inside a quote</q></p>'
+            # the unmounted chart lives on a page that loads no island: the front page now loads the inspector (The Line,
+            # 2026-11-14), which mounts every chart on its page — a planted one included — so the defect could not show there
+            '<svg viewBox="0 0 10 10" data-points="[{&quot;x&quot;:1,&quot;y&quot;:1,&quot;label&quot;:&quot;planted&quot;}]"></svg></main>',
+            1,
+        )
     )
     idx = os.path.join(tmp, "index.html")
     html = open(idx, encoding="utf-8").read()
@@ -325,7 +332,6 @@ def mutation_control(dist: str, base: str, snapshot: str = SNAPSHOT) -> bool:
         '<svg viewBox="0 0 1000 100" width="100%"><text x="10" y="50" font-size="20">PLANTED-SMALL</text></svg>'
         '<svg viewBox="0 0 300 60" width="300" height="60"><text x="10" y="30" font-size="14">PLANTED-A</text>'
         '<text x="14" y="32" font-size="14">PLANTED-B</text><text x="280" y="50" font-size="14">PLANTED-CLIP</text></svg>'
-        '<svg viewBox="0 0 10 10" data-points="[{&quot;x&quot;:1,&quot;y&quot;:1,&quot;label&quot;:&quot;planted&quot;}]"></svg>'
         # dates in words: authored copy, a correction, a quote in a heading, a borrowed exemption
         "<p>Planted authored copy dated 2031-01-02.</p>"
         '<p class="correction" role="note">Correction: planted on 2031-01-03.</p>'
@@ -343,7 +349,7 @@ def mutation_control(dist: str, base: str, snapshot: str = SNAPSHOT) -> bool:
         "horizontal overflow" in text,
         "inline <script>" in text,
         "sentinel" in text,
-        "no inspect island" in text,
+        "no inspect island" in privacy,
         "SVG text below 11px floor: 'PLANTED-SMALL'" in text,
         "SVG labels overlap: 'PLANTED-A' × 'PLANTED-B'" in text,
         "SVG text clipped by its chart frame: 'PLANTED-CLIP'" in text,
