@@ -60,7 +60,6 @@ from publish_snapshot_chapters import (
     CALL_OUTCOME,
     apply_week_intervals,
     chapter_summary,
-    clean_excerpt,
     week_id as _week_id,  # None for a withdrawn installment: never a chapter (owner ruling 2026-11-10)
     whole_sentence_summary,
 )  # noqa: E402 — one vocabulary for weeks, excerpts and calls
@@ -413,8 +412,6 @@ def _live_chapters(ctx: LiveContext) -> None:
             ctx.chapter_by_week[week] = cid
         wc = p.get("word_count") if isinstance(p.get("word_count"), int) else None
         has_ep = week is not None and week in ctx.ep_by_week
-        body = _chapter_body(ctx, p.get("url"))
-        summary = chapter_summary(body) or clean_excerpt(p.get("excerpt"))
         ctx.objs["chapter"].append(
             envelope(
                 id=cid,
@@ -424,7 +421,7 @@ def _live_chapters(ctx: LiveContext) -> None:
                 source=["/journal/posts.json"],
                 approved={"by": "owner", "at": p["date"], "via": "chronicle-approve"},
                 title=p.get("title") or cid,
-                summary=summary,
+                summary=(summary := chapter_summary(body := _chapter_body(ctx, p.get("url")), p.get("excerpt"))),
                 week=week,
                 week_label=p.get("label") or (f"Week {week}" if week is not None else cid),
                 date=p["date"],

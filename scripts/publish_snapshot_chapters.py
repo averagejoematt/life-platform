@@ -109,19 +109,18 @@ def _whole_sentences(text: str, limit: int) -> str:
     return text[:limit].rsplit(" ", 1)[0].rstrip(",;:—– ") + "…"
 
 
-def chapter_summary(body_html: str | None, limit: int = 300) -> str | None:
+def chapter_summary(body_html: str | None, excerpt: str | None = None, limit: int = 300) -> str | None:
     """A chapter's summary read off its published body: the italic dek the narrator wrote for it when there is one,
     otherwise the opening paragraph — in whole sentences. An editor's note and the machine "Day N ·" stat line are
     never the summary (2026-11-14: the 300-character posts.json excerpt was mostly editor's note on chapters 0–4, so
     the front page and /story/ showed fragments such as "He is down 15 pounds from his first weigh-in in 24…")."""
-    if not isinstance(body_html, str) or not body_html.strip():
-        return None
-    for attrs, inner in _PARA.findall(body_html):
-        t = _text(inner)
-        if not t or t.lower().startswith("editor's note") or t.lower().startswith("editor’s note") or _STAT_LINE.match(t):
-            continue
-        return _whole_sentences(t, limit) or None
-    return None
+    if isinstance(body_html, str) and body_html.strip():
+        for _attrs, inner in _PARA.findall(body_html):
+            t = _text(inner)
+            if not t or t.lower().startswith("editor's note") or t.lower().startswith("editor’s note") or _STAT_LINE.match(t):
+                continue
+            return _whole_sentences(t, limit) or None
+    return clean_excerpt(excerpt)  # no readable body: the served excerpt, cleaned as before
 
 
 def whole_sentence_summary(text: str | None) -> str | None:

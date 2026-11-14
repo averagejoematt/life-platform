@@ -34,6 +34,7 @@ def test_a_long_opening_ends_on_a_whole_sentence():
 
 def test_no_body_no_summary():
     assert chapter_summary(None) is None and chapter_summary("") is None
+    assert chapter_summary(None, "*A served excerpt.*") == "A served excerpt."
 
 
 def test_a_feed_summary_cut_mid_word_ends_on_its_last_sentence():
