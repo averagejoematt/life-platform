@@ -759,6 +759,7 @@ def measure(week: dict[str, Any], lib: dict[str, Any], catalog: dict[str, Any], 
             "steps_per_day": (week.get("steps_credit") or {}).get("steps_per_day"),
         },
         "hard_sets": hard_sets_by_muscle(week, lib, catalog),
+        "press_trade": _press_trade_numbers(lib, catalog),
         "delt_heads": delt_heads(week, lib, catalog),
     }
 
@@ -772,6 +773,14 @@ def _hard_items(week: dict[str, Any], lib: dict[str, Any], catalog: dict[str, An
         for s in week["sessions"]
         for lift in s["lifts"]
     ]
+
+
+def _press_trade_numbers(lib: dict[str, Any], catalog: dict[str, Any]) -> dict[str, Any]:
+    """Ruling 6 as served (the press's sets from the lateral raises) beside the owner's alternative (from the rear-delt surplus),
+    per delt head, in the plan's hard sets (`live_volume.press_trade_alternative`) — reported, never applied."""
+    from training import live_volume
+
+    return live_volume.press_trade_alternative(catalog, lib)
 
 
 def delt_heads(week: dict[str, Any], lib: dict[str, Any], catalog: dict[str, Any]) -> dict[str, float]:

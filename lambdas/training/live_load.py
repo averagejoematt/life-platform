@@ -91,12 +91,6 @@ def e1rm(r: dict[str, Any]) -> float:
     return t["kg"] * (1 + (t["reps"] + 10.0 - min(10.0, max(6.0, rpe))) / 30.0)
 
 
-def reps_e1rm(r: dict[str, Any]) -> float:
-    """Plain Epley on the top set (load and reps only): the PERFORMANCE read, blind to the logged RPE (rules 2 and 4)."""
-    t = _top(r)
-    return t["kg"] * (1 + t["reps"] / 30.0)
-
-
 def read_e1rm(r: dict[str, Any]) -> float:
     """The decline read (rule 4): effort-adjusted Epley with the logged RPE clamped to 6-9 — a set logged 9.5-10 reads as RPE 9, so
     an RPE-10 habit never manufactures a decline while the reps at the load hold; unlogged reads as 8."""
@@ -401,6 +395,8 @@ def set_loads(
             + ")"
         )
     mark["load_guard"] = out
+    if load_floors is not None:  # rule 7: the note composer drops the re-entry cap and layoff line on a familiar pattern
+        load_floors["live_familiar"] = sorted(familiar_keys(rx) or ())
     return out
 
 

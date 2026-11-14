@@ -202,7 +202,6 @@ def _compose_notes(
     rotation: dict[str, Any] | None = None,
     deload: bool = False,
     red_day: bool = False,
-    familiar: set[str] | None = None,
 ) -> dict[str, Any]:
     """#5428: every lift note composed from what the passes decided (`lift_note.compose_blocks`) — the inputs_snapshot record.
     #5083: a rotated accessory's note names the exercise it replaces (`variant_rotation.swaps`). #5771: each lift's ranked
@@ -219,7 +218,7 @@ def _compose_notes(
         target_date=target_date,
         rotations=variant_rotation.swaps(rotation, movements),
         fallbacks=fb["by_key"] if fb.get("render") else None,
-        **({"familiar": familiar} if familiar is not None else {}),  # #5861 fix round 9, live only: no re-entry cap on a familiar pattern
+        **({"familiar": set(load_floors["live_familiar"])} if "live_familiar" in (load_floors or {}) else {}),  # #5861 round 9, live
     )
     ctx = {"deload": deload, "red_day": red_day, "load_floors": load_floors, "history_index": history_index, "target_date": target_date}
     cal = rpe_calibration.mark_session(blocks, movements, note_record=record, context=ctx)
@@ -412,18 +411,7 @@ def full_body_routines(
     # #5428: the Hevy note is composed LAST, from what every load and warm-up pass decided — the effort, at most one
     # reason (a row more than one step from PREVIOUS, or a scheme change), at most one cue; the passes' own text is kept
     # on inputs_snapshot["lift_notes"], never on the wire
-    note_record = _compose_notes(
-        blocks,
-        load_catalog,
-        load_floors,
-        history_index,
-        inputs.target_date,
-        rotation,
-        deload,
-        drop_accessories,
-        live_load.familiar_keys(rx),
-    )
-
+    note_record = _compose_notes(blocks, load_catalog, load_floors, history_index, inputs.target_date, rotation, deload, drop_accessories)
     caps = {
         "total_sets": week_cfg["session_set_ceiling"],
         "session_minutes": week_cfg["session_minutes_ceiling"],
