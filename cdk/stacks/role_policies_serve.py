@@ -18,6 +18,15 @@ from stacks.role_policies_base import (
     BUCKET_ARN,
     DLQ_ARN,
     KMS_KEY_ARN,
+    NS_AI,
+    NS_BUDGET,
+    NS_COMPUTE,
+    NS_HEVY_ROUTINE,
+    NS_INGEST_LIVENESS,
+    NS_INGEST_SHARED,
+    NS_PIPELINE,
+    NS_PREDICTIONS,
+    NS_TELEGRAM,
     REGION,
     SES_IDENTITY,
     SES_SITE_IDENTITY,
@@ -25,6 +34,7 @@ from stacks.role_policies_base import (
     _bedrock_statement,
     _bedrock_telemetry_statement,
     _charter_twin_list,
+    _put_metric_data_statement,
     _s3,
     _secret_arn,
 )
@@ -389,11 +399,7 @@ def site_api_ai() -> list[iam.PolicyStatement]:
         # dropped. Same class as coach_state_updater / coach_prediction_evaluator;
         # surfaced by the test_put_metric_data_grant_lockstep gate. PutMetricData
         # only accepts "*".
-        iam.PolicyStatement(
-            sid="CloudWatchMetrics",
-            actions=["cloudwatch:PutMetricData"],
-            resources=["*"],
-        ),
+        _put_metric_data_statement("CloudWatchMetrics", NS_AI, NS_COMPUTE),  # #5545
     ]
 
 
@@ -550,6 +556,13 @@ def mcp_server() -> list[iam.PolicyStatement]:
         # #4439: invoke implies record (#3563) — without it every MCP Bedrock call's
         # EstimatedCostUSD is dropped AccessDenied and the cost governor never sees it.
         _bedrock_telemetry_statement(),
+        # #5545: the namespaces the MCP bundle reaches besides LifePlatform/AI. It is the widest
+        # closure in the fleet because the surface waiter runs the site-api handlers in-process
+        # (#4774): Budget via site_api_budget -> cost_governor_lambda (DevSessionSpendMTD),
+        # Predictions via dispute_docket -> coach_prediction_evaluator, DynamoDB/OAuth via the
+        # ingestion framework, Compute via compute_metadata. Budget here is import-reachable,
+        # not observed — narrowing it needs a call-graph, not an import closure (follow-up).
+        _put_metric_data_statement("SharedModuleMetrics", NS_BUDGET, NS_COMPUTE, NS_PREDICTIONS, *NS_INGEST_SHARED),
         # #4774: the surface waiter (mcp/tools_surfaces._dispatch) runs the site-api
         # handlers IN-PROCESS, so they execute under THIS role, not site_api()'s. With no
         # CloudWatch read here, get_platform_cost's inference_receipt 503'd on
@@ -619,11 +632,7 @@ def hevy_routine_cron() -> list[iam.PolicyStatement]:
             actions=["sqs:SendMessage"],
             resources=[DLQ_ARN],
         ),
-        iam.PolicyStatement(
-            sid="CloudWatchMetrics",
-            actions=["cloudwatch:PutMetricData"],
-            resources=["*"],
-        ),
+        _put_metric_data_statement("CloudWatchMetrics", NS_AI, NS_COMPUTE, NS_HEVY_ROUTINE),  # #5545
     ]
 
 
@@ -670,11 +679,7 @@ def hevy_restamp() -> list[iam.PolicyStatement]:
                 f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/hevy/restamp_enabled",
             ],
         ),
-        iam.PolicyStatement(
-            sid="CloudWatchMetrics",
-            actions=["cloudwatch:PutMetricData"],
-            resources=["*"],
-        ),
+        _put_metric_data_statement("CloudWatchMetrics", NS_AI, NS_COMPUTE, NS_HEVY_ROUTINE),  # #5545
     ]
 
 
@@ -770,7 +775,8 @@ def pipeline_health_check() -> list[iam.PolicyStatement]:
             actions=["secretsmanager:DescribeSecret"],
             resources=[f"arn:aws:secretsmanager:{REGION}:{ACCT}:secret:life-platform/*"],
         ),
-        iam.PolicyStatement(sid="CloudWatchMetrics", actions=["cloudwatch:PutMetricData"], resources=["*"]),
+        # #5545: IngestLiveness (CloudTrail delivery, sensor self-test, unhealthy-source gauges) + Pipeline.
+        _put_metric_data_statement("CloudWatchMetrics", NS_INGEST_LIVENESS, NS_PIPELINE),
         iam.PolicyStatement(
             sid="SnsPublishDigest",
             actions=["sns:Publish"],
@@ -956,9 +962,5 @@ def telegram_worker() -> list[iam.PolicyStatement]:
         _charter_twin_list(),
         # Fail-loud partner of the same fix: an empty persona/registry now emits
         # TelegramPersonaMissing instead of a WARN nobody reads.
-        iam.PolicyStatement(
-            sid="Metrics",
-            actions=["cloudwatch:PutMetricData"],
-            resources=["*"],
-        ),
+        _put_metric_data_statement("Metrics", NS_AI, NS_COMPUTE, NS_TELEGRAM),  # #5545
     ]

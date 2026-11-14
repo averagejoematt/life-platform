@@ -16,6 +16,11 @@ from stacks.role_policies_base import (
     ACCT,
     DLQ_ARN,
     KMS_KEY_ARN,
+    NS_AI,
+    NS_COMPUTE,
+    NS_DYNAMODB,
+    NS_INGEST_SHARED,
+    NS_PREDICTIONS,
     REGION,
     SES_CONFIG_SET_ARN,
     SES_IDENTITY,
@@ -23,6 +28,7 @@ from stacks.role_policies_base import (
     _bedrock_statement,
     _bedrock_telemetry_statement,
     _charter_twin_list,
+    _put_metric_data_statement,
     _s3,
     _secret_arn,
 )
@@ -39,8 +45,14 @@ def _compute_base(
     needs_kms: bool = False,
     needs_ses: bool = False,
     extra_statements: list[iam.PolicyStatement] = None,
+    metric_namespaces: tuple = (NS_AI, NS_COMPUTE),
 ) -> list[iam.PolicyStatement]:
-    """Build standard compute role policies."""
+    """Build standard compute role policies.
+
+    #5545: `metric_namespaces` conditions the AICostMetrics grant (only emitted when
+    `needs_ai_keys`). The default is what every AI-calling compute handler reaches:
+    `bedrock_client` (LifePlatform/AI) and `common.compute_metadata` (LifePlatform/Compute).
+    """
     stmts = [
         iam.PolicyStatement(
             sid="DynamoDB",
@@ -92,13 +104,7 @@ def _compute_base(
         # role needs PutMetricData. Without it the emit fails AccessDenied (fail-
         # open → log spam) and the cost telemetry is silently dropped for that
         # feature — observed on ai-expert-analyzer. PutMetricData only accepts "*".
-        stmts.append(
-            iam.PolicyStatement(
-                sid="AICostMetrics",
-                actions=["cloudwatch:PutMetricData"],
-                resources=["*"],
-            )
-        )
+        stmts.append(_put_metric_data_statement("AICostMetrics", *metric_namespaces))
     if needs_ses:
         stmts.append(
             iam.PolicyStatement(
@@ -138,6 +144,7 @@ def compute_character_sheet() -> list[iam.PolicyStatement]:
         needs_s3_config=True,
         needs_ai_keys=True,
         needs_s3_write=["site/*", "generated/*"],
+        metric_namespaces=(NS_AI, NS_COMPUTE, NS_DYNAMODB),  # #5545: + common.item_size_guard
     )
 
 
@@ -202,6 +209,7 @@ def compute_coach_daily_reflection() -> list[iam.PolicyStatement]:
                 resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle"],
             ),
         ],
+        metric_namespaces=(NS_AI, NS_COMPUTE, NS_PREDICTIONS),  # #5545: + dispute_docket -> coach_prediction_evaluator
     )
 
 
@@ -239,6 +247,7 @@ def compute_daily_insight() -> list[iam.PolicyStatement]:
         needs_kms=True,  # writes to platform_memory + insights DDB partitions
         needs_ai_keys=True,
         needs_s3_config=True,
+        metric_namespaces=(NS_AI, NS_COMPUTE, NS_DYNAMODB),  # #5545: + common.item_size_guard
     )
 
 
@@ -288,6 +297,7 @@ def intelligence_journal_analyzer() -> list[iam.PolicyStatement]:
         needs_kms=True,
         needs_ai_keys=True,
         needs_s3_config=True,
+        metric_namespaces=(NS_AI, NS_COMPUTE, *NS_INGEST_SHARED),  # #5545: imports the ingestion framework (item_size_guard + auth_breaker)
     )
 
 
@@ -297,6 +307,7 @@ def compute_adaptive_mode() -> list[iam.PolicyStatement]:
         needs_kms=True,  # writes adaptive_mode record to DDB
         needs_ai_keys=True,
         needs_s3_config=True,
+        metric_namespaces=(NS_AI, NS_COMPUTE, NS_DYNAMODB),  # #5545: + common.item_size_guard
     )
 
 
@@ -370,6 +381,7 @@ def compute_coach_vision() -> list[iam.PolicyStatement]:
         ),
         _bedrock_statement(),
         _bedrock_telemetry_statement(),
+        _put_metric_data_statement("SharedModuleMetrics", NS_COMPUTE),  # #5545: common.compute_metadata
         iam.PolicyStatement(
             sid="BudgetTierRead",
             actions=["ssm:GetParameter"],
@@ -542,11 +554,9 @@ def compute_coach_prediction_evaluator() -> list[iam.PolicyStatement]:
                 actions=["lambda:InvokeFunction"],
                 resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-history-summarizer"],
             ),
-            iam.PolicyStatement(
-                sid="CloudWatchMetrics",
-                actions=["cloudwatch:PutMetricData"],
-                resources=["*"],
-            ),
+            # #5545: no needs_ai_keys here, so this is the role's ONLY metric grant —
+            # it carries the whole import-closure set, not just Predictions.
+            _put_metric_data_statement("CloudWatchMetrics", NS_AI, NS_COMPUTE, NS_PREDICTIONS),
         ],
     )
 
@@ -573,6 +583,8 @@ def compute_coach_orchestrator() -> list[iam.PolicyStatement]:
                 resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle"],
             ),
         ],
+        # #5545: coach-ensemble-digest (shares this role) reaches dispute_docket -> coach_prediction_evaluator.
+        metric_namespaces=(NS_AI, NS_COMPUTE, NS_PREDICTIONS),
     )
 
 
@@ -596,11 +608,7 @@ def compute_coach_state_updater() -> list[iam.PolicyStatement]:
         needs_ai_keys=True,
         needs_s3_config=True,
         extra_statements=[
-            iam.PolicyStatement(
-                sid="CloudWatchMetrics",
-                actions=["cloudwatch:PutMetricData"],
-                resources=["*"],
-            ),
+            _put_metric_data_statement("CloudWatchMetrics", NS_PREDICTIONS),  # #5545: AI/Compute ride AICostMetrics
             iam.PolicyStatement(
                 sid="ExperimentCycleRead",
                 actions=["ssm:GetParameter"],

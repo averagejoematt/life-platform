@@ -170,9 +170,69 @@ def _bedrock_telemetry_statement() -> iam.PolicyStatement:
     both simply holds two Allows for the same call — valid, and honest about which
     reason is which. `tests/test_bedrock_telemetry_iam_parity_3563.py` derives the
     pairing from the role family and reds on the next role that skips it.
+
+    #5545: conditioned to `LifePlatform/AI` — the only namespace `bedrock_client` writes.
+    A role whose code ALSO reaches another namespace carries that grant in its own
+    statement (`_put_metric_data_statement`), so this one stays exactly what its sid says.
+    """
+    return _put_metric_data_statement("BedrockTelemetryMetric", NS_AI)
+
+
+# ── #5545: every cloudwatch:PutMetricData grant names its namespaces ─────────────────────────
+# PutMetricData takes no resource ARN, so before #5545 every grant was `"*"` with no condition:
+# any of ~70 roles could write ANY namespace — including `LifePlatform/AI` and
+# `LifePlatform/Budget`, the series `cost_governor_lambda` projects spend from. The one lever
+# IAM offers is the `cloudwatch:namespace` condition key (single-valued; a StringEquals list is
+# an OR). Each role's set is the namespaces its handler's import closure passes to
+# `put_metric_data(Namespace=...)`; EMF lines printed to logs need no IAM and are NOT counted.
+# `tests/test_putmetricdata_namespace_condition_5545.py` re-derives every set from the code and
+# reds on a missing namespace (the metric would go dark) or an unconditioned grant.
+NS_ROOT = "LifePlatform"  # bare root — daily_brief's ComputePipelineStaleness; `LifePlatform/*` would NOT match it
+NS_AI = "LifePlatform/AI"
+NS_AI_CANARY = "LifePlatform/AICanary"
+NS_BUDGET = "LifePlatform/Budget"
+NS_CANARY = "LifePlatform/Canary"
+NS_COHERENCE = "LifePlatform/Coherence"
+NS_COMPUTE = "LifePlatform/Compute"
+NS_DYNAMODB = "LifePlatform/DynamoDB"
+NS_EMAIL = "LifePlatform/Email"
+NS_FRESHNESS = "LifePlatform/Freshness"
+NS_HEVY_ROUTINE = "LifePlatform/HevyRoutine"
+NS_INGEST_LIVENESS = "LifePlatform/IngestLiveness"
+NS_INGEST_RECONCILIATION = "LifePlatform/IngestReconciliation"
+NS_OAUTH = "LifePlatform/OAuth"
+NS_PIPELINE = "LifePlatform/Pipeline"
+NS_PODCAST = "LifePlatform/Podcast"
+NS_PREDICTIONS = "LifePlatform/Predictions"
+NS_QA = "LifePlatform/QA"
+NS_READING = "LifePlatform/Reading"
+NS_TELEGRAM = "LifePlatform/Telegram"
+NS_TRAFFIC = "LifePlatform/Traffic"
+
+#: What every ingestion Lambda reaches through the shared ingestion framework:
+#: `common.item_size_guard` (DynamoDB) and `common.auth_breaker` (OAuth).
+NS_INGEST_SHARED = (NS_DYNAMODB, NS_OAUTH)
+
+
+def _metric_namespace_condition(*namespaces: str) -> dict:
+    """The IAM condition block limiting PutMetricData to `namespaces` (exact match, OR'd)."""
+    names = sorted(set(namespaces))
+    if not names:
+        raise ValueError("a PutMetricData grant must name at least one namespace (#5545)")
+    return {"StringEquals": {"cloudwatch:namespace": names}}
+
+
+def _put_metric_data_statement(sid: str, *namespaces: str) -> iam.PolicyStatement:
+    """`cloudwatch:PutMetricData` on `"*"` (it takes no resource ARN) limited to `namespaces`.
+
+    PutMetricData ONLY. `cloudwatch:namespace` is present in the request context of
+    PutMetricData alone, so a read action (GetMetricData, GetMetricStatistics, ListMetrics)
+    in the same statement would meet a condition whose key is absent — StringEquals on an
+    absent key does not match, and the read would be denied. Reads stay in their own statement.
     """
     return iam.PolicyStatement(
-        sid="BedrockTelemetryMetric",
+        sid=sid,
         actions=["cloudwatch:PutMetricData"],
         resources=["*"],
+        conditions=_metric_namespace_condition(*namespaces),
     )
