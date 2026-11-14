@@ -310,6 +310,12 @@ def _recall_card_html(outcome):
     )
 
 
+def _off_the_list(inst, date_str):
+    """chronicle_schema.off_the_list, with the row being published right now exempt from the status test (it still reads
+    ``draft`` when its manifest is built). Every other unpublished row stays off the reading list."""
+    return chronicle_schema.off_the_list(inst, publishing=str(inst.get("sk", "")) == f"DATE#{date_str}")
+
+
 def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_installments, write_to_s3=True, *, _g):
     """Publish installment to the Signal-themed journal on averagejoematt.com.
 
@@ -346,7 +352,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     _all_dates = [k[0] for k in _all_keys]
     # #4537: an unlisted installment keeps its URL slot (seq is over ALL keys) but leaves the
     # manifest and the Prologue part numbering. Parity with deploy/restart_leadin_pages.run.
-    _unlisted = {(x.get("date", ""), str(x.get("sk", ""))) for x in all_installments if chronicle_schema.off_the_list(x)}
+    _unlisted = {(x.get("date", ""), str(x.get("sk", ""))) for x in all_installments if _off_the_list(x, date_str)}
     _pre_keys = [k for k in _all_keys if k[0] < _genesis and k not in _unlisted]
 
     def _series_label(d, k=""):
@@ -652,7 +658,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     # "label" carries the genesis-anchored truth (Prologue vs Week N).
     posts_manifest = []
     for inst in sorted(
-        [x for x in all_installments if not chronicle_schema.off_the_list(x)],
+        [x for x in all_installments if not _off_the_list(x, date_str)],
         key=lambda x: (x.get("date", ""), _seq_for(x.get("date", ""), x.get("sk", ""))),
         reverse=True,
     ):

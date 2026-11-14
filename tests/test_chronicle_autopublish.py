@@ -3,6 +3,7 @@ owner then ruled that elapsed time is never consent, so it holds and pages inste
 stale-draft window, that the sweep writes nothing on either path, and the tombstone guards (#3485)."""
 
 import importlib.util
+import io
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -135,11 +136,19 @@ def test_publish_to_s3_refuses_an_archived_row_on_any_path(mod):
 
 
 def test_publish_to_s3_writes_a_current_row(mod):
-    row = {"sk": "DATE#2026-09-12", "date": "2026-09-12", "status": "draft", "draft_journal_posts_json": "{}"}
-    with mock.patch.object(mod.s3, "put_object") as put:
+    row = {
+        "sk": "DATE#2026-09-12",
+        "date": "2026-09-12",
+        "status": "draft",
+        "draft_journal_post_key": "generated/journal/posts/week-02/index.html",
+        "draft_journal_post_html": "<p>post</p>",
+        "draft_journal_posts_json": json.dumps({"posts": [{"url": "/journal/posts/week-02/", "date": "2026-09-12"}]}),
+    }
+    live = {"Body": io.BytesIO(json.dumps({"posts": []}).encode())}
+    with mock.patch.object(mod.s3, "put_object") as put, mock.patch.object(mod.s3, "get_object", return_value=live):
         paths = mod._publish_to_s3(row)
-    assert paths == ["/journal/posts.json"]
-    put.assert_called_once()
+    assert paths == ["/journal/posts/week-02/*", "/journal/posts.json"]
+    assert put.call_count == 2
 
 
 def test_sweep_reports_the_refusal_and_publishes_nothing_else_for_that_row(mod):

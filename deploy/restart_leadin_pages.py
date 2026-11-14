@@ -488,7 +488,7 @@ def run(apply: bool = False, no_invalidate: bool = False) -> int:
     invalidation_paths = ["/journal/posts.json"]
 
     for item in installments:
-        if chronicle_schema.is_withdrawn(item):
+        if chronicle_schema.is_withdrawn(item) or chronicle_schema.is_unpublished(item):
             continue
         date_str = item.get("date", "")
         week_num = int(item.get("week_number", 0) or 0)
