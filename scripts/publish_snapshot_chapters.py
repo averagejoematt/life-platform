@@ -21,6 +21,7 @@ import os
 import re
 import sys
 from datetime import date, timedelta
+from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from publish_snapshot_contract import ISO_DAY  # noqa: E402
@@ -173,3 +174,11 @@ def versus_guess(comparison: dict | None) -> dict | None:
             }
         )
     return {"kinds": kinds} if kinds else None
+
+
+def quality_counts(q: Any) -> dict | None:
+    """The grader's per-coach quality counts (#5533), as served: clean + flagged + unassessed == n."""
+    if not isinstance(q, dict) or not all(isinstance(q.get(k), int) for k in ("clean", "flagged", "unassessed", "n")):
+        return None
+    by_flag = {str(k): int(v) for k, v in (q.get("by_flag") or {}).items() if isinstance(v, int)}
+    return {"clean": q["clean"], "flagged": q["flagged"], "unassessed": q["unassessed"], "n": q["n"], "by_flag": by_flag}

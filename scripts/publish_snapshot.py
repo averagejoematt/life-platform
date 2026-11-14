@@ -60,6 +60,7 @@ from publish_snapshot_chapters import (
     CALL_OUTCOME,
     apply_week_intervals,
     chapter_summary,
+    quality_counts as _quality_counts,
     versus_guess,
     week_id as _week_id,  # None for a withdrawn installment: never a chapter (owner ruling 2026-11-10)
     whole_sentence_summary,
@@ -439,14 +440,6 @@ def _live_chapters(ctx: LiveContext) -> None:
     for e in ctx.objs["episode"]:
         if e["number"] in ctx.chapter_by_week:
             e["chapter_id"] = ctx.chapter_by_week[e["number"]]
-
-
-def _quality_counts(q: Any) -> dict | None:
-    """The grader's per-coach quality counts (#5533), as served: clean + flagged + unassessed == n."""
-    if not isinstance(q, dict) or not all(isinstance(q.get(k), int) for k in ("clean", "flagged", "unassessed", "n")):
-        return None
-    by_flag = {str(k): int(v) for k, v in (q.get("by_flag") or {}).items() if isinstance(v, int)}
-    return {"clean": q["clean"], "flagged": q["flagged"], "unassessed": q["unassessed"], "n": q["n"], "by_flag": by_flag}
 
 
 def _live_coaches(ctx: LiveContext) -> None:
