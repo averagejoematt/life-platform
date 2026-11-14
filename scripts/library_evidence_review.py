@@ -615,14 +615,12 @@ def apply_review(lib: dict[str, Any], decided: dict[str, Any]) -> dict[str, Any]
     reviews.finalize_tiers(mv)  # the quality tier re-derived from the rubric (+ at most one recorded band, #5857)
     if acc["candidates"]:
         last = (out.get("_provenance") or {}).get("history_through") or "1970-01-01"
-        used_eq = sorted({x for e in mv.values() for x in e["equipment"]})
-        inventory, cutoff = b.home_gym_inventory(mv, {"last": last}, used_eq)
+        inventory = b.integrity_inputs.home_gym_inventory(mv, {"last": last}, b.cur.SEEDED_AVAILABILITY)
         out["gym_inventory"]["items"] = inventory
         for e in mv.values():
-            e["availability"] = {xl.LOCATION_ID: b.movement_availability(e, inventory, cutoff)}
-        fidx = xl.fallback_index(out)
+            e["availability"] = {xl.LOCATION_ID: b.integrity_inputs.movement_availability(e, inventory)}
         for key, e in mv.items():
-            e["fallbacks"] = [{"movement_id": k, "reason": r} for k, r in xl.fallback_candidates(out, key, fidx)[: b.MAX_FALLBACKS]]
+            e["fallbacks"] = [{"movement_id": k, "reason": r} for k, r in xl.fallback_candidates(out, key)[: b.MAX_FALLBACKS]]
         for key in list(mv):
             mv[key] = b._ordered(mv[key])
     prov = out.setdefault("_provenance", {})

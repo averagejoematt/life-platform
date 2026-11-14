@@ -1,0 +1,223 @@
+{
+ "_README": "Hevy template facts the exercise-library builder reads (deploy/exercise_library_integrity.py, #5861 fix round 13). DATA ONLY. `created`: library key -> {template_id, title} for a custom Hevy template created after the owner ruling of 2026-11-14 (the driver adds one row per creation; nothing else changes, and the next rebuild makes the movement loggable). `canonical_mappings`: a movement with no template of its own that is logged under another member of its canonical family, with the reason. `released`: a Hevy template id a library movement no longer logs under (its history, if any, stays where it was logged). `hevy_titles`: for every expansion candidate that names a template id, the title that template carries in Hevy; `differs_because` is required when it is not the candidate's own title. Check the whole file against a copy of the live template index with `python3 deploy/build_exercise_library.py --inputs F --template-index INDEX`.",
+ "created": {},
+ "canonical_mappings": {
+  "kettlebell_suitcase_carry": {
+   "logs_as": "suitcase_carry",
+   "why": "the same carry with a different implement: the Suitcase Carry template names no implement and already holds both dumbbell and kettlebell sessions, so no other exercise's history is mixed in"
+  }
+ },
+ "released": {
+  "D20D7BBE": {
+   "movement": "kettlebell_deadlift",
+   "why": "Hevy's Sumo Deadlift: a barbell lift's template, so kettlebell sessions logged there would share one history with a different exercise (owner ruling 2026-11-14). Never logged; the kettlebell deadlift waits for its own template."
+  }
+ },
+ "hevy_titles": {
+  "08590920": {
+   "title": "Hanging Knee Raise"
+  },
+  "091737FA": {
+   "title": "Back Extension (Weighted Hyperextension)"
+  },
+  "0E4523F4": {
+   "title": "Wrist Roller"
+  },
+  "108D7A14": {
+   "title": "Nordic Hamstrings Curls"
+  },
+  "11A123F3": {
+   "title": "Seated Leg Curl (Machine)"
+  },
+  "1837BA23": {
+   "title": "Single Arm Landmine Press (Barbell)"
+  },
+  "1B2B1E7C": {
+   "title": "Pull Up"
+  },
+  "1E42FD5F": {
+   "title": "Hack Squat (Machine)"
+  },
+  "20C1A3CB": {
+   "title": "Split Squat (Dumbbell)"
+  },
+  "23A48484": {
+   "title": "Cable Crunch"
+  },
+  "28BB4A95": {
+   "title": "Triceps Dip"
+  },
+  "29083183": {
+   "title": "Chin Up"
+  },
+  "293483AD": {
+   "title": "Low Cable Fly Crossovers"
+  },
+  "2DBCA395": {
+   "title": "Behind the Back Curl (Cable)"
+  },
+  "30E293E3": {
+   "title": "Pendulum Squat (Machine)"
+  },
+  "35E53528-D898-4721-9A36-65BC003EB0CB": {
+   "title": "Recumbent Bike"
+  },
+  "392887AA": {
+   "title": "Push Up"
+  },
+  "39C99849": {
+   "title": "Incline Push Ups"
+  },
+  "3D1CDC75": {
+   "title": "Belt Squat (Machine)"
+  },
+  "3FD83744": {
+   "title": "Single Leg Press (Machine)"
+  },
+  "4377A52C": {
+   "title": "Stair Machine (Steps)"
+  },
+  "4F5866F8": {
+   "title": "Back Extension (Hyperextension)"
+  },
+  "56808FD2": {
+   "title": "Pull Up (Band)"
+  },
+  "582ADA23": {
+   "title": "Overhead Curl (Cable)"
+  },
+  "5D99A2FA": {
+   "title": "Ski Erg"
+  },
+  "5E0DDACE": {
+   "title": "Aerobics",
+   "differs_because": "Hevy's generic 'Aerobics' template is where a low-impact step session is logged; no step-specific template exists"
+  },
+  "5F8903BF": {
+   "title": "Kettlebell Turkish Get Up"
+  },
+  "629AE73D": {
+   "title": "Single Leg Extensions"
+  },
+  "6433CD93": {
+   "title": "Kettlebell Shoulder Press"
+  },
+  "6A8D3193": {
+   "title": "Chest Supported T Bar Row"
+  },
+  "7952B5CD": {
+   "title": "Reverse Crunch"
+  },
+  "7D1BD41D": {
+   "title": "Sled Pull"
+  },
+  "89304423": {
+   "title": "Kettlebell Snatch"
+  },
+  "8BEBFED6": {
+   "title": "Hip Adduction (Machine)"
+  },
+  "923874CA": {
+   "title": "Landmine 180"
+  },
+  "937292AB": {
+   "title": "Single Leg Romanian Deadlift (Dumbbell)"
+  },
+  "98237BA2": {
+   "title": "Knee Raise Parallel Bars"
+  },
+  "983274DD": {
+   "title": "Landmine Squat and Press"
+  },
+  "A127DA73": {
+   "title": "Kettlebell Goblet Squat"
+  },
+  "AC0A1BF3": {
+   "title": "Sled Push"
+  },
+  "B05C2C29": {
+   "title": "Single Leg Standing Calf Raise (Machine)"
+  },
+  "B123DD01": {
+   "title": "Pullover (Machine)"
+  },
+  "B3B1D947": {
+   "title": "Bear Crawl"
+  },
+  "B60A678F": {
+   "title": "Swimming"
+  },
+  "B9380898": {
+   "title": "Dead Hang"
+  },
+  "BD4E7E53": {
+   "title": "Hang Clean"
+  },
+  "C15174B2-39DF-418B-BCB3-C94563278BE7": {
+   "title": "Landmine Press"
+  },
+  "C732C341": {
+   "title": "Meadows Rows (Barbell)"
+  },
+  "CC55119B": {
+   "title": "Cable Core Pallof Press"
+  },
+  "D5CA687B-C387-4F5B-A5B5-EA7A4BF8E8D6": {
+   "title": "Barbell High Pulls"
+  },
+  "D7D7FCCE": {
+   "title": "Landmine Row"
+  },
+  "D8460FA6": {
+   "title": "Reverse Wrist Curl (Dumbbell)"
+  },
+  "D8911FC4": {
+   "title": "Dead Bug"
+  },
+  "DE68C825": {
+   "title": "Single Arm Lateral Raise (Cable)"
+  },
+  "EB5E90DB-F4F0-47EA-9D9B-FCADE21F4EFC": {
+   "title": "Stability Ball Stir The Pot"
+  },
+  "EC02979E": {
+   "title": "Lateral Band Walks",
+   "differs_because": "the same exercise under Hevy's name: a lateral step against a band"
+  },
+  "F21D5693": {
+   "title": "Chest Supported Y Raise (Dumbbell)"
+  },
+  "F4B4C6EE": {
+   "title": "Hip Abduction (Machine)"
+  },
+  "F5DEF1EB": {
+   "title": "Sissy Squat (Weighted)",
+   "differs_because": "Hevy's only sissy squat template is titled 'Sissy Squat (Weighted)'; it logs the bodyweight and the loaded form alike"
+  },
+  "F60BDDF8": {
+   "title": "Negative Pull Up"
+  },
+  "F623B185-7E9E-46C7-BC6E-B587EFD0D64D": {
+   "title": "Hip Flexor Stretch",
+   "differs_because": "his custom 'Hip Flexor Stretch' template is the half-kneeling stretch; the library title names the position"
+  },
+  "F8356514": {
+   "title": "Hanging Leg Raise"
+  },
+  "F8A0FCCA": {
+   "title": "Kettlebell Swing"
+  },
+  "F99C211D": {
+   "title": "Kettlebell Clean"
+  },
+  "FAB6EB2F": {
+   "title": "Preacher Curl (Dumbbell)"
+  },
+  "FAF31231": {
+   "title": "Decline Bench Press (Machine)"
+  },
+  "FBF92739": {
+   "title": "Incline Chest Press (Machine)"
+  }
+ }
+}

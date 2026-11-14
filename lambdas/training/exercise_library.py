@@ -49,7 +49,7 @@ from typing import Any, Optional
 
 from common import repo_config
 
-from training import quality_rubric
+from training import library_integrity as integrity, quality_rubric
 
 logger = logging.getLogger("exercise_library")
 
@@ -96,16 +96,16 @@ LIBRARY_GATE_KINDS = (
 UNKNOWN_INPUT = "locked"
 PAIN_SOURCE_ID = "training_notes_pain.pain_class (#5806)"  # the rule behind the overlay's `pain_flag` tag (#5773)
 
-# ── availability (owner ruling 2026-11-11) ──
-# One location id, never a name: `home_gym`. A movement logged in the last AVAILABLE_LOOKBACK_YEARS of his
-# Hevy history is AVAILABLE there by default; equipment seen only in older history, or only in expansion
-# candidates, is UNKNOWN. A swap note saying the gym does not have X marks X UNAVAILABLE (owner-confirmable);
+# ── availability (owner rulings 2026-11-11 and 2026-11-14) ──
+# One location id, never a name: `home_gym`. Every equipment id and every movement carries one of five EVIDENCE states
+# (`library_integrity.AVAILABILITY_EVIDENCE`: owner-confirmed, recent inferred, historical-only, unknown, confirmed
+# unavailable) and the engine's `state` follows from it (`library_integrity.EVIDENCE_STATE`): a machine known only from old
+# logs is `unknown`, never served. A swap note saying the gym does not have X marks X unavailable (owner-confirmable);
 # "X was taken" / "no bench free" is CONTENTION, which never makes anything unavailable.
-LOCATION_ID = "home_gym"
+LOCATION_ID = integrity.LOCATION
 AVAILABILITY_STATES = ("available", "unavailable", "unknown")
-AVAILABLE_LOOKBACK_YEARS = 5
-FALLBACK_REASONS = ("same_stimulus", "same_target", "same_family")
-MIN_FALLBACKS = 1
+AVAILABLE_LOOKBACK_YEARS = 5  # the input review's "a movement he uses" window; NOT an availability rule since fix round 13
+FALLBACK_REASONS = integrity.FALLBACK_REASONS
 
 # A template id is 8-char uppercase hex (Hevy standard; a few legacy ids carry other characters) or a custom UUID.
 _TID_RE = re.compile(r"^(?:[0-9A-Z]{8}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$")
@@ -341,14 +341,6 @@ def validate(lib: dict[str, Any]) -> list[str]:
             _err(errors, w, "hypertrophy needs at least one per-target row")
         for row in hyp or []:
             _hypertrophy_row_errors(errors, w, e, row, citations)
-        fbs = e.get("fallbacks")
-        if not isinstance(fbs, list) or len(fbs) < MIN_FALLBACKS:
-            _err(errors, w, "needs >= 1 ranked fallback")
-        for fb in fbs or []:
-            if fb.get("movement_id") not in lib["movements"] or fb.get("movement_id") == mid:
-                _err(errors, w, f"fallback {fb.get('movement_id')!r} is not another library movement")
-            if fb.get("reason") not in FALLBACK_REASONS:
-                _err(errors, w, f"fallback reason {fb.get('reason')!r}")
         av = (e.get("availability") or {}).get(LOCATION_ID) or {}
         if av.get("state") not in AVAILABILITY_STATES:
             _err(errors, w, f"availability.{LOCATION_ID}.state must be one of {AVAILABILITY_STATES}")
@@ -367,6 +359,7 @@ def validate(lib: dict[str, Any]) -> list[str]:
             _err(errors, w, "skill movement without a chain / owner-confirmation / charter gate")
     errors += _equivalence_errors(lib)
     errors += _evaluation_errors(lib)
+    errors += integrity.problems(lib)  # #5861 fix round 13: loggable, availability evidence, the fallback rule, gate chains
     return errors
 
 
@@ -641,63 +634,11 @@ def movement_pattern(title: str) -> str:
     return "other"
 
 
-def _locking_gate_kinds(lib: dict[str, Any], e: dict[str, Any]) -> set[str]:
-    gates = lib.get("gates") or {}
-    return {gates[g]["kind"] for g in e.get("gates") or [] if g in gates and gates[g].get("locks")}
-
-
-def fallback_index(lib: dict[str, Any]) -> dict[str, tuple[str, set[str]]]:
-    """key -> (movement pattern, locking gate kinds) — computed once when ranking every movement's fallbacks."""
-    return {k: (movement_pattern(e.get("title", "")), _locking_gate_kinds(lib, e)) for k, e in movements(lib).items()}
-
-
-def fallback_candidates(lib: dict[str, Any], key: str, index: Optional[dict[str, tuple[str, set[str]]]] = None) -> list[tuple[str, str]]:
-    """Ranked (movement_id, reason) same-stimulus substitutes for `key` — pure over the library.
-
-    Eligible: another movement, not `not_for_you_now`, not unavailable at home_gym, with no bodyweight / chain /
-    owner-confirmation / charter gate (a fallback must be usable the day the primary is not) — unless the primary is
-    itself gated, when gated candidates are allowed but ranked after ungated ones. Reason:
-    `same_stimulus` = same primary target AND same movement pattern; `same_target` = same primary target;
-    `same_family` = same family and (same region + pattern, or any, for a pattern-less movement) — the last resort. Ranked by reason, then NO shared equipment with the
-    primary (a missing item must be a swap, not the same hole), then same length bias, then available, then
-    history exposures.
-    """
-    mv = movements(lib)
-    idx = index if index is not None else fallback_index(lib)
-    me = mv[key]
-    tgt = (me.get("target") or {}).get("primary")
-    region = (me.get("target") or {}).get("region")
-    pat = idx[key][0]
-    my_eq = set(me.get("equipment") or [])
-    blocking = {"bodyweight_threshold", "chain_prerequisite", "owner_confirmation", "charter_gate"}
-    # A movement that is itself behind a skill / bodyweight / charter gate may fall back to another gated one (an
-    # Olympic lift's substitute is another pull, not a curl), ranked AFTER every ungated candidate.
-    primary_gated = bool(idx[key][1] & blocking)
-    ranked = []
-    for k, e in mv.items():
-        if k == key or e.get("not_for_you_now"):
-            continue
-        if ((e.get("availability") or {}).get(LOCATION_ID) or {}).get("state") == "unavailable":
-            continue
-        gated = bool(idx[k][1] & blocking)
-        if gated and not primary_gated:
-            continue
-        et = (e.get("target") or {}).get("primary")
-        same_pat = idx[k][0] == pat and pat != "other"
-        if et == tgt and tgt not in (None, "unknown", "other") and same_pat:
-            reason, r = "same_stimulus", 0
-        elif et == tgt and tgt not in (None, "unknown", "other"):
-            reason, r = "same_target", 1
-        elif e.get("family") == me.get("family") and (((e.get("target") or {}).get("region") == region and same_pat) or pat == "other"):
-            reason, r = "same_family", 2
-        else:
-            continue
-        shares = bool(set(e.get("equipment") or []) & my_eq)
-        avail = ((e.get("availability") or {}).get(LOCATION_ID) or {}).get("state") == "available"
-        exp = (e.get("history") or {}).get("exposures", 0)
-        ranked.append(((r, gated, shares, e.get("length_bias") != me.get("length_bias"), not avail, -exp, k), k, reason))
-    ranked.sort()
-    return [(k, reason) for _, k, reason in ranked]
+def fallback_candidates(lib: dict[str, Any], key: str) -> list[tuple[str, str]]:
+    """Ranked (movement_id, reason) fallbacks for `key` under THE equivalence rule (`library_integrity`, #5861 fix round 13):
+    the same purpose, movement function and stimulus, and valid in itself (available, ungated, loggable, suitable). A
+    movement with no equivalent has none — nothing is added to fill the list."""
+    return integrity.fallback_candidates(lib, key)
 
 
 # ── coded note signals (pure; feeds the PRIVATE overlay only — never the public library) ────────────────────────

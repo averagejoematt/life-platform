@@ -55,12 +55,14 @@ sys.path[:0] = [os.path.join(REPO_ROOT, "lambdas"), REPO_ROOT, os.path.dirname(o
 
 import exercise_library_curation as cur  # noqa: E402
 import exercise_library_input_review as input_review  # noqa: E402
+import exercise_library_integrity as integrity_inputs  # noqa: E402
 import exercise_library_objectives as objectives  # noqa: E402
 import exercise_library_reviews as reviews  # noqa: E402
 import exercise_library_targets as targets  # noqa: E402
 from exercise_library_changelog import BUILDER_CHANGE_LOG  # noqa: E402
 from training import (
     exercise_library as lib_rules,  # noqa: E402
+    library_integrity,  # noqa: E402
     live_settings,  # noqa: E402
     quality_rubric,  # noqa: E402
 )
@@ -535,8 +537,10 @@ def auto_gates(entry: dict[str, Any]) -> list[str]:
             g += ["bw_dip", "chain_dip"]
         elif re.search(r"nordic", t, re.I):
             g += ["bw_nordic", "chain_nordic"]
+        elif re.search(r"hanging knee", t, re.I):  # fix round 13: one ordered step per movement, never its own prerequisite
+            g += ["bw_hanging", "chain_hanging_knee_raise"]
         elif re.search(r"hanging|toes to bar|l[\s-]?sit", t, re.I):
-            g += ["bw_hanging", "chain_hanging"]
+            g += ["bw_hanging", "chain_hanging_leg_raise"]
         elif re.search(r"handstand|pistol|dragon flag", t, re.I):
             g += ["bw_advanced", "owner_confirmation_skill"]
         else:
@@ -576,6 +580,17 @@ def _ledger() -> dict[str, Any]:
     if _LEDGER is None:
         _LEDGER = reviews.load_ledger()
     return _LEDGER
+
+
+_TEMPLATES: dict[str, Any] | None = None
+
+
+def _templates() -> dict[str, Any]:
+    """The Hevy template facts (`deploy/exercise_library_templates.json`, #5861 fix round 13), read once per process."""
+    global _TEMPLATES
+    if _TEMPLATES is None:
+        _TEMPLATES = integrity_inputs.load_templates()
+    return _TEMPLATES
 
 
 ADDITIONS_MODULE = "exercise_library_additions"  # deploy/exercise_library_additions.py (epic #5861 lane L2), optional
@@ -622,6 +637,9 @@ def _history_entries(
     """tid -> history entry (derived, then expansion-candidate attributes, then curation); and the merged candidate keys."""
     cat_mv = catalog.get("movements") or {}
     by_tid = {str(v.get("hevy_template_id_hint") or "").upper(): v for v in cat_mv.values() if v.get("hevy_template_id_hint")}
+    by_tid = {
+        t: v for t, v in by_tid.items() if t not in integrity_inputs.released_ids(_templates())
+    }  # a released id keeps its logged name
     by_title = {str(v.get("title") or "").strip().lower(): v for v in cat_mv.values()}
     expansion_by_tid = {str(x["template_id"]).upper(): x for x in _expansion_list() if x.get("template_id")}
     entries: dict[str, dict[str, Any]] = {}
@@ -659,7 +677,7 @@ def _catalog_only_entries(catalog: dict[str, Any], entries: dict[str, dict[str, 
     catalog_only: list[str] = []
     for k, v in (catalog.get("movements") or {}).items():
         tid = str(v.get("hevy_template_id_hint") or "").upper()
-        if not tid or tid in entries:
+        if not tid or tid in entries or tid in integrity_inputs.released_ids(_templates()):
             continue
         e = derive(tid, v.get("title") or k, v)
         e.update({"source": "expansion", "template_id": tid, "expansion_origin": f"movement_catalog:{k}"})
@@ -843,10 +861,14 @@ def rating_counts(movements: dict[str, dict[str, Any]]) -> dict[str, dict[str, i
 def build_library(
     current: dict[str, Any] | None, history: dict[str, Any], catalog: dict[str, Any], aliases: dict[str, str]
 ) -> dict[str, Any]:
+    bad_titles = integrity_inputs.candidate_title_errors(_expansion_list(), _templates())
+    if bad_titles:  # fix round 13: a candidate never points at another exercise's template unnoticed
+        raise SystemExit("expansion candidates and their Hevy templates disagree:\n  " + "\n  ".join(bad_titles))
     entries, merged_into_history = _history_entries(history, catalog, aliases)
     catalog_only = _catalog_only_entries(catalog, entries)
     no_template = _expansion_entries(entries, merged_into_history)
     movements, tid_to_key = _keyed_movements(entries, no_template)
+    integrity_inputs.apply_templates(movements, tid_to_key, _templates())  # created ids, canonical mappings, the unloggable stamp
     gates_out = _resolved_gates(movements, tid_to_key)
     apply_target_audit(movements)  # #5857: Hevy's raw muscle label -> the reviewed target, before any tier is derived
     apply_attribute_audit(movements)  # #5857 rubric v2 (board rec 5): reviewed attribute fixes + joint ratings
@@ -860,14 +882,12 @@ def build_library(
         raise SystemExit(f"evidence-review ledger: evidence change for a movement not in the library: {missing}")
     reviews.finalize_tiers(movements)  # #5857 + #5861: every row's tier (+ at most one recorded band) and every objective rating
 
-    used_eq = sorted({x for e in movements.values() for x in e["equipment"]})
-    inventory, cutoff = home_gym_inventory(movements, history, used_eq)
+    inventory = integrity_inputs.home_gym_inventory(movements, history, cur.SEEDED_AVAILABILITY)
     for e in movements.values():
-        e["availability"] = {lib_rules.LOCATION_ID: movement_availability(e, inventory, cutoff)}
+        e["availability"] = {lib_rules.LOCATION_ID: integrity_inputs.movement_availability(e, inventory)}
     proto = {"gates": gates_out, "movements": movements}
-    fidx = lib_rules.fallback_index(proto)
-    for key, e in movements.items():
-        fbs = lib_rules.fallback_candidates(proto, key, fidx)[:MAX_FALLBACKS]
+    for key, e in movements.items():  # fix round 13: THE equivalence rule; fewer than three, or none, is correct
+        fbs = lib_rules.fallback_candidates(proto, key)[:MAX_FALLBACKS]
         e["fallbacks"] = [{"movement_id": k, "reason": r} for k, r in fbs]
     for key in list(movements):
         movements[key] = _ordered(movements[key])
@@ -907,6 +927,7 @@ def build_library(
                 "variants": sum(len(f["variants"]) for f in families.values()),
             },
             "hypertrophy_rows_by_evidence_confidence": {c: confidence.get(c, 0) for c in quality_rubric.EVIDENCE_CONFIDENCE},
+            "integrity": integrity_counts(movements, inventory),
             "expansion_candidates_already_in_history": sorted(merged_into_history),
             "catalog_movements_not_in_current_history": sorted(catalog_only),
             "attribute_rule": "derived by rule unless deploy/exercise_library_curation.py overrides; `unknown` = the rule cannot say",
@@ -915,10 +936,7 @@ def build_library(
         "equipment_vocabulary": cur.EQUIPMENT_VOCABULARY,
         "gym_inventory": {
             "location_id": lib_rules.LOCATION_ID,
-            "rule": "owner ruling 2026-11-11: equipment used by any movement logged in the last "
-            f"{lib_rules.AVAILABLE_LOOKBACK_YEARS} years of Hevy history (on or after {cutoff}) is `available` at home_gym; equipment seen "
-            "only in older history or only in expansion candidates is `unknown`; a 'gym doesn't have X' note makes X `unavailable` "
-            "(owner-confirmable); contention ('X was taken', 'no bench free') never changes a state. The gym is never named.",
+            "rule": integrity_inputs.INVENTORY_RULE,
             "items": inventory,
         },
         "citations": library_citations(),
@@ -949,6 +967,7 @@ _ORDER = (
     "source",
     "template_id",
     "template_note",
+    "logs_as",
     "alias_of",
     "expansion_origin",
     "history",
@@ -987,7 +1006,23 @@ def _ordered(e: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-MAX_FALLBACKS = 3
+MAX_FALLBACKS = library_integrity.MAX_FALLBACKS
+
+
+def integrity_counts(movements: dict[str, dict[str, Any]], inventory: dict[str, Any]) -> dict[str, Any]:
+    """The integrity pass's own counts (#5861 fix round 13), so a report reconciles against the file and not a recount."""
+    loc = lib_rules.LOCATION_ID
+    ev = Counter(e["availability"][loc]["evidence"] for e in movements.values())
+    eq = Counter(row[loc]["evidence"] for row in inventory.values())
+    states = library_integrity.AVAILABILITY_EVIDENCE
+    return {
+        "fallback_links": sum(len(e["fallbacks"]) for e in movements.values()),
+        "movements_without_fallbacks": sum(1 for e in movements.values() if not e["fallbacks"]),
+        "template_id_null": sum(1 for e in movements.values() if not e.get("template_id")),
+        "not_loggable": sum(1 for e in movements.values() if library_integrity.unloggable(e)),
+        "movements_by_availability_evidence": {s: ev.get(s, 0) for s in states},
+        "equipment_by_availability_evidence": {s: eq.get(s, 0) for s in states},
+    }
 
 
 def _years_before(day: str, years: int) -> str:
@@ -995,38 +1030,6 @@ def _years_before(day: str, years: int) -> str:
     if m == 2 and d == 29:
         d = 28
     return f"{y - years:04d}-{m:02d}-{d:02d}"
-
-
-def home_gym_inventory(movements: dict[str, dict[str, Any]], history: dict[str, Any], used_eq: list[str]) -> tuple[dict[str, Any], str]:
-    """Equipment id -> {home_gym: {state, source}} by the owner's 2026-11-11 rule. Deterministic: the 5-year window is
-    anchored on the history's own last date, never the wall clock."""
-    cutoff = _years_before(history.get("last") or "1970-01-01", lib_rules.AVAILABLE_LOOKBACK_YEARS)
-    recent = {x for e in movements.values() if (e.get("history") or {}).get("last_done", "") >= cutoff for x in e["equipment"]}
-    older = {x for e in movements.values() if e.get("history") for x in e["equipment"]}
-    out: dict[str, Any] = {}
-    for eid in used_eq:
-        if eid in cur.SEEDED_AVAILABILITY:
-            st = dict(cur.SEEDED_AVAILABILITY[eid])
-        elif eid in recent:
-            st = {"state": "available", "source": f"rule: used by a movement logged on or after {cutoff}"}
-        elif eid in older:
-            st = {"state": "unknown", "source": f"rule: seen only in history before {cutoff}"}
-        else:
-            st = {"state": "unknown", "source": "rule: seen only in expansion candidates"}
-        out[eid] = {lib_rules.LOCATION_ID: st}
-    return out, cutoff
-
-
-def movement_availability(e: dict[str, Any], inventory: dict[str, Any], cutoff: str) -> dict[str, Any]:
-    states = {x: inventory[x][lib_rules.LOCATION_ID] for x in e["equipment"]}
-    bad = sorted(x for x, st in states.items() if st["state"] == "unavailable")
-    if bad:
-        return {"state": "unavailable", "source": "equipment unavailable at home_gym: " + ", ".join(bad)}
-    if (e.get("history") or {}).get("last_done", "") >= cutoff:
-        return {"state": "available", "source": f"rule: logged on or after {cutoff}"}
-    if all(st["state"] == "available" for st in states.values()):
-        return {"state": "available", "source": "rule: every equipment id available at home_gym"}
-    return {"state": "unknown", "source": "rule: not logged in the window and some equipment unknown"}
 
 
 def check_template_index(lib: dict[str, Any], index_path: str) -> list[str]:
@@ -1070,7 +1073,7 @@ def main(argv: list[str] | None = None) -> int:
     lib = build_library(current, history, catalog, aliases)
     errors = lib_rules.validate(lib)
     if args.template_index:
-        errors += check_template_index(lib, args.template_index)
+        errors += check_template_index(lib, args.template_index) + integrity_inputs.index_title_errors(_templates(), args.template_index)
     print(json.dumps(lib["_provenance"], indent=2))
     print(f"gates: {len(lib['gates'])}; not_for_you_now: {sum(1 for e in lib['movements'].values() if e.get('not_for_you_now'))}")
     if errors:
