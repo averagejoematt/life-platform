@@ -9,8 +9,8 @@ What it owns after fix round 9 (the load model moved to `live_load`, the volume 
   * AXIAL STACKING (`avoid_stacking`, STACK_RULE): at most two spine-loading squat/hinge compounds a session.
   * THE DELOAD SHAPE (`deload_shape`, DELOAD_SHAPE) and the fatigue cost the fatigue model's one reducer reads (`fatigue_cost`).
   * NOTES (`annotate`): each lift's one load reason (`live_load`) and each effort cap on its own Hevy note.
-  * CARDIO (`cardio_context`, `cardio_fit`, `cardio_note`): purposeful blocks only (owner ruling 4), the hard dose on the week's host,
-    under the shared cap the minutes lifting leaves (ruling 1), no symptom warning line (ruling 10).
+  * CARDIO (`cardio_context`, `cardio_fit`, `cardio_note`): the week's hard dose on its host is the only gym block (owner
+    rulings 1 and 4: no block fills free minutes), under the shared cap the minutes lifting leaves, no symptom warning line.
 
 Every number is a labelled PLATFORM HEURISTIC (practitioner consensus at best), owner-adjustable; none is validated."""
 
@@ -389,11 +389,13 @@ def avoid_stacking(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str, 
     return lines
 
 
-def axial_yesterday(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str, Any], workouts: Any) -> list[str]:
-    """IN PLACE (fix round 11, the tenth red team: a 3-morning week on consecutive days stacked squat, squat + deadlift, RDL): on a
-    full-body morning, a GUEST squat/hinge anchor that loads the spine is swapped for a low-spinal-load member of its pattern when
-    yesterday's session already loaded the spine with a squat or hinge (the host's own anchors never move). No such member:
-    it stays, said plainly. Returns the lines."""
+def axial_neighbours(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str, Any], workouts: Any) -> list[str]:
+    """IN PLACE — squat and hinge loading is not stacked on consecutive mornings (owner ruling 2026-11-14; fix round 11's
+    yesterday rule plus the declared mornings): on a full-body morning, a GUEST squat/hinge anchor that loads the spine is
+    swapped for a low-spinal-load member of its pattern when YESTERDAY's session loaded the spine with a squat or hinge, or
+    when TOMORROW is the heavy lower morning (`live_sequence.for_role`: the next declared morning, a calendar day away). The
+    host's own anchors never move; with a rest day between, the guest stays as written. No low-spine member: it stays, said
+    plainly. Returns the lines."""
     from common.pacific_time import shift_day_key
 
     from training import fatigue_model, live_session as ls
@@ -412,25 +414,26 @@ def axial_yesterday(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str,
         if str(w.get("date") or "")[:10] == yesterday
         for x in w.get("exercises") or []
     )
-    if not loaded:
+    if not loaded and not ctx.get("heavy_lower_tomorrow"):
         return []
+    why = "yesterday's session loaded the spine with a squat or hinge" if loaded else "tomorrow is the heavy lower morning"
     taken = {str(e.get("movement_key")) for e in rx["exposures"]}
     lines = []
     for e in guests:
         name = _entry(e.get("movement_key"), ctx).get("title") or e.get("movement_key")
         new = ls._replacement(e, "stacking", ctx, rotation, taken, limit=("spinal_load", 1))
         if not new:
-            lines.append(f"kept (live): {name} — yesterday loaded the spine too, and no low-spinal-load member is servable")
+            lines.append(f"kept (live): {name} — {why}, and no low-spinal-load member is servable")
             continue
         taken.add(new)
         i = rx["exposures"].index(e)
         rx["exposures"][i] = {k: v for k, v in e.items() if k not in ("template_id", "live_load")} | {
             "movement_key": new,
-            "live_swap": {"from": e["movement_key"], "code": "axial_yesterday"},
+            "live_swap": {"from": e["movement_key"], "code": "axial_neighbours"},
         }
         lines.append(
-            f"swapped (live): {name} -> {(ctx['catalog'].get(new) or {}).get('title') or new} — yesterday's session loaded the "
-            "spine with a squat or hinge (consecutive mornings: STACK_RULE across days)"
+            f"swapped (live): {name} -> {(ctx['catalog'].get(new) or {}).get('title') or new} — {why} "
+            "(consecutive mornings: STACK_RULE across days)"
         )
     return lines
 
@@ -450,7 +453,7 @@ def plan(rx: dict[str, Any], rotation: dict[str, Any], ctx: dict[str, Any], work
 
     lines += live_volume.spend_session(rx, ctx, flags)
     lines += live_rules.isolation_joint_cap(rx, ctx, flags)  # every isolation lift on a flagged joint: RPE <= 7, stop line
-    lines += avoid_stacking(rx, ctx, rotation, pinned) + axial_yesterday(rx, ctx, rotation, workouts)
+    lines += avoid_stacking(rx, ctx, rotation, pinned) + axial_neighbours(rx, ctx, rotation, workouts)
     lines += live_shape.deadlift_shape(rx) + live_shape.order_lower_volume(rx)  # ruling 5: the heavy pull; squat first
     lines += live_rulings.lead_lift(rx, ctx)  # ruling 5: the squat leads, the deadlift top + back-off at RPE <= 8
     mark_costs(rx, ctx)
@@ -460,17 +463,18 @@ def plan(rx: dict[str, Any], rotation: dict[str, Any], ctx: dict[str, Any], work
 # ── 1. load safety ────────────────────────────────────────────────────────────
 
 
-def _cap_effort(note: str, rpe_max: int, clause: str | None) -> str:
+def _cap_effort(note: str, rpe_max: int, clause: str | None, line: str | None = None) -> str:
     """Line 1 capped at RPE `rpe_max` (inserted when the lift's own note opens without an effort line — the first lift's
-    effort sits in the session block) and `clause` as the one reason line."""
+    effort sits in the session block) and `clause` as the one reason line. `line`: the role's own effort line instead of a cap
+    (`live_load.effort_line`: a heavy compound's `RPE 8, last set RPE 8–9`)."""
     from training import hevy_note_grammar as g, session_block as sb
     from training.lift_note import keep_stricter
 
     block, own = sb.split(note)
     lines = sb._own_lines(block, own)
-    cap = g.effort_line(rpe_max)
+    cap = line or g.effort_line(rpe_max)
     if lines and g.EFFORT_RE.match(lines[0]):
-        lines[0] = keep_stricter(lines[0], cap) if _top(lines[0]) > rpe_max else lines[0]
+        lines[0] = cap if line else (keep_stricter(lines[0], cap) if _top(lines[0]) > rpe_max else lines[0])
     else:
         lines = [cap] + lines
     text = sb._join(block, lines)
@@ -489,7 +493,7 @@ def annotate(blocks: list[Any], rx: dict[str, Any]) -> None:
     capped effort (a first session back, a new pattern, the second lift, a deload shape, a joint flag) on its own Hevy note."""
     if not is_live(rx):
         return
-    from training import live_balance, live_session as ls, session_block
+    from training import live_balance, live_load, live_session as ls, session_block
 
     guard = {d["key"]: d for d in (rx.get(ls.MARK) or {}).get("load_guard") or []}
     by_key = {e.get("movement_key"): e for e in rx.get("exposures") or []}
@@ -497,15 +501,16 @@ def annotate(blocks: list[Any], rx: dict[str, Any]) -> None:
         e = by_key.get(b.movement_key) or {}
         d, cap = guard.get(b.movement_key), e.get("live_effort")
         clause = d.get("clause") if d else None
-        if cap:
-            b.notes = _cap_effort(b.notes or "", int(cap), clause)
+        line = live_load.effort_line(e) if e and e.get("intensity") != "carry" else None  # the role's own effort (effort_targets)
+        if cap or line:
+            b.notes = _cap_effort(b.notes or "", int(cap or 0), clause, line)
         elif clause:
             b.notes = session_block.add_reason(b.notes, clause)
         b.notes = live_balance.assess_note(live_balance.one_effort(b.notes), str(e.get("live_assess") or ""))
         b.notes = live_balance.assess_note(b.notes, str(e.get("live_stop") or ""))  # the in-set stop line under a pain flag
     from training import live_safety
 
-    rx[ls.MARK].setdefault("lines", []).extend(live_safety.no_step(blocks, rx) + live_safety.r3_lines(blocks, rx))
+    rx[ls.MARK].setdefault("lines", []).extend(live_safety.no_step(blocks, rx))
     live_safety.coherent_effort(blocks, rx)
     rx[ls.MARK]["lines"] += live_safety.cap_lines(blocks)
 
@@ -529,7 +534,12 @@ def aerobic(inputs: Any) -> dict[str, Any] | None:
     line = rec.get("line") or "no recorded walks read: intensity unknown, nothing credited"
     if w.get("steps_per_day") is not None:
         line += f"; steps ~{w['steps_per_day']}/day reported as activity, not aerobic credit"
-    out = {"volume_covered": plan_["volume_covered"], "walking_min_per_wk": w["moderate_min_per_wk"], "line": line}
+    out = {
+        "volume_covered": plan_["volume_covered"],
+        "walking_min_per_wk": w["moderate_min_per_wk"],
+        "line": line,
+        "record_read": bool(rec),
+    }
     return out | {"steps_per_day": w.get("steps_per_day")}  # #5861 FIX8: ruling 12 — unknown intensity is never a deficit
 
 
@@ -567,13 +577,15 @@ def _next_role(role: str | None) -> str | None:
 
 def cardio_fit(menu: dict[str, Any], live: dict[str, Any] | None) -> tuple[dict[str, Any] | None, list[str]]:
     """The live cardio fit over the menu's pick (`draft_standing_constraint.cardio_block`). Shadow (`live` None): unchanged.
-    Live, in order: a hard kind turns easy under a recommended deload or high cardio load, on the heavy lower day or the
-    session before it, and (shared cap) on any day but shoulders+arms; an easy block (chosen, or a hard one turned easy) is
-    dropped when the week's steps already cover the aerobic volume — the walking IS the easy aerobic (steps first); under the shared cap the minutes fit what lifting leaves,
-    and a block under MIN_CARDIO_MINUTES is dropped. Returns (menu or None, rationale lines)."""
+    Live (owner rulings 1 and 4; fix round 12 — 75 minutes is a ceiling, never a target): the ONLY gym block is the week's hard
+    conditioning dose on its host morning. It is DROPPED — never served easy, which would only fill the freed minutes — under a
+    recommended deload, a strained read or a tripped stop line, and it never sits on the heavy lower day or the session before
+    it. No easy block exists on any morning: a week the RECORD shows short of the aerobic floor gets one optional walk prompt
+    (`live_shape.walk_prompt`), outside the gym. Under the shared cap the dose takes the minutes lifting leaves; under
+    MIN_CARDIO_MINUTES it is dropped. Returns (menu or None, rationale lines)."""
     if not live:
         return menu, []
-    from training import cardio_menu, live_balance, live_week, selection_engine as se
+    from training import cardio_menu, live_balance, live_rulings, live_shape, live_week, selection_engine as se
 
     menu, lines = live_balance.cardio_machine(menu, se.load_library_failsoft())  # FIX3: a machine the gym has
     kind = menu["kind"]
@@ -583,60 +595,37 @@ def cardio_fit(menu: dict[str, Any], live: dict[str, Any] | None) -> tuple[dict[
     if trip:
         lines.append(live_week.review_line(trip))
     hosts = live_rulings_hosts(live)
-    if role in hosts[1:] and kind not in HARD_KINDS and not trip and live.get("action") != "deload_recommended":
+    if role in hosts[1:] and kind not in HARD_KINDS:
         hard = next((k for k in ("intervals", "tempo", "hills") if cardio_menu.fits_machine(k, menu["machine"])), None)
         if hard:  # FIX7 `hard_conditioning_doses` 2: the second host's block is the week's second hard dose
             lines.append(f"cardio (live): {kind} -> {hard} — the week's second hard dose (hard_conditioning_doses=2)")
             kind = hard
-    if kind in HARD_KINDS:
-        why = None
-        if trip:
-            why = "a medical stop line is tripped: no hard work until it is reviewed"
-        elif live.get("action") == "deload_recommended":
-            why = "a deload is recommended"
-        elif live.get("cardio_strain"):
-            why = "hard cardio is itself a strain signal this week"
-        elif live.get("state") in ("strained", "overreached") or {"readiness", "sleep"} & set(live.get("strain") or []):
-            why = "recovery is strained (red readiness or a short night): easy work first, hard work waits"
-        elif role == "lower_heavy" or _next_role(role) == "lower_heavy":
-            why = "never on the heavy lower day or the session before it"
-        elif shared and role not in live_rulings_hosts(live):  # FIX7: hard_conditioning_doses (default 1: the host only)
-            why = f"the shared cap puts conditioning on {live.get('host', SHORT_WEEK_SKIP)}"
-        if why:
-            easy = "easy" if cardio_menu.fits_machine("easy", menu["machine"]) else "incline_treadmill_walk"
-            lines.append(f"cardio (live): {kind} -> {easy} — {why}")
-            kind = easy
-    from training import live_rulings  # #5861 FIX6 ruling 4: a gym block only for a named purpose
-
-    keep_, why_ = live_rulings.purposeful_cardio(kind, live, HARD_KINDS)
-    if not keep_:
-        from training import live_shape
-
-        return None, lines + why_ + live_shape.walk_prompt(live)
-    lines += why_
-    aer = live.get("aerobic") or {}
-    if kind not in HARD_KINDS and aer.get("volume_covered"):
-        lines.append(
-            f"cardio (live): no easy block — recorded walking already gives ~{aer.get('walking_min_per_wk')} moderate min/wk "
-            "(cardio_model.aerobic_plan: recorded activity first, no cardio added without a purpose)"
-        )
-        return None, lines
-    from training import live_shape  # #5861 FIX4: a small gap is the walk's, never a silent shortfall
-
-    covered = live_shape.walk_covers(kind, live)
-    if covered:
-        return None, lines + covered + live_shape.walk_prompt(live)
-    keep, gap = live_balance.easy_gap(kind, live)  # FIX3: an easy block closes the week's gap after the walking credit, no more
-    if not keep:
-        return None, lines + gap + live_shape.walk_prompt(live)
-    lines += gap
+    why = None
+    if kind not in HARD_KINDS:
+        why = "a gym block exists only for the week's conditioning dose; free minutes are never filled with cardio"
+    elif trip:
+        why = "a medical stop line is tripped: no hard work until it is reviewed"
+    elif live.get("action") == "deload_recommended":
+        why = "a deload is recommended: the week's hard dose is dropped, not served easy"
+    elif live.get("cardio_strain"):
+        why = "hard cardio is itself a strain signal this week"
+    elif live.get("state") in ("strained", "overreached") or {"readiness", "sleep"} & set(live.get("strain") or []):
+        why = "recovery is strained (red readiness or a short night): the week's hard dose is dropped, not served easy"
+    elif role == "lower_heavy" or _next_role(role) == "lower_heavy":
+        why = "never on the heavy lower day or the session before it"
+    elif not hosts:
+        why = "hard_conditioning_doses is 0: the owner traded the week's dose for lifting minutes"
+    elif shared and role not in hosts:  # FIX7: hard_conditioning_doses (default 1: the host only)
+        why = f"the shared cap puts conditioning on {live.get('host', SHORT_WEEK_SKIP)}"
+    if why:
+        tracked = (live.get("aerobic") or {}).get("line") or "walking outside the gym is tracked apart"
+        return None, lines + [f"cardio (live): no {kind} block — {why} ({tracked})"] + live_shape.walk_prompt(live)
+    lines += live_rulings.purpose_line(kind)
     minutes, prog = live_week.cardio_progress(kind, live, cardio_menu.block_minutes(kind))  # week to week: cardio_model.progress
     lines += prog
     if shared and live.get("cap") and live.get("lifting_minutes") is not None:
         room = int(float(live["cap"]) - float(live["lifting_minutes"]))
-        gap = live_shape.aerobic_gap(live)  # FIX7: a week the record shows short takes the idle cap minutes (>= 10) as aerobic work
-        short = kind not in HARD_KINDS and gap is not None and gap >= int(live_shape.WALK_PROMPT["min_minutes"]["value"])
-        if room < (MIN_CARDIO_MINUTES if short else live_balance.min_block(kind, MIN_CARDIO_MINUTES)):  # else a stub under 20
+        if room < MIN_CARDIO_MINUTES:
             lines.append(f"cardio (live): no block — the shared {live['cap']}-min cap leaves {max(room, 0)} min after lifting")
             return None, lines + live_shape.walk_prompt(live)
         if room < minutes:

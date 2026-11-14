@@ -483,7 +483,10 @@ def generate_week(
         from training import live_sequence
 
         days = len(p["days"])
-        live_roles, plan = live_sequence.week_roles(days, live_sequence.monday_of(p["days"][0]), record, world["lib"])
+        declared = (
+            days if p.get("spacing") == "undeclared" else list(p["days"])
+        )  # fix round 12: WHICH mornings (a bare count: profile `spacing`)
+        live_roles, plan = live_sequence.week_roles(declared, live_sequence.monday_of(p["days"][0]), record, world["lib"])
         roles = live_roles if (plan or days < len(_all_roles())) else roles
         short_line = (plan or {}).get("line") or (
             f"short week (slide): {days} of {len(_all_roles())} sessions — the sequence slides" if days < len(_all_roles()) else None
@@ -957,7 +960,6 @@ LIVE_PREFIXES = (
     "capped (live)",
     "short week (live",
     "heavy lower (live)",  # #5861 fix round 11 (ruling 5: the squat leads)
-    "in-session step (live)",  # #5861 fix round 11 (R3)
     "top-up (live)",
     "priority (live)",
     "evidence (live)",

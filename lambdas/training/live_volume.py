@@ -67,9 +67,6 @@ FILL: dict[str, tuple[str, ...]] = {
 }
 """A muscle under its aim with no slot left to grow takes the first of these the gym serves (familiar movements first; the
 time fit and the pain rule still apply). Practitioner consensus: low-fatigue isolation for the target muscle."""
-ARMS = ("biceps", "triceps")
-"""Owner ruling 9 as an outcome (fix round 11): on a full week a priority muscle's aim is at least one set over the busier arm —
-reached by spending free minutes (or, time short, sets OVER another muscle's own aim), never by cutting an arm under its aim."""
 FOUR_DAY_MEV = ("shoulders", "biceps", "triceps")
 """Owner ruling 3: a 4-morning week drops shoulders+arms but holds these at MEV, direct + indirect, counted."""
 ANYWHERE = ("abs", "calves")
@@ -347,7 +344,9 @@ def free_minutes(rows: list[dict[str, Any]], role: str, host: str | None, lib: d
 
     cap = float(lifting_minutes_cap())
     shared = _settings(lib).get("session_cap_includes_cardio")
-    if reserve and shared and role == host and len({r["role"] for r in rows}) >= 3:
+    from training import live_rulings
+
+    if reserve and shared and role == host and len({r["role"] for r in rows}) >= 3 and live_rulings.doses(lib) >= 1:
         cap -= float(cfg.value("conditioning_reserve_minutes"))
     return cap - plan_minutes([r for r in rows if r["role"] == role])
 
@@ -373,7 +372,7 @@ def spend(
     add: Any,
     last: dict[str, str] | None = None,
     budget: float | None = None,
-    lead: frozenset[str] = frozenset(),
+    first: frozenset[str] = frozenset(),
 ) -> list[str]:
     """THE ONE STEP that spends free minutes (fix round 11 — it replaces the grow/fill rules, the priority parity, the short-week
     rotation and the pain refill): while a muscle sits under its aim, the one FURTHEST under it as a share of its aim (one under its floor first; on a
@@ -381,7 +380,8 @@ def spend(
     the most free minutes (`room(role)`) that may hold it: an isolation slot it already has grows (never past `slot_max_sets`),
     else `add(muscle, role)` places a new 2-set slot (a second movement only once the first is full). Never past the movement
     cap. Time or the week's set `budget` short: a muscle OVER its own aim gives the set (`_make_room`) — never under its aim.
-    `lead`: the priority muscles, whose aim is also one set over the busier arm (`_aim`). Returns the lines."""
+    `first`: the priority muscles — under its own aim, a priority muscle has first call on the free minutes (fix round 12:
+    priority means reaching its own target, never a count above the arms). Returns the lines."""
     lo, hi = int(cfg.value("slot_min_sets")), int(cfg.value("slot_max_sets"))
     one = plan_minutes([{"kind": "accessory", "pattern": None, "sets": 1, "intensity": "accessory"}])
     blocked: set[str] = set()
@@ -390,8 +390,8 @@ def spend(
     for _ in range(96):
         c = _count(rows)
         need = sorted(  # under its FLOOR first (a ruled hold, ruling 3), then the furthest under its aim
-            (m for m in tg if m not in blocked and c[m] + 1e-9 < _aim(m, c, tg, lead)),
-            key=lambda m: (c[m] + 1e-9 >= tg[m]["floor"], -round(1 - c[m] / _aim(m, c, tg, lead), 2), (last or {}).get(m, ""), m),
+            (m for m in tg if m not in blocked and c[m] + 1e-9 < tg[m]["aim"]),
+            key=lambda m: (c[m] + 1e-9 >= tg[m]["floor"], m not in first, -round(1 - c[m] / tg[m]["aim"], 2), (last or {}).get(m, ""), m),
         )
         if not need:
             break
@@ -400,16 +400,16 @@ def spend(
             here = [r for r in rows if r["role"] == role]
             grow = [r for r in _iso(m, here) if r["sets"] < hi]
             spread = m in FILL_FIRST and _spread(m, rows, roles, full, room, lo)  # owner ruling #8: abs over the mornings
-            if grow and not spread and _make_room(rows, tg, lead, role, m, one, room, budget, gave):
+            if grow and not spread and _make_room(rows, tg, role, m, one, room, budget, gave):
                 max(grow, key=lambda r: (r.get("fill") == m, -r["sets"]))["sets"] += 1
                 placed = True
                 break
             full_up = len(here) >= (FULL_BODY_MAX_MOVEMENTS if full.get(role) else MAX_MOVEMENTS)
             if len(_iso(m, here)) < 2 and not grow and add(m, role, probe=True):
-                if _make_room(rows, tg, lead, role, m, lo * one, room, budget, gave, slot=full_up):
+                if _make_room(rows, tg, role, m, lo * one, room, budget, gave, slot=full_up):
                     new = add(m, role)
                     rows.append(new)
-                    lines.append(f"spend: {role} + {new['key']} x{lo} ({m} under its aim of {_aim(m, _count(rows), tg, lead):g})")
+                    lines.append(f"spend: {role} + {new['key']} x{lo} ({m} under its aim of {tg[m]['aim']:g})")
                     placed = True
                     break
         if not placed:
@@ -419,20 +419,9 @@ def spend(
     )
 
 
-def _aim(m: str, c: Counter, tg: dict[str, dict[str, float]], lead: frozenset[str]) -> float:
-    """A muscle's aim now: its target's, and for a `lead` (priority) muscle on a full week at least one set over the busier arm
-    (owner ruling 9 read as an outcome, reached by adding — `ARMS`)."""
-    aim = float(tg[m]["aim"])
-    if m in lead:
-        top = max((c[x] for x in ARMS if x not in lead), default=0.0)
-        aim = max(aim, min(float(tg[m]["cap"]), math.floor(top) + 1.0))
-    return aim
-
-
 def _make_room(
     rows: list[dict[str, Any]],
     tg: dict[str, dict[str, float]],
-    lead: frozenset[str],
     role: str,
     m: str,
     need: float,
@@ -459,7 +448,7 @@ def _make_room(
             take = r["sets"] if (slot or r["sets"] <= lo) else 1
             if take == r["sets"] and len(_iso(_main(r), rows)) <= 1:
                 return False  # never a muscle's last isolation slot of the week (its only leg curl, its only curl)
-            return all(c[k] - v * take >= _aim(k, c, tg, lead) if k in tg else True for k, v in r["credit"].items())
+            return all(c[k] - v * take >= tg[k]["aim"] if k in tg else True for k, v in r["credit"].items())
 
         give = [
             r
@@ -469,7 +458,7 @@ def _make_room(
         ]  # fmt: skip
         if not give:
             return False
-        r = max(give, key=lambda r: (c[_main(r)] - _aim(_main(r), c, tg, lead) if _main(r) in tg else 0.0, r["sets"], rows.index(r)))
+        r = max(give, key=lambda r: (c[_main(r)] - tg[_main(r)]["aim"] if _main(r) in tg else 0.0, r["sets"], rows.index(r)))
         whole = slot or r["sets"] <= lo
         gave[_main(r)] += r["sets"] if whole else 1
         if whole:  # drop, don't shave: its muscles all stay at their aims without it
@@ -550,12 +539,13 @@ def week_plan(
         new = {"kind": "accessory", "slot": f"fill_{m}", "intensity": "accessory", "movement_key": keys[0], "sets": [{}] * lo}
         return _row(role, new, catalog, lib) | {"fill": m}
 
-    lead = frozenset(m for m in prio if m in tg) if week["mornings"] >= 5 else frozenset()
     room = lambda role, m=None: free_minutes(rows, role, host, lib)  # noqa: E731 — the ruled dose keeps its minutes (ruling 1)
-    lines += spend(rows, tg, roles, full, room, add, last, _redline_sets(), lead)  # 2. the one step
+    lines += spend(rows, tg, roles, full, room, add, last, _redline_sets(), frozenset(prio))  # 2. the one step
     surplus()  # 3. again: a head's aim may have grown its muscle past MAV (ruling 9)
     lines += _redline(rows, tg, prio)
     counts = _count(rows)
+    short_of = [m for m in sorted(prio) if m in tg and counts[m] + 1e-9 < tg[m]["aim"]]
+    priority_line = _priority_trade(short_of, counts, tg, host, full, lib) if short_of else None
     under = [
         {"muscle": m, "sets": round(counts[m], 1), "floor": t["floor"], "aim": t["aim"]}
         for m, t in tg.items()
@@ -569,7 +559,28 @@ def week_plan(
         "under": under,
         "host": host,
         "lines": lines,
+        "priority_line": priority_line,
     }
+
+
+def _priority_trade(
+    short_of: list[str], counts: Counter, tg: dict[str, dict[str, float]], host: str, full: dict[str, bool], lib: dict[str, Any]
+) -> str:
+    """Owner ruling 2026-11-14 (fix round 12): a priority muscle that cannot reach its own aim is SAID, in one line, with the
+    trade named — never taken. A muscle whose half of the body hosts the week's conditioning dose is short of the dose's
+    reserved minutes (dropping the dose is the owner's choice, `hard_conditioning_doses`); any other is short of the 75-minute
+    morning itself. Nothing is cut to close it."""
+    parts = [f"{m} {counts[m]:g} of its aim {tg[m]['aim']:g}" for m in short_of]
+    reserve = int(cfg.value("conditioning_reserve_minutes"))
+    shared = _settings(lib).get("session_cap_includes_cardio")
+    on_host = [m for m in short_of if shared and _half_ok(m, host, full.get(host, False))]
+    trade = (
+        f"the conditioning dose keeps its {reserve} minutes on {host.replace('_', ' ')} — trading it for {', '.join(on_host)} "
+        "sets is your call (hard_conditioning_doses), never automatic"
+        if on_host
+        else "its mornings are at the 75-minute ceiling; nothing is cut to close it"
+    )
+    return f"priority (live): {'; '.join(parts)} this week — {trade}"
 
 
 def _surplus(rows: list[dict[str, Any]], tg: dict[str, dict[str, float]], prio: set[str], lines: list[str]) -> Any:
@@ -788,7 +799,10 @@ def apply(rx: dict[str, Any], ctx: dict[str, Any], plan: dict[str, Any]) -> list
     rx["exposures"] = keep
     if full:
         for prole, patterns in plan["week"]["partners"][role]:
-            for e in ps.session_prescription_for_role(prole, catalog_movements=ctx["catalog"])["exposures"]:
+            # fix round 12: a guest anchor is the variant he trains in this block (`in_block`), as on its own morning — the
+            # template's default member had no load on file ("find the load" on a machine compound)
+            guests = ps.session_prescription_for_role(prole, catalog_movements=ctx["catalog"], in_block=ctx.get("in_block"))
+            for e in guests["exposures"]:
                 r = by_slot.get(f"guest_{e.get('pattern')}")
                 if (
                     e.get("kind") == "anchor"

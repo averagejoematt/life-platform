@@ -266,6 +266,9 @@ def for_live_draft(
             "mild_pain": live_safety.mild_pain_tids(block_workouts),
             "pain_notes": live_safety.latest_notes(block_workouts),
         } | _week_ctx(week, inputs)
+        from training import in_block_variant
+
+        ctx["in_block"] = in_block_variant.performed_in_block(block_workouts, catalog, target)  # a guest anchor's variant
         mornings = int((week or {}).get("days") or 5)
         last = live_volume.last_trained(block_workouts, catalog, lib, target)  # the weekly memory (ties: longest ago first)
         plan = live_volume.week_plan(catalog, lib, mornings, last=last, overlay=ctx["overlay"])
@@ -273,6 +276,8 @@ def for_live_draft(
         role_rows = [r for r in plan["rows"] if r["role"] == rx.get("session_role")]
         plan_rows = dict(live_volume._count(role_rows))
         lines += [str((week or {})["line"])] if (week or {}).get("line") else []
+        if plan.get("priority_line") and rx.get("session_role") == plan["week"]["roles"][0]:  # once a week, its first morning
+            lines.append(str(plan["priority_line"]))
         lines += live_volume.apply(out, ctx, plan)
         lines += fit_exposures(out, rotation or {}, ctx)
         live_load.mark_novelty(out, ctx, block_workouts)
@@ -298,10 +303,15 @@ def for_live_draft(
     for x, n in zip(out["exposures"], before):
         if len(x["sets"]) < n:
             x["live_reduced"] = n - len(x["sets"])
-    if (out.get("fatigue") or {}).get("state") in ("strained", "overreached"):  # a hold day: loads held AND no grinding —
-        for x in out["exposures"]:  # every lift stops at RPE 8 (the deload shape caps lower still when one is recommended)
-            if x.get("intensity") != "carry":
-                x["live_effort"] = min(int(live_settings.value("first_back_rpe")), int(x.get("live_effort") or 99))
+    fat = out.get("fatigue") or {}
+    strained = fat.get("state") in ("strained", "overreached")
+    if strained or fat.get("strain_signals"):
+        # recovery-aware effort (fix round 12, `effort_targets`): ONE strain signal holds every compound at the hard-set line (RPE
+        # 8: a heavy lift's last-set allowance goes) before isolation changes; two or more — a hold day, loads held — hold every
+        # lift there. Never under it: an anchor's top set stays a hard set unless a deload is confirmed (the deload shape's own cap)
+        for x in out["exposures"]:
+            if x.get("intensity") != "carry" and (strained or x.get("live_cost") in ("high", "moderate")):
+                x["live_effort"] = min(int(live_settings.value("hard_rpe")), int(x.get("live_effort") or 99))
     slack = live_volume.floor_slack(plan, str(rx.get("session_role") or "")) if ctx is not None else {}
     lines += live_volume.fit_sets(out, set_cap, catalog, lib, slack)
     _refit(out)
@@ -375,6 +385,7 @@ def _week_ctx(week: dict[str, Any] | None, inputs: Any) -> dict[str, Any]:
             "week_skip": tuple(week.get("skip") or ()),
             "partner": week.get("partner"),
             "week_mode": week.get("mode"),
+            "heavy_lower_tomorrow": bool(week.get("heavy_lower_tomorrow")),
         }
     return {"short_week_host": None, "week_skip": (), "partner": None}
 
@@ -537,18 +548,16 @@ def _short_morning(blocks: list[Any], rx: dict[str, Any], movements: dict[str, A
 
 def contradictions(blocks: list[Any], rx: dict[str, Any]) -> list[str]:
     """Where a lift's note says something its own rows or the live decision contradict (fix round 9, G): a heavier/lighter
-    reason against the decision, a "find the load" over a written load, a layoff line on a lift of a familiar pattern, a held or
-    lightened lift whose note still steps it in-session — only the bounded R3 line, only where `live_load.r3_eligible` (fix round 11). [] = consistent. (The low-energy line's cardio promise is fitted on the WHY block, `live_balance.why_effort`.)
-    """
-    from training import hevy_note_grammar as g, live_load, live_safety
+    reason against the decision, a "find the load" over a written load, a layoff line on a lift of a familiar pattern, or ANY
+    in-session load-step line (fix round 12: the in-session step is off — double progression is the one load rule). [] =
+    consistent. (The low-energy line's cardio promise is fitted on the WHY block, `live_balance.why_effort`.)"""
+    from training import hevy_note_grammar as g, live_safety
 
     mark = rx.get(MARK) or {}
     guard = {d["key"]: d for d in mark.get("load_guard") or []}
     exp = {e.get("movement_key"): e for e in rx.get("exposures") or []}
-    held_day = bool(mark.get("hold_all")) or (rx.get("fatigue") or {}).get("state") in ("strained", "overreached")
-    r3 = mark.get("r3_step") or {}
     out = []
-    for i, b in enumerate(blocks):
+    for b in blocks:
         note, d, e = str(getattr(b, "notes", "") or ""), guard.get(b.movement_key), exp.get(b.movement_key) or {}
         work = [s for s in b.sets or [] if str(getattr(s, "type", "") or "normal") != "warmup"]
         if d and d["mode"] == "up" and ("Lighter today" in note or "Same load" in note):
@@ -559,10 +568,8 @@ def contradictions(blocks: list[Any], rx: dict[str, Any]) -> list[str]:
             out.append(f"{b.movement_key}: 'find the load' over a written load")
         if (e.get("live_familiar") or e.get("live_first_back")) and ("first time in" in note or "session back after" in note):
             out.append(f"{b.movement_key}: a layoff line on a familiar pattern")
-        steps = [ln.strip() for ln in note.split("\n") if live_safety._step_line(ln)]
-        allowed = live_load.r3_eligible(e, d, held_day) if e else False
-        if steps and not (allowed and all(ln == live_safety.r3_text(r3.get(str(b.movement_key))) for ln in steps)):
-            out.append(f"{b.movement_key}: the note steps it on later sets but the session-to-session rule holds, lightens or caps it")
+        if any(live_safety._step_line(ln) for ln in note.split("\n")):
+            out.append(f"{b.movement_key}: the note steps the load in-session — double progression is the one load rule")
     return out
 
 
@@ -585,7 +592,7 @@ def rationale_lines(rx: dict[str, Any]) -> list[str]:
         return []
     out = list(rx[MARK].get("summary") or [])
     # ruling 16 (evidence and completeness VISIBLE) and ruling 11 (the advisory loss-rate line) stay on the rationale
-    out += [ln for ln in rx[MARK].get("lines") or [] if ln.startswith(("evidence (live): ", "loss rate (advisory"))]
+    out += [ln for ln in rx[MARK].get("lines") or [] if ln.startswith(("evidence (live): ", "loss rate (advisory", "priority (live): "))]
     fat = rx.get("fatigue") or {}
     if fat:
         sig = ", ".join(fat.get("strain_signals") or []) or "none"

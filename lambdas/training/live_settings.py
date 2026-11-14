@@ -48,7 +48,8 @@ SETTINGS: dict[str, dict[str, Any]] = {
     "hard_conditioning_doses": {
         "default": 1,
         "ruling": "owner follow-up ruling (2026-11-13)",
-        "what": "hard conditioning blocks a week (the week's conditioning host takes the first; 2 adds `live_rulings.SECOND_HOST`)",
+        "what": "hard conditioning blocks a week (the week's conditioning host takes the first; 2 adds `live_rulings.SECOND_HOST`; 0 "
+        "serves none and gives the host's reserved minutes back to lifting — the explicit trade for a lower-body priority)",
     },
     "rate_ceiling_pct_bw": {
         "default": 1.0,
@@ -108,13 +109,18 @@ HEURISTICS: dict[str, dict[str, Any]] = {
         "basis": "the slump's volume answer: about a third of each accessory's working sets (never under 2); anchors keep theirs",
         "retune": "block retro: recovery markers in the weeks after a slump hold",
     },
-    "deadlift_rpe": {
-        "value": 8,
+    "effort_targets": {
+        "value": {"heavy_compound": [8, 9], "deadlift": [8, 8], "volume_compound": [9, 9], "accessory": [9, 10]},
         "group": "progression",
-        "basis": "owner ruling 5 (fix round 11, the tenth red team's simpler rule): the squat always leads the heavy lower morning; "
-        "the deadlift is a top set + one back-off capped at this RPE — never both maximal — and steps up after a top set at the "
-        "top of its range at or under it, like every lift",
-        "retune": "block retro: squat and deadlift e1RM trend over the block",
+        "basis": "owner ruling 2026-11-14 (fix round 12: not RPE 9 on everything): each role's [top RPE of a working set, top RPE "
+        "of the LAST set]. A heavy-day barbell or dumbbell anchor (squat, bench, the heavy row) works at RPE 8 and only its last "
+        "set may reach 9; the deadlift beside the squat stays at 8 throughout (owner ruling 5: never both maximal); a volume-day "
+        "compound works at 8-9; machine and isolation accessories at 8-9 with the last set 9-10 (low systemic cost, where "
+        "proximity to failure pays). The load steps up when the top of the range is reached at or under the role's working "
+        "RPE. Recovery-aware: ONE strain signal (the fatigue model's) holds every compound at RPE 8 — the last-set allowance "
+        "goes — before isolation changes; two or more hold isolation at 8 too; an anchor's top set never goes under `hard_rpe` "
+        "unless a deload is confirmed. Practitioner consensus, not a measurement",
+        "retune": "block retro: logged RPE against the prescribed RPE by role; anchor e1RM trend; weekly hard sets per muscle",
     },
     # ── novelty (live_load) ──
     "familiar_days": {

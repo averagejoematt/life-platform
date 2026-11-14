@@ -2,7 +2,7 @@
 
   * `deadlift_shape` (owner ruling 5): the heavy-day hinge anchor is its top set + ONE back-off.
   * `order_lower_volume`: the squat before the hinge (the RDL tires the erectors the squat needs), a full-body day too.
-  * The aerobic walk (`aerobic_gap`, `walk_covers`, `walk_prompt`, `walk_note`, WALK_PROMPT; owner ruling 12): a week the RECORD
+  * The aerobic walk (`aerobic_gap`, `walk_prompt`, `walk_note`, WALK_PROMPT; owner ruling 12): a week the RECORD
     shows short gets one optional walk prompt; steps of unknown intensity are reported, never turned into a gap.
 
 The volume rules this module carried (VOLUME, QUAD_SLOT, the weekly ceiling, drop-don't-shave, TIME_FIT) are `live_volume`'s one
@@ -20,7 +20,7 @@ WALK_PROMPT: dict[str, dict[str, Any]] = {
         "value": 40,
         "label": HEURISTIC,
         "basis": "one optional brisk walk covers a weekly aerobic gap up to this size (a 30-45 min walk is an ordinary day's "
-        "addition); under the default cap a larger gap still earns an easy ride, a smaller one is the walk's",
+        "addition); a larger gap still gets one prompt of this size — never a gym block",
     },
     "min_minutes": {"value": 15, "label": HEURISTIC, "basis": "a gap under 15 minutes is noise against the recorded walking: no prompt"},
     "active_steps": {
@@ -87,12 +87,13 @@ def deadlift_shape(rx: dict[str, Any]) -> list[str]:
 
 # ── 4. the aerobic gap ───────────────────────────────────────────────────────
 def aerobic_gap(live: dict[str, Any], today_minutes: int = 0) -> int | None:
-    """The week's aerobic minutes still missing: the guideline floor less the walking credit, less every block performed this
-    week before today, less today's block. None when steps were not read (unknown is never a gap)."""
+    """The week's aerobic minutes still missing: the guideline floor less the recorded credit, less every block performed this
+    week before today, less today's block. None — UNKNOWN, never a gap — when the aerobic record or the steps were not read
+    (fix round 12: missing data is not evidence that aerobic work is short) or the steps say he is moving (`intensity_unknown`)."""
     from training import cardio_model, live_sequence
 
     aer = live.get("aerobic") or {}
-    if not aer or intensity_unknown(aer):  # FIX8 (ruling 12): steps of unknown intensity are never a manufactured deficit
+    if not aer.get("record_read") or aer.get("steps_per_day") is None or intensity_unknown(aer):
         return None
     since, day = live_sequence.week_start(str(live.get("target_date") or "")), str(live.get("target_date") or "")
     done = sum(
@@ -102,21 +103,6 @@ def aerobic_gap(live: dict[str, Any], today_minutes: int = 0) -> int | None:
         if since <= str(r.get("date") or "")[:10] < day
     )
     return int(cardio_model.WEEKLY_MODERATE_MIN[0]) - int(aer.get("walking_min_per_wk") or 0) - done - int(today_minutes)
-
-
-def walk_covers(kind: str, live: dict[str, Any]) -> list[str] | None:
-    """Under the DEFAULT cap, an easy ride the walk prompt can replace: lines when the remaining gap is at most WALK_PROMPT
-    max_minutes (no ride — the host morning's walk covers it), else None (the ride stays)."""
-    from training import live_program
-
-    shared = bool((live.get("settings") or {}).get("session_cap_includes_cardio"))
-    gap = aerobic_gap(live)
-    if shared or kind in live_program.HARD_KINDS or gap is None or gap > int(WALK_PROMPT["max_minutes"]["value"]):
-        return None
-    return [
-        f"cardio (live): no easy ride — ~{max(gap, 0)} min short of the weekly aerobic floor: one optional walk covers it "
-        f"(WALK_PROMPT, heuristic)"
-    ]
 
 
 def walk_prompt(live: dict[str, Any] | None, today_minutes: int = 0) -> list[str]:

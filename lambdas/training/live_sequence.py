@@ -2,8 +2,8 @@
 every entry point checks `selection_engine.mode(lib) == "live"` first, so the sequence served while the library is `proposed` is
 today's, byte for byte (tests/test_no_live_change_5861_l6.py).
 
-  * `week_plan` — for a calendar week: the mornings declared (`days_available`: the nominal lifting days no dated charter travel
-    window covers) -> `live_volume.SHORT_WEEKS` (1-3: full-body mornings; 4: shoulders+arms skipped). An ADHERENCE DIP (5+ of the
+  * `week_plan` — for a calendar week: the mornings declared (`declared_days`: the nominal lifting days no dated charter travel
+    window covers — WHICH days, not only how many: a guest squat or hinge the morning before the heavy lower day goes low-spine) -> `live_volume.SHORT_WEEKS` (1-3: full-body mornings; 4: shoulders+arms skipped). An ADHERENCE DIP (5+ of the
     fortnight's 10 planned sessions missed, `DIP_MISSED`) is one 4-morning week (owner ruling 2) — never two in a row.
   * `sequence_skip` / `entry_week` / `serve` / `cron_*` — the plan as the sequence's skip and on the served day entry.
   * `rule_from` — owner ruling #4: the rules judge from the Monday after approval; earlier history is never re-sequenced."""
@@ -54,8 +54,8 @@ def week_start(day: str) -> str:
 monday_of = week_start
 
 
-def days_available(monday: str) -> int:
-    """The nominal lifting days of the week starting `monday` that no dated charter travel window covers."""
+def declared_days(monday: str) -> list[str]:
+    """The mornings declared for the week starting `monday`: the nominal lifting days no dated charter travel window covers."""
     from common.pacific_time import shift_day_key
 
     from training import program_structure as ps
@@ -63,23 +63,66 @@ def days_available(monday: str) -> int:
 
     windows = [w for w in charter_value("travel.windows", []) or [] if isinstance(w, dict) and w.get("start") and w.get("end")]
     days = [shift_day_key(monday, int(i)) for i in ps.NOMINAL_LIFTING_DAYS]
-    return sum(1 for d in days if not any(str(w["start"]) <= d <= str(w["end"]) for w in windows))
+    return [d for d in days if not any(str(w["start"]) <= d <= str(w["end"]) for w in windows)]
 
 
-def plan_for_days(days: int, lib: dict[str, Any] | None, mode: str = "short") -> dict[str, Any] | None:
-    """The week for `days` declared mornings (1-4; `live_volume.SHORT_WEEKS`), else None (a normal week)."""
+def days_available(monday: str) -> int:
+    """How many mornings are declared this week (`declared_days`)."""
+    return len(declared_days(monday))
+
+
+LEFT_OUT_WORDS = {"hinge": "deadlift / RDL", "vertical_pull": "pulldown", "overhead_press": "overhead press"}
+
+
+def _left_out(shape: dict[str, Any]) -> list[str]:
+    """The usual anchors a 1-3 morning week does not carry (owner ruling 2026-11-14: a short week balances coverage, recovery and
+    movement priorities — it does not have to carry every strength anchor, and says which it left out)."""
+    from training import program_structure as ps
+
+    kept = set()
+    for host in shape["roles"]:
+        kept |= {(host, pat) for pat, _i in ps.SESSION_TEMPLATES[host]["anchors"]}
+        for prole, patterns in (shape.get("partners") or {}).get(host) or ():
+            kept |= {(prole, pat) for pat in patterns}
+    out = []
+    for role in ps.SPLIT_ROLES:
+        for pat, intensity in ps.SESSION_TEMPLATES[role]["anchors"]:
+            if (role, pat) not in kept:
+                out.append(f"{'heavy' if intensity == 'heavy' else 'volume'} {LEFT_OUT_WORDS.get(pat, pat)}")
+    return list(dict.fromkeys(out))
+
+
+def plan_for_days(days: Any, lib: dict[str, Any] | None, mode: str = "short") -> dict[str, Any] | None:
+    """The week for the declared mornings (1-4; `live_volume.SHORT_WEEKS`), else None (a normal week). `days`: the declared
+    mornings as day keys — the week then follows WHICH mornings they are (fix round 12) — or a bare count, read as consecutive
+    days (the conservative case) and said so."""
     from training import live_volume, program_structure as ps
 
-    if days >= len(ps.SPLIT_ROLES) or days < 1:
+    dates = sorted(str(d)[:10] for d in days) if isinstance(days, list | tuple) else None
+    n = len(dates) if dates is not None else int(days)
+    if n >= len(ps.SPLIT_ROLES) or n < 1:
         return None
-    shape = live_volume.week_shape(int(days))
+    shape = live_volume.week_shape(n)
     skip = tuple(r for r in ps.SPLIT_ROLES if r not in shape["roles"])
     partners = {h: tuple(p for p, _ in ps_) for h, ps_ in (shape.get("partners") or {}).items()}
     full = "; ".join(f"{h} + {', '.join(p)} anchors" for h, p in partners.items())
-    line = f"{'short' if mode == 'short' else 'adherence dip'} week (live, {days} mornings): {', '.join(shape['roles'])}" + (
+    line = f"{'short' if mode == 'short' else 'adherence dip'} week (live, {n} mornings): {', '.join(shape['roles'])}" + (
         f" — full body: {full}" if full else f" — {', '.join(skip)} skipped"
     )
-    return {"skip": skip, "partners": partners, "host": shape["host"], "mode": mode, "days": int(days), "line": line}
+    if partners:
+        left = _left_out(shape)
+        line += f"; left out this week: {', '.join(left)} — {n} morning(s) carry a squat, a hinge, a press and a pull, not every anchor"
+        line += "" if dates is not None or n == 1 else "; spacing not declared: consecutive days assumed"
+    return {
+        "skip": skip,
+        "partners": partners,
+        "host": shape["host"],
+        "mode": mode,
+        "days": n,
+        "line": line,
+        "roles": tuple(shape["roles"]),
+        "dates": dates,
+    }
 
 
 def _dip(workouts: Any, monday: str) -> bool:
@@ -92,9 +135,9 @@ def _dip(workouts: Any, monday: str) -> bool:
     return int(adh["planned"]) - int(adh["performed"]) >= DIP_MISSED
 
 
-def week_plan(monday: str, workouts: Any, lib: dict[str, Any] | None, days: int | None = None) -> dict[str, Any] | None:
+def week_plan(monday: str, workouts: Any, lib: dict[str, Any] | None, days: Any = None) -> dict[str, Any] | None:
     """The plan for the calendar week starting `monday` (module doc), or None (a normal week, or not live). `days`: the mornings
-    declared (default `days_available`)."""
+    declared — day keys, or a bare count (default `declared_days`)."""
     from common.pacific_time import shift_day_key
 
     if not _live(lib):
@@ -102,7 +145,7 @@ def week_plan(monday: str, workouts: Any, lib: dict[str, Any] | None, days: int 
     since = rule_from(lib)
     if since and monday < since:
         return None
-    short = plan_for_days(days_available(monday) if days is None else int(days), lib)
+    short = plan_for_days(declared_days(monday) if days is None else days, lib)
     if short:
         return short
     if _dip(workouts, monday) and not _dip(workouts, shift_day_key(monday, -7)):
@@ -127,16 +170,24 @@ def sequence_skip(workouts: Any, lib: dict[str, Any] | None, days_fn: Callable[[
     return skip
 
 
-def entry_week(day: str, role: str, workouts: Any, lib: dict[str, Any] | None, days: int | None = None) -> dict[str, Any] | None:
+def entry_week(day: str, role: str, workouts: Any, lib: dict[str, Any] | None, days: Any = None) -> dict[str, Any] | None:
     """The week plan for the served session on `day` — {host, partner, skip, line, mode} — carried on the day entry as `live_week`
     (`live_session.for_live_draft` reads it); None in a normal week or when not live."""
     return for_role(week_plan(monday_of(day), workouts, lib, days), role)
 
 
 def for_role(plan: dict[str, Any] | None, role: str) -> dict[str, Any] | None:
-    """One session's view of a week plan (the day entry's `live_week`)."""
+    """One session's view of a week plan (the day entry's `live_week`). `heavy_lower_tomorrow` (fix round 12): the NEXT declared
+    morning is the heavy lower day and falls on the next calendar day — or the spacing was not declared (a bare count is read as
+    consecutive days) — so this morning's guest squat and hinge take low-spinal-load members (`live_program.axial_neighbours`)."""
     if not plan:
         return None
+    from common.pacific_time import shift_day_key
+
+    roles, dates = list(plan.get("roles") or ()), plan.get("dates")
+    i = roles.index(role) if role in roles else -1
+    nxt = roles[i + 1] if 0 <= i < len(roles) - 1 else None
+    adjacent = dates is None or (0 <= i < len(dates) - 1 and shift_day_key(dates[i], 1) == dates[i + 1])
     return {
         "host": plan["host"],
         "partner": plan["partners"].get(role),
@@ -144,17 +195,19 @@ def for_role(plan: dict[str, Any] | None, role: str) -> dict[str, Any] | None:
         "line": plan["line"],
         "mode": plan["mode"],
         "days": plan["days"],
+        "heavy_lower_tomorrow": bool(nxt == "lower_heavy" and adjacent),
     }
 
 
-def week_roles(days: int, monday: str, workouts: Any, lib: dict[str, Any] | None) -> tuple[list[str], dict[str, Any] | None]:
+def week_roles(days: Any, monday: str, workouts: Any, lib: dict[str, Any] | None) -> tuple[list[str], dict[str, Any] | None]:
     """The week's drafted roles in the charter's order from its first role (the sample generator's view of a week that starts
-    at upper heavy): the plan's skips stepped over, `days` of them; and the plan (None = a normal week)."""
+    at upper heavy): the plan's skips stepped over, one per declared morning; and the plan (None = a normal week). `days`: the
+    declared mornings (day keys) or a bare count."""
     from training import program_structure as ps
 
     plan = week_plan(monday, workouts, lib, days)
     roles = [r for r in ps.SPLIT_ROLES if not plan or r not in plan["skip"]]
-    return roles[: int(days)], plan
+    return roles[: len(days) if isinstance(days, list | tuple) else int(days)], plan
 
 
 def serve(seq: dict[str, Any] | None, day: str, workouts: Any, lib: dict[str, Any] | None) -> dict[str, Any] | None:

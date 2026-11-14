@@ -7,7 +7,7 @@ shadow and return their input there (tests/test_no_live_change_5861_l6.py).
   * `library_fallbacks`: an accessory's last resort — same pattern, same muscle, best tier first.
   * `effort_targets` / `one_effort` / `why_effort`: one effort target per lift; a morning with no cardio block never promises
     "easy cardio" (ruling 4).
-  * The cardio host and machine (`conditioning_host`, `easy_gap`, `min_block`, `cardio_machine`, `machine_label`).
+  * The cardio host and machine (`conditioning_host`, `cardio_machine`, `machine_label`).
 
 Deleted in fix round 9: the allocation, the kettlebell slot placement and template setting (the resolver is an identity seam kept
 for the cron and MCP call sites), the adherence dip's lighter week and the structured rate band."""
@@ -224,51 +224,6 @@ def conditioning_host(skipped: Any) -> str:
         return HOST_ROLE
     roles = [r for r in ps.SPLIT_ROLES if r not in (gone | {HOST_ROLE})] or [r for r in ps.SPLIT_ROLES if r not in gone]
     return roles[(roles.index("lower_heavy") + 1) % len(roles)] if "lower_heavy" in roles else roles[-1]
-
-
-def easy_gap(kind: str, live: dict[str, Any]) -> tuple[bool, list[str]]:
-    """(keep, lines) for an EASY block when the week's steps do not cover the aerobic floor: the block stays only while the
-    gap — the guideline floor less the walking credit less every block performed this week (since its Monday) — is at least
-    CARDIO_ROOM's minimum block. Steps first, then only the structured minutes that close the gap (third red team: the
-    conservative credit must not turn into an easy block every morning). A hard kind, or unread steps: (True, [])."""
-    from training import cardio_model, live_program, live_sequence
-
-    aer = live.get("aerobic") or {}
-    if kind in live_program.HARD_KINDS or not aer or aer.get("volume_covered"):
-        return True, []
-    from training import live_shape  # #5861 FIX8 (ruling 12): high steps of unknown intensity — reported, no easy block
-
-    if live_shape.intensity_unknown(aer):
-        return False, [
-            f"cardio (live): no easy block — steps ~{aer.get('steps_per_day')}/day, intensity unknown: reported, not a deficit "
-            "(ruling 12; WALK_PROMPT active_steps, heuristic)"
-        ]
-    since, day = live_sequence.week_start(str(live.get("target_date") or "")), str(live.get("target_date") or "")
-    done = sum(
-        int(r.get("duration_sec") or 0) // 60
-        for rows in (live.get("by_machine") or {}).values()
-        for r in rows or []
-        if since <= str(r.get("date") or "")[:10] < day
-    )
-    walk = int(aer.get("walking_min_per_wk") or 0)
-    gap = int(cardio_model.WEEKLY_MODERATE_MIN[0]) - walk - done
-    floor = EASY_MIN_BLOCK
-    if gap < floor:
-        return False, [
-            f"cardio (live): no easy block — recorded walking (~{walk} moderate min/wk credited) and {done} min of blocks this "
-            f"week leave {max(gap, 0)} min of the weekly {cardio_model.WEEKLY_MODERATE_MIN[0]}: under a {floor}-min block (recorded walking first)"
-        ]
-    return True, [
-        f"cardio (live): easy block kept — the week is ~{gap} min short of {cardio_model.WEEKLY_MODERATE_MIN[0]} after ~{walk} min of recorded walking and {done} min of blocks"
-    ]
-
-
-def min_block(kind: str, hard_min: int) -> int:
-    """The shortest block worth serving under the shared cap: CARDIO_ROOM's minimum for an easy block (a stub is worthless),
-    `hard_min` for a conditioning block (its intervals or tempo still fit)."""
-    from training import live_program
-
-    return hard_min if kind in live_program.HARD_KINDS else EASY_MIN_BLOCK
 
 
 def _unavailable(key: str, lib: dict[str, Any] | None) -> bool:

@@ -354,7 +354,7 @@ SET_1_HEAD = "Set 1: "
 HELD_TOP_RE = re.compile(
     r"^(?:Set 1: \d+ reps at RPE .* on later sets|Same load: \d+ reps again → .* next session\."
     # #5861 fix round 11: the live load model's held-top reasons (`live_load.decide`) — each names what moves it or why it waits
-    r"|Same load: (?:recovery first|slump week|first session back|[a-z ]+ flag|every set to \d+ reps, then up"
+    r"|Same load: (?:recovery first|slump week|first session back|[a-z ]+ flag|(?:all sets|top set) to \d+ reps, then up"
     r"|\d+ reps at RPE [\d.]+ or less, then up)\.$)"
 )
 # #5428 re-grade #3: a one-set exercise 1 carries no load rule (nothing to step today), so its note names the gain rule's
@@ -521,7 +521,11 @@ def carry_adjust_line(step_lb: Optional[float]) -> str:
     return f"Set 1 at RPE 7 or less: {_step_text(2 * float(step_lb or 5), True)}."
 
 
-CARRY_ADJUST_RE = re.compile(r"^Set 1 at RPE \d+(?:\.5)? or less: \+\d+(?:\.5)? lb per hand\.$")
+CARRY_ADJUST_RE = re.compile(
+    r"^(?:Set 1 at RPE \d+(?:\.5)? or less: \+\d+(?:\.5)? lb per hand\."
+    # #5861 fix round 12: the live engine's session-to-session form (`live_safety.CARRY_NEXT_LINE`) — no in-session step
+    r"|Both RPE \d+(?:\.5)? or less → heavier next time\.)$"
+)
 
 
 CARRY_CUE = "Tall, ribs down, bells off your legs."

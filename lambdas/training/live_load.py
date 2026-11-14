@@ -31,10 +31,6 @@ them with ONE model, keyed by SESSION ROLE (a heavy day and a volume day are two
      of the range at or under its own target (the deadlift's is its cap).
   7. NOVELTY (three rules). A NEW pattern (none logged in ~8 weeks) runs one exposure at RPE <= 7; a FAMILIAR pattern (a
      biomechanically similar swap included) works at normal effort with no re-entry cap; the layoff rule is 5.
-  8. ONE BOUNDED IN-SESSION STEP (fix round 11, the owner's 2026-10-27 R3 rule restored, pending his confirmation): when the
-     first working set of a straight-set lift lands at RPE <= 7, the remaining sets go up one load step — never down in-session, never on a lift that
-     is held for a reason (a pain flag, a first session back, a slump or strained day), stepped down, new, or capped at RPE 7
-     (`r3_eligible`; the note line is `live_safety.r3_lines`). It feeds double progression: the next session reads the new top.
 
 Every number is a labelled heuristic in `live_settings.HEURISTICS`. The engine's own load (the v0.3 ramp) stands only for a lift
 with no same-role exposure in the window. In shadow nothing here runs (the callers check the live mark first)."""
@@ -48,8 +44,37 @@ from training import live_settings as cfg
 
 ISSUE = "#5861"
 KG_PER_LB = 0.45359237
-TARGET_RPE = 9.0
-"""The top of the working effort band (RPE 8-9, last set 9-10 on isolation): a set logged ABOVE it is a grind."""
+
+
+def effort_role(e: dict[str, Any]) -> str:
+    """An exposure's row of the ONE effort table (`effort_targets`, fix round 12): a heavy-day anchor is a `heavy_compound`, any
+    other anchor a `volume_compound`, every accessory slot (machine and isolation work) an `accessory`. The deadlift beside the
+    squat takes its own row through its cap (`live_rulings.lead_lift`)."""
+    if e.get("kind") != "anchor":
+        return "accessory"
+    return "heavy_compound" if e.get("intensity") == "heavy" else "volume_compound"
+
+
+def step_rpe(e: dict[str, Any] | None = None) -> float:
+    """The RPE at or under which the top of the rep range earns the step up: the role's working-set RPE, or the lift's own cap
+    when that is lower (the deadlift, a pain hold, a strained day). No exposure: the accessory row's."""
+    work = float(cfg.value("effort_targets")[effort_role(e or {})][0])
+    cap = (e or {}).get("live_effort")
+    return min(work, float(cap)) if cap else work
+
+
+def effort_line(e: dict[str, Any]) -> str | None:
+    """The note's effort line for a role whose target is not the composer's band: a heavy compound's `RPE 8, last set RPE 8–9`
+    (None: the composer's line, or the lift's cap, stands)."""
+    from training import hevy_note_grammar as g
+
+    if effort_role(e) != "heavy_compound":
+        return None
+    work, last = cfg.value("effort_targets")["heavy_compound"]
+    cap = e.get("live_effort")
+    if cap and float(cap) < float(last):
+        return None  # a capped lift reads its cap (`live_program._cap_effort`)
+    return g.effort_line(work, (work, last))
 
 
 def _day(w: dict[str, Any]) -> str:
@@ -214,8 +239,9 @@ def decide(
     equipment: str | None,
     *,
     hold: str | None = None,
-    target_rpe: float = TARGET_RPE,
+    target_rpe: float | None = None,
     layoff_days: int | None = None,
+    top_set: bool = False,
 ) -> dict[str, Any] | None:
     """One lift's load: {kg, mode: up|hold|down, why, clause} from its same-role exposures (most recent first, the NEWEST is the
     reference), or None (no exposure in the window: the engine's own load stands). Two rules (module doc 1-2): DOWN when the top
@@ -225,6 +251,7 @@ def decide(
     session back after `long_layoff_days`+ starts `long_layoff_pct` under the last load (rule 5). Pure."""
     if not rows:
         return None
+    target_rpe = step_rpe() if target_rpe is None else target_rpe
     last = _top(rows[0])["kg"]
     if below_floor(rows, rep_lo):  # at least one step; enough to reach the floor again on the last exposure's own read
         kg = _floor_to_implement(min(last * (1 - float(cfg.value("step_down_pct")) / 100.0), floor_load(rows[0], rep_lo)), equipment)
@@ -250,31 +277,37 @@ def decide(
             "why": f"{rep_hi} reps reached",
             "clause": f"Heavier: {rep_hi} reps reached.",
         }
-    why = hold or "reps first"
     if hold:
-        return {"kg": last, "mode": "hold", "why": why, "clause": f"Same load: {hold}."}
+        return {"kg": last, "mode": "hold", "why": hold, "clause": f"Same load: {hold}."}
     top = _top(rows[0])
-    if top["reps"] >= rep_hi:  # fix round 11: a held top-of-range always says what moves it (the note lint's "no reason")
-        at = [st for st in rows[0]["sets"] if st["kg"] >= top["kg"] - 0.2]
-        why = "every set to the top first" if any(st["reps"] < rep_hi for st in at) else f"the top at RPE {target_rpe:g} first"
-        clause = (
-            f"Same load: every set to {rep_hi} reps, then up."
-            if why.startswith("every")
-            else f"Same load: {rep_hi} reps at RPE {target_rpe:g} or less, then up."
-        )
-        return {"kg": last, "mode": "hold", "why": why, "clause": clause}
-    return {"kg": last, "mode": "hold", "why": why, "clause": f"Same load: build to {rep_hi} reps."}
+    at = [st for st in rows[0]["sets"] if st["kg"] >= top["kg"] - 0.2]
+    if all(st["reps"] >= rep_hi for st in at):  # the top of the range reached, at too high an effort for the lift's target
+        return {
+            "kg": last,
+            "mode": "hold",
+            "why": f"the top at RPE {target_rpe:g} first",
+            "clause": f"Same load: {rep_hi} reps at RPE {target_rpe:g} or less, then up.",
+        }
+    # fix round 12: every held lift says what moves it (the one load rule, on the lift's own note)
+    which = "top set" if top_set else "all sets"  # `top_set`: a top set + back-offs — the top set alone earns the step
+    return {"kg": last, "mode": "hold", "why": "reps first", "clause": f"Same load: {which} to {rep_hi} reps, then up."}
 
 
-def r3_eligible(e: dict[str, Any], d: dict[str, Any] | None, held_day: bool) -> bool:
-    """Rule 8: the bounded in-session step may ride this lift — a loaded, straight-set, non-carry lift that is not new, not a first session
-    back, not pain-touched (its stop line) or held for a reason, not stepped down, on a day that holds nothing
-    (`held_day`: a slump, a strained or deload-recommended day). `d`: the lift's load decision (None: no same-role history)."""
-    if e.get("intensity") == "carry" or e.get("live_new") or e.get("live_first_back") or e.get("live_stop") or held_day:
-        return False
-    if any(x.get("kind") in ("top", "back_off") for x in e.get("sets") or []):  # a top set + back-offs is not "the later sets"
-        return False
-    return not d or d.get("mode") == "up" or (d.get("mode") == "hold" and d.get("why") in ("reps first", "every set to the top first"))
+def previous_clause(d: dict[str, Any], rows: list[dict[str, Any]], all_rows: list[dict[str, Any]], kind: str, day: str) -> str | None:
+    """Fix round 12 (a PREVIOUS load from another day quoted without saying so): Hevy's PREVIOUS column shows his LAST session of
+    the template, whatever its day. When that is not the exposure this load was read from (a heavy day before a volume day of the
+    same lift) and the row sits more than one implement step from it, the lift's one reason line says so — the standard's own
+    `Lighter:` / `Heavier:` word, by the direction against PREVIOUS. A step-down keeps its own reason. None: nothing to say."""
+    from training import hevy_note_grammar as g
+
+    prev = next((r for r in all_rows if r["date"] < day), None)
+    if prev is None or prev["date"] == rows[0]["date"] or d["mode"] == "down":
+        return None
+    row_lb, prev_lb = d["kg"] / KG_PER_LB, _top(prev)["kg"] / KG_PER_LB
+    word = g.delta_word(row_lb, prev_lb, g.implement_step_lb(kind, prev_lb))
+    if not word:
+        return None
+    return f"{word}: PREVIOUS was the {'heavy' if word == g.LIGHTER else 'volume'} day."
 
 
 # ── novelty ──────────────────────────────────────────────────────────────────
@@ -387,30 +420,24 @@ def set_loads(
             lo, hi = min(int(r[0]) for r in tmpl), max(int(r[-1]) for r in tmpl)
             for s in work:
                 s.rep_range_start, s.rep_range_end = lo, hi
-        from training.rep_scheme import DUMBBELL_KINDS, implement_step_lb
-
-        eq = str(entry.get("equipment") or "")
-        mark.setdefault("r3_step", {})[str(b.movement_key)] = [  # rule 8's step on this implement (None: a cable's next pin)
-            implement_step_lb(eq, max(float(s.weight_kg) for s in work) / KG_PER_LB),
-            eq.strip().lower() in DUMBBELL_KINDS,
-        ]
-        rows = same_role(hist.get(tid) or [], role, target_date, lo, hi)
+        lift_role = str(e.get("live_full_body") or role)  # fix round 12: a full-body guest is its partner role's lift
+        rows = same_role(hist.get(tid) or [], lift_role, target_date, lo, hi)
         if not rows and hold_all:  # a hold day holds a lift with no same-role exposure at its latest load of any role
             rows = same_role([r | {"role": ""} for r in hist.get(tid) or []], "", target_date, 0, 99)
         flag = e.get("live_load") or {}
         hold = "first session back" if e.get("live_first_back") else (str(flag.get("why") or "held") if flag.get("hold") else hold_all)
         gap = int((mark.get("layoff") or {}).get("gap_days") or 0) if e.get("live_first_back") else None
-        target = min(TARGET_RPE, float(e["live_effort"])) if e.get("live_effort") else TARGET_RPE  # a capped lift's own target
-        d = decide(rows, lo, hi, entry.get("equipment"), hold=hold, target_rpe=target, layoff_days=gap)
+        target = step_rpe(e)  # the role's working RPE (`effort_targets`), or the lift's own cap
+        shaped = any(x.get("kind") == "top" for x in e.get("sets") or [])
+        d = decide(rows, lo, hi, entry.get("equipment"), hold=hold, target_rpe=target, layoff_days=gap, top_set=shaped)
         if d is None:
             continue
-        engine = max(float(s.weight_kg) for s in work)
         for s in work:
             s.weight_kg = d["kg"]
-        # the note's reason line only where it changes what he reads: the engine's own load and reason stand when they agree —
-        # a hold for a reason (a flag, a hold day, the top reached at too high an effort) always says it (fix round 11)
-        quiet = abs(engine - float(d["kg"])) < 0.2 and (d["mode"] == "up" or d["why"] == "reps first") and not e.get("live_first_back")
-        d = d | ({"clause": None} if quiet else {})
+        from training import hevy_note_lint
+
+        other = previous_clause(d, rows, hist.get(tid) or [], hevy_note_lint.kind_of(str(b.movement_key), entry), target_date)
+        d = d | ({"clause": other} if other else {})
         rec = {"key": b.movement_key, **d, "last": {"date": rows[0]["date"], "role": rows[0]["role"], **_top(rows[0])}}
         out.append(rec)
         row = rows_out.get(b.movement_key)
