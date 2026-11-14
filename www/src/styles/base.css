@@ -1729,3 +1729,14 @@ span.gloss[data-quote-gloss] {
 .sets-table td.sets .set {
   white-space: nowrap;
 }
+
+/* The front page's one-line "so far" (2026-11-14): progress above the fold on a phone. */
+.sofar {
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--rule);
+  padding: 9px 0;
+  color: var(--ink);
+}
