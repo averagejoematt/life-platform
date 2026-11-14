@@ -363,6 +363,20 @@ def validate(lib: dict[str, Any]) -> list[str]:
     return errors
 
 
+def _target_matches(target: str, muscle: str) -> bool:
+    t, m = str(target or "").lower(), str(muscle or "").lower()
+    if not t or not m:
+        return False
+    sub = {"calves": ("gastrocnemius", "soleus")}
+    return t == m or t.startswith(m) or m.startswith(t) or t.startswith(sub.get(m, ("\0",)))
+
+
+def rows_for(entry: dict[str, Any], muscle: str) -> list[dict[str, Any]]:
+    """The entry's hypertrophy rows for `muscle`, a sub-target included (`triceps_long_head` is triceps, `gastrocnemius` and
+    `soleus` are calves). Moved here from `selection_engine` (#5861: the engine sits at the module-size ceiling)."""
+    return [r for r in entry.get("hypertrophy") or [] if _target_matches(r.get("target"), muscle)]
+
+
 def canonical_of(lib: dict[str, Any], ref: str) -> Optional[str]:
     """The canonical movement key for a library key OR a Hevy template id (#5861 alias layer); None when unknown. Every
     pre-existing key and template id resolves: aliases and variants keep their own entries and name their canonical."""

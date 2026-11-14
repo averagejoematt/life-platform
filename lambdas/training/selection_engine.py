@@ -258,16 +258,7 @@ def pain_exclusion(entry: dict[str, Any], overlay: dict[str, Any] | None) -> str
     return None
 
 
-def _target_matches(target: str, muscle: str) -> bool:
-    t, m = str(target or "").lower(), str(muscle or "").lower()
-    if not t or not m:
-        return False
-    sub = {"calves": ("gastrocnemius", "soleus")}
-    return t == m or t.startswith(m) or m.startswith(t) or t.startswith(sub.get(m, ("\0",)))
-
-
-def _rows_for(entry: dict[str, Any], muscle: str) -> list[dict[str, Any]]:
-    return [r for r in entry.get("hypertrophy") or [] if _target_matches(r.get("target"), muscle)]
+_rows_for = xl.rows_for  # the entry's hypertrophy rows for a muscle: a library helper (moved at the #5861 round-12/13 merge)
 
 
 def tier_for(entry: dict[str, Any], muscle: str) -> str:
