@@ -1740,3 +1740,25 @@ span.gloss[data-quote-gloss] {
   padding: 9px 0;
   color: var(--ink);
 }
+/* A phone reads facts two to a row (2026-11-14): one per row stacked the ledger's six counts ~650px deep before the
+   first record. Hairlines follow the 2-column grid. */
+@media (max-width: 560px) {
+  .facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .facts > div {
+    border-right: 0;
+    border-bottom: 1px solid var(--rule);
+    min-width: 0;
+  }
+  .facts > div:nth-child(odd) {
+    border-right: 1px solid var(--rule);
+  }
+  .facts > div:nth-child(odd):last-child {
+    grid-column: 1 / -1;
+    border-right: 0;
+  }
+  .facts .v {
+    overflow-wrap: anywhere;
+  }
+}
