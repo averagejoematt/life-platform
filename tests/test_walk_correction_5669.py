@@ -263,7 +263,7 @@ def test_the_recent_aerobic_block_counts_the_correction_as_a_labelled_row():
     assert ra.aerobic_minutes_7d(b) == round(round(100 / 60.0, 2) * 60.0, 1) == 100.2  # the block's hours rounding
     walks = b["totals"]["standalone_walks"]["trailing_7d"]["walks"]
     assert any(w["date"] == DAY and w["method"] == "owner_correction" for w in walks)
-    assert b["version"] == "recent-aerobic@1.3.0"
+    assert b["version"] == "recent-aerobic@1.4.0"  # 1.4.0 (#5916): heart rate is a measurement with its basis, never graded
 
 
 def test_negative_control_recent_aerobic_without_a_correction_is_unknown():
