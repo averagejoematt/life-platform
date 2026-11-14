@@ -51,6 +51,7 @@ from training import (  # noqa: E402
     live_settings,
     live_shape,
     live_volume,
+    live_week as lw,
     program_structure as ps,
     selection_engine as se,
     selection_live as sl,
@@ -315,7 +316,7 @@ def unprogrammed(week: dict, lib: dict, catalog: dict) -> list[str]:
     # third red team: the aerobic check passed on the engine's OWN sentence ("no easy block — steps already give"). Now an
     # OUTCOME: one block of at least CARDIO_ROOM's minimum, or the week's walking dose COMPUTED from its steps by the cardio
     # model's conservative credit (`week["steps_credit"]`, the generator's own call — never a rationale string)
-    long_enough = any((s["cardio"].get("minutes") or 0) >= lb.EASY_MIN_BLOCK for s in week["sessions"])
+    long_enough = any((s["cardio"].get("minutes") or 0) >= lw.EASY_MIN_BLOCK for s in week["sessions"])  # fix round 12: one constant
     # #5861 FIX6 (ruling 4): a purposeful conditioning block counts at the shared cap's own minimum (the cap is the owner's)
     long_enough = long_enough or any(
         s["cardio"].get("kind") in lp.HARD_KINDS and (s["cardio"].get("minutes") or 0) >= lp.MIN_CARDIO_MINUTES for s in week["sessions"]
@@ -477,7 +478,7 @@ def joint_unprotected(week: dict, lib: dict, catalog: dict, joint: str, group: s
             continue
         if lp._group(e.get("pattern")) == group and lp._stress(e, joint) >= 1:
             out.append(f"{x['key']}: same pattern")
-        elif e.get("pattern") in PROVOKING.get(joint, ()) and not (capped_at(x["hevy_note"], 8) and "stop this lift" in x["hevy_note"]):
+        elif e.get("pattern") in PROVOKING.get(joint, ()) and not (capped_at(x["hevy_note"], 8) and "stop the lift" in x["hevy_note"]):
             out.append(f"{x['key']}: no cap")
     return out
 
@@ -762,9 +763,7 @@ def test_d1_weekly_sets_per_muscle_sit_inside_the_volume_landmarks(weeks):
         "a_large_deficit_experienced",
         {
             (live_volume, "_surplus"): lambda rows, tg, prio, lines: (lambda: None),
-            (live_volume, "_make_room"): lambda rows, tg, lead, role, m, need, room, budget, gave, slot=False: room(role) >= need
-            and not slot,
-            (live_volume, "ARMS"): (),
+            (live_volume, "_make_room"): lambda rows, tg, role, m, need, n, room, budget, gave: room(role) >= need,
         },
     )
     lib, cat = raw["world"]["lib"], raw["world"]["catalog"]["movements"]
@@ -1059,11 +1058,18 @@ def filled(week: dict, lib: dict, catalog: dict, world: dict | None = None) -> l
     mornings = len(week["sessions"])
     day = week["sessions"][0].get("day")
     last = live_volume.last_trained((world or {}).get("record"), catalog, lib, day) if world else None
-    plan = live_volume.week_plan(catalog, lib, mornings, last=last, overlay=(world or {}).get("overlay"))
+    seen: dict = {}
+    if world:  # fix round 12: the draft's plan reads what he has logged and the in-block anchors — the test reads the same
+        from training import in_block_variant
+
+        rec = world.get("record") or []
+        seen["logged"] = frozenset(str(x.get("template_id") or "").upper() for wk in rec for x in wk["exercises"])
+        seen["in_block"] = in_block_variant.performed_in_block(rec, catalog, day)
+    plan = live_volume.week_plan(catalog, lib, mornings, last=last, overlay=(world or {}).get("overlay"), **seen)
     for s in week["sessions"]:
         rat = _all(s)
         expected = sum(1 for r in plan["rows"] if r["role"] == s["role"])
-        expected -= sum(1 for ln in rat if ln.startswith(("skipped (live)", "dropped (live)")))
+        expected -= sum(1 for ln in rat if ln.startswith(("skipped (live)", "dropped (live)", "not added (live)", "not served (live)")))
         expected -= sum(ln.count(" dropped") for ln in rat if ln.startswith("time (live)"))
         expected += sum(1 for ln in rat if ln.startswith("added (live)") and ln.endswith("free minutes"))
         if len(s["lifts"]) != expected:
@@ -1095,8 +1101,7 @@ def test_d5_no_training_is_added_to_fill_slots(weeks):
             (live_volume, "_spare"): lambda r, rows, tg: False,
             (live_volume, "_head_needs"): lambda r, rows, tg: True,
             (live_volume, "_surplus"): lambda rows, tg, prio, lines: (lambda: None),  # fix round 11: no surplus step
-            (live_volume, "_make_room"): lambda rows, tg, lead, role, m, need, room, budget, gave, slot=False: room(role) >= need
-            and not slot,
+            (live_volume, "_make_room"): lambda rows, tg, role, m, need, n, room, budget, gave, low=False: room(role, m) >= need,
         },
     )
     assert any(

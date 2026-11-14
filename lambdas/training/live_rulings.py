@@ -2,10 +2,9 @@
 through the ONE settings table (`live_settings`).
 
   1. THE HEAVY LOWER MORNING (`lead_lift`, ruling 5): squat and deadlift share it but are never both maximal — the squat always
-     leads at the session's effort, the deadlift is a top set + one back-off at RPE <= `deadlift_rpe` (fix round 11: the ISO-week
+     leads at the session's effort, the deadlift is a top set + one back-off at its `effort_targets` RPE (fix round 11: the ISO-week
      alternation, the lead by state and the second-lift band are gone with the ratchet they made).
-  2. PURPOSEFUL CARDIO (`purposeful_cardio`, ruling 4): a gym block only for a named purpose — the week's conditioning dose, or the
-     RECORD's aerobic gap.
+  2. PURPOSEFUL CARDIO (`purpose_line`, ruling 4): the one gym block is the week's conditioning dose; it carries its reason.
   3. EVIDENCE AND COMPLETENESS, VISIBLE (`evidence_line`, ruling 16).
   4. THE LOSS-RATE CEILING, ADVISORY (`rate_line`, ruling 11), never applied to a kcal target.
   5. The hard-conditioning hosts (`conditioning_hosts`, `hard_conditioning_doses`).
@@ -25,9 +24,16 @@ shoulders+arms host is the first)."""
 
 
 def conditioning_hosts(host: str, lib: dict[str, Any] | None = None) -> list[str]:
-    """The mornings that may hold HARD conditioning this week: the host, plus SECOND_HOST at `hard_conditioning_doses` 2."""
-    n = int(_settings(lib).get("hard_conditioning_doses") or 1)
-    return [host] + ([SECOND_HOST] if n >= 2 and SECOND_HOST != host else [])
+    """The mornings that may hold HARD conditioning this week: the host, plus SECOND_HOST at `hard_conditioning_doses` 2; none at
+    0 (fix round 12: the owner's explicit trade — the dose's reserved minutes go back to lifting)."""
+    n = doses(lib)
+    return ([host] if n >= 1 else []) + ([SECOND_HOST] if n >= 2 and SECOND_HOST != host else [])
+
+
+def doses(lib: dict[str, Any] | None = None) -> int:
+    """`hard_conditioning_doses` (unset reads 1, the ruled default; 0 is a choice, not a missing value)."""
+    n = _settings(lib).get("hard_conditioning_doses")
+    return 1 if n is None else int(n)
 
 
 def _settings(lib: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -40,7 +46,7 @@ def _settings(lib: dict[str, Any] | None = None) -> dict[str, Any]:
 def lead_lift(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
     """IN PLACE, the lower-heavy morning holding both a spine-loading squat and a hinge anchor (owner ruling 5, fix round 11 — the
     tenth red team's simpler rule): the SQUAT always leads at the session's effort; the deadlift runs its top set + one back-off
-    (`live_shape.deadlift_shape`) capped at `deadlift_rpe`. No week-by-week alternation, no lead by state: each is an ordinary
+    (`live_shape.deadlift_shape`) capped at its `effort_targets` row. No week-by-week alternation, no lead by state: each is an ordinary
     lift of the one load model (`live_load`), so a capped deadlift steps up after an easy top set and neither reads a stale lead
     day. A squat already capped (a pain flag) leaves both under the top effort — never both maximal. Returns the line."""
     if rx.get("session_role") != "lower_heavy":
@@ -57,12 +63,12 @@ def lead_lift(rx: dict[str, Any], ctx: dict[str, Any]) -> list[str]:
     }
     if len(anchors) < 2:  # a swapped-out deadlift (a hip thrust under discomfort) is not a second maximal lift
         return []
-    cap = int(live_settings.value("deadlift_rpe"))
+    cap = int(live_settings.value("effort_targets")["deadlift"][0])
     dl = anchors["hinge"]
     dl["live_effort"] = min(cap, int(dl.get("live_effort") or 99))
     return [
         f"heavy lower (live): the squat leads at the session's effort; the deadlift is a top set + one back-off at RPE <= {cap} "
-        "— never both maximal in one session (owner ruling 5; deadlift_rpe, heuristic)"
+        "— never both maximal in one session (owner ruling 5; effort_targets, heuristic)"
     ]
 
 
@@ -78,26 +84,9 @@ def _lib_entry(e: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
 
 
 # ── 4. purposeful cardio ─────────────────────────────────────────────────────
-def purposeful_cardio(kind: str, live: dict[str, Any], hard_kinds: tuple[str, ...]) -> tuple[bool, list[str]]:
-    """(keep, lines) under `cardio_purpose_only`: a hard block on the conditioning host keeps its purpose (the week's
-    conditioning dose); any other block — an easy kind, or a hard one turned easy — is not served. (True, []) when the setting
-    is off (the fifth round's easy-gap rules then decide)."""
-    if kind in hard_kinds:
-        return True, [f"cardio (live): {kind} — purpose: the week's conditioning dose (cardio_purpose_only)"]
-    from training import live_shape  # #5861 FIX7: the RECORD names the purpose — a week short of its aerobic floor
-
-    aer = live.get("aerobic") or {}
-    gap = live_shape.aerobic_gap(live)
-    if gap is not None and gap >= int(live_shape.WALK_PROMPT["min_minutes"]["value"]):
-        return True, [
-            f"cardio (live): {kind} — purpose: the week's aerobic floor, ~{gap} min short after the recorded, credited minutes "
-            "(cardio_purpose_only; the record names the purpose)"
-        ]
-    tracked = aer.get("line") or "walking outside the gym is tracked apart"
-    why = "the recorded aerobic minutes cover the week" if gap is not None else "no aerobic record read — nothing is assumed"
-    if gap is None and live_shape.intensity_unknown(aer):  # FIX8 (ruling 12): steps reported, intensity unknown, no deficit
-        why = f"steps ~{aer.get('steps_per_day')}/day, intensity unknown — reported, not a deficit"
-    return False, [f"cardio (live): no {kind} block — no named purpose today: {why} ({tracked})"]
+def purpose_line(kind: str) -> list[str]:
+    """The served conditioning block's recorded reason (owner ruling 4: no block without one): the week's conditioning dose."""
+    return [f"cardio (live): {kind} — purpose: the week's conditioning dose (hard_conditioning_doses)"]
 
 
 # ── 5. evidence and completeness, visible ───────────────────────────────────

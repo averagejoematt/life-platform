@@ -29,7 +29,6 @@ import sample_weeks_5861 as sw  # noqa: E402
 from health import rate_policy  # noqa: E402
 from training import (  # noqa: E402
     cardio_model as cm,
-    live_program as lp,
     live_rulings as lr,
     live_sequence,
     live_settings,
@@ -118,9 +117,8 @@ def test_ruling_4_no_cardio_block_without_a_named_purpose(weeks):
             if s["cardio"].get("key"):
                 assert any(ln.startswith("cardio (live):") and "purpose:" in ln for ln in s["rationale"]), (name, s["role"])
             assert "easy cardio" not in (s["lifts"][0]["hevy_note"] if s["lifts"] else "") or s["cardio"].get("key"), (name, s["role"])
-    gap = {(lp, "aerobic"): lambda inputs: {"volume_covered": False, "walking_min_per_wk": 0, "line": "x"}}
-    nopurpose = gap | {(lr, "purposeful_cardio"): lambda kind, live, hard: (True, [])}  # control: no purpose named -> caught
-    old = _week("a_large_deficit_experienced", nopurpose, settings={"session_cap_includes_cardio": False})
+    nopurpose = {(lr, "purpose_line"): lambda kind: []}  # control: the served block's reason not recorded -> caught
+    old = _week("a_large_deficit_experienced", nopurpose)
     assert any(
         s["cardio"].get("key") and not any("purpose:" in ln for ln in s["rationale"] if ln.startswith("cardio (live):"))
         for s in old["week"]["sessions"]
@@ -134,19 +132,21 @@ def _effort_top(note: str | None) -> float | None:
 
 def test_ruling_5_the_squat_leads_and_the_deadlift_runs_a_notch_lower_every_week(weeks):
     """Fix round 11 (the tenth red team's simpler rule): the squat always leads at the session's effort; the deadlift is a top set
-    + one back-off at RPE <= deadlift_rpe (8) — every week, no ISO-week alternation. Control: the rule off -> both at RPE 9."""
+    + one back-off at RPE 8 (`effort_targets` deadlift) — every week, no ISO-week alternation. Fix round 12: the squat works at
+    RPE 8 with only its last set to 9, so the deadlift is still the notch lower. Control: the rule off -> both read the same."""
     a = weeks["a_large_deficit_experienced"]["week"]
     lh = {x["key"]: x for x in _lifts(a, "lower_heavy")}
     squat, dl = _effort_top(lh["squat_barbell"]["hevy_note"]), _effort_top(lh["deadlift_barbell"]["hevy_note"])
-    assert squat == 9 and dl == live_settings.value("deadlift_rpe") == 8
+    assert "last set RPE 8–9" in lh["squat_barbell"]["hevy_note"] and "last set" not in lh["deadlift_barbell"]["hevy_note"]
+    assert squat == 8 and dl == live_settings.value("effort_targets")["deadlift"][0] == 8
     assert lh["deadlift_barbell"]["working_sets"] == 2  # top set + one back-off
     prof = PROFILES["a_large_deficit_experienced"]
     nxt = _week("a", profile=prof | {"days": [sw._day(d, 7) for d in prof["days"]]} | {"as_of": sw._day(prof["as_of"], 7)})
     lh2 = {x["key"]: x for x in _lifts(nxt["week"], "lower_heavy")}
-    assert _effort_top(lh2["squat_barbell"]["hevy_note"]) == 9 and _effort_top(lh2["deadlift_barbell"]["hevy_note"]) == 8  # no swap
+    assert "last set RPE 8–9" in lh2["squat_barbell"]["hevy_note"] and "last set" not in lh2["deadlift_barbell"]["hevy_note"]  # no swap
     both = _week("a_large_deficit_experienced", {(lr, "lead_lift"): lambda rx, ctx: []})["week"]  # control
     lh = {x["key"]: x for x in _lifts(both, "lower_heavy")}
-    assert _effort_top(lh["squat_barbell"]["hevy_note"]) == _effort_top(lh["deadlift_barbell"]["hevy_note"]) == 9
+    assert "last set RPE 8–9" in lh["squat_barbell"]["hevy_note"] and "last set RPE 8–9" in lh["deadlift_barbell"]["hevy_note"]
 
 
 def test_ruling_5_a_swapped_out_deadlift_is_not_a_second_maximal_lift(weeks):
@@ -210,8 +210,8 @@ def test_ruling_9_priority_muscles_at_or_over_mev_and_each_delt_head_has_its_aim
     plan = live_volume.week_plan(cat, lib, 5)
     for p in ("chest", "quadriceps"):
         assert plan["targets"][p]["aim"] > LANDMARKS["muscles"][p]["MEV"] and plan["counts"][p] >= plan["targets"][p]["aim"], p
-    with patch.dict(live_settings.HEURISTICS["priority_aim_share"], {"value": 0.0}), patch.object(live_volume, "ARMS", ()):
-        flat = live_volume.week_plan(cat, lib, 5)["counts"]  # control: the aim at MEV, no arm reference -> fewer priority sets
+    with patch.dict(live_settings.HEURISTICS["priority_aim_share"], {"value": 0.0}):
+        flat = live_volume.week_plan(cat, lib, 5)["counts"]  # control: the aim at MEV -> fewer priority sets
     assert flat["chest"] + flat["quadriceps"] < plan["counts"]["chest"] + plan["counts"]["quadriceps"]
 
 

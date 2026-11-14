@@ -346,7 +346,12 @@ def test_a_cardio_machine_the_gym_lacks_is_swapped_and_the_bike_is_named_for_wha
     assert lb.machine_label(note, LIB0) == note  # his gym: the recumbent stands
     garage = copy.deepcopy(LIB0)
     garage["gym_inventory"]["items"]["recumbent_bike"] = {"home_gym": {"state": "unavailable", "source": "control"}}
-    assert lb.machine_label(note, garage) == "RPE _\nBike · your level · RPE 6–7"
+    assert lb.machine_label(note, garage) == "RPE _\nUpright bike · your level · RPE 6–7"  # a machine of the note grammar
+    none = copy.deepcopy(lib)  # fix round 12: no machine the gym has runs the kind -> no machine (no block), never one it lacks
+    for key in ("treadmill", "rowing_machine", "air_bike"):
+        none["movements"][key]["availability"] = {"home_gym": {"state": "unavailable", "source": "control"}}
+    none["gym_inventory"]["items"]["elliptical"] = {"home_gym": {"state": "unavailable", "source": "control"}}
+    assert lb.cardio_machine({"kind": "tempo", "machine": "cycling"}, none)[0]["machine"] is None
 
 
 def test_the_one_settings_table_holds_the_rulings_and_nothing_dead():

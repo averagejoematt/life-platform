@@ -690,6 +690,36 @@ def apply_to_session(
     return out
 
 
+def _assess_inputs(inputs: Any, block_workouts: list[dict[str, Any]] | None, lib: Any) -> dict[str, Any]:
+    """The assessment's inputs a draft already carries (the generator inputs' readiness tier, the block's Hevy record, the
+    library, the landmarks)."""
+    from training import block_model, program_structure
+
+    as_of = str(getattr(inputs, "target_date", ""))
+    return {
+        "workouts": block_workouts,
+        "lib": lib,
+        "as_of": as_of,
+        "readiness": getattr(inputs, "recovery_tier", None),
+        "acwr": getattr(inputs, "acwr_flag", None),  # #5861 L6: the autoreg key (`high` / `very_high`), one HR-derived vote
+        "sleep_hours": getattr(inputs, "sleep_hours", None),
+        "cardio_load": getattr(inputs, "cardio_load", None)
+        or hevy_cardio_load(block_workouts, lib, as_of=as_of, steps_by_day=getattr(inputs, "steps_by_day", None)),  # the L4 seam
+        "landmarks": block_model.load_landmarks(),
+        "planned_per_week": len(program_structure.SPLIT_ROLES),
+    }
+
+
+def strained_inputs(inputs: Any, block_workouts: list[dict[str, Any]] | None, lib: Any) -> bool:
+    """LIVE only (`live_session.for_live_draft`): the day's inputs alone already read strained or worse — two or more strain
+    signals before the session exists (the slump vote is not in it). The session fit then introduces no movement new to him
+    (#5861 fix round 12). Never raises: an unreadable day is not a strained one."""
+    try:
+        return assess(**_assess_inputs(inputs, block_workouts, lib))["state"] in ("strained", "overreached")
+    except Exception:  # noqa: BLE001 — never blocks a draft
+        return False
+
+
 def for_live_draft(
     rx: dict[str, Any],
     rotation: dict[str, Any] | None,
@@ -704,21 +734,11 @@ def for_live_draft(
     if ((rotation or {}).get("selection") or {}).get("mode") != MODE_LIVE:
         return rx
     try:
-        from training import block_model, program_structure, selection_engine
+        from training import selection_engine
         from training.training_charter import charter_value
 
-        lib, as_of = selection_engine.load_library_failsoft(), str(getattr(inputs, "target_date", ""))
         assessment = assess(
-            workouts=block_workouts,
-            lib=lib,
-            as_of=as_of,
-            readiness=getattr(inputs, "recovery_tier", None),
-            acwr=getattr(inputs, "acwr_flag", None),  # #5861 L6: the autoreg key (`high` / `very_high`), one HR-derived vote
-            sleep_hours=getattr(inputs, "sleep_hours", None),
-            cardio_load=getattr(inputs, "cardio_load", None)
-            or hevy_cardio_load(block_workouts, lib, as_of=as_of, steps_by_day=getattr(inputs, "steps_by_day", None)),  # the L4 seam
-            landmarks=block_model.load_landmarks(),
-            planned_per_week=len(program_structure.SPLIT_ROLES),
+            **_assess_inputs(inputs, block_workouts, selection_engine.load_library_failsoft()),
             session_minutes=(rx.get("session_minutes") or {}).get("lifting_minutes"),
             minutes_ceiling=charter_value("split.session_minutes.lifting_ceiling"),
             slump=slump,

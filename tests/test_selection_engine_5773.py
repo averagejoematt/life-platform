@@ -568,7 +568,8 @@ def test_approved_library_serves_the_selection_live():
     want = sel["variants_by_role"]["upper_heavy"]
     assert out["variants"] == want != rot["variants"]
     assert out["volume_check"]["unchanged"]
-    assert {w["variant"] for w in out["ledger_writes"]} <= set(want.values())
+    # #5861 fix round 12: a live draft's picks are their own list, recorded apart from what the proposed path reads
+    assert out["ledger_writes"] == [] and {w["variant"] for w in out["live_ledger_writes"]} <= set(want.values())
     assert set(se.snapshot_fields(out)) == {"selection"}
     # control: the same inputs at status proposed never touch the served variants
     assert se.apply(copy.deepcopy(rot), cat, rows=[], lib=_lib("proposed"), overlay=None)["variants"] == rot["variants"]
