@@ -2055,4 +2055,57 @@ span.gloss[data-quote-gloss] {
   .ch-byline {
     display: none;
   }
+/* The Laboratory's index figures (2026-11-14, sprint II): the findings as a forest plot — pair, axis, how often it
+   was listed — and each test's paired days against what a verdict needs. */
+.forest {
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+}
+.forest-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px 150px;
+  gap: 4px 24px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.forest-row:last-child {
+  border-bottom: 0;
+}
+.forest-row > :last-child {
+  text-align: right;
+}
+.forest-head {
+  padding: 8px 0 4px;
+  align-items: end;
+}
+.forest-row svg {
+  display: block;
+}
+.lab-test-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.lab-arms svg {
+  display: block;
+}
+@media (max-width: 760px) {
+  .forest-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .forest-row > :last-child {
+    text-align: left;
+  }
+  .forest-head .label {
+    display: none;
+  }
+  .lab-test {
+    flex-direction: column;
+    align-items: flex-start !important;
+  }
+  .lab-test-side {
+    align-items: flex-start;
+  }
 }
