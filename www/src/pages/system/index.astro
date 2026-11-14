@@ -15,6 +15,26 @@ const record = recordBlock && recordBlock.state === "ok" ? (recordBlock.data as 
 const coaches = [...all.byType.coach].sort((a, b) => (a.tier === b.tier ? (b.record?.n || 0) - (a.record?.n || 0) : a.tier === "lead" ? -1 : 1));
 const sources = [...all.byType.source].sort((a, b) => (a.status === b.status ? (a.label < b.label ? -1 : 1) : a.status === "live" ? -1 : 1));
 const methods = all.byType.method;
+// In his own words (2026-11-14, sprint II): the site's narrator is the platform; the one long piece of first-person
+// writing he has published is the essay on how this is built. A pull-quote from it stands on the engineering door —
+// ONLY sentences the published essay's body carries verbatim (checked at build; a sentence the essay no longer holds
+// renders nothing), attributed and linked. Nothing here is written for him.
+const OWN_WORDS = [
+  "A Claude Code session is a competent engineer with total amnesia.",
+  "It arrives knowing nothing about yesterday, works for a few hours, and then ceases to exist.",
+  "Early on I treated that as a limitation to apologize for.",
+  "The unlock was treating it as a constraint to design an organization around — the way real orgs design around the fact that employees quit, sleep, and forget.",
+];
+const essay: any = all.get("essay", "org-chart-of-one");
+const essayText = essay?.body_html
+  ? String(essay.body_html)
+      .replace(/<[^>]+>/g, "")
+      .replace(/&#39;|&#x27;|&rsquo;/g, "'")
+      .replace(/&amp;/g, "&")
+      .replace(/&mdash;/g, "—")
+      .replace(/\s+/g, " ")
+  : "";
+const ownWords = essay && OWN_WORDS.every((q) => essayText.includes(q)) ? OWN_WORDS : null;
 const steps = [
   "<b>Sources arrive nightly.</b> The scale, the strap, the watch, the food log, the lifting log, the running log, habits, supplements, tasks, weather.",
   "<b>Each coach reads one slice.</b> They don't share a brain, which is why they disagree.",
@@ -70,6 +90,23 @@ const steps = [
       </div>
     </div>
   </section>
+
+  {
+    ownWords && (
+      <section class="section hair" data-own-words>
+        <div class="wrap" style="max-width:920px">
+          <p class="label">In my own words · on building it with AI</p>
+          <blockquote class="own-words">
+            {ownWords.join(" ")}
+          </blockquote>
+          <p class="muted" style="font-size:14px;margin-top:12px">
+            From my essay <a href={href(pathOf("essay", essay.id))}><b>{essay.title}</b></a>
+            {essay.date && dayInWords(essay.date) ? `, published ${dayInWords(essay.date)}` : ""}. The weekly chapters are written by the platform's narrator and published after I approve them; the essay is in my voice.
+          </p>
+        </div>
+      </section>
+    )
+  }
 
   <a href={href("/system/ledger/")} class="hair" style="display:block;text-decoration:none;border-bottom:1px solid var(--ink)">
     <div class="wrap between" style="padding:16px var(--pad)">
@@ -160,3 +197,15 @@ const steps = [
     </div>
   </section>
 </Base>
+
+<style>
+  .own-words {
+    margin: 12px 0 0;
+    padding: 0 0 0 20px;
+    border-left: 3px solid var(--cobalt);
+    font-family: var(--serif);
+    font-size: clamp(21px, 2.4vw, 28px);
+    line-height: 1.35;
+    color: var(--ink);
+  }
+</style>
