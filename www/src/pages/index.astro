@@ -32,10 +32,14 @@ const startDate: string | null = today?.start_date || edition?.start_date || nul
 // "So far", in one line above the fold (2026-11-14): on a phone the first screen carried the premise and no progress.
 // Day, pounds, chapters, the coaches against a guess — each carried from the edition / the room's verified lead.
 let soFarLead: ReturnType<typeof verifiedLead> = null;
+// #5950: the ledger's own count of dated forecasts (every record that is not an observation), as the producer serves
+// it; the snapshot's prediction objects are only the records served with an id, so counting them undercounted.
+let ledgerForecasts: number | null = null;
 if (roomPublic()) {
   try {
     const f: any = await loadCalibration();
     soFarLead = f?.state === "ok" ? verifiedLead(f.calibration || {}) : null;
+    ledgerForecasts = f?.state === "ok" && Number.isInteger(f.record?.total) && Number.isInteger(f.record?.observational) ? f.record.total - f.record.observational : null;
   } catch {
     soFarLead = null;
   }
@@ -536,7 +540,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
         </a>
         <a class="door" href={href("/system/")}>
           <span class="between mono muted" style="font-size:12px"><span class="cobalt">03</span><span>Inspect · as deep as you want</span></span>
-          <span><span class="t">The system</span><p class="serif muted" style="font-size:17px;margin-top:10px">The AI coaches, {all.byType.prediction.filter((p) => p.status !== "observation").length} dated forecasts, every grade public — beside what a simple guess would have scored.</p></span>
+          <span><span class="t">The system</span><p class="serif muted" style="font-size:17px;margin-top:10px">The AI coaches, {ledgerForecasts ?? all.byType.prediction.filter((p) => p.status !== "observation").length} dated forecasts, every grade public — beside what a simple guess would have scored.</p></span>
         </a>
       </div>
     </div>

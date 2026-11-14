@@ -4,9 +4,11 @@
 import Base from "../../../layouts/Base.astro";
 import StatusTag from "../../../components/StatusTag.astro";
 import Quote from "../../../components/Quote.astro";
+import Glossary from "../../../components/Glossary.astro";
 import { DISPUTED_NOTE, isDisputed, verified } from "../../../lib/disputed.js";
 import { callOutcome, dayInWords } from "../../../lib/format.js";
-import { loadAll, latestEdition } from "../../../lib/snapshot.js";
+import { loadAll, latestEdition, loadCalibration } from "../../../lib/snapshot.js";
+import { roomPublic } from "../../../lib/room.js";
 import { href, pathOf } from "../../../lib/url.js";
 
 const all = await loadAll();
@@ -25,26 +27,59 @@ const kinds = [...new Set(rows.map((r) => r.kind))].sort();
 const disagreements = all.byType.disagreement;
 // Owner ruling 2026-11-05: the publication method the ledger is counted under, as the export route served it.
 const method = (edition?.blocks?.ledger?.data as { method?: { version?: number; effective?: string; note?: string } } | undefined)?.method;
+// #5950 (2026-11-14): the page was billed as every prediction while the snapshot lists only the records the export
+// serves with an id (173 of 425 that day). The whole ledger's counts are the producer's (calibration.json `record`,
+// the same block the 49-of-95 headline reads), so the header reconciles with the headline one click away, and the page
+// says how many records it can list and how many it cannot. Nothing is derived beyond the one subtraction it states.
+let whole: any = null;
+if (roomPublic()) {
+  try {
+    const f: any = await loadCalibration();
+    whole = f?.state === "ok" && Number.isInteger(f.record?.total) ? f.record : null;
+  } catch {
+    whole = null;
+  }
+}
+const unlisted = whole ? whole.total - rows.length : 0;
 const KIND_WORDS: Record<string, string> = { number: "a number", direction: "a direction", yes_no: "yes or no", sealed: "sealed", interval: "an interval", observation: "an observation", unknown: "unclassified" };
 ---
 
-<Base title="The prediction ledger" top="system" description="Every prediction, dated and graded, with the grades that should not count flagged and every correction kept." status={edition ? dayInWords(edition.as_of) : null}>
+<Base title="The prediction ledger" top="system" description="The coaches' predictions, dated and graded, with flagged grades marked and every correction kept." status={edition ? dayInWords(edition.as_of) : null}>
   <section class="section" style="padding-bottom:20px">
     <div class="wrap">
-      <p class="label">System · the ledger · {rows.length} records in the snapshot</p>
+      <p class="label">System · the ledger · {whole ? `${whole.total} records · ${rows.length} listed here` : `${rows.length} records in the snapshot`}</p>
       <h1 style="font-size:44px;margin-top:8px">The prediction ledger</h1>
+      {whole && (
+        <div data-whole-ledger>
+          <div class="facts" style="margin-top:22px">
+            <div><span class="label">Right</span><span class="v num cobalt">{whole.confirmed}</span><span class="muted" style="font-size:12px">of {whole.decided} graded right or wrong</span></div>
+            <div><span class="label">Wrong</span><span class="v num verm">{whole.refuted}</span><span class="muted" style="font-size:12px">as graded now, corrections applied</span></div>
+            <div><span class="label">Open</span><span class="v num">{whole.pending}</span><span class="muted" style="font-size:12px">windows still open</span></div>
+            <div><span class="label">Could not be checked</span><span class="v num">{whole.expired}</span><span class="muted" style="font-size:12px">too few readings{whole.inconclusive ? ` · ${whole.inconclusive} inconclusive` : ""}</span></div>
+            <div><span class="label">Observations</span><span class="v num">{whole.observational}</span><span class="muted" style="font-size:12px">not graded, by design</span></div>
+          </div>
+          <p style="margin-top:14px;font-size:15px;line-height:1.5;max-width:78ch" data-unlisted>
+            The ledger holds <b>{whole.total}</b> records; those are its counts. <b>{rows.length}</b> of them are listed below, each with its own page.
+            {unlisted > 0 && ` The other ${unlisted} are served without a stable id, so they are counted above but cannot be listed or linked here yet.`}
+            {" "}Of the records listed: {counts.confirmed} right, {counts.refuted} wrong, {counts.pending} open, {counts.expired} could not be checked, {counts.observation} observations.
+          </p>
+        </div>
+      )}
+      {!whole && (
       <div class="facts" style="margin-top:22px">
         <div><span class="label">Right</span><span class="v num cobalt">{counts.confirmed}</span><span class="muted" style="font-size:12px">confirmed by the grader</span></div>
         <div><span class="label">Wrong</span><span class="v num verm">{counts.refuted}</span><span class="muted" style="font-size:12px">refuted by the grader</span></div>
         <div><span class="label">Open</span><span class="v num">{counts.pending}</span><span class="muted" style="font-size:12px">windows still open</span></div>
         <div><span class="label">Could not be checked</span><span class="v num">{counts.expired}</span><span class="muted" style="font-size:12px">too few readings</span></div>
         <div><span class="label">Observations</span><span class="v num">{counts.observation}</span><span class="muted" style="font-size:12px">not graded, by design</span></div>
-        {disputed > 0 && <div><span class="label">Disputed</span><span class="v num">{disputed}</span><span class="muted" style="font-size:12px">under classification review; verdict kept, not counted right or wrong</span></div>}
-        <div><span class="label">Flagged · corrected</span><span class="v num">{flagged} <small>· {corrected}</small></span><span class="muted" style="font-size:12px">a flagged grade is marked and still counted; corrections keep the original</span></div>
       </div>
+      )}
       <p class="muted" style="margin-top:12px;font-size:13px">
-        Counts are of the records in this snapshot, from one producer. Nothing here is computed in the page; the filter below only hides and shows.
+        {disputed > 0 && `${disputed} listed ${disputed === 1 ? "record is" : "records are"} under classification review: the verdict is kept, and counted neither right nor wrong. `}
+        {flagged} listed {flagged === 1 ? "grade is" : "grades are"} flagged (marked, still counted) and {corrected} carry a correction (the original is kept).
+        Every count is the producer's or a count of the rows listed; the filter below only hides and shows.
       </p>
+      <Glossary />
       {rows.some((p) => p.claim_withheld === "no_words") && (
         <p class="muted" style="margin-top:8px;font-size:13px" data-no-words-note>
           Some records carry no publishable commentary. Each still shows its coach, date, measure and grade.

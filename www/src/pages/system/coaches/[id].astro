@@ -11,6 +11,7 @@ import { KIND_WORDS, coachLead, countedCalls, verdictWords } from "../../../lib/
 import { loadAll, loadCalibration } from "../../../lib/snapshot.js";
 import { roomPublic } from "../../../lib/room.js";
 import VersusGuess from "../../../components/VersusGuess.astro";
+import Glossary from "../../../components/Glossary.astro";
 import { href, pathOf } from "../../../lib/url.js";
 
 export async function getStaticPaths() {
@@ -90,7 +91,7 @@ const callWords = (p: any, max = 110) => (p.claim_withheld ? heldCallWords(p, ma
             </div>
           )
         }
-        {lead && <a href={href("/system/calibration/")} style="font-size:13px;font-weight:700">How every call was checked, and which were left out →</a>}
+        <Glossary />
       </div>
     </div>
   </section>
