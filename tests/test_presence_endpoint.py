@@ -33,6 +33,11 @@ class _FakeTable:
     def get_item(self, Key=None):
         return {"Item": self._item} if self._item is not None else {}
 
+    def query(self, **_kw):
+        # #5955: /api/presence re-checks the food registry after the record's last food log; no
+        # food row after it here, so the registry agrees with the stored record.
+        return {"Items": []}
+
 
 def _body(resp):
     return json.loads(resp["body"]) if isinstance(resp.get("body"), str) else resp["body"]

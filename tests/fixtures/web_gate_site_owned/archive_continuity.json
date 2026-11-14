@@ -1,0 +1,9 @@
+{
+  "_note": "Synthetic stand-in for /archive/continuity.json (#5920): the continuity clock the /privacy/policy/ panel reads. site/-owned (the nightly writes it), so the v9 render gate serves this fixture at that exact path; shape copied from the live document, values invented.",
+  "state": "active",
+  "days_silent": 0,
+  "measurement_failed": false,
+  "terms": {
+    "version": "1.1.0"
+  }
+}

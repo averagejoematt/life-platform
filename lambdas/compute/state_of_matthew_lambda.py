@@ -283,7 +283,10 @@ def assemble_state(forecast, hypotheses, coaches, calibration, as_of: str) -> di
         "coaches": coaches,
         "calibration": calibration,
         "highlight": pick_highlight(forecast, hypotheses, coaches, calibration),
-        "phase": _phase_section(as_of),  # #1086 — mandatory experiment-phase context
+        # #1086 — mandatory experiment-phase context. #5931: NOT keyed `phase` — that name is the
+        # provenance attribute tag_record stamps (a string, "pilot"/"experiment"); a dict there made
+        # singleton_visible reject every row and /api/state_of_matthew serve unavailable all cycle.
+        "phase_context": _phase_section(as_of),
     }
 
 
@@ -291,9 +294,9 @@ def _narration_payload(state: dict) -> dict:
     """The exact numeric vocabulary the model is allowed to use — every present
     (non-None) section, nothing else. Also what gets rendered into the prompt.
     (#914: `presence` rides here too, so the gap-day count is in the allow-list;
-    #1086: `phase` likewise, so the day/week numbers are allowed vocabulary.)"""
+    #1086: `phase_context` likewise, so the day/week numbers are allowed vocabulary.)"""
     payload = {"as_of": state["as_of"]}
-    for key in ("forecast", "hypotheses", "coaches", "calibration", "highlight", "presence", "phase"):
+    for key in ("forecast", "hypotheses", "coaches", "calibration", "highlight", "presence", "phase_context"):
         if state.get(key) is not None:
             payload[key] = state[key]
     return payload
@@ -353,8 +356,8 @@ def build_narration_body(state: dict) -> dict:
     # #1086: the phase section is mandatory — inject it if the caller assembled
     # `state` by hand (fixtures/evals), so the rendered block and the ADR-104
     # allow-list (via _narration_payload) always agree on the day/week numbers.
-    if state.get("phase") is None:
-        state["phase"] = _phase_section(state.get("as_of"))
+    if state.get("phase_context") is None:
+        state["phase_context"] = _phase_section(state.get("as_of"))
     system = (
         'You are the narrator of "State of Matthew," a weekly one-paragraph brief that connects four '
         "independent measurement systems on a personal health-data platform: a statistical forecast "
@@ -573,7 +576,9 @@ def build_summary_item(state: dict, narration: dict, today_str: str) -> dict:
         "calibration": state.get("calibration"),
         "highlight": state.get("highlight"),
         "presence": state.get("presence"),  # #914 — loud/alarm logging gap, else None
-        "phase": state.get("phase"),  # #1086 — the experiment-phase facts the narration grounded on
+        # #1086 — the experiment-phase facts the narration grounded on. #5931: `phase_context`, never
+        # `phase` (tag_record owns that key; it must stay a provenance string).
+        "phase_context": state.get("phase_context"),
         "narrative": narration["narrative"],
         "narrated": narration["narrated"],
         "model": narration.get("model"),

@@ -558,8 +558,10 @@ export function ring({ value = "", sub = "", label = "", fill = 0, tone = "ember
 // downshifting into recovery — direction reads ember-positive even though RHR falls. Never red.
 // Tick-spine signature. Refuses <4 points. hist items: {date, rhr_bpm, hrv_ms}.
 export function autonomicHero(hist, { height = 190, label = "", baselineChange = null } = {}) {
-  const rhr = (hist || []).map((h) => ({ d: String(h.date || ""), v: Number(h.rhr_bpm) })).filter((p) => Number.isFinite(p.v) && /^\d{4}-\d{2}-\d{2}/.test(p.d)).sort((a, b) => a.d.localeCompare(b.d));
-  const hrv = (hist || []).map((h) => ({ d: String(h.date || ""), v: Number(h.hrv_ms) })).filter((p) => Number.isFinite(p.v) && /^\d{4}-\d{2}-\d{2}/.test(p.d)).sort((a, b) => a.d.localeCompare(b.d));
+  // #5953: a missing reading is null, and Number(null) is 0 — never plot it as a zero (the "down 0" hero)
+  const rd = (v) => (v == null || v === "" ? NaN : Number(v));
+  const rhr = (hist || []).map((h) => ({ d: String(h.date || ""), v: rd(h.rhr_bpm) })).filter((p) => Number.isFinite(p.v) && /^\d{4}-\d{2}-\d{2}/.test(p.d)).sort((a, b) => a.d.localeCompare(b.d));
+  const hrv = (hist || []).map((h) => ({ d: String(h.date || ""), v: rd(h.hrv_ms) })).filter((p) => Number.isFinite(p.v) && /^\d{4}-\d{2}-\d{2}/.test(p.d)).sort((a, b) => a.d.localeCompare(b.d));
   if (rhr.length < 4 || hrv.length < 4) {
     return `<figure class="chart chart--empty"><figcaption class="chart-cap label">The autonomic hero draws once there are 4+ nights of resting-HR and HRV.</figcaption></figure>`;
   }

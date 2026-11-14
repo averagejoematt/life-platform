@@ -719,6 +719,19 @@ PAGE_BINDINGS.append(
         "endpoints": [],  # editorial
     }
 )
+# #5920: the maintained policy at its own address — the owner's text from the generated twin (www/src/privacy/policy.json).
+PAGE_BINDINGS.append(
+    {
+        "path": "/privacy/policy/",
+        "name": "Privacy · the full policy (v9)",
+        "door": "utility",
+        "narrative_order": 97.5,
+        "story_intent": "the full, current privacy policy: subscriber data, cookies and tracking, rights, the AI disclaimer, the permanence contract",
+        # editorial; the live archive panel reads /archive/manifest.json + /archive/continuity.json (published documents,
+        # not /api/* routes — qa/qa_manifest.py carries them as this row's api_deps, so the smoke's JSON-health sweep covers them)
+        "endpoints": [],
+    }
+)
 PAGE_BINDINGS.append(
     {
         "path": "/subscribe/",

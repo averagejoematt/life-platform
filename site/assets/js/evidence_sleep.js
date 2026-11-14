@@ -360,9 +360,30 @@ export async function renderMind(d) {
   return parts.join("") || empty("The inner-life view fills in as restraint, mood, and reflection accrue.");
 }
 
+// /data/vices/ — `d` = /api/vice_streaks. #5948: only the two categories the governance rule allows to
+// be named (alcohol, food delivery) arrive as rows in `d.vices`. Every other restraint arrives as ONE
+// unlabelled aggregate, `d.unnamed` — no name, id or slug is in the payload — and renders as one card.
+// The fix is on the wire, not here: this function has no name to print for them.
+export function vicesUnnamedCard(u) {
+  const n = Number(u && u.tracked) || 0;
+  if (!n) return "";
+  const held = Number(u.held) || 0;
+  const longest = Number(u.longest_streak) || 0;
+  const meta = [u.best_streak != null && `best ${fmt(u.best_streak)}d`, u.relapses_90d != null && `${fmt(u.relapses_90d)} resets·90d, all together`].filter(Boolean).join("  ·  ");
+  return (
+    `<article class="vice-card vice-rest ${held ? "vice-hold" : "vice-broke"}">` +
+    `<header class="vice-top"><span class="vice-name">${n} more, named privately</span><span class="vice-flag label">${held} of ${n} holding</span></header>` +
+    `<div class="vice-streak"><span class="vice-days num">${longest}</span><span class="vice-unit label">day${longest === 1 ? "" : "s"} · the longest of them</span></div>` +
+    `<p class="vice-meta label">${meta}</p>` +
+    `</article>`
+  );
+}
+
 export function renderVices(d) {
   const v = d.vices || [];
-  if (!v.length) return empty("No vice tracking yet.");
+  const u = d.unnamed || {};
+  const un = Number(u.tracked) || 0;
+  if (!v.length && !un) return empty("No vice tracking yet.");
   const MILES = [7, 30, 90, 180, 365];
   const card = (x) => {
     const cur = Number(x.current_streak) || 0;
@@ -379,8 +400,10 @@ export function renderVices(d) {
     );
   };
   return (
-    figs([fig(d.total_held ?? 0, "holding"), fig(d.total_tracked ?? v.length, "tracked")]) +
-    `<div class="vice-grid">${v.map(card).join("")}</div>` +
-    note("Shown honestly — held and broken both. Named privately.")
+    figs([fig(d.total_held ?? 0, "holding"), fig(d.total_tracked ?? v.length + un, "tracked")]) +
+    `<div class="vice-grid">${v.map(card).join("")}${vicesUnnamedCard(u)}</div>` +
+    note(un
+      ? `Shown honestly — held and broken both. Only the alcohol and takeout ones are named here; the other ${un} ${un === 1 ? "is" : "are"} counted, and named privately.`
+      : "Shown honestly — held and broken both.")
   );
 }
