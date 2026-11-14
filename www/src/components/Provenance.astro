@@ -1,6 +1,9 @@
 ---
-// The provenance chip every object carries: verified + dated, or honestly stale/absent,
+// The provenance chip every object carries: dated from the platform, or honestly stale/absent,
 // or sample. Rendered only from the record; no template places a chip by hand.
+// 2026-11-14: it read "Verified · 13 Nov". On a weight tile that only ever meant "from the platform, dated", and the
+// Coaching Room uses "verified" for something precise — a grade re-checked under the current rules. A reader cannot
+// tell the two apart, so the chip says what it means: "As of 13 Nov".
 import { dayInWords } from "../lib/format.js";
 
 interface Props {
@@ -14,7 +17,7 @@ const through = o.data_through || o.as_of;
   o.sample ? (
     <span class="chip">Sample · for layout only</span>
   ) : o.state === "ok" ? (
-    <span class="verified">Verified · {dayInWords(through, { short: true })}</span>
+    <span class="verified">As of {dayInWords(through, { short: true })}</span>
   ) : (
     <span class="chip">
       {o.state} · {o.absent_text || `last ${dayInWords(through, { short: true })}`}
