@@ -284,7 +284,8 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
         {
           c.status === "published" && win && (
             <section aria-label="Calls graded this week" style="margin-bottom:28px" data-week-calls>
-              <p class="label" style="margin-bottom:8px">Calls graded this week · {weekCalls.length}</p>
+              {/* #5950: the snapshot lists only the ledger records served with an id, so this is "listed", never "all" */}
+              <p class="label" style="margin-bottom:8px">Graded calls listed for these days · {weekCalls.length}</p>
               {weekCalls.length ? (
                 <div class="rows">
                   {weekCalls.map((p) => (
@@ -297,7 +298,7 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
                   ))}
                 </div>
               ) : (
-                <p class="muted" style="font-size:14px">No coach call was graded inside this week.</p>
+                <p class="muted" style="font-size:14px">The ledger lists no graded call for these days.</p>
               )}
             </section>
           )

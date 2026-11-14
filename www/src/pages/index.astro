@@ -382,8 +382,8 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
                   <a href={href(pathOf("chapter", latestChapter.id))}>
                     <span style="font-size:14px;line-height:1.35">
                       {chWeekCalls.length
-                        ? `${chWeekCalls.length} coach ${chWeekCalls.length === 1 ? "call" : "calls"} graded that week`
-                        : "No coach call graded that week"}
+                        ? `${chWeekCalls.length} graded coach ${chWeekCalls.length === 1 ? "call" : "calls"} listed for its days`
+                        : "No graded coach call listed for its days"}
                     </span>
                     {chWeekCalls.length > 0 && <span class="mono muted" style="font-size:11px">{chWeekRight} right · {chWeekCalls.length - chWeekRight} wrong</span>}
                   </a>

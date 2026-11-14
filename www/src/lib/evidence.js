@@ -45,6 +45,11 @@ export function dailyBars(o) {
   const txt = (x, y, s, fill = "#5C5C58", weight = 400) =>
     `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="${fs}" font-weight="${weight}" fill="${fill}" stroke="#F4F4F0" stroke-width="4" stroke-linejoin="round" paint-order="stroke">${esc(s)}</text>`;
   let g = `<line x1="${pad.l}" y1="${base}" x2="${W - pad.r}" y2="${base}" stroke="#C9C9C3" stroke-width="1"/>`;
+  // the floor is drawn first, so a bar and its value label sit over it (a label is never struck through)
+  if (o.floor != null) {
+    const fy = Y(o.floor);
+    g += `<line x1="${pad.l}" y1="${fy.toFixed(1)}" x2="${W - pad.r}" y2="${fy.toFixed(1)}" stroke="#121212" stroke-width="1" stroke-dasharray="5 4"/>`;
+  }
   const points = [];
   const lowest = o.markLow ? Math.min(...vals) : null;
   o.values.forEach((d, i) => {
@@ -64,10 +69,6 @@ export function dailyBars(o) {
     g += txt(cx, y - 5, num(d.value, o.decimals || 0), isLow ? "#121212" : "#5C5C58", isLow ? 700 : 400);
     points.push({ x: Number(cx.toFixed(1)), y: Number(y.toFixed(1)), date: d.date, v: d.value, label: `${dayInWords(d.date, { weekday: true })} · ${num(d.value, o.decimals || 0)}${o.unit ? ` ${o.unit}` : ""}` });
   });
-  if (o.floor != null) {
-    const fy = Y(o.floor);
-    g += `<line x1="${pad.l}" y1="${fy.toFixed(1)}" x2="${W - pad.r}" y2="${fy.toFixed(1)}" stroke="#121212" stroke-width="1" stroke-dasharray="5 4"/>`;
-  }
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(o.aria || "")}" data-chart data-points="${esc(JSON.stringify(points))}">${g}</svg>`;
 }
 

@@ -2055,6 +2055,8 @@ span.gloss[data-quote-gloss] {
   .ch-byline {
     display: none;
   }
+}
+
 /* The Laboratory's index figures (2026-11-14, sprint II): the findings as a forest plot — pair, axis, how often it
    was listed — and each test's paired days against what a verdict needs. */
 .forest {
