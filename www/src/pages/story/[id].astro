@@ -41,6 +41,25 @@ const stateCopy: Record<string, string> = {
 const span = c.week_start && c.week_end ? `${(dayInWords(c.week_start) || "").replace(/ \d{4}$/, "")} to ${dayInWords(c.week_end)}` : null;
 const legacyNo = /^week-(\d+)$/.exec(c.id);
 const idNote = legacyNo && c.week != null && Number(legacyNo[1]) !== c.week ? `This page's address keeps the journal's post number (${legacyNo[1]}); the chapter is program ${c.week >= 1 ? `week ${c.week}` : "prologue"}.` : null;
+// The body as published, with two presentation-only touches (2026-11-14): the narrator's opening "signature" lines are
+// told apart — an editor's note (`note`) and the filed stat line, "Day N · …" (`filed`) — and the dek the header
+// already shows is not printed twice. No word of the text changes.
+const plain = (h: string) => h.replace(/<[^>]+>/g, "").replace(/&#39;|&#x27;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+function bodyForPage(html: string | null | undefined, dek: string | null | undefined): string | null {
+  if (!html) return null;
+  let dropped = false;
+  return html.replace(/<p class="signature">([\s\S]*?)<\/p>/g, (whole, inner) => {
+    const t = plain(inner);
+    if (!dropped && dek && t === dek.trim()) {
+      dropped = true;
+      return "";
+    }
+    if (/^editor[’']s note/i.test(t)) return `<p class="signature note">${inner}</p>`;
+    if (/^Day \d+\s*·/.test(t)) return `<p class="signature filed">${inner}</p>`;
+    return whole;
+  });
+}
+const body = bodyForPage(c.body_html, c.excerpt);
 const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
 ---
 
@@ -122,8 +141,8 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
               <b style="color:var(--ink)">{stateCopy[c.status] || c.status}</b>
               <span>{c.absent_text || ""}</span>
             </div>
-          ) : c.body_html ? (
-            <div data-published-body set:html={c.body_html} />
+          ) : body ? (
+            <div data-published-body set:html={body} />
           ) : (
             <div class="empty" style="font-family:var(--sans)">
               <b style="color:var(--ink)">The text lives on the current site.</b>

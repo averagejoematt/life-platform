@@ -87,6 +87,56 @@ def apply_week_intervals(chapters: list[dict], chapters_api: dict | None, genesi
         c["week_start"], c["week_end"] = a, b
 
 
+_PARA = re.compile(r"<p(\s[^>]*)?>([\s\S]*?)</p>", re.IGNORECASE)
+_TAG = re.compile(r"<[^>]+>")
+_STAT_LINE = re.compile(r"^Day \d+\s*·")  # the machine header ("Day 31 · 327.3 → 308.9 lb · …"), never prose
+_SENTENCE_END = re.compile(r"[.!?…](?:[\"”’)]*)(?=\s|$)")
+
+
+def _text(fragment: str) -> str:
+    import html as _html
+
+    return re.sub(r"\s+", " ", _html.unescape(_TAG.sub("", fragment))).strip()
+
+
+def _whole_sentences(text: str, limit: int) -> str:
+    """The longest run of whole sentences within `limit` characters; a single over-long sentence is cut at a word."""
+    if len(text) <= limit:
+        return text
+    cut = [m.end() for m in _SENTENCE_END.finditer(text) if m.end() <= limit]
+    if cut:
+        return text[: cut[-1]].strip()
+    return text[:limit].rsplit(" ", 1)[0].rstrip(",;:—– ") + "…"
+
+
+def chapter_summary(body_html: str | None, excerpt: str | None = None, limit: int = 300) -> str | None:
+    """A chapter's summary read off its published body: the italic dek the narrator wrote for it when there is one,
+    otherwise the opening paragraph — in whole sentences. An editor's note and the machine "Day N ·" stat line are
+    never the summary (2026-11-14: the 300-character posts.json excerpt was mostly editor's note on chapters 0–4, so
+    the front page and /story/ showed fragments such as "He is down 15 pounds from his first weigh-in in 24…")."""
+    if isinstance(body_html, str) and body_html.strip():
+        for _attrs, inner in _PARA.findall(body_html):
+            t = _text(inner)
+            if not t or t.lower().startswith("editor's note") or t.lower().startswith("editor’s note") or _STAT_LINE.match(t):
+                continue
+            return _whole_sentences(t, limit) or None
+    return clean_excerpt(excerpt)  # no readable body: the served excerpt, cleaned as before
+
+
+def whole_sentence_summary(text: str | None) -> str | None:
+    """A served summary that may have been cut mid-word upstream (the episodes feed cuts at a fixed length: "…and
+    been wrong every time until n") ends on its last whole sentence; stray markdown line-break backslashes go."""
+    if not isinstance(text, str):
+        return text
+    t = re.sub(r"\s+", " ", re.sub(r"(?:\\\s*)+", " ", text)).strip()
+    if not t:
+        return None
+    if _SENTENCE_END.search(t[-3:]):
+        return t
+    ends = [m.end() for m in _SENTENCE_END.finditer(t)]
+    return t[: ends[-1]].strip() if ends else t
+
+
 def clean_excerpt(text: str | None) -> str | None:
     if not isinstance(text, str):
         return text

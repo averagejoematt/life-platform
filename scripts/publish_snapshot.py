@@ -59,8 +59,9 @@ from publish_snapshot_calibration import (  # noqa: E402 — the Coaching Room's
 from publish_snapshot_chapters import (
     CALL_OUTCOME,
     apply_week_intervals,
-    clean_excerpt,
+    chapter_summary,
     week_id as _week_id,  # None for a withdrawn installment: never a chapter (owner ruling 2026-11-10)
+    whole_sentence_summary,
 )  # noqa: E402 — one vocabulary for weeks, excerpts and calls
 from publish_snapshot_coach_room import (  # noqa: E402 — the Coaching Room's coach profiles, WEB_ROOM=1 only (CR2)
     fixture_coach_room,
@@ -298,7 +299,7 @@ def _live_episodes(ctx: LiveContext) -> None:
                 data_through=e.get("date"),
                 source=["/panelcast/episodes.json"],
                 title=e.get("title") or f"Episode {n}",
-                summary=e.get("excerpt"),
+                summary=whole_sentence_summary(e.get("excerpt")),
                 number=n,
                 date=e["date"],
                 duration_sec=int(e["duration_sec"]) if e.get("duration_sec") is not None else None,
@@ -420,13 +421,13 @@ def _live_chapters(ctx: LiveContext) -> None:
                 source=["/journal/posts.json"],
                 approved={"by": "owner", "at": p["date"], "via": "chronicle-approve"},
                 title=p.get("title") or cid,
-                summary=clean_excerpt(p.get("excerpt")),
+                summary=(summary := chapter_summary(body := _chapter_body(ctx, p.get("url")), p.get("excerpt"))),
                 week=week,
                 week_label=p.get("label") or (f"Week {week}" if week is not None else cid),
                 date=p["date"],
                 status="published",
-                excerpt=clean_excerpt(p.get("excerpt")),
-                body_html=_chapter_body(ctx, p.get("url")),
+                excerpt=summary,
+                body_html=body,
                 word_count=wc,
                 read_minutes=max(1, round(wc / 230)) if wc else None,
                 url_legacy=p.get("url"),
