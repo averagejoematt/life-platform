@@ -331,9 +331,12 @@ REDLINES: dict[str, dict[str, Any]] = {
         "retired": {"front_load_permitted_hr_wk": 16, "front_load_weeks": [3, 12], "target_hr_wk": 13, "hr_ceiling_bpm": 105},
         "ceiling_hr_wk_outside_front_load": 15,
         "maintenance_floor_hr_wk": 10,
-        # OD2: the average walking HR is capped at 120 with the talk test; 105 is the TARGET, no longer the cap
-        "hr_ceiling_bpm": 120,  # drift-ok: a heart-rate ceiling in bpm, not a budget ceiling (ADR-133 scanner false-positive)
-        "hr_target_bpm": 105,
+        # #5916 (owner ruling 2026-11-13): OD2's heart-rate cap and target are RETIRED. Easy walking is prescribed and judged by
+        # the talk test plus RPE (`standing_constraints.easy_effort_cue(easy_rpe_max)` is the line every surface prints); heart
+        # rate is recorded as a measurement and never graded against a fixed ceiling. The retired numbers are history
+        # (`redline_changelog.RETIRED_WALKING_HR_LINE`), not a field of this redline.
+        "intensity_by": "talk test + RPE (owner ruling 2026-11-13, #5916); heart rate is a recorded measurement, never graded against a fixed ceiling",
+        "easy_rpe_max": 4,
         "talk_test": True,
         "long_walk_slots_per_wk": 1,
         # OD7 (A): the vital sign is hours AND >= 3 standalone walks a week of >= 20 min outside a gym window (`training.recent_aerobic`)
@@ -351,8 +354,8 @@ REDLINES: dict[str, dict[str, Any]] = {
             "~8.5 hrs/wk, from day one. v3 (historian, 2026-09-22): the 2024–25 rate was BOUGHT with walking — 15 walks, 16–19 h/wk "
             "at 83–104 bpm for the first nine weeks — and halved to 2.0 at ~269 lb when walking fell from 18 to 7 h while lifting "
             "volume rose. v0.5 (OD2, owner 2026-09-30): 11–12 h total by block-2 week 6 with weight-bearing ≥ 8.5 h; 16 h is retired "
-            "and so is 'cycling ≤ 2 h'; HR average ≤ 120 with the talk test, 105 the target; one long-walk slot a week, weekday walks "
-            "≤ 75 min as a default. The floor is PERMANENT and is a vital sign, not a schedule: a week under 8.5 h (10 h in "
+            "and so is 'cycling ≤ 2 h'; one long-walk slot a week, weekday walks ≤ 75 min as a default. Owner ruling 2026-11-13 (#5916): "
+            "OD2's heart-rate cap and target are retired; easy walking is prescribed and judged by the talk test plus RPE, and heart rate is recorded as a measurement, never graded against a fixed ceiling. The floor is PERMANENT and is a vital sign, not a schedule: a week under 8.5 h (10 h in "
             "maintenance) fires the relapse-prodrome tripwire in every phase (11.4 → 4.4 walks/wk inside 8 weeks of the 2025 trough "
             "preceded the regain) — and since OD7 the vital sign also counts walks: ≥ 3 standalone walks a week of ≥ 20 min outside "
             "a gym window. Owner correction 2026-09-19: treadmill and cycling blocks logged inside Hevy count toward hours; Apple "

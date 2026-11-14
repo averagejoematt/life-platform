@@ -95,7 +95,7 @@ def test_the_tombstoned_day_is_named_and_the_block_is_a_floor():
     assert [(g["date"], g["signal"]) for g in b["completeness"]["gaps"]] == [(DAY, "walk_habit_completed"), (DAY, "whoop_walk_workout")]
     assert b["totals_are_floor"] is True
     assert any(h.startswith(DAY) and "floor" in h for h in b["honesty"])
-    assert b["version"] == "recent-aerobic@1.3.0"
+    assert b["version"] == "recent-aerobic@1.4.0"  # 1.4.0 (#5916): heart rate is a measurement with its basis, never graded
 
 
 def test_the_day_as_ingested_is_complete():

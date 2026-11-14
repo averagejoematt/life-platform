@@ -111,11 +111,16 @@ MAX_HR = float(DEFAULT_MAX_HR)  # #4624: the same value every reader's profile-m
 # (`mcp/helpers.HR_ZONE_BOUNDS`, #2221; mirrored by `web/site_api_autonomic._ZONE_BOUNDS`).
 # `tests/test_training_load.py` asserts the three agree, so this cannot drift silently.
 Z1_CEILING_FRACTION_OF_MAX = 0.60
-# 0.60 × 183 = 109.8 bpm. At or below this average HR an activity contributes 0.
-# The programme's walking HR TARGET (`owner_redlines.REDLINES["walking_floor_hr_wk"]
-# ["hr_target_bpm"]` = 105) sits under it, so a walk on target scores exactly 0. Since OD2
-# (#4503) the CAP is 120 avg — a walk between 110 and 120 is compliant and scores a little.
+# 0.60 × 183 = 109.8 bpm. At or below this average HR an activity contributes 0; a walk
+# averaging above it scores a little. It is a LOAD-MODEL constant, never a walking target or cap:
+# the programme prescribes easy walking by the talk test and RPE (#5916, owner ruling
+# 2026-11-13), and the OD2 walking heart-rate numbers this comment used to cite are retired.
 Z1_CEILING_HR = round(MAX_HR * Z1_CEILING_FRACTION_OF_MAX, 1)
+# #5916: what `z1_ceiling_bpm` IS, stated beside it on every basis record (ADR-105).
+Z1_CEILING_PROVENANCE = (
+    f"population-derived: {Z1_CEILING_FRACTION_OF_MAX:g} x the profile max heart rate (the platform zone table), not a threshold "
+    "measured for him; the max is not re-derived since the 2026-10-10 HR regime change. A load-model constant, never a target or cap"
+)
 # Banister's TRIMP weighting (Banister 1991, "Modeling elite athletic performance",
 # in MacDougall, Wenger & Green (eds.), Physiological Testing of the High-Performance
 # Athlete, 2nd ed.; Morton, Fitz-Clarke & Banister 1990,
@@ -494,6 +499,7 @@ def daily_training_load(strava_60d, hevy_60d, today=None):
         "hr_model": HR_MODEL,
         "lift_model": LIFT_MODEL,
         "z1_ceiling_bpm": Z1_CEILING_HR,
+        "z1_ceiling_provenance": Z1_CEILING_PROVENANCE,
         "strava_days": len(kj_days | hr_days | duration_days),
         "strava_kj_days": len(kj_days),
         "strava_hr_days": len(hr_days),

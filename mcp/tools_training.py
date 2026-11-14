@@ -11,6 +11,7 @@ from health import hr_regime  # #4999: THE dated HR regime markers
 from health.watch_views import cardio_fitness_view  # #4979: the Apple Watch view
 from training import (
     session_count,  # #5398: THE session count
+    standing_constraints,  # #5916: no HR prescription while the standing constraint is active
     training_load,  # #4075: the ONE load model (computed_metrics' TSB)
     zone2_minutes,  # #4627: THE Zone 2 computation
 )
@@ -624,10 +625,10 @@ def _get_training_periodization(args):
             "Progressive overload = first-half vs second-half average weekly volume. "
             "Deload trigger: 4+ consecutive loading weeks or 3 weeks of rising volume. "
             "Zone 2 minutes = minutes in each device's own Zone 2 (stored time-in-zone), as get_zone2_breakdown "
-            "publishes (150 min/week target); the easy/moderate/hard split is by average HR (60/70/80% of max), "
-            "Zone 3 reported separately as middle_zone_pct, not folded into easy. rest_days is bounded by the days of "
-            "each ISO week the query actually covers (days_in_window), so an in-progress "
-            "or truncated week does not count unelapsed days as rest."
+            "publishes (150 min/week target); the easy/moderate/hard split is by average HR against fixed fractions (60/70/80%) of the "
+            "profile max heart rate: a population formula, not thresholds measured for him, on a max not re-derived since the 2026-10-10 "
+            "HR regime change (#5916). It describes past sessions and is never a prescription. Zone 3 reported separately as middle_zone_pct, "
+            "not folded into easy. rest_days is bounded by the days of each ISO week the query actually covers (days_in_window), so an in-progress or truncated week does not count unelapsed days as rest."
         ),
         "source": "strava + hevy",
     }
@@ -1106,7 +1107,10 @@ def _apply_hr_regime(out: dict) -> dict:
     protective flag is never dropped)."""
     regime = hr_regime.regime_status(out.get("date") or "")
     if regime is None:
-        return out
+        # #5916 (owner ruling 2026-11-13): the re-baselining window is time-boxed and has lapsed; the STANDING constraint
+        # has no end date. While it forbids HR prescriptions the tier and the session type stand, `hr_floor` /
+        # `hr_ceiling` are None, and a percent-of-max phrase in the description becomes the talk-test cue.
+        return standing_constraints.talk_test_recommendation(out)
     acwr = ((out.get("training_context") or {}).get("training_load") or {}).get("acwr")
     rec = {"type": "No HR-tier prescription — re-baselining", "intensity": None, "description": regime["note"], "duration_min": None}
     rec["hr_ceiling"] = None
