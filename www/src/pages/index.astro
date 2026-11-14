@@ -11,7 +11,9 @@ import VersusGuess from "../components/VersusGuess.astro";
 import OpenQuestions from "../components/OpenQuestions.astro";
 import { headline, weeklyBars } from "../lib/chart.js";
 import { dayInWords, domainWords, num, kOfN, clip } from "../lib/format.js";
-import { connectedTo, loadAll, loadSeries, latestEdition, dayLine } from "../lib/snapshot.js";
+import { connectedTo, loadAll, loadSeries, latestEdition, dayLine, loadCalibration } from "../lib/snapshot.js";
+import { verifiedLead } from "../lib/calibration.js";
+import { roomPublic } from "../lib/room.js";
 import { href, pathOf } from "../lib/url.js";
 
 const all = await loadAll();
@@ -26,6 +28,22 @@ const week = ok("week");
 const portrait = ok("portrait") || {};
 const lines: any[] = (ok("coach_lines")?.lines || []).slice(0, 3);
 const startDate: string | null = today?.start_date || edition?.start_date || null;
+// "So far", in one line above the fold (2026-11-14): on a phone the first screen carried the premise and no progress.
+// Day, pounds, chapters, the coaches against a guess — each carried from the edition / the room's verified lead.
+let soFarLead: ReturnType<typeof verifiedLead> = null;
+if (roomPublic()) {
+  try {
+    const f: any = await loadCalibration();
+    soFarLead = f?.state === "ok" ? verifiedLead(f.calibration || {}) : null;
+  } catch {
+    soFarLead = null;
+  }
+}
+const COACH_VS_GUESS: Record<string, string> = {
+  no_clear_difference: "the coaches no better than a simple guess yet",
+  rule_better: "a simple guess ahead of the coaches",
+  coach_better: "the coaches ahead of a simple guess",
+};
 
 const chapters = [...all.byType.chapter].sort((a, b) => (a.date < b.date ? 1 : -1));
 const published = chapters.filter((c) => c.status === "published");
@@ -151,6 +169,16 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
           {today?.start_weight_lbs ? ` ${num(today.start_weight_lbs, 0)} pounds` : " what the scale said"} and started this: the data sources on my
           body, a team of AI coaches, one honest journal, and a question I can't answer yet — whether getting healthier and getting happier are the
           same thing. The weight is the catalyst. It isn't the point.
+        </p>
+        <p class="sofar mono" data-so-far>
+          {[
+            edition?.day_n != null ? `Day ${edition.day_n}` : null,
+            today?.change_lbs != null ? `${num(Math.abs(today.change_lbs), 1)} lb ${today.change_lbs <= 0 ? "down" : "up"}` : null,
+            published.length ? `${published.length} ${published.length === 1 ? "chapter" : "chapters"}` : null,
+            soFarLead?.sign?.verdict && COACH_VS_GUESS[soFarLead.sign.verdict] ? COACH_VS_GUESS[soFarLead.sign.verdict] : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
         </p>
         <div class="row">
           {firstChapter && <a class="btn" href={href(pathOf("chapter", firstChapter.id))}>Start with chapter one</a>}
