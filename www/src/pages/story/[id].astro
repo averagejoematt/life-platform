@@ -8,7 +8,7 @@ import Provenance from "../../components/Provenance.astro";
 import StatusTag from "../../components/StatusTag.astro";
 import Quote from "../../components/Quote.astro";
 import { isDisputed } from "../../lib/disputed.js";
-import { clip, dayInWords, num } from "../../lib/format.js";
+import { clip, dayInWords, heldCallWords, num } from "../../lib/format.js";
 import { loadAll } from "../../lib/snapshot.js";
 import { hasPage, href, pathOf } from "../../lib/url.js";
 
@@ -43,8 +43,7 @@ const weekCalls =
         .filter((p) => (p.status === "confirmed" || p.status === "refuted") && p.settled_date && p.settled_date.slice(0, 10) >= c.week_start && p.settled_date.slice(0, 10) <= c.week_end)
         .sort((a, b) => (a.settled_date < b.settled_date ? -1 : 1))
     : [];
-const testWords = (t: string) => t.replace(/\b1 days\b/, "1 day").replace(/\d{4}-\d{2}-\d{2}/g, (iso) => dayInWords(iso, { short: true }) || iso);
-const callWords = (p: any) => (p.grading?.how ? `the test: ${testWords(p.grading.how)}` : "its words are not published");
+const callWords = (p: any) => heldCallWords(p) || p.claim;
 const stateCopy: Record<string, string> = {
   held: "Held.",
   skipped: "Skipped.",

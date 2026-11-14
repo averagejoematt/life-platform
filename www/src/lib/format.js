@@ -120,3 +120,16 @@ export function glossText(text) {
   const n = quoteGlosses(text).length;
   return n ? `${n === 1 ? "The date quoted is" : "The dates quoted are"} ${glossList(text)}.` : "";
 }
+
+/**
+ * A call whose words are withheld, in a compact mention (2026-11-14): its frozen test as the grader states it — already
+ * public on the call's own page — instead of repeating the ledger's one sentence ("The words of this call are not
+ * published.") five times down a day page. The ledger row itself still carries that sentence (owner ruling
+ * 2026-11-06). Null when the test is not served, so the caller falls back to the sentence. ISO dates become words.
+ */
+export function heldCallWords(p, max = 90) {
+  const how = p && p.grading && typeof p.grading.how === "string" ? p.grading.how.trim() : "";
+  if (!how) return null;
+  const t = how.replace(/\b1 days\b/, "1 day").replace(/\d{4}-\d{2}-\d{2}/g, (iso) => dayInWords(iso, { short: true }) || iso);
+  return `the test: ${clip(t, max)}`;
+}
