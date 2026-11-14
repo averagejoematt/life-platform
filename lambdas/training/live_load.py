@@ -97,6 +97,14 @@ def reps_e1rm(r: dict[str, Any]) -> float:
     return t["kg"] * (1 + t["reps"] / 30.0)
 
 
+def read_e1rm(r: dict[str, Any]) -> float:
+    """The decline read (rule 4): effort-adjusted Epley with the logged RPE clamped to 6-9 — a set logged 9.5-10 reads as RPE 9, so
+    an RPE-10 habit never manufactures a decline while the reps at the load hold; unlogged reads as 8."""
+    t = _top(r)
+    rpe = min(9.0, max(6.0, t["rpe"] if t["rpe"] is not None else 8.0))
+    return t["kg"] * (1 + (t["reps"] + 10.0 - rpe) / 30.0)
+
+
 def effort_unknown(rows: list[dict[str, Any]]) -> bool:
     """Rule 3: the logged RPE carries no information — no RPE on any set of the window's same-role exposures, or every logged
     set at >= implausible_rpe (a lifter who logs 10 on every set, whatever the reps). Progress then rides on reps and load only,
@@ -141,7 +149,7 @@ def declining(rows: list[dict[str, Any]]) -> bool:
     if len(rows) < 3:
         return False
     drop = float(cfg.value("decline_pct"))
-    return reps_e1rm(rows[0]) <= reps_e1rm(rows[1]) and reps_e1rm(rows[0]) < reps_e1rm(rows[2]) * (1 - drop)
+    return read_e1rm(rows[0]) <= read_e1rm(rows[1]) and read_e1rm(rows[0]) < read_e1rm(rows[2]) * (1 - drop)
 
 
 def slump(hist: dict[str, list[dict[str, Any]]], anchor_tids: set[str], deficit: bool | None, target_date: str) -> dict[str, Any] | None:

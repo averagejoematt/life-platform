@@ -2,8 +2,8 @@
 
 Configuration, not activation: every rule here runs only past `selection_engine.mode() == "live"` (the library is `proposed`
 today, so nothing here runs — tests/test_no_live_change_5861_l6.py poisons each entry point and pins the proposed digests).
-The rulings' values are library-carried (`programming_settings`, written by `deploy/build_exercise_library.py`
-OWNER_RULED_SETTINGS) and their code defaults are `SETTINGS_DEFAULTS` below plus the earlier rounds' dicts.
+The rulings' values are library-carried (`programming_settings`, written by `deploy/build_exercise_library.py` from the ONE
+settings table, `live_settings.SETTINGS`, fix round 9).
 
   1. THE LEAD LIFT (`lead_lift`, ruling 5). Heavy squat and heavy deadlift share the lower-heavy morning (#5694), but both are
      never maximal in one session: one LEADS at the session's top effort and the other is capped one RPE band lower
