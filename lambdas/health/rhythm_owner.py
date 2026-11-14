@@ -158,8 +158,8 @@ def _episode_text(e: dict) -> str:
     when = str(e.get("at") or e.get("day")).replace("T", " ")[:16]
     if e.get("family") == "ecg":
         return f"{when} ECG recording, device result '{e.get('result') or 'no result label'}'"
-    kind = e.get("kind") if e.get("kind") in KIND_LABELS else "unknown"
-    label = KIND_LABELS[kind][: -len("s")]  # singular
+    kind = str(e.get("kind"))
+    label = KIND_LABELS.get(kind, KIND_LABELS["unknown"])[: -len("s")]  # singular
     return f"{when} {label}" + (" (kind inferred from the reading, not named by the device)" if e.get("kind_inferred") else "")
 
 
