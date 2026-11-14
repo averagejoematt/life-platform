@@ -36,6 +36,7 @@ import boto3
 # PT swings between UTC-8 (PST) and UTC-7 (PDT) — a hardcoded offset is wrong for
 # ~8 months of the year. #1964: aliased from the canonical frame, not re-derived.
 from common.pacific_time import PACIFIC as _PT, pacific_today, parse_iso_utc
+from health.nutrition_logging import is_partial_export  # #5954: a partial export is not a day's meals
 
 try:
     from common.platform_logger import get_logger
@@ -229,6 +230,11 @@ def score_meal_timing(today_str):
     mf = fetch_source_date("macrofactor", today_str)
     if not mf:
         return None, "No MacroFactor data for today — meal timing unmeasured", False
+    # #5954: a row exported while the day was still being logged holds only the meals eaten by then — its
+    # "last meal" is the last one before the export (2026-11-13: a breakfast-time export scored 25/25 as
+    # "last meal ~09:00"). Part of a day cannot say when the day's eating ended: unmeasured, never scored.
+    if is_partial_export(mf):
+        return None, "Today's food log was exported before the day ended — meal timing unmeasured", False
 
     # MacroFactor stores food_log as list with timestamps
     food_log = mf.get("food_log") or mf.get("meals") or []

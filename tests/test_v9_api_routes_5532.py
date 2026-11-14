@@ -190,7 +190,7 @@ def test_series_projects_the_gap_columns_only_for_a_behavioral_source():
     series.handle_series(_event(metric="hrv"), query=query, today=TODAY)
     series.handle_series(_event(metric="total_protein_g"), query=query, today=TODAY)
     assert seen["whoop"] == ("date", "hrv")
-    assert set(seen["macrofactor"]) == {"date", "total_protein_g", "entries_count", "food_log", "_format"}
+    assert set(seen["macrofactor"]) == {"date", "total_protein_g", "entries_count", "food_log", "_format", "partial_at_export"}  # #5954
 
 
 def test_steps_resolve_per_day_through_metric_truth_and_name_the_source_that_answered():

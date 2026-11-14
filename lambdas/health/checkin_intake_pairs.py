@@ -104,7 +104,8 @@ def join_day(
     row[MOOD_FIELD] = _num(ci.get(MOOD_FIELD))
     row["mood_valence"] = _num(apple.get("som_avg_valence"))
     kcal = _num(food.get("total_calories_kcal"))
-    complete = kcal is not None and (complete_log_kcal is None or kcal >= complete_log_kcal)
+    # #5954: a partial export (exported while the day was still being logged) is never a complete day, whatever its kcal
+    complete = kcal is not None and (complete_log_kcal is None or kcal >= complete_log_kcal) and not food.get("partial_at_export")
     row["kcal"] = kcal if complete else None
     row["target_kcal"] = target_kcal
     row["kcal_over_target"] = round(kcal - target_kcal, 1) if complete and kcal is not None and target_kcal is not None else None

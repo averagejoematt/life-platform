@@ -48,6 +48,11 @@ _RDO_MIN_OVERLAP_DAYS = 14
 
 _RDO_IMPACT_R = 0.15
 
+#: #5954: the micronutrient block (and the electrolytes' potassium figure, its same derivation) is ONE day —
+#: the last complete food log joined with that day's supplements — never a partial export and never an average.
+#: Served with its window so a reader can tell it from the window averages beside it.
+MICRONUTRIENT_BASIS = "last_complete_day"
+
 # #5074 — NO rate target on this published surface: the band lives under the charter's `governing_goal`
 # (NEVER_PUBLISHED), so the public readout is the MEASURED rate in both units only. `target_rate_lb_wk`,
 # `required_deficit_kcal` and `gap_kcal` (each a restatement of the target) are retired from the payload.
@@ -275,10 +280,68 @@ def _trend_row(i: dict) -> dict:
     return {
         "date": d,
         "logging_gap": nutrition_logging.is_stub(i),  # #5607: a stub stays in the trend, flagged
+        # #5954: a row exported while its day was still being logged stays in the trend, flagged — never a day's intake
+        "partial_export": nutrition_logging.is_partial_export(i),
         "calories": round(_mf(i, "calories")) if _mf(i, "calories") is not None else None,
         "protein_g": (round(_mf(i, "protein_g", "total_protein_g"), 1) if _mf(i, "protein_g", "total_protein_g") is not None else None),
         "carbs_g": round(_mf(i, "carbs_g", "total_carbs_g"), 1) if _mf(i, "carbs_g", "total_carbs_g") is not None else None,
         "fat_g": round(_mf(i, "fat_g", "total_fat_g"), 1) if _mf(i, "fat_g", "total_fat_g") is not None else None,
+    }
+
+
+def _group_avg(group, field, alt_field=None):
+    vals = [_mf(x, field, alt_field) for x in group if _mf(x, field, alt_field) is not None]
+    return round(sum(vals) / len(vals), 1) if vals else None
+
+
+def _group_pro_hit(group, protein_target):
+    # #2221: grade only the days that actually logged protein — the headline
+    # `nutrition.protein_hit_pct` divides by exactly that set. This one divided by
+    # EVERY day in the bucket and coerced a missing value to 0 via `(… or 0) >=`,
+    # so an unlogged macro counted as a MISS. One field name, two definitions: a
+    # reader comparing the panels saw 100% and 50%. Absence is not a miss (ADR-104).
+    # #2360: `else None` — an empty bucket (a weekend with nothing logged) has no
+    # adherence rate to report, and `_empty_grp` publishes None for exactly this
+    # key. Returning 0 made "no weekend data" render as "cleared the target on 0%
+    # of weekend days."
+    vals = [v for v in (_mf(x, "protein_g", "total_protein_g") for x in group) if v is not None]
+    return round(sum(1 for v in vals if met_floor(v, protein_target)) / len(vals) * 100) if vals else None
+
+
+def _weekday_vs_weekend(items, protein_target) -> dict:
+    """The weekday/weekend split of the complete logs (extracted from nutrition_overview, #4880 paydown for #5954)."""
+    weekday_items = []
+    weekend_items = []
+    for i in items:
+        d = i.get("date") or i.get("sk", "").replace("DATE#", "")
+        try:
+            dow = datetime.strptime(d, "%Y-%m-%d").weekday()
+        except Exception:
+            continue
+        if dow >= 5:
+            weekend_items.append(i)
+        else:
+            weekday_items.append(i)
+
+    return {
+        "weekday": {
+            "avg_calories": _group_avg(weekday_items, "calories"),
+            "avg_protein_g": _group_avg(weekday_items, "protein_g", "total_protein_g"),
+            "avg_carbs_g": _group_avg(weekday_items, "carbs_g", "total_carbs_g"),
+            "avg_fat_g": _group_avg(weekday_items, "fat_g", "total_fat_g"),
+            "avg_fiber_g": _group_avg(weekday_items, "fiber_g", "total_fiber_g"),
+            "days": len(weekday_items),
+            "protein_hit_pct": _group_pro_hit(weekday_items, protein_target),
+        },
+        "weekend": {
+            "avg_calories": _group_avg(weekend_items, "calories"),
+            "avg_protein_g": _group_avg(weekend_items, "protein_g", "total_protein_g"),
+            "avg_carbs_g": _group_avg(weekend_items, "carbs_g", "total_carbs_g"),
+            "avg_fat_g": _group_avg(weekend_items, "fat_g", "total_fat_g"),
+            "avg_fiber_g": _group_avg(weekend_items, "fiber_g", "total_fiber_g"),
+            "days": len(weekend_items),
+            "protein_hit_pct": _group_pro_hit(weekend_items, protein_target),
+        },
     }
 
 
@@ -354,6 +417,7 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
                     "protein_floor_hit_days": 0,
                     "days_logged": 0,
                     "incomplete_days": [],
+                    "partial_days": [],
                     "tdee": None,
                     # #3931 box 4: the populated block carries the TDEE method and the
                     # impossibility basis, so the empty one must too — a field that
@@ -423,6 +487,8 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
                     "sodium_ref_low": 1500,
                     "sodium_ref_high": 2300,
                     "potassium_pct": None,
+                    "potassium_as_of": None,
+                    "potassium_basis": MICRONUTRIENT_BASIS,
                     "days_logged": 0,
                 },
                 "lean_mass": None,
@@ -441,6 +507,9 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
                     "food_only_avg_pct": None,
                     "protein_distribution_score": None,
                     "as_of": None,
+                    "basis": MICRONUTRIENT_BASIS,
+                    "window": {"from": None, "to": None, "days": 0},
+                    "partial": False,
                 },
                 "weekday_vs_weekend": {"weekday": dict(_empty_grp), "weekend": dict(_empty_grp)},
                 "eating_window": None,
@@ -460,8 +529,12 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
     items.sort(key=lambda x: x.get("sk", ""))
     # #5607: every count, average, latest day and group below reads complete logs only; the trend (all rows, stubs
     # flagged) and `incomplete_days` say which days were stubs. A real low day is a log and stays in.
+    # #5954: a partial export (the export's creation day, still being logged) is not a complete log either — it is
+    # flagged in `incomplete_days` (and `partial_days`) and kept out of every average, the floor count and the
+    # "latest" headline. The in-progress-day class of #5925.
     all_items, items = items, nutrition_logging.complete_logs(items)
-    incomplete_days = nutrition_logging.stub_days(all_items)
+    incomplete_days = nutrition_logging.incomplete_days(all_items)
+    partial_days = nutrition_logging.partial_days(all_items)
 
     cal_vals = [_mf(i, "calories") for i in items if _mf(i, "calories") is not None]
     pro_vals = [_mf(i, "protein_g", "total_protein_g") for i in items if _mf(i, "protein_g", "total_protein_g") is not None]
@@ -558,56 +631,7 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
     trend = [_trend_row(i) for i in all_items]
 
     # ── Weekday vs Weekend comparison ──
-    weekday_items = []
-    weekend_items = []
-    for i in items:
-        d = i.get("date") or i.get("sk", "").replace("DATE#", "")
-        try:
-            dow = datetime.strptime(d, "%Y-%m-%d").weekday()
-        except Exception:
-            continue
-        if dow >= 5:
-            weekend_items.append(i)
-        else:
-            weekday_items.append(i)
-
-    def _group_avg(group, field, alt_field=None):
-        vals = [_mf(x, field, alt_field) for x in group if _mf(x, field, alt_field) is not None]
-        return round(sum(vals) / len(vals), 1) if vals else None
-
-    def _group_pro_hit(group):
-        # #2221: grade only the days that actually logged protein — the headline
-        # `nutrition.protein_hit_pct` divides by exactly that set. This one divided by
-        # EVERY day in the bucket and coerced a missing value to 0 via `(… or 0) >=`,
-        # so an unlogged macro counted as a MISS. One field name, two definitions: a
-        # reader comparing the panels saw 100% and 50%. Absence is not a miss (ADR-104).
-        # #2360: `else None` — an empty bucket (a weekend with nothing logged) has no
-        # adherence rate to report, and `_empty_grp` publishes None for exactly this
-        # key. Returning 0 made "no weekend data" render as "cleared the target on 0%
-        # of weekend days."
-        vals = [v for v in (_mf(x, "protein_g", "total_protein_g") for x in group) if v is not None]
-        return round(sum(1 for v in vals if met_floor(v, protein_target)) / len(vals) * 100) if vals else None
-
-    weekday_vs_weekend = {
-        "weekday": {
-            "avg_calories": _group_avg(weekday_items, "calories"),
-            "avg_protein_g": _group_avg(weekday_items, "protein_g", "total_protein_g"),
-            "avg_carbs_g": _group_avg(weekday_items, "carbs_g", "total_carbs_g"),
-            "avg_fat_g": _group_avg(weekday_items, "fat_g", "total_fat_g"),
-            "avg_fiber_g": _group_avg(weekday_items, "fiber_g", "total_fiber_g"),
-            "days": len(weekday_items),
-            "protein_hit_pct": _group_pro_hit(weekday_items),
-        },
-        "weekend": {
-            "avg_calories": _group_avg(weekend_items, "calories"),
-            "avg_protein_g": _group_avg(weekend_items, "protein_g", "total_protein_g"),
-            "avg_carbs_g": _group_avg(weekend_items, "carbs_g", "total_carbs_g"),
-            "avg_fat_g": _group_avg(weekend_items, "fat_g", "total_fat_g"),
-            "avg_fiber_g": _group_avg(weekend_items, "fiber_g", "total_fiber_g"),
-            "days": len(weekend_items),
-            "protein_hit_pct": _group_pro_hit(weekend_items),
-        },
-    }
+    weekday_vs_weekend = _weekday_vs_weekend(items, protein_target)
 
     # ── Eating window (first/last meal time from food_log) ──
     eating_windows = []
@@ -777,6 +801,8 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
         "sodium_ref_low": 1500,
         "sodium_ref_high": 2300,
         "potassium_pct": _pot.get("pct"),
+        "potassium_as_of": latest_date,  # #5954: one day (MICRONUTRIENT_BASIS), not the sodium average's window
+        "potassium_basis": MICRONUTRIENT_BASIS,
         "days_logged": len(items),
     }
 
@@ -864,11 +890,13 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
         # by exactly that prefix. Accumulate from the first day carrying BOTH a logged
         # intake and a weigh-in; earlier days have no baseline to be measured against, so
         # they carry no projected value rather than a misleading one (ADR-104).
-        baseline_date = next((t["date"] for t in trend if t.get("calories") is not None and t["date"] in w_series), None)
+        baseline_date = next(
+            (t["date"] for t in trend if t.get("calories") is not None and not t.get("partial_export") and t["date"] in w_series), None
+        )
         cum_def = 0.0
         for t in trend:
             cal = t.get("calories")
-            if cal is None:
+            if cal is None or t.get("partial_export"):  # #5954: part of a day's intake is not a day's deficit
                 continue
             if baseline_date is not None and t["date"] < baseline_date:
                 recon_days.append({"date": t["date"], "projected_loss_lbs": None, "actual_loss_lbs": None})
@@ -907,7 +935,7 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
     deficit_by_date = {}
     if tdee:
         for t in trend:
-            if t.get("calories") is not None:
+            if t.get("calories") is not None and not t.get("partial_export"):  # #5954: never a partial day's "deficit"
                 deficit_by_date[t["date"]] = tdee - t["calories"]
     recovery_deficit_overlay = _recovery_deficit_overlay(deficit_by_date, recovery_by_date, d30, today)
 
@@ -974,7 +1002,9 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
                 "protein_floor_hit_pct": floor_hit_pct,
                 "protein_floor_hit_days": floor_hit_days,
                 "days_logged": _log_rec["days_logged"],
-                "incomplete_days": incomplete_days,  # #5607: stub rows (no diary entries) — not counted, not averaged
+                # #5607 stub rows (no diary entries) and #5954 partial exports — not counted, not averaged, never "latest"
+                "incomplete_days": incomplete_days,
+                "partial_days": partial_days,  # #5954: the subset of incomplete_days exported mid-day
                 "tdee": round(tdee) if tdee else None,
                 "tdee_source": tdee_source,
                 # #3931 box 4: the method behind the number, and the impossibility verdict.
@@ -1038,6 +1068,11 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
                 "food_only_avg_pct": _intake["food_only_avg_pct"],
                 "protein_distribution_score": (latest or {}).get("protein_distribution_score"),
                 "as_of": latest_date,
+                # #5954: what the figure is computed over — ONE day, the last complete log, never a partial export.
+                # The block sits beside window averages (sodium), so it states its own one-day window.
+                "basis": MICRONUTRIENT_BASIS,
+                "window": {"from": latest_date, "to": latest_date, "days": 1 if latest_date else 0},
+                "partial": nutrition_logging.is_partial_export(latest),
             },
         },
         cache_seconds=3600,
@@ -1278,6 +1313,7 @@ _EDITION_MF_FIELDS = (
     "total_protein_g",
     "entries_count",
     "food_log",
+    "partial_at_export",  # #5954: a partial export is not a complete log (`nutrition_logging.complete_logs`)
 )
 
 #: The `nutrition_trend` row keys the edition reads (``site_api_edition._week`` / ``_day_detail``).

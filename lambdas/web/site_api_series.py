@@ -7,7 +7,7 @@ with its own idea of an empty day. This is THE per-metric reader: one key, one w
 row per calendar day, and two flags that keep absence honest (ADR-104):
 
     {metric, unit, source_id, method_ids, as_of, window: {from, to},
-     days: [{date, value | null, present, gap}]}
+     days: [{date, value | null, present, gap[, partial, partial_value]}]}
 
   * ``present``  — a measured value is served for the day.
   * ``gap``      — a BEHAVIORAL source (the food diary) has a row for the day that records
@@ -15,6 +15,11 @@ row per calendar day, and two flags that keep absence honest (ADR-104):
                    80 kcal / 15 g from a pre-filled scheduled item) is not a measurement, so
                    the value is withheld and the day is marked a logging gap — distinct from a
                    day the source has no row for at all (``present: false, gap: false``).
+  * ``partial``  — a BEHAVIORAL row exported while its day was still being logged (#5954:
+                   ``partial_at_export``). Part of a day is not the day's value, so ``value`` is
+                   withheld (a tile's "latest" falls back to the last complete day, a pairing never
+                   reads it) and the part-day figure rides beside it as ``partial_value`` for a
+                   surface that labels it "so far". Extends #5925's in-progress-day row.
 
 WHICH KEYS. The offered keys are the ones the data room charts and the coaches are graded on;
 each resolves to the SAME source partition the grader reads
@@ -42,6 +47,7 @@ from typing import Any, Callable
 from common import metric_truth
 from common.pacific_time import pacific_today, parse_day_key, shift_day_key
 from experiment.measurable_metrics import METRIC_SOURCES
+from health.nutrition_logging import is_partial_export
 from ingestion.source_registry import SOURCE_REGISTRY
 from privacy.field_tiers import is_publishable, tier_of
 
@@ -97,7 +103,7 @@ SERIES: dict[str, SeriesSpec] = {
 }
 
 #: The attributes a behavioral source's row needs for the logging-gap test, beside the value.
-_GAP_FIELDS = ("entries_count", "food_log", "_format")
+_GAP_FIELDS = ("entries_count", "food_log", "_format", "partial_at_export")
 
 
 def publishable(spec: SeriesSpec) -> bool:
@@ -161,8 +167,10 @@ def _resolved_days(spec: SeriesSpec, start: str, end: str, query: Callable) -> t
 
 
 def series_days(spec: SeriesSpec, start: str, end: str, *, query: Callable = _query_source) -> list[dict]:
-    """Every calendar day in ``start..end`` as ``{date, value, present, gap}`` — pure given ``query``."""
+    """Every calendar day in ``start..end`` as ``{date, value, present, gap}`` (+ ``partial``/``partial_value`` on a
+    partial-export day, #5954) — pure given ``query``."""
     gaps: set[str] = set()
+    partials: dict[str, float] = {}
     sources: dict[str, str] = {}
     if spec.resolver:
         values, sources = _resolved_days(spec, start, end, query)
@@ -177,12 +185,19 @@ def series_days(spec: SeriesSpec, start: str, end: str, *, query: Callable = _qu
                 gaps.add(d)
                 continue
             v = _num(row.get(spec.field))
+            if spec.behavioral and is_partial_export(row):  # #5954: the one predicate
+                if v is not None and (d not in partials or v > partials[d]):
+                    partials[d] = v
+                continue
             if v is not None and (d not in values or v > values[d]):
                 values[d] = v
     out = []
     for d in days_between(start, end):
         v = values.get(d)
-        day = {"date": d, "value": v, "present": v is not None, "gap": d in gaps and v is None}
+        partial = d in partials and v is None
+        day = {"date": d, "value": v, "present": v is not None, "gap": d in gaps and v is None and not partial}
+        if partial:  # #5954: present only on a partial day, so every other day's shape is unchanged
+            day.update(partial=True, partial_value=partials[d])
         if spec.resolver and d in sources:
             day["source_id"] = sources[d]
         out.append(day)
@@ -233,6 +248,7 @@ def handle_series(event, *, query: Callable = _query_source, today: str | None =
             "days": days,
             "n_present": sum(1 for d in days if d["present"]),
             "n_gap": sum(1 for d in days if d["gap"]),
+            "n_partial": sum(1 for d in days if d.get("partial")),
         },
         cache_seconds=CACHE_SECONDS,
     )

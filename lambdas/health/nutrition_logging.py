@@ -152,8 +152,8 @@ def protein_intake(items: Iterable[dict], today: str, experiment_start: str) -> 
     """THE protein-intake average (#4343): the figure `/api/nutrition_overview` serves as
     `avg_protein_g`, with the window and the n that make it a claim.
 
-    Rows outside the `window_start` window (genesis-floored, ending `today`) and
-    superseded (`tombstone`) rows are dropped, so a producer that fetched a wider range
+    Rows outside the `window_start` window (genesis-floored, ending `today`), superseded
+    (`tombstone`) rows and incomplete rows (stubs, partial exports — `is_incomplete`, #5954) are dropped, so a producer that fetched a wider range
     cannot publish a different number. `computed_metrics.protein_g_avg` is written from
     this — before #4343 it was a 30-calendar-day mean that crossed the genesis (122.7 g on
     2026-09-27 against the served 153.5 g over 21 logged days), and every coach was told
@@ -161,7 +161,11 @@ def protein_intake(items: Iterable[dict], today: str, experiment_start: str) -> 
     """
     start = window_start(today, experiment_start)
     end = str(today)[:10]
-    rows = [i for i in items or () if isinstance(i, dict) and not i.get("tombstone") and start <= row_date(i) <= end]
+    # #5954: stubs and partial exports are not a day's intake — the producer (computed_metrics) and the route
+    # (which already reads `complete_logs`) drop them here, in the one derivation, so the two cannot differ.
+    rows = [
+        i for i in items or () if isinstance(i, dict) and not i.get("tombstone") and start <= row_date(i) <= end and not is_incomplete(i)
+    ]
     win = protein_window(protein_series(rows))
     return {"avg_g": win["mean"] if win else None, "days": win["n"] if win else 0, "window_start": start}
 
@@ -174,11 +178,39 @@ def is_stub(rec) -> bool:
     return is_zero_entry_day(rec)
 
 
+#: The diary row of a MacroFactor export's own creation day (#5519): the day was still being logged when the
+#: file was made, so the row holds only what was eaten by then. Written by `ingestion.macrofactor_lambda`
+#: (`PARTIAL_AT_EXPORT_FIELD`); a later export that covers the day replaces the row and drops the flag.
+PARTIAL_AT_EXPORT_FIELD = "partial_at_export"
+
+
+def is_partial_export(rec) -> bool:
+    """A diary row exported while its day was still being logged (#5954): it holds part of a day, never a day's
+    intake. On 2026-11-13 one such row (one entry, a breakfast's worth) was served as the latest complete day."""
+    return isinstance(rec, dict) and bool(rec.get(PARTIAL_AT_EXPORT_FIELD))
+
+
+def is_incomplete(rec) -> bool:
+    """A row that is not a whole day's food log: a stub (#5607) or a partial export (#5954)."""
+    return is_stub(rec) or is_partial_export(rec)
+
+
 def complete_logs(items) -> list:
-    """The rows that are a food log (#5607): every count and average reads these; stubs stay in a trend, flagged."""
-    return [i for i in items or () if not is_stub(i)]
+    """The rows that are a whole day's food log (#5607, #5954): every count, average and "latest" reads these;
+    stubs and partial exports stay in a trend, flagged."""
+    return [i for i in items or () if not is_incomplete(i)]
 
 
 def stub_days(items) -> list:
     """The days whose row is a stub, in row order (``date`` or the ``DATE#`` sort key)."""
-    return [i.get("date") or str(i.get("sk", "")).replace("DATE#", "") for i in items or () if is_stub(i)]
+    return [row_date(i) for i in items or () if is_stub(i)]
+
+
+def partial_days(items) -> list:
+    """The days whose row is a partial export (#5954), in row order."""
+    return [row_date(i) for i in items or () if is_partial_export(i)]
+
+
+def incomplete_days(items) -> list:
+    """The days whose row is not a whole day's log — stubs and partial exports — in row order (#5954)."""
+    return [row_date(i) for i in items or () if is_incomplete(i)]

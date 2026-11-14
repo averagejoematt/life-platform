@@ -158,7 +158,7 @@ FUNCTION_LENGTH_COUNTS = {
     "lambdas/web/site_api_ledger.py::discoveries": 188,
     "lambdas/web/site_api_mind.py::mind_overview": 222,
     "lambdas/web/site_api_nutrition.py::deficit_sustainability": 158,
-    "lambdas/web/site_api_nutrition.py::nutrition_overview": 532,
+    "lambdas/web/site_api_nutrition.py::nutrition_overview": 508,
     "lambdas/web/site_api_physical.py::physical_overview": 231,
     "lambdas/web/site_api_pulse.py::pulse": 432,
     "lambdas/web/site_api_rollups.py::observatory_week": 249,
