@@ -32,10 +32,14 @@ const startDate: string | null = today?.start_date || edition?.start_date || nul
 // "So far", in one line above the fold (2026-11-14): on a phone the first screen carried the premise and no progress.
 // Day, pounds, chapters, the coaches against a guess — each carried from the edition / the room's verified lead.
 let soFarLead: ReturnType<typeof verifiedLead> = null;
+// #5950: the ledger's own count of dated forecasts (every record that is not an observation), as the producer serves
+// it; the snapshot's prediction objects are only the records served with an id, so counting them undercounted.
+let ledgerForecasts: number | null = null;
 if (roomPublic()) {
   try {
     const f: any = await loadCalibration();
     soFarLead = f?.state === "ok" ? verifiedLead(f.calibration || {}) : null;
+    ledgerForecasts = f?.state === "ok" && Number.isInteger(f.record?.total) && Number.isInteger(f.record?.observational) ? f.record.total - f.record.observational : null;
   } catch {
     soFarLead = null;
   }
@@ -143,11 +147,12 @@ const dims: Dim[] = [
   seriesDim("sleep", "sleep_duration_hours", "Sleep", 1, "h", (h, bars) => {
     const f = firstBar(bars);
     const l = lastBar(bars);
-    return f != null && l != null ? `This week's mean. Week one was ${num(f, 1)} h.` : `${h.n} nights measured.`;
+    // #5953: the figure is the latest night; the note used to call it "this week's mean" (8.1 h beside a 7.6 h mean).
+    return f != null && l != null ? `Last night. The last seven nights average ${num(l, 1)} h; the first of the eight weeks drawn, ${num(f, 1)} h.` : `${h.n} nights measured.`;
   }),
   seriesDim("recovery", "hrv", "Recovery", 0, "ms", (h, bars) => {
     const f = firstBar(bars);
-    return f != null ? `Heart-rate variability. Week one averaged ${num(f, 0)} ms.` : `${h.n} mornings measured.`;
+    return f != null ? `Heart-rate variability, the latest morning. The first of the eight weeks drawn averaged ${num(f, 0)} ms.` : `${h.n} mornings measured.`;
   }),
   {
     // Owner ruling 2026-11-03: journal activity is private — whether, when and how often he writes.
@@ -317,7 +322,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
         <div class="wrap" style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
           <div style="flex:0 0 160px;display:flex;flex-direction:column;gap:6px">
             <span class="label">Chapter</span>
-            <span class="big cobalt" style="font-size:130px;display:block;line-height:.85">{String(latestChapter.week ?? 0).padStart(2, "0")}</span>
+            <span class="big cobalt ch-numeral" style="display:block;line-height:.85">{String(latestChapter.week ?? 0).padStart(2, "0")}</span>
             <span class="mono muted" style="font-size:12px">{weekRange(latestChapter) || dayInWords(latestChapter.date, { short: true })}</span>
             {chapterPublished(latestChapter) && (
               <span class="mono muted" style="font-size:12px" data-published>
@@ -347,7 +352,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
                 </span>
               ) : null}
             </div>
-            <p class="muted" style="font-size:13px">Written by the platform's narrator from the week's data; published after I approved it. The figures in it are explorable in the data room.</p>
+            <p class="muted ch-byline" style="font-size:13px">Written by the platform's narrator from the week's data; published after I approved it. The figures in it are explorable in the data room.</p>
           </article>
           <aside style="flex:1 1 240px;min-width:0">
             <p class="label" style="margin-bottom:8px">In this chapter</p>
@@ -548,7 +553,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
         </a>
         <a class="door" href={href("/system/")}>
           <span class="between mono muted" style="font-size:12px"><span class="cobalt">03</span><span>Inspect · as deep as you want</span></span>
-          <span><span class="t">The system</span><p class="serif muted" style="font-size:17px;margin-top:10px">The AI coaches, {all.byType.prediction.filter((p) => p.status !== "observation").length} dated forecasts, every grade public — beside what a simple guess would have scored.</p></span>
+          <span><span class="t">The system</span><p class="serif muted" style="font-size:17px;margin-top:10px">The AI coaches, {ledgerForecasts ?? all.byType.prediction.filter((p) => p.status !== "observation").length} dated forecasts, every grade public — beside what a simple guess would have scored.</p></span>
         </a>
       </div>
     </div>

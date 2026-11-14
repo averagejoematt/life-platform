@@ -20,7 +20,7 @@ const steps = [
   "<b>Each coach reads one slice.</b> They don't share a brain, which is why they disagree.",
   "<b>Every claim is written down.</b> With a date, the metric it's about, the direction or value expected, and a window.",
   "<b>When the window closes, code grades it.</b> Confirmed, refuted, or expired for lack of readings. The grader is arithmetic with a tolerance band, not a language model.",
-  "<b>I publish the ledger beside a simple guess.</b> A grade that ran through a logging gap, or a band wider than the claim, is flagged by the grader and kept out of the clean rate.",
+  "<b>I publish the ledger beside a simple guess.</b> A grade that ran through a logging gap, or a band wider than the claim, is flagged by the grader. A flagged grade is marked and still counted; it is never counted among the clean grades.",
 ];
 ---
 
@@ -47,7 +47,7 @@ const steps = [
         </ol>
       </div>
       <div>
-        <div class="between" style="padding-bottom:10px"><span class="label">The coaches · the record</span><span class="label">right, as first graded</span></div>
+        <div class="between" style="padding-bottom:10px"><span class="label">The coaches · the record</span><span class="label">right, as graded now</span></div>
         <div class="rows">
           {
             coaches.map((c) => (
@@ -85,7 +85,7 @@ const steps = [
         record ? (
           <>
             <h2 style="font-size:36px">{record.count_text || kOfN(record.right, record.decided)}</h2>
-            <p class="muted" style="font-size:14px">As first graded: every call the ledger checked, each grade kept as the grader first wrote it. The re-verified comparison against a guess is below.</p>
+            <p class="muted" style="font-size:14px">As graded now: every call the ledger holds a right-or-wrong grade for today, with its recorded corrections applied and none re-verified. The re-verified comparison against a guess is below.</p>
             {record.counted_text && <p class="muted">{record.counted_text}</p>}
             {record.comparison_text && <p class="serif" style="font-size:18px">{record.comparison_text}</p>}
           </>

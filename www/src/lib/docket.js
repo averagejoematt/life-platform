@@ -11,7 +11,7 @@
 //   * the result is the grader's: who won, the value the measure came in at and whether the test held, as served.
 //     A sentence here only restates those fields; it never says why a coach argued or how it took the loss;
 //   * a call under classification review is never right or wrong (lib/disputed.js); a corrected grade is shown with
-//     its correction (lib/corrections.js); a grade is "as first graded" — none is published as re-verified.
+//     its correction (lib/corrections.js); a grade is "as graded now" (its recorded corrections applied) — none is published as re-verified.
 import { callOutcome, dayInWords, num } from "./format.js";
 import { correctionRows, instantInWords } from "./corrections.js";
 import { isDisputed } from "./disputed.js";
@@ -316,7 +316,7 @@ export function refutedRow(p, nameOf = (x) => x) {
     coach: p.coach_name || nameOf(p.coach_id),
     made: dayInWords(p.logged_date) || "not recorded",
     settled: dayInWords(p.settled_date) || "not recorded",
-    outcome: `${callOutcome(p.status)}, as first graded`,
+    outcome: `${callOutcome(p.status)}, as graded now`,
     disputed: isDisputed(p),
     disputedReason: p.classification_review_reason ? datesInWords(p.classification_review_reason) : null,
     text: words.text,

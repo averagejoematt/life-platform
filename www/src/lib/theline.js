@@ -26,7 +26,7 @@ const PAPER = "#F4F4F0";
  *   rungs?: Array<{lb:number,date:string|null}>,
  *   chapters?: Array<{date:string,n:string}>,
  *   from?: string, to?: string, focus?: {from:string,to:string}|null,
- *   width?: number, height?: number, mobile?: boolean, aria?: string, unit?: string,
+ *   width?: number, height?: number, mobile?: boolean, aria?: string, unit?: string, shade?: boolean,
  * }} o
  */
 export function theLine(o) {
@@ -95,7 +95,7 @@ export function theLine(o) {
   });
   if (run.length) runs.push(run);
   const halfDay = (W - pad.l - pad.r) / Math.max(1, (x1 - x0) / DAY_MS) / 2;
-  for (const r of runs) {
+  for (const r of o.shade === false ? [] : runs) {
     const a = Math.max(pad.l, X(r[0].date) - (r.length === 1 ? halfDay * 0.8 : 0));
     const b = Math.min(W - pad.r, X(r[r.length - 1].date) + (r.length === 1 ? halfDay * 0.8 : 0));
     let d = `M${a.toFixed(1)},${sY.toFixed(1)}`;
