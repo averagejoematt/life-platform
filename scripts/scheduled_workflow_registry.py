@@ -117,6 +117,17 @@ WATCH_POLICY: dict[str, dict[str, Any]] = {
         "that stops leaves the site's only daily semantic QA dark with an empty (or "
         "stale-open) tracker issue that reads as healthy.",
     },
+    "web-preview-deploy.yml": {
+        "watched": True,
+        "grace_hours": 30.0,
+        "basis": "declared 15:30Z daily (2026-11-14); no observed history yet, so the grace is one full "
+        "cadence plus six hours: a merely-late or deferred-then-resumed run never reports, a "
+        "wholly missed day does.",
+        "reason": "The daily v9 rebuild. The public pages are a build-time snapshot of the live API, "
+        "and before this cron a published chapter, a graded call or a new day reached readers "
+        "only when unrelated www code merged (the front page sat two days stale, leading with "
+        "Chapter 06 after Week 10 published). If it stops, the site goes quietly stale again.",
+    },
     "operating-calendar.yml": {
         "watched": True,
         "grace_hours": 14.0,

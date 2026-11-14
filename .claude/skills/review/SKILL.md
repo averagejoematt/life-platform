@@ -198,17 +198,46 @@ own controls and reports whether they fired:
   written up as though it were a defect, in the batch's own voice, indistinguishable in shape
   from its neighbours. Keep the planted list out of the verifier's brief and in the run's notes.
   A verifier that returns CONFIRMED on a planted false finding has failed the control.
-- **Withhold a known issue or two from the graders** — real open issues in that lens's area,
-  removed from the do-not-refile list so the grader has a fair chance to find them. A grader row
-  that misses every withheld issue in its own area has failed the control.
+- **Withhold a known issue from the graders, per row** — a real open issue in that lens's area,
+  removed from the do-not-refile list so the grader has a fair chance to find it. Each withheld
+  issue has ONE owning lens, and the control is scored per row (#5914): **a row that misses its
+  own withheld issue has failed the control and keeps its expired from-scratch date; the other
+  rows of the run advance.** A different row stumbling on the issue does not rescue the owner.
+  Withhold for at least the recall-sensitive rows (security, data-architect, observability,
+  integrations), and for as many others as there are honest candidates — a row with no withheld
+  issue is covered by the verifier control alone, and the artifact says which rows those are.
+- **Pre-verify every withheld issue against live state before launch, and record the check.**
+  An open issue is not a live defect: on 2026-11-13 one of three withheld issues had been fixed
+  and deployed with the issue left open, so there was nothing to find. For each one, reproduce it
+  in the graded tree or on the live surface and write the command and its result into
+  `by_lens.<lens>.verified_live`. An issue that does not reproduce is not withheld — close-check
+  it instead.
+- **Keep the control blind.** A grader is given the prior run's **path-to-A list** for its lens,
+  never the prior run's entry for its lens: that entry describes the findings filed from it, and
+  an issue filed from the last review is exactly what gets withheld from this one (2026-11-13: the
+  only withheld issue a grader "found" was one its own prior entry described). Do not put the
+  withheld issue's number, title or file in any brief.
+- **A row that carries a withheld issue may run on the stronger grader.** Recall, not precision,
+  is the weak leg under Sonnet graders (two runs: 0 of 4, then 0 of 1 blind and still live). This
+  is the one sanctioned exception to "panelists run on Sonnet"; record the model per row.
 - **Record the outcome in the artifact**, in a `calibration` block:
   `{planted_false_findings: {n, confirmed_by_verifiers: [...]}, withheld_known_issues: {n,
-  found: [...], missed_by_graders: [...]}, verdict: "CALIBRATED" | "UNCALIBRATED"}`. Name each
-  planted item so a reader can check the claim.
+  found: [...], missed_by_graders: [...], by_lens: {<lens>: {withheld: [...], found: [...],
+  missed: [...], verified_live: "..."}}}, verdict: "CALIBRATED" | "PARTIALLY_CALIBRATED" |
+  "UNCALIBRATED"}`. Name each planted item so a reader can check the claim. `by_lens` is what
+  buys per-row scoring: it must own every issue in `missed_by_graders`, and an issue a lens lists
+  as withheld without listing it as found is a miss. An artifact without `by_lens` is scored by
+  the run-level rule (any miss voids the run), which is how every run before #5914 was scored.
 - **Calibration is mandatory from 2026-09-19 (#3919).** A run dated on/after that day with NO
   `calibration` block (`UNSTATED`) is treated as a MISSING run by `scripts/review_carry_forward.py`
   — it advances no lens's from-scratch date and satisfies no review clock. Runs before it are
   grandfathered (they could not have stated one).
+- **The two controls fail different things.** A planted false finding CONFIRMED is a verifier
+  asleep, and the verifiers read every row: the run is UNCALIBRATED. A withheld issue missed is
+  one grader's recall in one area: the run is PARTIALLY_CALIBRATED, it resets the ritual clock,
+  and `scripts/review_carry_forward.py::scratch_dates` holds back only the rows that missed — the
+  boot brief keeps printing them as expired until a run re-grades them. A run in which every
+  graded row missed is UNCALIBRATED.
 - **An UNCALIBRATED run does not reset the calendar clock.** `scripts/operating_calendar.py`
   reads that block (`calibrated_run`) and skips the artifact, so the lens still counts down
   toward DUE. A run whose instruments were asleep is not evidence that the ritual happened —
