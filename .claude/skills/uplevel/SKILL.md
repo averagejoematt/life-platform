@@ -3,7 +3,7 @@ name: uplevel
 description: "Session driver: survey the platform with fresh eyes, rank findings against the north star, and ship the single highest-leverage improvement end to end. Use to start a working session aimed at shipping, not reviewing."
 user-invocable: true
 argument-hint: "[lane or idea]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task, Agent, TodoWrite, WebFetch, WebSearch
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, TodoWrite, WebFetch, WebSearch
 ---
 
 # /uplevel — Fable session driver: find and ship the highest-leverage improvement

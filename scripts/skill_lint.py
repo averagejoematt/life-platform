@@ -196,6 +196,39 @@ def _unquote(v: str) -> str:
 
 
 # ── Checks ────────────────────────────────────────────────────────────────────
+# Built-in tool names a skill or agent may list. `Task` was renamed `Agent`; a stale `Task`
+# grants nothing, so it is flagged rather than accepted (#5515). `mcp__*` patterns are open.
+KNOWN_TOOLS = frozenset(
+    {
+        "Agent",
+        "Bash",
+        "DesignSync",
+        "Edit",
+        "Glob",
+        "Grep",
+        "NotebookEdit",
+        "Read",
+        "TodoWrite",
+        "WebFetch",
+        "WebSearch",
+        "Write",
+    }
+)
+STALE_TOOL_ALIASES = {"Task": "Agent"}
+
+
+def check_tool_vocabulary(rel: str, tools_key: str, value: str) -> list[Finding]:
+    out: list[Finding] = []
+    for tool in (s.strip() for s in value.split(",")):
+        if not tool or tool.startswith("mcp__"):
+            continue
+        if tool in STALE_TOOL_ALIASES:
+            out.append(Finding("frontmatter", rel, f"{tools_key} lists stale alias {tool!r} — use {STALE_TOOL_ALIASES[tool]!r}"))
+        elif tool not in KNOWN_TOOLS:
+            out.append(Finding("frontmatter", rel, f"{tools_key} lists unknown tool {tool!r}"))
+    return out
+
+
 def check_frontmatter(name: str, rel: str, fields: dict[str, str] | None, is_agent: bool) -> list[Finding]:
     out: list[Finding] = []
     if fields is None:
@@ -212,6 +245,8 @@ def check_frontmatter(name: str, rel: str, fields: dict[str, str] | None, is_age
     tools_key = "tools" if is_agent else "allowed-tools"
     if not fields.get(tools_key):
         out.append(Finding("frontmatter", rel, f"no {tools_key} — runs with unrestricted tool access"))
+    else:
+        out.extend(check_tool_vocabulary(rel, tools_key, fields[tools_key]))
     return out
 
 
@@ -481,6 +516,8 @@ def self_test() -> int:
         ("no frontmatter", lambda t: t.split("---\n", 2)[2], "frontmatter"),
         ("stripped description", lambda t: re.sub(r"\ndescription: [^\n]*\n", "\n", t, count=1), "frontmatter"),
         ("stripped allowed-tools", lambda t: re.sub(r"\nallowed-tools: [^\n]*\n", "\n", t, count=1), "frontmatter"),
+        ("stale Task alias", lambda t: re.sub(r"(\nallowed-tools: )", r"\1Task, ", t, count=1), "frontmatter"),
+        ("unknown tool name", lambda t: re.sub(r"(\nallowed-tools: )", r"\1BogusTool, ", t, count=1), "frontmatter"),
         ("dead reference", lambda t: t + "\n\nSee `docs/THIS_FILE_DOES_NOT_EXIST.md` for details.\n", "dead-ref"),
         ("ellipsis path", lambda t: t + "\n\nRun `scripts/.../ghost.py` first.\n", "dead-ref"),
     ]
