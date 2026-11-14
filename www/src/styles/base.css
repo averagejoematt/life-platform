@@ -1762,3 +1762,24 @@ span.gloss[data-quote-gloss] {
     overflow-wrap: anywhere;
   }
 }
+
+/* "Since your last visit" (islands/since.js): one quiet line, shown only to a returning browser. */
+.since {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  align-items: baseline;
+  margin: -8px 0 22px;
+  padding: 10px 14px;
+  border-left: 3px solid var(--cobalt);
+  background: var(--rule2);
+  font-size: 15px;
+  line-height: 1.45;
+}
+.since[hidden] {
+  display: none;
+}
+.since a {
+  font-weight: 700;
+  font-size: 13px;
+}
