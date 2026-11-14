@@ -176,6 +176,9 @@ def test_correlations_endpoint_missing_n_eff_falls_back_to_raw_n_honestly():
     record = dict(_LIVE_RECORD)
     calories = dict(_LIVE_RECORD["correlations"]["calories_vs_day_grade"])
     record["correlations"] = {"calories_vs_day_grade": {**calories, "pearson_r": 0.4, "n_days": 25, "fdr_significant": True}}
+    # 2026-11-11: a day_grade pair is served only from a record stamped with the public day grade's method
+    # (common.activity_publication.PUBLIC_METRIC_METHODS); the W35 fixture predates the stamp, so stamp it here.
+    record["metric_methods"] = {"day_grade": "day-grade-public-v1"}
     pairs = _correlations_pairs(record)
     cal = pairs[0]
     assert "n_eff" not in _LIVE_RECORD["correlations"]["calories_vs_day_grade"]

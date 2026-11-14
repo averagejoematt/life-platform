@@ -46,7 +46,10 @@ WORKFLOW_SIZE_COUNTS: dict = {
     "remediation-agent.yml": (184, 33),
     "secret-scan.yml": (89, 13),
     "served-coach-facts.yml": (80, 15),
-    "site-deploy.yml": (650, 152),
+    "site-deploy.yml": (
+        704,
+        154,
+    ),  # 2026-11-12: the Site API readiness gate (api-readiness + deferred jobs, the api_readiness input), each run ONE line calling deploy/www_api_readiness.py — the same module as web-preview-deploy.yml; was (650, 152)
     "surface-drift.yml": (51, 1),
     "v4-gate.yml": (170, 31),
     "visual-qa.yml": (326, 107),

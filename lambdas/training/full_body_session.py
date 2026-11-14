@@ -32,6 +32,7 @@ from training import (
     routine_generator as _rg,
     rpe_calibration,
     selection_engine,
+    session_time,
     variant_rotation,
     warmup_sets,
 )
@@ -98,7 +99,11 @@ def _blocks_from_prescription(
             (
                 Set(type="normal", distance_meters=int(sp["distance_meters"]))
                 if sp.get("distance_meters")
-                else Set(type="normal", rep_range_start=sp["reps"][0], rep_range_end=sp["reps"][1])
+                else Set(
+                    type="dropset" if sp.get("kind") == "drop" else "normal",  # #5799: the owner-selected short-on-time row
+                    rep_range_start=sp["reps"][0],
+                    rep_range_end=sp["reps"][1],
+                )
             )
             for sp in sets_spec
         ]
@@ -126,6 +131,7 @@ def _blocks_from_prescription(
                 movement_key=key,
                 sets=sets,
                 rest_seconds=e["rest_seconds"],
+                superset_id=e.get("superset_id"),  # #5799: the charter's antagonist pair (`session_shape.pair_supersets`)
                 notes=notes,
                 joint_friendly_score=mdef.get("joint_friendly_score", 3),
                 skill_tier=mdef.get("skill_tier", 1),
@@ -302,6 +308,7 @@ def _prescription(
         skill_ceiling=skill_ceiling,
         in_block=in_block,
         accessory_variants=rotation["variants"],
+        measured_minutes=session_time.role_median_minutes(block_workouts, day_entry["session_role"]),  # #5799
     )
     return in_block, rotation, rx
 

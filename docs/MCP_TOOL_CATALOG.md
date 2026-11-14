@@ -1,8 +1,8 @@
 # Life Platform — MCP Tool Catalog
 
-> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-11-12
+> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-11-14
 
-**Version:** v8.6.0 | **Last updated:** 2026-11-12 | **Total tools:** 91
+**Version:** v8.6.0 | **Last updated:** 2026-11-14 | **Total tools:** 92
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;
@@ -21,7 +21,7 @@
 
 ---
 
-## All 91 Tools — by module
+## All 92 Tools — by module
 
 | Module | Tools |
 |---|---|
@@ -50,6 +50,7 @@
 | `mcp/tools_memory.py` | 4 |
 | `mcp/tools_decisions.py` | 3 |
 | `mcp/tools_advice_links.py` | 1 |
+| `mcp/tools_advice_queue.py` | 1 |
 | `mcp/tools_hevy.py` | 2 |
 | `mcp/tools_hevy_routine.py` | 1 |
 | `mcp/tools_reading.py` | 11 |
@@ -248,7 +249,13 @@
 
 | Tool | Key Params | Description |
 |------|-----------|-------------|
-| `log_advice_link` | decision_sk, coach_id, ref_kind, ref_id, state, evidence_text=, evidence_ref= | #5612 (owner ruling F): record whether Matthew acted on ONE coach recommendation, linked to ONE logged decision (sk from get_decisions). state: acted_on / declined / partially_followed / unknown. ONLY when Matthew has SAID so — pass his own words as evidence_text (or evidence_ref: where he recorded it). NEVER from data: a workout, a meal, a metric or any behaviour that happens to match the advice is NOT evidence, and the tool must not be called on that basis. Any state but unknown without evidence is refused. The recommendation is ref_kind + ref_id + coach_id: prediction (prediction_id from get_predictions), coach_output (<YYYY-MM-DD>#<type>, e.g. 2026-11-02#daily_brief_sleep), or coach_action (<YYYY-MM-DD>-<domain>). Both records are checked to exist first. Re-calling with a new state supersedes and keeps the old one. |
+| `log_advice_link` | decision_sk=, coach_id, ref_kind, ref_id, state=, evidence_text=, evidence_ref=, withdraw= | #5612 (owner ruling F): record whether Matthew acted on ONE coach recommendation, linked to ONE logged decision (sk from get_decisions). state: acted_on / declined / partially_followed / unknown. ONLY when Matthew has SAID so — pass his own words as evidence_text (or evidence_ref: where he recorded it). NEVER from data: a workout, a meal, a metric or any behaviour that happens to match the advice is NOT evidence, and the tool must not be called on that basis. Any state but unknown without evidence is refused. The recommendation is ref_kind + ref_id + coach_id: prediction (prediction_id from get_predictions), coach_output (<YYYY-MM-DD>#<type>, e.g. 2026-11-02#daily_brief_sleep) or coach_action (<YYYY-MM-DD>-<domain>). Both records are checked to exist first. Re-calling with a new state supersedes and keeps the old one. A COACH ASK is answered differently: ref_kind='commitment', ref_id=<ask_id from get_advice_link_queue>, coach_id, NO decision_sk needed, state = what Matthew SAYS he did: acted_on / declined / partially_followed / not_yet_decided; evidence_text is an optional PRIVATE note (his words, never published). withdraw=true (no state) takes his answer back. Each call appends a revision (history kept, private); the public coach page shows only the newest answered state, its day and 'self-reported' (not_yet_decided, withdrawn and unanswered all read 'not recorded'). Never call it for an ask he did not answer, and never read an answer off the grader or the data. |
+
+### mcp.tools_advice_queue (`mcp/tools_advice_queue.py`)
+
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `get_advice_link_queue` | days=, coach_id=, max_asks= | READ-ONLY. The coaches' asks due in the last N days (default 14), most answerable first, each beside what Matthew recorded in its window — decisions, owner notes, check-in answers — so he can say what he did with it. Also returns documented activity (Hevy, MacroFactor, Habitify) labelled CONTEXT, NOT EVIDENCE: a workout or a meal that matches an ask never shows he acted on it, and must never be passed to log_advice_link. Writes nothing and proposes no link. Journal, State of Mind and video-diary data are never read. |
 
 ### Workouts (Unified — Hevy + MacroFactor, ADR-060) (`mcp/tools_hevy.py`)
 

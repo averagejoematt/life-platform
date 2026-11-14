@@ -94,10 +94,12 @@ def test_every_publish_path_calls_the_one_owner():
     fp = _functions(_PROMOTE_SRC)
     missing = [
         name
-        for name, fn in (("approve _handle", fa["_handle"]), ("sweep", fa["_sweep_stale_drafts"]), ("promote", fp["apply_effects"]))
+        for name, fn in (("approve _handle", fa["_handle"]), ("promote", fp["apply_effects"]))
         if "publish_side_effects" not in _called(fn)
     ]
     assert missing == [], f"publish path(s) that bypass publish_side_effects: {missing}"
+    # Owner ruling 2026-11-13: the stale-draft sweep is not a publish path any more — it holds and pages.
+    assert not (_called(fa["_sweep_stale_drafts"]) & (_HELPERS | {"publish_side_effects"})), "the sweep publishes"
     assert "apply_effects" in _called(fp["main"]), "season_promote.main never runs the effects step"
     assert "effects" in sp.STEPS
 
@@ -107,8 +109,6 @@ def test_no_publish_path_calls_a_side_effect_helper_around_the_owner():
     offenders = {}
     for name in ("_handle", "_sweep_stale_drafts"):
         direct = _called(fa[name]) & _HELPERS
-        if name == "_sweep_stale_drafts":
-            direct -= {"_invoke_email_sender", "_invoke_coach_panel_podcast"}  # the batch's one trigger for what it defers
         if direct:
             offenders[name] = sorted(direct)
     owner = _called(fa["publish_side_effects"]) & _HELPERS
@@ -130,7 +130,15 @@ def rec(monkeypatch):
 
 
 def test_approve_runs_every_side_effect_in_order(rec, monkeypatch):
-    row = {"sk": "DATE#2026-10-06", "date": "2026-10-06", "status": "draft", "approval_token": "t" * 64, "week_number": 5}
+    row = {
+        "sk": "DATE#2026-10-06",
+        "date": "2026-10-06",
+        "status": "draft",
+        "approval_token": "t" * 64,
+        "week_number": 5,
+        "content_markdown": "He trained four times.",
+        "desk_findings_json": '{"post": [], "episode": []}',  # owner ruling 2026-11-13: approval needs a passing audit
+    }
     monkeypatch.setattr(approve, "_get_draft", lambda d: row)
     resp = approve._handle(
         {"queryStringParameters": {"date": "2026-10-06", "token": "t" * 64, "action": "approve", "rev": revision_id(row)}}

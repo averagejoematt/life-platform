@@ -234,48 +234,6 @@ MAX_SCHEDULE_AHEAD_DAYS = 120
 
 CALENDAR: dict[str, dict] = {
     # ── Weekly ────────────────────────────────────────────────────────────────
-    "fullreview-delta": _entry(
-        skill=REVIEW_SPINE,
-        lens="full",
-        cadence_days=7,
-        grace_days=3,
-        attendance=AUTONOMOUS,
-        probe=(NEWEST_DATED_FILE, "docs/reviews", r"^fullreview_grades_(\d{4}-\d{2}-\d{2})(?:_delta|_partial)?\.json$"),
-        obligations=(
-            # Owner ruling 2026-11-06: a scheduled, REVIEW-ONLY classification review riding this clock rather than
-            # a schedule of its own. The script writes the proposal privately (never the repo, never public) and
-            # approves nothing; approval stays the owner's `approve` registry edit, landed by PR.
-            "Run `python3 scripts/prediction_publication_registry.py review` (read-only) and hand the owner the "
-            "private proposed-manifest path it prints — the calls, asks and bets waiting for publication review. "
-            "Approve nothing, and never copy the proposal's ids, words or size into the repo, a PR or the grades file",
-        ),
-        reason=(
-            "The one review family that was still alive at #2832's filing — weekly-ish and "
-            "shrinking (17→7 lenses). Weekly delta keeps the grades comparable session to "
-            "session; any run of the `full` lens (full, delta or partial) resets this clock, "
-            "because the weekly claim is 'the platform was looked at', not 'the look was "
-            "small'. Delta mode itself is defined in the `full` rubric's § 'Delta mode' "
-            "(#3250) — the artifact this probe reads is named there, so the clock and the "
-            "procedure cannot drift apart."
-        ),
-        hold=(
-            "2026-09-19",
-            "2026-09-26",
-            "#3603 (PR #3904, merged 2026-09-19) rewrote the instrument this clock measures — "
-            "frozen anchors per run, the 28-day carry-forward cap, the planted calibration "
-            "controls, and the rubric text in SKILL.md + references/full.md — and the change "
-            "surface since the 2026-09-05 baseline is 896 files across every area, so more than "
-            "~70% of the panel qualifies. Both are the rubric's own 'delta is INVALID' tests "
-            "(references/full.md § Delta mode): a delta across an instrument rewrite measures the "
-            "rubric moving, and a delta touching nearly everything is a full run wearing worse "
-            "anchors. Decision (Session AL, 2026-09-19): do NOT run the overdue delta; the next "
-            "fullreview run is a NEW BASELINE under the rewritten instrument (a full, suffix-free "
-            "grades file, `method` naming #3904), and this clock is re-anchored once to 2026-09-26 "
-            "so the 2026-09-16 hard date is discharged by a written decision rather than a silent "
-            "lapse. Precedent: the 2026-08-27 hold for #3245 (#3250, Session I). One-time: after "
-            "2026-09-26 the ordinary cadence applies and a missed run reds like any other.",
-        ),
-    ),
     # ── Monthly ───────────────────────────────────────────────────────────────
     "fullreview-full": _entry(
         skill=REVIEW_SPINE,
@@ -284,12 +242,26 @@ CALENDAR: dict[str, dict] = {
         grace_days=7,
         attendance=SESSION,
         probe=(NEWEST_DATED_FILE, "docs/reviews", r"^fullreview_grades_(\d{4}-\d{2}-\d{2})\.json$"),
-        obligations=(),
+        obligations=(
+            # Owner ruling 2026-11-06: a scheduled, REVIEW-ONLY classification review riding this clock rather than
+            # a schedule of its own (moved here from the retired weekly clock, owner ruling 2026-11-13). The script
+            # writes the proposal privately (never the repo, never public) and approves nothing; approval stays the
+            # owner's `approve` registry edit, landed by PR.
+            "Run `python3 scripts/prediction_publication_registry.py review` (read-only) and hand the owner the "
+            "private proposed-manifest path it prints — the calls, asks and bets waiting for publication review. "
+            "Approve nothing, and never copy the proposal's ids, words or size into the repo, a PR or the grades file",
+        ),
         reason=(
             "Deltas drift: each one grades against the last, so a slow slide can stay "
             "invisible to every individual delta. A monthly FULL run re-grades every area "
             "from scratch. The probe deliberately excludes _delta/_partial filenames — only "
-            "a full-suffix-free grades file resets this clock."
+            "a full-suffix-free grades file resets this clock. Owner ruling 2026-11-13 (the review "
+            "cadence for rapid development): this monthly adversarial run is the ONE clocked full "
+            "review. The weekly `fullreview-delta` clock is retired (delta mode stays an on-demand "
+            "procedure); a full run is also owed after a material architectural or publication-policy "
+            "change, a focused `/review <lens>` after a serious privacy or integrity incident, and a "
+            "full run whenever the owner asks. Continuous coverage between runs is the automated gates "
+            "on every PR and deploy. The change reset no clock: the next calibrated run is the baseline."
         ),
     ),
     "accuracy-full": _entry(
@@ -373,23 +345,23 @@ CALENDAR: dict[str, dict] = {
             "because the series count is only meaningful next to the dollars it explains."
         ),
     ),
-    "preview-fixture-recapture": _entry(
-        skill=None,  # not a command — a script run, recorded in the manifest the script writes
+    "live-contract-recapture": _entry(
+        skill=None,  # not a command — a script run, recorded in the snapshots the script writes
         cadence_days=25,
         grace_days=4,
         attendance=SESSION,
-        probe=(REGEX_IN_FILE, "tests/fixtures/kit_pages_4586/_capture.json", r'^ "captured_at": "(\d{4}-\d{2}-\d{2})T'),
+        probe=(REGEX_IN_FILE, "tests/api_schemas/api_edition.json", r'^  "captured_at": "(\d{4}-\d{2}-\d{2})T'),
         obligations=(
-            "Run `python3 scripts/capture_kit_page_fixtures.py` (read-only GETs of the live site: the kit pages "
-            "and the edition wire in one pass), then re-pin whatever a changed served shape reds to BEHAVIOUR, "
-            "never to the new capture's literal (the #4862 pattern), regenerate tests/fixtures/edition_contract_4582/"
-            "editions.json and the scorecard fixture, and change the 'Last recaptured' line in the script's docstring",
+            "Run `python3 tests/test_live_contract_shapes_fresh.py` for the two commands, run the `--check-drift` one "
+            "first (read-only GETs of every route the v9 site reads, shapes only) and read what moved — a removed key "
+            "a page still reads is a defect to fix, not a baseline to update — then run the capture one",
         ),
         reason=(
-            "#4864 (#4839): tests/test_kit_fixtures_fresh_4839.py reds main when the committed captures are over 30 "
-            "days old, by design — so the recapture is a dated task, not a surprise on main. The manifest the script "
-            "writes is the clock (the capture instant, not a file mtime), first captured 2026-10-13: due 2026-11-07, "
-            "overdue 2026-11-11 — the day the 30-day test would red."
+            "Owner ruling 2026-11-13: the v8 kit captures were frozen as historical evidence (ADR-166) and their 30-day "
+            "rule retired; the live API's freshness moved to tests/test_live_contract_shapes_fresh.py, which reds main "
+            "when any v9 route's shape baseline is over 30 days old — so the recapture is a dated task, not a surprise "
+            "on main. Re-pointed from `preview-fixture-recapture` (kit manifest probe, first captured 2026-10-13); the "
+            "probe reads /api/edition's baseline, which the one recapture command writes with the rest."
         ),
     ),
     # ── Quarterly ─────────────────────────────────────────────────────────────
@@ -454,19 +426,19 @@ CALENDAR: dict[str, dict] = {
         starts="2026-09-01",
         probe=(REGEX_IN_FILE, "docs/OPERATING_RHYTHM.md", r"^- 30-day checkpoint: (\d{4}-\d{2}-\d{2})"),
         obligations=(
-            "Answer the 30-day section of docs/OPERATING_RHYTHM.md from OBSERVED behaviour "
+            "Answer the monthly use read in docs/OPERATING_RHYTHM.md from OBSERVED behaviour "
             "(which surfaces were opened, which were not, which coaches were texted) rather "
             "than from memory, and append the dated log line this probe reads",
-            "This is the first window in which a feature may be reconsidered at all — "
-            "anything wanted before it waits, and anything wanted at it is filed as an issue "
-            "with the lived usage that motivated it written into the body",
+            "Name what shipped in the month that has not been used once — each is a prune "
+            "candidate or an issue with the reason it is still wanted, never a silent keep",
         ),
         reason=(
-            "First occurrence 2026-10-01. From the 2026-09-01 launch the owner operates the "
-            "platform instead of building it daily, and Claude sessions go bug-fix-only. Both "
-            "failure modes of that switch are invisible from inside any single day: the rhythm "
-            "quietly lapses, or feature work quietly resumes one 'small' change at a time. A "
-            "dated checkpoint is the only thing that reads a month of behaviour as a month."
+            "First occurrence 2026-10-01, written for the 2026-09-01 'operate, don't build' plan "
+            "(Claude bug-fix-only, feature work frozen until this read). Owner ruling 2026-11-13: "
+            "that premise ended — the platform is in rapid development (owner ruling 2026-11-07) — "
+            "so the freeze gate is retired and the checkpoint is kept for what still holds: building "
+            "fast makes unused surfaces accumulate faster, and only a dated read of a month of real "
+            "use sees them. The clock was not reset by this change; it is overdue until it is run."
         ),
     ),
     "rhythm-checkpoint-60d": _entry(
@@ -477,19 +449,18 @@ CALENDAR: dict[str, dict] = {
         starts="2026-09-01",
         probe=(REGEX_IN_FILE, "docs/OPERATING_RHYTHM.md", r"^- 60-day checkpoint: (\d{4}-\d{2}-\d{2})"),
         obligations=(
-            "Read September's close in docs/COST_TRACKER.md against what the platform "
+            "Read the latest closed month in docs/COST_TRACKER.md against what the platform "
             "actually DID for the owner that month — named, specific things, not a feeling; "
             "an honest 'nothing I can name' is a valid and important answer",
             "Append the dated log line this probe reads, with the two numbers (spend, and the "
-            "count of named returns) written down so the 90-day read has a prior",
+            "count of named returns) written down so the next read has a prior",
         ),
         reason=(
-            "First occurrence 2026-10-31, deliberately after the September cost close lands "
-            "rather than during it — the first full month of user-mode spend is the first "
-            "month whose cost can be read against use rather than against building. Cost "
-            "without a return read is half an instrument, which is how a platform stays "
-            "expensive and unquestioned (ADR-103/144's ledger asks the same question per "
-            "subsystem; this asks it once, for the whole thing, from the owner's chair)."
+            "First occurrence 2026-10-31. Cost without a return read is half an instrument, which is how a "
+            "platform stays expensive and unquestioned (ADR-103/144's ledger asks the same question per "
+            "subsystem; this asks it once, for the whole thing, from the owner's chair). Owner ruling "
+            "2026-11-13: kept through the rapid-development phase, where spend moves fastest; it reads "
+            "the latest closed month rather than September's. Not reset by this change."
         ),
     ),
     "rhythm-checkpoint-90d": _entry(
@@ -514,7 +485,9 @@ CALENDAR: dict[str, dict] = {
             "'I imagined I would need this', and every roadmap this platform has written from "
             "speculation has been re-written from usage within a cycle. Ninety days is also long "
             "enough that the checkpoint must be on a clock — nobody remembers a November date "
-            "they set in August."
+            "they set in August. Owner ruling 2026-11-13: in the rapid-development phase the roadmap "
+            "is no longer held for this date; the checkpoint stays as the usage-evidenced read of it "
+            "and the place the three rhythm rows are re-decided."
         ),
     ),
 }
@@ -643,7 +616,7 @@ carry_forward_report = _carry.carry_forward_report
 #: The two `full`-lens clocks read a calibration-aware probe. Wired here rather than at the
 #: CALENDAR literal because `calibrated_run` is defined below it; the set is explicit so a
 #: reader can see exactly which clocks a failed planted control stops (#3603).
-for _review_entry in ("fullreview-delta", "fullreview-full"):
+for _review_entry in ("fullreview-full",):
     CALENDAR[_review_entry]["qualifier"] = calibrated_run
 
 

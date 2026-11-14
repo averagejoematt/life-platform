@@ -28,19 +28,14 @@ CloudWatch delivery record in #3564). Every cron here is Pacific wall clock sinc
                            content-hash dedup). Often silent.
   * `chronicle-email-sender` Wednesday 8:10 AM PT — a clean no-op
                            unless an installment actually PUBLISHED. The
-                           Wednesday draft (`wednesday-chronicle`,
-                           `cron(0 8 ? * WED *)`) defaults to PREVIEW_MODE and
-                           waits for the owner's approval click; the
-                           `chronicle-approve` sweep (`cron(0 11 * * ? *)`)
-                           auto-publishes any draft older than
-                           CHRONICLE_AUTOPUBLISH_HOURS=48 and invokes the sender
-                           inline. 48h after Wednesday 08:00 PT is Friday 08:00
-                           PT, and the first sweep at/after that is Friday 11:00
-                           PT — which is exactly where the trailing 35 days of
-                           "Sent 1/1" datapoints landed. So the honest phrasing
-                           is "Wednesday, or Friday when a draft auto-publishes",
-                           and `chronicle_autopublish_weekday()` DERIVES that
-                           Friday rather than asserting it.
+                           Wednesday draft (`wednesday-chronicle`) defaults to
+                           PREVIEW_MODE and waits for the owner's approval
+                           click. Until 2026-11-13 the `chronicle-approve`
+                           sweep published a draft left unapproved for 48 h
+                           (so the promise read "Wednesday, or Friday when a
+                           draft auto-publishes"); the owner then ruled that
+                           elapsed time is never consent, the sweep stopped
+                           publishing, and the Friday clause left the promise.
 
 Why the copy was corrected instead of the cadence: the senders are doing what
 #1951's owner decision asked of them (make the weekly promise true), and every
@@ -53,7 +48,7 @@ same posture as the sibling `common/content_cadence.py`).
 """
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Optional
 
 from common.constants import EXPERIMENT_START_DATE
@@ -97,7 +92,7 @@ SUBSCRIBER_SENDERS = (
         function_name="chronicle-email-sender",
         construct_id="ChronicleEmailSender",
         cron="cron(10 8 ? * WED *)",
-        blurb="the Chronicle installment on {weekday} (or {fallback_weekday}, when an unapproved draft auto-publishes)",
+        blurb="the Chronicle installment on {weekday}",
         conditional=True,
     ),
     SubscriberSender(
@@ -108,16 +103,6 @@ SUBSCRIBER_SENDERS = (
         conditional=True,
     ),
 )
-
-# The chronicle publish path, mirrored from the same stack. These three facts
-# together decide the weekday a subscriber ACTUALLY receives an unapproved
-# installment on — the artifact the 35-day CloudWatch record shows.
-CHRONICLE_DRAFT_CONSTRUCT = "WednesdayChronicle"
-CHRONICLE_DRAFT_CRON = "cron(0 8 ? * WED *)"
-CHRONICLE_APPROVE_CONSTRUCT = "ChronicleApprove"
-CHRONICLE_APPROVE_SWEEP_CRON = "cron(0 11 * * ? *)"
-CHRONICLE_AUTOPUBLISH_HOURS = 48
-
 
 # ── cron parsing ──────────────────────────────────────────────────────────────
 
@@ -196,41 +181,9 @@ def chronicle_weekday() -> int:
     return required_weekday(sender("chronicle-email-sender").cron)
 
 
-def chronicle_autopublish_dt(draft_dt: datetime) -> datetime:
-    """When an UNAPPROVED draft actually reaches subscribers.
-
-    Derived, not asserted: the draft becomes sweep-eligible
-    CHRONICLE_AUTOPUBLISH_HOURS after it is written, and the daily
-    `chronicle-approve` sweep publishes it (and invokes the sender inline) at the
-    first sweep hour at or after that. Naive/aware agnostic — both crons are in the
-    one platform zone (Pacific wall clock, #4284).
-    """
-    eligible = draft_dt + timedelta(hours=CHRONICLE_AUTOPUBLISH_HOURS)
-    sweep_hour = cron_hour(CHRONICLE_APPROVE_SWEEP_CRON)
-    sweep = eligible.replace(hour=sweep_hour, minute=cron_minute(CHRONICLE_APPROVE_SWEEP_CRON), second=0, microsecond=0)
-    if sweep < eligible:
-        sweep += timedelta(days=1)
-    return sweep
-
-
-def chronicle_autopublish_weekday() -> int:
-    """The weekday the auto-publish path delivers on (Friday, today) — computed
-    from the draft cron + the 48h window + the sweep cron, so it moves with any
-    of the three."""
-    draft_weekday = required_weekday(CHRONICLE_DRAFT_CRON)
-    # Any concrete week works — the answer is a weekday offset, not a date.
-    anchor = datetime(2026, 1, 5)  # a Monday
-    draft_dt = (anchor + timedelta(days=draft_weekday)).replace(
-        hour=cron_hour(CHRONICLE_DRAFT_CRON), minute=cron_minute(CHRONICLE_DRAFT_CRON)
-    )
-    return chronicle_autopublish_dt(draft_dt).weekday()
-
-
 def delivery_weekdays() -> set:
     """Every weekday a subscriber can hear from the platform on."""
-    days = {required_weekday(s.cron) for s in SUBSCRIBER_SENDERS}
-    days.add(chronicle_autopublish_weekday())
-    return days
+    return {required_weekday(s.cron) for s in SUBSCRIBER_SENDERS}
 
 
 def promise_sentence() -> str:
@@ -248,7 +201,6 @@ def promise_sentence() -> str:
         clauses.append(
             s.blurb.format(
                 weekday=weekday_name(required_weekday(s.cron)),
-                fallback_weekday=weekday_name(chronicle_autopublish_weekday()),
             )
         )
     return f"At most {weekly_count_word()} emails a week: " + ", ".join(clauses) + "."

@@ -22,8 +22,9 @@ Four commands, none of which writes to AWS:
                            bet filed after the registry) to a PRIVATE file outside the repository (default
                            ``~/.life-platform/private/call_review/proposed-<date>.json``, mode 0600; a path inside
                            the checkout is refused). Every entry is written ``"approve": false``. It never edits the
-                           registry, never writes the table, and prints no count. It rides the weekly review clock
-                           (``scripts/operating_calendar.py`` ``fullreview-delta``), not a schedule of its own.
+                           registry, never writes the table, and prints no count. It rides the monthly review clock
+                           (``scripts/operating_calendar.py`` ``fullreview-full``; the weekly clock it first rode was
+                           retired 2026-11-13), not a schedule of its own.
 
   approve --manifest <file> The owner's act, after reading the proposal: every entry he set ``"approve": true`` is added
                            to the registry module (a repo edit that lands by code review, like any other). An entry the

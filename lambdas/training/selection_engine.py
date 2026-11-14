@@ -22,8 +22,11 @@ ranks the exercise library (#5769, `config/exercise_library.json`) per slot, det
     rank        = tier for the slot's muscle (A over B over C)
                   -> N=1 fit from the owner-private overlay (progression, pain history, sentiment; swap-out frequency
                      demotes; an absent overlay is `unknown`, score 0 — never an error)
-                  -> variety (not served in the last VARIETY_LOOKBACK_BLOCKS blocks of the rotation ledger; not already
-                     served by another slot this week; then familiar before new-to-him; then history exposures)
+                  -> variety (not served in the last VARIETY_LOOKBACK_BLOCKS blocks of the rotation ledger; then
+                     familiar before new-to-him; then history exposures)
+    no repeats  = best per slot, NO REPEATS PER WEEK (owner ruling 2026-11-11): a movement another slot already serves
+                  this program week is passed over and the next-best eligible candidate fills the later slot, recorded
+                  as `week_repeat` (a repeat only when nothing else is left: `week_repeat_unavoidable`). Pins are exempt.
     C           = served only with a recorded reason (`C_REASONS`): an A/B candidate for the slot exists and is excluded
                   by equipment, pain, a locked gate, or the catalog; the slot is an owner pin or the skill track; or
                   the library holds no A/B movement for the slot's job at all (`library_gap`).
@@ -100,9 +103,11 @@ C_REASONS: dict[str, str] = {
     "library_gap": "the library holds no A/B movement for this slot's job",
     "weekly_floor": "an A/B movement for this slot exists but the slot serves the week's family floor (#5759)",
     "not_for_you_now": "an A/B movement for this slot exists but the library marks it not-for-you-now (unlock recorded)",
+    "week_repeat": "every higher-tier movement for this slot already fills another slot this program week (no repeats)",
 }
 """Why a C movement is served. `equipment`, `pain_swap`, `owner_pin` and `skill_track` are the owner's (2026-11-11);
-`gate_locked`, `not_prescribable`, `library_gap`, `weekly_floor` and `not_for_you_now` are platform-proposed: they name the A/B the slot could not serve."""
+`gate_locked`, `not_prescribable`, `library_gap`, `weekly_floor` and `not_for_you_now` are platform-proposed; `week_repeat`
+follows the owner's no-repeats ruling (2026-11-11): they name the A/B the slot could not serve."""
 PROGRESSION_DROP = 0.05  # platform-proposed: a latest band best >5 % under the best band's e1RM reads as regressing
 APPROVAL_SERVES = ("approved", "prior_block")  # `block_design_review.APPROVED` / `PRIOR_BLOCK` (#5776)
 SKILL_TRACK_VOLUME = {"sets_max": 2, "reps_max": 5, "rpe_max": 7, "provenance": "platform-proposed (#5773), low volume"}
@@ -162,14 +167,22 @@ def mode(lib: dict[str, Any] | None) -> str:
 # ── the library <-> catalog join ─────────────────────────────────────────────
 def key_index(lib: dict[str, Any], catalog: dict[str, Any]) -> dict[str, dict[str, str]]:
     """`{"to_lib": catalog key -> library id, "to_cat": library id -> catalog key}` by Hevy template id (the catalog's
-    `hevy_template_id_hint`, the library's raw `template_id`). A library id that is itself a catalog key also joins."""
+    `hevy_template_id_hint`, the library's raw `template_id`). A library id that is itself a catalog key also joins. A
+    catalog entry with NO hint (resolved by title at commit, ADR-069 — `reverse_pec_deck`) joins the one library entry
+    whose title is the same, exactly (#5780: without it the incumbent of a slot had no library entry)."""
     by_tid: dict[str, str] = {}
+    by_title: dict[str, list[str]] = {}
     for k, e in xl.movements(lib).items():
         if e.get("template_id"):
             by_tid[str(e["template_id"]).upper()] = k
+        by_title.setdefault(str(e.get("title") or "").strip().lower(), []).append(k)
     to_lib: dict[str, str] = {}
     for ck, c in catalog.items():
-        lid = by_tid.get(str(c.get("hevy_template_id_hint") or "").upper()) or (ck if ck in xl.movements(lib) else None)
+        hint = str(c.get("hevy_template_id_hint") or "").upper()
+        same_title = by_title.get(str(c.get("title") or "").strip().lower()) or []
+        lid = by_tid.get(hint) or (ck if ck in xl.movements(lib) else None)
+        if not lid and not hint and str(c.get("title") or "").strip() and len(same_title) == 1:
+            lid = same_title[0]
         if lid:
             to_lib[ck] = lid
     to_cat: dict[str, str] = {}
@@ -373,20 +386,27 @@ def candidates(ctx: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str
     return eligible, excluded
 
 
-def rank_key(c: dict[str, Any], recent: set[str], week_taken: set[str]) -> tuple[Any, ...]:
-    """Tier, then N=1 fit, then variety: not served in the lookback, not taken by another slot this week, familiar
-    before new, more exposures, then the id (deterministic)."""
+def rank_key(c: dict[str, Any], recent: set[str]) -> tuple[Any, ...]:
+    """Tier, then N=1 fit, then variety: not served in the lookback, familiar before new, more exposures, then the id
+    (deterministic). No-repeats-per-week is not a rank term: it is a rule over the ranked list (`select_slot`)."""
     ck = c.get("catalog_key") or ""
-    return (TIER_RANK[c["tier"]], -c["n1"]["score"], ck in recent, ck in week_taken, c["novel"], -c["exposures"], c["movement_id"])
+    return (TIER_RANK[c["tier"]], -c["n1"]["score"], ck in recent, c["novel"], -c["exposures"], c["movement_id"])
 
 
-def c_reason(pick: dict[str, Any], excluded: list[dict[str, Any]], *, pinned: bool = False) -> dict[str, str] | None:
-    """The recorded reason a C pick is served (None for an A/B pick). The A/B exclusion with the best tier names it."""
+def c_reason(
+    pick: dict[str, Any], excluded: list[dict[str, Any]], *, pinned: bool = False, skipped: list[dict[str, Any]] | None = None
+) -> dict[str, str] | None:
+    """The recorded reason a C pick is served (None for an A/B pick). The A/B the slot could not serve with the best tier
+    names it — an exclusion, or a movement another slot already serves this week (`skipped`, `week_repeat`)."""
     if pick["tier"] != "C":
         return None
     if pinned:
         return {"code": "owner_pin", "why": C_REASONS["owner_pin"]}
-    above = sorted((x for x in excluded if x["tier"] != "C"), key=lambda x: (TIER_RANK[x["tier"]], x["movement_id"]))
+    blocked = list(excluded) + [c | {"code": "week_repeat", "why": "already fills another slot this program week"} for c in skipped or []]
+    # at one tier, a movement this slot could serve but another slot took (`week_repeat`) names it before an exclusion
+    above = sorted(
+        (x for x in blocked if x["tier"] != "C"), key=lambda x: (TIER_RANK[x["tier"]], x["code"] != "week_repeat", x["movement_id"])
+    )
     if above:
         x = above[0]
         return {"code": x["code"], "why": f"{x['title']} (tier {x['tier']}): {x['why']}", "blocked": x["movement_id"]}
@@ -427,10 +447,15 @@ def _novel_terms(pick: dict[str, Any]) -> dict[str, Any] | None:
 def select_slot(slot: dict[str, Any], ctx: dict[str, Any], recent: set[str], week_taken: set[str]) -> dict[str, Any]:
     """One slot's selection: the ranked eligible candidates, the pick, its C-reason, its fallbacks, the exclusions."""
     eligible, excluded = candidates(ctx)
-    ranked = sorted(eligible, key=lambda c: rank_key(c, recent, week_taken))
-    above = [x for x in excluded if TIER_RANK[x["tier"]] < TIER_RANK[ranked[0]["tier"]]] if ranked else excluded
+    ranked = sorted(eligible, key=lambda c: rank_key(c, recent))
+    # owner ruling 2026-11-11: best per slot, NO REPEATS PER WEEK — a movement another slot already serves this program week
+    # is passed over and the next-best eligible candidate fills this slot (`week_repeat`); a repeat only when none is left
+    open_ = [c for c in ranked if (c.get("catalog_key") or "") not in week_taken]
+    chosen = open_[0] if open_ else (ranked[0] if ranked else None)
+    skipped = ranked[: ranked.index(chosen)] if chosen else []
+    above = [x for x in excluded if TIER_RANK[x["tier"]] < TIER_RANK[chosen["tier"]]] if chosen else excluded
     base = {"slot_id": slot["slot_id"], "role": slot["role"], "incumbent": slot["incumbent"], "spec": ctx["spec"], "floor": ctx["floor"]}
-    if not ranked:
+    if chosen is None:
         return {
             **base,
             "pick": None,
@@ -438,11 +463,20 @@ def select_slot(slot: dict[str, Any], ctx: dict[str, Any], recent: set[str], wee
             "ranked": [],
             "excluded": excluded,
         }
-    pick = ranked[0]
+    pick = chosen
     budget = NOVELTY_PER_SLOT - int(pick["novel"])
+    repeat = (
+        {"code": "week_repeat", "why": C_REASONS["week_repeat"].split(" (")[0], "skipped": [c["movement_id"] for c in skipped]}
+        if skipped
+        else (
+            {"code": "week_repeat_unavoidable", "why": "every eligible candidate already fills another slot this week"}
+            if not open_
+            else None
+        )
+    )
     return {
         **base,
-        "pick": pick | {"c_reason": c_reason(pick, excluded), "novel_terms": _novel_terms(pick)},
+        "pick": pick | {"c_reason": c_reason(pick, excluded, skipped=skipped), "novel_terms": _novel_terms(pick), "week_repeat": repeat},
         "fallbacks": fallbacks(pick, ranked, novel_budget=budget),
         "ranked": [c["movement_id"] for c in ranked],
         "above_pick": [{k: x[k] for k in ("movement_id", "title", "tier", "code", "why")} for x in above],
@@ -455,7 +489,7 @@ def _owner_pinned(slot: dict[str, Any], ctx: dict[str, Any], pin: dict[str, Any]
     accessory, or one of the slot's eligible candidates. An approved movement the slot can no longer serve (equipment,
     pain, a lock, the catalog) is REFUSED, never forced: the record says why and drafting keeps the pool's variant."""
     eligible, excluded = candidates(ctx)
-    ranked = sorted(eligible, key=lambda c: rank_key(c, recent, week_taken))
+    ranked = sorted(eligible, key=lambda c: rank_key(c, recent))
     ck = str(pin.get("catalog_key") or "")
     meta = {k: pin.get(k) for k in ("source", "approved_block")} | {"catalog_key": ck, "experiment": pin.get("experiment")}
     hit = next((c for c in ranked if c["catalog_key"] == ck), None)
@@ -465,7 +499,8 @@ def _owner_pinned(slot: dict[str, Any], ctx: dict[str, Any], pin: dict[str, Any]
     if hit is None:
         why = next((x["why"] for x in excluded if x.get("catalog_key") == ck), "not a candidate for this slot's muscle and job")
         return select_slot(slot, ctx, recent, week_taken) | {"owner_pin": meta | {"state": "refused", "why": why}}
-    pick = hit | {"c_reason": c_reason(hit, excluded, pinned=True), "novel_terms": _novel_terms(hit)}
+    # an owner-approved pick is exempt from no-repeats, as a pin is (#5773 x #5776)
+    pick = hit | {"c_reason": c_reason(hit, excluded, pinned=True), "novel_terms": _novel_terms(hit), "week_repeat": None}
     return {
         "slot_id": slot["slot_id"],
         "role": slot["role"],
@@ -486,9 +521,9 @@ def _pinned(slot: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     lid = ctx["idx"]["to_lib"].get(slot["incumbent"])
     e = xl.movements(ctx["lib"]).get(lid or "") or {"title": slot["incumbent"]}
     pick = _candidate(lid or slot["incumbent"], e, slot["incumbent"], ctx)
-    pick |= {"c_reason": c_reason(pick, [], pinned=True), "novel_terms": None}
+    pick |= {"c_reason": c_reason(pick, [], pinned=True), "novel_terms": None, "week_repeat": None}  # a pin is exempt from no-repeats
     eligible, _excluded = candidates(ctx)
-    ranked = sorted(eligible, key=lambda c: rank_key(c, set(), set()))
+    ranked = sorted(eligible, key=lambda c: rank_key(c, set()))
     return {
         "slot_id": slot["slot_id"],
         "role": slot["role"],
@@ -542,16 +577,24 @@ def _lengthened_pass(picked: list[dict[str, Any]], full: dict[str, list[dict[str
             continue
         swapped = None
         for p in group:
+            others = {(q.get("pick") or {}).get("catalog_key") for q in picked if q is not p}  # never a week repeat
             alt = next(
                 (
                     c
                     for c in full[p["slot_id"]]
-                    if c["length_bias"] == "lengthened" and c["tier"] == p["pick"]["tier"] and c["n1"]["score"] == p["pick"]["n1"]["score"]
+                    if c["length_bias"] == "lengthened"
+                    and c["tier"] == p["pick"]["tier"]
+                    and c["n1"]["score"] == p["pick"]["n1"]["score"]
+                    and c.get("catalog_key") not in others
                 ),
                 None,
             )
             if alt:
-                p["pick"] = alt | {"c_reason": p["pick"]["c_reason"], "novel_terms": _novel_terms(alt)}
+                p["pick"] = alt | {
+                    "c_reason": p["pick"]["c_reason"],
+                    "novel_terms": _novel_terms(alt),
+                    "week_repeat": p["pick"].get("week_repeat"),
+                }
                 p["fallbacks"] = fallbacks(p["pick"], full[p["slot_id"]], novel_budget=NOVELTY_PER_SLOT - int(alt["novel"]))
                 p["lengthened_swap"] = True
                 swapped = p["slot_id"]
@@ -606,7 +649,8 @@ def _trim(p: dict[str, Any]) -> dict[str, Any]:
     pick = out.get("pick")
     if pick:
         out["pick"] = {
-            k: pick[k] for k in ("movement_id", "catalog_key", "title", "tier", "n1", "length_bias", "novel", "c_reason", "novel_terms")
+            k: pick[k]
+            for k in ("movement_id", "catalog_key", "title", "tier", "n1", "length_bias", "novel", "c_reason", "novel_terms", "week_repeat")
         }
     locked = sorted(
         (x for x in p.get("excluded") or [] if x.get("code") == "gate_locked"), key=lambda x: (TIER_RANK[x["tier"]], x["movement_id"])
@@ -656,10 +700,10 @@ def select_week(
             p = _pinned(slot, ctx) | {"spec": ctx["spec"]}
         elif (owner_pins or {}).get(slot["slot_id"]):
             p = _owner_pinned(slot, ctx, (owner_pins or {})[slot["slot_id"]], recent, taken)
-            full[slot["slot_id"]] = sorted(candidates(ctx)[0], key=lambda c: rank_key(c, recent, taken))
+            full[slot["slot_id"]] = sorted(candidates(ctx)[0], key=lambda c: rank_key(c, recent))
         else:
             p = select_slot(slot, ctx, recent, taken)
-            full[slot["slot_id"]] = sorted(candidates(ctx)[0], key=lambda c: rank_key(c, recent, taken))
+            full[slot["slot_id"]] = sorted(candidates(ctx)[0], key=lambda c: rank_key(c, recent))
         if p.get("pick") and p["pick"].get("catalog_key"):
             taken.add(p["pick"]["catalog_key"])
         picked.append(p)

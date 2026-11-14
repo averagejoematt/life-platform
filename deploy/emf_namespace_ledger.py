@@ -152,8 +152,18 @@ LEDGER: dict[str, dict] = {
             "bare / (CallerClass,) / (Coach,Surface) / (Endpoint,LambdaFunction)"
         ),
         live_series=89,
-        series_budget=186,
+        series_budget=212,
         note=(
+            "RE-PRICED 186 -> 212 on 2026-11-13 (#5888, measured 200 live): the grown dimension is the CALLER population of "
+            "(LambdaFunction,) — 39 live callers (every one emitted in the last 14d; the weekly/monthly ones included) against "
+            "the 26 the 186 assumed. Every one of those series is read: AnthropicInputTokens/OutputTokens/EstimatedCostUSD "
+            "per caller feed site_api_budget (per-Lambda spend rows) and scripts/ai_spend_attribution.py, and the cache pair "
+            "feeds the attribution too. Re-derived class by class, not by raising to the measured number: (LambdaFunction,) 170 = "
+            "40 callers x 3 universal = 120 + cache pair on up to 8 engaged callers = 16 (7 live) + PromptCacheNoOp on up to "
+            "14 decliners = 14 (14 live) + truncation pair on up to 10 callers = 20 (10 live); (Arm,Surface) 14 (13 live; was 30, "
+            "tightened); (CoachID,) 6 (4 live; was 12); bare 8 (8 live; was 10); (CallerClass,) 4 EXACT; (Coach,Surface) 4 (0 live; was 8); "
+            "(Endpoint,LambdaFunction) 4 (4 live; was 6); BoardQualityGateVerdict (Surface,) + (Outcome,Surface) 2 = alarmed in "
+            "monitoring_stack (new since the 186). Total 170+14+6+8+4+4+4+2 = 212. No series was cut: none is unread. "
             "The ADR-063/133 budget chain's raw input: 6 alarms, a dashboard, and three code "
             "readers (site_api_budget, ai_spend_attribution, batch_feasibility). Densest "
             "unalarmed-fraction namespace in the estate (16 of 102 active series) and entirely "
@@ -302,7 +312,13 @@ LEDGER: dict[str, dict] = {
         driver=None,
         live_series=2,
         series_budget=5,
-        note="4 alarms; both series alarmed. Backfill-gap reconciliation.",
+        note=(
+            "MissingActivityCount{Source=strava|whoop|hevy} = 3 series, each behind an alarm + heartbeat (6 alarms). "
+            "EmptiedDayCount{Source=strava} = the audit of the one WRITE the reconciler makes. #5888 (2026-11-13, 8 live vs 5) "
+            "stopped emitting StoreOnlyActivityCount / ChangedActivityCount (strava + whoop, 4 series): report-only, no alarm, "
+            "no dashboard, no reader — the counts stay in the [RECONCILE] warning log and the run report. Expected 4 series once "
+            "the retired four age out of the 14d list window."
+        ),
     ),
     "LifePlatform/Telegram": _row(
         owner="lambdas/coach/telegram_worker_lambda.py",
@@ -571,6 +587,8 @@ LEDGER: dict[str, dict] = {
         live_series=2,
         series_budget=5,
         note=(
+            "#5888 (2026-11-13, 6 live vs 5): hevy_restamp's eight Restamp* outcome metrics (no alarm, no dashboard, no reader; "
+            "one live, seven reachable) are now log-only — the series set is the five heartbeats below. "
             "Reclassified retire-candidate -> keep 2026-09-13 (#3764). The old note was accurate when "
             "written — 'no alarm, no dashboard, no reader' — and this namespace was on the kill list for "
             "exactly that reason. It now carries TemplateIndexRebuilt, the heartbeat behind "

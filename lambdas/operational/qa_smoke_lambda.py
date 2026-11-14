@@ -1067,6 +1067,9 @@ def _blog_links_retired():
     return [Check("blog:links", "Blog Links", CONTENT_TRUTH).pause(msg)]
 
 
+SWEEP_LAG_DAYS = 1  # the nightly pre-draft sweep (19:00 PT) runs between a draft turning ORPHAN_DRAFT_DAYS and this leg
+
+
 def check_orphan_routine_drafts():
     """#3772: routines still `draft` more than `ORPHAN_DRAFT_DAYS` (14, #4732: the sweep's own age) days after creation. The #3765 soft-timeout
     lands the draft and tells the client it timed out, so nothing ever lists it — one sat
@@ -1084,8 +1087,12 @@ def check_orphan_routine_drafts():
     from training.routine_repo import ORPHAN_DRAFT_DAYS, stale_draft_census
 
     c = Check("data:orphan_routine_drafts", "Orphaned routine drafts", CONTENT_TRUTH)
+    # The sweep archives at ORPHAN_DRAFT_DAYS at 19:00 PT; this leg runs at 11:30 PT, so a draft turning 14 that day was
+    # read here hours before its sweep ran — one false WARN per draft (2026-11-13 triage). Judging one day later gives
+    # the sweep its run first; a draft the sweep failed to archive still warns the next morning.
+    days = ORPHAN_DRAFT_DAYS + SWEEP_LAG_DAYS
     try:
-        census = stale_draft_census(older_than_days=ORPHAN_DRAFT_DAYS)
+        census = stale_draft_census(older_than_days=days)
     except Exception as e:  # noqa: BLE001
         return [c.warn(f"orphan-draft census errored (no verdict was reached): {e}")]
     live, history, w = census["live"], census["pre_genesis"], census["window"]
@@ -1098,12 +1105,12 @@ def check_orphan_routine_drafts():
         more = f" (+{len(live) - 5} more)" if len(live) > 5 else ""
         return [
             c.warn(
-                f"{len(live)} live-cycle routine draft(s) older than {ORPHAN_DRAFT_DAYS} days never committed or archived: {names}{more} — "
-                f"`manage_hevy_routine list start_date={w['genesis'] or w['start']} end_date={w['end']} status=draft older_than_days={ORPHAN_DRAFT_DAYS}` "
+                f"{len(live)} live-cycle routine draft(s) older than {days} days never committed or archived: {names}{more} — "
+                f"`manage_hevy_routine list start_date={w['genesis'] or w['start']} end_date={w['end']} status=draft older_than_days={days}` "
                 f"lists them (#3772); {window} (#4183)"
             )
         ]
-    return [c.ok(f"no live-cycle routine draft older than {ORPHAN_DRAFT_DAYS} days is left uncommitted (#3772); {window} (#4183).")]
+    return [c.ok(f"no live-cycle routine draft older than {days} days is left uncommitted (#3772); {window} (#4183).")]
 
 
 def check_pk_family_census():
@@ -1176,6 +1183,13 @@ def check_steps():
         ("phase_eval_liveness", lambda: phase_eval_qa.check_phase_eval_liveness(table, Check, CONTENT_TRUTH, pt_now)),  # #5575 dead-man
         ("planning_loop_liveness", lambda: planning_loop_qa.check_planning_loop_liveness(table, Check, CONTENT_TRUTH, pt_now)),  # #5761
         ("public_brief_liveness", lambda: public_brief_qa.check_public_brief_liveness(table, Check, CONTENT_TRUTH, pt_now)),
+        # the Monday brief's one manual input: MacroFactor's export age, WARN from Saturday while an upload can still land
+        (
+            "macrofactor_export_age",
+            lambda: public_brief_qa.check_macrofactor_export_age(
+                table, Check, CONTENT_TRUTH, pt_now, user_prefix=USER_PREFIX, bucket=S3_BUCKET
+            ),
+        ),
         # #3829 dead-man: coach-ensemble-digest writes exactly one ENSEMBLE#digest row per cycle on EVERY
         # non-crashing path (including the budget-tier pause), so a missing CYCLE# row is unambiguous. Two of
         # four cycles were missing for eight days with nothing reporting it but a DLQ alarm a human read at wrap.

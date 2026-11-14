@@ -21,6 +21,7 @@ the split, and it is why nothing here imports the facade — no import cycle.
 
 from boto3.dynamodb.conditions import Key
 from coach import (
+    ask_outcomes,  # owner 2026-11-12: Matthew's self-reported answer to an ask — the public projection only
     audience_guard,  # #4213: the by-coach slots serve the public twin or nothing
     coach_baseline,  # #4585: the record and what a simple guess scored, from one read
     coach_corrections,  # #1689 ledger — reused by the dossier retract/correct path (#1387)
@@ -42,6 +43,7 @@ from web import (
     trail_corrections,  # #5626: the learning trail read against the ledger's current verdicts
 )
 from web.site_api_common import (
+    USER_ID,
     USER_PREFIX,
     _decimal_to_float,
     _error,
@@ -555,6 +557,9 @@ def _dossier_block(coach_id, *, _g, commitments_only=False):
         commitments, learnings, docket_positions, relationship = [], [], [], None
         degraded = True
 
+    if not commitments_only and commitments:
+        commitments = _with_what_matt_did(commitments, coach_id, table)
+
     disclosure = (
         "Rendered verbatim from this coach's memory records — deterministic build, no AI in the "
         "render path. Every line carries its date. Lines that fail the standing privacy filter are "
@@ -588,6 +593,22 @@ def _dossier_block(coach_id, *, _g, commitments_only=False):
         "degraded": degraded,
         "disclosure": disclosure,
     }
+
+
+def _with_what_matt_did(commitments, coach_id, table):
+    """Owner 2026-11-12: each ask Matthew answered carries `what_matt_did` — exactly {ask_id, state, responded_on,
+    self_reported: True} from `coach.ask_outcomes.public_outcomes` (acted_on / declined / partially_followed only).
+    An unanswered, withdrawn or not-yet-decided ask carries nothing: the page reads "not recorded", and a missing
+    answer is never "declined". Nothing is inferred from the grader or the data; a read error publishes nothing."""
+    outcomes = ask_outcomes.public_outcomes(table, USER_ID, coach_id)
+    if not outcomes:
+        return commitments
+    out = []
+    for e in commitments:
+        ask_id = str(e.get("record_id") or "").removeprefix("COMMITMENT#")
+        did = outcomes.get(ask_id)
+        out.append({**e, "what_matt_did": dict(did)} if did else e)
+    return out
 
 
 def _absent_coaches(_g):

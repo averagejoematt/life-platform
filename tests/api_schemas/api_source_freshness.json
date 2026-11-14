@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T06:47:34.497546+00:00",
+  "captured_at": "2026-11-13T18:14:41.730906+00:00",
   "fetch_path": "/api/source_freshness",
   "is_prefix_sample": false,
   "path": "/api/source_freshness",
@@ -39,17 +39,20 @@
       "sources": {
         "items": {
           "keys": {
+            "absence_cause": {
+              "type": "string"
+            },
+            "absence_caveat": {
+              "type": "string"
+            },
+            "absence_status": {
+              "type": "string"
+            },
             "age_hours": {
               "type": "number"
             },
             "capture_channel": {
               "type": "string"
-            },
-            "carried": {
-              "type": "boolean"
-            },
-            "carried_from_cycle": {
-              "type": "integer"
             },
             "category": {
               "type": "string"
@@ -69,7 +72,7 @@
                 },
                 "type": "object"
               },
-              "length_sample": 4,
+              "length_sample": 3,
               "type": "array"
             },
             "datatypes": {
@@ -99,7 +102,7 @@
                 },
                 "type": "object"
               },
-              "length_sample": 6,
+              "length_sample": 10,
               "type": "array"
             },
             "days_dark": {
@@ -120,12 +123,6 @@
             "last_update": {
               "type": "string"
             },
-            "last_update_ahead_of_pt": {
-              "type": "boolean"
-            },
-            "last_update_frame": {
-              "type": "string"
-            },
             "last_update_ts": {
               "type": "string"
             },
@@ -140,14 +137,13 @@
             }
           },
           "optional": [
+            "absence_cause",
+            "absence_caveat",
+            "absence_status",
             "capture_channel",
-            "carried",
-            "carried_from_cycle",
             "dark_datatypes",
             "datatypes",
             "days_dark",
-            "last_update_ahead_of_pt",
-            "last_update_frame",
             "last_update_ts",
             "manual",
             "stale_hours"

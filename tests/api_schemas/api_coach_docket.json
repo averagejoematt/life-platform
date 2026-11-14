@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T06:47:34.497546+00:00",
+  "captured_at": "2026-11-13T18:14:41.730906+00:00",
   "fetch_path": "/api/coach_docket",
   "is_prefix_sample": false,
   "path": "/api/coach_docket",
@@ -42,12 +42,302 @@
         "type": "array"
       },
       "resolved": {
-        "items": null,
-        "length_sample": 0,
+        "items": {
+          "keys": {
+            "actual_value": {
+              "type": "number"
+            },
+            "claims": {
+              "keys": {
+                "mind_coach": {
+                  "type": "string"
+                },
+                "nutrition_coach": {
+                  "type": "string"
+                },
+                "physical_coach": {
+                  "type": "string"
+                },
+                "sleep_coach": {
+                  "type": "string"
+                }
+              },
+              "optional": [
+                "mind_coach",
+                "nutrition_coach",
+                "physical_coach",
+                "sleep_coach"
+              ],
+              "type": "object"
+            },
+            "coach_a": {
+              "type": "string"
+            },
+            "coach_b": {
+              "type": "string"
+            },
+            "concession": {
+              "type": "string"
+            },
+            "concession_unsourced": {
+              "keys": {
+                "gap": {
+                  "keys": {
+                    "end": {
+                      "type": "null"
+                    },
+                    "start": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "instrument": {
+                  "keys": {
+                    "datatype": {
+                      "type": "string"
+                    },
+                    "source": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "last_seen": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "said_on": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "criterion": {
+              "keys": {
+                "condition": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "metric": {
+                  "type": "string"
+                },
+                "threshold": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            },
+            "loser": {
+              "type": "string"
+            },
+            "opened_date": {
+              "type": "string"
+            },
+            "resolution_date": {
+              "type": "string"
+            },
+            "resolved_date": {
+              "type": "string"
+            },
+            "sides": {
+              "keys": {
+                "glucose_coach": {
+                  "type": "boolean"
+                },
+                "mind_coach": {
+                  "type": "boolean"
+                },
+                "nutrition_coach": {
+                  "type": "boolean"
+                },
+                "physical_coach": {
+                  "type": "boolean"
+                },
+                "sleep_coach": {
+                  "type": "boolean"
+                }
+              },
+              "optional": [
+                "glucose_coach",
+                "mind_coach",
+                "nutrition_coach",
+                "physical_coach",
+                "sleep_coach"
+              ],
+              "type": "object"
+            },
+            "stakes": {
+              "keys": {
+                "glucose_coach": {
+                  "keys": {
+                    "brier": {
+                      "type": "number"
+                    },
+                    "brier_n": {
+                      "type": "number"
+                    },
+                    "subdomain": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "mind_coach": {
+                  "keys": {
+                    "brier": {
+                      "type": "number"
+                    },
+                    "brier_n": {
+                      "type": "number"
+                    },
+                    "subdomain": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "nutrition_coach": {
+                  "keys": {
+                    "brier": {
+                      "type": "number"
+                    },
+                    "brier_n": {
+                      "type": "number"
+                    },
+                    "subdomain": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "physical_coach": {
+                  "keys": {
+                    "brier": {
+                      "type": "number"
+                    },
+                    "brier_n": {
+                      "type": "number"
+                    },
+                    "subdomain": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "sleep_coach": {
+                  "keys": {
+                    "brier": {
+                      "type": "number"
+                    },
+                    "brier_n": {
+                      "type": "number"
+                    },
+                    "subdomain": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              "optional": [
+                "glucose_coach",
+                "mind_coach",
+                "nutrition_coach",
+                "physical_coach",
+                "sleep_coach"
+              ],
+              "type": "object"
+            },
+            "topic": {
+              "type": "string"
+            },
+            "topic_slug": {
+              "type": "string"
+            },
+            "unsourced": {
+              "keys": {
+                "glucose_coach": {
+                  "keys": {
+                    "gap": {
+                      "keys": {
+                        "end": {
+                          "type": "null"
+                        },
+                        "start": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "instrument": {
+                      "keys": {
+                        "datatype": {
+                          "type": "string"
+                        },
+                        "source": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "last_seen": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    },
+                    "said_on": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              "type": "object"
+            },
+            "verdict": {
+              "keys": {
+                "actual_value": {
+                  "type": "number"
+                },
+                "holds": {
+                  "type": "boolean"
+                },
+                "loser": {
+                  "type": "string"
+                },
+                "outcome": {
+                  "type": "string"
+                },
+                "winner": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "winner": {
+              "type": "string"
+            }
+          },
+          "optional": [
+            "concession_unsourced",
+            "unsourced"
+          ],
+          "type": "object"
+        },
+        "length_sample": 3,
         "type": "array"
-      },
-      "withheld": {
-        "type": "integer"
       }
     },
     "type": "object"

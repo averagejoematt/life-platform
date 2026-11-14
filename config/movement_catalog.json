@@ -6,17 +6,17 @@
     "generated_by": "deploy/build_movement_catalog.py",
     "source": "DynamoDB life-platform pk=USER#matthew#SOURCE#hevy per-workout rows, every phase (read-only query) + Hevy GET /v1/exercise_templates (read-only)",
     "history_first": "2021-04-12",
-    "history_through": "2026-10-18",
-    "workouts": 518,
-    "distinct_templates": 538,
-    "entries": 544,
+    "history_through": "2026-11-11",
+    "workouts": 535,
+    "distinct_templates": 539,
+    "entries": 546,
     "reviewed": 27,
-    "coach_added": 2,
-    "generated": 515,
+    "coach_added": 3,
+    "generated": 516,
     "entries_by_skill_tier": {
       "1": 278,
-      "2": 198,
-      "3": 68
+      "2": 199,
+      "3": 69
     },
     "entries_by_anchor_family": {
       "bench": 10,
@@ -104,9 +104,9 @@
       "equipment": "dumbbell",
       "provenance": "hand_curated",
       "reviewed": true,
-      "sessions": 71,
+      "sessions": 74,
       "first_done": "2021-06-15",
-      "last_done": "2026-09-19",
+      "last_done": "2026-11-09",
       "anchor_family": "bench",
       "load_convention": "per_hand"
     },
@@ -145,9 +145,9 @@
       "equipment": "cable",
       "provenance": "hand_curated",
       "reviewed": true,
-      "sessions": 66,
+      "sessions": 73,
       "first_done": "2021-06-12",
-      "last_done": "2026-10-18",
+      "last_done": "2026-11-11",
       "anchor_family": "vertical_pull"
     },
     "machine_row": {
@@ -187,9 +187,9 @@
       "equipment": "dumbbell",
       "provenance": "hand_curated",
       "reviewed": true,
-      "sessions": 35,
+      "sessions": 42,
       "first_done": "2021-06-10",
-      "last_done": "2026-10-18",
+      "last_done": "2026-11-11",
       "anchor_family": "row"
     },
     "machine_shoulder_press": {
@@ -227,9 +227,9 @@
       "equipment": "dumbbell",
       "provenance": "hand_curated",
       "reviewed": true,
-      "sessions": 68,
+      "sessions": 72,
       "first_done": "2021-04-18",
-      "last_done": "2026-10-04",
+      "last_done": "2026-11-11",
       "anchor_family": null,
       "load_convention": "per_hand"
     },
@@ -249,9 +249,9 @@
       "equipment": "dumbbell",
       "provenance": "hand_curated",
       "reviewed": true,
-      "sessions": 63,
+      "sessions": 64,
       "first_done": "2021-06-12",
-      "last_done": "2026-10-18",
+      "last_done": "2026-10-21",
       "anchor_family": null,
       "load_convention": "per_hand"
     },
@@ -269,9 +269,9 @@
       "equipment": "cable",
       "provenance": "hand_curated",
       "reviewed": true,
-      "sessions": 59,
+      "sessions": 60,
       "first_done": "2021-04-13",
-      "last_done": "2026-10-18",
+      "last_done": "2026-10-21",
       "anchor_family": null
     },
     "leg_press": {
@@ -291,9 +291,9 @@
       "equipment": "machine",
       "provenance": "hand_curated",
       "reviewed": true,
-      "sessions": 9,
+      "sessions": 12,
       "first_done": "2022-08-31",
-      "last_done": "2026-10-16",
+      "last_done": "2026-10-28",
       "anchor_family": "squat"
     },
     "goblet_squat": {
@@ -338,9 +338,9 @@
       "equipment": "machine",
       "provenance": "hand_curated",
       "reviewed": true,
-      "sessions": 37,
+      "sessions": 39,
       "first_done": "2021-04-12",
-      "last_done": "2026-10-16",
+      "last_done": "2026-10-23",
       "anchor_family": null,
       "notes": "Remapped 2026-09-26 (#4169): the hint pointed to Lying Leg Curl (Machine, B8127AD1), a machine the owner has not logged since 2024-11-29; his 4 most recent leg-curl sessions (09-09..09-24, 90 lb x10-12) are all Seated Leg Curl (Machine). The prior template is preserved, unclaimed, as `lying_leg_curl_machine`."
     },
@@ -384,9 +384,9 @@
       "equipment": "machine",
       "provenance": "hand_curated",
       "reviewed": true,
-      "sessions": 13,
+      "sessions": 16,
       "first_done": "2023-05-29",
-      "last_done": "2026-10-16",
+      "last_done": "2026-10-28",
       "anchor_family": null,
       "notes": "Remapped 2026-09-26 (#4169): the hint pointed to Standing Calf Raise (Machine, E05C2C38), a machine the owner has not logged since 2025-05-14; his 6 most recent calf-raise sessions (09-09..09-24, 270-320 lb x15) are all Calf Press (Machine). The prior template is preserved, unclaimed, as `standing_calf_raise_machine`."
     },
@@ -446,9 +446,9 @@
       "equipment": "barbell",
       "provenance": "hand_curated",
       "reviewed": true,
-      "sessions": 130,
+      "sessions": 134,
       "first_done": "2021-04-12",
-      "last_done": "2026-10-18",
+      "last_done": "2026-11-11",
       "anchor_family": "bench",
       "hevy_template_id_hint": "79D0BB3A"
     },
@@ -468,9 +468,9 @@
       "equipment": "dumbbell",
       "provenance": "hand_curated",
       "reviewed": true,
-      "sessions": 46,
+      "sessions": 50,
       "first_done": "2023-01-04",
-      "last_done": "2026-10-18",
+      "last_done": "2026-11-08",
       "anchor_family": "overhead_press",
       "load_convention": "per_hand"
     },
@@ -488,9 +488,9 @@
       "equipment": "machine",
       "provenance": "hand_curated",
       "reviewed": true,
-      "sessions": 2,
+      "sessions": 4,
       "first_done": "2026-06-01",
-      "last_done": "2026-06-16",
+      "last_done": "2026-11-01",
       "anchor_family": null
     },
     "cycling": {
@@ -504,9 +504,9 @@
       "equipment": "machine",
       "provenance": "hand_curated",
       "reviewed": true,
-      "sessions": 33,
+      "sessions": 42,
       "first_done": "2026-05-31",
-      "last_done": "2026-10-18",
+      "last_done": "2026-11-10",
       "anchor_family": null
     },
     "rowing_machine": {
@@ -536,9 +536,9 @@
       "equipment": "machine",
       "provenance": "hand_curated",
       "reviewed": true,
-      "sessions": 13,
+      "sessions": 21,
       "first_done": "2026-06-23",
-      "last_done": "2026-10-07",
+      "last_done": "2026-11-11",
       "anchor_family": null
     },
     "elliptical": {
@@ -573,31 +573,113 @@
       "last_done": null,
       "anchor_family": null
     },
-    "face_pull": {
-      "title": "Face Pull",
-      "hevy_template_id_hint": "BE640BA0",
+    "kettlebell_deadlift": {
+      "title": "Sumo Deadlift",
+      "hevy_template_id_hint": "D20D7BBE",
+      "primary_muscle": "other",
+      "secondary_muscles": [],
+      "volume_muscle": null,
+      "hevy_primary_muscle_group": "other",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
+      "skill_tier": 2,
+      "skill_tier_source": "hevy_equipment:kettlebell (a kettlebell, by the owner ruling that names it)",
+      "joint_friendly_score": 2,
+      "default_rep_range": {
+        "start": 6,
+        "end": 8
+      },
+      "equipment": "kettlebell",
+      "notes": "#5774 owner ruling 2026-11-11: the kettlebell slot enters through 2 kettlebell-deadlift exposures, then the swing. Hevy has no Kettlebell Deadlift template (the Hevy template index of 2026-11-11 holds none; the exercise library notes template_id null and a custom template to create). Until one exists it logs under the closest real template no catalog key already holds: Sumo Deadlift D20D7BBE (the kettlebell deadlift is a floor-start hinge with the bell between the feet, a sumo stance; never logged before, so its exposures count cleanly). Deadlift (Dumbbell) 5F4E6DD3 is closer by implement but already catalogued (deadlift_dumbbell, with 2021-2025 history), and one template id is catalogued once (#4169). Counted as `other` like the swing, so it never moves a weekly muscle count; no anchor_family, so it is never the hinge anchor. One kettlebell, logged as the bell's weight.",
+      "provenance": "hand_curated",
+      "reviewed": true,
+      "sessions": 0,
+      "first_done": null,
+      "last_done": null,
+      "anchor_family": null
+    },
+    "pike_pushup": {
+      "title": "Pike Pushup",
+      "hevy_template_id_hint": "0EFE8162",
       "primary_muscle": "shoulders",
       "secondary_muscles": [
-        "biceps"
+        "triceps"
       ],
       "volume_muscle": "Shoulders",
       "hevy_primary_muscle_group": "shoulders",
-      "hevy_type": "weight_reps",
+      "hevy_type": "reps_only",
+      "is_custom": false,
+      "skill_tier": 2,
+      "skill_tier_source": "coach_added: the press loads most of the bodyweight onto the shoulders, so tier 2 by hand (#5088)",
+      "joint_friendly_score": 2,
+      "default_rep_range": {
+        "start": 6,
+        "end": 10
+      },
+      "equipment": "none",
+      "provenance": "coach_added",
+      "reviewed": false,
+      "sessions": 0,
+      "first_done": null,
+      "last_done": null,
+      "anchor_family": null,
+      "notes": "coach_added for the #5088 bodyweight travel variants (owner ruling 2026-10-18); template id from the Hevy template index built 2026-10-18"
+    },
+    "single_leg_glute_bridge": {
+      "title": "Single Leg Glute Bridge",
+      "hevy_template_id_hint": "CBC0D834",
+      "primary_muscle": "glutes",
+      "secondary_muscles": [
+        "hamstrings"
+      ],
+      "volume_muscle": "Glutes",
+      "hevy_primary_muscle_group": "glutes",
+      "hevy_type": "reps_only",
       "is_custom": false,
       "skill_tier": 1,
-      "skill_tier_source": "hevy_equipment:machine",
-      "joint_friendly_score": 1,
+      "skill_tier_source": "hevy_equipment:none",
+      "joint_friendly_score": 3,
       "default_rep_range": {
         "start": 10,
         "end": 15
       },
-      "equipment": "machine",
-      "provenance": "hevy_history",
+      "equipment": "none",
+      "provenance": "coach_added",
       "reviewed": false,
-      "sessions": 93,
-      "first_done": "2021-06-12",
-      "last_done": "2026-10-04",
-      "anchor_family": null
+      "sessions": 0,
+      "first_done": null,
+      "last_done": null,
+      "anchor_family": null,
+      "notes": "coach_added for the #5088 bodyweight travel variants (owner ruling 2026-10-18); template id from the Hevy template index built 2026-10-18"
+    },
+    "romanian_deadlift_dumbbell": {
+      "title": "Romanian Deadlift (Dumbbell)",
+      "hevy_template_id_hint": "72CFFAD5",
+      "provenance": "coach_added",
+      "notes": "Re-added as coach_added 2026-11-12: the owner-approved 2026-11-01 Hevy relabel moved its logged history to Deadlift (those pulls were conventional), so a true dumbbell RDL is a new movement; kept because the disruption pools program it.",
+      "primary_muscle": "hamstrings",
+      "secondary_muscles": [
+        "glutes",
+        "back"
+      ],
+      "volume_muscle": "Hamstrings",
+      "hevy_primary_muscle_group": "hamstrings",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
+      "skill_tier": 2,
+      "skill_tier_source": "hevy_equipment:dumbbell",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 8,
+        "end": 12
+      },
+      "equipment": "dumbbell",
+      "reviewed": false,
+      "sessions": 0,
+      "first_done": null,
+      "last_done": null,
+      "anchor_family": "hinge",
+      "load_convention": "per_hand"
     },
     "squat_barbell": {
       "title": "Squat (Barbell)",
@@ -621,10 +703,64 @@
       "equipment": "barbell",
       "provenance": "hevy_history",
       "reviewed": false,
-      "sessions": 92,
+      "sessions": 99,
       "first_done": "2021-04-12",
-      "last_done": "2026-10-16",
+      "last_done": "2026-11-10",
       "anchor_family": "squat"
+    },
+    "face_pull": {
+      "title": "Face Pull",
+      "hevy_template_id_hint": "BE640BA0",
+      "primary_muscle": "shoulders",
+      "secondary_muscles": [
+        "biceps"
+      ],
+      "volume_muscle": "Shoulders",
+      "hevy_primary_muscle_group": "shoulders",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
+      "skill_tier": 1,
+      "skill_tier_source": "hevy_equipment:machine",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 10,
+        "end": 15
+      },
+      "equipment": "machine",
+      "provenance": "hevy_history",
+      "reviewed": false,
+      "sessions": 96,
+      "first_done": "2021-06-12",
+      "last_done": "2026-11-05",
+      "anchor_family": null
+    },
+    "deadlift_barbell": {
+      "title": "Deadlift (Barbell)",
+      "hevy_template_id_hint": "C6272009",
+      "primary_muscle": "glutes",
+      "secondary_muscles": [
+        "hamstrings",
+        "quadriceps",
+        "back"
+      ],
+      "volume_muscle": "Glutes",
+      "hevy_primary_muscle_group": "glutes",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
+      "skill_tier": 3,
+      "skill_tier_source": "hevy_equipment:barbell",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 5,
+        "end": 8
+      },
+      "equipment": "barbell",
+      "provenance": "hevy_history",
+      "reviewed": false,
+      "sessions": 87,
+      "first_done": "2021-06-17",
+      "last_done": "2026-10-30",
+      "anchor_family": "hinge"
     },
     "hammer_curl_dumbbell": {
       "title": "Hammer Curl (Dumbbell)",
@@ -647,9 +783,9 @@
       "equipment": "dumbbell",
       "provenance": "hevy_history",
       "reviewed": false,
-      "sessions": 78,
+      "sessions": 80,
       "first_done": "2021-04-13",
-      "last_done": "2026-09-20",
+      "last_done": "2026-11-05",
       "anchor_family": null,
       "load_convention": "per_hand"
     },
@@ -677,33 +813,29 @@
       "last_done": "2026-06-17",
       "anchor_family": null
     },
-    "deadlift_barbell": {
-      "title": "Deadlift (Barbell)",
-      "hevy_template_id_hint": "C6272009",
-      "primary_muscle": "glutes",
-      "secondary_muscles": [
-        "hamstrings",
-        "quadriceps",
-        "back"
-      ],
-      "volume_muscle": "Glutes",
-      "hevy_primary_muscle_group": "glutes",
+    "leg_extension_machine": {
+      "title": "Leg Extension (Machine)",
+      "hevy_template_id_hint": "75A4F6C4",
+      "primary_muscle": "quadriceps",
+      "secondary_muscles": [],
+      "volume_muscle": "Quads",
+      "hevy_primary_muscle_group": "quadriceps",
       "hevy_type": "weight_reps",
       "is_custom": false,
-      "skill_tier": 3,
-      "skill_tier_source": "hevy_equipment:barbell",
+      "skill_tier": 1,
+      "skill_tier_source": "hevy_equipment:machine",
       "joint_friendly_score": 1,
       "default_rep_range": {
-        "start": 5,
-        "end": 8
+        "start": 10,
+        "end": 15
       },
-      "equipment": "barbell",
+      "equipment": "machine",
       "provenance": "hevy_history",
       "reviewed": false,
-      "sessions": 68,
-      "first_done": "2021-06-17",
-      "last_done": "2025-11-04",
-      "anchor_family": "hinge"
+      "sessions": 60,
+      "first_done": "2021-04-12",
+      "last_done": "2026-10-19",
+      "anchor_family": null
     },
     "incline_bench_press_barbell": {
       "title": "Incline Bench Press (Barbell)",
@@ -732,28 +864,24 @@
       "last_done": "2025-05-12",
       "anchor_family": "bench"
     },
-    "leg_extension_machine": {
-      "title": "Leg Extension (Machine)",
-      "hevy_template_id_hint": "75A4F6C4",
-      "primary_muscle": "quadriceps",
+    "stretching": {
+      "title": "Stretching",
+      "hevy_template_id_hint": "527DA061",
+      "primary_muscle": "other",
       "secondary_muscles": [],
-      "volume_muscle": "Quads",
-      "hevy_primary_muscle_group": "quadriceps",
-      "hevy_type": "weight_reps",
+      "volume_muscle": null,
+      "hevy_primary_muscle_group": "other",
+      "hevy_type": "duration",
       "is_custom": false,
       "skill_tier": 1,
-      "skill_tier_source": "hevy_equipment:machine",
+      "skill_tier_source": "hevy_equipment:none",
       "joint_friendly_score": 1,
-      "default_rep_range": {
-        "start": 10,
-        "end": 15
-      },
-      "equipment": "machine",
+      "equipment": "none",
       "provenance": "hevy_history",
       "reviewed": false,
-      "sessions": 59,
-      "first_done": "2021-04-12",
-      "last_done": "2026-10-09",
+      "sessions": 56,
+      "first_done": "2026-06-19",
+      "last_done": "2026-11-11",
       "anchor_family": null
     },
     "bulgarian_split_squat_dumbbell": {
@@ -778,11 +906,35 @@
       "equipment": "dumbbell",
       "provenance": "hevy_history",
       "reviewed": false,
-      "sessions": 51,
+      "sessions": 53,
       "first_done": "2021-06-11",
-      "last_done": "2025-04-08",
+      "last_done": "2026-11-06",
       "anchor_family": "squat",
       "load_convention": "per_hand"
+    },
+    "side_bend_dumbbell": {
+      "title": "Side Bend (Dumbbell)",
+      "hevy_template_id_hint": "026FD047",
+      "primary_muscle": "abs",
+      "secondary_muscles": [],
+      "volume_muscle": "Core",
+      "hevy_primary_muscle_group": "abdominals",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
+      "skill_tier": 2,
+      "skill_tier_source": "hevy_equipment:dumbbell",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 8,
+        "end": 12
+      },
+      "equipment": "dumbbell",
+      "provenance": "hevy_history",
+      "reviewed": false,
+      "sessions": 43,
+      "first_done": "2021-06-11",
+      "last_done": "2026-11-03",
+      "anchor_family": null
     },
     "seated_cable_row_bar_grip": {
       "title": "Seated Cable Row - Bar Grip",
@@ -811,50 +963,6 @@
       "last_done": "2023-07-25",
       "anchor_family": "row"
     },
-    "side_bend_dumbbell": {
-      "title": "Side Bend (Dumbbell)",
-      "hevy_template_id_hint": "026FD047",
-      "primary_muscle": "abs",
-      "secondary_muscles": [],
-      "volume_muscle": "Core",
-      "hevy_primary_muscle_group": "abdominals",
-      "hevy_type": "weight_reps",
-      "is_custom": false,
-      "skill_tier": 2,
-      "skill_tier_source": "hevy_equipment:dumbbell",
-      "joint_friendly_score": 1,
-      "default_rep_range": {
-        "start": 8,
-        "end": 12
-      },
-      "equipment": "dumbbell",
-      "provenance": "hevy_history",
-      "reviewed": false,
-      "sessions": 41,
-      "first_done": "2021-06-11",
-      "last_done": "2026-09-26",
-      "anchor_family": null
-    },
-    "stretching": {
-      "title": "Stretching",
-      "hevy_template_id_hint": "527DA061",
-      "primary_muscle": "other",
-      "secondary_muscles": [],
-      "volume_muscle": null,
-      "hevy_primary_muscle_group": "other",
-      "hevy_type": "duration",
-      "is_custom": false,
-      "skill_tier": 1,
-      "skill_tier_source": "hevy_equipment:none",
-      "joint_friendly_score": 1,
-      "equipment": "none",
-      "provenance": "hevy_history",
-      "reviewed": false,
-      "sessions": 40,
-      "first_done": "2026-06-19",
-      "last_done": "2026-10-18",
-      "anchor_family": null
-    },
     "standing_calf_raise_machine": {
       "title": "Standing Calf Raise (Machine)",
       "hevy_template_id_hint": "E05C2C38",
@@ -879,6 +987,33 @@
       "last_done": "2025-05-14",
       "anchor_family": null,
       "notes": "#4169: the `calf_raise_machine` catalog key's hint until 2026-09-26, when it was moved to `91237BDD` (Calf Press) because that is the machine the owner actually logs. This id is real logged history (38 sessions), not deleted — just no longer the pool's active choice. Field values other than title/hint/sessions/first_done/last_done are carried over from the prior curated entry, not a fresh live enrichment."
+    },
+    "decline_bench_press_machine": {
+      "title": "Decline Bench Press (Machine)",
+      "hevy_template_id_hint": "FAF31231",
+      "primary_muscle": "chest",
+      "secondary_muscles": [
+        "shoulders",
+        "triceps"
+      ],
+      "volume_muscle": "Chest",
+      "hevy_primary_muscle_group": "chest",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
+      "skill_tier": 1,
+      "skill_tier_source": "hevy_equipment:machine",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 10,
+        "end": 15
+      },
+      "equipment": "machine",
+      "provenance": "hevy_history",
+      "reviewed": false,
+      "sessions": 31,
+      "first_done": "2022-05-08",
+      "last_done": "2026-11-05",
+      "anchor_family": "bench"
     },
     "ez_bar_biceps_curl": {
       "title": "EZ Bar Biceps Curl",
@@ -928,31 +1063,6 @@
       "last_done": "2026-06-19",
       "anchor_family": null
     },
-    "kettlebell_deadlift": {
-      "title": "Sumo Deadlift",
-      "hevy_template_id_hint": "D20D7BBE",
-      "primary_muscle": "other",
-      "secondary_muscles": [],
-      "volume_muscle": null,
-      "hevy_primary_muscle_group": "other",
-      "hevy_type": "weight_reps",
-      "is_custom": false,
-      "skill_tier": 2,
-      "skill_tier_source": "hevy_equipment:kettlebell (a kettlebell, by the owner ruling that names it)",
-      "joint_friendly_score": 2,
-      "default_rep_range": {
-        "start": 6,
-        "end": 8
-      },
-      "equipment": "kettlebell",
-      "notes": "#5774 owner ruling 2026-11-11: the kettlebell slot enters through 2 kettlebell-deadlift exposures, then the swing. Hevy has no Kettlebell Deadlift template (the Hevy template index of 2026-11-11 holds none; the exercise library notes template_id null and a custom template to create). Until one exists it logs under the closest real template no catalog key already holds: Sumo Deadlift D20D7BBE (the kettlebell deadlift is a floor-start hinge with the bell between the feet, a sumo stance; never logged before, so its exposures count cleanly). Deadlift (Dumbbell) 5F4E6DD3 is closer by implement but already catalogued (deadlift_dumbbell, with 2021-2025 history), and one template id is catalogued once (#4169). Counted as `other` like the swing, so it never moves a weekly muscle count; no anchor_family, so it is never the hinge anchor. One kettlebell, logged as the bell's weight.",
-      "provenance": "hand_curated",
-      "reviewed": true,
-      "sessions": 0,
-      "first_done": null,
-      "last_done": null,
-      "anchor_family": null
-    },
     "lat_pulldown_close_grip_cable": {
       "title": "Lat Pulldown - Close Grip (Cable)",
       "hevy_template_id_hint": "4E5257DE",
@@ -979,33 +1089,6 @@
       "first_done": "2023-01-10",
       "last_done": "2026-09-20",
       "anchor_family": "vertical_pull"
-    },
-    "decline_bench_press_machine": {
-      "title": "Decline Bench Press (Machine)",
-      "hevy_template_id_hint": "FAF31231",
-      "primary_muscle": "chest",
-      "secondary_muscles": [
-        "shoulders",
-        "triceps"
-      ],
-      "volume_muscle": "Chest",
-      "hevy_primary_muscle_group": "chest",
-      "hevy_type": "weight_reps",
-      "is_custom": false,
-      "skill_tier": 1,
-      "skill_tier_source": "hevy_equipment:machine",
-      "joint_friendly_score": 1,
-      "default_rep_range": {
-        "start": 10,
-        "end": 15
-      },
-      "equipment": "machine",
-      "provenance": "hevy_history",
-      "reviewed": false,
-      "sessions": 30,
-      "first_done": "2022-05-08",
-      "last_done": "2024-11-30",
-      "anchor_family": "bench"
     },
     "bicep_curl_barbell": {
       "title": "Bicep Curl (Barbell)",
@@ -1284,6 +1367,34 @@
       "last_done": "2025-11-07",
       "anchor_family": "row"
     },
+    "deadlift_trap_bar": {
+      "title": "Deadlift (Trap bar)",
+      "hevy_template_id_hint": "B923B230",
+      "primary_muscle": "glutes",
+      "secondary_muscles": [
+        "hamstrings",
+        "quadriceps",
+        "back"
+      ],
+      "volume_muscle": "Glutes",
+      "hevy_primary_muscle_group": "glutes",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
+      "skill_tier": 3,
+      "skill_tier_source": "hevy_equipment:barbell",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 5,
+        "end": 8
+      },
+      "equipment": "barbell",
+      "provenance": "hevy_history",
+      "reviewed": false,
+      "sessions": 20,
+      "first_done": "2023-10-26",
+      "last_done": "2026-11-03",
+      "anchor_family": "hinge"
+    },
     "incline_chest_fly_dumbbell": {
       "title": "Incline Chest Fly (Dumbbell)",
       "hevy_template_id_hint": "D3E2AB55",
@@ -1363,6 +1474,31 @@
       "last_done": "2026-05-31",
       "anchor_family": "row"
     },
+    "seated_incline_curl_dumbbell": {
+      "title": "Seated Incline Curl (Dumbbell)",
+      "hevy_template_id_hint": "8BAB2735",
+      "primary_muscle": "biceps",
+      "secondary_muscles": [],
+      "volume_muscle": "Biceps",
+      "hevy_primary_muscle_group": "biceps",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
+      "skill_tier": 2,
+      "skill_tier_source": "hevy_equipment:dumbbell",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 8,
+        "end": 12
+      },
+      "equipment": "dumbbell",
+      "provenance": "hevy_history",
+      "reviewed": false,
+      "sessions": 19,
+      "first_done": "2021-04-13",
+      "last_done": "2026-11-11",
+      "anchor_family": null,
+      "load_convention": "per_hand"
+    },
     "triceps_extension_cable": {
       "title": "Triceps Extension (Cable)",
       "hevy_template_id_hint": "21310F5F",
@@ -1382,65 +1518,10 @@
       "equipment": "cable",
       "provenance": "hevy_history",
       "reviewed": false,
-      "sessions": 19,
+      "sessions": 18,
       "first_done": "2021-04-13",
-      "last_done": "2026-09-19",
+      "last_done": "2026-11-05",
       "anchor_family": null
-    },
-    "deadlift_trap_bar": {
-      "title": "Deadlift (Trap bar)",
-      "hevy_template_id_hint": "B923B230",
-      "primary_muscle": "glutes",
-      "secondary_muscles": [
-        "hamstrings",
-        "quadriceps",
-        "back"
-      ],
-      "volume_muscle": "Glutes",
-      "hevy_primary_muscle_group": "glutes",
-      "hevy_type": "weight_reps",
-      "is_custom": false,
-      "skill_tier": 3,
-      "skill_tier_source": "hevy_equipment:barbell",
-      "joint_friendly_score": 1,
-      "default_rep_range": {
-        "start": 5,
-        "end": 8
-      },
-      "equipment": "barbell",
-      "provenance": "hevy_history",
-      "reviewed": false,
-      "sessions": 17,
-      "first_done": "2023-10-26",
-      "last_done": "2026-10-13",
-      "anchor_family": "hinge"
-    },
-    "romanian_deadlift_barbell": {
-      "title": "Romanian Deadlift (Barbell)",
-      "hevy_template_id_hint": "2B4B7310",
-      "primary_muscle": "hamstrings",
-      "secondary_muscles": [
-        "glutes",
-        "back"
-      ],
-      "volume_muscle": "Hamstrings",
-      "hevy_primary_muscle_group": "hamstrings",
-      "hevy_type": "weight_reps",
-      "is_custom": false,
-      "skill_tier": 3,
-      "skill_tier_source": "hevy_equipment:barbell",
-      "joint_friendly_score": 1,
-      "default_rep_range": {
-        "start": 5,
-        "end": 8
-      },
-      "equipment": "barbell",
-      "provenance": "hevy_history",
-      "reviewed": false,
-      "sessions": 17,
-      "first_done": "2023-01-03",
-      "last_done": "2026-10-16",
-      "anchor_family": "hinge"
     },
     "lat_pulldown_wide_grip_cable": {
       "title": "Lat Pulldown - Wide Grip (Cable)",
@@ -1466,31 +1547,6 @@
       "last_done": "2025-05-09",
       "anchor_family": null
     },
-    "seated_incline_curl_dumbbell": {
-      "title": "Seated Incline Curl (Dumbbell)",
-      "hevy_template_id_hint": "8BAB2735",
-      "primary_muscle": "biceps",
-      "secondary_muscles": [],
-      "volume_muscle": "Biceps",
-      "hevy_primary_muscle_group": "biceps",
-      "hevy_type": "weight_reps",
-      "is_custom": false,
-      "skill_tier": 2,
-      "skill_tier_source": "hevy_equipment:dumbbell",
-      "joint_friendly_score": 1,
-      "default_rep_range": {
-        "start": 8,
-        "end": 12
-      },
-      "equipment": "dumbbell",
-      "provenance": "hevy_history",
-      "reviewed": false,
-      "sessions": 16,
-      "first_done": "2021-04-13",
-      "last_done": "2025-05-21",
-      "anchor_family": null,
-      "load_convention": "per_hand"
-    },
     "pull_up_assisted": {
       "title": "Pull Up (Assisted)",
       "hevy_template_id_hint": "2C37EC5E",
@@ -1513,10 +1569,62 @@
       "equipment": "machine",
       "provenance": "hevy_history",
       "reviewed": false,
+      "sessions": 15,
+      "first_done": "2023-04-28",
+      "last_done": "2026-11-01",
+      "anchor_family": "vertical_pull"
+    },
+    "lying_leg_curl_machine": {
+      "title": "Lying Leg Curl (Machine)",
+      "hevy_template_id_hint": "B8127AD1",
+      "primary_muscle": "hamstrings",
+      "secondary_muscles": [
+        "calves"
+      ],
+      "volume_muscle": "Hamstrings",
+      "hevy_primary_muscle_group": "hamstrings",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
+      "skill_tier": 1,
+      "skill_tier_source": "hevy_equipment:machine",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 10,
+        "end": 15
+      },
+      "equipment": "machine",
+      "provenance": "hevy_history",
+      "reviewed": false,
+      "sessions": 14,
+      "first_done": "2022-08-31",
+      "last_done": "2026-11-06",
+      "anchor_family": null,
+      "notes": "#4169: the `leg_curl` catalog key's hint until 2026-09-26, when it was moved to `11A123F3` (Seated Leg Curl) because that is the machine the owner actually logs. This id is real logged history (12 sessions), not deleted — just no longer the pool's active choice. Field values other than title/hint/sessions/first_done/last_done are carried over from the prior curated entry, not a fresh live enrichment."
+    },
+    "spider_curl": {
+      "title": "Spider Curl",
+      "hevy_template_id_hint": "610e3cbe-3eca-4651-9a9f-85761c9afe7c",
+      "primary_muscle": "biceps",
+      "secondary_muscles": [],
+      "volume_muscle": "Biceps",
+      "hevy_primary_muscle_group": "biceps",
+      "hevy_type": "weight_reps",
+      "is_custom": true,
+      "skill_tier": 2,
+      "skill_tier_source": "hevy_equipment:dumbbell",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 8,
+        "end": 12
+      },
+      "equipment": "dumbbell",
+      "provenance": "hevy_history",
+      "reviewed": false,
       "sessions": 14,
       "first_done": "2023-04-28",
-      "last_done": "2025-05-21",
-      "anchor_family": "vertical_pull"
+      "last_done": "2026-11-09",
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "cable_pull_through": {
       "title": "Cable Pull Through",
@@ -1545,13 +1653,42 @@
       "last_done": "2025-03-16",
       "anchor_family": null
     },
-    "spider_curl": {
-      "title": "Spider Curl",
-      "hevy_template_id_hint": "610e3cbe-3eca-4651-9a9f-85761c9afe7c",
-      "primary_muscle": "biceps",
+    "deadlift_dumbbell": {
+      "title": "Deadlift (Dumbbell)",
+      "hevy_template_id_hint": "5F4E6DD3",
+      "primary_muscle": "glutes",
+      "secondary_muscles": [
+        "hamstrings",
+        "quadriceps",
+        "back"
+      ],
+      "volume_muscle": "Glutes",
+      "hevy_primary_muscle_group": "glutes",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
+      "skill_tier": 2,
+      "skill_tier_source": "hevy_equipment:dumbbell",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 8,
+        "end": 12
+      },
+      "equipment": "dumbbell",
+      "provenance": "hevy_history",
+      "reviewed": false,
+      "sessions": 13,
+      "first_done": "2021-06-11",
+      "last_done": "2025-04-13",
+      "anchor_family": "hinge",
+      "load_convention": "per_hand"
+    },
+    "lying_db_tricep_extension": {
+      "title": "Lying Db Tricep Extension",
+      "hevy_template_id_hint": "2affffa8-bd9f-4f27-bb8c-159c2875c4b1",
+      "primary_muscle": "triceps",
       "secondary_muscles": [],
-      "volume_muscle": "Biceps",
-      "hevy_primary_muscle_group": "biceps",
+      "volume_muscle": "Triceps",
+      "hevy_primary_muscle_group": "triceps",
       "hevy_type": "weight_reps",
       "is_custom": true,
       "skill_tier": 2,
@@ -1565,8 +1702,8 @@
       "provenance": "hevy_history",
       "reviewed": false,
       "sessions": 13,
-      "first_done": "2023-04-28",
-      "last_done": "2025-04-03",
+      "first_done": "2024-09-17",
+      "last_done": "2026-11-08",
       "anchor_family": null,
       "load_convention": "per_hand"
     },
@@ -1597,40 +1734,41 @@
       "last_done": "2023-01-03",
       "anchor_family": "vertical_pull"
     },
-    "lying_db_tricep_extension": {
-      "title": "Lying Db Tricep Extension",
-      "hevy_template_id_hint": "2affffa8-bd9f-4f27-bb8c-159c2875c4b1",
-      "primary_muscle": "triceps",
+    "farmers_walk": {
+      "title": "Farmers Walk",
+      "hevy_template_id_hint": "50C613D0",
+      "primary_muscle": "other",
       "secondary_muscles": [],
-      "volume_muscle": "Triceps",
-      "hevy_primary_muscle_group": "triceps",
-      "hevy_type": "weight_reps",
-      "is_custom": true,
+      "volume_muscle": null,
+      "hevy_primary_muscle_group": "full_body",
+      "hevy_type": "short_distance_weight",
+      "is_custom": false,
       "skill_tier": 2,
-      "skill_tier_source": "hevy_equipment:dumbbell",
+      "skill_tier_source": "hevy_equipment:other",
       "joint_friendly_score": 1,
-      "default_rep_range": {
-        "start": 8,
-        "end": 12
-      },
-      "equipment": "dumbbell",
+      "equipment": "other",
       "provenance": "hevy_history",
       "reviewed": false,
       "sessions": 12,
-      "first_done": "2024-09-17",
-      "last_done": "2025-09-15",
+      "first_done": "2023-04-21",
+      "last_done": "2026-11-08",
       "anchor_family": null,
-      "load_convention": "per_hand"
+      "distance_unit_convention": "steps",
+      "load_convention": "per_hand",
+      "load_convention_history": [
+        {
+          "until": "2026-10-26",
+          "convention": "total_carried"
+        }
+      ]
     },
-    "lying_leg_curl_machine": {
-      "title": "Lying Leg Curl (Machine)",
-      "hevy_template_id_hint": "B8127AD1",
-      "primary_muscle": "hamstrings",
-      "secondary_muscles": [
-        "calves"
-      ],
-      "volume_muscle": "Hamstrings",
-      "hevy_primary_muscle_group": "hamstrings",
+    "bicep_curl_machine": {
+      "title": "Bicep Curl (Machine)",
+      "hevy_template_id_hint": "AF328E3D",
+      "primary_muscle": "biceps",
+      "secondary_muscles": [],
+      "volume_muscle": "Biceps",
+      "hevy_primary_muscle_group": "biceps",
       "hevy_type": "weight_reps",
       "is_custom": false,
       "skill_tier": 1,
@@ -1643,11 +1781,10 @@
       "equipment": "machine",
       "provenance": "hevy_history",
       "reviewed": false,
-      "sessions": 12,
-      "first_done": "2022-08-31",
-      "last_done": "2024-11-29",
-      "anchor_family": null,
-      "notes": "#4169: the `leg_curl` catalog key's hint until 2026-09-26, when it was moved to `11A123F3` (Seated Leg Curl) because that is the machine the owner actually logs. This id is real logged history (12 sessions), not deleted — just no longer the pool's active choice. Field values other than title/hint/sessions/first_done/last_done are carried over from the prior curated entry, not a fresh live enrichment."
+      "sessions": 11,
+      "first_done": "2023-09-10",
+      "last_done": "2026-11-02",
+      "anchor_family": null
     },
     "bottomed_out_squat_reaches": {
       "title": "Bottomed Out Squat Reaches",
@@ -1722,13 +1859,13 @@
       "last_done": "2025-10-28",
       "anchor_family": null
     },
-    "bicep_curl_machine": {
-      "title": "Bicep Curl (Machine)",
-      "hevy_template_id_hint": "AF328E3D",
-      "primary_muscle": "biceps",
+    "torso_rotation": {
+      "title": "Torso Rotation",
+      "hevy_template_id_hint": "FBB62888",
+      "primary_muscle": "abs",
       "secondary_muscles": [],
-      "volume_muscle": "Biceps",
-      "hevy_primary_muscle_group": "biceps",
+      "volume_muscle": "Core",
+      "hevy_primary_muscle_group": "abdominals",
       "hevy_type": "weight_reps",
       "is_custom": false,
       "skill_tier": 1,
@@ -1741,9 +1878,9 @@
       "equipment": "machine",
       "provenance": "hevy_history",
       "reviewed": false,
-      "sessions": 10,
-      "first_done": "2023-09-10",
-      "last_done": "2024-11-22",
+      "sessions": 11,
+      "first_done": "2022-02-08",
+      "last_done": "2026-11-10",
       "anchor_family": null
     },
     "chest_dip_weighted": {
@@ -1825,6 +1962,30 @@
       "last_done": "2025-04-23",
       "anchor_family": "vertical_pull"
     },
+    "lateral_raise_machine": {
+      "title": "Lateral Raise (Machine)",
+      "hevy_template_id_hint": "D5D0354D",
+      "primary_muscle": "shoulders",
+      "secondary_muscles": [],
+      "volume_muscle": "Shoulders",
+      "hevy_primary_muscle_group": "shoulders",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
+      "skill_tier": 1,
+      "skill_tier_source": "hevy_equipment:machine",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 10,
+        "end": 15
+      },
+      "equipment": "machine",
+      "provenance": "hevy_history",
+      "reviewed": false,
+      "sessions": 10,
+      "first_done": "2023-09-08",
+      "last_done": "2026-11-05",
+      "anchor_family": null
+    },
     "linear_leg_press": {
       "title": "Linear Leg Press",
       "hevy_template_id_hint": "cb2d3813-d5b7-4c2e-a85e-6508c4a18d8b",
@@ -1867,30 +2028,6 @@
       "sessions": 10,
       "first_done": "2023-04-28",
       "last_done": "2024-12-01",
-      "anchor_family": null
-    },
-    "torso_rotation": {
-      "title": "Torso Rotation",
-      "hevy_template_id_hint": "FBB62888",
-      "primary_muscle": "abs",
-      "secondary_muscles": [],
-      "volume_muscle": "Core",
-      "hevy_primary_muscle_group": "abdominals",
-      "hevy_type": "weight_reps",
-      "is_custom": false,
-      "skill_tier": 1,
-      "skill_tier_source": "hevy_equipment:machine",
-      "joint_friendly_score": 1,
-      "default_rep_range": {
-        "start": 10,
-        "end": 15
-      },
-      "equipment": "machine",
-      "provenance": "hevy_history",
-      "reviewed": false,
-      "sessions": 10,
-      "first_done": "2022-02-08",
-      "last_done": "2024-02-20",
       "anchor_family": null
     },
     "upright_row_barbell": {
@@ -1973,34 +2110,6 @@
       "last_done": "2025-03-09",
       "anchor_family": null,
       "load_convention": "per_hand"
-    },
-    "farmers_walk": {
-      "title": "Farmers Walk",
-      "hevy_template_id_hint": "50C613D0",
-      "primary_muscle": "other",
-      "secondary_muscles": [],
-      "volume_muscle": null,
-      "hevy_primary_muscle_group": "full_body",
-      "hevy_type": "short_distance_weight",
-      "is_custom": false,
-      "skill_tier": 2,
-      "skill_tier_source": "hevy_equipment:other",
-      "joint_friendly_score": 1,
-      "equipment": "other",
-      "provenance": "hevy_history",
-      "reviewed": false,
-      "sessions": 9,
-      "first_done": "2023-04-21",
-      "last_done": "2026-06-20",
-      "anchor_family": null,
-      "distance_unit_convention": "steps",
-      "load_convention": "per_hand",
-      "load_convention_history": [
-        {
-          "until": "2026-10-26",
-          "convention": "total_carried"
-        }
-      ]
     },
     "jump_rope": {
       "title": "Jump Rope",
@@ -2230,30 +2339,6 @@
       "anchor_family": null,
       "load_convention": "per_hand"
     },
-    "lateral_raise_machine": {
-      "title": "Lateral Raise (Machine)",
-      "hevy_template_id_hint": "D5D0354D",
-      "primary_muscle": "shoulders",
-      "secondary_muscles": [],
-      "volume_muscle": "Shoulders",
-      "hevy_primary_muscle_group": "shoulders",
-      "hevy_type": "weight_reps",
-      "is_custom": false,
-      "skill_tier": 1,
-      "skill_tier_source": "hevy_equipment:machine",
-      "joint_friendly_score": 1,
-      "default_rep_range": {
-        "start": 10,
-        "end": 15
-      },
-      "equipment": "machine",
-      "provenance": "hevy_history",
-      "reviewed": false,
-      "sessions": 8,
-      "first_done": "2023-09-08",
-      "last_done": "2024-02-09",
-      "anchor_family": null
-    },
     "power_clean": {
       "title": "Power Clean",
       "hevy_template_id_hint": "C628D768",
@@ -2302,34 +2387,6 @@
       "last_done": "2025-11-05",
       "anchor_family": null
     },
-    "romanian_deadlift_dumbbell": {
-      "title": "Romanian Deadlift (Dumbbell)",
-      "hevy_template_id_hint": "72CFFAD5",
-      "primary_muscle": "hamstrings",
-      "secondary_muscles": [
-        "glutes",
-        "back"
-      ],
-      "volume_muscle": "Hamstrings",
-      "hevy_primary_muscle_group": "hamstrings",
-      "hevy_type": "weight_reps",
-      "is_custom": false,
-      "skill_tier": 2,
-      "skill_tier_source": "hevy_equipment:dumbbell",
-      "joint_friendly_score": 1,
-      "default_rep_range": {
-        "start": 8,
-        "end": 12
-      },
-      "equipment": "dumbbell",
-      "provenance": "hevy_history",
-      "reviewed": false,
-      "sessions": 8,
-      "first_done": "2023-05-29",
-      "last_done": "2025-03-02",
-      "anchor_family": "hinge",
-      "load_convention": "per_hand"
-    },
     "superman_press_outs": {
       "title": "Superman Press Outs",
       "hevy_template_id_hint": "137dc79c-62cb-4fda-86b5-2073571ebfe6",
@@ -2352,6 +2409,55 @@
       "sessions": 8,
       "first_done": "2024-10-05",
       "last_done": "2025-01-13",
+      "anchor_family": null
+    },
+    "triceps_kickback_dumbbell": {
+      "title": "Triceps Kickback (Dumbbell)",
+      "hevy_template_id_hint": "6127A3AD",
+      "primary_muscle": "triceps",
+      "secondary_muscles": [],
+      "volume_muscle": "Triceps",
+      "hevy_primary_muscle_group": "triceps",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
+      "skill_tier": 2,
+      "skill_tier_source": "hevy_equipment:dumbbell",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 8,
+        "end": 12
+      },
+      "equipment": "dumbbell",
+      "provenance": "hevy_history",
+      "reviewed": false,
+      "sessions": 8,
+      "first_done": "2023-04-24",
+      "last_done": "2026-11-09",
+      "anchor_family": null,
+      "load_convention": "per_hand"
+    },
+    "triceps_rope_pushdown": {
+      "title": "Triceps Rope Pushdown",
+      "hevy_template_id_hint": "94B7239B",
+      "primary_muscle": "triceps",
+      "secondary_muscles": [],
+      "volume_muscle": "Triceps",
+      "hevy_primary_muscle_group": "triceps",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
+      "skill_tier": 1,
+      "skill_tier_source": "hevy_equipment:machine",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 10,
+        "end": 15
+      },
+      "equipment": "machine",
+      "provenance": "hevy_history",
+      "reviewed": false,
+      "sessions": 8,
+      "first_done": "2024-01-15",
+      "last_done": "2026-11-11",
       "anchor_family": null
     },
     "3_way_lunge": {
@@ -2454,6 +2560,30 @@
       "last_done": "2024-12-26",
       "anchor_family": null
     },
+    "chest_fly_machine": {
+      "title": "Chest Fly (Machine)",
+      "hevy_template_id_hint": "78683336",
+      "primary_muscle": "chest",
+      "secondary_muscles": [],
+      "volume_muscle": "Chest",
+      "hevy_primary_muscle_group": "chest",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
+      "skill_tier": 1,
+      "skill_tier_source": "hevy_equipment:machine",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 10,
+        "end": 15
+      },
+      "equipment": "machine",
+      "provenance": "hevy_history",
+      "reviewed": false,
+      "sessions": 7,
+      "first_done": "2022-01-17",
+      "last_done": "2026-11-09",
+      "anchor_family": null
+    },
     "chinnies": {
       "title": "Chinnies",
       "hevy_template_id_hint": "b5970124-d383-41a6-b6a9-35f4f8e7585f",
@@ -2549,6 +2679,31 @@
       "sessions": 7,
       "first_done": "2024-09-20",
       "last_done": "2025-02-27",
+      "anchor_family": null,
+      "load_convention": "per_hand"
+    },
+    "db_rear_delt_rows": {
+      "title": "DB Rear Delt Rows",
+      "hevy_template_id_hint": "6e1f6811-3457-40da-ab93-92de19b84707",
+      "primary_muscle": "shoulders",
+      "secondary_muscles": [],
+      "volume_muscle": "Shoulders",
+      "hevy_primary_muscle_group": "shoulders",
+      "hevy_type": "weight_reps",
+      "is_custom": true,
+      "skill_tier": 2,
+      "skill_tier_source": "hevy_equipment:dumbbell",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 8,
+        "end": 12
+      },
+      "equipment": "dumbbell",
+      "provenance": "hevy_history",
+      "reviewed": false,
+      "sessions": 7,
+      "first_done": "2024-10-04",
+      "last_done": "2026-11-08",
       "anchor_family": null,
       "load_convention": "per_hand"
     },
@@ -2671,31 +2826,6 @@
       "last_done": "2026-10-04",
       "anchor_family": null
     },
-    "triceps_kickback_dumbbell": {
-      "title": "Triceps Kickback (Dumbbell)",
-      "hevy_template_id_hint": "6127A3AD",
-      "primary_muscle": "triceps",
-      "secondary_muscles": [],
-      "volume_muscle": "Triceps",
-      "hevy_primary_muscle_group": "triceps",
-      "hevy_type": "weight_reps",
-      "is_custom": false,
-      "skill_tier": 2,
-      "skill_tier_source": "hevy_equipment:dumbbell",
-      "joint_friendly_score": 1,
-      "default_rep_range": {
-        "start": 8,
-        "end": 12
-      },
-      "equipment": "dumbbell",
-      "provenance": "hevy_history",
-      "reviewed": false,
-      "sessions": 7,
-      "first_done": "2023-04-24",
-      "last_done": "2025-03-06",
-      "anchor_family": null,
-      "load_convention": "per_hand"
-    },
     "underhand_barbell_dead_rows": {
       "title": "Underhand Barbell Dead Rows",
       "hevy_template_id_hint": "b2888f6e-6516-413a-b3fe-57c3f55b524c",
@@ -2794,6 +2924,33 @@
       "first_done": "2026-09-07",
       "last_done": "2026-10-04",
       "anchor_family": null
+    },
+    "chest_supported_reverse_fly_dumbbell": {
+      "title": "Chest Supported Reverse Fly (Dumbbell)",
+      "hevy_template_id_hint": "B582299E",
+      "primary_muscle": "shoulders",
+      "secondary_muscles": [
+        "back"
+      ],
+      "volume_muscle": "Shoulders",
+      "hevy_primary_muscle_group": "shoulders",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
+      "skill_tier": 2,
+      "skill_tier_source": "hevy_equipment:dumbbell",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 8,
+        "end": 12
+      },
+      "equipment": "dumbbell",
+      "provenance": "hevy_history",
+      "reviewed": false,
+      "sessions": 6,
+      "first_done": "2021-06-10",
+      "last_done": "2026-11-11",
+      "anchor_family": null,
+      "load_convention": "per_hand"
     },
     "db_chest_supported_rows": {
       "title": "DB Chest Supported Rows",
@@ -3018,6 +3175,30 @@
       "anchor_family": "overhead_press",
       "load_convention": "per_hand"
     },
+    "overhead_triceps_extension_cable": {
+      "title": "Overhead Triceps Extension (Cable)",
+      "hevy_template_id_hint": "B5EFBF9C",
+      "primary_muscle": "triceps",
+      "secondary_muscles": [],
+      "volume_muscle": "Triceps",
+      "hevy_primary_muscle_group": "triceps",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
+      "skill_tier": 2,
+      "skill_tier_source": "title:cable",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 8,
+        "end": 12
+      },
+      "equipment": "cable",
+      "provenance": "hevy_history",
+      "reviewed": false,
+      "sessions": 6,
+      "first_done": "2025-10-27",
+      "last_done": "2026-11-02",
+      "anchor_family": null
+    },
     "skullcrusher_barbell": {
       "title": "Skullcrusher (Barbell)",
       "hevy_template_id_hint": "875F585F",
@@ -3115,6 +3296,30 @@
       "sessions": 6,
       "first_done": "2023-01-03",
       "last_done": "2023-01-03",
+      "anchor_family": null
+    },
+    "21s": {
+      "title": "21s",
+      "hevy_template_id_hint": "6cb744a3-2830-4fd4-a208-d6fecd2f730c",
+      "primary_muscle": "other",
+      "secondary_muscles": [],
+      "volume_muscle": null,
+      "hevy_primary_muscle_group": "other",
+      "hevy_type": "weight_reps",
+      "is_custom": true,
+      "skill_tier": 1,
+      "skill_tier_source": "hevy_equipment:none",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 10,
+        "end": 15
+      },
+      "equipment": "none",
+      "provenance": "hevy_history",
+      "reviewed": false,
+      "sessions": 5,
+      "first_done": "2022-04-01",
+      "last_done": "2026-10-25",
       "anchor_family": null
     },
     "ab_wheel": {
@@ -3343,35 +3548,6 @@
       "anchor_family": null,
       "load_convention": "per_hand"
     },
-    "deadlift_dumbbell": {
-      "title": "Deadlift (Dumbbell)",
-      "hevy_template_id_hint": "5F4E6DD3",
-      "primary_muscle": "glutes",
-      "secondary_muscles": [
-        "hamstrings",
-        "quadriceps",
-        "back"
-      ],
-      "volume_muscle": "Glutes",
-      "hevy_primary_muscle_group": "glutes",
-      "hevy_type": "weight_reps",
-      "is_custom": false,
-      "skill_tier": 2,
-      "skill_tier_source": "hevy_equipment:dumbbell",
-      "joint_friendly_score": 1,
-      "default_rep_range": {
-        "start": 8,
-        "end": 12
-      },
-      "equipment": "dumbbell",
-      "provenance": "hevy_history",
-      "reviewed": false,
-      "sessions": 5,
-      "first_done": "2021-06-11",
-      "last_done": "2025-04-13",
-      "anchor_family": "hinge",
-      "load_convention": "per_hand"
-    },
     "doorway_face_pulls": {
       "title": "Doorway Face Pulls",
       "hevy_template_id_hint": "f78f086f-8e04-4032-860a-df4dc124e5fe",
@@ -3542,6 +3718,54 @@
       "last_done": "2023-01-03",
       "anchor_family": null
     },
+    "seated_calf_raise": {
+      "title": "Seated Calf Raise",
+      "hevy_template_id_hint": "062AB91A",
+      "primary_muscle": "calves",
+      "secondary_muscles": [],
+      "volume_muscle": "Calves",
+      "hevy_primary_muscle_group": "calves",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
+      "skill_tier": 1,
+      "skill_tier_source": "hevy_equipment:machine",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 10,
+        "end": 15
+      },
+      "equipment": "machine",
+      "provenance": "hevy_history",
+      "reviewed": false,
+      "sessions": 5,
+      "first_done": "2025-01-03",
+      "last_done": "2026-11-03",
+      "anchor_family": null
+    },
+    "standing_calf_raise_barbell": {
+      "title": "Standing Calf Raise (Barbell)",
+      "hevy_template_id_hint": "E53CCBE5",
+      "primary_muscle": "calves",
+      "secondary_muscles": [],
+      "volume_muscle": "Calves",
+      "hevy_primary_muscle_group": "calves",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
+      "skill_tier": 3,
+      "skill_tier_source": "hevy_equipment:barbell",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 5,
+        "end": 8
+      },
+      "equipment": "barbell",
+      "provenance": "hevy_history",
+      "reviewed": false,
+      "sessions": 5,
+      "first_done": "2026-06-18",
+      "last_done": "2026-11-10",
+      "anchor_family": null
+    },
     "t_spine_rotations": {
       "title": "T Spine Rotations",
       "hevy_template_id_hint": "d6ff5f88-2466-4e34-9fdb-c2253a037372",
@@ -3564,30 +3788,6 @@
       "sessions": 5,
       "first_done": "2024-10-01",
       "last_done": "2025-01-04",
-      "anchor_family": null
-    },
-    "triceps_rope_pushdown": {
-      "title": "Triceps Rope Pushdown",
-      "hevy_template_id_hint": "94B7239B",
-      "primary_muscle": "triceps",
-      "secondary_muscles": [],
-      "volume_muscle": "Triceps",
-      "hevy_primary_muscle_group": "triceps",
-      "hevy_type": "weight_reps",
-      "is_custom": false,
-      "skill_tier": 1,
-      "skill_tier_source": "hevy_equipment:machine",
-      "joint_friendly_score": 1,
-      "default_rep_range": {
-        "start": 10,
-        "end": 15
-      },
-      "equipment": "machine",
-      "provenance": "hevy_history",
-      "reviewed": false,
-      "sessions": 5,
-      "first_done": "2024-01-15",
-      "last_done": "2025-11-06",
       "anchor_family": null
     },
     "walking": {
@@ -3657,30 +3857,6 @@
       "first_done": "2024-12-21",
       "last_done": "2025-02-16",
       "anchor_family": "row"
-    },
-    "21s": {
-      "title": "21s",
-      "hevy_template_id_hint": "6cb744a3-2830-4fd4-a208-d6fecd2f730c",
-      "primary_muscle": "other",
-      "secondary_muscles": [],
-      "volume_muscle": null,
-      "hevy_primary_muscle_group": "other",
-      "hevy_type": "weight_reps",
-      "is_custom": true,
-      "skill_tier": 1,
-      "skill_tier_source": "hevy_equipment:none",
-      "joint_friendly_score": 1,
-      "default_rep_range": {
-        "start": 10,
-        "end": 15
-      },
-      "equipment": "none",
-      "provenance": "hevy_history",
-      "reviewed": false,
-      "sessions": 4,
-      "first_done": "2022-04-01",
-      "last_done": "2025-10-28",
-      "anchor_family": null
     },
     "back_extension_hyperextension": {
       "title": "Back Extension (Hyperextension)",
@@ -3781,56 +3957,29 @@
       "last_done": "2022-09-20",
       "anchor_family": null
     },
-    "chest_fly_machine": {
-      "title": "Chest Fly (Machine)",
-      "hevy_template_id_hint": "78683336",
-      "primary_muscle": "chest",
+    "clean": {
+      "title": "Clean",
+      "hevy_template_id_hint": "ABB00838",
+      "primary_muscle": "other",
       "secondary_muscles": [],
-      "volume_muscle": "Chest",
-      "hevy_primary_muscle_group": "chest",
+      "volume_muscle": null,
+      "hevy_primary_muscle_group": "full_body",
       "hevy_type": "weight_reps",
       "is_custom": false,
-      "skill_tier": 1,
-      "skill_tier_source": "hevy_equipment:machine",
+      "skill_tier": 3,
+      "skill_tier_source": "hevy_equipment:barbell",
       "joint_friendly_score": 1,
       "default_rep_range": {
-        "start": 10,
-        "end": 15
+        "start": 5,
+        "end": 8
       },
-      "equipment": "machine",
+      "equipment": "barbell",
       "provenance": "hevy_history",
       "reviewed": false,
       "sessions": 4,
-      "first_done": "2022-01-17",
-      "last_done": "2024-11-30",
+      "first_done": "2022-08-30",
+      "last_done": "2026-11-10",
       "anchor_family": null
-    },
-    "chest_supported_reverse_fly_dumbbell": {
-      "title": "Chest Supported Reverse Fly (Dumbbell)",
-      "hevy_template_id_hint": "B582299E",
-      "primary_muscle": "shoulders",
-      "secondary_muscles": [
-        "back"
-      ],
-      "volume_muscle": "Shoulders",
-      "hevy_primary_muscle_group": "shoulders",
-      "hevy_type": "weight_reps",
-      "is_custom": false,
-      "skill_tier": 2,
-      "skill_tier_source": "hevy_equipment:dumbbell",
-      "joint_friendly_score": 1,
-      "default_rep_range": {
-        "start": 8,
-        "end": 12
-      },
-      "equipment": "dumbbell",
-      "provenance": "hevy_history",
-      "reviewed": false,
-      "sessions": 4,
-      "first_done": "2021-06-10",
-      "last_done": "2021-07-19",
-      "anchor_family": null,
-      "load_convention": "per_hand"
     },
     "db_drag_curls": {
       "title": "DB Drag Curls",
@@ -3854,31 +4003,6 @@
       "sessions": 4,
       "first_done": "2024-10-05",
       "last_done": "2024-11-10",
-      "anchor_family": null,
-      "load_convention": "per_hand"
-    },
-    "db_rear_delt_rows": {
-      "title": "DB Rear Delt Rows",
-      "hevy_template_id_hint": "6e1f6811-3457-40da-ab93-92de19b84707",
-      "primary_muscle": "shoulders",
-      "secondary_muscles": [],
-      "volume_muscle": "Shoulders",
-      "hevy_primary_muscle_group": "shoulders",
-      "hevy_type": "weight_reps",
-      "is_custom": true,
-      "skill_tier": 2,
-      "skill_tier_source": "hevy_equipment:dumbbell",
-      "joint_friendly_score": 1,
-      "default_rep_range": {
-        "start": 8,
-        "end": 12
-      },
-      "equipment": "dumbbell",
-      "provenance": "hevy_history",
-      "reviewed": false,
-      "sessions": 4,
-      "first_done": "2024-10-04",
-      "last_done": "2025-03-19",
       "anchor_family": null,
       "load_convention": "per_hand"
     },
@@ -4536,30 +4660,6 @@
       "sessions": 3,
       "first_done": "2025-11-08",
       "last_done": "2026-10-04",
-      "anchor_family": null
-    },
-    "clean": {
-      "title": "Clean",
-      "hevy_template_id_hint": "ABB00838",
-      "primary_muscle": "other",
-      "secondary_muscles": [],
-      "volume_muscle": null,
-      "hevy_primary_muscle_group": "full_body",
-      "hevy_type": "weight_reps",
-      "is_custom": false,
-      "skill_tier": 3,
-      "skill_tier_source": "hevy_equipment:barbell",
-      "joint_friendly_score": 1,
-      "default_rep_range": {
-        "start": 5,
-        "end": 8
-      },
-      "equipment": "barbell",
-      "provenance": "hevy_history",
-      "reviewed": false,
-      "sessions": 3,
-      "first_done": "2022-08-30",
-      "last_done": "2022-09-25",
       "anchor_family": null
     },
     "cobra_pushups": {
@@ -5497,30 +5597,6 @@
       "last_done": "2023-06-02",
       "anchor_family": null
     },
-    "seated_calf_raise": {
-      "title": "Seated Calf Raise",
-      "hevy_template_id_hint": "062AB91A",
-      "primary_muscle": "calves",
-      "secondary_muscles": [],
-      "volume_muscle": "Calves",
-      "hevy_primary_muscle_group": "calves",
-      "hevy_type": "weight_reps",
-      "is_custom": false,
-      "skill_tier": 1,
-      "skill_tier_source": "hevy_equipment:machine",
-      "joint_friendly_score": 1,
-      "default_rep_range": {
-        "start": 10,
-        "end": 15
-      },
-      "equipment": "machine",
-      "provenance": "hevy_history",
-      "reviewed": false,
-      "sessions": 3,
-      "first_done": "2025-01-03",
-      "last_done": "2026-06-20",
-      "anchor_family": null
-    },
     "seated_shrugs": {
       "title": "Seated Shrugs",
       "hevy_template_id_hint": "62fdea29-5208-4eb7-8a34-388fc67049ca",
@@ -5692,30 +5768,6 @@
       "sessions": 3,
       "first_done": "2025-01-08",
       "last_done": "2025-02-02",
-      "anchor_family": null
-    },
-    "standing_calf_raise_barbell": {
-      "title": "Standing Calf Raise (Barbell)",
-      "hevy_template_id_hint": "E53CCBE5",
-      "primary_muscle": "calves",
-      "secondary_muscles": [],
-      "volume_muscle": "Calves",
-      "hevy_primary_muscle_group": "calves",
-      "hevy_type": "weight_reps",
-      "is_custom": false,
-      "skill_tier": 3,
-      "skill_tier_source": "hevy_equipment:barbell",
-      "joint_friendly_score": 1,
-      "default_rep_range": {
-        "start": 5,
-        "end": 8
-      },
-      "equipment": "barbell",
-      "provenance": "hevy_history",
-      "reviewed": false,
-      "sessions": 3,
-      "first_done": "2026-06-18",
-      "last_done": "2026-06-21",
       "anchor_family": null
     },
     "standing_calf_raise_dumbbell": {
@@ -6696,6 +6748,28 @@
       "anchor_family": "overhead_press",
       "load_convention": "per_hand"
     },
+    "dead_hang": {
+      "title": "Dead Hang",
+      "hevy_template_id_hint": "B9380898",
+      "primary_muscle": "back",
+      "secondary_muscles": [
+        "forearms"
+      ],
+      "volume_muscle": "Back",
+      "hevy_primary_muscle_group": "upper_back",
+      "hevy_type": "duration",
+      "is_custom": false,
+      "skill_tier": 1,
+      "skill_tier_source": "hevy_equipment:none",
+      "joint_friendly_score": 1,
+      "equipment": "none",
+      "provenance": "hevy_history",
+      "reviewed": false,
+      "sessions": 2,
+      "first_done": "2025-03-24",
+      "last_done": "2026-11-01",
+      "anchor_family": null
+    },
     "deadlift_twist": {
       "title": "Deadlift Twist",
       "hevy_template_id_hint": "d348d144-da66-4e2c-bf9c-87e0129a5d28",
@@ -7282,6 +7356,30 @@
       "last_done": "2025-01-29",
       "anchor_family": null
     },
+    "preacher_curl_barbell": {
+      "title": "Preacher Curl (Barbell)",
+      "hevy_template_id_hint": "4F942934",
+      "primary_muscle": "biceps",
+      "secondary_muscles": [],
+      "volume_muscle": "Biceps",
+      "hevy_primary_muscle_group": "biceps",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
+      "skill_tier": 3,
+      "skill_tier_source": "hevy_equipment:barbell",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 5,
+        "end": 8
+      },
+      "equipment": "barbell",
+      "provenance": "hevy_history",
+      "reviewed": false,
+      "sessions": 2,
+      "first_done": "2026-10-26",
+      "last_done": "2026-11-08",
+      "anchor_family": null
+    },
     "press_outs": {
       "title": "Press Outs",
       "hevy_template_id_hint": "fef96171-bc36-4f97-bea3-d3dfc7dbd1c6",
@@ -7539,6 +7637,33 @@
       "first_done": "2025-11-01",
       "last_done": "2025-11-08",
       "anchor_family": null
+    },
+    "romanian_deadlift_barbell": {
+      "title": "Romanian Deadlift (Barbell)",
+      "hevy_template_id_hint": "2B4B7310",
+      "primary_muscle": "hamstrings",
+      "secondary_muscles": [
+        "glutes",
+        "back"
+      ],
+      "volume_muscle": "Hamstrings",
+      "hevy_primary_muscle_group": "hamstrings",
+      "hevy_type": "weight_reps",
+      "is_custom": false,
+      "skill_tier": 3,
+      "skill_tier_source": "hevy_equipment:barbell",
+      "joint_friendly_score": 1,
+      "default_rep_range": {
+        "start": 5,
+        "end": 8
+      },
+      "equipment": "barbell",
+      "provenance": "hevy_history",
+      "reviewed": false,
+      "sessions": 2,
+      "first_done": "2026-11-06",
+      "last_done": "2026-11-10",
+      "anchor_family": "hinge"
     },
     "running": {
       "title": "Running",
@@ -9651,28 +9776,6 @@
       "sessions": 1,
       "first_done": "2024-12-18",
       "last_done": "2024-12-18",
-      "anchor_family": null
-    },
-    "dead_hang": {
-      "title": "Dead Hang",
-      "hevy_template_id_hint": "B9380898",
-      "primary_muscle": "back",
-      "secondary_muscles": [
-        "forearms"
-      ],
-      "volume_muscle": "Back",
-      "hevy_primary_muscle_group": "upper_back",
-      "hevy_type": "duration",
-      "is_custom": false,
-      "skill_tier": 1,
-      "skill_tier_source": "hevy_equipment:none",
-      "joint_friendly_score": 1,
-      "equipment": "none",
-      "provenance": "hevy_history",
-      "reviewed": false,
-      "sessions": 1,
-      "first_done": "2025-03-24",
-      "last_done": "2025-03-24",
       "anchor_family": null
     },
     "decline_bench_press_dumbbell": {
@@ -13271,60 +13374,6 @@
       "first_done": "2025-02-13",
       "last_done": "2025-02-13",
       "anchor_family": null
-    },
-    "pike_pushup": {
-      "title": "Pike Pushup",
-      "hevy_template_id_hint": "0EFE8162",
-      "primary_muscle": "shoulders",
-      "secondary_muscles": [
-        "triceps"
-      ],
-      "volume_muscle": "Shoulders",
-      "hevy_primary_muscle_group": "shoulders",
-      "hevy_type": "reps_only",
-      "is_custom": false,
-      "skill_tier": 2,
-      "skill_tier_source": "coach_added: the press loads most of the bodyweight onto the shoulders, so tier 2 by hand (#5088)",
-      "joint_friendly_score": 2,
-      "default_rep_range": {
-        "start": 6,
-        "end": 10
-      },
-      "equipment": "none",
-      "provenance": "coach_added",
-      "reviewed": false,
-      "sessions": 0,
-      "first_done": null,
-      "last_done": null,
-      "anchor_family": null,
-      "notes": "coach_added for the #5088 bodyweight travel variants (owner ruling 2026-10-18); template id from the Hevy template index built 2026-10-18"
-    },
-    "single_leg_glute_bridge": {
-      "title": "Single Leg Glute Bridge",
-      "hevy_template_id_hint": "CBC0D834",
-      "primary_muscle": "glutes",
-      "secondary_muscles": [
-        "hamstrings"
-      ],
-      "volume_muscle": "Glutes",
-      "hevy_primary_muscle_group": "glutes",
-      "hevy_type": "reps_only",
-      "is_custom": false,
-      "skill_tier": 1,
-      "skill_tier_source": "hevy_equipment:none",
-      "joint_friendly_score": 3,
-      "default_rep_range": {
-        "start": 10,
-        "end": 15
-      },
-      "equipment": "none",
-      "provenance": "coach_added",
-      "reviewed": false,
-      "sessions": 0,
-      "first_done": null,
-      "last_done": null,
-      "anchor_family": null,
-      "notes": "coach_added for the #5088 bodyweight travel variants (owner ruling 2026-10-18); template id from the Hevy template index built 2026-10-18"
     }
   }
 }

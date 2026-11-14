@@ -312,9 +312,10 @@ def test_approve_adds_only_what_the_owner_approved_and_refuses_what_the_rules_ho
     assert S.cmd_approve(str(manifest), target=target) == 2 and not target.exists()
 
 
-def test_the_review_rides_the_existing_weekly_review_clock():
-    """No schedule of its own: the obligation is on the weekly `fullreview-delta` calendar entry."""
+def test_the_review_rides_the_monthly_review_clock():
+    """No schedule of its own: the obligation is on the monthly `fullreview-full` calendar entry (moved there from
+    the weekly clock when it was retired, owner ruling 2026-11-13)."""
     import operating_calendar as oc
 
-    obligations = oc.CALENDAR["fullreview-delta"]["obligations"]
+    obligations = oc.CALENDAR["fullreview-full"]["obligations"]
     assert any("prediction_publication_registry.py review" in o and "Approve nothing" in o for o in obligations)

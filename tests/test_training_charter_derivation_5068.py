@@ -477,6 +477,9 @@ LEAF_PATTERNS: Dict[str, Tuple[Tuple[str, ...], Tuple[str, ...]]] = {
 # #5175: the charter numeric leaves NO pattern here owns, each with its reason. A dotted PREFIX covers every leaf under
 # it. The coverage test below fails on a leaf that is neither patterned nor listed, and on a row that covers nothing.
 NOT_APPLICABLE: Dict[str, str] = {
+    "split.session_minutes.measured_min_sessions": "the measured sessions before the per-set time is re-derived (#5799, charter "
+    "1.47.0): read only by training.session_time.min_sessions (derive_set_seconds), pinned against the recorded derivation by "
+    "tests/test_session_time_supersets_5799.py; a bare session count no prose pattern can key",
     "progression.set_raise_proposal.weeks_running": "the set-raise proposal's run length (#5796, charter 1.42.0, a platform "
     "default): read only through training.self_added_volume.set_raise_weeks (no fallback; a missing key raises), pinned by "
     "tests/test_prescription_reconciliation_5796.py",

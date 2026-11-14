@@ -334,6 +334,11 @@ MORNING_CHECKIN_ARMED_ON = "2026-10-27"  # first Pacific day a stamp can exist o
 MORNING_CHECKIN_LOOKBACK_DAYS = 14  # calendar days; enough weekdays to see a repeating skip across two weekends
 MORNING_SILENT_FAIL = 2  # consecutive completed weekdays with neither a send nor a sanctioned skip
 MORNING_REPEAT_WARN = 5  # consecutive completed weekdays with the SAME sanctioned skip and no send in between
+#: Owner ruling 2026-11-13: the silence latch (coach_outbound.two_consecutive_ignored — two unanswered check-ins and the
+#: coach stops until Matthew writes) is the system working as designed. A week of it is a STATUS, printed on every run
+#: with the day it began, never a warning. Every other repeated skip (dark, budget, held, capped, quiet_hours) still warns,
+#: and a weekday with no sanctioned outcome still fails.
+INTENTIONAL_PAUSE = "silence_respected"
 
 
 def check_morning_checkin_liveness(
@@ -352,7 +357,9 @@ def check_morning_checkin_liveness(
 
     FAIL when the newest ``MORNING_SILENT_FAIL`` (2) completed weekdays are all silent. WARN when the newest
     ``MORNING_REPEAT_WARN`` (5) completed weekdays carry the same sanctioned skip and no send: an alive rule that
-    never speaks is the 2026-10-01 ... 10-25 ``silence_respected`` latch, which nothing was reading. A single
+    never speaks. The one exception is ``silence_respected`` (owner ruling 2026-11-13): the latch is the intended
+    response to two unanswered check-ins, so a week of it is reported OK with a PAUSED status naming the day it
+    began — visible on every run, never counted as a defect. A single
     silent weekday, or fewer completed weekdays than a rule needs, is OK — the check never judges thin evidence.
     """
     c = Check("morning_checkin:weekday_liveness", "Data Freshness", tier)
@@ -385,6 +392,16 @@ def check_morning_checkin_liveness(
     window = outcomes[:MORNING_REPEAT_WARN]
     first = window[0][1]
     if len(window) >= MORNING_REPEAT_WARN and first in SANCTIONED and first != SENT and all(r == first for _, r in window):
+        if first == INTENTIONAL_PAUSE:
+            run = 0
+            while run < len(outcomes) and outcomes[run][1] == first:
+                run += 1
+            since = ("at least " if run == len(outcomes) else "") + outcomes[run - 1][0]  # the run may predate the lookback
+            c.ok(
+                f"morning check-in PAUSED (intentional): two check-ins went unanswered, so the coach has stood down "
+                f"on every weekday since {since} and resumes when Matthew replies on Telegram - a status, not a fault"
+            )
+            return [c]
         c.warn(
             f"morning check-in has stood down as '{first}' on each of the last {MORNING_REPEAT_WARN} weekdays "
             f"({window[-1][0]} .. {window[0][0]}) and sent nothing - the rule is alive but is not speaking"

@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T06:47:34.497546+00:00",
+  "captured_at": "2026-11-13T18:14:41.730906+00:00",
   "fetch_path": "/api/methods",
   "is_prefix_sample": false,
   "path": "/api/methods",
@@ -26,7 +26,7 @@
         "items": {
           "type": "string"
         },
-        "length_sample": 8,
+        "length_sample": 9,
         "type": "array"
       },
       "stats": {
@@ -71,7 +71,7 @@
           },
           "type": "object"
         },
-        "length_sample": 21,
+        "length_sample": 30,
         "type": "array"
       }
     },

@@ -290,7 +290,8 @@ def _outcome_core(text):
 
 
 # ── metric naming ────────────────────────────────────────────────────────────────────────
-_GENERIC_TOKENS = {"total", "score", "hours", "duration", "blood", "body", "heart", "rate", "resting", "count", "step"}
+# "volume" alone never names Hevy's lifting volume: a "Zone 2 volume" or "walking volume" call is not graded on it.
+_GENERIC_TOKENS = {"total", "score", "hours", "duration", "blood", "body", "heart", "rate", "resting", "count", "step", "volume"}
 
 
 def _names_for(metric):

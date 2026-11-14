@@ -2427,6 +2427,13 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": "between-chronicle",
+      "module": "lambdas/emails/between_chronicle_lambda.py",
+      "partition": "weekly_correlations",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": "between-chronicle",
       "module": "lambdas/emails/between_chronicle_lambda.py",
@@ -5262,6 +5269,13 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/web/site_api_ledger.py",
+      "partition": "weekly_correlations",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": null,
       "module": "lambdas/web/site_api_ledger.py",
@@ -6053,6 +6067,13 @@
       "via": "pk"
     },
     {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/fuel_loop.py",
+      "partition": "macrofactor",
+      "via": "seam"
+    },
+    {
       "direction": "unknown",
       "lambda": "life-platform-mcp",
       "module": "mcp/labs_helpers.py",
@@ -6114,6 +6135,34 @@
       "module": "mcp/shared_quantities.py",
       "partition": "withings",
       "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_advice_queue.py",
+      "partition": "decisions",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_advice_queue.py",
+      "partition": "habitify",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_advice_queue.py",
+      "partition": "hevy",
+      "via": "seam"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_advice_queue.py",
+      "partition": "macrofactor",
+      "via": "seam"
     },
     {
       "direction": "read",
@@ -8283,10 +8332,10 @@
       "contracts_enrolled": 16,
       "contracts_known": 15,
       "contracts_ratchet": 16,
-      "edges": 787,
+      "edges": 794,
       "lambdas": 107,
-      "mcp_tool_modules": 40,
-      "mcp_tools": 91,
+      "mcp_tool_modules": 41,
+      "mcp_tools": 92,
       "partitions": 125,
       "privacy_fields_owner_only": 69,
       "privacy_fields_owner_published": 11,
@@ -8297,9 +8346,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 394,
-        "sites_resolved": 987,
-        "sites_total": 1381
+        "sites_dynamic": 395,
+        "sites_resolved": 996,
+        "sites_total": 1391
       },
       "schedule_resolution": {
         "dynamic": 0,

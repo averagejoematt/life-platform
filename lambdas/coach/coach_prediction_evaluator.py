@@ -89,7 +89,7 @@ GRADING_COACH_IDS = COACH_IDS + [c for c in RETIRED_COACH_IDS if c not in COACH_
 # drift silently broke prediction grading. Single source now; MEASURABLE_METRICS is
 # DERIVED from this map, so the extractor's allowlist and the evaluator's source-map
 # cannot diverge. See lambdas/measurable_metrics.py.
-from experiment.measurable_metrics import METRIC_SOURCES, infer_direction  # noqa: E402
+from experiment.measurable_metrics import METRIC_SOURCES, infer_direction, row_is_reading  # noqa: E402
 
 # Window policy (domain minimums + subdomain map) moved to
 # coach.prediction_windows (#3046) so the public scorecard surface computes due
@@ -408,7 +408,8 @@ def _extract_metric_series(records, metric):
     """
     series = []
     for rec in records:
-        val = None if grading_quality.is_zero_entry_day(rec) else _safe_float(rec, metric)  # #5533 (c): an unlogged day is no reading
+        # #5533 (c): an unlogged day is no reading; nor is a row the metric's reading rule excludes (a Hevy plan, a load-free session)
+        val = None if grading_quality.is_zero_entry_day(rec) or not row_is_reading(rec, metric) else _safe_float(rec, metric)
         if val is not None:
             date_str = rec.get("date") or (rec.get("sk", "").replace("DATE#", ""))
             if date_str:

@@ -23,7 +23,9 @@ a Lambda CAN run, and the sweep runs it before it publishes anything nobody appr
     rule tightened between draft and publish still holds the week.
   * dated weekdays: "Monday, October 6" must name the weekday October 6 actually fell on.
 
-An owner approval is the other way through and is untouched: the approve click publishes whatever he approved.
+Owner ruling 2026-11-13: elapsed time is never consent, so the sweep no longer publishes at all — it holds and pages —
+and the approve click publishes only a draft this audit passes (chronicle_approve_lambda.approval_refusal), the craft
+hold being the one item an approval answers.
 Pure functions — no boto3, no model calls.
 """
 

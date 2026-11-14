@@ -821,6 +821,15 @@ def _titration_leg() -> dict[str, Any]:
     return nightly_leg()
 
 
+def _fuel_loop_leg() -> dict[str, Any]:
+    """#5792: a tripped protein/fat/fibre floor -> the window's menu + one Todoist prep task; fail-soft, never the outcome."""
+    try:
+        from mcp.fuel_loop import nightly_leg
+    except Exception as e:  # noqa: BLE001 — an import failure is named on the result, never raised into the pre-draft
+        return {"outcome": "failed", "error": type(e).__name__}
+    return nightly_leg()
+
+
 def _charter_version() -> Any:
     try:
         from training.training_charter import charter_version
@@ -849,6 +858,7 @@ def lambda_entry(event: dict[str, Any]) -> dict[str, Any]:
     result["fitness_battery"] = _fitness_battery_leg()  # #5078: upcoming|due|overdue|missed + FitnessBatteryMissed; never the outcome
     result["calibration"] = _calibration_leg()  # #5061: the tape/photo dead-man witness; fail-soft, never the outcome
     result["titration"] = _titration_leg()  # #5096: the coming week's calorie titration record; never the outcome
+    result["fuel_loop"] = _fuel_loop_leg()  # #5792: the kitchen intervention a tripped floor names; never the outcome
     print(emf_line(result.get("outcome") or FAILED))
     logger.info("%s", summary_line(result, _charter_version()))  # #5199: FIRST and compact — the detail line below is clipped
     logger.info("NIGHTLY_PREDRAFT %s", json.dumps(result, default=str)[:4000])

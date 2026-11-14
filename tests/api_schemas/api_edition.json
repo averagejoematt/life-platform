@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-10-11T22:19:31.415062+00:00",
+  "captured_at": "2026-11-13T18:14:41.730906+00:00",
   "fetch_path": "/api/edition",
   "is_prefix_sample": false,
   "path": "/api/edition",
@@ -43,6 +43,9 @@
                         "actual": {
                           "keys": {
                             "text": {
+                              "type": "string"
+                            },
+                            "unit": {
                               "type": "string"
                             },
                             "value": {
@@ -119,12 +122,9 @@
                           "type": "string"
                         }
                       },
-                      "optional": [
-                        "tolerance"
-                      ],
                       "type": "object"
                     },
-                    "length_sample": 55,
+                    "length_sample": 65,
                     "type": "array"
                   }
                 },
@@ -198,6 +198,29 @@
                   "dek": {
                     "type": "string"
                   },
+                  "held": {
+                    "type": "null"
+                  },
+                  "latest": {
+                    "keys": {
+                      "date": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "week": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "next_due": {
+                    "type": "string"
+                  },
                   "podcast": {
                     "keys": {
                       "absent_text": {
@@ -258,51 +281,7 @@
                 "type": "string"
               },
               "data": {
-                "keys": {
-                  "lines": {
-                    "items": {
-                      "keys": {
-                        "as_of": {
-                          "type": "string"
-                        },
-                        "bet_settles": {
-                          "type": "null"
-                        },
-                        "coach": {
-                          "type": "string"
-                        },
-                        "domain": {
-                          "type": "string"
-                        },
-                        "move": {
-                          "type": "string"
-                        },
-                        "move_label": {
-                          "type": "string"
-                        },
-                        "replies_to": {
-                          "type": "null"
-                        },
-                        "text": {
-                          "type": "string"
-                        },
-                        "truncated": {
-                          "type": "boolean"
-                        },
-                        "when_text": {
-                          "type": "null"
-                        }
-                      },
-                      "type": "object"
-                    },
-                    "length_sample": 3,
-                    "type": "array"
-                  },
-                  "mixed_days": {
-                    "type": "boolean"
-                  }
-                },
-                "type": "object"
+                "type": "null"
               },
               "source": {
                 "type": "string"
@@ -569,14 +548,44 @@
                           },
                           "data": {
                             "keys": {
+                              "hours": {
+                                "type": "number"
+                              },
+                              "night_of": {
+                                "type": "string"
+                              },
+                              "read_from": {
+                                "type": "string"
+                              },
+                              "recovery": {
+                                "keys": {
+                                  "unit": {
+                                    "type": "string"
+                                  },
+                                  "value": {
+                                    "type": "number"
+                                  }
+                                },
+                                "type": "object"
+                              },
                               "text": {
+                                "type": "string"
+                              },
+                              "unit": {
+                                "type": "string"
+                              },
+                              "wake_date": {
                                 "type": "string"
                               }
                             },
                             "type": "object"
                           },
                           "source": {
-                            "type": "string"
+                            "items": {
+                              "type": "string"
+                            },
+                            "length_sample": 2,
+                            "type": "array"
                           },
                           "state": {
                             "type": "string"
@@ -644,7 +653,7 @@
                 "items": {
                   "type": "string"
                 },
-                "length_sample": 8,
+                "length_sample": 9,
                 "type": "array"
               },
               "state": {
@@ -659,80 +668,10 @@
                 "type": "string"
               },
               "as_of": {
-                "type": "string"
+                "type": "null"
               },
               "data": {
-                "keys": {
-                  "days": {
-                    "items": {
-                      "keys": {
-                        "_meta": {
-                          "keys": {
-                            "cache_seconds": {
-                              "type": "integer"
-                            },
-                            "generated_at": {
-                              "type": "string"
-                            },
-                            "request_id": {
-                              "type": "string"
-                            },
-                            "served_at": {
-                              "type": "string"
-                            }
-                          },
-                          "type": "object"
-                        },
-                        "absent_text": {
-                          "type": "string"
-                        },
-                        "date": {
-                          "type": "string"
-                        },
-                        "lines": {
-                          "items": {
-                            "keys": {
-                              "bet_settles": {
-                                "type": "null"
-                              },
-                              "coach": {
-                                "type": "string"
-                              },
-                              "coach_id": {
-                                "type": "string"
-                              },
-                              "move": {
-                                "type": "string"
-                              },
-                              "move_label": {
-                                "type": "string"
-                              },
-                              "replies_to": {
-                                "type": "null"
-                              },
-                              "text": {
-                                "type": "string"
-                              }
-                            },
-                            "type": "object"
-                          },
-                          "length_sample": 3,
-                          "type": "array"
-                        },
-                        "source": {
-                          "type": "string"
-                        },
-                        "state": {
-                          "type": "string"
-                        }
-                      },
-                      "type": "object"
-                    },
-                    "length_sample": 7,
-                    "type": "array"
-                  }
-                },
-                "type": "object"
+                "type": "null"
               },
               "source": {
                 "type": "string"
@@ -759,39 +698,10 @@
                         "type": "string"
                       },
                       "as_of": {
-                        "type": "string"
+                        "type": "null"
                       },
                       "data": {
-                        "keys": {
-                          "question": {
-                            "type": "string"
-                          },
-                          "settle_date": {
-                            "type": "string"
-                          },
-                          "sides": {
-                            "items": {
-                              "keys": {
-                                "coach": {
-                                  "type": "string"
-                                },
-                                "reason": {
-                                  "type": "string"
-                                },
-                                "says": {
-                                  "type": "string"
-                                }
-                              },
-                              "type": "object"
-                            },
-                            "length_sample": 2,
-                            "type": "array"
-                          },
-                          "topic": {
-                            "type": "string"
-                          }
-                        },
-                        "type": "object"
+                        "type": "null"
                       },
                       "source": {
                         "type": "string"
@@ -881,6 +791,23 @@
               },
               "data": {
                 "keys": {
+                  "baseline": {
+                    "keys": {
+                      "rate": {
+                        "type": "number"
+                      },
+                      "rate_pct": {
+                        "type": "integer"
+                      },
+                      "rule": {
+                        "type": "string"
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
                   "beats_simple_guess": {
                     "type": "boolean"
                   },
@@ -1433,10 +1360,33 @@
                               "label": {
                                 "type": "string"
                               },
+                              "recovery": {
+                                "keys": {
+                                  "unit": {
+                                    "type": "string"
+                                  },
+                                  "value": {
+                                    "type": "number"
+                                  }
+                                },
+                                "type": "object"
+                              },
+                              "settled": {
+                                "type": "boolean"
+                              },
                               "text": {
                                 "type": "string"
+                              },
+                              "unit": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "number"
                               }
                             },
+                            "optional": [
+                              "settled"
+                            ],
                             "type": "object"
                           },
                           "length_sample": 4,
@@ -1476,6 +1426,9 @@
                                 "type": "array"
                               },
                               "text": {
+                                "type": "string"
+                              },
+                              "unit": {
                                 "type": "string"
                               },
                               "values": {
@@ -1522,6 +1475,9 @@
                               "text": {
                                 "type": "string"
                               },
+                              "unit": {
+                                "type": "string"
+                              },
                               "values": {
                                 "items": {
                                   "type": "number"
@@ -1561,6 +1517,9 @@
                               "text": {
                                 "type": "string"
                               },
+                              "unit": {
+                                "type": "string"
+                              },
                               "values": {
                                 "items": {
                                   "type": "number"
@@ -1591,6 +1550,9 @@
                           "data": {
                             "keys": {
                               "text": {
+                                "type": "string"
+                              },
+                              "unit": {
                                 "type": "string"
                               },
                               "values": {
@@ -1639,7 +1601,7 @@
                       },
                       "type": "object"
                     },
-                    "length_sample": 27,
+                    "length_sample": 58,
                     "type": "array"
                   }
                 },

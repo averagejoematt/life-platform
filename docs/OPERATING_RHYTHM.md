@@ -2,6 +2,13 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-31
 
+> **Amended 2026-11-13 (owner ruling).** The plan below was written for September's "operate, don't build"
+> mode, which ended: since the v9 launch the platform is in rapid development (owner ruling 2026-11-07). The
+> two monthly checkpoints stay, re-pointed (see "The three checkpoints"): the 30-day read is now a monthly
+> read of what is actually used, with no feature freeze attached, and the 60-day read is cost against named
+> returns for the latest closed month. Neither clock was reset by the amendment. The rest of this page is
+> the September plan, kept as written.
+
 Written to you, Matthew, for the era that starts September 1st: the platform is built,
 and from here you are its user. This page is the whole plan on one screen — what you do
 each day, what arrives each week, what Claude is for now, and the three dated points
@@ -91,19 +98,22 @@ will not, and that is the useful part.
 Dated, on the operating calendar, with the dead-man watching them. Each one is yours to
 run — they are owner-attended because every question in them is a judgment call.
 
-**October 1 — 30 days: is the rhythm holding?** Not "did you do it perfectly" but what
+**Monthly (first October 1) — what is actually used?** Not "did you do it perfectly" but what
 actually happened. Which surfaces did you open, which did you ignore, which coaches did
 you text and which have not heard from you once? Ignored is information: a surface you
-never open is a candidate for deletion, not for a redesign. This is also the first
-window in which a feature may be reconsidered at all.
+never open is a candidate for deletion, not for a redesign. Name anything that shipped
+in the month and was never used. (Until 2026-11-13 this was also the first window in
+which a feature could be reconsidered at all; that freeze ended with the user-mode plan.)
 
-**October 31 — 60 days: what did it cost, and what did it do?** September closes in the
-cost tracker; read the number next to a list of specific things the platform did for you
-that month. Named things — a decision it changed, a problem it caught, a question it
+**Every 60 days (first October 31) — what did it cost, and what did it do?** The latest
+closed month in the cost tracker; read the number next to a list of specific things the
+platform did for you that month. Named things — a decision it changed, a problem it caught, a question it
 answered. If the honest list is short, say so and write it down. A cost you cannot put a
 return next to is the finding, and it is more useful than a comfortable answer.
 
-**November 30 — 90 days: what gets built next?** By then you will have three months of
+**November 30 — 90 days: what gets built next?** (Since 2026-11-13 the roadmap is not held
+for this date; this is the usage-evidenced read of it, and where these three checkpoints are
+re-decided.) By then you will have three months of
 lived usage, which is the smallest sample that can tell "I need this" apart from "I
 imagined I would need this". The roadmap comes out of that, not out of anything either
 of us thinks today. Anything on your written-down list gets judged here against what you

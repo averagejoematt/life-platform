@@ -93,8 +93,8 @@ def chronicle_queue_lines(items: list, now: _dt.datetime) -> list[str]:
 
     #4531 (incident 2026-10-14): week 6 was drafted by the legacy writer after the desk
     failed, the preview email went out, and nobody approved it — the 48-hour sweep then
-    HELD it daily (an unaudited draft never auto-publishes, #4694) and the subscribers'
-    Wednesday simply did not arrive. Two sessions booted inside that window with no line
+    HELD it daily (an unaudited draft never auto-publishes, #4694; since the owner's 2026-11-13
+    ruling no draft does) and the subscribers' Wednesday simply did not arrive. Two sessions booted inside that window with no line
     telling them a draft was waiting. This is that line. A tombstoned or non-current-phase
     draft is history the sweep skips; it is still printed, flagged, never hidden.
     """

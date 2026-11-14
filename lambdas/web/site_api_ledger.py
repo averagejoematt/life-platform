@@ -132,9 +132,18 @@ def what_changed(*, _g) -> dict:
         )
     item = _decimal_to_float(item)
     # Owner rulings 2026-11-03/05: a newly-unlocked pair naming a private metric is omitted, and the
-    # honest-null flag is re-judged over what is served (common.activity_publication).
+    # honest-null flag is re-judged over what is served (common.activity_publication). 2026-11-12: a day_grade /
+    # habit_pct pair is "newly unlocked" only against earlier PUBLIC-METHOD weeks (public_newly_unlocked).
     deltas = item.get("deltas", [])
-    unlocked = [u for u in item.get("newly_unlocked", []) or [] if _activity_publication.correlation_pair_is_public(u)]
+    unlocked = _activity_publication.public_newly_unlocked(
+        item.get("newly_unlocked", []),
+        _activity_publication.unlocked_baseline_records(
+            table,
+            with_phase_filter({"KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}weekly_correlations")}),
+            item.get("newly_unlocked"),
+        ),
+        item.get("window_end"),
+    )
     return _ok(
         {
             "deltas": deltas,
@@ -170,6 +179,19 @@ def _supplement_stack_match(exp_name: str, registry: dict) -> bool:
             if item_name and (compound in item_name or item_name in compound):
                 return True
     return False
+
+
+def _finding_provenance(item: dict, pair: dict) -> dict:
+    """2026-11-11: the method each method-versioned metric of the pair was computed under, as the weekly record stamped
+    it (public_correlations already withheld an unstamped one) — so a downstream reader (the Laboratory's snapshot) can
+    hold the same rule without the record — and the run's trailing window (consecutive weeks share most of their days)."""
+    raw = item.get("metric_methods")
+    stamps: dict = raw if isinstance(raw, dict) else {}
+    return {
+        "metric_methods": {k: stamps[k] for k in (pair.get("metric_a"), pair.get("metric_b")) if k in stamps},
+        "window_start": item.get("start_date"),
+        "window_end": item.get("end_date"),
+    }
 
 
 def discoveries(*, _g) -> dict:
@@ -371,13 +393,11 @@ def discoveries(*, _g) -> dict:
             # `continue` on every real record (structurally always []); a
             # hypothetical legacy flat-list record is still accepted, the same way
             # site_api_discovery.correlations() handles both shapes.
-            if isinstance(corrs, dict):  # owner rulings 2026-11-03/05: public pairs, FDR re-run over them
-                pairs = list(_activity_publication.public_correlations(corrs).values())
-            elif isinstance(corrs, list):
-                pairs = _activity_publication.public_correlations(corrs)
-            else:
+            if not isinstance(corrs, (dict, list)):
                 continue
-            for c in pairs:
+            # owner rulings 2026-11-03/05: public pairs, FDR re-run over them; 2026-11-11: method-stamped records only
+            pairs = _activity_publication.public_correlations(corrs, metric_methods=item.get("metric_methods"))
+            for c in pairs.values() if isinstance(pairs, dict) else pairs:
                 if not isinstance(c, dict):
                     continue
                 if not (c.get("fdr_significant") or c.get("significant")):
@@ -388,20 +408,19 @@ def discoveries(*, _g) -> dict:
                 # hypothetical legacy flat-list record.
                 r = c.get("pearson_r", c.get("r", 0)) or 0
                 n = c.get("n_days", c.get("n", 0)) or 0
-                # #3445: the autocorrelation-corrected effective n, NOT raw n — feeds
-                # correlation_evidence's level/score so a claim isn't graded on a
-                # sample size larger than the data's real independent information.
+                # #3445: the autocorrelation-corrected effective n, NOT raw n — feeds correlation_evidence's level/score
+                # so a claim isn't graded on a sample size larger than the data's real independent information.
                 n_eff = c.get("n_eff")
                 direction = "positively" if r > 0 else "negatively"
-                # #1372 Evidence Bar: pass the stored FDR verdict through honestly —
-                # a legacy record with only the pre-FDR `significant` flag serves
-                # fdr_significant=None ("not checked"), never a fake pass.
+                # #1372 Evidence Bar: pass the stored FDR verdict through honestly — a legacy record with only the
+                # pre-FDR `significant` flag serves fdr_significant=None ("not checked"), never a fake pass.
                 fdr_flag = c.get("fdr_significant")
                 ai_findings.append(
                     {
                         "week": week,
                         "metric_a": a,
                         "metric_b": b,
+                        **_finding_provenance(item, c),
                         "r": round(r, 2) if r else 0,
                         "n": n,
                         "n_eff": n_eff,

@@ -35,6 +35,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import boto3
+from boto3.dynamodb.conditions import Key
 from common import activity_publication  # owner rulings 2026-11-03/05: private metrics off public mail
 from common.email_identity import CHRONICLE_SENDER  # #3568 — ONE sending vocabulary, gated against the SES-verified set
 from common.journal_silence import reader_mail  # #5131: the one public-surface guard
@@ -76,7 +77,7 @@ from common import send_ledger  # #3113 / DIL-025: the durable replay guard
 from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.unsubscribe_token import unsub_url_or_fallback  # #3044 — signed unsub link, never plaintext email
-from experiment.phase_filter import singleton_visible  # ADR-058 / #946 / #1200: honor restart tombstones on PERSONA reads
+from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1200: restart tombstones
 
 # #2654: the log token monitoring keys a MetricFilter + alarm on. The literal in
 # cdk/stacks/monitoring_stack.py must match this constant EXACTLY — pinned by
@@ -122,8 +123,12 @@ def gather_digest() -> dict:
         wc = _d2f(table.get_item(Key={"pk": f"{USER_PREFIX}what_changed", "sk": "SNAPSHOT#current"}).get("Item") or {})
         if not wc.get("honest_null"):
             digest["deltas"] = (wc.get("deltas") or [])[:6]
-            # Owner rulings 2026-11-03/05: the same public projection /api/what_changed serves.
-            digest["unlocked"] = [u for u in (wc.get("newly_unlocked") or []) if activity_publication.correlation_pair_is_public(u)][:4]
+            # Owner rulings 2026-11-03/05/11: the same public projection /api/what_changed serves.
+            unlocked = wc.get("newly_unlocked") or []
+            records = activity_publication.unlocked_baseline_records(
+                table, with_phase_filter({"KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}weekly_correlations")}), unlocked
+            )
+            digest["unlocked"] = activity_publication.public_newly_unlocked(unlocked, records, wc.get("window_end"))[:4]
     except Exception as e:
         logger.warning("what_changed read skipped: %s", e)
 

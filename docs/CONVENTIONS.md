@@ -753,9 +753,21 @@ dead-man's own derivation) and, when behind, **defers** — nothing synced, noth
 back — instead of waiting. `web-deploy-resume.yml` (every CI/CD completion + hourly) and the
 laptop deploy scripts re-dispatch the deferred deploy once the API lands; a deferral older
 than 8 h reds the resume run. Break-glass: dispatch with `api_readiness=skip`. Logic and
-tests: `deploy/www_api_readiness.py`, `tests/test_www_api_readiness.py`. Route-level
-deferral (`deploy/api_deploy_sequencing.json`) still covers `site/**`, which this gate does
-not.
+tests: `deploy/www_api_readiness.py`, `tests/test_www_api_readiness.py`.
+
+**The legacy `site/**` deploy carries the same gate (2026-11-12 follow-up).** `site-deploy.yml`
+(`/coaching/` and every kept shell) reads the same live Site API, so it runs the same
+`www_api_readiness.py check` in an `api-readiness` job; not ready → its own `deferred` job
+(nothing synced, so `rollback-site-on-failure` cannot fire — rollback still keys on a real
+smoke/visual red after a real deploy). `web-deploy-resume.yml` resumes **both** workflows
+(`TARGETS` in the module; one API read, one dispatch per deferred target) and the stale alarm
+times from the **first** deferral of a streak, so frequent `site/**` merges cannot keep
+resetting it. Break-glass: `gh workflow run site-deploy.yml --ref main -f api_readiness=skip`.
+`deploy/api_deploy_sequencing.json` is **kept as the secondary line**, not retired: it is
+still the PR-time advisory (`scripts/check_api_before_frontend.py`) and the smoke/visual 404
+downgrade for what the commit gate cannot see — an UNVERIFIED or break-glass run, and a cached
+edge 404 outliving the Lambda deploy. Entries should be rare and short-lived; the stale
+`/api/pairs` entry was re-armed with this change.
 
 ### 4c. Merge-day derived-artifact drift auto-reconciles on main (#1173)
 

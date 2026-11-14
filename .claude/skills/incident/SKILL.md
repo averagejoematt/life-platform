@@ -59,3 +59,11 @@ Ask the honest metric from epic #2799: **"would a recurrence be caught today?"**
 Guard the **set**, not the instance: a rule pinned to the one path that broke will miss
 the eleventh. `#953` fixed in-repo worktree pollution by naming one directory; a second
 in-repo worktree root reproduced it exactly, and the by-name skip read as coverage.
+
+## A serious privacy or integrity incident owes a focused review
+
+Owner ruling 2026-11-13 (the review cadence): when the incident exposed private data, or
+published something untrue as fact, run a focused `/review <lens>` on the lens that owns the
+class — `accuracy` for a false public claim, `full` with the privacy rows for an exposure —
+once the three artifacts above exist. It is not on the calendar on purpose: the incident is
+the trigger. Record the run's grades file in the incident's tracker.

@@ -11,8 +11,8 @@ The cadence promise is NOT typed here. Every weekday and the count come from
 `common.subscriber_cadence` — the one derivation from the senders' live crons that
 `tests/test_subscriber_cadence_promise_3564.py` pins byte for byte on every subscriber
 surface. The fold carries Prototype C's line in reader words, derived from the same
-registry ("The numbers every Sunday; the write-up every Wednesday." + the fallback day and
-the count); the exact `promise_sentence()` sits under "The exact terms", because the
+registry ("The numbers every Sunday; the write-up every Wednesday." + the note day and
+the count; the Friday fallback left with the auto-publish sweep, owner ruling 2026-11-13); the exact `promise_sentence()` sits under "The exact terms", because the
 nightly `qa_check_subscriber_promise` requires those bytes on the live /subscribe/ at the
 cut-over and the sentence names the Chronicle by its product name (the vocabulary ledger
 carries the one page it costs, dated). A driver finding on the live /next/subscribe/
@@ -101,13 +101,9 @@ def cadence_lines() -> tuple[str, str, str]:
     sc = subscriber_cadence
     signal = sc.weekday_name(sc.signal_weekday())
     writeup = sc.weekday_name(sc.chronicle_weekday())
-    fallback = sc.weekday_name(sc.chronicle_autopublish_weekday())
     note = sc.weekday_name(sc.required_weekday(sc.sender("between-chronicle").cron))
     lead = f"The numbers every {signal}; the write-up every {writeup}."
-    rest = (
-        f"Or {fallback}, when Matthew has not read the draft by then; now and then a short note on {note} "
-        f"when there is something new. Never more than {sc.weekly_count_word()} emails a week."
-    )
+    rest = f"Now and then a short note on {note} when there is something new. " f"Never more than {sc.weekly_count_word()} emails a week."
     return lead, rest, sc.promise_sentence()
 
 
@@ -121,7 +117,7 @@ def body(base: str) -> str:
             # R7 fix 10: one dated served fact in the fold — the next write-up's day, under the promise
             # (below the form it sat behind the bottom bar at 390×844).
             '    <p class="fo-count fo-fold-next fo-pending" id="fo-fold-next" data-src="api_content_cadence.chronicle.next_date">Not loaded yet.</p>\n'
-            f'    <p class="fo-small fo-terms" data-src="subscriber_cadence.{{chronicle_autopublish_weekday,weekly_count_word}}">{rest}</p>\n'
+            f'    <p class="fo-small fo-terms" data-src="subscriber_cadence.weekly_count_word">{rest}</p>\n'
             '    <details class="fo-fold"><summary>The exact terms</summary>'
             f'<p class="fo-note" data-src="subscriber_cadence.promise_sentence">{exact}</p></details>\n' + _NOSCRIPT
         )

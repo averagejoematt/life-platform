@@ -468,7 +468,7 @@ def _ungate() -> None:
     AP.field_is_public = lambda *_a: True
     AP.public_hae_datatypes = lambda rows: rows
     AP.correlation_pair_is_public = lambda _p: True
-    AP.public_correlations = lambda c, alpha=0.05: c
+    AP.public_correlations = lambda c, alpha=0.05, metric_methods=None: c
     AP.hypothesis_is_public = lambda _h: True
     AP.public_component_scores = lambda sc: dict(sc or {})
 

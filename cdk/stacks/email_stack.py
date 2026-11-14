@@ -634,15 +634,15 @@ class EmailStack(Stack):
             source_file="lambdas/emails/chronicle_approve_lambda.py",
             timeout_seconds=60,
             memory_mb=256,
-            # SS-01: a daily sweep auto-publishes any draft older than the review window
-            # (CHRONICLE_AUTOPUBLISH_HOURS) so the weekly story never goes dark unattended.
+            # SS-01: a daily sweep HOLDS and pages on any draft unapproved past the review window
+            # (CHRONICLE_AUTOPUBLISH_HOURS); it never publishes (owner ruling 2026-11-13: elapsed time is not consent).
             # The scheduled invoke arrives as source=aws.events → handled as a sweep.
             # schedule: config/schedules.json (#4284) — daily 10:00 AM PT
             environment={
                 "CF_DIST_ID": CF_DIST_ID,
                 "CHRONICLE_EMAIL_SENDER_ARN": chronicle_sender.function_arn,
-                "CHRONICLE_AUTOPUBLISH_HOURS": "48",  # publish a draft unapproved for this long…
-                "CHRONICLE_AUTOPUBLISH_MAX_DAYS": "10",  # …but never resurrect one abandoned past this
+                "CHRONICLE_AUTOPUBLISH_HOURS": "48",  # page on a draft unapproved for this long…
+                "CHRONICLE_AUTOPUBLISH_MAX_DAYS": "10",  # …until it is this old (the heartbeat alarm still pages after)
             },
             custom_policies=rp.email_chronicle_approve(),
             **shared,

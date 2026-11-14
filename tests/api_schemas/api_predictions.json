@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T06:47:34.497546+00:00",
+  "captured_at": "2026-11-13T18:14:41.730906+00:00",
   "fetch_path": "/api/predictions",
   "is_prefix_sample": false,
   "path": "/api/predictions",
@@ -26,6 +26,253 @@
         "keys": {
           "explorer": {
             "keys": {
+              "comparison": {
+                "keys": {
+                  "method": {
+                    "type": "string"
+                  },
+                  "min_n_for_rate": {
+                    "type": "integer"
+                  },
+                  "records": {
+                    "keys": {
+                      "direction": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "number": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {
+                              "no reading before the call was filed": {
+                                "type": "integer"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "sealed": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "yes_no": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "rule": {
+                    "type": "string"
+                  },
+                  "rule_sentence": {
+                    "type": "string"
+                  },
+                  "rule_version": {
+                    "type": "integer"
+                  },
+                  "rule_words": {
+                    "type": "string"
+                  },
+                  "scored_complete": {
+                    "type": "boolean"
+                  },
+                  "sentence": {
+                    "type": "string"
+                  },
+                  "skill": {
+                    "keys": {
+                      "brier_skill": {
+                        "type": "number"
+                      },
+                      "n": {
+                        "type": "integer"
+                      },
+                      "sentence": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "unclassified": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
               "confirmed": {
                 "type": "integer"
               },
@@ -36,7 +283,7 @@
                 "type": "integer"
               },
               "hit_rate_pct": {
-                "type": "null"
+                "type": "number"
               },
               "inconclusive": {
                 "type": "integer"
@@ -69,6 +316,9 @@
                   },
                   "total": {
                     "type": "integer"
+                  },
+                  "under_review": {
+                    "type": "integer"
                   }
                 },
                 "type": "object"
@@ -79,10 +329,64 @@
               "pending": {
                 "type": "integer"
               },
+              "quality": {
+                "keys": {
+                  "by_flag": {
+                    "keys": {
+                      "logging_gap": {
+                        "type": "integer"
+                      },
+                      "low_power": {
+                        "type": "integer"
+                      },
+                      "proxy_metric": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "clean": {
+                    "type": "integer"
+                  },
+                  "flagged": {
+                    "type": "integer"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "unassessed": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "record": {
+                "keys": {
+                  "confirmed": {
+                    "type": "integer"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "refuted": {
+                    "type": "integer"
+                  },
+                  "through": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
               "refuted": {
                 "type": "integer"
               },
+              "retired": {
+                "type": "boolean"
+              },
               "total": {
+                "type": "integer"
+              },
+              "under_review": {
                 "type": "integer"
               }
             },
@@ -90,6 +394,249 @@
           },
           "glucose": {
             "keys": {
+              "comparison": {
+                "keys": {
+                  "method": {
+                    "type": "string"
+                  },
+                  "min_n_for_rate": {
+                    "type": "integer"
+                  },
+                  "records": {
+                    "keys": {
+                      "direction": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "number": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "sealed": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "yes_no": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "rule": {
+                    "type": "string"
+                  },
+                  "rule_sentence": {
+                    "type": "string"
+                  },
+                  "rule_version": {
+                    "type": "integer"
+                  },
+                  "rule_words": {
+                    "type": "string"
+                  },
+                  "scored_complete": {
+                    "type": "boolean"
+                  },
+                  "sentence": {
+                    "type": "string"
+                  },
+                  "skill": {
+                    "keys": {
+                      "brier_skill": {
+                        "type": "number"
+                      },
+                      "n": {
+                        "type": "integer"
+                      },
+                      "sentence": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "unclassified": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
               "confirmed": {
                 "type": "integer"
               },
@@ -100,7 +647,7 @@
                 "type": "integer"
               },
               "hit_rate_pct": {
-                "type": "null"
+                "type": "number"
               },
               "inconclusive": {
                 "type": "integer"
@@ -117,7 +664,7 @@
                     "type": "integer"
                   },
                   "hit_rate_pct": {
-                    "type": "null"
+                    "type": "number"
                   },
                   "inconclusive": {
                     "type": "integer"
@@ -133,6 +680,9 @@
                   },
                   "total": {
                     "type": "integer"
+                  },
+                  "under_review": {
+                    "type": "integer"
                   }
                 },
                 "type": "object"
@@ -143,10 +693,64 @@
               "pending": {
                 "type": "integer"
               },
+              "quality": {
+                "keys": {
+                  "by_flag": {
+                    "keys": {
+                      "logging_gap": {
+                        "type": "integer"
+                      },
+                      "low_power": {
+                        "type": "integer"
+                      },
+                      "proxy_metric": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "clean": {
+                    "type": "integer"
+                  },
+                  "flagged": {
+                    "type": "integer"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "unassessed": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "record": {
+                "keys": {
+                  "confirmed": {
+                    "type": "integer"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "refuted": {
+                    "type": "integer"
+                  },
+                  "through": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
               "refuted": {
                 "type": "integer"
               },
+              "retired": {
+                "type": "boolean"
+              },
               "total": {
+                "type": "integer"
+              },
+              "under_review": {
                 "type": "integer"
               }
             },
@@ -154,6 +758,249 @@
           },
           "labs": {
             "keys": {
+              "comparison": {
+                "keys": {
+                  "method": {
+                    "type": "string"
+                  },
+                  "min_n_for_rate": {
+                    "type": "integer"
+                  },
+                  "records": {
+                    "keys": {
+                      "direction": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "number": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "sealed": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "yes_no": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "rule": {
+                    "type": "string"
+                  },
+                  "rule_sentence": {
+                    "type": "string"
+                  },
+                  "rule_version": {
+                    "type": "integer"
+                  },
+                  "rule_words": {
+                    "type": "string"
+                  },
+                  "scored_complete": {
+                    "type": "boolean"
+                  },
+                  "sentence": {
+                    "type": "string"
+                  },
+                  "skill": {
+                    "keys": {
+                      "brier_skill": {
+                        "type": "number"
+                      },
+                      "n": {
+                        "type": "integer"
+                      },
+                      "sentence": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "unclassified": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
               "confirmed": {
                 "type": "integer"
               },
@@ -164,7 +1011,7 @@
                 "type": "integer"
               },
               "hit_rate_pct": {
-                "type": "null"
+                "type": "number"
               },
               "inconclusive": {
                 "type": "integer"
@@ -181,7 +1028,7 @@
                     "type": "integer"
                   },
                   "hit_rate_pct": {
-                    "type": "null"
+                    "type": "number"
                   },
                   "inconclusive": {
                     "type": "integer"
@@ -197,6 +1044,9 @@
                   },
                   "total": {
                     "type": "integer"
+                  },
+                  "under_review": {
+                    "type": "integer"
                   }
                 },
                 "type": "object"
@@ -207,10 +1057,64 @@
               "pending": {
                 "type": "integer"
               },
+              "quality": {
+                "keys": {
+                  "by_flag": {
+                    "keys": {
+                      "logging_gap": {
+                        "type": "integer"
+                      },
+                      "low_power": {
+                        "type": "integer"
+                      },
+                      "proxy_metric": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "clean": {
+                    "type": "integer"
+                  },
+                  "flagged": {
+                    "type": "integer"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "unassessed": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "record": {
+                "keys": {
+                  "confirmed": {
+                    "type": "integer"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "refuted": {
+                    "type": "integer"
+                  },
+                  "through": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
               "refuted": {
                 "type": "integer"
               },
+              "retired": {
+                "type": "boolean"
+              },
               "total": {
+                "type": "integer"
+              },
+              "under_review": {
                 "type": "integer"
               }
             },
@@ -218,6 +1122,249 @@
           },
           "mind": {
             "keys": {
+              "comparison": {
+                "keys": {
+                  "method": {
+                    "type": "string"
+                  },
+                  "min_n_for_rate": {
+                    "type": "integer"
+                  },
+                  "records": {
+                    "keys": {
+                      "direction": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "number": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "sealed": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "yes_no": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "rule": {
+                    "type": "string"
+                  },
+                  "rule_sentence": {
+                    "type": "string"
+                  },
+                  "rule_version": {
+                    "type": "integer"
+                  },
+                  "rule_words": {
+                    "type": "string"
+                  },
+                  "scored_complete": {
+                    "type": "boolean"
+                  },
+                  "sentence": {
+                    "type": "string"
+                  },
+                  "skill": {
+                    "keys": {
+                      "brier_skill": {
+                        "type": "number"
+                      },
+                      "n": {
+                        "type": "integer"
+                      },
+                      "sentence": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "unclassified": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
               "confirmed": {
                 "type": "integer"
               },
@@ -228,7 +1375,7 @@
                 "type": "integer"
               },
               "hit_rate_pct": {
-                "type": "null"
+                "type": "number"
               },
               "inconclusive": {
                 "type": "integer"
@@ -245,7 +1392,7 @@
                     "type": "integer"
                   },
                   "hit_rate_pct": {
-                    "type": "null"
+                    "type": "number"
                   },
                   "inconclusive": {
                     "type": "integer"
@@ -261,6 +1408,9 @@
                   },
                   "total": {
                     "type": "integer"
+                  },
+                  "under_review": {
+                    "type": "integer"
                   }
                 },
                 "type": "object"
@@ -271,10 +1421,64 @@
               "pending": {
                 "type": "integer"
               },
+              "quality": {
+                "keys": {
+                  "by_flag": {
+                    "keys": {
+                      "logging_gap": {
+                        "type": "integer"
+                      },
+                      "low_power": {
+                        "type": "integer"
+                      },
+                      "proxy_metric": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "clean": {
+                    "type": "integer"
+                  },
+                  "flagged": {
+                    "type": "integer"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "unassessed": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "record": {
+                "keys": {
+                  "confirmed": {
+                    "type": "integer"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "refuted": {
+                    "type": "integer"
+                  },
+                  "through": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
               "refuted": {
                 "type": "integer"
               },
+              "retired": {
+                "type": "boolean"
+              },
               "total": {
+                "type": "integer"
+              },
+              "under_review": {
                 "type": "integer"
               }
             },
@@ -282,6 +1486,249 @@
           },
           "nutrition": {
             "keys": {
+              "comparison": {
+                "keys": {
+                  "method": {
+                    "type": "string"
+                  },
+                  "min_n_for_rate": {
+                    "type": "integer"
+                  },
+                  "records": {
+                    "keys": {
+                      "direction": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "number": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "sealed": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "yes_no": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "rule": {
+                    "type": "string"
+                  },
+                  "rule_sentence": {
+                    "type": "string"
+                  },
+                  "rule_version": {
+                    "type": "integer"
+                  },
+                  "rule_words": {
+                    "type": "string"
+                  },
+                  "scored_complete": {
+                    "type": "boolean"
+                  },
+                  "sentence": {
+                    "type": "string"
+                  },
+                  "skill": {
+                    "keys": {
+                      "brier_skill": {
+                        "type": "number"
+                      },
+                      "n": {
+                        "type": "integer"
+                      },
+                      "sentence": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "unclassified": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
               "confirmed": {
                 "type": "integer"
               },
@@ -292,7 +1739,7 @@
                 "type": "integer"
               },
               "hit_rate_pct": {
-                "type": "null"
+                "type": "number"
               },
               "inconclusive": {
                 "type": "integer"
@@ -325,6 +1772,9 @@
                   },
                   "total": {
                     "type": "integer"
+                  },
+                  "under_review": {
+                    "type": "integer"
                   }
                 },
                 "type": "object"
@@ -335,10 +1785,64 @@
               "pending": {
                 "type": "integer"
               },
+              "quality": {
+                "keys": {
+                  "by_flag": {
+                    "keys": {
+                      "logging_gap": {
+                        "type": "integer"
+                      },
+                      "low_power": {
+                        "type": "integer"
+                      },
+                      "proxy_metric": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "clean": {
+                    "type": "integer"
+                  },
+                  "flagged": {
+                    "type": "integer"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "unassessed": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "record": {
+                "keys": {
+                  "confirmed": {
+                    "type": "integer"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "refuted": {
+                    "type": "integer"
+                  },
+                  "through": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
               "refuted": {
                 "type": "integer"
               },
+              "retired": {
+                "type": "boolean"
+              },
               "total": {
+                "type": "integer"
+              },
+              "under_review": {
                 "type": "integer"
               }
             },
@@ -346,6 +1850,249 @@
           },
           "physical": {
             "keys": {
+              "comparison": {
+                "keys": {
+                  "method": {
+                    "type": "string"
+                  },
+                  "min_n_for_rate": {
+                    "type": "integer"
+                  },
+                  "records": {
+                    "keys": {
+                      "direction": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "number": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "sealed": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "yes_no": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "rule": {
+                    "type": "string"
+                  },
+                  "rule_sentence": {
+                    "type": "string"
+                  },
+                  "rule_version": {
+                    "type": "integer"
+                  },
+                  "rule_words": {
+                    "type": "string"
+                  },
+                  "scored_complete": {
+                    "type": "boolean"
+                  },
+                  "sentence": {
+                    "type": "string"
+                  },
+                  "skill": {
+                    "keys": {
+                      "brier_skill": {
+                        "type": "number"
+                      },
+                      "n": {
+                        "type": "integer"
+                      },
+                      "sentence": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "unclassified": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
               "confirmed": {
                 "type": "integer"
               },
@@ -356,7 +2103,7 @@
                 "type": "integer"
               },
               "hit_rate_pct": {
-                "type": "null"
+                "type": "number"
               },
               "inconclusive": {
                 "type": "integer"
@@ -389,6 +2136,9 @@
                   },
                   "total": {
                     "type": "integer"
+                  },
+                  "under_review": {
+                    "type": "integer"
                   }
                 },
                 "type": "object"
@@ -399,10 +2149,64 @@
               "pending": {
                 "type": "integer"
               },
+              "quality": {
+                "keys": {
+                  "by_flag": {
+                    "keys": {
+                      "logging_gap": {
+                        "type": "integer"
+                      },
+                      "low_power": {
+                        "type": "integer"
+                      },
+                      "proxy_metric": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "clean": {
+                    "type": "integer"
+                  },
+                  "flagged": {
+                    "type": "integer"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "unassessed": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "record": {
+                "keys": {
+                  "confirmed": {
+                    "type": "integer"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "refuted": {
+                    "type": "integer"
+                  },
+                  "through": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
               "refuted": {
                 "type": "integer"
               },
+              "retired": {
+                "type": "boolean"
+              },
               "total": {
+                "type": "integer"
+              },
+              "under_review": {
                 "type": "integer"
               }
             },
@@ -410,6 +2214,249 @@
           },
           "sleep": {
             "keys": {
+              "comparison": {
+                "keys": {
+                  "method": {
+                    "type": "string"
+                  },
+                  "min_n_for_rate": {
+                    "type": "integer"
+                  },
+                  "records": {
+                    "keys": {
+                      "direction": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "number": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "number"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "number"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "number"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "sealed": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "yes_no": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "rule": {
+                    "type": "string"
+                  },
+                  "rule_sentence": {
+                    "type": "string"
+                  },
+                  "rule_version": {
+                    "type": "integer"
+                  },
+                  "rule_words": {
+                    "type": "string"
+                  },
+                  "scored_complete": {
+                    "type": "boolean"
+                  },
+                  "sentence": {
+                    "type": "string"
+                  },
+                  "skill": {
+                    "keys": {
+                      "brier_skill": {
+                        "type": "number"
+                      },
+                      "n": {
+                        "type": "integer"
+                      },
+                      "sentence": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "unclassified": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
               "confirmed": {
                 "type": "integer"
               },
@@ -420,7 +2467,7 @@
                 "type": "integer"
               },
               "hit_rate_pct": {
-                "type": "null"
+                "type": "number"
               },
               "inconclusive": {
                 "type": "integer"
@@ -453,6 +2500,9 @@
                   },
                   "total": {
                     "type": "integer"
+                  },
+                  "under_review": {
+                    "type": "integer"
                   }
                 },
                 "type": "object"
@@ -463,10 +2513,64 @@
               "pending": {
                 "type": "integer"
               },
+              "quality": {
+                "keys": {
+                  "by_flag": {
+                    "keys": {
+                      "logging_gap": {
+                        "type": "integer"
+                      },
+                      "low_power": {
+                        "type": "integer"
+                      },
+                      "proxy_metric": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "clean": {
+                    "type": "integer"
+                  },
+                  "flagged": {
+                    "type": "integer"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "unassessed": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "record": {
+                "keys": {
+                  "confirmed": {
+                    "type": "integer"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "refuted": {
+                    "type": "integer"
+                  },
+                  "through": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
               "refuted": {
                 "type": "integer"
               },
+              "retired": {
+                "type": "boolean"
+              },
               "total": {
+                "type": "integer"
+              },
+              "under_review": {
                 "type": "integer"
               }
             },
@@ -474,6 +2578,249 @@
           },
           "training": {
             "keys": {
+              "comparison": {
+                "keys": {
+                  "method": {
+                    "type": "string"
+                  },
+                  "min_n_for_rate": {
+                    "type": "integer"
+                  },
+                  "records": {
+                    "keys": {
+                      "direction": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "number": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "sealed": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "yes_no": {
+                        "keys": {
+                          "coach_only": {
+                            "type": "integer"
+                          },
+                          "coach_right": {
+                            "type": "integer"
+                          },
+                          "coach_right_on_scored": {
+                            "type": "integer"
+                          },
+                          "coach_right_pct": {
+                            "type": "null"
+                          },
+                          "graded": {
+                            "type": "integer"
+                          },
+                          "not_yet_scored": {
+                            "type": "integer"
+                          },
+                          "rule_only": {
+                            "type": "integer"
+                          },
+                          "rule_right": {
+                            "type": "integer"
+                          },
+                          "rule_right_pct": {
+                            "type": "null"
+                          },
+                          "scored": {
+                            "type": "integer"
+                          },
+                          "sign_test_p": {
+                            "type": "null"
+                          },
+                          "unscorable": {
+                            "type": "integer"
+                          },
+                          "unscorable_reasons": {
+                            "keys": {},
+                            "type": "object"
+                          },
+                          "verdict": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "rule": {
+                    "type": "string"
+                  },
+                  "rule_sentence": {
+                    "type": "string"
+                  },
+                  "rule_version": {
+                    "type": "integer"
+                  },
+                  "rule_words": {
+                    "type": "string"
+                  },
+                  "scored_complete": {
+                    "type": "boolean"
+                  },
+                  "sentence": {
+                    "type": "string"
+                  },
+                  "skill": {
+                    "keys": {
+                      "brier_skill": {
+                        "type": "null"
+                      },
+                      "n": {
+                        "type": "integer"
+                      },
+                      "sentence": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "unclassified": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
               "confirmed": {
                 "type": "integer"
               },
@@ -484,7 +2831,7 @@
                 "type": "integer"
               },
               "hit_rate_pct": {
-                "type": "null"
+                "type": "number"
               },
               "inconclusive": {
                 "type": "integer"
@@ -517,6 +2864,9 @@
                   },
                   "total": {
                     "type": "integer"
+                  },
+                  "under_review": {
+                    "type": "integer"
                   }
                 },
                 "type": "object"
@@ -527,10 +2877,64 @@
               "pending": {
                 "type": "integer"
               },
+              "quality": {
+                "keys": {
+                  "by_flag": {
+                    "keys": {
+                      "logging_gap": {
+                        "type": "integer"
+                      },
+                      "low_power": {
+                        "type": "integer"
+                      },
+                      "proxy_metric": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "clean": {
+                    "type": "integer"
+                  },
+                  "flagged": {
+                    "type": "integer"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "unassessed": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "record": {
+                "keys": {
+                  "confirmed": {
+                    "type": "integer"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "refuted": {
+                    "type": "integer"
+                  },
+                  "through": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
               "refuted": {
                 "type": "integer"
               },
+              "retired": {
+                "type": "boolean"
+              },
               "total": {
+                "type": "integer"
+              },
+              "under_review": {
                 "type": "integer"
               }
             },
@@ -539,25 +2943,364 @@
         },
         "type": "object"
       },
+      "commitments": {
+        "keys": {
+          "as_of": {
+            "type": "string"
+          },
+          "lifetime": {
+            "keys": {
+              "broken": {
+                "type": "number"
+              },
+              "checkable": {
+                "type": "number"
+              },
+              "follow_through_ci95": {
+                "items": {
+                  "type": "number"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "follow_through_pct": {
+                "type": "number"
+              },
+              "graded": {
+                "type": "number"
+              },
+              "kept": {
+                "type": "number"
+              },
+              "pending": {
+                "type": "number"
+              },
+              "total": {
+                "type": "number"
+              },
+              "ungradeable": {
+                "type": "number"
+              },
+              "ungradeable_by_metric": {
+                "keys": {
+                  "total_calories_kcal": {
+                    "type": "number"
+                  },
+                  "total_protein_g": {
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              "unresolved": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "season": {
+            "keys": {
+              "broken": {
+                "type": "number"
+              },
+              "checkable": {
+                "type": "number"
+              },
+              "follow_through_ci95": {
+                "items": {
+                  "type": "number"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "follow_through_pct": {
+                "type": "number"
+              },
+              "graded": {
+                "type": "number"
+              },
+              "kept": {
+                "type": "number"
+              },
+              "pending": {
+                "type": "number"
+              },
+              "total": {
+                "type": "number"
+              },
+              "ungradeable": {
+                "type": "number"
+              },
+              "ungradeable_by_metric": {
+                "keys": {},
+                "type": "object"
+              },
+              "unresolved": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "comparison": {
+        "keys": {
+          "method": {
+            "type": "string"
+          },
+          "min_n_for_rate": {
+            "type": "integer"
+          },
+          "records": {
+            "keys": {
+              "direction": {
+                "keys": {
+                  "coach_only": {
+                    "type": "integer"
+                  },
+                  "coach_right": {
+                    "type": "integer"
+                  },
+                  "coach_right_on_scored": {
+                    "type": "integer"
+                  },
+                  "coach_right_pct": {
+                    "type": "number"
+                  },
+                  "graded": {
+                    "type": "integer"
+                  },
+                  "not_yet_scored": {
+                    "type": "integer"
+                  },
+                  "rule_only": {
+                    "type": "integer"
+                  },
+                  "rule_right": {
+                    "type": "integer"
+                  },
+                  "rule_right_pct": {
+                    "type": "number"
+                  },
+                  "scored": {
+                    "type": "integer"
+                  },
+                  "sign_test_p": {
+                    "type": "number"
+                  },
+                  "unscorable": {
+                    "type": "integer"
+                  },
+                  "unscorable_reasons": {
+                    "keys": {},
+                    "type": "object"
+                  },
+                  "verdict": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "number": {
+                "keys": {
+                  "coach_only": {
+                    "type": "integer"
+                  },
+                  "coach_right": {
+                    "type": "integer"
+                  },
+                  "coach_right_on_scored": {
+                    "type": "integer"
+                  },
+                  "coach_right_pct": {
+                    "type": "number"
+                  },
+                  "graded": {
+                    "type": "integer"
+                  },
+                  "not_yet_scored": {
+                    "type": "integer"
+                  },
+                  "rule_only": {
+                    "type": "integer"
+                  },
+                  "rule_right": {
+                    "type": "integer"
+                  },
+                  "rule_right_pct": {
+                    "type": "number"
+                  },
+                  "scored": {
+                    "type": "integer"
+                  },
+                  "sign_test_p": {
+                    "type": "number"
+                  },
+                  "unscorable": {
+                    "type": "integer"
+                  },
+                  "unscorable_reasons": {
+                    "keys": {
+                      "no reading before the call was filed": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "verdict": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "sealed": {
+                "keys": {
+                  "coach_only": {
+                    "type": "integer"
+                  },
+                  "coach_right": {
+                    "type": "integer"
+                  },
+                  "coach_right_on_scored": {
+                    "type": "integer"
+                  },
+                  "coach_right_pct": {
+                    "type": "null"
+                  },
+                  "graded": {
+                    "type": "integer"
+                  },
+                  "not_yet_scored": {
+                    "type": "integer"
+                  },
+                  "rule_only": {
+                    "type": "integer"
+                  },
+                  "rule_right": {
+                    "type": "integer"
+                  },
+                  "rule_right_pct": {
+                    "type": "null"
+                  },
+                  "scored": {
+                    "type": "integer"
+                  },
+                  "sign_test_p": {
+                    "type": "null"
+                  },
+                  "unscorable": {
+                    "type": "integer"
+                  },
+                  "unscorable_reasons": {
+                    "keys": {},
+                    "type": "object"
+                  },
+                  "verdict": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "yes_no": {
+                "keys": {
+                  "coach_only": {
+                    "type": "integer"
+                  },
+                  "coach_right": {
+                    "type": "integer"
+                  },
+                  "coach_right_on_scored": {
+                    "type": "integer"
+                  },
+                  "coach_right_pct": {
+                    "type": "null"
+                  },
+                  "graded": {
+                    "type": "integer"
+                  },
+                  "not_yet_scored": {
+                    "type": "integer"
+                  },
+                  "rule_only": {
+                    "type": "integer"
+                  },
+                  "rule_right": {
+                    "type": "integer"
+                  },
+                  "rule_right_pct": {
+                    "type": "null"
+                  },
+                  "scored": {
+                    "type": "integer"
+                  },
+                  "sign_test_p": {
+                    "type": "null"
+                  },
+                  "unscorable": {
+                    "type": "integer"
+                  },
+                  "unscorable_reasons": {
+                    "keys": {},
+                    "type": "object"
+                  },
+                  "verdict": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "rule": {
+            "type": "string"
+          },
+          "rule_sentence": {
+            "type": "string"
+          },
+          "rule_version": {
+            "type": "integer"
+          },
+          "rule_words": {
+            "type": "string"
+          },
+          "scored_complete": {
+            "type": "boolean"
+          },
+          "sentence": {
+            "type": "string"
+          },
+          "skill": {
+            "keys": {
+              "brier_skill": {
+                "type": "number"
+              },
+              "n": {
+                "type": "integer"
+              },
+              "sentence": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "unclassified": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "cycle": {
         "type": "integer"
       },
       "method": {
-        "type": "object",
         "keys": {
-          "version": {
-            "type": "integer"
-          },
           "effective": {
             "type": "string"
           },
-          "note": {
-            "type": "string"
-          },
           "history": {
-            "type": "array",
             "items": {
-              "type": "object",
               "keys": {
                 "effective": {
                   "type": "string"
@@ -568,19 +3311,97 @@
                 "version": {
                   "type": "integer"
                 }
-              }
+              },
+              "type": "object"
             },
-            "length_sample": 2
+            "length_sample": 2,
+            "type": "array"
+          },
+          "note": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
           }
-        }
+        },
+        "type": "object"
       },
       "overall": {
         "keys": {
           "accuracy_pct": {
-            "type": "null"
+            "type": "number"
+          },
+          "baseline": {
+            "keys": {
+              "rate": {
+                "type": "number"
+              },
+              "rate_pct": {
+                "type": "integer"
+              },
+              "rule": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "type": "object"
           },
           "confirmed": {
             "type": "integer"
+          },
+          "counted": {
+            "keys": {
+              "bet": {
+                "keys": {
+                  "n": {
+                    "type": "integer"
+                  },
+                  "right": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "commentary": {
+                "keys": {
+                  "n": {
+                    "type": "integer"
+                  },
+                  "right": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "conditional": {
+                "keys": {
+                  "n": {
+                    "type": "integer"
+                  },
+                  "right": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "sealed": {
+                "keys": {
+                  "n": {
+                    "type": "integer"
+                  },
+                  "right": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "counted_text": {
+            "type": "string"
           },
           "decided": {
             "type": "integer"
@@ -633,6 +3454,9 @@
               },
               "total": {
                 "type": "integer"
+              },
+              "under_review": {
+                "type": "integer"
               }
             },
             "type": "object"
@@ -648,13 +3472,22 @@
           },
           "total": {
             "type": "integer"
+          },
+          "under_review": {
+            "type": "integer"
           }
         },
         "type": "object"
       },
+      "percent_floor": {
+        "type": "integer"
+      },
       "predictions": {
         "items": {
           "keys": {
+            "algo_version": {
+              "type": "string"
+            },
             "coach_id": {
               "type": "string"
             },
@@ -668,12 +3501,18 @@
               "type": "string"
             },
             "due_date": {
-              "type": "string"
+              "type": "null"
             },
             "eval_type": {
               "type": "string"
             },
+            "evaluator_version": {
+              "type": "string"
+            },
             "gradeable": {
+              "type": "boolean"
+            },
+            "graded_on_data": {
               "type": "boolean"
             },
             "metric": {
@@ -681,6 +3520,18 @@
             },
             "outcome_notes": {
               "type": "string"
+            },
+            "pre_registered": {
+              "type": "boolean"
+            },
+            "pre_registered_at": {
+              "type": "null"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "retired": {
+              "type": "boolean"
             },
             "status": {
               "type": "string"
@@ -690,6 +3541,9 @@
             },
             "text": {
               "type": "string"
+            },
+            "verification": {
+              "type": "null"
             }
           },
           "type": "object"
@@ -699,9 +3553,6 @@
       },
       "prereg_seal": {
         "keys": {
-          "artifact_url": {
-            "type": "string"
-          },
           "genesis": {
             "type": "string"
           },
@@ -714,8 +3565,28 @@
           "stamped_at": {
             "type": "string"
           },
-          "verify": {
+          "unverifiable_text": {
             "type": "string"
+          },
+          "verifiable": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "verification_summary": {
+        "keys": {
+          "corrected": {
+            "type": "integer"
+          },
+          "could_not_verify": {
+            "type": "integer"
+          },
+          "none": {
+            "type": "integer"
+          },
+          "reproduced": {
+            "type": "integer"
           }
         },
         "type": "object"
@@ -723,6 +3594,5 @@
     },
     "type": "object"
   },
-  "status": 200,
-  "_note": "2026-11-05 (owner ruling): `method` added \u2014 the call publication method every public count of calls is under."
+  "status": 200
 }
