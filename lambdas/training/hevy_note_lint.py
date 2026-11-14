@@ -341,7 +341,7 @@ def _lint_test(body: str, where: str, out: list[Problem]) -> None:
         out.append(Problem("L7", where, f"test note {g.phone_lines(body)} phone lines > {g.TEST_MAX_LINES}"))
 
 
-def _lint_lift(ex: LintExercise, body: str, where: str, out: list[Problem]) -> None:
+def _lint_lift(ex: LintExercise, body: str, where: str, out: list[Problem], live: bool = False) -> None:
     lines = body.split("\n")
     l1 = lines[0]
     rx = g.CARRY_LINE1_RE if ex.kind == "carry" else g.EFFORT_RE
@@ -364,7 +364,10 @@ def _lint_lift(ex: LintExercise, body: str, where: str, out: list[Problem]) -> N
     if ex.kind != "carry" and any(r[1] is not None for r in work) and g.PICK_LOAD_OPEN_TAIL in body:
         # #5428 re-grade #2: "find the load" over rows that carry the start load reads as "ignore the rows"
         out.append(Problem("L4", where, f"the W line says {g.PICK_LOAD_OPEN_TAIL!r} but the working rows carry a load"))
-    if ex.kind in ("barbell", "machine") and ex.compound and work and all(r[1] is None for r in work) and g.PICK_LOAD_OPEN_TAIL in body:
+    # #5861 fix round 12: a LIVE draft never invents a load for a lift with no exposure in its window; on a MACHINE the W-set
+    # feeler is the instruction (stable, low skill) — the rule stays for a barbell, and for every shadow draft
+    kinds = ("barbell",) if live else ("barbell", "machine")
+    if ex.kind in kinds and ex.compound and work and all(r[1] is None for r in work) and g.PICK_LOAD_OPEN_TAIL in body:
         # #5428 re-grade #6 (2026-11-08, 4 of 4 voices): the 11-06 Romanian deadlift asked him to "find the load" at RPE 8–9
         # after heavy squats, with no load on any row. A barbell or machine compound carries the engine's start load
         # (§3.3); with no basis for one, the draft is not ready — this fails it rather than shipping the open form
@@ -686,7 +689,7 @@ def lint_routine(rt: LintRoutine) -> LintResult:
             if body and g.phone_lines(body) > g.MOBILITY_MAX_LINES:
                 out.append(Problem("L7", where, f"mobility note {g.phone_lines(body)} phone lines > {g.MOBILITY_MAX_LINES}"))
         else:
-            _lint_lift(ex, body, where, out)
+            _lint_lift(ex, body, where, out, live=rt.live)
         mw = g.W_TEXT_RE.search(body)
         if mw:
             wreps = {r[2] for r in ex.rows if r[0] == "W"}

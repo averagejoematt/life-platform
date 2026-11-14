@@ -152,9 +152,21 @@ def effort_unknown(rows: list[dict[str, Any]]) -> bool:
 
 
 def below_floor(rows: list[dict[str, Any]], rep_lo: int, n: int | None = None) -> bool:
-    """Rule 2: each of the last `below_floor_exposures` (or `n`) same-role exposures had its top set under `rep_lo` (reps only)."""
+    """Rule 2: each of the last `below_floor_exposures` (or `n`) same-role exposures had its top set under `rep_lo` (reps only)
+    — AT THE CURRENT LOAD (fix round 12): after a step-down the count starts again, so a second step needs two fresh exposures
+    under the floor at the new load, never one (a stalled lift ran 190, 170, 155, 140 ... a step a week)."""
     n = int(cfg.value("below_floor_exposures")) if n is None else n
-    return len(rows) >= n and all(_top(r)["reps"] < rep_lo for r in rows[:n])
+    if len(rows) < n:
+        return False
+    load = _top(rows[0])["kg"]
+    return all(_top(r)["reps"] < rep_lo and _top(r)["kg"] <= load * 1.01 for r in rows[:n])
+
+
+def steps_down(rows: list[dict[str, Any]]) -> int:
+    """How many times this lift's same-role top load already came DOWN inside the window (most recent first): a load more than
+    2 % under the exposure before it."""
+    tops = [_top(r)["kg"] for r in rows]
+    return sum(1 for new, old in zip(tops, tops[1:]) if new < old * 0.98)
 
 
 def floor_load(r: dict[str, Any], rep_lo: int) -> float:
@@ -253,9 +265,16 @@ def decide(
         return None
     target_rpe = step_rpe() if target_rpe is None else target_rpe
     last = _top(rows[0])["kg"]
-    if below_floor(rows, rep_lo):  # at least one step; enough to reach the floor again on the last exposure's own read
-        kg = _floor_to_implement(min(last * (1 - float(cfg.value("step_down_pct")) / 100.0), floor_load(rows[0], rep_lo)), equipment)
+    if below_floor(rows, rep_lo):
         n = int(cfg.value("below_floor_exposures"))
+        if steps_down(rows) >= int(cfg.value("step_downs_per_window")):
+            # fix round 12: two step-downs inside the window did not bring the reps back — the load is not the cause. HELD and
+            # flagged for a look (technique, recovery, a swap), never cut again (a stalled lift was halved in eight weeks)
+            why = f"still under {rep_lo} reps after {steps_down(rows)} step-downs"
+            return {"kg": last, "mode": "hold", "why": why, "clause": f"Same load: {why}.", "flag": True}
+        # at least one step; as far as the last exposure's own read says reaches the floor — never more than step_down_max_pct
+        size = min(last * (1 - float(cfg.value("step_down_pct")) / 100.0), floor_load(rows[0], rep_lo))
+        kg = _floor_to_implement(max(size, last * (1 - float(cfg.value("step_down_max_pct")) / 100.0)), equipment)
         return {
             "kg": kg,
             "mode": "down",
@@ -407,8 +426,10 @@ def set_loads(
         e = by_key.get(b.movement_key) or {}
         entry = movements.get(b.movement_key) or {}
         tid = tid_of(b.movement_key, movements, lib, idx)
-        work = [s for s in b.sets if str(getattr(s, "type", "") or "normal") != "warmup" and getattr(s, "weight_kg", None) is not None]
-        if not e or not tid or e.get("intensity") == "carry" or not work:
+        # fix round 12: a lift the engine left UNLOADED is read too — a familiar movement the plan added (a curl he logged three
+        # weeks ago) was served with empty rows and no instruction while its last load sat in the record
+        work = [s for s in b.sets if str(getattr(s, "type", "") or "normal") != "warmup"]
+        if not e or not tid or e.get("intensity") == "carry" or not work or not any(getattr(s, "rep_range_end", None) for s in work):
             continue
         lo = min(int(getattr(s, "rep_range_start", 0) or 0) or 99 for s in work)
         hi = max(int(getattr(s, "rep_range_end", 0) or 0) for s in work) or lo
@@ -431,6 +452,8 @@ def set_loads(
         shaped = any(x.get("kind") == "top" for x in e.get("sets") or [])
         d = decide(rows, lo, hi, entry.get("equipment"), hold=hold, target_rpe=target, layoff_days=gap, top_set=shaped)
         if d is None:
+            if hold:  # fix round 12: a lift held for a reason says it even with no same-role exposure in the window
+                out.append({"key": b.movement_key, "kg": None, "mode": "hold", "why": hold, "clause": f"Same load: {hold}."})
             continue
         for s in work:
             s.weight_kg = d["kg"]

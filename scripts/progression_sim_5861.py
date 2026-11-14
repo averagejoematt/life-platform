@@ -96,7 +96,12 @@ class Physiological:
     true: dict[str, float] = field(default_factory=dict)
     seed: dict[str, float] = field(default_factory=dict)
     done: list[dict[str, Any]] = field(default_factory=list)
-    """Every exposure performed: {date, role, key, lb, reps, floor} of its top working set (fix round 10: `floor_runs`)."""
+    """Every exposure performed: {date, role, key, lb, reps, true_reps, floor} of its top working set (`floor_runs`). `reps` is
+    what he LOGGED — what the engine reads; `true_reps` what he did (fix round 12: they differ for an athlete whose log is noisy)."""
+
+    def _log(self, sets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """The sets as LOGGED (a subclass adds its logging noise); the default athlete logs what he did."""
+        return sets
 
     def start(self, record: list[dict[str, Any]]) -> None:
         """Seed each lift's true e1RM from its STRONGEST effort-adjusted set in the record's last 28 days (a heavy day and a volume
@@ -162,11 +167,21 @@ class Physiological:
                     row.pop("rpe")
                 sets.append(row)
             if sets:
+                true = max(sets, key=lambda x: (x["weight_kg"], x["reps"]))["reps"]
+                sets = self._log(sets)
                 exercises.append({"name": key, "template_id": tid, "notes": "", "sets": sets})
                 top = max(sets, key=lambda x: (x["weight_kg"], x["reps"]))
                 floor = min(int((s.get("rep_range") or {}).get("start") or 99) for s in ex.get("sets") or [] if s.get("type") != "warmup")
                 self.done.append(
-                    {"date": day, "role": role, "key": key, "lb": round(top["weight_kg"] * LB_PER_KG), "reps": top["reps"], "floor": floor}
+                    {
+                        "date": day,
+                        "role": role,
+                        "key": key,
+                        "lb": round(top["weight_kg"] * LB_PER_KG),
+                        "reps": top["reps"],
+                        "true_reps": true,
+                        "floor": floor,
+                    }
                 )
         return sw._workout(day, role, exercises)
 
@@ -175,12 +190,15 @@ class Physiological:
 class Scripted(Physiological):
     """#5861 fix round 11 — the tenth red team's athletes, ported: a `Physiological` lifter whose true strength follows a per-week
     `schedule` (week -> fractional change, e.g. -0.02 then +0.015: a decline that recovers), with optional one-off `jump`s (week ->
-    multiplier: a detraining layoff 0.92, a hidden 15 % strength) and logged rep `noise` (a repeating list of rep offsets applied
-    to every exercise in turn, AFTER the honest RPE — a flat lifter whose reps swing +-2)."""
+    multiplier: a detraining layoff 0.92, a hidden 15 % strength) and LOGGING noise applied after the honest set (fix round 12):
+    rep `noise` (a repeating list of rep offsets, one per exercise in turn — a flat lifter whose logged reps swing +-2) and
+    `rpe_jitter` (each logged RPE moved by a seeded uniform draw in +-jitter, to the half point, 5-10 — an unreliable rater)."""
 
     schedule: dict[int, float] = field(default_factory=dict)
     jump: dict[int, float] = field(default_factory=dict)
     noise: list[int] = field(default_factory=list)
+    rpe_jitter: float = 0.0
+    rng_seed: int = 5861
     _n: int = 0
     _wk: int = 0
 
@@ -190,25 +208,33 @@ class Scripted(Physiological):
         for k in self.true:
             self.true[k] *= mult
 
-    def perform(self, session: dict[str, Any], day: str, role: str) -> dict[str, Any]:
-        w = super().perform(session, day, role)
-        for x in w["exercises"] if self.noise else []:
+    def _log(self, sets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        import random
+
+        out = [dict(st) for st in sets]
+        if self.noise:
             z = self.noise[self._n % len(self.noise)]
-            self._n += 1
-            for st in x["sets"]:
+            for st in out:
                 st["reps"] = max(1, int(st["reps"]) + z)
-        return w
+        if self.rpe_jitter:
+            rng = random.Random(self.rng_seed * 1000 + self._n)
+            for st in out:
+                if st.get("rpe") is not None:
+                    st["rpe"] = min(10.0, max(5.0, round((float(st["rpe"]) + rng.uniform(-self.rpe_jitter, self.rpe_jitter)) * 2) / 2))
+        self._n += 1
+        return out
 
 
-def floor_runs(athlete: Physiological, keys: tuple[str, ...] | None = None) -> dict[tuple[str, str], int]:
+def floor_runs(athlete: Physiological, keys: tuple[str, ...] | None = None, field: str = "reps") -> dict[tuple[str, str], int]:
     """Fix round 10 (the ninth red team): (key, role) -> the longest run of consecutive exposures whose top set sat under the
-    prescribed rep floor. A real decline answered by the load model never runs past `below_floor_exposures`."""
+    prescribed rep floor. `field`: `reps` — the LOGGED reps, what the engine sees and answers (the default) — or `true_reps`
+    (what he did; report it beside, never as the engine's evidence). Only exposures actually performed are in the record."""
     runs: dict[tuple[str, str], list[int]] = {}
     for d in sorted(athlete.done, key=lambda d: d["date"]):
         if keys and d["key"] not in keys:
             continue
         r = runs.setdefault((d["key"], d["role"]), [0, 0])
-        r[0] = r[0] + 1 if d["reps"] < d["floor"] else 0
+        r[0] = r[0] + 1 if d.get(field, d["reps"]) < d["floor"] else 0
         r[1] = max(r[1], r[0])
     return {k: v[1] for k, v in runs.items() if v[1]}
 
@@ -248,38 +274,56 @@ def _role_loads(week: dict[str, Any]) -> dict[tuple[str, str], float]:
     return out
 
 
-def simulate(profile: dict[str, Any], weeks: int, athlete: Athlete | Physiological | None = None, skip: Any = None) -> list[dict[str, Any]]:
-    """`weeks` drafted weeks, each performed by `athlete` and fed to the next (a week `skip(k)` names is drafted but NOT
-    performed: the alternate-week misser). Returns per week: the date, each lift's top prescribed loads, its reps, the roles,
-    the prescribed HARD sets per muscle (`sample_weeks_5861.hard_sets_by_muscle`) and the rationale."""
+def simulate(
+    profile: dict[str, Any],
+    weeks: int,
+    athlete: Athlete | Physiological | None = None,
+    skip: Any = None,
+    recovery: Any = None,
+) -> list[dict[str, Any]]:
+    """`weeks` drafted weeks, each performed by `athlete` and fed to the next. A week `skip(k)` names is NOT TRAINED: nothing is
+    drafted, performed or logged for it (fix round 12 — the earlier version drafted it and let the athlete perform it, so a
+    skipped week's sets sat in his own record as done), only his strength moves (`next_week`). `recovery(k)` -> the profile
+    inputs that week (`readiness`, `sleep_hours`, `acwr`) — a poor-recovery week. Returns per week: the date, each lift's top
+    prescribed loads, its reps, the roles, the prescribed HARD sets per muscle, the fatigue action per morning, the rationale."""
     athlete = athlete or Athlete()
     world = sw.build_world(profile, "approved")
     if isinstance(athlete, Physiological):
         athlete.start(world["record"])
+    base = {k: world["profile"].get(k) for k in ("readiness", "sleep_hours", "acwr")}
     out = []
     for k in range(weeks):
         p = _shift(profile, k)
-        world["profile"] = world["profile"] | {"days": p["days"], "as_of": p["as_of"]}
         if isinstance(athlete, Physiological):
             athlete.next_week()
-        week = sw.generate_week(p, "approved", world, perform=athlete.perform)
-        skipped = bool(skip and skip(k))
-        if not skipped:
-            world["record"] = list(world["record"]) + list(week["performed"])
-        out.append(
-            {
-                "week": k,
-                "monday": p["days"][0],
-                "skipped": skipped,
-                "roles": [s["role"] for s in week["sessions"]],
-                "loads": top_loads(week),
-                "role_loads": _role_loads(week),
-                "reps": {lift["key"]: lift["reps"] for s in week["sessions"] for lift in s["lifts"]},
-                "hard": sw.hard_sets_by_muscle(week, world["lib"], world["catalog"]["movements"]),
-                "rationale": {s["role"]: list(s["rationale"]) + list(s.get("live_fit") or []) for s in week["sessions"]},
-            }
-        )
+        if skip and skip(k):
+            out.append({"week": k, "monday": p["days"][0], "skipped": True, **{x: {} for x in ("loads", "role_loads", "reps", "hard")}})
+            out[-1] |= {"roles": [], "fatigue": {}, "rationale": {}}
+            continue
+        inputs = base | ((recovery(k) or {}) if recovery else {})
+        world["profile"] = world["profile"] | {"days": p["days"], "as_of": p["as_of"]} | inputs
+        week = sw.generate_week(p | inputs, "approved", world, perform=athlete.perform)
+        world["record"] = list(world["record"]) + list(week["performed"])
+        out.append(week_row(k, p["days"][0], week, world))
     return out
+
+
+def week_row(k: int, monday: str, week: dict[str, Any], world: dict[str, Any]) -> dict[str, Any]:
+    """One simulated week's record (`simulate`; the private owner-record run builds the same rows)."""
+    return {
+        "week": k,
+        "monday": monday,
+        "skipped": False,
+        "roles": [s["role"] for s in week["sessions"]],
+        "loads": top_loads(week),
+        "role_loads": _role_loads(week),
+        "reps": {lift["key"]: lift["reps"] for s in week["sessions"] for lift in s["lifts"]},
+        "hard": sw.hard_sets_by_muscle(week, world["lib"], world["catalog"]["movements"]),
+        "fatigue": {
+            s["role"]: f"{(s.get('fatigue') or {}).get('state')}/{(s.get('fatigue') or {}).get('action')}" for s in week["sessions"]
+        },
+        "rationale": {s["role"]: list(s["rationale"]) + list(s.get("live_fit") or []) for s in week["sessions"]},
+    }
 
 
 def role_loads(rows: list[dict[str, Any]]) -> dict[tuple[str, str], list[float | None]]:
@@ -292,16 +336,29 @@ def role_loads(rows: list[dict[str, Any]]) -> dict[tuple[str, str], list[float |
     return out
 
 
-def step_downs(rows: list[dict[str, Any]]) -> dict[tuple[str, str], list[int]]:
-    """(key-title, role) -> the weeks the load model stepped the lift DOWN on evidence (`live_load` "down" lines: reps under the floor)."""
-    out: dict[tuple[str, str], list[int]] = {}
+def step_down_events(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Every step-DOWN the load model made, with its trigger: {week, role, lift, lb, trigger} from the `load (live)` lines (`down:
+    under N reps 2 sessions running`, `down: first session back after N days off`). A week not trained decides nothing."""
+    import re
+
+    out = []
     for r in rows:
-        if r.get("skipped"):  # a drafted week never performed (the alternate-week misser) decides nothing
-            continue
-        for role, lines in r["rationale"].items():
+        for role, lines in (r.get("rationale") or {}).items():
             for ln in lines:
-                if ln.startswith("load (live): ") and " — down: under " in ln:
-                    out.setdefault((ln[len("load (live): ") :].split(" — ")[0].rsplit(" ", 2)[0], role), []).append(r["week"])
+                m = re.match(r"load \(live\): (?P<lift>.+) (?P<lb>[\d.]+) lb — down: (?P<why>.+?) \(last ", ln)
+                if m and not r.get("skipped"):
+                    out.append(
+                        {"week": r["week"], "role": role, "lift": m.group("lift"), "lb": float(m.group("lb")), "trigger": m.group("why")}
+                    )
+    return out
+
+
+def step_downs(rows: list[dict[str, Any]]) -> dict[tuple[str, str], list[int]]:
+    """(key-title, role) -> the weeks the load model stepped the lift DOWN on evidence (reps under the floor: `step_down_events`)."""
+    out: dict[tuple[str, str], list[int]] = {}
+    for e in step_down_events(rows):
+        if e["trigger"].startswith("under "):
+            out.setdefault((e["lift"], e["role"]), []).append(e["week"])
     return out
 
 
@@ -393,7 +450,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"resets {k}: {resets(rows, k)}")
     for (k, role), seq in sorted(role_loads(rows).items()):
         print(f"{k} [{role}]: {' -> '.join(f'{x:g}' if x else '-' for x in seq)}")
-    print("step-downs:", step_downs(rows))
+    print("step-downs:", [(e["week"], e["role"], e["lift"], e["lb"], e["trigger"]) for e in step_down_events(rows)])
+    print("fatigue by week:", {r["week"]: sorted(set(r["fatigue"].values())) or "not trained" for r in rows})
     print("falls without evidence:", falls_without_evidence(rows))
     print("oscillations:", oscillations(rows))
     return 0

@@ -53,6 +53,7 @@ STRESS = (
     "sample_week_stress_profiles_fix7_5861",
     "sample_week_stress_profiles_fix8_5861",
     "sample_week_stress_profiles_fix9_5861",
+    "sample_week_stress_profiles_fix10_5861",  # fix round 12: the final review found r1-r8 outside the 75-minute test
 )
 A = PROFILES["a_large_deficit_experienced"]
 ATHLETES = {

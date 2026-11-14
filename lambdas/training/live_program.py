@@ -145,8 +145,7 @@ def mark_costs(rx: dict[str, Any], ctx: dict[str, Any]) -> None:
     reduce_min_sets) — what `fatigue_model.apply_to_session` reads to cut high-fatigue work first."""
     for e in rx.get("exposures") or []:
         e["live_cost"] = fatigue_cost(e, ctx)
-        if e["live_cost"] != "low" or e.get("intensity") != "carry":  # #5861 FIX4: isolation too — drop, don't shave
-            e["live_min_sets"] = int(DELOAD_SHAPE["reduce_min_sets"]["value"])
+        e["live_min_sets"] = int(DELOAD_SHAPE["reduce_min_sets"]["value"])  # FIX4 + fix round 12: every lift, the carry too
 
 
 def trim_order(surplus: Any) -> Any:
@@ -488,12 +487,17 @@ def _top(effort: str) -> float:
     return max(nums) if nums else 99.0
 
 
+NO_LOAD_LINE = "No recent load on file for this one."
+"""A familiar movement with no load in the history window: the note says so beside its "find the load" set (the final review:
+"find the load" on a calf raise the week he logged calves read as if the engine had lost his record)."""
+
+
 def annotate(blocks: list[Any], rx: dict[str, Any]) -> None:
     """IN PLACE, live only, after the notes are composed: each lift's ONE load reason (`live_load.decide`'s clause) and each
     capped effort (a first session back, a new pattern, the second lift, a deload shape, a joint flag) on its own Hevy note."""
     if not is_live(rx):
         return
-    from training import live_balance, live_load, live_session as ls, session_block
+    from training import hevy_note_grammar as g, live_balance, live_load, live_session as ls, session_block
 
     guard = {d["key"]: d for d in (rx.get(ls.MARK) or {}).get("load_guard") or []}
     by_key = {e.get("movement_key"): e for e in rx.get("exposures") or []}
@@ -506,6 +510,8 @@ def annotate(blocks: list[Any], rx: dict[str, Any]) -> None:
             b.notes = _cap_effort(b.notes or "", int(cap or 0), clause, line)
         elif clause:
             b.notes = session_block.add_reason(b.notes, clause)
+        if e.get("live_familiar") and g.PICK_LOAD_OPEN_TAIL in (b.notes or "") and g.ROTATION_HEAD not in (b.notes or ""):
+            b.notes = session_block.add_reason(b.notes, NO_LOAD_LINE)  # fix round 12: say what is known
         b.notes = live_balance.assess_note(live_balance.one_effort(b.notes), str(e.get("live_assess") or ""))
         b.notes = live_balance.assess_note(b.notes, str(e.get("live_stop") or ""))  # the in-set stop line under a pain flag
     from training import live_safety
@@ -588,6 +594,8 @@ def cardio_fit(menu: dict[str, Any], live: dict[str, Any] | None) -> tuple[dict[
     from training import cardio_menu, live_balance, live_rulings, live_shape, live_week, selection_engine as se
 
     menu, lines = live_balance.cardio_machine(menu, se.load_library_failsoft())  # FIX3: a machine the gym has
+    if not menu.get("machine"):
+        return None, lines + live_shape.walk_prompt(live)
     kind = menu["kind"]
     shared = bool((live.get("settings") or {}).get("session_cap_includes_cardio"))
     role = live.get("role")

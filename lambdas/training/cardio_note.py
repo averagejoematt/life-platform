@@ -118,7 +118,10 @@ CARDIO_KINDS_SHAPE = {"easy": "flat", "tempo": "flat", "intervals": "intervals",
 KIND_SHAPE = CARDIO_KINDS_SHAPE
 
 _N = r"\d{1,2}(?:\.\d{1,2})?"
-_MACHINE_ALT = "|".join(re.escape(v) for v in sorted(set(MACHINES.values()), key=len, reverse=True))
+UPRIGHT_BIKE = "Upright bike"
+"""#5861 fix round 12: the `cycling` label the LIVE engine writes where the gym has no recumbent (`live_balance.machine_label`) —
+a machine of the note grammar (`hevy_note_grammar.CARDIO_MACHINES`), read here so the block's kind is not lost."""
+_MACHINE_ALT = "|".join(re.escape(v) for v in sorted(set(MACHINES.values()) | {UPRIGHT_BIKE}, key=len, reverse=True))
 # Line 1 (#5428). Named groups `level`, `mph`, `walk_mph` and `effort` are read by `hevy_render` (the render table);
 # `mph` is a bike's speed, which is never prescribed (an output), so it is an always-empty group kept for that reader.
 LINE1_RE = re.compile(

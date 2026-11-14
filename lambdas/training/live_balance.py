@@ -235,7 +235,8 @@ def _unavailable(key: str, lib: dict[str, Any] | None) -> bool:
 
 def cardio_machine(menu: dict[str, Any], lib: dict[str, Any] | None) -> tuple[dict[str, Any], list[str]]:
     """The menu's machine when the gym has it; else the first machine the menu runs this kind on that it has (treadmill,
-    rower, bike, elliptical — `cardio_menu.fits_machine`); else unchanged (named). Live only (`live_program.cardio_fit`)."""
+    rower, bike, elliptical — `cardio_menu.fits_machine`); else NO machine (fix round 12: an unavailable elliptical was
+    served — a cardio machine respects availability exactly as a lift does). Live only (`live_program.cardio_fit`)."""
     from training import cardio_menu, cardio_note
 
     key = str(menu.get("machine") or "")
@@ -244,7 +245,7 @@ def cardio_machine(menu: dict[str, Any], lib: dict[str, Any] | None) -> tuple[di
     for alt in cardio_note.MACHINES:
         if alt != key and cardio_menu.fits_machine(str(menu["kind"]), alt) and not _unavailable(alt, lib):
             return {**menu, "machine": alt}, [f"cardio (live): {key} -> {alt} — the gym has no {key} (equipment, live)"]
-    return menu, [f"cardio (live): {key} kept — no other machine the gym has runs {menu['kind']}"]
+    return {**menu, "machine": None}, [f"cardio (live): no block — the gym has no machine that runs {menu['kind']} ({key} is not there)"]
 
 
 def recumbent_missing(lib: dict[str, Any] | None) -> bool:
@@ -254,10 +255,13 @@ def recumbent_missing(lib: dict[str, Any] | None) -> bool:
 
 
 def machine_label(notes: str, lib: dict[str, Any] | None) -> str:
-    """A `cycling` note names "Recumbent" (the owner's knee-sparing bike); where the gym has no recumbent it names "Bike"."""
+    """A `cycling` note names "Recumbent" (the owner's knee-sparing bike); where the gym has no recumbent it names the
+    "Upright bike" — a machine of the note grammar (fix round 12: "Bike" was not, so the linter could not read the block)."""
     if not recumbent_missing(lib):
         return notes
-    return "\n".join(("Bike" + ln[len("Recumbent") :]) if ln.startswith("Recumbent") else ln for ln in notes.split("\n"))
+    from training.cardio_note import UPRIGHT_BIKE
+
+    return "\n".join((UPRIGHT_BIKE + ln[len("Recumbent") :]) if ln.startswith("Recumbent") else ln for ln in notes.split("\n"))
 
 
 # ── 9. the rate band, by setting ─────────────────────────────────────────────

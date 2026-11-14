@@ -199,11 +199,17 @@ def _with_cardio(record: list[dict[str, Any]], profile: dict[str, Any], start: s
             )
 
 
-def history_index(record: list[dict[str, Any]], catalog: dict[str, Any] | None = None, as_of: str | None = None) -> dict:
+def history_index(
+    record: list[dict[str, Any]], catalog: dict[str, Any] | None = None, as_of: str | None = None, live: bool = False
+) -> dict:
     """`exercise_history.load_history_indexes()[0]`'s shape, built from the synthetic record (most recent first). An
     experienced profile has also trained, months ago, every catalog movement the catalog records sessions for: one older
-    synthetic exposure each, so only a truly new movement reads "find the load" (as it would on a real year of history)."""
+    synthetic exposure each, so only a truly new movement reads "find the load" (as it would on a real year of history).
+    `live` (fix round 12): a live world's index holds no CARRY — the synthetic record logs a carry as a rep lift, a shape a
+    real carry (a distance-typed set) never has, and the note lint then read a PREVIOUS the carry's own start-load read could
+    not see (4 false "names no start" problems). The proposed world keeps the base tree's index (its digests are pinned)."""
     idx: dict[str, list[dict[str, Any]]] = {}
+    carries = {_tid(catalog or {}, k) for k, c in (catalog or {}).items() if live and c.get("hevy_type") == "short_distance_weight"}
     old = _day(as_of, -120) if as_of else None
     for key, c in (catalog or {}).items():
         tid = _tid(catalog or {}, key)
@@ -219,7 +225,7 @@ def history_index(record: list[dict[str, Any]], catalog: dict[str, Any] | None =
     for w in record:
         for ex in w["exercises"]:
             sets = [{"weight_kg": s["weight_kg"], "reps": s["reps"], "rpe": s.get("rpe")} for s in ex["sets"] if s.get("reps")]
-            if sets:
+            if sets and ex["template_id"] not in carries:
                 idx.setdefault(ex["template_id"], []).append(
                     {"date": w["date"], "sets": sets, "top_weight_kg": max(s["weight_kg"] for s in sets)}
                 )
@@ -307,7 +313,7 @@ def _entry(role: str, week: int, block: int, n: int, prev: dict[str, Any] | None
     }
 
 
-def _inputs(profile: dict[str, Any], day: str, record: list[dict[str, Any]], rows: list[dict[str, Any]]) -> Any:
+def _inputs(profile: dict[str, Any], day: str, record: list[dict[str, Any]], rows: list[dict[str, Any]], live: bool = False) -> Any:
     from training import routine_generator as rg
 
     acwr = {"safe": "safe", "caution": "caution", "danger": "high"}.get(str(profile.get("acwr")), "safe")  # the cron's live map
@@ -317,7 +323,9 @@ def _inputs(profile: dict[str, Any], day: str, record: list[dict[str, Any]], row
         acwr_flag=acwr,
         block_workouts=record,
         rotation_rows=rows,
-        z2_minutes_7d=walk_minutes_7d(profile),
+        # fix round 12 (owner ruling 12): a live world passes NO steps-derived zone-2 minutes — unknown is unknown (None); the
+        # proposed world keeps the base tree's figure (its digests are pinned)
+        z2_minutes_7d=None if live else walk_minutes_7d(profile),
     )
     setattr(inp, "sleep_hours", profile.get("sleep_hours"))
     setattr(inp, "steps_by_day", steps_by_day(profile))  # the cron's live input (steps_resolver), into cardio_model.cardio_load
@@ -477,7 +485,7 @@ def generate_week(
     rw = resolve_week_grid(rg._load_json)
     record = list(world["record"])
     sessions, cardio_index, prev = [], _cardio_index(record), None
-    hidx = history_index(record, catalog["movements"], p["as_of"])
+    hidx = history_index(record, catalog["movements"], p["as_of"], live=mode == "approved")
     roles, short_line, plan = list(p["roles"]), None, None
     if mode == "approved":  # #5861 FIX5: the PRODUCTION week plan (`live_sequence`, the cron's sequence reads the same one)
         from training import live_sequence
@@ -498,7 +506,7 @@ def generate_week(
                 from training import live_sequence
 
                 entry["live_week"] = live_sequence.for_role(plan, role)  # what the cron's entry carries (live_sequence.serve)
-            inp = _inputs(p, day, record, world["rows"])
+            inp = _inputs(p, day, record, world["rows"], live=mode == "approved")
             out = fbs.full_body_routines(inp, entry, rw.week, landmarks, catalog, rw, [], block_workouts=record)
             ideal = out[0]
             cardio = _cardio(ideal, p, day, cardio_index)

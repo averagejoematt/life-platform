@@ -354,7 +354,7 @@ SET_1_HEAD = "Set 1: "
 HELD_TOP_RE = re.compile(
     r"^(?:Set 1: \d+ reps at RPE .* on later sets|Same load: \d+ reps again → .* next session\."
     # #5861 fix round 11: the live load model's held-top reasons (`live_load.decide`) — each names what moves it or why it waits
-    r"|Same load: (?:recovery first|slump week|first session back|[a-z ]+ flag|(?:all sets|top set) to \d+ reps, then up"
+    r"|Same load: (?:recovery first|slump week|first session back|[a-z ]+ flag|(?:all sets|top set) to \d+ reps, then up|still under \d+ reps after \d+ step-downs"
     r"|\d+ reps at RPE [\d.]+ or less, then up)\.$)"
 )
 # #5428 re-grade #3: a one-set exercise 1 carries no load rule (nothing to step today), so its note names the gain rule's

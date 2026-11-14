@@ -88,6 +88,21 @@ HEURISTICS: dict[str, dict[str, Any]] = {
         "when the last exposure says 5% still leaves him under the floor",
         "retune": "block retro: e1RM a month after each step-down",
     },
+    "step_down_max_pct": {
+        "value": 10,
+        "group": "progression",
+        "basis": "fix round 12 (the final review: two noisy logs cut a flat lifter's bench 12.5 %): one step-down never takes more "
+        "than 10 % off the load; a real decline that needs more gets it from the next two exposures at the new load",
+        "retune": "block retro: reps at the first exposure after each step-down (back inside the range?)",
+    },
+    "step_downs_per_window": {
+        "value": 2,
+        "group": "progression",
+        "basis": "fix round 12 (the final review: a stalled deadlift ran 190, 170, 155, 140, 125, 110, 100): each step-down needs "
+        "two fresh exposures under the floor at the NEW load, and after two step-downs inside the history window the lift is "
+        "HELD and flagged — the load is no longer the likely cause (technique, recovery, the movement itself)",
+        "retune": "block retro: every flagged lift — what the cause turned out to be",
+    },
     "implausible_rpe": {
         "value": 9.5,
         "group": "progression",
@@ -214,11 +229,12 @@ HEURISTICS: dict[str, dict[str, Any]] = {
         "retune": "block retro: priority muscles' performance and the time the plan spent on them",
     },
     "conditioning_reserve_minutes": {
-        "value": 20,
+        "value": 15,
         "group": "volume",
         "basis": "owner ruling 1: under the shared cap the week's conditioning dose takes only what lifting leaves — so the plan "
         "leaves this many minutes free on its host morning instead of filling them with isolation (a 1-2 morning week spends its "
-        "few minutes on lifting first; the dose takes what is left)",
+        "few minutes on lifting first; the dose takes what is left). 15, not 20, since fix round 12: the plan's time model now "
+        "counts the warm-ups the routine writes, and at 20 the host morning's chest and calf sets fell under their floors",
         "retune": "block retro: the conditioning minutes delivered",
     },
     "min_session_minutes": {

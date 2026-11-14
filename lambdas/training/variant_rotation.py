@@ -327,6 +327,11 @@ def _title(key: str | None, catalog: dict[str, Any]) -> str:
 
 
 # ── the ledger ───────────────────────────────────────────────────────────────
+LIVE_PHASE_PREFIX = "live_"
+"""A live draft's ledger attribute is `live_phase_N` (`record`); `selection_engine.ledger_view` lays it over `phase_N` for the
+live reader only. Every proposed-path reader matches `phase_` at the start of the key and never sees it."""
+
+
 def ledger_sk(block: int, slot_id: str) -> str:
     return f"{LEDGER_SK_PREFIX}B{int(block):03d}#{slot_id}"
 
@@ -385,8 +390,12 @@ def record(rotation: dict[str, Any] | None, table: Any, recorded_at: str) -> int
     """Write every pending phase of a drafted session's rotation (`plan(...)["ledger_writes"]`), each `if_not_exists`
     so the first draft of a phase wins. Numbers go in as Decimal. Returns the number of rows written. Raises."""
     n = 0
-    for w in (rotation or {}).get("ledger_writes") or []:
-        phase_attr = f"phase_{int(w['phase'])}"
+    # #5861 fix round 12 (rollback safety): a LIVE draft's picks (`live_ledger_writes`) are kept apart — the proposed path reads
+    # `phase_N` only, so going back to `proposed` serves exactly what it would have served had the library never been approved
+    writes = [(w, "") for w in (rotation or {}).get("ledger_writes") or []]
+    writes += [(w, LIVE_PHASE_PREFIX) for w in (rotation or {}).get("live_ledger_writes") or []]
+    for w, prefix in writes:
+        phase_attr = f"{prefix}phase_{int(w['phase'])}"
         table.update_item(
             Key={"pk": LEDGER_PK, "sk": ledger_sk(int(w["block"]), w["slot_id"])},
             UpdateExpression="SET #p = if_not_exists(#p, :p), #b = :b, #s = :s, #r = :r, #i = :i, #iss = :iss",
@@ -415,7 +424,7 @@ def record(rotation: dict[str, Any] | None, table: Any, recorded_at: str) -> int
 
 def record_failsoft(rotation: dict[str, Any] | None, table: Any, recorded_at: str) -> int | None:
     """`record`, or None when the write failed — logged; the draft already landed and the next draft re-offers the write."""
-    if not (rotation or {}).get("ledger_writes"):
+    if not ((rotation or {}).get("ledger_writes") or (rotation or {}).get("live_ledger_writes")):
         return 0
     try:
         return record(rotation, table, recorded_at)
@@ -651,6 +660,10 @@ def for_session(
             from training import block_design_review
 
             approvals = block_design_review.load_failsoft(pos["block"])
+    if select and rows:  # #5861 fix round 12: live reads its own phase rows over the shadow ones; in shadow `rows` itself
+        from training import selection_engine
+
+        rows = selection_engine.ledger_view(rows)
     day = (day_entry or {}).get("date") or (day_entry or {}).get("target_date")
     # the planned session carries its own measured count (`program_structure.planned_session`); a generator passes the record
     n = kb_entry.exposures(block_workouts, day) if block_workouts is not None else (day_entry or {}).get("kb_entry_exposures")
