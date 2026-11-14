@@ -109,7 +109,7 @@ never be late is decoration.
 
 ## Dated holds (a deferral is a decision, #3250)
 
-_None in force._
+- **emf-series-census** — declared 2026-11-14, resumes 2026-11-28. #5888: the census cannot pass before its window ends. The 2026-11-13 `--strict` run is red (4 namespaces, 21 series over budget) and this entry's own obligation forbids appending the dated line over a red, so the ritual is deferred to 2026-11-28 by owner ruling 2026-11-14 (#5935) while #5888 cuts or re-prices those rows.
 
 A hold re-anchors ONE entry's clock ONE time, with a date and a written reason, so a
 deliberate skip is discharged by a decision instead of a silent lapse. It is bounded

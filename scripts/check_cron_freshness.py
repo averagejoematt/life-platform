@@ -130,11 +130,43 @@ EXIT STATUS
          install, not a blind network. That stays 2 with or without the flag: a run
          that cannot read its own subjects has no board to report on at all.
 
+THE WORKFLOW-RED TENURE RULE (#5935)
+------------------------------------
+The board above judges WHEN a scheduled run happened, never whether it passed. The
+other half had no owner: `operating-calendar.yml` was red on every scheduled run from
+2026-09-30 for ~45 days, and nothing filed, because that workflow appends no advisory
+filer and the #1447 filer only exists where a workflow opted in. Alarms had a tenure
+rule (`ALARM_TENURE_ISSUE_DAYS`); workflow reds did not.
+
+With `--tenure` (report) or `--file-tenure` (report AND act — what the workflow runs),
+this module also reads the trailing `event: schedule` runs of EVERY scheduled workflow
+in the registry (watched or not — a red is a red whether or not its cadence is watched)
+and counts the consecutive red streak from the newest completed run backwards:
+
+  * streak >= TENURE_RED_RUNS (3) and no owning issue -> ONE tracker is filed, carrying
+    the `advisory-failure:` marker under the slug `workflow-red-tenure-<stem>`, so it
+    dedups exactly like every other auto-filed tracker and satisfies the hygiene
+    carve-out (`check_backlog_hygiene.is_tracker`: `auto-filed` + marker + no `type:*`
+    + one `area:*` + a `**Close policy:**`).
+  * an open tenure tracker -> its body's streak block is REFRESHED in place (a body
+    edit sends no notification, the #5821 policy), keeping `red since` and days-red
+    current; the boot brief reads days-red from that block.
+  * the workflow already has an open #1447 advisory tracker (its own
+    `workflow-slug:` marker) -> `owned`, nothing filed: one owning issue, never two.
+  * the newest completed scheduled run is green -> the tenure tracker is closed with
+    a recovery comment.
+
+Cancelled/skipped runs are neither red nor green and are stepped over. The tracker
+lands on the first push-to-main after the third red (this workflow's trigger), bounded
+by main's push rate exactly as residual 2 above is.
+
 USAGE
 -----
     python3 scripts/check_cron_freshness.py                    # gate
     python3 scripts/check_cron_freshness.py --json             # machine-readable
     python3 scripts/check_cron_freshness.py --allow-unverified # offline / no gh auth
+    python3 scripts/check_cron_freshness.py --tenure           # + the red-streak board (reads only)
+    python3 scripts/check_cron_freshness.py --file-tenure      # + file/refresh/close tenure trackers (CI)
 
 v1.0.0 — 2026-08-27 (#3213, epic #2799)
 """
@@ -144,6 +176,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -151,6 +184,7 @@ from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import advisory_failure_issue as afi  # noqa: E402 — #5935: the ONE tracker shape + dedup marker
 from scheduled_workflow_registry import (  # noqa: E402
     REPO_ROOT,
     SCHEDULED_WORKFLOW_FLOOR,
@@ -550,6 +584,330 @@ def first_commit_time(workflow_file: str, repo_root: str | None = None) -> Any:
     return lines[-1] if lines else None
 
 
+# ── #5935: the workflow-red TENURE rule ──────────────────────────────────────
+#
+# Pure pieces first (offline-tested in tests/test_workflow_red_tenure_5935.py), then the
+# thin IO. The tracker shape and its dedup marker are advisory_failure_issue's — one
+# filing contract for every machine-filed workflow tracker, never a second one.
+
+TENURE_RED_RUNS = 3  # the third consecutive scheduled red files the owner
+TENURE_SAMPLE = 30  # trailing scheduled runs read per workflow
+TENURE_SLUG_PREFIX = "workflow-red-tenure-"
+TENURE_AREA_LABEL = "area:infra"
+RED_CONCLUSIONS = frozenset({"failure", "timed_out", "startup_failure"})
+GREEN_CONCLUSIONS = frozenset({"success"})
+STREAK_START = "<!-- workflow-red-streak:start -->"
+STREAK_END = "<!-- workflow-red-streak:end -->"
+RED_SINCE_RE = re.compile(r"<!-- workflow-red-since: (\S+) -->")
+_ADVISORY_SLUG_RE = re.compile(r"^\s*workflow-slug:\s*['\"]?([A-Za-z0-9_.-]+)['\"]?\s*$", re.MULTILINE)
+
+# plan actions
+T_FILE, T_REFRESH, T_CLOSE, T_OWNED, T_BELOW, T_UNVERIFIED = "file", "refresh", "close", "owned", "below-tenure", "unverified"
+
+
+def tenure_slug(workflow_file: str) -> str:
+    """The stable dedup slug for a workflow's tenure tracker (never change it once issues exist)."""
+    stem = workflow_file.rsplit(".", 1)[0] if workflow_file.endswith((".yml", ".yaml")) else workflow_file
+    return TENURE_SLUG_PREFIX + stem
+
+
+def advisory_slugs(yaml_text: str) -> list[str]:
+    """The literal `workflow-slug:` values a workflow passes to the #1447 advisory filer.
+    A templated slug (`${{ matrix.slug }}`) is not a literal and is not returned."""
+    return _ADVISORY_SLUG_RE.findall(yaml_text or "")
+
+
+def red_streak(runs: list[dict[str, Any]], sample: int = TENURE_SAMPLE) -> dict[str, Any]:
+    """The consecutive-red streak at the head of a workflow's scheduled-run history.
+
+    `runs` is a list of `{created_at, status, conclusion, html_url}`; it is sorted here
+    newest-first rather than trusting the API's page order (#4520). In-progress runs and
+    neutral conclusions (cancelled, skipped, ...) are stepped over — neither evidence of
+    red nor of green. `lower_bound` is True when the whole sampled page was red, so the
+    streak (and `red_since`) may extend further back than this read can see.
+    """
+    ordered = sorted((r for r in runs if r.get("created_at")), key=lambda r: str(r["created_at"]), reverse=True)
+    streak, red_since, newest_red_url, latest, ended = 0, None, None, None, False
+    for r in ordered:
+        if r.get("status") != "completed":
+            continue
+        c = r.get("conclusion")
+        if c in RED_CONCLUSIONS:
+            latest = latest or "red"
+            streak += 1
+            red_since = r["created_at"]
+            newest_red_url = newest_red_url or r.get("html_url")
+        elif c in GREEN_CONCLUSIONS:
+            latest = latest or "green"
+            ended = True
+            break
+    return {
+        "streak": streak,
+        "red_since": red_since,
+        "newest_red_url": newest_red_url,
+        "latest": latest,
+        "lower_bound": bool(streak and not ended and len(ordered) >= sample),
+    }
+
+
+def days_red(red_since: str | None, now: datetime) -> float | None:
+    since = _parse_iso(red_since)
+    return None if since is None else round((now - since).total_seconds() / 86400.0, 1)
+
+
+def plan_tenure(
+    streaks: dict[str, Any],
+    open_issues: list[dict[str, Any]],
+    slugs_by_file: dict[str, list[str]] | None = None,
+    threshold: int = TENURE_RED_RUNS,
+) -> list[dict[str, Any]]:
+    """One planned action per workflow whose state calls for one. Pure.
+
+    `streaks` maps workflow file -> `red_streak()` dict, or the sentinel False when the run
+    lookup failed (reported UNVERIFIED, never read as green). `open_issues` is the
+    `auto-filed` open-issue list. `slugs_by_file` names each workflow's own #1447 advisory
+    slugs, so a workflow that already files its own tracker is `owned`, not double-filed.
+    """
+    plan: list[dict[str, Any]] = []
+    for wf in sorted(streaks):
+        info = streaks[wf]
+        if info is False:
+            plan.append({"file": wf, "action": T_UNVERIFIED, "issue": None})
+            continue
+        tracker = afi.find_open_issue(open_issues, tenure_slug(wf))
+        owner = None
+        for s in (slugs_by_file or {}).get(wf, []):
+            owner = afi.find_open_issue(open_issues, s)
+            if owner is not None:
+                break
+        streak = info["streak"]
+        if tracker is not None:
+            if info["latest"] == "green":
+                plan.append({"file": wf, "action": T_CLOSE, "issue": tracker["number"]})
+            elif streak:
+                plan.append({"file": wf, "action": T_REFRESH, "issue": tracker["number"]})
+            continue
+        if streak >= threshold:
+            if owner is not None:
+                plan.append({"file": wf, "action": T_OWNED, "issue": owner["number"]})
+            else:
+                plan.append({"file": wf, "action": T_FILE, "issue": None})
+        elif streak:
+            plan.append({"file": wf, "action": T_BELOW, "issue": None})
+    return plan
+
+
+def build_streak_block(info: dict[str, Any], red_since: str | None, now: datetime) -> str:
+    d = days_red(red_since, now)
+    bound = "at least " if info.get("lower_bound") else ""
+    return (
+        f"{STREAK_START}\n"
+        f"**Red since:** {red_since or 'unknown'} — **days red:** {bound}{d if d is not None else '?'} — "
+        f"consecutive scheduled reds: {bound}{info['streak']} — newest red run: {info.get('newest_red_url') or 'n/a'}. "
+        f"_Refreshed in place by the cron-freshness watcher on every push to main (a body edit sends no notification, #5821)._\n"
+        f"<!-- workflow-red-since: {red_since or 'unknown'} -->\n"
+        f"{STREAK_END}"
+    )
+
+
+def build_tenure_title(workflow_name: str) -> str:
+    return f"[auto-filed] {workflow_name}: red on {TENURE_RED_RUNS}+ consecutive scheduled runs"
+
+
+def build_tenure_body(workflow_file: str, workflow_name: str, info: dict[str, Any], now: datetime) -> str:
+    slug = tenure_slug(workflow_file)
+    return f"""Auto-filed by the **workflow-red tenure rule** (#5935, `scripts/check_cron_freshness.py --file-tenure`):
+the scheduled workflow **{workflow_name}** (`.github/workflows/{workflow_file}`) has been red on
+{TENURE_RED_RUNS} or more consecutive scheduled runs, and no open issue owned the red. A red that
+persists with no owner is the class #5935 closed: `operating-calendar.yml` sat red for ~45 days.
+
+{build_streak_block(info, info.get("red_since"), now)}
+
+**Acceptance criteria:**
+- [ ] The underlying failure is diagnosed and fixed (or explicitly dispositioned).
+- [ ] The newest completed scheduled run of `{workflow_file}` is green — this issue then auto-closes with a recovery comment.
+
+**Close policy:** auto-closes when the cron-freshness watcher (`.github/workflows/cron-freshness.yml`, every push to
+main) next sees this workflow's newest completed scheduled run green. Repeat reds refresh the streak block
+above in place, never a comment. Closing by hand while the workflow is still red just means the next watcher
+run files a fresh issue.
+
+**outcome_if_fixed:** this scheduled workflow is back to green, and the red it carried had an owner the whole time.
+
+{afi.issue_marker(slug)}
+"""
+
+
+def refresh_tenure_body(body: str, info: dict[str, Any], now: datetime) -> str:
+    """The tracker body with its streak block rewritten in place. `red since` stays the
+    EARLIER of the recorded and the observed instant when this read could not see the
+    streak's start (`lower_bound`); otherwise the observed start is exact and wins."""
+    body = body or ""
+    recorded = RED_SINCE_RE.search(body)
+    red_since = info.get("red_since")
+    if info.get("lower_bound") and recorded:
+        prior = _parse_iso(recorded.group(1))
+        seen = _parse_iso(red_since)
+        if prior is not None and (seen is None or prior < seen):
+            red_since = recorded.group(1)
+    block = build_streak_block(info, red_since, now)
+    i, j = body.find(STREAK_START), body.find(STREAK_END)
+    if 0 <= i < j:
+        return body[:i] + block + body[j + len(STREAK_END) :]
+    return body.rstrip("\n") + "\n\n" + block + "\n"
+
+
+def render_tenure(plan: list[dict[str, Any]], streaks: dict[str, Any], names: dict[str, str], now: datetime) -> str:
+    lines = ["", "-" * 78, f"WORKFLOW-RED TENURE — #5935 (the {TENURE_RED_RUNS}rd consecutive scheduled red files ONE owner)", "-" * 78]
+    if not plan:
+        lines.append(f"  no scheduled workflow is red at the head of its scheduled history ({len(streaks)} read).")
+    for p in plan:
+        info = streaks.get(p["file"])
+        if p["action"] == T_UNVERIFIED:
+            lines.append(f"  [ ????? ] {p['file']:<34} run lookup failed — UNKNOWN, not green")
+            continue
+        d = days_red(info["red_since"], now)
+        bound = ">=" if info["lower_bound"] else ""
+        what = {
+            T_FILE: "no owner — FILE a tenure tracker",
+            T_REFRESH: f"owned by tenure tracker #{p['issue']} — refresh",
+            T_CLOSE: f"green again — CLOSE tenure tracker #{p['issue']}",
+            T_OWNED: f"owned by its own advisory tracker #{p['issue']}",
+            T_BELOW: f"below tenure (<{TENURE_RED_RUNS})",
+        }[p["action"]]
+        red = (
+            f"red {bound}{info['streak']} run(s), {bound}{d}d since {info['red_since']}" if info["streak"] else "newest completed run green"
+        )
+        lines.append(f"  [{p['action']:^9}] {p['file']:<34} {red} — {what}")
+    return "\n".join(lines)
+
+
+def apply_tenure(
+    plan: list[dict[str, Any]],
+    streaks: dict[str, Any],
+    names: dict[str, str],
+    open_issues: list[dict[str, Any]],
+    client: Any,
+    now: datetime,
+) -> tuple[list[str], list[str]]:
+    """Execute the plan through an advisory_failure_issue-shaped client. Returns
+    (results, errors); one failed write never stops the rest."""
+    results: list[str] = []
+    errors: list[str] = []
+    by_number = {i.get("number"): i for i in open_issues}
+    now_iso = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    for p in plan:
+        wf, action = p["file"], p["action"]
+        try:
+            if action == T_FILE:
+                client.ensure_label(afi.MARKER_LABEL, afi.MARKER_LABEL_COLOR, afi.MARKER_LABEL_DESCRIPTION)
+                created = client.create_issue(
+                    title=build_tenure_title(names.get(wf, wf)),
+                    body=build_tenure_body(wf, names.get(wf, wf), streaks[wf], now),
+                    labels=[afi.MARKER_LABEL, TENURE_AREA_LABEL],
+                )
+                results.append(f"{wf}: created #{created.get('number')}")
+                # Two pushes land seconds apart and their watcher runs race (the concurrency
+                # group is per-sha, #3533): both can see no tracker and both create. Converge
+                # after the fact — every racer keeps the LOWEST-numbered tracker and closes its
+                # own if it is not that one, so the survivor is the same whichever run wins.
+                twins = sorted(
+                    i["number"]
+                    for i in (client.list_open_issues(afi.MARKER_LABEL) or [])
+                    if "pull_request" not in i and afi.issue_marker(tenure_slug(wf)) in (i.get("body") or "")
+                )
+                mine = created.get("number")
+                if twins and mine is not None and mine != twins[0]:
+                    client.comment(mine, f"Duplicate of #{twins[0]} — a concurrent watcher run filed the same tenure tracker first.")
+                    client.close_issue(mine)
+                    results.append(f"{wf}: closed duplicate #{mine} (keeps #{twins[0]})")
+            elif action == T_REFRESH:
+                body = (by_number.get(p["issue"]) or {}).get("body") or ""
+                client.update_issue_body(p["issue"], refresh_tenure_body(body, streaks[wf], now))
+                results.append(f"{wf}: refreshed #{p['issue']}")
+            elif action == T_CLOSE:
+                client.comment(
+                    p["issue"],
+                    f"Recovered — the newest completed scheduled run of `{wf}` is green (read {now_iso}).\n\n"
+                    "Auto-closing per the close policy (#5935 tenure rule).",
+                )
+                client.close_issue(p["issue"])
+                results.append(f"{wf}: closed #{p['issue']}")
+        except Exception as exc:  # noqa: BLE001 — collected and reported; one failure must not hide the rest
+            errors.append(f"{wf}: {action} failed — {type(exc).__name__}: {exc}")
+    return results, errors
+
+
+def scheduled_runs(workflow_file: str, per_page: int = TENURE_SAMPLE) -> Any:
+    """The trailing `event: schedule` runs (created_at, status, conclusion, html_url), or
+    the sentinel False when the lookup failed — never an empty list standing in for one."""
+    try:
+        out = subprocess.run(
+            [
+                "gh",
+                "api",
+                f"repos/{{owner}}/{{repo}}/actions/workflows/{workflow_file}/runs?event=schedule&per_page={per_page}",
+                "--jq",
+                "[.workflow_runs[] | {created_at, status, conclusion, html_url}]",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=True,
+        ).stdout.strip()
+        parsed = json.loads(out or "[]")
+    except (subprocess.SubprocessError, OSError, ValueError):
+        return False
+    return parsed if isinstance(parsed, list) else False
+
+
+def _tenure_client() -> Any:
+    """The advisory filer's urllib client. GITHUB_TOKEN, else GH_TOKEN (the cron-freshness
+    step already exports GH_TOKEN for `gh`); None when neither is set."""
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN") or ""
+    if not token:
+        return None
+    return afi.GitHubClient(os.environ.get("GITHUB_REPOSITORY", "averagejoematt/life-platform"), token)
+
+
+def run_tenure(rows: dict[str, dict[str, Any]], now: datetime, act: bool, client: Any = None) -> tuple[str, dict[str, Any], list[str]]:
+    """(report, json-able summary, errors) for the tenure pass over every scheduled workflow."""
+    names = {f: r.get("name") or f for f, r in rows.items()}
+    streaks: dict[str, Any] = {}
+    for wf in sorted(rows):
+        runs = scheduled_runs(wf)
+        streaks[wf] = False if runs is False else red_streak(runs)
+    slugs: dict[str, list[str]] = {}
+    for wf in rows:
+        try:
+            with open(os.path.join(REPO_ROOT, ".github", "workflows", wf), encoding="utf-8") as fh:
+                slugs[wf] = advisory_slugs(fh.read())
+        except OSError:
+            slugs[wf] = []
+    errors: list[str] = []
+    client = client if client is not None else (_tenure_client() if act else None)
+    open_issues: list[dict[str, Any]] = []
+    if client is not None:
+        try:
+            open_issues = list(client.list_open_issues(afi.MARKER_LABEL) or [])
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"listing open `{afi.MARKER_LABEL}` issues failed — {type(exc).__name__}: {exc}")
+    elif act:
+        errors.append("--file-tenure: no GITHUB_TOKEN/GH_TOKEN — cannot file or refresh tenure trackers")
+    plan = plan_tenure(streaks, open_issues, slugs)
+    report = render_tenure(plan, streaks, names, now)
+    if client is None:
+        report += "\n  (owners not read — no GitHub client; `file` here means 'would file if no owner exists')"
+    results: list[str] = []
+    if act and client is not None and not errors:
+        results, apply_errors = apply_tenure(plan, streaks, names, open_issues, client, now)
+        errors += apply_errors
+        report += "".join(f"\n  -> {r}" for r in results)
+    for e in errors:
+        report += f"\n  ::error::tenure: {e}"
+    return report, {"plan": plan, "streaks": streaks, "results": results, "errors": errors}, errors
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--json", action="store_true", help="machine-readable findings on stdout")
@@ -558,6 +916,12 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="a LOOKUP-blind run exits 0 instead of 2 (offline / no gh auth). Explicit by design. "
         "Does NOT cover an unimportable PyYAML — that is a broken install, not a blind network.",
+    )
+    ap.add_argument("--tenure", action="store_true", help="#5935: also print the scheduled red-streak board (reads only)")
+    ap.add_argument(
+        "--file-tenure",
+        action="store_true",
+        help="#5935: --tenure AND file/refresh/close the tenure trackers (the CI step; needs GITHUB_TOKEN or GH_TOKEN)",
     )
     args = ap.parse_args(argv)
 
@@ -614,6 +978,14 @@ def main(argv: list[str] | None = None) -> int:
     findings = evaluate(rows, newest, now, birth)
     code, report = render(findings, unruled, orphaned, len(rows), grace_notes)
 
+    tenure_summary: dict[str, Any] | None = None
+    if args.tenure or args.file_tenure:
+        tenure_report, tenure_summary, tenure_errors = run_tenure(rows, now, act=args.file_tenure)
+        report += "\n" + tenure_report
+        if tenure_errors and code == 0:
+            # A tenure write that failed is a blind owner, not a clean board (#5935).
+            code = 1
+
     if args.json:
         print(
             json.dumps(
@@ -625,6 +997,7 @@ def main(argv: list[str] | None = None) -> int:
                     "orphaned": orphaned,
                     "grace_notes": grace_notes,
                     "birth": birth,
+                    "tenure": tenure_summary,
                 },
                 indent=2,
             )
