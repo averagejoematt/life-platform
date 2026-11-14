@@ -207,12 +207,20 @@ def test_without_a_ledger_the_pick_is_initial():
 
 
 def test_stress_progressing_holds_stalled_rotates():
+    from unittest.mock import patch as _patch
+
+    from training import live_sequence
+
     progressing = [_w(d, PREV_TID, 25 + 2 * i) for i, d in enumerate(DAYS[:3])]
     stalled = [_w(d, PREV_TID, x) for d, x in zip(DAYS, (30, 29, 29.5))]
-    held = _live(rows=HELD, workouts=progressing)
-    assert _pick(held) == PREV and _rot(held)["trend"] == "progressing"
-    moved = _live(rows=HELD, workouts=stalled)
-    assert _pick(moved) != PREV and _rot(moved)["trigger"] == "stall"
+    with _patch.object(live_sequence, "week_plan", lambda *a, **k: None):  # a normal week (three sessions read as a dip week)
+        held = _live(rows=HELD, workouts=progressing)
+        assert _pick(held) == PREV and _rot(held)["trend"] == "progressing"
+        moved = _live(rows=HELD, workouts=stalled)
+        assert _pick(moved) != PREV and _rot(moved)["trigger"] == "stall"
+    # fix round 10 (the ninth red team): on a short or adherence-dip week the novelty budget is zero — the stall rotation waits
+    with _patch.object(live_sequence, "week_plan", lambda *a, **k: {"mode": "dip"}):
+        assert _pick(_live(rows=HELD, workouts=stalled)) == PREV
 
 
 def test_stress_a_step_due_series_holds_the_movement():

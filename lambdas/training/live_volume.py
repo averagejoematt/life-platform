@@ -729,20 +729,33 @@ def floor_slack(plan: dict[str, Any], role: str | None = None) -> dict[str, floa
     return out
 
 
-def next_cut(items: list[tuple[bool, bool, bool, int]]) -> tuple[int, str] | None:
-    """THE trim order (`live_settings.TRIM_ORDER`) over items (anchor, carry, priority, working sets): (index, "set" | "drop") —
-    the latest-listed candidate of the first tier that has one: non-priority accessory back-offs, non-priority anchor back-offs,
-    priority back-offs; then a carry, a whole non-priority accessory at 2, a priority one. Anchors never under 2, never dropped."""
+def next_cut(items: list[tuple[Any, ...]]) -> tuple[int, str] | None:
+    """THE trim order (`live_settings.TRIM_ORDER`) over items (anchor, carry, priority, working sets[, slack]): (index, "set" |
+    "drop") — the latest-listed candidate of the first tier that has one: non-priority accessory back-offs, non-priority anchor
+    back-offs, (fix round 10) a whole non-priority accessory at 2 whose muscle stays over its floor without it, priority back-offs
+    (the one whose muscle sits furthest over its floor first — `slack` — so a ruled floor breaks last); then a carry, any other
+    whole non-priority accessory at 2, a priority one. Anchors never under 2, never dropped."""
     floor = int(cfg.value("slot_min_sets"))
     tiers: list[list[tuple[int, str]]] = [[], [], [], [], [], []]
-    for i, (anchor, carry, prio, n) in enumerate(items):
+    room = {i: float(it[4]) if len(it) > 4 else 0.0 for i, it in enumerate(items)}
+    for i, (anchor, carry, prio, n, *_rest) in enumerate(items):
         if carry and not anchor:
             tiers[3].append((i, "drop"))
         elif n > floor:
             tiers[2 if prio else (1 if anchor else 0)].append((i, "set"))
         elif not anchor:
             tiers[5 if prio else 4].append((i, "drop"))
-    return next((tier[-1] for tier in tiers if tier), None)
+    tiers[2].sort(key=lambda c: (room[c[0]], c[0]))
+    spare = [c for c in tiers[4] if len(items[c[0]]) > 4 and room[c[0]] >= items[c[0]][3]]  # its muscle stays over its floor
+    order = [tiers[0], tiers[1], spare, tiers[2], tiers[3], tiers[4], tiers[5]]
+    return next((tier[-1] for tier in order if tier), None)
+
+
+def _room(key: Any, catalog: dict[str, Any], lib: dict[str, Any], slack: dict[str, float]) -> float:
+    """How far a movement's main muscle (and its delt heads) sits over the week's floor: the least slack among them."""
+    c = credits(lib_entry(key, catalog, lib), key, catalog)
+    main = max((m for m in c if m not in HEADS), key=c.get, default=None)
+    return min((float(slack[m]) for m in c if (m == main or m in HEADS) and m in slack), default=99.0)
 
 
 def fit_sets(
@@ -812,6 +825,7 @@ def _fit_to(
                 kinds[blocks[i].movement_key].get("intensity") == "carry",
                 _prio(blocks[i].movement_key, movements, lib, slack),
                 _work(blocks[i]),
+                _room(blocks[i].movement_key, movements, lib, slack),
             )
             for i in lifts
         ]

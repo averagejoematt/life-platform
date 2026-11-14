@@ -245,7 +245,7 @@ def test_one_to_three_mornings_are_real_full_body_weeks(name):
 
 
 def test_short_and_normal_weeks_meet_their_floors():
-    for mornings, name in ((5, "a_large_deficit_experienced"), (4, "e_short_week")):
+    for mornings, name in ((5, "a_large_deficit_experienced"), (4, "e_short_week"), (4, "d_stalled_anchor_adherence_dip")):
         w = _week(PROFILES[name])
         tg = live_volume.targets(w["world"]["lib"], mornings)
         under = {

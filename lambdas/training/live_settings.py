@@ -208,10 +208,11 @@ HEURISTICS: dict[str, dict[str, Any]] = {
 for _row in HEURISTICS.values():
     _row["label"] = H  # ruling 18: every row a labelled heuristic
 
-TRIM_ORDER: tuple[str, ...] = ("accessory_backoff", "anchor_backoff", "priority_last_set")
-"""THE one time fit's order (fix round 9): non-priority accessory back-off sets, then non-priority anchor back-offs, then a
-priority muscle's last sets; never under 2 working sets, an accessory left at 2 is dropped whole only after every back-off is
-gone. Read by `live_volume.time_fit`."""
+TRIM_ORDER: tuple[str, ...] = ("accessory_backoff", "anchor_backoff", "spare_accessory", "priority_last_set")
+"""THE one time fit's order (fix round 9; fix round 10 adds the spare accessory): non-priority accessory back-off sets, then
+non-priority anchor back-offs, then a whole 2-set accessory whose muscle stays over its floor without it, then a priority (or
+floor-holding) muscle's last sets — the one furthest over its floor first; never under 2 working sets. Read by
+`live_volume.time_fit`."""
 
 
 def settings(lib: dict[str, Any] | None) -> dict[str, Any]:

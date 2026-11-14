@@ -284,7 +284,7 @@ library builder writes `programming_settings` from the same table.
 | `short_week_floor` | `3` | volume | a 1-3 morning week holds each priority muscle and each major pattern at maintenance: MV x mornings / 3 hard sets (at least 2-3), full-body mornings of 4-6 movements at 2-3 sets — never a 1-set anchor | block retro: anchor e1RM after a short week |
 | `time_cap_minutes` | `75` | time | the owner's 75-minute morning, warm-ups included (#5799 time model, 99 s a set measured) | the #5799 measured set time |
 
-Time-fit order: accessory_backoff -> anchor_backoff -> priority_last_set.
+Time-fit order: accessory_backoff -> anchor_backoff -> spare_accessory -> priority_last_set.
 <!-- GENERATED:live_settings END -->
 
 ## Block-retro hooks (ruling 18)
