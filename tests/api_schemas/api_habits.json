@@ -219,6 +219,23 @@
         "length_sample": 59,
         "type": "array"
       },
+      "restraints_unnamed": {
+        "keys": {
+          "adherence_pct": {
+            "type": "integer"
+          },
+          "completed_days": {
+            "type": "integer"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "scheduled_days": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "worst_day": {
         "type": "integer"
       }

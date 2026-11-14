@@ -295,7 +295,7 @@ Full suite creds-blanked: **2045 passed, 0 failed**; live CI Lint + Unit Tests b
 
 Reframed `/evidence/mind/` (the most sensitive page) on the spine **"the layer the machine can't see — awaiting its human."** Per `docs/specs/SPEC_MIND_PAGE_REDESIGN_2026-06-21.md`; **Phase 0 only** (P0.1–P0.4, front-end); the Phase-1 capture mechanics are DEFERRED pending the invitation-not-obligation UX sign-off (its explicit STOP-AND-ASK) — tracked as MIND-01..05. Deployed + live-verified. Seventh page redesign.
 
-**Fixed a live privacy leak:** the previous page rendered vice streaks by NAME ("No alcohol", "No sweets"…); Phase 0 renders them **unnamed** per the hard privacy rule — verified live (zero vice names on the page).
+**Fixed a live privacy leak:** the previous page rendered vice streaks by NAME ("No alcohol"…); Phase 0 renders them **unnamed** per the hard privacy rule — verified live (zero vice names on the page).
 
 - **P0.1** vice restraint, reset-honest: leads with **cumulative days held** (resilience across resets, never erased) over a fragile streak; streaks **unnamed** (counts only); resets read muted as restarts — **zero red, no shame**.
 - **P0.2** the inviting absence: empty mood/journal is a dignified invitation, never a hollow axis; a held one-tap affordance (mechanic is P1, gated).

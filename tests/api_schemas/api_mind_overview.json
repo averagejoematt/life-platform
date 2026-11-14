@@ -97,9 +97,6 @@
             },
             "holding": {
               "type": "boolean"
-            },
-            "name": {
-              "type": "string"
             }
           },
           "type": "object"
@@ -115,29 +112,6 @@
             },
             "held": {
               "type": "integer"
-            },
-            "streaks": {
-              "keys": {
-                "No Fried Food": {
-                  "type": "integer"
-                },
-                "No Phone 30 Mins Before Bed": {
-                  "type": "integer"
-                },
-                "No alcohol": {
-                  "type": "integer"
-                },
-                "No mindless scrolling": {
-                  "type": "integer"
-                },
-                "No solo takeout": {
-                  "type": "integer"
-                },
-                "No sweets": {
-                  "type": "integer"
-                }
-              },
-              "type": "object"
             },
             "total": {
               "type": "integer"
