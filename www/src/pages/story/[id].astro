@@ -24,9 +24,22 @@ const { chapter: c } = Astro.props;
 const all = await loadAll();
 const episode = c.episode_id ? all.get("episode", c.episode_id) : null;
 const ordered = [...all.byType.chapter].filter((x) => hasPage("chapter", x)).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : (a.week ?? 0) - (b.week ?? 0)));
-const i = ordered.findIndex((x) => x.id === c.id);
-const prev = i > 0 ? ordered[i - 1] : null;
-const next = i >= 0 && i < ordered.length - 1 ? ordered[i + 1] : null;
+// The walk goes chapter to chapter (2026-11-14, sprint II): from The Rate Flag, "Previous" led to "Week 7", a skipped
+// week's page that says only "Skipped." A published chapter's neighbours are the nearest published chapters; the weeks
+// between them are named in one neutral line, with no title or state beyond what /story/ already lists. A week with
+// no chapter keeps walking the full list, so its own page still reaches its neighbours.
+const walk = c.status === "published" ? ordered.filter((x) => x.status === "published") : ordered;
+const i = walk.findIndex((x) => x.id === c.id);
+const prev = i > 0 ? walk[i - 1] : null;
+const next = i >= 0 && i < walk.length - 1 ? walk[i + 1] : null;
+const between = (a: any, b: any) => {
+  if (!a || !b || c.status !== "published" || !(a.week >= 0) || !(b.week >= 0) || b.week - a.week < 2) return null;
+  const from = a.week + 1;
+  const to = b.week - 1;
+  return from === to ? `Week ${from} has no published chapter.` : `Weeks ${from} to ${to} have no published chapter.`;
+};
+const gapBefore = between(prev, c);
+const gapAfter = between(c, next);
 const weekDays = all.byType.day.filter((d) => d.chapter_id === c.id).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 const dayRow = (d: any) => {
   const r = d.readings || {};
@@ -291,6 +304,7 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
           <a href={href(`/story/${prev.id}/`)} style="display:flex;flex-direction:column;gap:6px;padding:22px;border-right:1px solid var(--ink);text-decoration:none">
             <span class="label">← Previous · {prev.week_label}</span>
             <b style="font-size:22px;letter-spacing:-.02em">{prev.title}</b>
+            {gapBefore && <span class="muted" style="font-size:13px">{gapBefore}</span>}
           </a>
         ) : (
           <span style="padding:22px;border-right:1px solid var(--ink)" class="muted">
@@ -303,6 +317,7 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
           <a href={href(`/story/${next.id}/`)} style="display:flex;flex-direction:column;gap:6px;padding:22px;text-decoration:none">
             <span class="label">Next · {next.week_label} →</span>
             <b style="font-size:22px;letter-spacing:-.02em">{next.title}</b>
+            {gapAfter && <span class="muted" style="font-size:13px">{gapAfter}</span>}
           </a>
         ) : (
           <span style="padding:22px" class="muted">
