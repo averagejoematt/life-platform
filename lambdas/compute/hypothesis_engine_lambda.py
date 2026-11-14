@@ -79,13 +79,13 @@ from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment import experiment_gates, prereg_effect  # #1371: the arming-threshold registry · #3552: the min_effect facet
-from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058: default-deny pilot data
+from experiment.phase_filter import source_reads_cross_phase  # ADR-058 (#5518: the load's filter is sealed_hypotheses's)
 from experiment.phase_taxonomy import forbidden_provenance  # #3915: the calibration ledger carries no provenance
 from health import eating_window, habit_pct_public  # #5099: THE eating window; 2026-11-06: the public habit_pct
 from health.calorie_target import target_phrase  # #5095: the ONE calorie target
 from training import session_count  # #5387: THE session count + THE Zone 2 computation, per day
 
-from compute import watch_hypotheses  # #4979: the watch-enabled metrics + their three pre-registered hypotheses
+from compute import sealed_hypotheses, watch_hypotheses  # #5518: sealed rows seen + graded on their window · #4979: watch metrics
 from compute.compute_json_schemas import hypotheses_schema  # #4276: the generation output schema (module at its size ceiling)
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
@@ -237,11 +237,12 @@ def fetch_profile():
     return _shared_fetch_profile(table, USER_ID)
 
 
-def gather_data(days=LOOKBACK_DAYS):
+def gather_data(days=LOOKBACK_DAYS, start_date=None, end_date=None):
     """Fetch multi-source data. #530: 30 days — deterministic checks evaluate the
-    hypothesis's full monitoring window; generation only sees the last GENERATION_DAYS."""
-    end_date = pacific_today()
-    start_date = (pacific_now() - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    hypothesis's full monitoring window; generation only sees the last GENERATION_DAYS.
+    #5518: an explicit [start_date, end_date] reads a sealed row's own closed window."""
+    end_date = end_date or pacific_today()
+    start_date = start_date or (pacific_now() - timedelta(days=days - 1)).strftime("%Y-%m-%d")
 
     # #3049: the ingest set is DECLARED ONCE in the compute-input census
     # (common.input_manifest.COMPUTE_INPUTS). This list was a second copy of it,
@@ -265,19 +266,10 @@ def gather_data(days=LOOKBACK_DAYS):
 
 
 def load_existing_hypotheses(status_filter=None):
-    """Load existing hypotheses from DynamoDB."""
-    from boto3.dynamodb.conditions import Key
-
+    """Load existing hypotheses from DynamoDB. #5518: the phase filter OR a sealed genesis row stamped pilot by the
+    wall clock (sealed_hypotheses.grader_visible) — paginated (one unpaginated query before)."""
     try:
-        resp = table.query(
-            **with_phase_filter(
-                {
-                    "KeyConditionExpression": Key("pk").eq(HYPOTHESES_PK) & Key("sk").begins_with("HYPOTHESIS#"),
-                    "ScanIndexForward": False,
-                }
-            )
-        )
-        items = d2f(resp.get("Items", []))
+        items = sealed_hypotheses.load_visible(table, HYPOTHESES_PK, d2f)
         if status_filter:
             items = [h for h in items if h.get("status") == status_filter]
         return items
@@ -569,7 +561,7 @@ def enforce_hard_expiry(all_hypotheses):
     now = pacific_now().date()
 
     for hyp in all_hypotheses:
-        if hyp.get("status") in ("archived", "confirmed", "refuted"):
+        if hyp.get("status") in ("archived", "confirmed", "refuted") or sealed_hypotheses.is_sealed(hyp):  # #5518: graded on its window
             continue
 
         created_at = hyp.get("created_at", "")
@@ -1177,6 +1169,11 @@ def check_pending_hypotheses(pending_hypotheses, daily_rows):
         if not sk or not hyp.get("hypothesis"):
             continue
 
+        if sealed_hypotheses.due_for_window_grade(hyp, now.isoformat()):  # #5518: once, on its own sealed window — never today's 30 days
+            updates.append(
+                sealed_hypotheses.grade_closed_window(hyp, gather_data, build_data_narrative, evaluate_test_spec, deterministic_evidence)
+            )
+            continue
         spec = hyp.get("test_spec")
         if not spec:
             logger.info(f"[#530] {sk[:40]} is a v1 hypothesis (no test_spec) — left to hard expiry, never LLM-checked")

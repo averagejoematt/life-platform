@@ -88,7 +88,8 @@ from stacks.monitoring_denial_alarms import add_denial_alarms  # #3563: the perm
 from stacks.monitoring_prediction_alarms import (
     add_commitment_alarms,
     add_prediction_alarms,
-)  # #727/#3046/#3553: the science alarms, same seam
+    add_prereg_overdue_alarm,
+)  # #727/#3046/#3553/#5518: the science alarms, same seam
 from stacks.monitoring_silence_alarms import add_silence_alarms  # #2977: the fail-soft token alarms, same seam
 from stacks.monitoring_token_alarms import add_token_alarms  # #3505: the AI token/spend family, same seam
 from stacks.reader_audience import route_reader_audience  # #3499: the reader-audience facet decides the urgent route
@@ -631,6 +632,7 @@ class MonitoringStack(Stack):
         # #727/#3046 science + #2824 budget-unreadable alarms — siblings on the #2610 extraction seam (same scope, same digest topic).
         add_prediction_alarms(self, digest)
         add_commitment_alarms(self, digest)  # #3553: the follow-through ledger's dead-man
+        add_prereg_overdue_alarm(self, digest)  # #5518: a sealed bet open past its due date
         add_budget_alarms(self, digest)
 
         # ══════════════════════════════════════════════════════════════
