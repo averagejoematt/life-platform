@@ -78,6 +78,12 @@ const chapters = defineCollection({
     // the program week's explicit interval (/api/chapters), null for a prologue — never inferred from `date`
     week_start: z.string().regex(ISO_DAY).nullable(),
     week_end: z.string().regex(ISO_DAY).nullable(),
+    // a published chapter's TRUE dates (/api/chapters, published weeks only): the owner's approval as a Pacific day,
+    // and the days the chapter covers (its "Day A to Day B" stats line). `date` is the chronicle's DATA date. Null when
+    // not served — a page then never calls `date` the publication date.
+    published_at: z.string().regex(ISO_DAY).nullable(),
+    covers_start: z.string().regex(ISO_DAY).nullable(),
+    covers_end: z.string().regex(ISO_DAY).nullable(),
     excerpt: z.string().nullable(),
     body_html: z.string().nullable(),
     word_count: z.number().int().nullable(),
