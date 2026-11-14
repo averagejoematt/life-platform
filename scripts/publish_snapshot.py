@@ -60,6 +60,7 @@ from publish_snapshot_chapters import (
     CALL_OUTCOME,
     apply_week_intervals,
     chapter_summary,
+    versus_guess,
     week_id as _week_id,  # None for a withdrawn installment: never a chapter (owner ruling 2026-11-10)
     whole_sentence_summary,
 )  # noqa: E402 — one vocabulary for weeks, excerpts and calls
@@ -474,6 +475,7 @@ def _live_coaches(ctx: LiveContext) -> None:
                 short_bio=c.get("short_bio"),
                 record=record,
                 comparison_text=comp if isinstance(comp, str) and comp else None,
+                versus_guess=versus_guess(bc.get("comparison")),
                 quality=_quality_counts(bc.get("quality")),
                 instrument_absent={"absent": bool(c.get("absent")), "reason": c.get("reason")} if c.get("absent") else None,
             )
@@ -552,6 +554,7 @@ def _retired_coach(ctx: LiveContext, pid: str, short: str, name: str) -> None:
             short_bio="A retired seat: off the active roster, its calls kept under its own byline.",
             record={"right": bc.get("confirmed"), "n": int(decided), "through": rec.get("through")} if isinstance(decided, int) else None,
             comparison_text=None,
+            versus_guess=None,
             quality=_quality_counts(bc.get("quality")),
             instrument_absent=None,
         )

@@ -143,3 +143,33 @@ def clean_excerpt(text: str | None) -> str | None:
     out = _EDITOR_NOTE.sub("", text, count=1) if _EDITOR_NOTE.match(text) else text
     out = _EMPHASIS.sub("", out).strip()
     return out or None
+
+
+_KINDS = ("number", "direction", "yes_no", "sealed")
+
+
+def versus_guess(comparison: dict | None) -> dict | None:
+    """A coach's record against a guess that nothing changes, per kind of call, as /api/predictions serves it
+    (`by_coach.<id>.comparison.records`) — counts and the producer's own verdict, nothing computed (2026-11-14: the
+    coach page showed this only as one paragraph of kind-by-kind sentences). Kinds are never added together; a kind
+    with no scored call is left out. None when the comparison is not served."""
+    recs = (comparison or {}).get("records") if isinstance(comparison, dict) else None
+    if not isinstance(recs, dict):
+        return None
+    kinds = []
+    for k in _KINDS:
+        r = recs.get(k)
+        if not isinstance(r, dict) or not isinstance(r.get("scored"), int) or r["scored"] < 1:
+            continue
+        if not all(isinstance(r.get(f), int) for f in ("coach_right_on_scored", "rule_right")):
+            continue
+        kinds.append(
+            {
+                "kind": k,
+                "scored": r["scored"],
+                "coach_right": r["coach_right_on_scored"],
+                "rule_right": r["rule_right"],
+                "verdict": str(r.get("verdict") or ""),
+            }
+        )
+    return {"kinds": kinds} if kinds else None

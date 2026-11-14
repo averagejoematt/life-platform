@@ -261,6 +261,7 @@ SCHEMA: dict[str, dict[str, tuple[str, bool]]] = {
         "short_bio": ("str", True),
         "record": ("obj", True),
         "comparison_text": ("str", True),
+        "versus_guess": ("obj", True),
         "quality": ("obj", True),
         "instrument_absent": ("obj", True),
     },
