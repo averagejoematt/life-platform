@@ -10,7 +10,7 @@ import StatusTag from "../components/StatusTag.astro";
 import VersusGuess from "../components/VersusGuess.astro";
 import OpenQuestions from "../components/OpenQuestions.astro";
 import { headline, weeklyBars } from "../lib/chart.js";
-import { dayInWords, domainWords, num, kOfN, clip, heldCallWords } from "../lib/format.js";
+import { chapterCovers, chapterPublished, chapterWindow, dayInWords, domainWords, num, kOfN, clip, heldCallWords } from "../lib/format.js";
 import { connectedTo, loadAll, loadSeries, latestEdition, dayLine, loadCalibration, loadJourney } from "../lib/snapshot.js";
 import { lineCounts, theLine } from "../lib/theline.js";
 import { verifiedLead } from "../lib/calibration.js";
@@ -58,14 +58,19 @@ const nextChapterNo = String((latestChapter?.week ?? 0) + 1).padStart(2, "0");
 const inChapterAll = latestChapter ? await connectedTo("chapter", latestChapter.id, { cap: 6 }) : null;
 const inChapter = inChapterAll ? { ...inChapterAll, items: inChapterAll.items.filter((e) => e.type !== "edition").slice(0, 4) } : null;
 // The latest chapter's week in two lines (2026-11-14): its graded calls and its days, both on the chapter page.
-const chWeekCalls =
-  latestChapter?.week_start && latestChapter?.week_end
-    ? all.byType.prediction.filter(
-        (p) => (p.status === "confirmed" || p.status === "refuted") && p.settled_date && p.settled_date.slice(0, 10) >= latestChapter.week_start && p.settled_date.slice(0, 10) <= latestChapter.week_end,
-      )
-    : [];
+// Read over the chapter's covered days when served (lib/format.js::chapterWindow), as the chapter page does.
+const chWindow = chapterWindow(latestChapter);
+const chWeekCalls = chWindow
+  ? all.byType.prediction.filter(
+      (p) => (p.status === "confirmed" || p.status === "refuted") && p.settled_date && p.settled_date.slice(0, 10) >= chWindow[0] && p.settled_date.slice(0, 10) <= chWindow[1],
+    )
+  : [];
 const chWeekRight = chWeekCalls.filter((p) => p.status === "confirmed").length;
-const chWeekDays = latestChapter ? all.byType.day.filter((d) => d.chapter_id === latestChapter.id).length : 0;
+const chWeekDays = latestChapter
+  ? all.byType.day.filter((d) =>
+      latestChapter.covers_start && latestChapter.covers_end ? d.date >= latestChapter.covers_start && d.date <= latestChapter.covers_end : d.chapter_id === latestChapter.id,
+    ).length
+  : 0;
 const pending = all.byType.prediction
   .filter((p) => p.status === "pending")
   .sort((a, b) => ((a.due_date || "9999") < (b.due_date || "9999") ? -1 : 1))
@@ -78,14 +83,17 @@ const weekOrder: string[] = week?.order || [];
 // date reaches the HTML); the browser remembers only the last edition day it saw.
 const dayNo = (iso: string | null | undefined) => (iso && /^\d{4}-\d{2}-\d{2}/.test(iso) ? Math.round(Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) / 864e5) : null);
 const sinceEvents = [
-  ...published.map((c) => ({ d: dayNo(c.date), k: "chapter", t: c.title, u: href(pathOf("chapter", c.id)) })),
+  ...published.map((c) => ({ d: dayNo(c.published_at || c.date), k: "chapter", t: c.title, u: href(pathOf("chapter", c.id)) })),
   ...all.byType.prediction.filter((p) => p.status === "confirmed" || p.status === "refuted").map((p) => ({ d: dayNo(p.settled_date), k: p.status })),
 ].filter((e) => e.d != null);
 const sinceAsOf = dayNo(edition?.as_of);
 const weekLabel: Record<string, string> = { weight: "Weight", training: "Training", sleep: "Sleep", food: "Food" };
 
-// The week a chapter covers: its explicit interval from the snapshot (/api/chapters), never re-derived here.
+// The days a chapter covers: its served covered days ("Days 60–66 · 4–10 Nov"), else its explicit program-week interval
+// from the snapshot (/api/chapters), never re-derived here.
 function weekRange(c: any): string | null {
+  const covers = chapterCovers(c, { short: true });
+  if (covers) return covers;
   const a = c?.week_start ? dayInWords(c.week_start, { short: true }) : null;
   const b = c?.week_end ? dayInWords(c.week_end, { short: true }) : null;
   return a && b ? `${a} – ${b}` : null;
@@ -311,6 +319,11 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
             <span class="label">Chapter</span>
             <span class="big cobalt" style="font-size:130px;display:block;line-height:.85">{String(latestChapter.week ?? 0).padStart(2, "0")}</span>
             <span class="mono muted" style="font-size:12px">{weekRange(latestChapter) || dayInWords(latestChapter.date, { short: true })}</span>
+            {chapterPublished(latestChapter) && (
+              <span class="mono muted" style="font-size:12px" data-published>
+                {chapterPublished(latestChapter)}
+              </span>
+            )}
           </div>
           <article style="flex:1 1 480px;min-width:0;display:flex;flex-direction:column;gap:16px">
             <div class="row">
