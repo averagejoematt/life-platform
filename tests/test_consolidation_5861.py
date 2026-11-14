@@ -330,3 +330,21 @@ def test_a_hold_day_holds_every_load_and_stops_every_lift_at_rpe_8():
     with patch.dict(live_settings.HEURISTICS["first_back_rpe"], {"value": 10}):
         off = _week(PROFILES["b_shoulder_flag_low_recovery"])
     assert any((sw.lift_effort(x["hevy_note"]) or 0) > 8 for x in lifts(off))
+
+
+def test_a_slump_trims_about_a_third_of_each_accessory_never_an_anchor():
+    """The slump's volume answer (the red team's N7 survivor): accessories lose about a third of their working sets, never under 2;
+    anchors keep theirs. Control: the drop athlete's slump week serves fewer accessory sets than the same week without the trim."""
+    rx = {"exposures": [
+        {"kind": "anchor", "sets": [{}] * 3}, {"kind": "accessory", "sets": [{}] * 3}, {"kind": "accessory", "sets": [{}] * 4},
+        {"kind": "accessory", "sets": [{}] * 2},
+    ]}  # fmt: skip
+    lines = live_load.slump_trim(rx)
+    assert [len(e["sets"]) for e in rx["exposures"]] == [3, 2, 3, 2] and lines
+    rows = _run("drop", 4)
+    off = _run("drop", 4, {(live_load, "slump_trim"): lambda rx: []})
+    acc = lambda rr: sum(sum(len(v) for v in r["loads"].values()) for r in rr)  # noqa: E731 — exposures served
+    held = [r["week"] for r in rows if any(ln.startswith("today: every load held") for v in r["rationale"].values() for ln in v)]
+    assert held
+    sets = lambda rr: sum(n for r in rr for n in r["hard"].values())  # noqa: E731
+    assert sets(rows) < sets(off) and acc(rows) <= acc(off)
