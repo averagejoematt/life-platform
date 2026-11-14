@@ -2,7 +2,7 @@
 name: wrap
 description: "Close out the current session: run the gate battery, archive the outgoing handover, replace the CLAUDE.md status block, update memory, sweep the backlog and commit. Use at the end of a working session, or when asked to wrap up."
 user-invocable: true
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task, Agent, TodoWrite
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, TodoWrite
 ---
 
 Close out the current session: archive the outgoing handover, replace the CLAUDE.md

@@ -3,7 +3,7 @@ name: cost-diligence
 description: "Run full-P&L cost diligence: pull live AWS cost truth, decompose the drivers, and produce a ranked stop/reduce/redesign/merge portfolio with numbered owner asks. Use when asked about spend, the Bedrock budget ceiling, a cost spike, or where money is going."
 user-invocable: true
 argument-hint: "[focus area]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task, Agent, TodoWrite, WebFetch, WebSearch
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, TodoWrite, WebFetch, WebSearch
 ---
 
 Run the full-P&L cost diligence: pull live cost truth, decompose the drivers, and turn

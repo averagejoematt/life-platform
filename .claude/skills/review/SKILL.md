@@ -3,7 +3,7 @@ name: review
 description: "Run one graded, evidence-bound review of the platform through a named lens — accuracy, craft, sdlc, site, platform, journey or full. The spine supplies the phases (orient, panel fan-out, adversarial verification, scorecard, disposition); the lens supplies the rubric. Use for any scheduled or on-request quality review."
 user-invocable: true
 argument-hint: "<accuracy|craft|sdlc|site|platform|journey|full> [seed, scope, or mode]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task, Agent, TodoWrite, WebFetch, WebSearch
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, TodoWrite, WebFetch, WebSearch
 ---
 
 # /review &lt;lens&gt; — one review ritual, seven rubrics

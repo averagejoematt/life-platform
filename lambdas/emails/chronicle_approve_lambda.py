@@ -146,6 +146,44 @@ def _publishable(item: dict) -> bool:
     return singleton_visible(item)
 
 
+MANIFEST_KEY = "generated/journal/posts.json"
+
+
+def _merge_manifest(staged_json: str, post_key: str, failures: list | None = None) -> str | None:
+    """The reading list to write on publish: the LIVE manifest with this one post's entry added or replaced.
+
+    The staged manifest is a draft-time snapshot of every row. Written whole, it put two held weeks' titles and excerpts
+    on the public list, dropped any week published since the draft, and rewrote an older post's excerpt (Week 10,
+    2026-11-14). The live manifest stays the record for every other post; the snapshot contributes only the entry
+    whose URL is this post's. Returns None (and records why) when that can't be done safely — the list is then left
+    as it was, never rebuilt from the snapshot."""
+
+    def _refuse(why: str) -> str | None:
+        logger.warning("posts.json not written: %s", why)
+        if failures is not None:
+            failures.append(f"posts.json not written: {why}")
+        return None
+
+    parts = (post_key or "").split("/")
+    if len(parts) < 3 or parts[0] != "generated":
+        return _refuse(f"no journal post key to identify this post ({post_key!r})")
+    post_url = "/" + "/".join(parts[1:-1]) + "/"
+    try:
+        staged = json.loads(staged_json) if isinstance(staged_json, str) else staged_json
+        entry = next(p for p in staged.get("posts") or [] if p.get("url") == post_url)
+    except (ValueError, StopIteration, AttributeError):
+        return _refuse(f"the staged manifest has no entry for {post_url}")
+    try:
+        live = json.loads(s3.get_object(Bucket=S3_BUCKET, Key=MANIFEST_KEY)["Body"].read()).get("posts") or []
+    except Exception as exc:
+        if (getattr(exc, "response", None) or {}).get("Error", {}).get("Code") not in ("NoSuchKey", "404"):
+            return _refuse(f"the live manifest could not be read ({exc})")
+        live = []  # the first post ever published
+    posts = [entry] + [p for p in live if p.get("url") != post_url]
+    posts.sort(key=lambda p: (str(p.get("date", "")), int(p.get("sequence") or 0)), reverse=True)
+    return json.dumps({"posts": posts, "updated_at": datetime.now(timezone.utc).isoformat()}, indent=2)
+
+
 def _publish_to_s3(item: dict, failures: list | None = None) -> list[str]:
     """Write pre-built HTML artifacts to S3. Returns list of invalidated CF paths.
 
@@ -177,15 +215,17 @@ def _publish_to_s3(item: dict, failures: list | None = None) -> list[str]:
         invalidation_paths.append(f"/{week_dir}/*")
 
     if journal_posts_json:
-        s3.put_object(
-            Bucket=S3_BUCKET,
-            Key="generated/journal/posts.json",
-            Body=public_body(journal_posts_json.encode("utf-8"), "application/json"),
-            ContentType="application/json",
-            CacheControl="max-age=300",
-        )
-        logger.info("S3: wrote generated/journal/posts.json")
-        invalidation_paths.append("/journal/posts.json")
+        merged = _merge_manifest(journal_posts_json, journal_post_key, failures)
+        if merged is not None:
+            s3.put_object(
+                Bucket=S3_BUCKET,
+                Key=MANIFEST_KEY,
+                Body=public_body(merged.encode("utf-8"), "application/json"),
+                ContentType="application/json",
+                CacheControl="max-age=300",
+            )
+            logger.info("S3: wrote %s", MANIFEST_KEY)
+            invalidation_paths.append("/journal/posts.json")
 
     # #405: the per-chronicle share kit → its stable generated location (served via
     # the already-routed /moments/* behavior). Built at draft time; written on publish

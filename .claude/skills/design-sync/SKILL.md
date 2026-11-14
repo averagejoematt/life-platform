@@ -3,7 +3,7 @@ name: design-sync
 description: "Push the repo's v5 design system — tokens, foundations, components, reference pages — into the Claude Design project, incrementally and one component at a time. Use when the design project needs to catch up to the repo."
 user-invocable: true
 argument-hint: "[component or --all]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task, Agent, TodoWrite, DesignSync, WebFetch
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, TodoWrite, DesignSync, WebFetch
 ---
 
 Push the current v5 design system — tokens, foundations, components, reference pages,

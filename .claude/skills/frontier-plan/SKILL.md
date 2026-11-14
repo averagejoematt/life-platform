@@ -3,7 +3,7 @@ name: frontier-plan
 description: "Full-horizon product strategy review: where the platform should go next, from quantified self toward quantified life, ending in a stack-ranked backlog filed as issues. Use for long-range planning, roadmap questions, or 'what should we build next'."
 user-invocable: true
 argument-hint: "[theme]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task, Agent, TodoWrite, WebFetch, WebSearch
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, TodoWrite, WebFetch, WebSearch
 ---
 
 # /frontier-plan — the full-horizon review: from quantified self to quantified *life*
