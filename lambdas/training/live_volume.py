@@ -303,13 +303,23 @@ def week_plan(catalog: dict[str, Any], lib: dict[str, Any], mornings: int, high_
             and r["credit"].get(m)
         ]
 
-    # 1. surplus over the cap gives first (non-priority isolation, largest slot first, never under 2)
-    for m, t in tg.items():
-        while _count(rows)[m] > t["cap"] and m not in prio:
-            give = [r for r in iso(m) if r["sets"] > lo and not _head_needs(r, rows, tg)]
-            if not give:
-                break
-            max(give, key=lambda r: (r["sets"], rows.index(r)))["sets"] -= 1
+    def surplus() -> None:
+        # surplus over the cap gives first (non-priority isolation, largest slot first, never under 2; a slot already at 2 goes
+        #    whole when every muscle and head it trains stays at its aim — ruling 9: never force total shoulder volume)
+        for m, t in tg.items():
+            while _count(rows)[m] > t["cap"] and m not in prio:
+                give = [r for r in iso(m) if r["sets"] > lo and not _head_needs(r, rows, tg)]
+                if give:
+                    max(give, key=lambda r: (r["sets"], rows.index(r)))["sets"] -= 1
+                    continue
+                whole = [r for r in iso(m) if r["sets"] and _spare(r, rows, tg)]
+                if not whole:
+                    break
+                gone = whole[-1]
+                rows.remove(gone)
+                lines.append(f"surplus: {gone['role']} - {gone['key']} ({m} over its MAV, every head at its aim)")
+
+    surplus()  # 1. surplus over the cap gives first
     # 2. under the aim: grow its isolation slots, then a fill slot (priority muscles, heads and abs first)
     order = sorted(tg, key=lambda m: (m not in prio, m not in HEADS, m != "abs", m))
     taken = {str(r["key"]) for r in rows}
@@ -337,6 +347,8 @@ def week_plan(catalog: dict[str, Any], lib: dict[str, Any], mornings: int, high_
                 )
                 lines.append(f"fill: {role} + {key} x{lo} ({m} under its aim of {tg[m]['aim']:g})")
         grow(m)
+    surplus()  # 3. again after the fills: a head's aim may have grown its muscle past MAV (ruling 9)
+    lines += _redline(rows, tg, prio)
     counts = _count(rows)
     under = [
         {"muscle": m, "sets": round(counts[m], 1), "floor": t["floor"], "aim": t["aim"]}
@@ -351,6 +363,42 @@ def week_plan(catalog: dict[str, Any], lib: dict[str, Any], mornings: int, high_
         "under": under,
         "lines": lines,
     }
+
+
+def _spare(r: dict[str, Any], rows: list[dict[str, Any]], tg: dict[str, dict[str, float]]) -> bool:
+    """The whole slot can go: every muscle and head it credits stays at or over its aim (and floor) without it."""
+    c = _count(rows)
+    return all(c[m] - v * r["sets"] >= max(tg.get(m, {}).get("aim", 0.0), tg.get(m, {}).get("floor", 0.0)) for m, v in r["credit"].items())
+
+
+def _redline(rows: list[dict[str, Any]], tg: dict[str, dict[str, float]], prio: set[str]) -> list[str]:
+    """The owner's weekly hard-set redline as a CHECK on the plan: over it, one set at a time comes off the non-priority isolation
+    slot whose main muscle sits furthest over its floor (never a slot under 2, never a floor broken). Returns the lines."""
+    from training import owner_redlines
+
+    cap = int(owner_redlines.REDLINES["lifting_sessions_per_wk"]["total_hard_sets_wk"][1])
+    lo, taken = int(cfg.value("slot_min_sets")), 0
+    while sum(r["sets"] for r in rows) > cap:
+        c = _count(rows)
+        cands = [
+            r
+            for r in rows
+            if r["kind"] == "accessory" and r["intensity"] != "carry" and r["sets"] > lo and r["credit"]
+            and max(r["credit"], key=r["credit"].get) not in prio
+            and all(c[m] - v >= tg.get(m, {}).get("floor", 0.0) for m, v in r["credit"].items())
+        ]  # fmt: skip
+        if not cands:
+            break
+        best = max(
+            cands,
+            key=lambda r: (
+                c[max(r["credit"], key=r["credit"].get)] - tg.get(max(r["credit"], key=r["credit"].get), {}).get("floor", 0.0),
+                rows.index(r),
+            ),
+        )
+        best["sets"] -= 1
+        taken += 1
+    return [f"redline: {taken} set(s) off — the week held to the owner's {cap} hard sets"] if taken else []
 
 
 def _head_needs(r: dict[str, Any], rows: list[dict[str, Any]], tg: dict[str, dict[str, float]]) -> bool:

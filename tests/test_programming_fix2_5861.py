@@ -15,6 +15,20 @@ lift performed earlier in the same week, a shadow-era rotation ledger carried in
   7. the behind-schedule week (off by default)
 
 Live mode = an IN-MEMORY approved copy of the library (the committed file stays `proposed`; acceptance e3 holds that).
+
+FIX ROUND 9 (consolidation) — tests deleted or rewritten here:
+  test_the_kettlebell_slot_names_its_implement_caps_effort_and_loads_the_bell -> deleted: the KB slot machinery (rulings #2/#6/#7:
+      no KB hinge slot under live), outcome now `live_volume._kb_slot` (tests/test_consolidation_5861.py)
+  test_the_kettlebell_slot_loads_only_a_bell_on_file_and_counts_toward_glutes_and_hamstrings -> rewritten: only its still-true
+      half (the logged weekly count credits through the library, never `other`)
+  test_an_isolation_load_cut_needs_effort_evidence_not_a_trend_alone -> rewritten on `live_load.decide` (the one step-down)
+  test_a_lift_is_never_cut_twice_in_one_week -> rewritten: mark_retreats deleted; the step-down's evidence restarts at a new load
+  test_a_new_movement_never_enters_at_a_strength_rep_range -> rewritten: NOVEL_START deleted; a NEW pattern runs RPE <= 7 once
+      (`live_load.mark_novelty`)
+  test_the_press_sets_option_is_three_by_ruling_and_trades_lateral_raise_sets -> rewritten on the weekly plan (`live_volume`)
+  test_the_behind_schedule_week_is_an_off_by_default_option -> deleted: `behind_schedule_week` (a dead alternative; ruling 2's
+      dip week is `live_sequence.plan_for_days(4, mode="dip")`, tests/test_programming_fix3_5861.py)
+  test_every_live_week_constant_is_a_labelled_heuristic -> rewritten onto `live_settings.HEURISTICS`
 """
 
 from __future__ import annotations
@@ -23,7 +37,6 @@ import copy
 import json
 import pathlib
 import sys
-from collections import Counter
 from unittest.mock import patch
 
 import pytest
@@ -35,8 +48,10 @@ for _p in (REPO, REPO / "lambdas", REPO / "scripts", REPO / "lambdas" / "operati
 import sample_weeks_5861 as sw  # noqa: E402
 from training import (  # noqa: E402
     fatigue_model as fm,
+    live_load as ll,
     live_program as lp,
-    live_rules as lrules,
+    live_settings as lset,
+    live_volume as lv,
     live_week as lw,
     selection_engine as se,
     selection_live as sl,
@@ -89,59 +104,15 @@ def weeks() -> dict:
 
 
 # ── 1. the kettlebell slot ────────────────────────────────────────────────────
-def test_the_kettlebell_slot_names_its_implement_caps_effort_and_loads_the_bell(weeks):
-    """The KB deadlift logs as Hevy's "Sumo Deadlift" (an owner-ruled stand-in): the note must name the kettlebell, cap the
-    effort at RPE 7-8 (an entry drill — 7 when it is also the session's third hinge), and carry the bell he swings instead of
-    "find the load". Control: the KB rules off -> no implement on the note and the load to find."""
-    # FIX3 (third red team): the slot moves off lower volume (two spine-loading lifts already) to shoulders+arms by default
-    # #5861 FIX5: the KB deadlift is served only to a lifter who does not deadlift a barbell (else it is filler: KB_FILLER)
-    # #5861 FIX6: under the ruled shared cap the slot passes over the conditioning host — this test holds the default-cap placement
-    nodl = _week(
-        "a_large_deficit_experienced", {(lrules, "deadlifts"): lambda workouts, ctx: False}, {"session_cap_includes_cardio": False}
-    )
-    kb = _lift(nodl["week"], "shoulders_arms", "kettlebell_deadlift")
-    assert kb is not None and kb["title"] == "Sumo Deadlift"
-    note = kb["hevy_note"]
-    assert lw.KB_SLOT["implement_line"]["value"] in note.split("\n")
-    assert note.startswith(("RPE 7\n", "RPE 7–8\n")) and "9–10" not in note and "find the load" not in note
-    off = _week(
-        "a_large_deficit_experienced",
-        {(lw, "kb_slot"): lambda rx, ctx: [], (lw, "kb_seed"): lambda *a, **k: None, (lrules, "deadlifts"): lambda workouts, ctx: False},
-        {"session_cap_includes_cardio": False},
-    )
-    bare = _lift(off["week"], "shoulders_arms", "kettlebell_deadlift")["hevy_note"]
-    assert lw.KB_SLOT["implement_line"]["value"] not in bare and "find the load" in bare
-
-
-def test_the_kettlebell_slot_loads_only_a_bell_on_file_and_counts_toward_glutes_and_hamstrings():
-    """`kb_seed` takes the entry's own last load, else the swing's; with neither on file the load is genuinely unknown and the
-    rows stay empty. Its sets count toward glutes (and hamstrings at the secondary credit), never `other`."""
-    from training.routine_ir import ExerciseBlock, Set
-
-    rx = {"exposures": [{"movement_key": "kettlebell_deadlift", "live_kb": True}]}
-
-    def block():
-        return ExerciseBlock(movement_key="kettlebell_deadlift", sets=[Set(type="normal", rep_range_start=6, rep_range_end=8)] * 2)
-
-    swing = {"F8A0FCCA": [{"date": "2026-11-02", "sets": [{"weight_kg": 24.0, "reps": 10, "rpe": 7}]}]}
-    b, lines = block(), []
-    lw.kb_seed([b], rx, swing, CAT0, "2026-11-20", lines)
-    assert all(abs(float(s.weight_kg) - 24.0) < 0.1 for s in b.sets) and lines
-    b2 = block()
-    lw.kb_seed([b2], rx, {}, CAT0, "2026-11-20", [])
-    assert all(getattr(s, "weight_kg", None) is None for s in b2.sets)  # control: nothing on file -> nothing invented
+def test_the_logged_weekly_count_credits_a_lift_through_the_library_never_other():
+    """The engine's own weekly count (fatigue_model, read by the live fatigue model and the cron's 7-day volume) credits a logged
+    lift through the library target (glutes, hamstrings at the secondary credit), never the catalog's `other`. Control: no
+    library -> unplaced, never guessed."""
     assert CAT0["kettlebell_deadlift"]["primary_muscle"] == "other"
-    assert lw.landmark_muscle("kettlebell_deadlift", CAT0, LIB0) == "glutes"
-    week = {"sessions": [{"lifts": [{"key": "kettlebell_deadlift", "working_sets": 2}]}]}
-    sets = sw.sets_by_muscle(week, LIB0, CAT0)
-    assert sets.get("glutes") == 2 and sets.get("hamstrings") == 1.0
-    assert lw.landmark_muscle("kettlebell_deadlift", CAT0, None) == "other"  # control: the catalog alone hides the sets
-    # the engine's own weekly count (fatigue_model, read by the live fatigue model and the cron's 7-day volume) credits the
-    # KB slot's logged sets through the library (template D20D7BBE), never the catalog's `other`; the catalog stays as ruled
-    rec = [{"date": "2026-11-12", "exercises": [_ex("D20D7BBE", [(35, 8, 7.0), (35, 8, 7.0)])]}]
+    rec = [{"date": "2026-11-12", "exercises": [_ex("D20D7BBE", [(35, 8, 8.0), (35, 8, 8.0)])]}]
     hard = fm.hard_sets_by_muscle(rec, fm.library_index(LIB0), as_of="2026-11-13")
     assert hard.get("glutes") == 2 and hard.get("hamstrings") == 1.0 and "other" not in hard and "unplaced" not in hard
-    assert fm.hard_sets_by_muscle(rec, {}, as_of="2026-11-13") == {"unplaced": 2.0}  # control: no library -> not placed
+    assert fm.hard_sets_by_muscle(rec, {}, as_of="2026-11-13") == {"unplaced": 2.0}  # control
 
 
 def test_a_reviewed_rating_ranks_ahead_of_a_provisional_one_at_an_equal_tier():
@@ -173,75 +144,49 @@ def _lateral_record() -> list[dict]:
     return [{"date": d, "exercises": [_ex(LATERAL, s)]} for d, s in rows]
 
 
+def _rows(record: list[dict], tid: str, role: str = "") -> list[dict]:
+    return ll.same_role(ll.history(record, {tid})[tid], role, "2026-11-16", 8, 15)
+
+
 def test_an_isolation_load_cut_needs_effort_evidence_not_a_trend_alone():
     """Second red team on the owner run: a dumbbell lateral raise read 'strength sliding' and dropped a dumbbell step after a
-    top set inside its range at a moderate RPE (the 2.5-lb dumbbell grid turns a 10% cut into more). The fixture reproduces the
-    trigger (the trend IS 'regressing'); the guard now HOLDS without effort evidence. Controls: evidence present cuts; the
-    evidence rule off cuts a whole dumbbell step."""
+    top set inside its range at a moderate RPE. The fixture reproduces the trigger (the trend IS 'regressing'); the one load
+    model holds it (no grind, no evidence). Control: three sessions at one load, fewer reps than his best there, every set over
+    RPE 9 -> the ONE step-down, 5% floored to the dumbbell."""
     rec = _lateral_record()
     assert fm.movement_signals(rec, as_of="2026-11-16")[LATERAL]["trend"] == "regressing"  # the real-data trigger, reproduced
-    acc = {"kind": "accessory", "live_cost": "low"}
-    prev = {"lb": 25.0, "reps": 11, "rpe": 7.0}
-    d = lp.load_decision(acc, "regressing", prev, "normal", 8)
-    assert d["mode"] == "hold" and d["why"] == "trend down, effort fine"
-    assert lp.load_decision(acc, "regressing", prev | {"reps": 7, "rpe": 9.5}, "normal", 8)["mode"] == "down"  # real evidence cuts
-    cable = {"kind": "anchor", "live_cost": "moderate"}  # the lat pulldown: a cable compound reads the same rule
-    assert lp.load_decision(cable, "regressing", {"lb": 120.0, "reps": 9, "rpe": 7.5}, "normal", 6)["mode"] == "hold"
-    barbell = {"kind": "anchor", "live_cost": "high"}  # a barbell trend mixing rep ranges holds too; a grind still cuts
-    assert lp.load_decision(barbell, "regressing", {"lb": 185.0, "reps": 9, "rpe": 8.5}, "normal", 8)["mode"] == "hold"
-    assert lp.load_decision(barbell, "regressing", {"lb": 185.0, "reps": 4, "rpe": 9.0}, "normal", 4)["mode"] == "down"
-    with patch.object(lp, "effort_evidence", lambda previous, rep_lo: True):  # control: the trend alone cuts again
-        cut = lp.load_decision(acc, "regressing", prev, "normal", 8)
-        assert cut["mode"] == "down"
-        assert round(lp._floor_to_implement(25 * KG * (1 - cut["pct"] / 100), "dumbbell") / KG, 1) == 22.5  # a whole dumbbell step
-
-
-def _row_record(done_monday: bool) -> list[dict]:
-    """A row trained twice a week (invented numbers): last week's heavy day overshot (a top set at RPE 9.5); this Monday's heavy
-    day was done at the guarded, lighter load (or not done at all)."""
-    rec = [
-        {"date": "2026-10-27", "exercises": [_ex(ROW, [(80, 6, 8.5), (80, 6, 9.0)])]},
-        {"date": "2026-11-03", "exercises": [_ex(ROW, [(85, 6, 9.0)])]},
-        {"date": "2026-11-06", "exercises": [_ex(ROW, [(65, 12, 8.5), (65, 11, 9.0)])]},
-        {"date": "2026-11-10", "exercises": [_ex(ROW, [(85, 4, 9.5)])]},
+    d = ll.decide(_rows(rec, LATERAL), 8, 15, "dumbbell")
+    assert d["mode"] == "hold" and abs(d["kg"] - 25 * KG) < 0.05
+    grind = rec + [
+        {"date": "2026-11-11", "exercises": [_ex(LATERAL, [(25, 9, 9.5), (25, 8, 10.0)])]},
+        {"date": "2026-11-12", "exercises": [_ex(LATERAL, [(25, 9, 9.5), (25, 8, 10.0)])]},
+        {"date": "2026-11-13", "exercises": [_ex(LATERAL, [(25, 9, 9.5), (25, 8, 10.0)])]},
     ]
-    return rec + ([{"date": "2026-11-16", "exercises": [_ex(ROW, [(80, 6, 8.5), (80, 6, 8.5)])]}] if done_monday else [])
+    cut = ll.decide(_rows(grind, LATERAL), 8, 15, "dumbbell")
+    assert cut["mode"] == "down" and round(cut["kg"] / KG, 1) == 22.5  # control: real evidence -> one dumbbell step
+    bar = [{"date": f"2026-10-{d:02d}", "exercises": [_ex(ROW, [(185, r, rpe)] * 2)]} for d, r, rpe in ((20, 6, 8.5),)]
+    bar += [{"date": f"2026-10-{d:02d}", "exercises": [_ex(ROW, [(185, 4, 9.5)] * 2)]} for d in (23, 27, 30)]
+    one = ll.decide(ll.same_role(ll.history(bar, {ROW})[ROW], "", "2026-11-03", 4, 6), 4, 6, "barbell")
+    assert one["mode"] == "down" and round(one["kg"] / KG) == 175  # 5% under 185, floored to the bar's step — never 10%
 
 
-def _row_rx() -> dict:
-    return {
-        "session_role": "upper_volume",
-        "exposures": [
-            {
-                "kind": "anchor",
-                "pattern": "row",
-                "intensity": "volume",
-                "movement_key": "one_arm_db_row",
-                "sets": [{"kind": "working", "reps": [8, 12]} for _ in range(3)],
-            }
-        ],
-    }
-
-
-def test_a_lift_is_never_cut_twice_in_one_week():
-    """Second red team on the owner run: a row was cut on Monday (an overshoot) and stall-reset on Thursday. With
-    Monday DONE, Thursday holds: no second cut, no stall reset. Controls: Monday not done -> Thursday's reset stands (the rule
-    reads what happened, never a plan); the rule off -> the second retreat returns."""
-    lib = _lib()
-    ctx = {"lib": lib, "idx": se.key_index(lib, CAT0), "catalog": CAT0, "target_date": "2026-11-19"}
-    trends = {ROW: "stalled"}
-    rx = _row_rx()
-    lines = lp.mark_retreats(rx, ctx, _row_record(True), trends) + lp.stall_scheme(rx, ctx, trends)
-    e = rx["exposures"][0]
-    assert e.get("live_retreated") and e["sets"][0]["reps"] == [8, 12] and any(ln.startswith("one cut a week (live)") for ln in lines)
-    assert lp.load_decision(e, "stalled", {"lb": 80.0, "reps": 6, "rpe": 8.5}, "normal", 8)["mode"] == "hold"
-    rx2 = _row_rx()  # control 1: Monday not done -> Thursday's reset is the week's only retreat
-    lp.mark_retreats(rx2, ctx, _row_record(False), trends)
-    lp.stall_scheme(rx2, ctx, trends)
-    assert not rx2["exposures"][0].get("live_retreated") and rx2["exposures"][0]["sets"][0]["reps"] == [10, 14]
-    rx3 = _row_rx()  # control 2: the rule off -> the second retreat (reset + 10% less load) returns
-    lp.stall_scheme(rx3, ctx, trends)
-    assert rx3["exposures"][0]["live_load"]["pct"] == 10
+def test_a_step_down_restarts_its_evidence_at_the_new_load():
+    """Second red team: a row was cut twice in one week. The one load model steps down only after three sessions at ONE load,
+    so the exposure right after a step-down (a new load) can never step down again. Control: three more grinds at the new load
+    -> a second step-down, three exposures later (at most one per three)."""
+    grind = [(80, 4, 9.5), (80, 4, 10.0)]
+    rec = [{"date": f"2026-10-{d:02d}", "exercises": [_ex(ROW, [(80, 6, 8.5), (80, 6, 9.0)])]} for d in (20,)]
+    rec += [{"date": f"2026-10-{d:02d}", "exercises": [_ex(ROW, grind)]} for d in (23, 27, 30)]
+    rows = ll.same_role(ll.history(rec, {ROW})[ROW], "", "2026-11-03", 4, 6)
+    first = ll.decide(rows, 4, 6, "machine")
+    assert first["mode"] == "down"
+    after = rec + [{"date": "2026-11-03", "exercises": [_ex(ROW, [(first["kg"] / KG, 4, 10.0)])]}]
+    rows2 = ll.same_role(ll.history(after, {ROW})[ROW], "", "2026-11-06", 4, 6)
+    assert ll.decide(rows2, 4, 6, "machine")["mode"] != "down"  # the next exposure holds
+    lb2 = first["kg"] / KG
+    more = after + [{"date": f"2026-11-{d:02d}", "exercises": [_ex(ROW, [(lb2, 3, 10.0)])]} for d in (6, 10, 13)]
+    rows3 = ll.same_role(ll.history(more, {ROW})[ROW], "", "2026-11-17", 4, 6)
+    assert ll.decide(rows3, 4, 6, "machine")["mode"] == "down"  # control: new evidence at the new load
 
 
 # ── 5. the novelty budget ─────────────────────────────────────────────────────
@@ -338,11 +283,7 @@ def test_a_ledger_carried_rotation_is_inside_the_weekly_novelty_budget():
     assert len(served) <= sl.MAX_NEW_PER_WEEK, served
     assert len(sw.measure(week, world["lib"], world["catalog"]["movements"], LANDMARKS)["new_this_week"]) <= sl.MAX_NEW_PER_WEEK
     assert any("novelty budget" in ln for s in week["sessions"] for ln in s["selection"])
-    # control (FIX4: with the weekly redline, which may drop a whole slot, off too)
-    with (
-        patch.object(sl, "enforce_novelty", lambda picked, policy, catalog=None: []),
-        patch("training.live_shape.week_ceiling", lambda env, adds: []),
-    ):
+    with patch.object(sl, "enforce_novelty", lambda picked, policy, catalog=None: []):  # control: the budget off
         off = sw.generate_week(prof, "approved", world)
     # FIX4 (drop, don't shave): four new movements each add a find-the-load warm-up, so the time fit may DROP a whole carried
     # accessory rather than shave it to one set — it was still served by the selection, and the time line names it
@@ -427,7 +368,7 @@ def test_the_cardio_block_progresses_week_to_week_by_the_cardio_model():
     two = _bike([("2026-11-11", 20, 6.5), ("2026-11-04", 20, 6.5)])
     minutes, lines = lw.cardio_progress("tempo", base | {"by_machine": two}, 30)
     assert minutes == 25 and "add_duration" in lines[0]
-    assert lw.cardio_progress("tempo", base | {"by_machine": two, "state": "strained"}, 30)[0] == lw.CARDIO_ROOM["min_block"]["value"]
+    assert lw.cardio_progress("tempo", base | {"by_machine": two, "state": "strained"}, 30)[0] == lw.EASY_MIN_BLOCK
     unlogged = _bike([("2026-11-11", 20, None), ("2026-11-04", 20, None)])
     held, hl = lw.cardio_progress("tempo", base | {"by_machine": unlogged}, 30)
     assert held == 30 and "hold" in hl[0]
@@ -465,77 +406,58 @@ def test_the_garage_week_keeps_a_vertical_pull_through_the_fallback_order(weeks)
     assert _vertical_pulls(off["week"], lib, cat) == 0
 
 
-def test_a_new_movement_never_enters_at_a_strength_rep_range(weeks):
-    """Red team: the deadlift discomfort swap put a machine hip thrust new to him into a deload at 4-6, "find the load". A
-    movement swapped in that he has not done this block starts at NOVEL_START (6-8, RPE <= 7). Control: the rule off -> 4-6."""
-    f = weeks["f_high_fatigue_poor_sleep"]["week"]
-    hip = _lift(f, "lower_heavy", "machine_hip_thrust")
-    assert hip is not None and hip["reps"] == "6-8" and hip["hevy_note"].startswith("RPE 7")
-    off = _week("f_high_fatigue_poor_sleep", {(lw, "novel_start"): lambda rx, ctx, workouts: []})
-    assert _lift(off["week"], "lower_heavy", "machine_hip_thrust")["reps"] == "4-6"
+def test_a_new_pattern_runs_rpe_7_once_a_familiar_one_works_at_target():
+    """Red team: a machine hip thrust new to him entered a deload at 4-6, "find the load". Round 9's novelty rule: a NEW pattern
+    (none logged in ~8 weeks) runs ONE exposure at RPE <= 7; a familiar pattern (a similar swap included) works at normal
+    effort. Control: the same lift with its pattern in the record -> no cap."""
+    lib = _lib()
+    ctx = {"lib": lib, "idx": se.key_index(lib, CAT0), "catalog": CAT0, "target_date": "2026-11-16"}
+    hip = {"kind": "accessory", "movement_key": "machine_hip_thrust", "intensity": "accessory", "sets": [{"reps": [8, 12]}]}
+    rx = {"exposures": [dict(hip)]}
+    ll.mark_novelty(rx, ctx, [{"date": "2026-11-10", "exercises": [_ex(ROW, [(80, 8, 8.0)])]}])
+    e = rx["exposures"][0]
+    assert e.get("live_new") and e["live_effort"] == lset.value("new_pattern_rpe")
+    pattern = lv.lib_entry("machine_hip_thrust", CAT0, lib).get("pattern")
+    same = next(
+        str(r["template_id"]).upper()
+        for k, r in ((k, lv.lib_entry(k, CAT0, lib)) for k in CAT0)
+        if r.get("pattern") == pattern and r.get("template_id") and k != "machine_hip_thrust"
+    )
+    rx2 = {"exposures": [dict(hip)]}
+    ll.mark_novelty(rx2, ctx, [{"date": "2026-11-10", "exercises": [_ex(same, [(80, 8, 8.0)])]}])
+    assert rx2["exposures"][0].get("live_familiar") and "live_effort" not in rx2["exposures"][0]  # control: familiar
 
 
 def test_the_press_sets_option_is_three_by_ruling_and_trades_lateral_raise_sets():
-    """The week's one vertical-press set was a charter decision (`split.frequency.overhead_press_per_wk` 1, #5162). Owner ruling 6
-    (2026-11-13, #5861 FIX6): 2-3 weekly working sets, reallocated from redundant lateral-delt work — `press_sets` defaults to 3
-    and the extra sets come off the LATERAL raises (`live_rulings.press_trade`), never the rear delts first. Control:
-    `press_sets: 1` serves the charter's one set."""
-    a = _week("a_large_deficit_experienced", settings={"press_sets": 1})["week"]
-    on = _week("a_large_deficit_experienced")["week"]
+    """Owner ruling 6: 2-3 weekly overhead-press working sets, reallocated from redundant lateral-delt work — `press_sets`
+    defaults to 3 and the weekly plan takes the extra sets off the LATERAL raises (down to the side-delt aim), never the rear
+    delts. Control: `press_sets: 1` keeps the charter's one set."""
 
-    def sa(week):
-        s = next(s for s in week["sessions"] if s["role"] == "shoulders_arms")
-        return {x["key"]: x["working_sets"] for x in s["lifts"]}
+    def plan(n):
+        lib = _lib()
+        lib["programming_settings"] = dict(lib.get("programming_settings") or {}) | {"press_sets": n}
+        return lv.week_plan(CAT0, lib, 5)["rows"]
 
-    press = next(k for k in sa(a) if "press" in k)
-    assert sa(a)[press] == 1  # control: the charter's one set
-    # #5861 FIX4: the week's allocation counts the press option, so the trade lands on the week's delt isolation (whichever
-    # day holds the surplus), not only this morning's face pull: the WEEK's sets and its shoulders stay put
-    # #5861 FIX8: the upper sessions' sets — the lower-volume time fit (the week floor's abs, a calf block) moves on its own
-    week_sets = lambda w: sum(
-        x["working_sets"] for s in w["sessions"] if not s["role"].startswith("lower") for x in s["lifts"]
-    )  # noqa: E731
-    assert sa(on)[press] == 3 and week_sets(on) <= week_sets(a) + 2
+    def sets(rows, word, role=None):
+        return sum(r["sets"] for r in rows if word in str(r["key"]) and (role is None or r["role"] == role))
 
-    def week_of(w, word):
-        return sum(x["working_sets"] for s in w["sessions"] for x in s["lifts"] if word in x["key"])
-
-    assert week_of(on, "lateral_raise") < week_of(a, "lateral_raise")  # the trade is the lateral raises'
-    assert week_of(on, "reverse_pec_deck") + week_of(on, "face_pull") >= 4  # the rear delts keep two sets twice a week
+    on, one = plan(3), plan(1)
+    press = next(r for r in on if r["role"] == "shoulders_arms" and r["pattern"] == "overhead_press")
+    assert press["sets"] == 3
+    assert next(r for r in one if r["role"] == "shoulders_arms" and r["pattern"] == "overhead_press")["sets"] == 1  # control
+    # the trade comes off the lateral raises, never the rear delts — and only down to the side-delt aim (ruling #9: each head
+    # assessed on its own; overhead pressing credits the side delt half a set)
+    assert sets(on, "lateral_raise") <= sets(one, "lateral_raise")
+    assert lv._count(on)["side_delts"] >= lset.value("delt_heads")["side_delts"]
+    # the rear delts give only what keeps the shoulders at MAV (ruling 9), never under their own aim
+    assert lv._count(on)["rear_delts"] >= lset.value("delt_heads")["rear_delts"] and lv._count(on)["shoulders"] <= 16
 
 
-# ── 7. behind schedule ───────────────────────────────────────────────────────
-def test_the_behind_schedule_week_is_an_off_by_default_option():
-    """Red team: 5 of 14 days' sessions done changed almost nothing (2 sets off a session). The live option
-    `behind_schedule_week` (off by default; owner decision) offers a shorter week instead: four sessions of ~45 lifting min that
-    keep every anchor, with at most one accessory per major muscle. Controls: the default (off) drafts the usual five; on, with
-    the miss threshold out of reach, nothing changes."""
-    # FIX3: the DEFAULT response to a dip is now the shorter week (live_balance.lighter_week, tests/test_programming_fix3_5861.py);
-    # `adherence_response=trim_sets` is today's old answer — five sessions, two sets off
-    off = _week("d_stalled_anchor_adherence_dip", settings={"adherence_response": "trim_sets"})
-    assert len(off["week"]["sessions"]) == 5 and not off["week"].get("short_week")
-    on = _week("d_stalled_anchor_adherence_dip", settings={"behind_schedule_week": True})
-    w = on["week"]
-    assert w["short_week"].startswith("behind schedule") and len(w["sessions"]) == 4
-    assert all((s["lifting_minutes"] or 0) <= lw.BEHIND_SCHEDULE["session_minutes"]["value"] for s in w["sessions"])
-    from training import program_structure as ps
-
-    for s in w["sessions"]:
-        anchors = [x for x in s["lifts"] if str(x["tag"]).startswith("anchor:")]
-        assert len(anchors) == len(ps.SESSION_TEMPLATES[s["role"]]["anchors"]), s["role"]  # every anchor kept
-        acc = [x for x in s["lifts"] if str(x["tag"]).startswith("accessory:") and not str(x["tag"]).endswith(":carry")]
-        mus = Counter(lw.landmark_muscle(x["key"], on["world"]["catalog"]["movements"], on["world"]["lib"]) for x in acc)
-        assert all(n == 1 for m, n in mus.items() if m in lw.MAJOR), (s["role"], mus)
-    with patch.dict(lw.BEHIND_SCHEDULE, {"missed_min": {"value": 99}}):
-        assert len(_week("d_stalled_anchor_adherence_dip", settings={"behind_schedule_week": True})["week"]["sessions"]) == 5
-
-
-def test_every_live_week_constant_is_a_labelled_heuristic():
-    for table in (lw.KB_SLOT, lw.CARDIO_ROOM, lw.BEHIND_SCHEDULE, lw.NOVEL_START):
-        for name, row in table.items():
-            assert row["label"] == "heuristic" and row["basis"], name
-    for name in ("evidence_rpe", "one_retreat_per_week"):
-        assert lp.LOAD_POLICY[name]["label"] == "heuristic"
-    assert "pinned_light_rpe" not in lp.STACK_RULE  # FIX3: "kept light" was not a limit — the pinned slot moves or is dropped
-    assert lp.SETTINGS_DEFAULTS["behind_schedule_week"] is False and (LIB0.get("programming_settings") or {})["press_sets"] == 3
-    assert lp.SETTINGS_DEFAULTS["symptom_line"] == ""  # #5861 FIX6, owner ruling 10: no symptom warning line by default
+def test_every_consolidated_heuristic_is_labelled_and_the_ruled_settings_hold():
+    """Ruling 18: every number of the consolidated rules is ONE labelled row (`live_settings.HEURISTICS`: value, group, basis,
+    re-tune metric); the ruled settings keep their defaults (press 3, no symptom line exists to switch on)."""
+    for name, row in lset.HEURISTICS.items():
+        assert row["basis"] and row["retune"] and row["group"] in ("progression", "novelty", "volume", "time"), name
+    assert lset.defaults()["press_sets"] == 3
+    assert not {"symptom_line", "behind_schedule_week", "kb_slot_role"} & set(lset.SETTINGS)
+    assert "pinned_light_rpe" not in __import__("training.live_program", fromlist=["x"]).STACK_RULE

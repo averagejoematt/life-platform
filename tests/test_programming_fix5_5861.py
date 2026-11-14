@@ -15,6 +15,17 @@ week, no barbell, a sedentary week, everything bad in two days, knee discomfort)
   8. the thresholds are read; the deload's isolation effort cap
   9. the self-reported stop lines
   10. the corrected (and the kept) ratings
+
+FIX ROUND 9 (consolidation): live lines are read from the rationale AND the debug view (`live_fit`). Deleted or rewritten:
+  test_the_set_cap_guard_is_what_keeps_the_three_day_week_from_crashing -> rewritten: SET_CAP / fit_set_cap deleted; the
+      ceiling is the ONE trim order's (`live_volume.fit_sets`)
+  test_three_and_two_day_weeks_train_legs_and_the_upper_body_twice -> rewritten: full-body mornings are `live_volume.SHORT_WEEKS`
+  test_a_lift_with_no_load_on_file_starts_at_rpe_7_isolation_too -> rewritten: round 9's novelty rule — a NEW pattern runs RPE
+      <= 7 once; a familiar pattern ("find the load" on a similar swap) works at target (ruling #10, the eighth red team)
+  test_no_added_work_on_a_strained_overreached_or_deload_day -> deleted: the bolt-on additions (QUAD_SLOT, the trunk floor, the
+      relocated KB slot, the week floor) are deleted; the week's fills are planned volume the fatigue model reduces on a bad day
+  test_the_kettlebell_deadlift_is_never_filler_for_a_lifter_who_deadlifts -> rewritten: no KB hinge slot under live at all
+      (rulings #2/#6/#7), gates open or not
 """
 
 from __future__ import annotations
@@ -41,6 +52,8 @@ from training import (  # noqa: E402
     live_program as lp,
     live_rules as lrules,
     live_sequence as lseq,
+    live_settings as lset,
+    live_volume as lvol,
     live_week as lw,
     program_structure as ps,
     quality_rubric as qr,
@@ -57,7 +70,6 @@ STRESS4 = sw.load_profiles(REPO / "tests" / "fixtures" / "sample_week_stress_pro
 RT5 = sw.load_profiles(REPO / "tests" / "fixtures" / "sample_week_stress_profiles_rt5_5861.json")
 ALL = PROFILES | STRESS4 | RT5
 DAYS = ["2026-11-16", "2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20"]
-NODL = {(lrules, "deadlifts"): lambda workouts, ctx: False}
 
 
 def _week(name: str, patches: dict | None = None, settings: dict | None = None, days: int | None = None, record=None) -> dict:
@@ -93,7 +105,7 @@ def _top_rpe(note: str | None) -> float:
 
 
 def _lines(week: dict, prefix: str) -> list[str]:
-    return [ln for s in week["sessions"] for ln in s["rationale"] if ln.startswith(prefix)]
+    return [ln for s in week["sessions"] for ln in list(s["rationale"]) + list(s.get("live_fit") or []) if ln.startswith(prefix)]
 
 
 # ── 1. short weeks ───────────────────────────────────────────────────────────
@@ -115,9 +127,24 @@ def test_every_week_of_one_to_five_mornings_drafts_within_the_session_set_cap(na
 
 
 def test_the_set_cap_guard_is_what_keeps_the_three_day_week_from_crashing():
+    """The fifth red team's 3-day week crashed (`total_sets 23 > cap 20`). The ONE trim order holds every prescription to the
+    session set ceiling before the routine is built (`live_volume.fit_sets`). Control: no ceiling -> 23 stays."""
     _week("l_three_day_week", days=3)  # drafts
-    with pytest.raises(AssertionError, match="total_sets"):  # control: the guard off -> the red team's crash returns
-        _week("l_three_day_week", {(lrules, "fit_set_cap"): lambda rx, cap: []}, days=3)
+
+    def rx():
+        acc = [{"kind": "accessory", "movement_key": "db_curl", "intensity": "accessory", "sets": [{}] * 3} for _ in range(5)]
+        return {
+            "exposures": [{"kind": "anchor", "movement_key": "squat_barbell", "intensity": "heavy", "sets": [{}] * 3}] * 1
+            + acc
+            + [{"kind": "anchor", "movement_key": "barbell_bench_press", "intensity": "heavy", "sets": [{}] * 5}]
+        }
+
+    r = rx()
+    assert sum(len(e["sets"]) for e in r["exposures"]) == 23
+    assert lvol.fit_sets(r, 20, CAT0, LIB0) and sum(len(e["sets"]) for e in r["exposures"]) <= 20
+    assert all(len(e["sets"]) >= 2 for e in r["exposures"])  # never a one-set lift
+    r2 = rx()
+    assert lvol.fit_sets(r2, None, CAT0, LIB0) == [] and sum(len(e["sets"]) for e in r2["exposures"]) == 23  # control
 
 
 def _regions(w: dict) -> list[set[str]]:
@@ -135,7 +162,8 @@ def test_three_and_two_day_weeks_train_legs_and_the_upper_body_twice():
     assert "legs keep 2x" not in three["week"]["short_week"] and "full body" in three["week"]["short_week"]
     two = _week("a_large_deficit_experienced", days=2)
     assert all({"upper", "lower"} <= r for r in _regions(two)), _regions(two)  # two FULL-BODY days, never halves
-    halves = _week("a_large_deficit_experienced", {(lrules, "full_body"): lambda rx, ctx: []}, days=2)  # control: no partner
+    with patch.dict(lvol.SHORT_WEEKS[2], {"partners": {}}):  # control: no partners -> an upper half and a lower half
+        halves = _week("a_large_deficit_experienced", days=2)
     assert not all({"upper", "lower"} <= r for r in _regions(halves))
 
 
@@ -202,42 +230,26 @@ def test_loaded_elbow_isolation_loads_the_elbow_and_keeps_its_healthy_joint_cost
     assert toy["x"]["joint_stress"]["elbow"] == "low"
 
 
-def test_a_lift_with_no_load_on_file_starts_at_rpe_7_isolation_too():
-    weeks = [_week(n)["week"] for n in ("a_large_deficit_experienced", "c_equipment_limited")]
-    new = [x for w in weeks for x in _lifts(w) if "find the load" in (x["hevy_note"] or "") and not str(x["tag"]).endswith(":carry")]
-    assert new and all(_top_rpe(x["hevy_note"]) <= 7 for x in new)
-    raw = _week("c_equipment_limited", {(lp, "_novel_cap"): lambda note, e: note})["week"]  # control: the cap off
-    assert any(_top_rpe(x["hevy_note"]) > 7 for x in _lifts(raw) if "find the load" in (x["hevy_note"] or ""))
-
-
-# ── 4. nothing added on a bad day ────────────────────────────────────────────
-def _added_on_bad_days(week: dict) -> list[str]:
+def _new(week: dict) -> list[dict]:
+    """The lifts the summary names NEW this morning (`live_load.mark_novelty`: no exposure of the pattern in ~8 weeks)."""
     out = []
     for s in week["sessions"]:
-        fat = s.get("fatigue") or {}
-        if fat.get("state") in ("strained", "overreached") or fat.get("action") == "deload_recommended":
-            out += [
-                f"{s['role']}: {ln}"
-                for ln in s["rationale"]
-                if ln.startswith(("added (live)", "trunk floor (live)")) and "short week" not in ln and "weekly carry" not in ln
-            ]
+        names = {n.strip() for ln in s["rationale"] if ln.startswith("today: new to you") for n in ln.split(": ", 2)[2].split(",")}
+        out += [x for x in s["lifts"] if x["title"] in names]
     return out
 
 
-def test_no_added_work_on_a_strained_overreached_or_deload_day():
-    """The quadriceps slot, the trunk floor and a relocated kettlebell slot wait on a bad day (profile f: deload recommended
-    all week; b: strained). Control: the rule off (and the trunk floor's bad-day check off) -> the leg extension is added."""
-    for name in ("f_high_fatigue_poor_sleep", "b_shoulder_flag_low_recovery"):
-        w = _week(name, NODL)["week"]
-        assert _added_on_bad_days(w) == [], name
-    f = _week("f_high_fatigue_poor_sleep", NODL)["week"]
-    assert "leg_extension_machine" not in {x["key"] for x in _lifts(f)}
-    off = _week(
-        "f_high_fatigue_poor_sleep",
-        NODL | {(lrules, "no_added_work"): lambda rx: [], (lrules, "bad_day"): lambda rx: False},
-        {"press_sets": 1},  # #5861 FIX6: the round-5 week (the press trade takes the freed sets the slot needs)
+def test_a_new_pattern_starts_at_rpe_7_isolation_too():
+    """Round 9's novelty rule: a NEW pattern runs one exposure at RPE <= 7, isolation included; a familiar pattern works at its
+    target (no re-entry cap on patterns he trains weekly). Control: the new-pattern cap moved to 9 -> a new lift past RPE 7."""
+    weeks = [_week(n)["week"] for n in ("a_large_deficit_experienced", "c_equipment_limited", "m_no_barbell")]
+    new = [x for w in weeks for x in _new(w)]
+    assert new and all(_top_rpe(x["hevy_note"]) <= 7 for x in new)
+    with patch.dict(lset.HEURISTICS["new_pattern_rpe"], {"value": 9}):
+        raw = _week("c_equipment_limited")["week"]
+    assert any(_top_rpe(x["hevy_note"]) > 7 for x in _new(raw)) or any(
+        _top_rpe(x["hevy_note"]) > 7 for x in _lifts(raw) if "find the load" in (x["hevy_note"] or "")
     )
-    assert "leg_extension_machine" in {x["key"] for x in _lifts(off["week"])}
 
 
 # ── 5. production parity ─────────────────────────────────────────────────────
@@ -311,17 +323,19 @@ def test_the_short_weeks_input_in_production_is_the_charters_travel_windows():
 
 
 # ── 6. the kettlebell deadlift as filler ─────────────────────────────────────
-def test_the_kettlebell_deadlift_is_never_filler_for_a_lifter_who_deadlifts():
+def test_no_kettlebell_hinge_slot_under_live_gates_open_or_not():
+    """Rulings #2/#6/#7 (fix round 8): no KB hinge slot — the swing stays gated and optional, never filling a hinge slot, not
+    even with its gate open."""
+    kb = {"kettlebell_deadlift", kb_entry.TARGET}
     a = _week("a_large_deficit_experienced")["week"]
-    assert "kettlebell_deadlift" not in {x["key"] for x in _lifts(a)}
-    assert any("filler" in ln for ln in _lines(a, "kettlebell slot (live)"))
-    # #5861 FIX8 (owner ruling #6): even with the swing's gate open, the swing never fills the slot — it drops, no makeup
+    assert not kb & {x["key"] for x in _lifts(a)}
     swing = _week("a_large_deficit_experienced", {(se, "locked_gates"): lambda entry, lib: []})["week"]
-    assert kb_entry.TARGET not in {x["key"] for x in _lifts(swing)} and "kettlebell_deadlift" not in {x["key"] for x in _lifts(swing)}
-    entry = _week("a_large_deficit_experienced", NODL)["week"]  # control: no barbell deadlift on record -> the entry drill serves
-    assert "kettlebell_deadlift" in {x["key"] for x in _lifts(entry)}
-    kb = LIB0["movements"]["kettlebell_deadlift"]["hypertrophy"][0]
-    assert kb["tier"] == "B" and any("load ceiling low" in b for b in kb["basis"])  # one bell: the rubric's cap, not C
+    assert not kb & {x["key"] for x in _lifts(swing)}
+    # control: the slot's removal off (and the stacking limit that would drop it as a third spine-loading lift) -> it serves
+    back = _week("a_large_deficit_experienced", {(lvol, "_kb_slot"): lambda e: False, (lp, "avoid_stacking"): lambda *a: []})["week"]
+    assert kb & {x["key"] for x in _lifts(back)}
+    kbr = LIB0["movements"]["kettlebell_deadlift"]["hypertrophy"][0]
+    assert kbr["tier"] == "B" and any("load ceiling low" in b for b in kbr["basis"])  # one bell: the rubric's cap, not C
 
 
 # ── 7. "sore" at the mild line ───────────────────────────────────────────────
