@@ -56,6 +56,15 @@ const withAudio = published.filter((c) => c.episode_id && all.get("episode", c.e
 const nextChapterNo = String((latestChapter?.week ?? 0) + 1).padStart(2, "0");
 const inChapterAll = latestChapter ? await connectedTo("chapter", latestChapter.id, { cap: 6 }) : null;
 const inChapter = inChapterAll ? { ...inChapterAll, items: inChapterAll.items.filter((e) => e.type !== "edition").slice(0, 4) } : null;
+// The latest chapter's week in two lines (2026-11-14): its graded calls and its days, both on the chapter page.
+const chWeekCalls =
+  latestChapter?.week_start && latestChapter?.week_end
+    ? all.byType.prediction.filter(
+        (p) => (p.status === "confirmed" || p.status === "refuted") && p.settled_date && p.settled_date.slice(0, 10) >= latestChapter.week_start && p.settled_date.slice(0, 10) <= latestChapter.week_end,
+      )
+    : [];
+const chWeekRight = chWeekCalls.filter((p) => p.status === "confirmed").length;
+const chWeekDays = latestChapter ? all.byType.day.filter((d) => d.chapter_id === latestChapter.id).length : 0;
 const pending = all.byType.prediction
   .filter((p) => p.status === "pending")
   .sort((a, b) => ((a.due_date || "9999") < (b.due_date || "9999") ? -1 : 1))
@@ -274,9 +283,22 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
                   </a>
                 ))
               ) : (
-                <span>
-                  <span class="muted">Its figures, in the data room.</span>
-                </span>
+                <>
+                  {chWeekDays > 0 && (
+                    <a href={`${href(pathOf("chapter", latestChapter.id))}#days`}>
+                      <span style="font-size:14px;line-height:1.35">The week, day by day</span>
+                      <span class="mono muted" style="font-size:11px">{chWeekDays} days</span>
+                    </a>
+                  )}
+                  <a href={href(pathOf("chapter", latestChapter.id))}>
+                    <span style="font-size:14px;line-height:1.35">
+                      {chWeekCalls.length
+                        ? `${chWeekCalls.length} coach ${chWeekCalls.length === 1 ? "call" : "calls"} graded that week`
+                        : "No coach call graded that week"}
+                    </span>
+                    {chWeekCalls.length > 0 && <span class="mono muted" style="font-size:11px">{chWeekRight} right · {chWeekCalls.length - chWeekRight} wrong</span>}
+                  </a>
+                </>
               )}
               {next?.chapter?.state === "ok" && next.chapter.data?.date && (
                 <span style="flex-direction:column;align-items:flex-start;gap:3px">
