@@ -126,3 +126,8 @@ A read that fails or comes back empty is a warn with no verdict, never a pass.
   email and attaching its verdict is the live-path follow-up #4549 names.
 - Count-claim predictions are still graded by slope upstream (#4541). The dossier carries that
   caveat to the writers.
+- **A graded prediction entry carries three days (#5899).** `made` is the filing day, `target` is the
+  day the call was about and its evidence was read from (the point spec's `evaluation.target_date`,
+  else the day the claim's own sentence names, else the end of `outcome_notes.window`; omitted when
+  none, never taken from `graded`), and `graded` is only when scoring ran. The fact read's rubric
+  checks a sentence about the target morning against `target`.
