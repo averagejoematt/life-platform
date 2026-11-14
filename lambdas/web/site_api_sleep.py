@@ -22,6 +22,7 @@ pre-split module).
 from datetime import timedelta
 
 from common.pacific_time import parse_iso_utc  # #1964: the ONE ISO-8601 parser
+from health import nutrition_logging  # #5954: the partial-export predicate
 
 from web.site_api_common import (
     NIGHT_OF_FRAME,
@@ -359,6 +360,28 @@ def _f(v):
         return None
 
 
+def _last_meal_minutes(rows) -> dict:
+    """``{day: minutes after midnight of the latest timed food-log entry}`` for the A4 card.
+
+    #5954: a partial export's latest entry is the last meal before the export, not the day's last meal —
+    left out of the series, the same rule as a provisional night."""
+    last_meal = {}
+    for m in rows:
+        dt = m.get("date") or m.get("sk", "").replace("DATE#", "")[:10]
+        if nutrition_logging.is_partial_export(m):
+            continue
+        times = []
+        for ent in m.get("food_log") or []:
+            try:
+                p = str(ent.get("time")).split(":")
+                times.append(int(p[0]) * 60 + int(p[1]))
+            except (ValueError, IndexError, AttributeError):
+                pass
+        if times and dt:
+            last_meal[dt] = max(times)
+    return last_meal
+
+
 def sleep_correlations(*, _g) -> dict:
     """
     GET /api/sleep_correlations
@@ -423,18 +446,7 @@ def sleep_correlations(*, _g) -> dict:
             eight[dt] = {"score": _f(e.get("sleep_score"))}
     sleep_score = {d: v["score"] for d, v in eight.items() if v["score"] is not None}
     # A4 — last meal time → sleep score. MacroFactor food_log latest time per day.
-    last_meal = {}
-    for m in _query_source("macrofactor", d30, today):
-        dt = m.get("date") or m.get("sk", "").replace("DATE#", "")[:10]
-        times = []
-        for ent in m.get("food_log") or []:
-            try:
-                p = str(ent.get("time")).split(":")
-                times.append(int(p[0]) * 60 + int(p[1]))
-            except (ValueError, IndexError, AttributeError):
-                pass
-        if times and dt:
-            last_meal[dt] = max(times)
+    last_meal = _last_meal_minutes(_query_source("macrofactor", d30, today))
     cards.append(
         _corr_card(
             "A4",
