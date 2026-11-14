@@ -581,25 +581,32 @@ def _active_ceiling_window():
     }
 
 
-def _weekly_uniques_baseline(now: datetime) -> list:
-    """The trailing `SURGE_BASELINE_WEEKS` weekly UniqueVisitors7d readings, oldest
-    first. traffic_digest_lambda emits ONE datapoint per week, so a daily-period
-    Maximum query returns one point per emitting day — the weekly series itself.
-    Empty on any read error (the caller falls back to the floor and says so)."""
+def _surge_reading_and_baseline(now: datetime) -> tuple:
+    """(recent_uniques, baseline) from ONE UniqueVisitors7d read (#5936).
+
+    traffic_digest_lambda emits ONE datapoint per week, so a daily-period Maximum query
+    returns the weekly series itself. The window spans the baseline weeks PLUS the
+    reading-under-test lookback, and `split_reading_and_baseline` (pure) takes the
+    baseline strictly before that reading — the two used to be separate windows that
+    both ended at `now`, so a traffic jump sat inside its own bar. (None, []) on any
+    read error: no signal fails closed to non-surge, the bar falls back to the floor.
+    """
     try:
         resp = _cw.get_metric_statistics(
             Namespace="LifePlatform/Traffic",
             MetricName="UniqueVisitors7d",
-            StartTime=now - timedelta(days=7 * SURGE_BASELINE_WEEKS),
+            StartTime=now - timedelta(days=7 * SURGE_BASELINE_WEEKS + cost_governor_surge.SURGE_RECENT_LOOKBACK_DAYS),
             EndTime=now,
             Period=86400,
             Statistics=["Maximum"],
         )
-        points = sorted(resp.get("Datapoints", []), key=lambda d: d["Timestamp"])
-        return [int(p["Maximum"]) for p in points]
+        points = [(p["Timestamp"], p["Maximum"]) for p in resp.get("Datapoints", [])]
+        return cost_governor_surge.split_reading_and_baseline(points, now)
     except Exception as e:
-        logger.warning(f"surge baseline read failed (falls back to the {SURGE_UNIQUES_THRESHOLD} floor): {e}")
-        return []
+        logger.warning(
+            f"traffic metric read failed (fails closed to non-surge, bar falls back to the {SURGE_UNIQUES_THRESHOLD} floor): {e}"
+        )
+        return None, []
 
 
 def _effective_ceiling(recent_uniques, threshold: int | None = None, prev_surge_active: bool = False) -> tuple[float, bool]:
@@ -987,33 +994,6 @@ def _alert_surge(active: bool, recent_uniques, mtd: float, projected: float, thr
         logger.warning(f"Surge alert SNS publish failed: {e}")
 
 
-def _recent_unique_visitors(now: datetime, lookback_days: int = 14):
-    """Latest LifePlatform/Traffic::UniqueVisitors7d datapoint, or None.
-
-    traffic_digest_lambda emits this weekly (Mondays), so the lookback window
-    is wider than the metric's cadence to tolerate a missed run. Returns None
-    (not 0) when nothing has been emitted yet — _effective_ceiling treats
-    None as "no signal, stay at the normal ceiling", never as "0 traffic."
-    """
-    try:
-        resp = _cw.get_metric_statistics(
-            Namespace="LifePlatform/Traffic",
-            MetricName="UniqueVisitors7d",
-            StartTime=now - timedelta(days=lookback_days),
-            EndTime=now,
-            Period=86400,
-            Statistics=["Maximum"],
-        )
-        points = resp.get("Datapoints", [])
-        if not points:
-            return None
-        latest = max(points, key=lambda d: d["Timestamp"])
-        return int(latest["Maximum"])
-    except Exception as e:
-        logger.warning(f"traffic metric read failed (non-critical, fails closed to non-surge): {e}")
-        return None
-
-
 def _self_reported_cost_mtd(start: datetime, now: datetime) -> float:
     """Sum LifePlatform/AI::EstimatedCostUSD over [start, now). This is the
     self-emitted metric from bedrock_client._emit_usage_metrics() — it under-counts
@@ -1219,12 +1199,13 @@ def lambda_handler(event, context):
         # for readers arriving but can't be triggered by a dev/internal spend
         # spike. Computed BEFORE _decide_tier so the effective ceiling — not
         # always MONTHLY_CEILING — is what tiers are measured against.
-        recent_uniques = _recent_unique_visitors(now)
+        # #5936: one read, split so the baseline ends BEFORE the reading under test.
+        recent_uniques, uniques_baseline = _surge_reading_and_baseline(now)
         # #3510: the bar is DERIVED from the trailing weekly baseline on every run
         # (ADR-133's revisit clause, carried), and engagement is hysteretic against the
         # PREVIOUSLY persisted state — read here rather than at the alert site below so
         # both the decision and the edge detection see the same prior.
-        surge_threshold, surge_threshold_rule = surge_threshold_from_baseline(_weekly_uniques_baseline(now))
+        surge_threshold, surge_threshold_rule = surge_threshold_from_baseline(uniques_baseline)
         # #3661: the persisted state carries the bar that MINTED it, and `decide` re-decides
         # from OFF when that bar is not the bar in force — hysteresis may hold a state
         # across noise, never across a threshold the reading would not have crossed.
