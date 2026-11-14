@@ -13,8 +13,8 @@ A total cannot say "yesterday was 2¾ hours on foot". This block can:
 
   * ONE ROW PER ACTIVITY over the last three days through target − 1 — date, source, device,
     modality (walk / treadmill / cycling / recumbent), moving time, distance, elevation, average
-    and max HR — each flagged against `owner_redlines.walking_floor_hr_wk` (`over_75_min`,
-    `avg_hr_over_ceiling`);
+    and max HR — each flagged against `owner_redlines.walking_floor_hr_wk`'s walk length
+    (`over_75_min`); its heart rate is a MEASUREMENT with its basis (`avg_hr_basis`), never a grade;
   * the SAME sources and the SAME time de-dup as the weekly walking hours (#3930/#4068): Strava
     Walk/Hike/Ride UNION the Hevy treadmill/walking/cycling blocks Strava cannot see, a
     WHOOP/Garmin walk recorded over a Hevy cardio session's minutes counted once. The primitives
@@ -27,8 +27,12 @@ A total cannot say "yesterday was 2¾ hours on foot". This block can:
     `walking_volume.dedup_strava` rule. A walk with no timestamp cannot be placed against a gym
     window; it is counted in `untimed`, never as standalone, and makes a short count UNKNOWN.
 
-The OD2 heart-rate line (owner 2026-09-30): `hr_ceiling_bpm` is the cap on a walk's AVERAGE (120,
-with the talk test) and `hr_target_bpm` the aim (105) — `avg_hr_over_ceiling` flags the cap only.
+THE HEART-RATE LINE IS RETIRED (#5916, owner ruling 2026-11-13). OD2's cap on a walk's average and
+its target are history (`redline_changelog.RETIRED_WALKING_HR_LINE`). Easy walking is prescribed
+and judged by the talk test plus RPE (`EASY_EFFORT_CUE`, read from the redline's `easy_rpe_max`).
+Heart rate is still recorded on every row that has one, labelled as a measurement with its basis,
+and nothing here grades it: no `avg_hr_over_ceiling` flag, no cap on the block's `redlines`, no HR
+field on `cardio_pick`. Records written before the ruling keep the flags they were written with.
 
 THE WATCH BACKSTOP (#5369/#5371): from 2026-10-26 WHOOP no longer shares to Strava and the watch
 uploads its own workouts. A caller may hand in the apple_health day rows (`apple_items`); the watch's
@@ -58,11 +62,12 @@ from typing import Any
 
 from common.pacific_time import pacific_weekday, parse_day_key, shift_day_key
 
-from training import cardio_hr, owner_redlines, walking_volume
+from training import cardio_hr, owner_redlines, redline_changelog, standing_constraints, walking_volume
 
 # 1.1.0 (#5369): the watch's own walks/rides as a third source; 1.2.0 (#5669): the walk-signal completeness check;
-# 1.3.0 (#5669): the owner's walk corrections, labelled `owner_correction`
-RECENT_AEROBIC_VERSION = "recent-aerobic@1.3.0"
+# 1.3.0 (#5669): the owner's walk corrections, labelled `owner_correction`; 1.4.0 (#5916): heart rate is a measurement
+# with its basis, never graded — the talk test plus RPE replace the cap and the target
+RECENT_AEROBIC_VERSION = "recent-aerobic@1.4.0"
 
 RECENT_DAYS = 3  # the rows: target − 3 .. target − 1 (tonight's plan sees today)
 READ_DAYS = 14  # the partition read: covers the prior Mon–Sun week and the trailing-7 comparison
@@ -71,8 +76,16 @@ _WALKING = owner_redlines.REDLINES["walking_floor_hr_wk"]
 # "2–3 per day, none over 75 min" — `walking_floor_hr_wk.walks` (owner-history). A test holds this
 # number equal to the phrase in the redline, so the two cannot drift apart.
 WALK_MAX_MIN = 75
-HR_CEILING_BPM = int(_WALKING["hr_ceiling_bpm"])
-HR_TARGET_BPM = int(_WALKING["hr_target_bpm"])  # #4503 OD2: the aim under the 120 cap
+# #5916 (owner ruling 2026-11-13): THE intensity line — the talk test plus the redline's easy-effort RPE. No bpm.
+EASY_EFFORT_CUE = standing_constraints.easy_effort_cue(int(_WALKING["easy_rpe_max"]))
+# What a row's heart rate IS since #5916: a measurement, stated with its basis, graded against nothing.
+HR_NOT_GRADED = "information only, never graded against a fixed ceiling (owner ruling 2026-11-13, #5916)"
+AVG_HR_BASIS_DEVICE = f"measured: the recording device's average over the whole activity; {HR_NOT_GRADED}"
+AVG_HR_BASIS_JOINED = "measured: wearable heart rate joined over the block's inferred minutes ({basis}); " + HR_NOT_GRADED
+# RETIRED 2026-11-13 (#5916). Nothing in this module prescribes or grades against these two. The names stay ONLY because
+# `coach.critics_aerobic` (another lane's file) still formats them into its swap sentence; delete both with that change.
+HR_CEILING_BPM = int(redline_changelog.RETIRED_WALKING_HR_LINE["hr_ceiling_bpm"])
+HR_TARGET_BPM = int(redline_changelog.RETIRED_WALKING_HR_LINE["hr_target_bpm"])
 _STANDALONE = _WALKING["standalone_walks"]  # #4503 OD7: >= 3 walks/wk of >= 20 min outside a gym window
 _M_PER_MI = 1609.344
 
@@ -143,6 +156,7 @@ def _strava_rows(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     "elevation_ft": _num(a.get("total_elevation_gain_feet")),
                     "avg_hr": _num(a.get("average_heartrate")),
                     "max_hr": _num(a.get("max_heartrate")),
+                    "avg_hr_basis": AVG_HR_BASIS_DEVICE,
                 }
             )
     return rows
@@ -228,6 +242,7 @@ def _hevy_rows(workouts: list[dict[str, Any]], strava_items: list[dict[str, Any]
                     "elevation_ft": None,
                     "avg_hr": _num(hr.get("avg_hr")) if joined else None,
                     "max_hr": _num(hr.get("max_hr")) if joined else None,
+                    "avg_hr_basis": AVG_HR_BASIS_JOINED.format(basis=hr.get("avg_hr_basis") or "#4412 join"),
                     "hr_source": (
                         f"the block's inferred minutes ({(hr.get('window') or {}).get('timing')}), from a {hr.get('hr_source')} "
                         f"Strava record, coverage {hr.get('hr_coverage')} (#4412 join)"
@@ -327,11 +342,11 @@ def _public_row(r: dict[str, Any]) -> dict[str, Any]:
         "avg_hr": r.get("avg_hr"),
         "max_hr": r.get("max_hr"),
         "start_utc": r["start"].isoformat() if r.get("start") else None,
-        "flags": {
-            "over_75_min": bool(wb and minutes > WALK_MAX_MIN),
-            "avg_hr_over_ceiling": None if r.get("avg_hr") is None else float(r["avg_hr"]) > HR_CEILING_BPM,
-        },
+        # #5916: the walk-length line is the only flag. Heart rate is a measurement (`avg_hr_basis`), never a grade.
+        "flags": {"over_75_min": bool(wb and minutes > WALK_MAX_MIN)},
     }
+    if r.get("avg_hr") is not None:
+        out["avg_hr_basis"] = r.get("avg_hr_basis") or AVG_HR_BASIS_DEVICE
     if r.get("hr_source"):
         out["hr_source"] = r["hr_source"]
     if r.get("method"):  # #5669: an owner correction says so on every row it rides
@@ -466,8 +481,9 @@ def build(
         "owner_corrections": walking_volume.corrections_public(corr),
         "redlines": {
             "walk_max_min": WALK_MAX_MIN,
-            "hr_ceiling_bpm": HR_CEILING_BPM,
-            "hr_target_bpm": HR_TARGET_BPM,
+            # #5916: no heart-rate cap and no target. The intensity line is the talk test plus RPE.
+            "intensity": EASY_EFFORT_CUE,
+            "heart_rate": f"avg_hr / max_hr on a row are measurements, each with its `avg_hr_basis`; {HR_NOT_GRADED}",
             "provenance": _WALKING["provenance"],
             "source": "owner_redlines.walking_floor_hr_wk",
         },
@@ -504,7 +520,11 @@ def aerobic_minutes_7d(block: dict[str, Any] | None) -> float | None:
 def last_cardio_block_hr(block: dict[str, Any] | None) -> dict[str, Any] | None:
     """The most recent Hevy cardio block in the block's rows WITH its joined heart rate (#4412), or None.
 
-    None = no Hevy cardio block in the window, or none whose HR joined — unknown, never a 0 bpm."""
+    None = no Hevy cardio block in the window, or none whose HR joined — unknown, never a 0 bpm.
+
+    #5916 (owner ruling 2026-11-13): the average is a MEASUREMENT with its basis and is graded against nothing.
+    `over_ceiling` stays in the shape as None ("not graded") only because `coach.critics_aerobic` (another lane's
+    file) reads the key by name; drop it with that reader."""
     rows = [r for r in (block or {}).get("rows") or [] if r.get("source") == "hevy" and r.get("hr_state") == "joined"]
     if not rows:
         return None
@@ -516,7 +536,8 @@ def last_cardio_block_hr(block: dict[str, Any] | None) -> dict[str, Any] | None:
         "avg_hr": r["avg_hr"],
         "max_hr": r.get("max_hr"),
         "hr_coverage": r.get("hr_coverage"),
-        "over_ceiling": r["avg_hr"] is not None and float(r["avg_hr"]) > HR_CEILING_BPM,
+        "avg_hr_basis": r.get("avg_hr_basis") or AVG_HR_BASIS_JOINED.format(basis="#4412 join"),
+        "over_ceiling": None,
     }
 
 
@@ -555,8 +576,10 @@ def cardio_pick(block: dict[str, Any] | None, archetype: Any, target_date: str |
     A lower session, a heavy walking weekend, or an unread block gets cycling (recumbent, the
     program's knee-sparing substitute); the treadmill only when the legs are fresh.
 
-    #5000: with `target_date`, a standing constraint that forbids HR prescriptions on that day
-    (`training.standing_constraints`) drops the HR ceiling/target and writes the talk test instead."""
+    #5916 (owner ruling 2026-11-13): the pick carries NO heart-rate field on any day. Its `intensity` is the
+    redline's line, the talk test plus RPE (`EASY_EFFORT_CUE`).
+    #5000: with `target_date`, on a day a standing constraint forbids HR prescriptions
+    (`training.standing_constraints`) the pick also names the constraint (`hr_fields_dropped_by`)."""
     loaded, why = legs_loaded(block)
     if is_lower(archetype):
         modality, reason = "cycling", f"a lower session — the legs are already the session's work ({why})"
@@ -569,15 +592,12 @@ def cardio_pick(block: dict[str, Any] | None, archetype: Any, target_date: str |
     pick = {
         "movement_key": modality,
         "modality": "cycling (recumbent)" if modality == "cycling" else "treadmill",
-        "hr_ceiling_bpm": HR_CEILING_BPM,
-        "hr_target_bpm": HR_TARGET_BPM,
+        "intensity": EASY_EFFORT_CUE,
         "reason": reason,
         "rule": "lower session or loaded legs -> cycling; treadmill only when the legs are fresh (#4387)",
     }
     if target_date is None:
         return pick
-    from training import standing_constraints
-
     return standing_constraints.talk_test_pick(pick, standing_constraints.active_constraint(target_date))
 
 

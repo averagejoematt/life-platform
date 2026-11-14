@@ -80,7 +80,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from training import effort_ceilings, in_block_variant, program_conflicts, program_v03, program_v04, variant_rotation
+from training import effort_ceilings, in_block_variant, program_conflicts, program_v03, program_v04, recent_aerobic, variant_rotation
 from training.accessory_check import CARDIO_NAME_HINTS, accessory_rotation, classify_movement  # noqa: F401 — re-exported (#5069 split)
 from training.program_v03 import BLOCK_CALENDAR  # noqa: F401 — v0.3 history; `load_ramp.block_1_start()` reads it (#4107)
 from training.session_cues import CARRY_EXPOSURE, _default_sets, exposure_cue  # noqa: F401 — #5317/#5318, re-exported
@@ -327,7 +327,9 @@ DAY_SHAPE: dict[str, Any] = {
         f"ruling A4 2026-10-24: a shorter session is never padded), one cardio block <= {charter_value('split.session_minutes.cardio_block_max')} min and "
         f"stretching <= {charter_value('split.session_minutes.stretching_max')} min on top"
     ),
-    "pm": "easy walking EVERY day (HR avg ≤ 120 with the talk test, 105 the target; 2–3 walks, weekday none over 75 min, one long-walk slot a week; never intervals)",
+    # #5916 (owner ruling 2026-11-13): no heart-rate number here. The talk test plus the redline's easy-effort RPE
+    # (`recent_aerobic.EASY_EFFORT_CUE` <- `owner_redlines.walking_floor_hr_wk.easy_rpe_max`), read, never retyped.
+    "pm": f"easy walking EVERY day: {recent_aerobic.EASY_EFFORT_CUE} 2–3 walks, weekday none over 75 min, one long-walk slot a week; never intervals",
     "order": "the sessions are a SEQUENCE, not weekdays (#4110): a walk or rest day postpones the next session, never skips it (#4147, #5069)",
     "cardio_placement": "no walking in the 2 h before lifting; the lightest walking day follows the heavy session; cycling is the knee-sparing substitute (OD2 deleted the ≤ 2 h cap)",
     "provenance": "owner-history",

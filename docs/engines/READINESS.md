@@ -49,10 +49,12 @@ fatigue), `TSB = CTL − ATL`, over the 60-day Strava+Hevy window ending the row
    `(avg_hr − Z1) / (max_hr − Z1)` clamped to [0, 1], weighted `HRr·0.64·e^(1.92·HRr)`
    (Banister 1991; Morton, Fitz-Clarke & Banister 1990), normalised so 1 h at 165 bpm =
    100 (basis `hr`). `Z1` = 0.60 × the profile's measured max HR 183 = **109.8 bpm** — the
-   zone-1 upper bound of the platform's one zone table (`mcp/helpers.HR_ZONE_BOUNDS`);
-   the programme's walking HR TARGET (105 bpm, `owner_redlines` `hr_target_bpm`) sits under
-   it, so a walk on target scores 0; since OD2 (#4503, 2026-09-30) the walking CAP is 120 bpm
-   average, ABOVE Z1, so a compliant walk at 110–120 bpm scores a little. The ONE
+   zone-1 upper bound of the platform's one zone table (`mcp/helpers.HR_ZONE_BOUNDS`).
+   It is a population fraction of the profile max, not a threshold measured for him, and a
+   load-model constant only: a walk averaging at or under it scores 0 and one above it
+   scores a little. It is never a walking target or cap (#5916, owner ruling 2026-11-13:
+   easy walking is prescribed by the talk test and RPE; the OD2 walking heart-rate numbers
+   are retired). The ONE
    deviation from Banister, stated: HR reserve is measured above the Z1 ceiling instead of
    above resting HR, so recovery-intensity work contributes **0** to CTL/ATL.
 3. no HR → duration proxy, labelled (basis `duration`): walks 25 points/h, anything else
@@ -80,7 +82,7 @@ same 0.25 work fraction. The 50 points/h rate itself is unchanged (stated limita
 RPE 8 is harder per minute than IF 0.7, so the lifting term likely under-states).
 
 The stored `tsb_load_basis` names the model (`model` = `trimp_above_z1_plus_hevy_worked_set_v2`;
-`hr_model`, `lift_model`, `z1_ceiling_bpm`) and the provenance split (`confidence` ∈ power / hr /
+`hr_model`, `lift_model`, `z1_ceiling_bpm` with its `z1_ceiling_provenance`, #5916) and the provenance split (`confidence` ∈ power / hr /
 worked_set / duration_proxy / mixed; `proxy_share` = duration-only share; `hr_share`;
 `worked_set_share`; a `worked_set` block with the per-rep constant, its source, and assumed vs
 measured seconds); every surface decides its "duration-proxy" label through

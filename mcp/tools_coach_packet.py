@@ -128,7 +128,8 @@ SOURCES: dict[str, str] = {
     "today": (
         "mcp.coach_packet_today.today_view (#4311): Hevy via tools_strength._read_hevy_all_phases + Strava via core.query_source_range, "
         "de-dup = training.walking_volume.dedup_strava (#4068), walking = mcp.shared_quantities.walking_layer_for_day, "
-        "HR ceiling = owner_redlines.REDLINES['walking_floor_hr_wk']['hr_ceiling_bpm']"
+        "walking intensity = training.recent_aerobic.EASY_EFFORT_CUE (the talk test plus the redline's easy-effort RPE, #5916); a walk's "
+        "average heart rate is a measurement with its basis (walk_hr_measured), never graded against a ceiling"
     ),
     "fitness_tests": "mcp.tools_fitness_tests.read_view -> training.fitness_tests (#5078): the BATTERY# record + Hevy over "
     "plan_hevy_windows._block_workouts, each test's trend in its better direction and the cadence state (upcoming/due/overdue/missed, counted in program weeks) with its prompt",

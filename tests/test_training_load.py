@@ -220,18 +220,18 @@ def test_z1_ceiling_is_derived_from_the_platforms_one_zone_table():
     assert tl.Z1_CEILING_HR == round(tl.MAX_HR * tl.Z1_CEILING_FRACTION_OF_MAX, 1) == 109.8
 
 
-def test_a_walk_on_the_redline_target_scores_exactly_zero():
-    """The programme's walking HR TARGET (owner_redlines, 105 bpm) sits under the Z1 ceiling, so a walk
-    on target contributes nothing to ATL/CTL. Since OD2 (#4503) the CAP is 120 avg — above Z1 — so a
-    compliant walk near the cap scores a little, and that is stated rather than hidden."""
+def test_a_walk_at_or_under_the_z1_ceiling_scores_exactly_zero():
+    """A walk averaging at or under the Z1 ceiling contributes nothing to ATL/CTL; one above it scores a
+    little, and that is stated rather than hidden. #5916 (owner ruling 2026-11-13): the walking redline
+    no longer carries a heart-rate target or cap for this test to read — the Z1 ceiling is a load-model
+    constant with its provenance on the basis record, never a walking target."""
     from training.owner_redlines import REDLINES
 
-    target = REDLINES["walking_floor_hr_wk"]["hr_target_bpm"]
-    assert target <= tl.Z1_CEILING_HR
-    pts, basis = tl.activity_load(_hr_walk(75, target))
-    assert pts == 0.0 and basis == "hr"
-    cap = REDLINES["walking_floor_hr_wk"]["hr_ceiling_bpm"]
-    assert cap > tl.Z1_CEILING_HR and tl.activity_load(_hr_walk(75, cap))[0] > 0.0
+    assert "hr_target_bpm" not in REDLINES["walking_floor_hr_wk"] and "hr_ceiling_bpm" not in REDLINES["walking_floor_hr_wk"]
+    for under in (tl.Z1_CEILING_HR - 5, tl.Z1_CEILING_HR):
+        pts, basis = tl.activity_load(_hr_walk(75, under))
+        assert pts == 0.0 and basis == "hr"
+    assert tl.activity_load(_hr_walk(75, tl.Z1_CEILING_HR + 10))[0] > 0.0
 
 
 def test_z1_walk_with_hr_is_near_zero_while_the_same_walk_without_hr_is_proxied():
@@ -275,6 +275,8 @@ def test_duration_proxy_only_when_hr_absent_and_labelled():
     assert basis["confidence"] == "hr" and basis["strava_hr_days"] == 1 and basis["strava_duration_days"] == 0
     assert basis["proxy_share"] == 0.0 and basis["hr_share"] == 1.0
     assert basis["model"] == tl.LOAD_MODEL and basis["hr_model"] == tl.HR_MODEL and basis["z1_ceiling_bpm"] == tl.Z1_CEILING_HR
+    # #5916: the ceiling states what it is beside the number — a population fraction, never a target
+    assert basis["z1_ceiling_provenance"] == tl.Z1_CEILING_PROVENANCE and basis["z1_ceiling_provenance"].startswith("population-derived")
     assert not tl.is_duration_proxy(basis) and tl.basis_note(basis) == ""
     _load, basis = tl.daily_training_load([{"date": d, "activities": [{"type": "Walk", "moving_time_seconds": 3600}]}], [], today)
     assert basis["confidence"] == "duration_proxy" and tl.is_duration_proxy(basis)

@@ -403,16 +403,19 @@ GET_NUTRITION_DESCRIPTION = (
 )
 
 GET_ZONE2_BREAKDOWN_DESCRIPTION = (
-    "Zone 2 training tracker and weekly breakdown. Classifies Strava activities into 5 HR zones "
-    "based on average heartrate as a percentage of max HR (from profile). Aggregates weekly Zone 2 "
+    "Zone 2 training tracker and weekly breakdown. Counts the minutes actually spent in each recording "
+    "device's OWN Zone 2 band (Whoop workout zones, Strava activity zones; each session counted once across "
+    "sources). Basis: the vendors' own zone formulas as stored — not a percent of the profile max HR, and not "
+    "thresholds measured or re-derived for him; a measurement of past sessions, never a heart-rate target. "
+    "Hevy bike/elliptical/treadmill blocks are reported as cardio minutes, never Zone 2. Aggregates weekly Zone 2 "
     "minutes and compares to the 150 min/week target (Attia, Huberman, WHO moderate-intensity guidelines). "
     "Shows full 5-zone training distribution, sport type breakdown for Zone 2, weekly trend analysis, "
     "and training polarization alerts (Zone 3 'no man's land' warning per Seiler). "
-    "Zone 2 (60-70% max HR) is the highest-evidence longevity training modality — builds mitochondrial "
+    "Zone 2 is the highest-evidence longevity training modality — builds mitochondrial "
     "density, fat oxidation capacity, and cardiovascular base. "
     "Use for: 'how much Zone 2 am I doing?', 'am I hitting my Zone 2 target?', "
     "'show my training zone distribution', 'weekly Zone 2 minutes', 'zone 2 trend', "
-    "'am I doing enough easy cardio?', 'training polarization check'. Requires Strava data with HR."
+    "'am I doing enough easy cardio?', 'training polarization check'. Requires Whoop or Strava sessions with HR zones."
 )
 
 SAVE_INSIGHT_DESCRIPTION = (

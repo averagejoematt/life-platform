@@ -248,7 +248,7 @@ def attach_cardio_cues(
             treadmill_sessions=hist["by_machine"].get(cardio_menu.TREADMILL),
             aerobic_block=aerobic_block,
             constraint=constraint,
-            hr_ceiling_bpm=None if constraint else recent_aerobic.HR_CEILING_BPM,
+            hr_ceiling_bpm=None,  # #5916: the walking HR cap is retired (owner ruling 2026-11-13); the note never printed it
             placement_why=why,
             previous=previous,
             # #5428: the watch step when a Hevy block follows (owner protocol 2026-10-27), and an author's route why
