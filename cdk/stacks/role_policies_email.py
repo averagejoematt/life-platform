@@ -17,6 +17,13 @@ from stacks.role_policies_base import (
     CF_DIST_ARN,
     DLQ_ARN,
     KMS_KEY_ARN,
+    NS_AI,
+    NS_COMPUTE,
+    NS_EMAIL,
+    NS_INGEST_SHARED,
+    NS_PODCAST,
+    NS_PREDICTIONS,
+    NS_ROOT,
     REGION,
     SES_CONFIG_SET_ARN,
     SES_IDENTITY,
@@ -24,6 +31,7 @@ from stacks.role_policies_base import (
     _bedrock_statement,
     _bedrock_telemetry_statement,
     _charter_twin_list,
+    _put_metric_data_statement,
     _s3,
     _secret_arn,
     _ses_reader_resources,
@@ -39,8 +47,14 @@ def _email_base(
     needs_s3_write: list[str] = None,
     extra_secrets: list[str] = None,
     extra_statements: list[iam.PolicyStatement] = None,
+    metric_namespaces: tuple = (NS_COMPUTE,),
 ) -> list[iam.PolicyStatement]:
-    """Build standard email Lambda policies: DDB read, S3 config, ai-keys, SES, DLQ."""
+    """Build standard email Lambda policies: DDB read, S3 config, ai-keys, SES, DLQ.
+
+    #5545: `metric_namespaces` are the namespaces OTHER than LifePlatform/AI (which the
+    telemetry statement carries) that the handler's import closure writes — by default
+    `common.compute_metadata`'s LifePlatform/Compute. Pass `()` for a role that reaches none.
+    """
     stmts = [
         iam.PolicyStatement(
             sid="DynamoDB",
@@ -90,6 +104,8 @@ def _email_base(
                 resources=_s3(*needs_s3_write),
             )
         )
+    if metric_namespaces:
+        stmts.append(_put_metric_data_statement("SharedModuleMetrics", *metric_namespaces))
     if extra_statements:
         stmts.extend(extra_statements)
     return stmts
@@ -128,11 +144,8 @@ def email_daily_brief() -> list[iam.PolicyStatement]:
     return _email_base(
         needs_s3_write=["dashboard/*", "buddy/*", "site/*", "generated/*"],
         extra_statements=[
-            iam.PolicyStatement(
-                sid="CloudWatchMetrics",
-                actions=["cloudwatch:PutMetricData"],
-                resources=["*"],
-            ),
+            # Risk-7 ComputePipelineStaleness — the BARE `LifePlatform` root namespace (#5545: exact match).
+            _put_metric_data_statement("CloudWatchMetrics", NS_ROOT),
             iam.PolicyStatement(
                 sid="ExperimentCycleRead",
                 actions=["ssm:GetParameter"],
@@ -222,6 +235,7 @@ def email_chronicle_podcast() -> list[iam.PolicyStatement]:
     return _email_base(
         needs_s3_write=["generated/podcast/*"],
         extra_secrets=["life-platform/google-tts"],
+        metric_namespaces=(),  # #5545: its closure (google_tts, persona_registry, ...) emits no PutMetricData
         extra_statements=[
             iam.PolicyStatement(
                 sid="ChroniclePostsRead",
@@ -242,7 +256,7 @@ def email_daily_debrief() -> list[iam.PolicyStatement]:
         needs_s3_write=["generated/podcast/debrief/*"],
         extra_secrets=["life-platform/google-tts"],
         extra_statements=[
-            iam.PolicyStatement(sid="PublishedMetric", actions=["cloudwatch:PutMetricData"], resources=["*"]),
+            _put_metric_data_statement("PublishedMetric", NS_PODCAST),
         ],
     )
 
@@ -286,7 +300,7 @@ def email_coach_panel_podcast() -> list[iam.PolicyStatement]:
                 sid="HoldAlertSNS", actions=["sns:Publish"], resources=[f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"]
             ),
             # Publish heartbeat metric — the "show went silent" alarm watches for its absence.
-            iam.PolicyStatement(sid="PublishedMetric", actions=["cloudwatch:PutMetricData"], resources=["*"]),
+            _put_metric_data_statement("PublishedMetric", NS_PODCAST),
             # Auto-invalidate /panelcast/* after publishing so a new episode is live
             # immediately — wk*.wav carries a 24h cache header, so without this the CDN
             # serves the prior cut for up to a day (observed 2026-06-17: a stale Ep0).
@@ -317,7 +331,7 @@ def email_wednesday_chronicle() -> list[iam.PolicyStatement]:
                 resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:elena-state-updater"],
             ),
             # #2669: the timeout watchdog emits ChronicleTimeoutImminent.
-            iam.PolicyStatement(sid="TimeoutWatchdogMetric", actions=["cloudwatch:PutMetricData"], resources=["*"]),
+            _put_metric_data_statement("TimeoutWatchdogMetric", NS_EMAIL),  # common.timeout_watchdog default namespace
             _experiment_cycle_read(),  # #3599: bundles content.insight_writer
         ],
     )
@@ -394,6 +408,7 @@ def email_ai_review_pack() -> list[iam.PolicyStatement]:
         # #3563: 3 datapoint families per critic call were DROPPED here — this role
         # emitted the last live denial of the measured set, 2026-09-13 18:00:28Z.
         _bedrock_telemetry_statement(),
+        _put_metric_data_statement("SharedModuleMetrics", NS_COMPUTE),  # #5545: common.compute_metadata
         iam.PolicyStatement(
             sid="BudgetTier",
             actions=["ssm:GetParameter"],
@@ -425,6 +440,9 @@ def email_coach_nudge() -> list[iam.PolicyStatement]:
         silently, never regenerated — AC4).
     """
     return _email_base(
+        # #5545: the nudge bundle reaches the ingestion framework (item_size_guard/auth_breaker) and the
+        # prediction evaluator (dispute_docket) besides compute_metadata.
+        metric_namespaces=(NS_COMPUTE, *NS_INGEST_SHARED, NS_PREDICTIONS),
         extra_statements=[
             iam.PolicyStatement(
                 sid="SSMRead",
@@ -439,7 +457,7 @@ def email_coach_nudge() -> list[iam.PolicyStatement]:
                 actions=["lambda:InvokeFunction"],
                 resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-quality-gate"],
             ),
-        ]
+        ],
     )
 
 
@@ -538,11 +556,8 @@ def email_chronicle_sender() -> list[iam.PolicyStatement]:
             resources=[TABLE_ARN],
             conditions={"ForAllValues:StringEquals": {"dynamodb:LeadingKeys": ["USER#matthew#SOURCE#email_log#wednesday_chronicle"]}},
         ),
-        iam.PolicyStatement(
-            sid="DeliveryHeartbeatMetric",
-            actions=["cloudwatch:PutMetricData"],
-            resources=["*"],
-        ),
+        # #5545: the heartbeat is LifePlatform/Email; AI + Compute are reached through the bundle's imports.
+        _put_metric_data_statement("DeliveryHeartbeatMetric", NS_AI, NS_COMPUTE, NS_EMAIL),
         iam.PolicyStatement(
             sid="BudgetTierRead",
             actions=["ssm:GetParameter"],
@@ -644,11 +659,8 @@ def email_weekly_signal() -> list[iam.PolicyStatement]:
             actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem"],
             resources=[TABLE_ARN],
         ),
-        iam.PolicyStatement(
-            sid="DeliveryHeartbeatMetric",
-            actions=["cloudwatch:PutMetricData"],
-            resources=["*"],
-        ),
+        # #5545: the heartbeat is LifePlatform/Email; AI + Compute are reached through the bundle's imports.
+        _put_metric_data_statement("DeliveryHeartbeatMetric", NS_AI, NS_COMPUTE, NS_EMAIL),
         iam.PolicyStatement(
             sid="S3Read",
             actions=["s3:GetObject"],
@@ -721,11 +733,7 @@ def email_elena_state_updater() -> list[iam.PolicyStatement]:
             actions=["ssm:GetParameter"],
             resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle"],
         ),
-        iam.PolicyStatement(
-            sid="CloudWatchMetrics",  # retry_utils token telemetry
-            actions=["cloudwatch:PutMetricData"],
-            resources=["*"],
-        ),
+        _put_metric_data_statement("CloudWatchMetrics", NS_AI, NS_COMPUTE),  # retry_utils token telemetry + compute_metadata
         _bedrock_statement(),
         iam.PolicyStatement(
             sid="DLQ",
@@ -778,6 +786,7 @@ def email_chronicle_approve() -> list[iam.PolicyStatement]:
         _bedrock_statement(),
         # #3563: and its companion — the embed's cost datapoints were dropped too.
         _bedrock_telemetry_statement(),
+        _put_metric_data_statement("SharedModuleMetrics", NS_COMPUTE),  # #5545: common.compute_metadata
         iam.PolicyStatement(
             sid="SSMBudgetTier",
             # budget_guard.allow("semantic_recall") gates the embed (band 2, ADR-125);
