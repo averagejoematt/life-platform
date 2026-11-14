@@ -574,6 +574,10 @@ def summary(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any]) ->
     out += _zero_by_design(blocks, rx, movements) + _short_morning(blocks, rx, movements)
     gone = [ln for ln in mark.get("lines") or [] if ln.startswith(("skipped (live)", "swapped (live)"))]
     out += [ln.split(" — ")[0].replace(" (live)", "") for ln in gone][:1]
+    waits = [
+        ln.split(": ", 1)[1].split(" — ")[0] for ln in mark.get("lines") or [] if ln.startswith(("not added (live)", "not served (live)"))
+    ]
+    out += [f"today: nothing new on a strained day — {', '.join(waits)} waits"] if waits else []  # fix round 12: said, once
     fat = rx.get("fatigue") or {}
     if fat.get("state") in ("strained", "overreached") or fat.get("sets_removed"):
         out.append(f"today: recovery reads {fat.get('state')} — {sets_off(rx)}")

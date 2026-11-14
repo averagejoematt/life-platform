@@ -163,10 +163,16 @@ def below_floor(rows: list[dict[str, Any]], rep_lo: int, n: int | None = None) -
 
 
 def steps_down(rows: list[dict[str, Any]]) -> int:
-    """How many times this lift's same-role top load already came DOWN inside the window (most recent first): a load more than
-    2 % under the exposure before it."""
+    """How many times this lift's same-role top load came DOWN in its current decline (most recent first): a load more than 2 %
+    under the exposure before it, counted back to the last time the load went UP — a lift that climbed since is a new episode
+    (a step-down months ago, then progress, never reads as "already cut twice")."""
     tops = [_top(r)["kg"] for r in rows]
-    return sum(1 for new, old in zip(tops, tops[1:]) if new < old * 0.98)
+    n = 0
+    for new, old in zip(tops, tops[1:]):
+        if new > old + 0.5:  # any step up (half a kilo) ends the episode
+            break
+        n += new < old * 0.98
+    return n
 
 
 def floor_load(r: dict[str, Any], rep_lo: int) -> float:
