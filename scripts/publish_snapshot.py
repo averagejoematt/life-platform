@@ -1025,7 +1025,7 @@ def _build_live_ctx(base_url: str, timeout: float) -> "LiveContext":
     _live_episodes(ctx)  # first, so chapters can point at them
     _live_chapters(ctx)
     _live_week_states(ctx)
-    apply_week_intervals(ctx.objs["chapter"], ctx.fetched.get("chapters"), None)  # explicit week intervals on every chapter
+    apply_week_intervals(ctx.objs["chapter"], ctx.fetched.get("chapters"), None)  # week intervals + true published/covered days
     _live_coaches(ctx)
     _live_ledger(ctx)
     _live_disagreements(ctx)
