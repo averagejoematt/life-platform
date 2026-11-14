@@ -618,6 +618,16 @@ def library_additions() -> list[dict[str, Any]]:
     return adds
 
 
+def declared_keys() -> set[str]:
+    """Every candidate key a source declares — the curation's and the additions module's own `ADDITIONS`, read directly, so a
+    build run without the additions hook still knows them (fix round 13: a created template for a declared key is skipped
+    there, never refused)."""
+    import importlib.util
+
+    adds = importlib.import_module(ADDITIONS_MODULE) if importlib.util.find_spec(ADDITIONS_MODULE) else None
+    return {x["key"] for x in cur.EXPANSION} | {x["key"] for x in getattr(adds, "ADDITIONS", [])}
+
+
 def _expansion_list() -> list[dict[str, Any]]:
     """The curation's candidates, then the #5861 additions, then the ledger's accepted ones (a ledger key already listed
     is a replacement)."""
@@ -868,7 +878,7 @@ def build_library(
     catalog_only = _catalog_only_entries(catalog, entries)
     no_template = _expansion_entries(entries, merged_into_history)
     movements, tid_to_key = _keyed_movements(entries, no_template)
-    integrity_inputs.apply_templates(movements, tid_to_key, _templates())  # created ids, canonical mappings, the unloggable stamp
+    integrity_inputs.apply_templates(movements, tid_to_key, _templates(), declared_keys())  # created ids, mappings, the stamp
     gates_out = _resolved_gates(movements, tid_to_key)
     apply_target_audit(movements)  # #5857: Hevy's raw muscle label -> the reviewed target, before any tier is derived
     apply_attribute_audit(movements)  # #5857 rubric v2 (board rec 5): reviewed attribute fixes + joint ratings

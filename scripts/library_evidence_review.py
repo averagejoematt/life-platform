@@ -615,7 +615,9 @@ def apply_review(lib: dict[str, Any], decided: dict[str, Any]) -> dict[str, Any]
     reviews.finalize_tiers(mv)  # the quality tier re-derived from the rubric (+ at most one recorded band, #5857)
     if acc["candidates"]:
         last = (out.get("_provenance") or {}).get("history_through") or "1970-01-01"
-        b.integrity_inputs.apply_templates(mv, {}, b._templates())  # a candidate with no Hevy template is never selectable
+        b.integrity_inputs.apply_templates(
+            mv, {}, b._templates(), b.declared_keys()
+        )  # a candidate with no Hevy template is never selectable
         inventory = b.integrity_inputs.home_gym_inventory(mv, {"last": last}, b.cur.SEEDED_AVAILABILITY)
         out["gym_inventory"]["items"] = inventory
         for e in mv.values():

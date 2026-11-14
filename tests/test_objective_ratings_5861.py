@@ -156,6 +156,8 @@ def test_control_cardio_pushed_through_hypertrophy_or_a_carry_left_unrated_goes_
 
 # ── the canonical layer ───────────────────────────────────────────────────────────────────────────────────────────────
 RELEASED = {"kettlebell_deadlift": "D20D7BBE"}
+CREATED = {k: r["template_id"] for k, r in json.loads((REPO / "deploy" / "exercise_library_templates.json").read_text())["created"].items()}
+"""Fix round 13 (owner ruling 2026-11-14): a pre-#5861 key with NO template id may gain exactly its created custom template."""
 """#5861 fix round 13 (owner ruling 2026-11-14): the kettlebell deadlift left Hevy's Sumo Deadlift template (never logged
 there) and waits for its own. Every other pre-#5861 key keeps its template id exactly."""
 
@@ -167,11 +169,11 @@ def _id_offenders(lib: dict) -> list[str]:
         if e is None:
             out.append(f"{key}: key gone")
             continue
-        if key in RELEASED:  # the id was released by an owner ruling: the key stays, template-less, and resolves to itself
-            if e.get("template_id") is not None or xl.canonical_of(lib, key) != key:
-                out.append(f"{key}: a released template id must leave the key in place with no template")
+        if key in RELEASED:  # the id was released by an owner ruling: the key stays, never on that id, and resolves to itself
+            if str(e.get("template_id") or "").upper() == RELEASED[key] or xl.canonical_of(lib, key) != key:
+                out.append(f"{key}: a released template id must leave the key in place, off that id")
             continue
-        if e.get("template_id") != tid:
+        if e.get("template_id") != tid and not (tid is None and e.get("template_id") == CREATED.get(key)):
             out.append(f"{key}: template id {e.get('template_id')} != {tid}")
         head = xl.canonical_of(lib, key)
         if head not in lib["movements"] or (tid and xl.canonical_of(lib, tid) != head):

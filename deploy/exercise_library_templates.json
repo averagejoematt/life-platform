@@ -1,6 +1,143 @@
 {
  "_README": "Hevy template facts the exercise-library builder reads (deploy/exercise_library_integrity.py, #5861 fix round 13). DATA ONLY. `created`: library key -> {template_id, title} for a custom Hevy template created after the owner ruling of 2026-11-14 (the driver adds one row per creation; nothing else changes, and the next rebuild makes the movement loggable). `canonical_mappings`: a movement with no template of its own that is logged under another member of its canonical family, with the reason. `released`: a Hevy template id a library movement no longer logs under (its history, if any, stays where it was logged). `hevy_titles`: for every expansion candidate that names a template id, the title that template carries in Hevy; `differs_because` is required when it is not the candidate's own title. Check the whole file against a copy of the live template index with `python3 deploy/build_exercise_library.py --inputs F --template-index INDEX`.",
- "created": {},
+ "created": {
+  "adductor_rock_back": {
+   "template_id": "40e1acf3-2c34-4d8b-a4c9-1e7abc029748",
+   "title": "Adductor Rock Back"
+  },
+  "band_assisted_reverse_nordic": {
+   "template_id": "5046a835-6b36-46e2-a226-b107d4edccdf",
+   "title": "Reverse Nordic (Band)"
+  },
+  "band_finger_extension": {
+   "template_id": "83bd1a2d-47cb-49fc-a0cf-25f96054b23d",
+   "title": "Finger Extension (Band)"
+  },
+  "banded_ankle_inversion_eversion": {
+   "template_id": "a65129d0-0279-42ac-aa81-24211348484e",
+   "title": "Ankle Inversion and Eversion (Band)"
+  },
+  "cable_internal_rotation": {
+   "template_id": "de730ded-9444-478d-8747-95d7f0b7788c",
+   "title": "Internal Rotation (Cable)"
+  },
+  "cable_serratus_punch": {
+   "template_id": "27d64ed6-09de-4919-acce-a22951b4740e",
+   "title": "Serratus Punch (Cable)"
+  },
+  "controlled_forward_step_down": {
+   "template_id": "478ba086-1e5b-4528-8783-e7e8a8c21f30",
+   "title": "Step Down"
+  },
+  "copenhagen_side_plank": {
+   "template_id": "29f11c5c-bd0c-4ef5-8de6-0e6af9a09787",
+   "title": "Copenhagen Plank"
+  },
+  "forearm_rotation_dumbbell": {
+   "template_id": "9e506ff5-e1ee-4be3-b8ac-64077b67d21f",
+   "title": "Forearm Pronation and Supination (Dumbbell)"
+  },
+  "front_rack_carry_kettlebell": {
+   "template_id": "fcb929db-a3c6-45ad-b303-65628818f501",
+   "title": "Front Rack Carry (Kettlebell)"
+  },
+  "hand_gripper_squeeze": {
+   "template_id": "1b15c81a-0a6b-48ba-b06f-e1bf211f31d0",
+   "title": "Hand Gripper"
+  },
+  "hip_airplane": {
+   "template_id": "b75a6a45-6ce5-46a7-887f-80df4c5cbc69",
+   "title": "Hip Airplane"
+  },
+  "hip_cars": {
+   "template_id": "0836a196-e54a-4ad6-b1e9-b77885e20540",
+   "title": "Hip CARs"
+  },
+  "kettlebell_deadlift": {
+   "template_id": "6c4e54c2-c4b8-4e42-b712-e4f879d57d80",
+   "title": "Deadlift (Kettlebell)"
+  },
+  "knee_to_wall_dorsiflexion": {
+   "template_id": "16516b7b-c359-4526-8e6c-9387dbd6056f",
+   "title": "Knee to Wall Ankle Dorsiflexion"
+  },
+  "landmine_squat": {
+   "template_id": "8fb17c14-227c-4285-bc9f-dee26391ec85",
+   "title": "Landmine Squat"
+  },
+  "low_box_step_off_landing": {
+   "template_id": "3e7a1c76-e745-4eca-a55f-aa73f0ab6599",
+   "title": "Step Off Landing"
+  },
+  "mcgill_curl_up": {
+   "template_id": "fb9ed6d7-60e7-48ae-88dd-4486d5630534",
+   "title": "McGill Curl Up"
+  },
+  "medicine_ball_chest_pass": {
+   "template_id": "61f8856e-843a-4884-b2ff-9c58cd9a0652",
+   "title": "Medicine Ball Chest Pass"
+  },
+  "medicine_ball_scoop_toss": {
+   "template_id": "8d4aebad-8966-4bc6-ae21-2f832c7b4e47",
+   "title": "Medicine Ball Scoop Toss"
+  },
+  "neck_isometric_holds": {
+   "template_id": "afc3a5d3-567c-4df8-b2bb-10c46a2c4f21",
+   "title": "Neck Isometric Hold"
+  },
+  "plate_pinch_hold": {
+   "template_id": "f1046566-ecc3-4744-89d8-3888b0c954a6",
+   "title": "Plate Pinch Hold"
+  },
+  "rucking": {
+   "template_id": "7cb091c4-e6c9-4711-8143-e0fc4b784521",
+   "title": "Rucking"
+  },
+  "short_foot": {
+   "template_id": "21cd935b-771b-4b60-98b3-05d803942a0e",
+   "title": "Short Foot"
+  },
+  "shoulder_cars": {
+   "template_id": "c27762a1-69e9-422e-a6b4-0dd6f1e3defd",
+   "title": "Shoulder CARs"
+  },
+  "spanish_squat": {
+   "template_id": "d9d92345-01aa-43fa-9ff7-d90dbed1c283",
+   "title": "Spanish Squat (Band)"
+  },
+  "standing_cable_chest_press": {
+   "template_id": "1575d773-170b-44e0-b2ff-cc8034838bce",
+   "title": "Standing Chest Press (Cable)"
+  },
+  "standing_cable_knee_drive": {
+   "template_id": "4fae371f-8477-49a5-9502-9741e0a2a763",
+   "title": "Standing Knee Drive (Cable)"
+  },
+  "suitcase_deadlift": {
+   "template_id": "4f424c1f-a78c-4d7b-9757-82690c9ac3d2",
+   "title": "Suitcase Deadlift"
+  },
+  "supine_deep_neck_flexor_nod": {
+   "template_id": "d511caec-091a-4e7c-9ec1-68df240be8e7",
+   "title": "Deep Neck Flexor Nod"
+  },
+  "tall_high_pull": {
+   "template_id": "69f7b5d8-5f3e-44e7-98b9-53fc496d10ed",
+   "title": "Tall High Pull (Barbell)"
+  },
+  "tibialis_raise": {
+   "template_id": "5cc1b232-70ed-4574-a469-fa5785b850dd",
+   "title": "Tibialis Raise"
+  },
+  "wrist_deviation_dumbbell": {
+   "template_id": "305324a1-621f-462c-9c87-89ee8b52d360",
+   "title": "Wrist Radial and Ulnar Deviation (Dumbbell)"
+  },
+  "wrist_extension_mobilization": {
+   "template_id": "272c35c2-3b2d-4b64-bba1-f46c34ee176d",
+   "title": "Wrist Extension Mobilization"
+  }
+ },
  "canonical_mappings": {
   "kettlebell_suitcase_carry": {
    "logs_as": "suitcase_carry",

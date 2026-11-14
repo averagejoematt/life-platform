@@ -130,7 +130,10 @@ def test_flags_show_anchor_gate_template_and_variant():
 
     assert "anchor" in flags("squat_barbell")
     assert "gated (locked)" in flags("pull_up") and "gated (locked)" in flags("kettlebell_swing")
-    assert "needs a Hevy template" in flags("landmine_squat") and "needs a Hevy template" in flags("kettlebell_deadlift")
+    assert not [k for k in MV if "needs a Hevy template" in flags(k)], "every movement can be logged (34 templates created)"
+    bare = copy.deepcopy(LIB)  # control: a created id taken away again is flagged
+    bare["movements"]["landmine_squat"]["template_id"] = None
+    assert "needs a Hevy template" in gen.flags(bare, "landmine_squat", CHARTER)
     assert "logged as suitcase_carry" in flags("kettlebell_suitcase_carry")
     assert "variant of pull_up" in flags("pull_up_assisted")
     assert "confirmed unavailable" in flags("preacher_curl_machine")

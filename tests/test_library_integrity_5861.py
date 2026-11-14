@@ -246,7 +246,7 @@ CHAIN_DEFECT_CASES = {
     "a gate that requires the movement it gates (the v0.3.7 defect)": (_old_cycle, "cycle"),
     "an indirect cycle through three gates": (_indirect_cycle, "cycle"),
     "a prerequisite the Hevy record cannot measure": (
-        lambda lib: lib["movements"]["tall_high_pull"].pop("template_match"),
+        lambda lib: lib["movements"]["tall_high_pull"].update(template_id=None, template_match=None),
         "no Hevy template and no title rule",
     ),
     "a prerequisite that needs equipment confirmed unavailable": (
@@ -308,16 +308,37 @@ def test_bodyweight_gates_say_unset_is_locked_and_state_the_accepted_standard():
 NO_TEMPLATE = sorted(k for k, e in MV.items() if not e.get("template_id"))
 
 
+CREATED = inputs.load_templates()["created"]
+
+
 def test_every_template_less_movement_has_a_disposition():
+    """Owner ruling 2026-11-14: every exercise missing from Hevy got a custom template (34, created by the driver and recorded
+    in deploy/exercise_library_templates.json). One movement has no id of its own and logs through a verified canonical
+    mapping. Nothing is left unloggable."""
     counts = LIB["_provenance"]["integrity"]
-    assert len(NO_TEMPLATE) == counts["template_id_null"]
-    mapped = [k for k in NO_TEMPLATE if MV[k].get("logs_as")]
-    waiting = [k for k in NO_TEMPLATE if not MV[k].get("logs_as")]
-    assert len(waiting) == counts["not_loggable"] and len(mapped) + len(waiting) == len(NO_TEMPLATE)
-    assert mapped == ["kettlebell_suitcase_carry"]
-    for k in waiting:
-        assert MV[k]["not_for_you_now"]["reason_code"] == li.UNLOGGABLE_CODE and MV[k]["template_note"], k
-    assert {"landmine_squat", "tall_high_pull", "kettlebell_deadlift"} <= set(waiting)
+    assert len(NO_TEMPLATE) == counts["template_id_null"] == 1 and counts["not_loggable"] == 0
+    assert NO_TEMPLATE == ["kettlebell_suitcase_carry"] and MV["kettlebell_suitcase_carry"]["logs_as"]
+    assert len(CREATED) == 34 and {"landmine_squat", "tall_high_pull", "kettlebell_deadlift"} <= set(CREATED)
+    for k, row in CREATED.items():
+        e = MV[k]
+        assert str(e["template_id"]) == row["template_id"] and not li.unloggable(e), k
+        assert (e.get("not_for_you_now") or {}).get("reason_code") != li.UNLOGGABLE_CODE, k
+    assert len({r["template_id"].upper() for r in CREATED.values()}) == 34, "one id per movement"
+
+
+def test_a_created_template_makes_a_movement_loggable_never_eligible_on_its_own():
+    """A template id only lifts the loggable rule: every other check still applies. The created movements that sit behind a
+    gate stay locked, the ones whose equipment is not confirmed stay unavailable, and none is a fallback unless it passes the
+    equivalence rule like any other movement."""
+    gated = sorted(k for k in CREATED if li.locking_gates(LIB, MV[k]))
+    assert gated == ["low_box_step_off_landing", "medicine_ball_chest_pass", "medicine_ball_scoop_toss", "tall_high_pull"]
+    unconfirmed = sorted(k for k in CREATED if MV[k]["availability"]["home_gym"]["state"] != "available")
+    assert {"hand_gripper_squeeze", "rucking", "medicine_ball_chest_pass", "medicine_ball_scoop_toss"} == set(unconfirmed)
+    for k in gated + unconfirmed:
+        assert not [a for a, b in LINKS if b == k], f"{k} is gated or unavailable, yet a fallback"
+    for a, b in LINKS:
+        if b in CREATED:
+            assert li.fallback_problems(LIB, a, b) == [], (a, b)
 
 
 def test_no_unloggable_movement_is_selectable_whatever_its_flags_say():
@@ -329,14 +350,14 @@ def test_no_unloggable_movement_is_selectable_whatever_its_flags_say():
             assert verdict is not None, f"{k}: no template, yet selectable"
             stripped = {x: v for x, v in e.items() if x != "not_for_you_now"} | {"needs_custom_template": False}
             assert "not loggable" in str(se.not_for_you_now(stripped)), f"{k}: selectable once its flag is gone"
-    bare = copy.deepcopy(LIB)
-    bare["movements"]["landmine_squat"]["not_for_you_now"] = None
+    bare = copy.deepcopy(LIB)  # a created id taken away again, and no flag: the build refuses the row
+    bare["movements"]["landmine_squat"].update(template_id=None, not_for_you_now=None)
     assert any("landmine_squat: not loggable" in e for e in xl.validate(bare)), "the build refuses an unflagged unloggable row"
 
 
 def test_must_fail_the_engine_without_the_structural_check_would_select_it(monkeypatch):
     """The control on the rule itself: with `unloggable` blinded, a template-less row whose flag is gone reads selectable."""
-    stripped = {x: v for x, v in MV["landmine_squat"].items() if x != "not_for_you_now"}
+    stripped = {x: v for x, v in MV["landmine_squat"].items() if x != "not_for_you_now"} | {"template_id": None}
     assert se.not_for_you_now(stripped) is not None
     monkeypatch.setattr(li, "unloggable", lambda entry: None)
     assert se.not_for_you_now(stripped) is None
@@ -344,10 +365,35 @@ def test_must_fail_the_engine_without_the_structural_check_would_select_it(monke
 
 def test_the_kettlebell_deadlift_left_the_sumo_deadlift_template():
     kb = MV["kettlebell_deadlift"]
-    assert kb["template_id"] is None and li.unloggable(kb) and se.not_for_you_now(kb)
+    assert kb["template_id"] == CREATED["kettlebell_deadlift"]["template_id"] and not li.unloggable(kb)
+    assert CREATED["kettlebell_deadlift"]["title"] == "Deadlift (Kettlebell)"
     assert not [k for k, e in MV.items() if str(e.get("template_id") or "").upper() == "D20D7BBE"], "no row logs under Sumo Deadlift"
-    assert kb["template_match"] == {"title_all": ["kettlebell", "deadlift"]}, "its own template, once created, is measured by title"
+    assert kb["template_match"] == {"title_all": ["kettlebell", "deadlift"]}, "its own template is also measured by title"
     assert "D20D7BBE" in inputs.released_ids(inputs.load_templates())
+
+
+CATALOG_DISAGREES_TODAY = {"kettlebell_deadlift"}
+"""A movement-catalog key whose Hevy template hint is NOT the template its joined library movement logs under. The catalog
+(today's live path, with `kb_entry.ENTRY_TEMPLATE_ID`) still writes the kettlebell deadlift as Sumo Deadlift D20D7BBE; the
+library logs it under its own new template. Reconciling the catalog changes today's path, so it is the driver's step, not
+this lane's. Pinned: a second disagreement is red."""
+
+
+def _catalog_disagreements(lib: dict, cat: dict) -> set[str]:
+    out = set()
+    for ck, lid in se.key_index(lib, cat)["to_lib"].items():
+        hint, logged = str(cat[ck].get("hevy_template_id_hint") or "").upper(), li.log_template(lib["movements"][lid]) or ""
+        if hint and logged and hint != logged:
+            out.add(ck)
+    return out
+
+
+def test_the_catalog_and_the_library_log_each_movement_under_one_template():
+    cat = json.loads((REPO / "config" / "movement_catalog.json").read_text())["movements"]
+    assert _catalog_disagreements(LIB, cat) == CATALOG_DISAGREES_TODAY
+    planted = copy.deepcopy(cat)  # control: a second catalog hint drifts from the library
+    planted["squat_barbell"]["hevy_template_id_hint"] = "AAAAAAAA"
+    assert _catalog_disagreements(LIB, planted) == CATALOG_DISAGREES_TODAY | {"squat_barbell"}
 
 
 def test_a_canonical_mapping_is_verified_inside_one_family_only():

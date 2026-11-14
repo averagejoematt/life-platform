@@ -78,11 +78,17 @@ def index_title_errors(templates: dict[str, Any], index_path: str) -> list[str]:
     return out
 
 
-def apply_templates(movements: dict[str, dict[str, Any]], tid_to_key: dict[str, str], templates: dict[str, Any]) -> None:
+def apply_templates(
+    movements: dict[str, dict[str, Any]], tid_to_key: dict[str, str], templates: dict[str, Any], declared: set[str] | None = None
+) -> None:
     """In place, before gates resolve: created templates, canonical mappings, then the structural stamp on every movement
-    the Hevy record cannot represent. A row that does not fit is a hard stop — a template fact never vanishes silently."""
+    the Hevy record cannot represent. A row that does not fit is a hard stop — a template fact never vanishes silently.
+    `declared`: every key a candidate source declares (the curation and the additions module); a created row for a declared
+    key that THIS build does not hold (a build run without the additions) is skipped, an undeclared key is a hard stop."""
     for key, row in templates["created"].items():
         e = movements.get(key)
+        if e is None and declared is not None and key in declared:
+            continue
         taken = e is not None and e.get("template_id") and str(e["template_id"]) != str(row.get("template_id"))
         if e is None or taken or not row.get("template_id") or not row.get("title"):
             raise SystemExit(f"templates.created.{key}: needs a template-less library movement, a template_id and its Hevy title")
@@ -91,6 +97,10 @@ def apply_templates(movements: dict[str, dict[str, Any]], tid_to_key: dict[str, 
         tid_to_key[str(row["template_id"]).upper()] = key
         if (e.get("not_for_you_now") or {}).get("reason_code") == rules.UNLOGGABLE_CODE:
             e["not_for_you_now"] = None
+        profile = e.get("expansion_profile")
+        if isinstance(profile, dict) and isinstance(profile.get("hevy"), dict):  # an addition's own record follows the created id
+            hevy = profile["hevy"] | {"template": e["template_id"], "kind": "custom_existing", "needs_custom_template": False}
+            e["expansion_profile"] = profile | {"hevy": hevy | {"prescribable": True}}  # copies: the source module is never mutated
     for key, row in templates["canonical_mappings"].items():
         e, head = movements.get(key), movements.get(str(row.get("logs_as")))
         if e is None or head is None or e.get("template_id") or not head.get("template_id"):

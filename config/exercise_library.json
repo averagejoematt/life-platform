@@ -357,10 +357,10 @@
    "none_reviewed": 640
   },
   "integrity": {
-   "fallback_links": 1114,
-   "movements_without_fallbacks": 235,
-   "template_id_null": 35,
-   "not_loggable": 34,
+   "fallback_links": 1115,
+   "movements_without_fallbacks": 234,
+   "template_id_null": 1,
+   "not_loggable": 0,
    "movements_by_availability_evidence": {
     "owner_confirmed": 0,
     "recent_inferred": 560,
@@ -2638,7 +2638,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "incline_bench_press_dumbbell",
+     "movement_id": "standing_cable_chest_press",
      "reason": "same_stimulus"
     }
    ]
@@ -6192,7 +6192,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "knee_push_up",
+     "movement_id": "standing_cable_chest_press",
      "reason": "same_stimulus"
     }
    ],
@@ -52718,7 +52718,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "knee_push_up",
+     "movement_id": "standing_cable_chest_press",
      "reason": "same_stimulus"
     }
    ],
@@ -56580,7 +56580,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "knee_push_up",
+     "movement_id": "standing_cable_chest_press",
      "reason": "same_stimulus"
     }
    ],
@@ -87936,7 +87936,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "incline_bench_press_dumbbell",
+     "movement_id": "standing_cable_chest_press",
      "reason": "same_stimulus"
     }
    ],
@@ -93538,8 +93538,8 @@
   "adductor_rock_back": {
    "title": "Adductor Rock-Back",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "40e1acf3-2c34-4d8b-a4c9-1e7abc029748",
+   "template_note": "custom Hevy template 'Adductor Rock Back', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §18",
    "target": {
     "primary": "mobility",
@@ -93645,10 +93645,7 @@
     "reviewed": true
    },
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -93709,18 +93706,18 @@
      "why": "used when squat depth is adductor/hip limited"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "40e1acf3-2c34-4d8b-a4c9-1e7abc029748",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    }
   },
   "band_assisted_reverse_nordic": {
    "title": "Band-Assisted Reverse Nordic",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "5046a835-6b36-46e2-a226-b107d4edccdf",
+   "template_note": "custom Hevy template 'Reverse Nordic (Band)', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §8",
    "target": {
     "primary": "quadriceps",
@@ -93826,10 +93823,7 @@
     "reviewed": true
    },
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -93900,18 +93894,18 @@
      "why": "knee-resilience work best added once kneeling and body mass allow it"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "5046a835-6b36-46e2-a226-b107d4edccdf",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    }
   },
   "band_finger_extension": {
    "title": "Band Finger Extension",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "83bd1a2d-47cb-49fc-a0cf-25f96054b23d",
+   "template_note": "custom Hevy template 'Finger Extension (Band)', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §7",
    "target": {
     "primary": "forearms",
@@ -94020,10 +94014,7 @@
     "reviewed": true
    },
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -94085,18 +94076,18 @@
      "why": "balancing work only with a grip-related need"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "83bd1a2d-47cb-49fc-a0cf-25f96054b23d",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    }
   },
   "banded_ankle_inversion_eversion": {
    "title": "Banded Ankle Inversion and Eversion",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "a65129d0-0279-42ac-aa81-24211348484e",
+   "template_note": "custom Hevy template 'Ankle Inversion and Eversion (Band)', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §12",
    "target": {
     "primary": "ankle_stabilisers",
@@ -94204,10 +94195,7 @@
     "reviewed": true
    },
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -94269,10 +94257,10 @@
      "why": "ankle rehab work, only with an ankle need"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "a65129d0-0279-42ac-aa81-24211348484e",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    },
    "variants": [
@@ -94287,8 +94275,8 @@
   "cable_internal_rotation": {
    "title": "Cable Internal Rotation",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "de730ded-9444-478d-8747-95d7f0b7788c",
+   "template_note": "custom Hevy template 'Internal Rotation (Cable)', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §4",
    "target": {
     "primary": "rotator_cuff",
@@ -94398,10 +94386,7 @@
     "reviewed": true
    },
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -94477,10 +94462,10 @@
      "why": "internal-rotation strength is rarely limiting; use on an identified need"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "de730ded-9444-478d-8747-95d7f0b7788c",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    },
    "provocation_floor": {
@@ -94493,8 +94478,8 @@
   "cable_serratus_punch": {
    "title": "Cable Serratus Punch",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "27d64ed6-09de-4919-acce-a22951b4740e",
+   "template_note": "custom Hevy template 'Serratus Punch (Cable)', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §4",
    "target": {
     "primary": "serratus",
@@ -94605,10 +94590,7 @@
     "reviewed": true
    },
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -94684,10 +94666,10 @@
      "why": "the only loadable protraction movement; a low-fatigue shoulder-health accessory beside heavy pressing"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "27d64ed6-09de-4919-acce-a22951b4740e",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    },
    "variants": [
@@ -94703,8 +94685,8 @@
   "controlled_forward_step_down": {
    "title": "Controlled Forward Step-Down",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "478ba086-1e5b-4528-8783-e7e8a8c21f30",
+   "template_note": "custom Hevy template 'Step Down', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §8",
    "target": {
     "primary": "quadriceps",
@@ -94816,10 +94798,7 @@
     "reviewed": true
    },
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -94899,10 +94878,10 @@
      "why": "the only eccentric single-leg knee-control movement; low load, regressed by step height"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "478ba086-1e5b-4528-8783-e7e8a8c21f30",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    },
    "variants": [
@@ -94924,8 +94903,8 @@
   "copenhagen_side_plank": {
    "title": "Copenhagen Side Plank",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "29f11c5c-bd0c-4ef5-8de6-0e6af9a09787",
+   "template_note": "custom Hevy template 'Copenhagen Plank', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §11",
    "target": {
     "primary": "adductors",
@@ -95040,10 +95019,7 @@
    "gates": [
     "clinical_cue_breathing"
    ],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -95113,10 +95089,10 @@
      "why": "adductor resilience line; the machine carries the current adductor work"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "29f11c5c-bd0c-4ef5-8de6-0e6af9a09787",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    },
    "variants": [
@@ -95153,8 +95129,8 @@
   "forearm_rotation_dumbbell": {
    "title": "Dumbbell Pronation and Supination",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "9e506ff5-e1ee-4be3-b8ac-64077b67d21f",
+   "template_note": "custom Hevy template 'Forearm Pronation and Supination (Dumbbell)', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §7",
    "target": {
     "primary": "forearms",
@@ -95269,10 +95245,7 @@
     "reviewed": true
    },
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -95338,10 +95311,10 @@
      "why": "rotation strength is rarely the limiter; use for an elbow/forearm need"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "9e506ff5-e1ee-4be3-b8ac-64077b67d21f",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    },
    "variants": [
@@ -95362,8 +95335,8 @@
   "front_rack_carry_kettlebell": {
    "title": "Front Rack Carry (Kettlebell)",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "fcb929db-a3c6-45ad-b303-65628818f501",
+   "template_note": "custom Hevy template 'Front Rack Carry (Kettlebell)', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §16",
    "target": {
     "primary": "abs",
@@ -95496,10 +95469,7 @@
    "gates": [
     "clinical_cue_breathing"
    ],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -95569,10 +95539,10 @@
      "why": "the farmer's and suitcase carries already cover loaded carrying"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "fcb929db-a3c6-45ad-b303-65628818f501",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    },
    "variants": [
@@ -95599,8 +95569,8 @@
   "hand_gripper_squeeze": {
    "title": "Hand Gripper Squeeze",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "1b15c81a-0a6b-48ba-b06f-e1bf211f31d0",
+   "template_note": "custom Hevy template 'Hand Gripper', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §7",
    "target": {
     "primary": "forearms",
@@ -95713,10 +95683,7 @@
     "reviewed": true
    },
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "unknown",
@@ -95724,7 +95691,12 @@
      "source": "the worst of its equipment: hand_gripper"
     }
    },
-   "fallbacks": [],
+   "fallbacks": [
+    {
+     "movement_id": "plate_pinch_hold",
+     "reason": "same_function"
+    }
+   ],
    "expansion_profile": {
     "section": "§7",
     "priority": "P3",
@@ -95782,18 +95754,18 @@
      "why": "crush grip is already trained by heavy pulling and carries"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "1b15c81a-0a6b-48ba-b06f-e1bf211f31d0",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    }
   },
   "hip_airplane": {
    "title": "Hip Airplane",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "b75a6a45-6ce5-46a7-887f-80df4c5cbc69",
+   "template_note": "custom Hevy template 'Hip Airplane', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §10",
    "target": {
     "primary": "hip_abductors",
@@ -95907,10 +95879,7 @@
     "reviewed": true
    },
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -95977,18 +95946,18 @@
      "why": "hip rotation control is useful, not urgent"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "b75a6a45-6ce5-46a7-887f-80df4c5cbc69",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    }
   },
   "hip_cars": {
    "title": "Hip CARs",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "0836a196-e54a-4ad6-b1e9-b77885e20540",
+   "template_note": "custom Hevy template 'Hip CARs', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §18",
    "target": {
     "primary": "mobility",
@@ -96095,10 +96064,7 @@
     "reviewed": true
    },
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -96163,18 +96129,18 @@
      "why": "warm-up or limitation tool; walking_hip_circles already exists"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "0836a196-e54a-4ad6-b1e9-b77885e20540",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    }
   },
   "kettlebell_deadlift": {
    "title": "Kettlebell Deadlift",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "owner ruling 2026-11-14: it gets its OWN custom Hevy template (on the creation list). It no longer logs under Hevy's Sumo Deadlift D20D7BBE — a barbell lift's template, so the two histories would have mixed (nothing was ever logged there). Not selectable until the template id is recorded in deploy/exercise_library_templates.json",
+   "template_id": "6c4e54c2-c4b8-4e42-b712-e4f879d57d80",
+   "template_note": "custom Hevy template 'Deadlift (Kettlebell)', created after the owner ruling of 2026-11-14",
    "target": {
     "primary": "glutes",
     "secondary": [
@@ -96292,10 +96258,7 @@
    "gates": [
     "clinical_cue_breathing"
    ],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -96504,8 +96467,8 @@
   "knee_to_wall_dorsiflexion": {
    "title": "Knee-to-Wall Ankle Dorsiflexion",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "16516b7b-c359-4526-8e6c-9387dbd6056f",
+   "template_note": "custom Hevy template 'Knee to Wall Ankle Dorsiflexion', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §18",
    "target": {
     "primary": "mobility",
@@ -96611,10 +96574,7 @@
     "reviewed": true
    },
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -96676,10 +96636,10 @@
      "why": "used when squat or step-down depth is ankle-limited"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "16516b7b-c359-4526-8e6c-9387dbd6056f",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    },
    "variants": [
@@ -96694,8 +96654,8 @@
   "landmine_squat": {
    "title": "Landmine Squat",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy standard template for the squat alone; 983274DD is the squat-and-press complex — create a custom template",
+   "template_id": "8fb17c14-227c-4285-bc9f-dee26391ec85",
+   "template_note": "custom Hevy template 'Landmine Squat', created after the owner ruling of 2026-11-14",
    "target": {
     "primary": "quadriceps",
     "secondary": [
@@ -96809,10 +96769,7 @@
     "reviewed": true
    },
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -96848,8 +96805,8 @@
   "low_box_step_off_landing": {
    "title": "Low-Box Step-Off Landing",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "3e7a1c76-e745-4eca-a55f-aa73f0ab6599",
+   "template_note": "custom Hevy template 'Step Off Landing', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §19",
    "target": {
     "primary": "full_body",
@@ -96965,10 +96922,7 @@
     "charter_plyometric",
     "clinical_cue_breathing"
    ],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -97037,10 +96991,10 @@
      "why": "the first rung of landing work, behind the charter's plyometric gate"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "3e7a1c76-e745-4eca-a55f-aa73f0ab6599",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    },
    "variants": [
@@ -97070,8 +97024,8 @@
   "mcgill_curl_up": {
    "title": "McGill Curl-Up",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "fb9ed6d7-60e7-48ae-88dd-4486d5630534",
+   "template_note": "custom Hevy template 'McGill Curl Up', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §13",
    "target": {
     "primary": "abs",
@@ -97182,10 +97136,7 @@
    "gates": [
     "clinical_cue_breathing"
    ],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -97250,18 +97201,18 @@
      "why": "a back-sensitive trunk-endurance option; the dead bug serves the general case"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "fb9ed6d7-60e7-48ae-88dd-4486d5630534",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    }
   },
   "medicine_ball_chest_pass": {
    "title": "Medicine Ball Chest Pass",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "61f8856e-843a-4884-b2ff-9c58cd9a0652",
+   "template_note": "custom Hevy template 'Medicine Ball Chest Pass', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §19",
    "target": {
     "primary": "full_body",
@@ -97375,10 +97326,7 @@
     "owner_confirmation_skill",
     "clinical_cue_breathing"
    ],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "unknown",
@@ -97446,10 +97394,10 @@
      "why": "power work is not auto-programmed in the current phase"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "61f8856e-843a-4884-b2ff-9c58cd9a0652",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    },
    "variants": [
@@ -97465,8 +97413,8 @@
   "medicine_ball_scoop_toss": {
    "title": "Medicine Ball Scoop Toss",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "8d4aebad-8966-4bc6-ae21-2f832c7b4e47",
+   "template_note": "custom Hevy template 'Medicine Ball Scoop Toss', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §19",
    "target": {
     "primary": "full_body",
@@ -97579,10 +97527,7 @@
     "owner_confirmation_skill",
     "clinical_cue_breathing"
    ],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "unknown",
@@ -97649,10 +97594,10 @@
      "why": "power work is not auto-programmed in the current phase"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "8d4aebad-8966-4bc6-ae21-2f832c7b4e47",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    },
    "variants": [
@@ -97667,8 +97612,8 @@
   "neck_isometric_holds": {
    "title": "Neck Isometric Holds",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "afc3a5d3-567c-4df8-b2bb-10c46a2c4f21",
+   "template_note": "custom Hevy template 'Neck Isometric Hold', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §20",
    "target": {
     "primary": "neck",
@@ -97774,10 +97719,7 @@
     "reviewed": true
    },
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -97839,10 +97781,10 @@
      "why": "optional, symptom-led"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "afc3a5d3-567c-4df8-b2bb-10c46a2c4f21",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    },
    "variants": [
@@ -97857,8 +97799,8 @@
   "plate_pinch_hold": {
    "title": "Plate Pinch Hold",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "f1046566-ecc3-4744-89d8-3888b0c954a6",
+   "template_note": "custom Hevy template 'Plate Pinch Hold', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §7",
    "target": {
     "primary": "forearms",
@@ -97972,10 +97914,7 @@
    "gates": [
     "clinical_cue_breathing"
    ],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -98042,18 +97981,18 @@
      "why": "pinch is the one grip mode no current movement trains; optional"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "f1046566-ecc3-4744-89d8-3888b0c954a6",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    }
   },
   "rucking": {
    "title": "Rucking (Loaded Walk)",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "7cb091c4-e6c9-4711-8143-e0fc4b784521",
+   "template_note": "custom Hevy template 'Rucking', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §17",
    "target": {
     "primary": "cardio",
@@ -98172,10 +98111,7 @@
     "reviewed": true
    },
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "unknown",
@@ -98267,10 +98203,10 @@
      "why": "while body mass is high, the body itself is the load; incline walking progresses walking first"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "7cb091c4-e6c9-4711-8143-e0fc4b784521",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    },
    "variants": [
@@ -98285,8 +98221,8 @@
   "short_foot": {
    "title": "Short-Foot Exercise",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "21cd935b-771b-4b60-98b3-05d803942a0e",
+   "template_note": "custom Hevy template 'Short Foot', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §12",
    "target": {
     "primary": "foot_intrinsics",
@@ -98394,10 +98330,7 @@
     "reviewed": true
    },
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -98461,10 +98394,10 @@
      "why": "foot-control drill without a current need"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "21cd935b-771b-4b60-98b3-05d803942a0e",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    },
    "variants": [
@@ -98479,8 +98412,8 @@
   "shoulder_cars": {
    "title": "Shoulder CARs",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "c27762a1-69e9-422e-a6b4-0dd6f1e3defd",
+   "template_note": "custom Hevy template 'Shoulder CARs', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §18",
    "target": {
     "primary": "mobility",
@@ -98586,10 +98519,7 @@
     "reviewed": true
    },
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -98652,10 +98582,10 @@
      "why": "warm-up or limitation tool"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "c27762a1-69e9-422e-a6b4-0dd6f1e3defd",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    },
    "variants": [
@@ -98670,8 +98600,8 @@
   "spanish_squat": {
    "title": "Spanish Squat",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "d9d92345-01aa-43fa-9ff7-d90dbed1c283",
+   "template_note": "custom Hevy template 'Spanish Squat (Band)', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §8",
    "target": {
     "primary": "quadriceps",
@@ -98781,10 +98711,7 @@
     "reviewed": true
    },
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -98853,10 +98780,10 @@
      "why": "a knee-tolerance tool, programmed when the knee asks for it"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "d9d92345-01aa-43fa-9ff7-d90dbed1c283",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    },
    "variants": [
@@ -98871,8 +98798,8 @@
   "standing_cable_chest_press": {
    "title": "Standing Cable Chest Press",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "1575d773-170b-44e0-b2ff-cc8034838bce",
+   "template_note": "custom Hevy template 'Standing Chest Press (Cable)', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §1",
    "target": {
     "primary": "chest",
@@ -98994,10 +98921,7 @@
     "reviewed": true
    },
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -99078,10 +99002,10 @@
      "why": "chest pressing is already served by stable, more loadable presses"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "1575d773-170b-44e0-b2ff-cc8034838bce",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    },
    "variants": [
@@ -99102,8 +99026,8 @@
   "standing_cable_knee_drive": {
    "title": "Standing Cable Knee Drive",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "4fae371f-8477-49a5-9502-9741e0a2a763",
+   "template_note": "custom Hevy template 'Standing Knee Drive (Cable)', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §15",
    "target": {
     "primary": "hip_flexors",
@@ -99220,10 +99144,7 @@
     "reviewed": true
    },
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -99291,10 +99212,10 @@
      "why": "hip-flexor work is generally optional; walking and knee raises already load it"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "4fae371f-8477-49a5-9502-9741e0a2a763",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    },
    "variants": [
@@ -99321,8 +99242,8 @@
   "suitcase_deadlift": {
    "title": "Suitcase Deadlift",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "4f424c1f-a78c-4d7b-9757-82690c9ac3d2",
+   "template_note": "custom Hevy template 'Suitcase Deadlift', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §13",
    "target": {
     "primary": "abs",
@@ -99444,10 +99365,7 @@
    "gates": [
     "clinical_cue_breathing"
    ],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -99514,18 +99432,18 @@
      "why": "anti-lateral flexion is already served by the suitcase carry without the extra hinge"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "4f424c1f-a78c-4d7b-9757-82690c9ac3d2",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    }
   },
   "supine_deep_neck_flexor_nod": {
    "title": "Supine Deep Neck Flexor Nod",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "d511caec-091a-4e7c-9ec1-68df240be8e7",
+   "template_note": "custom Hevy template 'Deep Neck Flexor Nod', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §20",
    "target": {
     "primary": "neck",
@@ -99629,10 +99547,7 @@
     "reviewed": true
    },
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -99694,10 +99609,10 @@
      "why": "optional, symptom-led"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "d511caec-091a-4e7c-9ec1-68df240be8e7",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    },
    "variants": [
@@ -99713,8 +99628,8 @@
   "tall_high_pull": {
    "title": "Tall High Pull (Barbell)",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template; on the creation list (`barbell_high_pulls` in his account is the hang version)",
+   "template_id": "69f7b5d8-5f3e-44e7-98b9-53fc496d10ed",
+   "template_note": "custom Hevy template 'Tall High Pull (Barbell)', created after the owner ruling of 2026-11-14",
    "target": {
     "primary": "back",
     "secondary": [
@@ -99826,10 +99741,7 @@
     "owner_confirmation_skill",
     "clinical_cue_breathing"
    ],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -99850,8 +99762,8 @@
   "tibialis_raise": {
    "title": "Tibialis Raise",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "5cc1b232-70ed-4574-a469-fa5785b850dd",
+   "template_note": "custom Hevy template 'Tibialis Raise', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §12",
    "target": {
     "primary": "tibialis",
@@ -99958,10 +99870,7 @@
     "reviewed": true
    },
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -100041,10 +99950,10 @@
      "why": "serves the charter's lower-leg prep, which prescribes tibialis work with no movement behind it"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "5cc1b232-70ed-4574-a469-fa5785b850dd",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    },
    "variants": [
@@ -100065,8 +99974,8 @@
   "wrist_deviation_dumbbell": {
    "title": "Dumbbell Radial and Ulnar Deviation",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "305324a1-621f-462c-9c87-89ee8b52d360",
+   "template_note": "custom Hevy template 'Wrist Radial and Ulnar Deviation (Dumbbell)', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §7",
    "target": {
     "primary": "forearms",
@@ -100175,10 +100084,7 @@
     "reviewed": true
    },
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -100243,10 +100149,10 @@
      "why": "specialist wrist work with no current need"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "305324a1-621f-462c-9c87-89ee8b52d360",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    },
    "variants": [
@@ -100261,8 +100167,8 @@
   "wrist_extension_mobilization": {
    "title": "Wrist Extension Mobilization",
    "source": "expansion",
-   "template_id": null,
-   "template_note": "no Hevy template (built-in or custom) exists: needs a custom template, owner-gated (#5861); not prescribable",
+   "template_id": "272c35c2-3b2d-4b64-bba1-f46c34ee176d",
+   "template_note": "custom Hevy template 'Wrist Extension Mobilization', created after the owner ruling of 2026-11-14",
    "expansion_origin": "#5861 amendment 15 §18",
    "target": {
     "primary": "mobility",
@@ -100368,10 +100274,7 @@
     "reviewed": true
    },
    "gates": [],
-   "not_for_you_now": {
-    "reason_code": "needs_custom_hevy_template",
-    "unlock_condition": "its custom Hevy template is created (owner ruling 2026-11-14: every exercise missing from Hevy gets one) and the id is recorded in deploy/exercise_library_templates.json; then a movement-catalog entry"
-   },
+   "not_for_you_now": null,
    "availability": {
     "home_gym": {
      "state": "available",
@@ -100436,10 +100339,10 @@
      "why": "only for a front-rack or push-up wrist limitation"
     },
     "hevy": {
-     "template": null,
-     "kind": null,
-     "needs_custom_template": true,
-     "prescribable": false
+     "template": "272c35c2-3b2d-4b64-bba1-f46c34ee176d",
+     "kind": "custom_existing",
+     "needs_custom_template": false,
+     "prescribable": true
     }
    }
   }

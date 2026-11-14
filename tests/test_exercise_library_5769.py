@@ -63,11 +63,11 @@ def test_every_movement_catalog_template_is_in_the_library():
         for k, v in CATALOG["movements"].items()
         if v.get("hevy_template_id_hint") and str(v["hevy_template_id_hint"]).upper() not in TIDS
     ]
-    # #5861 fix round 13 (owner ruling 2026-11-14): the kettlebell deadlift no longer logs under Hevy's Sumo Deadlift. The
-    # catalog (today's path) still carries that hint until its own template exists; the library has RELEASED the id
-    # (deploy/exercise_library_templates.json) and keeps the movement, template-less and not selectable.
+    # #5861 fix round 13 (owner ruling 2026-11-14): the kettlebell deadlift no longer logs under Hevy's Sumo Deadlift; it has its
+    # own custom template now. The catalog (today's path) still carries the Sumo hint until the driver reconciles it; the library
+    # has RELEASED that id (deploy/exercise_library_templates.json).
     assert missing == [("kettlebell_deadlift", "D20D7BBE")]
-    assert MV["kettlebell_deadlift"]["template_id"] is None and MV["kettlebell_deadlift"]["not_for_you_now"]
+    assert MV["kettlebell_deadlift"]["template_id"] and str(MV["kettlebell_deadlift"]["template_id"]).upper() != "D20D7BBE"
 
 
 def test_every_logged_template_is_a_history_entry():
