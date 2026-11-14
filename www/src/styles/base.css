@@ -1971,3 +1971,143 @@ span.gloss[data-quote-gloss] {
     display: none;
   }
 }
+
+/* Evidence in the margin (2026-11-14, sprint II): a chapter's figures and graded-call cards sit beside the paragraph
+   that first talks about them — floated into the column's right edge on a wide screen, inline on a phone. They are
+   machine evidence, so they read in the sans/mono voice, never the narrator's serif. */
+.article [data-published-body] .evidence {
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 1.4em 0;
+  padding: 10px 0 0;
+  border-top: 2px solid var(--ink);
+}
+.article [data-published-body] .evidence + p {
+  margin-top: 0;
+}
+.evidence .label {
+  display: block;
+  margin-bottom: 6px;
+}
+.evidence-chart {
+  position: relative;
+}
+.evidence-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.evidence-note {
+  color: var(--muted);
+  margin-top: 6px;
+}
+.evidence-note a,
+.callcard a {
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.callcard {
+  background: var(--rule2);
+  padding: 12px 14px 14px !important;
+  border-top-color: var(--cobalt) !important;
+}
+.callcard p + p {
+  margin-top: 8px;
+}
+.callcard-test {
+  font-weight: 600;
+  color: var(--ink);
+}
+.callcard-what {
+  color: var(--muted);
+}
+.callcard-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: center;
+}
+@media (min-width: 1000px) {
+  .article [data-published-body] .evidence {
+    float: right;
+    clear: right;
+    width: 330px;
+    margin: 0.35em 0 1.2em 32px;
+  }
+}
+.article [data-published-body]::after {
+  content: "";
+  display: block;
+  clear: both;
+}
+
+/* The front page's latest chapter on a phone (2026-11-14): the numeral is a marker, not a poster, and the byline the
+   chapter page itself carries is not repeated — the page stays inside its phone-length budget. */
+.ch-numeral {
+  font-size: 130px;
+}
+@media (max-width: 640px) {
+  .ch-numeral {
+    font-size: 72px;
+  }
+  .ch-byline {
+    display: none;
+  }
+}
+
+/* The Laboratory's index figures (2026-11-14, sprint II): the findings as a forest plot — pair, axis, how often it
+   was listed — and each test's paired days against what a verdict needs. */
+.forest {
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+}
+.forest-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px 150px;
+  gap: 4px 24px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.forest-row:last-child {
+  border-bottom: 0;
+}
+.forest-row > :last-child {
+  text-align: right;
+}
+.forest-head {
+  padding: 8px 0 4px;
+  align-items: end;
+}
+.forest-row svg {
+  display: block;
+}
+.lab-test-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.lab-arms svg {
+  display: block;
+}
+@media (max-width: 760px) {
+  .forest-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .forest-row > :last-child {
+    text-align: left;
+  }
+  .forest-head .label {
+    display: none;
+  }
+  .lab-test {
+    flex-direction: column;
+    align-items: flex-start !important;
+  }
+  .lab-test-side {
+    align-items: flex-start;
+  }
+}

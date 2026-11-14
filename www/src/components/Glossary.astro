@@ -1,0 +1,76 @@
+---
+// The record's vocabulary in one fold (2026-11-14, sprint II): a reader met "verified", "as graded now", "could not be
+// checked", "flagged" and "a guess that nothing changes" on the ledger and the coach pages and had to open the method
+// pages to learn what each means. Every definition restates the producer's own rule text (calibration.json
+// `verification_summary.rules`, `comparison.method`, the ledger's status words in lib/format.js); none adds a claim.
+import { href } from "../lib/url.js";
+
+const TERMS: [string, string][] = [
+  ["right · wrong", "Code, not a person, compared the call with the published reading it named, by the test shown on the call's own page. Right means inside that test's tolerance."],
+  ["open", "The day or window the call was made for has not finished."],
+  ["could not be checked", "There were too few readings to grade it either way."],
+  ["observation · not graded", "A remark about the data rather than a forecast. There is nothing to grade, by design."],
+  ["as graded now", "The ledger's current grade for every call, with its recorded corrections applied. Not re-verified."],
+  ["checked under the current rules", "A forecast that could be checked fairly, counted once, whose grade was reproduced when it was re-checked, or carries its recorded correction. The comparisons with a guess count only these."],
+  ["as first graded", "The archive: every grade as it stood before the rules for which calls count were corrected. Kept as history, never used as the score."],
+  ["a guess that nothing changes", "A rule that says the measure stays at its last reading before the call. The same grader scores it on exactly the same calls."],
+  ["no detectable difference · too few to tell", "The test looks only at calls where one of the two was right and the other wrong. Either it found no difference it could tell from chance, or there were too few such calls to test."],
+  ["flagged", "The grader marks a grade made across a logging gap, on too little data, or on a stand-in measure. A flagged grade still counts."],
+];
+---
+
+<details class="gloss" data-glossary>
+  <summary>What these words mean</summary>
+  <dl>
+    {TERMS.map(([t, d]) => (
+      <div>
+        <dt>{t}</dt>
+        <dd>{d}</dd>
+      </div>
+    ))}
+  </dl>
+  <p><a href={href("/system/calibration/")}>The full method, and every call left out →</a></p>
+</details>
+
+<style>
+  .gloss {
+    border-top: 1px solid var(--ink);
+    border-bottom: 1px solid var(--ink);
+    margin-top: 18px;
+  }
+  .gloss summary {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .gloss dl {
+    margin: 0 0 10px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+    gap: 0 32px;
+  }
+  .gloss dl > div {
+    padding: 10px 0;
+    border-top: 1px solid var(--rule);
+  }
+  .gloss dt {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+  }
+  .gloss dd {
+    margin: 4px 0 0;
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--muted);
+  }
+  .gloss p {
+    font-size: 13px;
+    font-weight: 700;
+    padding-bottom: 12px;
+  }
+</style>
