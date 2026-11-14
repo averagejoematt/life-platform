@@ -224,7 +224,7 @@ class TestEveryNarrativePromptBuilderCarriesTheBlock:
         assert MARKER in body["system"]
         # the phase numbers ride the payload → the ADR-104 allow-list
         payload = som._narration_payload(state)
-        assert payload["phase"]["days_in"] == 4 and payload["phase"]["week_num"] == 1
+        assert payload["phase_context"]["days_in"] == 4 and payload["phase_context"]["week_num"] == 1
 
     def test_state_of_matthew_hand_built_state_still_gets_block(self):
         # fixtures/evals that skip assemble_state cannot dodge the block
