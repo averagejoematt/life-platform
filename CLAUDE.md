@@ -78,7 +78,7 @@ python3 mcp_bridge.py
 
 **Prompt caching (COST-OPT-2, ADR-049)** — `ai_calls.py`/`retry_utils.py` auto-wrap system messages as cached blocks, but **a `cache_control` block is NOT evidence of caching**: below the model's minimum cacheable prefix it is silently ignored. Read the floors and per-caller record from `lambdas/ai/prompt_cache.py` and the live proof from the `PromptCacheNoOp` metric. Haiku for structured tasks, Sonnet for narrative; `AI_MODEL` overrides.
 
-**Format gate (ENFORCED)** — CI runs `black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/` (line-length 140, `pyproject.toml`) and fails the build; `ruff` and flake8 (`.flake8`) also run. **Format before committing** (`deploy/agent_commit.sh` uses the pinned black). The gates report independently and the CI pins can drift from `requirements-dev.txt` — `docs/CONVENTIONS.md` §4.
+**Format gate (ENFORCED)** — CI runs `black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/ qa/` (line-length 140, `pyproject.toml`) and fails the build; `ruff` and flake8 (`.flake8`) also run. **Format before committing** (`deploy/agent_commit.sh` uses the pinned black). The gates report independently and the CI pins can drift from `requirements-dev.txt` — `docs/CONVENTIONS.md` §4.
 
 ## CDK Structure
 
@@ -86,7 +86,7 @@ The stacks are `cdk/stacks/*_stack.py`, entry point `cdk/app.py`; each stack cre
 
 ## CI/CD
 
-`.github/workflows/ci-cd.yml`: Lint → Test → Plan → Deploy (manual approval, GitHub Environment `production`) → Smoke → auto-rollback; OIDC auth, no long-lived keys. Site QA (ADR-076) is `deploy/smoke_test_site.sh`, `lambdas/operational/qa_smoke_lambda.py` and the gating Playwright + AI-vision sweep `qa/visual_qa.py --screenshot --ai-qa` (the `/qa` skill); how the visual gate gates and when it rolls back is `docs/CONVENTIONS.md` §4b.
+`.github/workflows/ci-cd.yml`: Lint → Test → Plan → Deploy → Smoke → auto-rollback; OIDC auth, no long-lived keys. Code ships on green with no approval click (ADR-158, #4256); the one manual approval left is the additive-IAM CDK job `deploy-iam` (GitHub Environment `production`), and only when the push changed `cdk/` or `infra/`. Site QA (ADR-076) is `deploy/smoke_test_site.sh`, `lambdas/operational/qa_smoke_lambda.py` and the gating Playwright + AI-vision sweep `qa/visual_qa.py --screenshot --ai-qa` (the `/qa` skill); how the visual gate gates and when it rolls back is `docs/CONVENTIONS.md` §4b.
 
 ## AI Inference (Bedrock + Budget Guard)
 
