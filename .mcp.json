@@ -3,7 +3,11 @@
     "life-platform": {
       "command": "python3",
       "args": ["mcp_bridge.py"],
-      "cwd": "/Users/matthewwalker/dev/life-platform"
+      "cwd": "/Users/matthewwalker/dev/life-platform",
+      "env": {
+        "AWS_PROFILE": "ajm-admin",
+        "AWS_REGION": "us-west-2"
+      }
     }
   }
 }
