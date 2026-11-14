@@ -172,8 +172,10 @@ def cap_lines(blocks: list[Any]) -> list[str]:
     the load reason, the pain stop line and the pain assess line always stay. Returns the line."""
     from training import hevy_note_grammar as g, session_block as sb
 
-    def rank(ln: str) -> int:  # lower goes first
+    def rank(ln: str, lines: list[str]) -> int:  # lower goes first
         t = ln.strip()
+        if t.startswith("Same load all sets:") and any(x.strip().startswith("Same load: ") for x in lines):
+            return 1  # fix round 12: one load reason — the engine's own hold outranks the composer's layoff line
         if t.startswith(("Pain past", "Heavier", "Lighter", "Same load", "Still hurts", "Both RPE", "W set", "W at ")) or g.EFFORT_RE.match(
             t
         ):
@@ -185,7 +187,7 @@ def cap_lines(blocks: list[Any]) -> list[str]:
         block, own = sb.split(b.notes or "")
         lines = [ln for ln in own.split("\n") if ln.strip()]
         while g.phone_lines("\n".join(lines)) > g.LIFT_MAX_LINES:
-            drop = min((rank(ln), -i) for i, ln in enumerate(lines))
+            drop = min((rank(ln, lines), -i) for i, ln in enumerate(lines))
             if drop[0] >= 9:
                 break
             lines.pop(-drop[1])

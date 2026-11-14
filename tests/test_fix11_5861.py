@@ -295,9 +295,10 @@ def test_every_lift_note_fits_four_phone_lines():
     def over(w):
         return [x["key"] for x in _lifts(w["week"]) if g.phone_lines(sb.split(x["hevy_note"] or "")[1].strip()) > g.LIFT_MAX_LINES]
 
-    for prof in (A, FIX10["r5_garage_hip_knee"], PROFILES["b_shoulder_flag_low_recovery"]):
+    for prof in (A, FIX10["r5_garage_hip_knee"], FIX10["r1_knee_and_lowback_5day"], PROFILES["b_shoulder_flag_low_recovery"]):
         assert over(_week(prof)) == [], prof["name"]
-    off = _week(PROFILES["b_shoulder_flag_low_recovery"], {(live_safety, "cap_lines"): lambda blocks: []})
+    # control (fix round 12: the stop line now fits one phone line, so the shoulder week no longer overflows on its own)
+    off = _week(FIX10["r1_knee_and_lowback_5day"], {(live_safety, "cap_lines"): lambda blocks: []})
     assert over(off)
 
 
