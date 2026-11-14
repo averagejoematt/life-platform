@@ -8,6 +8,7 @@ import Base from "../layouts/Base.astro";
 import Provenance from "../components/Provenance.astro";
 import StatusTag from "../components/StatusTag.astro";
 import VersusGuess from "../components/VersusGuess.astro";
+import OpenQuestions from "../components/OpenQuestions.astro";
 import { headline, weeklyBars } from "../lib/chart.js";
 import { dayInWords, domainWords, num, kOfN, clip } from "../lib/format.js";
 import { connectedTo, loadAll, loadSeries, latestEdition, dayLine } from "../lib/snapshot.js";
@@ -259,6 +260,8 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
       </section>
     )
   }
+
+  <OpenQuestions measured={measured} foodText={week?.measures?.food?.state === "ok" ? week.measures.food.data?.text : null} />
 
   <section class="section hair">
     <div class="wrap">
