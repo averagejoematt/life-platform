@@ -480,8 +480,8 @@ def summary(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any]) ->
 
 
 def _zero_by_design(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any]) -> list[str]:
-    """Fix round 9 (F): a priority muscle the week's plan gives this morning that the pain rule took to ZERO is said plainly —
-    never "held" (the eighth red team's garage + sharp shoulder: chest 0 while a line claimed 8)."""
+    """A muscle the week's plan gives this morning that the pain rule took to ZERO (no reviewed low-stress route) is said plainly,
+    priority muscles first — never "held" (fix round 9 F; fix round 10: every muscle, ruling 16 — no unreviewed route stands in)."""
     from training import live_settings, live_volume, selection_engine as se
 
     lib = se.load_library_failsoft() or {}
@@ -491,14 +491,15 @@ def _zero_by_design(blocks: list[Any], rx: dict[str, Any], movements: dict[str, 
         (live_volume.lib_entry(b.movement_key, movements, lib), 1, None, b.movement_key, movements) for b in blocks
     )
     pain = [ln for ln in (rx.get(MARK) or {}).get("lines") or [] if ln.startswith("skipped (live)") and (" pain" in ln or "flag" in ln)]
-    out = []
-    for m in prio:
-        if plan.get(m) and not final.get(m) and pain:
-            out.append(
-                f"today: {m} 0 here by design — the pain rule took its pressing/squatting off and no lower-stress {m} "
-                "option is available; it returns when the flag clears"
-            )
-    return out
+    marks = live_volume._marks()
+    zero = [m for m in dict.fromkeys(prio + sorted(plan)) if m in marks and plan.get(m, 0) >= 1 and not final.get(m)]
+    if not (zero and pain):
+        return []
+    names = ", ".join(zero)
+    return [
+        f"today: {names} 0 here by design — the pain rule took that work off and no reviewed lower-stress option is available; "
+        "it returns when the flag clears"
+    ]
 
 
 def contradictions(blocks: list[Any], rx: dict[str, Any]) -> list[str]:

@@ -332,10 +332,10 @@ def test_a_priority_muscle_a_pain_flag_takes_to_zero_is_said_plainly():
     w = _week(FIX9["n6_garage_sharp_shoulder"])
     assert w["hard"].get("chest", 0) == 0
     lines = [ln for s in w["week"]["sessions"] for ln in s["rationale"]]
-    assert any(ln.startswith("today: chest 0 here by design") for ln in lines)
+    assert any(ln.startswith("today: chest") and " 0 here by design" in ln for ln in lines)
     assert not any("chest held" in ln for ln in lines)
     off = _week(FIX9["n6_garage_sharp_shoulder"], {(ls, "_zero_by_design"): lambda *a: []})  # control: silent zero
-    assert not any(ln.startswith("today: chest 0") for s in off["week"]["sessions"] for ln in s["rationale"])
+    assert not any(ln.startswith("today: chest") for s in off["week"]["sessions"] for ln in s["rationale"])
 
 
 def test_a_sharp_low_back_flag_reaches_every_spine_loading_lift():

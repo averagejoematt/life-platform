@@ -168,7 +168,8 @@ def hard_sets(items: Any) -> dict[str, float]:
 SHORT_ROTATION = ("calves", "side_delts", "triceps")
 """Fix round 10 (the ninth red team: three 1-morning weeks running served calves 0, side delts 0, triceps 1.5 every week): a
 1-3 morning week aims ONE of these at a 2-set slot, rotating by ISO week — consecutive short weeks rotate what is under target,
-with no state to keep."""
+with no state to keep. A 1-morning week has room for one accessory slot (6 movements), so the direct ab sets take their turn in
+the rotation (owner ruling #8: reductions allowed on a short week)."""
 
 
 def targets(lib: dict[str, Any], mornings: int, high_fatigue: bool = False, monday: str | None = None) -> dict[str, dict[str, float]]:
@@ -196,15 +197,19 @@ def targets(lib: dict[str, Any], mornings: int, high_fatigue: bool = False, mond
     for head, aim in cfg.value("delt_heads").items():  # a short week aims at the side delt pro rata (no floor: time decides)
         if not short:
             out[head] = {"floor": float(aim), "aim": float(aim), "cap": 99.0}
-        elif head == "side_delts":
+        elif head == "side_delts" and mornings > 1:  # one morning: the side delt takes its turn in SHORT_ROTATION
             out[head] = {"floor": 0.0, "aim": float(math.ceil(float(aim) * mornings / 5)), "cap": 99.0}
     if short and monday:
         from common.pacific_time import parse_day_key
 
         d = parse_day_key(str(monday)[:10])
-        owed = SHORT_ROTATION[d.isocalendar()[1] % len(SHORT_ROTATION)] if d else None
-        if owed in out:
-            out[owed]["aim"] = max(out[owed]["aim"], float(cfg.value("slot_min_sets")) + 1)  # two short: its fill slot joins
+        turn = (("abs",) if mornings == 1 else ()) + SHORT_ROTATION  # one morning has ONE accessory slot: abs take their turn
+        owed = turn[d.isocalendar()[1] % len(turn)] if d and turn else None
+        if mornings == 1 and owed and owed != "abs" and "abs" in out:
+            out["abs"] = {"floor": 0.0, "aim": 0.0, "cap": out["abs"]["cap"]}
+        if owed and owed != "abs":  # two short: its fill slot joins
+            row = out.setdefault(owed, {"floor": 0.0, "aim": 0.0, "cap": 99.0})
+            row["aim"] = max(row["aim"], float(cfg.value("slot_min_sets")) + 1)
     return out
 
 
