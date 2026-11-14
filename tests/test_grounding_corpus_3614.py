@@ -52,8 +52,10 @@ CORPUS_DIR = _TESTS / "grounding_corpus"
 # Seeded 2026-09-05 (#3614): the review's eight — five caught (two by the #3614
 # stale_reset_date class, one by the #3518 plan class, one by the #1242 date class, one by
 # the ADR-104 number class), three open (#3516 x2, #3519's structured field).
-MIN_SPECIMENS = 8
-MIN_CAUGHT = 7  # 5 → 7 on 2026-09-19: the two #3516 source-facet specimens (the gate became replayable)
+# 8 → 9 specimens and 7 → 8 caught on 2026-11-14 (#5933): the 2026-10-31 weekly_priority origin idiom
+# ("brought him from 305 lbs to 296.1 lbs"), caught by stale_baseline's from-X framing.
+MIN_SPECIMENS = 9
+MIN_CAUGHT = 8  # 5 → 7 on 2026-09-19: the two #3516 source-facet specimens (the gate became replayable)
 
 REQUIRED_KEYS = {
     "id",
