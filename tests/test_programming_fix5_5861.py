@@ -179,7 +179,7 @@ def test_above_the_mild_line_the_flagged_pattern_is_off_for_the_session():
     b = _week("b_shoulder_flag_low_recovery")
     presses = [x for x in _lifts(b["week"]) if _entry(b, x["key"]).get("pattern") in PRESS]
     assert all(_entry(b, x["key"])["joint_stress"]["shoulder"] == "low" for x in presses), [x["key"] for x in presses]
-    assert all(_top_rpe(x["hevy_note"]) <= 8 and "stop this lift" in x["hevy_note"] for x in presses)
+    assert all(_top_rpe(x["hevy_note"]) <= 8 and "stop the lift" in x["hevy_note"] for x in presses)
     real = lp.joint_flags
     reduce = lambda ctx, workouts, discomfort: [f | {"tier": "reduce"} for f in real(ctx, workouts, discomfort)]  # noqa: E731
     soft = _week("b_shoulder_flag_low_recovery", {(lp, "joint_flags"): reduce})
@@ -201,11 +201,11 @@ def test_same_joint_isolation_is_capped_with_the_stop_line_under_an_elbow_flag()
     # FIX7; fix round 11: a stated 5/10 routes only the provoking bench — a triceps extension is LOW on the elbow or held (RPE <= 8,
     # the stop line)
     assert all(
-        _top_rpe(x["hevy_note"]) <= 8 and (_entry(k, x["key"])["joint_stress"]["elbow"] == "low" or "stop this lift" in x["hevy_note"])
+        _top_rpe(x["hevy_note"]) <= 8 and (_entry(k, x["key"])["joint_stress"]["elbow"] == "low" or "stop the lift" in x["hevy_note"])
         for x in tri
     )
     curls = [x for x in _lifts(k["week"]) if _entry(k, x["key"]).get("pattern") == "curl"]
-    assert curls and all(_top_rpe(x["hevy_note"]) <= 8 and "stop this lift" in x["hevy_note"] for x in curls)
+    assert curls and all(_top_rpe(x["hevy_note"]) <= 8 and "stop the lift" in x["hevy_note"] for x in curls)
     old = copy.deepcopy(LIB0)
     for e in old["movements"].values():
         if (e.get("provocation_floor") or {}).get("elbow"):
@@ -357,7 +357,7 @@ def test_a_joint_located_sore_note_at_the_mild_line_is_light_discomfort():
     flagged = [ln for ln in _lines(h, "held (live)") if "(elbow, 2/10)" in ln]  # FIX7: low discomfort touches this lift only
     assert flagged
     oh = [x for x in _lifts(h) if x["key"] == "overhead_triceps_extension_cable"]
-    assert oh and all(_top_rpe(x["hevy_note"]) <= 8 and "stop this lift" in x["hevy_note"] for x in oh)  # light-and-keep: a hard set
+    assert oh and all(_top_rpe(x["hevy_note"]) <= 8 and "stop the lift" in x["hevy_note"] for x in oh)  # light-and-keep: a hard set
     off = _week("h_heavy_walker", {(lrules, "note_class"): lambda note: pain_class(str(note or ""))})["week"]  # control
     assert not [ln for ln in _lines(off, "kept (live)") if "(elbow, 2/10)" in ln]
 

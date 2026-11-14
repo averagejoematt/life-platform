@@ -150,7 +150,7 @@ def knee_breaches(w: dict) -> list[str]:
             e = _entry(w, x["key"])
             knee = str((e.get("joint_stress") or {}).get("knee"))
             squat = lp._group(e.get("pattern")) == "squat"
-            held = _top_rpe(x["hevy_note"]) <= 8 and "stop this lift" in (x["hevy_note"] or "")  # fix round 11: held, not routed
+            held = _top_rpe(x["hevy_note"]) <= 8 and "stop the lift" in (x["hevy_note"] or "")  # fix round 11: held, not routed
             if (knee == "high" and not held) or (squat and knee == "moderate" and _top_rpe(x["hevy_note"]) > 8):
                 out.append(f"{s['role']}: {x['key']} knee {knee} @ RPE {_top_rpe(x['hevy_note']):g}")
     return out
@@ -189,7 +189,7 @@ def test_mild_pain_keeps_the_movement_lighter_with_a_stop_line(weeks):
     i = weeks[("i_mild_pain_low_back", False)]["week"]
     lh = next(s for s in i["sessions"] if s["role"] == "lower_heavy")
     dl = next(x for x in lh["lifts"] if x["key"] == "deadlift_barbell")
-    assert _top_rpe(dl["hevy_note"]) <= 8 and "Pain past 2/10 or sharp → stop this lift." in dl["hevy_note"]
+    assert _top_rpe(dl["hevy_note"]) <= 8 and "Pain past 2/10 or sharp → stop the lift." in dl["hevy_note"]
     assert any(ln.startswith("load (live): Deadlift (Barbell)") and " — hold: " in ln for ln in _lines(lh))
     old = _week("i_mild_pain_low_back", {(lsafe, "blocked_pain_is_mild"): lambda entry, ctx: False})
     assert "deadlift_barbell" not in {x["key"] for x in next(s for s in old["week"]["sessions"] if s["role"] == "lower_heavy")["lifts"]}
@@ -202,7 +202,7 @@ def unstopped(week: dict) -> list[str]:
         touched = {ln.split("(live): ", 1)[1].split(" — ")[0] for ln in _lines(s) if ln.startswith("held (live): ")}
         touched |= {ln.split(" -> ", 1)[1].split(" — ")[0] for ln in _lines(s) if ln.startswith("swapped (live): ") and " flag on " in ln}
         out += [
-            f"{s['role']}: {x['key']}" for x in s["lifts"] if x["title"] in touched and "→ stop this lift." not in (x["hevy_note"] or "")
+            f"{s['role']}: {x['key']}" for x in s["lifts"] if x["title"] in touched and "→ stop the lift." not in (x["hevy_note"] or "")
         ]
     return out
 

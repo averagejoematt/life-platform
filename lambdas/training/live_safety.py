@@ -52,7 +52,7 @@ JOINT_GROUP = {"knee": "squat"}
 (squat, lunge, split squat, step-up — the `squat` pattern — and leg extension) whatever lift the note was on. Other joints keep
 the flagged movement's own group (a shoulder flag on a press avoids presses)."""
 STOP_LINE: dict[str, Any] = {
-    "value": "Pain past {n}/10 or sharp → stop this lift.",
+    "value": "Pain past {n}/10 or sharp → stop the lift.",
     "label": HEURISTIC,
     "basis": "fourth red team (physio): a pain-flagged lift needs an in-set rule. The pain-monitoring line is PAIN_RULE mild_max "
     "(3/10) or the stated score when lower: pain above it, or turning sharp, ends that lift for the day (practitioner consensus)",

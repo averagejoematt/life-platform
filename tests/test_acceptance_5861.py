@@ -478,7 +478,7 @@ def joint_unprotected(week: dict, lib: dict, catalog: dict, joint: str, group: s
             continue
         if lp._group(e.get("pattern")) == group and lp._stress(e, joint) >= 1:
             out.append(f"{x['key']}: same pattern")
-        elif e.get("pattern") in PROVOKING.get(joint, ()) and not (capped_at(x["hevy_note"], 8) and "stop this lift" in x["hevy_note"]):
+        elif e.get("pattern") in PROVOKING.get(joint, ()) and not (capped_at(x["hevy_note"], 8) and "stop the lift" in x["hevy_note"]):
             out.append(f"{x['key']}: no cap")
     return out
 

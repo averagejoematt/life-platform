@@ -255,7 +255,7 @@ def test_a_stated_pain_score_routes_only_the_provoking_lift():
     assert w["hard"].get("quadriceps", 0) >= LANDMARKS["quadriceps"]["MEV"] and w["hard"].get("glutes", 0) > 0, w["hard"]
     for x in _lifts(w["week"], "lower_heavy"):
         if x["key"] in ("squat_barbell", "deadlift_barbell"):
-            assert (sw.lift_effort(x["hevy_note"]) or 9) <= 8 and "stop this lift" in x["hevy_note"], x
+            assert (sw.lift_effort(x["hevy_note"]) or 9) <= 8 and "stop the lift" in x["hevy_note"], x
     floor = live_settings.value("min_session_minutes")
     assert all(s["lifting_minutes"] >= floor or any("a short morning" in ln for ln in s["rationale"]) for s in w["week"]["sessions"])
     real = live_pain.hit

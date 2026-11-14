@@ -232,7 +232,7 @@ def for_live_draft(
     `week`: the served day's week plan (`live_sequence.entry_week`, on the day entry); `set_cap` the session set ceiling."""
     if not is_live(rotation):
         return rx
-    from training import fatigue_model, live_load, live_program, live_settings, live_volume
+    from training import fatigue_model, live_load, live_program, live_sequence, live_settings, live_volume
 
     out = copy.deepcopy(rx)
     lines: list[str] = []
@@ -272,8 +272,13 @@ def for_live_draft(
         ctx["in_block"] = in_block_variant.performed_in_block(block_workouts, catalog, target)  # a guest anchor's variant
         mornings = int((week or {}).get("days") or 5)
         last = live_volume.last_trained(block_workouts, catalog, lib, target)  # the weekly memory (ties: longest ago first)
+        monday = live_sequence.week_start(target)  # before this week only: the plan is the same for every morning of the week
         ctx["logged_tids"] = frozenset(
-            str(x.get("template_id") or "").upper() for w in block_workouts or [] for x in w.get("exercises") or [] if x.get("sets")
+            str(x.get("template_id") or "").upper()
+            for w in block_workouts or []
+            if str(w.get("date") or str(w.get("sk") or "")[5:15])[:10] < monday
+            for x in w.get("exercises") or []
+            if x.get("sets")
         )
         ctx["no_new"] = fatigue_model.strained_inputs(inputs, block_workouts, lib)  # a high-fatigue day adds nothing new
         plan = live_volume.week_plan(

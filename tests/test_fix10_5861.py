@@ -98,7 +98,7 @@ def test_a_joint_flag_reaches_every_lift_loading_that_joint_and_the_muscle_keeps
         title = ln[len("load (live): ") :].rsplit(" — ", 1)[0].rsplit(" ", 2)[0]
         assert live_program._stress(sw._lib_entry(lib, cat, by_title.get(title, "")), "hip") < 1, ln
     held = {x["key"]: x for s in w["week"]["sessions"] if s["role"] == "lower_heavy" for x in s["lifts"]}
-    assert "deadlift_barbell" in held and "stop this lift" in held["deadlift_barbell"]["hevy_note"]
+    assert "deadlift_barbell" in held and "stop the lift" in held["deadlift_barbell"]["hevy_note"]
     assert all(w["hard"].get(m, 0) > 0 for m in ("hamstrings", "quadriceps", "glutes")), w["hard"]
     real = live_pain.hit
 
