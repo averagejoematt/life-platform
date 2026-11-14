@@ -2,14 +2,34 @@
 import Base from "../../layouts/Base.astro";
 import StatusTag from "../../components/StatusTag.astro";
 import StoryEntry from "../../components/StoryEntry.astro"; // the Human Story (HS1): renders nothing unless WEB_STORY=1
-import { chapterCovers, chapterPublished, dayInWords, rangeInWords } from "../../lib/format.js";
-import { loadAll } from "../../lib/snapshot.js";
+import { chapterCovers, chapterPublished, chapterWindow, dayInWords, num, rangeInWords } from "../../lib/format.js";
+import { loadAll, loadJourney, loadSeries } from "../../lib/snapshot.js";
+import { weekStrip } from "../../lib/theline.js";
 import { hasPage, href, pathOf } from "../../lib/url.js";
 
 const all = await loadAll();
 const chapters = [...all.byType.chapter].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.week ?? 0) - (a.week ?? 0)));
 const published = chapters.filter((c) => c.status === "published").length;
 const episodes = all.byType.episode.length;
+// The line through the chapters (2026-11-14, sprint II): each row carries its week's weigh-ins on the whole journey's
+// weight scale, so reading down the list the line steps back through the weeks — including the weeks with no chapter,
+// which is the point: the experiment went on. The window is the row's own (format.js chapterWindow: the covered days,
+// else the program week); a prologue has none. Public daily weigh-ins only (the weight series).
+const weight = (await loadSeries())["weight_lbs"];
+const readings = weight ? weight.days.filter((d: any) => d.value != null && !d.gap) : [];
+const scale = readings.length ? { lo: Math.min(...readings.map((d: any) => d.value)) - 1, hi: Math.max(...readings.map((d: any) => d.value)) + 1 } : null;
+// The ten-pound marks the platform published (journey.json `rungs`), named on the row whose own days contain the
+// crossing — the list's milestones, each with its real date; a crossing outside every row's days is not placed.
+const journey: any = await loadJourney();
+const rungs: { lb: number; date: string | null }[] = journey && journey.state !== "absent" ? (journey.rungs || []).filter((r: any) => r.date) : [];
+const rungsOf = (c: any) => {
+  const w = (c.week ?? 0) >= 1 ? chapterWindow(c) : null;
+  return w ? rungs.filter((r) => r.date! >= w[0] && r.date! <= w[1]) : [];
+};
+const stripOf = (c: any) => {
+  const w = scale && (c.week ?? 0) >= 1 ? chapterWindow(c) : null;
+  return w ? weekStrip({ days: weight.days, from: w[0], to: w[1], ...scale, muted: c.status !== "published", latest: readings[readings.length - 1].date }) : null;
+};
 ---
 
 <Base title="The story" top="story" description="Every weekly chapter of the experiment, in order: the ones published, and the weeks held or skipped, said plainly.">
@@ -25,28 +45,50 @@ const episodes = all.byType.episode.length;
   </section>
   {/* "the story so far" (HS1) sits flush against the next tag: with WEB_STORY off the page's bytes are unchanged */}<StoryEntry /><section class="section hair">
     <div class="wrap">
-      <div class="rows">
+      {scale && (
+        <div class="chapter-row chapter-head" data-strip-key aria-hidden="true">
+          <span />
+          <span class="label">The line through the chapters · each row draws its own days, newest at the top · a tick at the edge is a morning with no weigh-in</span>
+          <span class="ch-axis mono">
+            <span>{num(scale.lo + 1, 0)}</span>
+            <span>{num(scale.hi - 1, 0)} lb</span>
+          </span>
+          <span />
+        </div>
+      )}
+      <div class="chapter-rows">
         {
           chapters.map((c) => {
             // A held week is listed in words, never linked: it has no page (url.js::hasPage, owner ruling 2026-11-10 item 5).
             const Row = hasPage("chapter", c) ? "a" : "div";
+            const strip = stripOf(c);
             return (
-            <Row href={Row === "a" ? href(pathOf("chapter", c.id)) : undefined} style={c.status !== "published" ? "color:var(--muted)" : ""}>
-              <span style="display:flex;gap:18px;align-items:baseline;min-width:0">
-                <span class={`mono ${c.status === "published" ? "cobalt" : "faint"}`} style="font-size:14px;white-space:nowrap">
-                  {c.week == null ? "—" : String(c.week).padStart(2, "0")}
-                </span>
-                <span style="display:flex;flex-direction:column;gap:3px;min-width:0">
-                  <b style="font-size:18px;letter-spacing:-.02em;line-height:1.15">{c.status === "published" ? c.title : c.week_label}</b>
-                  <span class="serif muted" style="font-size:15px">
-                    {c.status === "published" ? c.excerpt || c.week_label : c.absent_text}
-                  </span>
+            <Row class="chapter-row" href={Row === "a" ? href(pathOf("chapter", c.id)) : undefined} style={c.status !== "published" ? "color:var(--muted)" : ""}>
+              <span class={`mono ch-no ${c.status === "published" ? "cobalt" : "faint"}`}>
+                {c.week == null ? "—" : String(c.week).padStart(2, "0")}
+              </span>
+              <span class="ch-text">
+                <b style="font-size:18px;letter-spacing:-.02em;line-height:1.15">{c.status === "published" ? c.title : c.week_label}</b>
+                <span class="serif muted" style="font-size:15px">
+                  {c.status === "published" ? c.excerpt || c.week_label : c.absent_text}
                 </span>
               </span>
-              <span style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;white-space:nowrap">
+              <span class="ch-strip" set:html={strip ? strip.svg : ""} />
+              <span class="ch-when">
                 <span class="mono muted" style="font-size:12px">
-                  {(c.status === "published" && (chapterCovers(c, { short: true }) || rangeInWords(c.week_start, c.week_end, { short: true }))) || dayInWords(c.date, { short: true })}
+                  {(c.status === "published" && (chapterCovers(c, { short: true }) || rangeInWords(c.week_start, c.week_end, { short: true }))) || rangeInWords(c.week_start, c.week_end, { short: true }) || dayInWords(c.date, { short: true })}
                 </span>
+                {strip && (
+                  <span class="mono" style="font-size:12px" data-strip-weights>
+                    {strip.n > 1 ? `${num(strip.first.value, 1)} → ${num(strip.last.value, 1)} lb` : `${num(strip.last.value, 1)} lb`}
+                    {strip.missing > 0 ? ` · ${strip.missing} blank` : ""}
+                  </span>
+                )}
+                {rungsOf(c).map((r) => (
+                  <span class="mono cobalt" style="font-size:12px" data-rung>
+                    crossed {r.lb} lb · {dayInWords(r.date, { short: true })}
+                  </span>
+                ))}
                 {c.status === "published" && c.published_at && (
                   <span class="mono muted" style="font-size:12px" data-published>
                     {chapterPublished(c)}
@@ -67,3 +109,105 @@ const episodes = all.byType.episode.length;
     </div>
   </section>
 </Base>
+
+<style>
+  .chapter-rows {
+    border-top: 1px solid var(--ink);
+    border-bottom: 1px solid var(--ink);
+  }
+  .chapter-row {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) 220px 190px;
+    column-gap: 22px;
+    align-items: stretch;
+    border-bottom: 1px solid var(--rule);
+    text-decoration: none;
+    color: var(--ink);
+  }
+  .chapter-row:last-child {
+    border-bottom: 0;
+  }
+  .chapter-head {
+    border-bottom: 0;
+    align-items: end;
+    padding-bottom: 8px;
+  }
+  .ch-axis {
+    white-space: nowrap;
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--muted);
+    padding: 0 8px;
+  }
+  a.chapter-row:hover b {
+    text-decoration: underline;
+  }
+  .ch-no,
+  .ch-text,
+  .ch-when {
+    padding: 18px 0;
+  }
+  .ch-no {
+    font-size: 14px;
+    white-space: nowrap;
+    padding-top: 21px;
+  }
+  .ch-text {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+  .ch-strip {
+    position: relative;
+    min-height: 96px;
+    background: linear-gradient(var(--rule2), var(--rule2)) left / 1px 100% no-repeat, linear-gradient(var(--rule2), var(--rule2)) right / 1px 100% no-repeat;
+  }
+  .ch-strip :global(svg) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .ch-when {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    text-align: right;
+  }
+  @media (max-width: 860px) {
+    .chapter-row {
+      grid-template-columns: 26px minmax(0, 1fr) 84px;
+      column-gap: 12px;
+    }
+    .chapter-head > :last-child,
+    .chapter-head .label {
+      display: none;
+    }
+    .chapter-head .ch-axis {
+      grid-column: 3;
+      padding: 0;
+      font-size: 12px;
+    }
+    .ch-text {
+      padding-bottom: 6px;
+    }
+    .ch-strip {
+      grid-column: 3;
+      grid-row: 1 / span 2;
+    }
+    .ch-when {
+      grid-column: 2;
+      grid-row: 2;
+      padding-top: 0;
+      align-items: flex-start;
+      text-align: left;
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 2px 12px;
+    }
+  }
+</style>

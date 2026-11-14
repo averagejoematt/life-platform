@@ -148,6 +148,8 @@ jobs:
       # build's routes checked against the kept site/ pages (deploy/www_owned_paths.py --check-dist).
       - name: Build and scan for the target (scripts/check_www_build.py --scan-only; root adds the live collision check)
         run: |
+          PINS=$(python3 scripts/ci_pins.py pillow)  # the share cards www_build_target.sh draws (scripts/v9_og_images.py)
+          pip install $PINS
           bash deploy/www_build_target.sh "${{ steps.target.outputs.target }}"  # runs scripts/check_www_build.py --scan-only [+ www_owned_paths.py --check-dist]
 
       - name: Sync to the target prefix and invalidate it (root waits for the invalidation)
