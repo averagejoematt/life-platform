@@ -24,7 +24,7 @@ const mine = all.byType.prediction.filter((p) => p.coach_id === c.id).sort((a, b
 const by = (s: string) => (s === "confirmed" || s === "refuted" ? verified(mine, s).length : mine.filter((p) => p.status === s).length);
 const disputed = mine.filter(isDisputed).length;
 // Against a guess that nothing changes, kind by kind (2026-11-14: one paragraph of sentences in a narrow cell).
-// The coach's record as first graded; counts and verdicts as served; kinds never added together.
+// The coach's ledger record as graded now (corrections applied, not re-verified); counts and verdicts as served; kinds never added together.
 const vg = (c.versus_guess?.kinds || []) as { kind: string; scored: number; coach_right: number; rule_right: number; verdict: string }[];
 const coachWord = (v: string) => (v === "coach_better" ? `${c.name.split(" ")[0]} did better` : verdictWords(v));
 // Accountability first (2026-11-14, sprint II): the page used to open on the record as first graded (15 of 34 for the
@@ -71,7 +71,7 @@ const callWords = (p: any, max = 110) => (p.claim_withheld ? heldCallWords(p, ma
         </p>
         <p class="muted" style="font-size:13px">An AI character: software built with Claude, not a person. It reads real data and speaks in its own voice — correlative, never causal.</p>
         <ol class="acct-steps" aria-label="How to read this page">
-          <li><b>{c.record?.n ?? "—"}</b> calls graded in the ledger, on their grades as first written</li>
+          <li><b>{c.record?.n ?? "—"}</b> calls the ledger holds a right-or-wrong grade for today, corrections applied</li>
           <li><b>{lead ? lead.n : "—"}</b> could be checked fairly under the current rules, each grade re-verified</li>
           <li><b>{lead ? lead.k : "—"}</b> of those {first} got right{lead?.baseline ? `; a guess that nothing changes got ${lead.baseline.right}` : ""}</li>
         </ol>
@@ -83,7 +83,7 @@ const callWords = (p: any, max = 110) => (p.claim_withheld ? heldCallWords(p, ma
           ) : (
             <div class="facts">
               <div>
-                <span class="label">Record, as first graded</span>
+                <span class="label">Record, as graded now</span>
                 <span class="v num">{c.record ? kOfN(c.record.right, c.record.n) : "—"}</span>
                 <span class="muted" style="font-size:12px">{c.record?.n ? "not re-verified: no checked record is served for this coach" : c.retired ? "retired" : c.tier === "lead" ? "the lead makes no calls of its own" : "no checked call yet"}</span>
               </div>
@@ -164,9 +164,9 @@ const callWords = (p: any, max = 110) => (p.claim_withheld ? heldCallWords(p, ma
       </div>
       <div style="display:flex;flex-direction:column;gap:22px">
         <div>
-          <p class="label" style="margin-bottom:8px">The ledger as first graded · not re-verified</p>
+          <p class="label" style="margin-bottom:8px">The ledger as graded now · not re-verified</p>
           <div class="facts">
-            <div><span class="label">Every graded call</span><span class="v num">{c.record ? kOfN(c.record.right, c.record.n) : "—"}</span><span class="muted" style="font-size:12px">{c.record?.through ? `right, through ${dayInWords(c.record.through, { short: true })}, on its grades as first written` : "no graded call yet"}</span></div>
+            <div><span class="label">Every graded call</span><span class="v num">{c.record ? kOfN(c.record.right, c.record.n) : "—"}</span><span class="muted" style="font-size:12px">{c.record?.through ? `right, through ${dayInWords(c.record.through, { short: true })}, with recorded corrections applied` : "no graded call yet"}</span></div>
             {c.quality && (
               <div>
                 <span class="label">Grade quality</span>
@@ -180,7 +180,7 @@ const callWords = (p: any, max = 110) => (p.claim_withheld ? heldCallWords(p, ma
         {
           vg.length > 0 && (
             <div data-versus-kinds>
-              <p class="label" style="margin-bottom:8px">Beside a guess that nothing changes · by kind, as first graded</p>
+              <p class="label" style="margin-bottom:8px">Beside a guess that nothing changes · by kind, as graded now</p>
               <div class="scroll">
                 <table class="vk">
                   <thead>

@@ -402,7 +402,7 @@ export function recordHeadline(file) {
       ci95: v.accuracy_ci95 || null,
       records: (vc && vc.records) || null,
       // the producer's archived original grading when served (verification_summary.archive), else the record as served
-      archive: archiveRecord(file.calibration) || { k: rec.confirmed, n: rec.decided, pct: pct(rec.accuracy_pct), label: "as first graded, including grades not re-verified" },
+      archive: archiveRecord(file.calibration) || { k: rec.confirmed, n: rec.decided, pct: pct(rec.accuracy_pct), label: "as graded now, including grades not re-verified" },
     };
   }
   const ci = intervalText(stratum.accuracy_ci95);
@@ -411,12 +411,12 @@ export function recordHeadline(file) {
     mode: "as_graded",
     k: rec.confirmed,
     n: rec.decided,
-    h1: `The coaches were right on ${rec.confirmed} of ${rec.decided} checked calls, as first graded.`,
+    h1: `The coaches were right on ${rec.confirmed} of ${rec.decided} checked calls, as graded now.`,
     dek: [p ? `That is ${p}${ci ? ` — the ${ci}` : "; the 95% interval for the coaches' record is not published yet"}.` : null, baseline, skill].filter(Boolean).join(" "),
-    sentence: `${rec.confirmed} of ${rec.decided} checked calls right as first graded${p ? ` — ${p}${ci ? `, ${ci}` : ", no interval published yet"}` : ""}${baseline ? ` — and ${lower(baseline)}` : ""}.`,
+    sentence: `${rec.confirmed} of ${rec.decided} checked calls right as graded now${p ? ` — ${p}${ci ? `, ${ci}` : ", no interval published yet"}` : ""}${baseline ? ` — and ${lower(baseline)}` : ""}.`,
     ci95: stratum.accuracy_ci95 || null,
     caveat:
-      "These are the grades as the grader first wrote them. The platform does not yet publish which of them were re-verified under the current rules, so read this as the recorded history, not a validated score.",
+      "These are the ledger's grades as they stand now, recorded corrections applied. The platform does not yet publish which of them were re-verified under the current rules, so read this as the recorded history, not a validated score.",
     skill,
     records: (file.calibration.comparison || {}).records || null,
     archive: null,
