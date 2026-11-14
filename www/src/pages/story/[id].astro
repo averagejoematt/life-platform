@@ -8,11 +8,10 @@ import Provenance from "../../components/Provenance.astro";
 import StatusTag from "../../components/StatusTag.astro";
 import Quote from "../../components/Quote.astro";
 import { isDisputed } from "../../lib/disputed.js";
-import { clip, dayInWords, heldCallWords, num } from "../../lib/format.js";
+import { CALL_OUTCOME, chapterCovers, chapterPublished, chapterWindow, clip, dayInWords, heldCallWords, num } from "../../lib/format.js";
 import { latestEdition, loadAll, loadSeries } from "../../lib/snapshot.js";
-import { chapterWindow, dailyBars, placeEvidence, windowValues } from "../../lib/evidence.js";
+import { dailyBars, placeEvidence, windowValues } from "../../lib/evidence.js";
 import { theLine } from "../../lib/theline.js";
-import { CALL_OUTCOME } from "../../lib/format.js";
 import { hasPage, href, pathOf } from "../../lib/url.js";
 
 export async function getStaticPaths() {
@@ -40,7 +39,13 @@ const between = (a: any, b: any) => {
 };
 const gapBefore = between(prev, c);
 const gapAfter = between(c, next);
-const weekDays = all.byType.day.filter((d) => d.chapter_id === c.id).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+// The days the chapter is about (2026-11-14): its covered days when served ("Day 60 to Day 66" — Week 10 covers 4–10
+// November, not its program week 8–14 November), else the program week; never a span read off its data date.
+const win = chapterWindow(c);
+const covered = c.status === "published" && c.covers_start && c.covers_end;
+const weekDays = all.byType.day
+  .filter((d) => (covered ? d.date >= c.covers_start && d.date <= c.covers_end : d.chapter_id === c.id))
+  .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 const dayRow = (d: any) => {
   const r = d.readings || {};
   const bits = [
@@ -54,9 +59,9 @@ const dayRow = (d: any) => {
 // only connection was the day's edition. Every row is a ledger object as served; a call whose words are withheld shows
 // its frozen test, as its own page does.
 const weekCalls =
-  c.status === "published" && c.week_start && c.week_end
+  c.status === "published" && win
     ? all.byType.prediction
-        .filter((p) => (p.status === "confirmed" || p.status === "refuted") && p.settled_date && p.settled_date.slice(0, 10) >= c.week_start && p.settled_date.slice(0, 10) <= c.week_end)
+        .filter((p) => (p.status === "confirmed" || p.status === "refuted") && p.settled_date && p.settled_date.slice(0, 10) >= win[0] && p.settled_date.slice(0, 10) <= win[1])
         .sort((a, b) => (a.settled_date < b.settled_date ? -1 : 1))
     : [];
 const callWords = (p: any) => heldCallWords(p) || p.claim;
@@ -67,7 +72,11 @@ const stateCopy: Record<string, string> = {
 };
 // The calendar week and the address can disagree by design: published chapters keep the journal's post ids
 // (week-04 is program Week 1), which are permanent URLs. The page says which week it is, by its interval.
-const span = c.week_start && c.week_end ? `${(dayInWords(c.week_start) || "").replace(/ \d{4}$/, "")} to ${dayInWords(c.week_end)}` : null;
+// A published chapter shows the days it covers and the day Matthew approved it (2026-11-14: Week 10 read "8 November to
+// 14 November 2026 · Published 10 November 2026" — its program week and its DATA date — while it covers 4–10 November and
+// was approved on 13 November). Without the served dates: the program week, and the data date said as one.
+const span = (c.status === "published" && chapterCovers(c)) || (c.week_start && c.week_end ? `${(dayInWords(c.week_start) || "").replace(/ \d{4}$/, "")} to ${dayInWords(c.week_end)}` : null);
+const publishedWords = chapterPublished(c, { lower: true });
 const legacyNo = /^week-(\d+)$/.exec(c.id);
 const idNote = legacyNo && c.week != null && Number(legacyNo[1]) !== c.week ? `This page's address keeps the journal's post number (${legacyNo[1]}); the chapter is program ${c.week >= 1 ? `week ${c.week}` : "prologue"}.` : null;
 // The body as published, with two presentation-only touches (2026-11-14): the narrator's opening "signature" lines are
@@ -95,24 +104,25 @@ const rawBody = bodyForPage(c.body_html, c.excerpt);
 const series = await loadSeries();
 const edition = await latestEdition();
 const startDate: string | null = edition?.start_date || edition?.blocks?.today?.data?.start_date || null;
-const win = chapterWindow(c, startDate);
+// the same days the header and the day list read (format.js chapterWindow); a prologue has none
+const ev = win && c.status === "published" && (c.week ?? 0) >= 1 ? { from: win[0], to: win[1] } : null;
 const dayById = new Map(all.byType.day.map((d: any) => [d.date, d]));
 const dayLink = (iso: string) => (dayById.get(iso) ? href(pathOf("day", (dayById.get(iso) as any).id)) : null);
-const winWords = win ? `${(dayInWords(win.from, { short: true }) || "").replace(/ \d{4}$/, "")} to ${dayInWords(win.to, { short: true })}` : "";
+const winWords = ev ? `${(dayInWords(ev.from, { short: true }) || "").replace(/ \d{4}$/, "")} to ${dayInWords(ev.to, { short: true })}` : "";
 function evidenceFigure(key: string, title: string, svg: string | null, note: string, link: string | null) {
   if (!svg) return null;
   return `<figure class="evidence" data-evidence="${key}"><figcaption class="label">Evidence · ${title}</figcaption><div class="evidence-chart">${svg}</div><p class="evidence-note">${note}${link ? ` <a href="${link}">The day →</a>` : ""}</p></figure>`;
 }
 const esc = (x: string) => String(x).replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch] as string);
 const figures: { key: string; match: RegExp; html: string }[] = [];
-if (win && c.status === "published" && rawBody) {
+if (ev && c.status === "published" && rawBody) {
   const w = series["weight_lbs"];
   if (w) {
-    const before = new Date(Date.parse(`${win.from}T00:00:00Z`) - 21 * 864e5).toISOString().slice(0, 10);
+    const before = new Date(Date.parse(`${ev.from}T00:00:00Z`) - 21 * 864e5).toISOString().slice(0, 10);
     const from = startDate && before < startDate ? startDate : before;
-    const inWin = windowValues(w, win.from, win.to).filter((d) => d.value != null);
+    const inWin = windowValues(w, ev.from, ev.to).filter((d) => d.value != null);
     const svg = inWin.length
-      ? theLine({ days: w.days.map((d: any) => ({ date: d.date, value: d.value, gap: d.gap })), from, to: win.to, focus: win, shade: false, mobile: true, width: 320, height: 170, aria: `Weigh-ins from ${dayInWords(from)} to ${dayInWords(win.to)}, the chapter's days shaded.` })
+      ? theLine({ days: w.days.map((d: any) => ({ date: d.date, value: d.value, gap: d.gap })), from, to: ev.to, focus: ev, shade: false, mobile: true, width: 320, height: 170, aria: `Weigh-ins from ${dayInWords(from)} to ${dayInWords(ev.to)}, the chapter's days shaded.` })
       : null;
     const a = inWin[0];
     const b = inWin[inWin.length - 1];
@@ -122,7 +132,7 @@ if (win && c.status === "published" && rawBody) {
   }
   const r = series["recovery_score"];
   if (r) {
-    const vals = windowValues(r, win.from, win.to);
+    const vals = windowValues(r, ev.from, ev.to);
     const got = vals.filter((d) => d.value != null);
     const low = got.length ? got.reduce((m, d) => (d.value < m.value ? d : m)) : null;
     const svg = dailyBars({ values: vals, markLow: true, unit: "out of 100", aria: `Morning recovery, ${winWords}.` });
@@ -135,7 +145,7 @@ if (win && c.status === "published" && rawBody) {
     // the floor is the one the chapter's own sentence states ("a floor of 170"); with none stated, none is drawn
     const stated = /floor of (\d{2,3})\b/i.exec((rawBody || "").replace(/<[^>]+>/g, " "));
     const floor = stated ? Number(stated[1]) : null;
-    const vals = windowValues(pr, win.from, win.to);
+    const vals = windowValues(pr, ev.from, ev.to);
     const n = vals.filter((d) => d.value != null).length;
     const met = floor != null ? vals.filter((d) => d.value != null && d.value >= floor).length : null;
     const svg = dailyBars({ values: vals, floor, unit: "g", aria: `Protein logged each day, ${winWords}${floor != null ? `, against the stated floor of ${floor} g` : ""}.` });
@@ -144,7 +154,7 @@ if (win && c.status === "published" && rawBody) {
     if (f) figures.push({ key: "protein", match: /\bprotein\b/i, html: f });
   }
   // a graded call, beside the paragraph that names its coach: the test it was held to, what happened, the grade
-  for (const p of all.byType.prediction.filter((x: any) => (x.status === "confirmed" || x.status === "refuted") && x.settled_date && x.settled_date.slice(0, 10) >= win.from && x.settled_date.slice(0, 10) <= win.to)) {
+  for (const p of all.byType.prediction.filter((x: any) => (x.status === "confirmed" || x.status === "refuted") && x.settled_date && x.settled_date.slice(0, 10) >= ev.from && x.settled_date.slice(0, 10) <= ev.to)) {
     const name = String(p.coach_name || "");
     if (!name || figures.some((f) => f.key === `call:${name}`)) continue;
     const words = p.claim_withheld ? heldCallWords(p) || "" : `“${clip(p.claim, 140)}”`;
@@ -157,7 +167,7 @@ const body = rawBody ? placeEvidence(rawBody, figures).html : rawBody;
 const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
 ---
 
-<Base title={c.title} top="story" description={c.excerpt || c.title} status={dayInWords(c.date)}>
+<Base title={c.title} top="story" description={c.excerpt || c.title} status={dayInWords(c.published_at || c.date)}>
   <section class="section" style="padding-bottom:24px">
     <div class="wrap" style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-end">
       <div style="flex:0 0 150px">
@@ -169,10 +179,10 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
           <span>{c.week_label}</span>
           <span>·</span>
           {span ? <span>{span}</span> : <span>{dayInWords(c.date)}</span>}
-          {span && c.status === "published" && (
+          {span && publishedWords && (
             <>
               <span>·</span>
-              <span>published {dayInWords(c.date)}</span>
+              <span data-published>{publishedWords}</span>
             </>
           )}
           <Provenance object={c} />
@@ -272,7 +282,7 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
       </article>
       <aside style="flex:0 1 300px;min-width:260px">
         {
-          c.status === "published" && c.week_start && (
+          c.status === "published" && win && (
             <section aria-label="Calls graded this week" style="margin-bottom:28px" data-week-calls>
               <p class="label" style="margin-bottom:8px">Calls graded this week · {weekCalls.length}</p>
               {weekCalls.length ? (

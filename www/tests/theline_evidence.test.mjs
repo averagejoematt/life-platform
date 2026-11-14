@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { chapterWindow, dailyBars, placeEvidence, windowValues } from "../src/lib/evidence.js";
+import { dailyBars, placeEvidence, windowValues } from "../src/lib/evidence.js";
 import { lineCounts, theLine } from "../src/lib/theline.js";
 
 const days = [
@@ -29,14 +29,6 @@ test("The Line: one inspectable point per real reading, a missing morning marked
 test("The Line draws no projection and no goal", () => {
   const svg = theLine({ days, startValue: 327.3 });
   assert.doesNotMatch(svg, /goal|projected/i);
-});
-
-test("a chapter's window: the served interval, else the seven days to its data date, never before day one", () => {
-  assert.deepEqual(chapterWindow({ status: "published", week: 10, covers_start: "2026-11-04", covers_end: "2026-11-10" }), { from: "2026-11-04", to: "2026-11-10" });
-  assert.deepEqual(chapterWindow({ status: "published", week: 10, data_through: "2026-11-10" }), { from: "2026-11-04", to: "2026-11-10" });
-  assert.deepEqual(chapterWindow({ status: "published", week: 1, data_through: "2026-09-08" }, "2026-09-06"), { from: "2026-09-06", to: "2026-09-08" });
-  assert.equal(chapterWindow({ status: "published", week: 0, data_through: "2026-08-31" }), null);
-  assert.equal(chapterWindow({ status: "held", week: 8, data_through: "2026-10-31" }), null);
 });
 
 test("daily bars: a day with no reading is an open slot, below the stated floor is hollow, the floor drawn only when given", () => {

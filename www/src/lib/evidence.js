@@ -11,18 +11,6 @@ const t = (iso) => Date.parse(`${iso}T00:00:00Z`);
 const iso = (ms) => new Date(ms).toISOString().slice(0, 10);
 const WEEKDAY = ["S", "M", "T", "W", "T", "F", "S"];
 
-/** The days a chapter covers: its served interval when the snapshot carries one (`covers_start`..`covers_end`),
- * else the seven days ending on its data date, never before day one. A prologue (week 0) has none. */
-export function chapterWindow(c, startDate) {
-  if (!c || c.status !== "published" || !(c.week >= 1)) return null;
-  if (c.covers_start && c.covers_end) return { from: c.covers_start, to: c.covers_end };
-  const to = c.data_through || c.date;
-  if (!to) return null;
-  let from = iso(t(to) - 6 * DAY_MS);
-  if (startDate && from < startDate) from = startDate;
-  return { from, to };
-}
-
 /** The published days of a series inside a window, one entry per calendar day (a day the series lacks is null). */
 export function windowValues(series, from, to) {
   const by = new Map(((series && series.days) || []).map((d) => [d.date, d]));
