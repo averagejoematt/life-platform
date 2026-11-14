@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.47.0",
+  "version": "1.48.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -322,6 +322,13 @@
       "date": "2026-11-11",
       "by": "owner goal 2026-11-11 (#5799: measure lifting minutes against the 75-min ceiling; over it, antagonist supersets for accessories; drop sets only as an owner-selectable short-on-time variant) and owner ruling 2026-11-11 on PR #5811: GO, provided every pair is two non-competing accessories and no main lift is paired; no pair beyond these two without his approval",
       "what": "Adds split.session_minutes.measured_min_sessions (10, platform-proposed: two passes of the five-session sequence) and measured_rule: the per-set time model is re-derived from his measured Hevy sessions and the platform's 45 s constant retires. Adds split.supersets: the antagonist pairs (curl + triceps; lateral raise + rear delt), applied ahead of the accessory time trim when a draft runs over the lifting ceiling, anchors never; drop sets only as an owner-selectable short-on-time variant.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.48.0",
+      "date": "2026-11-13",
+      "by": "owner ruling 2026-11-13 on #5794 (the titrated band rule, follow-up to the 1.46.0 entry)",
+      "what": "A titration step no longer moves prescribed_band_kcal by the same offset as the target (that rule pushed one day type out of band on any step: a step down to 1,350 gave [1450, 1750], leaving a 1,900 lifting day out). A titrated band is [max(base, floor_any_day_kcal), max(base + nutrition.training_day.lifting_uplift_kcal, floor_lifting_day_kcal)]: the served rest day and the served lifting day, so both day-type floors always sit inside it. With no step the band is prescribed_band_kcal unchanged ([1600, 1900]). One rule, health.calorie_target.titrated_band: the weekly titration engine writes it and the resolver re-derives it from a record's base, so a record stamped under the retired rule cannot serve it. Planned maintenance dates keep their own maintenance band.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -1522,7 +1529,7 @@
       "planned_minimum_any_weight_kcal": 1400,
       "records_from_version": "1.21.0",
       "resolver": "health.calorie_target.resolve",
-      "reading": "target_kcal is the day's calorie target (owner ruling R1 2026-10-23: stay ~1,500). A titration record for the week outranks it, unless it was written under a charter version before records_from_version (a record from before the re-target is not the base). The served target is CLAMPED at the day's floor (owner ruling 2026-11-11, #5794, option A): a lifting day is never served under floor_lifting_day_kcal and every other day never under floor_any_day_kcal (the rest-day floor); base_kcal keeps the titrated base and floor_clamp_kcal states the lift. floor_role ('warning') governs the GRADING of logged days: the critics grade logged days against the floors, visibly, never as a veto. The lifting-day and any-day floors grade single days; the 7-day-mean floor is reported, not enforced. prescribed_band_kcal is the calorie habit's floor and ceiling (#5099): since owner ruling 2026-11-11 (#5794) it runs from the any-day floor to the lifting-day floor, so an on-plan rest or lifting day reads in band; a titration record moves it by the same offset it moves the target.",
+      "reading": "target_kcal is the day's calorie target (owner ruling R1 2026-10-23: stay ~1,500). A titration record for the week outranks it, unless it was written under a charter version before records_from_version (a record from before the re-target is not the base). The served target is CLAMPED at the day's floor (owner ruling 2026-11-11, #5794, option A): a lifting day is never served under floor_lifting_day_kcal and every other day never under floor_any_day_kcal (the rest-day floor); base_kcal keeps the titrated base and floor_clamp_kcal states the lift. floor_role ('warning') governs the GRADING of logged days: the critics grade logged days against the floors, visibly, never as a veto. The lifting-day and any-day floors grade single days; the 7-day-mean floor is reported, not enforced. prescribed_band_kcal is the calorie habit's floor and ceiling (#5099): since owner ruling 2026-11-11 (#5794) it runs from the any-day floor to the lifting-day floor, so an on-plan rest or lifting day reads in band; a titration step re-derives it (owner ruling 2026-11-13, #5794): [max(base, floor_any_day_kcal), max(base + nutrition.training_day.lifting_uplift_kcal, floor_lifting_day_kcal)], so both day-type floors always sit inside it; with no step it is this band unchanged.",
       "provenance": "owner",
       "derived_by": "owner ruling 2026-10-23 R1 (#5091) on the target and the band; the floors are the red-team consensus 2026-09-22 (physician + nutritionist), kept as warnings by the same ruling",
       "stated": "2026-10-23"
