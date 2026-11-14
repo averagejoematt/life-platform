@@ -32,7 +32,7 @@ import {
   tileValue,
   unservedText,
 } from "../../../lib/day.js";
-import { callOutcome, dayInWords, num } from "../../../lib/format.js";
+import { callOutcome, dayInWords, heldCallWords, num } from "../../../lib/format.js";
 import { VISIBLE_CAP, callsAboutDay, leadLine } from "../../../lib/day_coaching.js";
 import StatusTag from "../../../components/StatusTag.astro";
 import { gradeNoteRows } from "../../../lib/corrections.js";
@@ -115,6 +115,8 @@ const nearest = d.calls_settled.length ? null : nearestGraded(days, i);
 const predHref = (id: string) => (all.get("prediction", id) ? href(pathOf("prediction", id)) : null);
 // A withheld claim's chip carries the hold's own sentence ("Not quoted: …"), authored copy, never the coach's words (#5609).
 const heldWords = (id: string) => Boolean(all.get("prediction", id)?.claim_withheld);
+// A withheld call reads as its frozen test when one is served (lib/format.js::heldCallWords), else the hold's sentence.
+const heldText = (id: string, fallback: string) => heldCallWords(all.get("prediction", id)) || fallback;
 // Owner rulings 2026-11-03: a verdict under classification review is printed as graded, with the dispute beside it.
 const disputedNote = (id: string) => (isDisputed(all.get("prediction", id)) ? ` · ${DISPUTED_NOTE}` : "");
 const coachHref = (id: string) => (all.get("coach", id) ? href(pathOf("coach", id)) : null);
@@ -661,7 +663,7 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                       {disputedNote(c.prediction_id)}
                     </span>
                     <span>
-                      {c.coach_name}: {heldWords(c.prediction_id) ? c.claim_short : <Quote text={c.claim_short} />}
+                      {c.coach_name}: {heldWords(c.prediction_id) ? heldText(c.prediction_id, c.claim_short) : <Quote text={c.claim_short} />}
                     </span>
                   </a>
                 ))}
@@ -680,7 +682,7 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                           {disputedNote(c.prediction_id)}
                         </span>
                         <span>
-                          {c.coach_name}: {heldWords(c.prediction_id) ? c.claim_short : <Quote text={c.claim_short} />}
+                          {c.coach_name}: {heldWords(c.prediction_id) ? heldText(c.prediction_id, c.claim_short) : <Quote text={c.claim_short} />}
                         </span>
                       </a>
                     ))}
@@ -698,7 +700,7 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                     <a class="callchip" href={predHref(c.prediction_id)}>
                       <span class="k">settles {words(c.due_date)}</span>
                       <span>
-                        {c.coach_name}: {heldWords(c.prediction_id) ? c.text : <Quote text={c.text} />}
+                        {c.coach_name}: {heldWords(c.prediction_id) ? heldText(c.prediction_id, c.text) : <Quote text={c.text} />}
                       </span>
                     </a>
                   ))}

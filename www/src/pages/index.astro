@@ -10,7 +10,7 @@ import StatusTag from "../components/StatusTag.astro";
 import VersusGuess from "../components/VersusGuess.astro";
 import OpenQuestions from "../components/OpenQuestions.astro";
 import { headline, weeklyBars } from "../lib/chart.js";
-import { dayInWords, domainWords, num, kOfN, clip } from "../lib/format.js";
+import { dayInWords, domainWords, num, kOfN, clip, heldCallWords } from "../lib/format.js";
 import { connectedTo, loadAll, loadSeries, latestEdition, dayLine, loadCalibration } from "../lib/snapshot.js";
 import { verifiedLead } from "../lib/calibration.js";
 import { roomPublic } from "../lib/room.js";
@@ -373,7 +373,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
                 {pending.map((p) => (
                   <a href={href(pathOf("prediction", p.id))}>
                     <span style="font-size:14px;line-height:1.35">
-                      <b>{p.coach_name}</b> · {p.claim_withheld && p.grading?.how ? <>the test: {clip(p.grading.how.replace(/\b1 days\b/, "1 day").replace(/\d{4}-\d{2}-\d{2}/g, (iso: string) => dayInWords(iso, { short: true }) || iso), 80)}</> : clip(p.claim, 88)}
+                      <b>{p.coach_name}</b> · {(p.claim_withheld && heldCallWords(p, 80)) || clip(p.claim, 88)}
                     </span>
                     <StatusTag status="pending" date={p.due_date} call />
                   </a>
