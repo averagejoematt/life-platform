@@ -297,7 +297,7 @@ def test_bodyweight_gates_say_unset_is_locked_and_state_the_accepted_standard():
     bw = {g: row for g, row in LIB["gates"].items() if row["kind"] == "bodyweight_threshold" and "ref" in row["threshold"]}
     assert set(bw) == set(cur.READINESS_STANDARDS) and len(bw) == 6
     for gid, row in bw.items():
-        assert row["threshold"]["unset"] == "locked" and "value" not in row["threshold"], gid
+        assert row["threshold_unset"] == "locked" and set(row["threshold"]) == {"ref", "comparison"}, gid
         std = row["readiness_standard"]
         assert std["demonstrate"] and std["confirm"] and "not yet evaluated" in std["status"], gid
         verdict = eg.bodyweight_verdict(gid, row, {"gates": {gid: {"value": None}}}, {"bodyweight": {"mean_lb": 1.0}})
@@ -566,15 +566,17 @@ def test_approval_succeeds_with_every_readiness_gate_locked_on_a_copy(tmp_path):
 
 
 # ── served weeks: nothing unloggable, unavailable, deferred or gated is ever served ───────────────────────────────────
-def _week(name: str, cap: bool, mutate=None):
-    """One synthetic profile's LIVE week (an in-memory approved copy; the committed library is never touched)."""
+def _week(name: str, cap: bool, mutate=None, gym: str | None = "full_club"):
+    """One synthetic profile's LIVE week (an in-memory approved copy; the committed library is never touched). `gym`: the
+    fixture's synthetic full club (the historical machines present), or None for the library's own states, as the owner's
+    week reads them."""
     import sample_weeks_5861 as sw
 
     kept = dict(sw.SETTINGS)
     sw.SETTINGS.clear()
     sw.SETTINGS["session_cap_includes_cardio"] = cap
     try:
-        profile = sw.load_profiles()[name]
+        profile = sw.load_profiles()[name] | {"gym": gym}
         world = sw.build_world(profile, "approved")
         if mutate:
             mutate(world)
@@ -625,6 +627,23 @@ def test_no_served_week_names_an_unloggable_unavailable_deferred_or_gated_moveme
         world, week = _week(name, cap)
         assert sum(len(s["lifts"]) for s in week["sessions"]) > 0
         assert _unservable(world, week) == [], f"{name} cap={cap}"
+
+
+HISTORICAL_IN_TODAYS_PROGRAM = {"machine_row", "machine_shoulder_press", "standing_calf_raise_machine"}
+
+
+def test_a_machine_known_only_from_old_logs_is_swapped_out_of_the_live_week():
+    """Owner ruling 2026-11-14: availability fails SAFE. With the library's own states (no synthetic club), the machines
+    today's program names but the logs only show as historical are never served: the live fit swaps each for an available
+    lift and says so. Control: the same week in a full club (the machines confirmed) serves them."""
+    world, week = _week("a_large_deficit_experienced", True, gym=None)
+    served = {k for _r, k, _e in _served(world, week)}
+    assert not served & HISTORICAL_IN_TODAYS_PROGRAM and _unservable(world, week) == []
+    lines = [ln for s in week["sessions"] for ln in s["live_fit"] or [] if ln.startswith("swapped (live)")]
+    assert any("Seated Row (Machine) ->" in ln and "unknown" in ln for ln in lines), lines
+    assert any("Seated Shoulder Press (Machine) ->" in ln and "unknown" in ln for ln in lines), lines
+    club, confirmed = _week("a_large_deficit_experienced", True)
+    assert {k for _r, k, _e in _served(club, confirmed)} & HISTORICAL_IN_TODAYS_PROGRAM, "control: confirmed machines are served"
 
 
 def test_a_served_movement_that_loses_its_template_is_no_longer_served():

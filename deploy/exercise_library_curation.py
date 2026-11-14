@@ -366,13 +366,14 @@ READINESS_STANDARDS: dict[str, dict[str, list[str]]] = {
 
 def _bw(gid_key: str, what: str) -> dict:
     """A bodyweight gate. Owner ruling 19 (2026-11-13): no bodyweight cut-off is ever derived, so the private threshold stays
-    unset and UNSET IS LOCKED (`threshold.unset`; `exercise_gates.bodyweight_verdict` reads it so, and the private check
+    unset and UNSET IS LOCKED (`threshold_unset`; `exercise_gates.bodyweight_verdict` reads it so, and the private check
     counts it valid). What he would have to show is the accepted readiness standard, stated on the gate."""
     return {
         "kind": "bodyweight_threshold",
         "locks": True,
         "measured_input": "7-day mean bodyweight (Withings), the same reading the charter's bodyweight gates use",
-        "threshold": {"ref": f"overlay:gate_thresholds.{gid_key}", "comparison": "at_or_under", "unset": "locked"},
+        "threshold": {"ref": f"overlay:gate_thresholds.{gid_key}", "comparison": "at_or_under"},
+        "threshold_unset": "locked",  # said on the gate: no threshold is a LOCKED gate, and a valid one
         "unlock_condition": f"LOCKED for {what}: the private threshold is unset, and by owner ruling (2026-11-13) no bodyweight "
         "cut-off is derived, so it stays unset. What opens this is the readiness standard below, shown in logged sessions, once "
         "that standard is built as a measured chain — a follow-up; until then nothing opens it.",

@@ -109,11 +109,15 @@ def test_the_logged_weekly_count_credits_a_lift_through_the_library_never_other(
     """The engine's own weekly count (fatigue_model, read by the live fatigue model and the cron's 7-day volume) credits a logged
     lift through the library target (glutes, hamstrings at the secondary credit), never the catalog's `other`. Control: no
     library -> unplaced, never guessed."""
-    assert CAT0["kettlebell_deadlift"]["primary_muscle"] == "other"
-    rec = [{"date": "2026-11-12", "exercises": [_ex("D20D7BBE", [(35, 8, 8.0), (35, 8, 8.0)])]}]
+    # #5861 fix round 13: the example is the kettlebell high pull (the kettlebell deadlift has no Hevy template until its own
+    # is created — it no longer logs under Sumo Deadlift D20D7BBE, so that id belongs to no library movement)
+    assert CAT0["kettlebell_high_pull"]["primary_muscle"] == "other"
+    rec = [{"date": "2026-11-12", "exercises": [_ex("9B13BA4B", [(35, 8, 8.0), (35, 8, 8.0)])]}]
     hard = fm.hard_sets_by_muscle(rec, fm.library_index(LIB0), as_of="2026-11-13")
-    assert hard.get("glutes") == 2 and hard.get("hamstrings") == 1.0 and "other" not in hard and "unplaced" not in hard
+    assert hard.get("glutes") == 2 and hard.get("back") == 1.0 and "other" not in hard and "unplaced" not in hard
     assert fm.hard_sets_by_muscle(rec, {}, as_of="2026-11-13") == {"unplaced": 2.0}  # control
+    released = [{"date": "2026-11-12", "exercises": [_ex("D20D7BBE", [(35, 8, 8.0)])]}]  # a template no movement holds: never guessed
+    assert fm.hard_sets_by_muscle(released, fm.library_index(LIB0), as_of="2026-11-13") == {"unplaced": 1.0}
 
 
 def test_a_reviewed_rating_ranks_ahead_of_a_provisional_one_at_an_equal_tier():

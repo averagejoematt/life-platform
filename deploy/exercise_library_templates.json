@@ -4,7 +4,7 @@
  "canonical_mappings": {
   "kettlebell_suitcase_carry": {
    "logs_as": "suitcase_carry",
-   "why": "the same carry with a different implement: the Suitcase Carry template names no implement and already holds both dumbbell and kettlebell sessions, so no other exercise's history is mixed in"
+   "why": "the same carry with a different implement: his Suitcase Carry template names no implement (the curation records it as logged with a dumbbell or a kettlebell), so no other exercise's history is mixed in"
   }
  },
  "released": {

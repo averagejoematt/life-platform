@@ -544,6 +544,11 @@ or confirmation) wins over the logs: the preacher curl machine is confirmed unav
 six machines the owner deferred on 2026-11-13 stay `unknown`. "X was taken" / "no bench free" is contention and never
 changes a state. To confirm a machine, add one seed row `{"evidence": "owner_confirmed", "source": "..."}` and rebuild.
 
+The evidence is read from the owner's history, so it says nothing about a synthetic lifter's gym: the sample-week harness
+gives every committed synthetic profile a full club (`sample_weeks_5861.FULL_CLUB`: the `historical_only` machines
+present; never-logged, deferred and unavailable equipment unchanged). A private profile file reads the library's own
+states, so the owner's weeks swap a historical-only machine and say so until he confirms it.
+
 ### Fallbacks: one equivalence rule
 
 A fallback serves the same training function in the slot (`library_integrity.fallback_problems`):

@@ -1547,9 +1547,9 @@
    "measured_input": "7-day mean bodyweight (Withings), the same reading the charter's bodyweight gates use",
    "threshold": {
     "ref": "overlay:gate_thresholds.bw_pull",
-    "comparison": "at_or_under",
-    "unset": "locked"
+    "comparison": "at_or_under"
    },
+   "threshold_unset": "locked",
    "unlock_condition": "LOCKED for bodyweight pull-ups / chin-ups: the private threshold is unset, and by owner ruling (2026-11-13) no bodyweight cut-off is derived, so it stays unset. What opens this is the readiness standard below, shown in logged sessions, once that standard is built as a measured chain — a follow-up; until then nothing opens it.",
    "readiness_standard": {
     "status": "accepted by the owner 2026-11-13 as the criteria; practitioner heuristics; stated here, not yet evaluated",
@@ -1572,9 +1572,9 @@
    "measured_input": "7-day mean bodyweight (Withings), the same reading the charter's bodyweight gates use",
    "threshold": {
     "ref": "overlay:gate_thresholds.bw_dip",
-    "comparison": "at_or_under",
-    "unset": "locked"
+    "comparison": "at_or_under"
    },
+   "threshold_unset": "locked",
    "unlock_condition": "LOCKED for bodyweight dips: the private threshold is unset, and by owner ruling (2026-11-13) no bodyweight cut-off is derived, so it stays unset. What opens this is the readiness standard below, shown in logged sessions, once that standard is built as a measured chain — a follow-up; until then nothing opens it.",
    "readiness_standard": {
     "status": "accepted by the owner 2026-11-13 as the criteria; practitioner heuristics; stated here, not yet evaluated",
@@ -1597,9 +1597,9 @@
    "measured_input": "7-day mean bodyweight (Withings), the same reading the charter's bodyweight gates use",
    "threshold": {
     "ref": "overlay:gate_thresholds.bw_pushup",
-    "comparison": "at_or_under",
-    "unset": "locked"
+    "comparison": "at_or_under"
    },
+   "threshold_unset": "locked",
    "unlock_condition": "LOCKED for floor push-up volume: the private threshold is unset, and by owner ruling (2026-11-13) no bodyweight cut-off is derived, so it stays unset. What opens this is the readiness standard below, shown in logged sessions, once that standard is built as a measured chain — a follow-up; until then nothing opens it.",
    "readiness_standard": {
     "status": "accepted by the owner 2026-11-13 as the criteria; practitioner heuristics; stated here, not yet evaluated",
@@ -1622,9 +1622,9 @@
    "measured_input": "7-day mean bodyweight (Withings), the same reading the charter's bodyweight gates use",
    "threshold": {
     "ref": "overlay:gate_thresholds.bw_nordic",
-    "comparison": "at_or_under",
-    "unset": "locked"
+    "comparison": "at_or_under"
    },
+   "threshold_unset": "locked",
    "unlock_condition": "LOCKED for the Nordic hamstring curl: the private threshold is unset, and by owner ruling (2026-11-13) no bodyweight cut-off is derived, so it stays unset. What opens this is the readiness standard below, shown in logged sessions, once that standard is built as a measured chain — a follow-up; until then nothing opens it.",
    "readiness_standard": {
     "status": "accepted by the owner 2026-11-13 as the criteria; practitioner heuristics; stated here, not yet evaluated",
@@ -1648,9 +1648,9 @@
    "measured_input": "7-day mean bodyweight (Withings), the same reading the charter's bodyweight gates use",
    "threshold": {
     "ref": "overlay:gate_thresholds.bw_hanging",
-    "comparison": "at_or_under",
-    "unset": "locked"
+    "comparison": "at_or_under"
    },
+   "threshold_unset": "locked",
    "unlock_condition": "LOCKED for hanging knee / leg raises: the private threshold is unset, and by owner ruling (2026-11-13) no bodyweight cut-off is derived, so it stays unset. What opens this is the readiness standard below, shown in logged sessions, once that standard is built as a measured chain — a follow-up; until then nothing opens it.",
    "readiness_standard": {
     "status": "accepted by the owner 2026-11-13 as the criteria; practitioner heuristics; stated here, not yet evaluated",
@@ -1673,9 +1673,9 @@
    "measured_input": "7-day mean bodyweight (Withings), the same reading the charter's bodyweight gates use",
    "threshold": {
     "ref": "overlay:gate_thresholds.bw_advanced",
-    "comparison": "at_or_under",
-    "unset": "locked"
+    "comparison": "at_or_under"
    },
+   "threshold_unset": "locked",
    "unlock_condition": "LOCKED for advanced bodyweight skills (pistol, handstand, lever, flag): the private threshold is unset, and by owner ruling (2026-11-13) no bodyweight cut-off is derived, so it stays unset. What opens this is the readiness standard below, shown in logged sessions, once that standard is built as a measured chain — a follow-up; until then nothing opens it.",
    "readiness_standard": {
     "status": "accepted by the owner 2026-11-13 as the criteria; practitioner heuristics; stated here, not yet evaluated",
@@ -96343,7 +96343,7 @@
    "logs_as": {
     "movement_id": "suitcase_carry",
     "template_id": "056A1C53-C778-4ACE-BB18-6F72E81B6724",
-    "why": "the same carry with a different implement: the Suitcase Carry template names no implement and already holds both dumbbell and kettlebell sessions, so no other exercise's history is mixed in"
+    "why": "the same carry with a different implement: his Suitcase Carry template names no implement (the curation records it as logged with a dumbbell or a kettlebell), so no other exercise's history is mixed in"
    },
    "target": {
     "primary": "abs",

@@ -1170,7 +1170,13 @@ def unresolved(lib: dict, pre: dict[str, str]) -> list[str]:
 
 def test_e1_every_pre_epic_key_and_template_id_still_resolves():
     pre = json.loads((REPO / "tests" / "fixtures" / "exercise_library_keys_pre_5861.json").read_text())["keys"]
-    assert len(pre) >= 578 and unresolved(LIB0, pre) == []
+    # #5861 fix round 13 (owner ruling 2026-11-14): the kettlebell deadlift left Hevy's Sumo Deadlift template (never logged
+    # there); the key stays and resolves, the template id belongs to no movement until one is logged under it
+    assert len(pre) >= 578 and unresolved(LIB0, pre) == ["kettlebell_deadlift"] and pre["kettlebell_deadlift"] == "D20D7BBE"
+    assert (
+        xl.canonical_of(LIB0, "kettlebell_deadlift") == "kettlebell_deadlift"
+        and LIB0["movements"]["kettlebell_deadlift"]["template_id"] is None
+    )
     bad = copy.deepcopy(LIB0)  # control: one pre-epic movement removed
     del bad["movements"]["squat_barbell"]
     assert "squat_barbell" in unresolved(bad, pre)
