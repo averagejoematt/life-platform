@@ -244,13 +244,10 @@ def pain_source_state(overlay: dict[str, Any] | None) -> str:
 
 
 def not_for_you_now(entry: dict[str, Any]) -> str | None:
-    """The library's curated `not_for_you_now` verdict, or None. STRUCTURAL (#5861 fix round 13): a movement the Hevy record
-    cannot represent — no template id and no verified canonical mapping — is never selectable, whatever its flags say."""
-    nfy = entry.get("not_for_you_now")
-    if nfy:
-        return f"not_for_you_now ({nfy.get('reason_code')}; unlock: {nfy.get('unlock_condition')})"
+    """The curated `not_for_you_now` verdict, or None; an unloggable movement always has one (#5861 fix round 13, structural)."""
     why = xl.integrity.unloggable(entry)
-    return f"not_for_you_now (not loggable: {why})" if why else None
+    nfy = entry.get("not_for_you_now") or ({"reason_code": "not loggable", "unlock_condition": why} if why else None)
+    return f"not_for_you_now ({nfy.get('reason_code')}; unlock: {nfy.get('unlock_condition')})" if nfy else None
 
 
 def pain_exclusion(entry: dict[str, Any], overlay: dict[str, Any] | None) -> str | None:

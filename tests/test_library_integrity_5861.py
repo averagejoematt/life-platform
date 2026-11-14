@@ -242,7 +242,7 @@ def _indirect_cycle(lib):
     lib["gates"]["chain_dead_hang"]["chain_prerequisites"] = ["hanging_leg_raise"]  # leg raise -> knee raise -> dead hang -> leg raise
 
 
-GATE_CONTROLS = {
+CHAIN_DEFECT_CASES = {
     "a gate that requires the movement it gates (the v0.3.7 defect)": (_old_cycle, "cycle"),
     "an indirect cycle through three gates": (_indirect_cycle, "cycle"),
     "a prerequisite the Hevy record cannot measure": (
@@ -271,9 +271,9 @@ GATE_CONTROLS = {
 }
 
 
-@pytest.mark.parametrize("name", sorted(GATE_CONTROLS))
+@pytest.mark.parametrize("name", sorted(CHAIN_DEFECT_CASES))
 def test_must_fail_each_gate_defect(name):
-    change, words = GATE_CONTROLS[name]
+    change, words = CHAIN_DEFECT_CASES[name]
     errors = li._gate_errors(_gate_lib(change))
     assert any(words in e for e in errors), f"{name}: {errors}"
     assert any(words in e for e in xl.validate(_gate_lib(change))), "the build refuses it"
