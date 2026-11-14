@@ -86,6 +86,11 @@ class Physiological:
 
     drift: float = 0.0
     under: bool = False
+    log: str = "honest"
+    """#5861 fix round 9 (the eighth red team's athletes, ported): `honest` logs the set's true RPE; `rpe10` logs RPE 10 on every
+    set whatever the reps (unreliable RPE); `none` logs no RPE at all."""
+    over: bool = False
+    """The over-performer: 12% stronger than the record says, always does the range top + 2 at the prescribed top RPE."""
     true: dict[str, float] = field(default_factory=dict)
     seed: dict[str, float] = field(default_factory=dict)
 
@@ -131,7 +136,7 @@ class Physiological:
                 lb = float(s["weight_kg"]) * LB_PER_KG
                 if key not in self.true:
                     mid = (int(rr["start"]) + int(rr["end"])) / 2
-                    self.true[key] = self.seed.get(str(tid).upper()) or lb * (1 + (mid + 2) / 30)
+                    self.true[key] = (self.seed.get(str(tid).upper()) or lb * (1 + (mid + 2) / 30)) * (1.12 if self.over else 1.0)
                 rtf = max(0.0, 30 * (self.true[key] / lb - 1))
                 reps = min(int(rr["end"]), int(math.floor(rtf - rir + 1e-9)))
                 if reps < int(rr["start"]):
@@ -139,7 +144,14 @@ class Physiological:
                 reps = max(1, reps - 1) if self.under else reps
                 rpe = min(10.0, 10.0 - (rtf - reps)) if rtf >= reps else 10.0
                 rpe = min(10.0, rpe + 1) if self.under else rpe
-                sets.append({"type": "normal", "weight_kg": round(float(s["weight_kg"]), 3), "reps": int(reps), "rpe": round(rpe * 2) / 2})
+                if self.over:
+                    reps, rpe = int(rr["end"]) + 2, 10.0 - rir
+                row = {"type": "normal", "weight_kg": round(float(s["weight_kg"]), 3), "reps": int(reps), "rpe": round(rpe * 2) / 2}
+                if self.log == "rpe10":
+                    row["rpe"] = 10.0
+                elif self.log == "none":
+                    row.pop("rpe")
+                sets.append(row)
             if sets:
                 exercises.append({"name": key, "template_id": tid, "notes": "", "sets": sets})
         return sw._workout(day, role, exercises)
@@ -169,6 +181,17 @@ def top_loads(week: dict[str, Any]) -> dict[str, list[float]]:
     return out
 
 
+def _role_loads(week: dict[str, Any]) -> dict[tuple[str, str], float]:
+    out = {}
+    for s in week["sessions"]:
+        wires = [w for w in s.get("wire") or [] if _not_cardio(w)]
+        for lift, ex in zip(s.get("lifts") or [], wires):
+            loads = [float(x["weight_kg"]) for x in ex.get("sets") or [] if x.get("type") != "warmup" and x.get("weight_kg")]
+            if loads:
+                out[(str(lift["key"]), str(s["role"]))] = round(max(loads) * LB_PER_KG / 2.5) * 2.5
+    return out
+
+
 def simulate(profile: dict[str, Any], weeks: int, athlete: Athlete | Physiological | None = None, skip: Any = None) -> list[dict[str, Any]]:
     """`weeks` drafted weeks, each performed by `athlete` and fed to the next (a week `skip(k)` names is drafted but NOT
     performed: the alternate-week misser). Returns per week: the date, each lift's top prescribed loads, its reps, the roles,
@@ -194,11 +217,60 @@ def simulate(profile: dict[str, Any], weeks: int, athlete: Athlete | Physiologic
                 "skipped": skipped,
                 "roles": [s["role"] for s in week["sessions"]],
                 "loads": top_loads(week),
+                "role_loads": _role_loads(week),
                 "reps": {lift["key"]: lift["reps"] for s in week["sessions"] for lift in s["lifts"]},
                 "hard": sw.hard_sets_by_muscle(week, world["lib"], world["catalog"]["movements"]),
                 "rationale": {s["role"]: s["rationale"] for s in week["sessions"]},
             }
         )
+    return out
+
+
+def role_loads(rows: list[dict[str, Any]]) -> dict[tuple[str, str], list[float | None]]:
+    """(catalog key, session role) -> its top prescribed load (lb) each week (None when not served): a heavy day and a volume day
+    of one lift are two series (fix round 9: the load model is keyed by session role)."""
+    out: dict[tuple[str, str], list[float | None]] = {}
+    for i, r in enumerate(rows):
+        for (key, role), lb in r["role_loads"].items():
+            out.setdefault((key, role), [None] * len(rows))[i] = lb
+    return out
+
+
+def step_downs(rows: list[dict[str, Any]]) -> dict[tuple[str, str], list[int]]:
+    """(key-title, role) -> the weeks the load model stepped the lift DOWN on evidence (`live_load` "down" lines)."""
+    out: dict[tuple[str, str], list[int]] = {}
+    for r in rows:
+        for role, lines in r["rationale"].items():
+            for ln in lines:
+                if ln.startswith("load (live): ") and " — down: " in ln and "sessions under best" in ln:
+                    out.setdefault((ln[len("load (live): ") :].split(" — ")[0].rsplit(" ", 2)[0], role), []).append(r["week"])
+    return out
+
+
+def falls_without_evidence(rows: list[dict[str, Any]], limit: float = 0.10) -> dict[tuple[str, str], float]:
+    """Every (key, role) series whose load ever sits more than `limit` under its first served load while the model never stepped
+    it down on evidence — the eighth red team's acceptance line ({} = none)."""
+    downs = {role for (_t, role) in step_downs(rows)}
+    out = {}
+    for (key, role), seq in role_loads(rows).items():
+        got = [x for x in seq if x]
+        if len(got) < 2:
+            continue
+        worst = min(got)
+        if worst < got[0] * (1 - limit) and role not in downs:
+            out[(key, role)] = round(1 - worst / got[0], 3)
+    return out
+
+
+def oscillations(rows: list[dict[str, Any]], drop: float = 0.07) -> dict[tuple[str, str], list[float]]:
+    """(key, role) series that fall `drop`+ and climb back to the pre-fall load within three weeks (160 -> 140 -> 125 -> 160)."""
+    out = {}
+    for (key, role), seq in role_loads(rows).items():
+        got = [x for x in seq if x]
+        for i in range(1, len(got)):
+            if got[i] <= got[i - 1] * (1 - drop) and any(x >= got[i - 1] for x in got[i + 1 : i + 4]):
+                out[(key, role)] = got
+                break
     return out
 
 
@@ -230,7 +302,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--athlete",
         default="top",
-        help="top | bottom | stalled:<key>[,<key>] | capacity:<key>=<e1rm lb>[,...] | physio:<steady|gain|drop|under|skip_odd>",
+        help="top | bottom | stalled:<key>[,<key>] | capacity:<key>=<e1rm lb>[,...] | "
+        "physio:<steady|gain|drop|decline|under|skip_odd|rpe10|norpe|over>",
     )
     ap.add_argument("--keys", default="squat_barbell,deadlift_barbell,barbell_bench_press")
     a = ap.parse_args(argv)
@@ -242,7 +315,12 @@ def main(argv: list[str] | None = None) -> int:
         ath = Athlete(capacity={k: float(v) for k, v in (x.split("=") for x in a.athlete.split(":", 1)[1].split(","))})
     elif a.athlete.startswith("physio:"):
         mode = a.athlete.split(":", 1)[1]
-        ath = Physiological(drift={"gain": 0.005, "drop": -0.01}.get(mode, 0.0), under=mode == "under")
+        ath = Physiological(
+            drift={"gain": 0.005, "drop": -0.01, "decline": -0.005}.get(mode, 0.0),
+            under=mode == "under",
+            log={"rpe10": "rpe10", "norpe": "none"}.get(mode, "honest"),
+            over=mode == "over",
+        )
     else:
         ath = Athlete(reps=a.athlete)
     skip = (lambda k: k % 2 == 1) if a.athlete == "physio:skip_odd" else None
@@ -255,6 +333,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"| {r['week']} | {r['monday']} | " + " | ".join(cells) + " |")
     for k in keys:
         print(f"resets {k}: {resets(rows, k)}")
+    for (k, role), seq in sorted(role_loads(rows).items()):
+        print(f"{k} [{role}]: {' -> '.join(f'{x:g}' if x else '-' for x in seq)}")
+    print("step-downs:", step_downs(rows))
+    print("falls without evidence:", falls_without_evidence(rows))
+    print("oscillations:", oscillations(rows))
     return 0
 
 

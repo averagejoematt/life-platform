@@ -27,7 +27,7 @@ from typing import Any
 from training import (
     in_block_variant,
     lift_note,
-    live_program,
+    live_load,
     live_session,
     load_ramp,
     program_structure,
@@ -218,6 +218,7 @@ def _compose_notes(
         target_date=target_date,
         rotations=variant_rotation.swaps(rotation, movements),
         fallbacks=fb["by_key"] if fb.get("render") else None,
+        **({"familiar": set(load_floors["live_familiar"])} if "live_familiar" in (load_floors or {}) else {}),  # #5861 round 9, live
     )
     ctx = {"deload": deload, "red_day": red_day, "load_floors": load_floors, "history_index": history_index, "target_date": target_date}
     cal = rpe_calibration.mark_session(blocks, movements, note_record=record, context=ctx)
@@ -275,10 +276,9 @@ def _session_loads(
     deload: bool,
 ) -> dict[str, Any]:
     """The floor (#4107: the ONE v0.3 load path, `load_ramp.v03_floor`) and then the double
-    progression (#5052) — held on a deload the owner applied, whose loads are held as written. Then (#5861 red team, LIVE
-    only, `live_program.guard_loads`): no load steps up on a regressing / grinding / stalled lift or a strained day, and
-    down-steps on regression, overshoot, a joint flag or a stall reset — before the back-offs and warm-ups, which follow
-    the top set. Shadow: the guard returns before reading anything."""
+    progression (#5052) — held on a deload the owner applied, whose loads are held as written. Then (#5861, LIVE only,
+    `live_load.set_loads`): the one load model — double progression keyed by session role, one evidence-gated step-down — sets the
+    top load before the back-offs and warm-ups, which follow it. Shadow: it returns before reading anything."""
     load_floors = _enforce_load_floors(
         blocks,
         load_catalog,
@@ -292,7 +292,7 @@ def _session_loads(
         hold_reason="a deload the owner applied holds every load" if deload else None,
     )
     load_floors["load_rule"] = {"rule": "v0.3 §3 entry ramp", "week": ramp_week, "params": load_ramp.params()}
-    live_program.guard_loads(blocks, rx, load_floors, history_index, load_catalog.get("movements") or {}, inputs.target_date, rationale)
+    live_load.set_loads(blocks, rx, load_floors, load_catalog.get("movements") or {}, inputs.target_date, rationale)
     return load_floors
 
 
@@ -411,7 +411,6 @@ def full_body_routines(
     # reason (a row more than one step from PREVIOUS, or a scheme change), at most one cue; the passes' own text is kept
     # on inputs_snapshot["lift_notes"], never on the wire
     note_record = _compose_notes(blocks, load_catalog, load_floors, history_index, inputs.target_date, rotation, deload, drop_accessories)
-
     caps = {
         "total_sets": week_cfg["session_set_ceiling"],
         "session_minutes": week_cfg["session_minutes_ceiling"],

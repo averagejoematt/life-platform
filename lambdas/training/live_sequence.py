@@ -1,30 +1,12 @@
-"""live_sequence.py — the week's sessions in the nightly SEQUENCE: the short week and the adherence dip (#5861 FIX5). LIVE only:
-every entry point checks `selection_engine.mode(lib) == "live"` first and returns None otherwise, so the sequence the cron
-serves while the library is `proposed` is today's, byte for byte (`tests/test_no_live_change_5861_l6.py`).
+"""live_sequence.py — the week's sessions in the nightly SEQUENCE: declared mornings and the adherence dip (#5861). LIVE only:
+every entry point checks `selection_engine.mode(lib) == "live"` first, so the sequence served while the library is `proposed` is
+today's, byte for byte (tests/test_no_live_change_5861_l6.py).
 
-WHY IT EXISTS. A fifth independent red team (2026-11-13) found the short-week and adherence-dip role choices only in the
-sample-week generator: production never set `short_week` and never skipped a role, so the samples showed weeks the nightly job
-would never draft — and a 3-day week crashed the draft (`total_sets 23 > cap 20`). This module is the ONE decision both read:
-
-  * `week_plan` — for a calendar week (Monday to Sunday, Pacific): which roles it does NOT draft, which session takes a
-    partner role's anchors (a full-body day), and which session hosts the week's carry and trunk floor. A SHORT week (fewer
-    lifting mornings than roles: `SHORT_WEEK_PLANS`) or an ADHERENCE DIP (`live_balance.adherence_response`, judged on the
-    record before the Monday) gives a plan; a normal week gives None.
-  * `sequence_skip` — the plan as the callable `session_sequence.ledger` / `next_session` step over (`_skip_roles`), so the
-    order SKIPS a role that week instead of sliding, and the credit check reads the role the plan served.
-  * `entry_week` — the plan for the served day, carried on the day entry (`live_week`) into the draft
-    (`live_session.for_live_draft`).
-
-THE SHORT WEEK'S INPUT. Production has no "mornings this week" record; `days_available` counts the nominal lifting days
-(`program_structure.NOMINAL_LIFTING_DAYS`) not covered by a dated charter travel window (`travel.windows`). The sample
-generator passes its profile's day count. A per-week declared count would be better — the owner's call (named on the PR).
-
-`sequence_rule_from` (library `programming_settings`) or, by default, the Monday AFTER the library's `approved_on` stamp
-(owner ruling #4, fix round 8: `rule_from`): the first Monday the rule judges — never applied retroactively. Approving the
-library stamps `approved_on` (an OWNER ACTION with the status flip); with neither, the rule judges from the block start.
-
-Every rule is a labelled PLATFORM HEURISTIC (practitioner consensus at best), owner-adjustable; none is validated.
-"""
+  * `week_plan` — for a calendar week: the mornings declared (`days_available`: the nominal lifting days no dated charter travel
+    window covers) -> `live_volume.SHORT_WEEKS` (1-3: full-body mornings; 4: shoulders+arms skipped). An ADHERENCE DIP (5+ of the
+    fortnight's 10 planned sessions missed, `DIP_MISSED`) is one 4-morning week (owner ruling 2) — never two in a row.
+  * `sequence_skip` / `entry_week` / `serve` / `cron_*` — the plan as the sequence's skip and on the served day entry.
+  * `rule_from` — owner ruling #4: the rules judge from the Monday after approval; earlier history is never re-sequenced."""
 
 from __future__ import annotations
 
@@ -33,43 +15,10 @@ from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 ISSUE = "#5861"
-HEURISTIC = "heuristic"
-
-SHORT_WEEK_PLANS: dict[int, dict[str, Any]] = {
-    4: {
-        "skip": ("shoulders_arms",),
-        "partners": {},
-        "host": "lower_volume",
-        "label": HEURISTIC,
-        "basis": "four mornings: the shoulders_arms role goes first (L5's rule) — both lower days and both upper days keep their anchors; "
-        "the delts and arms sit at their floor for one week",
-    },
-    3: {
-        "skip": ("shoulders_arms", "upper_volume"),
-        "partners": {"lower_volume": "upper_volume"},
-        "host": "lower_volume",
-        "label": HEURISTIC,
-        "basis": "three mornings: the heavy upper and heavy lower roles, then a FULL-BODY day (the lower_volume role + the "
-        "upper_volume anchors) — legs and the upper body each train twice (an A/B/full week; practitioner consensus)",
-    },
-    2: {
-        "skip": ("shoulders_arms", "upper_volume", "lower_volume"),
-        "partners": {"upper_heavy": "lower_volume", "lower_heavy": "upper_volume"},
-        "host": "lower_heavy",
-        "label": HEURISTIC,
-        "basis": "two mornings: two FULL-BODY days (upper_heavy + the lower_volume anchors; lower_heavy + the upper_volume "
-        "anchors) — never an upper half and a lower half (the fifth red team's 2-day week: chest 2 sets, abs 0)",
-    },
-    1: {
-        "skip": ("lower_heavy", "shoulders_arms", "upper_volume", "lower_volume"),
-        "partners": {"upper_heavy": "lower_volume"},
-        "host": "upper_heavy",
-        "label": HEURISTIC,
-        "basis": "one morning: one full-body session (upper_heavy + the lower_volume anchors) — a holding week",
-    },
-}
-"""Mornings this week -> the plan. A partner role's ANCHORS join its host session (`live_rules.full_body`); the session set cap
-(`live_rules.fit_set_cap`) and the 75-minute fit then hold the session. Days >= the split's roles: no plan."""
+DIP_MISSED = 5
+"""Heuristic: 5 or more of the fortnight's 10 planned sessions missed (over a fully covered window) is an adherence dip — owner
+ruling 2: one 4-morning week to get back into the routine, no make-up sets. A dip week is never followed by a second one for the
+same gap (the eighth red team: a 12-day layoff produced two dip weeks in a row)."""
 
 
 def _live(lib: dict[str, Any] | None) -> bool:
@@ -78,29 +27,30 @@ def _live(lib: dict[str, Any] | None) -> bool:
     return se.mode(lib) == se.MODE_LIVE
 
 
-def _settings(lib: dict[str, Any] | None) -> dict[str, Any]:
-    from training import live_program
-
-    return live_program.settings(lib)
-
-
 def rule_from(lib: dict[str, Any] | None) -> str | None:
     """The first Monday the sequence rules judge (owner ruling #4, fix round 8): `sequence_rule_from` when set, else the Monday
     AFTER the library's `approved_on` stamp (the approval day itself is never re-judged; earlier history is kept for baselines
     and analysis, never re-sequenced). None (no stamp, no setting) = from the block start, the pre-ruling behaviour."""
     from common.pacific_time import shift_day_key
 
-    since = _settings(lib).get("sequence_rule_from")
+    from training import live_settings
+
+    since = live_settings.settings(lib).get("sequence_rule_from")
     if since:
         return monday_of(str(since))
     stamp = (lib or {}).get("approved_on")
     return shift_day_key(monday_of(str(stamp)), 7) if stamp else None
 
 
-def monday_of(day: str) -> str:
-    from training.live_balance import week_start
+def week_start(day: str) -> str:
+    """The Monday (Pacific day key) of `day`'s ISO week."""
+    from common.pacific_time import parse_day_key, shift_day_key
 
-    return week_start(str(day)[:10])
+    d = parse_day_key(str(day)[:10])
+    return shift_day_key(str(day)[:10], -d.weekday()) if d is not None else str(day)[:10]
+
+
+monday_of = week_start
 
 
 def days_available(monday: str) -> int:
@@ -115,35 +65,37 @@ def days_available(monday: str) -> int:
     return sum(1 for d in days if not any(str(w["start"]) <= d <= str(w["end"]) for w in windows))
 
 
-def plan_for_days(days: int, lib: dict[str, Any] | None) -> dict[str, Any] | None:
-    """SHORT_WEEK_PLANS for `days` mornings (the `short_week_rule` setting: `slide` keeps today's sliding sequence), else None."""
-    from training import program_structure as ps
+def plan_for_days(days: int, lib: dict[str, Any] | None, mode: str = "short") -> dict[str, Any] | None:
+    """The week for `days` declared mornings (1-4; `live_volume.SHORT_WEEKS`), else None (a normal week)."""
+    from training import live_volume, program_structure as ps
 
-    if days >= len(ps.SPLIT_ROLES) or days < 1 or _settings(lib).get("short_week_rule") != "skip_shoulders_arms":
+    if days >= len(ps.SPLIT_ROLES) or days < 1:
         return None
-    plan = SHORT_WEEK_PLANS.get(int(days))
-    if plan is None:
-        return None
-    kept = [r for r in ps.SPLIT_ROLES if r not in plan["skip"]]
-    full = [f"{r} + {p} anchors" for r, p in plan["partners"].items()]
-    line = (
-        f"short week (live, {days} of {len(ps.SPLIT_ROLES)} mornings): {', '.join(kept)} — {', '.join(plan['skip'])} skipped"
-        + (f"; full body: {'; '.join(full)}" if full else "")
-        + f"; the carry and trunk floor ride {plan['host']} (SHORT_WEEK_PLANS, heuristic)"
+    shape = live_volume.week_shape(int(days))
+    skip = tuple(r for r in ps.SPLIT_ROLES if r not in shape["roles"])
+    partners = {h: tuple(p for p, _ in ps_) for h, ps_ in (shape.get("partners") or {}).items()}
+    full = "; ".join(f"{h} + {', '.join(p)} anchors" for h, p in partners.items())
+    line = f"{'short' if mode == 'short' else 'adherence dip'} week (live, {days} mornings): {', '.join(shape['roles'])}" + (
+        f" — full body: {full}" if full else f" — {', '.join(skip)} skipped"
     )
-    return {
-        "skip": tuple(plan["skip"]),
-        "partners": dict(plan["partners"]),
-        "host": plan["host"],
-        "mode": "short",
-        "days": days,
-        "line": line,
-    }
+    return {"skip": skip, "partners": partners, "host": shape["host"], "mode": mode, "days": int(days), "line": line}
+
+
+def _dip(workouts: Any, monday: str) -> bool:
+    from training import fatigue_model, program_structure as ps
+
+    before = None if workouts is None else [w for w in workouts if str(w.get("date") or str(w.get("sk") or "")[5:15])[:10] < monday]
+    adh = fatigue_model.adherence(before, as_of=monday, planned_per_week=len(ps.SPLIT_ROLES))
+    if adh.get("state") == "unknown" or not adh.get("window_covered"):
+        return False
+    return int(adh["planned"]) - int(adh["performed"]) >= DIP_MISSED
 
 
 def week_plan(monday: str, workouts: Any, lib: dict[str, Any] | None, days: int | None = None) -> dict[str, Any] | None:
     """The plan for the calendar week starting `monday` (module doc), or None (a normal week, or not live). `days`: the mornings
-    available (default `days_available`)."""
+    declared (default `days_available`)."""
+    from common.pacific_time import shift_day_key
+
     if not _live(lib):
         return None
     since = rule_from(lib)
@@ -152,13 +104,9 @@ def week_plan(monday: str, workouts: Any, lib: dict[str, Any] | None, days: int 
     short = plan_for_days(days_available(monday) if days is None else int(days), lib)
     if short:
         return short
-    from training import live_balance, live_week, program_structure as ps
-
-    dip = live_balance.adherence_response(workouts, monday, lib)
-    if not dip:
-        return None
-    _roles, line = live_week.behind_schedule_roles(list(ps.SPLIT_ROLES), dip)
-    return {"skip": ("shoulders_arms",), "partners": {}, "host": "lower_volume", "mode": dip["mode"], "dip": dip, "line": line}
+    if _dip(workouts, monday) and not _dip(workouts, shift_day_key(monday, -7)):
+        return plan_for_days(4, lib, mode="dip")
+    return None
 
 
 def sequence_skip(workouts: Any, lib: dict[str, Any] | None, days_fn: Callable[[str], int] | None = None) -> Any:
@@ -194,6 +142,7 @@ def for_role(plan: dict[str, Any] | None, role: str) -> dict[str, Any] | None:
         "skip": list(plan["skip"]),
         "line": plan["line"],
         "mode": plan["mode"],
+        "days": plan["days"],
     }
 
 

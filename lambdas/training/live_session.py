@@ -189,14 +189,11 @@ def fit_exposures(rx: dict[str, Any], rotation: dict[str, Any], ctx: dict[str, A
         old = e["movement_key"]
         new = _replacement(e, code, ctx, rotation, taken)
         name = (ctx["catalog"].get(old) or {}).get("title") or old
-        if not new and code == "equipment":  # a trunk slot keeps direct trunk work (live_program.TRUNK_FALLBACK_ORDER, heuristic)
-            from training import live_program, live_week
+        if not new and code == "equipment":  # a vertical pull keeps a vertical pull (VERTICAL_PULL_FALLBACK, heuristic; fail-closed)
+            from training import live_week
 
-            new = live_program.trunk_fallback(e, ctx, taken)
-            why = f"{why}; no same-function member — the nearest trunk job (TRUNK_FALLBACK_ORDER, heuristic)" if new else why
-            if not new:  # a vertical pull keeps a vertical pull (live_week.VERTICAL_PULL_FALLBACK, heuristic; gates fail-closed)
-                new = live_week.vertical_pull_fallback(e, ctx, taken)
-                why = f"{why}; no pulldown — the first servable vertical pull (VERTICAL_PULL_FALLBACK, heuristic)" if new else why
+            new = live_week.vertical_pull_fallback(e, ctx, taken)
+            why = f"{why}; no pulldown — the first servable vertical pull (VERTICAL_PULL_FALLBACK, heuristic)" if new else why
         if new:
             taken.add(new)
             keep.append(e | {"movement_key": new, "template_id": None, "live_swap": {"from": old, "code": code}})
@@ -227,37 +224,33 @@ def for_live_draft(
     week: dict[str, Any] | None = None,
     set_cap: int | None = None,
 ) -> dict:
-    """The draft path's live hook (`full_body_session._prescription`): equipment and pain on every exposure, then the fatigue
-    model (`fatigue_model.for_live_draft`, its one graded reduction). In shadow: `rx` itself, nothing read. Never raises.
-    `week` (#5861 FIX5): the served day's week plan (`live_sequence.entry_week`, on the day entry) — its skipped roles, the
-    host of the carry and trunk floor, this session's full-body partner; `set_cap` the week grid's session set ceiling."""
+    """The draft path's live hook (`full_body_session._prescription`). In shadow: `rx` itself, nothing read. Never raises.
+    Fix round 9's ONE pass, in order: the week's volume plan (`live_volume`: this morning's share, a short week's full-body
+    composition), equipment and pain on every exposure, novelty (`live_load.mark_novelty`), the joint / stacking / lead-lift
+    programming (`live_program.plan`), the systemic slump (`live_load.slump`), the fatigue model's one reducer, the set ceiling.
+    `week`: the served day's week plan (`live_sequence.entry_week`, on the day entry); `set_cap` the session set ceiling."""
     if not is_live(rotation):
         return rx
-    from training import fatigue_model, live_balance, live_program, live_rules, live_week
+    from training import fatigue_model, live_load, live_program, live_settings, live_volume
 
     out = copy.deepcopy(rx)
     lines: list[str] = []
     ctx: dict[str, Any] | None = None
-    behind = None
+    hold_all = None
+    plan_rows: dict[str, float] = {}
+    plan: dict[str, Any] = {}
+    lib: dict[str, Any] = {}
+    catalog = catalog_movements or {}
     try:
         from training import selection_engine as se
 
         lib = se.load_library_failsoft() or {}
-        catalog = catalog_movements or {}
-        sig: dict[str, Any] = (
-            fatigue_model.movement_signals(
-                block_workouts,
-                as_of=str(getattr(inputs, "target_date", "")),
-                deficit=fatigue_model.in_deficit(getattr(inputs, "weights_by_day", None)),  # #5861 FIX7: held in a deficit = held
-            )
-            if block_workouts
-            else {}
-        )
+        target = str(getattr(inputs, "target_date", "") or "")
+        sig: dict[str, Any] = fatigue_model.movement_signals(block_workouts, as_of=target) if block_workouts else {}
         n_hurt = fatigue_model.THRESHOLDS["discomfort_sessions"]["value"]
-        hurts = {tid for tid, v in sig.items() if v.get("discomfort_sessions", 0) >= n_hurt}
-        from training import live_pain  # #5861 FIX7: discomfort at or under 2/10 keeps the lift (lighter), never swaps it out
+        from training import live_pain, live_safety
 
-        hurts -= live_pain.low_discomfort(block_workouts)
+        hurts = {tid for tid, v in sig.items() if v.get("discomfort_sessions", 0) >= n_hurt} - live_pain.low_discomfort(block_workouts)
         light = {tid for tid, v in sig.items() if v.get("light_sessions", 0) + v.get("discomfort_sessions", 0) >= n_hurt} - hurts
         ctx = {
             "lib": lib,
@@ -267,128 +260,114 @@ def for_live_draft(
             "ceiling": SKILL_CEILING,
             "role": rx.get("session_role"),
             "discomfort": hurts,
-            "light_discomfort": light,  # FIX5: a joint-located "sore" at the mild line — the joint rule keeps it, lighter
-            "target_date": str(getattr(inputs, "target_date", "") or ""),
+            "light_discomfort": light,
+            "target_date": target,
+            "mild_pain": live_safety.mild_pain_tids(block_workouts),
+            "pain_notes": live_safety.latest_notes(block_workouts),
         } | _week_ctx(week, inputs)
-        from training import live_safety  # #5861 FIX4: the pain note's site and the mild line, read once
-
-        ctx |= {"mild_pain": live_safety.mild_pain_tids(block_workouts), "pain_notes": live_safety.latest_notes(block_workouts)}
+        mornings = int((week or {}).get("days") or 5)
+        plan = live_volume.week_plan(catalog, lib, mornings)
+        ctx["volume_plan"] = plan
+        role_rows = [r for r in plan["rows"] if r["role"] == rx.get("session_role")]
+        plan_rows = dict(live_volume._count(role_rows))
         lines += [str((week or {})["line"])] if (week or {}).get("line") else []
-        lines += live_rules.full_body(out, ctx)  # FIX5: a short week's full-body day takes its partner's anchors (then fitted)
+        lines += live_volume.apply(out, ctx, plan)
         lines += fit_exposures(out, rotation or {}, ctx)
-        from training import live_progress  # #5861 FIX8 (owner ruling #10): each lift's first session back after 10+ days off
-
-        back = live_progress.first_back(out, ctx, block_workouts)  # before the plan: no stall reset on a first session back
-        lines += live_program.plan(out, rotation or {}, ctx, block_workouts, sig)  # joint pain, stacking, stalls, fatigue cost
-        lines += back
-        from training import live_stimulus  # #5861 FIX7: a fast cut with broad regression answers with volume, never load
-
-        lines += live_stimulus.fast_cut(out, sig, inputs)
-        lines += live_week.novel_start(out, ctx, block_workouts)  # a movement new to him never starts at 4-6 reps
-        behind = live_balance.adherence_response(block_workouts, ctx["target_date"], lib)  # FIX3: a dip changes the week
-        lines += live_week.keep_the_anchors(out, ctx, behind) + live_balance.lighter_week(out, ctx, behind)
-        from training import live_rulings  # #5861 FIX6 ruling 3: AFTER the dip's lighter week, so it is never undone
-
-        lines += live_rulings.arms_top_up(out, ctx, block_workouts) + live_rulings.arms_keep(out, ctx, block_workouts)
+        live_load.mark_novelty(out, ctx, block_workouts)
+        lines += live_program.plan(out, rotation or {}, ctx, block_workouts, sig)
+        lines += live_volume.pair_anchors(out, plan)
+        tids = {live_load.tid_of(e.get("movement_key"), catalog, lib, ctx["idx"]) for e in out["exposures"]}
+        anchors = _anchor_tids(catalog)
+        hist = live_load.history(block_workouts, (tids | anchors) - {""})
+        slump = live_load.slump(hist, anchors, fatigue_model.in_deficit(getattr(inputs, "weights_by_day", None)), target)
+        if slump:
+            hold_all = "slump week, loads held"
+            lines += [f"slump (live): {slump['declining']} of {slump['judged']} anchors declining together — every load held"]
+            lines += live_load.slump_trim(out)
         _refit(out)
     except Exception as e:  # noqa: BLE001 — the live fit never blocks a draft
         lines.append(f"live session fit failed ({type(e).__name__}) — the prescription is unchanged")
         out = copy.deepcopy(rx)
-        sig = {}
+        sig, hist = {}, {}
     before = [len(x["sets"]) for x in out["exposures"]]
-    order = live_program.trim_order(surplus_first(catalog_movements or {}))  # high-fatigue work first, then surplus isolation
-    if behind:  # the keep-the-anchors week IS the adherence answer: no further set trim for adherence on top of it
-        order.adherence = lambda exposures: []
+    order = live_program.trim_order(surplus_first(catalog))
     out = fatigue_model.for_live_draft(out, rotation, inputs, block_workouts, trim_order=order)
     for x, n in zip(out["exposures"], before):
         if len(x["sets"]) < n:
             x["live_reduced"] = n - len(x["sets"])
-    from training import live_shape  # #5861 FIX4: the kettlebell slot under strain (kb_slot_under_strain)
-
-    strained = live_shape.kb_under_strain(out)
-    if strained:  # #5861 FIX6: the slot dropped under strain (ruling 7) — its plan line "added ... host this week" goes with it
-        lines = [ln for ln in lines if not (ln.startswith("added (live)") and "kettlebell slot" in ln)]
-    lines += strained
-    waits = live_rules.no_added_work(out)  # FIX5: nothing ADDED on a bad day — and the plan's "added" line for it goes
-    gone = [str((catalog_movements or {}).get(k, {}).get("title") or k) for k in live_rules.waited(waits)]
-    lines = [ln for ln in lines if not (ln.startswith("added (live)") and any(f": {t}" in ln for t in gone))] + waits
-    if ctx is not None:
-        try:  # the week's trunk-stability floor: purpose-driven, never on a strained day (live_program.trunk_floor)
-            lines += live_program.trunk_floor(out, ctx, (out.get("fatigue") or {}).get("state"))
-            _refit(out)
-        except Exception as e:  # noqa: BLE001 — never blocks a draft
-            lines.append(f"trunk floor failed ({type(e).__name__}) — nothing added")
-    if ctx is not None:  # FIX7: every muscle with an MEV reaches it in HARD sets — after the trunk floor, never on a bad day
-        from training import live_stimulus
-
-        lines += live_stimulus.week_floor(out, ctx, block_workouts, set_cap)
-        _refit(out)
-    lines += live_rules.fit_set_cap(out, set_cap)  # FIX5: every live session within the session set ceiling (a crash before)
+    if (out.get("fatigue") or {}).get("state") in ("strained", "overreached"):  # a hold day: loads held AND no grinding —
+        for x in out["exposures"]:  # every lift stops at RPE 8 (the deload shape caps lower still when one is recommended)
+            if x.get("intensity") != "carry":
+                x["live_effort"] = min(int(live_settings.value("first_back_rpe")), int(x.get("live_effort") or 99))
+    slack = live_volume.floor_slack(plan, str(rx.get("session_role") or "")) if ctx is not None else {}
+    lines += live_volume.fit_sets(out, set_cap, catalog, lib, slack)
     _refit(out)
-    from training import live_rulings  # #5861 FIX6 ruling 16: evidence confidence + data completeness, visible
+    if ctx is not None:
+        from training import live_rulings
 
-    lines += live_rulings.evidence_line(out, ctx) if ctx is not None else []
+        lines += live_rulings.evidence_line(out, ctx)
     trends = {tid: str(v.get("trend")) for tid, v in (sig or {}).items()}
+    from training import live_balance, live_week
+
+    skip = (ctx or {}).get("week_skip") or _week_ctx(week, inputs)["week_skip"]
     extra = {
         "aerobic": live_program.aerobic(inputs),
         "trends": trends,
-        # the medical stop line, read — and (FIX5) a symptom he logged on a Hevy note in the last fortnight
         "symptom_tripwire": live_week.symptom_gate(
             getattr(inputs, "medical_stop_lines", None), block_workouts, getattr(inputs, "target_date", None)
         ),
-        "conditioning_host": live_balance.conditioning_host((ctx or {}).get("week_skip") or _week_ctx(week, inputs)["week_skip"]),
-        "week_skip": list((ctx or {}).get("week_skip") or _week_ctx(week, inputs)["week_skip"]),  # FIX6: the time trim's week count
-        "week_mode": (ctx or {}).get("week_mode"),  # FIX8: the arms floor's level in the time fit (`live_shape.precious`)
+        "conditioning_host": (week or {}).get("host") or live_balance.conditioning_host(skip),  # the declared week's own host
+        "week_skip": list(skip),
+        "hist": hist,
+        "hold_all": hold_all,
+        "layoff": (ctx or {}).get("layoff"),
+        "plan_rows": plan_rows if ctx is not None else {},
+        "floor_slack": slack,
     }
-    rate = live_rulings.rate_line(inputs, out.get("fatigue"), out.get("session_role"))  # FIX6 ruling 11: once a week, advisory
-    band = live_balance.rate_band(out.get("fatigue"), getattr(inputs, "sleep_hours", None))  # FIX3: rate_band_mode=structured
-    extra |= {"rate_band": band} if band["mode"] == "structured" else {}
-    if rate:
-        from training import live_stimulus
+    from training import live_rulings
 
-        rate += live_stimulus.rate_suffix(out)  # FIX7: the advisory line names the fast-cut answer
+    rate = live_rulings.rate_line(inputs, out.get("fatigue"), out.get("session_role"))
     out[MARK] = {"issue": ISSUE, "lines": lines + ([rate] if rate else []), **extra}
-    from training import live_progress
-
-    tids = {
-        str((catalog_movements or {}).get(str(e.get("movement_key")), {}).get("hevy_template_id_hint") or "").upper()
-        for e in out["exposures"]
-    }
-    out[MARK]["refs"] = live_progress.role_refs(block_workouts, tids - {""})  # FIX8: the load guard's role-keyed references
     return out
 
 
-def _week_ctx(week: dict[str, Any] | None, inputs: Any) -> dict[str, Any]:
-    """The week plan's context keys (#5861 FIX5): `short_week_host`, `week_skip` (the roles this week does not draft) and
-    `partner` (this session's full-body partner). Without a plan, the generator's old `short_week` attribute (a host role)
-    still reads as a shoulders+arms skip."""
-    from training.live_program import SHORT_WEEK_SKIP
+def _anchor_tids(catalog: dict[str, Any]) -> set[str]:
+    """The template ids of every anchor the five templates serve (the slump's anchors)."""
+    from training import program_structure as ps
 
+    out = set()
+    for role in ps.SPLIT_ROLES:
+        for e in ps.session_prescription_for_role(role, catalog_movements=catalog)["exposures"]:
+            if e.get("kind") == "anchor":
+                out.add(str((catalog.get(str(e.get("movement_key"))) or {}).get("hevy_template_id_hint") or "").upper())
+    return out - {""}
+
+
+def _week_ctx(week: dict[str, Any] | None, inputs: Any) -> dict[str, Any]:
+    """The week plan's context keys: `short_week_host`, `week_skip` (the roles this week does not draft), `partner` (this
+    session's full-body partners) and `week_mode`."""
     if week:
         return {
             "short_week_host": week.get("host"),
             "week_skip": tuple(week.get("skip") or ()),
             "partner": week.get("partner"),
-            "week_mode": week.get("mode"),  # #5861 FIX6: short (fewer mornings) or the dip's own mode — the arms top-up's target
+            "week_mode": week.get("mode"),
         }
-    host = getattr(inputs, "short_week", None)
-    return {"short_week_host": host, "week_skip": (SHORT_WEEK_SKIP,) if host else (), "partner": None}
+    return {"short_week_host": None, "week_skip": (), "partner": None}
 
 
 def surplus_first(catalog: dict[str, Any]) -> Any:
     """The fatigue model's trim order: take sets first from the accessory whose muscle the program's week loads furthest above
     its MEV landmark (config/training_landmarks.json), ties last-listed first — a recovery trim never takes a muscle sitting at
-    its minimum effective dose (the crunch, the calves) below it while the delts sit near MAV. Heuristic over existing data."""
-    from collections import Counter
-
-    from training import block_model, live_week, program_structure as ps, selection_engine as se
+    its minimum effective dose below it while the delts sit near MAV. Heuristic over existing data."""
+    from training import block_model, live_volume, program_structure as ps, selection_engine as se
 
     marks = block_model.load_landmarks() or {}
-    lib = se.load_library_failsoft()
+    lib = se.load_library_failsoft() or {}
 
-    def muscle(key: Any) -> str:  # a catalog `other` (the kettlebell slot) reads the library's target (second red team)
-        m = (catalog.get(key or "") or {}).get("primary_muscle")
-        return live_week.landmark_muscle(key, catalog, lib) if m in (None, "other") else str(m)
+    def muscle(key: Any) -> str:
+        c = live_volume.credits(live_volume.lib_entry(key, catalog, lib), key, catalog)
+        return max(c, key=c.get) if c else "other"
 
     week: Counter = Counter()
     for role in ps.SPLIT_ROLES:
@@ -402,7 +381,7 @@ def surplus_first(catalog: dict[str, Any]) -> Any:
     def order(exposures: list[dict[str, Any]]) -> list[dict[str, Any]]:
         acc = [e for e in exposures if e.get("kind") == "accessory"]
         ranked = sorted(acc, key=lambda e: (-surplus(e), -acc.index(e)))
-        return [e for e in ranked for _ in range(max(1, len(e.get("sets") or []) - 1))]  # drain the top surplus first
+        return [e for e in ranked for _ in range(max(1, len(e.get("sets") or []) - 1))]
 
     return order
 
@@ -445,62 +424,101 @@ def _unpair(blocks: list[Any], sid: Any) -> None:
 
 
 def fit_routine(blocks: list[Any], rx: dict[str, Any], cap: int, movements: dict[str, Any], rationale: list[str], shape: dict) -> dict:
-    """IN PLACE: under live, drop accessory blocks, last-listed first, until the routine's minutes as written (warm-ups
-    included) fit `cap`; anchors never. Returns the session shape (re-measured when anything went). Shadow: `shape`."""
+    """IN PLACE: under live, the ONE time fit (`live_volume.time_fit`) on the routine as written (warm-ups included). Returns the
+    session shape (re-measured when anything went). Shadow: `shape`."""
     if MARK not in rx or shape.get("lifting_minutes") is None:
         return shape
-    from training import live_week
+    if shape["lifting_minutes"] > cap:
+        from training import live_volume, program_structure, warmup_sets
 
-    cap = min(int(cap), int(rx.get("live_session_cap") or cap))  # a behind-schedule session's ~45 min (live option)
-    shape = live_week.make_cardio_room(blocks, rx, movements, cap, shape)  # shared cap: lifting gives sets for an aerobic block
-    from training import live_shape  # #5861 FIX4: drop, don't shave — no accessory left at one working set
+        rx[MARK]["lines"] += live_volume.time_fit(blocks, rx, movements, int(cap))
+        rationale[:] = [r for r in rationale if not r.startswith(f"OVER the {cap}-min lifting cap")]
+        shape = program_structure.enforce_session_shape(blocks, movements) | {
+            "working_sets": sum(warmup_sets.working_set_count(b.sets) for b in blocks)
+        }
+    rx[MARK]["summary"] = summary(blocks, rx, movements)
+    rx[MARK]["contradictions"] = contradictions(blocks, rx)
+    return shape
 
-    singles = live_shape.no_single_sets(blocks, movements)
-    if singles:
-        from training import program_structure as _ps, warmup_sets as _ws
 
-        shape = _ps.enforce_session_shape(blocks, movements) | {"working_sets": sum(_ws.working_set_count(b.sets) for b in blocks)}
-        rx[MARK]["lines"].append(f"dropped (live): {', '.join(singles)} — one working set left: drop, don't shave (live_shape)")
-    if shape["lifting_minutes"] <= cap:
-        return shape
-    from training import program_structure
-    from training.session_shape import routine_minutes
+def _title(key: Any, movements: dict[str, Any]) -> str:
+    return str((movements.get(str(key)) or {}).get("title") or key)
 
-    before, dropped = shape["lifting_minutes"], []
-    trimmed = live_week.trim_sets_for_time(blocks, rx, movements, cap)  # second red team: sets before exercises
-    gone = Counter(trimmed)  # #5861 FIX4: what the drop order counts as off (the trimmed sets + every dropped accessory)
-    guests = live_shape.trim_anchor_backoffs(blocks, rx, movements, cap, guests=True)  # FIX8: a full-body day's guest back-offs
-    fixed = live_week._fixed(rx)
-    while routine_minutes(blocks, movements)["lifting_minutes"] > cap:
-        idx = live_shape.next_drop(blocks, movements, gone, fixed, rx)  # FIX4: largest surplus over MEV first
-        if idx is None:
-            break
-        # FIX8: before a kept slot (a floor's, the only ab work) or a priority muscle's last sets under MEV go, the back-offs
-        if str(blocks[idx].movement_key) in fixed or live_shape.precious(blocks[idx], movements, gone, rx):
-            guests += live_shape.trim_anchor_backoffs(blocks, rx, movements, cap, guests=False, priority=False)
-            if routine_minutes(blocks, movements)["lifting_minutes"] <= cap:
-                break
-        cut = blocks.pop(idx)
-        _unpair(blocks, getattr(cut, "superset_id", None))
-        dropped.append((movements.get(cut.movement_key) or {}).get("title") or cut.movement_key)
-    dropped += live_shape.no_single_sets(blocks, movements)
-    anchors = live_shape.trim_anchor_backoffs(blocks, rx, movements, cap, guests=False)  # FIX8: the ceiling holds, always
-    from training import warmup_sets
 
-    new = program_structure.enforce_session_shape(blocks, movements) | {
-        "working_sets": sum(warmup_sets.working_set_count(b.sets) for b in blocks)
-    }
-    how = [", ".join(f"{n} {m}" for m, n in sorted(trimmed.items())) + " set(s) off (surplus over MEV first)"] if trimmed else []
-    how += (  # FIX8: before "dropped …", which ends the line's list of whole exercises
-        [f"anchor back-offs off: {', '.join(f'{n} {k}' for k, n in Counter(guests + anchors).items())} (TIME_FIT)"]
-        if guests + anchors
-        else []
+def summary(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any]) -> list[str]:
+    """The 3-5 rationale lines that change what he does today, generated from the FINAL routine (fix round 9: the rest of the
+    live lines stay on the record as `rx[MARK]["lines"]`, the debug view). Never a line about something the routine lacks."""
+    mark = rx.get(MARK) or {}
+    here = {b.movement_key for b in blocks}
+    exp = {e.get("movement_key"): e for e in rx.get("exposures") or [] if e.get("movement_key") in here}
+    out = [ln for ln in mark.get("lines") or [] if ln.startswith(("short week (live", "adherence dip week (live"))][:1]
+    guard = [d for d in mark.get("load_guard") or [] if d["key"] in here]
+    for mode, head in (("up", "heavier"), ("down", "lighter"), ("second", "the second lift, one band lower")):
+        names = [_title(d["key"], movements) + (f" ({d['why']})" if mode == "down" else "") for d in guard if d["mode"] == mode]
+        if names:
+            out.append(f"today: {head}: {', '.join(names)}")
+    if mark.get("hold_all"):
+        out.append(f"today: every load held — {mark['hold_all']}")
+    back = [_title(k, movements) for k, e in exp.items() if e.get("live_first_back")]
+    new = [_title(k, movements) for k, e in exp.items() if e.get("live_new")]
+    if back:
+        out.append(
+            f"today: first session back after {((mark.get('layoff') or {}).get('gap_days')) or '10+'} days off — RPE 8, no step: {', '.join(back)}"
+        )
+    if new:
+        out.append(f"today: new to you, RPE 7 once: {', '.join(new)}")
+    out += _zero_by_design(blocks, rx, movements)
+    gone = [ln for ln in mark.get("lines") or [] if ln.startswith(("skipped (live)", "swapped (live)"))]
+    out += [ln.split(" — ")[0].replace(" (live)", "") for ln in gone][:1]
+    fat = rx.get("fatigue") or {}
+    if fat.get("state") in ("strained", "overreached") or fat.get("sets_removed"):
+        out.append(f"today: recovery reads {fat.get('state')} — {fat.get('sets_removed') or 0} accessory set(s) off, anchors kept")
+    return out[:5]
+
+
+def _zero_by_design(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any]) -> list[str]:
+    """Fix round 9 (F): a priority muscle the week's plan gives this morning that the pain rule took to ZERO is said plainly —
+    never "held" (the eighth red team's garage + sharp shoulder: chest 0 while a line claimed 8)."""
+    from training import live_settings, live_volume, selection_engine as se
+
+    lib = se.load_library_failsoft() or {}
+    plan = (rx.get(MARK) or {}).get("plan_rows") or {}
+    prio = [str(m) for m in live_settings.settings(lib).get("priority_muscles") or []]
+    final = live_volume.hard_sets(
+        (live_volume.lib_entry(b.movement_key, movements, lib), 1, None, b.movement_key, movements) for b in blocks
     )
-    how += [f"dropped {', '.join(dropped)}"] if dropped else []
-    line = f"time (live): ~{before} min as written (warm-ups included) > the {cap}-min lifting cap — {'; '.join(how)} -> ~{new['lifting_minutes']} min"
-    rx[MARK]["lines"].append(line)  # `rationale_lines` writes it
-    rationale[:] = [r for r in rationale if not r.startswith(f"OVER the {cap}-min lifting cap")]
-    return new
+    pain = [ln for ln in (rx.get(MARK) or {}).get("lines") or [] if ln.startswith("skipped (live)") and (" pain" in ln or "flag" in ln)]
+    out = []
+    for m in prio:
+        if plan.get(m) and not final.get(m) and pain:
+            out.append(
+                f"today: {m} 0 here by design — the pain rule took its pressing/squatting off and no lower-stress {m} "
+                "option is available; it returns when the flag clears"
+            )
+    return out
+
+
+def contradictions(blocks: list[Any], rx: dict[str, Any]) -> list[str]:
+    """Where a lift's note says something its own rows or the live decision contradict (fix round 9, G): a heavier/lighter
+    reason against the decision, a "find the load" over a written load, a layoff line on a lift of a familiar pattern.
+    [] = consistent. (The low-energy line's cardio promise is fitted on the WHY block, `live_balance.why_effort`.)"""
+    from training import hevy_note_grammar as g
+
+    guard = {d["key"]: d for d in (rx.get(MARK) or {}).get("load_guard") or []}
+    exp = {e.get("movement_key"): e for e in rx.get("exposures") or []}
+    out = []
+    for i, b in enumerate(blocks):
+        note, d, e = str(getattr(b, "notes", "") or ""), guard.get(b.movement_key), exp.get(b.movement_key) or {}
+        work = [s for s in b.sets or [] if str(getattr(s, "type", "") or "normal") != "warmup"]
+        if d and d["mode"] == "up" and ("Lighter today" in note or "Same load" in note):
+            out.append(f"{b.movement_key}: steps up but the note holds or lightens it")
+        if d and d["mode"] == "down" and "Heavier" in note:
+            out.append(f"{b.movement_key}: steps down but the note says heavier")
+        if g.PICK_LOAD_OPEN_TAIL in note and work and all(getattr(s, "weight_kg", None) for s in work):
+            out.append(f"{b.movement_key}: 'find the load' over a written load")
+        if (e.get("live_familiar") or e.get("live_first_back")) and ("first time in" in note or "session back after" in note):
+            out.append(f"{b.movement_key}: a layoff line on a familiar pattern")
+    return out
 
 
 # ── 4. one story ─────────────────────────────────────────────────────────────
@@ -528,10 +546,13 @@ def rotation_lines(rotation: dict[str, Any]) -> list[str]:
 
 
 def rationale_lines(rx: dict[str, Any]) -> list[str]:
-    """The live fit's lines and the fatigue model's decision, for the rationale. Shadow: []."""
+    """The rationale's live lines: the 3-5 that change what he does (`summary`, from the final routine) and the fatigue model's
+    decision; the rest of the live lines stay on the record (`rx[MARK]["lines"]`, the debug view). Shadow: []."""
     if MARK not in rx:
         return []
-    out = list(rx[MARK]["lines"])
+    out = list(rx[MARK].get("summary") or [])
+    # ruling 16 (evidence and completeness VISIBLE) and ruling 11 (the advisory loss-rate line) stay on the rationale
+    out += [ln for ln in rx[MARK].get("lines") or [] if ln.startswith(("evidence (live): ", "loss rate (advisory"))]
     fat = rx.get("fatigue") or {}
     if fat:
         sig = ", ".join(fat.get("strain_signals") or []) or "none"

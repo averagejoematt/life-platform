@@ -65,7 +65,7 @@ rated hypertrophy row also `provisional` and, when true, `provisional_why`). A h
 objective does not apply to carries `tier: null`, `applicable: false` and its reason. The top level carries
 `canonical_families`.
 
-## Quality tiers — the hypertrophy objective (#5857 rubric v2.0.0, owner ruling 2026-11-12; #5861 rubric v3.5.0, PROPOSED)
+## Quality tiers — the hypertrophy objective (#5857 rubric v2.0.0, owner ruling 2026-11-12; #5861 rubric v3.6.0, PROPOSED)
 
 The tier grades **quality, not evidence**. The first tiers (A/B/C) graded evidence directness: A was a direct trial
 of this exact movement, B a trial of a close one, C `none_reviewed` — 561 of 582 ratings were C, and most muscles' top
@@ -147,6 +147,13 @@ bodyweight -> weighted, kneeling -> standing; `objective_inputs.ladder`) earns t
 term is FIXED at mid for any known length, not only capped: the trial that removed the stretch premium (the shortened hip
 thrust matched the lengthened squat) equally removes the shortened penalty. Then the points band is held under the
 categorical caps below (Objectives).
+
+## Rubric v3.6.0 — the basis states inputs, not a points sum (#5861 fix round 9 — PROPOSED)
+
+Each hypertrophy row's basis now opens `stimulus profile <band>: stretch <length_bias>, stability <stability>, …` — the
+categorical input each term read — instead of `points N/14`. The points remain the rubric's internal stimulus profile (held under
+the categorical caps and S criteria, which are unchanged); printing their sum read as a measured score the evidence cannot carry.
+No tier moved (5,118 tier fields compared before and after).
 
 ## Rubric v3.5.0 — ruling 17 applied as written (#5861 FIX7 — PROPOSED)
 

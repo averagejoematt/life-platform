@@ -33,7 +33,6 @@ import exercise_library_objectives as objectives  # noqa: E402
 import exercise_library_reviews as reviews  # noqa: E402
 from training import (
     exercise_library as xl,  # noqa: E402
-    live_program,  # noqa: E402
     quality_rubric as qr,  # noqa: E402
 )
 
@@ -249,31 +248,25 @@ def test_face_pull_and_the_cuff_class_are_joint_capacity_not_mobility():
     assert qr.mobility_rating(e)[0] == "A"
 
 
-# ── 6. the programming lane's library-carried settings ──────────────────────────────────────────────────────────────────
-WANT_SETTINGS = {
-    "session_cap_includes_cardio": True,  # #5861 FIX6: owner ruling 1 (2026-11-13)
-    "symptom_line": "",  # #5861 FIX6: owner ruling 10 — no symptom warning line
-    "short_week_rule": "skip_shoulders_arms",
-    "behind_schedule_week": False,
-}
-
-
-def _settings_offenders(lib: dict, defaults: dict) -> list[str]:
+# ── 6. the programming lane's library-carried settings (#5861 fix round 9: the ONE table, `training.live_settings`) ───────
+def _settings_offenders(lib: dict, want: dict) -> list[str]:
     have = lib.get("programming_settings")
     if not isinstance(have, dict):
         return ["no programming_settings block"]
-    want = {**defaults, **builder.OWNER_RULED_SETTINGS} if defaults is builder.PROGRAMMING_SETTINGS_DEFAULTS else defaults
-    out = [f"{k}: {have.get(k)!r} != {v!r}" for k, v in WANT_SETTINGS.items() if have.get(k) != v or want.get(k) != v]
-    out += [f"{k}: live_program default {v!r} differs" for k, v in live_program.SETTINGS_DEFAULTS.items() if have.get(k) != v]
-    return out
+    return [f"{k}: {have.get(k)!r} != {v!r}" for k, v in want.items() if have.get(k) != v] + [
+        f"{k}: not in the table" for k in have if k not in want
+    ]
 
 
 def test_programming_settings_ship_with_the_owner_pending_defaults():
-    assert _settings_offenders(LIB, builder.PROGRAMMING_SETTINGS_DEFAULTS) == []
+    from training import live_settings
+
+    assert _settings_offenders(LIB, live_settings.defaults()) == []
     assert LIB["status"] == "proposed"
 
 
-def test_control_a_changed_or_missing_default_goes_red(monkeypatch):
-    monkeypatch.setitem(builder.PROGRAMMING_SETTINGS_DEFAULTS, "behind_schedule_week", True)
-    assert _settings_offenders(LIB, builder.PROGRAMMING_SETTINGS_DEFAULTS)
-    assert _settings_offenders({k: v for k, v in LIB.items() if k != "programming_settings"}, WANT_SETTINGS)
+def test_control_a_changed_or_missing_default_goes_red():
+    from training import live_settings
+
+    assert _settings_offenders(LIB, live_settings.defaults() | {"press_sets": 2})
+    assert _settings_offenders({k: v for k, v in LIB.items() if k != "programming_settings"}, live_settings.defaults())

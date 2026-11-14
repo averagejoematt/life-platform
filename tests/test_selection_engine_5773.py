@@ -695,6 +695,11 @@ def test_a_generated_draft_serves_the_selection_once_approved():
     keys = [b.movement_key for b in ideal.exercises]
     # #5861 FIX4 (drop, don't shave): a short morning's time fit may DROP a whole selected accessory (it never shaves one to a
     # single set) — the selection still served it, and the time line names it
-    timed = " ".join(ln for ln in ideal.rationale if ln.startswith("time (live)") and "dropped " in ln)
-    titles = {k: (CAT0.get(k) or {}).get("title") or k for k in want.values()}
-    assert snap["rotation"]["variants"] == want and all(v in keys or titles[v] in timed for v in want.values())
+    # #5861 fix round 9: the live lines live on the record (`session_prescription.live_session.lines`); the weekly plan may also
+    # take a slot off the morning (no KB hinge slot; a delt slot the shoulders' MAV does not need) — said there, by key
+    live = " ".join((snap["session_prescription"].get("live_session") or {}).get("lines") or [])
+    from training import live_volume
+
+    planned = {r["slot"] for r in live_volume.week_plan(CAT0, LIB0, 5)["rows"] if r["role"] == role}
+    gone = lambda slot, v: f"{v} dropped" in live or slot not in planned  # noqa: E731
+    assert snap["rotation"]["variants"] == want and all(v in keys or gone(slot, v) for slot, v in want.items())

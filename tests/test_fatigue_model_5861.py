@@ -227,16 +227,15 @@ def test_session_minutes_over_the_ceiling_is_reported():
     assert _assess(session_minutes=70, minutes_ceiling=75)["session_minutes"]["over"] is False
 
 
-def test_adherence_low_is_reported_never_adds_and_shortens_the_session():
-    """#5861 L6: `adherence_low`'s own basis ("keep the plan short and never add") — one step of accessory sets off, never a
-    strain state, never a deload; with enough sessions logged, nothing comes off (the control)."""
+def test_adherence_low_is_reported_never_adds_and_never_trims_twice():
+    """#5861 fix round 9: adherence is REPORTED here and answered once, by the week (owner ruling 2: one 4-morning week —
+    `live_sequence`); the fatigue model takes no second trim for it (a first week back is never shortened twice). Control: the
+    same record with enough sessions logged reads `ok`."""
     a = _assess(workouts=[_w("2026-10-30", _ex("T_LR", 10, 12)), _w("2026-11-10", _ex("T_LR", 10, 12))], planned_per_week=5)
-    assert a["adherence"]["state"] == "low" and a["action"] == "reduce" and a["never_adds"] is True
-    assert a["reduce_sets"] == fm.THRESHOLDS["reduce_sets_per_step"]["value"] and a["state"] == "normal" and not a["deload"]["recommended"]
+    assert a["adherence"]["state"] == "low" and a["never_adds"] is True
+    assert a["reduce_sets"] == 0 and a["state"] == "normal" and not a["deload"]["recommended"]
     full = _assess(workouts=[_w(f"2026-11-{d:02d}", _ex("T_LR", 10, 12)) for d in range(3, 13)], planned_per_week=5)
     assert full["adherence"]["state"] == "ok" and full["reduce_sets"] == 0
-    start = _assess(workouts=[_w("2026-11-10", _ex("T_LR", 10, 12))], planned_per_week=5)  # a block that just started
-    assert start["adherence"]["state"] == "low" and not start["adherence"]["window_covered"] and start["reduce_sets"] == 0
 
 
 # ── the live draft hook ──────────────────────────────────────────────────────

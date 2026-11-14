@@ -95,4 +95,13 @@ BUILDER_CHANGE_LOG = [
         "what the time fit drops.",
         "rule": "an owner-ruled default — configuration only; status stays proposed until the owner approves the library",
     },
+    {
+        "version": "0.3.6",
+        "date": "2026-11-13",
+        "by": "#5861 fix round 9 (consolidation, PROPOSAL for the owner's review with the library)",
+        "what": "Fix round 9: `programming_settings` reduced to the one live settings table (`training.live_settings.SETTINGS`, 7 "
+        "keys, each with its ruling) — the dead alternatives the owner had ruled out are gone; rating bases drop the points "
+        "arithmetic (rubric 3.6.0: the basis states each term's categorical input, the tiers and S criteria unchanged).",
+        "rule": "configuration and data only — status stays proposed until the owner approves the library",
+    },
 ]

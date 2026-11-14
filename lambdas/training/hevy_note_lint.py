@@ -172,7 +172,7 @@ def _lint_session(session: str, note: str, out: list[Problem], rt: Optional["Lin
             out.append(Problem("L3", "session block", f"is {len(lines)} line(s); a test day's block is its session line"))
     elif len(lines) >= 2 and lines[1] in g.LOW_ENERGY_LINES:
         # #5428 re-grades #2/#3: each part its own message, so a draft with several defects shows each
-        if lines[1] != low:
+        if lines[1] != low and not (lines[1] == g.LOW_ENERGY_LIFTS_LINE and not (cardio_kinds(rt) if rt is not None else [])):
             # "+ easy cardio" over a session whose only cardio is intervals promises a block it lacks
             out.append(Problem("L3", "session block", f"the low-energy line for this session's cardio is {low!r}"))
         if lines[2:] != want_rule:

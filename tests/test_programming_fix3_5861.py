@@ -15,6 +15,27 @@ each alternative is exercised here so it is known to work.
   8. the conservative steps credit
   9. the garage leg curl from the library pattern
  10. cardio host and machine, the owner settings (KB template, rate band, symptom wording)
+
+FIX ROUND 9 (consolidation) — tests deleted or rewritten here:
+  test_a_pain_flag_carries_the_persistence_line_on_its_own_lift_only -> rewritten: the line is a constant (`PAIN_ASSESS_LINE`,
+      its setting deleted); the off-control patches the constant
+  test_the_week_is_allocated_by_priority_before_any_muscle_sits_over_mav -> rewritten on the ONE weekly plan (`live_volume`)
+  test_the_kettlebell_slot_moves_off_a_stacked_session_by_setting -> deleted: KB slot machinery (rulings #2/#6/#7: no KB hinge
+      slot under live; the slot is removed by `live_volume._kb_slot`)
+  test_the_kb_template_setting_writes_the_slot_under_his_custom_template -> deleted: ruling #2 (no KB template); the resolver is
+      the identity (asserted in the settings test below)
+  test_an_adherence_dip_changes_the_week_fewer_shorter_sessions_anchored -> rewritten: ruling 2's dip is ONE 4-morning week
+      (`live_sequence.plan_for_days(4, mode="dip")`), never two in a row; the 60-min cap / trim_sets / behind_schedule options
+      are deleted dead alternatives
+  test_easy_blocks_close_the_weeks_gap_and_never_gut_lifting -> deleted: it held the `cardio_purpose_only=False` / `as_fix5`
+      branches the owner ruled out (ruling 4; purposeful cardio is tests/test_owner_rulings_5861.py)
+  test_an_equipment_limited_week_keeps_hamstring_knee_flexion_from_the_library -> rewritten: the "nothing fills it" line is a
+      debug line now (`live_fit`), not the rationale
+  test_the_short_week_under_the_shared_cap_keeps_a_real_aerobic_block -> rewritten: CARDIO_ROOM deleted (ruling 1: no strength
+      work cut for cardio); the outcome kept is the short week's conditioning host and the 75-min morning
+  test_the_rate_band_and_symptom_wording_settings_work_with_todays_defaults -> deleted: `rate_band_mode` / `body_fat_tier` /
+      `symptom_line` settings (owner ruled: advisory only, no symptom line)
+  test_every_fix3_constant_is_labelled_and_every_default_is_todays -> rewritten onto `live_settings`
 """
 
 from __future__ import annotations
@@ -38,12 +59,9 @@ import sample_weeks_5861 as sw  # noqa: E402
 from training import (  # noqa: E402
     cardio_model as cm,
     exercise_library as xl,
-    kb_entry,
     live_balance as lb,
-    live_program as lp,
-    live_rules as lrules,
-    live_week as lw,
-    program_structure as ps,
+    live_settings as lset,
+    live_volume as lvol,
     quality_rubric as qr,
     selection_engine as se,
 )
@@ -129,8 +147,8 @@ def _pain_week(patches: dict | None = None, settings: dict | None = None) -> dic
 
 def test_a_pain_flag_carries_the_persistence_line_on_its_own_lift_only(weeks):
     """#5861 FIX7 (sixth red team: the bench-elbow 'get it assessed' line printed on the squat and the RDL): the persistence line
-    rides the flagged lift (or what stands in for it) and nothing else; the setting turns it off."""
-    line = lb.SETTINGS_DEFAULTS["pain_assess_line"]
+    rides the flagged lift (or what stands in for it) and nothing else."""
+    line = lb.PAIN_ASSESS_LINE
     on = [x for x in _lifts(_pain_week()) if line in (x["hevy_note"] or "").split("\n")]
     assert on and {x["key"] for x in on} == {"barbell_bench_press"}, [x["key"] for x in on]
     assert not any(line in (x["hevy_note"] or "") for x in _lifts(weeks[("a_large_deficit_experienced", False)]["week"]))  # no flag
@@ -138,73 +156,29 @@ def test_a_pain_flag_carries_the_persistence_line_on_its_own_lift_only(weeks):
 
     first = {(live_pain, "assess_target"): lambda rx, ctx, pains: rx["exposures"][0]}  # control: the old 'first lift' placement
     assert {x["key"] for x in _lifts(_pain_week(first)) if line in (x["hevy_note"] or "")} - {"barbell_bench_press"}
-    off = _pain_week(settings={"pain_assess_line": ""})  # control: the owner turns it off
+    off = _pain_week({(lb, "PAIN_ASSESS_LINE"): ""})  # control: no line -> none printed
     assert not any(line in (x["hevy_note"] or "") for x in _lifts(off))
 
 
 # ── 2. volume by priority ────────────────────────────────────────────────────
-def test_the_week_is_allocated_by_priority_before_any_muscle_sits_over_mav():
+def test_the_week_is_planned_by_priority_and_no_non_priority_muscle_grows_over_mav():
+    """Round 9's ONE weekly plan: the template's delt spread gives isolation sets first (face pulls toward their 2-set floor), the
+    priority muscles sit at or over MEV with the side and rear delt heads at their aims, direct abs at the ruled 4. Setting: the
+    owner may name other priority muscles. Control: a slot floor out of reach -> the face pulls keep their template sets."""
     lib = copy.deepcopy(LIB0)
-    plan = lb.allocation_plan(CAT0, lib)
+    plan = lvol.week_plan(CAT0, lib, 5)
     marks = LANDMARKS["muscles"]
-    assert plan["before"]["shoulders"] > marks["shoulders"]["MAV"]  # the template's delt spread (the red team's 18)
-    assert plan["after"]["shoulders"] <= marks["shoulders"]["MAV"]
-    assert all(plan["after"][m] >= marks[m]["MEV"] for m in ("chest", "back", "quadriceps", "hamstrings"))
-    assert plan["after"]["chest"] > plan["before"]["chest"]  # the freed sets went to the priority muscle at MEV + 1
-    assert all(d < 0 for (r, slot), d in plan["deltas"].items() if slot in ("face_pull", "db_lateral_raise", "reverse_pec_deck"))
-    # setting: the owner may make the delts a priority muscle (it is his split) — the freed sets then never go to chest first
-    shoulders_first = copy.deepcopy(lib)
-    shoulders_first["programming_settings"] = {**(lib.get("programming_settings") or {}), "priority_muscles": ["shoulders"]}
-    assert lb.allocation_plan(CAT0, shoulders_first)["after"]["chest"] == plan["before"]["chest"]
-    # control: no slot may give (and #5861 FIX4's weekly redline, which may drop a whole slot, off) -> delts stay over MAV
-    with patch.dict(lb.ALLOCATION, {"over_mav_floor": {"value": 99}}), patch("training.live_shape.week_ceiling", lambda env, adds: []):
-        assert lb.allocation_plan(CAT0, lib)["after"]["shoulders"] > marks["shoulders"]["MAV"]
-
-
-# ── 3. one spine-loading definition; the kettlebell slot ─────────────────────
-NODL = {(lrules, "deadlifts"): lambda workouts, ctx: False}
-"""#5861 FIX5: a lifter with no barbell deadlift on record — the KB deadlift is his entry drill (for a deadlifter it is filler)."""
-
-
-def test_the_kettlebell_slot_moves_off_a_stacked_session_by_setting(weeks):
-    a = _week("a_large_deficit_experienced", NODL, {"session_cap_includes_cardio": False})["week"]  # FIX6: the default-cap placement
-    where = {s["role"]: {x["key"] for x in s["lifts"]} for s in a["sessions"]}
-    assert "kettlebell_deadlift" in where["shoulders_arms"] and "kettlebell_deadlift" not in where["lower_volume"]
-    shared = _week("a_large_deficit_experienced", NODL, {"session_cap_includes_cardio": True})["week"]  # S+A keeps the cardio
-    where = {s["role"]: {x["key"] for x in s["lifts"]} for s in shared["sessions"]}
-    assert "kettlebell_deadlift" in where["upper_volume"]
-    drop = _week("a_large_deficit_experienced", settings={"kb_slot_when_stacked": "drop"})["week"]  # the alternative works
-    assert "kettlebell_deadlift" not in {x["key"] for x in _lifts(drop)}
-    assert any(ln.startswith("dropped (live): Sumo Deadlift") for s in drop["sessions"] for ln in s["rationale"])
-    home = _week("a_large_deficit_experienced", NODL, settings={"kb_slot_role": "upper_volume"})["week"]  # a placement he picks
-    assert "kettlebell_deadlift" in {x["key"] for s in home["sessions"] if s["role"] == "upper_volume" for x in s["lifts"]}
-    for w in (a, shared, drop, home):  # every alternative keeps lower volume at two spine-loading lifts
-        lv = next(s for s in w["sessions"] if s["role"] == "lower_volume")
-        lib = LIB0
-        assert sum(1 for x in lv["lifts"] if lb.spine_loading(sw._lib_entry(lib, CAT0, x["key"]))) <= 2
-    # control: placement off -> the stacking rule must DROP the pinned third hinge (no "kept light" exemption any more)
-    off = _week("a_large_deficit_experienced", {(lb, "place_kb"): lambda rx, ctx, workouts: []} | NODL)["week"]
-    lv = next(s for s in off["sessions"] if s["role"] == "lower_volume")
-    assert "kettlebell_deadlift" not in {x["key"] for x in lv["lifts"]}
-    assert any("the third spine-loading lift" in ln for ln in lv["rationale"])
-
-
-def test_the_kb_template_setting_writes_the_slot_under_his_custom_template():
-    approved = copy.deepcopy(LIB0)
-    approved["status"] = "approved"
-    base = lambda k: str((CAT0.get(k) or {}).get("hevy_template_id_hint") or k)  # noqa: E731
-    assert lb.template_resolver(base, approved) is base  # default (None): today's Sumo Deadlift stand-in, the resolver itself
-    custom = copy.deepcopy(approved)
-    custom["programming_settings"] = {**(custom.get("programming_settings") or {}), "kb_deadlift_template_id": "C0FFEE01"}
-    r = lb.template_resolver(base, custom)
-    assert r(kb_entry.ENTRY) == "C0FFEE01" and r("squat_barbell") == base("squat_barbell")
-    assert lb.kb_note_line(custom) == "KB deadlift — one kettlebell." and "Sumo" in lb.kb_note_line(approved)
-    proposed = copy.deepcopy(custom)
-    proposed["status"] = "proposed"
-    assert lb.template_resolver(base, proposed) is base  # control: never while the library is proposed (shadow untouched)
-    rec = [{"date": "2026-11-12", "exercises": [{"template_id": "C0FFEE01", "sets": [{"reps": 8, "weight_kg": 24}]}]}]
-    assert kb_entry.exposures(rec, "2026-11-20") == 0  # the stand-in count alone does not see his custom template
-    assert lb.kb_exposures(rec, "2026-11-20", custom) == 1 and lb.kb_exposures(rec, "2026-11-20", approved) == 0
+    c = plan["counts"]
+    assert all(c[m] >= marks[m]["MEV"] for m in ("chest", "quadriceps"))  # the ruled priority muscles
+    assert c["side_delts"] >= lset.value("delt_heads")["side_delts"] and c["rear_delts"] >= lset.value("delt_heads")["rear_delts"]
+    assert c["abs"] == lset.defaults()["abs_direct_sets_per_week"]
+    assert sum(r["sets"] for r in plan["rows"] if r["key"] == "face_pull") <= 4  # the template's 3 + 3 gave first
+    other = copy.deepcopy(lib)
+    other["programming_settings"] = {**(lib.get("programming_settings") or {}), "priority_muscles": ["back"]}
+    assert lvol.week_plan(CAT0, other, 5)["targets"]["chest"]["floor"] == marks["chest"]["MV"]  # a setting he owns
+    assert c["shoulders"] <= marks["shoulders"]["MAV"]  # ruling 9: total shoulder volume never forced over MAV
+    with patch.object(lvol, "_spare", lambda r, rows, tg: False):  # control: no slot may go whole -> the delts sit over MAV
+        assert lvol.week_plan(CAT0, lib, 5)["counts"]["shoulders"] > marks["shoulders"]["MAV"]
 
 
 # ── 4. S rarity ──────────────────────────────────────────────────────────────
@@ -290,49 +264,27 @@ def _irregular(record: list, prof: dict) -> list:
     return [w for w in record if w["date"] < start or w["date"] in keep]
 
 
-def test_an_adherence_dip_changes_the_week_fewer_shorter_sessions_anchored():
+def test_an_adherence_dip_is_one_four_morning_week_no_make_up():
+    """Owner ruling 2: after a dip, one 4-morning week (shoulders+arms skipped) to get back into the routine — no make-up sets,
+    and never a second dip week for the same gap (the eighth red team: a 12-day layoff gave two). The week is PRODUCTION's plan,
+    the one the nightly sequence reads. Control: the full record -> no dip."""
     full = _week("a_large_deficit_experienced")
     dip = _week("a_large_deficit_experienced", record=_irregular)
     w = dip["week"]
-    assert w["short_week"].startswith("adherence dip (live, adherence_response=short_week)") and len(w["sessions"]) == 4
-    # #5861 FIX5 (fifth red team: this asserted the harness): the week is PRODUCTION's plan — the one the nightly sequence reads
-    # (`live_sequence.sequence_skip` -> `session_sequence.next_session`; served end to end in tests/test_programming_fix5_5861.py)
+    assert len(w["sessions"]) == 4 and "shoulders_arms" not in [s["role"] for s in w["sessions"]]
     from training import live_sequence, session_sequence as ss
 
     plan = live_sequence.week_plan("2026-11-16", dip["world"]["record"], dip["world"]["lib"])
-    assert plan and plan["mode"] == "dip" and plan["line"] == w["short_week"] and plan["skip"] == ("shoulders_arms",)
+    assert plan and plan["mode"] == "dip" and plan["skip"] == ("shoulders_arms",) and plan["days"] == 4
     skip = live_sequence.sequence_skip(dip["world"]["record"], dip["world"]["lib"])
     assert ss.next_session("2026-11-16", dip["world"]["record"], [], skip=skip)["session_role"] != "shoulders_arms"
     assert live_sequence.week_plan("2026-11-16", full["world"]["record"], full["world"]["lib"]) is None  # control: no dip
-    cap = lb.ADHERENCE_DIP["session_minutes"]["value"]
-    assert all((s["lifting_minutes"] or 0) <= cap for s in w["sessions"])
-    full_anchor = {
-        s["role"]: [x["working_sets"] for x in s["lifts"] if str(x["tag"]).startswith("anchor:")] for s in full["week"]["sessions"]
-    }
-    from training import live_shape
-
-    keep = int(live_shape.TIME_FIT["anchor_min_sets"]["value"])
-    for s in w["sessions"]:
-        # #5861 FIX8 (the seventh red team: a dip week left the shoulders at 3 hard sets): the anchors are whole UNLESS the 60-min
-        # cap would otherwise drop the arms floor's kept slot — then a back-off goes first (TIME_FIT), never below top + one
-        mine = [x["working_sets"] for x in s["lifts"] if str(x["tag"]).startswith("anchor:")]
-        assert len(mine) == len(full_anchor[s["role"]]) and all(n >= min(f, keep) for n, f in zip(mine, full_anchor[s["role"]])), s["role"]
-        if mine != full_anchor[s["role"]]:
-            assert any("anchor back-offs off" in ln and "TIME_FIT" in ln for ln in s["rationale"]), s["role"]
-        acc = [x for x in s["lifts"] if str(x["tag"]).startswith("accessory:") and not str(x["tag"]).endswith(":carry")]
-        # #5861 FIX8: except a slot the arms floor topped up to maintenance (ruling 3's MV on a dip week, "top-up (live)")
-        topped = {ln.split(" — ", 1)[1].split(" +", 1)[0] for ln in s["rationale"] if ln.startswith("top-up (live)") and " — " in ln}
-        assert all(x["working_sets"] <= lb.ADHERENCE_DIP["accessory_sets"]["value"] or x["title"] in topped for x in acc), s["role"]
-    sets = lambda wk: sum(x["working_sets"] for x in _lifts(wk))  # noqa: E731
-    assert sets(w) <= 0.75 * sets(full["week"])  # meaningfully less, not two sets off
-    # control: today's answer (two sets off, five full sessions) through the setting
-    trim = _week("a_large_deficit_experienced", settings={"adherence_response": "trim_sets"}, record=_irregular)["week"]
-    assert len(trim["sessions"]) == 5 and sets(trim) > sets(w)
-    # the stricter keep-the-anchors week stays behind its own setting (~45 min, one accessory per major muscle)
-    behind = _week("a_large_deficit_experienced", settings={"behind_schedule_week": True}, record=_irregular)["week"]
-    assert behind["short_week"].startswith("behind schedule") and all(
-        (s["lifting_minutes"] or 0) <= lw.BEHIND_SCHEDULE["session_minutes"]["value"] for s in behind["sessions"]
-    )
+    full_anchor = {s["role"]: [x["key"] for x in s["lifts"] if str(x["tag"]).startswith("anchor:")] for s in full["week"]["sessions"]}
+    for s in w["sessions"]:  # every anchor kept, none at one set
+        mine = [x for x in s["lifts"] if str(x["tag"]).startswith("anchor:")]
+        assert [x["key"] for x in mine] == full_anchor[s["role"]] and all(x["working_sets"] >= 2 for x in mine), s["role"]
+    with patch.object(live_sequence, "_dip", lambda workouts, monday: True):  # a dip the week before -> no second dip week
+        assert live_sequence.week_plan("2026-11-23", dip["world"]["record"], dip["world"]["lib"]) is None
 
 
 # ── 8. the steps credit (#5861 FIX6, owner ruling 12: REMOVED — steps are reported, never credited) ──────────────────────
@@ -346,56 +298,6 @@ def test_steps_earn_no_credit_and_cadence_minutes_count_first():
     assert not cm.aerobic_plan({d: 30000 for d in days})["volume_covered"]  # no step count 'covers' the week by itself
 
 
-def _walker_week(steps: int, settings: dict | None = None, patches: dict | None = None) -> dict:
-    """Profile (a) with a different daily step count and ~88 recorded moderate walking minutes a week (#5861 FIX6: the credit
-    is recorded minutes with intensity evidence; steps alone earn none) — the walking no longer covers the weekly floor."""
-    days = sw.steps_by_day(PROFILES["a_large_deficit_experienced"])
-    record = {"minutes_by_day": {d: 88 / 7 for d in days}, "line": "recorded outside the gym: 88 min credited (synthetic)"}
-    prof = PROFILES["a_large_deficit_experienced"] | {"steps_per_day": steps, "aerobic_record": record}
-    with patch.dict(sw.SETTINGS, settings or {}):
-        world = sw.build_world(prof, "approved")
-        ps_ = [patch.object(m, a, v) for (m, a), v in (patches or {}).items()]
-        for p in ps_:
-            p.start()
-        try:
-            return sw.generate_week(prof, "approved", world)
-        finally:
-            for p in ps_:
-                p.stop()
-
-
-def test_easy_blocks_close_the_weeks_gap_and_never_gut_lifting():
-    """Steps first, then only the structured minutes that close the gap to the weekly floor (cardio_model.WEEKLY_MODERATE_MIN):
-    a 10k walker (~88 credited min) gets easy blocks until the week's blocks close the gap — not one every morning — and under
-    the shared cap only the conditioning host buys room (an easy block takes what lifting leaves, else none)."""
-    # #5861 FIX6: the fifth round's gap rule, held under its own setting — owner ruling 4 (purposeful cardio only) is the
-    # default and serves NO easy block at all (`test_owner_rulings_5861.py`)
-    old = {"cardio_purpose_only": False, "session_cap_includes_cardio": False, "cardio_room_takes": "as_fix5"}
-    week = _walker_week(5000, old)  # #5861 FIX8: LOW steps — a 10k walker's unknown-intensity steps are no gap (ruling 12)
-    kinds = [s["cardio"].get("kind") for s in week["sessions"]]
-    easy = [k for k in kinds if k and k not in lp.HARD_KINDS]
-    total = sum(int(s["cardio"].get("minutes") or 0) for s in week["sessions"])
-    assert easy and len(easy) < len([s for s in week["sessions"] if s["cardio"].get("kind") not in lp.HARD_KINDS])
-    assert total + week["steps_credit"]["moderate_min_per_wk"] >= cm.WEEKLY_MODERATE_MIN[0]
-    from training import live_shape
-
-    # control: no gap rule (FIX4: nor the walk prompt's "a small gap is the walk's")
-    every = _walker_week(
-        5000, old, patches={(lb, "easy_gap"): lambda kind, live: (True, []), (live_shape, "walk_covers"): lambda kind, live: None}
-    )
-    assert sum(1 for s in every["sessions"] if s["cardio"].get("kind") and s["cardio"]["kind"] not in lp.HARD_KINDS) > len(easy)
-    shared = _walker_week(5000, old | {"session_cap_includes_cardio": True})
-    full = {s["role"]: s["lifting_minutes"] for s in week["sessions"]}
-    for s in shared["sessions"]:
-        if s["role"] != "shoulders_arms":  # only the host trims lifting for its block
-            assert s["lifting_minutes"] >= full[s["role"]] - 0.05, s["role"]
-        assert (
-            not s["cardio"].get("minutes")
-            or s["cardio"]["minutes"] >= lp.MIN_CARDIO_MINUTES  # FIX7: a week the record shows short takes idle minutes >= 10
-            or s["cardio"]["kind"] in lp.HARD_KINDS
-        )
-
-
 # ── 9. the garage leg curl ───────────────────────────────────────────────────
 def test_an_equipment_limited_week_keeps_hamstring_knee_flexion_from_the_library(weeks):
     c = weeks[("c_equipment_limited", False)]
@@ -405,27 +307,19 @@ def test_an_equipment_limited_week_keeps_hamstring_knee_flexion_from_the_library
     off = _week("c_equipment_limited", {(lb, "library_fallbacks"): lambda e, ctx: []})  # control: slot fallbacks only
     lh = next(s for s in off["week"]["sessions"] if s["role"] == "lower_heavy")
     assert not [x for x in lh["lifts"] if sw._lib_entry(off["world"]["lib"], CAT0, x["key"]).get("pattern") == "leg_curl"]
-    assert any("Leg Curl" in ln and "nothing fills it" in ln for ln in lh["rationale"])
+    assert any("Leg Curl" in ln and "nothing fills it" in ln for ln in lh["live_fit"] or [])
 
 
 # ── 10. cardio and the owner's settings ──────────────────────────────────────
-def test_the_short_week_under_the_shared_cap_keeps_a_real_aerobic_block(weeks):
-    # #5861 FIX6 (owner ruling 1: no strength work a muscle needs is cut to make room): the fifth round's room-making
-    # (`cardio_room_takes: as_fix5`) is what buys a 20-min block on the short week's host; the ruled default does not
-    old = {"session_cap_includes_cardio": True, "cardio_room_takes": "as_fix5"}
-    low = PROFILES["e_short_week"] | {"steps_per_day": 5000}  # #5861 FIX8: a LOW-steps week (high steps are no gap, ruling 12)
-    from training import live_rulings  # #5861 FIX8: and the arms floor's kept slots open to it (`arms_keep` protects them now)
-
-    e = _week("e_short_week", {(live_rulings, "arms_keep"): lambda rx, ctx, w: []}, settings=old, profile=low)["week"]
-    assert max(s["cardio"].get("minutes") or 0 for s in e["sessions"]) >= lw.CARDIO_ROOM["min_block"]["value"]
-    assert lb.conditioning_host("shoulders_arms") == "upper_volume" and lb.conditioning_host(None) == "shoulders_arms"
-    stuck = _week(
-        "e_short_week",
-        {(lb, "conditioning_host"): lambda skipped: "shoulders_arms", (live_rulings, "arms_keep"): lambda rx, ctx, w: []},
-        old,
-        profile=low,
-    )
-    assert max(s["cardio"].get("minutes") or 0 for s in stuck["week"]["sessions"]) == 0  # control: the skipped day as host
+def test_the_short_week_hosts_its_conditioning_on_a_morning_it_drafts():
+    """The third red team's short week had no conditioning at all under the shared cap. The host moves off a skipped
+    shoulders+arms to the morning after the heavy lower day; ruling 1 (round 9): the block takes only what lifting leaves, so
+    every morning fits 75 minutes. Control: a week that keeps shoulders+arms hosts it there."""
+    assert lb.conditioning_host(("shoulders_arms",)) == "upper_volume"
+    assert lb.conditioning_host(None) == "shoulders_arms"  # control
+    e = _week("e_short_week", settings={"session_cap_includes_cardio": True})["week"]
+    for s in e["sessions"]:
+        assert (s["lifting_minutes"] or 0) + (s["cardio"].get("minutes") or 0) <= 75.05, s["role"]
 
 
 def test_a_cardio_machine_the_gym_lacks_is_swapped_and_the_bike_is_named_for_what_is_there():
@@ -441,32 +335,12 @@ def test_a_cardio_machine_the_gym_lacks_is_swapped_and_the_bike_is_named_for_wha
     assert lb.machine_label(note, garage) == "RPE _\nBike · your level · RPE 6–7"
 
 
-def test_the_rate_band_and_symptom_wording_settings_work_with_todays_defaults():
-    lib = copy.deepcopy(LIB0)
-    band = lb.rate_band(None, 7.5, lib)
-    assert band["mode"] == "advisory" and band["body_fat_tier"] == "unknown"
-    set_ = copy.deepcopy(lib)
-    from health import rate_policy
-
-    tier = sorted(rate_policy.START_RUNG_BY_TIER)[0]
-    set_["programming_settings"] = {**(lib.get("programming_settings") or {}), "body_fat_tier": tier, "rate_band_mode": "structured"}
-    got = lb.rate_band(None, 7.5, set_)
-    assert got["mode"] == "structured" and got["body_fat_tier"] == tier
-    assert got["band_pct_bw_per_wk"] == rate_policy.propose_band(body_fat_tier=tier)["band_pct_bw_per_wk"]
-    wording = "Chest, breathing, dizzy, heart racing or irregular? Stop, log it."
-    w = _week("a_large_deficit_experienced", settings={"symptom_line": wording})["week"]
-    hard = [s["cardio"]["note"] for s in w["sessions"] if s["cardio"].get("kind") in lp.HARD_KINDS]
-    assert hard and all(n.split("\n")[-1] == wording for n in hard)
-
-
-def test_every_fix3_constant_is_labelled_and_every_default_is_todays():
-    for table in (lb.ALLOCATION, lb.ADHERENCE_DIP):
-        for name, row in table.items():
-            assert row["label"] == "heuristic" and row["basis"], name
-    s = lp.settings(LIB0)
-    # #5861 FIX6: the owner's rulings of 2026-11-13 — the shared cap ON (ruling 1), no symptom line (ruling 10)
-    assert s["session_cap_includes_cardio"] is True and s["behind_schedule_week"] is False
-    assert s["symptom_line"] == "" and s["kb_deadlift_template_id"] is None
-    assert s["kb_slot_role"] == "lower_volume" == lb.KB_HOME and s["body_fat_tier"] is None and s["rate_band_mode"] == "advisory"
-    assert ps.SESSION_TEMPLATES["lower_volume"]["accessories"].count(lb.KB_SLOT_KEY) == 1  # the template placement is today's
+def test_the_one_settings_table_holds_the_rulings_and_nothing_dead():
+    s = lset.settings(LIB0)
+    # the owner's rulings of 2026-11-13 — the shared cap ON (ruling 1), press 3 (ruling 6), chest + quadriceps (ruling 9)
+    assert s["session_cap_includes_cardio"] is True and s["press_sets"] == 3 and s["priority_muscles"] == ["chest", "quadriceps"]
+    dead = {"behind_schedule_week", "symptom_line", "kb_deadlift_template_id", "kb_slot_role", "body_fat_tier", "rate_band_mode"}
+    assert not dead & set(s)
+    base = lambda k: k  # noqa: E731
+    assert lb.template_resolver(base) is base  # ruling #2: no KB template — the resolver is the identity
     assert cm.STEPS_PER_MODERATE_MIN == cm.CADENCE_MODERATE_SPM == 100  # a population heuristic, labelled (ruling 12)

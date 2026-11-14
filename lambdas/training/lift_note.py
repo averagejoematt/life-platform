@@ -548,6 +548,7 @@ def compose_blocks(
     rotations: dict[str, str] | None = None,
     authored: dict[str, dict[str, str]] | None = None,
     fallbacks: dict[str, list[str]] | None = None,
+    familiar: set[str] | None = None,
 ) -> dict[str, Any]:
     """Rewrite every lift block's note to the standard, IN PLACE, after every load and warm-up pass. Returns the
     `inputs_snapshot` record: `previous_loads` (Hevy's PREVIOUS, for the linter) and `lift_notes` (per movement: the
@@ -609,6 +610,8 @@ def compose_blocks(
         caps = (row.get("ramp") or {}).get("exposure_caps")
         stale = is_stale(previous, target_date)
         layoff = is_layoff_return(caps, previous, target_date)
+        if familiar is not None and key in familiar:  # #5861 fix round 9 (live only): a familiar pattern has no re-entry cap
+            caps, layoff = None, False
         line1 = own.get("effort") or exposure_cue(intensity, [{}] * max(1, len(_working(block.sets))))
         line2, pick, reason_kind = "", False, None
         if caps:

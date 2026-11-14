@@ -54,17 +54,7 @@ STOP_LINE: dict[str, Any] = {
     "basis": "fourth red team (physio): a pain-flagged lift needs an in-set rule. The pain-monitoring line is PAIN_RULE mild_max "
     "(3/10) or the stated score when lower: pain above it, or turning sharp, ends that lift for the day (practitioner consensus)",
 }
-NO_STEP_LINE = "No load step today."
 HOLD_DAY_LINE = "No load steps today."  # #5861 FIX7: lint L1 bans "as written"
-SYMPTOM_PRESETS: dict[str, str] = {
-    "extended": "Chest, breathing, dizzy, heart racing or irregular? Stop.\nDoesn't settle → get medical help.",
-}
-"""`programming_settings.symptom_line` may name a preset instead of literal text (OWNER DECISION; the default literal is
-unchanged). `extended` adds a racing or irregular heartbeat and a seek-care step (fourth red team, the clinician panel voice).
-No condition named, no heart-rate number (owner rulings)."""
-SETTINGS_DEFAULTS: dict[str, Any] = {"symptom_line_on_lifting_days": False}
-"""OWNER DECISION, off by default: True prints the symptom line as the last line of exercise 1 on every live lifting morning
-(today it prints on conditioning notes only)."""
 
 
 # ── 1. the pain site ─────────────────────────────────────────────────────────
@@ -137,10 +127,11 @@ def pain_limit(entry: dict[str, Any] | None, ctx: dict[str, Any]) -> tuple[str, 
 
 # ── 3. no load step on a held lift ───────────────────────────────────────────
 def _hold_day(rx: dict[str, Any]) -> bool:
-    from training.live_program import LOAD_POLICY
+    from training import live_session as ls
 
     fat = rx.get("fatigue") or {}
-    return fat.get("state") in LOAD_POLICY["hold_states"]["value"] or fat.get("action") == "deload_recommended"
+    held = bool((rx.get(ls.MARK) or {}).get("hold_all"))
+    return held or fat.get("state") in ("strained", "overreached") or fat.get("action") == "deload_recommended"
 
 
 def no_step_keys(rx: dict[str, Any]) -> set[str]:
@@ -148,10 +139,14 @@ def no_step_keys(rx: dict[str, Any]) -> set[str]:
     deload shape, a lift already cut this week, a pain swap."""
     from training import live_session as ls
 
-    out = {str(d["key"]) for d in (rx.get(ls.MARK) or {}).get("load_guard") or []}
+    out = {
+        str(d["key"])
+        for d in (rx.get(ls.MARK) or {}).get("load_guard") or []
+        if d.get("mode") in ("down", "second") or (d.get("mode") == "hold" and d.get("why") != "reps first")
+    }
     for e in rx.get("exposures") or []:
         swap = (e.get("live_swap") or {}).get("code")
-        if e.get("live_load") or e.get("live_retreated") or e.get("live_stop") or e.get("live_first_back") or swap in ("joint", "pain"):
+        if e.get("live_load") or e.get("live_stop") or e.get("live_first_back") or swap in ("joint", "pain"):
             out.add(str(e.get("movement_key")))
     return out
 
@@ -200,8 +195,6 @@ def no_step(blocks: list[Any], rx: dict[str, Any]) -> list[str]:
         b.notes = block + ("\n\n" + "\n".join(lines) if lines else "") if block else "\n".join(lines)
         if i == 0 and hold:
             b.notes = assess_note(b.notes, HOLD_DAY_LINE)
-        elif i > 0 and not hold and sb.steppable(b):
-            b.notes = assess_note(b.notes, NO_STEP_LINE)
     here = keys & {b.movement_key for b in blocks}
     if hold:
         return [f"no step (live): a hold day ({(rx.get('fatigue') or {}).get('state')}) — no in-session load step on any lift"]
@@ -319,17 +312,3 @@ def fix_block(block: str, rx: dict[str, Any], blocks: list[Any]) -> str:
 
 
 # ── 5. the stop line ─────────────────────────────────────────────────────────
-def symptom_text(settings: dict[str, Any] | None) -> str:
-    """The configured symptom line: a SYMPTOM_PRESETS name resolves to its text; anything else is the owner's literal."""
-    raw = str((settings or {}).get("symptom_line") or "").strip()
-    return SYMPTOM_PRESETS.get(raw, raw)
-
-
-def lifting_day_symptom(blocks: list[Any], settings: dict[str, Any] | None) -> None:
-    """IN PLACE: with `symptom_line_on_lifting_days`, the symptom line as exercise 1's last lines (idempotent)."""
-    text = symptom_text(settings)
-    if not blocks or not text or not (settings or {}).get("symptom_line_on_lifting_days"):
-        return
-    note = blocks[0].notes or ""
-    if text not in note:
-        blocks[0].notes = f"{note}\n{text}".strip()

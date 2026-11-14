@@ -61,6 +61,7 @@ import exercise_library_targets as targets  # noqa: E402
 from exercise_library_changelog import BUILDER_CHANGE_LOG  # noqa: E402
 from training import (
     exercise_library as lib_rules,  # noqa: E402
+    live_settings,  # noqa: E402
     quality_rubric,  # noqa: E402
 )
 
@@ -89,39 +90,8 @@ INITIAL_HEADER = {
 
 # Change-log lines the BUILDER owns: deploy/exercise_library_changelog.py (#5861 FIX4: extracted on the module-size seam).
 
-# #5861 FIX2-DATA: the programming lane's library-carried settings (`training.live_program.SETTINGS_DEFAULTS` reads them).
-# OWNER DECISIONS PENDING — these are the defaults, written once; a value on disk (an owner's ruling) is kept by every rebuild.
-PROGRAMMING_SETTINGS_DEFAULTS: dict[str, Any] = {
-    "session_cap_includes_cardio": False,
-    "symptom_line": "Chest, breathing, dizzy? Stop, log it.",
-    "short_week_rule": "skip_shoulders_arms",
-    "behind_schedule_week": False,
-}
-# #5861 FIX6: THE OWNER'S RULINGS of 2026-11-13 on the decision register (configuration, NOT activation — `status` stays
-# `proposed`). Written over any earlier on-disk default by every rebuild: a ruling lives here, in the generator, and a later
-# ruling edits this dict. Each key is read only under `selection_engine.mode() == "live"` (`training.live_program.settings`,
-# whose code defaults equal these — tests/test_owner_rulings_5861.py holds the two to each other).
-OWNER_RULED_SETTINGS: dict[str, Any] = {
-    "session_cap_includes_cardio": True,  # ruling 1: lifting + gym cardio share the 75-min cap
-    "adherence_response": "short_week",  # ruling 2: a 4-session week after missed sessions, no make-up sets
-    "short_week_rule": "skip_shoulders_arms",  # ruling 3: the 4-day week drops shoulders+arms (arms/shoulders held at MEV)
-    "cardio_purpose_only": True,  # ruling 4: a gym cardio block only for a named purpose (the week's conditioning dose)
-    "heavy_day_deadlift_shape": "top_plus_backoff",  # ruling 5: top set + one back-off
-    "lead_lift_rule": "alternate_weekly",  # ruling 5: one of squat / deadlift leads the heavy day, the other a band lower
-    "press_sets": 3,  # ruling 6: overhead press 2-3 weekly working sets, from redundant lateral-delt sets
-    "kb_slot_under_strain": "drop",  # ruling 7: no KB hinge on a strained week, no make-up
-    "priority_muscles": ["chest", "quadriceps"],  # ruling 9
-    "priority_add_rule": "stimulus_and_performance",  # ruling 9: an added slot only when stimulus AND performance say so
-    "rate_band_mode": "advisory",  # ruling 11: advisory upper reference, never applied
-    "rate_ceiling_pct_bw": 1.0,  # ruling 11: ~1 % of current bodyweight a week, the advisory upper planning reference
-    "symptom_line": "",  # ruling 10 (follow-up): no symptom warning line on any session
-    "symptom_line_on_lifting_days": False,  # ruling 10
-    "hard_conditioning_doses": 1,  # owner ruling 2026-11-13 (FIX7 follow-up): one hard conditioning dose a week; kept a setting
-    "abs_direct_sets_per_week": 4,  # owner ruling #8 (fix round 8): ~4 challenging DIRECT ab sets a week, spread; indirect never
-}
-"""#5861 FIX7 also records the owner's 2026-11-13 clarification of ruling 17 (no setting: the rubric itself, quality_rubric 3.5.0):
-glute stretch credit only for genuinely lengthened loading, the same standard as every muscle — short-range glute lifts (kickbacks,
-hip thrust variants) earn no stretch credit (`quality_rubric.STRETCH_CAPS` empty)."""
+# #5861 fix round 9: `programming_settings` is THE one live settings table (`training.live_settings.SETTINGS`, each row with its
+# ruling and provenance) — written whole by every rebuild; a later ruling edits that table, never this file.
 
 
 def with_builder_changes(head: dict[str, Any]) -> dict[str, Any]:
@@ -966,9 +936,7 @@ def build_library(
             "evaluated_by": "#5772 (next story); v0.1 only defines gates",
         },
         "gates": gates_out,
-        "programming_settings": PROGRAMMING_SETTINGS_DEFAULTS
-        | dict((current or {}).get("programming_settings") or {})
-        | OWNER_RULED_SETTINGS,
+        "programming_settings": live_settings.defaults(),
         "canonical_families": families,
         "movements": movements,
     }
