@@ -276,7 +276,7 @@ def for_live_draft(
         live_load.mark_novelty(out, ctx, block_workouts)
         lines += live_program.plan(out, rotation or {}, ctx, block_workouts, sig)
         lines += live_volume.pair_anchors(out, plan)
-        tids = {str(catalog.get(str(e.get("movement_key")), {}).get("hevy_template_id_hint") or "").upper() for e in out["exposures"]}
+        tids = {live_load.tid_of(e.get("movement_key"), catalog, lib, ctx["idx"]) for e in out["exposures"]}
         anchors = _anchor_tids(catalog)
         hist = live_load.history(block_workouts, (tids | anchors) - {""})
         slump = live_load.slump(hist, anchors, fatigue_model.in_deficit(getattr(inputs, "weights_by_day", None)), target)
@@ -295,7 +295,7 @@ def for_live_draft(
     for x, n in zip(out["exposures"], before):
         if len(x["sets"]) < n:
             x["live_reduced"] = n - len(x["sets"])
-    slack = live_volume.floor_slack(plan) if ctx is not None else {}
+    slack = live_volume.floor_slack(plan, str(rx.get("session_role") or "")) if ctx is not None else {}
     lines += live_volume.fit_sets(out, set_cap, catalog, lib, slack)
     _refit(out)
     if ctx is not None:
@@ -312,7 +312,7 @@ def for_live_draft(
         "symptom_tripwire": live_week.symptom_gate(
             getattr(inputs, "medical_stop_lines", None), block_workouts, getattr(inputs, "target_date", None)
         ),
-        "conditioning_host": live_balance.conditioning_host(skip),
+        "conditioning_host": (week or {}).get("host") or live_balance.conditioning_host(skip),  # the declared week's own host
         "week_skip": list(skip),
         "hist": hist,
         "hold_all": hold_all,

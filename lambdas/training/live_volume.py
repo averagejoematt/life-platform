@@ -79,7 +79,7 @@ SHORT_WEEKS: dict[int, dict[str, Any]] = {
             "upper_heavy": (("lower_volume", ("squat", "hinge")),),
             "lower_heavy": (("upper_volume", ("bench", "row", "vertical_pull")),),
         },
-        "host": "lower_heavy",
+        "host": "upper_heavy",
     },
     1: {"roles": ("upper_heavy",), "partners": {"upper_heavy": (("lower_volume", ("squat", "hinge")),)}, "host": "upper_heavy"},
 }
@@ -469,6 +469,9 @@ def apply(rx: dict[str, Any], ctx: dict[str, Any], plan: dict[str, Any]) -> list
         lines.append(f"full body (live): {role} + {', '.join(p for p, _ in plan['week']['partners'][role])} anchors at 2-3 sets each")
     for r in mine:
         if r.get("fill") and r["key"] not in {e.get("movement_key") for e in rx["exposures"]}:
+            title = (ctx["catalog"].get(r["key"]) or {}).get("title") or r["key"]
+            aim = plan["targets"].get(r["fill"], {}).get("aim")
+            lines.append(f"added (live): {title} {r['sets']} x 8-15 — {r['fill']} under its weekly aim of {aim:g} (live_volume fill)")
             rx["exposures"].append(
                 {
                     "kind": "accessory",
@@ -544,9 +547,18 @@ def _prio(key: Any, catalog: dict[str, Any], lib: dict[str, Any], slack: dict[st
     return any(m in (slack or {}) and (slack or {})[m] < 1.0 for m in c)
 
 
-def floor_slack(plan: dict[str, Any]) -> dict[str, float]:
-    """Muscle (and delt head) -> the week plan's hard sets over its floor (what the time fit may spend before a floor breaks)."""
-    return {m: round(float(plan["counts"].get(m, 0.0)) - float(t["floor"]), 1) for m, t in plan["targets"].items() if t["floor"]}
+def floor_slack(plan: dict[str, Any], role: str | None = None) -> dict[str, float]:
+    """Muscle (and delt head) -> the hard sets the time fit may spend before the week's floor breaks: the plan's surplus over the
+    floor, apportioned to `role`'s morning by its share of the muscle's planned sets (every morning's fit spends only its share)."""
+    here = _count([r for r in plan["rows"] if r["role"] == role]) if role else None
+    out = {}
+    for m, t in plan["targets"].items():
+        if not t["floor"]:
+            continue
+        total = float(plan["counts"].get(m, 0.0))
+        share = (float(here.get(m, 0.0)) / total) if (here is not None and total) else 1.0
+        out[m] = round((total - float(t["floor"])) * share, 2)
+    return out
 
 
 def next_cut(items: list[tuple[bool, bool, bool, int]]) -> tuple[int, str] | None:
@@ -592,15 +604,37 @@ def fit_sets(
 
 
 def time_fit(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any], cap: int) -> list[str]:
-    """IN PLACE: the routine as written (warm-ups included) to `cap` minutes by `next_cut`. Returns the line (empty when it fits)."""
+    """IN PLACE: the routine as written (warm-ups included) to `cap` minutes by `next_cut`. Returns the line (empty when it fits).
+    Under the shared cap the conditioning dose takes only what lifting leaves (ruling 1: never strength work for cardio)."""
     from training import selection_engine as se
-    from training.live_session import _unpair
     from training.session_shape import routine_minutes
 
     lib = se.load_library_failsoft() or {}
     slack = (rx.get("live_session") or {}).get("floor_slack") or {}
     kinds = {e.get("movement_key"): e for e in rx.get("exposures") or []}
     before = routine_minutes(blocks, movements)["lifting_minutes"]
+    done: list[str] = []
+    done += _fit_to(blocks, kinds, movements, lib, slack, int(cap))
+    if not done:
+        return []
+    after = routine_minutes(blocks, movements)["lifting_minutes"]
+    return [
+        f"time (live): ~{before} min as written (warm-ups included) > the {cap}-min cap — {', '.join(done)} (one order: "
+        f"non-priority back-offs first, priority last) -> ~{after} min"
+    ]
+
+
+def _fit_to(
+    blocks: list[Any],
+    kinds: dict[str, Any],
+    movements: dict[str, Any],
+    lib: dict[str, Any],
+    slack: dict[str, float],
+    cap: int,
+) -> list[str]:
+    from training.live_session import _unpair
+    from training.session_shape import routine_minutes
+
     done: list[str] = []
     while routine_minutes(blocks, movements)["lifting_minutes"] > cap:
         lifts = [i for i, b in enumerate(blocks) if b.movement_key in kinds]
@@ -624,10 +658,4 @@ def time_fit(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any], c
         else:
             b.sets.pop(max(j for j, s in enumerate(b.sets) if str(getattr(s, "type", "") or "normal") != "warmup"))
             done.append(f"{b.movement_key} -1")
-    if not done:
-        return []
-    after = routine_minutes(blocks, movements)["lifting_minutes"]
-    return [
-        f"time (live): ~{before} min as written (warm-ups included) > the {cap}-min cap — {', '.join(done)} (one order: "
-        f"non-priority back-offs first, priority last) -> ~{after} min"
-    ]
+    return done

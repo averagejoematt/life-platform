@@ -299,7 +299,7 @@ def mark_novelty(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> None
         if e.get("intensity") == "carry":
             continue
         entry = _lib(e, ctx)
-        tid = str((ctx["catalog"].get(str(e.get("movement_key"))) or {}).get("hevy_template_id_hint") or "").upper()
+        tid = tid_of(e.get("movement_key"), ctx["catalog"], ctx.get("lib"), ctx.get("idx"))
         if gap and tid and tid in logged and tid not in since:
             e["live_first_back"] = True
             e["live_effort"] = min(int(cfg.value("first_back_rpe")), int(e.get("live_effort") or 99))
@@ -346,11 +346,15 @@ def set_loads(
     )
     by_key = {e.get("movement_key"): e for e in rx.get("exposures") or []}
     rows_out = (load_floors or {}).get("movements") or {}
+    from training import selection_engine as se
+
+    lib = se.load_library_failsoft() or {}
+    idx = se.key_index(lib, movements)
     out = []
     for b in blocks:
         e = by_key.get(b.movement_key) or {}
         entry = movements.get(b.movement_key) or {}
-        tid = str(entry.get("hevy_template_id_hint") or "").upper()
+        tid = tid_of(b.movement_key, movements, lib, idx)
         work = [s for s in b.sets if str(getattr(s, "type", "") or "normal") != "warmup" and getattr(s, "weight_kg", None) is not None]
         if not e or not tid or e.get("intensity") == "carry" or not work:
             continue
@@ -358,6 +362,8 @@ def set_loads(
         hi = max(int(getattr(s, "rep_range_end", 0) or 0) for s in work) or lo
         lo = lo if lo != 99 else hi
         rows = same_role(hist.get(tid) or [], role, target_date, lo, hi)
+        if not rows and hold_all:  # a hold day holds a lift with no same-role exposure at its latest load of any role
+            rows = same_role([r | {"role": ""} for r in hist.get(tid) or []], "", target_date, 0, 99)
         band = tuple(e["live_effort_band"]) if e.get("live_lead") == "second" and e.get("live_effort_band") else None
         led = lead_rows(rows, e) if e.get("live_lead") else rows  # rule 6: a lead progresses from its own LEAD exposures
         flag = e.get("live_load") or {}
@@ -396,6 +402,15 @@ def set_loads(
         )
     mark["load_guard"] = out
     return out
+
+
+def tid_of(key: Any, movements: dict[str, Any], lib: dict[str, Any] | None, idx: dict[str, Any] | None = None) -> str:
+    """A movement's Hevy template id: the catalog's hint, else (a title-only catalog entry) its library row's template."""
+    hint = (movements.get(str(key)) or {}).get("hevy_template_id_hint")
+    if hint:
+        return str(hint).upper()
+    lid = ((idx or {}).get("to_lib") or {}).get(str(key))
+    return str((((lib or {}).get("movements") or {}).get(lid) or {}).get("template_id") or "").upper()
 
 
 def _lb(kg: float) -> str:
