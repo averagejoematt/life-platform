@@ -420,17 +420,11 @@ NOVELTY_HOLD = "novelty budget: the week already changes its quota of movements 
 
 
 def served_key(p: dict[str, Any], policy: dict[str, Any]) -> str | None:
-    """What the slot SERVES this week under live (`selection_engine._live`): a budget hold (`novelty_serve`), else the rotation
-    ledger's variant for this phase when it is still one of the pick's eligible movements (the phase's first draft decided it —
-    possibly a shadow-era #5075 calendar rotation), else the pick; an approved pick is served as approved."""
-    from training import variant_rotation as vr
-
-    pick = p.get("pick") or {}
-    key, pos = pick.get("catalog_key"), policy.get("position") or {}
-    if not key or p.get("novelty_serve"):
-        return p.get("novelty_serve") or key
-    held = vr._ledger_variant(policy.get("rows"), int(pos.get("block") or 0), p["slot_id"], int(pos.get("phase") or 0)) if pos else None
-    return held if held and held in _eligible(p) else key
+    """What the slot SERVES this week under live (`selection_engine._live`): a budget hold (`novelty_serve`), else the pick — ONE
+    authority (fix round 10, the ninth red team: "selection X — THIS phase serves Y" was the rotation ledger overriding the live
+    pick; the ledger now only records what served)."""
+    key = (p.get("pick") or {}).get("catalog_key")
+    return p.get("novelty_serve") or key
 
 
 def _eligible(p: dict[str, Any]) -> set[str]:
@@ -476,7 +470,8 @@ def _change_rank(p: dict[str, Any]) -> int:
 
 def enforce_novelty(picked: list[dict[str, Any]], policy: dict[str, Any] | None, catalog: dict[str, Any] | None = None) -> list[str]:
     """IN PLACE, live only (`selection_engine.select_week`, after every slot): MAX_NEW_PER_WEEK covers EVERY movement the served
-    week changes. Second red team: the owner's real run served four new movements against a budget of two — the budget counted
+    week changes — ZERO on a declared short or adherence-dip week (fix round 10, the ninth red team: two new accessories in the
+    week meant to rebuild routine; forced changes still serve). Second red team: the owner's real run served four new movements against a budget of two — the budget counted
     only never-logged picks, and the rotation ledger carried a shadow-era (#5075 calendar) phase decision forward, which
     `_live` serves whenever it is one of the pick's fallbacks. Now a change whose last-phase movement can still serve here
     (one of the slot's eligible movements) is OPTIONAL; any other is FORCED (pain, equipment, no longer servable) and keeps its
@@ -493,7 +488,8 @@ def enforce_novelty(picked: list[dict[str, Any]], policy: dict[str, Any] | None,
         }
 
     forced = [i for i in changed if not optional(i)]
-    room = max(0, MAX_NEW_PER_WEEK - len(forced))
+    budget = 0 if policy.get("settle_week") else MAX_NEW_PER_WEEK  # fix round 10: a short or dip week rebuilds routine first
+    room = max(0, budget - len(forced))
     deferred = []
     for i in sorted((i for i in changed if optional(i)), key=lambda i: (_change_rank(picked[i]), i))[room:]:
         p, prev = picked[i], last_phase_key(picked[i], policy)
@@ -508,7 +504,7 @@ def enforce_novelty(picked: list[dict[str, Any]], policy: dict[str, Any] | None,
         deferred.append(p["slot_id"])
     for p in picked:
         p.pop("novelty_hold", None)  # the alternative is not part of the record
-    policy["novelty"] = {"changed": len(changed), "forced": len(forced), "deferred": deferred, "budget": MAX_NEW_PER_WEEK}
+    policy["novelty"] = {"changed": len(changed), "forced": len(forced), "deferred": deferred, "budget": budget}
     return deferred
 
 
@@ -526,8 +522,11 @@ def build_policy(
     and the fatigue model's swaps (from the Hevy record), the ledger rows and the position."""
     from training import fatigue_model as fm
 
-    signals, swaps, stacking, recent = None, [], False, None
+    signals, swaps, stacking, recent, settle = None, [], False, None, None
     if block_workouts is not None and as_of:
+        from training import live_sequence
+
+        settle = (live_sequence.week_plan(live_sequence.monday_of(str(as_of)[:10]), block_workouts, lib) or {}).get("mode")
         recent = _recent_tids(block_workouts, as_of)
         signals = fm.movement_signals(block_workouts, as_of=as_of)
         found = fm.axial_stacking(block_workouts, fm.library_index(lib), as_of=as_of)
@@ -551,6 +550,7 @@ def build_policy(
         "week_counts": Counter(),
         "recent_tids": recent,  # #5861 second red team: what he performed in RECENT_DAYS (the novelty budget's "new to him")
         "mild_pain": _mild_pain(block_workouts),  # #5861 FIX4: a mild (<= 3/10, not sharp) pain note keeps the movement
+        "settle_week": settle,  # fix round 10: a short / dip week's mode — the novelty budget is zero (`enforce_novelty`)
     }
 
 

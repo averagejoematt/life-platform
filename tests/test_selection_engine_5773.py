@@ -573,15 +573,19 @@ def test_approved_library_serves_the_selection_live():
     assert se.apply(copy.deepcopy(rot), cat, rows=[], lib=_lib("proposed"), overlay=None)["variants"] == rot["variants"]
 
 
-def test_live_keeps_the_ledgers_held_variant_when_still_eligible():
+def test_live_serves_the_pick_and_the_ledger_never_overrides_it():
+    """#5861 fix round 10 (the ninth red team: "selection X — THIS phase serves Y", two authorities): under live the pick serves;
+    a ledger row naming an eligible fallback for this phase is a record, not an override. Control: the ledger's variant is an
+    eligible fallback the old rule would have served."""
     cat = _cat()
     sel = _week(lib=_lib("approved"))
     s = _slot(sel, "upper_heavy.reverse_pec_deck")
     held = s["fallbacks"][0]["catalog_key"]
+    assert held != s["pick"]["catalog_key"]  # control: the old rule served `held` (an eligible fallback)
     rows = [{"sk": vr.ledger_sk(2, "upper_heavy.reverse_pec_deck"), "block": 2, "phase_1": {"variant": held}}]
     rot = vr.plan(WEEK7, cat, role="upper_heavy", rows=rows, ledger_state="injected")
     out = se.apply(rot, cat, rows=rows, lib=_lib("approved"), overlay=None)
-    assert out["variants"]["reverse_pec_deck"] == held
+    assert out["variants"]["reverse_pec_deck"] == s["pick"]["catalog_key"]
 
 
 def test_no_library_serves_the_pools_and_says_so():

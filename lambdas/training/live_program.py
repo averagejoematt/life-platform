@@ -3,9 +3,9 @@
 `selection_engine.mode() == "live"`). tests/test_no_live_change_5861_l6.py pins the served proposed-mode drafts byte for byte.
 
 What it owns after fix round 9 (the load model moved to `live_load`, the volume to `live_volume`):
-  * PAIN BY JOINT (`joint_flags`, `apply_joint_rule`, PAIN_RULE): a pain or discomfort flag reaches every movement that loads the
-    same joint at moderate or more; at or under the mild line the lift is reduced (10% lighter, RPE <= 7, the stop line), above it
-    the flagged pattern is avoided (a lower-stress member, else skipped).
+  * PAIN BY JOINT (`joint_flags`, `apply_joint_rule`, PAIN_RULE; the reach and routes are `live_pain`): a flag reaches every
+    lift loading its joint at moderate or more; at or under the mild line each is held (load held, RPE <= 8, the stop line), above
+    it the flagged pattern and any lift loading the joint high are routed to a reviewed low-stress member, the rest held.
   * AXIAL STACKING (`avoid_stacking`, STACK_RULE): at most two spine-loading squat/hinge compounds a session.
   * THE DELOAD SHAPE (`deload_shape`, DELOAD_SHAPE) and the fatigue cost the fatigue model's one reducer reads (`fatigue_cost`).
   * NOTES (`annotate`): each lift's one load reason (`live_load`) and each effort cap on its own Hevy note.
@@ -51,14 +51,29 @@ PAIN_RULE: dict[str, dict[str, Any]] = {
     "mild_max": {
         "value": 3,
         "label": HEURISTIC,
-        "basis": "pain at or under 3/10 (the platform's own pain tripwire, training_notes_pain.SEVERITY_THRESHOLD) is allowed "
-        "with reduced load on every movement loading that joint; above it, or a 'sharp' note, or no stated number, the "
-        "same-pattern movements that load the joint are AVOIDED (swapped for a lower-stress member, else skipped) and the rest "
-        "are reduced — a common pain-monitoring rule (owner to confirm the line)",
+        "basis": "pain at or under 3/10 (the platform's own pain tripwire, training_notes_pain.SEVERITY_THRESHOLD) keeps every lift "
+        "loading that joint, its load held; above it, or a 'sharp' note, or no stated number, the flagged lift, its pattern group "
+        "and every lift loading the joint HIGH are routed (a reviewed pain-free member) and the rest held — a common "
+        "pain-monitoring rule (owner to confirm the line)",
     },
-    "reduce_pct": {"value": 10, "label": HEURISTIC, "basis": "a joint-flag reduction is 10% under the last top set"},
-    "reduce_rpe": {"value": 7, "label": HEURISTIC, "basis": "and stops at RPE 7"},
-    "joint_level": {"value": "moderate", "label": HEURISTIC, "basis": "a movement 'loads the joint' at moderate or high joint stress"},
+    "lift_only_max": {
+        "value": 2,
+        "label": HEURISTIC,
+        "basis": "a discomfort note at or under 2/10 (or the light-discomfort class) changes only the lift it was logged on: "
+        "pain-monitoring models tolerate low, settling discomfort during loading (practitioner consensus)",
+    },
+    "pain_rpe": {
+        "value": 8,
+        "label": HEURISTIC,
+        "basis": "every lift the pain rule keeps, routes or holds runs at RPE <= 8 with the in-set stop line and its load HELD (no "
+        "step up while a flag stands; reps under the floor still step it down) — still a hard set (RPE 8 = 2 in reserve)",
+    },
+    "joint_level": {
+        "value": "moderate",
+        "label": HEURISTIC,
+        "basis": "a flag reaches every lift loading its joint at moderate or high stress, whatever the pattern (the low back is "
+        "the spinal_load case of the same rule)",
+    },
 }
 STACK_RULE: dict[str, dict[str, Any]] = {
     "axial_per_session": {
@@ -219,10 +234,9 @@ def joint_flags(ctx: dict[str, Any], workouts: list[dict[str, Any]] | None, disc
 
 
 def apply_joint_rule(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str, Any], flags: list[dict[str, Any]]) -> list[str]:
-    """IN PLACE: every exposure that loads a flagged joint (module doc 3). `avoid` (above the mild line, "sharp" or no number):
-    the flagged PATTERN is off for the session — every member of the flag's pattern group that loads the joint at moderate or
-    more is dropped, and so is the session fit's pain swap for the flagged movement itself (#5861 FIX5: no substitute of the
-    same pattern); `reduce`: kept, marked for a load cut (`live_load`) and an RPE cap. Returns the rationale lines."""
+    """IN PLACE: every exposure a flag reaches (`live_pain` module doc: one joint rule). `avoid`: routed — a reviewed pain-free
+    member, else the muscle's reviewed route, else skipped (the muscle zero by design); `hold`: kept, its load held (no step up),
+    RPE <= pain_rpe, the stop line. Returns the rationale lines."""
     from training import live_pain, live_safety
 
     if not flags:
@@ -249,7 +263,7 @@ def apply_joint_rule(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str
                 e | {k: v for k, v in live_pain.serve_route(e, str(e["movement_key"]), f, "pain_free_variant").items() if k != "live_swap"}
             )
             lines.append(
-                f"kept (live): {name} — {why}: a pain-free variant (low on the flagged joint), RPE <= 8 with the stop line (PAIN_SCOPE)"
+                f"kept (live): {name} — {why}: a pain-free variant (low on the flagged joint), RPE <= 8 with the stop line (PAIN_RULE)"
             )
             continue
         if tier == "avoid":  # #5861 FIX7: the pattern is off today — a pain-free same-family member first, else the muscle's route
@@ -272,29 +286,20 @@ def apply_joint_rule(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str
                         if how == "priority_route"
                         else "low stress on the flagged joint"
                     )
-                    + f"), RPE <= {served['live_effort']} with the stop line (PAIN_SCOPE, heuristic)"
+                    + f"), RPE <= {served['live_effort']} with the stop line (PAIN_RULE, heuristic)"
                 )
                 continue
             lines.append(f"skipped (live): {name} — {why}: above the mild line, the flagged pattern is off today — no pain-free route")
             continue
-        if f.get("scope") == "lift":  # #5861 FIX7: <= 2/10 discomfort — the lift stays a hard set, load held, the stop line on
-            e["live_effort"] = min(int(live_pain.PAIN_SCOPE["variant_rpe"]["value"]), int(e.get("live_effort") or 99))
-            e["live_stop"] = stop
-            keep.append(e)
-            lines.append(
-                f"kept (live): {name} — {why}: low discomfort, this lift only — RPE <= 8, the stop line on (PAIN_SCOPE, heuristic)"
-            )
-            continue
-        e["live_load"] = {
-            **(e.get("live_load") or {}),
-            "pct": int(PAIN_RULE["reduce_pct"]["value"]),
-            "why": f"{joint.replace('_', ' ')} flag",
-        }
-        e["live_effort"] = min(int(PAIN_RULE["reduce_rpe"]["value"]), int(e.get("live_effort") or 99))
+        e["live_load"] = {**(e.get("live_load") or {}), "hold": True, "why": f"{joint.replace('_', ' ')} flag"}  # fix round 10
+        e["live_effort"] = min(int(PAIN_RULE["pain_rpe"]["value"]), int(e.get("live_effort") or 99))
         e["live_stop"] = stop
         keep.append(e)
-        lines.append(f"reduced (live): {name} — {why}: loads that joint, {PAIN_RULE['reduce_pct']['value']}% lighter, RPE <= 7")
+        lines.append(f"held (live): {name} — {why}: loads that joint, load held, RPE <= {PAIN_RULE['pain_rpe']['value']}, the stop line on")
     rx["exposures"] = [{k: v for k, v in e.items() if not (k == "template_id" and v is None)} for e in keep]
+    from training import live_volume  # fix round 10: a pain-skipped lift's time goes to reviewed, pain-free work
+
+    lines += live_volume.refill(rx, ctx, flags, sum(1 for ln in lines if ln.startswith("skipped (live)")))
     return lines
 
 
@@ -309,8 +314,10 @@ def _avoided_swap(e: dict[str, Any], ctx: dict[str, Any], flags: list[dict[str, 
     f = next((f for f in flags if f["movement_id"] == mid and f["tier"] == "avoid"), None)
     if f is None or _group(src.get("pattern")) != _group(_entry(e.get("movement_key"), ctx).get("pattern")):
         return None
-    if all(_stress(_entry(e.get("movement_key"), ctx), j) == 0 for j in f["joints"]):
-        return None  # #5861 FIX7: a same-family member LOW on the flagged joint is the pain-free variant — it stands (live_pain)
+    from training import live_pain
+
+    if live_pain._low(_entry(e.get("movement_key"), ctx), f["joints"]):
+        return None  # a reviewed same-family member LOW on the flagged joint is the pain-free variant — it stands (live_pain)
     return f"stands in for {f['title']}, pain flag" + (f" {f['severity']:g}/10" if f["severity"] else "")
 
 

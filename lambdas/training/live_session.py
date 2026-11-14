@@ -266,7 +266,7 @@ def for_live_draft(
             "pain_notes": live_safety.latest_notes(block_workouts),
         } | _week_ctx(week, inputs)
         mornings = int((week or {}).get("days") or 5)
-        plan = live_volume.week_plan(catalog, lib, mornings)
+        plan = live_volume.week_plan(catalog, lib, mornings, monday=target or None)  # any day: its ISO week
         ctx["volume_plan"] = plan
         role_rows = [r for r in plan["rows"] if r["role"] == rx.get("session_role")]
         plan_rows = dict(live_volume._count(role_rows))
@@ -281,9 +281,10 @@ def for_live_draft(
         hist = live_load.history(block_workouts, (tids | anchors) - {""})
         slump = live_load.slump(hist, anchors, fatigue_model.in_deficit(getattr(inputs, "weights_by_day", None)), target)
         if slump:
-            hold_all = "slump week, loads held"
-            lines += [f"slump (live): {slump['declining']} of {slump['judged']} anchors declining together — every load held"]
-            lines += live_load.slump_trim(out)
+            hold_all = "slump week"
+            lines += [f"slump (live): {slump['declining']} of {slump['judged']} anchors declining together — no load steps up"]
+            prio = {str(e.get("movement_key")) for e in out["exposures"] if live_volume._prio(e.get("movement_key"), catalog, lib)}
+            lines += live_load.slump_trim(out, prio)
         _refit(out)
     except Exception as e:  # noqa: BLE001 — the live fit never blocks a draft
         lines.append(f"live session fit failed ({type(e).__name__}) — the prescription is unchanged")
@@ -316,7 +317,9 @@ def for_live_draft(
         "symptom_tripwire": live_week.symptom_gate(
             getattr(inputs, "medical_stop_lines", None), block_workouts, getattr(inputs, "target_date", None)
         ),
-        "conditioning_host": (week or {}).get("host") or live_balance.conditioning_host(skip),  # the declared week's own host
+        "conditioning_host": (
+            live_volume.conditioning_host(plan) if ctx is not None else (week or {}).get("host") or live_balance.conditioning_host(skip)
+        ),  # fix round 10: the morning with the most free minutes
         "week_skip": list(skip),
         "hist": hist,
         "hold_all": hold_all,
@@ -458,7 +461,7 @@ def summary(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any]) ->
         if names:
             out.append(f"today: {head}: {', '.join(names)}")
     if mark.get("hold_all"):
-        out.append(f"today: every load held — {mark['hold_all']}")
+        out.append(f"today: no load steps up — {mark['hold_all']}")
     back = [_title(k, movements) for k, e in exp.items() if e.get("live_first_back")]
     new = [_title(k, movements) for k, e in exp.items() if e.get("live_new")]
     if back:
@@ -477,8 +480,8 @@ def summary(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any]) ->
 
 
 def _zero_by_design(blocks: list[Any], rx: dict[str, Any], movements: dict[str, Any]) -> list[str]:
-    """Fix round 9 (F): a priority muscle the week's plan gives this morning that the pain rule took to ZERO is said plainly —
-    never "held" (the eighth red team's garage + sharp shoulder: chest 0 while a line claimed 8)."""
+    """A muscle the week's plan gives this morning that the pain rule took to ZERO (no reviewed low-stress route) is said plainly,
+    priority muscles first — never "held" (fix round 9 F; fix round 10: every muscle, ruling 16 — no unreviewed route stands in)."""
     from training import live_settings, live_volume, selection_engine as se
 
     lib = se.load_library_failsoft() or {}
@@ -488,21 +491,23 @@ def _zero_by_design(blocks: list[Any], rx: dict[str, Any], movements: dict[str, 
         (live_volume.lib_entry(b.movement_key, movements, lib), 1, None, b.movement_key, movements) for b in blocks
     )
     pain = [ln for ln in (rx.get(MARK) or {}).get("lines") or [] if ln.startswith("skipped (live)") and (" pain" in ln or "flag" in ln)]
-    out = []
-    for m in prio:
-        if plan.get(m) and not final.get(m) and pain:
-            out.append(
-                f"today: {m} 0 here by design — the pain rule took its pressing/squatting off and no lower-stress {m} "
-                "option is available; it returns when the flag clears"
-            )
-    return out
+    marks = live_volume._marks()
+    zero = [m for m in dict.fromkeys(prio + sorted(plan)) if m in marks and plan.get(m, 0) >= 1 and not final.get(m)]
+    if not (zero and pain):
+        return []
+    names = ", ".join(zero)
+    return [
+        f"today: {names} 0 here by design — the pain rule took that work off and no reviewed lower-stress option is available; "
+        "it returns when the flag clears"
+    ]
 
 
 def contradictions(blocks: list[Any], rx: dict[str, Any]) -> list[str]:
     """Where a lift's note says something its own rows or the live decision contradict (fix round 9, G): a heavier/lighter
-    reason against the decision, a "find the load" over a written load, a layoff line on a lift of a familiar pattern.
-    [] = consistent. (The low-energy line's cardio promise is fitted on the WHY block, `live_balance.why_effort`.)"""
-    from training import hevy_note_grammar as g
+    reason against the decision, a "find the load" over a written load, a layoff line on a lift of a familiar pattern, a held or
+    lightened lift whose note still steps it in-session (fix round 10: one load rule). [] = consistent. (The low-energy line's cardio promise is fitted on the WHY block, `live_balance.why_effort`.)
+    """
+    from training import hevy_note_grammar as g, live_safety
 
     guard = {d["key"]: d for d in (rx.get(MARK) or {}).get("load_guard") or []}
     exp = {e.get("movement_key"): e for e in rx.get("exposures") or []}
@@ -518,6 +523,8 @@ def contradictions(blocks: list[Any], rx: dict[str, Any]) -> list[str]:
             out.append(f"{b.movement_key}: 'find the load' over a written load")
         if (e.get("live_familiar") or e.get("live_first_back")) and ("first time in" in note or "session back after" in note):
             out.append(f"{b.movement_key}: a layoff line on a familiar pattern")
+        if ("Same load" in note or "Lighter today" in note) and any(live_safety._step_line(ln) for ln in note.split("\n")):
+            out.append(f"{b.movement_key}: holds or lightens its load but the note steps it on later sets (two load rules)")
     return out
 
 
@@ -529,20 +536,8 @@ def rotation_lines(rotation: dict[str, Any]) -> list[str]:
     if not is_live(rotation) or rotation.get("source") != "selection":
         return lines
     slots = rotation.get("slots") or []
-    served = {s.get("slot_id") for s in slots if s.get("source") in ("selection", "ledger", "owner_approved")}
-    lines = [ln for ln in lines if not (ln.startswith(POOL_LINE_PREFIXES) and any(f"[{sid}," in ln for sid in served))]
-    # a phase the ledger already decided (its first draft, before the library was approved) keeps its movement until the next
-    # phase: the selection's line then names what WILL serve, so it says what serves NOW
-    picks = {s["slot_id"]: (s.get("pick") or {}).get("catalog_key") for s in (rotation.get("selection") or {}).get("slots") or []}
-    kept = {s["slot_id"]: s["variant"] for s in slots if s.get("source") == "ledger" and s.get("variant") != picks.get(s.get("slot_id"))}
-    return [
-        (
-            ln + f" — THIS phase serves {kept[sid]} (the rotation ledger: a phase's first draft decides it); the pick serves from the next"
-            if ln.startswith("selection:") and (sid := next((k for k in kept if f" for {k} " in ln or ln.endswith(f" for {k}")), None))
-            else ln
-        )
-        for ln in lines
-    ]
+    served = {s.get("slot_id") for s in slots if s.get("source") in ("selection", "owner_approved")}
+    return [ln for ln in lines if not (ln.startswith(POOL_LINE_PREFIXES) and any(f"[{sid}," in ln for sid in served))]
 
 
 def rationale_lines(rx: dict[str, Any]) -> list[str]:

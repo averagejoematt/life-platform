@@ -36,7 +36,8 @@ SETTINGS: dict[str, dict[str, Any]] = {
     "priority_muscles": {
         "default": ["chest", "quadriceps"],
         "ruling": "owner ruling 9 (2026-11-13)",
-        "what": "muscles planned toward the middle of MEV-MAV (never under MEV in a normal week) and trimmed last for time",
+        "what": "muscles planned at MEV at least and never under the non-priority arm and calf muscles' weekly hard sets (the "
+        "plan pays them from those isolation slots); trimmed last for time and by a slump",
     },
     "abs_direct_sets_per_week": {
         "default": 4,
@@ -71,32 +72,34 @@ HEURISTICS: dict[str, dict[str, Any]] = {
         "basis": "a same-role exposure in the last 8 weeks is a load reference; older, the engine's own ramp load stands",
         "retune": "block retro: how often a lift returns after >8 weeks",
     },
-    "step_down_exposures": {
-        "value": 3,
+    "below_floor_exposures": {
+        "value": 2,
         "group": "progression",
-        "basis": "a step-down needs three same-role exposures in a row under the previous best e1RM, each with its top set logged "
-        "ABOVE the target RPE (one set at or under target vetoes it) — so a lift steps down at most once per `step_down_exposures`",
-        "retune": "block retro: step-downs that were followed by a new best within 3 weeks (too eager) vs grinding sessions",
+        "basis": "fix round 10: the top set under the rep range's floor in two same-role exposures running steps the lift down "
+        "(at least step_down_pct; as far as the last exposure says reaches the floor with 2 in reserve) — nothing blocks it (a slump, strain, pain or first-back hold stops only a step up); RPE plays no part, so "
+        "missing or always-10 RPE never moves a load down on its own",
+        "retune": "block retro: exposures spent under the floor; step-downs followed by a new best within 3 weeks (too eager)",
     },
     "step_down_pct": {
         "value": 5,
         "group": "progression",
-        "basis": "one step-down is 5% under the last top load (one implement step on most lifts), never 10%: a 3% e1RM drift is "
-        "not answered with a 10% intensity cut",
+        "basis": "the smallest step-down: 5% under the last top load (one implement step on most lifts); a larger step only "
+        "when the last exposure says 5% still leaves him under the floor",
         "retune": "block retro: e1RM a month after each step-down",
     },
     "implausible_rpe": {
         "value": 9.5,
         "group": "progression",
-        "basis": "RPE missing on every set, or >= 9.5 on every set while reps at the load rise, is EFFORT UNKNOWN: the lift "
-        "progresses on reps and load only and never steps down on effort",
+        "basis": "RPE missing on every set, or >= 9.5 on every set, is EFFORT UNKNOWN: the step up rides on reps alone; a load "
+        "moves down only on reps under the floor, never on effort",
         "retune": "block retro: RPE calibration report (rpe_calibration)",
     },
     "slump_anchors": {
         "value": 4,
         "group": "progression",
         "basis": "four or more anchors declining together (or, in a deficit, at least half of them) is systemic — sleep, recovery "
-        "or the deficit, not the lifts: every load HOLDS and accessory volume comes down about a third",
+        "or the deficit, not the lifts: no load steps UP and non-priority accessory volume comes down about a third (a lift under its "
+        "floor still steps down)",
         "retune": "block retro: anchor e1RM across the block vs sleep and loss rate",
     },
     "decline_pct": {
@@ -148,23 +151,30 @@ HEURISTICS: dict[str, dict[str, Any]] = {
         "basis": "a working set prescribed at RPE >= 8 (the top of its effort line) is a hard set; the ONE counter",
         "retune": "block retro: logged RPE of prescribed hard sets",
     },
-    "secondary_credit": {
-        "value": 0.5,
+    "set_credit": {
+        "value": {
+            "secondary": 0.5,
+            "delt": {
+                "horizontal_press": {"front_delts": 0.5},
+                "vertical_press": {"front_delts": 1.0, "side_delts": 0.5},
+                "horizontal_pull": {"rear_delts": 0.5},
+            },
+            "never": {"*": ["abs"], "hip_extension": ["quadriceps"], "leg_curl": ["calves"]},
+        },
         "group": "volume",
-        "basis": "a lift's secondary muscle takes half a set (the fatigue model's convention)",
+        "basis": "THE one set-credit table (fix round 10): a working set credits its target's landmark muscle 1.0 and each "
+        "secondary — the library's secondaries and every other muscle it is RATED for — `secondary` (half a set, the fatigue "
+        "model's convention); each delt head direct 1.0, or by `delt` from the lift's pattern (pressing -> front and, overhead, "
+        "half a side; rowing -> rear — practitioner consensus, explicit so it can be argued with); `never` drops a credit the "
+        "anatomy does not support (indirect trunk loading is never an ab set, owner ruling #8; a hip thrust trains no quadriceps; "
+        "a leg curl no calves)",
         "retune": "none (convention)",
-    },
-    "priority_aim": {
-        "value": 0.25,
-        "group": "volume",
-        "basis": "a priority muscle aims a quarter of the way from MEV to MAV (chest and quadriceps 8 -> 10): more than the "
-        "minimum, never mechanical volume maximisation (ruling 9)",
-        "retune": "block retro: priority muscles' anchor progression",
     },
     "slot_max_sets": {
         "value": 3,
         "group": "volume",
-        "basis": "an accessory slot takes at most 3 working sets; 4+ in one slot is junk volume",
+        "basis": "an accessory slot takes at most 3 working sets — a template slot written at 4 is served at 3 (fix round 10: "
+        "the calf slots); 4+ in one slot is junk volume",
         "retune": "none",
     },
     "slot_min_sets": {
@@ -180,39 +190,24 @@ HEURISTICS: dict[str, dict[str, Any]] = {
         "aims at 6 hard sets, the rear at 4",
         "retune": "block retro: lateral-raise and rear-delt progression",
     },
-    "delt_credit": {
-        "value": {
-            "horizontal_press": {"front_delts": 0.5},
-            "vertical_press": {"front_delts": 1.0, "side_delts": 0.5},
-            "horizontal_pull": {"rear_delts": 0.5},
-        },
-        "group": "volume",
-        "basis": "indirect delt-head credit by library pattern: pressing -> front (and, overhead, half a side), rowing -> rear "
-        "(practitioner consensus; explicit so it can be argued with)",
-        "retune": "none (convention)",
-    },
     "short_week_floor": {
         "value": 3,
         "group": "volume",
-        "basis": "a 1-3 morning week holds each priority muscle and each major pattern at maintenance: MV x mornings / 3 hard "
-        "sets (at least 2-3), full-body mornings of 4-6 movements at 2-3 sets — never a 1-set anchor",
+        "basis": "a 1-3 morning week holds each priority muscle and each major pattern at maintenance: MV x mornings / this "
+        "value hard sets (at least 2), a priority muscle aiming at MEV x mornings / this value; full-body mornings of 4-6 "
+        "movements at 2-3 sets — never a 1-set anchor",
         "retune": "block retro: anchor e1RM after a short week",
-    },
-    "time_cap_minutes": {
-        "value": 75,
-        "group": "time",
-        "basis": "the owner's 75-minute morning, warm-ups included (#5799 time model, 99 s a set measured)",
-        "retune": "the #5799 measured set time",
     },
 }
 
 for _row in HEURISTICS.values():
     _row["label"] = H  # ruling 18: every row a labelled heuristic
 
-TRIM_ORDER: tuple[str, ...] = ("accessory_backoff", "anchor_backoff", "priority_last_set")
-"""THE one time fit's order (fix round 9): non-priority accessory back-off sets, then non-priority anchor back-offs, then a
-priority muscle's last sets; never under 2 working sets, an accessory left at 2 is dropped whole only after every back-off is
-gone. Read by `live_volume.time_fit`."""
+TRIM_ORDER: tuple[str, ...] = ("accessory_backoff", "anchor_backoff", "spare_accessory", "priority_last_set")
+"""THE one time fit's order (fix round 9; fix round 10 adds the spare accessory): non-priority accessory back-off sets, then
+non-priority anchor back-offs, then a whole 2-set accessory whose muscle stays over its floor without it, then a priority (or
+floor-holding) muscle's last sets — the one furthest over its floor first; never under 2 working sets. Read by
+`live_volume.time_fit`."""
 
 
 def settings(lib: dict[str, Any] | None) -> dict[str, Any]:

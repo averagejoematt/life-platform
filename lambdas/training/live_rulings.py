@@ -51,8 +51,8 @@ def lead_blocked(e: dict[str, Any], trend: str | None) -> str | None:
     """#5861 FIX7 (sixth red team: a −10% reset 'led' while the squat was capped — no top-effort lift on the heavy day): why this
     anchor cannot lead today — a load cut or reset on it (`live_load` pct), a rebuild after a reset, a regressing trend, a held
     retreat, or a pain/discomfort effort cap at or under RPE 7 — else None."""
-    if (e.get("live_load") or {}).get("pct"):
-        return str((e.get("live_load") or {}).get("why") or "cut")
+    if e.get("live_stop"):  # fix round 10: a pain-touched lift (held, stop line) never leads
+        return str((e.get("live_load") or {}).get("why") or "pain flag")
     if trend == "regressing":
         return "regressing"
     if e.get("live_effort") is not None and int(e["live_effort"]) <= 7:
@@ -199,11 +199,9 @@ HEURISTIC_HOOKS: dict[str, str] = {
     "rate_policy.CEILING_TAPER": "4-week loss rate vs anchor e1RM and lean-mass (DEXA) change at each block retro",
     "rate_policy.SUSTAINED_WEEKS": "weeks above the ceiling that preceded an anchor decline, across blocks",
     "rate_policy.SIGNAL_STEP_PCT": "loss rate in weeks with 1, 2, 3 slow signals vs strength the following week",
-    "live_program.PAIN_RULE": "pain-note recurrence within 2 sessions of a reduce / avoid",
+    "live_program.PAIN_RULE": "pain-note recurrence within 2 sessions of a hold / route, and the flagged muscle's hard sets",
     "live_program.DELOAD_SHAPE": "readiness and first-set reps the week after a deload",
     "live_program.STACK_RULE": "low-back discomfort notes and squat/hinge e1RM in weeks at the cap",
-    "live_pain.PAIN_SCOPE": "pain-note recurrence within 2 sessions of a lift-only / pattern / pain-free-route answer, and the flagged muscle's hard sets",
-    "live_pain.SPINE_REACH": "low-back notes after a flag vs the lifts it reached",
     "live_shape.WALK_PROMPT": "walks logged after a prompt",
     "fatigue_model.THRESHOLDS": "strain calls vs the next session's first-set reps / RPE",
     "quality_rubric.NEUTRAL": "how often a reviewed input moved a provisional row's tier",

@@ -65,12 +65,20 @@ ATHLETES = {
     "decline": {"drift": -0.005},
     "drop": {"drift": -0.01},
 }
+DECLINERS = {
+    "d3_honest": {"drift": -0.03, "drift_weeks": 4},
+    "d3_rpe9": {"drift": -0.03, "drift_weeks": 4, "log": "rpe9"},
+    "d3_rpe10": {"drift": -0.03, "drift_weeks": 4, "log": "rpe10"},
+}
+"""Fix round 10 — the ninth red team's decliner: 3 %/week for four weeks, then flat (a 45-kg cut can do this), logging honest RPE,
+never above 9, or 10 on every set. Fix round 9 held the bench while he did 4, 3, 2, 2, 2 reps on 4-6, for weeks."""
+HEAVY = ("barbell_bench_press", "machine_row", "lat_pulldown", "squat_barbell", "deadlift_barbell")
 REPLACED = {
     "fix7: a reset performed as written is never reset again": "test_no_athlete_loses_load_without_evidence_or_oscillates",
     "fix7: an athlete doing exactly what is prescribed never loses load": "test_no_athlete_loses_load_without_evidence_or_oscillates",
-    "fix7: a genuinely stalled lift resets at most once per 3": "test_a_step_down_needs_three_grinding_sessions_at_one_load",
-    "fix7: a held e1RM in a deficit holds": "test_a_systemic_decline_holds_every_load_and_trims_accessories",
-    "fix7: a fast cut with every lift regressing keeps loads": "test_a_systemic_decline_holds_every_load_and_trims_accessories",
+    "fix7: a genuinely stalled lift resets at most once per 3": "test_a_step_down_needs_two_exposures_under_the_floor_and_no_hold_blocks_it",
+    "fix7: a held e1RM in a deficit holds": "test_a_systemic_decline_blocks_every_step_up_and_trims_accessories",
+    "fix7: a fast cut with every lift regressing keeps loads": "test_a_real_decline_steps_down_within_two_exposures (fix round 10)",
     "fix7: every muscle reaches MEV in hard sets": "ruled outcome: priority >= MEV, others >= MV (test_short_and_normal_weeks_meet_their_floors)",
     "fix7: a like-for-like swap is not capped as new": "test_owner_rulings_5861::test_ruling_10_familiar_patterns...",
     "fix7/fix8 mechanism tests (ROLE_REF, SECOND_LIFT, hard_capable, WEEK_FLOOR, PARITY, the KB slot)": "deleted with the mechanism",
@@ -96,13 +104,17 @@ def _week(prof: dict, patches: dict | None = None, settings: dict | None = None)
     return {"world": world, "week": week, "hard": sw.hard_sets_by_muscle(week, world["lib"], world["catalog"]["movements"])}
 
 
-def _run(name: str, weeks: int = 8, patches: dict | None = None) -> list[dict]:
+def _run(name: str, weeks: int = 8, patches: dict | None = None, athlete: list | None = None) -> list[dict]:
+    """`athlete`: a list the simulated athlete is appended to (its `done` record feeds `sim.floor_runs`)."""
     ps_ = [patch.object(m, a, v) for (m, a), v in (patches or {}).items()]
     for p in ps_:
         p.start()
     try:
         skip = (lambda k: k % 2 == 1) if name == "alternate" else None
-        return sim.simulate(A, weeks, sim.Physiological(**ATHLETES[name]), skip=skip)
+        ath = sim.Physiological(**(ATHLETES | DECLINERS)[name])
+        if athlete is not None:
+            athlete.append(ath)
+        return sim.simulate(A, weeks, ath, skip=skip)
     finally:
         for p in ps_:
             p.stop()
@@ -116,10 +128,15 @@ def _windows(downs: dict) -> list:
 # ── 1. progression: the red team's athletes over 8 weeks ─────────────────────────────────────────────────────────────────────
 @pytest.mark.parametrize("name", sorted(ATHLETES))
 def test_no_athlete_loses_load_without_evidence_or_oscillates(name):
-    rows = _run(name)
+    """No load falls >10% without a step-down on evidence (reps under the floor), none oscillates, at most one step-down per lift
+    per 3 weeks — and NO athlete grinds under a rep floor for more than two exposures running (fix round 10: the freeze the ninth
+    red team found counted as success here; the control in test_a_real_decline_steps_down_within_two_exposures shows it fails)."""
+    ath: list = []
+    rows = _run(name, athlete=ath)
     assert sim.falls_without_evidence(rows) == {}, name
     assert sim.oscillations(rows) == {}, name
     assert _windows(sim.step_downs(rows)) == [], name
+    assert max(sim.floor_runs(ath[0]).values(), default=0) <= 2, (name, sim.floor_runs(ath[0]))
     loads = sim.role_loads(rows)
     if name == "over":  # the over-performer climbs every exposure
         assert all((s[-1] or 0) > (s[0] or 0) for (k, r), s in loads.items() if k in ("barbell_bench_press", "lat_pulldown"))
@@ -127,50 +144,74 @@ def test_no_athlete_loses_load_without_evidence_or_oscillates(name):
         assert all(min(x for x in s if x) >= 0.94 * next(x for x in s if x) for s in loads.values() if any(s))
 
 
+@pytest.mark.parametrize("name", sorted(DECLINERS))
+def test_a_real_decline_steps_down_within_two_exposures(name):
+    """THE TEST THE NINTH RED TEAM ASKED FOR — a real decline driven end to end through `live_load.decide` (drafted weeks, performed
+    by a simulated athlete, fed back): with honest, capped-at-9 or always-10 RPE, every heavy lift steps DOWN once its top set sits
+    under the floor two exposures running, and never grinds under it for a third; the bench is lighter before the four-week
+    decline ends. Red on fix round 9 (bench held while reps fell 4 -> 2 for weeks). Control: the step-down blocked (the old freeze)
+    -> a lift sits under its floor three or more exposures running."""
+    ath: list = []
+    rows = _run(name, athlete=ath)
+    runs = sim.floor_runs(ath[0], HEAVY)
+    assert max(runs.values(), default=0) <= 2, (name, runs)
+    bench = sim.role_loads(rows)[("barbell_bench_press", "upper_heavy")]
+    assert min(bench[:5]) < max(bench[:2]), (name, bench)  # stepped down inside the four-week decline
+    assert sim.falls_without_evidence(rows) == {} and sim.step_downs(rows), name
+    if name == "d3_honest":
+        frozen: list = []
+        _run(name, patches={(live_load, "below_floor"): lambda *a: False}, athlete=frozen)
+        assert max(sim.floor_runs(frozen[0], HEAVY).values(), default=0) >= 3  # control: the freeze is caught
+
+
 def test_unreliable_rpe_is_effort_unknown_and_never_a_step_down():
-    """RPE 10 logged on every set (the red team: bench 185 -> 105 in five weeks) or no RPE at all is EFFORT UNKNOWN: the lift
-    progresses on reps and load only and never steps down on effort. Control: the plausibility rule off -> the same record cuts."""
+    """RPE 10 logged on every set (the red team: bench 185 -> 105 in five weeks) or no RPE at all is EFFORT UNKNOWN: the step up
+    rides on reps alone, and effort never moves a load down — reps under the floor do, whatever the RPE says. Control: the
+    plausibility rule off -> an RPE-10 lifter at the top of the range never steps up."""
     row = lambda reps, rpe: {
         "date": "2026-11-0",
         "role": "upper_heavy",
         "sets": [{"kg": 100.0, "reps": reps, "rpe": rpe}] * 3,
     }  # noqa: E731
     always10 = [row(5, 10), row(5, 10), row(5, 10), row(6, 10)]
-    assert live_load.effort_unknown(always10) and not live_load.step_down_due(always10)
+    assert live_load.effort_unknown(always10) and live_load.decide(always10, 4, 6, "barbell")["mode"] == "hold"
     assert live_load.effort_unknown([row(5, None), row(6, None)])
+    assert live_load.decide([row(5, None), row(5, None)], 4, 6, "barbell")["mode"] == "hold"
     topped = [row(6, 10), row(5, 10)]
     assert live_load.decide(topped, 4, 6, "barbell")["mode"] == "up"  # reps reached the top: it progresses on reps alone
+    assert live_load.decide([row(3, None), row(3, None)], 4, 6, "barbell")["mode"] == "down"  # reps under the floor, no RPE
     with patch.object(live_load, "effort_unknown", lambda rows: False):  # control
-        assert live_load.step_down_due(always10)
         assert live_load.decide(topped, 4, 6, "barbell")["mode"] == "hold"
 
 
-def test_a_step_down_needs_three_grinding_sessions_at_one_load():
+def test_a_step_down_needs_two_exposures_under_the_floor_and_no_hold_blocks_it():
     kg = 100.0
     row = lambda reps, rpe, load=kg: {
         "date": "2026-11-0",
         "role": "upper_heavy",
         "sets": [{"kg": load, "reps": reps, "rpe": rpe}],
     }  # noqa: E731
-    grind = [row(4, 10), row(4, 10), row(4, 10), row(6, 9)]  # newest first: three sessions under the 6 done at this load, all RPE 10
-    assert live_load.step_down_due(grind)
-    assert not live_load.step_down_due([row(4, 10), row(4, 9), row(4, 10), row(6, 9)])  # one set at target vetoes
-    assert not live_load.step_down_due([row(4, 10), row(4, 10), row(4, 10, 105), row(6, 9)])  # a load change restarts the count
-    assert not live_load.step_down_due([row(6, 10), row(6, 10), row(6, 10), row(6, 10)])  # reps held: RPE 10 alone is no evidence
-    assert not live_load.step_down_due([dict(r, sets=[dict(r["sets"][0], rpe=None)]) for r in grind])  # no RPE: effort unknown
-    with patch.dict(live_settings.HEURISTICS["step_down_exposures"], {"value": 1}):  # control: one session would do it
-        assert live_load.step_down_due([row(4, 10), row(4, 9), row(6, 9)])
-    d = live_load.decide(grind, 4, 6, "barbell")
-    assert d["mode"] == "down" and kg * 0.92 <= d["kg"] < kg  # one 5% step, floored to the implement (never 10%)
+    under = [row(3, 9), row(3, 10), row(6, 9)]  # newest first: two sessions under the floor of 4-6
+    for hold in (None, "slump week", "recovery first", "knee flag", "first session back"):
+        d = live_load.decide(under, 4, 6, "barbell", hold=hold)
+        assert d["mode"] == "down" and kg * 0.85 <= d["kg"] <= kg * 0.95, hold  # at least 5%, never a collapse
+    assert live_load.decide([row(3, 9), row(4, 10), row(6, 9)], 4, 6, "barbell")["mode"] == "hold"  # one under: hold
+    assert live_load.decide([row(4, 10), row(4, 10), row(4, 10)], 4, 6, "barbell")["mode"] == "hold"  # at the floor: hold
+    assert live_load.decide([row(6, 8)], 4, 6, "barbell", hold="slump week")["mode"] == "hold"  # a hold stops only the step up
+    with patch.dict(live_settings.HEURISTICS["below_floor_exposures"], {"value": 3}):  # control: three needed -> two hold
+        assert live_load.decide(under, 4, 6, "barbell")["mode"] == "hold"
 
 
-def test_a_systemic_decline_holds_every_load_and_trims_accessories():
-    rows = _run("drop", 6)
-    held = [r["week"] for r in rows if any(ln.startswith("today: every load held") for v in r["rationale"].values() for ln in v)]
+def test_a_systemic_decline_blocks_every_step_up_and_trims_accessories():
+    ath: list = []
+    rows = _run("drop", 6, athlete=ath)
+    held = [r["week"] for r in rows if any(ln.startswith("today: no load steps up") for v in r["rationale"].values() for ln in v)]
     assert held, "a -1 %/wk athlete reads as a systemic decline"
-    assert sim.step_downs(rows) == {}  # held, never a cascade of cuts (the red team: six anchors -10% in one week)
+    ups = [r["week"] for r in rows if r["week"] in held for v in r["rationale"].values() for ln in v if ln.startswith("today: heavier")]
+    assert ups == []  # the slump blocks every step up that week
+    assert max(sim.floor_runs(ath[0]).values(), default=0) <= 2  # ... and never a step down for reps under the floor
     off = _run("drop", 6, {(live_load, "slump"): lambda *a, **k: None})  # control: no slump rule
-    assert not any(ln.startswith("today: every load held") for r in off for v in r["rationale"].values() for ln in v)
+    assert not any(ln.startswith("today: no load steps up") for r in off for v in r["rationale"].values() for ln in v)
 
 
 def test_the_same_template_on_a_heavy_and_a_volume_day_is_two_lifts():
@@ -204,7 +245,7 @@ def test_one_to_three_mornings_are_real_full_body_weeks(name):
 
 
 def test_short_and_normal_weeks_meet_their_floors():
-    for mornings, name in ((5, "a_large_deficit_experienced"), (4, "e_short_week")):
+    for mornings, name in ((5, "a_large_deficit_experienced"), (4, "e_short_week"), (4, "d_stalled_anchor_adherence_dip")):
         w = _week(PROFILES[name])
         tg = live_volume.targets(w["world"]["lib"], mornings)
         under = {
@@ -274,8 +315,16 @@ def test_a_note_never_contradicts_its_routine():
     blk.notes = "RPE 8\nSame load: first time in 19 weeks."
     rx[ls.MARK]["load_guard"] = []
     assert ls.contradictions([blk], rx)  # a layoff line on a familiar pattern
-    blk.notes = "RPE 8\nLighter today: 3 grinding sessions."
+    blk.notes = "RPE 8\nLighter today: under 4 reps 2 sessions running."
     rx[ls.MARK]["load_guard"] = [{"key": "x", "mode": "down"}]
+    assert ls.contradictions([blk], rx) == []
+    # fix round 10 (the ninth red team): a second load rule in the note — red on fix round 9, whose lint passed this note
+    blk.notes = "RPE 8–9\nTop reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.\n\nSame load: build to 12 reps."
+    rx[ls.MARK]["load_guard"] = [{"key": "x", "mode": "hold"}]
+    assert ls.contradictions([blk], rx)
+    blk.notes = "RPE 8\nSet 1: 6 reps at RPE 8.5 or less → +5 lb on later sets.\nSame load: knee flag."
+    assert ls.contradictions([blk], rx)
+    blk.notes = "RPE 8–9\nSame load: build to 12 reps."
     assert ls.contradictions([blk], rx) == []
 
 
@@ -283,10 +332,10 @@ def test_a_priority_muscle_a_pain_flag_takes_to_zero_is_said_plainly():
     w = _week(FIX9["n6_garage_sharp_shoulder"])
     assert w["hard"].get("chest", 0) == 0
     lines = [ln for s in w["week"]["sessions"] for ln in s["rationale"]]
-    assert any(ln.startswith("today: chest 0 here by design") for ln in lines)
+    assert any(ln.startswith("today: chest") and " 0 here by design" in ln for ln in lines)
     assert not any("chest held" in ln for ln in lines)
     off = _week(FIX9["n6_garage_sharp_shoulder"], {(ls, "_zero_by_design"): lambda *a: []})  # control: silent zero
-    assert not any(ln.startswith("today: chest 0") for s in off["week"]["sessions"] for ln in s["rationale"])
+    assert not any(ln.startswith("today: chest") for s in off["week"]["sessions"] for ln in s["rationale"])
 
 
 def test_a_sharp_low_back_flag_reaches_every_spine_loading_lift():
@@ -294,7 +343,7 @@ def test_a_sharp_low_back_flag_reaches_every_spine_loading_lift():
     keys = {x["key"] for s in w["week"]["sessions"] for x in s["lifts"]}
     assert not keys & {"deadlift_barbell", "romanian_deadlift_barbell", "squat_barbell"}
     assert w["hard"].get("quadriceps", 0) >= 8
-    off = _week(FIX8["x_sharp_low_back_5day"], {(live_pain, "spine_reach"): lambda entry, f, joint: False})  # control
+    off = _week(FIX8["x_sharp_low_back_5day"], {(live_pain, "scope"): lambda flag, light, tid: "lift"})  # control: no joint reach
     assert {x["key"] for s in off["week"]["sessions"] for x in s["lifts"]} & {"deadlift_barbell", "romanian_deadlift_barbell"}
 
 
@@ -342,20 +391,20 @@ def test_a_slump_trims_about_a_third_of_each_accessory_never_an_anchor():
     lines = live_load.slump_trim(rx)
     assert [len(e["sets"]) for e in rx["exposures"]] == [3, 2, 3, 2] and lines
     rows = _run("drop", 4)
-    off = _run("drop", 4, {(live_load, "slump_trim"): lambda rx: []})
+    off = _run("drop", 4, {(live_load, "slump_trim"): lambda rx, keep=None: []})
     acc = lambda rr: sum(sum(len(v) for v in r["loads"].values()) for r in rr)  # noqa: E731 — exposures served
-    held = [r["week"] for r in rows if any(ln.startswith("today: every load held") for v in r["rationale"].values() for ln in v)]
+    held = [r["week"] for r in rows if any(ln.startswith("today: no load steps up") for v in r["rationale"].values() for ln in v)]
     assert held
     sets = lambda rr: sum(n for r in rr for n in r["hard"].values())  # noqa: E731
     assert sets(rows) < sets(off) and acc(rows) <= acc(off)
 
 
 def test_a_cut_regressing_or_capped_lift_never_leads_the_heavy_lower_day():
-    """Ruling 5's lead by state (the red team's N12 survivor): a joint-flag cut, a regressing trend or an effort cap at RPE 7
+    """Ruling 5's lead by state (the red team's N12 survivor): a pain-touched lift, a regressing trend or an effort cap at RPE 7
     blocks the lead; a clean lift may lead. Control: the same clean exposure is never blocked."""
     from training import live_rulings
 
-    assert live_rulings.lead_blocked({"live_load": {"pct": 10, "why": "knee flag"}}, None) == "knee flag"
+    assert live_rulings.lead_blocked({"live_stop": "Pain past 3/10", "live_load": {"hold": True, "why": "knee flag"}}, None) == "knee flag"
     assert live_rulings.lead_blocked({}, "regressing") == "regressing"
     assert live_rulings.lead_blocked({"live_effort": 7}, None) == "effort capped"
     assert live_rulings.lead_blocked({"live_effort": 9}, "progressing") is None

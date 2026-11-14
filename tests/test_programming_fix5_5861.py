@@ -193,13 +193,14 @@ def test_above_the_mild_line_the_flagged_pattern_is_off_for_the_session():
 def test_same_joint_isolation_is_capped_with_the_stop_line_under_an_elbow_flag():
     """Profile k: elbow pain 5/10 on the bench. The triceps slots went to a pushaway rated LOW for the elbow, at RPE 8-9 (last
     set 9-10). Now a triceps extension is served only LOW on the elbow (#5861 FIX7: a pain-free route) and capped like every curl
-    at RPE 7 with the stop line (above the mild line every same-joint isolation is capped). Control: the elbow data as it was AND the isolation cap off -> an elbow isolation above RPE 7.
+    at the pain RPE (8, fix round 10) with the stop line (above the mild line every same-joint isolation is capped). Control: the
+    elbow data as it was AND the isolation cap off -> an elbow isolation above RPE 8.
     """
     k = _week("k_elbow_pain_press")
     tri = [x for x in _lifts(k["week"]) if _entry(k, x["key"]).get("pattern") == "triceps_extension"]
-    assert all(_entry(k, x["key"])["joint_stress"]["elbow"] == "low" and _top_rpe(x["hevy_note"]) <= 7 for x in tri)  # FIX7
+    assert all(_entry(k, x["key"])["joint_stress"]["elbow"] == "low" and _top_rpe(x["hevy_note"]) <= 8 for x in tri)  # FIX7
     curls = [x for x in _lifts(k["week"]) if _entry(k, x["key"]).get("pattern") == "curl"]
-    assert curls and all(_top_rpe(x["hevy_note"]) <= 7 and "stop this lift" in x["hevy_note"] for x in curls)
+    assert curls and all(_top_rpe(x["hevy_note"]) <= 8 and "stop this lift" in x["hevy_note"] for x in curls)
     old = copy.deepcopy(LIB0)
     for e in old["movements"].values():
         if (e.get("provocation_floor") or {}).get("elbow"):
@@ -348,7 +349,7 @@ def test_a_joint_located_sore_note_at_the_mild_line_is_light_discomfort():
     assert lrules.note_class("legs sore after yesterday") is None  # no joint named: muscle soreness, not a joint flag
     assert lrules.note_class("elbow sore 6/10") == PAIN
     h = _week("h_heavy_walker")["week"]  # the profile's note is on a lift the prior phase served
-    flagged = [ln for ln in _lines(h, "kept (live)") if "(elbow, 2/10)" in ln]  # FIX7: low discomfort touches this lift only
+    flagged = [ln for ln in _lines(h, "held (live)") if "(elbow, 2/10)" in ln]  # FIX7: low discomfort touches this lift only
     assert flagged
     oh = [x for x in _lifts(h) if x["key"] == "overhead_triceps_extension_cable"]
     assert oh and all(_top_rpe(x["hevy_note"]) <= 8 and "stop this lift" in x["hevy_note"] for x in oh)  # light-and-keep: a hard set

@@ -1,7 +1,7 @@
 """live_rules.py — joint-located isolation caps and the self-report gate (#5861). LIVE only.
 
   * `isolation_joint_cap` (JOINT_ISOLATION): under a flag on a joint, every isolation lift that works it is capped at PAIN_RULE's
-    reduce RPE with the stop line.
+    pain RPE with the stop line.
   * `note_class` (DISCOMFORT_WORDS, LIGHT): a joint-located "sore" at or under the mild line is light discomfort — kept, lighter.
   * `self_report` (SELF_REPORT): his own Hevy note in the last fortnight naming palpitations or fainting trips the no-hard-cardio
     gate (owner ruling 10 follow-up: the behaviour stays; no warning line is printed).
@@ -25,7 +25,7 @@ JOINT_ISOLATION: dict[str, tuple[str, ...]] = {
     "hip": ("hip_abduction", "hip_adduction", "hip_extension"),
 }
 """Joint -> the isolation patterns that WORK it (heuristic, practitioner consensus): under a flag on the joint each is capped at
-PAIN_RULE reduce_rpe with the stop line, independent of the library's joint-stress rating."""
+PAIN_RULE pain_rpe with the stop line, independent of the library's joint-stress rating."""
 DISCOMFORT_WORDS = r"\b(?:sore(?:ness)?|ach(?:e|es|ing|y|ey)|tight(?:ness)?|cranky|niggl\w*|tweaky)\b"
 """A joint-located sensation word the engine reads as discomfort at or under the mild line (heuristic)."""
 SELF_REPORT: dict[str, Any] = {
@@ -58,12 +58,12 @@ def _title(key: Any, ctx: dict[str, Any]) -> str:
 
 # ── 4. same-joint isolation under a flag ─────────────────────────────────────
 def isolation_joint_cap(rx: dict[str, Any], ctx: dict[str, Any], flags: list[dict[str, Any]]) -> list[str]:
-    """IN PLACE: every isolation exposure whose pattern works a flagged joint (JOINT_ISOLATION) is capped at PAIN_RULE reduce_rpe
+    """IN PLACE: every isolation exposure whose pattern works a flagged joint (JOINT_ISOLATION) is capped at PAIN_RULE pain_rpe
     and carries the stop line — the data-independent half of the pain rule. Returns the rationale lines."""
     from training import live_safety
     from training.live_program import PAIN_RULE
 
-    rpe = int(PAIN_RULE["reduce_rpe"]["value"])
+    rpe = int(PAIN_RULE["pain_rpe"]["value"])
     lines = []
     for e in rx["exposures"]:
         entry = _entry(e.get("movement_key"), ctx)
