@@ -3,7 +3,7 @@ site_api_data.py (#1654): source_freshness / last_sync / presence / device_agree
 Handlers receive `_g` (the facade's globals()) from their thin delegator and read the
 facade's injectable/monkeypatched state via `_g["<name>"]` — same object the test patched."""
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from boto3.dynamodb.conditions import Key
 from common import activity_publication as _activity_publication  # owner ruling 2026-11-05: private sub-streams off the board
@@ -38,23 +38,16 @@ _DEVICE_AGREEMENT_MIN_NIGHTS = 30
 _PRESENCE_LOUD = {"light", "quiet", "dark"}
 
 
-def _day_before(day: str) -> str:
-    try:
-        return (date.fromisoformat(str(day)[:10]) - timedelta(days=1)).isoformat()
-    except ValueError:
-        return str(day)[:10]
-
-
-def _food_log_dates_since(table, after, today) -> list[str] | None:
+def _food_log_dates_since(table, lo_sk, today) -> list[str] | None:
     """#5955: the food-log days (primary channel, its public presence predicate — a stub row is not
-    a log) the registry holds after ``after`` up to ``today``, read at request time so a lull the
+    a log) the registry holds from sort key ``lo_sk`` up to ``today``, read at request time so a lull the
     once-a-day presence record states can be checked against rows ingested since it was computed.
     Every page is read (the 1 MB page limit counts the whole MacroFactor row, before projection).
     None when the read fails — the caller treats that as "unverified", never as "no logs"."""
     pk = USER_PREFIX + PRIMARY_CHANNEL
     attrs = ["sk"] + [a for a in public_presence_fields(PRIMARY_CHANNEL) if a != "sk"]
     kwargs = {
-        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{after}~", f"DATE#{today}~"),
+        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(lo_sk, f"DATE#{today}~"),
         "ProjectionExpression": ", ".join(attrs),
     }
     out = set()
@@ -682,10 +675,11 @@ def presence(*, _g) -> dict:
     # (or a failed read) fails closed to "present" — a lull is never stated over days with food rows.
     if rec:
         today = pacific_today()
-        after = rec.get("last_food_log_date") or rec.get("experiment_window_start") or rec.get("date") or today
-        # A record with no food log this cycle is contradicted by a log ON the window start too.
-        after = after if rec.get("last_food_log_date") else _day_before(after)
-        food_dates = _food_log_dates_since(table, after, today)
+        last = rec.get("last_food_log_date")
+        # After the last food log ('~' sorts past every sub-row of that day); a record with no food
+        # log this cycle is contradicted by a log ON the window start too, so that bound is inclusive.
+        lo_sk = f"DATE#{last}~" if last else f"DATE#{rec.get('experiment_window_start') or rec.get('date') or today}"
+        food_dates = _food_log_dates_since(table, lo_sk, today)
         rec = reconcile_presence_with_food_registry(rec, food_dates, today)
     presence_class = rec.get("presence_class") or "present"
     returned = bool(rec.get("returned"))
