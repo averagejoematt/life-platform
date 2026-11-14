@@ -467,11 +467,11 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
         </a>
         <a class="door" href={href("/data/")}>
           <span class="between mono muted" style="font-size:12px"><span class="cobalt">02</span><span>Explore · an hour, if you like</span></span>
-          <span><span class="t">The data</span><p class="serif muted" style="font-size:17px;margin-top:10px">Six dimensions, {all.byType.source.length} live sources, every method on show. Compare anything with anything, and see what the platform found when it did.</p></span>
+          <span><span class="t">The data</span><p class="serif muted" style="font-size:17px;margin-top:10px">Six dimensions, {all.byType.source.filter((x) => x.status === "live").length} live sources, every method on show. Compare anything with anything, and see what the platform found when it did.</p></span>
         </a>
         <a class="door" href={href("/system/")}>
           <span class="between mono muted" style="font-size:12px"><span class="cobalt">03</span><span>Inspect · as deep as you want</span></span>
-          <span><span class="t">The system</span><p class="serif muted" style="font-size:17px;margin-top:10px">The AI coaches, {all.byType.prediction.length} dated predictions, every grade public — beside what a simple guess would have scored.</p></span>
+          <span><span class="t">The system</span><p class="serif muted" style="font-size:17px;margin-top:10px">The AI coaches, {all.byType.prediction.filter((p) => p.status !== "observation").length} dated forecasts, every grade public — beside what a simple guess would have scored.</p></span>
         </a>
       </div>
     </div>
