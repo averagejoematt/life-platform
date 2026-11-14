@@ -54,7 +54,7 @@ LANDMARK_OF = {
 MAJOR = ("chest", "back", "quadriceps", "hamstrings", "glutes")
 FILL: dict[str, tuple[str, ...]] = {
     "quadriceps": ("leg_extension_machine", "single_leg_extension", "leg_press", "goblet_squat"),
-    "abs": ("machine_crunch", "cable_crunch", "reverse_crunch"),
+    "abs": ("machine_crunch", "cable_crunch", "reverse_crunch", "side_bend_dumbbell"),  # fix round 12: a logged one first
     "chest": ("cable_chest_fly", "chest_fly_machine", "chest_fly_dumbbell", "push_up"),
     "side_delts": ("db_lateral_raise", "lateral_raise_machine", "lateral_raise_cable_single_arm"),
     "hamstrings": ("leg_curl",),
