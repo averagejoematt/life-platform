@@ -2,7 +2,7 @@
 import Base from "../../layouts/Base.astro";
 import StatusTag from "../../components/StatusTag.astro";
 import StoryEntry from "../../components/StoryEntry.astro"; // the Human Story (HS1): renders nothing unless WEB_STORY=1
-import { chapterCovers, chapterPublished, chapterWindow, dayInWords, num, rangeInWords } from "../../lib/format.js";
+import { chapterCovers, chapterPublished, dayInWords, num, rangeInWords } from "../../lib/format.js";
 import { loadAll, loadJourney, loadSeries } from "../../lib/snapshot.js";
 import { weekStrip } from "../../lib/theline.js";
 import { hasPage, href, pathOf } from "../../lib/url.js";
@@ -13,8 +13,7 @@ const published = chapters.filter((c) => c.status === "published").length;
 const episodes = all.byType.episode.length;
 // The line through the chapters (2026-11-14, sprint II): each row carries its week's weigh-ins on the whole journey's
 // weight scale, so reading down the list the line steps back through the weeks — including the weeks with no chapter,
-// which is the point: the experiment went on. The window is the row's own (format.js chapterWindow: the covered days,
-// else the program week); a prologue has none. Public daily weigh-ins only (the weight series).
+// which is the point: the experiment went on. Public daily weigh-ins only (the weight series).
 const weight = (await loadSeries())["weight_lbs"];
 const readings = weight ? weight.days.filter((d: any) => d.value != null && !d.gap) : [];
 const scale = readings.length ? { lo: Math.min(...readings.map((d: any) => d.value)) - 1, hi: Math.max(...readings.map((d: any) => d.value)) + 1 } : null;
@@ -23,11 +22,13 @@ const scale = readings.length ? { lo: Math.min(...readings.map((d: any) => d.val
 const journey: any = await loadJourney();
 const rungs: { lb: number; date: string | null }[] = journey && journey.state !== "absent" ? (journey.rungs || []).filter((r: any) => r.date) : [];
 const rungsOf = (c: any) => {
-  const w = (c.week ?? 0) >= 1 ? chapterWindow(c) : null;
+  const w = (c.week ?? 0) >= 1 && c.week_start && c.week_end ? [c.week_start, c.week_end] : null;
   return w ? rungs.filter((r) => r.date! >= w[0] && r.date! <= w[1]) : [];
 };
+// Each row draws its PROGRAM week (week_start..week_end), so consecutive rows are consecutive weeks and the line runs
+// unbroken; a chapter's own covered days (which can straddle two program weeks) are stated in words beside it.
 const stripOf = (c: any) => {
-  const w = scale && (c.week ?? 0) >= 1 ? chapterWindow(c) : null;
+  const w = scale && (c.week ?? 0) >= 1 && c.week_start && c.week_end ? [c.week_start, c.week_end] : null;
   return w ? weekStrip({ days: weight.days, from: w[0], to: w[1], ...scale, muted: c.status !== "published", latest: readings[readings.length - 1].date }) : null;
 };
 ---
@@ -48,7 +49,7 @@ const stripOf = (c: any) => {
       {scale && (
         <div class="chapter-row chapter-head" data-strip-key aria-hidden="true">
           <span />
-          <span class="label">The line through the chapters · each row draws its own days, newest at the top · a tick at the edge is a morning with no weigh-in</span>
+          <span class="label">The line through the weeks · each row draws its program week's weigh-ins, newest at the top · a tick at the edge is a morning with no weigh-in</span>
           <span class="ch-axis mono">
             <span>{num(scale.lo + 1, 0)}</span>
             <span>{num(scale.hi - 1, 0)} lb</span>
@@ -80,6 +81,7 @@ const stripOf = (c: any) => {
                 </span>
                 {strip && (
                   <span class="mono" style="font-size:12px" data-strip-weights>
+                    {c.status === "published" && c.covers_start ? `${rangeInWords(c.week_start, c.week_end, { short: true })}: ` : ""}
                     {strip.n > 1 ? `${num(strip.first.value, 1)} → ${num(strip.last.value, 1)} lb` : `${num(strip.last.value, 1)} lb`}
                     {strip.missing > 0 ? ` · ${strip.missing} blank` : ""}
                   </span>
