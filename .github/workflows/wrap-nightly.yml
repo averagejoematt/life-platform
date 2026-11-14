@@ -20,13 +20,9 @@
 #                                 session there is no diff, and it reds UNANCHORED by
 #                                 construction (measured 2026-09-29 on 481019497: rc=1).
 #                                 It stays a wrap-time gate.
-#   alarm-citations        NOT a leg — it needs CloudWatch read credentials. The only role
-#                                 that holds DescribeAlarms + DescribeAlarmHistory today is
-#                                 github-actions-remediation-role, which also holds Bedrock;
-#                                 widening its callers is an owner ruling (or a narrow new
-#                                 role, which is CDK). Without creds the script prints
-#                                 UNVERIFIED and exits 0, so a creds-less leg would red every
-#                                 night and file a permanent tracker. Parked on #4262.
+#   alarm-citations        leg (#5934; ALSO stays in the wrap's e10) — needs DescribeAlarmHistory + the
+#                                 qa-smoke log read the readonly role lacks, so it assumes the remediation
+#                                 (diagnosis) role that holds both, as raw-kms-readability does. No IAM change.
 #
 #   fleet-drift            leg  — NOT a wrap check (#5316 box 2): `check_fleet_drift.py
 #                                 --expect-deploy-base`, every fleet Lambda on main's last
@@ -35,7 +31,7 @@
 #                                 vs the model; its UNVERIFIED fail-open reds by the rule below.
 #                                 Both AWS legs assume github-actions-readonly-role, which holds
 #                                 lambda:GetFunction + cloudwatch:DescribeAlarms (not History,
-#                                 hence alarm-citations stays out); the role trusts main only.
+#                                 hence alarm-citations' role above); the role trusts main only.
 #
 # Since the #4262 follow-up, backlog-hygiene, unlinked-closures and merge-text-closures run
 # ONLY here: they left `scripts/wrap_gates.py`'s interactive battery for its NIGHTLY list,
@@ -95,6 +91,9 @@ jobs:
           - slug: alarm-census
             cmd: python3 scripts/check_alarm_census.py
             aws-role: arn:aws:iam::205930651321:role/github-actions-readonly-role
+          - slug: wrap-alarm-citations
+            cmd: python3 scripts/check_alarm_citations.py
+            aws-role: arn:aws:iam::205930651321:role/github-actions-remediation-role
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -134,4 +133,4 @@ jobs:
             A nightly check failed, or declined to look (UNVERIFIED / gh fail-open /
             indeterminate). Re-run the command named in the job log locally for the detail;
             a wrap leg's remedy is its step in .claude/skills/wrap/SKILL.md, fleet-drift's is
-            deploy/deploy_fleet.sh from main (#5316), alarm-census's is its own docstring (#5143).
+            deploy/deploy_fleet.sh from main (#5316), alarm-census's its docstring (#5143), alarm-citations' wrap step e10.
