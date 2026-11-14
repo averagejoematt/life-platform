@@ -193,15 +193,10 @@ HEURISTICS: dict[str, dict[str, Any]] = {
     "short_week_floor": {
         "value": 3,
         "group": "volume",
-        "basis": "a 1-3 morning week holds each priority muscle and each major pattern at maintenance: MV x mornings / 3 hard "
-        "sets (at least 2-3), full-body mornings of 4-6 movements at 2-3 sets — never a 1-set anchor",
+        "basis": "a 1-3 morning week holds each priority muscle and each major pattern at maintenance: MV x mornings / this "
+        "value hard sets (at least 2), a priority muscle aiming at MEV x mornings / this value; full-body mornings of 4-6 "
+        "movements at 2-3 sets — never a 1-set anchor",
         "retune": "block retro: anchor e1RM after a short week",
-    },
-    "time_cap_minutes": {
-        "value": 75,
-        "group": "time",
-        "basis": "the owner's 75-minute morning, warm-ups included (#5799 time model, 99 s a set measured)",
-        "retune": "the #5799 measured set time",
     },
 }
 

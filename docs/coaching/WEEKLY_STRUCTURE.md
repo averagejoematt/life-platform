@@ -141,8 +141,7 @@ own (`rate_policy`'s `body_fat_tier` is a function input, not a library setting)
 | `slot_max_sets` | `3` | volume | an accessory slot takes at most 3 working sets — a template slot written at 4 is served at 3 (fix round 10: the calf slots); 4+ in one slot is junk volume | none |
 | `slot_min_sets` | `2` | volume | an accessory or anchor never runs one working set: drop, don't shave | none |
 | `delt_heads` | `{'side_delts': 6, 'rear_delts': 4}` | volume | owner ruling #9: each delt head assessed apart, direct + indirect; the side delt (no compound trains it much) aims at 6 hard sets, the rear at 4 | block retro: lateral-raise and rear-delt progression |
-| `short_week_floor` | `3` | volume | a 1-3 morning week holds each priority muscle and each major pattern at maintenance: MV x mornings / 3 hard sets (at least 2-3), full-body mornings of 4-6 movements at 2-3 sets — never a 1-set anchor | block retro: anchor e1RM after a short week |
-| `time_cap_minutes` | `75` | time | the owner's 75-minute morning, warm-ups included (#5799 time model, 99 s a set measured) | the #5799 measured set time |
+| `short_week_floor` | `3` | volume | a 1-3 morning week holds each priority muscle and each major pattern at maintenance: MV x mornings / this value hard sets (at least 2), a priority muscle aiming at MEV x mornings / this value; full-body mornings of 4-6 movements at 2-3 sets — never a 1-set anchor | block retro: anchor e1RM after a short week |
 
 Time-fit order: accessory_backoff -> anchor_backoff -> spare_accessory -> priority_last_set.
 <!-- GENERATED:live_settings END -->

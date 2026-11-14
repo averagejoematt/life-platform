@@ -185,8 +185,9 @@ def targets(lib: dict[str, Any], mornings: int, high_fatigue: bool = False, mond
             n = math.ceil(n / 2) if (short or high_fatigue) else n
             out[m] = {"floor": n, "aim": n, "cap": mav}
         elif short:
-            floor = max(float(cfg.value("slot_min_sets")), math.ceil(mv * mornings / 3)) if (m in prio or m in MAJOR) else 0.0
-            aim = max(floor, math.ceil(mev * mornings / 3)) if m in prio else floor  # a priority muscle aims at MEV pro rata
+            per = float(cfg.value("short_week_floor"))
+            floor = max(float(cfg.value("slot_min_sets")), math.ceil(mv * mornings / per)) if (m in prio or m in MAJOR) else 0.0
+            aim = max(floor, math.ceil(mev * mornings / per)) if m in prio else floor  # a priority muscle aims at MEV pro rata
             out[m] = {"floor": floor, "aim": aim, "cap": mav}
         elif m in prio:  # the plan then lifts it to the arms and calves (`_priority_parity`)
             out[m] = {"floor": mev, "aim": mev, "cap": mav}
