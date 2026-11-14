@@ -26,6 +26,13 @@ WHAT PINS IT (tests/test_boot_contract_3314.py)
   fail-soft with its reason, and it is deliberately NOT a BOOT_CONTRACT entry — the model
   carries the platform's shape, not the review's clock.
 
+  #5935 adds the WORKFLOW-RED lines (``workflow_red_lines``): days-red for every scheduled
+  workflow red long enough to own an auto-filed tracker (the cron-freshness tenure rule files
+  one on the third consecutive scheduled red; the #1447 advisory filer on the first). Like the
+  red-alarm lines it is not a model fact: a separate fail-soft function the SessionStart hook
+  calls, reading the open ``auto-filed`` issues with ONE ``gh`` call; render_lines() stays
+  offline-pure.
+
   python3 scripts/boot_brief.py             # the brief, as the SessionStart hook prints it
   python3 scripts/boot_brief.py --json      # the same facts as JSON (a routine's boot)
   python3 scripts/boot_brief.py --model P   # render another model file (tests)
@@ -37,6 +44,7 @@ import argparse
 import datetime as _dt
 import json
 import pathlib
+import re
 import sys
 from typing import NamedTuple
 
@@ -397,6 +405,74 @@ def red_alarm_lines(now: _dt.datetime | None = None, client_factory=None, region
             lines.append(f"  flapped 24h {name} — fired {_fmt_duration(now - ts)} ago, now cleared")
     if not lines:
         lines.append(f"  red alarms  none in ALARM, none fired in the last {FLAP_WINDOW_HOURS}h (read {', '.join(regions)})")
+    return lines
+
+
+# ---------------------------------------------------------------------------------------
+# #5935 — scheduled-workflow reds at boot, with days-red. The trackers carry the instant:
+# a tenure tracker's `<!-- workflow-red-since: ISO -->` marker (scripts/check_cron_freshness.py
+# refreshes it on every push to main), or an advisory tracker's `**First failure:** ISO` line
+# (scripts/advisory_failure_issue.py). Days-red is computed at boot from that instant, so it
+# stays current between refreshes.
+_WF_RED_SINCE_RE = re.compile(r"<!-- workflow-red-since: (\S+) -->")
+_WF_FIRST_FAILURE_RE = re.compile(r"\*\*First failure:\*\* (\S+)")
+_WF_TITLE_RE = re.compile(r"^\[auto-filed\]\s*(.*?):\s")
+_WF_RED_MAX_LINES = 8
+
+
+def _gh_open_auto_filed() -> list:
+    import subprocess
+
+    out = subprocess.run(
+        ["gh", "issue", "list", "--label", "auto-filed", "--state", "open", "--json", "number,title,body", "--limit", "100"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=True,
+    ).stdout
+    data = json.loads(out or "[]")
+    if not isinstance(data, list):
+        raise ValueError("gh issue list did not return a list")
+    return data
+
+
+def _iso_utc(text: str) -> _dt.datetime | None:
+    try:
+        parsed = _dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=_dt.timezone.utc)
+
+
+def workflow_red_lines(now: _dt.datetime | None = None, reader=None) -> list[str]:
+    """One WF RED line per open auto-filed workflow tracker, longest red first, with its
+    days-red. Any read failure is a single UNVERIFIED line — never blank, never 'none'
+    unless the read succeeded and found nothing. `reader` is injected by tests."""
+    now = now or _dt.datetime.now(_dt.timezone.utc)
+    try:
+        issues = (reader or _gh_open_auto_filed)()
+    except Exception as exc:  # noqa: BLE001 — offline/no gh auth must degrade, not crash
+        return [f"  wf reds     UNVERIFIED (open auto-filed trackers not read: {type(exc).__name__}: {str(exc)[:80]}) — not a clean board"]
+    rows: list[tuple[_dt.timedelta | None, str]] = []
+    for issue in issues:
+        body = issue.get("body") or ""
+        m = _WF_RED_SINCE_RE.search(body) or _WF_FIRST_FAILURE_RE.search(body)
+        if m is None:
+            continue
+        title = issue.get("title") or ""
+        tm = _WF_TITLE_RE.match(title)
+        name = tm.group(1) if tm else title
+        since = _iso_utc(m.group(1))
+        age = (now - since) if since else None
+        how = "tenure" if _WF_RED_SINCE_RE.search(body) else "advisory"
+        red = f"red {_fmt_duration(age)} since {m.group(1)[:10]}" if age is not None else "red since unknown"
+        rows.append((age, f"  WF RED      {name} — {red} (#{issue.get('number')}, {how} tracker)"))
+    if not rows:
+        return ["  wf reds     none — no open auto-filed workflow tracker (tenure rule #5935: 3 consecutive scheduled reds files one)"]
+    rows.sort(key=lambda r: -(r[0].total_seconds() if r[0] is not None else float("inf")))
+    lines = [line for _age, line in rows[:_WF_RED_MAX_LINES]]
+    if len(rows) > _WF_RED_MAX_LINES:
+        lines.append(f"  wf reds     … and {len(rows) - _WF_RED_MAX_LINES} more: gh issue list --label auto-filed")
     return lines
 
 

@@ -344,6 +344,17 @@ CALENDAR: dict[str, dict] = {
             "one-time audit. It rides the monthly cost close (cost-diligence Phase 5) "
             "because the series count is only meaningful next to the dollars it explains."
         ),
+        # #5935 owner ruling 2026-11-14: a dated deferral, not a re-anchor of convenience. The
+        # owner asked for an EXEMPT row; EXEMPT is keyed by review PROCEDURE and the set guard
+        # reads a calendar-entry key there as a phantom, so the calendar's dated per-entry
+        # exemption — this `hold` — is where that ruling lives.
+        hold=(
+            "2026-11-14",
+            "2026-11-28",
+            "#5888: the census cannot pass before its window ends. The 2026-11-13 `--strict` run is red (4 namespaces, "
+            "21 series over budget) and this entry's own obligation forbids appending the dated line over a red, so the "
+            "ritual is deferred to 2026-11-28 by owner ruling 2026-11-14 (#5935) while #5888 cuts or re-prices those rows.",
+        ),
     ),
     "live-contract-recapture": _entry(
         skill=None,  # not a command — a script run, recorded in the snapshots the script writes
