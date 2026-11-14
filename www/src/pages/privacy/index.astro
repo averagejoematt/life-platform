@@ -1,5 +1,8 @@
 ---
 import Base from "../../layouts/Base.astro";
+import { href } from "../../lib/url.js";
+// The full policy's last-changed date, from the same generated twin /privacy/policy/ renders (#5920).
+import policy from "../../privacy/policy.json";
 ---
 
 <Base title="Privacy" top={null} description="What is published here, what never is, and how a private record becomes public content.">
@@ -8,18 +11,20 @@ import Base from "../../layouts/Base.astro";
       <p class="label">Privacy</p>
       <h1 style="font-size:40px">Only deliberately published figures appear here.</h1>
       <p class="dek" style="font-size:19px">
-        Journals, photos, medical records, genome identifiers and age stay private. A private record reaches a public page only through the platform's
-        publication boundary and, where a person's words or a picture are concerned, an explicit approval. Readers' entries are never collected on these
-        pages.
+        Selected health measurements are published, some blood-test results and a biological-age estimate among them. Journals, progress photos,
+        genetic findings, his actual age and other sensitive records stay private. A private record reaches a public page only through the
+        platform's publication boundary and, where a person's words or a picture are concerned, an explicit approval. Readers' entries are never
+        collected on these pages.
       </p>
       <p>
         The full policy — what a subscriber's address is used for and how to leave, cookies and tracking, your rights, the AI disclaimer and the
-        permanence contract — <a href="/reference/2026-11-01-privacy-v5/">as it stood at the site's relaunch on 1 November 2026</a>. One clause has
-        been added since (4 November: only published activity moves the permanence clock).
+        permanence contract — is <a href={href("/privacy/policy/")}>the current privacy policy</a>, last changed on {policy.updated}. The policy
+        as it stood at the site's relaunch on 1 November 2026 is kept as <a href="/reference/2026-11-01-privacy-v5/">an archived copy</a>.
       </p>
       <p class="muted" style="font-size:14px">
-        One thing is kept in your browser, and only there: the date of your last visit, so the front page can say what changed since. Nothing about a
-        visit is sent anywhere.
+        This site stores the date of your last visit in your browser — the date of the front page's edition you last saw — to show what has
+        changed since then. The date is not sent to the site or used for advertising or analytics. Some older pages still served from the site's
+        earlier design keep other small settings in your browser; the full policy's section on cookies and tracking says what they are.
       </p>
     </div>
   </section>

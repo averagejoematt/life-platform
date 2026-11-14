@@ -53,6 +53,7 @@
     "/data/total_protein_g/",
     "/data/weight_lbs/",
     "/privacy/",
+    "/privacy/policy/",
     "/story/",
     "/story/program-week-09/",
     "/story/so-far/",
@@ -91,5 +92,5 @@
     "/system/sources/whoop/",
     "/system/sources/withings/"
   ],
-  "transitive_count": 70
+  "transitive_count": 71
 }

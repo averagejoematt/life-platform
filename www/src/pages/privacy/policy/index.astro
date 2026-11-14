@@ -1,0 +1,167 @@
+---
+// The maintained privacy policy at its own address (#5920). The text is NOT written here: it is the owner's policy,
+// site/privacy/index.html, carried by the generated twin src/privacy/policy.json (scripts/v9_privacy_policy_twin.py;
+// tests/test_privacy_policy_twin_5920.py pins the twin to the source). This page only frames it: which edition is
+// current, when it last changed, and where the archived 1 November copy lives. islands/permanence.js fills the
+// live archive panel inside section 09.
+import Base from "../../../layouts/Base.astro";
+import { href } from "../../../lib/url.js";
+import policy from "../../../privacy/policy.json";
+---
+
+<Base title="Privacy policy" top={null} description="The full privacy policy: what a subscriber's address is used for, cookies and tracking, your rights, the AI disclaimer and the permanence contract.">
+  <section class="section">
+    <div class="wrap" style="max-width:760px;display:flex;flex-direction:column;gap:18px">
+      <p class="label"><a href={href("/privacy/")}>Privacy</a> · the full policy</p>
+      <h1 style="font-size:40px">Privacy policy</h1>
+      <p class="dek" style="font-size:19px" data-policy-current>
+        This is the current policy, last changed on {policy.updated}. The policy as it stood at the site's relaunch on 1 November 2026 is kept as an
+        archive: <a href="/reference/2026-11-01-privacy-v5/">the 1 November 2026 copy</a>.
+      </p>
+      <div class="policy" set:html={policy.body} />
+    </div>
+  </section>
+</Base>
+
+<script>
+  import "../../../islands/permanence.js";
+</script>
+
+<style is:global>
+  .policy {
+    font-size: var(--fs-body);
+    line-height: 1.6;
+  }
+  .policy a {
+    color: var(--cobalt);
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+  .policy .policy-tldr {
+    border: 1px solid var(--rule);
+    border-left: 2px solid var(--cobalt);
+    padding: 18px 20px;
+  }
+  .policy .pt-h,
+  .policy .pl-h,
+  .policy .pl-grid dt,
+  .policy .pc-id,
+  .policy .pc-kind,
+  .policy .pl-links,
+  .policy .policy-section h2 {
+    font-family: var(--mono);
+    font-size: var(--fs-label);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 400;
+  }
+  .policy .pt-h,
+  .policy .pl-h,
+  .policy .ps-n,
+  .policy .pc-id {
+    color: var(--cobalt);
+  }
+  .policy .policy-tldr p + p {
+    margin-top: 10px;
+    font-family: var(--serif);
+    font-size: 19px;
+    line-height: 1.4;
+  }
+  .policy .policy-section {
+    margin-top: 36px;
+  }
+  .policy .policy-section h2 {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    color: var(--ink);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .policy .policy-section p,
+  .policy .policy-section ul {
+    margin-top: 14px;
+  }
+  .policy .policy-section ul {
+    padding-left: 20px;
+    display: grid;
+    gap: 8px;
+  }
+  .policy .perm-live {
+    margin-top: 18px;
+    border: 1px solid var(--rule);
+    border-left: 2px solid var(--cobalt);
+    padding: 18px 20px;
+  }
+  .policy .pl-grid {
+    margin: 14px 0 0;
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  }
+  .policy .pl-grid dt {
+    color: var(--faint);
+  }
+  .policy .pl-grid dd {
+    margin: 6px 0 0;
+    font-family: var(--mono);
+    overflow-wrap: anywhere;
+  }
+  .policy .pl-grid dd[data-absent="1"] {
+    color: var(--faint);
+  }
+  .policy .pl-grid .pl-wide {
+    grid-column: 1 / -1;
+  }
+  .policy .pl-sum {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--rule);
+  }
+  .policy .pl-sum code {
+    display: block;
+    margin-top: 6px;
+    font-family: var(--mono);
+    font-size: var(--fs-small);
+    color: var(--muted);
+    overflow-wrap: anywhere;
+  }
+  .policy .pl-links {
+    margin-top: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+  .policy .pl-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap);
+  }
+  .policy .perm-clauses {
+    list-style: none;
+    margin: 24px 0 0;
+    padding: 0;
+    display: grid;
+    gap: 20px;
+  }
+  .policy .perm-clause {
+    border-top: 1px solid var(--rule);
+    padding-top: 14px;
+  }
+  .policy .pc-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px;
+    margin: 0;
+  }
+  .policy .pc-title {
+    font-family: var(--serif);
+    font-size: var(--fs-h3);
+    line-height: 1.25;
+    color: var(--ink);
+  }
+  .policy .pc-kind {
+    color: var(--faint);
+  }
+</style>
