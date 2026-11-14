@@ -637,6 +637,8 @@ def week_plan(
         entry = lib_entry(keys[0], catalog, lib) if keys else {}
         # known: logged in this block, or its PATTERN is (the novelty rule's own reading, `live_load.mark_novelty`)
         known = bool(keys) and (str(entry.get("template_id") or "").upper() in logged or entry.get("pattern") in logged_patterns)
+        if keys and not known and logged and m not in prio:
+            return 0  # a movement new to him (one RPE-7 exposure) is added only for a priority muscle's aim — never for another
         if not keys or probe:
             return (1 if known else 2) if keys else 0
         taken.add(keys[0])
