@@ -1,6 +1,6 @@
 ---
 name: daily-debrief
-description: "Run the nightly coaching debrief: review what training actually happened today, then author tomorrow's session as a Hevy routine. Use at end of day for training review, or when asked to plan tomorrow's workout."
+description: "Run the nightly coaching debrief: review what training actually happened today, then author tomorrow's session as a Hevy routine. Use at end of day for the nightly debrief, or when asked to plan tomorrow's workout as part of that nightly routine (not for the end-of-block scorecard retro, which is training-review)."
 user-invocable: true
 argument-hint: "[review | author]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, TodoWrite, mcp__life-platform__*
