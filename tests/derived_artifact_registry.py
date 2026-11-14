@@ -501,6 +501,18 @@ ARTIFACTS: dict[str, dict] = {
             "drifts from what the owner recorded."
         ),
     ),
+    "scripts/v9_privacy_policy_twin.py": _excluded(
+        "scripts/v9_privacy_policy_twin.py",
+        reason=(
+            "The #5920 privacy-policy twin. It only READS site/privacy/index.html (the maintained policy, "
+            "the one editable source) and WRITES www/src/privacy/policy.json, which is NOT under an "
+            "artifact root — the same shape as sync_constants_from_config above. Discovery sees the read "
+            "because the module names the source literal and also writes. The twin is still drift-held, "
+            "outside this registry's two lanes: tests/test_privacy_policy_twin_5920.py asserts the "
+            "committed twin equals build() in pr-checks.yml's required full unit suite, which carries no "
+            "path filter, so the PR that edits the policy without regenerating is the one that reds."
+        ),
+    ),
 }
 
 
