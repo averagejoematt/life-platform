@@ -22,12 +22,16 @@ import hashlib
 import html
 import json
 import os
+import re
 import sys
 import urllib.request
 from datetime import datetime, timezone
 
 from common.journal_silence import public_body  # #5131: the one public-surface guard
-from common.pacific_time import PACIFIC as PT  # #2414: reader-facing dates anchor in the Pacific day
+from common.pacific_time import (
+    PACIFIC as PT,  # #2414: reader-facing dates anchor in the Pacific day
+    parse_iso_utc,
+)
 
 from web.journey_direction import DOWN, EVEN, UNKNOWN, UP, classify_delta  # #3293: the ONE ruling on the sign of the journey delta
 
@@ -297,6 +301,24 @@ def _weight_bit(lost_lbs):
     return [f"{magnitude} lbs {DOWN if direction == DOWN else UP}"]
 
 
+def _recap_footer(weight_as_of, stats):
+    """The recap card's footer: each figure's own date, never "live". The weight's is its weigh-in; the rest are as
+    fresh as the stats file's last write (``_meta.refreshed_at``, else ``generated_at``), stated as that day in PT."""
+    meta = (stats or {}).get("_meta") or {}
+    written = None
+    for key in ("refreshed_at", "generated_at"):
+        at = parse_iso_utc(str(meta.get(key) or ""))
+        if at is not None:
+            written = at.astimezone(PT).strftime("%Y-%m-%d")
+            break
+    parts = []
+    if weight_as_of:
+        parts.append(f"weight as of {weight_as_of}")
+    if written:
+        parts.append(f"{'other figures' if weight_as_of else 'figures'} as of {written}")
+    return " · ".join(parts) or "undated figures withheld"
+
+
 def _sweep_week_recap(s3, stats):
     """The weekly recap — refreshed daily under the ISO-week permalink."""
     journey = stats.get("journey") or {}
@@ -306,8 +328,14 @@ def _sweep_week_recap(s3, stats):
         return None  # empty moment → no card, no shell
     iso = datetime.now(PT).isocalendar()  # #2414: the week id is the reader's Pacific week
     wid = f"{iso.year}-W{iso.week:02d}"
+    # Review 2026-11-14 (growth-2): the card printed "live numbers as of <today>" over a weight figure the morning brief
+    # had computed from the day BEFORE's weigh-in. A weight claim now carries the date of its own weigh-in, and one
+    # with no date on it is not printed at all (owner ruling 2026-11-14: "display its true measurement date").
+    weight_as_of = str(journey.get("weight_as_of") or "")[:10]
+    weight_dated = bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}", weight_as_of))
     bits = []
-    bits.extend(_weight_bit(journey.get("lost_lbs")))
+    if weight_dated:
+        bits.extend(_weight_bit(journey.get("lost_lbs")))
     if vitals.get("hrv_ms") is not None:
         bits.append(f"HRV {round(vitals['hrv_ms'])} ms")
     if platform.get("tier0_streak") is not None:
@@ -316,7 +344,7 @@ def _sweep_week_recap(s3, stats):
         bits.append(f"day {int(platform['days_in'])}")
     meta = " · ".join(bits)
     title = f"The week so far — {wid}"
-    card = build_moment_card("the weekly recap", title, meta, f"live numbers as of {datetime.now(PT):%Y-%m-%d}")
+    card = build_moment_card("the weekly recap", title, meta, _recap_footer(weight_as_of if weight_dated else None, stats))
     body = f"<p>{html.escape(meta)}</p><p>The full instruments — sparklines, deltas, and the honest gaps — live on the cockpit's week view.</p>"
     shell = _shell_html(
         "the weekly recap",
