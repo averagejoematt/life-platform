@@ -738,6 +738,96 @@ def defined_props(*files: Path) -> set:
     return props
 
 
+# ── #5938: the v9 build (www/) — the leg the site/ sweep never reached ─────────────────────────────────
+#
+# Every check above sweeps site/assets/css and the v4 generators; the live site is the v9 Astro build under www/, which
+# no source-level gate covered (only the rendered 11px floor in tests/web_preview_gate.py). This leg reads www/src
+# READ-ONLY and holds three rules, each as a RATCHET that may only shrink:
+#   * hex   — a hex colour outside www/src/styles/tokens.css: in a sheet, a `<style>` block or a `style=` attribute.
+#   * fs    — a font-size under the build's own `--fs-label` floor (read from www/src/styles/tokens.css, so moving the
+#             floor moves the gate): px literals, rem/em at 16px, and SVG `font-size="N"` presentation attributes.
+#   * the @media (max|min)-width set — pinned exactly; a NEW breakpoint is a finding.
+# The violations present when the gate landed (2026-11-15) are the baseline below, per (rule, file). A count above its
+# pin, or a (rule, file) with no pin, is a finding; a count below its pin is progress — lower the pin in the same PR.
+# The wider baseline (inline px sizes, chart-generator palettes, the off-scale 12.5px) is the epic #5926's rows.
+WWW_SRC = REPO / "www" / "src"
+WWW_TOKENS = WWW_SRC / "styles" / "tokens.css"
+WWW_BREAKPOINTS = {560, 640, 700, 760, 820, 860, 900, 1000, 1100}
+WWW_RATCHET = {
+    ("hex", "www/src/components/VersusGuess.astro"): 2,
+    ("hex", "www/src/styles/base.css"): 6,
+    ("fs", "www/src/pages/index.astro"): 4,
+    ("fs", "www/src/pages/system/coaches/[id].astro"): 1,
+    ("fs", "www/src/room/coach-record.astro"): 1,
+}
+_WWW_STYLE_ATTR = re.compile(r"""\bstyle\s*=\s*(?:"([^"]*)"|'([^']*)'|\{`([^`]*)`\})""")
+_WWW_STYLE_BLOCK = re.compile(r"<style[^>]*>(.*?)</style>", re.S | re.I)
+_WWW_FS_LITERAL = re.compile(r"font-size\s*:\s*([0-9.]+)(px|rem|em)\b")
+_WWW_FS_ATTR = re.compile(r"""\bfont-size\s*=\s*["']([0-9.]+)(px)?["']""")
+_WWW_FLOOR = re.compile(r"--fs-label\s*:\s*([0-9.]+)px")
+
+
+def www_fs_floor(tokens_text: str) -> float:
+    """The v9 build's type floor, read from its own tokens.css (`--fs-label`)."""
+    m = _WWW_FLOOR.search(tokens_text)
+    assert m, "www/src/styles/tokens.css no longer defines --fs-label in px — re-read #5938's premise"
+    return float(m.group(1))
+
+
+def _www_style_texts(path_suffix: str, text: str) -> list:
+    """The CSS a file carries: the whole sheet for .css, else its `<style>` blocks and `style=` attribute values."""
+    if path_suffix == ".css":
+        return [strip_comments(text)]
+    return [strip_comments(b) for b in _WWW_STYLE_BLOCK.findall(text)] + [a or b or c for a, b, c in _WWW_STYLE_ATTR.findall(text)]
+
+
+def www_counts(files: Dict[str, str], floor: float) -> Tuple[Dict[Tuple[str, str], int], Dict[int, List[str]]]:
+    """Pure: ``({(rule, file): count}, {breakpoint: [file, …]})`` over ``{relpath: text}``."""
+    counts: Dict[Tuple[str, str], int] = {}
+    bps: Dict[int, List[str]] = {}
+    for rel, text in sorted(files.items()):
+        suffix = Path(rel).suffix
+        styles = _www_style_texts(suffix, text)
+        hexes = 0 if rel.endswith("styles/tokens.css") else sum(len(HEX_COLOR.findall(s)) for s in styles)
+        small = sum(1 for s in styles for v, u in _WWW_FS_LITERAL.findall(s) if float(v) * (1 if u == "px" else 16) < floor)
+        if suffix == ".astro":
+            small += sum(1 for v, _u in _WWW_FS_ATTR.findall(text) if float(v) < floor)
+        for rule, n in (("hex", hexes), ("fs", small)):
+            if n:
+                counts[(rule, rel)] = n
+        for s in styles if suffix == ".css" else styles + [text]:
+            for m in BP_MEDIA.finditer(strip_comments(s)):
+                bps.setdefault(int(m.group(1)), [])
+                if rel not in bps[int(m.group(1))]:
+                    bps[int(m.group(1))].append(rel)
+    return counts, bps
+
+
+def www_findings(files: Dict[str, str], floor: float, ratchet=None, breakpoints=None) -> list:
+    """Pure: the ratchet's verdict — growth over a pin, an unpinned (rule, file), or a breakpoint outside the set."""
+    ratchet = WWW_RATCHET if ratchet is None else ratchet
+    breakpoints = WWW_BREAKPOINTS if breakpoints is None else breakpoints
+    counts, bps = www_counts(files, floor)
+    out = []
+    words = {"hex": "hex colour(s) outside www/src/styles/tokens.css", "fs": f"font-size(s) under the --fs-label floor ({floor:g}px)"}
+    for (rule, rel), n in sorted(counts.items()):
+        pin = ratchet.get((rule, rel), 0)
+        if n > pin:
+            out.append(f"{rel}: {n} {words[rule]}, ratchet allows {pin} (#5938) — use a token, never raise the pin")
+    for bp in sorted(set(bps) - set(breakpoints)):
+        out.append(f"{', '.join(bps[bp])}: new breakpoint `{bp}px` — the v9 set is pinned to {sorted(breakpoints)} (#5938)")
+    return out
+
+
+def www_sources() -> Dict[str, str]:
+    """``{relpath: text}`` for every .css and .astro file under www/src — read-only."""
+    out = {}
+    for path in sorted(WWW_SRC.rglob("*")):
+        if path.suffix in (".css", ".astro") and path.is_file():
+            out[path.relative_to(REPO).as_posix()] = path.read_text(errors="replace")
+    return out
+
+
 def check() -> list:
     findings = []
     base = defined_props(TOKENS)
@@ -781,6 +871,9 @@ def check() -> list:
     # (#3543) tokens.css's COMPONENT half — ordinary CSS that was exempt from the type
     # scale only because of the file it lives in. Definition blocks stay masked out.
     findings.extend(font_size_findings("site/assets/css/tokens.css", token_definition_mask(TOKENS.read_text())))
+    # (#5938) …and the live v9 build, which none of the above reaches: a ratchet over www/src.
+    if WWW_TOKENS.exists():
+        findings.extend(www_findings(www_sources(), www_fs_floor(WWW_TOKENS.read_text())))
     return findings
 
 
