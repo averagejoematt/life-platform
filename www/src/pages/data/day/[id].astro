@@ -341,6 +341,11 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                   {night.efficiency != null && ` Efficiency ${num(night.efficiency, 1)} percent.`}
                   {night.score != null && ` Sleep score ${num(night.score, 0)}.`}
                 </p>
+                {bed && bed.provisional === true && (
+                  <p class="small" data-night-provisional>
+                    <b>Still recording.</b> The mattress had not finished this night when it was read, so its hours, score and efficiency are provisional.
+                  </p>
+                )}
                 {night.deep_pct != null && night.rem_pct != null && night.light_pct != null && (
                   <>
                     <div class="stages" role="img" aria-label={stagesLabel(night)}>
