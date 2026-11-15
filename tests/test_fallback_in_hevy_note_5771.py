@@ -26,6 +26,10 @@ REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "lambdas"))
 sys.path.insert(0, str(REPO / "tests"))
+sys.path.insert(0, str(REPO / "scripts"))
+
+from sample_weeks_5861 import full_club_library  # noqa: E402
+
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
 from training import (  # noqa: E402
@@ -60,7 +64,11 @@ def _offline(monkeypatch):
 def _lib(status: str = "approved") -> dict:
     lib = copy.deepcopy(LIB0)
     lib["status"] = status
-    return lib
+    lib["approved_on"] = "2026-01-02"  # #5861 fix round 11: live needs the approval day
+    # #5861 fix round 13: this file tests the note's fallback line, not availability. Its world is a synthetic full club — the machines
+    # the library only knows from the owner's older logs are present (`sample_weeks_5861.full_club_library`); never-logged,
+    # deferred and unavailable equipment stay as the library has them.
+    return full_club_library(lib)
 
 
 def _rotation(status: str = "approved", overlay=None) -> dict:
@@ -212,5 +220,7 @@ def test_an_approved_library_draft_carries_the_line_and_adds_no_lint_problem():
     assert shadow.inputs_snapshot["note_fallbacks"]["mode"] == "shadow" and shadow.inputs_snapshot["note_fallbacks"]["by_key"]
     # the offline render reads no history, so its compounds carry the L4 "find the load" problem either way; the
     # fallback line adds none (same problem set with and without it), and every lift note stays inside its budget
-    assert sorted(_lint_lines(live)) == sorted(_lint_lines(shadow))
+    # (#5861 fix round 12: a live draft's machine compound with no load on file keeps its W-set feeler, which the live lint
+    # accepts — so the live set may be SMALLER than the shadow's, never larger)
+    assert set(_lint_lines(live)) <= set(_lint_lines(shadow))
     assert all(g.phone_lines(b.notes or "") <= g.EX1_MAX_LINES for b in live.exercises)

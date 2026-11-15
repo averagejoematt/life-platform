@@ -432,7 +432,11 @@ BUDGET_SECONDS = 1950
 # fixed in the same PR. This constant is required by construction to track that job's
 # timeout-minutes exactly (the assertion below), so it moves WITH it, not as an
 # independent re-derivation of BUDGET_SECONDS above (which is unchanged).
-HARD_CEILING_SECONDS = 2340
+# 35 -> 39 detail (moved here from pr-checks.yml to hold the workflow-size ratchet): 30m08s
+# observed against the 35m cap on 2026-09-07 (86%); genuine p95 32.11min (n=24 of 28).
+# 2340 -> 3300 (2026-11-15): the job's timeout moved 39 -> 55 after #5858 grew the suite
+# past the cap (measurement in pr-checks.yml). Again NOT a duration-budget raise.
+HARD_CEILING_SECONDS = 3300
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)

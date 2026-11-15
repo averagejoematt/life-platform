@@ -1,0 +1,241 @@
+{
+  "_comment": "#5861 fix round 10: synthetic stress profiles (no person's numbers) from the ninth red team \u2014 two lower pain sites, two upper pain sites, a sharp back on a 2-morning week, a tired 4-morning week with low discomfort, a garage gym with hip pain + knee discomfort, low steps and poor sleep in the garage, every lift regressing on 4 mornings, wrist pain",
+  "as_of": "2026-11-16",
+  "position": {
+    "week": 10,
+    "block": 2
+  },
+  "defaults": {
+    "roles": [
+      "upper_heavy",
+      "lower_heavy",
+      "shoulders_arms",
+      "upper_volume",
+      "lower_volume"
+    ],
+    "days": [
+      "2026-11-16",
+      "2026-11-17",
+      "2026-11-18",
+      "2026-11-19",
+      "2026-11-20"
+    ],
+    "bodyweight_lb": 250,
+    "readiness": "green",
+    "sleep_hours": 7.5,
+    "acwr": "safe",
+    "steps_per_day": 14000,
+    "trend": "progressing",
+    "trend_overrides": {},
+    "discomfort": [],
+    "pain": [],
+    "unavailable_equipment": [],
+    "sessions_last_14d": 10,
+    "hard_cardio_minutes_7d": 40
+  },
+  "profiles": {
+    "r1_knee_and_lowback_5day": {
+      "label": "(r1) knee 5/10 on squat + low-back 4/10 on deadlift, 5 mornings",
+      "story": "two lower sites",
+      "pain": [
+        {
+          "movement": "squat_barbell",
+          "note": "knee pain 5/10 at the bottom"
+        },
+        {
+          "movement": "deadlift_barbell",
+          "note": "low back pain 4/10 off the floor"
+        }
+      ]
+    },
+    "r2_shoulder_and_elbow_5day": {
+      "label": "(r2) shoulder 4/10 on OHP + elbow 4/10 on skullcrusher/tri ext, 5 mornings",
+      "story": "two upper sites",
+      "pain": [
+        {
+          "movement": "machine_shoulder_press",
+          "note": "shoulder pain 4/10 at the top"
+        },
+        {
+          "movement": "overhead_triceps_extension_cable",
+          "note": "elbow pain 4/10"
+        }
+      ]
+    },
+    "r3_sharp_back_two_mornings": {
+      "label": "(r3) sharp low back on RDL, 2 mornings",
+      "story": "sharp back short",
+      "roles": [
+        "upper_heavy",
+        "lower_heavy"
+      ],
+      "days": [
+        "2026-11-16",
+        "2026-11-19"
+      ],
+      "pain": [
+        {
+          "movement": "romanian_deadlift_barbell",
+          "note": "sharp low back pain 6/10"
+        }
+      ]
+    },
+    "r4_fatigue_four_day_discomfort": {
+      "label": "(r4) red/short sleep + 4 mornings + bench discomfort 2/10",
+      "story": "tired short",
+      "roles": [
+        "upper_heavy",
+        "lower_heavy",
+        "shoulders_arms",
+        "upper_volume"
+      ],
+      "days": [
+        "2026-11-16",
+        "2026-11-17",
+        "2026-11-18",
+        "2026-11-19"
+      ],
+      "readiness": "red",
+      "sleep_hours": 5.4,
+      "acwr": "danger",
+      "discomfort": [
+        {
+          "movement": "barbell_bench_press",
+          "note": "shoulder a bit achy 2/10"
+        }
+      ]
+    },
+    "r5_garage_hip_knee": {
+      "label": "(r5) garage + hip pain 4/10 on BSS + knee discomfort 2/10 on squat",
+      "story": "garage hips",
+      "unavailable_equipment": [
+        "ab_crunch_machine",
+        "assisted_pullup_dip_machine",
+        "belt_squat_machine",
+        "biceps_curl_machine",
+        "cable_stack",
+        "calf_raise_seated_machine",
+        "calf_raise_standing_machine",
+        "chest_press_machine",
+        "decline_press_machine",
+        "glute_kickback_machine",
+        "hack_squat_machine",
+        "hip_abduction_machine",
+        "hip_adduction_machine",
+        "hip_thrust_machine",
+        "incline_press_machine",
+        "lat_pulldown_station",
+        "lateral_raise_machine",
+        "leg_curl_lying",
+        "leg_curl_seated",
+        "leg_extension_machine",
+        "leg_press_machine",
+        "machine_unspecified",
+        "pec_deck",
+        "pendulum_squat_machine",
+        "preacher_machine",
+        "pullover_machine",
+        "rear_delt_machine",
+        "seated_row_machine",
+        "shoulder_press_machine",
+        "smith_machine",
+        "t_bar_row_machine",
+        "torso_rotation_machine",
+        "triceps_machine",
+        "elliptical",
+        "rower",
+        "sled",
+        "stair_climber",
+        "ski_erg",
+        "recumbent_bike"
+      ],
+      "pain": [
+        {
+          "movement": "bulgarian_split_squat_dumbbell",
+          "note": "hip pain 4/10"
+        }
+      ],
+      "discomfort": [
+        {
+          "movement": "squat_barbell",
+          "note": "knee a bit sore 2/10"
+        }
+      ]
+    },
+    "r6_low_steps_poor_sleep_garage": {
+      "label": "(r6) garage + 3000 steps + 5.8 h sleep, 5 mornings",
+      "story": "sedentary tired",
+      "unavailable_equipment": [
+        "ab_crunch_machine",
+        "assisted_pullup_dip_machine",
+        "belt_squat_machine",
+        "biceps_curl_machine",
+        "cable_stack",
+        "calf_raise_seated_machine",
+        "calf_raise_standing_machine",
+        "chest_press_machine",
+        "decline_press_machine",
+        "glute_kickback_machine",
+        "hack_squat_machine",
+        "hip_abduction_machine",
+        "hip_adduction_machine",
+        "hip_thrust_machine",
+        "incline_press_machine",
+        "lat_pulldown_station",
+        "lateral_raise_machine",
+        "leg_curl_lying",
+        "leg_curl_seated",
+        "leg_extension_machine",
+        "leg_press_machine",
+        "machine_unspecified",
+        "pec_deck",
+        "pendulum_squat_machine",
+        "preacher_machine",
+        "pullover_machine",
+        "rear_delt_machine",
+        "seated_row_machine",
+        "shoulder_press_machine",
+        "smith_machine",
+        "t_bar_row_machine",
+        "torso_rotation_machine",
+        "triceps_machine",
+        "elliptical",
+        "rower",
+        "sled",
+        "stair_climber",
+        "ski_erg",
+        "recumbent_bike"
+      ],
+      "steps_per_day": 3000,
+      "sleep_hours": 5.8,
+      "hard_cardio_minutes_7d": 0
+    },
+    "r7_regressing_four_day": {
+      "label": "(r7) every lift regressing, 4 mornings",
+      "story": "regress short",
+      "trend": "regressing",
+      "roles": [
+        "upper_heavy",
+        "lower_heavy",
+        "shoulders_arms",
+        "upper_volume"
+      ],
+      "days": [
+        "2026-11-16",
+        "2026-11-17",
+        "2026-11-18",
+        "2026-11-19"
+      ]
+    },
+    "r8_wrist_pain_5day": {
+      "label": "(r8) wrist pain 5/10 on bench + curls",
+      "story": "wrists",
+      "pain": [
+        {
+          "movement": "barbell_bench_press",
+          "note": "wrist pain 5/10"
+        }
+      ]
+    }
+  }
+}
