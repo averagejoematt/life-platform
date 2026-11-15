@@ -116,8 +116,8 @@ def approved_library(lib: dict[str, Any], profile: dict[str, Any], status: str =
     if profile.get("gym") == FULL_CLUB:
         full_club_library(out, f"synthetic profile {profile.get('name')}: a full commercial club")
     out["status"] = status
-    if status == "approved":  # live needs the approval day too (fix round 11); synthetic, before every synthetic week
-        out.setdefault("approved_on", SYNTHETIC_APPROVED_ON)
+    if status == "approved":  # live needs the approval day too (fix round 11); synthetic, before every synthetic week —
+        out["approved_on"] = SYNTHETIC_APPROVED_ON  # always: the committed library's own day (2026-11-14) is after some of them
     if SETTINGS:
         out["programming_settings"] = {**(out.get("programming_settings") or {}), **SETTINGS}
     items = (out.get("gym_inventory") or {}).get("items") or {}

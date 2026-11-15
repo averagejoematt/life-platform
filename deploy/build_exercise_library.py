@@ -902,12 +902,10 @@ def build_library(
     for key in list(movements):
         movements[key] = _ordered(movements[key])
     head = with_builder_changes({k: (current or {}).get(k, v) for k, v in INITIAL_HEADER.items()})
-    if (current or {}).get("approved_on"):  # #5861 fix round 11: the approval day is kept with the status (live needs both)
-        head["approved_on"] = current["approved_on"]
     tiers = Counter(r["tier"] or "not_applicable" for e in movements.values() for r in e["hypertrophy"])
     confidence = Counter(r["evidence_confidence"] for e in movements.values() for r in e["hypertrophy"])
     src = Counter(e["source"] for e in movements.values())
-    return {
+    out = {
         "_README": (
             "The owner's exercise library (#5769). PROPOSED — nothing in the drafting path reads it until the owner approves "
             "it. Public half only: no bodyweight, no loads, no note text — the N=1 half (best set per bodyweight band, coded "
@@ -970,6 +968,11 @@ def build_library(
         "canonical_families": families,
         "movements": movements,
     }
+    # #5861 fix round 11: the approval day is kept with the status (live needs both). It goes LAST, where
+    # scripts/approve_exercise_library.py writes it, so a rebuild of an approved library is a zero diff.
+    if (current or {}).get("approved_on"):
+        out["approved_on"] = current["approved_on"]
+    return out
 
 
 _ORDER = (

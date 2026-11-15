@@ -366,7 +366,11 @@ def test_an_approved_library_without_its_approval_day_serves_exactly_what_propos
 
         return edit
 
-    proposed = _served(prof, lambda lib: None)
+    def rollback(lib):  # the committed library is approved (2026-11-14): its rollback copy is the proposed baseline
+        lib["status"] = "proposed"
+        lib.pop("approved_on", None)
+
+    proposed = _served(prof, rollback)
     assert _served(prof, approve(None)) == proposed and _served(prof, approve("2026-13-01")) == proposed
     assert _served(prof, approve("2026-01-02")) != proposed
     lib = {"status": "approved", "approved_on": "2026-11-18"}
@@ -375,9 +379,8 @@ def test_an_approved_library_without_its_approval_day_serves_exactly_what_propos
     assert se.mode(lib) == se.MODE_LIVE and live_sequence.rule_from(lib) == "2026-11-23"
     from training import exercise_library as xl
 
-    assert any(
-        "approved_on" in e
-        for e in xl.validate(json.loads((REPO / "config" / "exercise_library.json").read_text()) | {"status": "approved"})
-    )
+    committed = json.loads((REPO / "config" / "exercise_library.json").read_text())
+    assert committed["status"] == "approved" and xl.validate(committed) == [] and se.mode(committed) == se.MODE_LIVE
+    assert any("approved_on" in e for e in xl.validate({k: v for k, v in committed.items() if k != "approved_on"}))
     with patch.object(se, "approved_stamp", lambda lib: "2026-01-02"):  # control: status alone switches live
         assert _served(prof, approve(None)) != proposed

@@ -45,8 +45,8 @@ def test_no_rating_basis_carries_points_arithmetic():
     assert hits == [], hits[:5]
 
 
-def test_the_library_stays_proposed():
-    assert LIB["status"] == "proposed"
+def test_the_library_is_approved():
+    assert (LIB["status"], LIB.get("approved_on")) == ("approved", "2026-11-14")  # owner approval 2026-11-14
 
 
 def test_every_heuristic_and_setting_states_its_provenance():

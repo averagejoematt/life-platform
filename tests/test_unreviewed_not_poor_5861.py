@@ -262,7 +262,7 @@ def test_programming_settings_ship_with_the_owner_pending_defaults():
     from training import live_settings
 
     assert _settings_offenders(LIB, live_settings.defaults()) == []
-    assert LIB["status"] == "proposed"
+    assert (LIB["status"], LIB.get("approved_on")) == ("approved", "2026-11-14")  # owner approval; the defaults are unchanged
 
 
 def test_control_a_changed_or_missing_default_goes_red():

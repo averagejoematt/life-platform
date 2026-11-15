@@ -515,4 +515,4 @@ def test_every_fix4_constant_is_labelled_and_every_default_is_todays():
         assert all(v["label"] == "heuristic" and v["basis"] for v in table.values())
     assert lsafe.STOP_LINE["label"] == "heuristic"
     assert not {"heavy_day_deadlift_shape", "kb_slot_under_strain"} & set(lset.SETTINGS)  # rulings 5 and 7 are the rule now
-    assert LIB0["status"] == "proposed"
+    assert (LIB0["status"], LIB0.get("approved_on")) == ("approved", "2026-11-14")  # owner approval; the defaults are unchanged

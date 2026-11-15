@@ -1223,6 +1223,8 @@ def test_e2_every_movement_the_program_names_is_in_the_catalog_and_coach_additio
     assert sorted(program_keys() - (set(CAT0) - {"machine_row"})) == ["machine_row"]  # control: a missing key is seen
 
 
-def test_e3_the_committed_library_stays_proposed_so_nothing_here_is_live():
-    assert LIB0["status"] == "proposed" and se.mode(LIB0) == se.MODE_SHADOW
-    assert se.mode(_live_lib()) == se.MODE_LIVE  # the suite's switch flips a COPY only
+def test_e3_the_committed_library_is_approved_and_its_rollback_copy_is_shadow():
+    """Owner approval 2026-11-14: the committed library is live. Rollback is status back to proposed — that copy is shadow."""
+    assert (LIB0["status"], LIB0.get("approved_on")) == ("approved", "2026-11-14") and se.mode(LIB0) == se.MODE_LIVE
+    assert se.mode(LIB0 | {"status": "proposed"}) == se.MODE_SHADOW
+    assert se.mode(_live_lib()) == se.MODE_LIVE  # the suite's own live copy (a synthetic approval day before every scenario)

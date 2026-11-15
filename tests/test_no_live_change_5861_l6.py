@@ -147,7 +147,7 @@ def test_no_l6_live_only_code_runs_in_shadow():
 
 def test_the_crons_session_sequence_is_unchanged_while_the_library_is_proposed():
     """#5861 FIX5: the week rule is wired into the cron's sequence (`routine_generator._schedule_entry_for_date` ->
-    `session_sequence.next_session(skip=...)`, `live_sequence`) behind `mode() == "live"`. With the committed (proposed) library
+    `session_sequence.next_session(skip=...)`, `live_sequence`) behind `mode() == "live"`. With the committed library rolled back (status proposed)
     the served entry is exactly `next_session` without a skip, on every day of a DIP week (the case the live rule changes) —
     and the live week plan never runs. Control: the same record under an approved copy serves a different week (no
     shoulders+arms) and carries `live_week`."""
@@ -162,7 +162,9 @@ def test_the_crons_session_sequence_is_unchanged_while_the_library_is_proposed()
     keep = {sw._day(start, d) for d in (0, 3, 7, 8, 11)}  # five of ten mornings: a dip (tests/test_programming_fix3_5861.py)
     record = [w for w in world["record"] if w["date"] < start or w["date"] in keep]
     lib = json.loads((REPO / "config" / "exercise_library.json").read_text())
-    assert lib["status"] == "proposed"
+    assert lib["status"] == "approved"  # owner approval 2026-11-14: the rollback copy (status proposed) is what is held here
+    lib["status"] = "proposed"
+    lib.pop("approved_on", None)
     week_cfg = {"schedule": {}}
     days = [sw._day(prof["as_of"], n) for n in range(5)]
     with (

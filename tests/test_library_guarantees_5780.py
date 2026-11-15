@@ -21,7 +21,8 @@ and each beside a must-fail control that mutates the config or the engine and sh
 Inputs: the shipped `config/exercise_library.json`, `config/movement_catalog.json`, `config/training_charter.json`; the
 default skill ceiling (2); NO private overlay (the N=1 fit is unknown) except where a test injects a SYNTHETIC one. The
 ledger is simulated in memory phase by phase (what `variant_rotation.record` would write). No AWS, no network, no clock:
-every date is a literal.
+every date is a literal. The committed library is APPROVED (owner, 2026-11-14): the shadow guarantees run on its rollback
+copy (`LIB_SHADOW`: status proposed, no approval day), the live ones on `_lib("approved")`.
 """
 
 from __future__ import annotations
@@ -54,6 +55,11 @@ from training import (  # noqa: E402
 from training.block_model import block_weeks  # noqa: E402
 
 LIB0 = json.loads((REPO / "config" / "exercise_library.json").read_text())
+LIB_SHADOW = copy.deepcopy(LIB0) | {"status": "proposed"}
+LIB_SHADOW.pop("approved_on", None)
+"""The ROLLBACK state of the committed library (owner approval 2026-11-14): status back to proposed, no approval day. The
+shadow guarantees (the #5075 pools serve, the selection is recorded) run on it, so they hold for a rollback; the approved
+program is served from `_lib("approved")` below."""
 CAT0 = json.loads((REPO / "config" / "movement_catalog.json").read_text())["movements"]
 CHARTER0 = json.loads((REPO / "config" / "training_charter.json").read_text())
 CEILING = 2  # the generator's default skill ceiling (`select_week`'s default)
@@ -69,7 +75,7 @@ def _offline(monkeypatch):
     monkeypatch.setattr(tc, "_from_s3", lambda key: None)
     monkeypatch.setattr(xl, "_overlay_from_local", lambda: None)
     monkeypatch.setattr(xl, "_overlay_from_s3", lambda: None)
-    monkeypatch.setattr(wf, "library", lambda path=None: copy.deepcopy(LIB0))
+    monkeypatch.setattr(wf, "library", lambda path=None: copy.deepcopy(LIB_SHADOW))
     tc.reset_cache()
     se._LIB_CACHE.clear()
     yield
@@ -93,7 +99,9 @@ def _program_entries(day: str = WARN_DAY) -> list[dict]:
 
 
 def _lib(status: str | None = None) -> dict:
-    lib = copy.deepcopy(LIB0)
+    """The rollback (proposed) copy by default; `_lib("approved")` the live library with a synthetic approval day before the
+    program, so the live rules apply from its first week."""
+    lib = copy.deepcopy(LIB_SHADOW)
     if status:
         lib["status"] = status
         lib["approved_on"] = "2026-01-02"  # #5861 fix round 11: live needs the approval day
@@ -130,6 +138,14 @@ def _shipped(kb: int) -> list[tuple[dict, dict]]:
     if kb not in _SHIPPED:
         _SHIPPED[kb] = _serve_program(_lib(), CAT0, kb=kb)
     return _SHIPPED[kb]
+
+
+def test_the_committed_library_is_live_and_the_shadow_guarantees_run_on_its_rollback_copy():
+    """Owner approval 2026-11-14: the committed library serves LIVE. The shadow-mode guarantees below run on its rollback copy,
+    which differs from it ONLY in the switch (status, approved_on) — the same movements, tiers, inventory and gates."""
+    assert (LIB0["status"], LIB0.get("approved_on"), se.mode(LIB0)) == ("approved", "2026-11-14", se.MODE_LIVE)
+    assert se.mode(LIB_SHADOW) == se.MODE_SHADOW and se.mode(_lib()) == se.MODE_SHADOW and se.mode(_lib("approved")) == se.MODE_LIVE
+    assert {k for k in LIB0.keys() | LIB_SHADOW.keys() if LIB0.get(k) != LIB_SHADOW.get(k)} == {"status", "approved_on"}
 
 
 def _selections(lib: dict, cat: dict, overlay=None, missing=None) -> list[tuple[dict, dict]]:
@@ -489,8 +505,8 @@ def test_g4_every_weekly_commitment_is_met_by_the_served_week():
         for day in (WARN_DAY, BLOCK_DAY):
             program = _shipped(kb) if day == WARN_DAY else _serve_program(_lib(), CAT0, kb=kb, day=day)
             for pos, rot in program:
-                assert rot["selection"]["mode"] == se.MODE_SHADOW  # the library is proposed: the pools serve
-                assert _commitment_offenders(rot, pos, on=day, lib=LIB0) == [], (kb, day, pos)
+                assert rot["selection"]["mode"] == se.MODE_SHADOW  # the rollback copy is proposed: the pools serve
+                assert _commitment_offenders(rot, pos, on=day, lib=LIB_SHADOW) == [], (kb, day, pos)
                 rows_seen += 1
     assert rows_seen == 4 * len(_program_entries())
     assert {c["id"] for c in wc.COMMITMENTS} == {
@@ -507,22 +523,22 @@ def test_g4_every_weekly_commitment_is_met_by_the_served_week():
 
 def test_g4_control_a_week_missing_a_commitment_goes_red():
     pos, rot = _shipped(kb_entry.ENTRY_EXPOSURES)[2]
-    assert _commitment_offenders(rot, pos, on=BLOCK_DAY, lib=LIB0) == []
+    assert _commitment_offenders(rot, pos, on=BLOCK_DAY, lib=LIB_SHADOW) == []
     # control 1: the carry slot serves a non-carry -> the carries floor blocks
     bad = copy.deepcopy(rot)
     served = _served_keys(rot, CAT0)
     other = next(k for k in ("seated_calf_raise", "chest_fly_machine", "bicep_curl_machine", "leg_extension_machine") if k not in served)
     bad["variants_by_role"]["shoulders_arms"]["farmers_walk"] = other  # a non-carry the week does not already serve
-    assert any(o.startswith("carries: block") for o in _commitment_offenders(bad, pos, on=BLOCK_DAY, lib=LIB0))
+    assert any(o.startswith("carries: block") for o in _commitment_offenders(bad, pos, on=BLOCK_DAY, lib=LIB_SHADOW))
     # control 2: the kettlebell slot serves a non-kettlebell movement after the enforcement date -> blocks
     bad = copy.deepcopy(rot)
     bad["variants_by_role"]["lower_volume"]["kettlebell_swing"] = "machine_crunch"
-    assert any(o.startswith("kettlebell: block") for o in _commitment_offenders(bad, pos, on=BLOCK_DAY, lib=LIB0))
+    assert any(o.startswith("kettlebell: block") for o in _commitment_offenders(bad, pos, on=BLOCK_DAY, lib=LIB_SHADOW))
     # control 3: a slot held at a phase boundary -> the rotation commitment blocks
     bad = copy.deepcopy(rot)
     s = next(x for x in bad["slots"] if x.get("source") != "pinned" and len(x.get("pool") or []) >= 2)
     s["variant"] = s["previous"]
-    assert any(o.startswith("rotation: block") for o in _commitment_offenders(bad, pos, on=BLOCK_DAY, lib=LIB0))
+    assert any(o.startswith("rotation: block") for o in _commitment_offenders(bad, pos, on=BLOCK_DAY, lib=LIB_SHADOW))
 
 
 _APPROVED: list = []

@@ -450,4 +450,4 @@ def test_progression_standards_are_owner_approved_and_bodyweight_values_stay_uns
             assert "pending owner ruling" not in g["provenance"], gid
         if g["kind"] == "bodyweight_threshold" and "ref" in (g.get("threshold") or {}):
             assert "value" not in g["threshold"], gid  # the number is the owner's, in the private overlay
-    assert _LIB["status"] == "proposed"
+    assert (_LIB["status"], _LIB.get("approved_on")) == ("approved", "2026-11-14")  # owner approval; the standards are unchanged

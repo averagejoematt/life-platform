@@ -72,7 +72,7 @@ def _lifts(week: dict, role: str | None = None) -> list[dict]:
 def test_every_ruled_setting_is_library_carried_and_equal_to_its_code_default():
     have = LIB0["programming_settings"]
     assert have == live_settings.defaults()  # the ONE table, written by the builder (no per-round dicts, no stale disk value)
-    assert LIB0["status"] == "proposed"  # configuration, never activation
+    assert (LIB0["status"], LIB0.get("approved_on")) == ("approved", "2026-11-14")  # owner approval; the settings are unchanged
     stale = {"behind_schedule_week", "adherence_response", "cardio_purpose_only", "kb_slot_role", "symptom_line", "rate_band_mode"}
     assert not stale & set(have)  # the dead alternatives the owner ruled out are gone from the data
     assert live_settings.settings({"programming_settings": {"press_sets": 2}})["press_sets"] == 2  # control: a value on disk wins
@@ -333,7 +333,8 @@ def test_ruling_12_the_cron_reads_the_record_only_when_live(monkeypatch):
     sys.path.insert(0, str(REPO / "lambdas" / "operational"))
     import hevy_routine_cron_lambda as cron
 
-    monkeypatch.setattr(se, "load_library_failsoft", lambda: LIB0)
+    rollback = {k: v for k, v in LIB0.items() if k != "approved_on"} | {"status": "proposed"}  # the committed library, rolled back
+    monkeypatch.setattr(se, "load_library_failsoft", lambda: rollback)
     assert cron._live_inputs("2026-11-16", read=lambda *a: pytest.fail("no read while proposed")) == {}
     live = copy.deepcopy(LIB0) | {"status": "approved", "approved_on": "2026-01-02"}
     monkeypatch.setattr(se, "load_library_failsoft", lambda: live)

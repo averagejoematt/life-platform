@@ -37,10 +37,17 @@ def test_library_is_schema_valid():
     assert errors == [], "\n".join(errors[:30])
 
 
-def test_library_ships_proposed_and_versioned():
-    assert LIB["status"] == "proposed"
+def test_library_ships_approved_and_versioned():
+    """Owner approval 2026-11-14 (scripts/approve_exercise_library.py): approved with its day, 0.4.0, the approval line last.
+    Rollback is status back to proposed — that copy is shadow."""
+    from training import selection_engine as se
+
+    assert (LIB["status"], LIB.get("approved_on"), LIB["version"]) == ("approved", "2026-11-14", "0.4.0")
     assert re.match(r"^\d+\.\d+\.\d+$", LIB["version"])
     assert LIB["change_log"][0]["version"] == "0.1.0"
+    last = LIB["change_log"][-1]
+    assert (last["version"], last["date"]) == ("0.4.0", "2026-11-14") and last["what"].startswith("approved: status proposed -> approved")
+    assert se.mode(LIB) == se.MODE_LIVE and se.mode(LIB | {"status": "proposed"}) == se.MODE_SHADOW
 
 
 def test_validator_catches_a_broken_entry():
@@ -496,7 +503,8 @@ def test_approval_refuses_without_a_complete_private_check(tmp_path):
     import approve_exercise_library as appr
 
     lib_path = tmp_path / "lib.json"
-    lib_path.write_text(json.dumps(LIB))
+    rollback = {k: v for k, v in LIB.items() if k != "approved_on"} | {"status": "proposed"}  # the approval runs on a proposed copy
+    lib_path.write_text(json.dumps(rollback))
     bad = tmp_path / "bad.json"
     ov = _complete_overlay()
     ov["gates"]["chain_nordic"]["value"] = None  # a chain gate with no standard

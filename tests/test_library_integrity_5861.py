@@ -592,7 +592,8 @@ def test_approval_succeeds_with_every_readiness_gate_locked_on_a_copy(tmp_path):
     import approve_exercise_library as appr
 
     lib_path, ov_path, bad_path = tmp_path / "lib.json", tmp_path / "overlay.json", tmp_path / "bad.json"
-    lib_path.write_text(json.dumps(LIB))
+    committed = (REPO / "config" / "exercise_library.json").read_text()
+    lib_path.write_text(json.dumps({k: v for k, v in LIB.items() if k != "approved_on"} | {"status": "proposed"}))  # the rollback copy
     ov_path.write_text(json.dumps(_overlay()))
     bad = _overlay()
     bad["gates"]["bw_pull"].update(value="soon")
@@ -606,7 +607,7 @@ def test_approval_succeeds_with_every_readiness_gate_locked_on_a_copy(tmp_path):
     assert any("LOCKED with no threshold set" in x and "bw_pull" in x for x in lines)
     after = json.loads(lib_path.read_text())
     assert (after["status"], after["approved_on"]) == ("approved", "2026-11-14")
-    assert json.loads((REPO / "config" / "exercise_library.json").read_text())["status"] == "proposed"
+    assert (REPO / "config" / "exercise_library.json").read_text() == committed  # the committed library is never touched
     gates = eg.evaluate_gates(after, _overlay(), {"as_of": "2026-11-15", "bodyweight": {"mean_lb": 1.0}})
     assert all(gates[g]["state"] == eg.LOCKED for g in cur.READINESS_STANDARDS), "approved, and every bodyweight gate still locked"
 

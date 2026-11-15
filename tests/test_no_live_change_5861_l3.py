@@ -157,7 +157,11 @@ def digests(lib: dict, cat: dict) -> dict[str, str]:
 
 
 def _inputs() -> tuple[dict, dict]:
+    """The committed library's ROLLBACK copy (status proposed, no approval day): it is approved since 2026-11-14, and these
+    tests hold that a rollback serves the shadow path with no live-only code."""
     lib = json.loads((REPO / "config" / "exercise_library.json").read_text())
+    lib["status"] = "proposed"
+    lib.pop("approved_on", None)
     cat = json.loads((REPO / "config" / "movement_catalog.json").read_text())["movements"]
     se._LIB_CACHE.update(lib=lib, at=float("inf"))  # the drafting paths read the library through the cache
     return lib, cat

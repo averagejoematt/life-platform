@@ -12,7 +12,8 @@ Held here, each beside a must-fail control that was run red:
     verdict, which the selection engine honours;
   * existing ids and history are untouched: building WITHOUT the additions gives every pre-existing movement byte-for-byte
     (fallbacks aside, which may now name an addition), and the committed library is exactly the builder's output;
-  * the builder is deterministic (two runs, identical), the library stays `proposed` (shadow), and the public coverage doc
+  * the builder is deterministic (two runs, identical), the committed library is the builder's proposed output plus exactly
+    the owner's approval delta (2026-11-14, a rebuild keeps it), the rollback copy is shadow, and the public coverage doc
     is the module's own render.
 
 Pure: the committed config, no AWS, no network, no clock.
@@ -275,15 +276,50 @@ def test_existing_ids_and_history_are_unchanged(monkeypatch):
     assert moved == []
 
 
+APPROVAL = {"version": "0.4.0", "approved_on": "2026-11-14"}
+"""The owner's approval (2026-11-14), written by scripts/approve_exercise_library.py AFTER the build: status, approved_on (last
+key), a minor version bump and one change-log line. The builder never emits `approved`; it only preserves an approval it reads."""
+
+
+def _pre_approval(lib: dict) -> dict:
+    """The committed library with the approval delta removed — what the builder produced before the owner approved it."""
+    pre = copy.deepcopy(lib)
+    assert pre.pop("approved_on") == APPROVAL["approved_on"]
+    line = pre["change_log"].pop()
+    assert (line["version"], line["date"]) == (APPROVAL["version"], APPROVAL["approved_on"])
+    assert line["what"] == "approved: status proposed -> approved (schema valid, private gate check passed)"
+    pre["status"], pre["version"] = "proposed", pre["change_log"][-1]["version"]
+    return pre
+
+
+def _text(lib: dict) -> str:
+    return json.dumps(lib, indent=1, ensure_ascii=False) + "\n"
+
+
 def test_the_committed_library_is_the_builders_output_and_the_build_is_deterministic(monkeypatch):
+    committed = (REPO / "config" / "exercise_library.json").read_text()
     one = _build(monkeypatch)
     two = _build(monkeypatch)
     assert one == two and xl.validate(one) == []
-    assert json.dumps(one, indent=1, ensure_ascii=False) + "\n" == (REPO / "config" / "exercise_library.json").read_text()
+    # a rebuild of the APPROVED file keeps the approval byte for byte (status, approved_on, version, change log): never a revert
+    assert _text(one) == committed
+    # the committed file is exactly the builder's PROPOSED output plus the approval delta, applied the way the script writes it
+    pre = _pre_approval(LIB)
+    monkeypatch.setattr(b, "_LEDGER", None)
+    history, aliases = _inputs()
+    built = b.build_library(copy.deepcopy(pre), history, copy.deepcopy(CATALOG), aliases)
+    assert built["status"] == "proposed" and "approved_on" not in built and _text(built) == _text(pre)
+    approved = built | {"version": APPROVAL["version"], "status": "approved", "change_log": built["change_log"] + [LIB["change_log"][-1]]}
+    approved["approved_on"] = APPROVAL["approved_on"]
+    assert _text(approved) == committed
+    # control: the builder never emits an approval it did not read — no current file builds proposed, unstamped
+    fresh = b.build_library(None, history, copy.deepcopy(CATALOG), aliases)
+    assert fresh["status"] == "proposed" and "approved_on" not in fresh
 
 
-def test_the_library_stays_proposed_so_nothing_is_live():
-    assert LIB["status"] == "proposed" and se.mode(LIB) == "shadow"
+def test_the_library_is_approved_and_its_rollback_copy_is_shadow():
+    assert (LIB["status"], LIB["approved_on"], LIB["version"]) == ("approved", "2026-11-14", "0.4.0") and se.mode(LIB) == "live"
+    assert se.mode(LIB | {"status": "proposed"}) == "shadow"  # the rollback: status back to proposed
     # #5861 L6: an addition reaches the catalog ONLY as a deliberate coach_added twin (deploy/movement_catalog_additions.py) — a
     # built-in template, never a not_for_you_now movement — and even then it serves only once the library is approved
     import movement_catalog_additions as mca
