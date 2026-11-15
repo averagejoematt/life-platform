@@ -44,6 +44,7 @@ def _pick(week="2026-W30", title="On Rest as a Skill", **over):
         "title": title,
         "source": "The Marginalian",
         "pitch": "a reframe of rest as active recovery, not idleness",
+        "pitchStatus": "published",  # #5947: the curate-time publication stamp
         "rationale_tag": "experiment-relevant",
         "curator": "mind",
         "verification": {"verified": True, "status": 200},
@@ -326,3 +327,100 @@ def resp_text(body):
     import json
 
     return json.dumps(body)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #5947 — coach-written text on the feed is public by POSITIVE stamp, fail closed
+# (synthetic vocabulary only: the real one lives in the off-repo channel)
+# ══════════════════════════════════════════════════════════════════════════════
+import datetime as _dt  # noqa: E402
+import json as _json  # noqa: E402
+
+from privacy import content_filter_channel as _channel  # noqa: E402
+from reading import horizons_publication as hp  # noqa: E402
+
+_SYNTHETIC_CLINICAL = "snorbleitis"  # a conftest NEUTRAL_CONTENT_FILTER clinical term, never a real one
+_SYNTHETIC_PHRASE = "quibbled-wumpus"  # the fixture's two-word term, written with a hyphen
+
+
+@pytest.fixture()
+def unarmed_clinical_channel(monkeypatch):
+    """A channel armed BEFORE the clinical list existed: the blocked vocabulary, no clinical key."""
+    monkeypatch.setenv("CONTENT_FILTER_JSON", _json.dumps({"blocked_vice_keywords": ["fizzlewick"]}))
+    _channel.reset_cache()
+    yield
+    _channel.reset_cache()
+
+
+def test_a_pitch_with_no_publication_stamp_is_never_served(fake_table):
+    """The must-fail control: the row shape every pick had before the stamp existed. Its pitch was served
+    verbatim; now the card is served without it — and with the stamp, the same clean text is served."""
+    legacy = _pick("2026-W28", pitch="words nobody screened")
+    del legacy["pitchStatus"]
+    rs.put_horizon_pick(legacy)
+    rs.put_horizon_pick(_pick("2026-W30", pitch="words that cleared the screen"))
+    body = _parse(sar.handle_horizons())
+    newest, older = body["items"]
+    assert older["title"] and older["pitch"] is None
+    assert "words nobody screened" not in resp_text(body)
+    assert newest["pitch"] == "words that cleared the screen"
+
+
+def test_a_stamped_pitch_is_rescreened_at_the_read_and_a_held_stamp_never_serves(fake_table):
+    rs.put_horizon_pick(_pick("2026-W29", pitch=f"a week after the {_SYNTHETIC_CLINICAL} finding"))  # stamped, vocabulary widened since
+    rs.put_horizon_pick(_pick("2026-W30", pitch="clean words, held stamp", pitchStatus="held"))
+    body = _parse(sar.handle_horizons())
+    assert [i["pitch"] for i in body["items"]] == [None, None]
+    assert _SYNTHETIC_CLINICAL not in resp_text(body)
+
+
+def test_a_published_retrospective_is_rescreened_and_a_flagged_title_drops_the_card(fake_table):
+    rs.put_horizon_pick(_pick("2026-W29", title=f"Living with {_SYNTHETIC_PHRASE}"))
+    rs.put_horizon_pick(_pick("2026-W30"))
+    rs.set_horizon_retrospective(
+        "2026-W30", {"status": "published", "text": f"I sent it the week {_SYNTHETIC_CLINICAL} arrived.", "curator": "mind"}
+    )
+    body = _parse(sar.handle_horizons())
+    assert [i["week"] for i in body["items"]] == ["2026-W30"] and body["count"] == 1
+    assert "retrospective" not in body["items"][0]
+    assert _SYNTHETIC_CLINICAL not in resp_text(body) and "wumpus" not in resp_text(body)
+
+
+def test_the_screen_fails_closed_when_the_clinical_vocabulary_is_not_armed(fake_table, unarmed_clinical_channel):
+    """An unarmed screen vouches for nothing: nothing new is stamped published and nothing stamped is served."""
+    assert hp.screen("perfectly ordinary words") == (hp.STATUS_HELD, [hp.CATEGORY_SCREEN_UNAVAILABLE])
+    assert hp.stamp({"pitch": "perfectly ordinary words", "title": "A Piece"})[hp.STATUS_ATTR] == hp.STATUS_HELD
+    rs.put_horizon_pick(_pick("2026-W30"))
+    card = _parse(sar.handle_horizons())["items"][0]
+    assert card["title"] == "On Rest as a Skill", "an unavailable screen is not a finding: the verified title still shows"
+    assert card["pitch"] is None
+
+
+def test_the_stamp_names_a_neutral_category_and_never_the_term():
+    attrs = hp.stamp({"pitch": f"since the {_SYNTHETIC_CLINICAL} news", "title": "A Piece", "source": "Somewhere"})
+    assert attrs == {hp.STATUS_ATTR: hp.STATUS_HELD, hp.CATEGORIES_ATTR: [hp.CATEGORY_CLINICAL]}
+    assert hp.stamp({"pitch": "about the piece itself", "title": "A Piece"}) == {hp.STATUS_ATTR: hp.STATUS_PUBLISHED}
+
+
+def test_a_retrospective_is_never_written_from_an_unpublished_pitch_and_a_clinical_draft_is_held(tier0):
+    held_pitch = _pick(pitch="words the screen held", pitchStatus="held")
+    assert "words the screen held" not in hr.build_body(held_pitch)["messages"][0]["content"]
+    assert "a reframe of rest" in hr.build_body(_pick())["messages"][0]["content"]
+    out = hr.generate(_pick(), invoker=_clean_invoker(f"I sent this the week the {_SYNTHETIC_CLINICAL} result came back."))
+    assert out["status"] == hr.STATUS_HELD and "text" not in out
+    assert out["categories"] == [hp.CATEGORY_CLINICAL]
+
+
+def test_the_pending_line_is_promised_only_inside_the_retrospective_window(fake_table, monkeypatch):
+    """A pick's "retrospective is coming" flag is true for this ISO week and the one before, and false after —
+    the page no longer promises a note that is weeks overdue. The clock is pinned (#4848)."""
+    today = _dt.date(2026, 7, 29)  # ISO 2026-W31
+    assert sar._retrospective_window_open("2026-W31", today) and sar._retrospective_window_open("2026-W30", today)
+    assert not sar._retrospective_window_open("2026-W29", today) and not sar._retrospective_window_open(None, today)
+    monkeypatch.setattr(sar, "_retrospective_window_open", lambda week, today=None: week == "2026-W30")
+    rs.put_horizon_pick(_pick("2026-W28"))
+    rs.put_horizon_pick(_pick("2026-W29"))
+    rs.put_horizon_pick(_pick("2026-W30"))
+    rs.set_horizon_retrospective("2026-W29", {"status": "published", "text": "the coach's grounded note", "curator": "mind"})
+    flags = {i["week"]: i["retrospective_pending"] for i in _parse(sar.handle_horizons())["items"]}
+    assert flags == {"2026-W30": True, "2026-W29": False, "2026-W28": False}

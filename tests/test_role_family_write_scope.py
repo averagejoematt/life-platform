@@ -974,4 +974,307 @@ def test_MUTATION_a_put_only_grant_reds_on_the_hold_read():
     }
 
 
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# 6. #5513 — THE INGESTION ROLES' DeleteItem SCOPE, DERIVED THROUGH THE CALL GRAPH
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# Until 2026-11-13 every `_ingestion_base` role carried `dynamodb:DeleteItem` on the whole
+# table. #5513 (b) narrowed each to the partitions its code deletes from, and a WRONG narrowing
+# is this file's own class exactly: every one of these deletes sits in a try/except that logs
+# and continues, so a denial is silence. Sections 1-5 cannot hold that line, because the delete
+# that matters most — the auth-breaker clear, on every clean run of every source — lives in
+# SHARED modules (`common/auth_breaker.py`, `ingestion/ingestion_framework.py`), and this file
+# scopes to the entrypoint a stack names (the blind spot stated in the header, and the one
+# #3975 fell into on the compute side). So this leg walks the handler's import-scoped call
+# graph (`tests/grant_enumeration.py`, the #2824 engine) for every reachable `delete_item`,
+# resolves the partition each one deletes from, and compares to the role's LeadingKeys-scoped
+# DeleteItem grant IN BOTH DIRECTIONS: a reached partition with no grant is a silent denial, and
+# a granted partition nothing reaches is the over-grant #5513 was filed about.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import grant_enumeration as _ge  # noqa: E402
+
+INGESTION_STACK = "ingestion_stack.py"
+_SOURCE_NAME = "\x00source_name\x00"
+
+#: A `delete_item(Key=<data>)` whose pk is not an expression but a row read back from the
+#: table. Each entry names the partition the keys can come from AND the source line that makes
+#: that true — `test_data_keyed_deletes_still_read_the_partition_they_claim` re-reads the line,
+#: so the claim cannot outlive the code. A site not listed here reds as undecidable.
+DATA_KEYED_DELETES: dict = {
+    ("lambdas/training/hevy_common.py", "delete_workout_records"): (
+        "USER#*#SOURCE#hevy",
+        "find_workout_record_keys",
+        'pk = f"USER#{USER_ID}#SOURCE#{SOURCE}"',
+    ),
+}
+
+#: Reached-but-ungranted deletes found by this leg and NOT fixed in the PR that found them.
+#: Same shrink-only, dated contract as KNOWN_GAPS (both ratchet tests below enforce it).
+KNOWN_DELETE_GAPS: dict = {
+    "weather-data-ingestion::USER#*#SOURCE#weather": (
+        "2026-11-13 (#5513): found by this leg on the day it landed, pre-existing and out of that PR's scope (a narrowing PR "
+        "does not also widen). weather runs through run_ingestion, whose clean-run path calls auth_breaker.clear_failure -> "
+        "delete_item on its own partition, and ingestion_weather() has never granted DeleteItem. The denial is swallowed "
+        "(`auth_breaker_clear_failed`); the marker still expires by its 24h TTL, so the cost is a breaker that cannot clear "
+        "early. CLEARS WHEN ingestion_weather() gains a LeadingKeys-scoped DeleteItem on USER#matthew#SOURCE#weather and "
+        "the owner deploys LifePlatformIngestion — or the framework stops clearing a breaker for a source with no auth."
+    ),
+}
+
+
+def _scope_nodes(mf, scope: str) -> list:
+    """The AST bodies `grant_enumeration.ModuleFacts` files under one scope name."""
+    out = []
+    for node in mf.tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if node.name == scope:
+                out.append(node)
+        elif isinstance(node, ast.ClassDef):
+            for member in node.body:
+                if isinstance(member, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    if member.name == scope:
+                        out.append(member)
+                elif scope == _ge.MODULE_SCOPE:
+                    out.append(member)
+        elif scope == _ge.MODULE_SCOPE:
+            out.append(node)
+    return out
+
+
+def _module_bindings(mf) -> dict:
+    """Module string bindings, following ONE `from x import NAME` hop — hevy_backfill's
+    `SOURCE` is `training.hevy_common.SOURCE`, and reading it as unresolved would turn the
+    hevy partition into `USER#*#SOURCE#*`, which covers everything and proves nothing."""
+    bindings = dict(_string_bindings(mf.tree))
+    for node in ast.walk(mf.tree):
+        if isinstance(node, ast.ImportFrom) and not node.level and node.module:
+            origin = None
+            for alias in node.names:
+                name = alias.asname or alias.name
+                if bindings.get(name) is not None:
+                    continue
+                origin = origin or _ge.facts(node.module)
+                if origin is not None:
+                    value = _string_bindings(origin.tree).get(alias.name)
+                    if value is not None:
+                        bindings[name] = value
+    return bindings
+
+
+def _pk_template(node, mf, bindings: dict):
+    """A delete's pk as a pattern. A call to a module-local one-line helper returning an
+    f-string (`_pk(source_name, user_id)`, `_auth_breaker_pk(...)`) is expanded, with its
+    `source_name` parameter left as a placeholder for the handler's own value."""
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+        for fn in mf.tree.body:
+            if isinstance(fn, ast.FunctionDef) and fn.name == node.func.id and len(fn.body) == 1:
+                ret = fn.body[0]
+                if isinstance(ret, ast.Return) and isinstance(ret.value, ast.JoinedStr):
+                    out = ""
+                    for part in ret.value.values:
+                        if isinstance(part, ast.Constant):
+                            out += str(part.value)
+                        elif isinstance(part, ast.FormattedValue) and isinstance(part.value, ast.Name) and part.value.id == "source_name":
+                            out += _SOURCE_NAME
+                        else:
+                            out += "*"
+                    return out
+        return None
+    return resolve_string(node, bindings)
+
+
+def _handler_source_names(mf) -> set:
+    """Every `source_name=<string>` the handler passes anywhere — to `IngestionConfig(...)`
+    (the SIMP-2 path) or straight to `clear_failure(...)`. This is the value the auth breaker
+    builds its pk from, which is why the grant must follow IT and not the role's label."""
+    bindings = _module_bindings(mf)
+    names = set()
+    for node in ast.walk(mf.tree):
+        if isinstance(node, ast.Call):
+            for kw in node.keywords:
+                if kw.arg == "source_name":
+                    value = resolve_string(kw.value, bindings)
+                    if value and "*" not in value:
+                        names.add(value)
+    return names
+
+
+def reachable_deletes(source_file: str, roots=None) -> tuple:
+    """(pks, undecidable) for every `delete_item` reachable from one handler.
+
+    `pks` is {pattern: [site, ...]}; `undecidable` is the sites whose partition could not be
+    named — never silently treated as covered."""
+    roots = tuple(roots or _ge.DEFAULT_ROOTS)
+    path = os.path.join(ROOT, source_file) if not os.path.isabs(source_file) else source_file
+    own_dir = os.path.dirname(os.path.abspath(path))
+    roots = roots if own_dir in roots else (own_dir,) + roots
+    module = _ge._module_name(path, roots)
+    entry = _ge.facts(module, roots)
+    if entry is None:
+        return {}, [f"{source_file}: entry module did not parse"]
+    source_names = _handler_source_names(entry)
+    pks: dict = {}
+    undecidable: list = []
+    seen = {(module, scope) for scope in entry.scopes}
+    stack = list(seen)
+    while stack:
+        mod, scope = stack.pop()
+        mf = _ge.facts(mod, roots)
+        if mf is None or scope not in mf.scopes:
+            continue
+        rel = os.path.relpath(mf.path, ROOT)
+        bindings = None
+        for body in _scope_nodes(mf, scope):
+            for node in ast.walk(body):
+                if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "delete_item"):
+                    continue
+                site = f"{rel}:{node.lineno} ({scope})"
+                key = next((kw.value for kw in node.keywords if kw.arg == "Key"), None)
+                pk_node = None
+                if isinstance(key, ast.Dict):
+                    pk_node = next((v for k, v in zip(key.keys, key.values) if isinstance(k, ast.Constant) and k.value == "pk"), None)
+                if pk_node is None:
+                    declared = DATA_KEYED_DELETES.get((rel, scope))
+                    if declared:
+                        pks.setdefault(declared[0], []).append(site)
+                    else:
+                        undecidable.append(f"{site}: Key is data, and the site is not in DATA_KEYED_DELETES")
+                    continue
+                bindings = bindings if bindings is not None else _module_bindings(mf)
+                template = _pk_template(pk_node, mf, bindings)
+                if template is None:
+                    undecidable.append(f"{site}: pk expression {ast.unparse(pk_node)!r} did not resolve")
+                elif _SOURCE_NAME in template:
+                    if not source_names:
+                        undecidable.append(f"{site}: pk is built from source_name and the handler passes no literal `source_name=`")
+                    for name in sorted(source_names):
+                        pks.setdefault(template.replace(_SOURCE_NAME, name), []).append(site)
+                else:
+                    pks.setdefault(template, []).append(site)
+        for target_mod, target_fn in mf.scopes[scope]["calls"]:
+            for candidate in ((target_mod, target_fn), (target_mod, _ge.MODULE_SCOPE)):
+                if candidate not in seen:
+                    seen.add(candidate)
+                    stack.append(candidate)
+    return pks, undecidable
+
+
+def delete_scope_findings(function_name: str, pks: dict, undecidable: list, statements) -> dict:
+    """Pure: {key: detail} for one role. Three kinds — `unscoped`, a reached pk with no grant
+    (keyed `fn::<pk>`), and `overgrant::<pk>` for a granted partition nothing reaches."""
+    out: dict = {}
+    scopes = leading_keys_for(statements, "dynamodb:DeleteItem")
+    if any(not scope for scope in scopes):
+        out[f"{function_name}::unscoped"] = (
+            "a statement grants dynamodb:DeleteItem with NO dynamodb:LeadingKeys condition (table-wide delete)"
+        )
+    for site in undecidable:
+        out[f"{function_name}::undecidable::{site.split(':', 2)[0]}:{site.split(':', 2)[1].split(' ')[0]}"] = site
+    granted = sorted({p for scope in scopes for p in scope})
+    for pk, sites in sorted(pks.items()):
+        if any(not scope for scope in scopes):
+            continue  # table-wide: reachable, and already reported above
+        if not _pk_covered(pk, granted):
+            out[f"{function_name}::{pk}"] = f"deletes from {pk!r} at {sites} but DeleteItem is granted on {granted or 'nothing'}"
+    for pattern in granted:
+        if not any(_pk_covered(pk, [pattern]) for pk in pks):
+            out[f"{function_name}::overgrant::{pattern}"] = f"DeleteItem is granted on {pattern!r} and no reachable delete_item uses it"
+    return out
+
+
+def _ingestion_delete_findings() -> dict:
+    out: dict = {}
+    for e in ROLE_FAMILY:
+        if e.stack != INGESTION_STACK:
+            continue
+        pks, undecidable = reachable_deletes(e.source_file)
+        out.update(delete_scope_findings(e.function_name, pks, undecidable, policy_statements(e.policy_fn)))
+    return out
+
+
+INGESTION_DELETE_FINDINGS = _ingestion_delete_findings()
+
+
+def test_ingestion_roles_delete_only_the_partitions_their_code_reaches():
+    """#5513 (b), both directions, with the review's extra guard folded in: no ingestion role
+    grants DeleteItem without a LeadingKeys condition; every partition a handler's reachable
+    code deletes from is granted; and no granted partition is unreached."""
+    ingestion = [e for e in ROLE_FAMILY if e.stack == INGESTION_STACK]
+    assert len(ingestion) >= 15, f"only {len(ingestion)} ingestion-stack roles derived — the family scan broke"
+    # Non-vacuity, on the three shapes the derivation has to see: a SHARED-module delete reached
+    # through the framework, a second partition, and a data-keyed site resolved by declaration.
+    assert set(reachable_deletes("lambdas/ingestion/whoop_lambda.py")[0]) == {"USER#*#SOURCE#whoop"}
+    assert set(reachable_deletes("lambdas/ingestion/habitify_lambda.py")[0]) == {"USER#*#SOURCE#habitify", "USER#*#SOURCE#supplements"}
+    hevy, hevy_undecidable = reachable_deletes("lambdas/ingestion/hevy_backfill_lambda.py")
+    assert set(hevy) == {"USER#*#SOURCE#hevy", "USER#system"} and not hevy_undecidable, (hevy, hevy_undecidable)
+    assert any("hevy_common.py" in site for site in hevy["USER#*#SOURCE#hevy"]), "the data-keyed workout delete left the walk"
+    assert leading_keys_for(RP.ingestion_whoop(), "dynamodb:DeleteItem") == [["USER#matthew#SOURCE#whoop"]]
+    assert "dynamodb:DeleteItem" not in granted_actions(RP.ingestion_macrofactor()), "macrofactor reaches no delete_item"
+
+    unledgered = {k: v for k, v in INGESTION_DELETE_FINDINGS.items() if k not in KNOWN_DELETE_GAPS}
+    assert not unledgered, (
+        "ingestion-role DeleteItem scope != the partitions the code deletes from (#5513). A missing partition "
+        "AccessDenies inside a try/except and nothing reports it; an extra one is the over-grant:\n"
+        + "\n".join(f"  {k}\n      {v}" for k, v in sorted(unledgered.items()))
+        + "\n\nFix `delete_pks=` on the role in cdk/stacks/role_policies_ingestion.py (then the owner deploys LifePlatformIngestion)."
+    )
+    stale = sorted(k for k in KNOWN_DELETE_GAPS if k not in INGESTION_DELETE_FINDINGS)
+    assert not stale, "these KNOWN_DELETE_GAPS lines no longer describe a live gap — delete them:\n" + "\n".join(f"  {k}" for k in stale)
+    for key, reason in KNOWN_DELETE_GAPS.items():
+        assert (
+            reason[:4].isdigit() and reason[4] == "-" and "CLEARS WHEN" in reason and len(reason) >= 120
+        ), f"{key}: undated or says nothing"
+
+    # The claim behind each data-keyed site is re-read from the source it names.
+    for (rel, _scope), (pattern, reader, line) in DATA_KEYED_DELETES.items():
+        with open(os.path.join(ROOT, rel), encoding="utf-8") as fh:
+            tree = ast.parse(fh.read())
+        (fn,) = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == reader]
+        assert line in ast.unparse(fn).replace("'", '"'), f"{rel}::{reader} no longer reads {line!r} — re-derive {pattern!r}"
+
+    # `ddb_actions` may not carry the verb back in table-wide.
+    with pytest.raises(ValueError, match="delete_pks"):
+        _ingestion_module()._ingestion_base("probe", ddb_actions=["dynamodb:GetItem", "dynamodb:DeleteItem"])
+
+
+def _ingestion_module():
+    (mod,) = [m for m in ROLE_POLICY_MODULES if m.__name__.endswith("role_policies_ingestion")]
+    return mod
+
+
+def test_MUTATION_the_delete_scope_leg_reds_each_way(tmp_path):
+    """Every finding kind made to fire on purpose, plus the two real mutations the narrowing
+    could get wrong: a role given the WRONG partition, and the delete left table-wide."""
+    pks = {"USER#*#SOURCE#whoop": ["x.py:1 (f)"]}
+    own = [_Stmt("D", ["dynamodb:DeleteItem"], _scoped(["USER#matthew#SOURCE#whoop"]))]
+    assert delete_scope_findings("fn", pks, [], own) == {}, "negative control: the exact grant is clean"
+    wide = delete_scope_findings("fn", pks, [], [_Stmt("DynamoDB", ["dynamodb:PutItem", "dynamodb:DeleteItem"])])
+    assert list(wide) == ["fn::unscoped"], wide
+    wrong = delete_scope_findings("fn", pks, [], [_Stmt("D", ["dynamodb:DeleteItem"], _scoped(["USER#matthew#SOURCE#strava"]))])
+    assert sorted(wrong) == ["fn::USER#*#SOURCE#whoop", "fn::overgrant::USER#matthew#SOURCE#strava"], wrong
+    assert list(delete_scope_findings("fn", pks, [], [])) == ["fn::USER#*#SOURCE#whoop"], "no DeleteItem at all is a silent denial"
+    extra = own + [_Stmt("E", ["dynamodb:DeleteItem"], _scoped(["USER#system"]))]
+    assert list(delete_scope_findings("fn", pks, [], extra)) == ["fn::overgrant::USER#system"]
+    assert list(delete_scope_findings("fn", {}, ["a.py:9 (g): Key is data"], [])) == ["fn::undecidable::a.py:9"]
+
+    # The walk itself, on a planted two-module tree: the delete is in a SHARED module the
+    # handler only imports, behind a one-line pk helper — the auth-breaker shape exactly.
+    (tmp_path / "shared_5513.py").write_text(
+        "def _pk(source_name, user_id):\n    return f'USER#{user_id}#SOURCE#{source_name}'\n\n"
+        "def clear(table, source_name, user_id):\n    table.delete_item(Key={'pk': _pk(source_name, user_id), 'sk': 'AUTH_FAILURE'})\n\n"
+        "def purge(table, key):\n    table.delete_item(Key=key)\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "probe_5513_lambda.py").write_text(
+        "from shared_5513 import clear\n\nSOURCE = 'planted'\n\ndef lambda_handler(e, c):\n    clear(table, source_name=SOURCE, user_id='u')\n",
+        encoding="utf-8",
+    )
+    found, undecidable = reachable_deletes(str(tmp_path / "probe_5513_lambda.py"), roots=(str(tmp_path),))
+    assert set(found) == {"USER#*#SOURCE#planted"} and not undecidable, (found, undecidable)
+    (tmp_path / "probe2_5513_lambda.py").write_text(
+        "from shared_5513 import purge\n\ndef lambda_handler(e, c):\n    purge(table, e['key'])\n", encoding="utf-8"
+    )
+    found, undecidable = reachable_deletes(str(tmp_path / "probe2_5513_lambda.py"), roots=(str(tmp_path),))
+    assert not found and len(undecidable) == 1 and "DATA_KEYED_DELETES" in undecidable[0], (found, undecidable)
+
+
 # premerge-gate: 3596: IAM write-scope parity as a ROLE FAMILY — every create_platform_lambda's module AST-read for DynamoDB write verbs and pk literals, checked against the role_policies* statement its stack wires to it. Pure repo shape (~3s, the live leg is @integration and deselected here). Pre-merge because the PR that ADDS the write is the only moment the grant is a decision: after it, a FakeDdbTable cannot d
