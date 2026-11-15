@@ -723,6 +723,9 @@ _PENDING_PERMISSIONS_APPLY: dict[str, str] = {
     # zoned-schedule leg) was applied by the owner ~04:48Z with the same put-role-policy command;
     # post-apply `deploy/verify_oidc_iam.py --strict` reported CLEAN across all 17 targets.
     # Removed here per the same #2824 rule.
+    # 2026-11-15: the #5934 readonly-role entry (CloudWatchAlarmHistoryRead + QaSmokeCauseLogRead for
+    # wrap-nightly's alarm-citations leg) was applied ~06:00Z with the same put-role-policy command;
+    # get-role-policy read back both Sids. Removed here per the same #2824 rule.
     "github-actions-remediation-role": (
         "2026-11-15 (#5821): OpsDigestLine — sns:Publish on life-platform-alerts-digest, so the remediation "
         "summary becomes daily LP digest lines (remediation/agent.py digest_report; until applied the publish "
