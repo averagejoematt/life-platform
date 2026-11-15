@@ -44,7 +44,8 @@ def assess(dashboard) -> tuple[str, str]:
     if dashboard.get("regeneration_paused") is True:
         return "ok", "coach regeneration is paused — the board's mixed read days are the disclosed, expected state (#3252)"
     present = [c for c in dashboard["coaches"] if isinstance(c, dict) and not c.get("absent")]
-    span = dashboard.get("content_day_span") if isinstance(dashboard.get("content_day_span"), dict) else {}
+    raw_span = dashboard.get("content_day_span")
+    span: dict = raw_span if isinstance(raw_span, dict) else {}
     newest = _day(span.get("newest_day_n"))
     if newest is None:
         known = [d for d in (_day(c.get("analysis_as_of_day_n")) for c in present) if d is not None]
