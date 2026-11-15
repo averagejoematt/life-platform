@@ -246,6 +246,34 @@ def test_live_arm_unreachable_endpoint_is_a_violation_never_a_pass():
     assert all(arm == "endpoint-not-scanned" for _, arm, _ in res["violations"])
 
 
+def test_live_arm_classifies_a_dark_route_404_but_still_reds_everything_else(monkeypatch):
+    """#5976: a 404 on a registered DARK route is skipped with its reason; a 404 on any
+    other route, a 5xx on a dark route, and a leak in a dark route's 200 all still red."""
+
+    dark = set(guard.DARK_ROUTES)
+
+    def run(dark_status, other_status=200, dark_body=None):
+        def stub(fetch_path):
+            path = fetch_path.split("?")[0]
+            if path in dark:
+                return dark_status, dark_body, None
+            if path == "/api/vitals":
+                return other_status, ({"ok": 1} if other_status == 200 else None), None
+            return 200, {"ok": 1}, None
+
+        return guard.scan_endpoints("https://unit-test.invalid", fetcher=stub)
+
+    res = run(404)
+    assert not [v for v in res["violations"] if v[0] in guard.DARK_ROUTES], res["violations"]
+    assert all(r in res["skipped"] and "dark route" in res["skipped"][r] for r in guard.DARK_ROUTES)
+    # must-fail controls
+    assert [v for v in run(500)["violations"] if v[0] in guard.DARK_ROUTES], "5xx on a dark route must red"
+    leak = run(200, dark_body={"user": {"birth_year": 1985}})
+    assert any(arm == "pii-age-key" for _, arm, _ in leak["violations"]), "a launched dark route is scanned"
+    monkeypatch.setattr(guard, "DARK_ROUTES", {})
+    assert [v for v in run(404)["violations"] if v[0] in ("/api/coach_brief", "/api/coach_room_words")], "undeclared 404 must red"
+
+
 def test_live_arm_fires_on_a_planted_payload_and_never_fetches_post_only_routes(monkeypatch):
     """Two properties through one stubbed sweep: (a) a planted tell in a fetched
     payload reds; (b) POST-only routes — derived from the router's own AST method
