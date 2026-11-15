@@ -464,9 +464,10 @@ export function followLine(nextBlock, counts = null) {
   const day = usable(ch) ? dayInWords(ch.data.date) : "";
   if (day && !ch.data.drafted_not_promised) return `The next chapter is due ${day}. The week’s numbers go out every Sunday.`;
   const c = counts && Number.isInteger(counts.chapters) && Number.isInteger(counts.episodes) && counts.chapters > 0 ? counts : null;
-  const pod = !c ? "" : c.episodes === 0 ? ", none with a podcast episode yet" : c.episodes * 2 > c.chapters ? `, ${c.episodes} with a podcast episode` : `, only ${c.episodes} with a podcast episode`;
-  const base = `A new chapter each time Matthew approves a week’s draft${c ? ` (${c.chapters} so far${pod})` : ""}`;
-  return day ? `${base}. The next draft is dated ${day}. The week’s numbers go out every Sunday.` : `${base}, and the numbers every Sunday.`;
+  // Kept short: /start/ sits at the edge of its 4-screen budget (tests/kit_page_gate.py), one wrapped line is ~23 px.
+  const pod = !c ? "" : c.episodes === 0 ? ", no podcast yet" : c.episodes * 2 > c.chapters ? `, ${c.episodes} with a podcast` : `, only ${c.episodes} with a podcast`;
+  const base = `A new chapter when Matthew approves a week’s draft${c ? ` (${c.chapters} so far${pod})` : ""}`;
+  return day ? `${base}; the next is dated ${day}. Numbers every Sunday.` : `${base}, and the numbers every Sunday.`;
 }
 
 // ── the argument (round 8) ─────────────────────────────────────────────────────

@@ -206,10 +206,10 @@ test("the follow box says what arrives next and when", () => {
   // The capture's cadence marks the date a draft, not a promise: the box does not say "due".
   assert.ok(B.next.data.chapter.data.drafted_not_promised);
   const drafted = dayInWords(B.next.data.chapter.data.date);
-  assert.equal(F.followLine(B.next), `A new chapter each time Matthew approves a week’s draft. The next draft is dated ${drafted}. The week’s numbers go out every Sunday.`);
+  assert.equal(F.followLine(B.next), `A new chapter when Matthew approves a week’s draft; the next is dated ${drafted}. Numbers every Sunday.`);
   const promised = { ...B.next, data: { ...B.next.data, chapter: { ...B.next.data.chapter, data: { date: "2026-10-14" } } } };
   assert.equal(F.followLine(promised), "The next chapter is due Wednesday, October 14. The week’s numbers go out every Sunday.");
-  assert.equal(F.followLine({}), "A new chapter each time Matthew approves a week’s draft, and the numbers every Sunday.");
+  assert.equal(F.followLine({}), "A new chapter when Matthew approves a week’s draft, and the numbers every Sunday.");
 });
 
 test("#5939: the follow box's cadence is the record's — never a hand-typed 'podcast most weeks'", () => {
@@ -218,9 +218,9 @@ test("#5939: the follow box's cadence is the record's — never a hand-typed 'po
   const episodes = { episodes: [{ week: 4 }, { week: 0 }] };
   const counts = F.cadenceCounts(journal, episodes);
   assert.deepEqual(counts, { chapters: 7, episodes: 1 }); // the prologue counts as neither
-  assert.equal(F.followLine({}, counts), "A new chapter each time Matthew approves a week’s draft (7 so far, only 1 with a podcast episode), and the numbers every Sunday.");
-  assert.match(F.followLine({}, { chapters: 7, episodes: 6 }), /\(7 so far, 6 with a podcast episode\)/);
-  assert.match(F.followLine({}, { chapters: 7, episodes: 0 }), /none with a podcast episode yet/);
+  assert.equal(F.followLine({}, counts), "A new chapter when Matthew approves a week’s draft (7 so far, only 1 with a podcast), and the numbers every Sunday.");
+  assert.match(F.followLine({}, { chapters: 7, episodes: 6 }), /\(7 so far, 6 with a podcast\)/);
+  assert.match(F.followLine({}, { chapters: 7, episodes: 0 }), /no podcast yet/);
   assert.equal(F.cadenceCounts({ posts: [] }, episodes), null);
   for (const c of [null, counts, { chapters: 7, episodes: 6 }]) {
     for (const nb of [{}, B.next]) assert.doesNotMatch(F.followLine(nb, c), /podcast most weeks|chapter and podcast/, JSON.stringify(c));
