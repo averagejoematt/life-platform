@@ -86,6 +86,16 @@ QUESTIONS_FIRST_SEND = "2026-10-05"
 EPISODE_CHECK = "story_season:episode_or_hold"
 LEDGER_CHECK = "story_season:ledger_advanced"
 QUESTIONS_CHECK = "story_season:monday_questions"
+DOOR_CHECK = "story_season:chapter_door"
+
+# #5520 (e) the Story door's dead-man. /api/chapters is the ONE served account of every program
+# week (site_api_chapters.compose): published, held (a draft awaiting approval), skipped (with the
+# writer's reason) or pending (the week in progress). The door went 27 days on a Week-6 chapter
+# (approved 2026-10-18, the next approved 2026-11-14) while two drafts sat and a week went
+# unwritten, and nothing on the platform said so. A newest chapter older than this reds.
+CHAPTERS_PATH = "/api/chapters"
+DOOR_STALE_DAYS = 10
+WEEK_STATUSES = ("published", "held", "skipped", "pending")
 
 _WEEKDAYS = ("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
 
@@ -328,3 +338,76 @@ def check_story_season(
             f"every one of the {len(weeks)} published season week(s) has a Panel episode or a hold under {HOLD_ESCALATE_DAYS} days.{note}"
         )
     return out
+
+
+def door_findings(doc: dict, now: datetime) -> tuple[list[str], Optional[float], list[str]]:
+    """`(unexplained, age_days, open_weeks)` for the served /api/chapters document — pure.
+
+    * `unexplained` — an elapsed program week the route serves with no recognised status, or a
+      `skipped` week with no reason: the reader is told nothing about it.
+    * `age_days` — days since the newest published chapter went public (`published_at`, the owner's
+      approval instant; else its `date` at midnight UTC). None when no week has published yet.
+    * `open_weeks` — the held and skipped weeks, named, so a red says what is waiting and why.
+    """
+    unexplained: list[str] = []
+    open_weeks: list[str] = []
+    newest: Optional[datetime] = None
+    for w in doc.get("weeks") or []:
+        if not isinstance(w, dict):
+            continue
+        wk, status = w.get("week"), w.get("status")
+        if status not in WEEK_STATUSES:
+            unexplained.append(f"week {wk} served with status {status!r}")
+            continue
+        if status == "skipped":
+            reason = str(w.get("reason") or "").strip()
+            if not reason:
+                unexplained.append(f"week {wk} skipped with no reason")
+            else:
+                open_weeks.append(f"week {wk} skipped ({reason})")
+        elif status == "held":
+            open_weeks.append(f"week {wk} drafted {str(w.get('drafted_at') or '?')[:10]}, awaiting approval")
+        elif status == "published":
+            when = parse_iso_utc(w.get("published_at")) or parse_iso_utc(str(w.get("date") or "")[:10])
+            if when is not None and (newest is None or when > newest):
+                newest = when
+    age = None if newest is None else (now - newest).total_seconds() / 86400.0
+    return unexplained, age, open_weeks
+
+
+def check_chapter_door(
+    check_cls: Callable[..., Any],
+    partition: str,
+    pt_now: Callable[[], datetime],
+    *,
+    site_base_url: str,
+    budget: Any = None,
+) -> list:
+    """#5520: every elapsed program week is served with a state, and the door is never older than
+    DOOR_STALE_DAYS. Read over HTTP from /api/chapters exactly as the doors read it — the route is the
+    one producer of the per-week state, so this checks the served account, not a re-derivation."""
+    c = check_cls(DOOR_CHECK, "Data Freshness", partition)
+    now = pt_now().astimezone(timezone.utc)
+    fetched = budget.get(site_base_url.rstrip("/") + CHAPTERS_PATH) if budget is not None else None
+    doc = fetched.json() if fetched is not None and fetched.ok else None
+    if not isinstance(doc, dict) or not isinstance(doc.get("weeks"), list):
+        why = "no read budget was supplied" if fetched is None else (fetched.error or f"HTTP {fetched.status}, or not the chapters shape")
+        c.warn(f"{CHAPTERS_PATH} could not be read ({why}) — no verdict was reached on the Story door")
+        return [c]
+    if not doc["weeks"]:
+        c.warn(f"{CHAPTERS_PATH} served no program weeks (genesis {doc.get('genesis')!r}, as of {doc.get('as_of')!r}) — no verdict")
+        return [c]
+    unexplained, age, open_weeks = door_findings(doc, now)
+    note = f" Open: {'; '.join(open_weeks)}." if open_weeks else ""
+    parts = []
+    if unexplained:
+        parts.append(f"program week(s) the door serves with no state or no reason: {'; '.join(unexplained)}")
+    if age is None:
+        parts.append(f"no program week has a published chapter across {len(doc['weeks'])} served week(s)")
+    elif age > DOOR_STALE_DAYS:
+        parts.append(f"the newest published chapter is {age:.0f} days old (limit {DOOR_STALE_DAYS}) — the Story door has gone stale")
+    if parts:
+        c.fail(". ".join(parts) + "." + note + " Approve or retire the held draft, or check /aws/lambda/wednesday-chronicle.")
+    else:
+        c.ok(f"newest published chapter {age:.1f} days old (limit {DOOR_STALE_DAYS}); every elapsed week served with a state.{note}")
+    return [c]

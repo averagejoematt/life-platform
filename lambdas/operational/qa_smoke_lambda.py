@@ -1253,6 +1253,11 @@ def check_steps():
                 table, USER_PREFIX, Check, CONTENT_TRUTH, pt_now, site_base_url=SITE_BASE_URL, budget=census_budget()
             ),
         ),
+        # #5520: every elapsed program week is served with a state, and the newest chapter is under 10 days old
+        (
+            "chapter_door",
+            lambda: story_season_qa.check_chapter_door(Check, CONTENT_TRUTH, pt_now, site_base_url=SITE_BASE_URL, budget=census_budget()),
+        ),
         # #3485: the served journal manifest never carries a tombstoned / previous-cycle post
         (
             "chronicle_manifest_provenance",
