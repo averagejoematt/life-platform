@@ -581,6 +581,17 @@ def scan_schema_snapshots(snapshot_dir: str = _SNAPSHOT_DIR) -> dict:
     return {"violations": violations, "scanned_paths": scanned_paths, "files": files}
 
 
+# Routes that are deliberately DARK (built, flag-off, unlaunched): they answer 404 until the
+# launch flips, so a 404 here is the intended state, not an unscanned surface (#5976). ONLY a
+# 404 on a listed route is classified; a 200 is scanned like any other route, and any other
+# status (5xx, 403, timeout) on a dark route still reds. Remove the entry when the route
+# launches — a 404 on a launched route must red again.
+DARK_ROUTES = {
+    "/api/coach_brief": "Coaching Room CR1 brief — 404 while POL.PUBLICATION_LIVE is off (since 2026-11-09)",
+    "/api/coach_room_words": "Coaching Room CR2 historical words — 404 while dark (since 2026-11-09)",
+}
+
+
 def scan_endpoints(base_url: str, fetcher=None, sleep_seconds: float = 0.25) -> dict:
     """Live endpoint arm (QA/manual, GET-only, serial): fetch every derivable GET
     payload from `base_url` and run scan_endpoint_payload over the real values.
@@ -620,6 +631,9 @@ def scan_endpoints(base_url: str, fetcher=None, sleep_seconds: float = 0.25) -> 
         status, data, err = fetch(fetch_path)
         if fetcher is None and sleep_seconds:
             _time.sleep(sleep_seconds)
+        if status == 404 and path in DARK_ROUTES:
+            skipped[path] = f"dark route (404 expected): {DARK_ROUTES[path]}"
+            continue
         if err or status != 200 or data is None:
             violations.append((path, "endpoint-not-scanned", f"HTTP {status}: {err or 'non-200/empty'}"))
             continue
