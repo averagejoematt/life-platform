@@ -60,6 +60,7 @@ from web import (
     day_window,  # #5584 — the optional ?date= / ?from=&to= window on three read routes
     derived_summary_freshness as _cd_fresh,  # owner ruling 2026-11-03: a read a correction overtook is not current
     narrative_publication,  # owner ruling 2026-11-03: the narrative publication chokepoint
+    public_call_id,  # owner ruling 2026-11-14: opaque public call identity at the wire
 )
 from web.narrative_publication import servable as _np_servable, withheld_slot as _np_slot  # the dashboard's withheld slots
 from web.site_api_agents import handle_agent_activity
@@ -1333,4 +1334,7 @@ def lambda_handler(event, context):
 
     _emit_route_log(result.get("statusCode", 200))
     # The provenance gate (web.narrative_publication) is the policy; the #5131 scrub stays as defence in depth.
+    # owner ruling 2026-11-14: every call identity on the wire is its opaque public id, never its stored word-slug
+    # (web.public_call_id) — before the taint guard, so an id is never mistaken for withheld words again.
+    result = public_call_id.publicize_response(result)
     return guard_api_response(_in_cr2_scope(path, lambda: narrative_publication.annotate(result)), logger)

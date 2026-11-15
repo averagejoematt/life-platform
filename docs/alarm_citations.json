@@ -242,7 +242,8 @@
   "cause_observed": "2026-11-14",
   "updated": "2026-11-14",
   "citation": "#5928 — the 'no red without an owner' review epic owns this standing WARN until a narrower story is filed. RE-DERIVED 2026-11-14 from /aws/lambda/life-platform-qa-smoke (filter-log-events '\"[QA] CAUSE\"'): the 09:22Z run read `[QA] CAUSE warn 29659b98 reader_truth:verdict` — one Reader Truth low/med finding, `audience_violation` (med) on /now/: the rubric read the cockpit's second-person copy ('your read', 'your instinct against the board's') as addressing the owner outside the /coaching/ exception. The next run, 16:44Z, read `[QA] CAUSE warn none -`: the finding did not reproduce, so the alarm is lit on WarnCount's 24h count of the 09:22Z run alone and clears on or about 2026-11-15T09:30Z unless the verdict re-fires. No `cause` is declared because the live channel names none right now (a declared cause would read as contradicted); if `reader_truth:verdict` fires again, the undeclared-cause leg reds and this entry must be re-cited with it. The 2026-11-02 cause (`reader_truth:confirm,reader_truth:verdict` on the v9 Start portrait) is no longer the one firing; WarnCount is count-aggregated, so the episode that began 2026-11-01 spans both.",
-  "note": "Re-cited 2026-11-14 (#5934): the prior entry cited #2741 and #5596, both now closed, and a cause the live run no longer reports."
+  "note": "Re-cited 2026-11-14 (#5934): the prior entry cited #2741 and #5596, both now closed, and a cause the live run no longer reports.",
+  "cause": "reader_truth:confirm,reader_truth:verdict"
  },
  "field-notes-missing": {
   "added": "2026-10-25",
@@ -258,10 +259,9 @@
  },
  "qa-smoke-failures": {
   "added": "2026-10-27",
-  "cause": "reader_truth:verdict",
-  "cause_observed": "2026-11-02",
-  "updated": "2026-11-02",
-  "citation": "NEW EPISODE 2026-11-02: the 06:19Z nightly smoke reads `[QA] CAUSE fail 29659b98 reader_truth:verdict` — the Reader Truth rubric (CONTENT_TRUTH, never reverts a deploy) confirmed on a second pass a HIGH temporal_contradiction on the v9 Start portrait: the Mind tile's journal count and last-entry date (private, withheld per the owner ruling of 2026-11-05) read against the Connection tile 'The journal went quiet'. Owned by #5596 (Start is frozen until the owner's visual review, so filed, not fixed). The 10-29 data:hae_additive_integrity episode this entry used to cite aged out on 10-30."
+  "cause_observed": "2026-11-14",
+  "updated": "2026-11-14",
+  "citation": "#5939 — reader-facing coach-record figures that contradict their own data. NEW EPISODE 2026-11-14: one nightly-smoke FAIL at 19:32Z, `[QA] CAUSE fail 29659b98 reader_truth:verdict` — a HIGH temporal_contradiction on /api/coaches (a coach headline_stat's record window against its record object), the coach-record denominator class #5939 owns. Every later run reads `CAUSE fail none`; FailCount is a 24 h aggregate, so absent a repeat this self-clears about 2026-11-15T19:35Z. No `cause` field while the live channel reads none (a declared cause would read as contradicted)."
  },
  "ingest-reconciliation-whoop": {
   "added": "2026-10-26",
