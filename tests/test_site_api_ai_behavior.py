@@ -1367,6 +1367,46 @@ def test_a_pilot_phase_stance_never_reaches_a_board_answer(monkeypatch):
     assert ai._coach_stance_bits("sleep_coach") == ""
 
 
+def _board_user_turn_with_stance(ai, monkeypatch, headline):
+    """#5611 F1: the PUBLIC board prompt as the panel builds it, with only the stance read real."""
+    from web import site_api_board_panel as panel
+
+    tbl = FakeDdbTable(
+        store_items=[{"pk": "COACH#sleep_coach", "sk": "STANCE#latest", "headline_read": headline, "stage": {"label": "noticing"}}]
+    )
+    monkeypatch.setattr(ai, "table", tbl)
+    monkeypatch.setattr(ai, "_coach_memory_bits", lambda pid: "")
+    monkeypatch.setattr(ai, "_coach_recent_interactions", lambda pid: "")
+    monkeypatch.setattr(ai, "_phase_context_block", lambda: "PHASE: synthetic")
+    monkeypatch.setattr(ai, "_coach_system", lambda pid: "SYSTEM")
+    prepared, failed = panel._prepare(ai, ["sleep_coach"], "How is the plan going?", "FACTS")
+    assert not failed and len(prepared) == 1
+    return prepared[0][1]
+
+
+def test_a_stance_the_audience_guard_rejects_never_reaches_the_public_board_prompt(monkeypatch):
+    """#5611 F1 (owner ruling 2026-11-15, decision E): a coach's stance is private by default, so the
+    board reads it through `coach.audience_guard.reader_safe` and drops the WHOLE stance on a reject —
+    fail closed, never passed raw. Synthetic text only. The guard sees the full stored headline, not the
+    300-char prompt clip: an owner-directed clause past the clip is still caught."""
+    ai = _ai()
+    owner_directed = "Your evenings are the lever this week, and the plan bends around them."
+    late_address = ("The weekly pattern is steady and the plan is holding. " * 6) + "Keep going, you have it."
+    cycle_reference = "This attempt is going better than the last reset did."
+    for headline in (owner_directed, late_address, cycle_reference):
+        turn = _board_user_turn_with_stance(ai, monkeypatch, headline)
+        assert headline[:60] not in turn, f"a guard-rejected stance reached the public board prompt: {headline[:60]!r}"
+        assert "YOUR CURRENT READ" not in turn, "a rejected headline must drop the whole stance, stage label included"
+
+
+def test_a_reader_safe_stance_still_reaches_the_public_board_prompt(monkeypatch):
+    """#5611 F1 positive control: the read-side guard passes third-person prose through unchanged."""
+    ai = _ai()
+    turn = _board_user_turn_with_stance(ai, monkeypatch, "Evenings are the lever this week; the plan bends around them.")
+    assert "YOUR CURRENT READ (your own published stance): Evenings are the lever this week; the plan bends around them." in turn
+    assert "(stage: noticing)" in turn
+
+
 def test_a_coachs_compressed_memory_and_concerns_reach_the_board_prompt(monkeypatch):
     ai = _ai()
     tbl = FakeDdbTable(
