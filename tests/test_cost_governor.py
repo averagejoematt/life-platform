@@ -909,3 +909,52 @@ def test_surge_baseline_read_failure_is_empty(gov, monkeypatch):
     # …and the empty series degrades to the documented floor, with the reason stated.
     threshold, rule = gov.surge_threshold_from_baseline([])
     assert threshold == gov.SURGE_UNIQUES_THRESHOLD and "floor" in rule
+
+
+# ── #5821 (owner ruling 2026-11-15): a tier change below the hard cutoff is a digest line ──
+# Only the ADR-125 tier-3 hard stop still emails on the alerts topic; tiers 1-2 and every
+# step down to a tier below 3 become one line in the daily LP digest (common.ops_digest).
+
+
+class _FailingDigestSNS(_FakeSNS):
+    """The governor role before its DigestLine grant deploys: the digest publish is denied."""
+
+    def publish(self, **kwargs):
+        if kwargs.get("TopicArn", "").endswith(":life-platform-alerts-digest"):
+            raise RuntimeError("AuthorizationError: not authorized to perform sns:Publish")
+        self.calls.append(kwargs)
+
+
+def _topics(fake):
+    return [c["TopicArn"].rsplit(":", 1)[1] for c in fake.calls]
+
+
+def test_a_non_cutoff_tier_change_is_a_digest_line_not_an_email(gov, monkeypatch):
+    """THE control: 0→1, 1→2 and 3→2 publish ONE digest line and nothing to the alerts topic."""
+    import json as _json
+
+    for prev, new in ((0, 1), (1, 2), (3, 2), (1, 0)):
+        fake = _FakeSNS()
+        monkeypatch.setattr(gov, "_sns", fake)
+        gov._alert(prev, new, mtd=150.0, projected=190.0, ceiling=215.0)
+        assert _topics(fake) == ["life-platform-alerts-digest"], f"{prev}→{new} reached {_topics(fake)}"
+        line = _json.loads(fake.calls[0]["Message"])
+        assert line["AlarmName"] == f"budget-tier: {'raised' if new > prev else 'lowered'} {prev}→{new}"
+        assert gov._TIER_LABELS[new] in line["NewStateReason"] and "$215" in line["NewStateReason"]
+
+
+def test_the_tier_3_hard_cutoff_still_emails_at_once(gov, monkeypatch):
+    """The urgent case: entering tier 3 (brief data-only, AI CI gates paused) mails immediately."""
+    for prev in (0, 1, 2):
+        fake = _FakeSNS()
+        monkeypatch.setattr(gov, "_sns", fake)
+        gov._alert(prev, 3, mtd=210.0, projected=240.0, ceiling=215.0)
+        assert _topics(fake) == ["life-platform-alerts"], f"{prev}→3 must page the alerts topic, got {_topics(fake)}"
+        assert "🛑" in fake.calls[0]["Subject"]
+
+
+def test_a_failed_digest_publish_falls_back_to_the_alerts_email(gov, monkeypatch):
+    fake = _FailingDigestSNS()
+    monkeypatch.setattr(gov, "_sns", fake)
+    gov._alert(0, 1, mtd=50.0, projected=180.0, ceiling=215.0)
+    assert _topics(fake) == ["life-platform-alerts"], "a denied digest publish lost the tier change"

@@ -449,6 +449,14 @@ def operational_cost_governor() -> list[iam.PolicyStatement]:
             actions=["sns:Publish"],
             resources=[f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"],
         ),
+        # #5821: a tier change below the tier-3 hard cutoff is one line in the daily LP digest
+        # (common.ops_digest). Fail-soft in the lambda — without this grant the publish fails and
+        # the change is emailed on the alerts topic exactly as before.
+        iam.PolicyStatement(
+            sid="DigestLine",
+            actions=["sns:Publish"],
+            resources=[f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"],
+        ),
     ]
 
 
@@ -683,6 +691,14 @@ def operational_qa_smoke() -> list[iam.PolicyStatement]:
             sid="S3WriteClosureProbeAudit",
             actions=["s3:PutObject"],
             resources=_s3("remediation-log/closure-probe/*"),
+        ),
+        # #5821: a run whose failures are all content_truth is one line in the daily LP digest
+        # (common.ops_digest), not an email. Fail-soft in the lambda — without this grant the
+        # publish fails and the failure email goes out exactly as before.
+        iam.PolicyStatement(
+            sid="DigestLine",
+            actions=["sns:Publish"],
+            resources=[f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"],
         ),
     ]
 
