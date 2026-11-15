@@ -211,12 +211,25 @@ own controls and reports whether they fired:
   and deployed with the issue left open, so there was nothing to find. For each one, reproduce it
   in the graded tree or on the live surface and write the command and its result into
   `by_lens.<lens>.verified_live`. An issue that does not reproduce is not withheld — close-check
-  it instead.
+  it instead. Keep the plan (the `by_lens` block the artifact will carry) in a scratch file and
+  run `python3 scripts/review_carry_forward.py --check-controls <plan.json>` before launch: it
+  refuses a control with no `verified_live`, one owned by two lenses, and one a committed
+  calibration block already names.
 - **Keep the control blind.** A grader is given the prior run's **path-to-A list** for its lens,
   never the prior run's entry for its lens: that entry describes the findings filed from it, and
   an issue filed from the last review is exactly what gets withheld from this one (2026-11-13: the
   only withheld issue a grader "found" was one its own prior entry described). Do not put the
-  withheld issue's number, title or file in any brief.
+  withheld issue's number, title or file in any brief. Produce that list with
+  `python3 scripts/review_carry_forward.py --grader-context <lens> --plan <plan.json>` — it
+  prints the lens's path-to-A steps and drops any that name a planned control — and read it
+  before it goes out: a step can describe a control without naming it. Never hand a grader the
+  path of a prior grades JSON or report, and tell it not to read `docs/reviews/`.
+- **A control is spent once an artifact names it.** The committed calibration block is public
+  and permanent, so an issue it names can never be withheld blind again (`--check-controls`
+  refuses it). Record a control a grader MISSED under an opaque label (`W1`, `W2`), with its
+  class and the `verified_live` evidence at class level; keep the label-to-issue mapping in the
+  private run notes. The scorer compares labels, not issue numbers, so the artifact scores the
+  same and the issue stays usable. A control that was found is filed work and may be named.
 - **A row that carries a withheld issue may run on the stronger grader.** Recall, not precision,
   is the weak leg under Sonnet graders (two runs: 0 of 4, then 0 of 1 blind and still live). This
   is the one sanctioned exception to "panelists run on Sonnet"; record the model per row.
@@ -237,7 +250,8 @@ own controls and reports whether they fired:
   one grader's recall in one area: the run is PARTIALLY_CALIBRATED, it resets the ritual clock,
   and `scripts/review_carry_forward.py::scratch_dates` holds back only the rows that missed — the
   boot brief keeps printing them as expired until a run re-grades them. A run in which every
-  graded row missed is UNCALIBRATED.
+  graded row missed is UNCALIBRATED. A `_partial` artifact re-grades the rows it names and
+  retires none: the sweep reads the newest whole run and every partial after it together.
 - **An UNCALIBRATED run does not reset the calendar clock.** `scripts/operating_calendar.py`
   reads that block (`calibrated_run`) and skips the artifact, so the lens still counts down
   toward DUE. A run whose instruments were asleep is not evidence that the ritual happened —
