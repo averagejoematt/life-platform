@@ -667,9 +667,11 @@ cues}` — every "not for you now" carries its reason and its unlock condition.
   chain's entry step (`chain_dead_hang`, platform-proposed 2026-11-14, pending his ruling); the six owner-set bodyweight
   values stay null, so those gates stay locked. Each carries the readiness standard the owner accepted as the criteria
   (`readiness_standard`), stated and not yet evaluated.
-- **KB swing (owner ruling 2026-11-11):** `chain_kb_swing` opens on exactly 2 logged KB-deadlift sessions. The kettlebell
-  deadlift has no Hevy template of its own yet (fix round 13), so the gate waits on that template; a path that does not
-  depend on the kettlebell deadlift is with the owner as a proposal. The swing stays locked.
+- **KB swing (owner rulings 2026-11-14; fix round 14):** `chain_kb_swing` is measured on a lift the engine serves every
+  week — the barbell deadlift at 3 x 5 or more at RPE <= 8 in 3 sessions across 2 weeks, no pain flag in 28 days (hinge
+  strength and control) — and every swing template also carries `owner_confirmation_skill` (the technique is his word: it
+  is a hinge, the hips throw the bell, no breath-hold). The old entry (2 KB-deadlift sessions, 2026-11-11) waited on a
+  movement nothing serves. The swing stays locked until both are met; practitioner heuristic, no citation.
 - **Chain order:** a chain gate opens only when each prerequisite met its standard AND that prerequisite's own chain
   gates are open.
 - **A clinical cue never locks** and is never an intensity gate; it rides the movement's `cues`.

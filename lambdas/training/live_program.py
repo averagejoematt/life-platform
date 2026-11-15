@@ -246,7 +246,9 @@ def apply_joint_rule(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str
     taken = {str(e.get("movement_key")) for e in rx["exposures"]}
     for e in rx["exposures"]:
         entry = _entry(e.get("movement_key"), ctx)
-        hit = live_pain.hit(entry, e, flags, ctx) if entry and e.get("intensity") != "carry" else None  # FIX7: scoped
+        hit = live_pain.hit(entry, e, flags, ctx) if entry else None  # FIX7: scoped
+        if hit and e.get("intensity") == "carry":  # fix round 14 (B11/B15): a carry loading the flagged joint is held, never routed
+            hit = ("hold", hit[1], hit[2])
         swap_of = _avoided_swap(e, ctx, flags)
         if swap_of:
             lines.append(f"skipped (live): {entry.get('title') or e.get('movement_key')} — {swap_of}: the flagged pattern is off today")
@@ -534,8 +536,14 @@ def annotate(blocks: list[Any], rx: dict[str, Any]) -> None:
             b.notes = _cap_effort(b.notes or "", int(cap or 0), clause, line)
         elif clause:
             b.notes = session_block.add_reason(b.notes, clause)
+        b.notes = live_load.start_line(b.notes or "", e.get("live_start")) if not loaded else b.notes  # fix round 14 (B9)
         b.notes = live_balance.assess_note(live_balance.one_effort(b.notes), str(e.get("live_assess") or ""))
-        b.notes = live_balance.assess_note(b.notes, str(e.get("live_stop") or ""))  # the in-set stop line under a pain flag
+        stop = str(e.get("live_stop") or "")
+        if stop and e.get("intensity") == "carry":  # fix round 14: a held carry's stop line takes its posture cue's place (budget)
+            from training import hevy_note_grammar as g
+
+            b.notes = "\n".join(stop if ln == g.CARRY_CUE else ln for ln in (b.notes or "").split("\n"))
+        b.notes = live_balance.assess_note(b.notes, stop)  # the in-set stop line under a pain flag
     from training import live_safety
 
     rx[ls.MARK].setdefault("lines", []).extend(live_safety.no_step(blocks, rx))

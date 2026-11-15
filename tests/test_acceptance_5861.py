@@ -76,9 +76,14 @@ ROLE_SETS = {
 def weeks() -> dict[str, dict]:
     """Every profile's week, drafted live, with its world and measures (computed once)."""
     out = {}
+    real = live_volume.week_plan
     for name, prof in PROFILES.items():
+        plans: list = []
         world = sw.build_world(prof, "approved")
-        week = sw.generate_week(prof, "approved", world)
+        # fix round 14 (B23): the tests read the plan the mornings were drafted from, not a second plan of their own
+        with patch.object(live_volume, "week_plan", lambda *a, **k: plans.append(real(*a, **k)) or plans[-1]):
+            week = sw.generate_week(prof, "approved", world)
+        world["_plan"] = plans[0] if plans else None
         out[name] = {"world": world, "week": week, "m": sw.measure(week, world["lib"], world["catalog"]["movements"], LANDMARKS)}
     return out
 
@@ -747,7 +752,16 @@ def accessory_sets(week: dict, lib: dict, catalog: dict) -> dict:
 
 def test_d1_weekly_sets_per_muscle_sit_inside_the_volume_landmarks(weeks):
     for name in ("a_large_deficit_experienced", "c_equipment_limited"):  # full weeks, nothing trimmed for recovery
-        assert landmark_problems(weeks[name]["m"]) == [], name
+        w = weeks[name]
+        problems = landmark_problems(w["m"])
+        # fix round 14 (owner rule, B9): a normal week meets at most ONE movement new to him per muscle. When the week's only
+        # ab movement is new to him, the abs may sit under MEV rather than meet a second new movement — said here, by name
+        logged = {str(x.get("template_id") or "").upper() for wk in w["world"]["record"] for x in wk["exercises"]}
+        cat, lib = w["world"]["catalog"]["movements"], w["world"]["lib"]
+        ab = [x["key"] for x in _lifts(w["week"]) if live_volume.landmark_muscle(x["key"], cat, lib) == "abs"]
+        if ab and all(str(live_volume.lib_entry(k, cat, lib).get("template_id") or "").upper() not in logged for k in ab):
+            problems = [p for p in problems if not p.startswith("abs ")]
+        assert problems == [], name
     for name, w in weeks.items():  # the DISTRIBUTION: no muscle over MAV while a priority muscle sits at or under MEV + 1
         lib, cat = w["world"]["lib"], w["world"]["catalog"]["movements"]
         assert misallocated(w["m"], movable=accessory_sets(w["week"], lib, cat)) == [], name
@@ -1065,14 +1079,18 @@ def filled(week: dict, lib: dict, catalog: dict, world: dict | None = None) -> l
         rec = world.get("record") or []
         seen["logged"] = frozenset(str(x.get("template_id") or "").upper() for wk in rec for x in wk["exercises"])
         seen["in_block"] = in_block_variant.performed_in_block(rec, catalog, day)
-    plan = live_volume.week_plan(catalog, lib, mornings, last=last, overlay=(world or {}).get("overlay"), **seen)
+    plan = (world or {}).get("_plan") or live_volume.week_plan(
+        catalog, lib, mornings, last=last, overlay=(world or {}).get("overlay"), **seen
+    )
     for s in week["sessions"]:
         rat = _all(s)
         expected = sum(1 for r in plan["rows"] if r["role"] == s["role"])
         expected -= sum(1 for ln in rat if ln.startswith(("skipped (live)", "dropped (live)", "not added (live)", "not served (live)")))
         expected -= sum(ln.count(" dropped") for ln in rat if ln.startswith("time (live)"))
         expected += sum(1 for ln in rat if ln.startswith("added (live)") and ln.endswith("free minutes"))
-        if len(s["lifts"]) != expected:
+        reduced = (s.get("fatigue") or {}).get("action") in ("reduce", "deload_recommended")  # fix round 14: the plan the mornings
+        # used (`world["_plan"]`) is the full week's; a reduce/deload morning's reducer may take a whole accessory — never ADD one
+        if len(s["lifts"]) > expected or (len(s["lifts"]) < expected and not reduced):
             out.append(f"{s['role']}: {len(s['lifts'])} exercises, expected {expected} (the plan's rows less skips and time drops)")
         for ln in rat:
             if not ln.startswith("added (live): "):

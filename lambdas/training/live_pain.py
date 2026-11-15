@@ -45,6 +45,8 @@ def scope(flag: dict[str, Any], light: set[str], tid: str) -> str:
     sev = flag.get("severity")
     if flag.get("source") == "discomfort" and (tid in light or sev is None or float(sev) <= float(_rule("lift_only_max"))):
         return "lift"
+    if sev is not None and float(sev) <= float(_rule("lift_only_max")) and not flag.get("sharp"):
+        return "lift"  # fix round 14 (B16): a stated low score touches only the flagged lift, whatever the note's class
     return "joint"
 
 

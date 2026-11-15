@@ -229,8 +229,10 @@ def test_consecutive_short_weeks_rotate_the_free_slots_in_the_served_weeks():
         weeks = _short_run(days)
         for m in ("calves", "side_delts"):
             assert any(w.get(m, 0) > 0 for w in weeks), (days, m, weeks)
-        if days == 2:
-            assert len({json.dumps(w, sort_keys=True) for w in weeks}) > 1
+        if days == 2:  # fix round 14: the fit no longer reserves dose minutes on a 2-morning week (no dose is served there), so
+            # calves and side delts fit EVERY week; then identical weeks are correct — the rotation is for minutes that run short
+            every = all(w.get("calves", 0) > 0 and w.get("side_delts", 0) > 0 for w in weeks)
+            assert every or len({json.dumps(w, sort_keys=True) for w in weeks}) > 1, weeks
     same = _short_run(2, patches={(live_volume, "last_trained"): lambda *a: {}})
     assert len({json.dumps(w, sort_keys=True) for w in same}) == 1
 

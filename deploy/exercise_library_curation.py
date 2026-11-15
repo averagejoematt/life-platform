@@ -515,13 +515,19 @@ GATES: dict[str, dict] = {
         params={"sets": 3, "reps_min": 10, "sessions_min": 2},
     ),
     # kettlebell chain
-    # owner ruling 2026-11-11 (#5810): the kettlebell slot is the SWING, entered via 2 exposures of the KB deadlift — exactly
-    # "kettlebell deadlift logged in 2 sessions", not the generic 3-sessions/2-weeks standard (the other KB steps keep it).
+    # Fix round 14 (H4; the owner's 2026-11-14 library rulings, item 4, and his approval of the readiness standards as written):
+    # the swing's entry was "kettlebell deadlift logged in 2 sessions" (owner ruling 2026-11-11, #5810) — a movement the engine
+    # no longer serves, so the gate waited on a lift nobody prescribes. It is now the readiness proposal's measurable standard on
+    # a lift served every week: the barbell deadlift (hinge strength and control), PLUS the owner's one-time technique
+    # confirmation (`owner_confirmation_skill`, carried by every swing template). The swing stays LOCKED until both are met;
+    # nothing unlocks from this change. Practitioner heuristic, no citation.
     "chain_kb_swing": _chain(
-        ["key:kettlebell_deadlift"],
-        "kettlebell deadlift logged in 2 sessions (owner ruling 2026-11-11: the kettlebell slot is the swing, entered via 2 KB deadlift exposures)",
-        provenance="owner ruling 2026-11-11 (#5810)",
-        params={"sessions_min": 2},
+        ["tid:C6272009"],
+        "barbell deadlift logged at 3 x 5 or more at RPE <= 8 in at least 3 sessions across at least 2 weeks, with no pain flag on "
+        "it in the last 28 days (hinge strength and control), AND the swing technique owner-confirmed (owner_confirmation_skill)",
+        provenance="owner ruling 2026-11-14 (readiness standards approved as written; #5861 fix round 14) — replaces the "
+        "2-kettlebell-deadlift entry of 2026-11-11 (#5810)",
+        params={"sets": 3, "reps_min": 5, "rpe_max": 8, "prerequisite_sessions_min": 3, "span_weeks_min": 2, "flag_free_days": 28},
     ),
     "chain_kb_clean": _chain(["tid:F8A0FCCA"], "kettlebell swing " + _STD_3x),
     "chain_kb_overhead": _chain(["tid:F99C211D"], "kettlebell clean " + _STD_3x + ", rack position owner-confirmed"),
@@ -1112,8 +1118,8 @@ CURATED: dict[str, dict] = {
     "1211F57C-AB54-4489-9DAF-514337DECEDE": {"gates": ["bw_hanging", "chain_dead_hang"]},
     # fix round 13: the kettlebell swing's two other logged forms are the same ballistic hinge — they carry its chain step, so
     # a locked swing is never served under another name (owner ruling: the swing is never auto-unlocked)
-    "2CFA90EB-D60C-4AE1-BAD9-FB242EC4BFB1": {"gates": ["chain_kb_swing"]},
-    "D8EECEDA-FF22-42BC-8023-44E4F05B9CF5": {"gates": ["chain_kb_swing"]},
+    "2CFA90EB-D60C-4AE1-BAD9-FB242EC4BFB1": {"gates": ["chain_kb_swing", "owner_confirmation_skill"]},
+    "D8EECEDA-FF22-42BC-8023-44E4F05B9CF5": {"gates": ["chain_kb_swing", "owner_confirmation_skill"]},
 }
 
 # ── expansion candidates (#5769 owner spec) ─────────────────────────────────────────────────────────────────────────
@@ -1159,7 +1165,7 @@ EXPANSION: list[dict] = [
         family="carry_conditioning",
         skill_complexity="moderate",
         equipment=_KB,
-        gates=["chain_kb_swing"],
+        gates=["chain_kb_swing", "owner_confirmation_skill"],  # fix round 14: the technique is his word (the platform cannot see form)
     ),
     _x(
         "kettlebell_goblet_squat",

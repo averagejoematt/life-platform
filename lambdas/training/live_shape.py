@@ -74,7 +74,7 @@ def deadlift_shape(rx: dict[str, Any]) -> list[str]:
     if rx.get("session_role") != "lower_heavy":
         return []
     for e in rx["exposures"]:
-        if e.get("kind") != "anchor" or e.get("pattern") != "hinge" or e.get("intensity") != "heavy":
+        if not heavy_pull(str(rx.get("session_role")), e):
             continue
         backs = [i for i, s in enumerate(e.get("sets") or []) if s.get("kind") == "back_off"]
         if len(backs) <= 1:
@@ -83,6 +83,21 @@ def deadlift_shape(rx: dict[str, Any]) -> list[str]:
             e["sets"].pop(i)
         return ["deadlift (live option): top set + one back-off (heavy_day_deadlift_shape=top_plus_backoff); the pairing stays (#5694)"]
     return []
+
+
+def heavy_pull(role: str, e: dict[str, Any]) -> bool:
+    """The exposure `deadlift_shape` shapes: the heavy-day hinge anchor on the lower-heavy morning."""
+    return role == "lower_heavy" and e.get("kind") == "anchor" and e.get("pattern") == "hinge" and e.get("intensity") == "heavy"
+
+
+def served_sets(role: str, e: dict[str, Any]) -> int:
+    """The working sets `role`'s exposure `e` is SERVED with (fix round 14: the weekly plan counted the heavy deadlift at its
+    template's 3 sets while the morning serves 2): the heavy pull's top set(s) + one back-off, every other exposure its sets."""
+    sets = [s for s in e.get("sets") or [] if isinstance(s, dict)]
+    if not heavy_pull(role, e):
+        return len(e.get("sets") or [])
+    backs = sum(1 for s in sets if s.get("kind") == "back_off")
+    return len(sets) - backs + min(1, backs)
 
 
 # ── 4. the aerobic gap ───────────────────────────────────────────────────────

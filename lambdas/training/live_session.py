@@ -282,7 +282,15 @@ def for_live_draft(
         )
         ctx["no_new"] = fatigue_model.strained_inputs(inputs, block_workouts, lib)  # a high-fatigue day adds nothing new
         plan = live_volume.week_plan(
-            catalog, lib, mornings, last=last, overlay=ctx["overlay"], logged=ctx["logged_tids"], in_block=ctx["in_block"]
+            catalog,
+            lib,
+            mornings,
+            last=last,
+            overlay=ctx["overlay"],
+            logged=ctx["logged_tids"],
+            in_block=ctx["in_block"],
+            variants=(rotation or {}).get("week_variants"),  # fix round 14: the plan counts the accessories the week serves
+            set_cap=set_cap,
         )
         ctx["volume_plan"] = plan
         role_rows = [r for r in plan["rows"] if r["role"] == rx.get("session_role")]
@@ -291,6 +299,7 @@ def for_live_draft(
         if rx.get("session_role") == plan["week"]["roles"][0]:  # once a week, on its first morning
             lines += [str(plan["priority_line"])] if plan.get("priority_line") else []
             lines += [f"moved (live): {ln[len('moved: ') :]}" for ln in plan["lines"] if ln.startswith("moved: ")]
+            lines += [f"abs (live): {ln[len('abs: ') :]}" for ln in plan["lines"] if ln.startswith("abs: ")]
         lines += live_volume.apply(out, ctx, plan)
         lines += fit_exposures(out, rotation or {}, ctx) + _no_new_on_a_strained_day(out, rotation or {}, ctx)
         live_load.mark_novelty(out, ctx, block_workouts)
@@ -298,7 +307,7 @@ def for_live_draft(
         lines += _reps_follow_the_movement(out, ctx) + live_volume.pair_anchors(out, plan)
         tids = {live_load.tid_of(e.get("movement_key"), catalog, lib, ctx["idx"]) for e in out["exposures"]}
         anchors = _anchor_tids(catalog)
-        hist = live_load.history(block_workouts, (tids | anchors) - {""})
+        hist = live_load.history(block_workouts, (tids | anchors) - {""}, _anchor_roles(catalog, ctx.get("in_block")))
         slump = live_load.slump(hist, anchors, fatigue_model.in_deficit(getattr(inputs, "weights_by_day", None)), target)
         if slump:
             hold_all = "slump week"
@@ -430,6 +439,20 @@ def _anchor_tids(catalog: dict[str, Any]) -> set[str]:
     return out - {""}
 
 
+def _anchor_roles(catalog: dict[str, Any], in_block: Any = None) -> dict[str, set[str]]:
+    """Template id -> the roles whose template serves it as an anchor (this block's variants): an untitled workout's role is read
+    from it (`live_load.content_role`)."""
+    from training import program_structure as ps
+
+    out: dict[str, set[str]] = {}
+    for role in ps.SPLIT_ROLES:
+        for e in ps.session_prescription_for_role(role, catalog_movements=catalog, in_block=in_block)["exposures"]:
+            tid = str((catalog.get(str(e.get("movement_key"))) or {}).get("hevy_template_id_hint") or "").upper()
+            if e.get("kind") == "anchor" and tid:
+                out.setdefault(tid, set()).add(str(role))
+    return out
+
+
 def _week_ctx(week: dict[str, Any] | None, inputs: Any) -> dict[str, Any]:
     """The week plan's context keys: `short_week_host`, `week_skip` (the roles this week does not draft), `partner` (this
     session's full-body partners) and `week_mode`."""
@@ -524,6 +547,13 @@ def fit_routine(blocks: list[Any], rx: dict[str, Any], cap: int, movements: dict
         shape = program_structure.enforce_session_shape(blocks, movements) | {
             "working_sets": sum(warmup_sets.working_set_count(b.sets) for b in blocks)
         }
+    # fix round 14 (the owner's duration requirement): the prescription carries the minutes the 75-minute fit enforced — ONE
+    # model, the routine as written (warm-ups included) — never the pre-routine estimate its exposures were drafted with
+    rx["session_minutes"] = dict(rx.get("session_minutes") or {}) | {
+        "lifting_minutes": shape["lifting_minutes"],
+        "within_cap": shape["lifting_minutes"] <= cap,
+        "basis": "the routine as written, warm-ups included (session_shape.routine_minutes, the 75-minute fit's model)",
+    }
     rx[MARK]["summary"] = summary(blocks, rx, movements)
     rx[MARK]["contradictions"] = contradictions(blocks, rx)
     return shape
@@ -543,6 +573,8 @@ def _dose_reserve(rx: dict[str, Any]) -> int:
     ):
         return 0
     if fat.get("state") in ("strained", "overreached") or fat.get("action") == "deload_recommended" or fat.get("strain_signals"):
+        return 0
+    if len((rx.get(MARK) or {}).get("week_skip") or ()) >= 3:  # fix round 14: a 1-2 morning week reserves none (as the plan)
         return 0
     return int(live_volume.reserve_minutes())
 
@@ -691,7 +723,7 @@ def rationale_lines(rx: dict[str, Any]) -> list[str]:
     out += [
         ln
         for ln in rx[MARK].get("lines") or []
-        if ln.startswith(("evidence (live): ", "loss rate (advisory", "priority (live): ", "moved (live): "))
+        if ln.startswith(("evidence (live): ", "loss rate (advisory", "priority (live): ", "moved (live): ", "abs (live): "))
     ]
     fat = rx.get("fatigue") or {}
     if fat:

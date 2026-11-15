@@ -371,7 +371,8 @@ def test_the_heavy_day_deadlift_is_a_top_set_and_one_back_off(weeks):
 
     ruled, keys = dl(weeks[("a_large_deficit_experienced", False)]["week"])
     assert ruled["working_sets"] == 2 and "squat_barbell" in keys  # the pairing stays (#5694)
-    old, _keys2 = dl(_week("a_large_deficit_experienced", {(lshape, "deadlift_shape"): lambda rx: []})["week"])
+    off = {(lshape, "deadlift_shape"): lambda rx: [], (lshape, "served_sets"): lambda role, e: len(e.get("sets") or [])}
+    old, _keys2 = dl(_week("a_large_deficit_experienced", off)["week"])  # fix round 14: the plan counts the shape too
     assert old["working_sets"] == 3
 
 

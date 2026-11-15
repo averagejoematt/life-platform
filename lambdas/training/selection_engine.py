@@ -834,6 +834,11 @@ def select_week(
         else:
             p = select_slot(slot, ctx, recent, taken)
             full[slot["slot_id"]] = _pool_ranked(candidates(ctx)[0], recent, ctx["slot_last"])
+            rot = (p.get("pick") or {}).get("rotation") or {}
+            if rot.get("trigger") == "pain":  # fix round 14 (B15): the later passes keep the pain route's joint rule too
+                full[slot["slot_id"]] = (
+                    live.no_worse_for_pain(full[slot["slot_id"]], str(rot.get("previous")), ctx) or full[slot["slot_id"]]
+                )
         if p.get("pick") and p["pick"].get("catalog_key"):
             taken.add(p["pick"]["catalog_key"])
             live.count_pick(p, policy, ctx)  # #5861 L3: live only (no policy = no-op)
@@ -942,6 +947,7 @@ def _live(
     return rotation | {
         "variants": by_role.get(role, rotation.get("variants") or {}),
         "variants_by_role": by_role,
+        "week_variants": live.week_variants(by_role, sel, role, gated),
         "slots": slots,
         "ledger_writes": [],  # fix round 12 (rollback): a live draft's picks are their own list, never read by the proposed path
         "live_ledger_writes": writes,

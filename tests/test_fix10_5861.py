@@ -185,10 +185,16 @@ def test_same_role_prefers_the_newest_rows_and_never_leaks_heavy_rows_into_the_v
     Control: the old rule (titled rows only, band floor - 2) -> the stale titled row and the leaked heavy row."""
     row = lambda d, role, reps, kg=100.0: {"date": d, "role": role, "sets": [{"kg": kg, "reps": reps, "rpe": 8.0}]}  # noqa: E731
     rows = [row("2026-11-10", "", 9), row("2026-11-03", "lower_volume", 8), row("2026-10-27", "", 6, 120.0)]
+    # fix round 14 (B2): an untitled row takes its role from its CONTENT (`live_load.content_role`, in `history`) — the band
+    # test let a heavy day read the volume day's set; a row still role-less is no named role's reference
     got = live_load.same_role(rows, "lower_volume", "2026-11-14", 8, 12)
-    assert [r["date"] for r in got] == ["2026-11-10", "2026-11-03"]  # the new untitled row first; the heavy 6-rep row out
-    heavy = live_load.same_role(rows, "lower_heavy", "2026-11-14", 4, 6)
-    assert [r["date"] for r in heavy] == ["2026-10-27"]
+    assert [r["date"] for r in got] == ["2026-11-03"]
+    assert live_load.same_role(rows, "lower_heavy", "2026-11-14", 4, 6) == []
+    typed = [rows[0] | {"role": "lower_volume"}, rows[1], rows[2] | {"role": "lower_heavy"}]  # what content assigns them
+    assert [r["date"] for r in live_load.same_role(typed, "lower_volume", "2026-11-14", 8, 12)] == ["2026-11-10", "2026-11-03"]
+    assert [r["date"] for r in live_load.same_role(typed, "lower_heavy", "2026-11-14", 4, 6)] == ["2026-10-27"]
+    any_role = live_load.same_role(rows, "", "2026-11-14", 8, 12)  # the any-role read keeps the band (the heavy row out)
+    assert [r["date"] for r in any_role] == ["2026-11-10"]
 
     def old(rows, role, target_date, lo, hi):  # control: fix round 9's rule
         same = [r for r in rows if role and r["role"] == role]

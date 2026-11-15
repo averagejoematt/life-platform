@@ -288,7 +288,10 @@ def test_named_gate_chains():
     assert {"bw_pull", "chain_pull"} <= set(MV["pull_up"]["gates"])
     assert g["chain_pull"]["chain_prerequisites"] == ["pull_up_negative"]
     assert g["chain_pull_negative"]["chain_prerequisites"] == [TIDS["2C37EC5E"]]  # assisted pull-up
-    assert "chain_kb_swing" in MV["kettlebell_swing"]["gates"] and g["chain_kb_swing"]["chain_prerequisites"] == ["kettlebell_deadlift"]
+    # fix round 14 (H4): the swing is measured on the barbell deadlift the engine serves weekly, plus his technique confirmation
+    assert "chain_kb_swing" in MV["kettlebell_swing"]["gates"] and g["chain_kb_swing"]["chain_prerequisites"] == ["deadlift_barbell"]
+    for k in ("kettlebell_swing", "swing", "double_swings"):
+        assert {"chain_kb_swing", "owner_confirmation_skill"} <= set(MV[k]["gates"]), k
     assert g["chain_kb_clean"]["chain_prerequisites"] == ["kettlebell_swing"]
     assert g["chain_hang_high_pull"]["chain_prerequisites"] == ["tall_high_pull"]
     assert g["chain_hang_power_clean"]["chain_prerequisites"] == ["barbell_high_pulls"]  # fix round 13: the real hang high pull
