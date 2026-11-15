@@ -20,7 +20,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from coach import audience_guard
-from reading import reading_constellation, reading_store, reading_visibility as rv
+from reading import horizons_publication, reading_constellation, reading_store, reading_visibility as rv
 
 from web.site_api_common import PT, _ok
 
@@ -106,8 +106,27 @@ def handle_constellation():
 _HORIZONS_LIMIT = 52  # ~a year of weekly picks; the feed is a highlight rail, not an archive
 
 
-def _public_horizon_card(pick: dict) -> dict:
+def _iso_week(d) -> str:
+    year, week, _ = d.isocalendar()
+    return f"{year}-W{week:02d}"
+
+
+def _retrospective_window_open(week, today=None) -> bool:
+    """True while a pick's retrospective can still be expected: the pick is from this ISO week or the
+    one before (Pacific). The page promises the retrospective "a week later"; past that window an
+    absent one is not coming on schedule, and a card must not go on promising it (#5947)."""
+    today = today or datetime.now(PT).date()
+    return str(week or "") >= _iso_week(today - timedelta(days=7))
+
+
+def _public_horizon_card(pick: dict) -> dict | None:
     """A public Horizons card — an EXPLICIT allowlist projection (fail-closed).
+
+    #5947 — every coach-written string is public by POSITIVE stamp, never by default
+    (``reading.horizons_publication``): the pitch is served only when the row carries
+    ``pitchStatus == "published"`` AND still clears today's screen, so a pick curated before the
+    stamp existed serves no pitch. A published retrospective is re-screened the same way. A card
+    whose title or source carries a positive finding is not served at all (None).
 
     Only the reader-safe pick facts + the coach's retrospective (ONLY when the #1673
     gate cleared it, i.e. retrospectiveStatus == "published") leave this module. Any
@@ -122,23 +141,28 @@ def _public_horizon_card(pick: dict) -> dict:
     verdict (the Social Membrane's auto-publish posture), fail-closed by construction.
     """
     p = pick or {}
+    if horizons_publication.attribution_has_finding(p):
+        return None
     card = {
         "week": p.get("week"),
         "format": p.get("format"),
         "title": p.get("title"),
         "url": p.get("url"),
         "source": p.get("source"),
-        "pitch": p.get("pitch"),
+        "pitch": horizons_publication.public_pitch(p),
         "rationale_tag": p.get("rationale_tag"),
         "curator": p.get("curator") or "mind",
         "curated_at": p.get("curatedAt"),
     }
-    # The retrospective is the reader hook — but only a gate-CLEARED one is public. A
-    # held/paused/absent verdict yields an honest "coach's note coming" state client-side.
-    if p.get("retrospectiveStatus") == "published" and p.get("retrospective"):
+    # The retrospective is the reader hook — but only a gate-CLEARED one is public, and only while
+    # it still clears today's screen.
+    if p.get("retrospectiveStatus") == "published" and p.get("retrospective") and horizons_publication.is_clean(p["retrospective"]):
         card["retrospective"] = p["retrospective"]
         card["retrospective_at"] = p.get("retrospectiveAt")
         card["retrospective_curator"] = p.get("retrospectiveCurator") or "mind"
+    # The page's "retrospective is coming" line is a promise with a date on it: true only inside the
+    # window, so a pick whose retrospective never arrived stops promising one.
+    card["retrospective_pending"] = "retrospective" not in card and _retrospective_window_open(p.get("week"))
     return card
 
 
@@ -150,7 +174,7 @@ def handle_horizons():
     private reactions). Honest empty state before the first pick — no picks yet is normal.
     """
     picks = reading_store.horizon_picks(limit=_HORIZONS_LIMIT)
-    cards = [_public_horizon_card(p) for p in picks]
+    cards = [c for c in (_public_horizon_card(p) for p in picks) if c is not None]
     return _ok(
         {
             "items": cards,

@@ -26,6 +26,7 @@ from common.strava_read_seam import strava_read_seam  # #4419: multi-device stra
 from health import character_privacy  # owner ruling 2026-11-05: the published level is the public variant's
 from health.sensor_absence import carry_forward_ok  # #3204: may a value be republished as current?
 
+from web.journey_progress import displayed_progress  # the ONE displayed lost/remaining/progress arithmetic
 from web.vitals_resolver import resolve_vitals  # #1369: the ONE current-vitals truth
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -127,6 +128,32 @@ def resolve_glucose(apple_health, existing_vitals, today):
     return None, None
 
 
+def refresh_journey(journey: dict, weight, weight_as_of) -> dict:
+    """The stats file's journey block, moved to the newest dated weigh-in (review 2026-11-14, growth-2).
+
+    This refresh used to move ``vitals.weight_lbs`` to the newest weigh-in and leave the JOURNEY block on the morning
+    brief's reading — yesterday's, by construction — with no date on it. The weekly share card then read "36.7 lbs
+    down · live numbers as of today" while the site read 38.8 from that morning's weigh-in. The block now follows the
+    same weigh-in through the arithmetic ``/api/journey`` uses (``web.journey_progress``) and carries its date.
+
+    Unchanged when there is no dated fresh reading, when the stored block is already on a NEWER weigh-in, or when the
+    start/goal figures are absent — a figure is never recomputed from a guess."""
+    if not (weight and weight_as_of) or str(weight_as_of) < str(journey.get("weight_as_of") or ""):
+        return journey
+    figures = displayed_progress(journey.get("start_weight_lbs"), journey.get("goal_weight_lbs"), weight)
+    if not figures:
+        return journey
+    current, lost, remaining, pct = figures
+    return {
+        **journey,
+        "current_weight_lbs": current,
+        "lost_lbs": lost,
+        "remaining_lbs": remaining,
+        "progress_pct": pct,
+        "weight_as_of": weight_as_of,
+    }
+
+
 def resolve_tier0_streak(computed_metrics_record, existing_platform):
     """#3172: `tier0_streak` is written by daily-metrics-compute onto the
     ``computed_metrics`` ``DATE#`` row (``store_computed_metrics`` in
@@ -193,6 +220,7 @@ def lambda_handler(event, context):
     if ah_weight and (not weight or (ah_date and weight_as_of and ah_date > weight_as_of)):
         weight = ah_weight
         weight_as_of = ah_date
+    fresh_journey = refresh_journey(existing.get("journey") or {}, weight, weight_as_of)
     if not weight:
         weight = ev.get("weight_lbs")
         weight_as_of = ev.get("weight_as_of")
@@ -309,6 +337,7 @@ def lambda_handler(event, context):
             "generated_by": "daily-brief-lambda",
         },
         "vitals": fresh_vitals,
+        "journey": fresh_journey,
         "platform": {
             **ep,
             "tier0_streak": fresh_streak,

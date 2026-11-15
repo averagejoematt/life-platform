@@ -245,7 +245,11 @@ SURFACE_NOTES: dict[str, tuple[str, str, list[dict]]] = {
     "/api/workouts": ("Which workouts happened, and what was in them?", "what did I lift this week?", []),
     "/api/strength_benchmarks": ("Where do my lifts sit against the benchmarks?", "how strong am I?", []),
     "/api/labs": ("What do the bloodwork panels say?", "what did my last labs show?", []),
-    "/api/phenoage": ("What is the transparent Levine PhenoAge computation?", "what's my phenotypic age?", []),
+    "/api/phenoage": (
+        "What do the nine Levine PhenoAge markers read, markers only (his own figure is not served)?",
+        "what do my PhenoAge markers say?",
+        [],
+    ),
     "/api/physical_overview": ("What is the physical pillar's overview?", "how's my body doing?", []),
     "/api/mind_overview": ("What is the mind pillar's overview?", "how's my head?", []),
     "/api/reading_overview": ("What is the reading picture — pace, wheel, cockpit line?", "how's my reading going?", []),

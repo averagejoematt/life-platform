@@ -209,8 +209,10 @@ def test_kettlebell_blocks_before_the_date_once_the_library_is_approved(tmp_path
     # the library file is the switch: absent reads not approved; its status field is read as written
     assert wf.library_status(str(tmp_path / "absent.json")) is None
     lib = tmp_path / "exercise_library.json"
-    lib.write_text(json.dumps({"status": "approved"}), encoding="utf-8")
+    lib.write_text(json.dumps({"status": "approved", "approved_on": "2026-01-02"}), encoding="utf-8")  # #5861 fix round 11
     assert wf.library_status(str(lib)) == "approved"
+    lib.write_text(json.dumps({"status": "approved"}), encoding="utf-8")  # no approval day: fail-closed, reads as proposed
+    assert wf.library_status(str(lib)) == "proposed"
     lib.write_text(json.dumps({"status": "proposed"}), encoding="utf-8")
     assert wf.library_status(str(lib)) == "proposed"
 

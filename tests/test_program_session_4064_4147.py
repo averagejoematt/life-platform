@@ -37,6 +37,12 @@ from unittest.mock import patch
 
 import pytest
 
+ROLLBACK = pytest.mark.usefixtures("exercise_library_rollback")
+"""#5861 (owner approval 2026-11-14): the marked tests pin the PRE-approval generator — the v0.4 session shapes (role order lifts,
+back-offs, set counts, the red-day wholesale drop) are the pre-approval generator's. They run on the library's rollback copy (status
+proposed: tests/conftest.py `exercise_library_rollback`), so they keep guarding the rollback path; the approved (live) behaviour is
+pinned by the #5861 tests."""
+
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "lambdas"))
@@ -474,6 +480,7 @@ def _generate(day: str, **kw):
         return routine_generator.generate_routines(routine_generator.GeneratorInputs(target_date=day, **kw))
 
 
+@ROLLBACK
 def test_generator_builds_the_committed_lower_heavy_as_the_first_v04_session():
     ideal, floor = _generate("2026-09-25")
     assert ideal.archetype == "lower" and ideal.variant == "ideal"
@@ -491,6 +498,7 @@ def test_generator_builds_the_committed_lower_heavy_as_the_first_v04_session():
     ]
 
 
+@ROLLBACK
 def test_generator_builds_each_role_in_order():
     """Before the cut-over (2026-10-19) the v0.4 order, from lower-heavy (history — #4147)."""
     got = [_generate("2026-10-10", block_workouts=_done(n))[0] for n in range(4)]
@@ -508,6 +516,7 @@ def test_generator_builds_each_role_in_order():
     assert "machine_shoulder_press" not in [b.movement_key for b in got[3].exercises]
 
 
+@ROLLBACK
 def test_generator_builds_the_five_day_order_after_the_cut_over_and_the_fifth_role():
     """From the cut-over the charter's order continues from the role after the last v0.4 session: 25 daily sessions
     09-24..10-18 end on lower-heavy (v0.4 index 24), so the next five are shoulders+arms, upper-volume, lower-volume,
@@ -544,6 +553,7 @@ def test_mutation_control_without_the_sequence_the_nominal_grid_answers():
     assert routines[0].inputs_snapshot["calendar"]["session_role"] == UV, "the weekday answers only when the sequence does not"
 
 
+@ROLLBACK
 def test_generator_back_offs_sit_10_percent_under_the_ramped_top_set():
     lb = 0.45359237
     tid = CATALOG["movements"]["squat_barbell"]["hevy_template_id_hint"]
@@ -566,6 +576,7 @@ def test_generator_back_offs_sit_10_percent_under_the_ramped_top_set():
     assert squat.notes.splitlines()[0] == f"RPE {lo:g}–{hi:g}"  # #5058: the charter's band; #5428: the note's line 1
 
 
+@ROLLBACK
 def test_generator_deload_week_holds_loads_and_cuts_sets():
     # #5070 (owner ruling 2026-10-18): no scheduled deload — it applies only on a record of his word. A word starting
     # 11-04 covers 7 days; index 44 (11-07, week 7) is lower-heavy inside it. Without the record the same day is whole.
@@ -580,6 +591,7 @@ def test_generator_deload_week_holds_loads_and_cuts_sets():
     assert sum(len(_ws(b)) for b in ideal.exercises) == 8
 
 
+@ROLLBACK
 def test_red_recovery_drops_accessories_not_anchors():
     ideal = _generate("2026-09-25", recovery_tier="red")[0]
     assert [b.movement_key for b in ideal.exercises] == ["squat_barbell", "deadlift_barbell"]  # #5694: the conventional pull
