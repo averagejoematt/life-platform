@@ -364,3 +364,50 @@ def test_an_allowlisted_target_is_invoked_by_its_bare_name(env):
     mod, mocks, _ledger, _table = _import_module()
     assert mod.retry_message({"Body": "{}"}, "arn:aws:lambda:us-west-2:205930651321:function:daily-metrics-compute") is True
     assert mocks["lambda"].invoke.call_args.kwargs["FunctionName"] == "daily-metrics-compute"
+
+
+# ── #5980: the role grants invoke on exactly the allowlist, and no role holds `function:*` ──
+
+#: AWS caps a role's aggregate inline policy at 10,240 characters (whitespace excluded); the
+#: helper adds a few statements of its own on top of these, so keep visible headroom.
+_INLINE_POLICY_BUDGET = 9_500
+
+
+def test_the_redrive_invoke_grant_is_exactly_the_allowlist():
+    import test_role_family_write_scope as family  # the stubbed role_policies* import
+    from operational.redrive_targets import REDRIVE_TARGETS
+
+    statements = family.policy_statements("operational_dlq_consumer")
+    invoke = [s for s in statements if "lambda:InvokeFunction" in s.actions]
+    assert len(invoke) == 1, [s.sid for s in invoke]
+    assert all(":function:" in r and not r.endswith("*") for r in invoke[0].resources), invoke[0].resources
+    assert {r.rsplit(":function:", 1)[1] for r in invoke[0].resources} == set(REDRIVE_TARGETS)
+    size = len(json.dumps([{"Sid": s.sid, "Action": s.actions, "Resource": s.resources} for s in statements], separators=(",", ":")))
+    assert size < _INLINE_POLICY_BUDGET, f"the consumer's statements are {size} chars — near the 10,240 inline-policy cap"
+
+
+def test_no_role_grants_invoke_on_every_function_in_the_account():
+    """The #5980 Set: no `cdk/stacks/role_policies*.py` statement grants `lambda:InvokeFunction`
+    on `function:*`. Both former members are pinned to derived lists above and in
+    tests/test_health_probe_registry_4643.py."""
+    import test_role_family_write_scope as family
+
+    offenders, roles_read = [], 0
+    for mod in family.ROLE_POLICY_MODULES:
+        for name in dir(mod):
+            fn = getattr(mod, name)
+            if name.startswith("_") or not callable(fn) or getattr(fn, "__module__", "") != mod.__name__:
+                continue
+            try:
+                statements = fn()
+            except TypeError:
+                continue  # takes arguments — not a role's policy list
+            if not isinstance(statements, list):
+                continue
+            roles_read += 1
+            for s in statements:
+                actions = set(getattr(s, "actions", []))
+                if actions & {"lambda:InvokeFunction", "lambda:*", "*"} and any(r.endswith(":function:*") or r == "*" for r in s.resources):
+                    offenders.append(f"{mod.__name__}.{name} sid={s.sid}")
+    assert roles_read >= 80, f"only {roles_read} role policies read — the sweep is blind"
+    assert not offenders, f"account-wide lambda invoke grants: {offenders}"
