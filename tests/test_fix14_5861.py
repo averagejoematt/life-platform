@@ -482,3 +482,11 @@ def test_a_one_or_two_morning_week_reserves_no_dose_minutes_on_the_fit():
     assert live_session._dose_reserve(rx) == 0
     three = rx | {live_session.MARK: rx[live_session.MARK] | {"week_skip": ["a", "b"]}}
     assert live_session._dose_reserve(three) == int(live_volume.reserve_minutes())
+
+
+def test_a_held_carrys_stop_line_keeps_its_logging_line():
+    """The held carry's stop line (B11/B15) displaced 'Steps go in the yards box.' (lint L11) on the phone budget; it now takes
+    the posture cue's place. The note keeps line 1, the adjust rule and the yards line."""
+    w = _week(PROFILES["a_large_deficit_experienced"])  # an unflagged week: the cue stays
+    carry = next(x for s in w["week"]["sessions"] for x in s["lifts"] if x["key"] == "farmers_walk")
+    assert g.CARRY_CUE in carry["hevy_note"] and g.CARRY_STEPS_LINE in carry["hevy_note"]

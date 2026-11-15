@@ -538,7 +538,12 @@ def annotate(blocks: list[Any], rx: dict[str, Any]) -> None:
             b.notes = session_block.add_reason(b.notes, clause)
         b.notes = live_load.start_line(b.notes or "", e.get("live_start")) if not loaded else b.notes  # fix round 14 (B9)
         b.notes = live_balance.assess_note(live_balance.one_effort(b.notes), str(e.get("live_assess") or ""))
-        b.notes = live_balance.assess_note(b.notes, str(e.get("live_stop") or ""))  # the in-set stop line under a pain flag
+        stop = str(e.get("live_stop") or "")
+        if stop and e.get("intensity") == "carry":  # fix round 14: a held carry's stop line takes its posture cue's place (budget)
+            from training import hevy_note_grammar as g
+
+            b.notes = "\n".join(stop if ln == g.CARRY_CUE else ln for ln in (b.notes or "").split("\n"))
+        b.notes = live_balance.assess_note(b.notes, stop)  # the in-set stop line under a pain flag
     from training import live_safety
 
     rx[ls.MARK].setdefault("lines", []).extend(live_safety.no_step(blocks, rx))
