@@ -372,7 +372,7 @@ def test_the_cli_exits_red_on_a_problem_and_green_on_health(tmp_path, capsys):
     p.write_text(json.dumps(_persisted("2000-01-01")))
     assert a11y_audit.main(["--check-shrink-ledger", str(p)]) == 1
     assert "::error::" in capsys.readouterr().out
-    p.write_text(json.dumps(_persisted(date.today().isoformat())))
+    p.write_text(json.dumps(_persisted(_today())))
     assert a11y_audit.main(["--check-shrink-ledger", str(p)]) == 0
 
 
@@ -439,7 +439,7 @@ def test_the_cli_flag_reds_a_green_sweep_on_the_dead_man_and_never_greens_a_red_
     monkeypatch.setattr(a11y_audit, "persist_shrink_ledger", lambda *a, **k: calls.append("persist"))
     monkeypatch.setattr(a11y_audit, "load_shrink_ledger", lambda *a, **k: _persisted("2000-01-01"))
     assert visual_qa_cli.main(vqa=_Vqa, argv=["--a11y-ledger-s3"]) == 1 and calls == ["restore", "sweep", "persist"]
-    monkeypatch.setattr(a11y_audit, "load_shrink_ledger", lambda *a, **k: _persisted(date.today().isoformat()))
+    monkeypatch.setattr(a11y_audit, "load_shrink_ledger", lambda *a, **k: _persisted(_today()))
     assert visual_qa_cli.main(vqa=_Vqa, argv=["--a11y-ledger-s3"]) == 0
     _Vqa.sweep_ok = False
     assert visual_qa_cli.main(vqa=_Vqa, argv=["--a11y-ledger-s3"]) == 1

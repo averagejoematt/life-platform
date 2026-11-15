@@ -167,7 +167,7 @@ def main(vqa=None, argv=None):
     )
     if args.a11y_ledger_s3:
         vqa.a11y_audit.persist_shrink_ledger()
-        problems = vqa.a11y_audit.check_shrink_ledger(vqa.a11y_audit.load_shrink_ledger(), vqa.a11y_audit.date.today().isoformat())
+        problems = vqa.a11y_audit.check_shrink_ledger(vqa.a11y_audit.load_shrink_ledger(), vqa.a11y_audit.ledger_today())
         for p in problems:
             print(f"::error::a11y shrink dead-man (#5526): {p}")
         if ok and problems:

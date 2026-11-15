@@ -460,6 +460,15 @@ def _ensure_lambda_path():
             sys.path.insert(0, p)
 
 
+def ledger_today():
+    """The shrink ledger's as-of day: the Pacific calendar day (#3222). The sweep stamps `updated_at`/`first_seen` with
+    `capture_today_pt` (`pacific_today()`), so the dead-man must age them on that SAME clock, not the runner's UTC one."""
+    _ensure_lambda_path()
+    from common.pacific_time import pacific_today  # the one Pacific frame (#1964)
+
+    return pacific_today()
+
+
 def experiment_day_n(today_iso):
     """1-indexed Day-N of the running cycle for an ISO date — the SAME number
     `/api/journey` serves, from the same genesis constant its handler reads.
@@ -691,10 +700,9 @@ def persist_shrink_ledger(path=None, s3=None, bucket=None):
 def main(argv=None):
     """`--check-shrink-ledger PATH` (exit 1 on any problem) · `--refresh-owner-states` (rewrite the owner snapshot)."""
     argv = list(sys.argv[1:] if argv is None else argv)
-    today = date.today().isoformat()
     if argv[:1] == ["--check-shrink-ledger"]:
         ledger = load_shrink_ledger(argv[1] if len(argv) > 1 else None)
-        problems = check_shrink_ledger(ledger, today)
+        problems = check_shrink_ledger(ledger, ledger_today())
         for p in problems:
             print(f"::error::a11y shrink dead-man (#5526): {p}")
         print(f"a11y shrink dead-man: {len(ledger.get('entries', []))} tracked, {len(problems)} problem(s)")
