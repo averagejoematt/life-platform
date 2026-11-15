@@ -85,7 +85,9 @@ from test_paper_ramp_contrast import (  # noqa: E402
 CSS_DIR = TOKENS.parent
 
 # The inks a wash-backed container re-states, and the base token each one covers.
-ON_WASH = {"--ink-faint": "--ink-faint-on-wash", "--ink-muted": "--ink-muted-on-wash"}
+# #5526: --ember joins them — ember TEXT on an ember wash measured 4.45:1 live in light (/coaching/ .read-priority
+# .dx-kicker, .df-btn, .hb-fr.fr-auto), an unowned contrast class #3726's two-ink list never covered.
+ON_WASH = {"--ink-faint": "--ink-faint-on-wash", "--ink-muted": "--ink-muted-on-wash", "--ember": "--ember-on-wash"}
 
 # A working floor above the 4.5 AA line. 4.51:1 is a pass the next unrelated nudge
 # silently removes — the #1470 bump left exactly that margin, which is why this

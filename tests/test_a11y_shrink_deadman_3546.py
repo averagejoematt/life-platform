@@ -331,3 +331,118 @@ def test_experiment_day_n_is_the_journey_number():
     assert a11y_audit.experiment_day_n(EXPERIMENT_START_DATE) == 1
     assert a11y_audit.experiment_day_n("2026-01-01") == 0  # pre-genesis clamps
     assert a11y_audit.experiment_day_n(_today()) >= 0
+
+
+# ── #5526: the persisted dead-man — a stale row OR a silent ledger reds the scheduled sweep ──
+#
+# The committed sidecar read `entries=[]` forever because only the runner's disk ever held the written copy. The
+# scheduled sweep now restores and persists it (S3, .github/workflows/visual-qa.yml) and runs
+# `a11y_audit.py --check-shrink-ledger`, whose verdict is `check_shrink_ledger` — exercised here at the pinned _AS_OF.
+
+
+def _persisted(updated_at, entries=()):
+    return {"_meta": {"updated_at": updated_at}, "entries": list(entries)}
+
+
+def test_a_fresh_empty_ledger_is_healthy():
+    assert a11y_audit.check_shrink_ledger(_persisted(_AS_OF), _AS_OF) == []
+
+
+def test_a_ledger_the_sweep_stopped_writing_reds():
+    silent_since = (date.fromisoformat(_AS_OF) - timedelta(days=a11y_audit.SHRINK_LEDGER_MAX_SILENCE_DAYS + 1)).isoformat()
+    (problem,) = a11y_audit.check_shrink_ledger(_persisted(silent_since), _AS_OF)
+    assert "stopped persisting" in problem
+    (problem,) = a11y_audit.check_shrink_ledger({"_meta": {}, "entries": []}, _AS_OF)
+    assert "no readable updated_at" in problem
+
+
+def test_a_stale_row_in_a_fresh_ledger_reds_by_name():
+    row = {"page": "/coaching/", "rule": "color-contrast", "first_seen": _STALE_SINCE}
+    (problem,) = a11y_audit.check_shrink_ledger(_persisted(_AS_OF, [row]), _AS_OF)
+    assert "/coaching/ color-contrast" in problem and "--update-baseline" in problem
+
+
+def test_HISTORY_the_committed_sidecar_shape_would_red_as_silent():
+    """The committed file — updated_at 2026-09-19, entries [] — is exactly a ledger nothing has written since."""
+    assert a11y_audit.check_shrink_ledger(_persisted("2026-09-19"), "2026-11-15")
+
+
+def test_the_cli_exits_red_on_a_problem_and_green_on_health(tmp_path, capsys):
+    p = tmp_path / "ledger.json"
+    p.write_text(json.dumps(_persisted("2000-01-01")))
+    assert a11y_audit.main(["--check-shrink-ledger", str(p)]) == 1
+    assert "::error::" in capsys.readouterr().out
+    p.write_text(json.dumps(_persisted(date.today().isoformat())))
+    assert a11y_audit.main(["--check-shrink-ledger", str(p)]) == 0
+
+
+def test_the_scheduled_sweep_restores_persists_and_checks_the_ledger():
+    """Wired as ONE flag on the existing sweep command (no new workflow step: the census's positional CI-step ids and the
+    #4885 workflow-size ratchet both hold), on the diagnosis role's existing qa_archive/perf/ Get+Put grant."""
+    root = os.path.dirname(_HERE)
+    wf = open(os.path.join(root, ".github", "workflows", "visual-qa.yml"), encoding="utf-8").read()
+    step = wf[wf.index("- name: Run visual + AI-vision QA sweep") :]
+    step = step[: step.index("\n      - name:")]
+    assert "python3 qa/visual_qa.py" in step and "--a11y-ledger-s3" in step
+    grant = open(os.path.join(root, "infra", "iam", "github-actions-diagnosis-role.permissions.json"), encoding="utf-8").read()
+    assert "generated/qa_archive/perf/*" in grant and a11y_audit.SHRINK_LEDGER_S3_KEY.startswith("generated/qa_archive/perf/")
+
+
+class _FakeS3:
+    def __init__(self, body=None):
+        self.objects = {} if body is None else {a11y_audit.SHRINK_LEDGER_S3_KEY: body}
+
+    def get_object(self, Bucket, Key):
+        if Key not in self.objects:
+            raise RuntimeError("NoSuchKey")
+        return {"Body": type("B", (), {"read": lambda _s, b=self.objects[Key]: b})()}
+
+    def put_object(self, Bucket, Key, Body, **kw):
+        self.objects[Key] = Body
+
+
+def test_restore_carries_the_last_run_over_and_persist_writes_it_back(tmp_path):
+    p = tmp_path / "ledger.json"
+    p.write_text(json.dumps(_persisted("2000-01-01")))
+    last = json.dumps(_persisted(_AS_OF, [{"page": "/x/", "rule": "r", "first_seen": _STALE_SINCE}])).encode()
+    s3 = _FakeS3(last)
+    assert (
+        a11y_audit.restore_shrink_ledger(path=str(p), s3=s3) is True
+        and json.loads(p.read_text())["entries"][0]["first_seen"] == _STALE_SINCE
+    )
+    assert a11y_audit.persist_shrink_ledger(path=str(p), s3=s3) is True and s3.objects[a11y_audit.SHRINK_LEDGER_S3_KEY] == last
+
+
+def test_a_missing_or_garbage_object_never_overwrites_the_local_ledger(tmp_path):
+    p = tmp_path / "ledger.json"
+    p.write_text(json.dumps(_persisted(_AS_OF)))
+    for s3 in (_FakeS3(), _FakeS3(b"<html>")):
+        assert a11y_audit.restore_shrink_ledger(path=str(p), s3=s3) is False
+        assert json.loads(p.read_text()) == _persisted(_AS_OF)
+
+
+def test_the_cli_flag_reds_a_green_sweep_on_the_dead_man_and_never_greens_a_red_one(monkeypatch):
+    import visual_qa_cli
+
+    calls = []
+
+    class _Vqa:
+        SITE_URL, PAGES, a11y_audit = "https://example.invalid", [], a11y_audit
+        sweep_ok = True
+
+        @classmethod
+        def run_sweep(cls, **kw):
+            calls.append("sweep")
+            return cls.sweep_ok
+
+    monkeypatch.setattr(a11y_audit, "restore_shrink_ledger", lambda *a, **k: calls.append("restore"))
+    monkeypatch.setattr(a11y_audit, "persist_shrink_ledger", lambda *a, **k: calls.append("persist"))
+    monkeypatch.setattr(a11y_audit, "load_shrink_ledger", lambda *a, **k: _persisted("2000-01-01"))
+    assert visual_qa_cli.main(vqa=_Vqa, argv=["--a11y-ledger-s3"]) == 1 and calls == ["restore", "sweep", "persist"]
+    monkeypatch.setattr(a11y_audit, "load_shrink_ledger", lambda *a, **k: _persisted(date.today().isoformat()))
+    assert visual_qa_cli.main(vqa=_Vqa, argv=["--a11y-ledger-s3"]) == 0
+    _Vqa.sweep_ok = False
+    assert visual_qa_cli.main(vqa=_Vqa, argv=["--a11y-ledger-s3"]) == 1
+    calls.clear()
+    _Vqa.sweep_ok = True
+    assert visual_qa_cli.main(vqa=_Vqa, argv=[]) == 0 and calls == ["sweep"]  # the deploy-gate copies never touch S3

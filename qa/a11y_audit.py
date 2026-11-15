@@ -239,6 +239,68 @@ def untriaged_serious_entries(baseline):
     return out
 
 
+def unowned_serious_entries(baseline, owner_states=None):
+    """(ledger_key, page_path, rule_id, issue, state) for every SERIOUS/CRITICAL row whose owning issue is not OPEN in
+    the offline snapshot ``_meta.owner_states`` (#5526). Pure.
+
+    #3548's rule only asked that a row NAME an issue, and a closed one satisfied it: all 34 serious rows cited #3673
+    (closed, its repair handed to four more issues, all closed) or #3897 (closed) — debt owned by tombstones. A row
+    whose owner is CLOSED, or whose owner the snapshot does not list at all (state None), is unowned. An untriaged row
+    is `untriaged_serious_entries`' finding, not this one's.
+    """
+    states = owner_states if owner_states is not None else ((baseline.get("_meta") or {}).get("owner_states") or {})
+    out = []
+    for key in LEDGER_KEYS:
+        for page_path, rows in (baseline.get(key) or {}).items():
+            for r in rows:
+                issue = str(r.get("issue") or "")
+                if r.get("impact") not in GATING_IMPACTS or not _ISSUE_REF_RE.match(issue):
+                    continue
+                state = states.get(issue)
+                if str(state or "").upper() != "OPEN":
+                    out.append((key, page_path, r.get("id"), issue, state))
+    return out
+
+
+def cited_owners(baseline):
+    """Every issue ref a serious/critical row cites, sorted — what `--refresh-owner-states` asks GitHub about."""
+    refs = set()
+    for key in LEDGER_KEYS:
+        for rows in (baseline.get(key) or {}).values():
+            for r in rows:
+                issue = str(r.get("issue") or "")
+                if r.get("impact") in GATING_IMPACTS and _ISSUE_REF_RE.match(issue):
+                    refs.add(issue)
+    return sorted(refs, key=lambda x: int(x[1:]))
+
+
+def refresh_owner_states(path=None, fetch=None, today_iso=None):
+    """Re-read every cited owner's state from GitHub into ``_meta.owner_states`` (#5526) — the ONE write path for the
+    snapshot. ``fetch(ref) -> "OPEN" | "CLOSED" | None`` is the seam; production shells out to ``gh``."""
+    import subprocess
+
+    def _gh(ref):
+        try:
+            out = subprocess.run(
+                ["gh", "issue", "view", ref[1:], "--json", "state", "-q", ".state"], capture_output=True, text=True, timeout=30
+            )
+        except (OSError, subprocess.SubprocessError):
+            return None
+        return out.stdout.strip() or None if out.returncode == 0 else None
+
+    path = path or BASELINE_PATH
+    baseline = load_baseline(path)
+    fetch = fetch or _gh
+    meta = dict(baseline.get("_meta") or {})
+    meta["owner_states"] = {ref: fetch(ref) for ref in cited_owners(baseline)}
+    meta["owner_states_checked_at"] = today_iso or date.today().isoformat()
+    baseline["_meta"] = meta
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(baseline, f, indent=2, sort_keys=False)
+        f.write("\n")
+    return meta["owner_states"]
+
+
 def gate_findings(page_path, violations, baseline, theme="dark", viewport="desktop"):
     """Classify one page's observed violations against the baseline.
 
@@ -556,6 +618,95 @@ def stale_shrink_entries(ledger, today_iso, max_age_days=None):
     return sorted(out)
 
 
+# #5526: the sidecar lived only on the CI runner's disk — nothing persisted it, so the committed file read
+# `entries=[]` forever and the dead-man above could never fire. The scheduled sweep (.github/workflows/visual-qa.yml,
+# `--a11y-ledger-s3`, wired in qa/visual_qa_cli.py) now restores it from S3 before the run and persists it after, and
+# `check_shrink_ledger` reds that run when a row is stale OR the ledger itself stopped being written. The key rides the diagnosis role's existing qa_archive/perf/
+# Get+Put grant (infra/iam/github-actions-diagnosis-role.permissions.json), so no IAM change.
+SHRINK_LEDGER_S3_KEY = "generated/qa_archive/perf/a11y_shrink_ledger.json"
+# The sweep is daily; two missed days means it stopped persisting (or stopped running).
+SHRINK_LEDGER_MAX_SILENCE_DAYS = 2
+
+
+def check_shrink_ledger(ledger, today_iso, max_silence_days=None):
+    """The persisted dead-man's verdict: a list of problem sentences, empty when healthy. Pure.
+
+    Two failures: a row older than SHRINK_MAX_AGE_DAYS (paid debt nobody harvested — the baseline still gates on a
+    rule the page no longer breaks), and a ledger whose ``updated_at`` is older than the silence budget or missing (the
+    sweep stopped writing it, so an empty list proves nothing)."""
+    max_silence_days = SHRINK_LEDGER_MAX_SILENCE_DAYS if max_silence_days is None else max_silence_days
+    problems = []
+    updated = (ledger.get("_meta") or {}).get("updated_at")
+    try:
+        silence = (date.fromisoformat(today_iso) - date.fromisoformat(str(updated or ""))).days
+    except ValueError:
+        silence = None
+    if silence is None:
+        problems.append(f"the shrink ledger has no readable updated_at ({updated!r}) — no sweep has persisted it")
+    elif silence > max_silence_days:
+        problems.append(
+            f"the shrink ledger was last written {updated} ({silence} days ago, budget {max_silence_days}) — the sweep stopped persisting it"
+        )
+    for page, rule, first_seen, age in stale_shrink_entries(ledger, today_iso):
+        problems.append(f"{page} {rule}: no longer violated since {first_seen} ({age} days) — harvest it with --update-baseline")
+    return problems
+
+
+def _s3_client():
+    import boto3
+
+    return boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-west-2"))
+
+
+def restore_shrink_ledger(path=None, s3=None, bucket=None):
+    """Pull the last scheduled run's sidecar over the local copy so `merge_shrink_ledger` carries first_seen forward.
+    Fail-soft: a missing object (the first run) or a read failure leaves the local file alone. Returns True when
+    restored."""
+    path = path or SHRINK_LEDGER_PATH
+    try:
+        body = (s3 or _s3_client()).get_object(Bucket=bucket or "matthew-life-platform", Key=SHRINK_LEDGER_S3_KEY)["Body"].read()
+        json.loads(body)  # never overwrite the sidecar with something that is not a ledger
+    except Exception as e:  # noqa: BLE001
+        print(f"::warning::no persisted a11y shrink ledger restored ({str(e)[:120]}) — first_seen starts today (#5526)")
+        return False
+    with open(path, "wb") as f:
+        f.write(body)
+    return True
+
+
+def persist_shrink_ledger(path=None, s3=None, bucket=None):
+    """Push the sidecar the sweep just wrote. Fail-soft — the dead-man's silence check reds a ledger that stops landing."""
+    path = path or SHRINK_LEDGER_PATH
+    try:
+        with open(path, "rb") as f:
+            (s3 or _s3_client()).put_object(
+                Bucket=bucket or "matthew-life-platform", Key=SHRINK_LEDGER_S3_KEY, Body=f.read(), ContentType="application/json"
+            )
+    except Exception as e:  # noqa: BLE001
+        print(f"::warning::a11y shrink ledger persist failed ({str(e)[:120]}) — the next run starts its clocks over (#5526)")
+        return False
+    return True
+
+
+def main(argv=None):
+    """`--check-shrink-ledger PATH` (exit 1 on any problem) · `--refresh-owner-states` (rewrite the owner snapshot)."""
+    argv = list(sys.argv[1:] if argv is None else argv)
+    today = date.today().isoformat()
+    if argv[:1] == ["--check-shrink-ledger"]:
+        ledger = load_shrink_ledger(argv[1] if len(argv) > 1 else None)
+        problems = check_shrink_ledger(ledger, today)
+        for p in problems:
+            print(f"::error::a11y shrink dead-man (#5526): {p}")
+        print(f"a11y shrink dead-man: {len(ledger.get('entries', []))} tracked, {len(problems)} problem(s)")
+        return 1 if problems else 0
+    if argv[:1] == ["--refresh-owner-states"]:
+        states = refresh_owner_states()
+        print(json.dumps(states, indent=2))
+        return 0 if all(str(v or "").upper() == "OPEN" for v in states.values()) else 1
+    print(main.__doc__)
+    return 2
+
+
 def shrink_candidates(gate_results_by_path, day_n=None):
     """{page_path: [rule_id, …]} for pages whose gate_findings() reported
     "fixed" rules — baselined but no longer observed live (#1990).
@@ -592,3 +743,7 @@ def summarize(baseline, theme="dark", viewport="desktop"):
         for r in rows:
             counts[r.get("impact") or "unknown"] = counts.get(r.get("impact") or "unknown", 0) + 1
     return counts
+
+
+if __name__ == "__main__":
+    sys.exit(main())
