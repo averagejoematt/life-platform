@@ -24,6 +24,11 @@ import sys
 
 import pytest
 
+ROLLBACK = pytest.mark.usefixtures("exercise_library_rollback")
+"""#5861 (owner approval 2026-11-14): the marked tests pin the PRE-approval generator — the redrafted 10-18 upper is the pre-approval
+generator's (live fits different lifts). They run on the library's rollback copy (status proposed: tests/conftest.py
+`exercise_library_rollback`), so they keep guarding the rollback path; the approved (live) behaviour is pinned by the #5861 tests."""
+
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "lambdas"))
@@ -64,6 +69,7 @@ def _lift_blocks(ir):
 
 
 # ── 1. real generator renders ──────────────────────────────────────────────────────────────────────────────────────
+@ROLLBACK
 def test_every_lift_note_of_the_redrafted_10_18_upper_meets_the_standard():
     from test_warmup_sets_5049 import _redraft
 

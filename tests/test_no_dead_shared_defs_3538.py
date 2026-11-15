@@ -124,6 +124,13 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
         "in tests/test_cardio_menu_dose_5076.py for the #5056 steps-floor lane to read. The first live caller "
         "is #5056; delete this entry when it lands."
     ),
+    # Epic #5861 lane L4 (cardio on its own model, built behind the library switch and deliberately wired into no
+    # live drafting path; fixture-tested in tests/test_cardio_model_5861.py). Each names its first live caller.
+    "lambdas/training/cardio_model.py:conditioning_session": (
+        "#5861 L4: the conditioning-day seam a 4+1 split needs (the audit: no conditioning-day prescription path "
+        "existed). Deliberately not wired into live drafting; the first caller is the 4+1 day once the owner rules on "
+        "the split; delete this entry when it lands."
+    ),
     "lambdas/training/cardio_menu.py:place_week": (
         "#5076's week-whole reading of the cardio placement rule (`choose_kind` iterated over a week), the "
         "7-day placement proof in tests/test_cardio_menu_dose_5076.py. The draft path places one day at a "

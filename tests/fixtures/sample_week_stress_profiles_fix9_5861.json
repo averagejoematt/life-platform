@@ -1,0 +1,292 @@
+{
+  "_comment": "#5861 fix round 9: synthetic stress profiles (no person's numbers) from the eighth red team's simulator — 1/2/3 declared mornings, pain on short weeks, a stalled squat with low-back pain, dumbbell-only travel, a garage gym with a sharp shoulder, everything regressing on a green week",
+  "as_of": "2026-11-16",
+  "position": {
+    "week": 10,
+    "block": 2
+  },
+  "defaults": {
+    "roles": [
+      "upper_heavy",
+      "lower_heavy",
+      "shoulders_arms",
+      "upper_volume",
+      "lower_volume"
+    ],
+    "days": [
+      "2026-11-16",
+      "2026-11-17",
+      "2026-11-18",
+      "2026-11-19",
+      "2026-11-20"
+    ],
+    "bodyweight_lb": 250,
+    "readiness": "green",
+    "sleep_hours": 7.5,
+    "acwr": "safe",
+    "steps_per_day": 14000,
+    "trend": "progressing",
+    "trend_overrides": {},
+    "discomfort": [],
+    "pain": [],
+    "unavailable_equipment": [],
+    "sessions_last_14d": 10,
+    "hard_cardio_minutes_7d": 40
+  },
+  "profiles": {
+    "n1_one_morning_knee_shoulder": {
+      "label": "(n1) FIX9 (red team 8): 1 morning, knee pain 5/10 on squat + shoulder discomfort 2/10 on bench",
+      "story": "one morning, mixed pain",
+      "roles": [
+        "upper_heavy"
+      ],
+      "days": [
+        "2026-11-16"
+      ],
+      "pain": [
+        {
+          "movement": "squat_barbell",
+          "note": "knee pain 5/10 at the bottom"
+        }
+      ],
+      "discomfort": [
+        {
+          "movement": "barbell_bench_press",
+          "note": "shoulder a bit achy 2/10"
+        }
+      ]
+    },
+    "n2_two_morning_elbow_hip": {
+      "label": "(n2) FIX9 (red team 8): 2 mornings, elbow pain 4/10 on triceps ext + hip discomfort 2/10 on RDL",
+      "story": "two mornings mixed",
+      "roles": [
+        "upper_heavy",
+        "lower_heavy"
+      ],
+      "days": [
+        "2026-11-16",
+        "2026-11-19"
+      ],
+      "pain": [
+        {
+          "movement": "overhead_triceps_extension_cable",
+          "note": "elbow pain 4/10"
+        }
+      ],
+      "discomfort": [
+        {
+          "movement": "romanian_deadlift_barbell",
+          "note": "hip a bit tight 2/10"
+        }
+      ]
+    },
+    "n3_three_morning_back_stalled_squat": {
+      "label": "(n3) FIX9 (red team 8): 3 mornings, low-back pain 4/10 on squat (not sharp) + squat stalled",
+      "story": "three mornings back",
+      "roles": [
+        "upper_heavy",
+        "lower_heavy",
+        "upper_volume"
+      ],
+      "days": [
+        "2026-11-16",
+        "2026-11-18",
+        "2026-11-20"
+      ],
+      "pain": [
+        {
+          "movement": "squat_barbell",
+          "note": "low back pain 4/10 out of the hole"
+        }
+      ],
+      "trend_overrides": {
+        "squat_barbell": "stalled"
+      }
+    },
+    "n4_lowback_stalled_squat_5day": {
+      "label": "(n4) FIX9 (red team 8): 5 mornings, low-back pain 4/10 on squat + squat stalled",
+      "story": "back + stall",
+      "pain": [
+        {
+          "movement": "squat_barbell",
+          "note": "low back pain 4/10 out of the hole"
+        }
+      ],
+      "trend_overrides": {
+        "squat_barbell": "stalled"
+      }
+    },
+    "n5_dumbbell_travel_knee": {
+      "label": "(n5) FIX9 (red team 8): travel, dumbbells + bench only, knee pain 4/10 on squat",
+      "story": "hotel knee",
+      "unavailable_equipment": [
+        "ab_crunch_machine",
+        "ab_wheel",
+        "assisted_pullup_dip_machine",
+        "back_extension_45",
+        "barbell",
+        "belt_squat_machine",
+        "bench_decline",
+        "biceps_curl_machine",
+        "cable_stack",
+        "calf_raise_seated_machine",
+        "calf_raise_standing_machine",
+        "captains_chair",
+        "chest_press_machine",
+        "decline_press_machine",
+        "dip_station",
+        "elliptical",
+        "ez_bar",
+        "glute_kickback_machine",
+        "hack_squat_machine",
+        "hand_gripper",
+        "hip_abduction_machine",
+        "hip_adduction_machine",
+        "hip_thrust_machine",
+        "incline_press_machine",
+        "jump_rope",
+        "kettlebell",
+        "landmine",
+        "lat_pulldown_station",
+        "lateral_raise_machine",
+        "leg_curl_lying",
+        "leg_curl_seated",
+        "leg_extension_machine",
+        "leg_press_machine",
+        "machine_unspecified",
+        "medicine_ball",
+        "olympic_platform",
+        "other_unspecified",
+        "pec_deck",
+        "pendulum_squat_machine",
+        "plyo_box",
+        "preacher_bench",
+        "preacher_machine",
+        "pullover_machine",
+        "pullup_bar",
+        "rear_delt_machine",
+        "resistance_band",
+        "rower",
+        "ruck_vest",
+        "seated_row_machine",
+        "shoulder_press_machine",
+        "ski_erg",
+        "sled",
+        "smith_machine",
+        "squat_rack",
+        "stability_ball",
+        "stair_climber",
+        "stationary_bike",
+        "suspension_trainer",
+        "swimming_pool",
+        "t_bar_row_machine",
+        "torso_rotation_machine",
+        "trap_bar",
+        "treadmill",
+        "triceps_machine",
+        "weight_plate",
+        "wrist_roller"
+      ],
+      "pain": [
+        {
+          "movement": "squat_barbell",
+          "note": "knee pain 4/10 going down"
+        }
+      ]
+    },
+    "n6_garage_sharp_shoulder": {
+      "label": "(n6) FIX9 (red team 8): garage + sharp shoulder 6/10 on bench",
+      "story": "garage shoulder",
+      "unavailable_equipment": [
+        "ab_crunch_machine",
+        "assisted_pullup_dip_machine",
+        "belt_squat_machine",
+        "biceps_curl_machine",
+        "cable_stack",
+        "calf_raise_seated_machine",
+        "calf_raise_standing_machine",
+        "chest_press_machine",
+        "decline_press_machine",
+        "glute_kickback_machine",
+        "hack_squat_machine",
+        "hip_abduction_machine",
+        "hip_adduction_machine",
+        "hip_thrust_machine",
+        "incline_press_machine",
+        "lat_pulldown_station",
+        "lateral_raise_machine",
+        "leg_curl_lying",
+        "leg_curl_seated",
+        "leg_extension_machine",
+        "leg_press_machine",
+        "machine_unspecified",
+        "pec_deck",
+        "pendulum_squat_machine",
+        "preacher_machine",
+        "pullover_machine",
+        "rear_delt_machine",
+        "seated_row_machine",
+        "shoulder_press_machine",
+        "smith_machine",
+        "t_bar_row_machine",
+        "torso_rotation_machine",
+        "triceps_machine",
+        "elliptical",
+        "rower",
+        "sled",
+        "stair_climber",
+        "ski_erg",
+        "recumbent_bike"
+      ],
+      "pain": [
+        {
+          "movement": "barbell_bench_press",
+          "note": "sharp shoulder pain 6/10 at the bottom"
+        }
+      ]
+    },
+    "n7_two_mornings_clean": {
+      "label": "(n7) FIX9 (red team 8): 2 mornings, nothing wrong",
+      "story": "two clean",
+      "roles": [
+        "upper_heavy",
+        "lower_heavy"
+      ],
+      "days": [
+        "2026-11-16",
+        "2026-11-19"
+      ]
+    },
+    "n8_one_morning_clean": {
+      "label": "(n8) FIX9 (red team 8): 1 morning, nothing wrong",
+      "story": "one clean",
+      "roles": [
+        "upper_heavy"
+      ],
+      "days": [
+        "2026-11-18"
+      ]
+    },
+    "n9_three_mornings_clean_low_steps": {
+      "label": "(n9) FIX9 (red team 8): 3 mornings, 4000 steps, no cardio",
+      "story": "three sedentary",
+      "roles": [
+        "upper_heavy",
+        "lower_heavy",
+        "upper_volume"
+      ],
+      "days": [
+        "2026-11-16",
+        "2026-11-18",
+        "2026-11-20"
+      ],
+      "steps_per_day": 4000,
+      "hard_cardio_minutes_7d": 0
+    },
+    "n10_regressing_everything_green": {
+      "label": "(n10) FIX9 (red team 8): every lift regressing, green, good sleep, normal loss",
+      "story": "regress green",
+      "trend": "regressing"
+    }
+  }
+}

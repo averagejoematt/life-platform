@@ -48,6 +48,11 @@ from unittest.mock import patch
 
 import pytest
 
+ROLLBACK = pytest.mark.usefixtures("exercise_library_rollback")
+"""#5861 (owner approval 2026-11-14): the marked tests pin the PRE-approval generator — the heavy machine row is the pre-approval
+generator's (live swaps the unconfirmed machine row). They run on the library's rollback copy (status proposed: tests/conftest.py
+`exercise_library_rollback`), so they keep guarding the rollback path; the approved (live) behaviour is pinned by the #5861 tests."""
+
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "lambdas"))
@@ -190,6 +195,7 @@ def test_the_heavy_squat_with_no_in_band_history_gets_a_week_1_load_from_the_nea
     assert "band" not in _block(ideal, "squat_barbell").notes
 
 
+@ROLLBACK
 def test_every_heavy_anchor_of_the_first_v04_week_is_loaded_from_its_nearest_band():
     for key in HEAVY:
         ideal = _ideal_for(key)
@@ -202,6 +208,7 @@ def test_every_heavy_anchor_of_the_first_v04_week_is_loaded_from_its_nearest_ban
         assert [s.weight_kg for s in _ws(_block(ideal, key))[1:]] == [rep_scheme.round_to_implement_kg(top * 0.9, equipment)] * 2  # #5428
 
 
+@ROLLBACK
 def test_mutation_control_without_the_fallback_the_heavy_anchors_come_out_unloaded():
     for key in HEAVY:
         with patch.object(load_ramp, "nearest_band_anchor", return_value=None):
@@ -323,7 +330,9 @@ def _gate(ideal, **kw):
 
 
 @pytest.mark.parametrize("which", ["lower_heavy", "upper_heavy"])
-def test_the_chat_gate_derives_the_generator_rows_and_commits_its_loads(which):
+def test_the_chat_gate_derives_the_generator_rows_and_commits_its_loads(which, request):
+    if which == "upper_heavy":  # ROLLBACK (#5861): the heavy machine row is the pre-approval generator's; live swaps it
+        request.getfixturevalue("exercise_library_rollback")
     ideal = _generate()[0] if which == "lower_heavy" else _generate_upper()[0]
     gate = _gate(ideal)
     assert gate["verdict"] == "clean", gate["audit"]
@@ -413,9 +422,11 @@ def test_derivation_guard_only_v03_floor_calls_the_ramp_and_the_fallback():
 
 # ── 5. the planner ──────────────────────────────────────────────────────────
 @pytest.mark.parametrize("key", HEAVY)
-def test_plan_next_session_loads_the_heavy_anchor_from_the_nearest_band(key):
+def test_plan_next_session_loads_the_heavy_anchor_from_the_nearest_band(key, request):
     """#4147: the squat through lower-heavy on 09-24 (nothing completed), the row through
     upper-heavy on 09-27 (three completed) — the planner and the draft carry the same load."""
+    if key == "machine_row":  # ROLLBACK (#5861): the heavy machine row is the pre-approval generator's; live swaps it
+        request.getfixturevalue("exercise_library_rollback")
     from mcp import handler as h
     from tests.test_program_session_4064_4147 import _stage1_patches
 
