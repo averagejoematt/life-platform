@@ -467,7 +467,8 @@ export function followLine(nextBlock, counts = null) {
   // Kept short: /start/ sits at the edge of its 4-screen budget (tests/kit_page_gate.py), one wrapped line is ~23 px.
   const pod = !c ? "" : c.episodes === 0 ? ", no podcast yet" : c.episodes * 2 > c.chapters ? `, ${c.episodes} with a podcast` : `, only ${c.episodes} with a podcast`;
   const base = `A new chapter when Matthew approves a week’s draft${c ? ` (${c.chapters} so far${pod})` : ""}`;
-  return day ? `${base}; the next is dated ${day}. Numbers every Sunday.` : `${base}, and the numbers every Sunday.`;
+  // A drafted date is not stated at all (as on main before #5939): it is not a promise, and the clause cost a wrapped line.
+  return `${base}, and the numbers every Sunday.`;
 }
 
 // ── the argument (round 8) ─────────────────────────────────────────────────────

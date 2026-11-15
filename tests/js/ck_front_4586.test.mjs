@@ -205,8 +205,10 @@ test("the chapter and podcast lines are labelled as AI-written and carry Read an
 test("the follow box says what arrives next and when", () => {
   // The capture's cadence marks the date a draft, not a promise: the box does not say "due".
   assert.ok(B.next.data.chapter.data.drafted_not_promised);
+  // A drafted date is not stated at all: it is not a promise, and /start/ has no line to spare (kit_page_gate's 4-screen budget).
   const drafted = dayInWords(B.next.data.chapter.data.date);
-  assert.equal(F.followLine(B.next), `A new chapter when Matthew approves a week’s draft; the next is dated ${drafted}. Numbers every Sunday.`);
+  assert.equal(F.followLine(B.next), "A new chapter when Matthew approves a week’s draft, and the numbers every Sunday.");
+  assert.ok(!F.followLine(B.next).includes(drafted));
   const promised = { ...B.next, data: { ...B.next.data, chapter: { ...B.next.data.chapter, data: { date: "2026-10-14" } } } };
   assert.equal(F.followLine(promised), "The next chapter is due Wednesday, October 14. The week’s numbers go out every Sunday.");
   assert.equal(F.followLine({}), "A new chapter when Matthew approves a week’s draft, and the numbers every Sunday.");
