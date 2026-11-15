@@ -421,12 +421,20 @@ def _load_role_policies():
     for path in (os.path.join(REPO, "cdk"), stacks):
         if path not in sys.path:
             sys.path.insert(0, path)
+    names = sorted(f[:-3] for f in os.listdir(stacks) if f.startswith("role_policies") and f.endswith(".py"))
+    # Every role-policy module is imported FRESH under this stub, as a set: they import one another (as
+    # `stacks.role_policies_*`), and a copy another caller imported earlier under a thinner stub would hand back
+    # statements that carry no conditions — every conditioned grant would then read as unconditioned. Both spellings
+    # of each name are set aside first and put back afterwards, so this never changes what another caller holds.
+    spellings = [n for name in names for n in (name, f"stacks.{name}")]
+    kept = {n: sys.modules.pop(n) for n in spellings if n in sys.modules}
     mods = []
     try:
-        for name in sorted(f[:-3] for f in os.listdir(stacks) if f.startswith("role_policies") and f.endswith(".py")):
-            sys.modules.pop(name, None)
-            mods.append(importlib.import_module(name))
+        mods = [importlib.import_module(f"stacks.{n}") for n in names]
     finally:
+        for n in spellings:
+            sys.modules.pop(n, None)
+        sys.modules.update(kept)
         for k, v in saved.items():
             if v is None:
                 sys.modules.pop(k, None)
@@ -461,7 +469,7 @@ def iam_statements() -> list:
             params = inspect.signature(fn).parameters.values()
             if any(p.default is inspect.Parameter.empty and p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD) for p in params):
                 continue
-            where = f"{mod.__name__}.{fn_name}"
+            where = f"{mod.__name__.rsplit('.', 1)[-1]}.{fn_name}"
             try:
                 stmts = fn()
             except Exception:  # noqa: BLE001 — a builder that cannot be evaluated here is listed, not hidden
