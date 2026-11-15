@@ -3076,7 +3076,7 @@ Where `coach_id` is one of: `sleep_coach`, `nutrition_coach`, `training_coach`, 
 | `last_interaction_date` | string | YYYY-MM-DD this record was last updated (the signal-diff cursor) |
 | `tenure_days` | number | Days between `first_interaction_date` and `last_interaction_date` |
 | `trust_signals` | list | Rolling log of recent evidence strings (kept/broken commitments, confirmed/refuted predictions, board Q&A), capped at 8 |
-| `context_summary` | string | One-line deterministic summary of phase/rapport/tenure |
+| `context_summary` | string | One-line deterministic summary of phase/rapport/tenure. Owner-side only: not in the public `/api/coach/{id}` `dossier.relationship` projection (owner ruling 2026-11-15, #5611) |
 | `updated_at` | string | ISO timestamp |
 
 Written by `coach_state_updater.py` (`_update_relationship_state`) after every coach
