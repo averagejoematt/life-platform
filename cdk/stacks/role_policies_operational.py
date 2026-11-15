@@ -317,6 +317,9 @@ def operational_dlq_consumer() -> list[iam.PolicyStatement]:
     """DLQ consumer: reads the DLQ, re-drives transient failures to the source
     Lambda, tracks retries in a durable DDB ledger, archives + escalates
     permanent/repeated failures (S3 + SNS page + SES summary). ADR-115 / #402."""
+    # #5980: read at call time — role_policies_base (imported above) is what puts lambdas/ on sys.path.
+    from operational.redrive_targets import REDRIVE_TARGETS
+
     return [
         iam.PolicyStatement(
             sid="SQS",
@@ -366,10 +369,12 @@ def operational_dlq_consumer() -> list[iam.PolicyStatement]:
             actions=["events:ListTargetsByRule"],
             resources=[f"arn:aws:events:{REGION}:{ACCT}:rule/LifePlatform*"],
         ),
+        # #5980: scoped from `function:*` to the functions the consumer is allowed to re-drive —
+        # operational/redrive_targets.py, the same set the Lambda checks before every invoke.
         iam.PolicyStatement(
             sid="RedriveInvoke",
             actions=["lambda:InvokeFunction"],
-            resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:*"],
+            resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:{name}" for name in sorted(REDRIVE_TARGETS)],
         ),
     ]
 
