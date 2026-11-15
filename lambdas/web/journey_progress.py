@@ -21,7 +21,7 @@ def displayed_progress(start_weight_lbs: object, goal_weight_lbs: object, curren
     The #1225 display policy, in one place: weights are shown to ONE decimal and every delta is derived from those
     same displayed values, so shown_start − shown_now == shown_lost exactly. ``lost`` is signed (start − current)."""
     try:
-        start, goal, cur = (round(float(v), 1) for v in (start_weight_lbs, goal_weight_lbs, current_weight_lbs))  # type: ignore[arg-type]
+        start, goal, cur = (round(float(v), 1) for v in (start_weight_lbs, goal_weight_lbs, current_weight_lbs))
     except (TypeError, ValueError):
         return None
     if not all(math.isfinite(v) for v in (start, goal, cur)):
