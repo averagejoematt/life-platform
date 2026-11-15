@@ -227,6 +227,29 @@ def _positive(value):
         return False
 
 
+def _nutrition_logged_7d(table, today_pt) -> int:
+    """N2: how many of the SEVEN finished days before today carry a whole day's food log. Never raises.
+
+    #5929 (aiq-3) fixed two defects behind the narrative's "N/7 days logged". The window was
+    ``DATE#{today-7}`` .. ``DATE#{today}~``, eight dates under a "/7" label, so it could read 8/7.
+    And any row with calories counted as logged, so a partial export (#5954: the row of the export's
+    own creation day, holding only what was eaten by then) read as a logged day. The window is now
+    the seven days that have ended, and the count reads ``complete_logs``, the ONE predicate #5954
+    put every reader on. Stubs (#5607) drop out by the same predicate.
+    """
+    from health.nutrition_logging import complete_logs, row_date
+
+    end = datetime.strptime(today_pt, "%Y-%m-%d").date()
+    lo, hi = (end - timedelta(days=7)).isoformat(), (end - timedelta(days=1)).isoformat()
+    try:
+        items = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}macrofactor") & Key("sk").between(f"DATE#{lo}", f"DATE#{hi}~"),
+        ).get("Items", [])
+    except Exception:
+        return 0
+    return sum(1 for i in complete_logs(items) if lo <= (row_date(i) or "") <= hi and _positive(i.get("total_calories_kcal")))
+
+
 def pulse(*, _g) -> dict:
     """
     GET /api/pulse
@@ -368,18 +391,8 @@ def pulse(*, _g) -> dict:
     #     (owner ruling 2026-11-05, common.activity_publication) — no glyph, no read, and so no share
     #     of signals_reporting / signals_total either (omit, never mark).
 
-    # --- N2: Nutrition logging check (last 7 days) ---
-    nutrition_logged_7d = 0
-    try:
-        _d7 = (datetime.now(PT) - timedelta(days=7)).strftime("%Y-%m-%d")
-        _mf_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}macrofactor") & Key("sk").between(f"DATE#{_d7}", f"DATE#{today_pt}~"),
-        )
-        nutrition_logged_7d = sum(
-            1 for i in _mf_resp.get("Items", []) if i.get("total_calories_kcal") and float(str(i["total_calories_kcal"])) > 0
-        )
-    except Exception:
-        pass
+    # --- N2: Nutrition logging check (the seven finished days before today) ---
+    nutrition_logged_7d = _nutrition_logged_7d(table, today_pt)
 
     # --- Glyph state classification (DPR-1.02) ---
     # RULE: gray = genuinely no data (value is None/null/absent).
@@ -586,7 +599,7 @@ def pulse(*, _g) -> dict:
         else:
             narrative_parts.append(f"Recovery at {r_val}%.")
     if nutrition_logged_7d > 0:
-        narrative_parts.append(f"Nutrition: {nutrition_logged_7d}/7 days logged.")
+        narrative_parts.append(f"Nutrition: {nutrition_logged_7d} of the 7 days before today fully logged.")
     if not narrative_parts or signals_reporting == 0:
         narrative = "No data reported today. Signals populate as wearables sync."
     else:
