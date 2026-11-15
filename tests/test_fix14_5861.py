@@ -470,3 +470,15 @@ def test_the_prescription_carries_the_minutes_the_75_minute_fit_enforces():
 
     off = _week(A, {(live_session, "fit_routine"): stale})
     assert any(s["lifting_minutes"] != s["rx_minutes"] for s in off["week"]["sessions"])
+
+
+def test_a_one_or_two_morning_week_reserves_no_dose_minutes_on_the_fit():
+    """Found while reconciling planner and served counts: the 75-minute fit kept the conditioning dose's 10 minutes free on a
+    2-morning week's host (where no dose is served and the plan reserves none), and cut a planned calf slot for them. The fit
+    now reserves exactly what the plan does. Control: a 3-morning week still reserves them."""
+    from training import live_session
+
+    rx = {"session_role": "upper_heavy", live_session.MARK: {"conditioning_host": "upper_heavy", "week_skip": ["a", "b", "c"]}}
+    assert live_session._dose_reserve(rx) == 0
+    three = rx | {live_session.MARK: rx[live_session.MARK] | {"week_skip": ["a", "b"]}}
+    assert live_session._dose_reserve(three) == int(live_volume.reserve_minutes())

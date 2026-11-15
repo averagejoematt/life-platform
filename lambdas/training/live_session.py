@@ -574,6 +574,8 @@ def _dose_reserve(rx: dict[str, Any]) -> int:
         return 0
     if fat.get("state") in ("strained", "overreached") or fat.get("action") == "deload_recommended" or fat.get("strain_signals"):
         return 0
+    if len((rx.get(MARK) or {}).get("week_skip") or ()) >= 3:  # fix round 14: a 1-2 morning week reserves none (as the plan)
+        return 0
     return int(live_volume.reserve_minutes())
 
 
