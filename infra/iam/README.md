@@ -194,6 +194,30 @@ Role.AssumeRolePolicyDocument` lists exactly the two `environment:` subjects;
 (d) CloudTrail `AssumeRoleWithWebIdentity` for `github-actions-deploy-role` shows only
 `environment:` subjects after step 5.
 
+### APPLIED 2026-11-15 — the readonly role's alarm-history + qa-smoke cause read for the alarm-citation gate (#5934)
+
+> Applied ~06:00Z with the put-role-policy command below (owner-approved); `get-role-policy` read back
+> both Sids. The role's entry was deleted from `_PENDING_PERMISSIONS_APPLY` in the same PR.
+
+`github-actions-readonly-role.permissions.json` gains two read-only statements so wrap-nightly's
+`wrap-alarm-citations` leg can run `scripts/check_alarm_citations.py` unattended:
+`CloudWatchAlarmHistoryRead` (`cloudwatch:DescribeAlarmHistory` on `*` — the #2912 fired-and-cleared
+leg; the call takes no resource ARN) and `QaSmokeCauseLogRead` (`logs:FilterLogEvents` on
+`arn:aws:logs:us-west-2:205930651321:log-group:/aws/lambda/life-platform-qa-smoke:*` only — the
+#3501 live-cause leg). Both are reads; no write, no new trust subject.
+
+**Apply — the OWNER, before the leg can go green** (until then it reds UNVERIFIED nightly and
+files its own tracker):
+
+```bash
+aws iam put-role-policy --role-name github-actions-readonly-role --policy-name readonly-permissions \
+  --policy-document file://infra/iam/github-actions-readonly-role.permissions.json
+python3 deploy/verify_oidc_iam.py --strict   # expect CLEAN
+```
+
+Then delete the role's entry from `_PENDING_PERMISSIONS_APPLY` (`tests/test_grant_enumeration_drift.py`)
+per the #2824 rule. Rollback: `git revert` the PR and re-run the same put-role-policy.
+
 ### APPLIED 2026-10-23 — the readonly role's Scheduler read for I6 (#5252)
 
 > Applied by the owner ~04:48Z with

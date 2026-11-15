@@ -726,13 +726,12 @@ _PENDING_PERMISSIONS_APPLY: dict[str, str] = {
     # 2026-11-15: the #5513 deploy-role entry (GetSecretValue removed; CDKBootstrapRoleAssume names the 12
     # bootstrap roles) was applied ~06:10Z with `bash deploy/setup_github_oidc.sh`; its verifier showed the
     # deploy role matching. Removed here per the same #2824 rule.
-    "github-actions-remediation-role": (
-        "2026-11-15 (#5821): OpsDigestLine — sns:Publish on life-platform-alerts-digest, so the remediation "
-        "summary becomes daily LP digest lines (remediation/agent.py digest_report; until applied the publish "
-        "fails and the email goes out as before). Apply: `aws iam put-role-policy --role-name "
-        "github-actions-remediation-role --policy-name remediation-permissions --policy-document "
-        "file://infra/iam/github-actions-remediation-role.permissions.json` (or bash deploy/setup_remediation_role.sh)"
-    ),
+    # 2026-11-15: the #5934 readonly-role entry (CloudWatchAlarmHistoryRead + QaSmokeCauseLogRead for
+    # wrap-nightly's alarm-citations leg) was applied ~06:00Z with the same put-role-policy command;
+    # get-role-policy read back both Sids. Removed here per the same #2824 rule.
+    # 2026-11-15: the #5821 remediation-role entry (OpsDigestLine) was applied by the owner ~06:20Z with
+    # `bash deploy/setup_remediation_role.sh`; its post-apply verifier no longer listed the role as drifted.
+    # Removed here per the same #2824 rule.
 }
 
 
