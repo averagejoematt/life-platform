@@ -1701,6 +1701,12 @@ PILLAR_COMPUTERS = {
     "relationships": compute_relationships_raw,
 }
 
+# The order compute_character_sheet builds and SUMS the pillars in (Step 1's computers, then Step 2's consistency
+# meta-pillar). It is part of the headline's arithmetic, not a presentation detail: the headline level is the FLOOR of a
+# float weighted mean, and at an exact integer boundary the sum's order decides the floor (2026-11-14: exactly 20 —
+# 19.999999999999996 in this order, 20.000000000000004 alphabetically). progression_receipts replays in this order.
+HEADLINE_PILLAR_ORDER = (*PILLAR_COMPUTERS, "consistency")
+
 # Keys a computed record carries that the sheet item never stores: the #1373 fire-time transition capture (it persists
 # to the receipt partition) and the public variant's own capture (owner ruling 2026-11-05, health.character_public).
 _UNSTORED_KEYS = ("progression_transitions", "public_progression_transitions")
