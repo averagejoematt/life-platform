@@ -7,11 +7,12 @@
 # hook's inline `PATTERN` used a scope class of `[a-z0-9._-]+`, which REJECTS
 # this repo's own multi-issue commit convention — subjects like
 # `fix(#3535,#3537): …` — because `#` and `,` are outside that class. But
-# `deploy/agent_commit.sh` commits with `git commit --no-verify` (deliberately,
-# to skip the hook's OTHER job, the doc-sync sweep) and never checked the
-# subject at all, so the exact subject a plain `git commit` would refuse still
-# landed on main whenever it went through the script. Two lanes on 2026-09-06
-# used the multi-issue form and only the bypass let it through.
+# `deploy/agent_commit.sh` then skipped every hook (to keep the hook's OTHER job,
+# the doc-sync sweep, off a lane) and never checked the subject at all, so the
+# exact subject a plain `git commit` would refuse still landed on main whenever
+# it went through the script. Two lanes on 2026-09-06 used the multi-issue form
+# and only that skip let it through. (Since 2026-11-14 the script commits
+# through the hooks; this shared pattern is still the one definition.)
 #
 # DECISION (#3642): WIDEN, not narrow. `git log --oneline` shows the
 # multi-issue scope in real, heavy use on main (driver squash-merge titles

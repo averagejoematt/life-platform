@@ -1785,7 +1785,15 @@ GUARD_PROOFS.update(
                 "diff --stat` clean): OK, exit 0. The offline suite pins the identical shapes deterministically — "
                 "TestMustFailCases::test_an_entry_escalated_to_allow_fails_by_name and "
                 "::test_zero_execution_sites_fails — 21 tests total in tests/test_no_verify_set_guard_3642.py, "
-                "all passing."
+                "all passing. RE-PROVEN 2026-11-14 after the owner ruled routine hook bypassing out and the rule "
+                "inverted (the registered EXECUTION population is now ZERO; deploy/agent_commit.sh commits through "
+                "the hooks). M2' in the real tracked file: the live commit line changed back to "
+                '`git commit --no-verify -m "${MSG}" || refuse 1` — ARMED: exit 1, `EXECUTION site '
+                "deploy/agent_commit.sh:<line> runs a hook-skipping commit — none is registered since 2026-11-14`; "
+                "REVERTED from a byte copy: `OK — 19 site(s), all registered.`, exit 0. M1 (the settings escalation) "
+                "is unchanged and stays pinned offline by ::test_an_entry_escalated_to_allow_fails_by_name; the old "
+                "M2 shape (the line going away) is now the registered state, pinned by "
+                "::test_zero_execution_sites_is_the_registered_state; 22 tests."
             ),
             "scope": (
                 "A verdict on the CLASSIFIER (grep population + structural .claude/settings.json parse), not on "

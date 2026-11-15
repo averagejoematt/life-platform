@@ -92,6 +92,17 @@ if [[ -n "$STAGED_PY" ]]; then
   echo "[pre-commit] ✓ black $(pinned_formatter_version black) + ruff $(pinned_formatter_version ruff) clean on staged Python"
 fi
 
+# ── agent-commit-aware:v1 (owner ruling 2026-11-14: no routine --no-verify) ───────────────
+# deploy/agent_commit.sh used to commit with --no-verify, so NO hook ran on a lane commit. It now commits THROUGH
+# this hook: the format gate above has run, and the commit-msg hook will. What it must not get is the doc-sync
+# sweep below — correct for the driver on main, a guaranteed conflict on a lane, and agent_commit stages only the
+# paths it was handed. So the sweep is skipped for that one caller, by name. This is not a bypass of a gate: the
+# sweep is a convenience write, and every check in this hook has already run.
+if [[ "${LP_AGENT_COMMIT:-}" == "1" ]]; then
+  echo "[pre-commit] doc-sync sweep skipped for agent_commit (it stages only the named paths; main's reconcile owns the literals)"
+  exit 0
+fi
+
 # ── Doc-sync (#818: hook runs sync_doc_metadata.py directly — this IS the
 #    documented behavior in docs/CONVENTIONS.md, no wrapper indirection) ──────
 if [[ -f "$PROJ_ROOT/deploy/sync_doc_metadata.py" ]]; then
