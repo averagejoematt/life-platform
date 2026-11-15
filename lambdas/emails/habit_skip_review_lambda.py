@@ -7,8 +7,11 @@ stored `skipped` means "unconfirmed — he forgot to log it", not a decision. Th
 queue the owner settles later in Habitify (as passed or failed); the next habitify re-ingest
 then carries his answer onto the record (`habitify_lambda.upgrade_only_merge`, #4622).
 
-Nothing surfaced that queue — the owner had to remember to look. This Lambda does, once a
-week:
+Nothing surfaced that queue — the owner had to remember to look. This Lambda did, once a
+week, by email. #5821 (owner ruling 2026-11-15): "Habits to settle" no longer arrives as its
+own email — the Saturday Morning Brief carries the same list as a section, built from the
+same `collect_skips` / `render_lines` below (`brief_section`). This Lambda keeps its schedule
+and its run record, and sends nothing:
 
   * Reads the stored habitify records for the previous seven Pacific days (yesterday and
     the six before it — today has not closed) from DynamoDB ONLY. No Habitify API call, no
@@ -18,7 +21,8 @@ week:
     (`habit_statuses[name].periodicity`, written by habitify_lambda since #3666), not a
     day the owner owes an answer for. A row with no periodicity predates that field and is
     treated as daily.
-  * Sends ONE email to the owner — only when the list is non-empty.
+  * Sends NOTHING (#5821). Its role still carries an SES grant; retiring that grant, the
+    schedule and the function is a later CDK change (the PR that folded it says so).
   * Records every run, empty or not, as an EMF datapoint (`LifePlatform/Email` ::
     `HabitSkipReviewRun` + `HabitSkipQueueDays` / `HabitSkipQueueHabits`), so a quiet week
     ("nothing skipped") and a dead cron ("never ran") stay distinguishable. The producer
@@ -26,16 +30,15 @@ week:
     weekly cadence — its row in tests/test_heartbeat_completeness.py.
 
 PRIVACY. The repo is public and some habit names are sensitive. Habit names appear ONLY in
-the body of the owner-only email; logs and metrics carry counts, never a name.
+the owner-only Morning Brief section; logs and metrics carry counts, never a name.
 
-Schedule: Saturday 16:00 UTC (fixed, no DST drift — 09:00 PDT / 08:00 PST).
-Invoke with {"dry_run": true} to build without sending: the logs carry the counts, the
-response payload (invoker only, never logged) carries the rendered lines.
+Schedule: Saturday 09:00 Pacific (config/schedules.json), an hour before the 10:00 brief.
+Invoke with {"dry_run": true} to preview: the logs carry the counts, the response payload
+(invoker only, never logged) carries the rendered lines.
 """
 
 from __future__ import annotations
 
-import html
 import json
 import logging
 import os
@@ -45,7 +48,7 @@ import boto3
 from common import digest_utils  # the shared paginated, phase-scoped DATE# range read (#970)
 from common.habit_pause import is_name_paused_on  # #5007
 from common.pacific_time import pacific_today, parse_day_key, shift_day_key
-from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
+from common.send_guard import is_dry_run  # #2222: the dry-run vocabulary (nothing is sent since #5821)
 
 # OBS-1: structured logger
 try:
@@ -59,10 +62,9 @@ except ImportError:  # pragma: no cover — bundle-dependent
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
-RECIPIENT = os.environ.get("EMAIL_RECIPIENT", "lifeplatform@mattsusername.com")
-SENDER = os.environ.get("EMAIL_SENDER", "lifeplatform@mattsusername.com")
 
 SOURCE = "habitify"
+SATURDAY = 5  # date.weekday(): the brief carries the queue on the day this review runs
 WINDOW_DAYS = 7
 SKIPPED = "skipped"
 DAILY = "daily"
@@ -74,7 +76,7 @@ HABITS_METRIC = "HabitSkipQueueHabits"
 
 RESOLVE_HINT = (
     "To settle them: mark each one done or missed in Habitify (the next habitify ingest carries the answer), "
-    "or paste this email into a Claude session / run /habitify review."
+    "or paste this list into a Claude session / run /habitify review."
 )
 
 
@@ -121,25 +123,6 @@ def render_lines(queue: list[tuple[str, list[str]]]) -> list[str]:
     return [f"{day_label(d)}: {', '.join(names)}" for d, names in queue]
 
 
-def build_email(queue: list[tuple[str, list[str]]], dates: list[str]) -> tuple[str, str, str]:
-    """(subject, text body, html body) for a non-empty queue."""
-    n_habits = sum(len(names) for _, names in queue)
-    lines = render_lines(queue)
-    subject = f"Habits to settle: {n_habits} skipped across {len(queue)} day(s) ({day_label(dates[0])} to {day_label(dates[-1])})"
-    text = "\n".join(
-        ["Habitify marked these as skipped (not logged by bedtime). Each one is either done or missed:", ""] + lines + ["", RESOLVE_HINT]
-    )
-    items = "".join(f"<li style='margin:4px 0'>{html.escape(line)}</li>" for line in lines)
-    body = (
-        "<div style='font-family:-apple-system,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5;color:#222'>"
-        "<p>Habitify marked these as <b>skipped</b> (not logged by bedtime). Each one is either done or missed:</p>"
-        f"<ul style='padding-left:20px'>{items}</ul>"
-        f"<p style='color:#555'>{html.escape(RESOLVE_HINT)}</p>"
-        "</div>"
-    )
-    return subject, text, body
-
-
 def emit_run_metric(days: int, habits: int, sent: bool) -> None:
     """One EMF line per run — the 'it ran' record, empty week included. Counts only."""
     doc = {
@@ -183,7 +166,26 @@ def _load_registry(table) -> dict:
         return {}
 
 
-def _run(event: dict, context, table=None, ses=None) -> dict:
+def brief_section(table, today: str, user_id: str = USER_ID) -> dict | None:
+    """#5821: the Saturday Morning Brief's "Habits to settle" section, or None.
+
+    Saturday only (the weekly cadence this review had as an email); the same seven closed
+    Pacific days and the same pause-aware queue. Read-only. None on an empty week, as the
+    email was. The lines carry habit names: they go to the owner-only brief body and nowhere
+    else (never a log line, a metric or a public artifact)."""
+    day = parse_day_key(today)
+    if day is None or day.weekday() != SATURDAY:
+        return None
+    dates = window_dates(today)
+    queue = collect_skips(digest_utils.query_range(table, SOURCE, dates[0], dates[-1], user_id=user_id), dates, _load_registry(table))
+    if not queue:
+        return None
+    n_habits = sum(len(names) for _, names in queue)
+    head = f"{n_habits} skipped across {len(queue)} day(s), {day_label(dates[0])} to {day_label(dates[-1])}:"
+    return {"key": "habits_to_settle", "title": "Habits to settle", "lines": [head] + render_lines(queue) + [RESOLVE_HINT]}
+
+
+def _run(event: dict, context, table=None) -> dict:
     dry_run = is_dry_run(event)
     dates = window_dates(event.get("today") if isinstance(event, dict) else None)
     table = table or boto3.resource("dynamodb", region_name=REGION).Table(TABLE_NAME)
@@ -192,7 +194,7 @@ def _run(event: dict, context, table=None, ses=None) -> dict:
     n_days = len(queue)
     n_habits = sum(len(names) for _, names in queue)
     logger.info(
-        "[habit-skip-review] %s..%s: %d stored day(s), %d skipped daily habit(s) across %d day(s)",
+        "[habit-skip-review] %s..%s: %d stored day(s), %d skipped daily habit(s) across %d day(s) — folded into the brief, not mailed",
         dates[0],
         dates[-1],
         len(records),
@@ -200,37 +202,20 @@ def _run(event: dict, context, table=None, ses=None) -> dict:
         n_days,
     )
 
-    sent = False
-    if queue:
-        subject, text, body = build_email(queue, dates)
-        ses = ses or boto3.client("sesv2", region_name=REGION)
-        guarded_send_email(
-            ses,
-            dry_run,
-            FromEmailAddress=SENDER,
-            Destination={"ToAddresses": [RECIPIENT]},
-            Content={
-                "Simple": {
-                    "Subject": {"Data": subject, "Charset": "UTF-8"},
-                    "Body": {"Text": {"Data": text, "Charset": "UTF-8"}, "Html": {"Data": body, "Charset": "UTF-8"}},
-                }
-            },
-        )
-        sent = not dry_run
-    else:
-        logger.info("[habit-skip-review] nothing skipped this week — no email")
-
-    emit_run_metric(n_days, n_habits, sent)
+    # #5821: no SES call. The Saturday Morning Brief renders this queue (`brief_section`); the
+    # run record below stays, so the producer census still tells "ran, nothing" from "never ran".
+    emit_run_metric(n_days, n_habits, False)
     result = {
         "statusCode": 200,
         "window": [dates[0], dates[-1]],
         "skipped_days": n_days,
         "skipped_habits": n_habits,
-        "sent": sent,
+        "sent": False,
+        "folded_into_brief": True,
         "dry_run": dry_run,
     }
     if dry_run:
         # The rendered lines go back to the INVOKER only (the response payload is not
-        # logged) so a dry run can preview the email; logs above stay counts-only.
+        # logged) so a dry run can preview the section; logs above stay counts-only.
         result["lines"] = render_lines(queue)
     return result

@@ -492,8 +492,8 @@ def _mark_ledger_failed(date_pt: str, nudge_item: dict, error: Exception) -> Non
 
 
 def _send_steps_email(text: str, dry_run: bool = False, subject: str = "Steps today", label: str = "Steps note") -> None:
-    """#5056: the owner-only steps note — plain, no coach persona (it is deterministic, no model). #5098: the protein
-    breakfast note reuses it with its own subject and label."""
+    """#5056: the owner-only steps note — plain, no coach persona (it is deterministic, no model). (#5098's protein note
+    reused it until #5821 folded that note into the Morning Brief.)"""
     html = (
         "<div style='font-family:Georgia,serif;max-width:540px;margin:0 auto;padding:24px;color:#1a1a1a'>"
         f"<p style='font-size:16px;line-height:1.6'>{text}</p>"
@@ -523,14 +523,26 @@ def _steps_pass(now_utc: datetime, dry_run: bool) -> dict:
 
 
 def _protein_pass(now_utc: datetime, dry_run: bool) -> dict:
-    """#5098: the protein breakfast nudge — an independent pass on this hourly tick (own ledger row; fail-soft)."""
+    """#5098: the protein breakfast nudge — an independent pass on this hourly tick (own ledger row; fail-soft).
+
+    #5821 (owner ruling 2026-11-15): it no longer mails "Protein this morning". The Morning Brief carries the note as a
+    section (`protein_nudge_runner.brief_line`); this pass still evaluates, stamps the EVAL dead-man row and claims the
+    day, and settles the claim `folded_into_brief` instead of `sent`. The deliverer is a no-op — no SES call."""
     try:
         from emails import protein_nudge_runner
 
-        def send(text: str) -> None:
-            _send_steps_email(text, dry_run, subject="Protein this morning", label="Protein note")
+        def fold(_text: str) -> None:
+            return None  # the brief renders it; nothing leaves this Lambda
 
-        return protein_nudge_runner.run(_table(), send, now_utc, budget_guard.current_tier(), user=USER_ID, dry_run=dry_run)
+        return protein_nudge_runner.run(
+            _table(),
+            fold,
+            now_utc,
+            budget_guard.current_tier(),
+            user=USER_ID,
+            dry_run=dry_run,
+            delivered_status=protein_nudge_runner.FOLDED,
+        )
     except Exception as e:  # noqa: BLE001 — never let the protein pass break the coach nudge tick
         logger.error("[protein-nudge] pass failed: %s", e)
         return {"send": False, "reason": f"error:{type(e).__name__}"}

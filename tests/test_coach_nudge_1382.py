@@ -715,3 +715,43 @@ def test_1793_prediction_read_carries_phase_filter(monkeypatch):
     assert len(fake.query_calls) >= 2, "expected one PREDICTION# query per operational coach"
     for c in fake.query_calls:
         assert "FilterExpression" in c and "#phase" in str(c["FilterExpression"]), "#1793: PREDICTION# reads must be phase-filtered"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #5821 — "Protein this morning" is folded into the Morning Brief
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def test_the_protein_pass_no_longer_mails_and_settles_the_day_as_folded(monkeypatch):
+    """Owner ruling 2026-11-15: the breakfast note is a section of the Morning Brief, not its own email.
+
+    A day that IS behind at the 10:10 PT tick (the case that used to mail "Protein this morning") still evaluates,
+    stamps its EVAL dead-man row and claims the day — and makes NO SES call; the claim settles `folded_into_brief`.
+    Must-fail control: restoring the pre-#5821 `_send_steps_email(...)` deliverer puts one send in `ses.sends`."""
+    from emails import protein_nudge_runner as runner
+    from training import training_charter
+
+    monkeypatch.delenv(training_charter.PRIVATE_ENV_VAR, raising=False)
+    monkeypatch.setattr(training_charter, "_from_s3", lambda key: None)
+    training_charter.reset_cache()
+    tick_utc = datetime(2026, 10, 20, 10, 10, tzinfo=PT).astimezone(timezone.utc)  # frozen: the first in-window tick
+    below = float(training_charter.charter_value("nutrition.protein.feeding_threshold_g")) - 5
+    behind_day = {
+        "pk": "USER#matthew#SOURCE#macrofactor",
+        "sk": "DATE#2026-10-20",
+        "date": "2026-10-20",
+        "total_protein_g": below,
+        "food_log": [{"time": "08:15", "protein_g": below, "food_name": "x"}],
+    }
+    fake = _fake_table(rows=[behind_day])
+    ses, _ = _wire(monkeypatch, fake, now_utc=tick_utc)
+    try:
+        out = shell._protein_pass(tick_utc, False)
+    finally:
+        training_charter.reset_cache()
+
+    assert out["send"] is True and out["reason"] == "behind_logged_below", out  # the verdict still fires...
+    assert ses.sends == [], "the protein pass mailed — #5821 folded it into the Morning Brief"  # ...but nothing is mailed
+    assert (runner.LEDGER_PK, "EVAL#2026-10-20") in fake.store
+    settled = [u for u in fake.updates if u["Key"]["sk"] == "PROTEIN_NUDGE#2026-10-20"]
+    assert settled and settled[-1]["ExpressionAttributeValues"][":s"] == runner.FOLDED

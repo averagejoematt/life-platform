@@ -20,8 +20,14 @@ v1.2.0 (#2216): the AI-3 validation and IC-15 insight gates no longer key off
         failure marker (`_AI_UNAVAILABLE_MARKER`) no prompt asks for. The handler
         also accepts `{"dry_run": true}`: it builds the full review and returns
         it WITHOUT calling SES or writing any durable row.
+#5821 (owner ruling 2026-11-15): the review no longer arrives as its own "Nutrition Review"
+        email. It still gathers, commissions the panel, validates and renders; instead of SES it
+        stores a compact brief section on its weekly summary row (`brief_headline`, and a short
+        plain-text `brief_excerpt` of a real panel edition), and the Morning Brief renders that
+        section the morning after the run (emails.brief_lines). This Lambda sends nothing.
 """
 
+import html as _html
 import json
 import logging
 import os
@@ -57,14 +63,11 @@ _logger_std.setLevel(logging.INFO)
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
-RECIPIENT = os.environ["EMAIL_RECIPIENT"]
-SENDER = os.environ["EMAIL_SENDER"]
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
-ses = boto3.client("sesv2", region_name=REGION)
 secrets = boto3.client("secretsmanager", region_name=REGION)
 s3_client = boto3.client("s3", region_name=REGION)
 S3_BUCKET = os.environ["S3_BUCKET"]
@@ -967,7 +970,10 @@ def build_email_html(summary_table, ai_content, dates, weight_info, titration_ht
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def store_weekly_summary(dates, summary):
+def store_weekly_summary(dates, summary, brief=None):
+    """The weekly summary row (`SOURCE#nutrition_review` / `DATE#<this_end>`). #5821: `brief` carries the compact
+    Morning Brief section ({brief_headline, brief_excerpt}) on the same row — owner-only free text in a partition the
+    public read path already gates as narrative (web/narrative_publication.NARRATIVE_SOURCES)."""
     try:
         pk = f"USER#{USER_ID}#SOURCE#nutrition_review"
         sk = f"DATE#{dates['this_end']}"
@@ -978,13 +984,36 @@ def store_weekly_summary(dates, summary):
             "source": "nutrition_review",
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
-        for k, v in summary.items():
+        for k, v in {**summary, **(brief or {})}.items():
             if v is not None:
                 item[k] = Decimal(str(v)) if isinstance(v, float) else v
         table.put_item(Item=item)
         logger.info(f"Stored weekly summary: {sk}")
     except Exception as e:
         logger.warning(f"Failed to store summary: {e}")
+
+
+# #5821: the brief section's excerpt — a few plain-text sentences of a real panel edition, never the whole panel.
+BRIEF_EXCERPT_MAX_CHARS = 420
+
+
+def brief_excerpt(ai_content, max_chars=BRIEF_EXCERPT_MAX_CHARS):
+    """Plain text from the panel's HTML (tags dropped, entities decoded, whitespace collapsed), cut at the last sentence
+    end inside `max_chars` (else at a word, with an ellipsis). '' for empty input."""
+    text = re.sub(r"\s+", " ", _html.unescape(re.sub(r"<[^>]+>", " ", ai_content or ""))).strip()
+    if len(text) <= max_chars:
+        return text
+    cut = text[:max_chars]
+    end = max(cut.rfind(". "), cut.rfind("! "), cut.rfind("? "))
+    return cut[: end + 1] if end > max_chars // 3 else cut.rsplit(" ", 1)[0] + "…"
+
+
+def _headline(week_end, avg_cal, avg_pro):
+    """The review's one-line verdict — its old email subject, minus the "Nutrition Review" label. ADR-104: an absent
+    average says so, never a 0."""
+    cal_part = f"{int(avg_cal)} kcal" if avg_cal is not None else "calories not logged"
+    pro_part = f"{int(avg_pro)}g protein" if avg_pro is not None else "protein not logged"
+    return f"Week ending {week_end} - {cal_part} - {pro_part} (daily averages)"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1201,16 +1230,13 @@ def lambda_handler(event, context):
     summary = compute_weekly_summary(days_this)
     # #2221: a week of records that carry no totals (the partial-record case, and
     # the shape a stalled MacroFactor feed produces) leaves these None. `int(None)`
-    # raised here, BEFORE ses.send_email — losing the entire review rather than
+    # raised here, BEFORE the send (#5821: now the brief-section store) — losing the entire review rather than
     # degrading. ADR-104: say the number is absent, never substitute a 0.
-    avg_cal = summary.get("avg_calories")
-    avg_pro = summary.get("avg_protein_g")
-    cal_part = f"{int(avg_cal)} kcal" if avg_cal is not None else "calories not logged"
-    pro_part = f"{int(avg_pro)}g protein" if avg_pro is not None else "protein not logged"
-    subject = f"Nutrition Review - {dates['this_end']} - {cal_part} - {pro_part}"
+    headline = _headline(dates["this_end"], summary.get("avg_calories"), summary.get("avg_protein_g"))
+    subject = f"Nutrition Review - {headline}"
 
     if dry_run:
-        logger.info(f"[dry-run] Nutrition review built, NOT sent: {subject}")
+        logger.info(f"[dry-run] Nutrition review built, NOT stored: {subject}")
         return {
             "statusCode": 200,
             "dry_run": True,
@@ -1223,28 +1249,20 @@ def lambda_handler(event, context):
             "body": f"Nutrition review DRY RUN (not sent): {subject}",
         }
 
-    ses.send_email(
-        FromEmailAddress=SENDER,
-        Destination={"ToAddresses": [RECIPIENT]},
-        Content={
-            "Simple": {
-                "Subject": {"Data": subject, "Charset": "UTF-8"},
-                "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
-            }
-        },
-    )
-    # DIL-025: ONE line after the SES call. `store_weekly_summary` and the IC-15
-    # write below used to sit between the send and its only completion record.
+    # #5821: NO SES CALL. The review is folded into the Morning Brief: the summary row carries the section the brief
+    # renders the next morning. Only a real, unblocked panel edition contributes an excerpt — never the failure card
+    # or a validator fallback (the same rule IC-15 applies below).
+    real_edition = not panel_blocked and is_panel_edition(ai_content)
+    store_weekly_summary(dates, summary, {"brief_headline": headline, "brief_excerpt": brief_excerpt(ai_content) if real_edition else None})
+    # DIL-025: the week's completion row — the replay guard and the status page read it. It now means "this week's
+    # review was produced and handed to the brief", not "mailed".
     record_email_send(table, LEDGER_NAME, period_key)
-    logger.info(f"Sent: {subject}")
+    logger.info(f"Folded into the Morning Brief (not mailed): {subject}")
 
-    store_weekly_summary(dates, summary)
-
-    # IC-15: Persist nutrition insights. Only a REAL, delivered edition belongs in
-    # the ledger (#2216) — not the failure card, and not a validator fallback that
-    # replaced blocked output; IC-16 feeds those straight back into next week's
-    # prompt as "previous insights".
-    if _HAS_INSIGHT_WRITER and not panel_blocked and is_panel_edition(ai_content):
+    # IC-15: Persist nutrition insights. Only a REAL edition belongs in the ledger (#2216) — not the failure card, and
+    # not a validator fallback that replaced blocked output; IC-16 feeds those straight back into next week's prompt as
+    # "previous insights".
+    if _HAS_INSIGHT_WRITER and real_edition:
         try:
             insight_writer.write_insight(
                 digest_type="nutrition_review",
@@ -1261,4 +1279,4 @@ def lambda_handler(event, context):
         except Exception as e:
             logger.warning(f"IC-15 failed: {e}")
 
-    return {"statusCode": 200, "body": f"Nutrition review sent: {subject}"}
+    return {"statusCode": 200, "body": f"Nutrition review folded into the Morning Brief: {subject}"}
