@@ -40,6 +40,7 @@ def _lib(status: str = "approved") -> dict[str, Any]:
     return {
         "version": "0.1.0",
         "status": status,
+        "approved_on": "2026-01-02",  # #5861 fix round 11: live needs the approval day
         "gym_inventory": {"items": {"bar": {"home_gym": {"state": "available"}}, "odd": {"home_gym": {"state": "unknown"}}}},
         "gates": {
             "pain_flag_exclusion": {"kind": "pain_flag_exclusion", "locks": True, "applies_to": "all", "unlock_condition": "no pain"},
@@ -391,16 +392,19 @@ def _kb_dl(day: str, name: str = "Kettlebell Deadlift") -> dict[str, Any]:
     return {"date": day, "exercises": [{"template_id": "C0FFEE01", "name": name, "sets": _sets(2, 10), "notes": ""}]}
 
 
-def test_kb_swing_opens_on_two_kb_deadlift_sessions_and_not_one():
-    assert _LIB["gates"]["chain_kb_swing"]["standard"] == {"sessions_min": 2}
-    one = eg.evaluate_gates(_LIB, None, _measured([_kb_dl("2026-11-10")], mean_lb=250))["chain_kb_swing"]
-    assert one["state"] == eg.LOCKED and one["input"] == eg.MEASURED
-    two = eg.evaluate_gates(
-        _LIB, None, _measured([_kb_dl("2026-11-03"), _kb_dl("2026-11-10", "KB Romanian Deadlift (Kettlebell)")], mean_lb=250)
-    )
+def test_kb_swing_opens_on_the_barbell_deadlift_standard_not_kb_deadlift_sessions():
+    """Fix round 14 (H4; owner rulings 2026-11-14): the swing's chain step is measured on the barbell deadlift the engine serves
+    (3 x 5+ at RPE <= 8, 3 sessions across 2 weeks, no pain flag in 28 days); two kettlebell-deadlift sessions no longer open
+    it, and the swing itself still waits on his technique confirmation."""
+    std = _LIB["gates"]["chain_kb_swing"]["standard"]
+    assert std == {"sets": 3, "reps_min": 5, "rpe_max": 8, "prerequisite_sessions_min": 3, "span_weeks_min": 2, "flag_free_days": 28}
+    kb = eg.evaluate_gates(_LIB, None, _measured([_kb_dl("2026-11-03"), _kb_dl("2026-11-10")], mean_lb=250))["chain_kb_swing"]
+    assert kb["state"] == eg.LOCKED
+    dl = [_workout(d, "C6272009", _sets(3, 5, 8)) for d in ("2026-10-27", "2026-11-03", "2026-11-10")]
+    two = eg.evaluate_gates(_LIB, None, _measured(dl, mean_lb=250))
     assert two["chain_kb_swing"]["state"] == eg.UNLOCKED
     swing = eg.movement_states(_LIB, two)["kettlebell_swing"]
-    assert "chain_kb_swing" not in swing["locked_by"]
+    assert "chain_kb_swing" not in swing["locked_by"] and "owner_confirmation_skill" in swing["locked_by"]
 
 
 def test_the_kb_title_rule_needs_both_words():
@@ -439,9 +443,11 @@ def test_the_owners_clean_confirmation_meets_its_gate_and_nothing_else():
 
 def test_progression_standards_are_owner_approved_and_bodyweight_values_stay_unset():
     for gid, g in _LIB["gates"].items():
-        if g["kind"] in ("chain_prerequisite", "performance_threshold"):
+        if gid == "chain_dead_hang":  # #5861 fix round 13: the hanging chain's ENTRY step is platform-proposed, and says so
+            assert g["provenance"].startswith("platform-proposed") and "pending his ruling" in g["provenance"]
+        elif g["kind"] in ("chain_prerequisite", "performance_threshold"):
             assert g["provenance"].startswith("owner"), gid
             assert "pending owner ruling" not in g["provenance"], gid
         if g["kind"] == "bodyweight_threshold" and "ref" in (g.get("threshold") or {}):
             assert "value" not in g["threshold"], gid  # the number is the owner's, in the private overlay
-    assert _LIB["status"] == "proposed"
+    assert (_LIB["status"], _LIB.get("approved_on")) == ("approved", "2026-11-14")  # owner approval; the standards are unchanged

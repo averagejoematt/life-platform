@@ -2,8 +2,9 @@
  *
  * Renders the coach-curated media picks + their grounded retrospectives (reverse-chron)
  * into [data-horizons] on /data/horizons/, from the read-only /api/horizons endpoint.
- * The retrospective is the narrative pull; a pick still awaiting next week's retrospective
- * shows an honest "coach's note coming" line (never a fabricated one). Fail-soft: an API
+ * The retrospective is the narrative pull; a pick still inside its retrospective window
+ * (the API's `retrospective_pending`) shows an honest "coach's note coming" line — never a
+ * fabricated one, and never a promise past its date (#5947). Fail-soft: an API
  * error or an empty feed both render an honest state, never a blank shell or a thrown page.
  */
 const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -26,11 +27,14 @@ function card(it) {
     : `<h3 class="hz-title">${esc(it.title || "Untitled pick")}</h3>`;
   const pitch = it.pitch ? `<p class="hz-pitch">${esc(it.pitch)}</p>` : "";
   // The reader hook: the coach's grounded "why I recommended it" retrospective, when it
-  // has been archived (the week after). Until then, an honest pending line.
+  // has been archived (the week after). Until then, an honest pending line — only while the
+  // API says one is still due; an older pick without one promises nothing.
   const retro = it.retrospective
     ? `<div class="hz-retro"><span class="hz-retro-label">why the coach sent it</span>` +
       `<p class="hz-retro-text">${esc(it.retrospective)}</p></div>`
-    : `<p class="hz-retro-pending">the coach's retrospective lands next week</p>`;
+    : it.retrospective_pending
+      ? `<p class="hz-retro-pending">the coach's retrospective follows a week after the pick</p>`
+      : "";
   const cta = it.url ? `<a class="hz-cta" href="${esc(it.url)}" target="_blank" rel="noopener">open →</a>` : "";
   return `<li class="hz-card">${meta}${title}${pitch}${retro}${cta}</li>`;
 }
