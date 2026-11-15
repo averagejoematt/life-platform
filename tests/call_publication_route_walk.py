@@ -588,11 +588,16 @@ def _serve(L, path: str, qs: dict):
         "headers": {},
         "queryStringParameters": dict(qs),
     }
+    from web import public_call_id
+
     narrative_publication.begin_request()
     resp = L._dispatch_route(event, path, "GET")
     if resp is None and callable(L.ROUTES.get(path)):
         resp = L.ROUTES[path]()
-    return guard_api_response(narrative_publication.annotate(resp)) if isinstance(resp, dict) else resp
+    if not isinstance(resp, dict):
+        return resp
+    resp = public_call_id.publicize_response(resp)  # lambda_handler's step before the guards (owner ruling 2026-11-14)
+    return guard_api_response(narrative_publication.annotate(resp))
 
 
 def _parsed(resp):
