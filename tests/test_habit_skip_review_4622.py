@@ -4,7 +4,11 @@ A stored `skipped` is an unconfirmed day (Habitify's bedtime automation marks an
 unlogged). Once a week the owner gets ONE list of them to settle — and nothing at all on a
 week with none, while the run is still recorded so the dead-man can tell the two apart.
 
-Fully offline: a fake table answers the habitify Query, a fake SES records sends.
+#5821 (owner ruling 2026-11-15): the list no longer arrives as its own email. The Saturday
+Morning Brief carries it (`brief_section`); the Lambda keeps its run record and sends nothing.
+
+Fully offline: a fake table answers the habitify Query; a fake boto3 records any SES client
+the Lambda asks for (it must ask for none).
 
 Run:  python3 -m pytest tests/test_habit_skip_review_4622.py -v
 """
@@ -64,6 +68,28 @@ class _Ses:
         return {"MessageId": "m-1"}
 
 
+class _Boto3:
+    """Stands in for the module's `boto3`: records every client asked for. #5821: none may be SES."""
+
+    def __init__(self):
+        self.ses = _Ses()
+        self.clients = []
+
+    def client(self, service, **kwargs):
+        self.clients.append(service)
+        return self.ses
+
+    def resource(self, *args, **kwargs):  # pragma: no cover — every test passes a fake table
+        raise AssertionError("tests pass a fake table")
+
+
+@pytest.fixture
+def boto(monkeypatch):
+    b = _Boto3()
+    monkeypatch.setattr(hsr, "boto3", b)
+    return b
+
+
 def _emf_lines(capsys):
     out = []
     for line in capsys.readouterr().out.splitlines():
@@ -97,24 +123,13 @@ def test_the_window_is_the_seven_closed_pacific_days_before_today():
     ]
 
 
-def test_a_week_with_skips_renders_one_line_per_day(capsys):
-    table, ses = _Table(WEEK_WITH_SKIPS), _Ses()
-    out = hsr._run({"today": TODAY}, None, table=table, ses=ses)
-    assert out["skipped_days"] == 2 and out["skipped_habits"] == 3 and out["sent"] is True
-    assert len(ses.sent) == 1
-    msg = ses.sent[0]
-    assert msg["Destination"] == {"ToAddresses": [hsr.RECIPIENT]}
-    text = msg["Content"]["Simple"]["Body"]["Text"]["Data"]
-    assert "Tue 09-29: Floss, Mouthwash" in text
-    assert "Thu 10-01: Cold Shower" in text
-    assert "/habitify review" in text
-    # Only the window, only skips, only daily habits:
-    assert "09-25" not in text and "10-03" not in text  # outside the window
-    assert "Sauna" not in text  # a monthly habit's day status is a period judgement
-    day_lines = [ln for ln in text.splitlines() if re.match(r"^[A-Z][a-z]{2} \d{2}-\d{2}: ", ln)]
-    assert day_lines == ["Tue 09-29: Floss, Mouthwash", "Thu 10-01: Cold Shower"]  # exactly two day lines, oldest first
-    html_body = msg["Content"]["Simple"]["Body"]["Html"]["Data"]
-    assert "Tue 09-29: Floss, Mouthwash" in html_body
+def test_a_week_with_skips_sends_nothing_and_still_records_the_run(capsys, boto):
+    """#5821: the must-fail control for the fold — a week WITH skips (the case that used to mail) asks for no SES
+    client and sends nothing. Reverting `_run` to its pre-#5821 send makes `boto.clients` ["sesv2"] and this fails."""
+    table = _Table(WEEK_WITH_SKIPS)
+    out = hsr._run({"today": TODAY}, None, table=table)
+    assert out["skipped_days"] == 2 and out["skipped_habits"] == 3 and out["sent"] is False and out["folded_into_brief"] is True
+    assert boto.clients == [] and boto.ses.sent == []
     # The query read the habitify partition for the window only.
     q = table.queries[0]["ExpressionAttributeValues"]
     assert q[":pk"] == "USER#matthew#SOURCE#habitify"
@@ -123,11 +138,30 @@ def test_a_week_with_skips_renders_one_line_per_day(capsys):
     assert len(emf) == 1 and emf[0][hsr.RUN_METRIC] == 1 and emf[0][hsr.HABITS_METRIC] == 3 and emf[0][hsr.DAYS_METRIC] == 2
 
 
-def test_an_empty_week_sends_nothing_and_still_records_the_run(capsys):
+def test_the_brief_section_renders_one_line_per_day():
+    """#5821: the Saturday brief's section, from the same fixture week — the lines the email used to carry."""
+    sec = hsr.brief_section(_Table(WEEK_WITH_SKIPS), TODAY)
+    assert sec["key"] == "habits_to_settle" and sec["title"] == "Habits to settle"
+    lines = sec["lines"]
+    assert lines[0] == "3 skipped across 2 day(s), Sat 09-26 to Fri 10-02:"
+    # Only the window, only skips, only daily habits, oldest first:
+    day_lines = [ln for ln in lines if re.match(r"^[A-Z][a-z]{2} \d{2}-\d{2}: ", ln)]
+    assert day_lines == ["Tue 09-29: Floss, Mouthwash", "Thu 10-01: Cold Shower"]
+    text = "\n".join(lines)
+    assert "09-25" not in text and "10-03" not in text and "Sauna" not in text
+    assert "/habitify review" in lines[-1]
+
+
+def test_the_brief_section_is_saturday_only_and_absent_on_an_empty_week():
+    assert hsr.brief_section(_Table(WEEK_WITH_SKIPS), "2026-10-02") is None  # a Friday
+    rows = [_row("2026-09-29", {"Floss": _hs("completed")})]
+    assert hsr.brief_section(_Table(rows), TODAY) is None
+
+
+def test_an_empty_week_sends_nothing_and_still_records_the_run(capsys, boto):
     rows = [_row("2026-09-29", {"Floss": _hs("completed"), "Mouthwash": _hs("failed", miss_source="vendor")})]
-    ses = _Ses()
-    out = hsr._run({"today": TODAY}, None, table=_Table(rows), ses=ses)
-    assert ses.sent == []
+    out = hsr._run({"today": TODAY}, None, table=_Table(rows))
+    assert boto.ses.sent == []
     assert out["sent"] is False and out["skipped_habits"] == 0
     emf = _emf_lines(capsys)
     assert len(emf) == 1, "an empty week must still emit its run record — that is what the dead-man tells apart"
@@ -135,33 +169,30 @@ def test_an_empty_week_sends_nothing_and_still_records_the_run(capsys):
     assert emf[0]["_aws"]["CloudWatchMetrics"][0]["Namespace"] == "LifePlatform/Email"
 
 
-def test_no_stored_rows_at_all_is_an_empty_week_not_a_crash(capsys):
-    ses = _Ses()
-    out = hsr._run({"today": TODAY}, None, table=_Table([]), ses=ses)
-    assert ses.sent == [] and out["skipped_days"] == 0
+def test_no_stored_rows_at_all_is_an_empty_week_not_a_crash(capsys, boto):
+    out = hsr._run({"today": TODAY}, None, table=_Table([]))
+    assert boto.ses.sent == [] and out["skipped_days"] == 0
     assert len(_emf_lines(capsys)) == 1
 
 
-def test_a_dry_run_never_sends_and_returns_the_lines_to_the_invoker(capsys):
-    ses = _Ses()
-    out = hsr._run({"today": TODAY, "dry_run": True}, None, table=_Table(WEEK_WITH_SKIPS), ses=ses)
-    assert ses.sent == []
+def test_a_dry_run_never_sends_and_returns_the_lines_to_the_invoker(capsys, boto):
+    out = hsr._run({"today": TODAY, "dry_run": True}, None, table=_Table(WEEK_WITH_SKIPS))
+    assert boto.ses.sent == []
     assert out["sent"] is False and out["dry_run"] is True
     assert out["lines"] == ["Tue 09-29: Floss, Mouthwash", "Thu 10-01: Cold Shower"]
 
 
-def test_habit_names_never_reach_logs_or_metrics(capsys, caplog):
-    """PRIVACY: names live only in the owner email body. The logs (including the dry-run
-    send line, which prints the subject) and the EMF record carry counts."""
+def test_habit_names_never_reach_logs_or_metrics(capsys, caplog, boto):
+    """PRIVACY: names live only in the owner-only brief section. The logs and the EMF record
+    carry counts — on a real run and a dry run alike."""
     caplog.set_level("INFO")
-    hsr._run({"today": TODAY, "dry_run": True}, None, table=_Table(WEEK_WITH_SKIPS), ses=_Ses())
+    hsr._run({"today": TODAY}, None, table=_Table(WEEK_WITH_SKIPS))
+    hsr._run({"today": TODAY, "dry_run": True}, None, table=_Table(WEEK_WITH_SKIPS))
     printed = capsys.readouterr().out
     logged = "\n".join(r.getMessage() for r in caplog.records)
     for name in ("Floss", "Mouthwash", "Cold Shower", "Sauna"):
         assert name not in printed, f"{name} printed to stdout"
         assert name not in logged, f"{name} logged"
-    subject, _, _ = hsr.build_email([("2026-09-29", ["Floss"])], hsr.window_dates(TODAY))
-    assert "Floss" not in subject
 
 
 def test_a_row_without_periodicity_is_treated_as_daily():
