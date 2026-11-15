@@ -461,3 +461,63 @@ class TestNoRetrospectiveInvention:
                         if _IMPORT_LINE_RE.search(open(path, encoding="utf-8").read()):
                             importers.add(os.path.relpath(path, _REPO))
         assert importers <= allowed, sorted(importers - allowed)
+
+
+class TestGraderRefusesAMisfiledConditional:
+    """#5611 (decision E): the GRADING path refuses to grade an opinion as a prediction without frozen, measurable
+    criteria — the misfiled-conditional class, e.g. the 15 October protein call, stored before the filing rules as a
+    directional spec on the condition's own metric. Refused = not graded, not expired, no confidence move; the stored
+    row is read, never re-specified (rule (d))."""
+
+    @staticmethod
+    def _legacy(claim, spec, status="pending", **extra):
+        return {
+            "pk": "COACH#nutrition_coach",
+            "sk": "PREDICTION#pred_synthetic",
+            "prediction_id": "pred_synthetic",
+            "coach_id": "nutrition_coach",
+            "created_date": "2026-10-15",
+            "claim_natural": claim,
+            "evaluation": spec,
+            "subdomain": "protein",
+            "status": status,
+            **extra,
+        }
+
+    def test_every_real_misfiled_conditional_is_refused_and_the_controls_are_not(self):
+        conditional = [(claim, spec) for _day_, claim, spec in OPINIONS if cb.LEAD_CONDITION_RE.match(claim)]
+        assert len(conditional) >= 8, "the real misfiled-conditional fixtures have gone blind"
+        missed = [claim for claim, spec in conditional if not cb.misfiled_conditional(self._legacy(claim, spec))]
+        assert not missed, missed
+        claim, spec = conditional[0]  # the 15 October protein call
+        two_branch = "Recovery score will rise over the next two weeks; otherwise recovery score will fall."
+        controls = {
+            "filed under the rules": self._legacy(claim, spec, filing_rules_version=fr.FILING_RULES_VERSION),
+            "a sealed pre-registration": self._legacy(claim, spec, pre_registered=True),
+            "a legacy conditional spec": self._legacy(claim, {"type": "conditional", "condition_metric": "total_protein_g"}),
+            "a plain forecast": self._legacy("Recovery score will rise over the next 14 days.", _dir("recovery_score", "up")),
+        }
+        wrongly = [name for name, row in controls.items() if cb.misfiled_conditional(row)]
+        assert not wrongly, wrongly
+        assert cb.misfiled_conditional(self._legacy(two_branch, _dir("recovery_score", "up")))  # a negated second branch
+        # a decided row (a #2221 second look) is the owner's correction path, never this step's
+        log = type("L", (), {"info": staticmethod(lambda *a, **k: None)})()
+        assert not cb.skip_misfiled(self._legacy(claim, spec, status="refuted"), log)
+        stats: dict = {}
+        assert cb.skip_misfiled(self._legacy(claim, spec), log, stats) and stats == {"refused_misfiled_conditional": 1}
+
+    def test_the_evaluator_does_not_grade_the_15_october_call(self, monkeypatch):
+        """Through `_evaluate_all` itself, with the data readers stubbed. Must-fail control (watched red): remove the
+        `conditional_branches.skip_misfiled` step from `_evaluate_all` — the row reaches the grader and this reds."""
+        os.environ.setdefault("TABLE_NAME", "life-platform")
+        os.environ.setdefault("USER_ID", "matthew")
+        os.environ.setdefault("AWS_REGION", "us-west-2")
+        import coach_prediction_evaluator as ev
+
+        _day_, claim, spec = OPINIONS[0]
+        calls = []
+        monkeypatch.setattr(ev, "_get_source_data", lambda *a, **k: calls.append(a) or [])
+        monkeypatch.setattr(ev, "_update_prediction_status", lambda *a, **k: calls.append(("write", a)))
+        evaluations, stats = ev._evaluate_all([self._legacy(claim, spec)], "2026-11-15", write=False)
+        assert evaluations == [] and calls == [], (evaluations, calls)
+        assert stats.get("refused_misfiled_conditional") == 1 and stats["expired"] == 0 and stats["skipped_error"] == 0, stats
