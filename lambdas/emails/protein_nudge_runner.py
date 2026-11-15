@@ -8,7 +8,7 @@ spends the coach's one-a-day slot. No new EventBridge rule: the hourly cron cove
 #5821 (owner ruling 2026-11-15): the note no longer arrives as its own "Protein this morning" email. The Morning Brief
 (10:00 PT) carries it as a section through `brief_line` below — read-only, computed by the brief itself, because the
 brief runs BEFORE this pass's first in-window tick (10:10 PT). The pass keeps evaluating, stamping and claiming the day;
-coach_nudge_lambda hands it a no-op deliverer and `delivered_status=FOLDED`, so the ledger row says what happened.
+coach_nudge_lambda hands it a no-op deliverer and `delivered_status=emails.brief_lines.FOLDED`, so the ledger row says what happened.
 
 DEAD-MAN: every in-window tick (sent or not) overwrites `COACH#protein_nudge` / `EVAL#<date>` with its verdict;
 `nudge_ledger_qa.check_protein_nudge_liveness` reds when a recent day has no eval row (the pass never ran).
@@ -30,7 +30,6 @@ logger = logging.getLogger()
 LEDGER_PK = "COACH#protein_nudge"
 EVAL_PREFIX = "EVAL#"
 CHANNEL = "email"
-FOLDED = "folded_into_brief"  # #5821: the ledger status when the note was carried by the Morning Brief, not mailed
 
 
 def _today_row(table, date: str, user: str) -> dict | None:

@@ -16,10 +16,7 @@ reading the email on a Saturday morning — actually depends on:
     (which values appear, which rows exist) — not the exact HTML/CSS;
   * the AI path: the prompt must carry the data it claims to summarise, and a
     failed or blocked AI call must degrade honestly;
-  * lambda_handler, which never sends mail at all since #5821 (owner ruling
-    2026-11-15: the review is a section of the Morning Brief). A fake SES is
-    still wired as `m.ses`, so a regression that restores a send is recorded,
-    and the rendered body is read off `build_email_html`'s return.
+  * lambda_handler, which never sends mail here — `ses` is always a fake.
 
 Clock discipline: every test that touches "now" freezes it via `_FrozenDatetime`
 monkeypatched onto the module (fixture-date + real `datetime.now()` is a time
@@ -313,21 +310,13 @@ def _gathered(**over):
 
 @pytest.fixture
 def handler_env(monkeypatch, frozen_clock):
-    """Wire lambda_handler to fakes. Mail is NEVER sent (#5821: the handler holds no SES client; the fake is installed
-    with raising=False so a regression that reintroduces `m.ses.send_email` records into it and fails)."""
+    """Wire lambda_handler to fakes. Mail is NEVER sent."""
     ses = FakeSES()
     table = FakeTable()
     writer = FakeInsightWriter()
     calls = {"anthropic": [], "validate": []}
-    rendered = []
-    _real_build = m.build_email_html
 
-    def _recording_build(*args, **kwargs):
-        rendered.append(_real_build(*args, **kwargs))
-        return rendered[-1]
-
-    monkeypatch.setattr(m, "ses", ses, raising=False)
-    monkeypatch.setattr(m, "build_email_html", _recording_build)
+    monkeypatch.setattr(m, "ses", ses)
     monkeypatch.setattr(m, "table", table)
     monkeypatch.setattr(m, "insight_writer", writer)
     monkeypatch.setattr(m, "_HAS_INSIGHT_WRITER", True)
@@ -348,7 +337,6 @@ def handler_env(monkeypatch, frozen_clock):
 
     return {
         "ses": ses,
-        "rendered": rendered,
         "table": table,
         "writer": writer,
         "calls": calls,
@@ -358,19 +346,11 @@ def handler_env(monkeypatch, frozen_clock):
 
 
 def _sent_html(env):
-    """The review body the handler rendered (#5821: built, no longer mailed)."""
-    return env["rendered"][-1]
-
-
-def _stored_review(env):
-    rows = [p for p in env["table"].puts if p["pk"].endswith("SOURCE#nutrition_review")]
-    assert len(rows) == 1, f"expected one stored weekly summary row, got {len(rows)}"
-    return rows[0]
+    return env["ses"].sent[0]["Content"]["Simple"]["Body"]["Html"]["Data"]
 
 
 def _sent_subject(env):
-    """The review's one-line verdict — the Morning Brief section's headline (#5821; it was the email subject)."""
-    return _stored_review(env)["brief_headline"]
+    return env["ses"].sent[0]["Content"]["Simple"]["Subject"]["Data"]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1574,31 +1554,13 @@ def test_a_week_with_no_food_logged_at_all_sends_nothing(handler_env):
     assert handler_env["ses"].sent == []
 
 
-def test_the_happy_path_sends_no_email_and_stores_the_brief_section(handler_env):
-    """#5821 must-fail control: the full happy path makes no SES call (reintroducing `ses.send_email` records into
-    the fake and fails) and leaves the brief section on the weekly summary row."""
+def test_the_happy_path_sends_exactly_one_email_to_the_configured_recipient(handler_env):
     resp = m.lambda_handler({}, None)
     assert resp["statusCode"] == 200
-    assert handler_env["ses"].sent == []
-    assert not hasattr(m, "RECIPIENT") and not hasattr(m, "SENDER"), "the review keeps no mail address since #5821"
-    row = _stored_review(handler_env)
-    assert row["brief_headline"] == f"Week ending {W1_END} - 1800 kcal - 190g protein (daily averages)"
-    assert row["brief_excerpt"] == "Panel commentary about the week."
-
-
-def test_a_failed_panel_leaves_no_excerpt_on_the_brief_section(handler_env):
-    """Only a real edition contributes an excerpt — never the failure card (#2216's rule, #5821's section)."""
-    handler_env["state"]["ai_error"] = RuntimeError("bedrock throttled")
-    m.lambda_handler({}, None)
-    row = _stored_review(handler_env)
-    assert "brief_excerpt" not in row and row["brief_headline"].startswith(f"Week ending {W1_END}")
-
-
-def test_the_brief_excerpt_is_plain_text_cut_at_a_sentence():
-    panel = "<div><h3>Webb</h3><p>Protein held at 190&nbsp;g. " + "Fibre is the gap this week. " * 30 + "</p></div>"
-    out = m.brief_excerpt(panel)
-    assert "<" not in out and "&nbsp;" not in out
-    assert out.startswith("Webb Protein held at 190") and out.endswith(".") and len(out) <= m.BRIEF_EXCERPT_MAX_CHARS
+    assert len(handler_env["ses"].sent) == 1
+    sent = handler_env["ses"].sent[0]
+    assert sent["FromEmailAddress"] == m.SENDER
+    assert sent["Destination"]["ToAddresses"] == [m.RECIPIENT]
 
 
 def test_the_subject_line_carries_the_week_and_its_headline_averages(handler_env):
@@ -1711,7 +1673,7 @@ def test_the_send_is_logged_for_the_status_page(handler_env):
     assert logged and logged[0]["status"] == "success"
 
 
-def test_a_broken_insight_ledger_never_blocks_the_review(handler_env):
+def test_a_broken_insight_ledger_never_blocks_the_email(handler_env):
     class Exploding(FakeInsightWriter):
         def build_insights_context(self, **kwargs):
             raise RuntimeError("ddb down")
@@ -1721,7 +1683,7 @@ def test_a_broken_insight_ledger_never_blocks_the_review(handler_env):
 
     handler_env["monkeypatch"].setattr(m, "insight_writer", Exploding())
     assert m.lambda_handler({}, None)["statusCode"] == 200
-    assert _stored_review(handler_env)["brief_headline"]
+    assert len(handler_env["ses"].sent) == 1
 
 
 def test_a_config_driven_panel_prompt_is_used_when_the_board_config_loads(handler_env):
@@ -1831,7 +1793,7 @@ def test_a_dry_run_really_builds_the_review_it_declines_to_send(handler_env):
     the assertion above while proving nothing."""
     resp = m.lambda_handler({"dry_run": True}, None)
     assert resp["dry_run"] is True
-    assert resp["subject"] == "Nutrition Review - Week ending 2026-06-12 - 1800 kcal - 190g protein (daily averages)"
+    assert resp["subject"] == "Nutrition Review - 2026-06-12 - 1800 kcal - 190g protein"
     assert resp["html_bytes"] > 1_000
     assert len(handler_env["calls"]["anthropic"]) == 1  # the panel really ran
 
@@ -1858,13 +1820,13 @@ def test_a_dry_run_writes_no_durable_row(handler_env):
     assert handler_env["writer"].written == []
 
 
-def test_a_scheduled_invocation_still_stores_its_brief_section(handler_env):
-    """The EventBridge payload carries no dry_run key — the gate must default off (#5821: off = store, not send)."""
+def test_a_scheduled_invocation_still_sends(handler_env):
+    """The EventBridge payload carries no dry_run key — the gate must default off."""
     m.lambda_handler({"source": "aws.events", "detail-type": "Scheduled Event"}, None)
-    assert _stored_review(handler_env)["brief_headline"] and handler_env["ses"].sent == []
+    assert len(handler_env["ses"].sent) == 1
 
 
-def test_a_week_of_records_without_totals_still_produces_a_review(handler_env):
+def test_a_week_of_records_without_totals_still_sends_a_review(handler_env):
     handler_env["state"]["data"] = _gathered(
         macrofactor_this={
             "2026-06-06": {"food_log": [], "micronutrient_avg_pct": 40},
@@ -1873,7 +1835,7 @@ def test_a_week_of_records_without_totals_still_produces_a_review(handler_env):
     )
     resp = m.lambda_handler({}, None)
     assert resp["statusCode"] == 200
-    assert "calories not logged" in _sent_subject(handler_env)
+    assert len(handler_env["ses"].sent) == 1
     # #2584: ...but with no food logged, the panel is not commissioned to review one.
     assert handler_env["calls"]["anthropic"] == []
 

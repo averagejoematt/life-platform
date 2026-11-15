@@ -91,6 +91,7 @@ PRE_EXISTING_GUARD = {
     "emails/chronicle_email_sender_lambda.py": "dry_run",
     "emails/coach_panel_podcast_lambda.py": "dry_run",
     "emails/daily_brief_lambda.py": "DRY_RUN",
+    "emails/nutrition_review_lambda.py": "dry_run",  # #2216 owns this instance
     "emails/wednesday_chronicle_lambda.py": "PREVIEW_MODE",
 }
 

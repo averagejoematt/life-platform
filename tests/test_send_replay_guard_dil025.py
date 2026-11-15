@@ -807,8 +807,7 @@ class TestWeeklyLettersReplay:
         t = _seed(_FleetTable(), name, key())
         monkeypatch.setattr(mod, "table", t)
         monkeypatch.setattr(mod, first_call, _explode)
-        if hasattr(mod, "ses"):  # #5821: nutrition_review mails nothing and holds no SES client
-            monkeypatch.setattr(mod.ses, "send_email", _explode)
+        monkeypatch.setattr(mod.ses, "send_email", _explode)
         out = mod.lambda_handler(dict(self.EVENT), None)
         assert out["statusCode"] == 200
 
