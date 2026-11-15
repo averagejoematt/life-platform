@@ -391,6 +391,12 @@ def gate_item(item: Any, pk_hint: Any = None, *, strict: bool = False) -> Any:
             ok, reason = NP.eligibility(approved)
             if ok:
                 NA.note_served(item, pk)  # the wire exempts these words for this request only
+        elif NA.owner_ruled_words(item, pk):
+            # Owner ruling 2026-11-14 (wording batch v1): an exact historical call the owner approved BY RECORD — the
+            # listed key, no record of its own, words byte-identical. An owner exception, not a provenance claim, and
+            # honoured on every route so the ledger and the Coaching Room obey one decision.
+            ok, reason = True, "owner_ruled_words"
+            NA.note_served(item, pk)
     out = {k: v for k, v in item.items() if k != NP.PROVENANCE_KEY}
     if ok:
         _STATE["served"] += 1

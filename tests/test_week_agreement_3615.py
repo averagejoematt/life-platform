@@ -158,6 +158,11 @@ def _payloads(**overrides):
                 "weights": [{"date": "2026-09-06", "lbs": 327.3}, {"date": "2026-09-20", "lbs": 316.9}],
             },
         },
+        # review 2026-11-14 (growth-2): the stats file behind the share cards — its journey weight carries its weigh-in date
+        "/public_stats.json": {
+            "_meta": {"generated_at": "2026-09-20T18:01:00+00:00", "refreshed_at": "2026-09-21T02:00:00+00:00"},
+            "journey": {"start_weight_lbs": 327.34, "goal_weight_lbs": 185.0, "current_weight_lbs": 316.9, "weight_as_of": "2026-09-20"},
+        },
         "/api/pulse": {"_meta": {"generated_at": "2026-09-21T02:00:00+00:00"}, "pulse": {"day_number": 15, "date": "2026-09-20"}},
         "/api/fingerprint": {
             "_meta": {"generated_at": "2026-09-21T02:00:00+00:00"},
@@ -257,6 +262,21 @@ def test_a_half_pound_past_tolerance_is_a_FAIL():
     payloads["/api/snapshot"]["vitals"]["vitals"]["weight_lbs"] = 318.0
     check = _run(wq.check_week_agreement, payloads)
     assert check.passed is False and "api_snapshot" in check.message
+
+
+def test_the_stats_file_behind_the_share_cards_is_held_to_the_same_weigh_in():
+    """Review 2026-11-14 (growth-2): the recap card read 36.7 lbs down from a stats file still on the day-before's
+    weigh-in while /api/journey served that morning's. The stats file is a registered surface now: a current weight
+    that disagrees with /api/journey's FOR THE SAME DATE reds, and one honestly dated to an earlier weigh-in does not."""
+    stale_but_same_date = _payloads()
+    stale_but_same_date["/public_stats.json"]["journey"]["current_weight_lbs"] = 319.0
+    check = _run(wq.check_week_agreement, stale_but_same_date)
+    assert check.passed is False and "public_stats" in check.message and "api_journey" in check.message
+    honestly_older = _payloads()
+    honestly_older["/public_stats.json"]["journey"].update(current_weight_lbs=319.0, weight_as_of="2026-09-19")
+    assert _run(wq.check_week_agreement, honestly_older).passed is True, "an older weigh-in under its own date is not a contradiction"
+    observations, _, _ = wq.observe(_budget(_payloads()), "https://site")
+    assert any(o.surface == "public_stats" and o.fact == reg.FACT_CURRENT_WEIGHT and o.as_of == "2026-09-20" for o in observations)
 
 
 def test_an_unreachable_surface_is_a_WARN_never_a_silent_pass():

@@ -315,3 +315,120 @@ def test_a_listed_lead_read_whose_cited_block_names_a_private_field_fails_closed
         G.begin_request()
         out = G.gate_item(dict(row))
         assert out["text"] == "" and out[G.PUBLICATION_KEY]["state"] == "withheld"
+
+
+# ── owner-ruled call wording (owner ruling 2026-11-14, wording batch v1) ───────────────────────────────────────────
+# The ruled calls' words are published by this change, but this file carries none of them: the gate tests use a
+# synthetic entry, and the real list is checked structurally (keys, hashes, the live call registry).
+
+_RULED_TEXT = "A synthetic recovery forecast: tomorrow's score will land near sixty, inside a wide interval."
+_RULED_KEY = ("COACH#sleep_coach", "PREDICTION#pred_20260920_a_synthetic_owner_ruled_fixture")
+
+
+@pytest.fixture
+def owner_ruled(monkeypatch):
+    e = NA.Entry(_RULED_KEY[0], _RULED_KEY[1], "claim_natural", _sha(_RULED_TEXT), ())
+    monkeypatch.setattr(NA, "OWNER_RULED_INDEX", {**NA.OWNER_RULED_INDEX, _RULED_KEY: e})
+    monkeypatch.setattr(NA, "_OWNER_RULED_HASHES", frozenset(NA._OWNER_RULED_HASHES | {e.text_sha256}))
+    return {
+        "pk": e.pk,
+        "sk": e.sk,
+        "claim_natural": _RULED_TEXT,
+        "status": "refuted",
+        "outcome": "refuted",
+        "confidence": "0.5",
+        "prediction_id": e.sk[len("PREDICTION#") :],
+    }
+
+
+def test_the_owner_ruled_set_is_twelve_keys_and_hashes_and_nothing_else():
+    assert len(NA.OWNER_RULED) == 12 and len(NA.OWNER_RULED_INDEX) == 12, "13 were approved; one waits on the accuracy check"
+    for e in NA.OWNER_RULED:
+        assert e.pk.startswith("COACH#") and e.sk.startswith("PREDICTION#pred_202609") and e.field == "claim_natural"
+        assert (
+            re.fullmatch(r"[0-9a-f]{64}", e.text_sha256) and e.families == ()
+        ), "an owner exception names no family: it claims nothing about the inputs"
+        assert (e.pk, e.sk) not in NA.INDEX, "a ruled call is not also a CR2 allowlist entry"
+        assert PP.digest(e.pk, e.sk[len("PREDICTION#") :]) in REG.PUBLIC_DIGESTS, f"{e.sk}: not in the public call registry"
+    assert len({e.text_sha256 for e in NA.OWNER_RULED}) == 12
+
+
+def test_an_owner_ruled_call_is_served_on_every_route_with_its_record_untouched(owner_ruled):
+    """No scope: the ledger, the call pages and the Coaching Room read through one gate and get one decision. The
+    grade fields ride through unchanged — approving words changes no verdict."""
+    row = owner_ruled
+    for scope in (None, NA.SCOPE_CR2):
+        G.begin_request()
+        if scope:
+            with NA.serving(scope):
+                out = G.gate_item(dict(row))
+        else:
+            out = G.gate_item(dict(row))
+        assert out == row and G.withheld_count() == 0
+        assert not G.is_tainted(row["claim_natural"])
+
+
+def test_an_owner_ruled_call_survives_a_wire_taint_left_by_another_row(owner_ruled):
+    """Another withheld graded row can carry the same sentence (a later call restating it). Its taint must not blank
+    the ruled words in a request where the gate published them — and must still blank them where it did not."""
+    row = owner_ruled
+    twin = {
+        "pk": row["pk"],
+        "sk": "PREDICTION#pred_20260922_restates_it",
+        "claim_natural": f"As said two days ago: {_RULED_TEXT} That call still stands.",
+    }
+    G.begin_request()
+    G.gate_item(dict(twin))
+    assert G.is_tainted(_RULED_TEXT), "with the ruled call not read in this request, the shared sentence is withheld at the wire"
+    G.begin_request()
+    G.gate_item(dict(twin))
+    G.gate_item(dict(row))
+    body = json.loads(G.annotate({"statusCode": 200, "body": json.dumps({"claim": _RULED_TEXT, "twin": twin["claim_natural"]})})["body"])
+    assert body["claim"] == _RULED_TEXT and body["twin"] == "", "only the ruled words are released; the unruled call stays withheld"
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda r: r.update(claim_natural=r["claim_natural"] + " "),  # the words changed: not the ruled record
+        lambda r: r.update(provenance={"v": 1, "families": ["whoop", "journal_presence"], "producer": "t"}),  # its own record decides
+        lambda r: r.update(
+            provenance={"v": 1, "families": ["whoop"], "producer": "t"}
+        ),  # ...even a public one: then it is not this exception
+        lambda r: r.update(sk=r["sk"] + "_x"),  # another record with the same words
+        lambda r: r.update(claim_natural=None),
+    ],
+)
+def test_an_owner_ruled_call_fails_closed_when_it_is_not_exactly_the_ruled_record(owner_ruled, mutate):
+    row = dict(owner_ruled)
+    mutate(row)
+    assert NA.owner_ruled_words(row) is False
+    G.begin_request()
+    G.gate_item(dict(row))
+    if row.get("provenance", {}).get("families") != ["whoop"]:
+        assert G.withheld_count() == 1
+
+
+def test_the_owner_ruled_switch_and_the_private_word_belt(owner_ruled, monkeypatch):
+    row = owner_ruled
+    monkeypatch.setattr(NA, "OWNER_RULED_PUBLIC", False)
+    G.begin_request()
+    G.gate_item(dict(row))
+    assert G.withheld_count() == 1 and G.is_tainted(row["claim_natural"]), "the switch off withholds every ruled call again"
+    monkeypatch.setattr(NA, "OWNER_RULED_PUBLIC", True)
+    monkeypatch.setattr(PP, "words_name_private_activity", lambda *t: True)
+    assert NA.owner_ruled_words(row) is False, "words that name private activity are never released, ruled or not"
+
+
+def test_an_unlisted_historical_call_is_still_withheld_everywhere(owner_ruled):
+    """Negative control: the ruling covers the listed records and no others — the other unapproved calls stay withheld."""
+    other = {
+        "pk": owner_ruled["pk"],
+        "sk": "PREDICTION#pred_20260921_never_ruled",
+        "claim_natural": "A synthetic historical call nobody ruled on, with enough words.",
+    }
+    G.begin_request()
+    assert G.gate_item(dict(other)) == other and G.withheld_count() == 1 and G.is_tainted(other["claim_natural"])
+    assert (
+        "owner_ruled_words" not in (ROOT / "lambdas" / "web" / "site_api_coach_room.py").read_text()
+    ), "the Room reads through the gate, not a list of its own"
