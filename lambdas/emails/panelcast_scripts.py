@@ -32,6 +32,7 @@ except ImportError:
 
 from ai import prompt_cache  # #2888: the per-model minimum-cacheable-prefix registry + breakpoint helper
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
+from content import body_numbers  # #5949: the ONE spoken-weight rule
 
 from emails.chronicle_prompt import _vice_terms_clause  # #2370: channel-derived never-name enumeration
 
@@ -128,7 +129,8 @@ def build_intro_script(bible: dict, zeitgeist: list | None, deps: dict) -> list:
         "callback, a direct address to the listener, a moment of small talk that earns its place, lines worth quoting. "
         "Read it aloud in your head: if it sounds like a compliant briefing instead of a conversation with texture and "
         "charm, rewrite it. Never trade personality for compliance — deliver both.\n\n"
-        f"HARD GUARDRAILS (breaking any of these ruins the episode):\n{guards}\n\n"
+        f"HARD GUARDRAILS (breaking any of these ruins the episode):\n{guards}\n"
+        f"  - {body_numbers.SPOKEN_WEIGHT_RULE}\n\n"  # #5949: his history is told without its figures
         'OUTPUT: ONLY a JSON array of turns [{"speaker":"elena"|"eli","line":"..."}], 20–28 turns. '
         "No preamble, no stage directions, no JSON fences."
     )
@@ -181,7 +183,9 @@ def build_weekly_script(beats: dict, bible: dict, deps: dict) -> dict:
         "This is a forward-looking PERFORMANCE & HEALTH review, NOT a grief or personal-history piece. NEVER mention or allude to: "
         "a death, grief, a funeral, cancer, or any named family member (mother/father/sister/brother/girlfriend/wife/etc.); any specific "
         "vice or substance (" + _vice_terms_clause() + " — not even non-specifically as 'his vices' or 'private habits'); "
-        "or any body weight at all — numeric OR spelled-out ('nine pounds' is just as forbidden as '305 lbs'). Stay on training, sleep, recovery, habits, the deficit's effects, the bet, and the week's effort. "  # noqa: E501
+        "or any body weight at all. "
+        + body_numbers.SPOKEN_WEIGHT_RULE  # #5949: the ONE statement of the rule, shared with the judge and the story desk
+        + " Stay on training, sleep, recovery, habits, the deficit's effects, the bet, and the week's effort. "
         "THE BAR (this is the whole point): the TRANSCRIPT must pass for a real, human-made podcast — if a person read it aloud, "
         "nobody could tell it was AI-written. Earn a real hook in the first two lines, real human interest, genuine dry humor, and "
         "something a listener actually learns and would text to a friend. NO AI TELLS: never say 'in this episode' or 'today we're "
