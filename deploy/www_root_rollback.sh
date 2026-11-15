@@ -8,7 +8,7 @@
 # would hide the new one while the real defect stayed live); an absent verdict rolls back.
 #
 # The rollback itself is `deploy/www_preview_sync.sh --target root --restore-previous`: the last
-# green root build from s3://matthew-life-platform/site/_v9_previous/ copied back over the root,
+# green root build from s3://matthew-life-platform/www-previous/<LATEST>/ copied back over the root,
 # S3 → S3, no delete, v9-owned keys only — it structurally cannot re-publish the v8 front page or
 # touch a kept site/ page. On the first root deploy there is no previous build; the restore says so
 # and nothing is written (www/README.md names the owner's deliberate un-launch).
@@ -53,7 +53,7 @@ fi
 
 echo "⚠️  a post-deploy sweep failed on a v9-reachable surface — restoring the previous v9 build (never site/)"
 if bash "$HERE/www_preview_sync.sh" --target root --restore-previous; then
-  RESULT="restored the previous v9 build from s3://matthew-life-platform/site/_v9_previous/ (or reported that none exists yet)"
+  RESULT="restored the previous v9 build from s3://matthew-life-platform/www-previous/<LATEST>/ (or reported that none exists yet)"
 else
   RESULT="RESTORE FAILED (exit $?) — the root may be a mixed build; run: bash deploy/www_preview_sync.sh --target root --restore-previous"
 fi
