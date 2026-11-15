@@ -112,11 +112,26 @@ def test_endpoint_arm_fires_on_a_planted_birth_year_field():
 def test_endpoint_arm_allows_aggregate_genetic_counts_and_public_age_scores():
     """The sanctioned shapes must NOT trip: aggregate SNP counts (facts about the
     analysis, #1943) and the public fitness/bio-age scores (Option A keeps those)."""
-    ok = json.dumps({"genome": {"total_snps": 111, "snp_count": 8}, "vitals": {"fitness_age": 44, "bio_age": 39.2, "phenoage": 39.2}})
+    ok = json.dumps({"genome": {"total_snps": 111, "snp_count": 8}, "vitals": {"fitness_age": 44, "bio_age": 39.2, "phenoage": None}})
     hits = [
         h for h in guard.scan_endpoint_payload(ok, vice=[], literals=[]) if h[0].startswith("pii-genetic") or h[0].startswith("pii-age")
     ]
     assert hits == [], f"sanctioned aggregate/public-age shapes must pass, got {hits}"
+
+
+def test_endpoint_arm_fires_on_a_figure_of_his_phenotypic_age():
+    """Owner ruling 2026-11-14: the Levine formula is linear in age and its inputs are public, so a served phenotypic
+    age IS the chronological age to about a year. A number under the key reds at any depth; null and the snapshot's
+    reference object are the sanctioned shapes."""
+    for leak in ({"phenoage": 39}, {"journey": {"phenoage": {"phenotypic_age": 39.2}}}, {"x": [{"pheno_age": 39}]}):
+        hits = guard.scan_endpoint_payload(json.dumps(leak), vice=[], literals=[])
+        assert any(arm == "pii-age-derived" for arm, _ in hits), leak
+    for ok in (
+        {"phenoage": None, "withheld": "derived_from_chronological_age"},
+        {"journey": {"phenoage": {"as_of": "2026-04-03", "reference": {"slope": 0.892}}}},
+    ):
+        hits = guard.scan_endpoint_payload(json.dumps(ok), vice=[], literals=[])
+        assert not any(arm == "pii-age-derived" for arm, _ in hits), ok
 
 
 def test_card_arm_ignores_float_mantissas_but_still_catches_a_card():

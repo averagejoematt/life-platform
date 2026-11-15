@@ -53,16 +53,10 @@ from ingestion.source_registry import active_api_source_ids, best_effort_source_
 # functions in cdk/stacks/ingestion_stack.py.
 INGESTION_PROBES = health_probe_targets()
 
-# The compute/serve cascade is not ingestion and has no registry row; these stay
-# named here. Each handles {"healthcheck": true} as a boot check.
-COMPUTE_PROBES = [
-    ("character-sheet-compute", "Character Sheet", "character_sheet"),
-    ("daily-metrics-compute", "Daily Metrics", "computed_metrics"),
-    ("daily-insight-compute", "Daily Insights", "insights"),
-    ("adaptive-mode-compute", "Adaptive Mode", "adaptive_mode"),
-    ("daily-brief", "Daily Brief", "daily_brief"),
-    ("anomaly-detector", "Anomaly Detector", "anomaly_detector"),
-]
+# The compute/serve cascade is not ingestion and has no registry row. #5980: it lives in
+# operational/probe_targets.py (boto3-free), which the CDK role policy also reads, so this
+# function's invoke grant is exactly the list it probes.
+from operational.probe_targets import COMPUTE_PROBES  # noqa: E402
 
 PIPELINES = INGESTION_PROBES + COMPUTE_PROBES
 

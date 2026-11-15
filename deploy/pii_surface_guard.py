@@ -431,6 +431,48 @@ def _scan_keys(key_iter) -> list:
     return out
 
 
+# Owner ruling 2026-11-14: a figure of HIS phenotypic age is his chronological age to about a year — the Levine formula
+# is public and linear in age, and its nine inputs are public lab values (tests/age_inversion_lib.py is the attack).
+# So a NUMBER under one of these keys, anywhere in a public payload, is an age disclosure. The key holding null (the
+# endpoint's own "withheld" shape) or an object (the snapshot's markers-only reference) is the sanctioned form.
+_DERIVED_AGE_KEYS = {"phenoage", "phenotypic_age", "pheno_age", "phenoage_years"}
+
+
+def _derived_age_hits(node, path: str = "$") -> list:
+    out = []
+    if isinstance(node, dict):
+        for k, v in node.items():
+            here = f"{path}.{k}"
+            if str(k).lower() in _DERIVED_AGE_KEYS and isinstance(v, (int, float)) and not isinstance(v, bool):
+                out.append(("pii-age-derived", f"{here} (a figure of his phenotypic age: invertible to the chronological age)"))
+            out.extend(_derived_age_hits(v, here))
+    elif isinstance(node, list):
+        for i, v in enumerate(node):
+            out.extend(_derived_age_hits(v, f"{path}[{i}]"))
+    return out
+
+
+def _derived_age_shape_hits(node, path: str = "$") -> list:
+    """The same rule over a committed shape snapshot (tests/api_schemas/*.json): a derived-age key whose captured
+    type is a number. The offline, CI-gating half — a recapture of an endpoint that serves the figure again reds here."""
+    out = []
+    if isinstance(node, dict):
+        for k, v in node.items():
+            if k in ("keys", "items"):
+                out.extend(_derived_age_shape_hits(v, path))
+            elif k not in ("type", "length_sample", "optional"):
+                here = f"{path}.{k}"
+                types = v.get("type") if isinstance(v, dict) else None
+                types = types if isinstance(types, list) else [types]
+                if str(k).lower() in _DERIVED_AGE_KEYS and any(t in ("integer", "number") for t in types):
+                    out.append(("pii-age-derived", f"{here} (a figure of his phenotypic age: invertible to the chronological age)"))
+                out.extend(_derived_age_shape_hits(v, here))
+    elif isinstance(node, list):
+        for v in node:
+            out.extend(_derived_age_shape_hits(v, path))
+    return out
+
+
 def _masked(arm: str, detail: str) -> str:
     """The endpoint arm's violation details never carry the matched value (#4164 box 3):
     the scheduled sweep's log is a PUBLIC GitHub Actions run, so an echoed
@@ -496,6 +538,7 @@ def scan_endpoint_payload(text: str, vice=None, literals=None) -> list:
         # would echo it — so the key fragment reports its parent's path + a mask.
         out.extend(_scan_fragment(f"{path[: -len(key) - 1]}.<key masked>", key, vice, literals))
     out.extend(_scan_keys(iter_payload_keys(data)))
+    out.extend(_derived_age_hits(data))
     return out
 
 
@@ -530,7 +573,7 @@ def scan_schema_snapshots(snapshot_dir: str = _SNAPSHOT_DIR) -> dict:
         files += 1
         path = snap.get("path") or name
         scanned_paths.add(path)
-        for arm, detail in _scan_keys(iter_shape_keys(snap.get("shape") or {})):
+        for arm, detail in _scan_keys(iter_shape_keys(snap.get("shape") or {})) + _derived_age_shape_hits(snap.get("shape") or {}):
             violations.append((path, arm, detail))
 
     for path in sorted(discovered - scanned_paths - exempt):
