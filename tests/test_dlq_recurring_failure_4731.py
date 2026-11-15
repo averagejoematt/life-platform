@@ -248,3 +248,119 @@ def test_non_cdk_rule_targets_are_real_functions(env):
     missing = {r: f for r, f in mod.NON_CDK_RULE_TARGETS.items() if f not in deployed}
     assert not missing, f"NON_CDK_RULE_TARGETS names functions absent from ci/lambda_map.json: {missing}"
     assert mod.NON_CDK_RULE_TARGETS[RULE_1640] == "daily-metrics-compute"
+
+
+# ── #5980: the consumer re-invokes only functions on the redrive allowlist ──────
+
+OFF_LIST = "not-a-platform-function"
+
+
+def _dlq_wired_cdk_functions() -> set:
+    """Every function a us-west-2 CDK stack builds with the ingestion DLQ, read from
+    the stacks by AST (the same walk the enrollment kernel uses). Fails closed: a
+    `dlq=` it cannot classify reds the test rather than dropping the function."""
+    import ast
+
+    sys.path.insert(0, os.path.join(ROOT, "cdk"))
+    sys.path.insert(0, os.path.join(ROOT, "deploy"))
+    from check_lambda_config_drift import STACK_FILE_REGION
+    from stacks import lambda_enrollment as le
+
+    def splat(node, dict_vars):
+        if isinstance(node, ast.Dict):  # `**{**shared, "alerts_topic": None}`
+            out = {}
+            for k, v in zip(node.keys, node.values):
+                if k is None:
+                    out.update(splat(v, dict_vars))
+                elif isinstance(k, ast.Constant):
+                    out[k.value] = v
+            return out
+        return le._splat_contents(node, dict_vars)
+
+    stacks_dir = os.path.join(ROOT, "cdk", "stacks")
+    wired, unreadable = set(), []
+    for fname in sorted(os.listdir(stacks_dir)):
+        if not fname.endswith(".py") or fname == le.CONSTRUCTOR_FILE or STACK_FILE_REGION.get(fname, "us-west-2") != "us-west-2":
+            continue
+        with open(os.path.join(stacks_dir, fname), encoding="utf-8") as fh:
+            tree = ast.parse(fh.read())
+        dict_vars, consts = le._dict_literals(tree), le._module_constants(tree)
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            called = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, "id", None)
+            if called != le.CONSTRUCTOR:
+                continue
+            kwargs = {}
+            for kw in node.keywords:
+                if kw.arg is None:
+                    kwargs.update(splat(kw.value, dict_vars))
+            kwargs.update({kw.arg: kw.value for kw in node.keywords if kw.arg})
+            _, fn = le._kwarg(kwargs, "function_name", consts)
+            dlq = kwargs.get("dlq")
+            if dlq is None or (isinstance(dlq, ast.Constant) and dlq.value is None):
+                continue
+            if isinstance(dlq, ast.Name) and dlq.id == "local_dlq":
+                wired.add(fn)
+            else:
+                unreadable.append(f"{fname}:{node.lineno} dlq={ast.unparse(dlq)}")
+    assert not unreadable, f"dlq= values this derivation cannot classify (teach it, don't skip): {unreadable}"
+    return wired
+
+
+def test_redrive_targets_equal_the_dlq_wired_cdk_functions(env):
+    """The allowlist is the stacks' own DLQ wiring, not a hand opinion: a function added,
+    renamed or removed in CDK without updating operational/redrive_targets.py reds here."""
+    from operational.redrive_targets import REDRIVE_TARGETS
+
+    wired = _dlq_wired_cdk_functions()
+    assert len(wired) >= 80, f"only {len(wired)} DLQ-wired functions derived — the walk is broken"
+    assert set(REDRIVE_TARGETS) == wired, (
+        f"redrive_targets.py drifted from cdk/stacks: missing {sorted(wired - set(REDRIVE_TARGETS))}, "
+        f"stale {sorted(set(REDRIVE_TARGETS) - wired)}"
+    )
+    mod, _mocks, _ledger, _table = _import_module()
+    assert set(mod.NON_CDK_RULE_TARGETS.values()) <= set(REDRIVE_TARGETS)
+
+
+def test_a_target_off_the_allowlist_is_refused_escalated_and_never_invoked(env):
+    """Must-fail control: a message that resolves to a function outside the allowlist,
+    by either resolution path, is refused and logged — the invoke is never made."""
+    mod, mocks, _ledger, _table = _import_module()
+    bodies = [
+        json.dumps({"function_name": OFF_LIST}),
+        json.dumps(
+            {
+                "source": "aws.events",
+                "time": "2099-01-01T00:00:00Z",
+                "resources": [f"arn:aws:lambda:us-west-2:205930651321:function:{OFF_LIST}"],
+            }
+        ),
+    ]
+    warned = []
+    for i, body in enumerate(bodies):
+        escalations: list = []
+        stats = _stats()
+        with patch.object(mod.logger, "warning", side_effect=lambda m, *a, **k: warned.append(str(m))):
+            mod.process_message(_dlq_msg(f"m-off-{i}", body), stats, escalations)
+        assert stats["retried_ok"] == 0 and stats["escalated"] == 1, stats
+        assert escalations[0]["classification"] == "refused"
+    mocks["lambda"].invoke.assert_not_called()
+    assert sum("Refused re-drive" in w for w in warned) == 2, warned
+
+
+def test_the_invoke_site_refuses_an_off_list_target_on_its_own(env):
+    """Must-fail control at the one invoke site: retry_message refuses an off-list
+    target even when a caller hands it one directly."""
+    mod, mocks, _ledger, _table = _import_module()
+    assert mod.retry_message({"Body": "{}"}, OFF_LIST) is False
+    assert mod.retry_message({"Body": "{}"}, f"arn:aws:lambda:us-west-2:1:function:{OFF_LIST}") is False
+    mocks["lambda"].invoke.assert_not_called()
+
+
+def test_an_allowlisted_target_is_invoked_by_its_bare_name(env):
+    """Positive control: an allowlisted target still re-drives, and an ARN resolves to
+    the bare name, so the call stays in the consumer's own account and region."""
+    mod, mocks, _ledger, _table = _import_module()
+    assert mod.retry_message({"Body": "{}"}, "arn:aws:lambda:us-west-2:205930651321:function:daily-metrics-compute") is True
+    assert mocks["lambda"].invoke.call_args.kwargs["FunctionName"] == "daily-metrics-compute"

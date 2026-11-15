@@ -345,7 +345,7 @@ const workout = z
   })
   .strict();
 const device = z
-  .object({ night_of: z.string().regex(ISO_DAY).nullable(), hours: n, deep_hours: n, rem_hours: n, light_hours: n, score: n })
+  .object({ night_of: z.string().regex(ISO_DAY).nullable(), hours: n, deep_hours: n, rem_hours: n, light_hours: n, score: n, provisional: z.boolean().nullable() })
   .strict()
   .nullable();
 const night = z

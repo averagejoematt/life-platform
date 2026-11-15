@@ -101,8 +101,9 @@ import boto3
 # deploy path ships the full-tree bundle (#781), so web/site_api_common.py is
 # guaranteed present alongside this module.
 from common.client_ip import extract_client_ip, salted_ip_hash  # #1221 / #3620 (security ROW4)
+from common.constants import EXPERIMENT_START_DATE  # #5939 — the welcome email's day counter
 from common.email_identity import TRANSACTIONAL_SENDER  # #3568 — ONE sending vocabulary, gated against the SES-verified set
-from common.pacific_time import PACIFIC  # #2414 — the site's day boundary is Pacific (legacy-link sunset check)
+from common.pacific_time import PACIFIC, pacific_day_n, pacific_today  # #2414 Pacific day boundary; #5939 the one day-index formula
 from common.send_guard import guarded_send_email, is_dry_run  # #2291 — explicit dry_run honored
 from common.subscriber_cadence import (  # #3564/#3565 — copy RENDERED from the senders' crons + the source registry, never re-typed
     confirmation_cadence_phrase,
@@ -595,15 +596,46 @@ def handle_confirm(token: str, email_hash_prefix: str, dry_run: bool = False) ->
     return _redirect(f"{SITE_URL}/subscribe/confirm/?confirmed=true")
 
 
-def _welcome_email_content(email: str) -> tuple[str, str]:
+# #5939 (r2:cpo-3): the "brand new" paragraph is true for the first two weeks only. A Day-69
+# subscriber was told "the data is just starting to accumulate"; past this day the email says
+# which day it is instead, from the experiment constants.
+WELCOME_BRAND_NEW_MAX_DAY = 14
+
+# #5939: the v9 doors (www/src/pages — `/`, `/story/`, `/data/`, `/system/`). The welcome email
+# used to send a new reader to the legacy `/cockpit/` (placeholders until its JS ran) and
+# `/story/chronicle/`. Never a `/legacy` link.
+WELCOME_DOORS = (
+    ("Today, on the front page (rebuilt every morning)", "/"),
+    ("The story, chapter by chapter from the first one", "/story/"),
+    ("The evidence (every number, every source)", "/data/"),
+    ("How it works, and how the coaches' calls are graded", "/system/"),
+)
+
+
+def _welcome_day_paragraph(day: int) -> str:
+    """The where-we-are paragraph, by experiment day (Pacific frame, Day 1 = genesis)."""
+    if day <= WELCOME_BRAND_NEW_MAX_DAY:
+        return (
+            "Right now, the site is brand new and the data is just starting to accumulate. That's on purpose — I wanted you to be "
+            "able to see the whole journey from the beginning, not just the polished version."
+        )
+    return (
+        f"You're joining on day {day} of the experiment. Every day so far is on the site, from day 1 — the good weeks and the "
+        "bad ones, not just the polished version."
+    )
+
+
+def _welcome_email_content(email: str, on_date: str | None = None) -> tuple[str, str]:
     """Build the welcome email (subject, plaintext body). Factored out of the
     sender so the copy + links can be verified offline without hitting SES.
 
-    Links are v4 ("three doors": Story / Cockpit / Evidence) and lead with the
-    first dispatch so a new subscriber can read the journey from the beginning
-    (PG-03's "start from the beginning")."""
+    #5939: day-aware — the day comes from EXPERIMENT_START_DATE through
+    `pacific_day_n` (``on_date`` defaults to the Pacific today), and the links are
+    the v9 doors in WELCOME_DOORS, not the legacy cockpit/chronicle pages."""
     subject = "You're in. Here's what you just signed up for."
     unsub_url = unsub_url_or_fallback(email, SITE_URL)  # #3044 — signed token, never plaintext email
+    day = pacific_day_n(EXPERIMENT_START_DATE, on_date or pacific_today())
+    doors = "\n".join(f"-> {label}: {SITE_URL}{path}" for label, path in WELCOME_DOORS)
     body_text = f"""Hey —
 
 You just subscribed to The Measured Life. Here is exactly what that means. {promise_sentence()}
@@ -612,14 +644,11 @@ Each one is a dispatch from the experiment: what the data showed, what I tried, 
 
 This is a real experiment with real data. Not a highlight reel. The weeks the numbers go the wrong direction are in there too.
 
-Right now, the site is brand new and the data is just starting to accumulate. That's on purpose — I wanted you to be able to see the whole journey from the beginning, not just the polished version.
+{_welcome_day_paragraph(day)}
 
 A few things worth looking at while you're here:
 
--> Start from the beginning — the first dispatch: {SITE_URL}/story/chronicle/
--> The live cockpit (today's score, updated every morning): {SITE_URL}/cockpit/
--> The evidence (every number, every source): {SITE_URL}/data/
--> The Story (why I started): {SITE_URL}/story/
+{doors}
 
 See you {weekday_name(signal_weekday())}.
 

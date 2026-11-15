@@ -32,6 +32,11 @@ Why v2 (ADR-115):
   re-invoked. Hand-made rules the role cannot list resolve via
   NON_CDK_RULE_TARGETS instead of archiving as `fn=unknown`.
 
+  #5980: a re-drive invokes only a function on REDRIVE_TARGETS
+  (operational/redrive_targets.py — the functions that dead-letter to this
+  queue, held equal to cdk/stacks by a test). Any other resolved target is
+  refused, logged and escalated with reason `refused`; it is never invoked.
+
 Classification:
   TRANSIENT — timeout, throttle, transient API error → retry once via Lambda invoke
   PERMANENT — auth failure, missing resource, unretryable → escalate + archive to S3
@@ -74,6 +79,8 @@ from decimal import Decimal
 import boto3
 from common import pacific_time
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
+
+from operational.redrive_targets import REDRIVE_TARGETS  # #5980: the only functions a re-drive may invoke
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -485,12 +492,32 @@ def extract_function_name(message: dict) -> str | None:
     return None
 
 
+def redrive_target(fn_name: str | None) -> str | None:
+    """The function a re-drive may invoke, or None (#5980).
+
+    Returns the bare function name when it is on REDRIVE_TARGETS (the functions
+    that dead-letter to this queue, held equal to the CDK stacks by a test), and
+    None for anything else — including a resolved target that is not on the
+    list, which is logged as refused. The bare name is what gets invoked, so the
+    call always resolves in this function's own account and region."""
+    short = function_short_name(fn_name)
+    if not short:
+        return None
+    if short not in REDRIVE_TARGETS:
+        logger.warning(f"  Refused re-drive: {short[:80]!r} is not in the redrive allowlist (operational/redrive_targets.py)")
+        return None
+    return short
+
+
 def retry_message(message: dict, fn_name: str | None) -> bool:
     """
     Attempt to re-invoke the original Lambda with the same payload.
     Returns True only if the invoke was CONFIRMED accepted (Lambda returned 2xx).
     A False return means the retry was not accepted — the caller must NOT delete
     the message, so it redrives and the durable count keeps climbing.
+
+    #5980: only a function on REDRIVE_TARGETS is ever invoked; this is the one
+    invoke site, so the check lives here as well as in process_message.
     """
     body_str = message.get("Body", "{}")
 
@@ -498,10 +525,14 @@ def retry_message(message: dict, fn_name: str | None) -> bool:
         logger.warning("  Cannot retry: no function name extractable from message")
         return False
 
+    target = redrive_target(fn_name)
+    if target is None:
+        return False
+
     try:
-        logger.info(f"  Retrying Lambda: {fn_name}")
+        logger.info(f"  Retrying Lambda: {target}")
         response = lam.invoke(
-            FunctionName=fn_name,
+            FunctionName=target,
             InvocationType="Event",  # async — don't block
             Payload=body_str.encode("utf-8"),
         )
@@ -683,8 +714,11 @@ def process_message(msg: dict, stats: dict, escalations: list[dict]) -> None:
     receive_count = int(msg.get("Attributes", {}).get("ApproximateReceiveCount", "1"))
     body_str = msg.get("Body", "")
     fn_name = extract_function_name(msg)
-    retryable = fn_name is not None
-    fn_label = function_short_name(fn_name) or _unresolved_label(body_str)
+    # #5980: a resolved target off the redrive allowlist is refused — escalated, never invoked.
+    target = redrive_target(fn_name)
+    refused = fn_name is not None and target is None
+    retryable = target is not None
+    fn_label = (function_short_name(fn_name) or _unresolved_label(body_str))[:80]
 
     # #4731: key the ledger on function + failure signature, so the same crash
     # on a new message id (a new scheduled event) accumulates on one row.
@@ -707,7 +741,7 @@ def process_message(msg: dict, stats: dict, escalations: list[dict]) -> None:
     if not escalate:
         # Transient, below threshold → attempt one re-invoke.
         stats["transient"] += 1
-        retry_ok = retry_message(msg, fn_name)
+        retry_ok = retry_message(msg, target)
         if retry_ok:
             stats["retried_ok"] += 1
             _delete(msg, msg_id)  # confirmed accepted — safe to delete; count persists in the ledger
@@ -721,7 +755,12 @@ def process_message(msg: dict, stats: dict, escalations: list[dict]) -> None:
         return
 
     # Escalation path.
-    reason = classification if classification == "permanent" else ("unretryable" if not retryable else "threshold")
+    if refused:
+        reason = "refused"
+    elif classification == "permanent":
+        reason = classification
+    else:
+        reason = "unretryable" if not retryable else "threshold"
     stats["escalated"] += 1
     s3_key = archive_to_s3(msg, reason, retry_attempted=False, attempts=attempts)
     mark_escalated(stable_id)

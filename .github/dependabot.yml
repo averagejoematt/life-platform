@@ -6,6 +6,9 @@
 # #5473; the scheduled pip_audit_lambda retired 2026-10-30, #5474), not by
 # Dependabot (which can't resolve a binary Lambda layer). Here only the dev + CDK
 # toolchains are Dependabot-tracked.
+# Schedule (owner ruling 2026-11-15, #5821): every ecosystem runs MONTHLY, grouped, to cut
+# inbox noise. Security updates are not affected: Dependabot security PRs open on their own
+# schedule, independent of this version-update interval.
 version: 2
 updates:
   # GitHub Actions — keep the SHA-pinned actions current + patched.
@@ -16,7 +19,7 @@ updates:
       - "/"
       - "/.github/actions/*"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     open-pull-requests-limit: 5
     commit-message:
       prefix: "ci(deps)"
@@ -28,7 +31,7 @@ updates:
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps-dev)"
@@ -61,19 +64,25 @@ updates:
   - package-ecosystem: "npm"
     directory: "/remediation"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps-remediation)"
+    groups:
+      remediation:
+        patterns: ["*"]
 
   # CDK toolchain (cdk/requirements.txt: aws-cdk-lib, constructs).
   - package-ecosystem: "pip"
     directory: "/cdk"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps-cdk)"
+    groups:
+      cdk-pip:
+        patterns: ["*"]
 
   # CDK CLI (cdk/package.json: aws-cdk) — the npm leg of the CDK toolchain (#2760).
   # The pip leg is above; ci-cd.yml resolves the CLI version from cdk/package.json
@@ -83,7 +92,10 @@ updates:
   - package-ecosystem: "npm"
     directory: "/cdk"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps-cdk)"
+    groups:
+      cdk-npm:
+        patterns: ["*"]

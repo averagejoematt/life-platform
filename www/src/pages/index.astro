@@ -155,7 +155,10 @@ const dims: Dim[] = [
     const f = firstBar(bars);
     const l = lastBar(bars);
     // #5953: the figure is the latest night; the note used to call it "this week's mean" (8.1 h beside a 7.6 h mean).
-    return f != null && l != null ? `Last night. The last seven nights average ${num(l, 1)} h; the first of the eight weeks drawn, ${num(f, 1)} h.` : `${h.n} nights measured.`;
+    // sprint III item 8: the series is dated by the WAKE morning, so its newest point is "last night" only when that
+    // morning is the edition's day; an older newest point names its own night (the evening before that morning)
+    const night = h.lastDate && edition?.as_of && h.lastDate !== edition.as_of ? `The night before ${dayInWords(h.lastDate, { short: true })}, the latest measured.` : "Last night.";
+    return f != null && l != null ? `${night} The last seven nights average ${num(l, 1)} h; the first of the eight weeks drawn, ${num(f, 1)} h.` : `${h.n} nights measured.`;
   }),
   seriesDim("recovery", "hrv", "Recovery", 0, "ms", (h, bars) => {
     const f = firstBar(bars);
@@ -281,7 +284,8 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
           .join(" · ")}
       </p>
       <div class="row" style="margin-top:20px">
-        {firstChapter && <a class="btn" href={href(pathOf("chapter", firstChapter.id))}>Start with chapter one</a>}
+        {/* sprint III: a stranger starts with the moments that explain it (each links its chapter); chapter one is a click on */}
+        {firstChapter && <a class="btn" href={href("/story/moments/")}>Start here: the moments that explain it</a>}
         {latestChapter && <a class="btn ghost" href="#week">Latest published chapter ↓</a>}
       </div>
     </div>
@@ -408,7 +412,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
     )
   }
 
-  <OpenQuestions measured={measured} foodText={week?.measures?.food?.state === "ok" ? week.measures.food.data?.text : null} />
+  <OpenQuestions measured={measured} dimensions={dims.map((d) => ({ label: d.label, measured: d.measured }))} foodText={week?.measures?.food?.state === "ok" ? week.measures.food.data?.text : null} />
 
   <section class="section hair">
     <div class="wrap">
@@ -459,13 +463,15 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
           {
             pending.length ? (
               <div class="rows">
+                {/* sprint III: rows, not links — the ledger link below lists each with its page, and the front page's link
+                    budget (reach ceiling 12) carries the strangers' entry, the moments, instead */}
                 {pending.map((p) => (
-                  <a href={href(pathOf("prediction", p.id))}>
+                  <span>
                     <span style="font-size:14px;line-height:1.35">
                       <b>{p.coach_name}</b> · {(p.claim_withheld && heldCallWords(p, 80)) || clip(p.claim, 88)}
                     </span>
                     <StatusTag status="pending" date={p.due_date} call />
-                  </a>
+                  </span>
                 ))}
               </div>
             ) : (
