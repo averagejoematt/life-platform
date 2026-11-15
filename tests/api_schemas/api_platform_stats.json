@@ -61,6 +61,9 @@
       "review_grade": {
         "type": "string"
       },
+      "review_grade_calibration": {
+        "type": "string"
+      },
       "site_pages": {
         "type": "integer"
       },

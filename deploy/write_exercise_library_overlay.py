@@ -23,8 +23,8 @@ WHAT IT HOLDS (keyed by Hevy template id, joined to the public library at select
     (owner-confirmable), `contention` / `question` / `load_ceiling` counts. Contention never marks anything
     unavailable.
   * `gates` — one row per public gate id: measured input, comparator, value, chain prerequisites. Bodyweight
-    thresholds the owner has not set stay `null` (=> the gate is locked, and
-    `scripts/check_library_gates_private.py` fails until he sets them). A value already in the existing overlay
+    thresholds the owner has not set stay `null` (=> the gate is locked; that is a valid state the private check
+    lists and never fails, owner ruling 19 of 2026-11-13). A value already in the existing overlay
     is preserved — a re-run never wipes an owner-set threshold.
   * `not_for_you_now_detail` — the coded evidence behind each public `not_for_you_now`.
   * `technique_confirmations` — library movement id -> {confirmed_on, source}: the owner's technique confirmations, which

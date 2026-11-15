@@ -34,6 +34,7 @@ from health import (
     weight_trend,  # shared weekly-rate + projection
 )
 
+from web.journey_progress import displayed_progress  # the ONE displayed lost/remaining/progress arithmetic
 from web.site_api_common import (
     EXPERIMENT_BASELINE_WEIGHT_LBS,
     PT,
@@ -143,12 +144,16 @@ def journey(*, _g) -> dict:
     # == displayed_delta exactly. The old code rounded the displayed weight to an int (316)
     # while computing lost_lbs off the raw 315.6, so the hero stat row failed mental
     # arithmetic ("316 at last weigh-in · start 314 · 1.6 up" — 316 − 314 = 2 ≠ 1.6).
-    current_weight_disp = round(current_weight, 1)
+    # The arithmetic is web.journey_progress.displayed_progress — shared with the public stats file, so the API and
+    # the share cards cannot state two different figures for one weigh-in (review 2026-11-14, growth-2).
     start_weight_disp = round(start_weight, 1)
     goal_weight_disp = round(goal_weight, 1)
-    lost_lbs = round(start_weight_disp - current_weight_disp, 1)
-    remaining = round(current_weight_disp - goal_weight_disp, 1)
-    progress_pct = round(lost_lbs / (start_weight_disp - goal_weight_disp) * 100, 1) if start_weight_disp != goal_weight_disp else 0
+    current_weight_disp, lost_lbs, remaining, progress_pct = displayed_progress(start_weight, goal_weight, current_weight) or (
+        round(current_weight, 1),
+        None,
+        None,
+        None,
+    )
 
     # Recent rate + projection via the ONE shared computation (weight_trend) — the same
     # call the daily brief / public_stats uses, so the rate is identical everywhere.
