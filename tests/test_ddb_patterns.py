@@ -12,6 +12,7 @@ Rules enforced:
   D4  table.put_item calls in ingestion Lambdas are preceded by validate_item or
       validate_and_write (DATA-2 enforcement at code level)
   D5  no private float->Decimal walker outside lambdas/common/numeric.py (#1207)
+  D5b every OTHER recursive float->Decimal walker guards NaN/Inf, whatever its name (#5524)
   D6  no uncoerced float in a put_item/update_item payload in lambdas/ + mcp/ (#5524)
 
 Run with:   python3 -m pytest tests/test_ddb_patterns.py -v
@@ -344,10 +345,13 @@ MCP_DIR = os.path.join(ROOT, "mcp")
 # + the round-precision, expressed via floats_to_decimal(..., precision=)):
 #   * SCALAR coercers (not recursive walkers): coach_prediction_evaluator._scalar_to_decimal,
 #     measurements._parse_decimal_field.
-#   * int→Decimal / key-stringifying / zero-fallback recursive walkers, left as-is and
-#     tracked as follow-up: character_sheet_lambda._dec (int→Decimal),
+#   * int→Decimal / key-stringifying / zero-fallback / None-dropping recursive walkers,
+#     left as separate contracts: character_sheet_lambda._dec (int→Decimal),
 #     episode_detect_lambda._deep_dec (round(4) + int→Decimal + str(k) key coercion),
 #     weekly_correlation_compute_lambda._deep_dec (zero-fallback `_to_dec(obj) or 0`).
+#     These names are NOT matched here — D5b below checks them by SHAPE instead: each must
+#     still guard NaN/Inf (#5524, principal-6 of the 2026-11-13 /review full: a name list
+#     cannot see milestone_ledger._dec, which had no guard).
 #   * (#5524) the `try: from numeric import floats_to_decimal / except ImportError: def
 #     floats_to_decimal` fallback shims this list used to sanction are all gone (measured
 #     2026-11-10: `def floats_to_decimal` exists only in common/numeric.py), and the one
@@ -391,6 +395,198 @@ def test_d5_no_forked_floats_to_decimal():
         "`from numeric import floats_to_decimal` (with precision=/NaN-guard) instead of "
         "forking a private walker (#1207):\n  " + "\n  ".join(offenders)
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# D5b (#5524) — a recursive float→Decimal walker, under ANY name, guards NaN/Inf
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# D5 matches fork NAMES, so a walker under a new name (milestone_ledger._dec, found by the
+# 2026-11-13 /review full as principal-6) was invisible to it, and D6 then trusted the
+# same name as a coercer. Decimal(str(float("nan"))) is Decimal('NaN'), which boto3's
+# TypeSerializer rejects at WRITE time; Decimal('Infinity') likewise. So this gate finds
+# walkers by SHAPE, not by name:
+#
+#   a function that calls itself (recursive), builds a Decimal(...), and names `float`
+#   (an isinstance branch or a float() cast)
+#
+# and requires each one outside lambdas/common/numeric.py to either call
+# math.isnan / math.isinf / math.isfinite, or delegate to floats_to_decimal. `x == x` is
+# NOT accepted as a guard: it catches NaN and lets Infinity through (the old
+# health_auto_export_sleep._to_ddb shape).
+#
+# THE BOUND. A walker that recurses through a helper (A calls B calls A) is not seen;
+# scalar coercers (not recursive) are out of scope here and covered by D6 at the write.
+# Measured 2026-11-15 on lambdas/ + mcp/: 12 walkers outside numeric.py, 10 of them with
+# no NaN/Inf guard before this change; 11 now guarded or delegating, 1 allowlisted below.
+
+_NONFINITE_PREDICATE_NAMES = frozenset({"isnan", "isinf", "isfinite"})
+
+# "<relpath>::<function>" -> the written reason the walker may stay unguarded for now.
+D5B_UNGUARDED_WALKER_REASONS: dict[str, str] = {
+    "lambdas/training/variant_rotation.py::_to_ddb": (
+        "lambdas/training/** was fenced during the 2026-11-15 paydown block (the quality-tiers "
+        "branch owns that tree); give it a math.isfinite branch, or floats_to_decimal, once "
+        "that branch merges — tracked on #5524"
+    ),
+}
+
+
+def _call_name(node):
+    if isinstance(node.func, ast.Name):
+        return node.func.id
+    if isinstance(node.func, ast.Attribute):
+        return node.func.attr
+    return None
+
+
+def _decimal_walkers(src: str):
+    """Yield (function_name, lineno, guarded) for every recursive float→Decimal walker in `src`."""
+    tree = ast.parse(src)
+    for fn in ast.walk(tree):
+        if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        calls = {_call_name(n) for n in ast.walk(fn) if isinstance(n, ast.Call)}
+        names_float = any(isinstance(n, ast.Name) and n.id == "float" for n in ast.walk(fn))
+        if fn.name in calls and "Decimal" in calls and names_float:
+            guarded = bool(calls & _NONFINITE_PREDICATE_NAMES) or "floats_to_decimal" in calls
+            yield fn.name, fn.lineno, guarded
+
+
+def _unguarded_walkers_in_tree():
+    numeric_path = os.path.abspath(os.path.join(LAMBDAS_DIR, "common", "numeric.py"))
+    found, offenders = 0, []
+    for path in _iter_python_sources():
+        if os.path.abspath(path) == numeric_path:
+            continue
+        with open(path, encoding="utf-8") as f:
+            src = f.read()
+        try:
+            walkers = list(_decimal_walkers(src))
+        except SyntaxError:
+            continue
+        rel = os.path.relpath(path, ROOT)
+        for name, lineno, guarded in walkers:
+            found += 1
+            key = f"{rel}::{name}"
+            if not guarded and key not in D5B_UNGUARDED_WALKER_REASONS:
+                offenders.append(f"{rel}:{lineno} {name}")
+    return found, offenders
+
+
+def test_d5b_every_decimal_walker_guards_non_finite_floats():
+    """D5b (#5524): a recursive float→Decimal walker outside numeric.py guards NaN/Inf.
+
+    Use `from common.numeric import floats_to_decimal` (NaN/Inf → None), or give the
+    float branch a math.isfinite check. A NaN reaching a write is a TypeError in boto3's
+    serializer, raised in production on the first row that carries one.
+    """
+    found, offenders = _unguarded_walkers_in_tree()
+    # Blindness floor: the tree held 12 such walkers when this gate landed. If the detector
+    # finds almost none, it has gone blind (a refactor of the walk), not clean.
+    assert found >= 8, f"D5b found only {found} float→Decimal walkers under lambdas/ + mcp/ — the detector is blind"
+    assert not offenders, (
+        "A recursive float→Decimal walker has no NaN/Inf guard — boto3 rejects Decimal('NaN') "
+        "and Decimal('Infinity') at write time. Use common.numeric.floats_to_decimal, or add a "
+        "math.isfinite branch (`x == x` misses Infinity) (#5524):\n  " + "\n  ".join(offenders)
+    )
+
+
+def test_d5b_allowlist_entries_carry_a_reason_and_still_exist():
+    """Every D5b allowlist entry has a written reason and names a walker that is still unguarded."""
+    for key, reason in D5B_UNGUARDED_WALKER_REASONS.items():
+        assert len(reason.strip()) >= 40, f"{key}: the allowlist reason is too thin to review"
+        rel, _, name = key.partition("::")
+        path = os.path.join(ROOT, rel)
+        assert os.path.exists(path), f"{key}: the allowlisted file is gone — drop the entry"
+        with open(path, encoding="utf-8") as f:
+            walkers = {n: g for n, _, g in _decimal_walkers(f.read())}
+        assert name in walkers, f"{key}: no such walker any more — drop the entry"
+        assert not walkers[name], f"{key}: the walker is guarded now — drop the entry"
+
+
+_D5B_RED_PLANTS = {
+    # the milestone_ledger._dec shape principal-6 named (no guard at all)
+    "named_dec": """
+        def _dec(obj):
+            if isinstance(obj, list):
+                return [_dec(v) for v in obj]
+            if isinstance(obj, dict):
+                return {k: _dec(v) for k, v in obj.items()}
+            if isinstance(obj, float):
+                return Decimal(str(obj))
+            return obj
+    """,
+    # a NaN-only self-compare lets Infinity through
+    "self_compare": """
+        def _to_ddb(obj):
+            if isinstance(obj, float):
+                return Decimal(str(round(obj, 4))) if obj == obj else None
+            if isinstance(obj, dict):
+                return {k: _to_ddb(v) for k, v in obj.items()}
+            return obj
+    """,
+    # a brand-new name, nested inside a handler
+    "nested_new_name": """
+        def handler(event, context):
+            def make_writable(x):
+                if isinstance(x, float):
+                    return decimal.Decimal(repr(x))
+                if isinstance(x, list):
+                    return [make_writable(i) for i in x]
+                return x
+            return make_writable(event)
+    """,
+}
+
+_D5B_GREEN_PLANTS = {
+    "isfinite_branch": """
+        def _dec(obj):
+            if isinstance(obj, float):
+                return Decimal(str(obj)) if math.isfinite(obj) else None
+            if isinstance(obj, dict):
+                return {k: _dec(v) for k, v in obj.items()}
+            return obj
+    """,
+    "isnan_isinf_branch": """
+        def _dec(obj):
+            if isinstance(obj, float):
+                if math.isnan(obj) or math.isinf(obj):
+                    return None
+                return Decimal(str(obj))
+            if isinstance(obj, list):
+                return [_dec(v) for v in obj]
+            return obj
+    """,
+}
+
+
+def test_d5b_mutation_control_reds_every_unguarded_shape_and_passes_guarded_ones():
+    """The detector is watched failing: each planted unguarded walker is found and marked
+    unguarded; each guarded one is found and marked guarded (found-but-green, not missed)."""
+    for label, src in _D5B_RED_PLANTS.items():
+        walkers = list(_decimal_walkers(textwrap.dedent(src)))
+        assert walkers, f"{label}: the detector did not see the walker at all"
+        assert not any(g for _, _, g in walkers), f"{label}: an unguarded walker was read as guarded"
+    for label, src in _D5B_GREEN_PLANTS.items():
+        walkers = list(_decimal_walkers(textwrap.dedent(src)))
+        assert walkers, f"{label}: the detector did not see the walker at all"
+        assert all(g for _, _, g in walkers), f"{label}: a guarded walker was read as unguarded"
+
+
+def test_d5b_the_repaired_walkers_write_none_for_nan_and_inf():
+    """Behaviour, not only shape: the walkers this change guarded turn NaN/±Inf into None."""
+    sys.path.insert(0, LAMBDAS_DIR)
+    from decimal import Decimal
+
+    from compute import daily_metrics_compute_lambda as dm, episode_detect_lambda as ed
+    from health import titration
+    from ingestion import health_auto_export_protein as hp, health_auto_export_sleep as hs
+
+    for walker in (dm._deep_dec, ed._deep_dec, titration._to_ddb, hp._to_ddb, hs._to_ddb):
+        out = walker({"a": float("nan"), "b": float("inf"), "c": -float("inf"), "d": 1.5})
+        assert out.get("a") is None and out.get("b") is None and out.get("c") is None, walker.__qualname__
+        assert out["d"] == Decimal("1.5"), walker.__qualname__
 
 
 # ══════════════════════════════════════════════════════════════════════════════

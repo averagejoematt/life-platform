@@ -44,6 +44,7 @@ v1.2.0 — 2026-07-27 (#1843) diary_sessions (video-diary/solo-recording count, 
 """
 
 import logging
+import math
 import os
 import time
 from datetime import date, datetime, timedelta, timezone
@@ -960,6 +961,8 @@ def _deep_dec(obj):
     if isinstance(obj, bool):
         return obj
     if isinstance(obj, float):
+        if not math.isfinite(obj):
+            return None  # #5524: a NaN/Inf is unknown, never a fabricated 0 and never a write-time TypeError
         return _to_dec(obj) or Decimal("0")
     if isinstance(obj, int):
         return Decimal(str(obj))
