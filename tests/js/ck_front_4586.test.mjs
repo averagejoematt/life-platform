@@ -205,10 +205,30 @@ test("the chapter and podcast lines are labelled as AI-written and carry Read an
 test("the follow box says what arrives next and when", () => {
   // The capture's cadence marks the date a draft, not a promise: the box does not say "due".
   assert.ok(B.next.data.chapter.data.drafted_not_promised);
-  assert.equal(F.followLine(B.next), "A new chapter and podcast most weeks, each once Matthew approves it, and the numbers every Sunday.");
+  const drafted = dayInWords(B.next.data.chapter.data.date);
+  assert.equal(F.followLine(B.next), `A new chapter each time Matthew approves a week’s draft. The next draft is dated ${drafted}. The week’s numbers go out every Sunday.`);
   const promised = { ...B.next, data: { ...B.next.data, chapter: { ...B.next.data.chapter, data: { date: "2026-10-14" } } } };
-  assert.equal(F.followLine(promised), "The next chapter and podcast are due Wednesday, October 14. The week’s numbers go out every Sunday.");
-  assert.match(F.followLine({}), /most weeks/);
+  assert.equal(F.followLine(promised), "The next chapter is due Wednesday, October 14. The week’s numbers go out every Sunday.");
+  assert.equal(F.followLine({}), "A new chapter each time Matthew approves a week’s draft, and the numbers every Sunday.");
+});
+
+test("#5939: the follow box's cadence is the record's — never a hand-typed 'podcast most weeks'", () => {
+  // The record on 2026-11-15: posts.json program weeks 1-6 and 10 (+ the week-0 prologue), episodes.json weeks 0 and 4.
+  const journal = { posts: [10, 6, 5, 4, 3, 2, 1, 0].map((week) => ({ week, title: `t${week}`, url: `/u${week}/` })) };
+  const episodes = { episodes: [{ week: 4 }, { week: 0 }] };
+  const counts = F.cadenceCounts(journal, episodes);
+  assert.deepEqual(counts, { chapters: 7, episodes: 1 }); // the prologue counts as neither
+  assert.equal(F.followLine({}, counts), "A new chapter each time Matthew approves a week’s draft (7 so far, only 1 with a podcast episode), and the numbers every Sunday.");
+  assert.match(F.followLine({}, { chapters: 7, episodes: 6 }), /\(7 so far, 6 with a podcast episode\)/);
+  assert.match(F.followLine({}, { chapters: 7, episodes: 0 }), /none with a podcast episode yet/);
+  assert.equal(F.cadenceCounts({ posts: [] }, episodes), null);
+  for (const c of [null, counts, { chapters: 7, episodes: 6 }]) {
+    for (const nb of [{}, B.next]) assert.doesNotMatch(F.followLine(nb, c), /podcast most weeks|chapter and podcast/, JSON.stringify(c));
+  }
+  // The no-JS fallback in the shell is the same no-claim sentence — a literal cadence promise reds here.
+  const shell = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "site", "start", "index.html"), "utf8");
+  const line = shell.match(/id="ck-follow-line">([^<]*)</)[1];
+  assert.equal(line, F.followLine({}));
 });
 
 test("nothing the builders emit carries an honorific, an ISO date in text, or a first-person line", () => {
