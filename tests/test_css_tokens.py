@@ -20,6 +20,8 @@ test_sanction_issue_ref_live_check_is_a_pure_function below for why that stays s
 import sys
 from pathlib import Path
 
+# premerge-gate: #5938 — a www/src-only PR must meet the v9 token/type/breakpoint ratchet before merge, not after
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 import check_css_tokens  # noqa: E402
@@ -493,3 +495,63 @@ def test_kit_exemption_is_scoped_and_the_kit_rules_are_non_vacuous():
     for label, (mutated, expected) in mutations.items():
         assert mutated != sheet, f"mutation `{label}` did not change the sheet — the proof is vacuous"
         assert expected in "\n".join(c.kit_sheet_findings("clean.css", mutated)), label
+
+
+# ── #5938: the v9 build leg (www/src, read-only) — a ratchet that may only shrink ─────────────────────────
+
+
+def _www(files, ratchet=None, bps=None):
+    return check_css_tokens.www_findings(files, 12.0, ratchet=ratchet or {}, breakpoints=bps or {760})
+
+
+def test_the_live_v9_build_is_within_its_ratchet_and_the_leg_is_not_blind():
+    files = check_css_tokens.www_sources()
+    assert any(k.endswith("styles/base.css") for k in files) and sum(k.endswith(".astro") for k in files) > 20, "the www leg read nothing"
+    floor = check_css_tokens.www_fs_floor(check_css_tokens.WWW_TOKENS.read_text())
+    assert floor == 12.0  # the --fs-label the rendered floor and the source floor share
+    assert check_css_tokens.www_findings(files, floor) == []
+    counts, bps = check_css_tokens.www_counts(files, floor)
+    assert counts and set(bps) == check_css_tokens.WWW_BREAKPOINTS  # the baseline is real debt, and the set is exact
+
+
+def test_MUTATION_a_stray_hex_outside_www_tokens_reds_and_tokens_css_itself_does_not():
+    (f,) = _www({"www/src/styles/base.css": ".a { color: #8fa4ff; }"})
+    assert "1 hex colour(s)" in f and "allows 0" in f
+    assert _www({"www/src/styles/tokens.css": ":root { --ink: #221E17; }"}) == []
+    (f,) = _www({"www/src/components/X.astro": '<div style="background:#3a3a37">x</div>'})
+    assert "X.astro" in f
+    assert _www({"www/src/components/X.astro": "---\nconst c = '#3a3a37';\n---\n<p>#1234 is an issue</p>"}) == []  # not a style
+
+
+def test_MUTATION_a_sub_floor_font_size_reds_in_every_spelling():
+    for src in (
+        '<span style="font-size:11px">x</span>',
+        "<style>.k { font-size: 0.6rem; }</style>",
+        '<svg><text font-size="10">x</text></svg>',
+        "<span style={`font-size:11px`}>x</span>",
+    ):
+        (f,) = _www({"www/src/components/X.astro": src})
+        assert "under the --fs-label floor (12px)" in f, src
+    assert _www({"www/src/components/X.astro": '<span style="font-size:12px">x</span><text font-size="12.5"/>'}) == []
+    assert _www({"www/src/components/X.astro": '<span style="font-size:var(--fs-label)">x</span>'}) == []
+
+
+def test_MUTATION_a_new_breakpoint_reds_and_a_pinned_one_does_not():
+    (f,) = _www({"www/src/styles/base.css": "@media (max-width: 761px) { .a { color: red; } }"})
+    assert "new breakpoint `761px`" in f
+    assert _www({"www/src/styles/base.css": "@media (max-width: 760px) { .a { color: red; } }"}) == []
+    assert _www({"www/src/styles/base.css": "/* @media (max-width: 999px) was the old one */"}) == []
+
+
+def test_the_ratchet_holds_at_its_pin_and_reds_one_over_it():
+    key = ("hex", "www/src/styles/base.css")
+    two = {"www/src/styles/base.css": ".a { color: #111111; } .b { color: #222222; }"}
+    assert _www(two, ratchet={key: 2}) == [] and _www(two, ratchet={key: 3}) == []  # at or under the pin: green
+    (f,) = _www(two, ratchet={key: 1})
+    assert "2 hex colour(s)" in f and "ratchet allows 1" in f
+
+
+def test_the_www_leg_runs_inside_check():
+    src = Path(check_css_tokens.__file__).read_text()
+    body = src[src.index("def check() -> list:") :]
+    assert "www_findings(www_sources()" in body[: body.index("\ndef ")]
