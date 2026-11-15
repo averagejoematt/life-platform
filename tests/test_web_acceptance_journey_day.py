@@ -199,6 +199,31 @@ def _dist(tmp_path, journey_html, front_html="<a href='/data/'>x</a>"):
     return str(tmp_path)
 
 
+def test_spark_agreement_reds_when_one_series_is_two_pictures(tmp_path):
+    """Review 2026-11-14 (dataviz-2): the front page and the data room drew the same eight weekly means on two scales.
+    The build gate now compares them — same SVG, same latest reading — for every metric drawn on both."""
+    from check_www_build import spark_agreement
+
+    def page(svg, latest="288.5", metric="weight_lbs"):
+        return f'<a class="tile"><span class="spark" data-spark-of="{metric}" data-latest="{latest}"><svg viewBox="0 0 96 32">{svg}</svg></span></a>'
+
+    def dist(name, front, data):
+        root = tmp_path / name
+        (root / "data").mkdir(parents=True)
+        (root / "index.html").write_text(front, encoding="utf-8")
+        (root / "data" / "index.html").write_text(data, encoding="utf-8")
+        return str(root)
+
+    line = '<polyline points="5,4 17,9"/>'
+    assert (
+        spark_agreement(dist("same", page(line), page(line) + page("<rect/>", "58", "steps"))) == []
+    ), "a metric on one page only is not compared"
+    two = spark_agreement(dist("two", page(line), page('<rect height="26"/><rect height="4"/>')))
+    assert two and "weight_lbs" in two[0] and "one picture" in two[0]
+    stale = spark_agreement(dist("stale", page(line, "288.5"), page(line, "290.7")))
+    assert stale == ["weight_lbs: latest reading '290.7' on data/index.html but '288.5' on index.html"]
+
+
 def test_heart_coverage_holds_both_charts_and_the_front_page_budget(tmp_path):
     from check_www_build import heart_coverage
 

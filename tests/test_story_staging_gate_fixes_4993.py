@@ -75,9 +75,11 @@ def test_a_run_cannot_reach_across_the_sign_off():
 
 # ── 2. a rate is not a body number ───────────────────────────────────────────
 
-# the wk4 episode line as staged in the cycle-17 bundle (2026-10-18), turn 4 — the auditor's A15
+# the wk4 episode line as PUBLISHED, turn 4 — the auditor's A15. The staged draft (2026-10-18) also said how much the
+# scale was down since his first weigh-in; that amount is a spoken body-weight figure (#5949) and is pinned as one in
+# tests/test_panel_body_number_one_detector_4993.py. The rate is what this test is about, and the rate still clears.
 WK4_LINE = (
-    "A clean result. The scale is down about fifteen pounds from his first weigh-in, and the pace this window is 2.64 pounds "
+    "A clean result. The scale is moving in the right direction, and the pace this window is 2.64 pounds "
     "per week — slower than the season average, which is exactly what the plan said would happen as the early water and "
     "glycogen drop fades."
 )

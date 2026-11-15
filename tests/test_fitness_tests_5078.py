@@ -19,6 +19,12 @@ from unittest.mock import patch
 
 import pytest
 
+ROLLBACK = pytest.mark.usefixtures("exercise_library_rollback")
+"""#5861 (owner approval 2026-11-14): the marked tests pin the PRE-approval generator — the battery draft's shape and its catalog-hint
+resolver are the pre-approval generator's (live fits a title-only press, resolved at commit). They run on the library's rollback copy
+(status proposed: tests/conftest.py `exercise_library_rollback`), so they keep guarding the rollback path; the approved (live) behaviour
+is pinned by the #5861 tests."""
+
 os.environ.setdefault("S3_BUCKET", "test-bucket")
 os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
@@ -384,6 +390,7 @@ def _ideal(rs):
     return next(r for r in rs if r.variant == "ideal")
 
 
+@ROLLBACK
 def test_the_due_week_test_day_draft_carries_the_battery_on_its_minimum_session():
     from training import hevy_compiler, warmup_sets
 

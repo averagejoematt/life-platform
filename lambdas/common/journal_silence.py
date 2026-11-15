@@ -57,11 +57,16 @@ _RIGHT_BOUNDARY = re.compile(r"[.!?][\"'”’)\]]*(?=\s|$|<)|(?=[<>\n])")
 _MAX_PASSES = 200
 
 
-def scrub_document(text: Any) -> str:
-    """`text` with every sentence that mentions the journal's silence removed (clean text: unchanged)."""
+def scrub_document(text: Any, pattern: Any = None) -> str:
+    """`text` with every sentence that mentions the journal's silence removed (clean text: unchanged).
+
+    ``pattern`` is the compiled pattern whose sentences are removed — the journal's silence by default (read at
+    CALL time, never bound at import); a second public-surface guard with its own pattern
+    (``privacy.clinical_screen``, #5947) reuses the same degradation."""
+    pattern = pattern or JOURNAL_SILENCE
     s = "" if text is None else str(text)
     for _ in range(_MAX_PASSES):
-        m = JOURNAL_SILENCE.search(s)
+        m = pattern.search(s)
         if not m:
             break
         start = 0
@@ -75,22 +80,23 @@ def scrub_document(text: Any) -> str:
     return s if s.strip() else ""
 
 
-def _scrub(node: Any) -> tuple[Any, int]:
+def _scrub(node: Any, pattern: Any = None) -> tuple[Any, int]:
     """(scrubbed node, withheld-span count). A list drops every element whose subtree hit."""
+    pattern = pattern or JOURNAL_SILENCE
     if isinstance(node, str):
-        if not JOURNAL_SILENCE.search(node):
+        if not pattern.search(node):
             return node, 0
-        return scrub_document(node), 1
+        return scrub_document(node, pattern), 1
     if isinstance(node, dict):
         out, hits = {}, 0
         for k, v in node.items():
-            out[k], h = _scrub(v)
+            out[k], h = _scrub(v, pattern)
             hits += h
         return out, hits
     if isinstance(node, (list, tuple)):
         kept, hits = [], 0
         for v in node:
-            nv, h = _scrub(v)
+            nv, h = _scrub(v, pattern)
             if h:
                 hits += h
             else:
@@ -104,10 +110,11 @@ def scrub_payload(payload: Any) -> tuple[Any, int]:
     return _scrub(payload)
 
 
-def _scrub_text_body(text: str, content_type: str = "") -> tuple[str, int]:
+def _scrub_text_body(text: str, content_type: str = "", pattern: Any = None) -> tuple[str, int]:
     """A serialised body: JSON (by content type, or a body that parses as an object/array) structurally,
     anything else by sentence."""
-    if not JOURNAL_SILENCE.search(text):
+    pattern = pattern or JOURNAL_SILENCE
+    if not pattern.search(text):
         return text, 0
     if "json" in (content_type or "").lower() or text.lstrip()[:1] in ("{", "["):
         try:
@@ -115,9 +122,9 @@ def _scrub_text_body(text: str, content_type: str = "") -> tuple[str, int]:
         except ValueError:
             parsed = None
         if isinstance(parsed, (dict, list)):
-            scrubbed, hits = scrub_payload(parsed)
+            scrubbed, hits = _scrub(parsed, pattern)
             return json.dumps(scrubbed, ensure_ascii=False, default=str), hits
-    return scrub_document(text), 1
+    return scrub_document(text, pattern), 1
 
 
 def public_body(body: Any, content_type: str = "") -> Any:
@@ -140,7 +147,11 @@ def guard_api_response(response: Any, logger: Any = None) -> Any:
     """The public API Lambdas' last step before the wire. A base64 body (an image) and a non-dict result pass
     through untouched. The withheld count is LOGGED, never served: the former count header moved with how
     much journal-silence copy existed — a count about private activity on a public response (owner ruling
-    2026-11-05: withheld counts off public responses)."""
+    2026-11-05: withheld counts off public responses).
+
+    #5947: the SAME last step then applies the owner-only clinical vocabulary (``privacy.clinical_screen``) — one
+    wire door, so a route added tomorrow, or free text stored outside the narrative provenance gate, is screened
+    without its handler asking. A no-op while the off-repo channel carries no clinical list."""
     if not isinstance(response, dict) or response.get("isBase64Encoded"):
         return response
     body = response.get("body")
@@ -148,11 +159,25 @@ def guard_api_response(response: Any, logger: Any = None) -> Any:
         return response
     headers = response.get("headers") or {}
     new_body, hits = _scrub_text_body(body, str(headers.get("Content-Type") or headers.get("content-type") or ""))
-    if not hits:
+    if hits:
+        if logger is not None:
+            logger.warning("journal-silence copy withheld from a public response: %d span(s) (#5131)", hits)
+        response = {**response, "body": new_body}
+    return _clinical_pass(response, logger)
+
+
+def _clinical_pass(response: Any, logger: Any = None) -> Any:
+    """The clinical half of the wire guard. Imported lazily (``privacy`` imports ``common``); a bundle without the
+    module, or a guard that raises, is logged and the response served as the provenance gate left it — this layer
+    is defence in depth over the whole API, so it never turns one bad read into a site-wide outage."""
+    try:
+        from privacy import clinical_screen  # noqa: PLC0415 — lazy: keeps this module import-light and cycle-free
+
+        return clinical_screen.guard_response(response, logger)
+    except Exception as e:  # noqa: BLE001 — see docstring
+        if logger is not None:
+            logger.error("clinical wire guard did not run (%s) — response served without it (#5947)", type(e).__name__)
         return response
-    if logger is not None:
-        logger.warning("journal-silence copy withheld from a public response: %d span(s) (#5131)", hits)
-    return {**response, "body": new_body}
 
 
 def spoken_turns(turns: Any, key: str = "line") -> list:

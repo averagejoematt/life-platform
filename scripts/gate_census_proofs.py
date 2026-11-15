@@ -2061,6 +2061,35 @@ STRUCTURAL_HAND_PROOFS.update(
             ),
             "proved_on": "2026-11-01",
         },
+        # Owner ruling 2026-11-14: no public output is a function of the owner's age. The Levine phenotypic age served by
+        # /api/phenoage was the age to ~1.1 years (formula public and linear in age, the nine markers public).
+        "structural::test_age_inversion.py": {
+            "gate_name": "test_age_inversion.py",
+            "command": "python3 -m pytest tests/test_age_inversion.py -q -p no:randomly   # baseline 16 passed (14 when proven; two TDEE tests added with the reference-age estimate)",
+            "mutation": (
+                "Three plants in the real tracked tree, ONE AT A TIME, each restored from a byte copy: M1 the public handler "
+                "(lambdas/web/site_api_biomarkers.py::phenoage) reads the profile's birth date again and serves "
+                "`round(_compute_phenoage(vals, age))` under `phenoage` (the pre-ruling shape); M2 a function reading "
+                '`profile.get("date_of_birth")` appended to lambdas/web/site_api_physical.py (a public module off the allow-list); '
+                "M3 scripts/publish_snapshot_journey.py::phenoage writes a `years` figure into journey.json's phenoage object."
+            ),
+            "observed": (
+                "2026-11-14, this lane. BASELINE 14 passed. M1: 4 failed (the handler reads no profile and no clock; the response is "
+                "the same bytes whatever the birth date; the snapshot refuses a figure of his own; no other public path reads the "
+                "birth date). M2: 1 failed (test_no_other_public_path_reads_the_birth_date). M3: 1 failed (the snapshot test). "
+                "REVERTED 14 passed each time. The instrument's own controls are in-test on synthetic ages: the old shape scores a "
+                "window under 1.3 y, a five-year band 5–6 y narrowing with a second draw, a younger/older flag a one-sided bound."
+            ),
+            "scope": (
+                "The handler through a fake S3 client and injected globals that raise on any access, the publication snapshot's "
+                "producer and contract, and an AST sweep of lambdas/web, lambdas/coach, lambdas/content and lambdas/emails for a "
+                "`date_of_birth` key read (allow-list EMPTY since the public Mifflin estimate moved to a reference age). Synthetic markers and ages only. NOT SEEN: the "
+                "live response (tests/age_inversion_lib.py --live is the anonymous live attack; deploy/pii_surface_guard.py reds "
+                "on a served phenotypic-age figure, offline over the committed shape snapshots and live over the payloads), any "
+                "age-derived output computed outside those four packages, and what readers captured before the ruling."
+            ),
+            "proved_on": "2026-11-14",
+        },
         # #4880: the function-length ratchet (D3) — the module-size guard's shape, one level down.
         "structural::test_function_length_guard_4880.py": {
             "gate_name": "test_function_length_guard_4880.py",
@@ -4682,4 +4711,25 @@ STRUCTURAL_HAND_PROOFS["structural::test_anchor_cue_sheets_5817.py"] = {
         "predraft with a bench, squat, deadlift or one-arm DB row is the issue's live proof)."
     ),
     "proved_on": "2026-11-11",
+}
+
+STRUCTURAL_HAND_PROOFS["structural::test_rate_policy_5861.py"] = {
+    "gate_name": "test_rate_policy_5861.py",
+    "command": "python3 -m pytest tests/test_rate_policy_5861.py -q -p no:warnings   # baseline 11 passed",
+    "mutation": (
+        "M1 the strength signal never slows (`slow = False`); M2 adherence never slows (state 'ok' when a reason exists); "
+        "M3 an observed rate below the band lifts the band one rung; M4 a `time.time()` stamp in the proposal; M5 the "
+        "strength threshold restated as `5.0` instead of read from owner_redlines; M6 a `# from health import rate_policy` "
+        "line appended to lambdas/health/calorie_target.py (the no-live-reader sweep)."
+    ),
+    "observed": (
+        "2026-11-12, this lane. BASELINE 11 passed. M1: 4 failed. M2: 1 failed. M3: 2 failed (the below-band control and the "
+        "full signal grid). M4: 1 failed (test_deterministic). M5: 1 failed (test_strength_threshold_is_the_tripwires_own). "
+        "M6: 1 failed (test_no_live_path_reads_the_proposal). REVERTED 11 passed."
+    ),
+    "scope": (
+        "Repo-side only, synthetic profiles: the pure proposal and the import sweep of lambdas/ + mcp/. NOT SEEN: any live "
+        "output — nothing reads the proposal until the owner rules to wire it at health.titration.band_for."
+    ),
+    "proved_on": "2026-11-12",
 }

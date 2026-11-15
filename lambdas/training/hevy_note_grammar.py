@@ -27,6 +27,8 @@ from __future__ import annotations
 import re
 from typing import Optional, Union
 
+from training import cardio_model
+
 GRAMMAR_VERSION = "hevy-note-grammar@1.6.0"  # 1.1.0: re-grade #2; 1.2.0: re-grade #3; 1.3.0: re-grade #4; 1.4.0: the test-block grammar;
 # 1.5.0: re-grade #6 (2026-11-08) — one layoff line, plain load-rule line 4, intervals at steady + 2 (see each builder);
 # 1.6.0: owner ruling 2026-11-10 — a first session back after a long layoff (`FIRST_RETURN_RE`)
@@ -82,7 +84,10 @@ LOW_ENERGY_LINE = "Low energy → first 2 lifts + easy cardio."
 # #5428 re-grade #2 (2026-10-31): a session whose only cardio is a hard kind (intervals, tempo, hills) has no easy cardio
 # to fall back on, so the line names the change instead of promising a block that is not there.
 LOW_ENERGY_HARD_CARDIO_LINE = "Low energy → first 2 lifts + cardio, no hard efforts."
-LOW_ENERGY_LINES = (LOW_ENERGY_LINE, LOW_ENERGY_HARD_CARDIO_LINE)
+LOW_ENERGY_LIFTS_LINE = "Low energy → first 2 lifts, then stop."
+"""#5861 fix round 9, LIVE only (`live_program.annotate`): a morning that hosts no cardio block (purposeful cardio, owner ruling 4)
+never promises 'easy cardio'. Shadow sessions never carry it (`low_energy_line` is unchanged)."""
+LOW_ENERGY_LINES = (LOW_ENERGY_LINE, LOW_ENERGY_HARD_CARDIO_LINE, LOW_ENERGY_LIFTS_LINE)
 HARD_CARDIO_KINDS = ("tempo", "hills", "intervals")  # `cardio_menu.HARD`
 
 
@@ -346,7 +351,12 @@ SET_1_HEAD = "Set 1: "
 
 
 # what a held-top reason must read as (lint L4): the in-session step on set 1, or the next-session step on a one-set lift
-HELD_TOP_RE = re.compile(r"^(?:Set 1: \d+ reps at RPE .* on later sets|Same load: \d+ reps again → .* next session\.)")
+HELD_TOP_RE = re.compile(
+    r"^(?:Set 1: \d+ reps at RPE .* on later sets|Same load: \d+ reps again → .* next session\."
+    # #5861 fix round 11: the live load model's held-top reasons (`live_load.decide`) — each names what moves it or why it waits
+    r"|Same load: (?:recovery first|slump week|first session back|[a-z ]+ flag|(?:all sets|top set) to \d+ reps, then up|still under \d+ reps after \d+ step-downs"
+    r"|\d+ reps at RPE [\d.]+ or less, then up)\.$)"
+)
 # #5428 re-grade #3: a one-set exercise 1 carries no load rule (nothing to step today), so its note names the gain rule's
 # next-session step instead — the live branch on the lift that most needs one
 ONE_SET_HEAD = "One set: "
@@ -511,7 +521,11 @@ def carry_adjust_line(step_lb: Optional[float]) -> str:
     return f"Set 1 at RPE 7 or less: {_step_text(2 * float(step_lb or 5), True)}."
 
 
-CARRY_ADJUST_RE = re.compile(r"^Set 1 at RPE \d+(?:\.5)? or less: \+\d+(?:\.5)? lb per hand\.$")
+CARRY_ADJUST_RE = re.compile(
+    r"^(?:Set 1 at RPE \d+(?:\.5)? or less: \+\d+(?:\.5)? lb per hand\."
+    # #5861 fix round 12: the live engine's session-to-session form (`live_safety.CARRY_NEXT_LINE`) — no in-session step
+    r"|Both RPE \d+(?:\.5)? or less → heavier next time\.)$"
+)
 
 
 CARRY_CUE = "Tall, ribs down, bells off your legs."
@@ -541,8 +555,9 @@ AFTER_LINE = "After: end watch cardio, restart Hevy."
 INTERVAL_ESCAPE_STEP = 1
 # OWNER RULING 2026-11-08 (#5428, on re-grade #6, 3 of 4 voices: steady + 1 was the same L12 the tempo rides hold for 30 min
 # at RPE 6–7): an interval's hard minutes sit TWO levels over his steady level (L11/L13). Was 1 (platform-chosen, panel).
-# Not a charter number: the composer (`cardio_note`) and the linter (L9) both read it here.
-INTERVAL_HARD_STEP = 2
+# Not a charter number: the composer (`cardio_note`) and the linter (L9) both read it here. Epic #5861 (lane L4): the value
+# is protocol data now, `cardio_model.PROTOCOLS["structured_intervals"]["levels"]["hard_over_steady"]` (still 2).
+INTERVAL_HARD_STEP = int(cardio_model.PROTOCOLS["structured_intervals"]["levels"]["hard_over_steady"])
 
 
 def interval_escape_line(up_level: int, down_level: int) -> str:

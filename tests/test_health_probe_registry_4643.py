@@ -174,3 +174,19 @@ def test_an_enrichment_probe_is_recorded_under_its_own_id_not_its_parents(probe_
             assert stored[fn]["source_id"] == f"{src}:enrichment", fn
         else:
             assert stored[fn]["source_id"] == src, fn
+
+
+def test_the_invoke_grant_is_exactly_the_probe_list_5980():
+    """#5980: the role may invoke exactly the functions the probe iterates — the grant is
+    derived from operational/probe_targets.py, the same source PIPELINES is built from, so a
+    probe added without a grant (or a grant left on `function:*`) reds here."""
+    import test_role_family_write_scope as family  # the stubbed role_policies* import
+    from operational.probe_targets import probe_function_names
+
+    statements = family.policy_statements("pipeline_health_check")
+    invoke = [s for s in statements if "lambda:InvokeFunction" in s.actions]
+    assert len(invoke) == 1, [s.sid for s in invoke]
+    granted = {r.rsplit(":function:", 1)[1] for r in invoke[0].resources}
+    assert all(":function:" in r and not r.endswith("*") for r in invoke[0].resources), invoke[0].resources
+    probed = {fn for fn, _d, _s in phc.PIPELINES}
+    assert granted == probed == set(probe_function_names())

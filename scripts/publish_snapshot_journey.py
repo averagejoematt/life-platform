@@ -7,7 +7,7 @@ their coverage from /api/forecast, the ten-pound rungs derived from the publishe
 (publish_snapshot_contract.journey_rungs, shared with the fixture), and the baseline-change marker.
 Layers 2–3 (#5583) add the body beside the weight, each nullable on its own: the DEXA baseline from
 /api/physical_overview (`composition`), its blood pressure and last tape session (`bp`, `tape_date`), and
-PhenoAge from /api/phenoage (`phenoage` — the years, the as-of day and the nine drivers ONLY; never a
+PhenoAge from /api/phenoage (`phenoage` — the as-of day, the nine drivers and the markers-only reference line; never a figure of his own, a
 chronological age or any birth field, PhenoAge Option A). Absent (ctx.journey = None → the contract writes ABSENT_JOURNEY) when the API did not serve a complete
 record; the page then says so and draws nothing in its place.
 """
@@ -92,12 +92,34 @@ def body_composition(po: Any, start_date: str | None) -> dict | None:
     return out
 
 
+_REFERENCE_POINT_KEYS = ("at_years", "reads_years", "offset_years")
+
+
 def phenoage(pa: Any) -> dict | None:
-    """PhenoAge as served: the years, the as-of day and the drivers — an allow-list, so no age or birth field can ride along."""
-    if not isinstance(pa, dict) or _num(pa.get("phenoage")) is None or not _day(pa.get("as_of")):
+    """PhenoAge as served since the owner's ruling of 2026-11-14: the as-of day, the nine drivers and the MARKERS-ONLY
+    reference line — an allow-list. A figure of his own (the endpoint's `phenoage`, at any precision) is the age to
+    about a year, so a response that carries one is not carried at all: None, and the Journey says nothing."""
+    if not isinstance(pa, dict) or pa.get("phenoage") is not None or not _day(pa.get("as_of")):
+        return None
+    ref = pa.get("reference")
+    if not isinstance(ref, dict) or ref.get("basis") != "markers_only":
+        return None
+    points = [{k: _num(pt.get(k)) for k in _REFERENCE_POINT_KEYS} for pt in (ref.get("points") or []) if isinstance(pt, dict)]
+    if len(points) < 2 or any(v is None for pt in points for v in pt.values()):
+        return None
+    if _num(ref.get("offset_low")) is None or _num(ref.get("offset_high")) is None or _num(ref.get("slope")) is None:
         return None
     drivers = [{k: d.get(k) for k in _DRIVER_KEYS} for d in (pa.get("drivers") or []) if isinstance(d, dict) and d.get("name")]
-    return {"years": _num(pa.get("phenoage")), "as_of": _day(pa.get("as_of")), "drivers": drivers}
+    return {
+        "as_of": _day(pa.get("as_of")),
+        "drivers": drivers,
+        "reference": {
+            "points": points,
+            "offset_low": _num(ref["offset_low"]),
+            "offset_high": _num(ref["offset_high"]),
+            "slope": _num(ref["slope"]),
+        },
+    }
 
 
 def blood_pressure(po: Any) -> dict | None:
