@@ -22,3 +22,15 @@ test("a positive keystone says higher, and both say correlation, not cause", () 
   assert.match(up, /the day grade tends to be higher/);
   for (const r of [0.44, -0.57]) assert.match(habitsKeystone([{ group: "g", correlation_r: r, n_days: 20 }]), /a correlation, not a cause/);
 });
+
+test("#5523: the keystone card grades by the SERVED tier and prints the served interval — no client |r| rule", () => {
+  // |r| 0.57 used to read "suggestive · moderate" client-side; the API's tier says the interval crosses zero.
+  const weak = habitsKeystone([{ group: "g", correlation_r: 0.57, n_days: 14, tier: "weak", ci95: [-0.02, 0.84] }]);
+  assert.match(weak, /weak — treat as noise/);
+  assert.doesNotMatch(weak, /suggestive · moderate/);
+  const mod = habitsKeystone([{ group: "g", correlation_r: 0.45, n_days: 60, tier: "moderate", ci95: [0.22, 0.63] }]);
+  assert.match(mod, /suggestive · moderate/);
+  assert.match(mod, /95% CI 0\.22 to 0\.63/);
+  const unserved = habitsKeystone([{ group: "g", correlation_r: 0.9, n_days: 60 }]);
+  assert.match(unserved, /weak — treat as noise/); // an unserved tier is never a strength the page computed itself
+});

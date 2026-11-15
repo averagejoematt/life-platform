@@ -12,6 +12,7 @@ from common import (
 )
 from common.habit_registry import habit_tier
 from common.query_pages import query_pages  # #5656: whole-history reads follow every page
+from common.stats_core import correlation_tier  # #5523: the ONE correlation-tier rule
 from experiment import habit_causality
 from experiment.phase_filter import with_phase_filter
 from health import character_privacy  # owner rulings 2026-11-03/04: private-source pillars are served held
@@ -580,14 +581,9 @@ def habits(*, _g) -> dict:
         for gname, pairs in group_series.items():
             r = _pearson(pairs)
             if r is not None:
-                corr_list.append(
-                    {
-                        "group": gname,
-                        "correlation_r": r,
-                        "avg_pct": group_90d_avgs.get(gname),
-                        "n_days": len(pairs),
-                    }
-                )
+                corr_list.append({"group": gname, "correlation_r": r, "avg_pct": group_90d_avgs.get(gname), "n_days": len(pairs)})
+                # #5523: the shared tier (stats_core.correlation_tier) and its 95% interval, served — the page grades nothing
+                corr_list[-1].update({k: v for k, v in correlation_tier(r, len(pairs)).items() if k in ("tier", "ci95")})
         corr_list.sort(key=lambda x: abs(x["correlation_r"]), reverse=True)
         keystone_correlations = corr_list[:5]
     except Exception as _hc_e:

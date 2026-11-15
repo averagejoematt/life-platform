@@ -29,7 +29,10 @@ export function habitsKeystone(corrs) {
   const n = k.n_days;
   const ready = n >= 14;
   const dir = k.correlation_r >= 0 ? "moves up with" : "moves against";
-  const strength = Math.abs(k.correlation_r) >= 0.6 ? "strong" : Math.abs(k.correlation_r) >= 0.3 ? "moderate" : "faint";
+  // #5523: the tier is the API's (stats_core.correlation_tier: |r| ceiling, the 95% Fisher interval demotes) — no
+  // second rule here. An unserved tier reads as the weakest, never as a strength the page computed itself.
+  const tier = k.tier === "strong" || k.tier === "moderate" ? k.tier : "weak";
+  const strength = tier === "weak" ? "faint" : tier;
   const machine = `${ttl(k.group)} ${dir} the day grade · ${strength} direction · n=${fmt(n)} days — early signal, not proven${ready ? "" : " · coefficient withheld until 2 weeks"}`;
   // #5956 (2026-11-14): this sentence said "most pulling the day up" whatever the sign — so a group whose own card read
   // "moves against the day grade" (r = −0.57) was called the one lifting it — and "pulling" claimed a cause. The words
@@ -44,12 +47,13 @@ export function habitsKeystone(corrs) {
   // when |r| is small even with the overlap — so the magnitude never reads louder than its n.
   let card = "";
   if (ready) {
-    const absr = Math.abs(k.correlation_r);
-    const confidence = absr >= 0.6 ? "suggestive · strong" : absr >= 0.3 ? "suggestive · moderate" : "weak — treat as noise";
-    const noise = absr < 0.3 ? `<span class="cb-noise">⚠ likely noise at this n — direction only</span>` : "";
-    const read = absr < 0.3
+    const weak = tier === "weak";
+    const confidence = weak ? "weak — treat as noise" : `suggestive · ${tier}`;
+    const noise = weak ? `<span class="cb-noise">⚠ likely noise at this n — direction only</span>` : "";
+    const ci = Array.isArray(k.ci95) && k.ci95.length === 2 ? ` <span class="cb-ci">(95% CI ${k.ci95[0].toFixed(2)} to ${k.ci95[1].toFixed(2)})</span>` : "";
+    const read = weak
       ? `<p class="cb-dir">${esc(dir)} the day grade — direction only, coefficient too weak to trust</p>`
-      : `<p class="cb-dir mono">r = ${(Math.round(k.correlation_r * 100) / 100).toFixed(2)}</p>` + correlationChip([{ label: k.group, r: k.correlation_r, n }], { outcome: "the day grade" });
+      : `<p class="cb-dir mono">r = ${(Math.round(k.correlation_r * 100) / 100).toFixed(2)}${ci}</p>` + correlationChip([{ label: k.group, r: k.correlation_r, n }], { outcome: "the day grade" });
     card = `<div class="cb-grid"><article class="cb-card"><header class="cb-head"><h3 class="cb-pair">${esc(ttl(k.group))} <span class="cb-arrow">→</span> the day grade</h3><span class="cb-tag">${esc(confidence)}</span></header><div class="cb-read">${read}${noise}</div><p class="cb-meta label">n=${fmt(n)} · ${fmt(Math.round((n / 7) * 10) / 10)} wk overlap · N=1, correlative</p></article></div>`;
   }
   return sec("The keystone — one early signal, not a law",
