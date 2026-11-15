@@ -75,6 +75,8 @@ import boto3
 from common import pacific_time
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
+from operational.dlq_retry_targets import SCHEDULED_FUNCTIONS  # #5980: the only re-invokable targets
+
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from common.platform_logger import get_logger
@@ -463,10 +465,14 @@ def extract_function_name(message: dict) -> str | None:
     """
     Extract the original Lambda function name from an SQS DLQ message.
 
-    Lambda async-DLQ messages do NOT include the function name in attributes;
-    the body is the original event. We support two shapes:
-      1. Payloads that explicitly carry the name (rare).
-      2. EventBridge scheduled events → resolve via the triggering rule's target.
+    Lambda async-DLQ messages do NOT include the function name in attributes; the body is the original event. The only
+    shape resolved is an EventBridge scheduled event (the triggering rule's target, or a zoned schedule's target ARN).
+
+    #5980: the resolved target must be a function that actually runs on a schedule (operational.dlq_retry_targets) —
+    the consumer re-invokes under an account-wide grant, and a message is written by any of ~99 roles, so a name taken
+    from the message alone made it a confused deputy. The body-named rung (``function_name`` / ``FunctionName`` /
+    ``lambda_function``) is gone for the same reason: no producer writes it. Anything else is unresolved — escalated,
+    never re-invoked.
     """
     try:
         body = json.loads(message.get("Body", "{}"))
@@ -474,15 +480,16 @@ def extract_function_name(message: dict) -> str | None:
         return None
     if not isinstance(body, dict):
         return None
-
-    fn = body.get("function_name") or body.get("FunctionName") or body.get("lambda_function")
-    if fn:
-        return fn
-
-    if body.get("source") == "aws.events" or body.get("resources"):
-        return _function_from_eventbridge(body)
-
-    return None
+    if not (body.get("source") == "aws.events" or body.get("resources")):
+        return None
+    fn = _function_from_eventbridge(body)
+    if not fn:
+        return None
+    name = str(fn).split(":function:", 1)[-1].split(":", 1)[0]
+    if name not in SCHEDULED_FUNCTIONS:
+        logger.warning(f"  Refusing to re-invoke {name!r}: not a scheduled function (#5980)")
+        return None
+    return fn
 
 
 def retry_message(message: dict, fn_name: str | None) -> bool:

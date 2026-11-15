@@ -144,7 +144,7 @@ def test_record_failure_fails_soft_on_ddb_error(env):
 
 def test_transient_confirmed_retry_deletes_and_does_not_escalate(env):
     mod = _import_module(ledger_attempts=1)
-    mod._events.list_targets_by_rule.return_value = {"Targets": [{"Arn": "arn:aws:lambda:us-west-2:1:function:life-platform-foo"}]}
+    mod._events.list_targets_by_rule.return_value = {"Targets": [{"Arn": "arn:aws:lambda:us-west-2:1:function:activity-enrichment"}]}
     mod._lam.invoke.return_value = {"StatusCode": 202}
     stats = {"transient": 0, "escalated": 0, "retried_ok": 0, "retried_fail": 0, "left_on_queue": 0}
     escalations = []
@@ -160,7 +160,7 @@ def test_transient_confirmed_retry_deletes_and_does_not_escalate(env):
 
 def test_transient_unconfirmed_retry_is_left_on_queue(env):
     mod = _import_module(ledger_attempts=1)
-    mod._events.list_targets_by_rule.return_value = {"Targets": [{"Arn": "arn:aws:lambda:us-west-2:1:function:life-platform-foo"}]}
+    mod._events.list_targets_by_rule.return_value = {"Targets": [{"Arn": "arn:aws:lambda:us-west-2:1:function:activity-enrichment"}]}
     mod._lam.invoke.return_value = {"StatusCode": 500}  # NOT accepted
     stats = {"transient": 0, "escalated": 0, "retried_ok": 0, "retried_fail": 0, "left_on_queue": 0}
     escalations = []
@@ -178,7 +178,7 @@ def test_transient_unconfirmed_retry_is_left_on_queue(env):
 
 def test_permanent_body_escalates(env):
     mod = _import_module(ledger_attempts=1)
-    mod._events.list_targets_by_rule.return_value = {"Targets": [{"Arn": "arn:aws:lambda:us-west-2:1:function:life-platform-foo"}]}
+    mod._events.list_targets_by_rule.return_value = {"Targets": [{"Arn": "arn:aws:lambda:us-west-2:1:function:activity-enrichment"}]}
     body = json.dumps(
         {
             "source": "aws.events",
@@ -202,7 +202,7 @@ def test_permanent_body_escalates(env):
 def test_cumulative_threshold_escalates_a_transient(env):
     # A transient body, but the durable ledger says it has now failed 3 times.
     mod = _import_module(ledger_attempts=3)
-    mod._events.list_targets_by_rule.return_value = {"Targets": [{"Arn": "arn:aws:lambda:us-west-2:1:function:life-platform-foo"}]}
+    mod._events.list_targets_by_rule.return_value = {"Targets": [{"Arn": "arn:aws:lambda:us-west-2:1:function:activity-enrichment"}]}
     stats = {"transient": 0, "escalated": 0, "retried_ok": 0, "retried_fail": 0, "left_on_queue": 0}
     escalations = []
 
@@ -242,7 +242,7 @@ def test_empty_queue_no_alerts(env):
 
 def test_drain_loops_until_empty(env):
     mod = _import_module(ledger_attempts=1)
-    mod._events.list_targets_by_rule.return_value = {"Targets": [{"Arn": "arn:aws:lambda:us-west-2:1:function:life-platform-foo"}]}
+    mod._events.list_targets_by_rule.return_value = {"Targets": [{"Arn": "arn:aws:lambda:us-west-2:1:function:activity-enrichment"}]}
     mod._lam.invoke.return_value = {"StatusCode": 202}
     mod._sqs.receive_message.side_effect = [
         {"Messages": [_msg("a", handle="ha"), _msg("b", handle="hb")]},
