@@ -48,6 +48,8 @@ from datetime import datetime, timezone
 
 from privacy import broadcast_sensitivity_gate as gate
 
+from reading import horizons_publication
+
 # The ADR-104 grounded-generation harness (#1830). FAIL-CLOSED, unlike the fail-soft
 # import shims elsewhere in the codebase: this is a public reader surface, so if the
 # gate module is missing from the bundle we withhold the retrospective rather than
@@ -105,7 +107,9 @@ def _grounding_facts(pick: dict) -> str:
         lines.append(f"Source: {p['source']}")
     if p.get("rationale_tag"):
         lines.append(f"Why this pick, this week (rationale tag): {p['rationale_tag']}")
-    if p.get("pitch"):
+    # #5947: only a pitch that itself cleared for publication is an input — text written from a held
+    # pitch would restate it in other words, and no keyword screen sees a paraphrase.
+    if horizons_publication.pitch_is_stamped_public(p):
         lines.append(f"The one-line pitch you sent with it: {p['pitch']}")
     if p.get("week"):
         lines.append(f"ISO week recommended: {p['week']}")
@@ -282,6 +286,12 @@ def generate(pick: dict, *, invoker=None, offtopic_classifier=None) -> dict:
         verdict = gate.classify_sensitivity(text, offtopic_classifier=classifier)
         if not verdict.cleared:
             return _sensitivity_hold(verdict)
+
+    # 6. The owner-only clinical screen (#5947) on the bytes that would publish — fail closed: an
+    #    unarmed vocabulary holds, it never waves the text through.
+    status, cats = horizons_publication.screen(text)
+    if status != horizons_publication.STATUS_PUBLISHED:
+        return {"status": STATUS_HELD, "reason": "flagged: " + ", ".join(cats), "categories": list(cats), "generatedAt": now}
 
     return {
         "status": STATUS_PUBLISHED,

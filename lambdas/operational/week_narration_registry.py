@@ -144,6 +144,22 @@ WEEK_SURFACES: tuple = (
         ),
     ),
     Surface(
+        # Review 2026-11-14 (growth-2): the stats file the share cards read. Its journey block was written from the
+        # morning brief's weigh-in and never refreshed, undated, so a card said 36.7 lbs down on a day the site said
+        # 38.8. It now follows the newest weigh-in and carries the date (weight_as_of) — and is compared here nightly
+        # with every other surface's current weight for that same date.
+        id="public_stats",
+        label="/public_stats.json — the stats file behind the share cards and the legacy home hero",
+        producer="lambdas/web/site_stats_refresh_lambda.py",
+        kind="http_json",
+        locator="/public_stats.json",
+        facts=(
+            (FACT_BASELINE_WEIGHT, FactRef("journey.start_weight_lbs")),
+            (FACT_GOAL_WEIGHT, FactRef("journey.goal_weight_lbs")),
+            (FACT_CURRENT_WEIGHT, FactRef("journey.current_weight_lbs", as_of_path="journey.weight_as_of")),
+        ),
+    ),
+    Surface(
         id="api_timeline",
         label="/api/timeline — the milestone timeline",
         producer="lambdas/web/site_api_journey.py::timeline",

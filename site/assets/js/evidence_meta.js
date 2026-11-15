@@ -96,7 +96,7 @@ export async function renderBoard(d) {
     note("A board of named AI characters who each read the data differently. Interpretation, not instruction.");
 }
 
-export function renderPlatform(d) { return figs([fig(d.data_sources, "data sources (incl. derived)"), fig(d.mcp_tools, "MCP tools"), fig(d.lambdas, "lambdas"), fig(d.cdk_stacks, "CDK stacks")]) + sec("By the numbers", kvtable({ adrs: d.adrs, review_grade: d.review_grade, site_pages: d.site_pages })) + note("Built with the wearables already on his body — not a million-dollar lab. The full architecture (alarms, tests, the deeper counts) lives in the build write-up; this page keeps the human-legible ones."); }
+export function renderPlatform(d) { return figs([fig(d.data_sources, "data sources (incl. derived)"), fig(d.mcp_tools, "MCP tools"), fig(d.lambdas, "lambdas"), fig(d.cdk_stacks, "CDK stacks")]) + sec("By the numbers", kvtable({ adrs: d.adrs, review_grade: d.review_grade, review_grades_by_lens: d.review_grade_distribution, site_pages: d.site_pages }) + (d.review_grade_calibration ? `<p class="rd-meta label"><strong>About that grade.</strong> ${esc(d.review_grade_calibration)}</p>` : "")) + note("Built with the wearables already on his body — not a million-dollar lab. The full architecture (alarms, tests, the deeper counts) lives in the build write-up; this page keeps the human-legible ones."); }
 
 /* The ceiling is the platform's most-quoted number, and this function used to hand-type
    it three times — once in the figure and twice in the prose (base and surge). That is

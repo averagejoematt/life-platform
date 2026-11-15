@@ -869,6 +869,13 @@ footer.site a {
 .spark svg {
   display: block;
 }
+/* the spark's scale, in words, directly under it (lib/spark.js): a line on a nonzero range is never drawn unlabelled */
+.spark-scale {
+  display: block;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--muted);
+}
 
 /* long machine ids in labels (a prediction id, a metric key) break rather than overflow */
 .label .mono,
