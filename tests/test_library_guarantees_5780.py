@@ -566,17 +566,25 @@ def test_g4_once_approved_every_commitment_but_rotation_is_met_by_the_served_wee
     assert rest == []
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "#5857 FINDING (owner ruling needed): the free-weight compound floor (owner ruling 2026-11-12, board rec 4) BLOCKS "
-        "every approved week on PULL — the program's rows and pulldowns are machine/cable anchors and no accessory slot's "
-        "job is a back pull, so the selection cannot fill it. Press, squat and hinge are met by the anchors. While the "
-        "library is proposed the row only WARNS."
-    ),
-)
 def test_g4_the_approved_week_meets_the_free_weight_compound_floor():
+    """#6051 (found at the production launch, 2026-11-15): stage 1 read the PLANNED anchors, so the unconfirmed row machine
+    left the week with no free-weight pull and every approved week was refused at commit — although the live session fit
+    serves a dumbbell row in its place on every drafted morning. The floor now reads the week as the live fit serves it
+    (`week_commitments.live_anchor_swaps`)."""
     assert [o for o in _approved_offenders() if o.split(": ", 1)[1].startswith("free_weight_compounds:")] == []
+
+
+def test_g4_control_the_floor_judges_the_planned_machine_without_the_live_swap(monkeypatch):
+    """Must-fail controls for #6051: (1) with the swap disabled the approved week blocks on PULL again; (2) the swap only
+    replaces an UNAVAILABLE anchor — an anchor whose equipment is available keeps its key."""
+    pos, rot = _serve_program(_lib("approved"), CAT0, kb=kb_entry.ENTRY_EXPOSURES, day=BLOCK_DAY)[2]
+    monkeypatch.setattr(wc, "live_anchor_swaps", lambda served, lib, catalog, overlay=...: served)
+    assert any(o.startswith("free_weight_compounds: block") for o in _commitment_offenders(rot, pos, on=BLOCK_DAY, lib=_lib("approved")))
+    monkeypatch.undo()
+    served = [{"key": "squat_barbell", "role": "lower_heavy"}, {"key": "machine_row", "role": "upper_heavy"}]
+    swapped = wc.live_anchor_swaps(served, _lib("approved"), CAT0, overlay=None)
+    assert swapped[0] == served[0]  # available: untouched
+    assert swapped[1]["planned"] == "machine_row" and swapped[1]["key"] != "machine_row"
 
 
 def test_g4_the_served_week_still_meets_rotation_once_the_library_is_approved():

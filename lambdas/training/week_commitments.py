@@ -333,6 +333,8 @@ def _free_weight(c: dict[str, Any], served: list[dict[str, Any]], lib: Any, cata
     counting. It BLOCKS once the exercise library is approved (the selection then fills the slots) and WARNS before."""
     if not isinstance((lib or {}).get("movements"), dict):
         return _row(c, NOT_EVALUATED, "no exercise library on this bundle to read job / pattern from")
+    if status == week_floors.LIBRARY_APPROVED:  # #6051: a planned anchor counts as what the live fit will serve in its place
+        served = live_anchor_swaps(served, lib, catalog)
     groups = week_floors.free_weight_compounds(served, lib, catalog)
     if status == week_floors.LIBRARY_APPROVED:  # #5861 L3: live only — the floor is a strength/competence floor
         groups = _with_bodyweight_pull(groups, served, lib, catalog)
@@ -342,6 +344,44 @@ def _free_weight(c: dict[str, Any], served: list[dict[str, Any]], lib: Any, cata
         tail = "" if armed else " — a warning until the exercise library is approved"
         return _row(c, BLOCK if armed else WARN, f"no free-weight compound {' / '.join(missing)} this week{tail}")
     return _row(c, MET, "; ".join(f"{g}: {', '.join(hits)}" for g, hits in groups.items()))
+
+
+def live_anchor_swaps(served: list[dict[str, Any]], lib: Any, catalog: dict[str, Any], overlay: Any = ...) -> list[dict[str, Any]]:
+    """#6051 (live only): the week as the live session fit will serve it. An anchor whose equipment is not available at
+    home_gym (`selection_engine.availability`) is swapped at drafting for the first available, servable member of its anchor
+    family (`live_session._anchor_candidates`, the order `live_session._replacement` walks). Stage 1 read the PLANNED anchor,
+    so a week whose row machine is unconfirmed failed the free-weight pull floor although every drafted morning serves a
+    dumbbell row in its place, and the commit was refused. Equipment only: pain is a per-morning read and stays the draft's.
+    An anchor with no available member keeps its key (the floor then judges it as planned). Never raises."""
+    from training import live_session as ls, selection_engine as se
+
+    try:
+        ctx = {
+            "lib": lib or {},
+            "catalog": catalog,
+            "idx": se.key_index(lib or {}, catalog),
+            "overlay": se.load_overlay_failsoft() if overlay is ... else overlay,
+        }
+        out = []
+        for s in served:
+            key = str(s.get("key") or "")
+            fam = (catalog.get(key) or {}).get("anchor_family")
+            entry = ls._entry(key, ctx)
+            if not fam or entry is None or not se.availability(entry, ctx["lib"], ctx["overlay"]):
+                out.append(s)
+                continue
+            swap = None
+            for k in ls._anchor_candidates({"pattern": fam}, ctx, s.get("role")):
+                c, e = catalog.get(k) or {}, ls._entry(k, ctx)
+                if k == key or e is None or int(c.get("skill_tier", 99)) > ls.SKILL_CEILING or c.get("hevy_type") in ls.NOT_LIFTS:
+                    continue
+                if not se.availability(e, ctx["lib"], ctx["overlay"]) and ls._servable(k, ctx) is None:
+                    swap = k
+                    break
+            out.append(dict(s, key=swap, planned=key) if swap else s)
+        return out
+    except Exception:  # noqa: BLE001 — a failed read judges the week as planned (the pre-#6051 behaviour)
+        return served
 
 
 def _with_bodyweight_pull(groups: dict[str, list[str]], served: list[dict[str, Any]], lib: Any, catalog: dict[str, Any]) -> dict:
