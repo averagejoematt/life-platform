@@ -255,6 +255,8 @@ def test_every_owned_route_is_a_static_route_or_matches_a_pattern():
     [
         ("push", "", False, "preview"),
         ("push", "", True, "root"),
+        ("schedule", "", False, "preview"),  # the daily rebuild follows the switch exactly like a push
+        ("schedule", "", True, "root"),
         ("workflow_dispatch", "preview", False, "preview"),
         ("workflow_dispatch", "", True, "preview"),
         ("workflow_dispatch", "root", True, "root"),
@@ -486,6 +488,8 @@ def test_workflow_has_one_target_input_and_root_only_sweeps_and_rollback():
     assert set(inputs) == {"target", "api_readiness"} and inputs["api_readiness"]["default"] == "enforce"
     assert inputs["target"]["options"] == ["preview", "root"] and inputs["target"]["default"] == "preview"
     assert set(on["push"]["paths"]) >= {"www/**", "deploy/www_preview_sync.sh"}
+    # the daily rebuild (2026-11-14): without it the pages only refreshed when unrelated code merged
+    assert [c["cron"] for c in on["schedule"]] == ["30 15 * * *"]
     jobs = WORKFLOW["jobs"]
     # api-readiness + deferred: tests/test_www_api_readiness.py owns their wiring.
     assert set(jobs) == {"api-readiness", "deferred", "deploy", "smoke", "visual-qa", "record-previous", "rollback-v9-on-failure"}
@@ -528,3 +532,40 @@ def test_root_rollback_script_declines_on_an_unreachable_surface_and_restores_ot
 
 
 # premerge-gate: 5534: a structural sweep of deploy/sync_site_to_s3.sh, deploy/rollback_site.sh, .github/workflows/web-preview-deploy.yml and site/reference/ — a new sync step without the owned excludes, or a new superseded page without its copy, must red on the PR that adds it
+
+
+def test_the_previous_build_is_recorded_outside_the_served_prefix_one_build_per_prefix(tmp_path):
+    """Owner ruling 2026-11-14 (close current-surface exposures): the rollback source lived at site/_v9_previous/ —
+    served, so the whole previous site was public at /_v9_previous/, and (the deploy role cannot delete) every build's
+    stale pages accumulated there and a rollback re-published them. A green build is now recorded under its own prefix
+    OUTSIDE site/ (www-previous/<build>/), the LATEST pointer moves only after the copy, and the restore reads the pointer."""
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    (dist / "index.html").write_text("<!doctype html>")
+    env = {k: v for k, v in os.environ.items() if not k.startswith("AWS_")}
+    env.update({"AWS_ACCESS_KEY_ID": "", "AWS_SECRET_ACCESS_KEY": "", "AWS_PROFILE": "", "GITHUB_SHA": "abc123"})
+    r = subprocess.run(
+        [
+            "bash",
+            os.path.join(REPO, "deploy", "www_preview_sync.sh"),
+            "--target",
+            "root",
+            "--record-previous",
+            "--print",
+            "--dist",
+            str(dist),
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=REPO,
+    )
+    out = r.stdout
+    assert r.returncode == 0, out + r.stderr
+    assert "s3://matthew-life-platform/www-previous/abc123" in out and "www-previous/LATEST" in out, out
+    assert (
+        "site/_v9_previous" not in out and "s3://matthew-life-platform/site/" not in out
+    ), "the record never writes under the served prefix"
+    assert out.index("www-previous/abc123") < out.index("www-previous/LATEST"), "the pointer moves only after the copy"
+    restore = WWW_SYNC[WWW_SYNC.index('if [ "$MODE" = "restore" ]') : WWW_SYNC.index("# ── sync and record")]
+    assert "$PREVIOUS_ROOT/LATEST" in restore and 'PREVIOUS_PREFIX="$PREVIOUS_ROOT/$LATEST_ID"' in restore

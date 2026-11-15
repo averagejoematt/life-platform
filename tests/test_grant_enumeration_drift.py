@@ -723,13 +723,15 @@ _PENDING_PERMISSIONS_APPLY: dict[str, str] = {
     # zoned-schedule leg) was applied by the owner ~04:48Z with the same put-role-policy command;
     # post-apply `deploy/verify_oidc_iam.py --strict` reported CLEAN across all 17 targets.
     # Removed here per the same #2824 rule.
-    "github-actions-deploy-role": (
-        "2026-11-13 (#5513): two NARROWINGS, no new grant — `secretsmanager:GetSecretValue` leaves Sid SecretsManager "
-        "(no deploy-role job reads a secret value; enumeration in infra/iam/README.md) and Sid CDKBootstrapRoleAssume "
-        "names the 12 CDK bootstrap roles instead of role/cdk-*. Owner-attended apply: `bash deploy/setup_github_oidc.sh`, "
-        "which runs `aws iam put-role-policy --role-name github-actions-deploy-role --policy-name life-platform-cicd-permissions "
-        "--policy-document file://infra/iam/github-actions-deploy-role.permissions.json` and then the verifier. Delete this "
-        "entry in the commit that records the apply."
+    # 2026-11-15: the #5513 deploy-role entry (GetSecretValue removed; CDKBootstrapRoleAssume names the 12
+    # bootstrap roles) was applied ~06:10Z with `bash deploy/setup_github_oidc.sh`; its verifier showed the
+    # deploy role matching. Removed here per the same #2824 rule.
+    "github-actions-remediation-role": (
+        "2026-11-15 (#5821): OpsDigestLine — sns:Publish on life-platform-alerts-digest, so the remediation "
+        "summary becomes daily LP digest lines (remediation/agent.py digest_report; until applied the publish "
+        "fails and the email goes out as before). Apply: `aws iam put-role-policy --role-name "
+        "github-actions-remediation-role --policy-name remediation-permissions --policy-document "
+        "file://infra/iam/github-actions-remediation-role.permissions.json` (or bash deploy/setup_remediation_role.sh)"
     ),
 }
 

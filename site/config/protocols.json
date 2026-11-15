@@ -18,7 +18,7 @@
       "key_metrics": ["Whoop sleep score", "next-day recovery score", "HRV on waking"],
       "key_finding": "Bedtime after 11pm \u2192 \u221212% next-day recovery (r=\u22120.38, p=0.04)",
       "tracked_by": ["Whoop", "Eight Sleep", "Apple Health"],
-      "related_habits": ["Morning Sunlight / Luminette Glasses", "Nighttime Red Light Blocking Glasses", "No Phone 30 Mins Before Bed"],
+      "related_habits": ["Morning Sunlight / Luminette Glasses", "Nighttime Red Light Blocking Glasses"],
       "related_supplements": ["Magnesium Glycinate", "Melatonin"],
       "experiment_tags": ["sleep", "recovery", "circadian"],
       "adherence_target": 90,

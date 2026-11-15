@@ -213,13 +213,13 @@ def _cost(supplements: list[dict[str, Any]], sources: list[dict[str, Any]]) -> d
     ledger = json.loads((ROOT / "config" / "cost_of_ownership.json").read_text(encoding="utf-8"))
     ledger.pop("_description", None)  # build-side provenance note; not for readers
 
-    # ── AWS run-rate + ceilings, straight from the constants the site itself serves.
-    #    `monthly_cost` is the same field /method/cost/ renders via /api/platform_stats,
-    #    so the manifest and the cost page cannot disagree by construction.
+    # ── AWS run-rate + ceilings. Since #5952 /api/platform_stats derives `monthly_cost`
+    #    live from the last closed month; this static manifest carries a hand-grounded copy
+    #    (PLATFORM_STATS["monthly_cost"]) and says so, and points at the live figure.
     ledger["aws"]["monthly_usd_typical"] = PLATFORM_STATS["monthly_cost"]
     ledger["aws"]["monthly_usd_typical_basis"] = (
-        "the run-rate published on /method/cost/, read from the same constant the "
-        "/api/platform_stats endpoint serves — not a second opinion about it."
+        "the last closed month when this manifest was generated (see _meta.updated); the live "
+        "figure is /api/platform_stats monthly_cost, read from the cost governor's own series."
     )
     ledger["aws"]["ceiling_usd"] = MONTHLY_CEILING
     ledger["aws"]["surge_ceiling_usd"] = SURGE_CEILING_USD

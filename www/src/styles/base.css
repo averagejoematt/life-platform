@@ -616,8 +616,39 @@ th.r {
   line-height: 1.6;
   max-width: 760px;
 }
-.article > * + * {
+.article > * + *,
+.article [data-published-body] > * + * {
   margin-top: 26px;
+}
+/* A published chapter's body sits one level down (2026-11-14: its paragraphs had no space between them). The
+   narrator's opening lines carry class="signature": an editor's note reads as a dated note, a filed stat line as
+   evidence in mono — both as published, neither as prose. */
+.article [data-published-body] > * + * {
+  margin-top: 1.05em;
+}
+.article [data-published-body] p.signature {
+  font-style: italic;
+  color: var(--muted);
+}
+.article [data-published-body] p.signature.note {
+  font-family: var(--sans);
+  font-style: normal;
+  font-size: var(--fs-small);
+  line-height: 1.5;
+  border-left: 2px solid var(--verm);
+  padding-left: 12px;
+}
+.article [data-published-body] p.signature.note em {
+  font-style: normal;
+}
+.article [data-published-body] p.signature.filed {
+  font-family: var(--mono);
+  font-style: normal;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.article [data-published-body] p.signature.filed em {
+  font-style: normal;
 }
 .article p,
 .article li,
@@ -1697,4 +1728,392 @@ span.gloss[data-quote-gloss] {
 }
 .sets-table td.sets .set {
   white-space: nowrap;
+}
+
+/* The front page's one-line "so far" (2026-11-14): progress above the fold on a phone. */
+.sofar {
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--rule);
+  padding: 9px 0;
+  color: var(--ink);
+}
+/* A phone reads facts two to a row (2026-11-14): one per row stacked the ledger's six counts ~650px deep before the
+   first record. Hairlines follow the 2-column grid. */
+@media (max-width: 560px) {
+  .facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .facts > div {
+    border-right: 0;
+    border-bottom: 1px solid var(--rule);
+    min-width: 0;
+  }
+  .facts > div:nth-child(odd) {
+    border-right: 1px solid var(--rule);
+  }
+  .facts > div:nth-child(odd):last-child {
+    grid-column: 1 / -1;
+    border-right: 0;
+  }
+  .facts .v {
+    overflow-wrap: anywhere;
+  }
+}
+
+/* "Since your last visit" (islands/since.js): one quiet line, shown only to a returning browser. */
+.since {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  align-items: baseline;
+  margin: -8px 0 22px;
+  padding: 10px 14px;
+  border-left: 3px solid var(--cobalt);
+  background: var(--rule2);
+  font-size: 15px;
+  line-height: 1.45;
+}
+.since[hidden] {
+  display: none;
+}
+.since a {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+/* A row of counts (the Laboratory's five): two to a row on a phone, not five stacked (2026-11-14). */
+.tiles.counts {
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+}
+@media (max-width: 560px) {
+  .tiles.counts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .tiles.counts > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+
+/* The three doors on a phone (2026-11-14): the masthead's tab bar already carries them, so here they are a compact
+   recap — the front page stays inside its phone-length budget with the open questions above. */
+@media (max-width: 560px) {
+  .door {
+    min-height: 0;
+    padding: 16px 18px;
+    gap: 8px;
+  }
+  .door .t {
+    font-size: 26px;
+  }
+  .door p {
+    font-size: 15px !important;
+    margin-top: 6px !important;
+  }
+}
+
+/* The opening (2026-11-14, sprint II): the question and the premise side by side, then The Line across the full
+   width — the experiment seen happening before it is read about. */
+.opening {
+  padding-bottom: 36px;
+}
+.opening-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 24px 56px;
+  align-items: end;
+  margin-top: 14px;
+}
+.opening-grid h1 {
+  font-size: clamp(36px, 5.4vw, 72px);
+  line-height: 0.98;
+}
+.opening .premise {
+  gap: 16px;
+}
+@media (max-width: 900px) {
+  .opening-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.theline {
+  margin: 40px 0 0;
+  border-top: 2px solid var(--ink);
+  padding-top: 14px;
+}
+.theline-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 8px 24px;
+}
+.theline-stat {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+.theline-stat .big {
+  font-size: clamp(56px, 8vw, 104px);
+  line-height: 0.8;
+  color: var(--cobalt);
+  letter-spacing: -0.02em;
+}
+.theline-unit {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.15;
+}
+.theline-unit .muted {
+  font-weight: 400;
+  font-size: 15px;
+}
+.theline-chart {
+  position: relative;
+  margin-top: 10px;
+}
+.theline-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.theline-key {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 32px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  border-top: 1px solid var(--rule);
+  padding-top: 10px;
+}
+.theline-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 22px;
+}
+.theline-legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.theline-key a {
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.opening .sofar {
+  margin-top: 22px;
+}
+/* the portrait, demoted to a band under the figure: six across on a desktop, three on a phone */
+.portrait-band {
+  padding-top: 40px;
+  padding-bottom: 40px;
+}
+.portrait-band .portrait-tiles {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+.portrait-band .portrait-tiles .tile .v {
+  font-size: 30px;
+}
+.portrait-ratio {
+  font-size: 16px;
+  line-height: 1.5;
+}
+@media (max-width: 1100px) {
+  .portrait-band .portrait-tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .theline {
+    margin-top: 28px;
+  }
+  .theline-key a {
+    white-space: normal;
+  }
+  .portrait-band .portrait-tiles .tile {
+    padding: 10px 8px;
+    gap: 4px;
+  }
+  .portrait-band .portrait-tiles .tile .label {
+    font-size: 12px;
+    letter-spacing: 0.02em;
+  }
+  .portrait-band .portrait-tiles .tile .v {
+    font-size: 22px;
+  }
+  .portrait-band .portrait-tiles .tile .spark svg {
+    width: 64px;
+    height: 24px;
+  }
+  .portrait-band .portrait-tiles .tile .note {
+    display: none;
+  }
+}
+@media (max-width: 640px) {
+  /* the chapter section starts one screen below; on a phone the jump button only repeated the scroll */
+  .opening .btn.ghost {
+    display: none;
+  }
+  .portrait-band {
+    padding-top: 28px;
+    padding-bottom: 28px;
+  }
+  .portrait-band figcaption .verified {
+    display: none;
+  }
+}
+
+/* Evidence in the margin (2026-11-14, sprint II): a chapter's figures and graded-call cards sit beside the paragraph
+   that first talks about them — floated into the column's right edge on a wide screen, inline on a phone. They are
+   machine evidence, so they read in the sans/mono voice, never the narrator's serif. */
+.article [data-published-body] .evidence {
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 1.4em 0;
+  padding: 10px 0 0;
+  border-top: 2px solid var(--ink);
+}
+.article [data-published-body] .evidence + p {
+  margin-top: 0;
+}
+.evidence .label {
+  display: block;
+  margin-bottom: 6px;
+}
+.evidence-chart {
+  position: relative;
+}
+.evidence-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.evidence-note {
+  color: var(--muted);
+  margin-top: 6px;
+}
+.evidence-note a,
+.callcard a {
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.callcard {
+  background: var(--rule2);
+  padding: 12px 14px 14px !important;
+  border-top-color: var(--cobalt) !important;
+}
+.callcard p + p {
+  margin-top: 8px;
+}
+.callcard-test {
+  font-weight: 600;
+  color: var(--ink);
+}
+.callcard-what {
+  color: var(--muted);
+}
+.callcard-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: center;
+}
+@media (min-width: 1000px) {
+  .article [data-published-body] .evidence {
+    float: right;
+    clear: right;
+    width: 330px;
+    margin: 0.35em 0 1.2em 32px;
+  }
+}
+.article [data-published-body]::after {
+  content: "";
+  display: block;
+  clear: both;
+}
+
+/* The front page's latest chapter on a phone (2026-11-14): the numeral is a marker, not a poster, and the byline the
+   chapter page itself carries is not repeated — the page stays inside its phone-length budget. */
+.ch-numeral {
+  font-size: 130px;
+}
+@media (max-width: 640px) {
+  .ch-numeral {
+    font-size: 72px;
+  }
+  .ch-byline {
+    display: none;
+  }
+}
+
+/* The Laboratory's index figures (2026-11-14, sprint II): the findings as a forest plot — pair, axis, how often it
+   was listed — and each test's paired days against what a verdict needs. */
+.forest {
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+}
+.forest-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px 150px;
+  gap: 4px 24px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.forest-row:last-child {
+  border-bottom: 0;
+}
+.forest-row > :last-child {
+  text-align: right;
+}
+.forest-head {
+  padding: 8px 0 4px;
+  align-items: end;
+}
+.forest-row svg {
+  display: block;
+}
+.lab-test-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.lab-arms svg {
+  display: block;
+}
+@media (max-width: 760px) {
+  .forest-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .forest-row > :last-child {
+    text-align: left;
+  }
+  .forest-head .label {
+    display: none;
+  }
+  .lab-test {
+    flex-direction: column;
+    align-items: flex-start !important;
+  }
+  .lab-test-side {
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .foot-coaches {
+    display: none;
+  }
 }

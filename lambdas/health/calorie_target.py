@@ -47,6 +47,9 @@ CharterReader = Callable[[str], Any]
 DayLike = Union[str, date, None]
 
 TRAINING_DAY_PATH = "nutrition.training_day"
+#: How far the TITRATED band's ceiling sits above the base (owner ruling 2026-11-13, #5794): the lifting-day uplift, so
+#: the band's top is the base's own lifting day. Read from the charter at this path, never a literal.
+BAND_UPLIFT_PATH = f"{TRAINING_DAY_PATH}.lifting_uplift_kcal"
 DAY_TYPES = ("lifting", "rest", "travel", "disrupted", "unknown")  # disrupted: a recorded disruption covers the date (#5215)
 
 
@@ -129,6 +132,30 @@ def classify_day_type(
 
 def _grams(kcal: float, protein_g: float, fat_g: float) -> float:
     return max(0.0, (kcal - 4 * protein_g - 9 * fat_g) / 4)
+
+
+def titrated_band(
+    base: Optional[float],
+    *,
+    target: Optional[float],
+    band: Optional[Sequence[Any]],
+    floor_any: Optional[float],
+    floor_lift: Optional[float],
+    uplift: Optional[float],
+) -> Optional[tuple]:
+    """The calorie habit band for a titrated base (owner ruling 2026-11-13, #5794). No step (the base IS the charter's
+    target): the charter's ``prescribed_band_kcal`` unchanged. A step: ``[max(base, floor_any), max(base + uplift,
+    floor_lift)]`` — the rest-day and the lifting-day served targets, so both day-type floors always sit inside it.
+    (The retired rule moved both edges by the step, which pushed one day type out of band on any step.) None when the
+    base or a rule value is unreadable — never a guess."""
+    if base is None:
+        return None
+    edges = [_num(x) for x in band] if isinstance(band, (list, tuple)) and len(band) == 2 else [None, None]
+    if target is not None and base == target and None not in edges:
+        return int(edges[0]), int(edges[1])
+    if floor_any is None or floor_lift is None or uplift is None:
+        return None
+    return int(round(max(base, floor_any))), int(round(max(base + uplift, floor_lift)))
 
 
 def day_floor(day_type: Optional[str], floors: Dict[str, Any]) -> Optional[float]:
@@ -270,9 +297,7 @@ def resolve(
         out["provenance"] = f"titration record {titration_sk(week)}" + (
             f" ({record.get('reason')})" if record and record.get("reason") else ""
         )
-        lo, hi = _num((record or {}).get("band_low")), _num((record or {}).get("band_high"))
-        if lo is not None and hi is not None:
-            out["band_low"], out["band_high"] = int(lo), int(hi)
+        _record_band(out, record, rec_kcal, block, read)
         kcal = _maintenance_day(out, record, day, rec_kcal)
     else:
         kcal = _num(block.get("target_kcal"))
@@ -289,6 +314,23 @@ def resolve(
     out["base_kcal"] = int(round(kcal)) if kcal is not None else None
     _apply_day_type(out, kcal, day_type, week_day_types, read)
     return out
+
+
+def _record_band(out: Dict[str, Any], record: Optional[Dict[str, Any]], base: float, block: Dict[str, Any], read: CharterReader) -> None:
+    """The band a titration week serves: ``titrated_band`` from the record's base and the charter's floors and uplift
+    (#5794, owner ruling 2026-11-13), so a record stamped under the retired same-offset rule cannot serve a band that
+    leaves a day type out; the record's own stored band only when the rule is unreadable."""
+    rule = titrated_band(
+        base,
+        target=_num(block.get("target_kcal")),
+        band=block.get("prescribed_band_kcal"),
+        floor_any=_num(block.get("floor_any_day_kcal")),
+        floor_lift=_num(block.get("floor_lifting_day_kcal")),
+        uplift=_num(read(BAND_UPLIFT_PATH)),
+    )
+    lo, hi = rule if rule else (_num((record or {}).get("band_low")), _num((record or {}).get("band_high")))
+    if lo is not None and hi is not None:
+        out["band_low"], out["band_high"] = int(lo), int(hi)
 
 
 def _maintenance_day(out: Dict[str, Any], record: Optional[Dict[str, Any]], day: DayLike, base: float) -> float:
@@ -334,8 +376,9 @@ def target_kcal(day: DayLike = None, **readers: Any) -> Optional[int]:
 
 
 def calorie_band(day: DayLike = None, **readers: Any) -> Optional[tuple]:
-    """The calorie habit's floor and ceiling for ``day`` (#5099: ``prescribed_band_kcal``, the any-day to the lifting-day floor since #5794, moved
-    with it by a titration record): ``(band_low, band_high)``, or None when either edge is unresolved."""
+    """The calorie habit's floor and ceiling for ``day`` (#5099: ``prescribed_band_kcal``, the any-day to the lifting-day
+    floor since #5794; a titration step re-derives it through ``titrated_band``): ``(band_low, band_high)``, or None when
+    either edge is unresolved."""
     r = resolve(day, **readers)
     lo, hi = r.get("band_low"), r.get("band_high")
     return (int(lo), int(hi)) if lo is not None and hi is not None and lo <= hi else None

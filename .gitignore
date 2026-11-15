@@ -144,3 +144,4 @@ handovers/*
 www/content/snapshot/
 www/.astro/
 www/dist/
+www/public/assets/og/v9/

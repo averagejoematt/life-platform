@@ -38,28 +38,60 @@ Return ONLY valid JSON, no markdown, no preamble:
   "threads_to_watch": ["an unresolved tension going forward", "another"]
 }"""
 
-# Minimal raw-vital detector — this module isn't on the coach summarizer's path, so
-# we replicate a small regex here (mirrors coach_history_summarizer._RAW_VITAL_RE).
+# The raw-vital detector. A recap is narrative: the prompt allows a number ONLY when it
+# appears verbatim in a provided installment, and this is the code that holds it to that.
+#
+# #5933: the first cut of this regex required a bare 2-3 digit run directly before an
+# abbreviated unit, so "318.9 lbs" (a decimal) and "318 pounds" (a spelled unit) both
+# walked through, and `where_we_are_now` was never scanned at all. Widening the pattern
+# alone would have been wrong the other way — the recap legitimately quotes figures the
+# installments printed — so a matched figure is now GROUNDED: it passes when the number
+# appears in the installment text the model was shown, and is dropped when it does not.
 import re as _re  # noqa: E402
 
+_RECAP_NUM = r"(?<![\d.,])\d{1,3}(?:,\d{3})+(?:\.\d+)?|(?<![\d.,])\d+(?:\.\d+)?"
+_RECAP_UNIT = r"bpm|ms|mg/?dl|lbs?|pounds?|kg|kilograms?|kcal|cal|calories?"
 _RECAP_VITAL_RE = _re.compile(
-    r"\b\d{2,3}\s?(?:bpm|ms|mg/?dl|lbs?|kg|kcal|cal)\b"
+    r"(?:" + _RECAP_NUM + r")[\s-]?(?:" + _RECAP_UNIT + r")\b"
     r"|\b(?:rhr|hrv|recovery|resting heart rate|resting hr|deep|rem)\b[^.\n]{0,14}?\b\d"
-    r"|\b\d{1,3}(?:\.\d+)?\s?%",
+    r"|(?:" + _RECAP_NUM + r")\s?%",
     _re.IGNORECASE,
 )
+_RECAP_NUM_RE = _re.compile(_RECAP_NUM)
 
 
-def _recap_raw_vital(text):
-    """The first raw-vital span a recap text cites (the matched text), or None. #4865: the guard used to say only
-    "cites a raw vital", which left a rejected recap undiagnosable from the log."""
-    m = _RECAP_VITAL_RE.search(text or "")
-    return m.group(0) if m else None
+def _recap_numbers(text):
+    """Every number token in ``text`` as a float set ("1,800" is 1800; "318.90" is 318.9)."""
+    out = set()
+    for m in _RECAP_NUM_RE.finditer(text or ""):
+        try:
+            out.add(float(m.group(0).replace(",", "")))
+        except ValueError:
+            continue
+    return out
 
 
-def _recap_contains_raw_vitals(text):
+def _recap_raw_vital(text, grounded=None):
+    """The first raw-vital span a recap text cites that is NOT grounded (the matched text), or None.
+
+    ``grounded`` is the float set of numbers printed in the installment text the model was shown
+    (`_recap_numbers`); a vital whose every number is in it is a quotation, not an invention. With
+    no ``grounded`` set, every vital is reported — the pre-#5933 behaviour. #4865: the guard used to
+    say only "cites a raw vital", which left a rejected recap undiagnosable from the log."""
+    text = text or ""
+    grounded = grounded or set()
+    for m in _RECAP_VITAL_RE.finditer(text):
+        # the numbers this vital span carries — a token that merely overlaps the span counts whole,
+        # so the "recovery … 7" branch (which stops at the first digit) is judged on "76", not "7"
+        nums = [float(n.group(0).replace(",", "")) for n in _RECAP_NUM_RE.finditer(text) if n.start() < m.end() and n.end() > m.start()]
+        if not nums or any(n not in grounded for n in nums):
+            return m.group(0)
+    return None
+
+
+def _recap_contains_raw_vitals(text, grounded=None):
     """True if the text cites a raw physiological number a recap must not invent."""
-    return bool(_RECAP_VITAL_RE.search(text or ""))
+    return _recap_raw_vital(text, grounded) is not None
 
 
 def _mask_titles(text, titles):
@@ -118,11 +150,16 @@ def build_recap(data, new_installment_md=None, new_meta=None, *, _g):
                     "content_markdown": new_installment_md,
                 }
             )
+        # #5933: the numbers a recap may quote — the installment PROSE the model is shown (the same 1,200-char
+        # slice), plus the arc text. Not the titles (masked separately, #4537) and not the header dates/week
+        # numbers this block synthesises, which would ground "24%" off "2026-06-24".
+        grounding_prose = []
         for inst in ordered:
             wn = inst.get("week_number", "?")
             t = inst.get("title", "Untitled")
             d = inst.get("date", "?")
             md = (inst.get("content_markdown") or "")[:1200]
+            grounding_prose.append(md)
             src.append(f'\n--- Week {wn} ({d}): "{t}" ---\n{md}')
 
         arc = data.get("narrative_arc")
@@ -131,9 +168,12 @@ def build_recap(data, new_installment_md=None, new_meta=None, *, _g):
             note = arc.get("note") or arc.get("summary") or ""
             if phase or note:
                 src.append(f"\n=== NARRATIVE ARC ===\nphase: {phase}\n{note}")
+                grounding_prose.append(str(note))
         exp_arc = data.get("experiment_arc")
         if exp_arc and exp_arc.get("throughline"):
             src.append(f"\n=== EXPERIMENT THROUGHLINE ===\n{exp_arc.get('throughline')}")
+            grounding_prose.append(str(exp_arc.get("throughline")))
+        grounded = _recap_numbers("\n".join(grounding_prose))
 
         if not allowed:
             logger.info("[recap] no published installments — skipping recap")
@@ -154,8 +194,8 @@ def build_recap(data, new_installment_md=None, new_meta=None, *, _g):
             if b.get("date") not in allowed:
                 logger.info("[recap] dropping beat with non-published date %s", b.get("date"))
                 continue
-            # Guard 2 — strip beats that smuggle a raw vital.
-            if _recap_contains_raw_vitals(_mask_titles(b.get("beat", ""), titles)):
+            # Guard 2 — strip beats that smuggle a raw vital the installments never printed.
+            if _recap_contains_raw_vitals(_mask_titles(b.get("beat", ""), titles), grounded):
                 logger.info("[recap] dropping beat with raw vital: %s", b.get("beat"))
                 continue
             beats.append({"week": _as_int(b.get("week")), "date": b.get("date"), "beat": (b.get("beat") or "").strip()})
@@ -163,10 +203,26 @@ def build_recap(data, new_installment_md=None, new_meta=None, *, _g):
 
         story = (recap.get("story_so_far") or "").strip()
         # Guard 3 — the headline paragraph must not invent vitals either.
-        _story_vital = _recap_raw_vital(_mask_titles(story, titles))
+        _story_vital = _recap_raw_vital(_mask_titles(story, titles), grounded)
         if _story_vital:
             logger.warning("[recap] story_so_far cites a raw vital (%r) — skipping recap", _story_vital)
             return None
+
+        # Guard 3b (#5933) — the same rule for the two fields guards 2 and 3 never read. `where_we_are_now` is
+        # dropped (blanked) when it cites a figure the installments never printed; a thread that does is removed.
+        where_now = (recap.get("where_we_are_now") or "").strip()
+        _now_vital = _recap_raw_vital(_mask_titles(where_now, titles), grounded)
+        if _now_vital:
+            logger.warning("[recap] where_we_are_now cites an ungrounded figure (%r) — dropping the field", _now_vital)
+            where_now = ""
+        threads = []
+        for t in recap.get("threads_to_watch") or []:
+            t = str(t).strip()
+            _thread_vital = _recap_raw_vital(_mask_titles(t, titles), grounded)
+            if _thread_vital:
+                logger.info("[recap] dropping thread with an ungrounded figure (%r)", _thread_vital)
+                continue
+            threads.append(t)
 
         as_of = new_meta.get("date") if (new_meta and new_meta.get("date")) else (published[0].get("date") if published else None)
         as_of_week = (
@@ -178,8 +234,8 @@ def build_recap(data, new_installment_md=None, new_meta=None, *, _g):
         out = {
             "story_so_far": story,
             "recent_beats": beats,
-            "where_we_are_now": (recap.get("where_we_are_now") or "").strip(),
-            "threads_to_watch": [str(t).strip() for t in (recap.get("threads_to_watch") or [])][:3],
+            "where_we_are_now": where_now,
+            "threads_to_watch": threads[:3],
             "as_of": as_of,
             "as_of_week": _as_int(as_of_week),
             "experiment_day": _chronicle_day_n(as_of),  # powers the read-time stale guard

@@ -427,6 +427,7 @@
      "hours": 7.0,
      "light_hours": 4.07,
      "night_of": "2026-10-04",
+     "provisional": false,
      "rem_hours": 1.84,
      "score": 84.0
     },
@@ -435,6 +436,7 @@
      "hours": 6.8,
      "light_hours": 3.74,
      "night_of": "2026-10-04",
+     "provisional": false,
      "rem_hours": 1.7,
      "score": 88.0
     }
@@ -715,6 +717,7 @@
      "hours": 8.7,
      "light_hours": 5.05,
      "night_of": "2026-10-05",
+     "provisional": false,
      "rem_hours": 2.29,
      "score": 84.0
     },
@@ -723,6 +726,7 @@
      "hours": 8.5,
      "light_hours": 4.68,
      "night_of": "2026-10-05",
+     "provisional": false,
      "rem_hours": 2.12,
      "score": 88.0
     }
@@ -932,6 +936,7 @@
      "hours": 8.3,
      "light_hours": 4.81,
      "night_of": "2026-10-06",
+     "provisional": false,
      "rem_hours": 2.19,
      "score": 84.0
     },
@@ -940,6 +945,7 @@
      "hours": 8.1,
      "light_hours": 4.46,
      "night_of": "2026-10-06",
+     "provisional": false,
      "rem_hours": 2.02,
      "score": 88.0
     }
@@ -1202,6 +1208,7 @@
      "hours": 8.6,
      "light_hours": 4.99,
      "night_of": "2026-10-07",
+     "provisional": false,
      "rem_hours": 2.27,
      "score": 84.0
     },
@@ -1210,6 +1217,7 @@
      "hours": 8.4,
      "light_hours": 4.62,
      "night_of": "2026-10-07",
+     "provisional": false,
      "rem_hours": 2.1,
      "score": 88.0
     }
@@ -1421,6 +1429,7 @@
      "hours": 8.2,
      "light_hours": 4.76,
      "night_of": "2026-10-08",
+     "provisional": false,
      "rem_hours": 2.16,
      "score": 84.0
     },
@@ -1429,6 +1438,7 @@
      "hours": 8.0,
      "light_hours": 4.4,
      "night_of": "2026-10-08",
+     "provisional": false,
      "rem_hours": 2.0,
      "score": 88.0
     }
@@ -1709,6 +1719,7 @@
      "hours": 8.1,
      "light_hours": 4.71,
      "night_of": "2026-10-09",
+     "provisional": false,
      "rem_hours": 2.13,
      "score": 84.0
     },
@@ -1717,6 +1728,7 @@
      "hours": 7.9,
      "light_hours": 4.35,
      "night_of": "2026-10-09",
+     "provisional": false,
      "rem_hours": 1.98,
      "score": 88.0
     }
@@ -2126,6 +2138,7 @@
      "hours": 7.4,
      "light_hours": 4.31,
      "night_of": "2026-10-11",
+     "provisional": false,
      "rem_hours": 1.94,
      "score": 84.0
     },
@@ -2134,6 +2147,7 @@
      "hours": 7.2,
      "light_hours": 3.96,
      "night_of": "2026-10-11",
+     "provisional": false,
      "rem_hours": 1.8,
      "score": 88.0
     }
@@ -2393,6 +2407,7 @@
      "hours": 7.0,
      "light_hours": 4.07,
      "night_of": "2026-10-12",
+     "provisional": false,
      "rem_hours": 1.84,
      "score": 84.0
     },
@@ -2401,6 +2416,7 @@
      "hours": 6.8,
      "light_hours": 3.74,
      "night_of": "2026-10-12",
+     "provisional": false,
      "rem_hours": 1.7,
      "score": 88.0
     }
@@ -2600,6 +2616,7 @@
      "hours": 8.3,
      "light_hours": 4.81,
      "night_of": "2026-10-13",
+     "provisional": false,
      "rem_hours": 2.19,
      "score": 84.0
     },
@@ -2608,6 +2625,7 @@
      "hours": 8.1,
      "light_hours": 4.46,
      "night_of": "2026-10-13",
+     "provisional": false,
      "rem_hours": 2.02,
      "score": 88.0
     }
@@ -2915,6 +2933,7 @@
      "hours": 8.5,
      "light_hours": 4.93,
      "night_of": "2026-10-14",
+     "provisional": false,
      "rem_hours": 2.24,
      "score": 84.0
     },
@@ -2923,6 +2942,7 @@
      "hours": 8.3,
      "light_hours": 4.57,
      "night_of": "2026-10-14",
+     "provisional": false,
      "rem_hours": 2.08,
      "score": 88.0
     }
@@ -3173,6 +3193,7 @@
      "hours": 7.2,
      "light_hours": 4.19,
      "night_of": "2026-10-15",
+     "provisional": true,
      "rem_hours": 1.89,
      "score": 84.0
     },
@@ -3181,6 +3202,7 @@
      "hours": 7.0,
      "light_hours": 3.85,
      "night_of": "2026-10-15",
+     "provisional": false,
      "rem_hours": 1.75,
      "score": 88.0
     }
@@ -3481,6 +3503,7 @@
      "hours": 7.2,
      "light_hours": 4.19,
      "night_of": "2026-10-16",
+     "provisional": false,
      "rem_hours": 1.89,
      "score": 84.0
     },
@@ -3489,6 +3512,7 @@
      "hours": 7.0,
      "light_hours": 3.85,
      "night_of": "2026-10-16",
+     "provisional": false,
      "rem_hours": 1.75,
      "score": 88.0
     }

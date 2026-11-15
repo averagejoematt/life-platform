@@ -5,8 +5,13 @@
 import Base from "../../layouts/Base.astro";
 import Connected from "../../components/Connected.astro";
 import Provenance from "../../components/Provenance.astro";
-import { dayInWords, num } from "../../lib/format.js";
-import { loadAll } from "../../lib/snapshot.js";
+import StatusTag from "../../components/StatusTag.astro";
+import Quote from "../../components/Quote.astro";
+import { isDisputed } from "../../lib/disputed.js";
+import { CALL_OUTCOME, chapterCovers, chapterPublished, chapterWindow, clip, dayInWords, heldCallWords, num } from "../../lib/format.js";
+import { latestEdition, loadAll, loadSeries } from "../../lib/snapshot.js";
+import { dailyBars, placeEvidence, windowValues } from "../../lib/evidence.js";
+import { theLine } from "../../lib/theline.js";
 import { hasPage, href, pathOf } from "../../lib/url.js";
 
 export async function getStaticPaths() {
@@ -18,10 +23,29 @@ const { chapter: c } = Astro.props;
 const all = await loadAll();
 const episode = c.episode_id ? all.get("episode", c.episode_id) : null;
 const ordered = [...all.byType.chapter].filter((x) => hasPage("chapter", x)).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : (a.week ?? 0) - (b.week ?? 0)));
-const i = ordered.findIndex((x) => x.id === c.id);
-const prev = i > 0 ? ordered[i - 1] : null;
-const next = i >= 0 && i < ordered.length - 1 ? ordered[i + 1] : null;
-const weekDays = all.byType.day.filter((d) => d.chapter_id === c.id).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+// The walk goes chapter to chapter (2026-11-14, sprint II): from The Rate Flag, "Previous" led to "Week 7", a skipped
+// week's page that says only "Skipped." A published chapter's neighbours are the nearest published chapters; the weeks
+// between them are named in one neutral line, with no title or state beyond what /story/ already lists. A week with
+// no chapter keeps walking the full list, so its own page still reaches its neighbours.
+const walk = c.status === "published" ? ordered.filter((x) => x.status === "published") : ordered;
+const i = walk.findIndex((x) => x.id === c.id);
+const prev = i > 0 ? walk[i - 1] : null;
+const next = i >= 0 && i < walk.length - 1 ? walk[i + 1] : null;
+const between = (a: any, b: any) => {
+  if (!a || !b || c.status !== "published" || !(a.week >= 0) || !(b.week >= 0) || b.week - a.week < 2) return null;
+  const from = a.week + 1;
+  const to = b.week - 1;
+  return from === to ? `Week ${from} has no published chapter.` : `Weeks ${from} to ${to} have no published chapter.`;
+};
+const gapBefore = between(prev, c);
+const gapAfter = between(c, next);
+// The days the chapter is about (2026-11-14): its covered days when served ("Day 60 to Day 66" — Week 10 covers 4–10
+// November, not its program week 8–14 November), else the program week; never a span read off its data date.
+const win = chapterWindow(c);
+const covered = c.status === "published" && c.covers_start && c.covers_end;
+const weekDays = all.byType.day
+  .filter((d) => (covered ? d.date >= c.covers_start && d.date <= c.covers_end : d.chapter_id === c.id))
+  .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 const dayRow = (d: any) => {
   const r = d.readings || {};
   const bits = [
@@ -31,6 +55,16 @@ const dayRow = (d: any) => {
   ].filter(Boolean);
   return { href: href(pathOf("day", d.id)), words: (dayInWords(d.date, { weekday: true }) || "").replace(/ \d{4}$/, ""), text: bits.join(" · ") };
 };
+// The calls graded inside the chapter's week (2026-11-14): the story's link to the accountability record. The rail's
+// only connection was the day's edition. Every row is a ledger object as served; a call whose words are withheld shows
+// its frozen test, as its own page does.
+const weekCalls =
+  c.status === "published" && win
+    ? all.byType.prediction
+        .filter((p) => (p.status === "confirmed" || p.status === "refuted") && p.settled_date && p.settled_date.slice(0, 10) >= win[0] && p.settled_date.slice(0, 10) <= win[1])
+        .sort((a, b) => (a.settled_date < b.settled_date ? -1 : 1))
+    : [];
+const callWords = (p: any) => heldCallWords(p) || p.claim;
 const stateCopy: Record<string, string> = {
   held: "Held.",
   skipped: "Skipped.",
@@ -38,13 +72,102 @@ const stateCopy: Record<string, string> = {
 };
 // The calendar week and the address can disagree by design: published chapters keep the journal's post ids
 // (week-04 is program Week 1), which are permanent URLs. The page says which week it is, by its interval.
-const span = c.week_start && c.week_end ? `${(dayInWords(c.week_start) || "").replace(/ \d{4}$/, "")} to ${dayInWords(c.week_end)}` : null;
+// A published chapter shows the days it covers and the day Matthew approved it (2026-11-14: Week 10 read "8 November to
+// 14 November 2026 · Published 10 November 2026" — its program week and its DATA date — while it covers 4–10 November and
+// was approved on 13 November). Without the served dates: the program week, and the data date said as one.
+const span = (c.status === "published" && chapterCovers(c)) || (c.week_start && c.week_end ? `${(dayInWords(c.week_start) || "").replace(/ \d{4}$/, "")} to ${dayInWords(c.week_end)}` : null);
+const publishedWords = chapterPublished(c, { lower: true });
 const legacyNo = /^week-(\d+)$/.exec(c.id);
 const idNote = legacyNo && c.week != null && Number(legacyNo[1]) !== c.week ? `This page's address keeps the journal's post number (${legacyNo[1]}); the chapter is program ${c.week >= 1 ? `week ${c.week}` : "prologue"}.` : null;
+// The body as published, with two presentation-only touches (2026-11-14): the narrator's opening "signature" lines are
+// told apart — an editor's note (`note`) and the filed stat line, "Day N · …" (`filed`) — and the dek the header
+// already shows is not printed twice. No word of the text changes.
+const plain = (h: string) => h.replace(/<[^>]+>/g, "").replace(/&#39;|&#x27;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+function bodyForPage(html: string | null | undefined, dek: string | null | undefined): string | null {
+  if (!html) return null;
+  let dropped = false;
+  return html.replace(/<p class="signature">([\s\S]*?)<\/p>/g, (whole, inner) => {
+    const t = plain(inner);
+    if (!dropped && dek && t === dek.trim()) {
+      dropped = true;
+      return "";
+    }
+    if (/^editor[’']s note/i.test(t)) return `<p class="signature note">${inner}</p>`;
+    if (/^Day \d+\s*·/.test(t)) return `<p class="signature filed">${inner}</p>`;
+    return whole;
+  });
+}
+const rawBody = bodyForPage(c.body_html, c.excerpt);
+// Evidence in the margin (2026-11-14, sprint II): the week's weight, recovery and protein drawn beside the paragraph
+// that first talks about each, and a graded call's card beside the paragraph that names its coach. Every figure reads a
+// public series or ledger object; the chapter's words are untouched (lib/evidence.js places figures between paragraphs).
+const series = await loadSeries();
+const edition = await latestEdition();
+const startDate: string | null = edition?.start_date || edition?.blocks?.today?.data?.start_date || null;
+// the same days the header and the day list read (format.js chapterWindow); a prologue has none
+const ev = win && c.status === "published" && (c.week ?? 0) >= 1 ? { from: win[0], to: win[1] } : null;
+const dayById = new Map(all.byType.day.map((d: any) => [d.date, d]));
+const dayLink = (iso: string) => (dayById.get(iso) ? href(pathOf("day", (dayById.get(iso) as any).id)) : null);
+const winWords = ev ? `${(dayInWords(ev.from, { short: true }) || "").replace(/ \d{4}$/, "")} to ${dayInWords(ev.to, { short: true })}` : "";
+function evidenceFigure(key: string, title: string, svg: string | null, note: string, link: string | null) {
+  if (!svg) return null;
+  return `<figure class="evidence" data-evidence="${key}"><figcaption class="label">Evidence · ${title}</figcaption><div class="evidence-chart">${svg}</div><p class="evidence-note">${note}${link ? ` <a href="${link}">The day →</a>` : ""}</p></figure>`;
+}
+const esc = (x: string) => String(x).replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch] as string);
+const figures: { key: string; match: RegExp; html: string }[] = [];
+if (ev && c.status === "published" && rawBody) {
+  const w = series["weight_lbs"];
+  if (w) {
+    const before = new Date(Date.parse(`${ev.from}T00:00:00Z`) - 21 * 864e5).toISOString().slice(0, 10);
+    const from = startDate && before < startDate ? startDate : before;
+    const inWin = windowValues(w, ev.from, ev.to).filter((d) => d.value != null);
+    const svg = inWin.length
+      ? theLine({ days: w.days.map((d: any) => ({ date: d.date, value: d.value, gap: d.gap })), from, to: ev.to, focus: ev, shade: false, mobile: true, width: 320, height: 170, aria: `Weigh-ins from ${dayInWords(from)} to ${dayInWords(ev.to)}, the chapter's days shaded.` })
+      : null;
+    const a = inWin[0];
+    const b = inWin[inWin.length - 1];
+    const note = a && b && a !== b ? `The chapter's days are shaded, after the three weeks before them. In its days the scale went from ${num(a.value, 1)} lb (${dayInWords(a.date, { weekday: true, short: true })}) to ${num(b.value, 1)} lb (${dayInWords(b.date, { weekday: true, short: true })}). Withings.` : "The chapter's days are shaded, after the three weeks before them. Withings.";
+    const f = evidenceFigure("weight", `the scale, ${winWords}`, svg, esc(note), null);
+    if (f) figures.push({ key: "weight", match: /\b(pounds?|weigh(?:ed|s|-in|ing)?|scale)\b/i, html: f });
+  }
+  const r = series["recovery_score"];
+  if (r) {
+    const vals = windowValues(r, ev.from, ev.to);
+    const got = vals.filter((d) => d.value != null);
+    const low = got.length ? got.reduce((m, d) => (d.value < m.value ? d : m)) : null;
+    const svg = dailyBars({ values: vals, markLow: true, unit: "out of 100", aria: `Morning recovery, ${winWords}.` });
+    const note = low ? `Whoop's morning recovery score, out of 100; the lowest is in bold: ${num(low.value)} on ${dayInWords(low.date, { weekday: true, short: true })}.` : "";
+    const f = evidenceFigure("recovery", `morning recovery, ${winWords}`, svg, esc(note), low ? dayLink(low.date) : null);
+    if (f) figures.push({ key: "recovery", match: /\brecovery\b/i, html: f });
+  }
+  const pr = series["total_protein_g"];
+  if (pr) {
+    // the floor is the one the chapter's own sentence states ("a floor of 170"); with none stated, none is drawn
+    const stated = /floor of (\d{2,3})\b/i.exec((rawBody || "").replace(/<[^>]+>/g, " "));
+    const floor = stated ? Number(stated[1]) : null;
+    const vals = windowValues(pr, ev.from, ev.to);
+    const n = vals.filter((d) => d.value != null).length;
+    const met = floor != null ? vals.filter((d) => d.value != null && d.value >= floor).length : null;
+    const svg = dailyBars({ values: vals, floor, unit: "g", aria: `Protein logged each day, ${winWords}${floor != null ? `, against the stated floor of ${floor} g` : ""}.` });
+    const note = floor != null ? `Grams of protein logged each day; the dashed line is the ${floor} g floor the chapter names. ${met} of ${n} logged days reached it; hollow bars fell short. A day with no log is an open slot. MacroFactor.` : `Grams of protein logged each day; a day with no log is an open slot. MacroFactor.`;
+    const f = evidenceFigure("protein", `protein, ${winWords}`, svg, esc(note), null);
+    if (f) figures.push({ key: "protein", match: /\bprotein\b/i, html: f });
+  }
+  // a graded call, beside the paragraph that names its coach: the test it was held to, what happened, the grade
+  for (const p of all.byType.prediction.filter((x: any) => (x.status === "confirmed" || x.status === "refuted") && x.settled_date && x.settled_date.slice(0, 10) >= ev.from && x.settled_date.slice(0, 10) <= ev.to)) {
+    const name = String(p.coach_name || "");
+    if (!name || figures.some((f) => f.key === `call:${name}`)) continue;
+    const words = p.claim_withheld ? heldCallWords(p) || "" : `“${clip(p.claim, 140)}”`;
+    const outcome = CALL_OUTCOME[p.status] || p.status;
+    const html = `<aside class="evidence callcard" data-evidence="call"><p class="label">A graded call · ${esc(name)}</p><p class="callcard-test">${esc(words)}</p>${p.grading?.outcome_notes ? `<p class="callcard-what">${esc(p.grading.outcome_notes)}.</p>` : ""}<p class="callcard-foot"><span class="status ${p.status === "confirmed" ? "confirmed" : "refuted"}">${esc(outcome)}</span> <a href="${href(pathOf("prediction", p.id))}">The call and its grade →</a></p></aside>`;
+    figures.push({ key: `call:${name}`, match: new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), html });
+  }
+}
+const body = rawBody ? placeEvidence(rawBody, figures).html : rawBody;
 const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
 ---
 
-<Base title={c.title} top="story" description={c.excerpt || c.title} status={dayInWords(c.date)}>
+<Base title={c.title} top="story" description={c.excerpt || c.title} status={dayInWords(c.published_at || c.date)} card={c.status === "published" ? c.id : null} ogType={c.status === "published" ? "article" : "website"}>
   <section class="section" style="padding-bottom:24px">
     <div class="wrap" style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-end">
       <div style="flex:0 0 150px">
@@ -56,10 +179,10 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
           <span>{c.week_label}</span>
           <span>·</span>
           {span ? <span>{span}</span> : <span>{dayInWords(c.date)}</span>}
-          {span && c.status === "published" && (
+          {span && publishedWords && (
             <>
               <span>·</span>
-              <span>published {dayInWords(c.date)}</span>
+              <span data-published>{publishedWords}</span>
             </>
           )}
           <Provenance object={c} />
@@ -122,8 +245,8 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
               <b style="color:var(--ink)">{stateCopy[c.status] || c.status}</b>
               <span>{c.absent_text || ""}</span>
             </div>
-          ) : c.body_html ? (
-            <div data-published-body set:html={c.body_html} />
+          ) : body ? (
+            <div data-published-body set:html={body} />
           ) : (
             <div class="empty" style="font-family:var(--sans)">
               <b style="color:var(--ink)">The text lives on the current site.</b>
@@ -158,6 +281,28 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
         }
       </article>
       <aside style="flex:0 1 300px;min-width:260px">
+        {
+          c.status === "published" && win && (
+            <section aria-label="Calls graded this week" style="margin-bottom:28px" data-week-calls>
+              {/* #5950: the snapshot lists only the ledger records served with an id, so this is "listed", never "all" */}
+              <p class="label" style="margin-bottom:8px">Graded calls listed for these days · {weekCalls.length}</p>
+              {weekCalls.length ? (
+                <div class="rows">
+                  {weekCalls.map((p) => (
+                    <a href={href(pathOf("prediction", p.id))} style="align-items:flex-start">
+                      <span style="font-size:14px;line-height:1.35;min-width:0">
+                        <b>{p.coach_name}</b> · {p.claim_withheld ? callWords(p) : <Quote text={clip(p.claim, 110)} said={p.logged_date} />}
+                      </span>
+                      <StatusTag status={p.status} call disputed={isDisputed(p)} />
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <p class="muted" style="font-size:14px">The ledger lists no graded call for these days.</p>
+              )}
+            </section>
+          )
+        }
         <Connected type="chapter" id={c.id} heading="Connected to this chapter" />
       </aside>
     </div>
@@ -170,6 +315,7 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
           <a href={href(`/story/${prev.id}/`)} style="display:flex;flex-direction:column;gap:6px;padding:22px;border-right:1px solid var(--ink);text-decoration:none">
             <span class="label">← Previous · {prev.week_label}</span>
             <b style="font-size:22px;letter-spacing:-.02em">{prev.title}</b>
+            {gapBefore && <span class="muted" style="font-size:13px">{gapBefore}</span>}
           </a>
         ) : (
           <span style="padding:22px;border-right:1px solid var(--ink)" class="muted">
@@ -182,6 +328,7 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
           <a href={href(`/story/${next.id}/`)} style="display:flex;flex-direction:column;gap:6px;padding:22px;text-decoration:none">
             <span class="label">Next · {next.week_label} →</span>
             <b style="font-size:22px;letter-spacing:-.02em">{next.title}</b>
+            {gapAfter && <span class="muted" style="font-size:13px">{gapAfter}</span>}
           </a>
         ) : (
           <span style="padding:22px" class="muted">

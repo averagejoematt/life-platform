@@ -242,3 +242,74 @@ def test_unreadable_manifest_still_falls_back_to_the_static_pages(monkeypatch):
 
     monkeypatch.setattr(mod, "s3", _Boom())
     assert mod._get_published_posts() == mod.FALLBACK_PAGES
+
+
+# ── #5939 r2:cpo-3: the welcome email is day-aware and links the v9 doors ─────
+#
+# A Day-69 subscriber was told "the site is brand new and the data is just starting to
+# accumulate" and sent to the legacy /cockpit/ and /story/chronicle/. The day now comes from
+# EXPERIMENT_START_DATE through pacific_day_n; the clock is frozen in every case below (the
+# function's own `on_date=` plus a pinned module `pacific_today`), so no assertion here can
+# step at a round-number instant (#4848).
+
+_LEGACY_WELCOME_PATHS = ("/cockpit/", "/story/chronicle/", "/legacy")
+
+
+def _welcome_offenders(body: str, expect_brand_new: bool) -> list[str]:
+    """Every way a rendered welcome email breaks #5939's contract (empty = clean)."""
+    out = [f"legacy link {p}" for p in _LEGACY_WELCOME_PATHS if p in body]
+    if ("brand new" in body) != expect_brand_new:
+        out.append(f"'brand new' paragraph present={'brand new' in body}, expected {expect_brand_new}")
+    return out
+
+
+def _on_day(day: int) -> str:
+    from datetime import date, timedelta
+
+    from common.constants import EXPERIMENT_START_DATE
+
+    return (date.fromisoformat(EXPERIMENT_START_DATE) + timedelta(days=day - 1)).isoformat()
+
+
+def test_the_welcome_email_is_day_aware_and_links_the_v9_doors(monkeypatch):
+    import web.email_subscriber_lambda as esl
+
+    # Freeze the default clock too: the default path must give the same answer as the explicit one.
+    monkeypatch.setattr(esl, "pacific_today", lambda: _on_day(69))
+    _, day69_default = esl._welcome_email_content("reader@example.com")
+    _, day69 = esl._welcome_email_content("reader@example.com", on_date=_on_day(69))
+    _, day3 = esl._welcome_email_content("reader@example.com", on_date=_on_day(3))
+    _, day15 = esl._welcome_email_content("reader@example.com", on_date=_on_day(15))
+
+    offenders = {
+        "day 69 (default clock)": _welcome_offenders(day69_default, expect_brand_new=False),
+        "day 69": _welcome_offenders(day69, expect_brand_new=False),
+        "day 15": _welcome_offenders(day15, expect_brand_new=False),
+        "day 3": _welcome_offenders(day3, expect_brand_new=True),
+    }
+    assert not any(offenders.values()), offenders
+    assert day69_default == day69
+    assert "day 69 of the experiment" in day69
+    assert "day 15 of the experiment" in day15
+    for body in (day69, day3):
+        for path in ("/", "/story/", "/data/", "/system/"):
+            assert f"{esl.SITE_URL}{path}\n" in body, f"v9 door {path} missing"
+
+
+def test_the_welcome_contract_check_fails_on_the_old_copy(monkeypatch):
+    """Must-fail control: put the pre-#5939 behaviour back (the brand-new paragraph on every
+    day, the legacy cockpit/chronicle links) and the same check must name both defects."""
+    import web.email_subscriber_lambda as esl
+
+    monkeypatch.setattr(esl, "pacific_today", lambda: _on_day(69))
+    monkeypatch.setattr(esl, "WELCOME_BRAND_NEW_MAX_DAY", 10_000)
+    monkeypatch.setattr(
+        esl,
+        "WELCOME_DOORS",
+        (("The live cockpit", "/cockpit/"), ("The first dispatch", "/story/chronicle/")),
+    )
+    _, old = esl._welcome_email_content("reader@example.com", on_date=_on_day(69))
+    offenders = _welcome_offenders(old, expect_brand_new=False)
+    assert "legacy link /cockpit/" in offenders
+    assert "legacy link /story/chronicle/" in offenders
+    assert any("brand new" in o for o in offenders), offenders

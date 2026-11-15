@@ -31,11 +31,34 @@
       "total_tracked": {
         "type": "integer"
       },
+      "unnamed": {
+        "keys": {
+          "best_streak": {
+            "type": "integer"
+          },
+          "held": {
+            "type": "integer"
+          },
+          "longest_streak": {
+            "type": "integer"
+          },
+          "relapses_90d": {
+            "type": "integer"
+          },
+          "tracked": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "vices": {
         "items": {
           "keys": {
             "best_streak": {
               "type": "integer"
+            },
+            "category": {
+              "type": "string"
             },
             "current_streak": {
               "type": "integer"
@@ -52,7 +75,7 @@
           },
           "type": "object"
         },
-        "length_sample": 6,
+        "length_sample": 2,
         "type": "array"
       }
     },

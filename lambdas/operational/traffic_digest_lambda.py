@@ -1223,7 +1223,7 @@ def lambda_handler(event, context):
         # Publish even on a genuinely quiet week (0 views) — a real 0 is a valid
         # reading, and cost_governor's surge check needs a fresh datapoint every
         # run to tell "quiet week" apart from "no data yet" (a missing/stale
-        # metric fails closed to non-surge, see cost_governor._recent_unique_visitors).
+        # metric fails closed to non-surge, see cost_governor._surge_reading_and_baseline).
         try:
             # #3376: the per-door series ride the same weekly put. The Door
             # dimension takes only the six code-literal values in DOORS and

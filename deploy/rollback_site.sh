@@ -27,7 +27,7 @@
 # the build emits). sync_site_to_s3.sh excludes them on every run, this one included, so a
 # site/** rollback cannot un-launch the v9 site by accident. Rolling the v9 paths back is the
 # v9 workflow's own job (web-preview-deploy.yml: `deploy/www_preview_sync.sh --restore-previous`,
-# from s3://matthew-life-platform/site/_v9_previous/), never this script.
+# from s3://matthew-life-platform/www-previous/<LATEST>/), never this script.
 #
 # History (#418/ADR-117): previously this synced the raw site/ tree via safe_sync
 # with NO re-hash and NO version.json regen — which, in the v4 content-hashed-asset

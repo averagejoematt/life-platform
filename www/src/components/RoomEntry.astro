@@ -1,7 +1,7 @@
 ---
 // The Coaching Room's entry on /system/ (CR1). SELF-GATING: with the room off (src/lib/room.js) this component renders
 // nothing and reads nothing — not even the room's data files — so /system/ is byte-identical to a build without it.
-// No <style>, no <script>: it adds no asset to the build either way. On a private build it says so; on the published
+// No <style>, no <script> of its own (the published verified lead is drawn by VersusGuess, which the front page also uses). On a private build it says so; on the published
 // CR1 build (the committed `room_public: "cr1"`) it is the door to the calibration page and "wrong this month".
 // The docket door is CR3: only on a whole-room private build, and only when at least one docket entry is complete
 // enough to have a page (owner, 2026-11-09).
@@ -10,6 +10,7 @@ import { docketEntries } from "../lib/docket.js";
 import { ROOM_MARKER, roomAll, roomEnabled, roomPublic } from "../lib/room.js";
 import { loadCalibration, loadCoachRoom } from "../lib/snapshot.js";
 import { href } from "../lib/url.js";
+import VersusGuess from "./VersusGuess.astro";
 
 const on = roomEnabled();
 const head = on ? recordHeadline(await loadCalibration()) : null;
@@ -23,7 +24,9 @@ const room = { [ROOM_MARKER]: "entry" };
     <section class="section" {...room} style="border-top:1px solid var(--ink)">
       <div class="wrap" style="display:flex;flex-direction:column;gap:14px;max-width:900px">
         <p class="label">{pub ? "The coaches, graded" : "The Coaching Room · private build, not published"}</p>
-        {head ? (
+        {head && pub && head.mode === "verified" ? (
+          <VersusGuess links={false} />
+        ) : head ? (
           <>
             <h2 style="font-size:clamp(22px,3vw,30px);line-height:1.2">{head.sentence}</h2>
             {head.mode !== "verified" && <p class="muted" style="font-size:14px;max-width:70ch">{head.caveat}</p>}

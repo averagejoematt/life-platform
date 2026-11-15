@@ -1,6 +1,6 @@
 ---
 name: coach-session
-description: "Run a training coach session for Matthew: propose the next workout, review recent training, or debrief a session. Use when he says \"coach session\", \"coaching session\", \"what workout tomorrow\", \"debrief\", \"plan tomorrow's session\", or asks for a routine, a training read, or a Hevy plan. Reads the coach-session packet and its charter context first, plans through plan_next_session, and authors tier-agnostic Hevy routines he can run at 5am without adjusting."
+description: "Run a training coach session for Matthew: propose the next workout, review recent training on demand, or read a single session. Use when he says \"coach session\", \"coaching session\", \"what workout tomorrow\", \"plan tomorrow's session\", or asks for a routine, a training read, or a Hevy plan (the nightly end-of-day routine is daily-debrief). Reads the coach-session packet and its charter context first, plans through plan_next_session, and authors tier-agnostic Hevy routines he can run at 5am without adjusting."
 allowed-tools: Read, Glob, Grep, Bash, mcp__life-platform__*
 ---
 
