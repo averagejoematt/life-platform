@@ -51,6 +51,7 @@ def _inst(title, date, sk, week=0):
         "word_count": 100,
         "content_markdown": "body",
         "phase": "experiment",
+        "status": "published",
     }
 
 
@@ -113,7 +114,7 @@ def test_the_withdrawn_key_is_the_week_03_installment():
     assert chronicle_schema.is_withdrawn({"sk": WITHDRAWN_SK})
     assert chronicle_schema.off_the_list({"sk": WITHDRAWN_SK})
     assert chronicle_schema.off_the_list({"sk": "DATE#2000-01-01", "unlisted": True})
-    assert not chronicle_schema.off_the_list({"sk": "DATE#2000-01-01"})
+    assert not chronicle_schema.off_the_list({"sk": "DATE#2000-01-01", "status": "published"})
 
 
 def test_both_manifests_drop_it_and_keep_every_other_url(monkeypatch):

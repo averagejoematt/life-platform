@@ -1119,21 +1119,10 @@ def _workouts_store_vendor_diff(vendor_workouts: list, stored_workouts: list, co
 
 
 def _emit_store_vendor_metrics(absent_count: int, changed_count: int) -> None:
-    try:
-        _cw.put_metric_data(
-            Namespace="LifePlatform/IngestReconciliation",
-            MetricData=[
-                {
-                    "MetricName": name,
-                    "Dimensions": [{"Name": "Source", "Value": "whoop"}],
-                    "Value": float(value),
-                    "Unit": "Count",
-                }
-                for name, value in (("StoreOnlyActivityCount", absent_count), ("ChangedActivityCount", changed_count))
-            ],
-        )
-    except Exception as e:  # metric emission must never fail the run
-        logger.warning("store→vendor metric emit failed (non-fatal): %s", e)
+    """#5888: emits nothing. StoreOnlyActivityCount / ChangedActivityCount{Source=whoop} were unalarmed, undashboarded
+    series (+2 over the LifePlatform/IngestReconciliation budget); the counts live in the [RECONCILE] warning log
+    (non-zero cases) and the run's report body. Kept as a call site so a future alarm re-adds the put in one place."""
+    return None
 
 
 def _store_vendor_report(vendor_workouts: list, start, today) -> dict:

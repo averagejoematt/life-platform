@@ -190,7 +190,9 @@ def test_registry_lists_only_known_metrics_and_every_input_has_words():
     listed = {m for p in personas.values() for m in (p.get("public_brief_metrics") or [])}
     assert listed and listed <= set(METRIC_SOURCES)
     assert set(POL.eligible_metrics()) <= set(PB.METRIC_WORDS)
-    assert PB.brief_coaches() and set(PB.brief_coaches()) <= set(persona_registry.OPERATIONAL_COACH_IDS)
+    # operational coaches, plus any coach the registry explicitly enables (``public_brief_enabled: true``) — never another
+    explicit = {cid for cid, p in personas.items() if p.get(PB.ENABLED_KEY) is True}
+    assert PB.brief_coaches() and set(PB.brief_coaches()) <= set(persona_registry.OPERATIONAL_COACH_IDS) | explicit
 
 
 # ── 2. the contract: a private input set is withheld; the public control is served ───────────

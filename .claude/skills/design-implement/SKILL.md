@@ -3,7 +3,7 @@ name: design-implement
 description: "Pull a chosen design proposal out of the Claude Design project and land it as a site PR through the v5 design system and QA gates. Use when implementing a design that already exists in the design project."
 user-invocable: true
 argument-hint: "[component or proposal]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task, Agent, TodoWrite, DesignSync, WebFetch
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, TodoWrite, DesignSync, WebFetch
 ---
 
 Pull a chosen design proposal out of the v5 design project and land it as a PR through

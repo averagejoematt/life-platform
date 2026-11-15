@@ -18,15 +18,16 @@
     "risk' (informational). pending_deploy_routes = 'defer smoke/visual enforcement",
     "until the next post-deploy schema capture re-arms it' (the #2050 fix path).",
     "REMOVE the pending_deploy_routes entry once the API is confirmed live — a stale",
-    "entry hides a genuinely dead route (same discipline as the old inline set)."
+    "entry hides a genuinely dead route (same discipline as the old inline set).",
+    "",
+    "SECONDARY since 2026-11-12: the ORDERING itself is now enforced at deploy time by",
+    "deploy/www_api_readiness.py in BOTH site workflows (site-deploy.yml and",
+    "web-preview-deploy.yml) — a site deploy defers until the live Site API bundle contains",
+    "the commit it owes, and web-deploy-resume.yml resumes it. This registry is kept for",
+    "what that gate cannot see: the PR-time advisory (a page naming a route), an UNVERIFIED",
+    "or break-glass (api_readiness=skip) run, and a cached edge 404 outliving the Lambda",
+    "deploy. Entries should now be rare and short-lived; docs/CONVENTIONS.md §4b."
   ],
   "sequenced_routes": [],
-  "pending_deploy_routes": [
-    {
-      "route": "/api/pairs",
-      "pr": 5538,
-      "date": "2026-10-31",
-      "reason": "#5532: /api/pairs is a NEW site-api route and the regenerated /method/registry/ page (scripts/v4_build_methods.py, the spearman_rho registry entry's used_by text) names it — a text mention, not a fetch, but site/** auto-deploys on merge while the Site API deploys behind the production gate. Defer smoke/visual enforcement until the Site API bundle is live; REMOVE this entry at the next post-deploy schema capture."
-    }
-  ]
+  "pending_deploy_routes": []
 }

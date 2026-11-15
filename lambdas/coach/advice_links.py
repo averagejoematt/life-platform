@@ -32,6 +32,22 @@ ABSENCE IS UNKNOWN. A decision with no link row reads `unknown` (`state_for` bel
 no backfill and there must never be one: the existing `followed` boolean on a DECISION# row is
 NOT evidence of having acted on a coach recommendation (it names no recommendation and was
 never an owner-asserted link), so it is never converted.
+
+ASK RESPONSES (owner, 2026-11-12). A coach ask (COMMITMENT#) is answered by an ASK RESPONSE, not
+a link: Matthew's own structured answer to ONE ask, keyed by the ask, needing no decision.
+    pk = USER#<user>#SOURCE#decisions
+    sk = ASKRESPONSE#<coach_id>#<ask_id>#<recorded_at>
+  * every edit and every withdrawal is a NEW revision row (append-only, conditional put): the
+    newest revision is the answer, the older ones are the private audit trail;
+  * states: acted_on / declined / partially_followed / not_yet_decided, plus `withdrawn`, which
+    takes the answer back (the ask reads "not recorded" again). A private note is optional;
+  * the PUBLIC projection is `public_ask_outcome` and nothing else: {ask_id, state, responded_on,
+    self_reported: True} for the three answered states. `not_yet_decided` is private and, like a
+    withdrawn or unanswered ask, publishes nothing — the page reads "not recorded". The note, the
+    decision pointer and the revision history never cross;
+  * a missing response is NEVER `declined`: absence publishes nothing.
+The writer is the same owner tool (`log_advice_link`, ref_kind='commitment'); the one reader that
+serves the public projection is `coach/ask_outcomes.py`.
 """
 
 from __future__ import annotations
@@ -65,10 +81,8 @@ RECORDED_BY: frozenset[str] = frozenset({RECORDED_BY_OWNER})
 # names its coach in its own pk (prediction, coach_output, commitment) or its own `coach_id`
 # field (coach_action), so the link's coach_id is checked against the row, never trusted.
 #
-# `words_required` (commitment, owner 2026-11-12): an ask already carries the grader's metric
-# verdict (kept/broken), so the one thing a link can add is what Matthew SAYS he did. For that
-# kind an asserting state needs his own words (evidence_text); a reference alone — which could
-# name a workout, a meal log or any other data row — is refused.
+# `commitment` (a coach ask) is listed for its key and its id pattern only: an ask is answered by
+# an ASK RESPONSE (below), never by a decision link, so `build_link_record` refuses the kind.
 
 
 def _prediction_key(coach_id: str, ref_id: str, user_id: str) -> dict:
@@ -107,7 +121,7 @@ REF_KINDS: dict[str, dict] = {
         "about": "a coach ask — pk COACH#<coach_id>, sk COMMITMENT#<ask_id> (ask_id from get_advice_link_queue)",
         "key": _commitment_key,
         "ref_id": re.compile(r"^commit_\d{8}_[a-z0-9_]{0,80}$"),
-        "words_required": True,
+        "answered_by_ask_response": True,
     },
 }
 
@@ -133,22 +147,16 @@ def ref_key(ref_kind: str, coach_id: str, ref_id: str, user_id: str) -> dict:
     return REF_KINDS[ref_kind]["key"](coach_id, ref_id, user_id)
 
 
-def words_required(ref_kind: str | None) -> bool:
-    """True for a kind whose asserting states need Matthew's own words, not a reference alone."""
-    return bool((REF_KINDS.get(ref_kind or "") or {}).get("words_required"))
+def answered_by_ask_response(ref_kind: str | None) -> bool:
+    """True for the ask kind: answered by an ask response (its own revisioned family), never by a decision link."""
+    return bool((REF_KINDS.get(ref_kind or "") or {}).get("answered_by_ask_response"))
 
 
-def _evidence(state: str, evidence: dict | None, recorded_at: str, ref_kind: str | None = None) -> dict | None:
+def _evidence(state: str, evidence: dict | None, recorded_at: str) -> dict | None:
     ev = evidence or {}
     text = str(ev.get("text") or "").strip()
     reference = str(ev.get("reference") or "").strip()
     if state in EVIDENCE_REQUIRED_STATES:
-        if words_required(ref_kind) and not text:
-            raise AdviceLinkError(
-                f"state '{state}' on a {ref_kind} needs Matthew's own words (evidence_text) saying what he did with the ask. "
-                "A reference alone is refused, and nothing the data shows (a workout, a meal, the grader's kept/broken) is "
-                "evidence. Without his words the link stays 'unknown' (ruling F)."
-            )
         if not text and not reference:
             raise AdviceLinkError(
                 f"state '{state}' asserts what Matthew did, so it needs evidence — his own words (evidence_text) "
@@ -186,6 +194,8 @@ def build_link_record(
         raise AdviceLinkError(f"recorded_by must be one of {sorted(RECORDED_BY)} — a link is asserted by the owner only")
     if ref_kind not in REF_KINDS:
         raise AdviceLinkError(f"ref_kind must be one of {sorted(REF_KINDS)}")
+    if answered_by_ask_response(ref_kind):
+        raise AdviceLinkError(f"a {ref_kind} (a coach ask) is answered by an ask response, not a decision link")
     if coach_id not in KNOWN_COACH_IDS:
         raise AdviceLinkError(f"coach_id must be a persona id from the registry: {sorted(KNOWN_COACH_IDS)}")
     if not ref_id or not REF_KINDS[ref_kind]["ref_id"].match(ref_id):
@@ -203,7 +213,7 @@ def build_link_record(
         "recorded_at": recorded_at,
         "recorded_by": recorded_by,
     }
-    ev = _evidence(state, evidence, recorded_at, ref_kind)
+    ev = _evidence(state, evidence, recorded_at)
     if ev is not None:
         record["evidence"] = ev
     return record
@@ -221,8 +231,8 @@ def validate_stored(record: dict) -> list[str]:
         ev = record.get("evidence") or {}
         if not (str(ev.get("text") or "").strip() or str(ev.get("reference") or "").strip()):
             problems.append(f"state {state!r} carries no evidence")
-        elif words_required(record.get("ref_kind")) and not str(ev.get("text") or "").strip():
-            problems.append(f"state {state!r} on a {record.get('ref_kind')} carries no words of his")
+    if answered_by_ask_response(record.get("ref_kind")):
+        problems.append("an ask is answered by an ask response, never a decision link")
     return problems
 
 
@@ -259,3 +269,168 @@ def state_counts(decision_sks: list[str], links_by_decision: dict[str, list[dict
         for link in links:
             counts[effective_state(link)] += 1
     return counts
+
+
+# ── ASK RESPONSES: Matthew's structured answer to ONE coach ask (owner, 2026-11-12) ──────────
+
+NOT_YET_DECIDED = "not_yet_decided"
+WITHDRAWN = "withdrawn"
+
+#: The answers Matthew may give to an ask (the tool's state enum, for ref_kind='commitment').
+ASK_RESPONSE_STATES: tuple[str, ...] = (ACTED_ON, DECLINED, PARTIALLY_FOLLOWED, NOT_YET_DECIDED)
+
+#: Every state the tool accepts across both record families (the inputSchema enum is held EQUAL to this).
+TOOL_STATES: tuple[str, ...] = STATES + (NOT_YET_DECIDED,)
+
+#: What a stored revision may hold: an answer, or the withdrawal of one.
+REVISION_STATES: frozenset[str] = frozenset(ASK_RESPONSE_STATES) | {WITHDRAWN}
+
+#: The ONLY states a public page may show. `not_yet_decided` is a private state: publicly it reads
+#: "not recorded", exactly like an unanswered or withdrawn ask (the conservative reading, owner 2026-11-12).
+PUBLIC_ASK_STATES: frozenset[str] = frozenset({ACTED_ON, DECLINED, PARTIALLY_FOLLOWED})
+
+#: The public projection's keys — the complete list. Nothing else of a revision ever crosses.
+PUBLIC_ASK_KEYS: tuple[str, ...] = ("ask_id", "state", "responded_on", "self_reported")
+
+ASK_RESPONSE_SK_PREFIX = "ASKRESPONSE#"
+ASK_RESPONSE_KIND = "ask_response"
+ASK_NOTE_MAX = 1000
+#: How many revisions one ask may accumulate (a ceiling against a runaway caller, not a retention rule).
+ASK_REVISIONS_MAX = 50
+
+_ISO_INSTANT = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$")
+
+
+def ask_response_pk(user_id: str) -> str:
+    return f"USER#{user_id}#SOURCE#decisions"
+
+
+def ask_response_prefix(coach_id: str | None = None, ask_id: str | None = None) -> str:
+    """The begins_with prefix for every revision (no args), one coach's, or one ask's (both)."""
+    if coach_id is None:
+        return ASK_RESPONSE_SK_PREFIX
+    if ask_id is None:
+        return f"{ASK_RESPONSE_SK_PREFIX}{coach_id}#"
+    return f"{ASK_RESPONSE_SK_PREFIX}{coach_id}#{ask_id}#"
+
+
+def ask_response_sk(coach_id: str, ask_id: str, recorded_at: str) -> str:
+    return f"{ask_response_prefix(coach_id, ask_id)}{recorded_at}"
+
+
+def build_ask_response(
+    *,
+    user_id: str,
+    coach_id: str,
+    ask_id: str,
+    state: str | None,
+    withdraw: bool,
+    note: str | None,
+    decision_sk: str | None,
+    recorded_at: str,
+    revision: int,
+    supersedes: str | None,
+    recorded_by: str = RECORDED_BY_OWNER,
+) -> dict:
+    """The ONE constructor of an ask-response revision. Raises AdviceLinkError on anything the ruling forbids."""
+    if recorded_by not in RECORDED_BY:
+        raise AdviceLinkError(f"recorded_by must be one of {sorted(RECORDED_BY)} — an ask is answered by the owner only")
+    if coach_id not in KNOWN_COACH_IDS:
+        raise AdviceLinkError(f"coach_id must be a persona id from the registry: {sorted(KNOWN_COACH_IDS)}")
+    if not ask_id or not REF_KINDS["commitment"]["ref_id"].match(ask_id):
+        raise AdviceLinkError(f"ref_id does not identify a commitment: {REF_KINDS['commitment']['about']}")
+    if withdraw:
+        if state:
+            raise AdviceLinkError("withdraw takes no state — it takes the answer back, and the ask reads 'not recorded' again")
+        final = WITHDRAWN
+    else:
+        if state not in ASK_RESPONSE_STATES:
+            raise AdviceLinkError(
+                f"an ask's state must be one of {list(ASK_RESPONSE_STATES)} (or withdraw=true to take an answer back). "
+                "'unknown' is not an answer: an ask he has not answered already reads 'not recorded'."
+            )
+        final = state
+    if not recorded_at or not _ISO_INSTANT.match(recorded_at):
+        raise AdviceLinkError("recorded_at must be an ISO-8601 UTC instant")
+    if decision_sk and not decision_sk.startswith(DECISION_SK_PREFIX):
+        raise AdviceLinkError(f"decision_sk must start with {DECISION_SK_PREFIX}")
+    if not isinstance(revision, int) or revision < 1 or revision > ASK_REVISIONS_MAX:
+        raise AdviceLinkError(f"an ask keeps at most {ASK_REVISIONS_MAX} revisions")
+    record = {
+        "pk": ask_response_pk(user_id),
+        "sk": ask_response_sk(coach_id, ask_id, recorded_at),
+        "kind": ASK_RESPONSE_KIND,
+        "coach_id": coach_id,
+        "ask_id": ask_id,
+        "state": final,
+        "recorded_at": recorded_at,
+        "recorded_by": recorded_by,
+        "revision": revision,
+    }
+    text = str(note or "").strip()
+    if text:
+        record["note"] = text[:ASK_NOTE_MAX]  # PRIVATE: owner-side only, never in the public projection
+    if decision_sk:
+        record["decision_sk"] = decision_sk
+    if supersedes:
+        record["supersedes"] = supersedes
+    return record
+
+
+def validate_ask_response(record: dict) -> list[str]:
+    """Problems with a STORED revision (read side): the same rules, reported not raised."""
+    problems = []
+    if record.get("kind") != ASK_RESPONSE_KIND:
+        problems.append("not an ask-response row")
+    if record.get("state") not in REVISION_STATES:
+        problems.append(f"state {record.get('state')!r} not in {sorted(REVISION_STATES)}")
+    if record.get("recorded_by") not in RECORDED_BY:
+        problems.append("recorded_by is not the owner")
+    if record.get("coach_id") not in KNOWN_COACH_IDS:
+        problems.append("coach_id is not a persona id")
+    ask_id = str(record.get("ask_id") or "")
+    if not REF_KINDS["commitment"]["ref_id"].match(ask_id):
+        problems.append("ask_id is not an ask id")
+    if not _ISO_INSTANT.match(str(record.get("recorded_at") or "")):
+        problems.append("recorded_at is not an ISO instant")
+    elif record.get("sk") != ask_response_sk(str(record.get("coach_id")), ask_id, str(record.get("recorded_at"))):
+        problems.append("sk does not match the row's own coach, ask and instant")
+    return problems
+
+
+def latest_by_ask(rows: list[dict]) -> dict[tuple[str, str], dict]:
+    """(coach_id, ask_id) -> the newest revision (by sk: the instant sorts). Rows of other families are ignored."""
+    out: dict[tuple[str, str], dict] = {}
+    for r in rows or []:
+        if not str(r.get("sk") or "").startswith(ASK_RESPONSE_SK_PREFIX):
+            continue
+        key = (str(r.get("coach_id") or ""), str(r.get("ask_id") or ""))
+        if key not in out or str(r.get("sk")) > str(out[key].get("sk")):
+            out[key] = r
+    return out
+
+
+def public_ask_outcome(latest: dict | None, responded_on: str | None) -> dict | None:
+    """The PUBLIC projection of an ask's newest revision, or None (the page reads "not recorded").
+
+    None when there is no revision (a missing answer is never 'declined'), when the newest revision
+    is a withdrawal or the private `not_yet_decided`, or when it breaks any rule. Built from an
+    explicit key list: the note, the decision pointer and the history can never ride along."""
+    if not latest or validate_ask_response(latest):
+        return None
+    if latest["state"] not in PUBLIC_ASK_STATES or not responded_on:
+        return None
+    return {"ask_id": latest["ask_id"], "state": latest["state"], "responded_on": responded_on, "self_reported": True}
+
+
+def owner_ask_view(revisions: list[dict]) -> dict:
+    """The OWNER-side read of one ask's answer: the current state and the whole private history, oldest first."""
+    ordered = sorted(revisions or [], key=lambda r: str(r.get("sk")))
+    current = ordered[-1] if ordered else None
+    return {
+        "state": (current or {}).get("state") if current and not validate_ask_response(current) else None,
+        "recorded_at": (current or {}).get("recorded_at"),
+        "history": [
+            {k: r[k] for k in ("revision", "state", "note", "decision_sk", "recorded_at", "recorded_by") if k in r} for r in ordered
+        ],
+    }

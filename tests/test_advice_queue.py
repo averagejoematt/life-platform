@@ -296,12 +296,25 @@ def test_shape_most_answerable_first_and_nothing_called_a_link(run):
         "owner_notes": ["WORDS#2026-11-04#aaaaaaaaaaaa"],
     }
     assert top["answerability"] == 6
-    assert set(top) == {"coach_id", "coach", "ask_id", "asked_on", "due", "ask", "grader_status", "same_window_ids", "answerability"}
+    assert set(top) == {
+        "coach_id",
+        "coach",
+        "ask_id",
+        "asked_on",
+        "due",
+        "ask",
+        "grader_status",
+        "same_window_ids",
+        "answerability",
+        "your_answer",
+    }
+    assert all(a["your_answer"] is None for a in res["asks"]), "no answer recorded in the fixture: none is shown, none proposed"
     assert res["his_words"]["owner_notes_not_shown"] == 1 and len(res["his_words"]["owner_notes"]) == 1
     assert res["context_not_evidence"]["label"].startswith("context, not evidence")
     assert "not a link" in res["how_to_record"]
-    blob = json.dumps(res)
-    for state in ("acted_on", "declined", "partially_followed"):
+    # how_to_record names the vocabulary he answers in; nothing else in the answer spells (proposes) a state
+    blob = json.dumps({k: v for k, v in res.items() if k != "how_to_record"})
+    for state in ("acted_on", "declined", "partially_followed", "not_yet_decided"):
         assert state not in blob
 
 
@@ -331,3 +344,20 @@ def test_cap_payload_trims_context_before_asks():
     taq.cap_payload(out, limit=1500)
     assert out["truncated"]["context"] is True and out["truncated"]["asks"] is False
     assert len(out["asks"]) == 5 and len(json.dumps(out)) <= 1500
+
+
+def test_his_current_answer_rides_the_ask_and_answered_asks_go_last():
+    """Owner-side only: the current state (not_yet_decided included) and the revision count, never the note."""
+    asks = [
+        {"coach_id": "sleep_coach", "ask_id": "commit_20261102_a", "asked_on": "", "due": "2026-11-09"},
+        {"coach_id": "sleep_coach", "ask_id": "commit_20261102_b", "asked_on": "", "due": "2026-11-08"},
+        {"coach_id": "sleep_coach", "ask_id": "commit_20261102_c", "asked_on": "", "due": "2026-11-07"},
+    ]
+    answers = {
+        ("sleep_coach", "commit_20261102_a"): {"state": "acted_on", "recorded_at": "2026-11-10T00:00:00.000Z", "revisions": 2},
+        ("sleep_coach", "commit_20261102_b"): {"state": "not_yet_decided", "recorded_at": "2026-11-10T00:00:00.000Z", "revisions": 1},
+    }
+    ranked = taq.rank_asks(asks, [], [], [], answers)
+    assert [a["ask_id"] for a in ranked] == ["commit_20261102_b", "commit_20261102_c", "commit_20261102_a"]
+    assert ranked[2]["your_answer"] == {"state": "acted_on", "recorded_at": "2026-11-10T00:00:00.000Z", "revisions": 2}
+    assert ranked[1]["your_answer"] is None

@@ -46,6 +46,11 @@ METRIC_SOURCES = {
     "blood_glucose_avg": "apple_health",
     "blood_glucose_std_dev": "apple_health",
     "body_fat_pct": "dexa",
+    # Hevy's own per-session total (sum of weight x reps over the sets that carry both — hevy_common.normalize_workout),
+    # read verbatim off each performed WORKOUT# row. A gym visit is ONE Hevy session (Hevy is the one routine source;
+    # every Strava/watch/HealthKit copy is an echo and is never read here). Already served publicly per session by
+    # /api/workouts (``total_volume_kg``); ``row_is_reading`` below keeps routines, plans and load-free sessions out.
+    "total_volume_kg": "hevy",
 }
 
 # DERIVED — every measurable metric is, by definition, one the evaluator can source.
@@ -78,7 +83,32 @@ METRIC_SUBDOMAIN = {
     "total_calories_kcal": "calories",
     "total_protein_g": "protein",
     "steps": "training",
+    "total_volume_kg": "training",
 }
+
+# Which stored rows are READINGS of a metric, beyond carrying the field (the grader and the brief share this rule):
+#   * ``ROW_SK_MARKER`` — the metric is read only off rows whose sort key carries the marker: for Hevy, a performed
+#     workout (``DATE#<day>#WORKOUT#<id>``). A routine, a pre-draft, a planned session or a legacy daily aggregate is
+#     never a reading, so a plan is never counted as performed.
+#   * ``ZERO_IS_NO_READING`` — a 0 is not a reading of the metric: a Hevy session with no loaded set (a treadmill-only
+#     or mobility-only visit) carries total_volume_kg 0 and is not a lifting session.
+ROW_SK_MARKER = {"total_volume_kg": "#WORKOUT#"}
+ZERO_IS_NO_READING = frozenset({"total_volume_kg"})
+
+
+def row_is_reading(rec, metric_key):
+    """True when the stored row is a reading of ``metric_key`` under the rules above (the field's presence is the
+    caller's own check). Every metric without a rule: True."""
+    base = base_metric(metric_key)
+    marker = ROW_SK_MARKER.get(base)
+    if marker and marker not in str((rec or {}).get("sk") or ""):
+        return False
+    if base in ZERO_IS_NO_READING:
+        try:
+            return float((rec or {}).get(base)) != 0.0
+        except (TypeError, ValueError):
+            return False
+    return True
 
 
 def base_metric(metric_key):
@@ -123,6 +153,7 @@ _METRIC_HINT_NORMALIZERS = (
     ("postprandial glucose", "blood_glucose_avg"),
     ("post-meal glucose", "blood_glucose_avg"),
     ("body fat", "body_fat_pct"),
+    ("lifting volume", "total_volume_kg"),  # never bare "volume": Zone 2 / walking / cardio volume is not Hevy's lift total
     ("step count", "steps"),
     ("daily steps", "steps"),
     ("recovery score", "recovery_score"),

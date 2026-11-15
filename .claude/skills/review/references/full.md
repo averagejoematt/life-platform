@@ -5,9 +5,12 @@ verification pass. **The ADR-099 filing contract lives in exactly ONE place —
 `.claude/agents/issue-filer.md` — and is never restated here or in any other rubric.** This file
 owns the **panel, the modes, the artifact filenames and the bar** for the full product review.
 
-**Clocks:** `fullreview-delta` (weekly) and `fullreview-full` (monthly) in
-`scripts/operating_calendar.py`. The monthly probe deliberately ignores `_delta`/`_partial`
-filenames — only a suffix-free grades file resets it.
+**Clock:** `fullreview-full` (monthly) in `scripts/operating_calendar.py`. The probe deliberately
+ignores `_delta`/`_partial` filenames — only a suffix-free grades file resets it. Owner ruling
+2026-11-13: the weekly `fullreview-delta` clock is retired. A full run is also owed after a material
+architectural or publication-policy change and whenever the owner asks; a serious privacy or
+integrity incident owes a focused `/review <lens>`. Delta mode (below) remains a defined procedure,
+run on request, never on a clock.
 
 ## What this lens grades
 
@@ -99,9 +102,9 @@ evidence rule, same `finding-verifier` pass, same disposition.
 the last run — this rubric rewritten, the panel changed, the anchors restructured — then a delta
 measures the rubric moving, not the platform. Do not run it. Run a full and record it as a **new
 baseline** (suffix-free artifact, `method` naming what invalidated the comparison), and record the
-skipped delta as a dated `hold` on the `fullreview-delta` entry in `scripts/operating_calendar.py`
-so the clock is discharged by a written decision rather than a silent lapse. This happened on
-2026-08-27 — the precedent is in the registry, with its reason.
+decision in the grades file's `method`, so the choice is a written decision rather than a silent
+lapse. (While the weekly clock existed, 2026-08-27 and 2026-09-19, the skipped delta was recorded
+as a dated `hold` on its calendar entry; that entry was retired 2026-11-13.)
 
 ## Carried grades expire at 28 days (#3603)
 

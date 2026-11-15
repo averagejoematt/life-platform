@@ -3,7 +3,7 @@ name: qa
 description: "Run a QA sweep of averagejoematt.com to catch broken pages, stale data and rendering issues, across smoke, API-freshness, visual and AI-vision modes. Use after a site deploy, or when something on the site looks wrong."
 user-invocable: true
 argument-hint: "[tier1 | smoke | freshness | visual | ai | page <path>]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task, Agent, TodoWrite
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, TodoWrite
 ---
 
 Run a QA sweep of averagejoematt.com to check for broken pages, stale data, and rendering issues.

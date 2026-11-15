@@ -65,7 +65,15 @@ from decimal import Decimal
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
 from health import maintenance_week as _maint
-from health.calorie_target import TITRATION_PK, TITRATION_SK_PREFIX, _day, record_predates_retarget, week_monday
+from health.calorie_target import (
+    BAND_UPLIFT_PATH,
+    TITRATION_PK,
+    TITRATION_SK_PREFIX,
+    _day,
+    record_predates_retarget,
+    titrated_band,
+    week_monday,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -157,6 +165,10 @@ def settings(charter_reader: Optional[CharterReader] = None) -> Dict[str, Any]:
         "records_from_version": cal.get("records_from_version"),
         "target_kcal": _num(cal.get("target_kcal")),
         "band_kcal": [_num(band[0]), _num(band[1])] if isinstance(band, (list, tuple)) and len(band) == 2 else None,
+        # the titrated band's rule values (#5794, owner ruling 2026-11-13): both day-type floors and the lifting uplift
+        "floor_any_day_kcal": _num(cal.get("floor_any_day_kcal")),
+        "floor_lifting_day_kcal": _num(cal.get("floor_lifting_day_kcal")),
+        "band_uplift_kcal": _num(read(BAND_UPLIFT_PATH)),
         "minimum_kcal": _num(cal.get("planned_minimum_any_weight_kcal")),
         "dead_man_armed_from": (t.get("dead_man") or {}).get("armed_from") if isinstance(t.get("dead_man"), dict) else None,
         "charter_version": version if isinstance(version, str) else None,
@@ -429,16 +441,20 @@ def _stepped(out: Dict[str, Any], c: Mapping[str, Any], reason: str, detail: str
 
 
 def _with_band(out: Dict[str, Any], c: Mapping[str, Any]) -> Dict[str, Any]:
-    """``kcal`` (the resolver's field) = the new target; the calorie band = the charter's prescribed band moved by the
-    same offset the titration has moved the target from the charter's opening target."""
+    """``kcal`` (the resolver's field) = the new target; the calorie band = ``calorie_target.titrated_band`` (owner
+    ruling 2026-11-13, #5794): the charter's band when the target has not moved, else [max(base, any-day floor),
+    max(base + lifting uplift, lifting-day floor)], so both day-type floors stay inside it on every step."""
     kcal = out.get("new_target_kcal")
     out["kcal"] = kcal
-    band, target = c.get("band_kcal"), c.get("target_kcal")
-    if kcal is not None and band and None not in band and target is not None:
-        off = kcal - target
-        out["band_low"], out["band_high"] = int(band[0] + off), int(band[1] + off)
-    else:
-        out["band_low"] = out["band_high"] = None
+    band = titrated_band(
+        kcal,
+        target=c.get("target_kcal"),
+        band=c.get("band_kcal"),
+        floor_any=c.get("floor_any_day_kcal"),
+        floor_lift=c.get("floor_lifting_day_kcal"),
+        uplift=c.get("band_uplift_kcal"),
+    )
+    out["band_low"], out["band_high"] = band if band else (None, None)
     return out
 
 

@@ -423,7 +423,10 @@ def test_the_sweep_and_the_orphan_leg_read_one_constant():
     assert npd.STALE_DRAFT_DAYS is routine_repo.ORPHAN_DRAFT_DAYS == 14
     assert routine_repo.stale_draft_census.__defaults__[0] == routine_repo.ORPHAN_DRAFT_DAYS
     src = inspect.getsource(q.check_orphan_routine_drafts)
-    assert "older_than_days=ORPHAN_DRAFT_DAYS" in src and "older_than_days=7" not in src
+    # 2026-11-13: the leg judges one sweep run later (the sweep is 19:00 PT, the leg 11:30 PT), so a draft turning 14
+    # is archived before it can warn; the age is still the ONE constant, plus the one run between.
+    assert "days = ORPHAN_DRAFT_DAYS + SWEEP_LAG_DAYS" in src and "older_than_days=days" in src and "older_than_days=7" not in src
+    assert q.SWEEP_LAG_DAYS == 1
 
 
 def test_a_draft_at_the_shared_age_is_archived_and_no_longer_counted_one_day_younger_is_neither():

@@ -303,7 +303,9 @@ REPLAY_SEMANTICS: dict[str, tuple[str, str]] = {
     "mark_journal_quote": (CONTENT_KEY, "QUOTE#{date}#{sha256(norm(quote))[:10]} — the in-repo precedent this change copied"),
     "log_advice_link": (
         DETERMINISTIC_KEY,
-        "ADVICELINK#<decision-ts>#<kind>#<coach>#<ref> from the call's own args; an identical replay is read first and writes nothing (#5612)",
+        "ADVICELINK#<decision-ts>#<kind>#<coach>#<ref> from the call's own args; an identical replay is read first and writes nothing (#5612). "
+        "A coach ask's answer appends ASKRESPONSE#<coach>#<ask>#<ts> revisions by design, but reads the newest first: a replay of the "
+        "same answer writes nothing",
     ),
     "update_decision_outcome": (DETERMINISTIC_KEY, "updates the caller-supplied DECISION# sk in place; no new row is ever created"),
     "update_insight_outcome": (DETERMINISTIC_KEY, "updates the caller-supplied INSIGHT# sk in place; no new row is ever created"),

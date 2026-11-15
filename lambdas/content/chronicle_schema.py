@@ -461,6 +461,18 @@ def is_withdrawn(inst) -> bool:
     return str((inst or {}).get("sk", "")) in WITHDRAWN_SKS
 
 
-def off_the_list(inst) -> bool:
-    """True when an installment stays out of the public reading list: unlisted on its row, or withdrawn."""
-    return bool((inst or {}).get("unlisted")) or is_withdrawn(inst)
+def is_unpublished(inst) -> bool:
+    """True unless the row's status is ``published`` — a draft, a ``changes_requested`` hold or a row with no status.
+
+    Fail closed: a held installment's title and excerpt reached the public reading list when a LATER week published,
+    because the manifest was rebuilt from every row in the phase (Week 10, 2026-11-14)."""
+    return str((inst or {}).get("status") or "").strip().lower() != "published"
+
+
+def off_the_list(inst, *, publishing: bool = False) -> bool:
+    """True when an installment stays out of the public reading list: unlisted on its row, withdrawn, or not yet
+    published. ``publishing`` exempts the one row being published right now from the status test only — its row still
+    reads ``draft`` when the manifest is built. The week-NN URL sequence is NOT filtered by this: it runs over every
+    visible row, so a held week keeps its slot and no published link moves."""
+    inst = inst or {}
+    return bool(inst.get("unlisted")) or is_withdrawn(inst) or (not publishing and is_unpublished(inst))

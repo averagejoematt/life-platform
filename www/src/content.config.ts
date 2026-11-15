@@ -78,6 +78,12 @@ const chapters = defineCollection({
     // the program week's explicit interval (/api/chapters), null for a prologue — never inferred from `date`
     week_start: z.string().regex(ISO_DAY).nullable(),
     week_end: z.string().regex(ISO_DAY).nullable(),
+    // a published chapter's TRUE dates (/api/chapters, published weeks only): the owner's approval as a Pacific day,
+    // and the days the chapter covers (its "Day A to Day B" stats line). `date` is the chronicle's DATA date. Null when
+    // not served — a page then never calls `date` the publication date.
+    published_at: z.string().regex(ISO_DAY).nullable(),
+    covers_start: z.string().regex(ISO_DAY).nullable(),
+    covers_end: z.string().regex(ISO_DAY).nullable(),
     excerpt: z.string().nullable(),
     body_html: z.string().nullable(),
     word_count: z.number().int().nullable(),
@@ -252,6 +258,19 @@ const coaches = defineCollection({
       })
       .nullable(),
     comparison_text: z.string().nullable(),
+    versus_guess: z
+      .object({
+        kinds: z.array(
+          z.object({
+            kind: z.enum(["number", "direction", "yes_no", "sealed"]),
+            scored: z.number().int(),
+            coach_right: z.number().int(),
+            rule_right: z.number().int(),
+            verdict: z.string(),
+          }),
+        ),
+      })
+      .nullable(),
     quality: z
       .object({ clean: z.number().int(), flagged: z.number().int(), unassessed: z.number().int(), n: z.number().int(), by_flag: z.record(z.number().int()) })
       .nullable(),
@@ -326,7 +345,7 @@ const workout = z
   })
   .strict();
 const device = z
-  .object({ night_of: z.string().regex(ISO_DAY).nullable(), hours: n, deep_hours: n, rem_hours: n, light_hours: n, score: n })
+  .object({ night_of: z.string().regex(ISO_DAY).nullable(), hours: n, deep_hours: n, rem_hours: n, light_hours: n, score: n, provisional: z.boolean().nullable() })
   .strict()
   .nullable();
 const night = z

@@ -3,7 +3,7 @@ name: deploy
 description: "Deploy a Lambda function, the public site, or the whole fleet as one bundle. Use when shipping code to AWS, after merging a change that needs to reach production, or when asked to deploy, redeploy or roll back a specific function."
 user-invocable: true
 argument-hint: "[lambda <name> | site | fleet]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task, Agent, TodoWrite
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, TodoWrite
 ---
 
 Deploy a Lambda function, the site, or the fleet (one full-tree bundle, #781).

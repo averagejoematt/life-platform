@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.49.0",
+  "version": "1.51.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -167,7 +167,7 @@
       "version": "1.25.0",
       "date": "2026-10-24",
       "by": "owner ruling 2026-10-18 on epic #5120 (mind panel review): 'Core-12 is the CALCULATION set (the score, character sheet and coaches read it); ALL other habits are RETAINED - renamed where duplicated or misleading - never archived or deleted for now.' The twelve are the #5124 acceptance list; how each is read is a platform default, pending his ruling",
-      "what": "#5124: habits.core, the core-12 calculation set as data (weigh in; food logged; calories in band; protein at or above the floor; steps at or above the floor; planned session done; evening check-in; no alcohol; no solo takeout; no sweets or fried food; out of bed on time; one connection), each with its basis: the Habitify check-in of the registry entries that carry its id as their `core` flag, the resolved day's steps against steps.floor, the evening check-in row, or health.wake_consistency against sleep.wake_time (the #5133 rule). Resolved in one place, health.core_habits: the habit score, the character sheet's mind habit component and the daily coaches' missed-habit lines read it once any registry entry is flagged; every other habit stays tracked and visible (habits.retained). No new number.",
+      "what": "#5124: habits.core, the core-12 calculation set as data (weigh in; food logged; calories in band; protein at or above the floor; steps at or above the floor; planned session done; evening check-in; no alcohol; no solo takeout; a food restraint (named privately); out of bed on time; one connection), each with its basis: the Habitify check-in of the registry entries that carry its id as their `core` flag, the resolved day's steps against steps.floor, the evening check-in row, or health.wake_consistency against sleep.wake_time (the #5133 rule). Resolved in one place, health.core_habits: the habit score, the character sheet's mind habit component and the daily coaches' missed-habit lines read it once any registry entry is flagged; every other habit stays tracked and visible (habits.retained). No new number.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     },
     {
@@ -326,16 +326,30 @@
     },
     {
       "version": "1.48.0",
+      "date": "2026-11-13",
+      "by": "owner ruling 2026-11-13 on #5794 (the titrated band rule, follow-up to the 1.46.0 entry)",
+      "what": "A titration step no longer moves prescribed_band_kcal by the same offset as the target (that rule pushed one day type out of band on any step: a step down to 1,350 gave [1450, 1750], leaving a 1,900 lifting day out). A titrated band is [max(base, floor_any_day_kcal), max(base + nutrition.training_day.lifting_uplift_kcal, floor_lifting_day_kcal)]: the served rest day and the served lifting day, so both day-type floors always sit inside it. With no step the band is prescribed_band_kcal unchanged ([1600, 1900]). One rule, health.calorie_target.titrated_band: the weekly titration engine writes it and the resolver re-derives it from a record's base, so a record stamped under the retired rule cannot serve it. Planned maintenance dates keep their own maintenance band.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.49.0",
+      "date": "2026-11-14",
+      "by": "owner ruling 2026-11-14 (redact private habit names from the current public repository)",
+      "what": "One core-12 habit's label is replaced by a neutral description, 'a food restraint (named privately)': the habit is private by name (docs/DATA_GOVERNANCE.md, restraint categories). Its id and its scoring are unchanged; the original label is kept off-repo.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.50.0",
       "date": "2026-11-12",
       "by": "owner ruling 2026-11-12 on #5856 (option B), carried by #5857",
       "what": "The concession ledger's nippard `rotation` promise (stage 1's weekly rotation commitment, training/week_commitments.py) accepts a pick held at a phase boundary only when it is the single servable member of its slot's best quality band (selection_engine.top_band, the exercise library's S-D quality tiers, #5857); the hold is recorded on the rotation row. A slot whose best band has two or more members still rotates, and the selection ranks the member that slot served least recently first. No key or number in this file changes.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     },
     {
-      "version": "1.49.0",
+      "version": "1.51.0",
       "date": "2026-11-12",
       "by": "owner ruling 2026-11-12 on #5857 (all eight board recommendations adopted)",
-      "what": "concession_ledger.dan_john.in_return gains 'a free-weight press, pull, squat and hinge weekly': stage 1's weekly commitments (training/week_commitments.py, row free_weight_compounds) BLOCK a program week that serves no free-weight compound in any one of the four patterns (anchors count), read from the exercise library's job / pattern / resistance profile. Ruling B (1.48.0) is amended: a pick held at a phase boundary is accepted only when it is the single servable member of the slot's S and A bands (both programmable). No number changes.",
+      "what": "concession_ledger.dan_john.in_return gains 'a free-weight press, pull, squat and hinge weekly': stage 1's weekly commitments (training/week_commitments.py, row free_weight_compounds) BLOCK a program week that serves no free-weight compound in any one of the four patterns (anchors count), read from the exercise library's job / pattern / resistance profile. Ruling B (1.50.0) is amended: a pick held at a phase boundary is accepted only when it is the single servable member of the slot's S and A bands (both programmable). No number changes.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -543,7 +557,7 @@
       },
       {
         "id": "no_sweets_or_fried",
-        "label": "no sweets or fried food",
+        "label": "a food restraint (named privately)",
         "basis": "habitify"
       },
       {
@@ -1536,7 +1550,7 @@
       "planned_minimum_any_weight_kcal": 1400,
       "records_from_version": "1.21.0",
       "resolver": "health.calorie_target.resolve",
-      "reading": "target_kcal is the day's calorie target (owner ruling R1 2026-10-23: stay ~1,500). A titration record for the week outranks it, unless it was written under a charter version before records_from_version (a record from before the re-target is not the base). The served target is CLAMPED at the day's floor (owner ruling 2026-11-11, #5794, option A): a lifting day is never served under floor_lifting_day_kcal and every other day never under floor_any_day_kcal (the rest-day floor); base_kcal keeps the titrated base and floor_clamp_kcal states the lift. floor_role ('warning') governs the GRADING of logged days: the critics grade logged days against the floors, visibly, never as a veto. The lifting-day and any-day floors grade single days; the 7-day-mean floor is reported, not enforced. prescribed_band_kcal is the calorie habit's floor and ceiling (#5099): since owner ruling 2026-11-11 (#5794) it runs from the any-day floor to the lifting-day floor, so an on-plan rest or lifting day reads in band; a titration record moves it by the same offset it moves the target.",
+      "reading": "target_kcal is the day's calorie target (owner ruling R1 2026-10-23: stay ~1,500). A titration record for the week outranks it, unless it was written under a charter version before records_from_version (a record from before the re-target is not the base). The served target is CLAMPED at the day's floor (owner ruling 2026-11-11, #5794, option A): a lifting day is never served under floor_lifting_day_kcal and every other day never under floor_any_day_kcal (the rest-day floor); base_kcal keeps the titrated base and floor_clamp_kcal states the lift. floor_role ('warning') governs the GRADING of logged days: the critics grade logged days against the floors, visibly, never as a veto. The lifting-day and any-day floors grade single days; the 7-day-mean floor is reported, not enforced. prescribed_band_kcal is the calorie habit's floor and ceiling (#5099): since owner ruling 2026-11-11 (#5794) it runs from the any-day floor to the lifting-day floor, so an on-plan rest or lifting day reads in band; a titration step re-derives it (owner ruling 2026-11-13, #5794): [max(base, floor_any_day_kcal), max(base + nutrition.training_day.lifting_uplift_kcal, floor_lifting_day_kcal)], so both day-type floors always sit inside it; with no step it is this band unchanged.",
       "provenance": "owner",
       "derived_by": "owner ruling 2026-10-23 R1 (#5091) on the target and the band; the floors are the red-team consensus 2026-09-22 (physician + nutritionist), kept as warnings by the same ruling",
       "stated": "2026-10-23"

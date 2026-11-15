@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-10-11T22:19:31.415062+00:00",
+  "captured_at": "2026-11-13T18:14:41.730906+00:00",
   "fetch_path": "/api/calls",
   "is_prefix_sample": false,
   "path": "/api/calls",
@@ -36,6 +36,9 @@
                 "text": {
                   "type": "string"
                 },
+                "unit": {
+                  "type": "string"
+                },
                 "value": {
                   "type": "number"
                 }
@@ -70,6 +73,12 @@
               "type": "string"
             },
             "logged_date": {
+              "type": "string"
+            },
+            "observed_on": {
+              "type": "string"
+            },
+            "observed_on_text": {
               "type": "string"
             },
             "records": {
@@ -110,7 +119,7 @@
                 },
                 "type": "object"
               },
-              "length_sample": 2,
+              "length_sample": 1,
               "type": "array"
             },
             "sealed": {
@@ -118,30 +127,6 @@
             },
             "settled_date": {
               "type": "string"
-            },
-            "sides": {
-              "items": {
-                "keys": {
-                  "claim": {
-                    "type": "string"
-                  },
-                  "coach_id": {
-                    "type": "string"
-                  },
-                  "coach_name": {
-                    "type": "string"
-                  },
-                  "right": {
-                    "type": "boolean"
-                  },
-                  "said": {
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              },
-              "length_sample": 2,
-              "type": "array"
             },
             "simple_guess": {
               "keys": {
@@ -183,9 +168,6 @@
               },
               "type": "object"
             },
-            "topic": {
-              "type": "string"
-            },
             "verdict": {
               "type": "string"
             },
@@ -193,14 +175,9 @@
               "type": "string"
             }
           },
-          "optional": [
-            "sides",
-            "tolerance",
-            "topic"
-          ],
           "type": "object"
         },
-        "length_sample": 55,
+        "length_sample": 65,
         "type": "array"
       },
       "count": {
@@ -216,16 +193,10 @@
               "a direction read out of commentary, not a call sealed before day one": {
                 "type": "integer"
               },
-              "graded as no movement by a trend check that reads only the most recent readings": {
-                "type": "integer"
-              },
               "graded on a day the sentence does not name": {
                 "type": "integer"
               },
               "the sentence does not state the number or direction that was graded": {
-                "type": "integer"
-              },
-              "the sentence was conditional or hedged": {
                 "type": "integer"
               }
             },
@@ -238,21 +209,12 @@
         "type": "object"
       },
       "method": {
-        "type": "object",
         "keys": {
-          "version": {
-            "type": "integer"
-          },
           "effective": {
             "type": "string"
           },
-          "note": {
-            "type": "string"
-          },
           "history": {
-            "type": "array",
             "items": {
-              "type": "object",
               "keys": {
                 "effective": {
                   "type": "string"
@@ -263,11 +225,20 @@
                 "version": {
                   "type": "integer"
                 }
-              }
+              },
+              "type": "object"
             },
-            "length_sample": 2
+            "length_sample": 2,
+            "type": "array"
+          },
+          "note": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
           }
-        }
+        },
+        "type": "object"
       },
       "next": {
         "keys": {
@@ -275,31 +246,10 @@
             "type": "string"
           },
           "as_of": {
-            "type": "string"
+            "type": "null"
           },
           "data": {
-            "keys": {
-              "coach_names": {
-                "items": {
-                  "type": "string"
-                },
-                "length_sample": 2,
-                "type": "array"
-              },
-              "due_date": {
-                "type": "string"
-              },
-              "kind": {
-                "type": "string"
-              },
-              "question": {
-                "type": "string"
-              },
-              "text": {
-                "type": "string"
-              }
-            },
-            "type": "object"
+            "type": "null"
           },
           "source": {
             "type": "string"
@@ -325,6 +275,5 @@
     },
     "type": "object"
   },
-  "status": 200,
-  "_note": "2026-11-05 (owner ruling): `method` added \u2014 the call publication method every public count of calls is under."
+  "status": 200
 }

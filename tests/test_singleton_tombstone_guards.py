@@ -640,12 +640,14 @@ def _what_changed_body(item):
 _WC_PILOT = {
     "deltas": [{"label": "sleep", "delta": 0.4, "direction": "up"}],
     # metric_a / metric_b as the producer writes them (diff_newly_unlocked): a pair is published by its
-    # metrics' classification, and one with no metrics is unclassified (owner rulings 2026-11-03/05).
+    # metrics' classification, and one with no metrics is unclassified (owner rulings 2026-11-03/05). Two public,
+    # non-method-versioned metrics: a habit_pct / day_grade pair also needs public-method weeks to be "new" (2026-11-12,
+    # tests/test_what_changed_public_method_baseline.py), which this get_item-only fake does not carry.
     "newly_unlocked": [
         {
-            "label": "habit_pct_vs_day_grade",
-            "metric_a": "habit_pct",
-            "metric_b": "day_grade",
+            "label": "steps_vs_hrv",
+            "metric_a": "steps",
+            "metric_b": "hrv",
             "r": 0.8777,
             "n": 20,
             "first_seen": "2026-06-30",
@@ -682,7 +684,7 @@ def test_what_changed_still_serves_the_current_cycle():
     """The guard must not break the feature — a clean record serves normally."""
     body = _what_changed_body({"phase": "experiment", **_WC_PILOT})
     assert body["honest_null"] is False
-    assert body["newly_unlocked"][0]["label"] == "habit_pct_vs_day_grade"
+    assert body["newly_unlocked"][0]["label"] == "steps_vs_hrv"
     assert body["week"] == "2026-W27"
 
 

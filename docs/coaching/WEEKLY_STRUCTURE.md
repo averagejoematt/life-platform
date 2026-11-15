@@ -2,7 +2,7 @@
 
 > **Status:** analysis and proposal. **Nothing here changes the live program.** `program_structure.SESSION_TEMPLATES`, the
 > charter's `split` and the session sequence are untouched; every refinement below is an owner decision.
-> **Written:** 2026-11-12, against charter 1.49.0 and the session-time model of #5799 (99 s per set, measured).
+> **Written:** 2026-11-12, against charter 1.51.0 and the session-time model of #5799 (99 s per set, measured).
 > **Part of:** epic #5861 (lane L5). Companion module: `lambdas/health/rate_policy.py` (the loss-rate interface, last section).
 
 ## The question

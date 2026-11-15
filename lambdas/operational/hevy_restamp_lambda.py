@@ -83,13 +83,12 @@ def _ssm_get(name: str, default: str = "") -> str:
 
 
 def _emit_metric(metric_name: str, value: float = 1.0, unit: str = "Count") -> None:
-    try:
-        _cw.put_metric_data(
-            Namespace="LifePlatform/HevyRoutine",
-            MetricData=[{"MetricName": metric_name, "Value": value, "Unit": unit}],
-        )
-    except Exception as e:
-        logger.warning(f"metric emit failed for {metric_name}: {e}")
+    """#5888: log-only. The eight Restamp* outcomes were put to LifePlatform/HevyRoutine as unalarmed,
+    undashboarded series (one live, seven more reachable) that pushed the namespace over its census budget; every
+    outcome is already the handler's returned status dict and a log line, which is what is read. The one alarmed
+    series in the namespace per job (TemplateIndexRebuilt, PredraftOutcome, ...) is unaffected. A future alarm
+    that needs an outcome re-adds a put_metric_data here, in one place, with a ledger row."""
+    logger.info(f"restamp outcome={metric_name} value={value}")
 
 
 def _target_date_for_event(event: dict[str, Any]) -> str:

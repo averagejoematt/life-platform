@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T06:47:34.497546+00:00",
+  "captured_at": "2026-11-13T18:14:41.730906+00:00",
   "fetch_path": "/api/sleep_detail",
   "is_prefix_sample": false,
   "path": "/api/sleep_detail",
@@ -25,13 +25,13 @@
       "sleep_detail": {
         "keys": {
           "30d_avg_efficiency": {
-            "type": "null"
+            "type": "number"
           },
           "30d_avg_recovery": {
-            "type": "null"
+            "type": "number"
           },
           "30d_avg_score": {
-            "type": "null"
+            "type": "number"
           },
           "as_of_date": {
             "type": "string"
@@ -58,6 +58,9 @@
             "type": "string"
           },
           "avg_window_days": {
+            "type": "integer"
+          },
+          "avg_window_nights": {
             "type": "integer"
           },
           "days_tracked": {
@@ -103,6 +106,9 @@
               },
               "total_sleep_hours": {
                 "type": "number"
+              },
+              "vendor_incomplete": {
+                "type": "boolean"
               }
             },
             "type": "object"
@@ -136,6 +142,9 @@
               "trend_sleep_start_tz": {
                 "type": "string"
               },
+              "vendor_incomplete_note": {
+                "type": "string"
+              },
               "whoop_hours_source": {
                 "type": "string"
               }
@@ -153,6 +162,9 @@
           },
           "night_of": {
             "type": "string"
+          },
+          "nights_vendor_incomplete": {
+            "type": "integer"
           },
           "recovery_night_of": {
             "type": "null"
@@ -183,6 +195,9 @@
           },
           "total_sleep_hours": {
             "type": "number"
+          },
+          "vendor_incomplete": {
+            "type": "boolean"
           },
           "whoop": {
             "keys": {
@@ -257,6 +272,9 @@
                 "deep_pct": {
                   "type": "number"
                 },
+                "discounted": {
+                  "type": "boolean"
+                },
                 "light_hours": {
                   "type": "number"
                 },
@@ -280,8 +298,23 @@
                 },
                 "total_sleep_hours": {
                   "type": "number"
+                },
+                "vendor_incomplete": {
+                  "type": "boolean"
                 }
               },
+              "optional": [
+                "deep_hours",
+                "deep_pct",
+                "discounted",
+                "light_hours",
+                "light_pct",
+                "rem_hours",
+                "rem_pct",
+                "sleep_efficiency_pct",
+                "sleep_score",
+                "total_sleep_hours"
+              ],
               "type": "object"
             },
             "hours": {
@@ -355,7 +388,7 @@
           },
           "type": "object"
         },
-        "length_sample": 13,
+        "length_sample": 29,
         "type": "array"
       }
     },

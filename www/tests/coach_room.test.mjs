@@ -1,5 +1,5 @@
 // The Coaching Room's coach profiles (src/lib/coach_room.js, CR2): carried values only, the withheld rule, the
-// "what Matt did" rule, the docket from one coach's side, and the record labelled as first graded.
+// "what Matt did" rule, the docket from one coach's side, and the record labelled as graded now.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -10,6 +10,8 @@ import {
   NOT_PUBLISHED,
   WHAT_MATT_DID,
   askCountsText,
+  didSummary,
+  didWords,
   askRows,
   callsByDay,
   coachRecord,
@@ -97,6 +99,45 @@ test("the asks: the producer's tally carried as served, and every row's 'what Ma
   assert.equal(rows[3].checked, "not recorded");
 });
 
+test("what Matt did: his self-reported answer prints with its day; every other ask reads not recorded (owner 2026-11-12)", () => {
+  const entry = clone(sleep());
+  entry.asks.rows[0].did = { state: "acted_on", responded_on: "2026-11-14", self_reported: true };
+  entry.asks.rows[1].did = { state: "declined", responded_on: "2026-11-15", self_reported: true };
+  entry.asks.rows[2].did = { state: "partially_followed", responded_on: "2026-11-16", self_reported: true };
+  const rows = askRows(entry);
+  assert.deepEqual(
+    rows.map((r) => r.did),
+    ["acted on · self-reported 14 November 2026", "declined · self-reported 15 November 2026", "partly followed · self-reported 16 November 2026", "not recorded"],
+  );
+  assert.equal(didSummary(rows), "what Matt did: 3 of 4 answered, self-reported");
+  assert.equal(didSummary(askRows(sleep())), "what Matt did: not recorded", "the committed fixture has no answer: every row not recorded");
+  // a missing answer is never declined; a private or unknown state, an unmarked or undated answer: not recorded
+  for (const bad of [
+    undefined,
+    null,
+    { state: "not_yet_decided", responded_on: "2026-11-14", self_reported: true },
+    { state: "withdrawn", responded_on: "2026-11-14", self_reported: true },
+    { state: "acted_on", responded_on: "2026-11-14", self_reported: false },
+    { state: "acted_on", responded_on: null, self_reported: true },
+    { state: "toString", responded_on: "2026-11-14", self_reported: true },
+  ]) {
+    assert.equal(didWords(bad), WHAT_MATT_DID, JSON.stringify(bad));
+  }
+});
+
+test("what Matt did prints only the state, the day and 'self-reported' — a planted note never renders (must-fail control)", () => {
+  const SENTINEL = "SENTINEL-PRIVATE-7f3a9c";
+  const did = { state: "acted_on", responded_on: "2026-11-14", self_reported: true, note: SENTINEL, history: [SENTINEL] };
+  const entry = clone(sleep());
+  entry.asks.rows[0].did = did;
+  entry.asks.rows[0].outcome_notes = "";
+  const printed = JSON.stringify(askRows(entry).map((r) => r.did));
+  assert.ok(!printed.includes(SENTINEL));
+  assert.ok(printed.includes("acted on · self-reported 14 November 2026"));
+  // the control: the detector sees the sentinel when a renderer prints the object whole
+  assert.ok(JSON.stringify(entry.asks.rows[0].did).includes(SENTINEL));
+});
+
 test("the docket from this coach's side: its bet, its frozen stake, how it ended; withheld claims stay withheld", () => {
   const names = { sleep_coach: "Lisa Park", nutrition_coach: "Nathan Reeves" };
   const [d] = docketRows(sleep(), "sleep_coach", (id) => names[id]);
@@ -133,10 +174,10 @@ test("the calls by day: newest day first, each call keeps its own word, a disput
   assert.equal(disputed.corrected, true);
 });
 
-test("the record is labelled as first graded, carries its interval, and never computes a percentage", () => {
+test("the record is labelled as graded now, carries its interval, and never computes a percentage", () => {
   const cc = CAL.calibration.coaches.find((x) => x.coach_id === "sleep");
   const r = coachRecord(cc, null);
-  assert.match(r.line, /, as first graded$/);
+  assert.match(r.line, /, as graded now$/);
   assert.ok(r.interval.startsWith("95% interval") || r.interval === "no interval served");
   const planted = clone(cc);
   planted.accuracy_pct = 12.3; // deliberately not confirmed/n

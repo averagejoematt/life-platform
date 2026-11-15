@@ -76,6 +76,7 @@ _PART_I = {
     "stats_line": "Prologue",
     "word_count": 1242,
     "content_markdown": "Filed in the days before Day 1.",
+    "status": "published",
     "has_board_interview": False,
 }
 _PART_II = {
@@ -86,6 +87,7 @@ _PART_II = {
     "stats_line": "Prologue",
     "word_count": 1129,
     "content_markdown": "The habit tracker logged a 2 out of 100.",
+    "status": "published",
     "has_board_interview": True,
 }
 _PART_III = {
@@ -96,6 +98,7 @@ _PART_III = {
     "stats_line": "Prologue",
     "word_count": 1578,
     "content_markdown": "This morning a scale in a quiet bathroom recorded the first number.",
+    "status": "published",
     "has_board_interview": False,
 }
 

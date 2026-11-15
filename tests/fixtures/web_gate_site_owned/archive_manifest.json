@@ -1,0 +1,13 @@
+{
+  "_note": "Synthetic stand-in for /archive/manifest.json (#5920): the published archive document the /privacy/policy/ panel reads. site/-owned (the nightly writes it), so the v9 render gate serves this fixture at that exact path; shape copied from the live document, values invented.",
+  "schema": "public-archive/1",
+  "generated_at": "2026-10-31T07:00:00Z",
+  "entry_count": 1234,
+  "archive": {
+    "bytes": 10485760,
+    "path": "/archive/latest.tar.gz",
+    "root": "public-archive-sample",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "terms_version": "1.1.0"
+}

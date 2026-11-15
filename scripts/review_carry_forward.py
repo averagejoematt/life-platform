@@ -23,7 +23,13 @@ The assembler for the carried set, and the reader of a run's planted-control res
   from the carried set and surfaced as "expired, re-verify or refile";
 * ``calibration_verdict`` / ``calibrated_run`` — a run whose verifiers CONFIRMED a planted
   false finding is UNCALIBRATED, and an uncalibrated run is not evidence that the ritual
-  happened, so it does not advance the ritual's clock.
+  happened, so it does not advance the ritual's clock;
+* ``withheld_missed_lenses`` — the withheld-issue control scored PER ROW (#5914). A planted
+  false finding tests the verifiers, who see every row, so a confirmed one fails the run. A
+  withheld issue tests ONE grader's recall in ONE area, so a miss fails that row: the lens
+  keeps its expired from-scratch date and every other lens in the run advances. Two
+  consecutive full runs (2026-10-31, 2026-11-13) refuted every planted control and were
+  still voided whole — 17 rows each — by a single row's miss.
 
 It lives beside ``scripts/operating_calendar.py`` rather than inside it because that file
 is at its module-size ceiling (#1665) — the calendar imports these names and keeps owning
@@ -64,6 +70,10 @@ GRADES_RE = re.compile(r"^fullreview_grades_(\d{4}-\d{2}-\d{2})(?:_delta|_partia
 CALIBRATED = "CALIBRATED"
 UNCALIBRATED = "UNCALIBRATED"  # verifiers confirmed a planted false finding — the run is not evidence
 UNSTATED = "UNSTATED"  # the artifact carries no calibration block (every run before #3603)
+# #5914: the verifiers passed every planted control and at least one lens found (or was not
+# given) a withheld issue, but at least one lens missed its own. The run counts; the lenses
+# that missed do not advance.
+PARTIAL = "PARTIALLY_CALIBRATED"
 # #3919 (2026-09-20): calibration is MANDATORY for every review run from the day #3603's
 # planted controls landed. An UNSTATED artifact dated on/after this day is treated as a
 # MISSING run — it neither advances a lens's from-scratch date nor satisfies a review clock.
@@ -95,14 +105,59 @@ def artifact_date(path: str, run: dict | None = None) -> date | None:
 _DATE_IN_TEXT = re.compile(r"(\d{4}-\d{2}-\d{2})")
 
 
+def _issue_set(value) -> set[str]:
+    return {str(v).strip() for v in value if str(v).strip()} if isinstance(value, (list, tuple, set)) else set()
+
+
+def withheld_missed_lenses(run: dict) -> set[str] | None:
+    """The lenses that missed a withheld issue of their OWN, or None when the artifact does
+    not attribute its withheld issues to lenses (#5914).
+
+    The per-row shape is `calibration.withheld_known_issues.by_lens`:
+    ``{"security": {"withheld": ["#5543"], "found": [], "missed": ["#5543"]}}``. None means
+    "this artifact cannot be scored per row" and the caller falls back to the run-level
+    rule, so every artifact committed before #5914 keeps the verdict it had.
+
+    Attribution has to be COMPLETE to count. If `missed_by_graders` names an issue that no
+    lens's `missed` list owns, the artifact is claiming a miss nobody is accountable for —
+    that is the run-level shape wearing a per-row label, and it is scored as the run-level
+    shape (None). A lens that lists an issue as withheld and as neither found nor missed
+    has an unreported outcome, which is a miss: silence is not a pass.
+    """
+    cal = run.get("calibration")
+    withheld = cal.get("withheld_known_issues") if isinstance(cal, dict) else None
+    by_lens = withheld.get("by_lens") if isinstance(withheld, dict) else None
+    if not isinstance(by_lens, dict) or not by_lens:
+        return None
+    missed_lenses: set[str] = set()
+    owned: set[str] = set()
+    for lens, row in by_lens.items():
+        if not isinstance(row, dict):
+            return None
+        missed = _issue_set(row.get("missed")) | (_issue_set(row.get("withheld")) - _issue_set(row.get("found")))
+        owned |= missed
+        if missed:
+            missed_lenses.add(str(lens).strip().lower())
+    if _issue_set(withheld.get("missed_by_graders")) - owned:
+        return None
+    return missed_lenses
+
+
 def calibration_verdict(run: dict) -> str:
-    """CALIBRATED / UNCALIBRATED / UNSTATED for one grades JSON.
+    """CALIBRATED / PARTIALLY_CALIBRATED / UNCALIBRATED / UNSTATED for one grades JSON.
 
     UNCALIBRATED is claimed two ways and either is enough: the run says so in
     `calibration.verdict`, or its own numbers say so (a planted false finding that came
     back CONFIRMED, or a withheld known issue nothing found). A run grading its own
     controls green while its numbers say otherwise is exactly the failure mode the
     controls exist to catch, so the numbers win.
+
+    The two controls test different things and so fail different things (#5914). A planted
+    false finding CONFIRMED is a verifier asleep, and verifiers read every row: the run is
+    UNCALIBRATED. A withheld issue missed is one grader's recall in one area: when the
+    artifact attributes every miss to its lens (`withheld_missed_lenses`), the run is
+    PARTIALLY_CALIBRATED — it counts, and those lenses do not advance. With no attribution,
+    or when every graded lens missed, the old run-level rule stands.
     """
     cal = run.get("calibration")
     if not isinstance(cal, dict):
@@ -113,8 +168,13 @@ def calibration_verdict(run: dict) -> str:
     withheld = cal.get("withheld_known_issues") or {}
     if isinstance(planted, dict) and planted.get("confirmed_by_verifiers"):
         return UNCALIBRATED
-    if isinstance(withheld, dict) and withheld.get("missed_by_graders"):
-        return UNCALIBRATED
+    missed_lenses = withheld_missed_lenses(run)
+    if missed_lenses is None:
+        if isinstance(withheld, dict) and withheld.get("missed_by_graders"):
+            return UNCALIBRATED
+    elif missed_lenses:
+        graded = {str(k).strip().lower() for k in (run.get("lenses") or {})} - set(carried_lenses(run))
+        return PARTIAL if graded - missed_lenses else UNCALIBRATED
     return CALIBRATED if str(cal.get("verdict", "")).strip().upper() == CALIBRATED else UNSTATED
 
 
@@ -183,6 +243,9 @@ def scratch_dates(runs: list[tuple[date, dict]]) -> dict[str, date | None]:
         # #3919: a run that does not count (UNCALIBRATED, or UNSTATED after the cutoff) grades
         # nothing from scratch — it may still SEED a lens through a citation, never advance one.
         graded = ({str(k).strip().lower() for k in (run.get("lenses") or {})} - set(carried)) if run_counts(run, run_date) else set()
+        # #5914: a lens that missed its own withheld issue was not graded by an instrument
+        # anyone can vouch for — the run counts, that row does not.
+        graded -= withheld_missed_lenses(run) or set()
         for lens in graded:
             if lens not in out or out[lens] is None or run_date > out[lens]:
                 out[lens] = run_date
@@ -267,6 +330,9 @@ def carry_forward_report(today: date, repo: str = REPO) -> tuple[list[str], list
             f"   calibration UNSTATED on a run dated {newest_date} ≥ {CALIBRATION_REQUIRED_FROM} — calibration is mandatory; "
             "this artifact counts as a MISSING run and advances nothing (#3919)."
         )
+    elif verdict == PARTIAL:
+        held = ", ".join(sorted(withheld_missed_lenses(newest) or ()))
+        lines.append(f"   the run counts; these lenses missed their own withheld issue and did NOT advance (#5914): {held}")
     if not expired:
         lines.append("   ✅ every graded lens is within the cap.")
         return lines, expired

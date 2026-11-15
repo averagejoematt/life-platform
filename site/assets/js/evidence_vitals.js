@@ -9,18 +9,27 @@ import { esc, tryJSON, isBad, has, fmt, fig, figs, sec, empty } from "/assets/js
 // Live Pulse — current status narrative + daily vitals trends (the old /live).
 // ── /data/vitals/ — the landing page, glance-first, three altitudes. "An instant, honest
 // tell at the top; the full documentary as you scroll." `d` = /api/pulse.
+// #5953 (2026-11-14): Number(null) and Number("") are 0, so a day the strap served no reading for was read as a
+// reading of zero — the 7-day rings fell to 44 bpm against a 49 bpm minimum and the grid printed 0% / 0 ms / 0 bpm.
+// Every read in this module goes through `finite`: a number, or null for a missing reading, never a zero.
+export const finite = (x) => (x == null || x === "" || typeof x === "boolean" ? null : Number.isFinite(Number(x)) ? Number(x) : null);
+
 // P0.1 — decompose the day into 4 component reads (recovery / HRV / RHR / sleep). Each becomes
 // a ring whose fill is the metric's own value or its position in the recent range. tone: ember
 // = good, muted = neutral/forming, alert = reserved RED STATE (run-down) — NEVER for direction
 // (RHR-down / HRV-up read ember-positive even as the line falls).
 export function _vitalsComponents(p, hist) {
   const g = (p && p.glyphs) || {};
-  const last = hist.length ? hist[hist.length - 1] : {};
-  const num = (x) => (Number.isFinite(Number(x)) ? Number(x) : null);
-  const recPct = num((g.recovery || {}).recovery_pct) ?? num(last.recovery_pct);
-  const hrv = num((g.recovery || {}).hrv_ms) ?? num(last.hrv_ms);
-  const rhr = num((g.recovery || {}).rhr_bpm) ?? num(last.rhr_bpm);
-  const sleep = num((g.sleep || {}).hours) ?? num(last.sleep_hours);
+  const num = finite;
+  // "last night" is the latest row that HAS the reading, never a still-empty today (#5953)
+  const latest = (k) => {
+    for (let i = hist.length - 1; i >= 0; i--) if (num(hist[i][k]) != null) return num(hist[i][k]);
+    return null;
+  };
+  const recPct = num((g.recovery || {}).recovery_pct) ?? latest("recovery_pct");
+  const hrv = num((g.recovery || {}).hrv_ms) ?? latest("hrv_ms");
+  const rhr = num((g.recovery || {}).rhr_bpm) ?? latest("rhr_bpm");
+  const sleep = num((g.sleep || {}).hours) ?? latest("sleep_hours");
   const col = (k) => hist.map((h) => num(h[k])).filter((v) => v != null);
   const rangePos = (val, arr, invert) => {
     if (val == null || arr.length < 2) return 0.5;
@@ -70,7 +79,7 @@ export function vitalsStatusRead(comps, p, dayNum) {
 // P0.2 — now vs 7-day vs 30-day ladder under each ring: "am I above/below my own normal?"
 // The 30-day baseline honestly reads "fills in" until 30 days exist. Aligns with the ring grid.
 export function vitalsLadder(comps, hist) {
-  const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+  const num = finite;
   const col = (k) => hist.map((h) => num(h[k])).filter((v) => v != null);
   const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
   const map = { recovery: "recovery_pct", hrv: "hrv_ms", rhr: "rhr_bpm", sleep: "sleep_hours" };
@@ -242,7 +251,11 @@ export async function renderPulse(d) {
     `<p class="rd-meta label">Resting heart rate and HRV are the two halves of one autonomic signal. RHR's axis is <strong>inverted</strong> so a falling resting HR reads as a rising line — because down is good. Both climbing together = the parasympathetic "rest &amp; repair" side taking over: the body downshifting. Last night's read; n=1, early moves partly water/novelty.</p>`));
   parts.push(vitalsReadinessDecomposed(comps)); // P1.3 — recovery broken into its drivers
   // ── ALTITUDE 3 — the analysis ──
-  const qpts = hist.slice(-8).map((h, i, a) => ({ strain: Number(h.strain), recovery: Number(h.recovery_pct), date: h.date, today: i === a.length - 1 }));
+  // a day missing either reading is left out of the snapshot, never placed at zero (#5953)
+  const qpts = hist
+    .slice(-8)
+    .map((h, i, a) => ({ strain: finite(h.strain), recovery: finite(h.recovery_pct), date: h.date, today: i === a.length - 1 }))
+    .filter((q) => q.strain != null && q.recovery != null);
   parts.push(sec("Autonomic balance — where the body's sat lately", // P2.1 — 2x2 snapshot
     `<div class="aq-wrap">${autonomicQuadrant(qpts)}</div>` +
     `<p class="rd-meta label">Day strain against recovery, the last ${qpts.length} days — recovered <em>and</em> training hard is flow; depleted and still pushing is stress. A snapshot of the spread, not a trajectory; no arrow drawn at this n.</p>`));
@@ -290,7 +303,7 @@ export function vitalsSmallMultiples(hist, baselineChange = null) {
     { k: "steps", lbl: "steps", unit: "", frame: "same-day", dp: 0 },
   ];
   const cells = SM.map((m) => {
-    const dated = hist.map((h) => ({ v: Number(h[m.k]), d: h.date })).filter((p) => Number.isFinite(p.v));
+    const dated = hist.map((h) => ({ v: finite(h[m.k]), d: h.date })).filter((p) => p.v != null);
     const vals = dated.map((p) => p.v);
     const bc = HR_DERIVED.has(m.k) ? baselineChange : null;
     if (vals.length < 2) return `<div class="sm-cell"><div class="sm-head"><span class="sm-lbl">${esc(m.lbl)}</span><span class="sm-frame label">${esc(m.frame)}</span></div><p class="sm-empty label">fills in</p></div>`;

@@ -10,8 +10,9 @@
 // producer's. Two rules from the owner bind every function below:
 //   * a withheld read shows the API's OWN withheld message when the row carries one, and otherwise only that its
 //     words are not published — never a paraphrase, never a guess at what it said;
-//   * "what Matt did" is an owner-asserted, evidence-only advice link that no public route serves, so it reads
-//     "not recorded" everywhere — it is never inferred from timing or from the data moving the way an ask wanted.
+//   * "what Matt did" is Matthew's OWN answer to an ask (owner 2026-11-12): the row's `did` {state, responded_on,
+//     self_reported} when he answered acted on / declined / partly followed, and "not recorded" for every other ask —
+//     never inferred from timing or from the data moving the way an ask wanted, and a missing answer is never "declined".
 import { callOutcome, dayInWords, kOfN, num } from "./format.js";
 import { instantInWords } from "./corrections.js";
 import { isDisputed } from "./disputed.js";
@@ -26,10 +27,26 @@ export const NOT_PUBLISHED = {
   claim: "The words of this side are not published.",
 };
 
-/** What Matt did, for every ask and every call: no public route serves an advice link (owner ruling 2026-11-02). */
+/** What Matt did with an ask he has not answered — and with every ask whose answer is not one of DID_WORDS. */
 export const WHAT_MATT_DID = "not recorded";
 export const WHAT_MATT_DID_NOTE =
-  "Whether Matt acted on an ask is recorded only when he links a decision to it himself, with evidence. None of those links is published, so every row reads “not recorded”. The site never infers it from timing, or from the data moving the way the ask wanted.";
+  "What Matt did with an ask is shown only when he answers it himself: acted on, declined or partly followed, with the day he answered, marked self-reported. Every other ask reads “not recorded”: an ask without an answer is never read as declined, and the site never infers it from timing, or from the data moving the way the ask wanted.";
+
+/** The only answers a page prints (owner 2026-11-12). Anything else — a private state, a malformed row — is not recorded. */
+export const DID_WORDS = { acted_on: "acted on", declined: "declined", partially_followed: "partly followed" };
+
+/** "acted on · self-reported 14 November 2026", or "not recorded". Only a dated, self-reported, known answer prints. */
+export function didWords(did) {
+  if (!did || did.self_reported !== true || !Object.hasOwn(DID_WORDS, did.state)) return WHAT_MATT_DID;
+  const day = dayInWords(did.responded_on);
+  return day ? `${DID_WORDS[did.state]} · self-reported ${day}` : WHAT_MATT_DID;
+}
+
+/** The summary line for a coach's asks: "not recorded" until he has answered at least one shown ask. */
+export function didSummary(rows) {
+  const answered = (rows || []).filter((r) => r.did !== WHAT_MATT_DID).length;
+  return answered ? `what Matt did: ${answered} of ${rows.length} answered, self-reported` : `what Matt did: ${WHAT_MATT_DID}`;
+}
 
 /** An ISO day or instant inside a served sentence, in words ("no sensor since 2026-10-12" → "… 12 October 2026"). */
 export function datesInWords(text) {
@@ -152,7 +169,7 @@ export function askRows(entry) {
       checked: checkWords(a.check) || "not recorded",
       text: words.text,
       message: words.message,
-      did: WHAT_MATT_DID,
+      did: didWords(a.did),
     };
   });
 }
@@ -249,14 +266,14 @@ export function correctionArrow(c) {
 
 /**
  * The record a reader meets on the coach's record page: the calibration file's entry for this coach (its Wilson
- * interval, its comparison with a simple guess), labelled AS FIRST GRADED — no re-verified split is served per coach,
+ * interval, its comparison with a simple guess), labelled AS GRADED NOW (corrections applied, #5951: 22 of the 95 decided calls carry a correction, so it is not the first grading) — no re-verified split is served per coach,
  * so this is never a validated headline. Falls back to the coach page's served record line; null when neither exists.
  */
 export function coachRecord(calCoach, card) {
   if (calCoach && Number.isInteger(calCoach.n)) {
     return {
       from: "calibration",
-      line: `${kOfN(calCoach.confirmed, calCoach.n)}, as first graded`,
+      line: `${kOfN(calCoach.confirmed, calCoach.n)}, as graded now`,
       pct: pct(calCoach.accuracy_pct),
       interval: intervalText(calCoach.accuracy_ci95) || "no interval served",
       skill: (((calCoach.comparison || {}).skill) || {}).sentence || null,
@@ -270,7 +287,7 @@ export function coachRecord(calCoach, card) {
   if (card && Number.isInteger(card.n)) {
     return {
       from: "coach",
-      line: `${kOfN(card.right, card.n)}, as first graded`,
+      line: `${kOfN(card.right, card.n)}, as graded now`,
       pct: null,
       interval: "no interval served",
       skill: card.skill_sentence || null,

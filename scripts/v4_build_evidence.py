@@ -180,7 +180,7 @@ REGISTRY = [
     (
         "vices",
         "Vice streaks",
-        "Days held across the tracked vices — shown honestly, named privately.",
+        "Days held across the tracked vices, shown honestly. Only the alcohol and takeout ones are named; the rest are counted.",
         "Mind & accountability",
         "data",
         "/api/vice_streaks",

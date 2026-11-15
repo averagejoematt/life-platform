@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { heartChart, heartWeeks, ladderRows, ordinal, paceBar, plainMean, rungChapters, visceralBand } from "../src/lib/journey.js";
+import { heartChart, heartWeeks, journeyChart, ladderRows, monthStep, ordinal, paceBar, plainMean, rungChapters, visceralBand } from "../src/lib/journey.js";
 
 test("the pace bar places the published rate and its interval on one scale; zero inside the interval is said", () => {
   const p = paceBar({ weekly_rate_lbs: -3.65, weekly_rate_ci_low: -4.05, weekly_rate_ci_high: -3.36 });
@@ -116,4 +116,40 @@ test("the visceral band on the previous site's scale, and ordinals", () => {
   assert.equal(visceralBand(3.21), "elevated");
   assert.equal(visceralBand(null), null);
   assert.deepEqual([1, 2, 3, 11, 12, 13, 22, 99].map(ordinal), ["1st", "2nd", "3rd", "11th", "12th", "13th", "22nd", "99th"]);
+});
+
+// The live shape on 12 November: 68 days of weigh-ins from 6 September and a projection wedge out to 28 August
+// 2027 — a twelve-month axis. At 390 px (a ~350-unit viewBox) one-month ticks put 'Feb' on 'Mar' (the render gate,
+// live build). The month labels on the axis line must clear each other by the gate's own measure at every width.
+test("the journey's month ticks thin by the width they have: no two axis labels collide on a phone, none dropped on a desktop", () => {
+  const days = Array.from({ length: 68 }, (_, i) => {
+    const d = new Date(Date.UTC(2026, 8, 6 + i)).toISOString().slice(0, 10);
+    return { date: d, value: 327 - i * 0.52, present: true, gap: false };
+  });
+  const journey = {
+    start_weight_lbs: 327.3, goal_weight_lbs: 185, start_date: "2026-09-06",
+    projected_goal_date: "2027-07-25", projected_goal_date_latest: "2027-08-28", projected_goal_date_earliest: "2027-07-09",
+  };
+  const base = { days, journey, rungs: [], markers: [], chapters: [], unit: "lb", decimals: 1, frame: "distance", range: null,
+    show: { mean: true, projection: true, rungs: true, chapters: false, events: true } };
+  const axis = (svg, fs) => {
+    const h = Number(/viewBox="0 0 [\d.]+ ([\d.]+)"/.exec(svg)[1]);
+    return [...svg.matchAll(/<text x="([\d.]+)" y="([\d.]+)" text-anchor="middle"[^>]*>([A-Z][a-z]{2})<\/text>/g)]
+      .filter((m) => Number(m[2]) === h - 9)
+      .map((m) => ({ x: Number(m[1]), s: m[3], w: m[3].length * fs * 0.6 }));
+  };
+  for (const width of [320, 343, 350, 358]) {
+    const ticks = axis(journeyChart({ ...base, mobile: true, width }), 12.5);
+    assert.ok(ticks.length >= 3, `${width}: the axis still names months (${ticks.length})`);
+    for (let i = 1; i < ticks.length; i++) {
+      const gap = ticks[i].x - ticks[i].w / 2 - (ticks[i - 1].x + ticks[i - 1].w / 2);
+      assert.ok(gap >= 2, `${width}: '${ticks[i - 1].s}' and '${ticks[i].s}' collide (gap ${gap.toFixed(1)})`);
+    }
+  }
+  const wide = axis(journeyChart({ ...base, mobile: false }), 11);
+  assert.deepEqual(wide.map((x) => x.s), ["Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug"], "a desktop keeps every month");
+  // the step is calendar-regular, and a month a tick is kept wherever the width allows it
+  assert.equal(monthStep(30 * 864e5, 300, 12.5), 1);
+  assert.ok([2, 3].includes(monthStep(356 * 864e5, 302, 12.5)));
+  assert.equal(monthStep(356 * 864e5, 1042, 11), 1);
 });

@@ -1,0 +1,27 @@
+{
+  "id": "2026-10-31-weekly-priority-brought-him-from-305-lbs",
+  "issue": "#5933",
+  "review": "docs/reviews/FULLREVIEW_2026-10-31.md aiq.A.3 / docs/reviews/FULLREVIEW_2026-11-13.md aiq-1",
+  "captured_at": "2026-10-31T17:02:21Z",
+  "surface": "/api/coaching-dashboard weekly_priority.text (generated 2026-10-31T17:02:21Z, day 56, cycle-17 genesis 2026-09-06)",
+  "verbatim": false,
+  "verbatim_note": "The clause is byte for byte what docs/reviews/fullreview_grades_2026-10-31.json quotes from the served text; the rest of the paragraph was not archived, so the sentence around the clause is not reproduced.",
+  "status": "caught",
+  "gate": "composite",
+  "expect_type": "stale_baseline",
+  "specimen": "sustained a 3.9 lb per week fat loss that has brought him from 305 lbs to 296.1 lbs",
+  "control": "sustained a 3.9 lb per week fat loss that has brought him from 327.3 lbs to 296.1 lbs",
+  "inputs": {
+    "allowed": [
+      3.9,
+      296.1,
+      305,
+      305.4,
+      327.3
+    ],
+    "generation_date_iso": "2026-10-31",
+    "start_date_iso": "2026-09-06",
+    "baseline_lbs": 327.34
+  },
+  "why_it_passed_then": "305 was a real mid-cycle weigh-in, so the number class passed it from the allow-list, and stale_baseline matched framing WORDS (starting weight, started at) — the origin idiom 'brought him from X lbs to Y lbs' carries none, so an unlabelled window read as the journey start (327.3) with every gate green."
+}

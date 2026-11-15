@@ -692,7 +692,11 @@ REGISTRY = {
         # MacroFactor stub) yields NO reading instead of its pre-filled default, so the
         # trailing series is shorter on such days and the 9-observation floor applies to
         # logged days only. Non-behavioral metrics are untouched.
-        "fec01b467e15",
+        # Re-recorded 2026-11-12 (public brief, Hevy). METHOD unchanged, prose re-read: same EWMA, same ±2% band, same
+        # 9-observation floor. What moved is `_extract_metric_series`: a row the metric's reading rule excludes
+        # (`measurable_metrics.row_is_reading` — for Hevy's total_volume_kg, a non-WORKOUT# row such as a routine or a
+        # plan, or a session with no load) yields NO reading. Every other metric is untouched.
+        "32c9d5498a53",
         min_n=9,
         used_by=(
             "Coach prediction grading \u2014 since #4617 only a direction call with no filing date "

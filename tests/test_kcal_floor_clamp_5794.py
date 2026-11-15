@@ -82,7 +82,8 @@ def test_the_charter_states_the_ruling():
     assert REREAD["ruled_on"] == "2026-11-11" and REREAD["reread_on"] == DAY_14
     assert REREAD["decide_below_lb_per_wk"] == 3.0
     # found by lookup, never by position or a pinned version: the driver stacks concurrent charter bumps at merge
-    (log,) = [e for e in tc.charter_value("change_log") if "#5794" in e["by"]]
+    log, band_rule = [e for e in tc.charter_value("change_log") if "#5794" in e["by"]]  # the clamp, then the titrated band
+    assert "max(base + nutrition.training_day.lifting_uplift_kcal, floor_lifting_day_kcal)" in band_rule["what"]
     have = tuple(int(x) for x in tc.charter_value("version").split("."))
     assert tuple(int(x) for x in log["version"].split(".")) <= have
     assert "[1400, 1600] -> [1600, 1900]" in log["what"], "the habit-band raise is recorded in the same entry"
@@ -158,3 +159,81 @@ def test_control_a_moved_reread_edge_is_caught(monkeypatch):
         assert _reread_offenders(), f"a re-read moved to {moved} was not caught"
     monkeypatch.setattr(nc, "charter_value", lambda p, *a: None if p == nc.FLOOR_CLAMP_REREAD_PATH else real(p, *a))
     assert {d["state"] for d in _decisions(DAY_14, 2.0)} == {"unevaluable"}, "an unreadable rule is named, never a pass"
+
+
+# ── the titrated band (owner ruling 2026-11-13, #5794) ──────────────────────────────────────────────────────────
+# A titration step re-derives the band as [max(base, any-day floor), max(base + lifting uplift, lifting-day floor)]; with
+# no step it is the charter's band unchanged. The retired rule moved both edges by the step.
+
+
+def _same_offset_band(base, *, target, band, floor_any, floor_lift, uplift):
+    """The RETIRED rule, patched back in by the must-fail controls: both edges moved by the step."""
+    if base is None or target is None or not band:
+        return None
+    return int(band[0] + base - target), int(band[1] + base - target)
+
+
+def _band_offenders():
+    """Each titrated week the ruling names: (record base, what must hold). Reported, never stopped at the first."""
+    floor_any, floor_lift = _floor("rest"), _floor("lifting")
+    charter_band = tuple(tc.charter_value("nutrition.calories.prescribed_band_kcal"))
+    bad = []
+    for base in (1350, 1550, 1650, 1500):
+        rec = {"kcal": base, "charter_version": tc.charter_value("version")}
+        days = {t: ct.resolve(WEEK[0], titration_reader=lambda week, r=rec: r, day_type=t) for t in ("lifting", "rest")}
+        lo, hi = days["rest"]["band_low"], days["rest"]["band_high"]
+        served = {t: r["kcal"] for t, r in days.items()}
+        out = [t for t, k in served.items() if not lo <= k <= hi]
+        if out:
+            bad.append(f"base {base}: served {served} out of band [{lo}, {hi}] on {out}")
+        if base <= floor_any and not lo <= floor_any <= hi:
+            bad.append(f"base {base}: the rest-day floor {floor_any} is out of band [{lo}, {hi}]")
+        if not lo <= floor_lift <= hi:
+            bad.append(f"base {base}: the lifting-day floor {floor_lift} is out of band [{lo}, {hi}]")
+        if base == tc.charter_value("nutrition.calories.target_kcal") and (lo, hi) != charter_band:
+            bad.append(f"no step: band [{lo}, {hi}] is not the charter's {charter_band}")
+    return bad
+
+
+def test_a_titrated_band_keeps_both_day_types_in_band_and_no_step_leaves_it_unchanged():
+    assert not _band_offenders(), _band_offenders()
+    down = ct.resolve(WEEK[0], titration_reader=lambda week: {"kcal": 1350}, day_type="lifting")
+    assert (down["band_low"], down["band_high"], down["kcal"]) == (1600, 1900, 1900), "a step down keeps the 1,900 lifting day in"
+    up = ct.resolve(WEEK[0], titration_reader=lambda week: {"kcal": 1550}, day_type="rest")
+    assert (up["band_low"], up["band_high"]) == (1600, 1900), "a step up to 1,550 keeps the rest-day floor in band"
+    same = ct.resolve(WEEK[0], titration_reader=lambda week: {"kcal": 1500}, day_type="rest")
+    assert (same["band_low"], same["band_high"]) == tuple(tc.charter_value("nutrition.calories.prescribed_band_kcal")) == (1600, 1900)
+
+
+def test_the_band_ceiling_is_the_named_lifting_uplift_not_a_literal():
+    assert ct.BAND_UPLIFT_PATH == "nutrition.training_day.lifting_uplift_kcal"
+    uplift = tc.charter_value(ct.BAND_UPLIFT_PATH)
+    hi = ct.titrated_band(2000, target=1500, band=[1600, 1900], floor_any=1600, floor_lift=1900, uplift=uplift)[1]
+    assert hi == 2000 + uplift, "above the floors, the ceiling is the base's own lifting day"
+
+
+def test_the_engine_writes_the_same_band_the_resolver_serves():
+    from health import titration as ti
+
+    c = ti.settings()
+    for base in (1350, 1500, 1650):
+        out = ti._with_band({"new_target_kcal": base}, c)
+        served = ct.resolve(WEEK[0], titration_reader=lambda week, b=base: {"kcal": b})
+        assert (out["band_low"], out["band_high"]) == (served["band_low"], served["band_high"]), base
+
+
+def test_control_the_retired_same_offset_band_is_caught(monkeypatch):
+    """Must-fail: the old rule (both edges moved by the step), patched back into the resolver, reds the same sweep — a
+    step down leaves the lifting day out, a step up leaves the rest day out."""
+    monkeypatch.setattr(ct, "titrated_band", _same_offset_band)
+    bad = _band_offenders()
+    assert any("base 1350" in b and "lifting" in b for b in bad), bad
+    assert any("base 1650" in b and "rest" in b for b in bad), bad
+
+
+def test_control_the_engine_on_the_retired_rule_is_caught(monkeypatch):
+    from health import titration as ti
+
+    monkeypatch.setattr(ti, "titrated_band", _same_offset_band)
+    out = ti._with_band({"new_target_kcal": 1350}, ti.settings())
+    assert not out["band_low"] <= _floor("lifting") <= out["band_high"], "the retired rule must leave the lifting floor out"

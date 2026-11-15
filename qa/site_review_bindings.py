@@ -719,6 +719,34 @@ PAGE_BINDINGS.append(
         "endpoints": [],  # editorial
     }
 )
+# Sprint III (2026-11-14): the moments that explain it — a stranger's way in, built from the publication snapshot
+# (journey, chapters, coaches, calibration, lab); each moment links its evidence.
+PAGE_BINDINGS.append(
+    {
+        "path": "/story/moments/",
+        "name": "Story · the moments that explain it (v9)",
+        "door": "story",
+        "narrative_order": 109.5,
+        "story_intent": "the few documented moments that best explain the experiment so far, numbered on The Line, each tied to its evidence",
+        "endpoints": [
+            {"url": "/api/journey", "role": "primary", "metrics": []},
+            {"url": "/api/chapters", "role": "primary", "metrics": []},
+        ],
+    }
+)
+# #5920: the maintained policy at its own address — the owner's text from the generated twin (www/src/privacy/policy.json).
+PAGE_BINDINGS.append(
+    {
+        "path": "/privacy/policy/",
+        "name": "Privacy · the full policy (v9)",
+        "door": "utility",
+        "narrative_order": 97.5,
+        "story_intent": "the full, current privacy policy: subscriber data, cookies and tracking, rights, the AI disclaimer, the permanence contract",
+        # editorial; the live archive panel reads /archive/manifest.json + /archive/continuity.json (published documents,
+        # not /api/* routes — qa/qa_manifest.py carries them as this row's api_deps, so the smoke's JSON-health sweep covers them)
+        "endpoints": [],
+    }
+)
 PAGE_BINDINGS.append(
     {
         "path": "/subscribe/",

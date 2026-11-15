@@ -5,19 +5,19 @@ The defect: `/subscribe/` said "One email a week, then quiet until next
 Wednesday" and the confirmation email said "every Wednesday", while the three
 subscriber-facing senders #1951 enabled delivered up to THREE emails a week —
 weekly-signal Sunday 16:30 UTC, between-chronicle Sunday 17:00 UTC, and the
-chronicle Wednesday 15:10 UTC that, unapproved, actually lands FRIDAY 18:00 UTC
-via the 48h auto-publish sweep. Zero tests mentioned either promise literal, and
+chronicle Wednesday 15:10 UTC (which, unapproved, then landed FRIDAY 18:00 UTC via the
+48h auto-publish sweep — retired by the owner's 2026-11-13 ruling, so the promise no
+longer names a Friday). Zero tests mentioned either promise literal, and
 `qa_check_subscriber_promise` (#1951) checks the kill SWITCH, so nothing on the
 platform could see a promise that named the wrong count and the wrong day.
 
 The guards here, in the order they matter:
 
   MIRROR      every cron this module derives from equals the live `schedule=`
-              literal under its construct in cdk/stacks/email_stack.py, and
-              CHRONICLE_AUTOPUBLISH_HOURS equals the deployed env var. A mirror
+              literal under its construct in cdk/stacks/email_stack.py. A mirror
               that can go stale silently is the whole #3564 class one level down.
-  DERIVATION  the Friday a subscriber actually receives an unapproved installment
-              on is COMPUTED (draft cron + window + sweep cron), never asserted.
+  NO-FALLBACK no unapproved draft reaches a subscriber (owner ruling 2026-11-13),
+              so the promise names no fallback day and no auto-publish.
   PIN         every subscriber-facing surface — the page, the three site JS
               strings, the confirmation email, the welcome email, the onboarding
               email — carries the one rendered promise sentence, byte for byte.
@@ -29,7 +29,7 @@ The guards here, in the order they matter:
 import os
 import re
 import sys
-from datetime import date, datetime
+from datetime import date
 
 import pytest
 import schedule_rows  # noqa: E402 - tests/ is on sys.path; #4284 the schedule table
@@ -66,17 +66,6 @@ def test_each_sender_cron_matches_the_live_cdk_literal(sender):
     )
 
 
-def test_chronicle_draft_and_sweep_crons_match_the_live_cdk_literals():
-    assert sc.CHRONICLE_DRAFT_CRON == _cdk_schedule(sc.CHRONICLE_DRAFT_CONSTRUCT)
-    assert sc.CHRONICLE_APPROVE_SWEEP_CRON == _cdk_schedule(sc.CHRONICLE_APPROVE_CONSTRUCT)
-
-
-def test_autopublish_window_matches_the_live_cdk_env_var():
-    m = re.search(r'"CHRONICLE_AUTOPUBLISH_HOURS":\s*"(\d+)"', _stack_src())
-    assert m, "CHRONICLE_AUTOPUBLISH_HOURS is no longer set in email_stack.py"
-    assert sc.CHRONICLE_AUTOPUBLISH_HOURS == int(m.group(1))
-
-
 def test_the_registry_covers_exactly_the_qa_checks_subscriber_facing_senders():
     """One list of subscriber-facing senders, not two. #1951's kill-switch check and
     this module's promise renderer must never disagree about who mails a reader."""
@@ -85,28 +74,18 @@ def test_the_registry_covers_exactly_the_qa_checks_subscriber_facing_senders():
     assert sorted(s.function_name for s in sc.SUBSCRIBER_SENDERS) == sorted(SUBSCRIBER_FACING_SENDERS)
 
 
-# ── DERIVATION: the Friday is computed, not claimed ───────────────────────────
+# ── NO-FALLBACK: elapsed time never publishes (owner ruling 2026-11-13) ─────
 
 
-def test_unapproved_draft_reaches_subscribers_on_friday_derived_not_asserted():
-    """The 35-day CloudWatch record shows chronicle-email-sender delivering Friday
-    18:00 UTC (11:00 PDT), not Wednesday. That is not a schedule defect — it is the 48h
-    sweep doing exactly what it says. Derived here from the three facts that cause it;
-    every cron is Pacific wall clock since #4284 (ADR-165)."""
-    draft = datetime(2026, 8, 12, 8, 0)  # a Wednesday, the draft cron's Pacific hour
-    assert sc.chronicle_autopublish_dt(draft) == datetime(2026, 8, 14, 11, 0)  # Friday 11:00 PT
-    assert sc.weekday_name(sc.chronicle_autopublish_weekday()) == "Friday"
-
-
-def test_autopublish_weekday_moves_with_the_window(monkeypatch):
-    """Widen the review window by a day and the delivery weekday moves — proof the
-    Friday is a computation over CHRONICLE_AUTOPUBLISH_HOURS, not a literal."""
-    monkeypatch.setattr(sc, "CHRONICLE_AUTOPUBLISH_HOURS", 72)
-    assert sc.weekday_name(sc.chronicle_autopublish_weekday()) == "Saturday"
+def test_the_promise_names_no_fallback_day_and_no_auto_publish():
+    promise = sc.promise_sentence()
+    assert "auto-publish" not in promise and "unapproved" not in promise
+    assert "Friday" not in promise
+    assert not hasattr(sc, "chronicle_autopublish_weekday"), "the derived fallback day is gone with the sweep's publish"
 
 
 def test_delivery_weekdays_are_the_days_the_senders_actually_fire():
-    assert sc.delivery_weekdays() == {2, 4, 6}  # Wednesday, Friday, Sunday
+    assert sc.delivery_weekdays() == {2, 6}  # Wednesday, Sunday
     assert 2 in sc.delivery_weekdays()  # the chronicle's own cron day is still real
 
 

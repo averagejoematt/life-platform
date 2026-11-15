@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-10-10T02:32:14.933484+00:00",
+  "captured_at": "2026-11-13T18:14:41.730906+00:00",
   "fetch_path": "/api/coach/sleep_coach",
   "is_prefix_sample": true,
   "path": "/api/coach/",
@@ -104,7 +104,7 @@
         "type": "object"
       },
       "daily": {
-        "type": "string"
+        "type": "null"
       },
       "disclosure": {
         "type": "string"
@@ -156,13 +156,13 @@
                   "type": "string"
                 },
                 "outcome": {
-                  "type": "null"
+                  "type": "string"
                 },
                 "outcome_date": {
-                  "type": "null"
+                  "type": "string"
                 },
                 "outcome_notes": {
-                  "type": "null"
+                  "type": "string"
                 },
                 "record_id": {
                   "type": "string"
@@ -176,7 +176,7 @@
               },
               "type": "object"
             },
-            "length_sample": 48,
+            "length_sample": 21,
             "type": "array"
           },
           "degraded": {
@@ -186,40 +186,20 @@
             "type": "string"
           },
           "docket_positions": {
-            "items": {
-              "keys": {
-                "criterion": {
-                  "type": "string"
-                },
-                "date": {
-                  "type": "string"
-                },
-                "evidence_link": {
-                  "type": "string"
-                },
-                "kind": {
-                  "type": "string"
-                },
-                "my_claim": {
-                  "type": "string"
-                },
-                "record_id": {
-                  "type": "string"
-                },
-                "resolution_date": {
-                  "type": "string"
-                },
-                "topic": {
-                  "type": "string"
-                },
-                "versus": {
-                  "type": "string"
-                }
-              },
-              "type": "object"
-            },
-            "length_sample": 1,
+            "items": null,
+            "length_sample": 0,
             "type": "array"
+          },
+          "learning_corrections": {
+            "keys": {
+              "corrected": {
+                "type": "integer"
+              },
+              "unverified": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
           },
           "learnings": {
             "items": {
@@ -243,14 +223,32 @@
                     }
                   },
                   "optional": [
-                    "actual_value",
-                    "prediction_id",
                     "threshold"
                   ],
                   "type": "object"
                 },
                 "evidence_link": {
                   "type": "string"
+                },
+                "grade_correction": {
+                  "keys": {
+                    "corrected_at": {
+                      "type": "string"
+                    },
+                    "corrected_status": {
+                      "type": "string"
+                    },
+                    "explanation": {
+                      "type": "string"
+                    },
+                    "original_reason": {
+                      "type": "string"
+                    },
+                    "original_status": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
                 },
                 "kind": {
                   "type": "string"
@@ -268,6 +266,9 @@
                   "type": "string"
                 }
               },
+              "optional": [
+                "grade_correction"
+              ],
               "type": "object"
             },
             "length_sample": 25,
@@ -276,7 +277,7 @@
           "relationship": {
             "keys": {
               "context_summary": {
-                "type": "string"
+                "type": "null"
               },
               "date": {
                 "type": "string"
@@ -313,9 +314,6 @@
           },
           "verbatim": {
             "type": "boolean"
-          },
-          "withheld": {
-            "type": "integer"
           }
         },
         "type": "object"
@@ -372,7 +370,7 @@
             "type": "string"
           },
           "threshold": {
-            "type": "number"
+            "type": "integer"
           }
         },
         "type": "object"
@@ -411,10 +409,8 @@
               "type": "string"
             },
             "themes": {
-              "items": {
-                "type": "string"
-              },
-              "length_sample": 13,
+              "items": null,
+              "length_sample": 0,
               "type": "array"
             }
           },
@@ -548,7 +544,7 @@
                             "type": "integer"
                           },
                           "coach_right_pct": {
-                            "type": "null"
+                            "type": "number"
                           },
                           "graded": {
                             "type": "integer"
@@ -563,13 +559,13 @@
                             "type": "integer"
                           },
                           "rule_right_pct": {
-                            "type": "null"
+                            "type": "number"
                           },
                           "scored": {
                             "type": "integer"
                           },
                           "sign_test_p": {
-                            "type": "null"
+                            "type": "number"
                           },
                           "unscorable": {
                             "type": "integer"
@@ -687,7 +683,7 @@
                     "type": "string"
                   },
                   "rule_sentence": {
-                    "type": "null"
+                    "type": "string"
                   },
                   "rule_version": {
                     "type": "integer"
@@ -745,6 +741,26 @@
                     "date": {
                       "type": "string"
                     },
+                    "grade_correction": {
+                      "keys": {
+                        "corrected_at": {
+                          "type": "string"
+                        },
+                        "corrected_status": {
+                          "type": "string"
+                        },
+                        "explanation": {
+                          "type": "string"
+                        },
+                        "original_reason": {
+                          "type": "string"
+                        },
+                        "original_status": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
                     "metric": {
                       "type": "string"
                     },
@@ -755,6 +771,9 @@
                       "type": "string"
                     }
                   },
+                  "optional": [
+                    "grade_correction"
+                  ],
                   "type": "object"
                 },
                 "length_sample": 6,
@@ -832,9 +851,6 @@
             "type": "string"
           },
           "band_metric": {
-            "type": "string"
-          },
-          "confidence_note": {
             "type": "string"
           },
           "current_value": {
@@ -926,10 +942,8 @@
             "type": "object"
           },
           "set_aside_for_now": {
-            "items": {
-              "type": "string"
-            },
-            "length_sample": 3,
+            "items": null,
+            "length_sample": 0,
             "type": "array"
           },
           "source": {
@@ -975,7 +989,7 @@
           },
           "type": "object"
         },
-        "length_sample": 4,
+        "length_sample": 8,
         "type": "array"
       },
       "tier": {

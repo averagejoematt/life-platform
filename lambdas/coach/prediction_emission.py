@@ -130,6 +130,7 @@ _METRIC_UNITS = {
     "total_calories_kcal": {"kcal", "cal", "calories"},
     "total_protein_g": {"g", "grams", "gram"},
     "steps": {"steps", "step"},
+    "total_volume_kg": {"kg", "kgs"},
     "blood_glucose_avg": {"mg/dl"},
     "blood_glucose_std_dev": {"mg/dl"},
 }
