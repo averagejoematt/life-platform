@@ -2526,6 +2526,9 @@ def lambda_handler(event, context):
                     "start_weight_lbs": _start_wt,
                     "goal_weight_lbs": _goal_wt,
                     "current_weight_lbs": _curr_wt,
+                    # Review 2026-11-14 (growth-2): the reading's own date travels with it (the brief's window ends at
+                    # yesterday, so this is the latest AVAILABLE weigh-in, not today's) — the share cards print it.
+                    "weight_as_of": _weight_as_of,
                     "lost_lbs": _lost,
                     "remaining_lbs": _remain,
                     "progress_pct": _prog_pct,
@@ -2637,6 +2640,7 @@ def lambda_handler(event, context):
                     },
                     journey={
                         "current_weight_lbs": _curr_wt,
+                        "weight_as_of": _weight_as_of,
                         "lost_lbs": _lost,
                         "progress_pct": _prog_pct,
                     },
