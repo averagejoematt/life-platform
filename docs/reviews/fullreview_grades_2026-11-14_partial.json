@@ -1,0 +1,319 @@
+{
+ "date": "2026-11-14",
+ "run_id": "wf_10255c5d-c0b",
+ "method": "PARTIAL run of /review full: the `security` lens only, graded from scratch on the stronger grader, then one Opus finding-verifier batch with one planted false finding. Chosen subset, no change-surface derivation: the lens was the only one whose from-scratch date did not advance on 2026-11-13 (it missed its withheld issue). Phase 2 followed the #5914 rules: one withheld issue, pre-verified live, grader given the prior path-to-A list only. Phases 0-3 only by owner instruction; nothing filed, committed or fixed. Unfixed weaknesses are cut to their class here; full text is held privately.",
+ "headline": "security C+ (was B). 5 findings CONFIRMED, 3 REFUTED, planted control refuted, withheld #5932 found: CALIBRATED. One new P1: an input-validation gap in the MCP authorization flow (class only).",
+ "graded_sha": "926dab04416f2e65c53cd5a4eb20e6a38991b1a3",
+ "model": "grader: session model; verifier: opus (finding-verifier)",
+ "experiment_day": 70,
+ "cycle": 17,
+ "budget_tier": 1,
+ "anchor_seal": {
+  "sha256": "af9f958947dc30c8023d47553fc378e505dc01b56006afb154f183e71be96f57",
+  "resolved": {
+   "a11y_viewports": "desktop, mobile",
+   "ceiling": 215,
+   "cycle": 17,
+   "cycle_day": 70,
+   "distinct_margin": 35.0,
+   "lane_budget": 1286,
+   "min_n": 6,
+   "mobile_viewport": 390,
+   "page_count": 106,
+   "surge_ceiling": 252,
+   "type_floor_px": 11.0
+  },
+  "unobserved_placeholders": [],
+  "signed_loosenings": [],
+  "header": "REVIEW ANCHORS — sealed artifact (#3607)\n\n  artifact   docs/reviews/anchors/ANCHORS.json\n  sha256     af9f958947dc30c8023d47553fc378e505dc01b56006afb154f183e71be96f57\n  sealed_at  2026-09-21T04:51:14.637047+00:00\n  frozen_at  2026-09-20   lenses: 17\n\n  Placeholders resolved for this run:\n    ${a11y_viewports} = desktop, mobile   [qa/a11y_audit.VIEWPORTS]\n    ${ceiling} = 215   [scripts/budget_ceilings.budget_amount_usd() — the value cdk/stacks/core_stack.py synths]\n    ${cycle} = 17   [SSM /life-platform/experiment-cycle]\n    ${cycle_day} = 70   [lambdas/common/constants.EXPERIMENT_START_DATE (2026-09-06) vs 2026-11-14]\n    ${distinct_margin} = 35.0   [lambdas/ai/voice_fidelity_core._DISTINCT_MARGIN_PTS]\n    ${lane_budget} = 1286   [deploy/github_posture.json::main_required_checks_ruleset.required_status_checks[].typical_seconds (max — the checks run in parallel)]\n    ${min_n} = 6   [lambdas/ai/voice_fidelity_core.MIN_N_FOR_VERDICT]\n    ${mobile_viewport} = 390   [qa/a11y_audit.MOBILE_VIEWPORT['width']]\n    ${page_count} = 106   [qa/qa_manifest.visual_pages()]\n    ${surge_ceiling} = 252   [scripts/budget_ceilings.read_family().active_pair()]\n    ${type_floor_px} = 11.0   [qa/visual_qa.SVG_TEXT_FLOOR_PX]\n\n  Owner-signed loosenings: none — every clause is at or above the previous seal.\n\n  Every clause resolves MET (cited) / FAILED (cited) / UNOBSERVED (with the reason it\n  could not be sampled). A lens with ANY UNOBSERVED clause cannot be graded A. An extension\n  proposed during this run goes to proposed_extensions[] and does not bind this run's grade."
+ },
+ "anchor_freeze": {
+  "lens": "full",
+  "frozen_at": "2026-11-14",
+  "graded_sha": "926dab04416f2e65c53cd5a4eb20e6a38991b1a3",
+  "rubric": {
+   ".claude/skills/review/SKILL.md": "sha256:ba522256c0a89d89",
+   ".claude/skills/review/references/full.md": "sha256:d0f00ad316fcfe68"
+  },
+  "carry_forward_cap_days": 28,
+  "rule": "Anchors are FROZEN for this run: the A/C/F criteria are the text of the files fingerprinted above, at graded_sha. They may not be extended, narrowed or reworded during the run — an anchor moved inside the run that grades against it makes decay and a raised bar inseparable (#3603). Extensions land between runs, by PR."
+ },
+ "calibration": {
+  "planted_false_findings": {
+   "n": 1,
+   "confirmed_by_verifiers": [],
+   "items": {
+    "security-9": {
+     "verdict": "REFUTED",
+     "what": "claimed the config/ prefix answers unsigned requests at the S3 origin; it returns 403",
+     "verifier": "The evidence does not reproduce. An unsigned GET of https://matthew-life-platform.s3.us-west-2.amazonaws.com/config/ returns 403. An unsigned ListObjectsV2 with prefix=config/ returns AccessDenied XML, not a listing. Unsigned GETs of three real keys (checked against the read-only `list-objects-v2`) all return 403: config/board_of_directors.json, config/challenges_catalog.json and config/action_det"
+    }
+   }
+  },
+  "withheld_known_issues": {
+   "n": 1,
+   "found": [
+    "#5932"
+   ],
+   "missed_by_graders": [],
+   "by_lens": {
+    "security": {
+     "withheld": [
+      "#5932"
+     ],
+     "found": [
+      "#5932"
+     ],
+     "missed": [],
+     "found_as": [
+      "security-4"
+     ],
+     "blind": true,
+     "blind_note": "The grader was given the prior path-to-A list only. It was told not to read docs/reviews/ from 2026-10-31 on and not to query GitHub issues or PRs; #5932 was left off its do-not-refile list. Blindness rests on that instruction, not on an enforced sandbox. Another session agreed to leave the file and the issue untouched during the run.",
+     "verified_live": "2026-11-14 ~16:35Z: read of mcp/handler.py at origin/main (file unchanged since #5893): the gap #5932 tracks is present. Class only; lines held privately.",
+     "grader_model": "session model (the stronger grader; the sanctioned exception for a row carrying a withheld issue)"
+    }
+   }
+  },
+  "verdict": "CALIBRATED"
+ },
+ "lenses": {
+  "security": {
+   "area": "security",
+   "title": "Security / privacy lead",
+   "grade": "C+",
+   "grade_with_proposed": "C+",
+   "grader_grade": "C+",
+   "grader_model": "session model",
+   "reconciliation": "Grader C+, kept. Its two legs for the C.1 condition were security-1 (CONFIRMED) and a known residual on a public endpoint (REFUTED as a documented posture). One confirmed leg is enough for C range; the '+' reflects that every other sampled boundary held.",
+   "justification": "C range because one enforcement boundary is bypassable: a new, confirmed input-validation gap in the MCP authorization flow (class only), on top of the hardening gap already tracked as #5932. A.5 still fails on the known IAM items plus one new privilege-boundary weakness. Everything else sampled is strong: 21 private prefixes 403 at the origin, 147 routes and the public archive clean of the absolutes this clause sweeps for, the per-IP limiter held against 13 forged-header requests, no secret in the tree or recent history.",
+   "prior": "B",
+   "prior_from": "fullreview_grades_2026-11-13.json (PARTIALLY_CALIBRATED; this lens missed its withheld issue there)",
+   "trend_vs_prior": "down 2 (B to C+): one confirmed finding the two earlier passes did not find, not a change in the system — mcp/handler.py is unchanged since before 2026-11-13",
+   "anchors_sha256": "af9f958947dc30c8023d47553fc378e505dc01b56006afb154f183e71be96f57",
+   "clause_verdicts": [
+    {
+     "clause_id": "security.A.1",
+     "verdict": "MET",
+     "citation": "Live sweep 2026-11-14: all 147 /api/* route literals fetched (125 x 200); greps for age, birth year, genome identifiers and non-permitted category vocabulary: 0 hits. Same greps over the public archive (2,926 files): 0 hits.",
+     "reason": "Met on direct exposure. Two caveats: the governance-permitted public category appears by name (chosen posture, DATA_GOVERNANCE.md:291; the clause reword is still pending), and a documented residual (PHY-01) remains. NOTE: the same day's accuracy review found two things this clause's sweep does not look for — a clinical fact on one public page and four restraint-habit labels the governance doc keeps unnamed (#5947, #5948)."
+    },
+    {
+     "clause_id": "security.A.2",
+     "verdict": "MET",
+     "citation": "Unsigned `curl -r 0-0 https://matthew-life-platform.s3.us-west-2.amazonaws.com/<real key>` and `?list-type=2&prefix=<p>` for raw/, config/, uploads/, dashboard/, exports/, imports/, mcp-audit/, backups/, claude-memory-backup/, cloudtrail/, buddy/, story-desk/, session-artifacts/, panelcast-holds/, recap/, remediation-log/, deploys/, datadrops-archive/, dead-letter-archive/, generated/qa_archive/, generated/ -> GET=403 LIST=403 on every one. Bucket root 403; s3-website endpoint raw/ and config/ 403; reader_input/ LIST 403. `aws s3api get-bucket-policy`: Principal * GetObject only on site/* and 14 named generated/ paths.",
+     "reason": "Each probe used a real existing key (first key listed per prefix with signed read-only AWS), so a 403 is a denial, not a miss."
+    },
+    {
+     "clause_id": "security.A.3",
+     "verdict": "MET",
+     "citation": "`gitleaks git --redact --log-opts=--since=2026-09-01` (v8.30.1): 1,793 commits, 1 finding = handovers/HANDOVER_LATEST.md @4907f0a5 line 25, a Secrets-Manager field-NAME constant quoted in prose (false positive). `git grep` over 5,625 tracked files for AKIA/ASIA/sk-ant/ghp_/private-key/lp_<64hex>/Telegram/AIza shapes: 3 hits = tests/fixtures/gitleaks/planted_tokens.txt, plus .gitleaks.toml:48 and docs/DECISIONS.md:1847 (a third-party Firebase WEB key documented as public by design). Reader doors traced: submit_finding and board_question -> lambdas/web/site_api_capture_store.py:45 READER_INPUT_PREFIX='reader_input/' (role grant cdk/stacks/role_policies_serve.py:122-123; unsigned LIST 403); subscribe -> DDB subscribers partition with salted ip_hash (email_subscriber_lambda.py:421-436); votes/follows/checkins/predict/page_feedback/morning_note -> DDB only. Public archive grep for email/ip_ha",
+     "reason": "History before 2026-09-01 was not scanned (the clause says recent). The gitleaks directory scan of the working tree timed out at 10 minutes and was replaced by the pattern grep above."
+    },
+    {
+     "clause_id": "security.A.4",
+     "verdict": "FAILED",
+     "citation": "Rate-limit half PROVEN live: 13 GETs with rotating forged client-address headers returned 404 x10 then 429 x3 (limit 10/h); direct site-API Function URL GETs return 403. OAuth half FAILED: two confirmed gaps in the authorization flow, security-1 and security-4 (class only; probes held privately).",
+     "reason": "The consent gate has a spoofable boundary. Bearer checks themselves held: no bearer, a forged bearer and GET /token all returned 401."
+    },
+    {
+     "clause_id": "security.A.5",
+     "verdict": "FAILED",
+     "citation": "Live IAM over all 118 functions: the known over-broad grants tracked on #5513, #5543 and #5545 are still present; one role is shared by two edge functions (security-8); one operational role holds a broader grant than its callers (security-3, class only).",
+     "reason": "Mostly the open, known items, confirmed still live."
+    },
+    {
+     "clause_id": "security.C.1",
+     "verdict": "MET",
+     "citation": "Met by security-1 (CONFIRMED): one enforcement boundary is bypassable.",
+     "reason": "The grader also cited a known residual on a public biomarker endpoint; the verifier refuted that as a documented chosen posture, so the C condition rests on security-1 alone."
+    },
+    {
+     "clause_id": "security.F.1",
+     "verdict": "FAILED",
+     "citation": "No F condition observed: no endpoint returns an absolute directly, no live credential in the tree or recent history, no bearer minted for an unauthenticated request, raw data 403 at the origin.",
+     "reason": "Not exercised end to end: the path security-1 describes was confirmed up to the consent form by GET and by code read, and not driven further (that would need a write)."
+    }
+   ],
+   "findings_confirmed": [
+    {
+     "id": "security-1",
+     "sev": "P1",
+     "effort": "S",
+     "verdict": "CONFIRMED",
+     "summary": "A second, more serious gap on the MCP OAuth door: an input-validation weakness in the authorization flow (class only; mechanism, probe and reproduction held privately). Confirmed in code and by read-only live GETs. Fails security.A.4 and meets the C.1 condition.",
+     "evidence": "held privately",
+     "verifier": "held privately",
+     "regression_guard": "held privately",
+     "extends_issue": null,
+     "redacted": true
+    },
+    {
+     "id": "security-3",
+     "sev": "P2",
+     "effort": "S",
+     "verdict": "CONFIRMED",
+     "summary": "A privilege-boundary weakness in one operational Lambda: it acts on a caller-supplied target under a broader grant than its callers hold (class only; detail held privately). Confirmed in code and in the CDK role policy. Fails security.A.5.",
+     "evidence": "held privately",
+     "verifier": "held privately",
+     "regression_guard": "held privately",
+     "extends_issue": null,
+     "redacted": true
+    },
+    {
+     "id": "security-4",
+     "sev": "P3",
+     "effort": "S",
+     "verdict": "CONFIRMED",
+     "summary": "The authorization-flow hardening gap already tracked as #5932 (class only). This was the run's withheld control, and the grader found it unprompted. Graded P3 on its own; it compounds security-1.",
+     "evidence": "held privately; tracked on #5932",
+     "verifier": "held privately",
+     "regression_guard": "held privately",
+     "extends_issue": null,
+     "redacted": true
+    },
+    {
+     "id": "security-6",
+     "sev": "P3",
+     "effort": "S",
+     "verdict": "CONFIRMED",
+     "summary": "The unspoofable-client-address guarantee is still proven only by hand. The nightly edge check sends no forged address headers, so it shows a 429 exists but not that a rotated header cannot mint a fresh bucket.",
+     "evidence": "lambdas/operational/qa_check_edge_429.py `_post_once` sends only Content-Type; `grep -rniE 'forged|X-Forwarded-For' lambdas/operational/*.py .github/workflows/*.yml` -> no probe. Today's manual GET sequence (13 rotating forged headers -> 404 x10, 429 x3) is the proof the nightly could record.",
+     "verifier": "lambdas/operational/qa_check_edge_429.py:67-85 `_post_once` sends only `Content-Type: application/json`. `grep -rniE 'X-Forwarded-For|Viewer-Address'` over deploy/, qa/, scripts/, lambdas/operational/ and .github/ finds nothing, and deploy/probe_rate_limiter.py also sends only Content-Type/Accept. The forged-header guarantee is pinned by the unit test tests/test_rate_limit_identity_1221.py, built from a hand measurement on 2026-08-14, and by no scheduled live probe. So the claim holds: the nightly shows that a 429 exists, not that a rotated forged header cannot open a fresh bucket. No open issue tracks it (#1221 and #3620 are closed and cover different ground). This is a coverage gap (P3), n",
+     "regression_guard": "qa_check_edge_429 sends a different X-Forwarded-For and CloudFront-Viewer-Address on every probe and fails if the 429 does not arrive within MAX_PROBES; pin the header rotation in tests/test_qa_check_edge_429.py.",
+     "extends_issue": null,
+     "redacted": false
+    },
+    {
+     "id": "security-8",
+     "sev": "P3",
+     "effort": "S",
+     "verdict": "CONFIRMED",
+     "summary": "The two Lambda@Edge auth gates share one role, so each can read the other's secret; the only break in one-role-per-function across 118 functions.",
+     "evidence": "Live: life-platform-cf-auth and life-platform-buddy-auth both use role life-platform-cf-auth-edge, whose inline policy 'secrets-read' allows GetSecretValue on secret:life-platform/cf-auth-* and secret:life-platform/buddy-auth-*.",
+     "verifier": "Live, read-only: `aws lambda list-functions --region us-east-1` shows both life-platform-cf-auth and life-platform-buddy-auth on role arn:aws:iam::<acct>:role/life-platform-cf-auth-edge. That role has one inline policy, 'secrets-read', allowing GetSecretValue on us-east-1 secret:life-platform/cf-auth-* and secret:life-platform/buddy-auth-*. The function count is 112 in us-west-2 plus 6 in us-east-1, which is 118. `uniq -d` over the us-west-2 role ARNs finds no other shared role, so this is the only role reuse. No repo file mentions cf-auth-edge (the role was made out of band), and no issue tracks it. Low severity: the impact is lateral reads between two edge auth secrets.",
+     "regression_guard": "Add the edge functions to whichever check asserts role uniqueness, or record the shared role as an accepted exception with its reason.",
+     "extends_issue": null,
+     "redacted": false
+    }
+   ],
+   "findings_plausible": [],
+   "findings_refuted": [
+    {
+     "id": "security-2",
+     "sev": "P2",
+     "effort": "S",
+     "verdict": "REFUTED",
+     "summary": "A documented residual on one public biomarker endpoint (tracked in the repo as PHY-01): refuted as a finding because it is a recorded, chosen posture. Mechanics not restated here.",
+     "evidence": "held privately",
+     "verifier": "held privately",
+     "regression_guard": "held privately",
+     "extends_issue": null,
+     "redacted": true
+    },
+    {
+     "id": "security-5",
+     "sev": "P3",
+     "effort": "S",
+     "verdict": "REFUTED",
+     "summary": "A convenience posture on the MCP consent step, recorded in a code comment and a closed issue: refuted as a finding because it is chosen and has no exploit path on its own. It does compound security-1.",
+     "evidence": "held privately",
+     "verifier": "held privately",
+     "regression_guard": "held privately",
+     "extends_issue": null,
+     "redacted": true
+    },
+    {
+     "id": "security-7",
+     "sev": "P2",
+     "effort": "M",
+     "verdict": "REFUTED",
+     "summary": "#5513 has not landed; live policy still shows all three parts, with exact counts.",
+     "evidence": "Live IAM today: dynamodb:DeleteItem on table/life-platform with no LeadingKeys condition on 14 LifePlatformIngestion roles (Bluesky, DropboxPoll, Eightsleep, FoodDelivery, Habitify, HevyBackfill, Macrofactor, Mastodon, Notion, Strava, Todoist, Whoop, Withings, Youtube); github-actions-deploy-role 'life-platform-cicd-permissions' GetSecretValue on secret:life-platform/* (this includes the MCP API key from which the bearer, passcode and cookie are all derived); HaeWebhookRole GetSecretValue on secret:life-platform/ingestion-keys*.",
+     "verifier": "This duplicates OPEN issue #5513, which already tracks all three parts (a, b, c), and its 'exact counts' are wrong. From live IAM (`get-account-authorization-details`, 158 roles): (a) github-actions-deploy-role 'life-platform-cicd-permissions' GetSecretValue on secret:life-platform/* — present. (c) HaeWebhookRole GetSecretValue on secret:life-platform/ingestion-keys* — present. (b) Statements with DeleteItem on table/life-platform and no LeadingKeys condition exist on 13 LifePlatformIngestion roles, not 14: Bluesky, DropboxPoll, Eightsleep, Habitify, HevyBackfill, Macrofactor, Mastodon, Notion, Strava, Todoist, Whoop, Withings, Youtube. FoodDelivery, which the finding lists, has no Delete ac",
+     "regression_guard": "CDK assertion: no ingestion role statement carries DeleteItem without a dynamodb:LeadingKeys condition; the deploy role's secret resources are an explicit list.",
+     "extends_issue": "#5513",
+     "redacted": false
+    }
+   ],
+   "planted_control": {
+    "id": "security-9",
+    "verdict": "REFUTED"
+   },
+   "prior_path_to_A_status": [
+    "1. #5513 - NOT LANDED. Live IAM today: 14 ingestion roles still hold table-wide DeleteItem with no LeadingKeys condition; github-actions-deploy-role still has GetSecretValue on secret:life-platform/*; the HAE webhook role still reads the ingestion-keys bundle.",
+    "2. Unattended rate-limit proof - NOT LANDED. lambdas/operational/qa_check_edge_429.py still sends no forged client-address header and no workflow does. The proof was reproduced by hand this run (13 rotating forged headers -> 404 x10 then 429 x3).",
+    "3. A.1 reword ruling - STILL PENDING (the sealed clause text is unchanged). The governance-permitted category was treated as documented chosen posture and not filed; it remains the only vice vocabulary found on the live surface."
+   ],
+   "path_to_A": [
+    {
+     "action": "Fix the two authorization-flow gaps on the MCP OAuth door (security-1 first, then #5932) with must-fail tests. Clears A.4 and the C.1 condition. Detail held privately.",
+     "class_AB": "A",
+     "effort": "S"
+    },
+    {
+     "action": "Land #5513, and in the same change close the privilege-boundary weakness security-3 (detail held privately).",
+     "class_AB": "A",
+     "effort": "M"
+    },
+    {
+     "action": "Close #5543 and #5545: partition-scope the public site-API roles' table reads and add a namespace condition to the unconditioned PutMetricData statements.",
+     "class_AB": "A",
+     "effort": "M"
+    },
+    {
+     "action": "Make the A.4 rate-limit proof unattended: rotate forged client-address headers inside the existing nightly edge check (security-6). Prior path-to-A item 2, still not landed.",
+     "class_AB": "B",
+     "effort": "S"
+    },
+    {
+     "action": "Owner rulings: reword security.A.1 for the governance-permitted category (prior item 3, still pending), and decide whether the documented PHY-01 residual is accepted or narrowed. Give the two edge auth functions separate roles (security-8).",
+     "class_AB": "B",
+     "effort": "S"
+    }
+   ],
+   "already_A": [
+    "A.2: every sampled private prefix (21, including raw/config/uploads/dashboard) is 403 to unsigned GET and LIST at the S3 origin; the bucket policy grants anonymous read only to site/* and 14 named generated/ paths.",
+    "A.3: history since 2026-09-01 and the tracked tree carry no live secret; reader-supplied text and identifiers go to reader_input/ (private, 403) or DynamoDB, never to a public prefix.",
+    "Deliberate posture confirmed correct - origin lock: direct GETs to the site-API and site-API-AI Function URLs (both committed in cdk/cdk.json, AuthType NONE) return 403 with or without a forged CloudFront-Viewer-Address, because of the X-AMJ-Origin shared-secret check (site_api_lambda.py:1282-1285). This is what keeps the 'CloudFront-Viewer-Address is unforgeable' premise in lambdas/common/client_ip.py true.",
+    "Deliberate posture confirmed correct - fail-closed single identity source: the limiter keys on CloudFront-Viewer-Address only; the forged-header sequence was metered at exactly 10/h.",
+    "Deliberate posture confirmed correct - holds stay off the public prefix: posts.json lists 8 chronicle weeks and the origin serves exactly those; unpublished slots (week-10, -11, -13) are 403 at the origin; panelcast holds live under the private panelcast-holds/ prefix.",
+    "Genome is owner-only on the wire: /api/genome_risks returns a status/disclosure object and nothing else.",
+    "MCP bearer checks: no bearer, a forged lps_ bearer and GET /token all return 401; a forged approval cookie gets the form; privileged job branches are gated to the warmer function before auth (mcp/invoke_gate.py).",
+    "CloudTrail is logging (latest delivery 2026-11-14 09:20 PT, no error); the mcp-auth-failures alarm exists with an action (threshold 50/h, state OK)."
+   ],
+   "proposed_extensions": [
+    {
+     "run_id": "wf_10255c5d-c0b",
+     "text": "A.1: judge a value from which a protected fact can be recomputed from published fields by A.1 itself, not only by C.1."
+    },
+    {
+     "run_id": "wf_10255c5d-c0b",
+     "text": "A.1: name the governance-permitted public categories explicitly as allowed (prior path item 3, still pending)."
+    },
+    {
+     "run_id": "wf_10255c5d-c0b",
+     "text": "A.4: a tightening of the evidence requirement for the authorization flow (wording held privately until security-1 is fixed)."
+    },
+    {
+     "run_id": "wf_10255c5d-c0b",
+     "text": "A.5: no function acts on a caller-controlled target under a broader grant than the caller holds."
+    },
+    {
+     "run_id": "wf_10255c5d-c0b",
+     "text": "A.1 (driver): extend the sweep to clinical facts and to labels the governance doc makes aggregate-only; the 2026-11-14 accuracy review found both on public surfaces while this clause read MET."
+    }
+   ],
+   "coverage_statement": "Sampled live:\n- All 147 /api/* route literals by GET (125 returned 200).\n- The public archive tarball (2,926 files) and the chronicle list, fetched unsigned from the S3 origin.\n- 21 private prefixes, unsigned GET and LIST at the origin.\n- The MCP Function URL: 9 GETs, 3 of them unauthenticated bearer attempts (kept under the auth-failure alarm threshold).\n- One 13-request forged-header GET sequence against /api/verify_subscriber. This left one TTL'd rate-counter row and exhausted that door's hourly budget for this machine's IP.\n- Inline policies of all 117 Lambda roles and the GitHub roles' secret statements.\n- Bucket policy, public-access block, CloudTrail status and the MCP auth-failure alarm.\n\nRead end to end: mcp/handler.py, mcp/invoke_gate.py, the OAuth and session parts of mcp/core.py, lambdas/common/client_ip.py, lambdas/common/rate_limiter.py, qa_check_edge_429.py, and the verify_subscriber, chronicle-approve, telegram-webhook and one operational handler.\n\nNOT sampled:\n- Every POST door live (board_ask, submit_finding, votes, subscribe, page_feedback): code and grep only.\n- The /token exchange and the cookie-holding /authorize path. Finding 1's mint step, finding 3 and finding 5 are code-read, not probed.\n- One step of security-1 past the consent form (detail held privately); it rests on a code read, not a run.\n- The email-subscriber, og-image and progress-viewer functions in us-east-1, the two Lambda@Edge gates' code, the HAE webhook, and the MCP tool handlers. No MCP tool was invoked.\n- IAM trust policies, permission boundaries, the KMS key policy, SQS queue policies and non-Lambda roles beyond the GitHub secret statements.\n- Per-statement review of table reads: counted only (100 of 117 roles with no LeadingKeys condition).\n- Git history before 2026-09-01, and third-party PII beyond an email-address sweep. The gitleaks working-tree scan timed out and was replaced by a credential-pattern grep.\n- Rendered site HTML other than the copy inside the archive's 2026-11-13 edition; OG images, audio and transcripts.\n- The off-repo never-public vice vocabulary: a generic word list was used, so a term outside it would be missed.\n\nBlindness rules kept: nothing under docs/reviews/ other than the anchors file was read, no GitHub issue or PR query was made, no 'private' directory was opened, and no journal, clinical or heart-rhythm content was opened (public API bodies were pattern-grepped, not read). The chronological-age value recovered in finding 2 was computed but deliberately not printed or recorded.",
+   "side_effects": "One 13-request GET sequence against a public rate-limited endpoint left one TTL'd rate-counter row and used that door's hourly budget for this machine's address. No other write."
+  }
+ },
+ "totals": {
+  "confirmed": 5,
+  "plausible": 0,
+  "refuted": 3
+ },
+ "disposition": {
+  "status": "NOT RUN — owner instruction: Phases 0-3 only."
+ }
+}

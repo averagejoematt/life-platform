@@ -33,6 +33,10 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
 
 from common import prediction_publication as PP  # noqa: E402
+from web import public_call_id as PCI  # noqa: E402
+
+sys.path.insert(0, str(ROOT / "tests"))
+import call_publication_route_walk as CPW  # noqa: E402
 
 NOW = "2026-11-07T20:00:00+00:00"
 VARIANTS = ("none", "some", "many")
@@ -132,10 +136,19 @@ def test_the_walk_is_not_vacuous(walks):
     """The public record is served: legacy reviewed calls, a structured call filed after the registry, a public bet,
     the commitments tally the grader produced."""
     out = walks["none"]
-    ids = {i["prediction_id"] for i in _body(out, "/api/ledger_export")["items"]}
-    assert "pred_20261020_synthetic_public_sleep_0" in ids and "pred_20261106_synthetic_public_new_sleep" in ids
-    # Owner ruling 2026-11-06: a word the graded source explains does not take a call off the public record.
-    assert {"pred_20261106_synthetic_public_fatigue", "pred_20261106_synthetic_public_rpe"} <= ids
+    items = _body(out, "/api/ledger_export")["items"]
+    # Owner ruling 2026-11-14: a call's public identity is opaque (web.public_call_id) — every served call carries one,
+    # unique within its coach, and no stored key (a slug of the call's words) reaches any body or page.
+    ids = [(i["coach_id"], i["prediction_id"]) for i in items]
+    assert ids and all(PCI.PUBLIC_ID.match(pid) for _c, pid in ids), ids
+    assert len(set(ids)) == len(ids)
+    for v, walk in walks.items():
+        for key, body in walk["bodies"].items():
+            assert "synthetic_public" not in body and "synthetic_private" not in body, (v, key)
+        assert "synthetic_public" not in walk["pages"], v
+    # the public record is served: the fixed public calls (3 per coach), the structured ones filed after the registry
+    # and (owner ruling 2026-11-06) the two whose words a graded source explains
+    assert len(items) >= 3 * len(CPW.COACHES) + 3
     assert any("public-bet" in json.dumps(r) for r in _body(out, "/api/coach_docket")["resolved"])
     assert _body(out, "/api/predictions")["commitments"] is not None
 
@@ -201,8 +214,12 @@ def test_negative_control_the_ungated_policy_leaks(ungated):
     ):
         assert key in moved, (key, sorted(moved))
     some = ungated["some"]
-    assert any(t in body for body in some["bodies"].values() for t in PRIVATE_MARKS)
-    assert any(t in some["pages"] for t in PRIVATE_MARKS)
+    # ungated, the private calls reach the wire: the ledger serves more calls than the public-only variant (their ids are
+    # opaque since the owner's 2026-11-14 ruling, so the bodies no longer spell them — the count is what moves)
+    assert _body(some, "/api/ledger_export")["total"] > _body(ungated["none"], "/api/ledger_export")["total"]
+    # the private calls reach the pages: more prediction pages than the public-only variant (ids are opaque now, so the
+    # pages no longer spell them — owner ruling 2026-11-14 — and the count is what moves)
+    assert len(json.loads(some["pages"])["prediction"]) > len(json.loads(ungated["none"]["pages"])["prediction"])
     assert _body(some, "/api/predictions")["overall"]["total"] > _body(ungated["none"], "/api/predictions")["overall"]["total"]
     # Owner 2026-11-09: ungated, the private verified calls move the new counts too — the identity above is not vacuous.
     assert _body(some, "/api/ledger_export")["verification_summary"] != _body(ungated["none"], "/api/ledger_export")["verification_summary"]
@@ -213,4 +230,4 @@ def test_negative_control_the_ungated_policy_leaks(ungated):
     s_vs = _body(some, "/api/calibration")["verification_summary"]
     n_vs = _body(ungated["none"], "/api/calibration")["verification_summary"]
     assert s_vs["eligible_total"] > n_vs["eligible_total"] and s_vs["verified"]["n"] > n_vs["verified"]["n"]
-    assert any("private" in c for c in s_vs["counted_calls"])
+    assert len(s_vs["counted_calls"]) > len(n_vs["counted_calls"])  # the private calls are counted (opaque ids since 2026-11-14)

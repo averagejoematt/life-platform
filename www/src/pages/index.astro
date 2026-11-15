@@ -409,7 +409,7 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
     )
   }
 
-  <OpenQuestions measured={measured} foodText={week?.measures?.food?.state === "ok" ? week.measures.food.data?.text : null} />
+  <OpenQuestions measured={measured} dimensions={dims.map((d) => ({ label: d.label, measured: d.measured }))} foodText={week?.measures?.food?.state === "ok" ? week.measures.food.data?.text : null} />
 
   <section class="section hair">
     <div class="wrap">
