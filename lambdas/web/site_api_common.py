@@ -249,7 +249,7 @@ PLATFORM_STATS = {
     # closed month on 2026-11-14; change it and regenerate site/data/stack.json in one commit.
     # Deliberately NO ceiling figure in this comment — the ceiling family has exactly one source
     # (cost_governor_lambda.MONTHLY_CEILING / SURGE_CEILING_USD) (#2898).
-    "review_count": 21,  # 2026-11-13 full review (the 21st; docs/reviews/fullreview_grades_2026-11-13.json)
+    "review_count": 22,  # 2026-11-14 full review (the 22nd; docs/reviews/fullreview_grades_2026-11-14.json, PARTIALLY_CALIBRATED)
     # #3690: was "A" while the newest full review graded ZERO lenses at A — the
     # 2026-09-05 baseline is B+ 9 · B 3 · B- 3 · C+ 2 across 17 lenses, modal B+,
     # worst C+. This is the platform's most-quoted credibility number, on the page a
@@ -265,8 +265,8 @@ PLATFORM_STATS = {
     # 2026-10-31 baseline: A- 3 · B+ 10 · B 2 · B- 2 across 17 lenses, modal B+ (the run's
     # calibration block reads UNCALIBRATED on the withheld-issue control — that governs the
     # review CLOCK, not whether these 17 grades were awarded; docs/reviews/FULLREVIEW_2026-10-31.md).
-    "review_grade": "B",
-    "review_grade_distribution": "A- 1 · B+ 5 · B 6 · B- 4 · C+ 1 (17 lenses, 2026-11-13)",
+    "review_grade": "C+",
+    "review_grade_distribution": "A- 1 · B+ 2 · B 2 · B- 4 · C+ 4 · C 4 (17 lenses, 2026-11-14)",
     "active_secrets": 30,  # #3690: was 21; 28 -> 29 with life-platform/ip-hash-salt (#3620); 29 -> 30 with life-platform/progress-photos-signing (#3760). model/platform_model.json cost_surface.secrets
     "site_pages": 107,  # #3690: was 77; qa/qa_manifest.py is the single page registry. 93 -> 95 with /start/ and /coaches/ (#4588); 95 -> 99 with the v9 /system/ pages (#5534 cut-over); 100 with /data/journey/ (#5579); 101 with the sampled day page (#5585); 100 with /story/theme-river/ unpublished (journal-derived, owner rulings 2026-11-03/05); 102 with /data/lab/ + /data/lab/protocols/ (Laboratory L1 live, owner GO 2026-11-09); 103 with /story/so-far/ (Human Story HS1 live, owner GO 2026-11-09); 105 with /system/calibration/ + /system/ledger/refuted/ (Coaching Room CR1 live, owner GO 2026-11-10); 106 with /data/lab/findings/ (findings over time, 2026-11-11); 107 with /privacy/policy/ (the maintained policy served again, #5920)
     "board_technical": 12,
