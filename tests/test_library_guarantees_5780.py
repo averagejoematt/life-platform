@@ -408,12 +408,13 @@ def _absent_equipment(keys: set[str], lib: dict, cat: dict, missing: list[str]) 
     return out
 
 
-UNCONFIRMED_TODAY = {"machine_row", "machine_shoulder_press", "standing_calf_raise_machine"}
+UNCONFIRMED_TODAY = {"standing_calf_raise_machine"}
 """#5861 fix round 13 (owner ruling 2026-11-14: a machine known only from old logs is `unknown`, never assumed). Today's #5075
-pools and anchor lists do not read the library, and they still name three machines the library now holds as
-`historical_only` — logged, but not in the last 12 months. That is today's behaviour and this lane does not change it; the
-three are on the owner's confirm list, and under an APPROVED library the session fit swaps or skips them
-(tests/test_library_integrity_5861.py holds every served week to `available`). The set is pinned: a fourth is red."""
+pools and anchor lists do not read the library, and they still name a machine the library holds as `historical_only` —
+logged, but not in the last 12 months. Under an APPROVED library the session fit swaps or skips it
+(tests/test_library_integrity_5861.py holds every served week to `available`). The set is pinned: a second is red. #6014
+(owner ruling 2026-11-15, A): the row and shoulder press machines are owner-confirmed and left the set; the standing calf
+raise machine stays (ruling B: owner unsure)."""
 
 
 def _absent(offenders: list[str]) -> list[str]:
@@ -566,16 +567,10 @@ def test_g4_once_approved_every_commitment_but_rotation_is_met_by_the_served_wee
     assert rest == []
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "#5857 FINDING (owner ruling needed): the free-weight compound floor (owner ruling 2026-11-12, board rec 4) BLOCKS "
-        "every approved week on PULL — the program's rows and pulldowns are machine/cable anchors and no accessory slot's "
-        "job is a back pull, so the selection cannot fill it. Press, squat and hinge are met by the anchors. While the "
-        "library is proposed the row only WARNS."
-    ),
-)
 def test_g4_the_approved_week_meets_the_free_weight_compound_floor():
+    """#5857's finding (the floor blocked every approved week on PULL: the planned heavy row was the row machine), closed by
+    #6014 (coaching decision 2026-11-15, owner-vetoable): the heavy-upper row is pinned to the one-arm dumbbell row
+    (`SESSION_TEMPLATES['upper_heavy']['anchor_keys']`). Its must-fail control is tests/test_equipment_confirm_6014.py."""
     assert [o for o in _approved_offenders() if o.split(": ", 1)[1].startswith("free_weight_compounds:")] == []
 
 

@@ -281,14 +281,19 @@ APPROVAL = {"version": "0.4.0", "approved_on": "2026-11-14"}
 key), a minor version bump and one change-log line. The builder never emits `approved`; it only preserves an approval it reads."""
 
 
+def _approval_index(lib: dict) -> int:
+    return [x["version"] for x in lib["change_log"]].index(APPROVAL["version"])
+
+
 def _pre_approval(lib: dict) -> dict:
-    """The committed library with the approval delta removed — what the builder produced before the owner approved it."""
+    """The committed library with the approval delta removed — what the builder produces from these inputs without the owner's
+    approval. The approval line is where the script wrote it; later builder lines (0.4.1, #6014) follow it."""
     pre = copy.deepcopy(lib)
     assert pre.pop("approved_on") == APPROVAL["approved_on"]
-    line = pre["change_log"].pop()
+    line = pre["change_log"].pop(_approval_index(lib))
     assert (line["version"], line["date"]) == (APPROVAL["version"], APPROVAL["approved_on"])
     assert line["what"] == "approved: status proposed -> approved (schema valid, private gate check passed)"
-    pre["status"], pre["version"] = "proposed", pre["change_log"][-1]["version"]
+    pre["status"] = "proposed"
     return pre
 
 
@@ -309,7 +314,9 @@ def test_the_committed_library_is_the_builders_output_and_the_build_is_determini
     history, aliases = _inputs()
     built = b.build_library(copy.deepcopy(pre), history, copy.deepcopy(CATALOG), aliases)
     assert built["status"] == "proposed" and "approved_on" not in built and _text(built) == _text(pre)
-    approved = built | {"version": APPROVAL["version"], "status": "approved", "change_log": built["change_log"] + [LIB["change_log"][-1]]}
+    i = _approval_index(LIB)
+    log = built["change_log"][:i] + [LIB["change_log"][i]] + built["change_log"][i:]
+    approved = built | {"status": "approved", "change_log": log}
     approved["approved_on"] = APPROVAL["approved_on"]
     assert _text(approved) == committed
     # control: the builder never emits an approval it did not read — no current file builds proposed, unstamped
@@ -318,7 +325,7 @@ def test_the_committed_library_is_the_builders_output_and_the_build_is_determini
 
 
 def test_the_library_is_approved_and_its_rollback_copy_is_shadow():
-    assert (LIB["status"], LIB["approved_on"], LIB["version"]) == ("approved", "2026-11-14", "0.4.0") and se.mode(LIB) == "live"
+    assert (LIB["status"], LIB["approved_on"], LIB["version"]) == ("approved", "2026-11-14", "0.4.1") and se.mode(LIB) == "live"
     assert se.mode(LIB | {"status": "proposed"}) == "shadow"  # the rollback: status back to proposed
     # #5861 L6: an addition reaches the catalog ONLY as a deliberate coach_added twin (deploy/movement_catalog_additions.py) — a
     # built-in template, never a not_for_you_now movement — and even then it serves only once the library is approved

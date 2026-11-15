@@ -134,8 +134,10 @@ the hold is recorded on the rotation row. Two or more members rotate.
 **Weekly free-weight floor (owner ruling 2026-11-12).** Every program week serves at least one free-weight compound for
 each of press, pull, squat and hinge; anchors count (`week_floors.free_weight_compounds`, stage-1 row
 `free_weight_compounds`, the charter's `dan_john` ledger line). It warns while the library is proposed and blocks once
-it is approved. Finding: today's program meets press, squat and hinge through its anchors but serves no free-weight
-back pull (its rows and pulldown are machine/cable anchors), so approval would block every week until the owner rules.
+it is approved. The pull is the heavy-upper row, pinned to the one-arm dumbbell row (#6014, coaching decision
+2026-11-15, owner-vetoable: `program_structure.SESSION_TEMPLATES['upper_heavy']['anchor_keys']`); without the pin the
+row family's first member, the seated row machine (owner-confirmed 2026-11-15), would leave the week with no free-weight
+pull and stage 1 would block every commit. The volume day keeps the family's order.
 
 **Attribute audit (owner ruling 2026-11-12, blocking before approval).** `deploy/exercise_library_targets.py` carries
 the reviewed `ATTRIBUTE_OVERRIDES` (the weighted chest dip is a free-weight dip, not a selectorized machine; the dumbbell
@@ -532,7 +534,7 @@ Every equipment id and every movement carries one of five EVIDENCE states, and t
 | `evidence` | means | `state` |
 |---|---|---|
 | `owner_confirmed` | the owner said the gym has it | `available` |
-| `recent_inferred` | HEURISTIC: used by a movement logged in the last 12 months of the Hevy history | `available` |
+| `recent_inferred` | HEURISTIC: used by a movement logged in the last 12 months of the Hevy history, and never before he began training at home_gym (`exercise_library_curation.HOME_GYM_SINCE`, May 2026, owner ruling 2026-11-15) | `available` |
 | `historical_only` | used only by movements logged before that window | `unknown` (not served) |
 | `unknown` | never logged; or deferred by an owner ruling | `unknown` (not served) |
 | `confirmed_unavailable` | an owner note or ruling says the gym does not have it | `unavailable` |
@@ -541,7 +543,8 @@ A movement's evidence is the worst of its equipment's. The basic classes (`libra
 weights, flat and adjustable benches, the rack, cable stations, the pull-up bar, bands, bodyweight) are inferred as a
 class and never confirmed one by one. A seed in `exercise_library_curation.SEEDED_AVAILABILITY` (an owner note, ruling
 or confirmation) wins over the logs: the preacher curl machine is confirmed unavailable (owner note 2026-11-08) and the
-six machines the owner deferred on 2026-11-13 stay `unknown`. "X was taken" / "no bench free" is contention and never
+six machines the owner deferred on 2026-11-13 stay `unknown`; twelve machines and stations are owner-confirmed (owner
+ruling 2026-11-15, #6014) and the standing calf raise machine is left to its logs (owner unsure). "X was taken" / "no bench free" is contention and never
 changes a state. To confirm a machine, add one seed row `{"evidence": "owner_confirmed", "source": "..."}` and rebuild.
 
 The evidence is read from the owner's history, so it says nothing about a synthetic lifter's gym: the sample-week harness

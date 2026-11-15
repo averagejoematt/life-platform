@@ -585,6 +585,39 @@ SEEDED_AVAILABILITY: dict[str, dict] = {
     "incline_press_machine": dict(_DEFERRED),
 }
 
+# Owner ruling 2026-11-15 (A, #6014): equipment the owner CONFIRMED present at home_gym. An owner confirmation wins over the
+# logs, so each is `owner_confirmed` (served) whatever its log history says. The standing calf raise machine is NOT here
+# (ruling B: owner unsure — its state is left to the logs).
+_OWNER_CONFIRMED_1115 = {
+    "evidence": "owner_confirmed",
+    "source": "owner ruling 2026-11-15 (A): confirmed present at home_gym",
+}
+SEEDED_AVAILABILITY |= {
+    eid: dict(_OWNER_CONFIRMED_1115)
+    for eid in (
+        "seated_row_machine",  # seated row machine
+        "shoulder_press_machine",  # seated shoulder press machine
+        "hip_thrust_machine",  # hip thrust machine
+        "t_bar_row_machine",  # chest-supported T-bar row
+        "hack_squat_machine",  # hack squat machine
+        "back_extension_45",  # 45-degree back extension bench
+        "triceps_machine",  # triceps extension / push-away machine
+        "bench_decline",  # decline bench
+        "ab_wheel",  # ab wheel
+        "smith_machine",  # Smith machine
+        "captains_chair",  # captain's chair (supported knee raise station)
+        "pullover_machine",  # pullover machine
+    )
+}
+
+HOME_GYM_SINCE: dict[str, str] = {
+    "date": "2026-05-01",
+    "source": "owner ruling 2026-11-15 (C): he has trained at home_gym only since May 2026",
+}
+"""The first day a log can be evidence for home_gym (owner ruling 2026-11-15, C, #6014). The recent-inferred window starts at
+the LATER of its 12 months and this day, so a log from an earlier gym never makes a machine look present. Month only — no
+personal log date rides the repo."""
+
 # ── hand-curated attributes ─────────────────────────────────────────────────────────────────────────────────────────
 _L, _M, _H, _U = "low", "moderate", "high", "unknown"
 

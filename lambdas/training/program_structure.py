@@ -604,6 +604,13 @@ SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
         # #5162 (owner ruling 2026-10-23, "trade inside 75"): the press's 3 sets became 3 lateral-raise sets
         "anchors": [["bench", "heavy"], ["row", "heavy"], ["vertical_pull", "moderate"]],
         "anchor_sets": {"vertical_pull": 2},
+        # #6014 (coaching decision 2026-11-15, owner-vetoable): the heavy row is the free-weight one-arm dumbbell row, pinned. With
+        # the seated row machine confirmed (owner ruling 2026-11-15, A) the row family's own order would serve `machine_row` here,
+        # the week would carry no free-weight pull and stage 1 (`week_commitments` free_weight_compounds, owner ruling 2026-11-12)
+        # would block every commit. The dumbbell row alone, so an in-block machine row on the volume day never takes this slot
+        # (`in_block_variant.prefer` only reorders the pinned members); a pain or equipment swap still walks the whole family
+        # (`live_session._anchor_candidates`). The volume day keeps the family's order.
+        "anchor_keys": {"row": ["one_arm_db_row"]},
         # #5053: the rear-delt slot (delts 14–18/wk, charter `volume_priorities`) — the upper heavy day carries the pec deck
         # the traded delt slot leads the accessories: a time trim drops last-listed first, so it goes last
         "accessories": ["db_lateral_raise", "cable_tricep_pushdown", "db_curl", "reverse_pec_deck"],

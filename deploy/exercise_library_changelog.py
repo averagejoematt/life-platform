@@ -139,4 +139,17 @@ BUILDER_CHANGE_LOG = [
         "24 links went, the lists refilled with the next equivalent movement where one exists (18), one list is empty.",
         "rule": "data only — status stays proposed until the owner approves the library",
     },
+    {
+        "version": "0.4.1",
+        "date": "2026-11-15",
+        "by": "#6014 (owner ruling 2026-11-15, A and C; the library stays approved)",
+        "what": "Equipment the owner confirmed present at home_gym is owner_confirmed and served: the seated row, shoulder press, hip "
+        "thrust, hack squat, pullover and triceps machines, the chest-supported T-bar row, the 45-degree back extension and decline "
+        "benches, the ab wheel, the Smith machine and the captain's chair (ruling A). The standing calf raise machine is unchanged "
+        "(ruling B: owner unsure). The recent-inferred window never starts before the day he began training at home_gym "
+        "(`HOME_GYM_SINCE`, May 2026, ruling C): a log from an earlier gym is no evidence a machine is here (no state moves "
+        "on today's history). 20 movements become available; fallback lists recompute under the one equivalence rule (79 "
+        "movements), since an available movement can now be a fallback. No tier, gate, rating or setting changes.",
+        "rule": "data and one window rule, by owner ruling; status stays approved (approved_on unchanged)",
+    },
 ]

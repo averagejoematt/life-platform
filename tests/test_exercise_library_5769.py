@@ -38,15 +38,19 @@ def test_library_is_schema_valid():
 
 
 def test_library_ships_approved_and_versioned():
-    """Owner approval 2026-11-14 (scripts/approve_exercise_library.py): approved with its day, 0.4.0, the approval line last.
-    Rollback is status back to proposed — that copy is shadow."""
+    """Owner approval 2026-11-14 (scripts/approve_exercise_library.py): approved with its day at 0.4.0; every later data
+    change is an owner-ruled, versioned line after it (0.4.1: #6014, owner ruling 2026-11-15). Rollback is status back to
+    proposed — that copy is shadow."""
     from training import selection_engine as se
 
-    assert (LIB["status"], LIB.get("approved_on"), LIB["version"]) == ("approved", "2026-11-14", "0.4.0")
+    assert (LIB["status"], LIB.get("approved_on"), LIB["version"]) == ("approved", "2026-11-14", "0.4.1")
     assert re.match(r"^\d+\.\d+\.\d+$", LIB["version"])
     assert LIB["change_log"][0]["version"] == "0.1.0"
-    last = LIB["change_log"][-1]
-    assert (last["version"], last["date"]) == ("0.4.0", "2026-11-14") and last["what"].startswith("approved: status proposed -> approved")
+    versions = [x["version"] for x in LIB["change_log"]]
+    approval = LIB["change_log"][versions.index("0.4.0")]
+    assert approval["date"] == "2026-11-14" and approval["what"].startswith("approved: status proposed -> approved")
+    after = LIB["change_log"][versions.index("0.4.0") + 1 :]
+    assert [x["version"] for x in after] == ["0.4.1"] and all("owner ruling" in x["by"] for x in after)
     assert se.mode(LIB) == se.MODE_LIVE and se.mode(LIB | {"status": "proposed"}) == se.MODE_SHADOW
 
 

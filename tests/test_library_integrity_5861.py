@@ -510,8 +510,8 @@ def test_no_log_date_rides_the_availability_data():
 def test_the_builder_derives_the_five_states_from_the_history_window():
     mv = {
         "recent": {"equipment": ["leg_curl_seated"], "history": {"last_done": "2026-10-01"}},
-        "old": {"equipment": ["hack_squat_machine"], "history": {"last_done": "2024-01-01"}},
-        "edge": {"equipment": ["smith_machine"], "history": {"last_done": "2025-11-11"}},
+        "old": {"equipment": ["calf_raise_standing_machine"], "history": {"last_done": "2024-01-01"}},
+        "edge": {"equipment": ["rear_delt_machine"], "history": {"last_done": "2025-11-11"}},
         "never": {"equipment": ["ski_erg"]},
         "basic_old": {"equipment": ["weight_plate"], "history": {"last_done": "2022-01-01"}},
         "seeded": {"equipment": ["preacher_machine"], "history": {"last_done": "2026-10-01"}},
@@ -524,14 +524,17 @@ def test_the_builder_derives_the_five_states_from_the_history_window():
     got = {x: (r["home_gym"]["evidence"], r["home_gym"]["state"]) for x, r in inv.items()}
     assert got == {
         "leg_curl_seated": ("recent_inferred", "available"),
-        "hack_squat_machine": ("historical_only", "unknown"),
-        "smith_machine": ("recent_inferred", "available"),  # the window's first day counts
+        "calf_raise_standing_machine": ("historical_only", "unknown"),
+        "rear_delt_machine": ("recent_inferred", "available"),  # the window's first day counts
         "ski_erg": ("unknown", "unknown"),
         "weight_plate": ("recent_inferred", "available"),  # a basic class is inferred as a class
         "preacher_machine": ("confirmed_unavailable", "unavailable"),  # an owner note wins over a recent log
         "pullover_machine": ("owner_confirmed", "available"),
     }
-    assert inputs.movement_availability({"equipment": ["leg_curl_seated", "hack_squat_machine"]}, inv)["evidence"] == "historical_only"
+    assert (
+        inputs.movement_availability({"equipment": ["leg_curl_seated", "calf_raise_standing_machine"]}, inv)["evidence"]
+        == "historical_only"
+    )
     assert inputs.movement_availability({"equipment": ["leg_curl_seated", "weight_plate"]}, inv)["state"] == "available"
 
 
@@ -682,8 +685,19 @@ HISTORICAL_IN_TODAYS_PROGRAM = {"machine_row", "machine_shoulder_press", "standi
 def test_a_machine_known_only_from_old_logs_is_swapped_out_of_the_live_week():
     """Owner ruling 2026-11-14: availability fails SAFE. With the library's own states (no synthetic club), the machines
     today's program names but the logs only show as historical are never served: the live fit swaps each for an available
-    lift and says so. Control: the same week in a full club (the machines confirmed) serves them."""
-    world, week = _week("a_large_deficit_experienced", True, gym=None)
+    lift and says so. Control: the same week in a full club (the machines confirmed) serves them. #6014 (owner ruling
+    2026-11-15) confirmed the row and shoulder press machines, so the week is run with them back at `historical_only` (in
+    memory) — the rule under test, not today's inventory."""
+
+    def unconfirm(world):
+        lib = world["lib"]
+        for eid in ("seated_row_machine", "shoulder_press_machine"):
+            lib["gym_inventory"]["items"][eid]["home_gym"] = {"state": "unknown", "evidence": "historical_only", "source": "test"}
+        for e in lib["movements"].values():
+            if {"seated_row_machine", "shoulder_press_machine"} & set(e["equipment"]):
+                e["availability"]["home_gym"] = {"state": "unknown", "evidence": "historical_only", "source": "test"}
+
+    world, week = _week("a_large_deficit_experienced", True, unconfirm, gym=None)
     served = {k for _r, k, _e in _served(world, week)}
     assert not served & HISTORICAL_IN_TODAYS_PROGRAM and _unservable(world, week) == []
     lines = [ln for s in week["sessions"] for ln in s["live_fit"] or [] if ln.startswith("swapped (live)")]

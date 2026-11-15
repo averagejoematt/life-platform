@@ -892,7 +892,7 @@ def build_library(
         raise SystemExit(f"evidence-review ledger: evidence change for a movement not in the library: {missing}")
     reviews.finalize_tiers(movements)  # #5857 + #5861: every row's tier (+ at most one recorded band) and every objective rating
 
-    inventory = integrity_inputs.home_gym_inventory(movements, history, cur.SEEDED_AVAILABILITY)
+    inventory = integrity_inputs.home_gym_inventory(movements, history, cur.SEEDED_AVAILABILITY, cur.HOME_GYM_SINCE["date"])
     for e in movements.values():
         e["availability"] = {lib_rules.LOCATION_ID: integrity_inputs.movement_availability(e, inventory)}
     proto = {"gates": gates_out, "movements": movements}
