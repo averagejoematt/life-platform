@@ -1,14 +1,17 @@
-# Exercise library (v0.3, PROPOSED) — #5769, #5857, #5861
+# Exercise library (0.4.0, APPROVED 2026-11-14 — live) — #5769, #5857, #5861
 
 The coaching team's menu, chosen **before** drafting: what Matthew has done (his full Hevy history),
 what he could do next (expansion candidates), what each movement trains, what it costs, what it needs,
 what must be true before it is programmed, and what to swap to when the kit is missing.
 
-**Status: `proposed`.** Only the selection engine reads it (#5773, `lambdas/training/selection_engine.py`;
-`tests/test_exercise_library_5769.py` asserts no other module under `lambdas/` or `mcp/` does), and while the
-status is `proposed` it runs in SHADOW: the selection is recorded on each draft as `inputs_snapshot.selection_shadow`
-beside the #5075 pools, which still serve. It changes live drafts only once the status is `approved`. Every draft
-records `inputs_snapshot.library_version`. Gate evaluation is #5772; note rendering is #5771.
+**Status: `approved` (2026-11-14, library 0.4.0, merged in #5858; its rules apply from 2026-11-16).** Only the selection
+engine reads it (#5773, `lambdas/training/selection_engine.py`; `tests/test_exercise_library_5769.py` asserts no other
+module under `lambdas/` or `mcp/` does). With the status `approved` the engine runs LIVE: its selection serves the
+draft. **Rollback is the status back to `proposed`**, which returns the engine to SHADOW — the selection is recorded on
+each draft as `inputs_snapshot.selection_shadow` beside the #5075 pools, which then serve again (the
+`exercise_library_rollback` test fixture keeps that path working). Every draft records
+`inputs_snapshot.library_version`. Gate evaluation is #5772; note rendering is #5771. The rubric sections below keep
+the "PROPOSED" tag each carried when it was written: they are the dated record of how the approved content was built.
 
 ## Files
 
