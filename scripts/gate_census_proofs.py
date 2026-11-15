@@ -4733,3 +4733,24 @@ STRUCTURAL_HAND_PROOFS["structural::test_rate_policy_5861.py"] = {
     ),
     "proved_on": "2026-11-12",
 }
+
+
+STRUCTURAL_HAND_PROOFS["structural::test_putmetricdata_namespace_condition_5545.py"] = {
+    "gate_name": "test_putmetricdata_namespace_condition_5545.py",
+    "command": "python3 -m pytest tests/test_putmetricdata_namespace_condition_5545.py -q -p no:warnings   # baseline 11 passed",
+    "mutation": (
+        "M1 `_put_metric_data_statement` drops its `cloudwatch:namespace` condition (rule 1); M2 a hand-spelled "
+        "`cloudwatch:PutMetricData` PolicyStatement in role_policies_operational.py (rule 2); M3 the whoop role loses "
+        "LifePlatform/IngestReconciliation its _reconcile emits (rule 3, coverage); M4 daily-brief gains LifePlatform/Budget "
+        "no code it reaches emits (rule 4, justification)."
+    ),
+    "observed": (
+        "2026-11-15, #5545 lane. BASELINE 11 passed. M1: 3 failed. M2: 1 failed. M3: 1 failed. M4: 1 failed. " "REVERTED 11 passed."
+    ),
+    "scope": (
+        "Repo-side only: the CDK role builders and the static import closure of each handler in the one bundle. NOT SEEN: "
+        "the deployed roles until the owner runs the six OWNER-REQUIRED stacks (tests/test_role_family_write_scope.py's "
+        "live leg reads them after deploy)."
+    ),
+    "proved_on": "2026-11-15",
+}
