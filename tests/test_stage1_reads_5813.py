@@ -16,10 +16,20 @@ This file holds:
      stage-1 output is byte-equal once `timing_ms` is removed, and the memo run makes strictly fewer calls.
   3. The memos' contract: one read per call, a copy per caller, a plain read outside a plan call.
   4. `timing_ms.stage_1` carries every `STAGE_1_READERS` key, and that list covers every `_read` label stage 1 uses.
+  5. (2026-11-15) THE CATALOG RATCHET, `MAX_STAGE_1_CATALOG_READS`. The laptop profile above ran from the repo, where
+     `config/movement_catalog.json` is a local file. The Lambda bundle does not stage it, so there every read is a
+     430 KB S3 GET + parse. Profiled on the built MCP bundle (read-only, live): the self-added-volume report read it
+     once per movement LABEL, 545 GETs and 23.5 s of a 34-46 s stage 1. That is why every live plan call since
+     2026-11-12 hit the 30 s cap. The before/after check patches the replaced paths back in and compares stage 1
+     byte for byte.
 
 Mutation controls (run on the lane, recorded on the PR): (M1) drop NOTES_HEALTH from `plan_call_scope._CALL_KINDS`
 -> the ratchet reds (and the memo test); (M2) drop SOURCE_RANGE -> the ratchet reds; (M3) `memo_get` returns the
-stored object, not a copy -> the copy test reds.
+stored object, not a copy -> the copy test reds. 2026-11-15: (M4) `_catalog_once` ignores its cache -> the catalog
+ratchet + the weekly_excess test red; (M5) `parallel_query_sources` without the copied context -> the DDB ratchet + the
+query_source test red; (M6) `lean` back in the memo key -> the query_source test reds; (M7) `_current_many` out of
+order -> the pointer test reds; (M8) the keyword pattern without its look-behind -> the taxonomy test reds; (M9) the
+read-once catalog returns {} -> the before/after check reds.
 """
 
 from __future__ import annotations
@@ -64,7 +74,16 @@ from mcp import (  # noqa: E402
 # (`nutrition_critics_inputs._lab_draws`), not a duplicate a memo could fold; the Whoop nights ride the existing memo.
 # +1 (#5772): `exercise_unlocks` queries the `EXGATE#ANNOUNCE#` claim-once rows — ONE begins_with Query no other stage-1
 # reader touches (a new read, not a lost memo). MEASURED on the merged tree (with #5802's labs read): see the pin below.
-MAX_STAGE_1_DDB_CALLS = 101
+# -4 (#5813, 2026-11-15): the per-call `query_source` memo keys the READ — the resolved phase decision, never `lean` — and
+# covers `parallel_query_sources`' pool workers (a copied context), so a lean/plain or derived/explicit pair, or a fan-out
+# worker beside a main-thread reader, is one query. Measured 101 -> 97 on this fixture.
+MAX_STAGE_1_DDB_CALLS = 97
+# #5813 (2026-11-15): `health.adherence_calc._load_catalog` reads per stage-1 call. On the Lambda the movement catalog is NOT
+# in the bundle, so each read is a 430 KB S3 GET + parse; the self-added-volume report read it once per movement LABEL —
+# 545 S3 GETs and 23.5 s of a live stage 1 measured on the bundle layout (laptop, read-only), the reason every
+# plan_next_session call since 2026-11-12 hit the 30 s cap. Now once per `weekly_excess`. Down-only.
+MAX_STAGE_1_CATALOG_READS = 7  # measured on this fixture, 2026-11-15 (the per-label read: 205)
+_LAST: dict[str, int] = {}
 
 _TARGET = "2026-09-20"
 _NOW = datetime(2026, 9, 20, 19, 0, tzinfo=timezone.utc)  # noon Pacific on the target day — the clock is frozen
@@ -127,6 +146,20 @@ def _world() -> dict[str, list[dict]]:
                 "end_time": f"{d}T18:00:00Z",
                 "phase": "experiment",
                 "exercises": exs,
+                # #5813 (2026-11-15): matched adherence, so the self-added-volume report labels every movement — the loop
+                # that read the 430 KB movement catalog from S3 once per LABEL on the Lambda (~540 reads, ~25 s)
+                "adherence": {
+                    "status": "matched",
+                    "movements": [
+                        {
+                            "movement_key": key,
+                            "programmed_working_sets": 3,
+                            "performed_working_sets": 3 + (i + j) % 2,
+                            "intensity": {"max_rpe": 8 + (i + j) % 2},
+                        }
+                        for j, key in enumerate([f"tmpl:{tid}" for tid, _n in _TEMPLATES] + ["leg_press", "not_a_catalog_key"])
+                    ],
+                },
             }
         )
         for j, (tid, _name) in enumerate(_TEMPLATES):
@@ -281,10 +314,30 @@ def _own_the_tables(st: ExitStack) -> None:
                 st.enter_context(patch.object(mod, attr, real))
 
 
-def _stage1(routine: bool = True, memos: bool = True) -> tuple[dict, int, int]:
-    """(stage-1 output, DynamoDB calls before stage 2 starts, all calls) for one plan call on the fixture."""
+def _legacy_read_paths(st: ExitStack) -> None:
+    """The three read paths as they stood before the 2026-11-15 #5813 pass, patched back in for the before/after check:
+    the catalog read once per self-added-volume LABEL, the week's routine pointers read one after another, and the
+    taxonomy keyword pattern built on every match."""
+    from training import muscle_volume, routine_repo, self_added_volume
+
+    st.enter_context(patch.object(self_added_volume, "_catalog_once", lambda _cache: self_added_volume._catalog_movements()))
+    st.enter_context(patch.object(routine_repo, "_current_many", lambda rids: [routine_repo.get_current(r) for r in rids]))
+    st.enter_context(patch.object(muscle_volume, "_matches", lambda kw, nl: re.search(r"(?<![a-z])" + re.escape(kw), nl) is not None))
+
+
+def _stage1(routine: bool = True, memos: bool = True, legacy: bool = False) -> tuple[dict, int, int]:
+    """(stage-1 output, DynamoDB calls before stage 2 starts, all calls) for one plan call on the fixture. The call's
+    movement-catalog reads land in `_LAST["catalog_reads"]`."""
+    from health import adherence_calc
+
     fake = _FakeAws(_world())
     seen: dict[str, int] = {}
+    catalog_reads = []
+    real_catalog = adherence_calc._load_catalog
+
+    def counted_catalog():
+        catalog_reads.append(1)
+        return real_catalog()
 
     def stage_2_stub(*_a, **_kw):
         seen["at_stage_2"] = len(fake.ddb_calls)
@@ -302,8 +355,12 @@ def _stage1(routine: bool = True, memos: bool = True) -> tuple[dict, int, int]:
         st.enter_context(patch.object(plan_call_scope, "_CALL_KINDS", kinds))
         st.enter_context(patch("mcp.tools_plan._model_allowed", return_value=(False, "fixture: model off")))
         st.enter_context(patch("mcp.tools_plan._run_stage_2", side_effect=stage_2_stub))
+        st.enter_context(patch.object(adherence_calc, "_load_catalog", counted_catalog))
+        if legacy:
+            _legacy_read_paths(st)
         args = {"target_date": _TARGET, **({"routine_id": "r-5813"} if routine else {})}
         out = tp.tool_plan_next_session(args)
+    _LAST["catalog_reads"] = len(catalog_reads)
     assert "error" not in out, out
     # The world must actually be READ: a reader that fails before reaching the fake makes no call in either arm, and a
     # count comparison over two failed reads proves nothing (the CI flake this guard names).
@@ -418,3 +475,126 @@ def test_timing_ms_stage_1_names_every_reader_and_the_reader_list_covers_every_s
     owner_words = {"deload_records", "disruption_records"}  # `_owner_word_records` reads them through a loop variable
     missing = sorted((labels | owner_words) - set(plan_call_scope.STAGE_1_READERS))
     assert not missing, f"stage-1 read labels missing from plan_call_scope.STAGE_1_READERS: {missing}"
+
+
+# ── #5813, 2026-11-15: the Lambda-only cost — the movement catalog read per label — and three smaller duplicates ────────
+
+
+def test_the_movement_catalog_is_read_a_bounded_number_of_times_per_stage_1_call():
+    """The catalog ratchet (down-only). Mutation: restore the per-label read (`_catalog_once` ignoring its cache) -> this
+    reds, and the legacy arm below shows the size of what it guards."""
+    _stage1()
+    _stage1()
+    reads = _LAST["catalog_reads"]
+    _stage1(legacy=True)
+    legacy = _LAST["catalog_reads"]
+    assert reads <= MAX_STAGE_1_CATALOG_READS, (
+        f"a draft_custom stage 1 now reads the movement catalog {reads} times (pin {MAX_STAGE_1_CATALOG_READS}); on the "
+        "Lambda each is a 430 KB S3 GET + parse — read it once per caller loop, not once per row or label (#5813)"
+    )
+    assert legacy >= reads + 30, f"the fixture no longer exercises the per-label loop ({legacy} legacy vs {reads} reads)"
+
+
+def test_the_2026_11_15_read_paths_change_no_output():
+    """Before/after on the fixed world: the read-once catalog, the concurrent routine pointers and the compiled keyword
+    patterns return a stage 1 byte-equal to the paths they replaced (patched back in), with and without a routine."""
+    for routine in (True, False):
+        _stage1(routine=routine)
+        before, _n, _t = _stage1(routine=routine, legacy=True)
+        after, _n, _t = _stage1(routine=routine)
+        a = json.dumps(_strip_timing(before), sort_keys=True, default=str)
+        b = json.dumps(_strip_timing(after), sort_keys=True, default=str)
+        assert a == b, f"routine={routine}: the 2026-11-15 #5813 read paths changed the stage-1 output"
+        assert '"movement": "Leg Press' in b, "the self-added-volume labels must actually be rendered on this fixture"
+
+
+def test_weekly_excess_reads_the_catalog_once_and_labels_exactly_as_a_read_per_label():
+    from training import self_added_volume as sav
+
+    world = _world()
+    rows = [dict(r, date=r["date"]) for r in world[_U + "hevy"]]
+    reads = []
+    real = sav._catalog_movements
+
+    def counted():
+        reads.append(1)
+        return real()
+
+    with patch.object(sav, "_catalog_movements", counted):
+        after = sav.weekly_excess(copy.deepcopy(rows), _TARGET)
+        once = len(reads)
+        with patch.object(sav, "_catalog_once", lambda _cache: sav._catalog_movements()):
+            before = sav.weekly_excess(copy.deepcopy(rows), _TARGET)
+    assert once == 1 and len(reads) - once > 10
+    assert json.dumps(before, sort_keys=True, default=str) == json.dumps(after, sort_keys=True, default=str)
+
+
+def test_routine_pointers_are_read_together_in_index_order_and_the_first_raise_wins():
+    from training import routine_repo
+
+    got = []
+
+    def fake_current(rid):
+        got.append(rid)
+        if rid.startswith("boom"):
+            raise RuntimeError(rid)
+        return None if rid == "gone" else f"ir:{rid}"
+
+    with patch.object(routine_repo, "get_current", fake_current):
+        assert routine_repo._current_many([f"r{i}" for i in range(12)] + ["gone", "r12"]) == [f"ir:r{i}" for i in range(12)] + [
+            None,
+            "ir:r12",
+        ]
+        assert sorted(got) == sorted([f"r{i}" for i in range(13)] + ["gone"])
+        try:
+            routine_repo._current_many(["r1", "boom1", "r2", "boom2"])
+            raise AssertionError("expected the first raise")
+        except RuntimeError as e:
+            assert str(e) == "boom1"
+
+
+def test_query_source_one_read_serves_lean_and_plain_and_a_pool_worker(monkeypatch):
+    queries = []
+
+    class _Table:
+        def query(self, **kw):
+            queries.append(kw)
+            return {
+                "Items": [
+                    {"pk": "USER#matthew#SOURCE#whoop", "sk": "DATE#2026-09-19", "date": "2026-09-19", "hrv": Decimal(40), "_raw": "x"}
+                ]
+            }
+
+    monkeypatch.setattr(core, "table", _Table())
+    monkeypatch.setattr(core, "_LEAN_STRIP", frozenset({"_raw"}))
+    window = ("2026-09-13", "2026-09-19")
+
+    def plain_reads():
+        return {
+            "plain": core.query_source("whoop", *window),
+            "lean": core.query_source("whoop", *window, lean=True),
+            "pool": core.parallel_query_sources(["whoop"], *window)["whoop"],
+            "pool_lean": core.parallel_query_sources(["whoop"], *window, lean=True)["whoop"],
+        }
+
+    outside = plain_reads()
+    assert len(queries) == 4, "outside a plan call every read queries"
+    queries.clear()
+    inside = plan_call_scope.plan_call(plain_reads)()
+    inside.pop("timing_ms", None)
+    assert len(queries) == 1, f"one (source, window) read per plan call, whatever the spelling: {len(queries)} queries"
+    assert inside == outside
+    assert "_raw" not in inside["lean"][0] and inside["plain"][0]["_raw"] == "x"
+
+
+def test_taxonomy_keyword_matching_is_the_old_regex_on_every_catalog_title():
+    """`muscle_volume._matches` (compiled once per keyword) against the per-call pattern it replaced, for every taxonomy
+    keyword over every catalog title and alias — the attribution behind the volume gates must not move."""
+    from training import muscle_volume as mv
+
+    catalog = json.loads((_REPO / "config" / "movement_catalog.json").read_text(encoding="utf-8"))["movements"]
+    names = {str(v.get("title") or k).lower() for k, v in catalog.items()} | {n.lower() for _t, n in _TEMPLATES}
+    names |= {"narrow grip bench press", "medicine ball throw", "farmers walk", "", "row", "x-row"}
+    keywords = {kw for kws, *_rest in mv.EXERCISE_TAXONOMY for kw in kws}
+    diffs = [(kw, n) for kw in keywords for n in names if mv._matches(kw, n) != (re.search(r"(?<![a-z])" + re.escape(kw), n) is not None)]
+    assert not diffs, diffs[:10]
