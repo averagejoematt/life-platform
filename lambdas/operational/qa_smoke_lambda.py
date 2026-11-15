@@ -64,6 +64,7 @@ from operational import (
     chronicle_status_row_qa,  # noqa: E402  (#3563 dead-man)
     closure_probe_qa,  # noqa: E402  (#4022 close-on-first-live-output)
     coach_checkin_queue_qa,  # noqa: E402  (#5127: the check-in queue served past rotation / on a paused source)
+    coach_read_freshness_qa,  # noqa: E402  (#5521: a present coach's read more than 7 days behind the board, unpaused)
     ensemble_digest_qa,  # noqa: E402  (#3829 dead-man)
     habit_cross_source_qa,  # noqa: E402  (#3666 cross-source contract)
     hae_additive_integrity_qa,  # noqa: E402  (#4628: a stored Apple Health day total below the delivered readings)
@@ -1260,6 +1261,7 @@ def check_steps():
         ),  # #1243: a same-title podcast episode must date-match its journal article
         ("published_permalink_reachable", check_published_permalink_reachable),  # #3284: no published post url may be a redirect source
         ("weight_truth", lambda: weight_truth_qa.checks(Check, SITE_BASE_URL, CONTENT_TRUTH, table=table)),  # #1894/#4025
+        ("coach_read_freshness", lambda: coach_read_freshness_qa.checks(Check, SITE_BASE_URL, CONTENT_TRUTH)),  # #5521
         ("receipt_replay", check_receipt_replay),  # #1373: progression-receipt drift alarm (deterministic replay)
         ("redirect_spotcheck", check_redirect_spotcheck),  # #1430: weekly legacy-redirect sample, rotates over redirects.map
         ("notion_template_schema", check_notion_template_schema),  # #1840: code TEMPLATE_SK vs live Notion schema drift gate
