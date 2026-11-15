@@ -15,7 +15,7 @@
 # (the owner's keep-everything rulings). Hashed assets are immutable for a year; pages are 300 s — the
 # same ladder deploy/sync_site_to_s3.sh uses for site/.
 #
-# Rollback (root only): `--restore-previous` copies s3://…/site/_v9_previous/ (the last root build
+# Rollback (root only): `--restore-previous` copies s3://…/www-previous/<LATEST>/ (the last root build
 # whose sweeps were green, written by `--record-previous` at the end of a green run) back over the
 # root, S3 → S3, no delete. The source holds only v9 output, so the restore can only ever touch
 # v9-owned keys — it cannot re-publish the v8 front page, and it cannot touch a kept site/ page.
@@ -35,7 +35,16 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 BUCKET="${BUCKET:-matthew-life-platform}"
 STACK="${WEB_STACK:-LifePlatformWeb}"
-PREVIOUS_PREFIX="site/_v9_previous"
+# The previous green root build — the source of a rollback. Since 2026-11-14 (owner ruling: close current-surface
+# exposures) each green build is recorded under its OWN prefix outside site/, never served: `www-previous/<build>/`, with
+# `www-previous/LATEST` naming the newest. The old copy lived at site/_v9_previous/ — under the served prefix, so the
+# whole previous site was public at /_v9_previous/, and because the deploy role cannot delete (ADR-032/046) every
+# build's stale pages accumulated in it (and a rollback re-published them). A per-build prefix needs no delete: a
+# rollback restores exactly one build. LEGACY_PREVIOUS is read only until the first per-build copy exists.
+PREVIOUS_ROOT="www-previous"
+LEGACY_PREVIOUS="site/_v9_previous"
+BUILD_ID="${GITHUB_SHA:-local-$(date -u +%Y%m%dT%H%M%SZ)}"
+PREVIOUS_PREFIX="$LEGACY_PREVIOUS"
 
 TARGET=""
 DIST="www/dist"
@@ -106,6 +115,15 @@ invalidate() {
 # ── restore: the previous v9 build back over the root, S3 → S3 ─────────────────────────────────
 if [ "$MODE" = "restore" ]; then
   [ "$TARGET" = "root" ] || { echo "www_preview_sync: --restore-previous is a root-target operation" >&2; exit 3; }
+  # the newest per-build copy, by its pointer; the legacy served copy only when no per-build copy exists yet
+  if [ "$PRINT" = "1" ]; then
+    echo "  \$ aws s3 cp s3://$BUCKET/$PREVIOUS_ROOT/LATEST -   # the newest recorded build's id → s3://$BUCKET/$PREVIOUS_ROOT/<id>/ (absent → the legacy $LEGACY_PREVIOUS/)"
+  else
+    LATEST_ID=$(aws s3 cp "s3://$BUCKET/$PREVIOUS_ROOT/LATEST" - 2>/dev/null | tr -d '[:space:]' || true)
+    if [ -n "$LATEST_ID" ]; then
+      PREVIOUS_PREFIX="$PREVIOUS_ROOT/$LATEST_ID"
+    fi
+  fi
   echo "www_preview_sync: ROLLBACK — restoring the previous v9 build from s3://$BUCKET/$PREVIOUS_PREFIX/ over s3://$BUCKET/site/ (no delete; v9-owned keys only, #5534)"
   if [ "$PRINT" = "1" ]; then
     echo "  \$ aws s3 ls s3://$BUCKET/$PREVIOUS_PREFIX/index.html   # absent (exit 1, no error text) → first root deploy, nothing to restore, exit 0; an ERROR (no credentials, AccessDenied) → exit 2"
@@ -145,8 +163,15 @@ PAGES=$(find "$DIST" -name index.html | wc -l | tr -d ' ')
 
 if [ "$MODE" = "record" ]; then
   [ "$TARGET" = "root" ] || { echo "www_preview_sync: --record-previous is a root-target operation" >&2; exit 3; }
-  echo "www_preview_sync: recording this green root build ($PAGES pages) as the previous build at s3://$BUCKET/$PREVIOUS_PREFIX/ (no delete)"
+  PREVIOUS_PREFIX="$PREVIOUS_ROOT/$BUILD_ID"
+  echo "www_preview_sync: recording this green root build ($PAGES pages) as the previous build at s3://$BUCKET/$PREVIOUS_PREFIX/ (its own prefix, outside site/ — never served)"
   run aws s3 sync "$DIST" "s3://$BUCKET/$PREVIOUS_PREFIX" --cache-control "public, max-age=300" --only-show-errors
+  # the pointer moves only after the whole build is copied: a half-copied build is never the rollback source
+  if [ "$PRINT" = "1" ]; then
+    echo "  \$ printf '%s' $BUILD_ID | aws s3 cp - s3://$BUCKET/$PREVIOUS_ROOT/LATEST"
+  else
+    printf '%s' "$BUILD_ID" | aws s3 cp - "s3://$BUCKET/$PREVIOUS_ROOT/LATEST" --only-show-errors
+  fi
   exit 0
 fi
 

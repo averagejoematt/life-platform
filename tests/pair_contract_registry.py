@@ -384,6 +384,12 @@ def _consume_engagement_state(record):
         def get_item(self, Key, **_kw):  # noqa: N803
             return {"Item": dict(record)} if record.get("sk") == Key.get("sk") and record.get("pk") == Key.get("pk") else {}
 
+        def query(self, **_kw):
+            # #5955: the consumer re-checks the food registry after the record's last food log. The
+            # producer's food channel last logged before the stated gap, so the registry holds nothing
+            # after it — the registry agrees with the record.
+            return {"Items": []}
+
     # `_g` is the facade's injectable state. `_ENGAGEMENT_CHANNELS` is taken from the
     # module that really owns it (site_api_data) rather than rebuilt here — the channel
     # set + labels must be the engine's own, which is the point of that indirection.

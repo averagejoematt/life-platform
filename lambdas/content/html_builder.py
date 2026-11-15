@@ -1838,6 +1838,28 @@ def _brief_rhythm(lines):
     )
 
 
+def _brief_folded(sections):
+    """#5821: the owner's folded emails (emails.brief_lines.folded_sections) — one compact block per section, escaped,
+    inside demo-hideable markers. "" when there are none, so a morning with nothing folded renders exactly as before."""
+    if not sections:
+        return ""
+    from html import escape  # noqa: PLC0415
+
+    out = ""
+    for sec in sections:
+        body = "".join(
+            '<p style="font-size:12px;color:#475569;margin:0 0 4px;">' + escape(str(ln)) + "</p>" for ln in sec.get("lines") or []
+        )
+        out += (
+            '<div style="padding:8px 24px 8px;"><p style="font-size:11px;font-weight:700;color:#334155;margin:0 0 6px;">'
+            + escape(str(sec.get("title", "")))
+            + "</p>"
+            + body
+            + "</div>"
+        )
+    return "<!-- S:folded -->" + out + "<!-- /S:folded -->"
+
+
 def build_html(
     data,
     profile,
@@ -1876,6 +1898,7 @@ def build_html(
     journal_coach_absent=False,
     steps_line=None,
     rhythm_lines=None,
+    folded_sections=None,
 ):
     """Build the full daily brief HTML email.
 
@@ -1885,7 +1908,8 @@ def build_html(
     intake_line (#1405: intake_response.brief_line, n + CI per ADR-105) and steps_line (#5056) are pre-formatted
     Matthew-private one-liners; they must never reach a public surface.
     rhythm_lines (#4972, emails.brief_lines.rhythm_lines) are the owner-only heart-rhythm section's data lines —
-    the same rule: this email only.
+    the same rule: this email only. folded_sections (#5821, emails.brief_lines.folded_sections) are the owner's
+    folded emails (protein note, nutrition review, habits to settle) — owner-only, the same rule.
     """
     date_str = data["date"]
     # #4182: the H1 names the morning the brief is read (data day + 1); the freshness line names the data day.
@@ -1929,6 +1953,7 @@ def build_html(
         html += '<div style="padding:4px 24px 4px;"><p style="font-size:12px;color:#475569;margin:0;">👣 ' + steps_line + "</p></div>"
     if intake_line:
         html += '<div style="padding:4px 24px 12px;"><p style="font-size:12px;color:#475569;margin:0;">🌙 ' + intake_line + "</p></div>"
+    html += _brief_folded(folded_sections)
     html += _brief_rhythm(rhythm_lines)
     html += _brief_footer(compute_age_msg, compute_stale, data, date_str, budget_headroom_line=budget_headroom_line)
     return html

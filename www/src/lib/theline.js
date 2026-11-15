@@ -26,7 +26,7 @@ const PAPER = "#F4F4F0";
  *   rungs?: Array<{lb:number,date:string|null}>,
  *   chapters?: Array<{date:string,n:string}>,
  *   from?: string, to?: string, focus?: {from:string,to:string}|null,
- *   width?: number, height?: number, mobile?: boolean, aria?: string, unit?: string,
+ *   width?: number, height?: number, mobile?: boolean, aria?: string, unit?: string, shade?: boolean,
  * }} o
  */
 export function theLine(o) {
@@ -95,7 +95,7 @@ export function theLine(o) {
   });
   if (run.length) runs.push(run);
   const halfDay = (W - pad.l - pad.r) / Math.max(1, (x1 - x0) / DAY_MS) / 2;
-  for (const r of runs) {
+  for (const r of o.shade === false ? [] : runs) {
     const a = Math.max(pad.l, X(r[0].date) - (r.length === 1 ? halfDay * 0.8 : 0));
     const b = Math.min(W - pad.r, X(r[r.length - 1].date) + (r.length === 1 ? halfDay * 0.8 : 0));
     let d = `M${a.toFixed(1)},${sY.toFixed(1)}`;
@@ -171,4 +171,59 @@ export function lineCounts(days, from, to) {
   const w = (days || []).filter((d) => (!from || d.date >= from) && (!to || d.date <= to));
   const n = w.filter((d) => d.value != null && !d.gap).length;
   return { days: w.length, readings: n, missing: w.length - n };
+}
+
+/**
+ * One week of The Line, for a row of the chapter list (2026-11-14, sprint II), drawn DOWN the page: time runs along
+ * the row's height (the week's last day at the top, the list being newest first) and weight across its width on the
+ * WHOLE journey's scale (`lo`..`hi`). The svg stretches to its row (preserveAspectRatio none; strokes and dots do not
+ * scale), so the segments of consecutive rows meet at the row borders and the list carries one line through every
+ * week — the weeks with no chapter included. A reading is a dot, consecutive mornings are joined solid, a missing
+ * morning is bridged dashed and marked with a short tick at the edge. Nothing is drawn the series does not carry.
+ * Returns { svg, first, last, n, missing } or null when the week has no reading.
+ */
+export function weekStrip(o) {
+  const W = o.width || 200;
+  const H = 100; // a unit box: the row's CSS height decides the pixels
+  const pad = 8;
+  const days = (o.days || []).filter((d) => d && d.date >= o.from && d.date <= o.to);
+  const readings = days.filter((d) => d.value != null && !d.gap);
+  if (!readings.length) return null;
+  const n = Math.max(1, Math.round((t(o.to) - t(o.from)) / DAY_MS) + 1);
+  const Y = (iso) => (((t(o.to) - t(iso)) / DAY_MS + 0.5) / n) * H;
+  const X = (v) => pad + ((v - o.lo) / (o.hi - o.lo || 1)) * (W - 2 * pad);
+  const ink = o.muted ? "#8A8A85" : INK;
+  const ns = 'vector-effect="non-scaling-stroke"';
+  let g = "";
+  days.forEach((d) => {
+    if (d.value == null || d.gap) g += `<line x1="0" y1="${Y(d.date).toFixed(2)}" x2="9" y2="${Y(d.date).toFixed(2)}" stroke="${MUTED}" stroke-width="1" ${ns}/>`;
+  });
+  let solid = "";
+  let dashed = "";
+  for (let i = 1; i < readings.length; i++) {
+    const a = readings[i - 1];
+    const b = readings[i];
+    const seg = `M${X(a.value).toFixed(1)},${Y(a.date).toFixed(2)} L${X(b.value).toFixed(1)},${Y(b.date).toFixed(2)}`;
+    if ((t(b.date) - t(a.date)) / DAY_MS > 1) dashed += seg;
+    else solid += seg;
+  }
+  if (dashed) g += `<path d="${dashed}" fill="none" stroke="${ink}" stroke-width="1.3" stroke-dasharray="2 3" ${ns}/>`;
+  if (solid) g += `<path d="${solid}" fill="none" stroke="${ink}" stroke-width="1.8" ${ns}/>`;
+  // a dot is a zero-length round-capped stroke, so it stays round however the row stretches the box
+  readings.forEach((d, i) => {
+    const now = Boolean(o.latest) && d.date === o.latest; // only the journey's latest morning is the cobalt dot
+    const x = X(d.value).toFixed(1);
+    const y = Y(d.date).toFixed(2);
+    g += `<path d="M${x},${y} L${x},${y}" stroke="${now ? COBALT : ink}" stroke-width="${now ? 9 : 5}" stroke-linecap="round" ${ns}/>`;
+  });
+  const first = readings[0];
+  const last = readings[readings.length - 1];
+  const aria = `${readings.length} weigh-ins from ${dayInWords(o.from, { short: true })} to ${dayInWords(o.to, { short: true })}: ${num(first.value, 1)} to ${num(last.value, 1)} pounds.`;
+  return {
+    svg: `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(aria)}">${g}</svg>`,
+    first,
+    last,
+    n: readings.length,
+    missing: days.length - readings.length,
+  };
 }

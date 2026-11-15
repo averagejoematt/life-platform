@@ -71,6 +71,10 @@ _ALLOWED_REDIRECT = "https://claude.ai/api/mcp/auth_callback"
 # redirect and the probe's own target is inert.
 _FOREIGN_REDIRECT = "https://oauth-probe.invalid/cb"
 
+# #5979: a URL that Python's urlparse reads as an allowlisted host (claude.ai) but a browser reads as the foreign
+# one (a backslash is "/" to a browser). The allowlist must refuse it like any foreign host.
+_DIFFERENTIAL_REDIRECT = "https://oauth-probe.invalid\\@claude.ai/cb"
+
 
 def _request(url, *, method="GET", data=None, headers=None):
     """One probe. Returns (status:int, headers:dict, body:str).
@@ -100,18 +104,42 @@ def _yellow(c, why):
     return c
 
 
-def _authorize_url(base, redirect_uri):
-    qs = urllib.parse.urlencode(
-        {
-            "response_type": "code",
-            "client_id": "qa-smoke-oauth-probe",
-            "redirect_uri": redirect_uri,
-            "state": "qa-smoke-3620",
-            "code_challenge": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
-            "code_challenge_method": "S256",
-        }
-    )
-    return f"{base.rstrip('/')}/authorize?{qs}"
+def _authorize_url(base, redirect_uri, *, pkce=True):
+    params = {
+        "response_type": "code",
+        "client_id": "qa-smoke-oauth-probe",
+        "redirect_uri": redirect_uri,
+        "state": "qa-smoke-3620",
+    }
+    if pkce:
+        params.update({"code_challenge": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", "code_challenge_method": "S256"})
+    return f"{base.rstrip('/')}/authorize?{urllib.parse.urlencode(params)}"
+
+
+def _refused(name, base, url, what):
+    """A GET /authorize that must be REFUSED (4xx) — never the consent form, never a redirect."""
+    c = Check(name, "MCP OAuth door", CONTENT_TRUTH)
+    try:
+        status, headers, _body = _request(url)
+    except Exception as e:
+        return _yellow(c, f"{type(e).__name__}: {e}")
+    if status >= 500:
+        return _yellow(c, f"HTTP {status} from /authorize")
+    c.passed = 400 <= status < 500
+    c.message = f"/authorize refused {what} ({status})" if c.passed else f"/authorize answered {status} (not a refusal) for {what}"
+    if status in (301, 302, 303, 307, 308):
+        c.message = f"OPEN REDIRECT: /authorize {status}'d {what} to {headers.get('Location', '?')[:80]}"
+    return c
+
+
+def _check_parser_differential_refused(base):
+    """#5979: the redirect allowlist agrees with a browser, not only with Python's URL parser."""
+    return _refused("oauth:parser_differential", base, _authorize_url(base, _DIFFERENTIAL_REDIRECT), "a backslash-userinfo redirect_uri")
+
+
+def _check_pkce_required(base):
+    """#5932: PKCE is mandatory — an allowed redirect with no code_challenge is refused, never shown the form."""
+    return _refused("oauth:pkce_required", base, _authorize_url(base, _ALLOWED_REDIRECT, pkce=False), "a request with no PKCE challenge")
 
 
 def _check_consent_form(base):
@@ -237,13 +265,15 @@ def _check_mcp_requires_bearer(base):
 
 
 def checks():
-    """The four probes. Yellow-all when the Function URL cannot be discovered —
+    """The six probes. Yellow-all when the Function URL cannot be discovered —
     absence of evidence is reported as absence, never as a pass."""
     base = resolve_mcp_url()
     probes = (
         ("oauth:consent_form", _check_consent_form),
         ("oauth:token_unbound", _check_token_without_code),
         ("oauth:foreign_redirect", _check_foreign_redirect_refused),
+        ("oauth:parser_differential", _check_parser_differential_refused),
+        ("oauth:pkce_required", _check_pkce_required),
         ("oauth:bearer_required", _check_mcp_requires_bearer),
     )
     if not base:

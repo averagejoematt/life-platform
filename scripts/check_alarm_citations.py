@@ -134,7 +134,9 @@ DEGRADE HONESTLY
 
 USAGE
   python3 scripts/check_alarm_citations.py             # gate: uncited long-red or fired-and-cleared -> exit 1
-  python3 scripts/check_alarm_citations.py --decoded    # operator named the shortfall; exit 0
+  python3 scripts/check_alarm_citations.py --decoded    # operator named the shortfall; exit 0 —
+      EXCEPT an alarm lit >14 days with no valid citation (no `#N`, or every `#N` closed): that
+      exits 1 regardless, so it blocks the wrap (#5934, `unowned_ancient_reds`).
 """
 
 import json
@@ -314,6 +316,37 @@ def issueless_ancient_reds(alarms, citations, now=None, threshold_days=ALARM_TEN
         if not re.search(_ISSUE_REF, citation):
             out.append((name, age))
     return out
+
+
+def unowned_ancient_reds(alarms, citations, issue_states, now=None, threshold_days=ALARM_TENURE_ISSUE_DAYS):
+    """(alarm_name, age_hours, reason) for every alarm lit > threshold_days with no VALID citation —
+    no entry, no `#N`, or every cited `#N` known closed. The one leg `--decoded` cannot release (#5934):
+    past 14 days a handover sentence is not an owner. An unreadable issue state is UNKNOWN, never closed."""
+    now = now or datetime.now(timezone.utc)
+    out = []
+    for a in alarms:
+        name = a.get("name") or "?"
+        age = alarm_age_hours(a, now)
+        if a.get("by_construction") or age is None or age <= threshold_days * 24.0:
+            continue
+        refs = issue_refs((citations.get(name) or {}).get("citation", ""))
+        if not refs:
+            out.append((name, age, "no filed-issue citation"))
+        elif all(issue_states.get(n) is not None and str(issue_states[n]).upper() != "OPEN" for n in refs):
+            out.append((name, age, "every cited issue is closed: " + ", ".join(f"#{n}" for n in refs)))
+    return out
+
+
+def render_unowned(unowned):
+    """The non-decodable block message for unowned_ancient_reds' result ([] -> [])."""
+    if not unowned:
+        return []
+    lines = [
+        f"⛔ {len(unowned)} alarm(s) lit >{ALARM_TENURE_ISSUE_DAYS} DAYS without a valid citation — this BLOCKS the wrap (#5934); --decoded does not release it:"
+    ]
+    lines += [f"   - {name}  (red {age / 24:.1f}d; {reason})" for name, age, reason in sorted(unowned)]
+    lines.append("   Fix the alarm, or file/re-point an OPEN issue and put its `#N` in docs/alarm_citations.json.")
+    return lines
 
 
 def flapped_uncited(history, citations, now=None, window_hours=FLAP_WINDOW_HOURS, live_alarm_names=None):
@@ -1129,6 +1162,11 @@ def main():
 
     aged_lines = [] if err else render_lines(aged_unrefreshed_citations(alarms, citations))
     code, message = (1, "\n".join(aged_lines) + ("\n" + message if code else "")) if aged_lines else (code, message)
+    # #5934: >14d with no valid citation blocks the wrap outright — the one leg --decoded cannot release.
+    unowned_lines = [] if err else render_unowned(unowned_ancient_reds(alarms, citations, {} if issue_err else issue_states))
+    if unowned_lines:
+        print("\n".join(unowned_lines) + ("\n" + message if code else ""))
+        return 1
     print(message)
     if code == 0:
         return 0

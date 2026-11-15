@@ -93,6 +93,17 @@ def _macrofactor_rows():
             "total_protein_g": 175,
             "food_log": food_log,
         },
+        # #5954: today's row from a mid-day export (`partial_at_export`) is not a complete log — never the latest day.
+        # Dropping `partial_at_export` from the projection makes it the latest day, so the mutation below must notice.
+        {
+            "sk": f"DATE#{_day(0)}",
+            "date": _day(0),
+            "entries_count": 1,
+            "total_calories_kcal": 80,
+            "total_protein_g": 15,
+            "food_log": food_log[:1],
+            "partial_at_export": True,
+        },
     ]
     for r in rows:
         r.update(pk=f"{_PREFIX}macrofactor", phase="experiment")
@@ -251,7 +262,7 @@ def test_the_narrow_nutrition_reader_serves_the_routes_own_edition_fields(fake_t
     # The fixture exercises the facts: 8 logged in-window rows (the tombstone and the 40-day row are not; #5607: the
     # stub is not a log, the zero-count row with a food log is), a protein-floor hit count, and both macro spellings.
     assert whole["nutrition"]["days_logged"] == 8 and whole["nutrition"]["latest_date"] == _day(1), whole["nutrition"]
-    assert whole["nutrition"]["incomplete_days"] == [_day(2)]
+    assert whole["nutrition"]["incomplete_days"] == [_day(2), _day(0)] and whole["nutrition"]["partial_days"] == [_day(0)]
     stub = next(r for r in whole["nutrition_trend"] if r["date"] == _day(2))
     assert stub["logging_gap"] is True and stub["protein_g"] == 15, "the trend keeps the stub, flagged"
     assert whole["nutrition"]["protein_floor_hit_days"] > 0

@@ -131,7 +131,10 @@ Role.AssumeRolePolicyDocument` lists exactly the two `environment:` subjects;
 (d) CloudTrail `AssumeRoleWithWebIdentity` for `github-actions-deploy-role` shows only
 `environment:` subjects after step 5.
 
-### PENDING APPLY — the readonly role's alarm-history + qa-smoke cause read for the alarm-citation gate (#5934, 2026-11-14)
+### APPLIED 2026-11-15 — the readonly role's alarm-history + qa-smoke cause read for the alarm-citation gate (#5934)
+
+> Applied ~06:00Z with the put-role-policy command below (owner-approved); `get-role-policy` read back
+> both Sids. The role's entry was deleted from `_PENDING_PERMISSIONS_APPLY` in the same PR.
 
 `github-actions-readonly-role.permissions.json` gains two read-only statements so wrap-nightly's
 `wrap-alarm-citations` leg can run `scripts/check_alarm_citations.py` unattended:

@@ -2,7 +2,7 @@
  "_source": "LIVE Habitify API, captured 2026-09-06 ~20:30 PT for #3666 (read-only GETs).",
  "_journal_query": "GET /journal?target_date=2026-09-06T00:00:00+00:00",
  "_logs_query": "GET /logs/{habit_id}?from=2026-08-31T00:00:00+00:00&to=2026-09-08T00:00:00+00:00",
- "_privacy": "Two habit NAMES are substituted ('Vice Habit (name withheld)', 'Vice Habit 2 (name withheld)') under the never-public content rule — in BOTH the journal entry and the logs key, which is keyed by habit name. Owner ruling 2026-11-05: real journal-activity values replaced with synthetic ones for privacy — the two journal habits' names AND ids are substituted the same way ('Withheld Habit A/B (name withheld)', synthetic ids), so no journal status is attributable. Every other timestamp, id, status, goal and value is verbatim wire.",
+ "_privacy": "Two habit NAMES are substituted ('Vice Habit (name withheld)', 'Vice Habit 2 (name withheld)') under the never-public content rule — in BOTH the journal entry and the logs key, which is keyed by habit name. Owner ruling 2026-11-05: real journal-activity values replaced with synthetic ones for privacy — the two journal habits' names AND ids are substituted the same way ('Withheld Habit A/B (name withheld)', synthetic ids), so no journal status is attributable. #5948 (2026-11-14): four more habit NAMES are substituted ('Restraint Habit A/B/C/D (name withheld)') — restraint habits outside the two categories docs/DATA_GOVERNANCE.md allows to be named in public; their ids, statuses and logs are untouched. Every other timestamp, id, status, goal and value is verbatim wire.",
  "area_map": {
   "-P-Bq7K_2mUXjwtetrQp": "Core",
   "-P-Bq87ujL_d3KDcrA8b": "Optimize",
@@ -326,7 +326,7 @@
   },
   {
    "id": "D013DD53-60FB-4D84-9B0D-9C8045F4242B",
-   "name": "No Fried Food",
+   "name": "Restraint Habit A (name withheld)",
    "is_archived": false,
    "goal": {
     "unit_type": "rep",
@@ -368,7 +368,7 @@
   },
   {
    "id": "6F66604E-9BC0-4492-B7DA-A7305E3C4146",
-   "name": "No Phone 30 Mins Before Bed",
+   "name": "Restraint Habit C (name withheld)",
    "is_archived": false,
    "goal": {
     "unit_type": "rep",
@@ -410,7 +410,7 @@
   },
   {
    "id": "F1A7E0F3-1377-456F-B0FA-C43E85EA51E0",
-   "name": "No mindless scrolling",
+   "name": "Restraint Habit D (name withheld)",
    "is_archived": false,
    "goal": {
     "unit_type": "rep",
@@ -431,7 +431,7 @@
   },
   {
    "id": "F92AFAEC-4B0F-43F0-8E93-42401FFF910D",
-   "name": "No sweets",
+   "name": "Restraint Habit B (name withheld)",
    "is_archived": false,
    "goal": {
     "unit_type": "rep",
@@ -1422,7 +1422,7 @@
   "L-Threonate": [],
   "Apigenin": [],
   "Theanine": [],
-  "No Fried Food": [
+  "Restraint Habit A (name withheld)": [
    {
     "id": "-P0td5xGuBnMhFJ-RYT8",
     "value": 1,
@@ -1440,7 +1440,7 @@
     "habit_id": "306691EF-799A-4B92-8AA5-336A522D6B95"
    }
   ],
-  "No Phone 30 Mins Before Bed": [],
+  "Restraint Habit C (name withheld)": [],
   "Vice Habit (name withheld)": [
    {
     "id": "-P0td6bF5MPfon5PRGpw",
@@ -1450,8 +1450,8 @@
     "habit_id": "6DF2A02C-146B-41A0-841F-DACAEACF75ED"
    }
   ],
-  "No mindless scrolling": [],
-  "No sweets": [
+  "Restraint Habit D (name withheld)": [],
+  "Restraint Habit B (name withheld)": [
    {
     "id": "-P0td711emLc0ZZfnHOg",
     "value": 1,

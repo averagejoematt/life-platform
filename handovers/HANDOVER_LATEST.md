@@ -1,56 +1,56 @@
-# Handover — Depth restoration, autonomous night: the Journey and the Day live at the root, every chart answers, three pay-downs — 10 PRs merged, 9 root deploys, one rollback fixed within the hour (2026-11-02)
+# Handover — Backlog paydown, the 8-hour block: ten review and accuracy bugs fixed in parallel lanes, 12 PRs merged and deployed, six closed on live proof (2026-11-14)
 
 ## Driving instruction
-After the v9 launch (2026-11-01) the owner commissioned a parity audit (125 historical capabilities: A17 / B41 / C64 / D3), approved the Journey, One Day, Coaching Room and Laboratory prototypes as product directions (revision 2), sent seven prototype sections to keep verbatim, and decided: Journey at `/data/journey/` linked from the weight page · silhouette deferred · projected date off Start · date parameters on three read-only endpoints · coach lines only through the existing filters · nutrition as logged, missing ≠ zero · DEXA scan two shown missing · fluid in-place Day browsing with URL/history in sync (never navigation-only) · Journey visual-QA tier 1, Day pages tier 3 sampled · chapter progress bar retired, other retirements pending. Then: "yes you can do all the production work and merge … continue this plan … use opus/sonnet accordingly to conserve fable." Start stays frozen until his visual review. Fable ran out mid-wrap; the wrap finished on Opus.
+The owner asked for "a fresh new sweep of our backlog, coordinate with other sessions, and make a plan for an autonomous session for the next 8 hours paying more issues down", then "go" on the plan, which carried five calls he accepted with it: merge the surge-baseline fix even though surge engages (ceiling $215 → $252 while it does); no DynamoDB backfill for state_of_matthew; the alarm-citation schedule's IAM goes to him as a draft PR, not deployed; exemption/hold for the emf census to 11-28 and the two rhythm checkpoints left to him; fold the nutrition epic #5094. Mid-block he offered the 2026-11-14 accuracy-review issues; this session took the engine-side three (#5952, #5954, #5955). Lanes were agreed with the peer sessions: training (life-platform-fe: lambdas/training/**, the #5858 conflict set incl. the gate-census files), v9 sprint (session-co-issue-paydown: www/**, site/privacy/, site_api_chapters.py, publish_snapshot*), review (life-platform-34: no paths; #5932 and mcp/handler.py held untouched as its blind control).
 
 ## What is COMPLETE (merged, deployed, verified live)
-- **M0 every chart answers + M1 the Journey layers 0–1** — PR #5580 (`69afaa072`) + #5582 (`e5ed127a8`, the phone label fix). #5578, #5579 closed with live proof.
-- **Footer "sample content" chip** — PR #5588 (`227e967ff`). #5581 closed.
-- **Coach names in disagreement verdicts** — PR #5587 (`cf4ad8050`); the build refuses a raw persona id. #5572 closed.
-- **M3a date windows** on `/api/workouts`, `/api/sleep_detail`, `/api/nutrition_overview` — PR #5590 (`5a0eba3ad`), fleet deploy run 41396844099; `?date=` / `?from=&to=` (≤ 92 days, clamped, `window` echoed, 400 on a bad date, bare responses unchanged). #5584 closed.
-- **M3b the Day object** — PR #5591 (`2e3fb3804`): `/data/day/<date>/` for all 57 days, readings against their own 7/30-day normals (computed at export), 14-day strip, scrubber, in-place swap with `pushState` + title + canonical in sync (proven on production: zero reloads, back/forward restore). #5585 closed.
-- **M4 the Day's layers 2–3** — PR #5592 (`c6b5da702`): session set by set, night by two devices, recovery decomposed, food as logged with the platform's gap flag, engine score (absent shown as absent), coach lines, calls graded and open; every block has its in-place unavailable state. #5586 closed.
-- **Chapter pages → their seven days** — PR #5594 (`fd0028536`). #5593 closed.
-- **M2 the Journey layers 2–3** — PR #5589 (`c70d77a60`): the pace (the one published rate + 95% interval), the milestones ladder, the body (DEXA baseline, visceral gauge, "Missing: scan two", PhenoAge drivers, no chronological age anywhere), RHR + HRV in device eras, the coaches on the weight. #5583 closed. Root run 41415741597 green.
-- All seven owner keep-verbatim sections are on production. Every root deploy ran smoke + visual + AI-vision QA; only the first (M1) rolled back.
+- **#5936** PR #5961 (e313b9d42) — the surge baseline ends before the reading under test. cost-governor redeployed 19:07Z; bundle carries `split_reading_and_baseline`. Closed.
+- **#5930 + #5527** PR #5963 (07229169a) — status board pages to the end, derives rows from the registry, unique `apple_health:<field>` ids. Live /api/status 21:38Z: 0 duplicate ids, CGM 79d, Mindful 217d, hevy row, macrofactor_workouts as archive. Both closed.
+- **#5955** PR #5964 (ee56f1697) — /api/presence reconciles against food rows at read time (cause: MacroFactor batch exports land after the 17:35Z presence compute). Live: present, last_log_date = newest food row. Closed.
+- **#5954** PR #5962 (5559e1bbe) — `partial_at_export` rows labelled partial and kept out of headline, averages, floor count, micronutrients, Data room tiles, meal-timing anchor. Live (cache-busted): partial_days [2026-11-13], latest_date 2026-11-12. Closed.
+- **#5952** PR #5960 (2c05f830f) + PR #5988 (ed0d41a24) — monthly_cost derived from the last closed month (~$220 for 2026-10); stack.json and the starter-slice cost note re-grounded. Live /api/platform_stats and /data/stack.json both ~$220. Closed.
+- **#5094** folded: all 19 stories closed; rulings R1–R8 carried verbatim to #5907. Closed.
 
-## TESTED, merged, NOT run against production (owner-authorised acts only)
-- none — everything merged this session is deployed and verified at the root.
-
-## Owner rulings applied after the wrap (2026-11-02, same session)
-- **#5596** — keep both Start statements; fix the QA rule: PR #5601 (`0d90963f0`, rubric clause + structural ruling, qa-smoke Lambda deployed). Open until the next nightly smoke reads `fail none -`.
-- **HRV CI coverage + the 300 lb milestone** — PR #5600 (`e4588e030`, root run 41489096100 green): HRV covered via fixture-only `journey.json` `heart_series` (Start untouched, reach 12); every crossed rung keeps its date, "Week 8 · held" shown unlinked, missing chapters read "no chapter yet". #5598 closed.
-- **#5597** — the render gate measures SVG text at 390/360 against 11 px: PR #5599 (`8386410d1`). Closed.
-- **Production review package** delivered (`~/Desktop/averagejoematt-production-review-journey-day-2026-11-02.zip`): full-page screenshots, three interaction recordings, 20/20 interaction checks, the uncached homepage response (ETag 463cf230…, Last-Modified 15:39:43Z).
-- **Hold:** Coaching Room, Laboratory and Story timeline stay on hold until the owner reviews Journey and Day. No further feature work.
+## Merged, live proof still owed (Refs, not Fixes)
+- **#5931** PR #5965 (70d8f787f) — the writer's stage map renamed `phase_context`; `tag_record` overwrites a non-string `phase`. Proof: the Sun 19:30Z state-of-matthew run → `/api/state_of_matthew` `available: true`. The payload newly carries `phase_context` (day/week/stage — already public).
+- **#5933** PR #5967 (1ac9a8134) — origin-idiom framings checked against the journey start; recap figures grounded against the installment text incl. `where_we_are_now`. Proof: the next weekly_priority and Wednesday chronicle.
+- **#5934** PR #5958 (445dffa0f) — citations re-pointed; an alarm lit >14 d with no open `#N` now blocks wrap. The unattended schedule is draft PR **#5966** (OWNER-REQUIRED readonly-role grant); the paydown would not widen the remediation role's callers.
+- **#5935** PR #5957 (c8cd41c58) — scheduled-workflow red tenure: the cron-freshness watcher files/refreshes one `auto-filed` tracker at 3 consecutive reds; `WF RED` lines at boot. It filed #5973–#5976 on its first run (each now carries a diagnosis). managed-where re-verified; emf-series-census held to 2026-11-28.
+- **#5937** PR #5971 (8364da1f2) — CLAUDE.md CI/CD paragraph + format command corrected and gated by check_doc_facts; this wrap refreshes the status pointer (the last box).
 
 ## AWAITING THE OWNER
-- **Start's visual review** (stabilization) — the new pages are reached from the data room, the weight page and chapter pages, not from `/`.
-- **His visual and interaction review of the Journey and Day** (acceptance is subject to it).
-- The remaining proposed retirements (S09/A32, A07 deferred, A27, A30, M11) and the next restoration milestones (Coaching Room CR1–CR4, Laboratory L1–L4, Story HS1–HS3) — not started; his review first.
+- **#5947 (P1)** — an owner-only clinical fact is live on a public surface (detail held privately). Takedown is his act.
+- **#5949 (P1)** — Panel prologue speaks body-weight figures: re-cut, or rule historical weights allowed in audio.
+- **PR #5966** — apply the readonly-role grant (#5934's schedule). **PR #5910** (#5513) and **#5897** (#5545, after #5858) as before.
+- **#5935** — the two rhythm checkpoints (steps on PR #5957); the accuracy-review artifact landing ("land it" to the review session) resets accuracy-full.
+- **#5974** — eval-harvest's role is KMS-denied on the table (IAM/key policy).
 
 ## Gotchas learned (each in memory)
-- A fixed mobile viewBox scaled into a phone column shrinks SVG text below the visual sweep's 11 px floor → rollback; pass the container width as the viewBox, and measure effective text before a root deploy (`reference_a_phone_chart_viewbox_must_follow_the_container`; class tracker #5597).
-- A rollback after a www merge restores only the previous build's paths — new pages keep serving beside reverted ones (a mixed root) until the next green run.
-- `scripts/publish_snapshot.py` sits at the module-size guard; new mappers go in their own modules (`publish_snapshot_journey.py`, `publish_snapshot_day.py`).
-- A live build rewrites `www/owned_paths.json` + `www/reach.json`; always re-export the fixture and rebuild before committing.
-- axe cannot be injected under the live CSP; measure it in a `bypass_csp` context only. Playwright taps during smooth scroll miss.
-- An Opus lane agent went silent mid-merge for 2.5 h (conflicts resolved, nothing committed); took the merge over by hand. The commit-msg hook requires a Conventional Commit subject even on merge commits (`chore(merge): …`).
+- A new test FILE is a new gate in the census (ceiling 857; census files fenced while #5858 is open) — fold new tests into an existing proven test file. Two lanes hit it.
+- Peer sessions in bypass mode hold this session's cross-session messages; three expired or waited for approval. Put cross-lane notes on the issue instead.
+- A merge-loop's "all checks done" must wait for the main PR workflow to REGISTER — `assert_pr_green.py` caught two expected checks missing on #5988 while "PR checks" sat queued.
+- A site deploy whose change touches site-API code defers itself until the site API serves that commit; it re-dispatches after the CI/CD deploy (stack.json landed ~40 min after merge).
+- CloudFront holds `/api/nutrition_overview` up to 1 h — read live proofs cache-busted.
 
 ## Residual / next picks
-- #5596 — close on the next nightly smoke reading `[QA] CAUSE fail none -` (the rule fix is deployed).
-- #5577 — the restoration epic: next milestones (CR/L/HS/DM) need the owner's review of tonight's pages first.
-- #5573 — the parallel session's open item: `program_structure.py` still names `romanian_deadlift_*` (held for stabilization); lateral-raise/triceps questions unanswered.
-- not-work — the owner's five-reader review of the launched site is his (2026-11-01 ruling).
+- #5518 — Sun 2026-11-15 12:00 PT the hypothesis-engine writes the two genesis voids; verify both rows `expired_undecided`, then close (also clears `prereg-overdue`).
+- #5931 — read `/api/state_of_matthew` after the Sun 19:30Z run; close on `available: true`.
+- #5933 — close on the next weekly_priority + Wednesday chronicle passing the gates.
+- #5575 — Mon 2026-11-16 weekly run closes it, with #5759, #5761, #5772 and likely #5505.
+- #5802 — last box (one live stage-1 read) blocked by stage-1 latency #5813 (training lane).
+- #5990 — Coaching Room: critics_aerobic.py still prints the retired cap (residual of #5916).
+- #5973 — config-twin drift is training-lane artifacts; #5976 — PII sweep reds on two dark Coaching Room 404s.
+- not-work — the wrap's memory backup (`aws s3 sync … claude-memory-backup/`) was not run: an S3 write is ask-first under the owner's global rules; run it attended.
+- not-work — read the cost-governor's first run on the new code (~2026-11-15T01:00Z): expect `surge_threshold=1769 … recent_uniques=2603 surge_active=True`.
 
-**Build beat:** 2026-11-02-the-depth-came-back
-**Docs:** `docs/INCIDENT_LOG.md` (+1 P3 row, Patterns regenerated) · `docs/alarm_citations.json` (qa-smoke-failures / -warnings re-cited to #5596) · `docs/OPERATING_KNOWLEDGE_LEDGER.md` (+6 rows, snapshot + counters) · `docs/API.md` (the day window, in #5590) · `www/README.md` (the Journey and Day objects)
-**Decisions:** none needed — every rule shipped tonight is an owner decision of 2026-11-02 recorded on epic #5577 and its stories; no governance change
-**Main:** green (c70d77a6)
-**Incidents:** 1 row added — the Journey's first root deploy rolled back on a 9.1 px SVG label (P3, loud; class tracker #5597)
-**Stash/hooks:** clean · worktree-reap removed 11 merged lanes; no dirty lane
-**Closures:** #5578, #5579, #5581, #5572, #5584, #5585, #5586, #5593, #5583 commented (Shipped + Live proof + Outcome realized) · DoD: scanned=11 hits=0
-**Backlog:** Now live at 10 (sonnet 4 · opus 10 · fable 2 startable); filed this session #5577 (epic), #5583–#5586, #5593, #5596, #5597; no promotion needed
-**Alarms:** qa-smoke-failures / qa-smoke-warnings re-cited to #5596 (new episode 2026-11-02 06:19Z, reader_truth on the Start portrait); the failures citation names `reader_truth:verdict` while the latest run reads `-` because the daily-period alarm still holds the 06:19Z bucket — decoded, it clears at the first clean daily evaluation; calibration-deadman (#3759) and chronicle-delivery-heartbeat (#4531) unchanged
-**CI warnings:** 5 — all the same intentional skip ("SKIPPED in CI — no playwright/chromium installed here", #3640); no action
-**Ledger:** none — no standing machinery shipped (the web gate's new chart-answers check is a check inside the existing gate)
+**Build beat:** none — a backlog paydown of ten engine and gate fixes; no single reader-visible story to narrate
+**Docs:** `docs/alarm_citations.json` (qa-smoke-failures re-cited to #5939, new 2026-11-14 episode; qa-smoke-warnings gains its `cause`) · `CLAUDE.md` (status pointer) · CLAUDE.md CI/CD + format lines, `docs/MANAGED_WHERE_LEDGER.md`, `docs/OPERATING_CALENDAR.md` shipped in the lane PRs
+**Decisions:** none needed — every call this block made was the owner's plan answer of 2026-11-14 recorded on the issues; no governance change
+**Main:** green (ed0d41a2)
+**Incidents:** none
+**Stash/hooks:** clean · worktree-reap removed 140 merged lanes, released 14 locks; 1 dirty lane named and untouched (`sprint3/redact-labels`, the v9 sprint session's)
+**Closures:** #5094, #5110, #5371, #5527, #5530, #5533, #5540, #5542, #5558, #5769, #5780, #5792, #5795, #5801, #5817, #5899, #5930, #5936, #5952, #5954, #5955 commented (Shipped + Outcome); #3759/#4772 (folded, not planned) lost `closure:live-proof` with a not-realized verdict · DoD: scanned=37 hits=5 — #5916 unhomed-residual homed on #5990 (the sweep still reads the original close-time verdict); #5899 post-close "Reopen if…" is the owner's week-10 regeneration condition, not a reopen; #5920, #5948, #5956 are the v9 sprint session's closes, verdicts theirs
+**Backlog:** Now live at 12 (sonnet 2 · opus 12 · fable 1 startable); no promotion needed; Later sweep — no stale Later issues. Filed this session: #5990. Open 103 (95 at block start; +12 accuracy-review, +4 auto-filed trackers, +1 #5990)
+**Alarms:** all lit alarms cited; qa-smoke-failures (single 19:32Z FAIL, self-clears ~2026-11-15T19:35Z) → #5939; prereg-overdue → #5518
+**CI warnings:** 6 — 5 the intentional playwright skip (#3640), no action; 1 `test_grant_enumeration_drift.py::test_every_lambda_consumer_is_granted_its_channel` 92.7 s over the 90 s bar under a saturated runner day → #5514 (CI hygiene, per-test timeout)
+**Ledger:** omitted — #5935's tenure pass and #5934's wrap block are legs inside existing gates (cron-freshness, check_alarm_citations), and `docs/PROPORTIONALITY.md` is fenced to the training lane while #5858 is open; its wrap-nightly row still says alarm-citations is "not a leg" (owed with #5966)

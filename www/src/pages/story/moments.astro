@@ -1,0 +1,183 @@
+---
+// The moments that explain it (2026-11-14, sprint III): the few documented events that best explain the experiment so
+// far, numbered on The Line, each a card tied to its evidence (lib/moments.js picks them by rule from published objects).
+import Base from "../../layouts/Base.astro";
+import { loadAll, loadCalibration, loadJourney, loadLab, loadSeries } from "../../lib/snapshot.js";
+import { moments, heldEveryWeek } from "../../lib/moments.js";
+import { theLine } from "../../lib/theline.js";
+import { verifiedLead } from "../../lib/calibration.js";
+import { latestFindings, pairTitle } from "../../lib/laboratory.js";
+import { roomPublic } from "../../lib/room.js";
+import { labEnabled } from "../../lib/lab.js";
+import { dayInWords } from "../../lib/format.js";
+import { href, pathOf } from "../../lib/url.js";
+
+const all = await loadAll();
+const journey: any = await loadJourney();
+const weight = (await loadSeries())["weight_lbs"];
+let lead: any = null;
+if (roomPublic()) {
+  try {
+    const f: any = await loadCalibration();
+    lead = f?.state === "ok" ? verifiedLead(f.calibration || {}) : null;
+  } catch {
+    lead = null;
+  }
+}
+let finding: any = null;
+if (labEnabled()) {
+  try {
+    const lab: any = await loadLab();
+    finding = lab?.state === "ok" ? heldEveryWeek(latestFindings(lab.lab_findings).items, pairTitle) : null;
+  } catch {
+    finding = null;
+  }
+}
+const days = new Map(all.byType.day.map((d: any) => [d.date, d]));
+const list = moments({
+  journey: journey && journey.state !== "absent" ? journey : null,
+  chapters: all.byType.chapter,
+  coaches: all.byType.coach,
+  lead,
+  finding,
+  dayPath: (iso: string) => (days.get(iso) ? pathOf("day", (days.get(iso) as any).id) : null),
+  chapterPath: (c: any) => pathOf("chapter", c.id),
+  coachPath: (id: string) => pathOf("coach", id),
+});
+const dated = list.map((m, i) => ({ ...m, n: String(i + 1) })).filter((m) => m.date);
+const start = journey?.start_date || null;
+const lineData =
+  weight && dated.length
+    ? {
+        days: weight.days.filter((d: any) => !start || d.date >= start).map((d: any) => ({ date: d.date, value: d.value, gap: d.gap })),
+        startDate: start,
+        startValue: journey?.start_weight_lbs ?? null,
+        rungs: [],
+        chapters: dated.map((m) => ({ date: m.date, n: m.n })),
+      }
+    : null;
+const lineAria = `Every weigh-in since day one, with ${dated.length} numbered moments marked along the foot.`;
+// drawn here for the no-script reader; islands/theline.js redraws it at the container's width (phone labels keep size)
+const lineSvg = lineData ? theLine({ ...lineData, aria: lineAria }) : null;
+---
+
+<Base title="The moments that explain it" top="story" description="The few documented moments that best explain the experiment so far — each one tied to its chapter, its day and its numbers.">
+  <section class="section" style="padding-bottom:24px">
+    <div class="wrap" style="max-width:900px">
+      <p class="label">Story · start here</p>
+      <h1 style="margin-top:10px">The moments that explain it</h1>
+      <p class="dek" style="margin-top:14px">
+        {list.length} {list.length === 1 ? "moment" : "moments"} from the first {journey?.day_n ?? "few"} days, chosen because the record can show each one. Every number is the platform's,
+        every quotation is an approved chapter's own words, and each card leads to the evidence.
+      </p>
+    </div>
+  </section>
+  {
+    lineSvg && (
+      <section class="wrap" style="padding-bottom:24px">
+        <figure class="theline moments-line" style="margin-top:0" data-theline data-payload={JSON.stringify(lineData)} data-aria={lineAria}>
+          <figcaption class="label">The line, every morning on the scale · the numbered ticks are the moments below</figcaption>
+          <div class="theline-chart" data-theline-chart set:html={lineSvg} />
+        </figure>
+      </section>
+    )
+  }
+  <section class="section hair">
+    <div class="wrap">
+      <ol class="moments">
+        {
+          list.map((m, i) => (
+            <li class="moment" id={m.key}>
+              <span class="moment-n num">{i + 1}</span>
+              <div class="moment-body">
+                <p class="label">
+                  {m.kicker}
+                  {m.date ? ` · ${dayInWords(m.date)}` : ""}
+                </p>
+                <h2 class="moment-title">{m.title}</h2>
+                <p class="moment-text">{m.body}</p>
+                {m.quote && m.quote.text && (
+                  <blockquote class="moment-quote">
+                    <q>{m.quote.text}</q>
+                    <cite>— {m.quote.cite}, as published</cite>
+                  </blockquote>
+                )}
+                <p class="moment-links">
+                  {m.links.map((l: any) => (
+                    <a href={href(l.path)}>{l.label} →</a>
+                  ))}
+                </p>
+              </div>
+            </li>
+          ))
+        }
+      </ol>
+      <p class="muted" style="font-size:14px;margin-top:24px">
+        This is a short way in, not the whole story. <a href={href("/story/")}>Every chapter, and the weeks without one →</a>
+      </p>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import "../../islands/theline.js";
+</script>
+
+<style>
+  .moments {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr));
+    gap: 0 48px;
+  }
+  .moment {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr);
+    gap: 16px;
+    padding: 24px 0;
+    border-top: 1px solid var(--ink);
+  }
+  .moment-n {
+    font-family: var(--sans);
+    font-weight: 800;
+    font-size: 44px;
+    line-height: 0.9;
+    color: var(--cobalt);
+  }
+  .moment-title {
+    font-size: 24px;
+    line-height: 1.15;
+    margin-top: 6px;
+  }
+  .moment-text {
+    font-size: 15px;
+    line-height: 1.5;
+    margin-top: 8px;
+  }
+  .moment-quote {
+    margin: 12px 0 0;
+    padding-left: 14px;
+    border-left: 3px solid var(--rule);
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.45;
+  }
+  .moment-quote cite {
+    display: block;
+    font-family: var(--sans);
+    font-style: normal;
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+  .moment-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    margin-top: 12px;
+    font-size: 14px;
+    font-weight: 700;
+  }
+</style>
