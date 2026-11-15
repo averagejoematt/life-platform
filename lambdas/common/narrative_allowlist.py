@@ -295,6 +295,103 @@ APPROVED: tuple = (
 
 INDEX: dict = {(e.pk, e.sk): e for e in APPROVED}
 
+# ── owner-ruled call wording (owner ruling 2026-11-14, wording batch v1) ───────────────────────────────────────────
+#: THE RULING. "This is explicit, record-specific authorization to publish the exact historical output wording for the
+#: 13 selected calls, despite the limited private contextual inputs identified in their provenance. This authorization
+#: does not extend to the underlying private prompts, source metadata, journal-presence information, mood data, or
+#: other historical commentary." And: "Pin publication eligibility to the exact record key and original text hash ...
+#: Ensure the ledger and Coaching Room obey the same publication decision ... Do not change historical grades."
+#:
+#: WHAT THIS IS — and what it is not. These calls are NOT lineage-clean: the read each was extracted from carried a
+#: journal-presence line and/or a brief with self-report material, which is why the provenance rule alone withholds
+#: them. They are published because the owner read each one and ruled on it, so ``owner_ruled_words`` is an owner
+#: exception BY RECORD, not a provenance record: it claims nothing about the inputs and names no family. It is not
+#: scoped to a route — the ruling is that every surface obeys one decision — so the ledger, the call pages and the
+#: Coaching Room all read these words through the same gate. Only the words are released: the gate still strips any
+#: provenance field, and nothing about the prompts or sources is served.
+#:
+#: 12 of the 13 are listed. The final accuracy check (the one the CR2 lead reads went through) held one: its text
+#: cites a recovery reading under a date that differs by a day from the public series' dating of the same reading,
+#: so it waits for the owner (publish as is / with a dated note / keep withheld). Keys and hashes only; no words.
+OWNER_RULED_PUBLIC = True
+OWNER_RULED_AT = "2026-11-14"
+OWNER_RULED: tuple = (
+    _E(
+        "COACH#physical_coach",
+        "PREDICTION#pred_20260912_tomorrow_s_recovery_score_will_rebound_t",
+        "claim_natural",
+        "201e391e1026c43f9998480bceada999be392a3ec923a1595570d2bdb16d5dbe",
+    ),
+    _E(
+        "COACH#physical_coach",
+        "PREDICTION#pred_20260913_recovery_score_expected_to_be_approximat",
+        "claim_natural",
+        "3be0116633bcb7b91f3017dc2797b1c71c80667f1d2c5e693338b9d60b415d6b",
+    ),
+    _E(
+        "COACH#sleep_coach",
+        "PREDICTION#pred_20260917_deep_sleep_percentage_will_rise_as_zone",
+        "claim_natural",
+        "20a77b6d889064ad6f023d86ff2c735f44c13a8fe6d5980c9c71f96cadc14b8a",
+    ),
+    _E(
+        "COACH#sleep_coach",
+        "PREDICTION#pred_20260917_tonight_s_sleep_duration_will_be_approxi",
+        "claim_natural",
+        "7168d082629beacb46a414f73e433c81d1485b2ae0e7a7e09d53276a6823509b",
+    ),
+    _E(
+        "COACH#sleep_coach",
+        "PREDICTION#pred_20260918_deep_sleep_percentage_will_rise_as_zone",
+        "claim_natural",
+        "56f4c63e342c95f20d2813082a353b7d43debb80ad5cf988071b1547623f9484",
+    ),
+    _E(
+        "COACH#physical_coach",
+        "PREDICTION#pred_20260921_weight_loss_trajectory_from_september_6t",
+        "claim_natural",
+        "d0841183036a4a2dc49dea14422a64d6fc78965e8c66fcfc8adb7cd7ada17582",
+    ),
+    _E(
+        "COACH#sleep_coach",
+        "PREDICTION#pred_20260923_recovery_score_will_be_83_7_tomorrow_8",
+        "claim_natural",
+        "9b63608b0ba1fff6c4c15a8830a746ac7c08a6bf094f37921c17f47d67024e2f",
+    ),
+    _E(
+        "COACH#sleep_coach",
+        "PREDICTION#pred_20260923_sleep_duration_will_be_7_4_hours_tonight",
+        "claim_natural",
+        "c6895a74198e90949abee0e1c3a6ad17e1f09eeffb7914d75a5024cb4fe41d18",
+    ),
+    _E(
+        "COACH#physical_coach",
+        "PREDICTION#pred_20260925_weight_will_continue_to_decline_but_bod",
+        "claim_natural",
+        "ac96a4e7d454021a5d81360c0e1e411e6be0845cc619c8a810d099af987a13d0",
+    ),
+    _E(
+        "COACH#sleep_coach",
+        "PREDICTION#pred_20260925_recovery_will_be_89_1_tomorrow_80_pre",
+        "claim_natural",
+        "849bf3d206689a582697633a8c4a6dffb63f9b4e3120499f799e06a0c54e1dcc",
+    ),
+    _E(
+        "COACH#sleep_coach",
+        "PREDICTION#pred_20260925_sleep_duration_will_be_7_8_hours_tonight",
+        "claim_natural",
+        "131cd84fa568c17b97f715da16824bae641f94a4bcf8526ab3922ac1813c5848",
+    ),
+    _E(
+        "COACH#sleep_coach",
+        "PREDICTION#pred_20260926_recovery_score_will_be_approximately_85",
+        "claim_natural",
+        "70d1f2bb4381bd1157a2d7cb0094a4e70d4c5706f7222b57390df77ea1e70eb6",
+    ),
+)
+OWNER_RULED_INDEX: dict = {(e.pk, e.sk): e for e in OWNER_RULED}
+_OWNER_RULED_HASHES: frozenset = frozenset(e.text_sha256 for e in OWNER_RULED)
+
 #: How many lead daily reads were WRITTEN in the window the record-level check covered (counted read-only from the
 #: table, 2026-11-11: 28 rows under COACH#eli_marsh, LEAD_DAILY#2026-10-01..2026-11-03). Served beside the approved
 #: reads so the page says "n of 28", never a bare "n" that reads as the whole run (owner ruling 2026-11-11 item 8: do
@@ -386,8 +483,29 @@ def record_for(item: Any, pk: Any = None) -> Optional[dict]:
 _SERVED: set = set()
 
 
+def owner_ruled_words(item: Any, pk: Any = None) -> bool:
+    """True when ``item`` is one of the owner-ruled calls, exactly as ruled: the listed record key, carrying no
+    provenance record of its own, its words byte-identical to the ruled text (SHA-256), and those words naming no
+    private activity (a belt — the ruling was made on words that passed that screen). Any scope; fail closed."""
+    if not OWNER_RULED_PUBLIC or not isinstance(item, dict) or NP.PROVENANCE_KEY in item:
+        return False
+    entry = OWNER_RULED_INDEX.get((str(item.get("pk", pk) or ""), str(item.get("sk") or "")))
+    if entry is None:
+        return False
+    text = item.get(entry.field)
+    if not isinstance(text, str) or _sha(text) != entry.text_sha256:
+        return False
+    from common import prediction_publication as PP
+
+    return not PP.words_name_private_activity(text)
+
+
 def note_served(item: Any, pk: Any = None) -> None:
-    """Record that the gate published ``item``'s approved words in this request (only an approved row, in scope)."""
+    """Record that the gate published ``item``'s approved words in this request (only an approved row, in scope —
+    or an owner-ruled call, which is published in every scope)."""
+    if isinstance(item, dict) and owner_ruled_words(item, pk):
+        _SERVED.add(OWNER_RULED_INDEX[(str(item.get("pk", pk) or ""), str(item.get("sk") or ""))].text_sha256)
+        return
     if not active() or not isinstance(item, dict):
         return
     key = (str(item.get("pk", pk) or ""), str(item.get("sk") or ""))
@@ -412,4 +530,7 @@ def reset_served() -> None:
 def is_approved_text(text: Any) -> bool:
     """True, in an active scope, for a string that IS the words of an approved row the gate published in THIS request
     (exempt from a wire taint left by an earlier out-of-scope request in the same container)."""
-    return active() and isinstance(text, str) and _sha(text) in _SERVED
+    if not isinstance(text, str):
+        return False
+    h = _sha(text)
+    return h in _SERVED and (active() or h in _OWNER_RULED_HASHES)
