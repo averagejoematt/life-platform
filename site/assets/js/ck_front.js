@@ -448,13 +448,27 @@ export function weekSpan(week) {
   return `${shortDay(days[0])} to ${shortDay(days[days.length - 1])}`;
 }
 // What arrives next and when — the follow box says what a reader is signing up for.
-export function followLine(nextBlock) {
+// #5939: it said "a new chapter and podcast most weeks" as a literal while the record held 7 chapters and ONE Panel
+// episode (episodes.json week 4; weeks 1-3, 5, 6 retired). The cadence is now the record's: `counts` = {chapters,
+// episodes} — published program weeks (week >= 1) and those of them with an episode — via cadenceCounts(). With no
+// counts served the line makes no podcast claim at all, and a drafted date is never called "due" (a chapter publishes
+// once Matthew approves it).
+export function cadenceCounts(journal, episodes) {
+  const weeks = new Set(((journal && journal.posts) || []).map((p) => p && Number(p.week)).filter((w) => Number.isInteger(w) && w >= 1));
+  if (!weeks.size) return null;
+  const withEp = new Set(((episodes && episodes.episodes) || []).map((e) => e && Number(e.week)).filter((w) => weeks.has(w)));
+  return { chapters: weeks.size, episodes: withEp.size };
+}
+export function followLine(nextBlock, counts = null) {
   const ch = nextBlock && nextBlock.data && nextBlock.data.chapter;
   const day = usable(ch) ? dayInWords(ch.data.date) : "";
-  // A drafted date is not a promise (the cadence says `drafted_not_promised`): a chapter publishes
-  // once Matthew approves it, so the box does not say it is "due".
-  if (day && ch.data.drafted_not_promised) return "A new chapter and podcast most weeks, each once Matthew approves it, and the numbers every Sunday.";
-  return day ? `The next chapter and podcast are due ${day}. The week’s numbers go out every Sunday.` : "A new chapter and podcast most weeks, the numbers every Sunday.";
+  if (day && !ch.data.drafted_not_promised) return `The next chapter is due ${day}. The week’s numbers go out every Sunday.`;
+  const c = counts && Number.isInteger(counts.chapters) && Number.isInteger(counts.episodes) && counts.chapters > 0 ? counts : null;
+  // Kept short: /start/ sits at the edge of its 4-screen budget (tests/kit_page_gate.py), one wrapped line is ~23 px.
+  const pod = !c ? "" : c.episodes === 0 ? ", no podcast yet" : c.episodes * 2 > c.chapters ? `, ${c.episodes} with a podcast` : `, only ${c.episodes} with a podcast`;
+  const base = `A new chapter when Matthew approves a week’s draft${c ? ` (${c.chapters} so far${pod})` : ""}`;
+  // A drafted date is not stated at all (as on main before #5939): it is not a promise, and the clause cost a wrapped line.
+  return `${base}, and the numbers every Sunday.`;
 }
 
 // ── the argument (round 8) ─────────────────────────────────────────────────────

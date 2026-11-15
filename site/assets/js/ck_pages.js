@@ -1024,7 +1024,7 @@ export function startNumbersLine(t, edition) {
   return `From ${fmt1(start)} lb toward ${trim1(goal)}${since ? `, since ${since}` : ""}. ${when}: ${fmt1(now)} lb.`;
 }
 async function mountStart(edition, b) {
-  const [journal, timeline] = await Promise.all([tryJSON("/journal/posts.json"), tryJSON("/api/timeline")]);
+  const [journal, timeline, episodes] = await Promise.all([tryJSON("/journal/posts.json"), tryJSON("/api/timeline"), tryJSON("/panelcast/episodes.json")]);
   const allWeights = timeline && timeline.timeline && timeline.timeline.weights;
   const t = usable(b.today) ? b.today.data : {};
   const numbers = startNumbersLine(t, edition);
@@ -1044,7 +1044,7 @@ async function mountStart(edition, b) {
   if (bet === null) document.getElementById("ck-bet")?.remove();
   else fill("ck-bet", bet);
   fill("ck-record", recordHTML(b.record));
-  fill("ck-follow-line", esc(F.followLine(b.next)));
+  fill("ck-follow-line", esc(F.followLine(b.next, F.cadenceCounts(journal, episodes))));  // #5939: the record's cadence
 }
 const chapterNextLine = (nextBlock, chapterBlock = null) => {
   const ch = nextBlock && nextBlock.data && nextBlock.data.chapter;
