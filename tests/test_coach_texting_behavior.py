@@ -534,21 +534,28 @@ def test_nutrition_pack_falls_back_to_the_shared_energy_budget():
     block = cdf.domain_facts_block("nutrition", table, today="2026-08-09")
     assert "Mifflin" in block and "estimate" in block
     # True parity pin: the rendered TDEE is exactly what the shared ADR-152
-    # engine computes from the same inputs (same resolve_age, same empty
-    # exercise window) — not merely a similar-looking number.
-    age_years, age_basis, _ = health_tdee.resolve_age("1988-01-01")
+    # engine computes from the same inputs — the PUBLIC form (owner ruling 2026-11-14): coach facts feed published
+    # prose, so the estimate is computed at the stated reference age and the profile's birth date is not an input.
     ex = health_tdee.exercise_energy([], 321.6 * health_tdee.LB_TO_KG)
     budget = health_tdee.energy_budget(
         weight_lbs=321.6,
         height_inches=71,
-        age_years=age_years,
-        age_basis=age_basis,
+        public=True,
         exercise_kcal=ex["kcal"],
         exercise_energy_days=ex["days"],
         exercise_energy_basis=ex["basis"],
     )
     assert budget is not None
     assert f"TDEE (maintenance): {budget['tdee']} kcal" in block
+    assert budget["inputs"]["age_basis"] == health_tdee.PUBLIC_AGE_BASIS and health_tdee.METHOD_PUBLIC in block
+    # ...and it does not move with the birth date: a different one renders the same block
+    other = _RangeTable(
+        [
+            _ddb_row("withings", "2026-08-08", weight_lbs=321.6),
+            {"pk": "USER#matthew", "sk": "PROFILE#v1", "height_inches": 71, "date_of_birth": "1961-07-04"},
+        ]
+    )
+    assert cdf.domain_facts_block("nutrition", other, today="2026-08-09") == block
     from health.calorie_target import target_kcal  # #5095: the ONE calorie target, not TDEE - 500
 
     assert f"Calorie target: {target_kcal()} kcal/day" in block and f"{budget['tdee'] - 500} kcal" not in block

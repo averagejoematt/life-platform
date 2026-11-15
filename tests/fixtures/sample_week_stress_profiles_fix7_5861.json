@@ -1,0 +1,154 @@
+{
+ "_comment": "#5861 FIX7: synthetic stress profiles (no person's numbers): a 2-day week with a shoulder pain flag, a 3-day week with low knee discomfort, a dumbbells-only travel week, a fast cut with broad regression",
+ "as_of": "2026-11-16",
+ "position": {
+  "week": 10,
+  "block": 2
+ },
+ "defaults": {
+  "roles": [
+   "upper_heavy",
+   "lower_heavy",
+   "shoulders_arms",
+   "upper_volume",
+   "lower_volume"
+  ],
+  "days": [
+   "2026-11-16",
+   "2026-11-17",
+   "2026-11-18",
+   "2026-11-19",
+   "2026-11-20"
+  ],
+  "bodyweight_lb": 250,
+  "readiness": "green",
+  "sleep_hours": 7.5,
+  "acwr": "safe",
+  "steps_per_day": 14000,
+  "trend": "progressing",
+  "trend_overrides": {},
+  "discomfort": [],
+  "pain": [],
+  "unavailable_equipment": [],
+  "sessions_last_14d": 10,
+  "hard_cardio_minutes_7d": 40
+ },
+ "profiles": {
+  "q_two_day_shoulder_pain": {
+   "label": "(q) RT6: 2-day week, shoulder pain 4/10 on the bench",
+   "story": "two mornings, pain",
+   "roles": [
+    "upper_heavy",
+    "lower_heavy"
+   ],
+   "days": [
+    "2026-11-16",
+    "2026-11-18"
+   ],
+   "pain": [
+    {
+     "movement": "barbell_bench_press",
+     "note": "shoulder pain 4/10 at the bottom of the bench"
+    }
+   ]
+  },
+  "r_three_day_knee_discomfort": {
+   "label": "(r) RT6: 3-day week, knee discomfort 2/10 on the squat",
+   "story": "three mornings, mild knee",
+   "roles": [
+    "upper_heavy",
+    "lower_heavy",
+    "upper_volume"
+   ],
+   "days": [
+    "2026-11-16",
+    "2026-11-18",
+    "2026-11-20"
+   ],
+   "discomfort": [
+    {
+     "movement": "squat_barbell",
+     "note": "knee a bit achy 2/10"
+    }
+   ]
+  },
+  "u_travel_dumbbells_only": {
+   "label": "(u) RT6: travel, dumbbells + a bench only (no cardio kit)",
+   "story": "hotel",
+   "unavailable_equipment": [
+    "ab_crunch_machine",
+    "ab_wheel",
+    "assisted_pullup_dip_machine",
+    "back_extension_45",
+    "barbell",
+    "belt_squat_machine",
+    "bench_decline",
+    "biceps_curl_machine",
+    "cable_stack",
+    "calf_raise_seated_machine",
+    "calf_raise_standing_machine",
+    "captains_chair",
+    "chest_press_machine",
+    "decline_press_machine",
+    "dip_station",
+    "elliptical",
+    "ez_bar",
+    "glute_kickback_machine",
+    "hack_squat_machine",
+    "hand_gripper",
+    "hip_abduction_machine",
+    "hip_adduction_machine",
+    "hip_thrust_machine",
+    "incline_press_machine",
+    "jump_rope",
+    "kettlebell",
+    "landmine",
+    "lat_pulldown_station",
+    "lateral_raise_machine",
+    "leg_curl_lying",
+    "leg_curl_seated",
+    "leg_extension_machine",
+    "leg_press_machine",
+    "machine_unspecified",
+    "medicine_ball",
+    "olympic_platform",
+    "other_unspecified",
+    "pec_deck",
+    "pendulum_squat_machine",
+    "plyo_box",
+    "preacher_bench",
+    "preacher_machine",
+    "pullover_machine",
+    "pullup_bar",
+    "rear_delt_machine",
+    "resistance_band",
+    "rower",
+    "ruck_vest",
+    "seated_row_machine",
+    "shoulder_press_machine",
+    "ski_erg",
+    "sled",
+    "smith_machine",
+    "squat_rack",
+    "stability_ball",
+    "stair_climber",
+    "stationary_bike",
+    "suspension_trainer",
+    "swimming_pool",
+    "t_bar_row_machine",
+    "torso_rotation_machine",
+    "trap_bar",
+    "treadmill",
+    "triceps_machine",
+    "weight_plate",
+    "wrist_roller"
+   ]
+  },
+  "v_fast_loss_strength_drop": {
+   "label": "(v) RT6: 1.8 %BW/wk loss for weeks + every lift regressing, green, normal sleep",
+   "story": "fast cut",
+   "weekly_loss_pct": 1.8,
+   "trend": "regressing"
+  }
+ }
+}

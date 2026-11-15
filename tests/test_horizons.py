@@ -332,3 +332,23 @@ def test_curate_without_followup_is_unchanged(fake_table, monkeypatch):
     assert out["status"] == "committed" and out["follow_up_surfaced"] is False
     assert "follow_up" not in out["pick"]
     assert _checkins(fake_table, "mind") == []
+
+
+# ── #5947: the publication stamp on a curated pick ────────────────────────────
+def test_curate_stamps_the_pitch_and_the_preview_shows_the_verdict_before_commit(fake_table, monkeypatch):
+    """Every coach-typed string is screened at curate. A clean pitch is stamped published; one carrying a
+    (synthetic) owner-only term is stored HELD — the dry-run preview says so before anything is written, with
+    a neutral category and never the term."""
+    from reading import horizons_publication as hp
+
+    monkeypatch.setattr(horizons_verify, "_urllib_fetch", _ok_fetch)
+    clean = tr.tool_curate_horizon(_commit_args(week="2026-W30"))
+    assert clean["pick"][hp.STATUS_ATTR] == hp.STATUS_PUBLISHED and clean["pitch_publication"].startswith("published")
+
+    flagged = _commit_args(week="2026-W31", pitch="a week after the snorbleitis finding")
+    preview = tr.tool_curate_horizon({**flagged, "dry_run": True})
+    assert preview["pitch_publication"].startswith("HELD (clinical)") and "snorbleitis" not in preview["pitch_publication"]
+    assert rs.get_horizon_pick("2026-W31") is None, "a preview writes nothing"
+    out = tr.tool_curate_horizon(flagged)
+    assert out["pick"][hp.STATUS_ATTR] == hp.STATUS_HELD and out["pick"][hp.CATEGORIES_ATTR] == [hp.CATEGORY_CLINICAL]
+    assert rs.get_horizon_pick("2026-W31")[hp.STATUS_ATTR] == hp.STATUS_HELD

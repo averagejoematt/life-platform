@@ -624,27 +624,41 @@ export function physicalLeanLongevity(d) {
     `<p class="rd-meta label">Appendicular lean mass — the muscle on the arms and legs — is the body-comp figure that best predicts how well you age: it's the buffer against sarcopenia and frailty. ${Number.isFinite(almi) ? `At ${fmt(almi, 1)} kg/m²${Number.isFinite(pct) ? `, ${fmt(pct)}th percentile,` : ""} that's ${clear != null && clear > 0 ? `~${fmt(clear)} clear of` : "near"} the ~${FLOOR} sarcopenia floor.` : ""} The cut's whole job is to keep this while the fat comes off — confirmed only when scan two lands. Dated <strong>${esc(calendarDay(x.scan_date) || x.scan_date)}</strong>, pre-cut.</p>`);
 }
 
-// P1.5 — PhenoAge (transparent), Option A privacy. Shows the phenotypic ("biological") age +
-// the 9 markers driving it — NO chronological age, NO gap, so the page can't reveal real age.
-// Replaces the DEXA black-box "biological age". Honest "needs marker X" if any input missing.
+// P1.5 — PhenoAge (transparent), MARKERS ONLY since the owner's ruling of 2026-11-14. The endpoint no longer serves
+// a figure of his own: the Levine formula is linear in chronological age and the 9 markers are public, so the number
+// at any precision gave his age away (tests/test_age_inversion.py). What it serves, and this renders, is the
+// markers-only reading — what the same 9 markers return for a person of each reference age — plus the 9 inputs.
+// Honest "needs marker X" if any input is missing.
+function _paOffsetWords(ref) {
+  const lo = ref.offset_low, hi = ref.offset_high;
+  const y = (v) => `${Math.abs(v).toFixed(1)} years`;
+  if (hi <= 0 && lo < 0) return `${Math.abs(hi).toFixed(1)} to ${y(lo)} younger than the calendar`;
+  if (lo >= 0 && hi > 0) return `${lo.toFixed(1)} to ${y(hi)} older than the calendar`;
+  return `between ${y(lo)} younger and ${y(hi)} older than the calendar`;
+}
 export function physicalPhenoAge(pa) {
   if (!pa) return "";
+  const ref = pa.reference && Array.isArray(pa.reference.points) && pa.reference.points.length >= 2 ? pa.reference : null;
+  if (ref) {
+    const drivers = pa.drivers || [];
+    const driverRows = drivers.map((dv) => {
+      const tone = dv.direction === "younger" ? "pa-younger" : dv.direction === "older" ? "pa-older" : "pa-neutral";
+      const val = dv.value != null ? `${fmt(dv.value)}${dv.unit ? " " + dv.unit : ""}` : "—";
+      return `<div class="pa-driver ${tone}"><span class="pa-d-name">${esc(dv.name)}${dv.derived ? ` <span class="pa-derived">derived</span>` : ""}</span><span class="pa-d-val mono">${esc(val)}</span><span class="pa-d-dir label">${esc(dv.direction || "")}</span></div>`;
+    }).join("");
+    const points = ref.points.map((p) => `at ${esc(String(p.at_years))}, <strong>${esc(Number(p.reads_years).toFixed(1))}</strong>`).join(" · ");
+    return sec("Biological age — PhenoAge (markers only)",
+      `<p class="rd-meta label">For a reference adult these 9 markers read <strong>${esc(_paOffsetWords(ref))}</strong> — ${points}. Levine Phenotypic Age (2018) turns 9 standard blood markers and a person's age into a mortality score and back into years. ${pa.as_of ? `Recomputed per blood draw · <strong>${esc(pa.as_of)}</strong>.` : ""} <strong>His own figure isn't published, by design:</strong> the formula moves ${esc(Number(ref.slope).toFixed(2))} years per year of age and the markers are public, so the number at any precision would give his age away. <strong>Caveats:</strong> population-level, not a diagnosis; this is blood-based <em>Phenotypic</em> Age, NOT the DNAm epigenetic clock; it's volatile to single markers (a CRP spike from a cold can swing it). <a href="/data/labs/">See the full bloodwork →</a></p>` +
+      `<details class="pa-details"><summary class="pa-sum label">The 9 markers driving it — show the inputs</summary><div class="pa-drivers">${driverRows}</div>` +
+      `<p class="rd-meta label">Ember = the marker is pushing the number <em>younger</em> vs a healthy reference; muted = older; faint = neutral. Lymphocyte % is derived from absolute lymphocytes ÷ WBC.</p></details>`);
+  }
   if (pa.phenoage == null) {
     const miss = (pa.missing || []).join(", ");
     return sec("Biological age — PhenoAge (transparent)",
       `<p class="rd-meta label">Phenotypic Age needs all 9 blood markers and is never approximated from partial data${miss ? ` — waiting on: <strong>${esc(miss)}</strong>` : ""}. It fills in at the next complete draw.</p>`);
   }
-  const drivers = pa.drivers || [];
-  const driverRows = drivers.map((dv) => {
-    const tone = dv.direction === "younger" ? "pa-younger" : dv.direction === "older" ? "pa-older" : "pa-neutral";
-    const val = dv.value != null ? `${fmt(dv.value)}${dv.unit ? " " + dv.unit : ""}` : "—";
-    return `<div class="pa-driver ${tone}"><span class="pa-d-name">${esc(dv.name)}${dv.derived ? ` <span class="pa-derived">derived</span>` : ""}</span><span class="pa-d-val mono">${esc(val)}</span><span class="pa-d-dir label">${esc(dv.direction || "")}</span></div>`;
-  }).join("");
-  return sec("Biological age — PhenoAge (transparent, replaces the black box)",
-    `<div class="pa-dial"><span class="pa-v mono">${esc(String(pa.phenoage))}</span><span class="pa-unit label">phenotypic age · years</span></div>` +
-    `<p class="rd-meta label">Levine Phenotypic Age (2018), computed from 9 standard blood markers — the transparent replacement for the DEXA "biological age" black box; every input is shown below. ${pa.as_of ? `Recomputed per blood draw · <strong>${esc(pa.as_of)}</strong>.` : ""} <strong>Chronological age isn't shown, by design</strong> — this can't be used to back out a real age. <strong>Caveats:</strong> population-level, not a diagnosis; this is blood-based <em>Phenotypic</em> Age, NOT the DNAm epigenetic clock; it's volatile to single markers (a CRP spike from a cold can swing it). <a href="/data/labs/">See the full bloodwork →</a></p>` +
-    `<details class="pa-details"><summary class="pa-sum label">The 9 markers driving it — show the inputs</summary><div class="pa-drivers">${driverRows}</div>` +
-    `<p class="rd-meta label">Ember = the marker is pushing the number <em>younger</em> vs a healthy reference; muted = older; faint = neutral. Lymphocyte % is derived from absolute lymphocytes ÷ WBC.</p></details>`);
+  // A payload that still carries a figure of his own (a stale cache from before 2026-11-14) is not rendered.
+  return "";
 }
 
 // P2.1–P2.5 — new-capture + velocity, honestly gated. Each is a real capability with an

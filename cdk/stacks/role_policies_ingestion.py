@@ -32,6 +32,17 @@ from stacks.role_policies_base import (
 # ═══════════════════════════════════════════════════════════════════════════
 
 
+def _source_pk(source_name: str) -> str:
+    """The partition a source's rows live in — `USER#matthew#SOURCE#{source_name}`.
+
+    It is also the auth-breaker's partition: `common.auth_breaker._pk(source_name, user_id)`
+    and `ingestion_framework._auth_breaker_pk` build exactly this string, and the marker
+    `clear_failure()` deletes on every clean run is the `AUTH_FAILURE` row in it. So
+    `source_name` here must be the `source_name=` the HANDLER passes, not the role's label.
+    """
+    return f"USER#matthew#SOURCE#{source_name}"
+
+
 def _ingestion_base(
     source: str,
     secret_name: str = None,
@@ -43,13 +54,35 @@ def _ingestion_base(
     extra_statements: list[iam.PolicyStatement] = None,
     no_s3: bool = False,
     no_secret: bool = False,
+    delete_pks: list[str] = None,
 ) -> list[iam.PolicyStatement]:
-    """Build standard ingestion role policies."""
+    """Build standard ingestion role policies.
+
+    #5513 (b): `dynamodb:DeleteItem` is NOT in the table-wide `DynamoDB` statement. Until
+    2026-11-13 it was, so every role built here could delete any item in any partition —
+    raw health data included — when the only deletes its code makes are a handful of rows
+    in its own partition. A role now deletes only what `delete_pks` names: each caller
+    passes the exact partition keys its handler's reachable code deletes from, and the
+    grant lands in a separate `DynamoDBDeleteOwnPartitions` statement conditioned on
+    `dynamodb:LeadingKeys`. No `delete_pks` means no DeleteItem at all.
+
+    The list is DERIVED, not guessed from `source`: tests/test_role_family_write_scope.py
+    walks each handler's call graph for `delete_item` sites (the auth-breaker clear in
+    common/auth_breaker.py and ingestion_framework.py is a SHARED module, invisible to a
+    handler-file scan) and asserts this list equals what the code reaches, both ways. That
+    matters because a wrong narrowing fails silently — every one of these deletes sits in a
+    try/except that logs and continues.
+    """
     stmts = []
 
-    # DynamoDB — DeleteItem needed for SIMP-2 framework's auth-breaker
-    # clear_failure() path (deletes the AUTH#failures marker on a clean run).
-    actions = ddb_actions or ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:Query", "dynamodb:DeleteItem"]
+    # DynamoDB — table-wide read/write WITHOUT DeleteItem (#5513). An explicit `ddb_actions`
+    # may not smuggle the verb back in table-wide; a delete goes through `delete_pks`.
+    actions = ddb_actions or ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:Query"]
+    if "dynamodb:DeleteItem" in actions:
+        raise ValueError(
+            f"_ingestion_base({source!r}): dynamodb:DeleteItem is not granted table-wide (#5513) — "
+            "name the partitions in delete_pks instead of passing it in ddb_actions"
+        )
     stmts.append(
         iam.PolicyStatement(
             sid="DynamoDB",
@@ -57,6 +90,15 @@ def _ingestion_base(
             resources=[TABLE_ARN],
         )
     )
+    if delete_pks:
+        stmts.append(
+            iam.PolicyStatement(
+                sid="DynamoDBDeleteOwnPartitions",
+                actions=["dynamodb:DeleteItem"],
+                resources=[TABLE_ARN],
+                conditions={"ForAllValues:StringEquals": {"dynamodb:LeadingKeys": list(delete_pks)}},
+            )
+        )
 
     # KMS — DDB CMK only. Phase 2.4 had also granted on the S3 CMK, but the
     # S3 bucket switched to AES256 default encryption (no per-object KMS), so
@@ -148,6 +190,8 @@ def ingestion_whoop() -> list[iam.PolicyStatement]:
         "whoop",
         secret_name="life-platform/whoop",
         extra_secret_actions=["secretsmanager:UpdateSecret"],
+        # #5513: the only delete is the auth-breaker clear (AUTH_FAILURE row) in this source's own partition.
+        delete_pks=[_source_pk("whoop")],
     )
 
 
@@ -159,6 +203,9 @@ def ingestion_notion() -> list[iam.PolicyStatement]:
         "notion",
         secret_name="life-platform/ingestion-keys",  # COST-B: bundled 2026-03-10
         s3_prefix="raw/matthew/notion/*",
+        # #5513: two delete sites, one partition — auth_breaker.clear_failure(source_name="notion") and
+        # _reconcile_deleted()'s removal of rekeyed/absent journal rows (notion_lambda.PK).
+        delete_pks=[_source_pk("notion")],
     )
 
 
@@ -184,6 +231,8 @@ def ingestion_youtube() -> list[iam.PolicyStatement]:
         secret_name="life-platform/youtube",
         s3_prefix="raw/matthew/youtube/*",
         extra_s3_read=["config/content_filter.json"],
+        # #5513: the only delete is the auth-breaker clear (AUTH_FAILURE row) in this source's own partition.
+        delete_pks=[_source_pk("youtube")],
     ) + [_bedrock_statement()]
 
 
@@ -208,6 +257,8 @@ def ingestion_bluesky() -> list[iam.PolicyStatement]:
         secret_name="life-platform/bluesky",
         s3_prefix="raw/matthew/bluesky/*",
         extra_s3_read=["config/content_filter.json"],
+        # #5513: the only delete is the auth-breaker clear (AUTH_FAILURE row) in this source's own partition.
+        delete_pks=[_source_pk("bluesky")],
     ) + [_bedrock_statement()]
 
 
@@ -233,6 +284,8 @@ def ingestion_mastodon() -> list[iam.PolicyStatement]:
         secret_name="life-platform/mastodon",
         s3_prefix="raw/matthew/mastodon/*",
         extra_s3_read=["config/content_filter.json"],
+        # #5513: the only delete is the auth-breaker clear (AUTH_FAILURE row) in this source's own partition.
+        delete_pks=[_source_pk("mastodon")],
     ) + [_bedrock_statement()]
 
 
@@ -246,6 +299,8 @@ def ingestion_withings() -> list[iam.PolicyStatement]:
         "withings",
         secret_name="life-platform/withings",
         extra_secret_actions=["secretsmanager:UpdateSecret"],
+        # #5513: the only delete is the auth-breaker clear (AUTH_FAILURE row) in this source's own partition.
+        delete_pks=[_source_pk("withings")],
     )
 
 
@@ -256,6 +311,9 @@ def ingestion_habitify() -> list[iam.PolicyStatement]:
         "habitify",
         secret_name="life-platform/habitify",
         s3_prefix="raw/matthew/habitify/*",
+        # #5513: the auth-breaker clear in its own partition, plus supplement_bridge() (#4632), which deletes a
+        # supplements row left holding nothing once a bridged completion is retracted (_SUPPLEMENTS_PK).
+        delete_pks=[_source_pk("habitify"), _source_pk("supplements")],
     )
 
 
@@ -270,6 +328,8 @@ def ingestion_strava() -> list[iam.PolicyStatement]:
         "strava",
         secret_name="life-platform/strava",
         extra_secret_actions=["secretsmanager:UpdateSecret"],
+        # #5513: the only delete is the auth-breaker clear (AUTH_FAILURE row) in this source's own partition.
+        delete_pks=[_source_pk("strava")],
     )
 
 
@@ -325,6 +385,11 @@ def ingestion_hevy_backfill() -> list[iam.PolicyStatement]:
         # previous copy (to refuse a shrink that would mean a partial walk) and writes the new one.
         extra_s3_read=["config/movement_catalog.json", "config/hevy_template_cache.json", "config/hevy_template_index.json"],
         extra_s3_write=["config/hevy_template_index.json"],
+        # #5513: three delete sites, two partitions. In the hevy partition: auth_breaker.clear_failure
+        # (source_name=SOURCE="hevy") and training.hevy_common.delete_workout_records (#475 — relocated and
+        # tombstoned workouts). Under USER#system: _clear_event_failure(), the per-event quarantine counter
+        # (QUARANTINE_PK). USER#system is shared with other system rows; the cursor itself is put, never deleted.
+        delete_pks=[_source_pk("hevy"), "USER#system"],
     ) + [
         _bedrock_statement(),
         _experiment_cycle_read(),
@@ -526,6 +591,8 @@ def ingestion_todoist() -> list[iam.PolicyStatement]:
         "todoist",
         secret_name="life-platform/ingestion-keys",  # COST-B: bundled 2026-03-10
         s3_prefix="raw/todoist/*",  # NOTE: no matthew/ prefix — Lambda writes to raw/todoist/ directly
+        # #5513: the only delete is the auth-breaker clear (AUTH_FAILURE row) in this source's own partition.
+        delete_pks=[_source_pk("todoist")],
     )
 
 
@@ -539,6 +606,8 @@ def ingestion_eightsleep() -> list[iam.PolicyStatement]:
         "eightsleep",
         secret_name="life-platform/eightsleep",
         extra_secret_actions=["secretsmanager:UpdateSecret"],
+        # #5513: the only delete is the auth-breaker clear (AUTH_FAILURE row) in this source's own partition.
+        delete_pks=[_source_pk("eightsleep")],
     )
 
 
@@ -584,7 +653,12 @@ def ingestion_activity_enrichment() -> list[iam.PolicyStatement]:
 
 
 def ingestion_macrofactor() -> list[iam.PolicyStatement]:
-    """MacroFactor: DDB write + S3 raw/macrofactor, reads CSV from uploads/macrofactor/."""
+    """MacroFactor: DDB write + S3 raw/macrofactor, reads CSV from uploads/macrofactor/.
+
+    #5513: NO DeleteItem. This handler is S3-triggered, does not run through the SIMP-2
+    `run_ingestion` loop and never touches the auth breaker; no `delete_item` is reachable
+    from it (tests/test_role_family_write_scope.py derives that), so it passes no `delete_pks`.
+    """
     return _ingestion_base(
         "macrofactor",
         no_secret=True,
@@ -638,6 +712,8 @@ def ingestion_dropbox() -> list[iam.PolicyStatement]:
         secret_name="life-platform/ingestion-keys",  # COST-B: bundled 2026-03-10
         s3_prefix="uploads/macrofactor/*",  # dropbox writes MacroFactor CSVs here
         extra_s3_read=["uploads/macrofactor/*"],
+        # #5513: dropbox_poll calls auth_breaker.clear_failure(source_name="dropbox") directly (no SIMP-2 run).
+        delete_pks=[_source_pk("dropbox")],
     )
 
 
