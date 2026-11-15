@@ -48,6 +48,9 @@ entire dynamic public surface was ungated. The endpoint arm closes that:
   - Live half (QA/manual, GET-only): fetches every derivable GET payload and runs
     the full scan_text arms PLUS the value/key tell arms over the real values.
     A fetch that fails is reported as `endpoint-not-scanned` — fail-closed.
+    #5947: it also reads every payload against the owner-only clinical vocabulary
+    (channel key `blocked_clinical_keywords`), REQUIRED — a channel that carries no
+    such list raises, so the scheduled sweep is red until the screen is armed.
 
 The genetic/age tell arms are deliberately NOT wired into scan_site(): public
 build-beat prose legitimately narrates the #1943 fix with the word "genotype" —
@@ -123,6 +126,20 @@ def _blocked_vice_keywords(require: bool = False) -> list:
     return content_filter_channel.blocked_keywords(require=require)
 
 
+def _clinical_pattern(require: bool = False):
+    """The owner-only clinical vocabulary as ONE compiled pattern (#5947), from the same
+    non-committed channel — `privacy.clinical_screen`, the matcher the serving path itself
+    uses, so the sweep and the wire guard cannot disagree about what a term matches.
+    Returns None when the channel carries no clinical list; require=True raises
+    ContentFilterUnavailable instead (the live arm: an unarmed screen is a red, not a pass)."""
+    lambdas_dir = os.path.join(_ROOT, "lambdas")
+    if lambdas_dir not in sys.path:
+        sys.path.insert(0, lambdas_dir)
+    from privacy import clinical_screen  # noqa: PLC0415 — deliberate lazy import
+
+    return clinical_screen.pattern(require=require)
+
+
 def _literal_denylist() -> list:
     """Personal guarded literals (partner name, employer, role, industry) from a
     NON-committed source. Returns [] (and the arm self-skips) when absent."""
@@ -161,12 +178,17 @@ def _word_hits(text_low: str, terms: list) -> set:
     return hits
 
 
-def scan_text(text: str, vice=None, literals=None) -> list:
-    """Return a list of (arm, detail) violations for one document's text."""
+def scan_text(text: str, vice=None, literals=None, clinical=None) -> list:
+    """Return a list of (arm, detail) violations for one document's text.
+
+    `clinical` is the compiled clinical pattern (`_clinical_pattern`); None leaves the
+    arm off, which is every caller but the endpoint arm (#5947)."""
     low = text.lower()
     out = []
     for kw in _word_hits(low, vice if vice is not None else _blocked_vice_keywords()):
         out.append(("blocked-vice", kw))
+    if clinical is not None and clinical.search(text):
+        out.append(("clinical-record", "clinical-record term (masked — #5947: never echoed)"))
     if _SSN_RE.search(text):
         out.append(("pii-ssn", "SSN-shaped number"))
     if _CARD_RE.search(_DOI_RE.sub(" ", text)):
@@ -485,13 +507,13 @@ def _masked(arm: str, detail: str) -> str:
     return detail
 
 
-def _scan_fragment(path: str, text: str, vice, literals) -> list:
+def _scan_fragment(path: str, text: str, vice, literals, clinical=None) -> list:
     """Every value arm over ONE payload fragment — a scalar leaf or a key name —
     each violation carrying the fragment's JSON path and a masked detail. The
     pii-card arm alone skips the response envelope's own opaque per-request id
     (`_ENVELOPE_ID_PATHS`, #4164); `_CARD_RE` itself is untouched."""
     out = []
-    for arm, detail in scan_text(text, vice=vice, literals=literals):
+    for arm, detail in scan_text(text, vice=vice, literals=literals, clinical=clinical):
         if arm == "pii-card" and path in _ENVELOPE_ID_PATHS:
             continue
         out.append((arm, f"{path} ({_masked(arm, detail)})"))
@@ -502,7 +524,7 @@ def _scan_fragment(path: str, text: str, vice, literals) -> list:
     return out
 
 
-def scan_endpoint_payload(text: str, vice=None, literals=None) -> list:
+def scan_endpoint_payload(text: str, vice=None, literals=None, clinical=None) -> list:
     """All arms over one /api/* payload body: the scan_text value arms PLUS the
     endpoint-only value tells, PLUS the key tells when the body parses as JSON.
 
@@ -524,7 +546,10 @@ def scan_endpoint_payload(text: str, vice=None, literals=None) -> list:
     except Exception:
         data = None
     if data is None:
-        out = [(arm, f"{_masked(arm, detail)} (path=non-json)") for arm, detail in scan_text(text, vice=vice, literals=literals)]
+        out = [
+            (arm, f"{_masked(arm, detail)} (path=non-json)")
+            for arm, detail in scan_text(text, vice=vice, literals=literals, clinical=clinical)
+        ]
         if _GENETIC_VALUE_RE.search(text):
             out.append(("pii-genetic", "genetic identifier tell (path=non-json)"))
         if _BIRTH_VALUE_RE.search(text):
@@ -532,11 +557,11 @@ def scan_endpoint_payload(text: str, vice=None, literals=None) -> list:
         return out
     out = []
     for path, leaf_text in iter_payload_leaves(data):
-        out.extend(_scan_fragment(path, leaf_text, vice, literals))
+        out.extend(_scan_fragment(path, leaf_text, vice, literals, clinical))
     for path, key in iter_payload_keys(data):
         # A key name that matches a VALUE pattern is itself the value, and its path
         # would echo it — so the key fragment reports its parent's path + a mask.
-        out.extend(_scan_fragment(f"{path[: -len(key) - 1]}.<key masked>", key, vice, literals))
+        out.extend(_scan_fragment(f"{path[: -len(key) - 1]}.<key masked>", key, vice, literals, clinical))
     out.extend(_scan_keys(iter_payload_keys(data)))
     out.extend(_derived_age_hits(data))
     return out
@@ -606,6 +631,10 @@ def scan_endpoints(base_url: str, fetcher=None, sleep_seconds: float = 0.25) -> 
     plan = cas.build_plan()
     records = er.discover_endpoint_records()
     vice = _blocked_vice_keywords(require=True)  # live arm is owner/QA-run — fail-closed
+    # #5947: the owner-only clinical record has no public projection, so every live payload is
+    # read against its vocabulary too. Fail-closed the same way: a channel with no clinical
+    # list raises here — the sweep goes red rather than report a surface it could not screen.
+    clinical = _clinical_pattern(require=True)
     literals = _literal_denylist()
     fetch = fetcher or cas._fetch
 
@@ -638,7 +667,7 @@ def scan_endpoints(base_url: str, fetcher=None, sleep_seconds: float = 0.25) -> 
             violations.append((path, "endpoint-not-scanned", f"HTTP {status}: {err or 'non-200/empty'}"))
             continue
         body = json.dumps(data)
-        for arm, detail in scan_endpoint_payload(body, vice=vice, literals=literals):
+        for arm, detail in scan_endpoint_payload(body, vice=vice, literals=literals, clinical=clinical):
             violations.append((path, arm, detail))
         scanned.append(path)
     return {"violations": violations, "scanned": scanned, "skipped": skipped, "literal_arm": "on" if literals else "skipped"}

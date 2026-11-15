@@ -244,6 +244,22 @@ def test_every_endpoint_violation_names_its_path_and_never_its_value():
         assert value not in joined, f"a violation line echoed a matched value: {joined}"
 
 
+def test_clinical_arm_names_the_path_masks_the_term_and_is_off_unless_handed_a_pattern():
+    """#5947: the endpoint arm reads a payload against the owner-only clinical vocabulary when handed its
+    compiled pattern (synthetic term here). The violation names the JSON path and never the term; a phrase
+    matches across a hyphen; and without a pattern the arm is off — every other caller is unchanged."""
+    import re
+
+    pattern = re.compile(r"(?<!\w)(?:zzzclinicalterm|zzz[\s\-]+phrase)(?!\w)", re.IGNORECASE)
+    payload = json.dumps({"items": [{"pitch": "a week after the ZzzClinicalTerm finding"}], "note": "the zzz-phrase again"})
+    hits = guard.scan_endpoint_payload(payload, vice=[], literals=[], clinical=pattern)
+    assert sorted(d.split(" ")[0] for arm, d in hits if arm == "clinical-record") == ["$.items[].pitch", "$.note"], hits
+    assert all("zzz" not in d.lower() for _, d in hits), f"a violation line echoed the term: {hits}"
+    assert guard.scan_endpoint_payload(payload, vice=[], literals=[]) == []
+    fallback = guard.scan_endpoint_payload("plain text with zzzclinicalterm", vice=[], literals=[], clinical=pattern)
+    assert [arm for arm, _ in fallback] == ["clinical-record"] and "zzz" not in fallback[0][1]
+
+
 def test_non_json_body_violations_are_masked_too():
     """The non-JSON fallback has no path to give, but it still never gives the value."""
     hits = guard.scan_endpoint_payload("plain text: someone.personal@gmail.com and 123-45-6789", vice=[], literals=[])
