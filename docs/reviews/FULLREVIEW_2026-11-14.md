@@ -72,6 +72,8 @@ The monthly `fullreview-full` ritual clock reads last = 2026-11-14 (it read 2026
 
 The four rows that carried a withheld issue ran on the stronger session model (the sanctioned exception) and still missed — the third consecutive run in which grader recall, not precision, is the weak leg (10-31: uncalibrated on the withheld control; 11-13: 0 of 1 blind; this run: 0 of 4). Each withheld issue sits in a corner the row's sweep did not reach: a read grant on one role among ~100 (#5543), a missing grant visible only by cross-referencing imports with IAM (#5906), a census script the cost row did not run (#5888), and a scheduled workflow's red history (#5973). That is a coverage pattern, not bad luck: graders sample the clauses and the prior path-to-A list well, and do not sweep the estate their area owns.
 
+One control was not blind: the security row's withheld issue had already been named as a missed control in the committed 2026-11-13 calibration block, so it was a spent control when this run re-used it (found by the #5914 lane's `--check-controls`, PR #6029). It is recorded as `blind: false`. It was still missed; nothing about the clocks changes.
+
 Candidates checked live before launch and found ALREADY FIXED with the issue still open (so not withheld): #5524 (a, b), #5221, #5519, #5525, #5514.
 
 ## Grade table

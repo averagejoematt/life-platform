@@ -147,8 +147,10 @@
       "#5543"
      ],
      "verified_live": "driver, before launch (2026-11-15 ~01:25Z): cdk/stacks/role_policies_serve.py site_api() DynamoDBRead (GetItem, Query) on TABLE_ARN and /index/* carries no dynamodb:LeadingKeys condition (graded tree a24ea2796).",
-     "blind": true,
-     "grader_model": "session model"
+     "blind": false,
+     "grader_model": "session model",
+     "blind_note": "NOT blind: this control was already named as a missed control in the committed 2026-11-13 calibration block, so it was a spent control when this run re-used it. The grader was told not to read review artifacts or query issues, but a control a committed artifact names cannot be recorded as blind. It is still a miss; no clock moves on it.",
+     "reused_from": "fullreview_grades_2026-11-13.json"
     },
     "observability": {
      "withheld": [
@@ -203,7 +205,7 @@
     "growth"
    ],
    "close_check_not_withheld": "Candidates checked live before launch and found ALREADY FIXED with the issue still open (so not withheld): #5524 (a, b), #5221, #5519, #5525, #5514.",
-   "blind_note": "Graders received only their row's prior path-to-A list, were told not to read docs/reviews FULLREVIEW/fullreview_grades from 2026-10 on and not to run gh issue/pr commands; the withheld issues were removed from their do-not-refile list. Blindness rests on that instruction, not on an enforced sandbox."
+   "blind_note": "Graders received only their row's prior path-to-A list, were told not to read docs/reviews FULLREVIEW/fullreview_grades from 2026-10 on and not to run gh issue/pr commands; the withheld issues were removed from their do-not-refile list. Blindness rests on that instruction, not on an enforced sandbox. Exception: the security row's control was re-used from the 2026-11-13 run and is recorded as not blind (see by_lens.security)."
   },
   "verdict": "PARTIALLY_CALIBRATED",
   "verdict_note": "Verifier control PASSED: 17 of 17 planted false findings REFUTED. Grader recall control FAILED in every row that carried one: 0 of 4 withheld issues found (security, observability, cost, devex). Owner ruling 2026-11-14: not a successful calibrated review. Per #5914 this run advances none of those four rows (cost, devex, observability stay at 2026-11-13; security stays at 2026-11-14, a date set by the separate calibrated security-only run of the same day, not by this one); the 13 rows with no withheld issue, covered by the verifier control alone, advance to 2026-11-14."
@@ -2048,7 +2050,9 @@
      "#5543"
     ],
     "verified_live": "driver, before launch (2026-11-15 ~01:25Z): cdk/stacks/role_policies_serve.py site_api() DynamoDBRead (GetItem, Query) on TABLE_ARN and /index/* carries no dynamodb:LeadingKeys condition (graded tree a24ea2796).",
-    "blind": true
+    "blind": false,
+    "blind_note": "NOT blind: this control was already named as a missed control in the committed 2026-11-13 calibration block, so it was a spent control when this run re-used it. The grader was told not to read review artifacts or query issues, but a control a committed artifact names cannot be recorded as blind. It is still a miss; no clock moves on it.",
+    "reused_from": "fullreview_grades_2026-11-13.json"
    }
   },
   "a11y": {
