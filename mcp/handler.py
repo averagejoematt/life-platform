@@ -940,18 +940,29 @@ _LOOPBACK_HOSTS = ("localhost", "127.0.0.1", "::1")
 
 
 def _redirect_uri_allowed(redirect_uri: str) -> bool:
-    """True if redirect_uri is an https callback on an allowlisted host (or loopback)."""
-    if not redirect_uri:
+    """True if redirect_uri is an https callback on an allowlisted host (or an http loopback).
+
+    #5979: the check must agree with how a BROWSER reads the URL, not only Python. ``urllib`` reads
+    ``https://evil.example\\@claude.ai/cb`` as host claude.ai; a browser treats the backslash as ``/`` and
+    goes to evil.example. So any URL a browser could resolve differently is refused outright: a backslash,
+    a control or whitespace character anywhere, userinfo (``@``) or a percent-escape in the authority.
+    What is left has one reading, and its host must be an allowlisted one (or a subdomain of one)."""
+    if not redirect_uri or not isinstance(redirect_uri, str):
+        return False
+    if "\\" in redirect_uri or any(ord(ch) <= 0x20 or ord(ch) == 0x7F for ch in redirect_uri):
         return False
     try:
         parsed = urllib.parse.urlparse(redirect_uri)
     except Exception:
         return False
+    netloc = parsed.netloc or ""
+    if not netloc or "@" in netloc or "%" in netloc or parsed.username is not None or parsed.password is not None:
+        return False
     host = (parsed.hostname or "").lower()
     if not host:
         return False
     if host in _LOOPBACK_HOSTS:
-        return True  # native/desktop clients use http://127.0.0.1:<port>/callback
+        return parsed.scheme in ("http", "https")  # native/desktop clients use http://127.0.0.1:<port>/callback
     if parsed.scheme != "https":
         return False
     extra = [h.strip().lower() for h in os.environ.get("OAUTH_REDIRECT_HOSTS", "").split(",") if h.strip()]
@@ -960,9 +971,14 @@ def _redirect_uri_allowed(redirect_uri: str) -> bool:
     return any(host == a or host.endswith("." + a) for a in allowed)
 
 
+def _pkce_request_ok(code_challenge: str, code_challenge_method: str) -> bool:
+    """#5932: PKCE is mandatory and S256-only — the metadata advertises exactly that. A request with no
+    challenge, or any other method, never reaches the consent form or a code."""
+    return bool(code_challenge) and code_challenge_method == "S256" and 43 <= len(code_challenge) <= 128
+
+
 def _verify_pkce(code_verifier: str, code_challenge: str, method: str) -> bool:
-    """RFC 7636 PKCE verification. S256 is required; 'plain' accepted only if the
-    client explicitly registered it (Claude uses S256)."""
+    """RFC 7636 PKCE verification, S256 only (#5932: 'plain' was accepted although no client could register it)."""
     if not code_challenge:
         return False
     if method == "S256":
@@ -971,8 +987,6 @@ def _verify_pkce(code_verifier: str, code_challenge: str, method: str) -> bool:
         digest = hashlib.sha256(code_verifier.encode("ascii")).digest()
         computed = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
         return hmac.compare_digest(computed, code_challenge)
-    if method == "plain":
-        return bool(code_verifier) and hmac.compare_digest(code_verifier, code_challenge)
     return False
 
 
@@ -997,6 +1011,8 @@ def _handle_authorize(event):
     if not _redirect_uri_allowed(redirect_uri):
         logger.warning(f"[OAuth] Rejected disallowed redirect_uri host: {urllib.parse.urlparse(redirect_uri).hostname!r}")
         return _remote_response(400, json.dumps({"error": "invalid_request", "error_description": "redirect_uri not allowed"}))
+    if not _pkce_request_ok(code_challenge, code_challenge_method):
+        return _remote_response(400, json.dumps({"error": "invalid_request", "error_description": "PKCE S256 code_challenge required"}))
 
     # Already-approved browser → refresh without re-prompting; otherwise show the form.
     if _approval_cookie_valid(event):
@@ -1021,6 +1037,8 @@ def _handle_authorize_submit(event):
 
     if not redirect_uri or not _redirect_uri_allowed(redirect_uri):
         return _remote_response(400, json.dumps({"error": "invalid_request", "error_description": "redirect_uri not allowed"}))
+    if not _pkce_request_ok(code_challenge, code_challenge_method):
+        return _remote_response(400, json.dumps({"error": "invalid_request", "error_description": "PKCE S256 code_challenge required"}))
 
     expected = _get_authorize_passcode()
     if expected == "__NO_KEY_CONFIGURED__":
@@ -1063,8 +1081,8 @@ def _handle_token(event):
         logger.warning("[OAuth] Token exchange rejected: redirect_uri mismatch")
         return _remote_response(400, json.dumps({"error": "invalid_grant", "error_description": "redirect_uri mismatch"}))
 
-    # PKCE: if the code was issued with a challenge (Claude always sends S256), it must verify.
-    if binding["code_challenge"] and not _verify_pkce(code_verifier, binding["code_challenge"], binding["code_challenge_method"]):
+    # PKCE (#5932): every code must verify — a code stored without a challenge is refused, never waved through.
+    if not _verify_pkce(code_verifier, binding.get("code_challenge") or "", binding.get("code_challenge_method") or ""):
         logger.warning("[OAuth] Token exchange rejected: PKCE verification failed")
         return _remote_response(400, json.dumps({"error": "invalid_grant", "error_description": "PKCE verification failed"}))
 
