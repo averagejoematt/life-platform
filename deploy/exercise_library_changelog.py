@@ -134,7 +134,9 @@ BUILDER_CHANGE_LOG = [
         "what": "The kettlebell swing's readiness path no longer waits on the kettlebell deadlift, a movement the engine does not "
         "serve: `chain_kb_swing` is the barbell deadlift at 3 x 5 or more at RPE <= 8 in 3 sessions across 2 weeks with no pain "
         "flag in 28 days (hinge strength and control), and every swing template also carries the owner's technique "
-        "confirmation (`owner_confirmation_skill`). The swing stays locked; nothing is unlocked.",
+        "confirmation (`owner_confirmation_skill`). The swing stays locked; nothing is unlocked. A fallback is never rated up "
+        "to high on a joint where its movement is below high (owner 2026-11-15: never a worse option for the affected joint): "
+        "24 links went, the lists refilled with the next equivalent movement where one exists (18), one list is empty.",
         "rule": "data only — status stays proposed until the owner approves the library",
     },
 ]

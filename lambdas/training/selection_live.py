@@ -328,6 +328,26 @@ def _choose(ranked: list[dict[str, Any]], counts: Counter, skip: str | None) -> 
     return rest, {"code": "week_repeat_cap", "why": f"{best['title']} already serves {n} slots this week (cap {MAX_WEEKLY_EXPOSURES})"}
 
 
+def no_worse_for_pain(ranked: list[dict[str, Any]], prev: str, ctx: dict[str, Any]) -> list[dict[str, Any]]:
+    """The candidates that load every joint the pain-excluded movement loads (rated moderate or high) no harder than it does —
+    the owner's 2026-11-15 rule: never replace a painful movement with an option rated worse for the affected joint. [] when
+    none qualifies (the caller then keeps the ranking; the pain rule's RPE cap and stop line still apply on the morning)."""
+    from training import selection_engine as se
+
+    rank = {"low": 0, "moderate": 1, "high": 2}
+    movs = se.xl.movements(ctx.get("lib") or {})
+    src = movs.get((ctx.get("idx") or {}).get("to_lib", {}).get(prev) or "") or {}
+    hurt = {j: rank[v] for j, v in (src.get("joint_stress") or {}).items() if rank.get(str(v), -1) >= 1}
+    if not hurt:
+        return list(ranked)
+
+    def ok(c: dict[str, Any]) -> bool:
+        js = (movs.get(str(c.get("movement_id"))) or {}).get("joint_stress") or {}
+        return all(rank.get(str(js.get(j)), 3) <= v for j, v in hurt.items())
+
+    return [c for c in ranked if ok(c)]
+
+
 def _novelty_cap(chosen: dict, ranked: list[dict], policy: dict, skip: str | None, repeat: Any) -> tuple[dict, Any]:
     """#5861 L6: `MAX_NEW_PER_WEEK` — past the week's new-movement budget a new pick yields to the best familiar candidate the
     repetition cap still allows (said so); with none it stands. Every new pick served is counted."""
@@ -361,6 +381,8 @@ def select_slot(slot: dict[str, Any], ctx: dict[str, Any], recent: set[str]) -> 
             "excluded": excluded,
         }
     trigger, held, trend = _trigger(prev, eligible, excluded, pool, ctx) if prev else (None, None, None)
+    if trigger == "pain":  # fix round 14 (B15): a painful movement is never replaced by one rated worse on the joints it loads
+        ranked = no_worse_for_pain(ranked, prev, ctx) or ranked
     defer = held if trigger in DEFERRABLE_TRIGGERS and held is not None else None  # a discretionary rotation can wait a week
     repeat = None
     if held is not None and trigger is None and counts[_fam(held)] < MAX_WEEKLY_EXPOSURES:

@@ -27,7 +27,7 @@ on every build and in CI, so a library that breaks a rule here is refused. Four 
                 mobility and rehab work, the same kind of work. A shared family label, or a shared muscle alone, is not
                 equivalence.
    and B is valid in itself: equipment `available` at home_gym; no locking gate and no `not_for_you_now`; loggable; and
-   suitable (not high-skill unless A is, no joint rated two levels worse, for conditioning no higher impact and no less
+   suitable (not high-skill unless A is, no joint rated two levels worse or raised to high, for conditioning no higher impact and no less
    controllable, not ballistic unless A is).
    Nothing is added to fill a list: a movement with no equivalent has NO fallbacks, and the served week drops the slot.
 
@@ -240,7 +240,12 @@ def _suitability_breaks(a: dict[str, Any], b: dict[str, Any]) -> list[str]:
     if b.get("skill_complexity") == "high" and a.get("skill_complexity") != "high":
         out.append("skill")
     ja, jb = a.get("joint_stress") or {}, b.get("joint_stress") or {}
-    if any(j in LEVEL and i in LEVEL and LEVEL[j] - LEVEL[i] >= 2 for i, j in ((str(ja.get(x)), str(jb.get(x))) for x in JOINTS)):
+    # fix round 14 (owner 2026-11-15: never a demonstrably worse option for the affected joint): two levels worse, or up to
+    # `high` from below it, breaks suitability
+    if any(
+        j in LEVEL and i in LEVEL and (LEVEL[j] - LEVEL[i] >= 2 or (j == "high" and i != "high"))
+        for i, j in ((str(ja.get(x)), str(jb.get(x))) for x in JOINTS)
+    ):
         out.append("joint_stress")
     ia, ib = (_inputs(a).get("conditioning") or {}).get("impact"), (_inputs(b).get("conditioning") or {}).get("impact")
     if ia in LEVEL and ib in LEVEL and LEVEL[ib] > LEVEL[ia]:

@@ -346,11 +346,11 @@ def decide(
 def effort_fit(rows: list[dict[str, Any]], rep_lo: int, target_rpe: float, equipment: str | None) -> dict[str, Any] | None:
     """Fix round 14 (D7: the target RPE dropped to 8 while the load stayed where he last logged RPE 9 at 4 reps — an impossible
     prescription). ONE rule for every lift: when the newest same-role top set, at the load it would hold, was logged ABOVE the
-    target RPE at or near the rep floor (floor + 1 at most), the load is the one that set's own effort-adjusted e1RM (`e1rm`)
+    target RPE at or near the rep floor (the floor or floor + 1; UNDER the floor is the two-exposure rule's alone), the load is the one that set's own effort-adjusted e1RM (`e1rm`)
     supports at the target RPE for the floor — never above the last load. Effort unknown (no RPE, or RPE 10 on everything): no
     fit, the reps decide. None when the last set already fits."""
     top = _top(rows[0])
-    if effort_unknown(rows) or top["rpe"] is None or top["rpe"] <= target_rpe or top["reps"] > rep_lo + 1:
+    if effort_unknown(rows) or top["rpe"] is None or top["rpe"] <= target_rpe or not rep_lo <= top["reps"] <= rep_lo + 1:
         return None
     kg = _floor_to_implement(e1rm(rows[0]) / (1 + (rep_lo + 10.0 - target_rpe) / 30.0), equipment)
     if kg >= top["kg"] - 1e-6:

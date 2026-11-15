@@ -128,6 +128,8 @@ def test_a_load_last_logged_above_the_target_at_the_floor_comes_to_what_his_e1rm
     assert live_load.decide(_rows((235, 4, 8.0)), 4, 6, "barbell", target_rpe=8)["mode"] == "hold"
     assert live_load.decide(_rows((235, 4, None), (235, 5, None)), 4, 6, "barbell", target_rpe=8)["mode"] == "hold"  # no RPE
     assert live_load.decide(_rows((235, 6, 9.0)), 4, 6, "barbell", target_rpe=8)["why"] == "the top at RPE 8 first"
+    one_under = live_load.decide(_rows((235, 3, 9.0), (235, 5, 8.0)), 4, 6, "barbell", target_rpe=8)  # under the floor ONCE:
+    assert one_under["mode"] == "hold" and round(one_under["kg"] / KG) == 235  # the two-exposure rule decides, unchanged
     with patch.object(live_load, "effort_fit", lambda *a, **k: None):  # control: the rule off
         held = live_load.decide(_rows((235, 4, 9.0)), 4, 6, "barbell", target_rpe=8)
     assert held["mode"] == "hold" and round(held["kg"] / KG) == 235

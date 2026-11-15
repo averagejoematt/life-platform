@@ -90,7 +90,7 @@
    "version": "0.3.9",
    "date": "2026-11-14",
    "by": "#5861 fix round 14 (H4; owner rulings 2026-11-14)",
-   "what": "The kettlebell swing's readiness path no longer waits on the kettlebell deadlift, a movement the engine does not serve: `chain_kb_swing` is the barbell deadlift at 3 x 5 or more at RPE <= 8 in 3 sessions across 2 weeks with no pain flag in 28 days (hinge strength and control), and every swing template also carries the owner's technique confirmation (`owner_confirmation_skill`). The swing stays locked; nothing is unlocked.",
+   "what": "The kettlebell swing's readiness path no longer waits on the kettlebell deadlift, a movement the engine does not serve: `chain_kb_swing` is the barbell deadlift at 3 x 5 or more at RPE <= 8 in 3 sessions across 2 weeks with no pain flag in 28 days (hinge strength and control), and every swing template also carries the owner's technique confirmation (`owner_confirmation_skill`). The swing stays locked; nothing is unlocked. A fallback is never rated up to high on a joint where its movement is below high (owner 2026-11-15: never a worse option for the affected joint): 24 links went, the lists refilled with the next equivalent movement where one exists (18), one list is empty.",
    "rule": "data only — status stays proposed until the owner approves the library"
   }
  ],
@@ -364,8 +364,8 @@
    "none_reviewed": 640
   },
   "integrity": {
-   "fallback_links": 1115,
-   "movements_without_fallbacks": 234,
+   "fallback_links": 1109,
+   "movements_without_fallbacks": 235,
    "template_id_null": 1,
    "not_loggable": 0,
    "movements_by_availability_evidence": {
@@ -9683,15 +9683,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "lying_db_tricep_extension",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "triceps_kickback_dumbbell",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "overhead_tricep_extension",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "skullcrusher_barbell",
      "reason": "same_stimulus"
     }
    ]
@@ -12945,15 +12945,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "zercher_squat",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "squat_bodyweight",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "box_squat_barbell",
+     "movement_id": "kettlebell_goblet_squat",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "wall_squat",
      "reason": "same_stimulus"
     }
    ],
@@ -14691,16 +14691,16 @@
    },
    "fallbacks": [
     {
-     "movement_id": "bench_dip",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "db_jm_press",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "db_diamond_press",
      "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "elbows_tucked_db_bench",
+     "reason": "substitute_pattern"
     }
    ],
    "attribute_audit": {
@@ -18209,15 +18209,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "lying_db_tricep_extension",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "overhead_triceps_extension_cable",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "skullcrusher_barbell",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "skullcrusher_dumbbell",
      "reason": "same_stimulus"
     }
    ],
@@ -19998,7 +19998,7 @@
      "reason": "substitute_pattern"
     },
     {
-     "movement_id": "bench_dip",
+     "movement_id": "db_jm_press",
      "reason": "substitute_pattern"
     }
    ],
@@ -20906,15 +20906,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "lying_db_tricep_extension",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "overhead_tricep_extension",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "skullcrusher_barbell",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "skullcrusher_dumbbell",
      "reason": "same_stimulus"
     }
    ],
@@ -29196,7 +29196,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "straight_leg_deadlift",
+     "movement_id": "banded_good_mornings",
      "reason": "same_stimulus"
     }
    ]
@@ -31242,15 +31242,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "zercher_squat",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "squat_bodyweight",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "box_squat_barbell",
+     "movement_id": "kettlebell_goblet_squat",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "wall_squat",
      "reason": "same_stimulus"
     }
    ],
@@ -38851,15 +38851,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "straight_leg_deadlift",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "banded_good_mornings",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "db_stiff_legged_deadlift",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "romanian_deadlift_dumbbell",
      "reason": "same_stimulus"
     }
    ],
@@ -43113,15 +43113,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "straight_leg_deadlift",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "banded_good_mornings",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "3_way_rdl",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "romanian_deadlift_dumbbell",
      "reason": "same_stimulus"
     }
    ],
@@ -44795,11 +44795,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "zercher_squat",
+     "movement_id": "db_bench_front_squats",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_bench_front_squats",
+     "movement_id": "db_crush_grip_squats",
      "reason": "same_stimulus"
     }
    ]
@@ -57396,15 +57396,7 @@
    },
    "fallbacks": [
     {
-     "movement_id": "goblet_squat",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "db_bench_front_squats",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "db_crush_grip_squats",
+     "movement_id": "wall_squat",
      "reason": "same_stimulus"
     }
    ],
@@ -59792,12 +59784,12 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "bench_dip",
+     "movement_id": "db_jm_press",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_jm_press",
-     "reason": "same_stimulus"
+     "movement_id": "bench_press_close_grip_barbell",
+     "reason": "substitute_pattern"
     }
    ],
    "attribute_audit": {
@@ -68922,11 +68914,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "zercher_squat",
+     "movement_id": "db_bench_front_squats",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_bench_front_squats",
+     "movement_id": "db_crush_grip_squats",
      "reason": "same_stimulus"
     }
    ]
@@ -84548,20 +84540,7 @@
      "source": "the worst of its equipment: bodyweight"
     }
    },
-   "fallbacks": [
-    {
-     "movement_id": "goblet_squat",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "db_bench_front_squats",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "db_crush_grip_squats",
-     "reason": "same_stimulus"
-    }
-   ],
+   "fallbacks": [],
    "attribute_audit": {
     "fields": [],
     "reason": "",
@@ -90897,15 +90876,15 @@
    },
    "fallbacks": [
     {
-     "movement_id": "straight_leg_deadlift",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "banded_good_mornings",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "3_way_rdl",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "db_stiff_legged_deadlift",
      "reason": "same_stimulus"
     }
    ],
@@ -96283,15 +96262,11 @@
    },
    "fallbacks": [
     {
-     "movement_id": "deadlift_barbell",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "deadlift_trap_bar",
-     "reason": "same_stimulus"
-    },
-    {
      "movement_id": "deadlift_dumbbell",
+     "reason": "same_stimulus"
+    },
+    {
+     "movement_id": "deadlift_twist",
      "reason": "same_stimulus"
     }
    ],
