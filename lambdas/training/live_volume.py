@@ -618,10 +618,12 @@ def week_plan(
     logged: frozenset[str] = frozenset(),
     in_block: Any = None,
     variants: Any = None,
+    set_cap: int | None = None,
 ) -> dict[str, Any]:
     """The week's plan (module doc 1): {week, rows (every drafted morning's rows, sized), targets, counts, under, host, lines}.
     Pure over the catalog, the library, the mornings and the weekly memory (`last`); the same for every morning of the week.
-    `variants`: the selection's accessory picks by role (`selection_engine._week_variants`), so the plan counts what is served."""
+    `variants`: the selection's accessory picks by role (`selection_engine._week_variants`), so the plan counts what is served;
+    `set_cap`: the session set ceiling the morning is fitted to."""
     week = week_shape(mornings)
     rows = [r for role in week["roles"] for r in day_rows(role, week, catalog, lib, in_block, variants)]
     lines = _press_trade(rows, lib, press_source)
@@ -637,6 +639,12 @@ def week_plan(
     by_tid = {str(e.get("template_id") or "").upper(): e for e in (lib.get("movements") or {}).values() if e.get("template_id")}
     logged_patterns = {by_tid[t].get("pattern") for t in logged if t in by_tid} - {None}
 
+    def unlogged(key: Any) -> bool:
+        return str(lib_entry(key, catalog, lib).get("template_id") or "").upper() not in logged
+
+    def main(r: dict[str, Any]) -> str:
+        return landmark_muscle(r["key"], catalog, lib)
+
     def add(m: str, role: str, probe: bool = False) -> Any:
         here = {lib_entry(r["key"], catalog, lib).get("pattern") for r in rows if r["role"] == role}  # never the same pattern twice
         keys = [
@@ -647,8 +655,8 @@ def week_plan(
         known = bool(keys) and (str(entry.get("template_id") or "").upper() in logged or entry.get("pattern") in logged_patterns)
         if keys and not known and logged and m not in prio:
             return 0  # a movement new to him (one RPE-7 exposure) is added only for a priority muscle's aim — never for another
-        if keys and not known and logged and any(r.get("learning") and r.get("fill") == m for r in rows):
-            return 0  # fix round 14: at most ONE movement new to him per muscle in a week (its first exposure counts nothing)
+        if keys and logged and unlogged(keys[0]) and any(unlogged(r["key"]) and (r.get("fill") or main(r)) == m for r in rows):
+            return 0  # fix round 14: at most ONE movement with no logged set (new to him) per muscle in a week
         if not keys or probe:
             return (1 if known else 2) if keys else 0
         taken.add(keys[0])
@@ -657,7 +665,15 @@ def week_plan(
             return _row(role, new, catalog, lib) | {"fill": m, "feeler": True, "learning": True}
         return _row(role, new, catalog, lib) | {"fill": m, "feeler": not known}  # no load on file: one "find the load" set
 
-    room = lambda role, m=None: free_minutes(rows, role, host, lib)  # noqa: E731 — the ruled dose keeps its minutes (ruling 1)
+    one = plan_minutes([{"kind": "accessory", "pattern": None, "sets": 1, "intensity": "accessory"}])
+
+    def room(role: str, m: Any = None) -> float:  # the ruled dose keeps its minutes (ruling 1); fix round 14: and the session
+        # set ceiling holds on the plan as it does on the morning (`fit_sets`) — a 21st planned set was trimmed when served
+        free = free_minutes(rows, role, host, lib)
+        if not set_cap:
+            return free
+        return min(free, (int(set_cap) - sum(r["sets"] for r in rows if r["role"] == role)) * one)
+
     lines += spend(rows, tg, roles, full, room, add, last, _redline_sets(), frozenset(prio))  # 2. the one step
     surplus()  # 3. again: a head's aim may have grown its muscle past MAV (ruling 9)
     lines += _redline(rows, tg, prio)

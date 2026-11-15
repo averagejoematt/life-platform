@@ -121,7 +121,8 @@ HEURISTICS: dict[str, dict[str, Any]] = {
     "slump_accessory_cut": {
         "value": 0.34,
         "group": "progression",
-        "basis": "the slump's volume answer: about a third of each accessory's working sets (never under 2); anchors keep theirs",
+        "basis": "the slump's volume answer: about a third of the session's non-priority accessory sets (fix round 14: a slot at 2 "
+        "goes whole once every slot is at 2); anchors, priority accessories and the carry keep theirs",
         "retune": "block retro: recovery markers in the weeks after a slump hold",
     },
     "effort_targets": {

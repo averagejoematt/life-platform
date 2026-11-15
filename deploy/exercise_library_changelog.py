@@ -127,4 +127,14 @@ BUILDER_CHANGE_LOG = [
         "plainly that an unset threshold is locked, and carry the accepted readiness standard. Nothing is unlocked.",
         "rule": "data and build-time validation only — status stays proposed until the owner approves the library",
     },
+    {
+        "version": "0.3.9",
+        "date": "2026-11-14",
+        "by": "#5861 fix round 14 (H4; owner rulings 2026-11-14)",
+        "what": "The kettlebell swing's readiness path no longer waits on the kettlebell deadlift, a movement the engine does not "
+        "serve: `chain_kb_swing` is the barbell deadlift at 3 x 5 or more at RPE <= 8 in 3 sessions across 2 weeks with no pain "
+        "flag in 28 days (hinge strength and control), and every swing template also carries the owner's technique "
+        "confirmation (`owner_confirmation_skill`). The swing stays locked; nothing is unlocked.",
+        "rule": "data only — status stays proposed until the owner approves the library",
+    },
 ]

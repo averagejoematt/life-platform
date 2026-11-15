@@ -1,6 +1,6 @@
 {
  "_README": "The owner's exercise library (#5769). PROPOSED — nothing in the drafting path reads it until the owner approves it. Public half only: no bodyweight, no loads, no note text — the N=1 half (best set per bodyweight band, coded note signals, gate threshold values) is the owner-private overlay s3://matthew-life-platform/config/coaching/exercise_library.private.json, joined at selection time by lambdas/training/exercise_library.py (fail-closed). Built by deploy/build_exercise_library.py from the full Hevy history + deploy/exercise_library_curation.py. Doc: docs/coaching/EXERCISE_LIBRARY.md.",
- "version": "0.3.8",
+ "version": "0.3.9",
  "status": "proposed",
  "change_log": [
   {
@@ -85,6 +85,13 @@
    "by": "#5861 fix round 13 (library integrity, owner rulings 2026-11-14)",
    "what": "One integrity pass, enforced at build time (`training.library_integrity`). Fallbacks follow ONE equivalence rule (same purpose, movement function and stimulus; available, ungated, loggable, suitable) and an empty list is valid. Readiness chains are acyclic and measurable: the hanging chain is three ordered steps, the pull-up negative's tempo is owner-confirmed, an unused gate is gone, and the dead hang's and the kettlebell swing's other logged forms carry their gates. A movement with no Hevy template (or verified canonical mapping) is never selectable; the kettlebell deadlift left Hevy's Sumo Deadlift template and waits for its own; the hang high pull points at its real template. Availability carries five evidence states and only owner-confirmed or recently logged equipment is served. Bodyweight gates say plainly that an unset threshold is locked, and carry the accepted readiness standard. Nothing is unlocked.",
    "rule": "data and build-time validation only — status stays proposed until the owner approves the library"
+  },
+  {
+   "version": "0.3.9",
+   "date": "2026-11-14",
+   "by": "#5861 fix round 14 (H4; owner rulings 2026-11-14)",
+   "what": "The kettlebell swing's readiness path no longer waits on the kettlebell deadlift, a movement the engine does not serve: `chain_kb_swing` is the barbell deadlift at 3 x 5 or more at RPE <= 8 in 3 sessions across 2 weeks with no pain flag in 28 days (hinge strength and control), and every swing template also carries the owner's technique confirmation (`owner_confirmation_skill`). The swing stays locked; nothing is unlocked.",
+   "rule": "data only — status stays proposed until the owner approves the library"
   }
  ],
  "_provenance": {
@@ -1842,17 +1849,22 @@
   },
   "chain_kb_swing": {
    "standard": {
-    "sessions_min": 2
+    "sets": 3,
+    "reps_min": 5,
+    "rpe_max": 8,
+    "prerequisite_sessions_min": 3,
+    "span_weeks_min": 2,
+    "flag_free_days": 28
    },
    "kind": "chain_prerequisite",
    "locks": true,
    "measured_input": "logged Hevy sessions of the prerequisite movement(s), with RPE and the private overlay's pain flags",
-   "unlock_condition": "kettlebell deadlift logged in 2 sessions (owner ruling 2026-11-11: the kettlebell slot is the swing, entered via 2 KB deadlift exposures)",
+   "unlock_condition": "barbell deadlift logged at 3 x 5 or more at RPE <= 8 in at least 3 sessions across at least 2 weeks, with no pain flag on it in the last 28 days (hinge strength and control), AND the swing technique owner-confirmed (owner_confirmation_skill)",
    "chain_prerequisites": [
-    "kettlebell_deadlift"
+    "deadlift_barbell"
    ],
    "unknown_input": "locked",
-   "provenance": "owner ruling 2026-11-11 (#5810)"
+   "provenance": "owner ruling 2026-11-14 (readiness standards approved as written; #5861 fix round 14) — replaces the 2-kettlebell-deadlift entry of 2026-11-11 (#5810)"
   },
   "chain_kb_clean": {
    "standard": {
@@ -6652,6 +6664,7 @@
    ],
    "gates": [
     "chain_kb_swing",
+    "owner_confirmation_skill",
     "clinical_cue_breathing"
    ],
    "not_for_you_now": null,
@@ -32658,7 +32671,8 @@
     "reviewed": true
    },
    "gates": [
-    "chain_kb_swing"
+    "chain_kb_swing",
+    "owner_confirmation_skill"
    ],
    "not_for_you_now": null,
    "availability": {
@@ -82767,6 +82781,7 @@
    },
    "gates": [
     "chain_kb_swing",
+    "owner_confirmation_skill",
     "clinical_cue_breathing"
    ],
    "not_for_you_now": null,

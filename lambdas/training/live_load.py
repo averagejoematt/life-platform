@@ -86,13 +86,28 @@ def _day(w: dict[str, Any]) -> str:
     return str(w.get("date") or str(w.get("sk") or "")[5:15])[:10]
 
 
-def history(workouts: Any, tids: set[str]) -> dict[str, list[dict[str, Any]]]:
-    """Template id -> its logged exposures, most recent first: {date, role, sets: [{kg, reps, rpe}]} (working sets with a load)."""
+def content_role(w: dict[str, Any], anchor_roles: dict[str, set[str]] | None) -> str:
+    """Fix round 14 (B2: role-less titles made the heavy day read the volume day's set): the role a workout whose title names none
+    is assigned BY ITS CONTENT — the role whose template anchors (`anchor_roles`: template id -> the roles serving it as an anchor)
+    it holds most of; '' on a tie or none (it is then no same-role reference, `same_role`)."""
+    from collections import Counter
+
+    votes: Counter = Counter()
+    for x in w.get("exercises") or []:
+        for r in (anchor_roles or {}).get(str(x.get("template_id") or "").upper()) or ():
+            votes[r] += 1
+    best = votes.most_common(2)
+    return best[0][0] if best and (len(best) == 1 or best[0][1] > best[1][1]) else ""
+
+
+def history(workouts: Any, tids: set[str], anchor_roles: dict[str, set[str]] | None = None) -> dict[str, list[dict[str, Any]]]:
+    """Template id -> its logged exposures, most recent first: {date, role, sets: [{kg, reps, rpe}]} (working sets with a load).
+    A workout whose title names no role takes its role from its content (`content_role`)."""
     from training.fatigue_model import session_role
 
     out: dict[str, list[dict[str, Any]]] = {}
     for w in workouts or []:
-        role, day = session_role(w), _day(w)
+        role, day = session_role(w) or content_role(w, anchor_roles), _day(w)
         for x in w.get("exercises") or []:
             tid = str(x.get("template_id") or "").upper()
             if tid not in tids:
@@ -110,20 +125,20 @@ def history(workouts: Any, tids: set[str]) -> dict[str, list[dict[str, Any]]]:
 
 
 def same_role(rows: list[dict[str, Any]], role: str, target_date: str, rep_lo: int, rep_hi: int) -> list[dict[str, Any]]:
-    """The exposures of today's session role in the window, most recent first (fix round 10: explicit role, then the band, then
-    recency). A row its title names today's role counts; a row whose title names NO role counts when its top set sits in today's
-    band (one under the floor at most, never over the top; a heavy day has no lower band to leak from, so any reps under its top).
-    Both kinds merge by date, so a new untitled session is never ignored for an older titled one."""
+    """The exposures of today's session role in the window, most recent first. A row of today's role counts (its title names it,
+    or fix round 14 its content does: `content_role`, so a new untitled session is never ignored for an older titled one). A
+    row with NO role is never a reference for a named role (fix round 14, B2: the band test let the heavy day read the volume
+    day's 10-rep set); only the any-role read (`role` '') takes it, when its top set sits in the band (one under the floor at
+    most, never over the top)."""
     from common.pacific_time import shift_day_key
 
     since = shift_day_key(target_date, -int(cfg.value("history_days")))
-    heavy = "heavy" in str(role or "")
     out = []
     for r in rows:
         if not since <= r["date"] < target_date:
             continue
         reps = _top(r)["reps"]
-        if (role and r["role"] == role) or (not r["role"] and reps <= max(rep_hi, rep_lo) and (heavy or reps >= rep_lo - 1)):
+        if (role and r["role"] == role) or (not role and not r["role"] and rep_lo - 1 <= reps <= max(rep_hi, rep_lo)):
             out.append(r)
     return sorted(out, key=lambda r: (r["date"], bool(r["role"])), reverse=True)
 
@@ -309,6 +324,9 @@ def decide(
             "why": f"{rep_hi} reps reached",
             "clause": f"Heavier: {rep_hi} reps reached.",
         }
+    fit = effort_fit(rows, rep_lo, target_rpe, equipment)
+    if fit is not None:
+        return fit
     if hold:
         return {"kg": last, "mode": "hold", "why": hold, "clause": f"Same load: {hold}."}
     top = _top(rows[0])
@@ -323,6 +341,27 @@ def decide(
     # fix round 12: every held lift says what moves it (the one load rule, on the lift's own note)
     which = "top set" if top_set else "all sets"  # `top_set`: a top set + back-offs — the top set alone earns the step
     return {"kg": last, "mode": "hold", "why": "reps first", "clause": f"Same load: {which} to {rep_hi} reps, then up."}
+
+
+def effort_fit(rows: list[dict[str, Any]], rep_lo: int, target_rpe: float, equipment: str | None) -> dict[str, Any] | None:
+    """Fix round 14 (D7: the target RPE dropped to 8 while the load stayed where he last logged RPE 9 at 4 reps — an impossible
+    prescription). ONE rule for every lift: when the newest same-role top set, at the load it would hold, was logged ABOVE the
+    target RPE at or near the rep floor (floor + 1 at most), the load is the one that set's own effort-adjusted e1RM (`e1rm`)
+    supports at the target RPE for the floor — never above the last load. Effort unknown (no RPE, or RPE 10 on everything): no
+    fit, the reps decide. None when the last set already fits."""
+    top = _top(rows[0])
+    if effort_unknown(rows) or top["rpe"] is None or top["rpe"] <= target_rpe or top["reps"] > rep_lo + 1:
+        return None
+    kg = _floor_to_implement(e1rm(rows[0]) / (1 + (rep_lo + 10.0 - target_rpe) / 30.0), equipment)
+    if kg >= top["kg"] - 1e-6:
+        return None
+    why = f"{top['reps']} reps at RPE {top['rpe']:g} last time"
+    return {
+        "kg": kg,
+        "mode": "down",
+        "why": why,
+        "clause": f"Lighter: {top['reps']} reps was RPE {top['rpe']:g} last time; this load is RPE {target_rpe:g} for {rep_lo}.",
+    }
 
 
 def previous_clause(d: dict[str, Any], rows: list[dict[str, Any]], all_rows: list[dict[str, Any]], kind: str, day: str) -> str | None:
@@ -383,6 +422,10 @@ def mark_novelty(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> None
             continue
         entry = _lib(e, ctx)
         tid = tid_of(e.get("movement_key"), ctx["catalog"], ctx.get("lib"), ctx.get("idx"))
+        start = start_point(e.get("movement_key"), ctx, workouts, logged)
+        if start is not None:  # fix round 14: the note's starting point from the closest logged movement, and why it is here
+            fill = str(e.get("live_added") or "")
+            e["live_start"] = start | ({"for": fill[len("fill_") :].replace("_", " ")} if fill.startswith("fill_") else {})
         if gap and tid and tid in logged and (tid, role) not in since and (tid, "") not in since:
             e["live_first_back"] = True
             e["live_effort"] = min(int(cfg.value("first_back_rpe")), int(e.get("live_effort") or 99))
@@ -394,9 +437,68 @@ def mark_novelty(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> None
             e["live_effort"] = min(int(cfg.value("new_pattern_rpe")), int(e.get("live_effort") or 99))
 
 
+def start_point(key: Any, ctx: dict[str, Any], workouts: Any, logged: set[str]) -> dict[str, Any] | None:
+    """Fix round 14 (B9: "find the load" on a curl while his curls sat in the record): a movement with no logged set in the
+    window gets a starting point from the CLOSEST logged movement — the same pattern on the same equipment (a dumbbell curl's
+    per-hand load never starts a cable curl), his most recent top working set of it. {lb, title, new} (`new`: never logged at
+    all, per the catalog's history), or {lb: None, new} when no such movement is on file ("find the load" stands)."""
+    from training import fatigue_model as fm
+
+    catalog = ctx.get("catalog") or {}
+    tid = tid_of(key, catalog, ctx.get("lib"), ctx.get("idx"))
+    if not tid or tid in logged:
+        return None
+    idx = fm.library_index(ctx.get("lib"))
+    by_tid = {str(v.get("hevy_template_id_hint") or "").upper(): v for v in catalog.values() if v.get("hevy_template_id_hint")}
+    pattern, kit = (idx.get(tid) or {}).get("pattern"), (catalog.get(str(key)) or {}).get("equipment")
+    new = not ((catalog.get(str(key)) or {}).get("sessions") or (catalog.get(str(key)) or {}).get("last_done"))
+    best: tuple[str, float, str] | None = None
+    for w in workouts or []:
+        for x in w.get("exercises") or []:
+            t = str(x.get("template_id") or "").upper()
+            if t == tid or not pattern or (idx.get(t) or {}).get("pattern") != pattern or (by_tid.get(t) or {}).get("equipment") != kit:
+                continue
+            kg = max(
+                (float(st.get("weight_kg") or 0) for st in x.get("sets") or [] if str(st.get("type") or "normal") != "warmup"), default=0
+            )
+            if kg and (best is None or _day(w) > best[0]):
+                best = (_day(w), kg, str((idx.get(t) or {}).get("title") or (by_tid.get(t) or {}).get("title") or t))
+    if best is None:
+        return {"lb": None, "new": new}
+    return {"lb": round(best[1] / KG_PER_LB * 2) / 2, "title": best[2], "new": new}
+
+
 def _lib(e: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     lid = ctx["idx"]["to_lib"].get(str(e.get("movement_key"))) if e.get("movement_key") else None
     return ((ctx["lib"].get("movements") or {}).get(lid) or {}) if lid else {}
+
+
+def start_line(note: str, start: dict[str, Any] | None) -> str:
+    """The note with its "find the load" line replaced by the starting point (`start_point`): `Start near 30 lb, the load of your
+    Seated Incline Curl.` under a `New: replaces …` line, else `New to you: start near …` (`Not done lately: …` for a movement
+    he logged long ago; `…, for calves` on a fill: the reason it is in the week); with no movement on file, `New to you: W set
+    up to 8 easy reps, find the load.` The first form that
+    fits the phone budget wins (a fallback line, then the `New: replaces` line, give way); else the note is unchanged."""
+    from training import hevy_note_grammar as g
+
+    lines = (note or "").split("\n")
+    i = next((n for n, ln in enumerate(lines) if g.PICK_LOAD_OPEN_TAIL in ln), None)
+    if i is None or not start:
+        return note
+    head = ("New to you" if start.get("new") else "Not done lately") + (f", for {start['for']}" if start.get("for") else "")
+    if start.get("lb"):
+        tail = f"start near {start['lb']:g} lb, the load of your {start['title']}."
+        own, said = f"{head}: {tail}", "Start" + tail[len("start") :]
+    else:
+        own = said = f"{head}: W set up to {g.PICK_LOAD_W_REPS} easy reps, {g.PICK_LOAD_OPEN_TAIL}"
+    rotated = any(ln.startswith(g.ROTATION_HEAD) for ln in lines)
+    first = lines[:i] + [said if rotated and start.get("lb") else (lines[i] if rotated else own)] + lines[i + 1 :]
+    no_fb = [ln for ln in first if not g.FALLBACK_RE.match(ln)]
+    merged = [own if n == i else ln for n, ln in enumerate(lines) if not ln.startswith(g.ROTATION_HEAD) and not g.FALLBACK_RE.match(ln)]
+    for out in (first, no_fb, merged):
+        if g.phone_lines("\n".join(out)) <= g.LIFT_MAX_LINES:
+            return "\n".join(out)
+    return note
 
 
 def familiar_keys(rx: dict[str, Any] | None) -> set[str] | None:
@@ -512,17 +614,32 @@ def _lb(kg: float) -> str:
 
 
 def slump_trim(rx: dict[str, Any], keep: set[str] | None = None) -> list[str]:
-    """IN PLACE, rule 4's volume answer: each NON-PRIORITY accessory loses about a third of its working sets (never under 2); an
-    accessory for a priority muscle (`keep`, its movement keys) keeps its sets (fix round 10: the ninth red team's slump trimmed
-    the priority chest fly harder than the curls). Returns the line."""
+    """IN PLACE, rule 4's volume answer: the session's NON-PRIORITY accessory sets come down by about a third (fix round 14, B5:
+    a per-slot third of 2-set slots took nothing, 2 of 44 sets a week, while the line said "a third"). As close to the third as
+    whole sets allow: one set off the largest slot over 2 first, then — every slot at 2 — the last such slot whole. An accessory
+    for a priority muscle (`keep`, its movement keys) and the carry keep theirs; anchors are never touched. Returns the line,
+    which says exactly what was taken."""
     cut = float(cfg.value("slump_accessory_cut"))
     floor = int(cfg.value("slot_min_sets"))
-    taken = 0
-    for e in rx["exposures"]:
-        if e.get("kind") != "accessory" or str(e.get("movement_key")) in (keep or set()):
-            continue
-        n = len(e.get("sets") or [])
-        keep_n = max(floor, n - int(round(n * cut)))
-        taken += max(0, n - keep_n)
-        e["sets"] = list(e["sets"])[:keep_n] if n > keep_n else e["sets"]
-    return [f"slump (live): non-priority accessories -{taken} set(s) (about a third), no load steps up"] if taken else []
+    pool = [
+        e
+        for e in rx["exposures"]
+        if e.get("kind") == "accessory" and e.get("intensity") != "carry" and str(e.get("movement_key")) not in (keep or set())
+    ]
+    total = sum(len(e.get("sets") or []) for e in pool)
+    exact, taken, dropped = total * cut, 0, []
+    while pool:
+        over = [e for e in pool if len(e.get("sets") or []) > floor]
+        e = max(over, key=lambda x: (len(x["sets"]), pool.index(x))) if over else pool[-1]
+        n = 1 if over else len(e.get("sets") or [])
+        if abs(taken + n - exact) >= abs(taken - exact):
+            break
+        taken += n
+        if over:
+            e["sets"] = list(e["sets"])[:-1]
+        else:
+            pool.remove(e)
+            rx["exposures"].remove(e)
+            dropped.append(str(e.get("movement_key")))
+    left = f"; left out: {', '.join(dropped)}" if dropped else ""
+    return [f"slump (live): non-priority accessories -{taken} of {total} set(s) (about a third{left}), no load steps up"] if taken else []

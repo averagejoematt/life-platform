@@ -290,6 +290,7 @@ def for_live_draft(
             logged=ctx["logged_tids"],
             in_block=ctx["in_block"],
             variants=(rotation or {}).get("week_variants"),  # fix round 14: the plan counts the accessories the week serves
+            set_cap=set_cap,
         )
         ctx["volume_plan"] = plan
         role_rows = [r for r in plan["rows"] if r["role"] == rx.get("session_role")]
@@ -305,7 +306,7 @@ def for_live_draft(
         lines += _reps_follow_the_movement(out, ctx) + live_volume.pair_anchors(out, plan)
         tids = {live_load.tid_of(e.get("movement_key"), catalog, lib, ctx["idx"]) for e in out["exposures"]}
         anchors = _anchor_tids(catalog)
-        hist = live_load.history(block_workouts, (tids | anchors) - {""})
+        hist = live_load.history(block_workouts, (tids | anchors) - {""}, _anchor_roles(catalog, ctx.get("in_block")))
         slump = live_load.slump(hist, anchors, fatigue_model.in_deficit(getattr(inputs, "weights_by_day", None)), target)
         if slump:
             hold_all = "slump week"
@@ -435,6 +436,20 @@ def _anchor_tids(catalog: dict[str, Any]) -> set[str]:
             if e.get("kind") == "anchor":
                 out.add(str((catalog.get(str(e.get("movement_key"))) or {}).get("hevy_template_id_hint") or "").upper())
     return out - {""}
+
+
+def _anchor_roles(catalog: dict[str, Any], in_block: Any = None) -> dict[str, set[str]]:
+    """Template id -> the roles whose template serves it as an anchor (this block's variants): an untitled workout's role is read
+    from it (`live_load.content_role`)."""
+    from training import program_structure as ps
+
+    out: dict[str, set[str]] = {}
+    for role in ps.SPLIT_ROLES:
+        for e in ps.session_prescription_for_role(role, catalog_movements=catalog, in_block=in_block)["exposures"]:
+            tid = str((catalog.get(str(e.get("movement_key"))) or {}).get("hevy_template_id_hint") or "").upper()
+            if e.get("kind") == "anchor" and tid:
+                out.setdefault(tid, set()).add(str(role))
+    return out
 
 
 def _week_ctx(week: dict[str, Any] | None, inputs: Any) -> dict[str, Any]:
