@@ -450,7 +450,7 @@ REGISTRY_0926 = {
     n: dict(_T0)
     for n in (
         "Walk 5k",
-        "No marijuana",
+        "Restraint habit C",
         "Primary Exercise",
         "Hydrate 3L",
         "Morning Sunlight / Luminette Glasses",
@@ -460,7 +460,7 @@ REGISTRY_0926 = {
 }
 HABITIFY_0926 = {
     "Walk Outdoor >2mi": 1,
-    "No marijuana": 1,
+    "Restraint habit C": 1,
     "Primary Exercise": 1,
     "Hydrate 3L": 1,
     "Morning Sunlight / Luminette Glasses": 0,
