@@ -679,7 +679,7 @@ def hevy_restamp() -> list[iam.PolicyStatement]:
                 f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/hevy/restamp_enabled",
             ],
         ),
-        _put_metric_data_statement("CloudWatchMetrics", NS_AI, NS_COMPUTE, NS_HEVY_ROUTINE),  # #5545
+        _put_metric_data_statement("CloudWatchMetrics", NS_AI, NS_COMPUTE),  # #5545 (HevyRoutine no longer reached)
     ]
 
 

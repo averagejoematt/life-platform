@@ -145,7 +145,9 @@ def email_daily_brief() -> list[iam.PolicyStatement]:
         needs_s3_write=["dashboard/*", "buddy/*", "site/*", "generated/*"],
         extra_statements=[
             # Risk-7 ComputePipelineStaleness — the BARE `LifePlatform` root namespace (#5545: exact match).
-            _put_metric_data_statement("CloudWatchMetrics", NS_ROOT),
+            _put_metric_data_statement(
+                "CloudWatchMetrics", NS_ROOT, *NS_INGEST_SHARED
+            ),  # #5545: + item_size_guard / auth_breaker, reached via its import closure
             iam.PolicyStatement(
                 sid="ExperimentCycleRead",
                 actions=["ssm:GetParameter"],
