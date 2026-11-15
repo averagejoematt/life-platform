@@ -400,7 +400,9 @@ def format_why_note(ir: RoutineSpec) -> str:
     if ir.variant == "floor":
         return "Floor session — minimum effective dose for a low-energy day."
     rationale_blob = " ".join(ir.rationale).lower()
-    if "recovery=red" in rationale_blob or "autoreg=0.6" in rationale_blob:
+    from training.live_session import GRADED_MARK  # #5861 L6: a live draft only TRIMMED for it — no "deloading" WHY line
+
+    if ("recovery=red" in rationale_blob or "autoreg=0.6" in rationale_blob) and GRADED_MARK.lower() not in rationale_blob:
         return "Recovery red. Deloading today; protect joints."
     if "portfolio guard active" in rationale_blob:
         return "Aerobic base low. Holding strength flat to protect Zone 2."
