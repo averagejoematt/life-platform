@@ -420,9 +420,9 @@ def test_recent_aerobic_shows_the_weekend_walks_flagged_and_joints_swaps_the_tre
     draft = critics.draft_summary(ir)
     verdict = critics.deterministic_verdict(_joints(draft, block))
     assert verdict["verdict"] == "change" and verdict["field"] == "exercises[5].movement_key" and verdict["to"] == "cycling"
-    # `coach.critics_aerobic` (another lane's file, out of #5916's scope) still formats the RETIRED cap into its swap
-    # sentence from `recent_aerobic`'s two legacy names; this pin moves with that file's own change.
-    assert "POPULATION-DERIVED" in verdict["reason"] and "HR avg ≤ 120 bpm (target 105)" in verdict["reason"]
+    # #5990: the swap sentence reads the talk-test cue, never the retired walking heart-rate cap (#5916)
+    assert "POPULATION-DERIVED" in verdict["reason"] and recent_aerobic.EASY_EFFORT_CUE in verdict["reason"]
+    assert "HR avg" not in verdict["reason"] and "(target" not in verdict["reason"]
     (rec,) = critics.apply_changes(ir, [{**verdict, "critic": "joints_tendons"}])
     assert rec["applied"] is True
     assert ir.exercises[5].movement_key == "cycling" and ir.exercises[5].sets[0].duration_seconds == 3600
@@ -829,11 +829,11 @@ def test_the_0925_treadmill_replays_joined_on_the_live_fixture():
         "max_hr": 150.0,
         "hr_coverage": 0.858,
         "avg_hr_basis": tread["avg_hr_basis"],  # #5916: a measurement with its basis…
-        "over_ceiling": None,  # …never graded; the key stays for `coach.critics_aerobic`, which reads it by name
+        "over_ceiling": None,  # …never graded (`coach.critics_aerobic` no longer reads it, #5990)
     }
     assert last["avg_hr_basis"].startswith("measured") and "never graded" in last["avg_hr_basis"]
     packet = _joints(critics.draft_summary(_lower_volume_draft()), block)
-    assert packet["numbers"]["last_cardio_block_avg_hr"] == 116.9 and packet["numbers"]["last_cardio_block_over_hr_ceiling"] is None
+    assert packet["numbers"]["last_cardio_block_avg_hr"] == 116.9 and "last_cardio_block_over_hr_ceiling" not in packet["numbers"]  # #5990
     verdict = critics.deterministic_verdict(packet)
     assert "116.9 bpm avg" in verdict["reason"] and "coverage 0.858" in verdict["reason"]
 
