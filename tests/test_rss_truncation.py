@@ -147,3 +147,38 @@ def test_4191_feed_description_opens_on_the_first_sentence_not_the_envelope_head
     assert "[Weight:" not in desc
     assert "T0 Streak" not in desc
     assert "Word Boundary Guard" not in desc
+
+
+def test_5946_chronicle_pubdate_is_the_publication_instant_not_the_dateline(monkeypatch, tmp_path):
+    """#5946: a chronicle item's pubDate is its publication instant (/api/chapters
+    ``published_at``), never the post's ``date`` (the week's data dateline, days earlier).
+    An item with no recorded publication carries no pubDate. Synthetic fixture."""
+    dateline = datetime.now(timezone.utc).strftime("%Y-%m-%d")  # fresh, so the freshness guard passes
+    posts = {
+        "posts": [
+            {"date": dateline, "title": "Published Week", "url": "/journal/posts/week-02/", "excerpt": "Body."},
+            {"date": dateline, "title": "Unrecorded Week", "url": "/journal/posts/week-01/", "excerpt": "Body."},
+        ]
+    }
+    chapters = {"weeks": [{"url": "/journal/posts/week-02/", "published_at": "2030-01-04T00:24:35+00:00"}]}
+
+    class _FakeResp(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            self.close()
+            return False
+
+    def _fake_urlopen(url, timeout=0):
+        return _FakeResp(json.dumps(chapters if url == v4_build_rss.CHAPTERS_SRC else posts).encode("utf-8"))
+
+    monkeypatch.setattr(v4_build_rss, "urlopen", _fake_urlopen)
+    monkeypatch.setattr(v4_build_rss, "_blog_posts", lambda: [])
+    monkeypatch.setattr(v4_build_rss, "OUT", tmp_path / "rss.xml")
+    monkeypatch.setattr(v4_build_rss, "OUT_ALIAS", tmp_path / "feed.xml")
+    assert v4_build_rss.main() == 0
+    items = {i.findtext("title"): i for i in ET.fromstring((tmp_path / "rss.xml").read_text()).iter("item")}  # noqa: S314 — own feed
+    assert items["Published Week"].findtext("pubDate") == "Fri, 04 Jan 2030 00:24:35 +0000"
+    assert items["Published Week"].findtext("pubDate") != v4_build_rss.rfc822(dateline)  # the dateline is not the publication
+    assert items["Unrecorded Week"].find("pubDate") is None  # missing stays missing

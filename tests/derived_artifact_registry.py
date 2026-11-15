@@ -314,7 +314,7 @@ ARTIFACTS: dict[str, dict] = {
         "scripts/v4_build_rss.py",
         step="deploy/sync_site_to_s3.sh",
         reason=(
-            "Generates site/rss.xml + feed.xml from the live chronicle posts.json. Its input is LIVE "
+            "Generates site/rss.xml + feed.xml from the live chronicle posts.json (pubDate: /api/chapters published_at, #5946). Its input is LIVE "
             "DATA, not repo state, so a repo-tree drift guard could not evaluate it — regenerating at "
             "publish time is the only correct moment."
         ),
