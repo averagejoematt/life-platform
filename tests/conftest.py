@@ -159,6 +159,9 @@ REAL_CONTENT_FILTER_ENV = os.environ.get("CONTENT_FILTER_JSON")
 NEUTRAL_CONTENT_FILTER = {
     "blocked_vices": ["No fizzlewick", "No grumbleflax"],
     "blocked_vice_keywords": ["fizzlewick", "grumbleflax", "zzq"],
+    # #5947: the owner-only clinical vocabulary is channel-only too — synthetic terms here, one of
+    # them multi-word (the screen matches a phrase across whitespace or a hyphen).
+    "blocked_clinical_keywords": ["snorbleitis", "quibbled wumpus"],
 }
 os.environ["CONTENT_FILTER_JSON"] = _json.dumps(NEUTRAL_CONTENT_FILTER)
 
