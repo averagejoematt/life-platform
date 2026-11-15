@@ -1,0 +1,10 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Sid": "ListOnlyTheTwoPrefixes", "Effect": "Allow", "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::matthew-life-platform",
+      "Condition": { "StringLike": { "s3:prefix": ["claude-memory-backup/*", "datadrops-archive/*", "claude-memory-backup", "datadrops-archive"] } } },
+    { "Sid": "WriteOnlyTheTwoPrefixes", "Effect": "Allow", "Action": "s3:PutObject",
+      "Resource": ["arn:aws:s3:::matthew-life-platform/claude-memory-backup/*", "arn:aws:s3:::matthew-life-platform/datadrops-archive/*"] }
+  ]
+}
