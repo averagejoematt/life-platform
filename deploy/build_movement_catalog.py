@@ -357,6 +357,19 @@ def _kind(entry: dict[str, Any]) -> str:
     return "preserve"
 
 
+def with_coach_additions(current: dict[str, Any], additions: dict[str, dict[str, Any]] | None = None) -> dict[str, Any]:
+    """The current catalog with every `deploy/movement_catalog_additions.py` stub (#5861 L6) merged as a `coach_added` entry
+    when its key is absent — a key already in the file (written, curated or generated) is never touched. Pure."""
+    if additions is None:
+        from movement_catalog_additions import stubs
+
+        additions = stubs()
+    movements = dict(current.get("movements") or {})
+    for key, stub in additions.items():
+        movements.setdefault(key, dict(stub))
+    return {**current, "movements": movements}
+
+
 def build_catalog(current: dict[str, Any], history: dict[str, Any], metadata: dict[str, dict[str, Any]]) -> dict[str, Any]:
     """Pure + deterministic. The current catalog + history summary + template metadata -> the new catalog."""
     title_to_tid: dict[str, str] = {}
@@ -495,7 +508,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     with open(CATALOG_PATH, encoding="utf-8") as f:
-        current = json.load(f)
+        current = with_coach_additions(json.load(f))  # #5861 L6: the coach_added library movements
 
     if args.inputs:
         with open(args.inputs, encoding="utf-8") as f:

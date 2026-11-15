@@ -10,6 +10,7 @@ import os
 import re
 
 from ai.model_routing import model_for  # #4770: the one model registry
+from content import body_numbers  # #5949: the ONE spoken-weight rule and detector, shared with the story desk
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -97,6 +98,23 @@ def _continuity_check(turns: list) -> list:
     ]
 
 
+def _spoken_weight_check(turns: list) -> list:
+    """Deterministic spoken-weight gate (#5949; deterministic-before-LLM, ADR-105). The judge's rubric item alone let a
+    prologue publish two weigh-ins from an earlier year: the figures carried no unit and were not this cycle's, so
+    nothing matched. Every shape `content.body_numbers` knows — a figure with its unit, a bare three-digit figure in
+    a weight sentence, a figure in words, an amount lost or regained — fails the script. The pace per week passes."""
+    fails = []
+    for i, t in enumerate(turns):
+        line = t.get("line") or ""
+        figures = [m.group(0) for m in body_numbers.BODY_NUM_RE.finditer(line)] + body_numbers.spoken_weight_figures(line)
+        if figures:
+            fails.append(
+                f"spoken body weight: turn {i} ({t.get('speaker')}) says {', '.join(repr(f) for f in figures)} — no body-weight "
+                "figure is spoken (direction and pace per week only)"
+            )
+    return fails
+
+
 def structural_seams(turns: list, max_consecutive: int = _QA_MAX_CONSECUTIVE) -> list:
     """#1170: the same-speaker adjacency spans the deterministic gate flags — the repair
     pass's work list, as inclusive (start, end) index spans. A run is a seam if it is longer
@@ -127,6 +145,7 @@ def _craft_check(turns: list, max_consecutive: int = _QA_MAX_CONSECUTIVE) -> lis
             label = "cold-open hook" if i == 0 else "monologue"
             fails.append(f"turn {i} is a {wc}-word {label} (max {cap}) — make it conversational")
     fails.extend(_continuity_check(turns))
+    fails.extend(_spoken_weight_check(turns))  # #5949
     return fails
 
 
@@ -222,6 +241,9 @@ _INTRO_RUBRIC = (
     "Matt's boss), or that Matt merely follows a single daily instruction / 'one next move' — Matt runs many "
     "parallel protocols (experiments, challenges, habit trials, supplements) and makes his own calls; the coaches "
     "advise, predict, and get publicly scored.\n"
+    # #5949: Episode 0 had no weight item at all — the prologue is where the earlier-year figures were spoken.
+    f"10. {body_numbers.SPOKEN_WEIGHT_RULE} Body weight in the GROUND TRUTH is fine and expected — flag it only if it "
+    "is SPOKEN in the script.\n"
     # #1180: the CRAFT items (Turing test, humour/texture, arc rhythm) moved to the Sonnet
     # _craft_judge (_INTRO_CRAFT_RUBRIC below) — this Haiku rubric is now structure/accuracy only.
 )
@@ -244,8 +266,9 @@ _WEEKLY_RUBRIC = (
     "4. GENUINE FRICTION: at least one real disagreement or tension, not constant agreement.\n"
     "5. GROUNDED: every specific claim, number, or event about MATT traces to the GROUND TRUTH. No invented scenes, "
     "times of day, or sensory detail (e.g. a '5 AM protein shake'). Flag anything not in the ground truth.\n"
-    "6. NO BODY WEIGHT IN THE SCRIPT: no body-weight figure appears in the spoken lines, numeric or spelled-out "
-    "(e.g. 'nine pounds'). Body weight in the GROUND TRUTH is fine and expected — only flag it if it is SPOKEN in the script."
+    # #5949: the rule is quoted from the ONE constant the writers' briefs quote, so judge and writer cannot disagree.
+    f"6. {body_numbers.SPOKEN_WEIGHT_RULE} Body weight in the GROUND TRUTH is fine and expected — flag it only if it "
+    "is SPOKEN in the script."
 )
 
 

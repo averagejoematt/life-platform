@@ -6,8 +6,10 @@ WHAT IT IS
 movement Matthew has logged in Hevy (all years, all phases, tombstones excluded) plus expansion
 candidates he has not done, each tagged with what it trains, how (length bias, resistance
 profile, stability), what it costs (joint stress, skill) and what it needs (equipment ids from a
-controlled vocabulary). A hypertrophy tier above C needs a citation verified to exist (DOI or
-PMID) — an unreviewed entry is tier C, never a guess.
+controlled vocabulary). Each per-target hypertrophy row carries a QUALITY tier S-D that the written rubric
+(`training.quality_rubric`, #5857) derives from those attributes, and its evidence confidence as a separate field: evidence
+above `none_reviewed` needs a citation verified to exist (DOI or PMID), and only a direct trial may move a row one band off
+its rubric tier, recorded with its citation.
 
 It ships `status: "proposed"`. Only the selection engine (#5773, `selection_engine` / `selection_critic`)
 reads it, and it changes no live draft until the owner approves the library: while `proposed` the engine
@@ -47,6 +49,8 @@ from typing import Any, Optional
 
 from common import repo_config
 
+from training import library_integrity as integrity, quality_rubric
+
 logger = logging.getLogger("exercise_library")
 
 LIBRARY_BASENAME = "exercise_library.json"
@@ -73,9 +77,12 @@ RESISTANCE_PROFILES = (
 STABILITY = ("high", "moderate", "low", "unknown")
 STRESS_LEVELS = ("low", "moderate", "high", "unknown")
 JOINT_STRESS_KEYS = ("spinal_load", "shear", "wrist", "elbow", "shoulder")
+PAIN_MAP_JOINTS = ("knee", "hip")
+"""#5861 FIX4: the knee and hip ratings the live pain rule reads (`deploy/exercise_library_input_review.KNEE_HIP`, a class rule);
+optional per entry, never read by the rubric's joint cost (`quality_rubric.RUBRIC_JOINTS`)."""
 SKILL = ("low", "moderate", "high")
-TIERS = ("A", "B", "C")
-EVIDENCE_QUALITY = ("rct_direct", "rct_characteristic", "meta_analysis", "none_reviewed")
+TIERS = quality_rubric.QUALITY_TIERS  # the QUALITY tier S-D, derived by the rubric (#5857) — never an evidence grade
+EVIDENCE_CONFIDENCE = quality_rubric.EVIDENCE_CONFIDENCE  # evidence strength, its own field beside the tier
 LIBRARY_GATE_KINDS = (
     "bodyweight_threshold",  # measured: the 7-day mean Withings bodyweight; threshold value lives in the private overlay
     "chain_prerequisite",  # measured: logged sessions of the prerequisite movement(s) meeting the stated standard
@@ -89,16 +96,16 @@ LIBRARY_GATE_KINDS = (
 UNKNOWN_INPUT = "locked"
 PAIN_SOURCE_ID = "training_notes_pain.pain_class (#5806)"  # the rule behind the overlay's `pain_flag` tag (#5773)
 
-# ── availability (owner ruling 2026-11-11) ──
-# One location id, never a name: `home_gym`. A movement logged in the last AVAILABLE_LOOKBACK_YEARS of his
-# Hevy history is AVAILABLE there by default; equipment seen only in older history, or only in expansion
-# candidates, is UNKNOWN. A swap note saying the gym does not have X marks X UNAVAILABLE (owner-confirmable);
+# ── availability (owner rulings 2026-11-11 and 2026-11-14) ──
+# One location id, never a name: `home_gym`. Every equipment id and every movement carries one of five EVIDENCE states
+# (`library_integrity.AVAILABILITY_EVIDENCE`: owner-confirmed, recent inferred, historical-only, unknown, confirmed
+# unavailable) and the engine's `state` follows from it (`library_integrity.EVIDENCE_STATE`): a machine known only from old
+# logs is `unknown`, never served. A swap note saying the gym does not have X marks X unavailable (owner-confirmable);
 # "X was taken" / "no bench free" is CONTENTION, which never makes anything unavailable.
-LOCATION_ID = "home_gym"
+LOCATION_ID = integrity.LOCATION
 AVAILABILITY_STATES = ("available", "unavailable", "unknown")
-AVAILABLE_LOOKBACK_YEARS = 5
-FALLBACK_REASONS = ("same_stimulus", "same_target", "same_family")
-MIN_FALLBACKS = 1
+AVAILABLE_LOOKBACK_YEARS = 5  # the input review's "a movement he uses" window; NOT an availability rule since fix round 13
+FALLBACK_REASONS = integrity.FALLBACK_REASONS
 
 # A template id is 8-char uppercase hex (Hevy standard; a few legacy ids carry other characters) or a custom UUID.
 _TID_RE = re.compile(r"^(?:[0-9A-Z]{8}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$")
@@ -164,6 +171,61 @@ def _err(errors: list[str], where: str, msg: str) -> None:
     errors.append(f"{where}: {msg}")
 
 
+def _equivalence_errors(lib: dict[str, Any]) -> list[str]:
+    """An equivalence adjustment (#5857 rubric v2, board rec 6) names a comparator whose tier for the same target sits
+    ABOVE this row's rubric tier — parity with a higher-tier movement is what earns the +1."""
+    out: list[str] = []
+    mv = lib["movements"]
+    for mid, e in mv.items():
+        for row in e.get("hypertrophy") or []:
+            adj = row.get("evidence_adjustment") or {}
+            if adj.get("basis") != "equivalence":
+                continue
+            comp = next(
+                (r for r in (mv.get(adj.get("comparator")) or {}).get("hypertrophy") or [] if r.get("target") == row.get("target")), None
+            )
+            order = quality_rubric.QUALITY_TIERS
+            if (
+                comp is None
+                or comp.get("tier") not in order
+                or row.get("rubric_tier") not in order
+                or order.index(str(comp.get("tier"))) >= order.index(str(row.get("rubric_tier")))
+            ):
+                out.append(
+                    f"movements.{mid}: equivalence with {adj.get('comparator')!r} needs a higher-tier comparator for {row.get('target')}"
+                )
+    return out
+
+
+def _hypertrophy_row_errors(errors: list[str], w: str, e: dict[str, Any], row: dict[str, Any], citations: Any) -> None:
+    """One per-target row (#5857): a quality tier S-D the rubric derives (plus at most one recorded evidence band), and
+    its evidence confidence beside it. Evidence above `none_reviewed` cites a registered reference and carries a date."""
+    if row.get("tier") not in TIERS and not (row.get("tier") is None and row.get("applicable") is False):
+        _err(errors, w, f"tier {row.get('tier')!r} (S-D, or None only on a not-applicable row, #5861)")
+    for why in quality_rubric.derivation_problems(e, row):
+        _err(errors, w, f"{row.get('target')}: {why}")
+    if row.get("evidence_confidence") not in EVIDENCE_CONFIDENCE:
+        _err(errors, w, f"evidence_confidence {row.get('evidence_confidence')!r}")
+    if row.get("evidence_confidence") not in (None, "none_reviewed"):
+        cites = row.get("citations") or []
+        if not cites or any(c not in citations for c in cites):
+            _err(errors, w, f"evidence {row.get('evidence_confidence')} for {row.get('target')} needs >=1 registered citation")
+        if not _DATE_RE.match(str(row.get("last_reviewed"))):
+            _err(errors, w, "a reviewed row carries a dated last_reviewed")
+    elif row.get("evidence_adjustment"):
+        _err(errors, w, "an unreviewed row never moves off its rubric tier")
+
+
+def approved_stamp(lib: dict[str, Any] | None) -> str | None:
+    """The library's `approved_on` day (YYYY-MM-DD) when it is a real calendar date, else None (#5861 fix round 11: live mode
+    needs it — `selection_engine.mode`, `week_floors.library_status`)."""
+    from common.pacific_time import parse_day_key  # THE calendar-day parse (#3741)
+
+    raw = str((lib or {}).get("approved_on") or "") if isinstance(lib, dict) else ""
+    day = parse_day_key(raw) if len(raw) == 10 else None
+    return day.isoformat() if day else None
+
+
 def validate(lib: dict[str, Any]) -> list[str]:
     """Every schema violation in the library, as readable strings. Empty list = valid."""
     errors: list[str] = []
@@ -184,6 +246,9 @@ def validate(lib: dict[str, Any]) -> list[str]:
         return errors
     if lib["status"] not in ("proposed", "approved", "retired"):
         _err(errors, "library", f"status {lib['status']!r} not in proposed|approved|retired")
+    if lib["status"] == "approved":  # #5861 fix round 11: approval needs its day — without it the library runs as proposed
+        if not approved_stamp(lib):
+            _err(errors, "library", "status approved without a valid `approved_on` (YYYY-MM-DD): it behaves exactly as proposed")
     if not re.match(r"^\d+\.\d+\.\d+$", str(lib["version"])):
         _err(errors, "library", "version must be semver")
     if not lib["change_log"] or not all({"version", "date", "by", "what"} <= set(c) for c in lib["change_log"]):
@@ -252,6 +317,8 @@ def validate(lib: dict[str, Any]) -> list[str]:
                 _err(errors, w, "a history entry carries its logged template_id")
         if e.get("family") not in FAMILIES:
             _err(errors, w, f"family {e.get('family')!r}")
+        if e.get("job") not in quality_rubric.JOBS:
+            _err(errors, w, f"job {e.get('job')!r} (compound | isolation, #5857 rubric v2)")
         if e.get("length_bias") not in LENGTH_BIAS:
             _err(errors, w, f"length_bias {e.get('length_bias')!r}")
         if e.get("resistance_profile") not in RESISTANCE_PROFILES:
@@ -261,8 +328,8 @@ def validate(lib: dict[str, Any]) -> list[str]:
         if e.get("skill_complexity") not in SKILL:
             _err(errors, w, f"skill_complexity {e.get('skill_complexity')!r}")
         js = e.get("joint_stress") or {}
-        if set(js) != set(JOINT_STRESS_KEYS) or any(v not in STRESS_LEVELS for v in js.values()):
-            _err(errors, w, "joint_stress needs exactly spinal_load/shear/wrist/elbow/shoulder in low|moderate|high|unknown")
+        if set(js) - set(PAIN_MAP_JOINTS) != set(JOINT_STRESS_KEYS) or any(v not in STRESS_LEVELS for v in js.values()):
+            _err(errors, w, "joint_stress needs exactly spinal_load/shear/wrist/elbow/shoulder (+ knee/hip) in low|moderate|high|unknown")
         tgt = e.get("target") or {}
         if not tgt.get("primary") or not tgt.get("region"):
             _err(errors, w, "target needs primary + region")
@@ -273,26 +340,7 @@ def validate(lib: dict[str, Any]) -> list[str]:
         if not isinstance(hyp, list) or not hyp:
             _err(errors, w, "hypertrophy needs at least one per-target row")
         for row in hyp or []:
-            if row.get("tier") not in TIERS:
-                _err(errors, w, f"tier {row.get('tier')!r}")
-            if row.get("evidence_quality") not in EVIDENCE_QUALITY:
-                _err(errors, w, f"evidence_quality {row.get('evidence_quality')!r}")
-            if row.get("tier") in ("A", "B"):
-                cites = row.get("citations") or []
-                if not cites or any(c not in citations for c in cites):
-                    _err(errors, w, f"tier {row['tier']} for {row.get('target')} needs >=1 registered citation")
-                if row.get("last_reviewed") == "unreviewed" or not _DATE_RE.match(str(row.get("last_reviewed"))):
-                    _err(errors, w, "a tier A/B row carries a dated last_reviewed")
-            if row.get("last_reviewed") == "unreviewed" and row.get("tier") != "C":
-                _err(errors, w, "unreviewed => tier C")
-        fbs = e.get("fallbacks")
-        if not isinstance(fbs, list) or len(fbs) < MIN_FALLBACKS:
-            _err(errors, w, "needs >= 1 ranked fallback")
-        for fb in fbs or []:
-            if fb.get("movement_id") not in lib["movements"] or fb.get("movement_id") == mid:
-                _err(errors, w, f"fallback {fb.get('movement_id')!r} is not another library movement")
-            if fb.get("reason") not in FALLBACK_REASONS:
-                _err(errors, w, f"fallback reason {fb.get('reason')!r}")
+            _hypertrophy_row_errors(errors, w, e, row, citations)
         av = (e.get("availability") or {}).get(LOCATION_ID) or {}
         if av.get("state") not in AVAILABILITY_STATES:
             _err(errors, w, f"availability.{LOCATION_ID}.state must be one of {AVAILABILITY_STATES}")
@@ -309,6 +357,77 @@ def validate(lib: dict[str, Any]) -> list[str]:
             _err(errors, w, "impact movement without its charter gate")
         if requires_skill_gate(e) and not kinds & {"chain_prerequisite", "owner_confirmation", "charter_gate"}:
             _err(errors, w, "skill movement without a chain / owner-confirmation / charter gate")
+    errors += _equivalence_errors(lib)
+    errors += _evaluation_errors(lib)
+    errors += integrity.problems(lib)  # #5861 fix round 13: loggable, availability evidence, the fallback rule, gate chains
+    return errors
+
+
+def _target_matches(target: str, muscle: str) -> bool:
+    t, m = str(target or "").lower(), str(muscle or "").lower()
+    if not t or not m:
+        return False
+    sub = {"calves": ("gastrocnemius", "soleus")}
+    return t == m or t.startswith(m) or m.startswith(t) or t.startswith(sub.get(m, ("\0",)))
+
+
+def rows_for(entry: dict[str, Any], muscle: str) -> list[dict[str, Any]]:
+    """The entry's hypertrophy rows for `muscle`, a sub-target included (`triceps_long_head` is triceps, `gastrocnemius` and
+    `soleus` are calves). Moved here from `selection_engine` (#5861: the engine sits at the module-size ceiling)."""
+    return [r for r in entry.get("hypertrophy") or [] if _target_matches(r.get("target"), muscle)]
+
+
+def canonical_of(lib: dict[str, Any], ref: str) -> Optional[str]:
+    """The canonical movement key for a library key OR a Hevy template id (#5861 alias layer); None when unknown. Every
+    pre-existing key and template id resolves: aliases and variants keep their own entries and name their canonical."""
+    mv = movements(lib)
+    e = mv.get(ref) or next((x for x in mv.values() if str(x.get("template_id") or "").upper() == str(ref).upper()), None)
+    return None if e is None else str(e.get("canonical") or next(k for k, x in mv.items() if x is e))
+
+
+def _input_ok(k: str, v: Any) -> bool:
+    """One objective input against its vocabulary: `functional` a list of qualities, `conditioning` None or a
+    {aerobic, control, impact, recovery} map of levels, every other input a single allowed value."""
+    allowed = quality_rubric.OBJECTIVE_INPUTS[k]
+    if k == "functional":
+        return isinstance(v, list) and all(x in allowed for x in v)
+    if k == "conditioning":
+        return v is None or (isinstance(v, dict) and set(v) == set(allowed) and all(x in quality_rubric.LEVELS for x in v.values()))
+    return v in allowed
+
+
+_ALIAS_SAME = ("family", "job", "pattern", "length_bias", "resistance_profile", "stability", "joint_stress", "skill_complexity")
+
+
+def _evaluation_errors(lib: dict[str, Any]) -> list[str]:
+    """#5861: category / trunk_function / functions in vocabulary, objective inputs well-formed, every rating what the
+    objective rubrics derive, and the canonical layer coherent (each canonical resolves; an alias carries its canonical's
+    attributes; the index and the entries agree)."""
+    errors: list[str] = []
+    qr = quality_rubric
+    mv = movements(lib)
+    for mid, e in mv.items():
+        w = f"movements.{mid}"
+        if e.get("category") not in qr.CATEGORIES:
+            _err(errors, w, f"category {e.get('category')!r}")
+        if "trunk_function" in e and e["trunk_function"] not in qr.TRUNK_FUNCTIONS:
+            _err(errors, w, f"trunk_function {e.get('trunk_function')!r}")
+        if any(f not in qr.FUNCTIONS for f in e.get("functions") or []):
+            _err(errors, w, f"functions {e.get('functions')!r}")
+        inp = e.get("objective_inputs") or {}
+        for k in qr.OBJECTIVE_INPUTS:
+            if k not in inp or not _input_ok(k, inp.get(k)):
+                _err(errors, w, f"objective_inputs.{k} {inp.get(k)!r}")
+        errors += [f"{w}: {why}" for why in qr.rating_problems(e)]
+        head = canonical_of(lib, mid)
+        if head not in mv:
+            _err(errors, w, f"canonical {e.get('canonical')!r} is not a library movement")
+        elif (e.get("variant") or {}).get("duplicate_of") and any(e.get(f) != mv[head].get(f) for f in _ALIAS_SAME):
+            _err(errors, w, f"an alias of {head} carries different attributes")
+    for head, fam in (lib.get("canonical_families") or {}).items():
+        for k in list(fam.get("aliases") or []) + list(fam.get("variants") or {}):
+            if (mv.get(k) or {}).get("canonical") != head:
+                _err(errors, f"canonical_families.{head}", f"{k} does not name {head} as its canonical")
     return errors
 
 
@@ -491,14 +610,21 @@ def classify_availability_note(text: str) -> list[dict[str, str]]:
 # ── fallbacks ────────────────────────────────────────────────────────────────────────────────────────────────────
 _PATTERNS: tuple[tuple[str, str], ...] = (
     ("calf", r"calf"),
+    # #5861 L6: a reverse Nordic is a knee EXTENSION (it was read as a leg curl); internal/external rotation is the cuff (it
+    # was read as trunk rotation); a curl-up is trunk flexion (it was read as a biceps curl); a band walk is hip abduction
+    # (any "walk" was read as cardio)
+    ("leg_extension", r"leg extension|sissy|reverse nordic|spanish squat"),
     ("leg_curl", r"leg curl|nordic|hamstring curl"),
-    ("leg_extension", r"leg extension|sissy"),
+    ("shoulder_rotation", r"(?:external|internal) rotation|rotator cuff"),
+    ("hip_abduction", r"hip abduction|band walks?|monster walk|lateral (?:band )?steps?|clam ?shell"),
+    ("hip_adduction", r"hip adduction|copenhagen"),
     ("hip_extension", r"hip thrust|glute bridge|back extension|hyperextension|pull through|kickback|rear kick|reverse hyper"),
     ("hinge", r"deadlift|\brdl\b|good morning|swing"),
     ("squat", r"squat|leg press|lunge|step up|split"),
     ("vertical_pull", r"pull ?up|chin ?up|pulldown|pullover"),
     ("horizontal_pull", r"\brows?\b|rowing|t bar"),
     ("triceps_extension", r"tricep|triceps|skull|pushdown|push ?away|kickback|jm press|dip"),
+    ("core_flexion_curl_up", r"curl[- ]ups?\b"),
     ("curl", r"curl|21s"),
     ("vertical_press", r"overhead press|shoulder press|military press|arnold|landmine press|pike|handstand"),
     ("lateral_raise", r"lateral raise|upright row|y raise"),
@@ -508,7 +634,7 @@ _PATTERNS: tuple[tuple[str, str], ...] = (
     ("carry", r"carry|carries|farmers|suitcase|sled|prowler"),
     ("core_anti", r"plank|pallof|dead bug|bird dog|ab wheel|rollout"),
     ("core_flexion", r"crunch|sit up|v up|leg raise|knee raise|rotation|twist|side bend|oblique"),
-    ("cardio", r"treadmill|cycling|bike|elliptical|rowing machine|stair|walk"),
+    ("cardio", r"treadmill|cycling|bike|elliptical|rowing machine|stair|\bwalk(?:ing|s)?\b"),
     ("olympic", r"clean|snatch|jerk|high pull"),
     ("shrug", r"shrug"),
 )
@@ -518,67 +644,15 @@ def movement_pattern(title: str) -> str:
     t = (title or "").lower()
     for name, pat in _PATTERNS:
         if re.search(pat, t):
-            return name
+            return "core_flexion" if name == "core_flexion_curl_up" else name
     return "other"
 
 
-def _locking_gate_kinds(lib: dict[str, Any], e: dict[str, Any]) -> set[str]:
-    gates = lib.get("gates") or {}
-    return {gates[g]["kind"] for g in e.get("gates") or [] if g in gates and gates[g].get("locks")}
-
-
-def fallback_index(lib: dict[str, Any]) -> dict[str, tuple[str, set[str]]]:
-    """key -> (movement pattern, locking gate kinds) — computed once when ranking every movement's fallbacks."""
-    return {k: (movement_pattern(e.get("title", "")), _locking_gate_kinds(lib, e)) for k, e in movements(lib).items()}
-
-
-def fallback_candidates(lib: dict[str, Any], key: str, index: Optional[dict[str, tuple[str, set[str]]]] = None) -> list[tuple[str, str]]:
-    """Ranked (movement_id, reason) same-stimulus substitutes for `key` — pure over the library.
-
-    Eligible: another movement, not `not_for_you_now`, not unavailable at home_gym, with no bodyweight / chain /
-    owner-confirmation / charter gate (a fallback must be usable the day the primary is not) — unless the primary is
-    itself gated, when gated candidates are allowed but ranked after ungated ones. Reason:
-    `same_stimulus` = same primary target AND same movement pattern; `same_target` = same primary target;
-    `same_family` = same family and (same region + pattern, or any, for a pattern-less movement) — the last resort. Ranked by reason, then NO shared equipment with the
-    primary (a missing item must be a swap, not the same hole), then same length bias, then available, then
-    history exposures.
-    """
-    mv = movements(lib)
-    idx = index if index is not None else fallback_index(lib)
-    me = mv[key]
-    tgt = (me.get("target") or {}).get("primary")
-    region = (me.get("target") or {}).get("region")
-    pat = idx[key][0]
-    my_eq = set(me.get("equipment") or [])
-    blocking = {"bodyweight_threshold", "chain_prerequisite", "owner_confirmation", "charter_gate"}
-    # A movement that is itself behind a skill / bodyweight / charter gate may fall back to another gated one (an
-    # Olympic lift's substitute is another pull, not a curl), ranked AFTER every ungated candidate.
-    primary_gated = bool(idx[key][1] & blocking)
-    ranked = []
-    for k, e in mv.items():
-        if k == key or e.get("not_for_you_now"):
-            continue
-        if ((e.get("availability") or {}).get(LOCATION_ID) or {}).get("state") == "unavailable":
-            continue
-        gated = bool(idx[k][1] & blocking)
-        if gated and not primary_gated:
-            continue
-        et = (e.get("target") or {}).get("primary")
-        same_pat = idx[k][0] == pat and pat != "other"
-        if et == tgt and tgt not in (None, "unknown", "other") and same_pat:
-            reason, r = "same_stimulus", 0
-        elif et == tgt and tgt not in (None, "unknown", "other"):
-            reason, r = "same_target", 1
-        elif e.get("family") == me.get("family") and (((e.get("target") or {}).get("region") == region and same_pat) or pat == "other"):
-            reason, r = "same_family", 2
-        else:
-            continue
-        shares = bool(set(e.get("equipment") or []) & my_eq)
-        avail = ((e.get("availability") or {}).get(LOCATION_ID) or {}).get("state") == "available"
-        exp = (e.get("history") or {}).get("exposures", 0)
-        ranked.append(((r, gated, shares, e.get("length_bias") != me.get("length_bias"), not avail, -exp, k), k, reason))
-    ranked.sort()
-    return [(k, reason) for _, k, reason in ranked]
+def fallback_candidates(lib: dict[str, Any], key: str) -> list[tuple[str, str]]:
+    """Ranked (movement_id, reason) fallbacks for `key` under THE equivalence rule (`library_integrity`, #5861 fix round 13):
+    the same purpose, movement function and stimulus, and valid in itself (available, ungated, loggable, suitable). A
+    movement with no equivalent has none — nothing is added to fill the list."""
+    return integrity.fallback_candidates(lib, key)
 
 
 # ── coded note signals (pure; feeds the PRIVATE overlay only — never the public library) ────────────────────────
@@ -646,12 +720,29 @@ def note_signal_tags(text: str) -> list[str]:
 PRIVATE_GATE_FIELDS = ("measured_input", "comparator", "value")
 
 
+def threshold_unset(g: dict[str, Any], row: Any) -> bool:
+    """A bodyweight gate whose private threshold the owner has not set: LOCKED, and VALID (owner ruling 19, 2026-11-13 — no
+    bodyweight cut-off is ever derived, so `null` is the correct state and `exercise_gates.bodyweight_verdict` reads it
+    locked). Only the overlay-owned thresholds: a charter-owned number that cannot be read is a gap, not a choice."""
+    thr = g.get("threshold") or {}
+    owned = g.get("kind") == "bodyweight_threshold" and str(thr.get("ref") or "").startswith("overlay:gate_thresholds.")
+    return owned and isinstance(row, dict) and row.get("value") is None
+
+
+def unset_thresholds(lib: dict[str, Any], overlay: Optional[dict[str, Any]]) -> list[str]:
+    """The gate ids that are locked with no threshold set (ids only) — reported by the private check, never an error."""
+    rows = (overlay or {}).get("gates") if isinstance(overlay, dict) else None
+    return sorted(gid for gid, g in (lib.get("gates") or {}).items() if isinstance(rows, dict) and threshold_unset(g, rows.get(gid)))
+
+
 def private_gate_gaps(lib: dict[str, Any], overlay: Optional[dict[str, Any]]) -> list[dict[str, Any]]:
     """Pure. Every public gate must resolve in the private overlay to a complete row.
 
     Returns one finding per incomplete gate: {gate_id, movement_ids, missing: [field names]}. Field names and ids
     only — NEVER a threshold value, because this output may land in logs. Empty list = complete.
-    A missing / unreadable overlay fails every gate (`missing: ["overlay"]`) — fail closed.
+    A missing / unreadable overlay fails every gate (`missing: ["overlay"]`) — fail closed. A bodyweight gate with no
+    threshold set is LOCKED and complete (`threshold_unset`, #5861 fix round 13): its row still needs its measured input
+    and comparator, and a threshold that IS set must be a number — a gate that could open is never under-specified.
     """
     mv = movements(lib)
     carriers: dict[str, list[str]] = {}
@@ -671,9 +762,11 @@ def private_gate_gaps(lib: dict[str, Any], overlay: Optional[dict[str, Any]]) ->
             row = rows[gid]
             for f in PRIVATE_GATE_FIELDS:
                 v = row.get(f)
+                if f == "value" and threshold_unset(g, row):
+                    continue  # locked, valid: no threshold is the owner's ruling, not a gap
                 if v is None or v == "" or v == {} or v == []:
                     missing.append(f)
-            if g.get("kind") == "bodyweight_threshold" and "value" not in missing:
+            if g.get("kind") == "bodyweight_threshold" and "value" not in missing and not threshold_unset(g, row):
                 if not isinstance(row.get("value"), (int, float)) or isinstance(row.get("value"), bool):
                     missing.append("value_numeric")
             for p in list(g.get("chain_prerequisites") or []) + list(row.get("chain_prerequisites") or []):

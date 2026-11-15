@@ -217,7 +217,7 @@ def _record_rotation(ir: RoutineSpec) -> RoutineSpec:
     from training import variant_rotation
 
     rotation = (getattr(ir, "inputs_snapshot", None) or {}).get("rotation")
-    if rotation and rotation.get("ledger_writes"):
+    if rotation and (rotation.get("ledger_writes") or rotation.get("live_ledger_writes")):  # #5861: a live draft's own list
         variant_rotation.record_failsoft(rotation, _table, datetime.now(timezone.utc).isoformat(timespec="seconds"))
     return ir
 

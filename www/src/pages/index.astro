@@ -10,6 +10,7 @@ import StatusTag from "../components/StatusTag.astro";
 import VersusGuess from "../components/VersusGuess.astro";
 import OpenQuestions from "../components/OpenQuestions.astro";
 import { headline, weeklyBars } from "../lib/chart.js";
+import { scaleWords, weeklySpark } from "../lib/spark.js";
 import { chapterCovers, chapterPublished, chapterWindow, dayInWords, domainWords, num, kOfN, clip, heldCallWords } from "../lib/format.js";
 import { connectedTo, loadAll, loadSeries, latestEdition, dayLine, loadCalibration, loadJourney } from "../lib/snapshot.js";
 import { lineCounts, theLine } from "../lib/theline.js";
@@ -138,14 +139,14 @@ const lineSvg = lineData ? theLine({ ...lineData, aria: lineAria }) : "";
 
 // ── Fig. 1 — the portrait. Body, Sleep and Recovery read their series; Mind and Connection read
 // the edition's published counts; Purpose has no instrument. Bars are eight weekly means (or counts).
-type Dim = { id: string; label: string; instrument: string; value: string | null; unit: string; bars: (number | null)[] | null; note: string; href: string | null; measured: boolean };
+type Dim = { id: string; label: string; instrument: string; value: string | null; unit: string; bars: (number | null)[] | null; note: string; href: string | null; measured: boolean; key?: string; decimals?: number; latest?: number | null };
 function seriesDim(id: string, key: string, label: string, decimals: number, unit: string, noteOf: (h: any, bars: (number | null)[]) => string): Dim {
   const s = series[key];
   const m = all.get("metric", key);
   if (!s) return { id, label, instrument: m?.instrument || "", value: null, unit, bars: null, note: "No series served for this yet.", href: m ? pathOf("metric", key) : null, measured: false };
   const h = headline(s.days);
   const bars = weeklyBars(s.days, 8);
-  return { id, label, instrument: m?.instrument || s.source_id || "", value: h.last == null ? null : num(h.last, decimals), unit, bars, note: noteOf(h, bars), href: pathOf("metric", key), measured: h.last != null };
+  return { id, label, instrument: m?.instrument || s.source_id || "", value: h.last == null ? null : num(h.last, decimals), unit, bars, note: noteOf(h, bars), href: pathOf("metric", key), measured: h.last != null, key, decimals, latest: h.last };
 }
 const firstBar = (bars: (number | null)[]) => bars.find((v) => v != null);
 const lastBar = (bars: (number | null)[]) => [...bars].reverse().find((v) => v != null);
@@ -200,29 +201,9 @@ if (lineData && dims[0].href) dims[0].href = "/data/journey/";
 // The measured count never depends on the journal: Mind is never "measured" on a public page.
 const measured = dims.filter((d) => d.measured).length;
 const WORDS = ["none", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
-function barSvg(bars: (number | null)[] | null, faint = false) {
-  const W = 96;
-  const H = 36;
-  if (!bars || !bars.some((v) => v != null)) {
-    let out = "";
-    for (let i = 0; i < 8; i++) out += `<rect x="${i * 12 + 0.5}" y="${H - 4.5}" width="9" height="4" fill="none" stroke="#B9B9B3" stroke-dasharray="2 2"/>`;
-    return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">${out}</svg>`;
-  }
-  const vals = bars.filter((v) => v != null) as number[];
-  const lo = Math.min(...vals, 0);
-  const hi = Math.max(...vals);
-  let out = "";
-  bars.forEach((v, i) => {
-    if (v == null) {
-      out += `<rect x="${i * 12 + 0.5}" y="${H - 4.5}" width="9" height="4" fill="none" stroke="#B9B9B3" stroke-dasharray="2 2"/>`;
-      return;
-    }
-    const h = hi === lo ? H * 0.6 : 4 + ((v - lo) / (hi - lo)) * (H - 6);
-    const last = i === bars.length - 1 || bars.slice(i + 1).every((x) => x == null);
-    out += `<rect x="${i * 12}" y="${(H - h).toFixed(1)}" width="10" height="${h.toFixed(1)}" fill="${last && !faint ? "#1B3FD6" : "#C9C9C3"}"/>`;
-  });
-  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">${out}</svg>`;
-}
+// The spark is the shared contract's (lib/spark.js, review 2026-11-14): bars from zero, or a line on a labelled range when
+// the weeks differ by little against their level — the same picture the data room draws for the same series.
+const sparkOf = (d: Dim) => weeklySpark(d.bars || [], { faint: d.value == null });
 ---
 
 <Base title="Average Joe Matt" top="start" status={status} card="home" description={ogDescription}>
@@ -305,14 +286,16 @@ function barSvg(bars: (number | null)[] | null, faint = false) {
                 <a class="tile" href={href(d.href)}>
                   <span class="label">{d.label} · {d.instrument}</span>
                   <span class={`v num ${d.value == null ? "hollow" : ""}`}>{d.value == null ? "—" : d.value}{d.value != null && d.unit && <small> {d.unit}</small>}</span>
-                  <span class="spark" set:html={barSvg(d.bars)} />
+                  <span class="spark" data-spark-of={d.key} data-latest={d.latest} set:html={sparkOf(d).svg} />
+                  {scaleWords(sparkOf(d).plan, d) && <span class="spark-scale mono">{scaleWords(sparkOf(d).plan, d)}</span>}
                   <span class="note">{d.note}</span>
                 </a>
               ) : (
                 <div class="tile">
                   <span class="label">{d.label} · {d.instrument}</span>
                   <span class={`v num ${d.value == null ? "hollow" : ""}`}>{d.value == null ? "—" : d.value}{d.value != null && d.unit && <small> {d.unit}</small>}</span>
-                  <span class="spark" set:html={barSvg(d.bars, d.value == null)} />
+                  <span class="spark" data-spark-of={d.key} data-latest={d.latest} set:html={sparkOf(d).svg} />
+                  {scaleWords(sparkOf(d).plan, d) && <span class="spark-scale mono">{scaleWords(sparkOf(d).plan, d)}</span>}
                   <span class="note">{d.note}</span>
                 </div>
               ),

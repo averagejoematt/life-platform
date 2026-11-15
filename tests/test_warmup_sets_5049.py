@@ -41,6 +41,11 @@ from unittest.mock import patch
 
 import pytest
 
+ROLLBACK = pytest.mark.usefixtures("exercise_library_rollback")
+"""#5861 (owner approval 2026-11-14): the marked tests pin the PRE-approval generator — the redrafted 10-18 bench's RPE 8–9 line is the
+pre-approval generator's (live effort table: RPE 8). They run on the library's rollback copy (status proposed: tests/conftest.py
+`exercise_library_rollback`), so they keep guarding the rollback path; the approved (live) behaviour is pinned by the #5861 tests."""
+
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "lambdas"))
@@ -112,6 +117,7 @@ def _working(sets):
 
 
 # ── 1. re-drafting 10-18's upper ─────────────────────────────────────────────
+@ROLLBACK
 def test_the_redrafted_10_18_bench_climbs_50_70_85_then_its_unchanged_working_sets():
     ideal = _redraft()
     bench = _block(ideal, BENCH)
