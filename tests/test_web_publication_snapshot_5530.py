@@ -792,8 +792,17 @@ _PHYSICAL_OVERVIEW = {  # the shape /api/physical_overview served on 2026-11-02 
     "tape_measurements": {"session_date": "2026-09-06", "waist_navel_in": 55.5},
     "blood_pressure": {"systolic": 121.0, "diastolic": 70.0, "date": "2026-10-13", "status": "normal", "readings_count": 2, "trend": []},
 }
+_PHENOAGE_REFERENCE = {
+    "basis": "markers_only",
+    "points": [{"at_years": 30, "reads_years": 27.4, "offset_years": -2.6}, {"at_years": 60, "reads_years": 54.2, "offset_years": -5.8}],
+    "offset_low": -5.8,
+    "offset_high": -2.6,
+    "slope": 0.892,
+}
 _PHENOAGE = {
-    "phenoage": 28,
+    "phenoage": None,  # owner ruling 2026-11-14: a figure of his own is never served (it is the age to about a year)
+    "withheld": "derived_from_chronological_age",
+    "reference": _PHENOAGE_REFERENCE,
     "as_of": "2026-04-03",
     "chronological_age": 99,  # never served today; planted so the allow-list is measured, not assumed
     "drivers": [{"name": "Albumin", "value": 4.9, "unit": "g/dL", "direction": "younger", "derived": False, "age_delta": 1}],
@@ -808,14 +817,19 @@ def test_journey_body_fields_map_the_served_shapes_and_carry_no_age():
     assert (c["lean_mass_lb"], c["fat_mass_lb"], c["visceral_fat_lb"], c["almi_percentile"]) == (170.6, 133.1, 3.21, 99.0)
     assert (c["visceral_target_lb"], c["next_recommended"], c["days_since"]) == (1.0, "2026-06-28", 217)
     assert f["phenoage"] == {
-        "years": 28,
         "as_of": "2026-04-03",
         "drivers": [{"name": "Albumin", "value": 4.9, "unit": "g/dL", "direction": "younger", "derived": False}],
+        "reference": {k: v for k, v in _PHENOAGE_REFERENCE.items() if k != "basis"},
     }
+    # a response that still carries a figure of his own is not carried into the build at all
+    assert (
+        pj.body_fields({"physical_overview": _PHYSICAL_OVERVIEW, "phenoage": {**_PHENOAGE, "phenoage": 28}}, "2026-09-06")["phenoage"]
+        is None
+    )
     assert f["bp"] == {"systolic": 121.0, "diastolic": 70.0, "date": "2026-10-13", "status": "normal", "readings_count": 2}
     assert f["tape_date"] == "2026-09-06"
     blob = json.dumps(f)
-    assert "age" not in blob.replace("phenoage", ""), "no age field rides along (PhenoAge Option A)"
+    assert "age" not in blob.replace("phenoage", ""), "no age field rides along"
     _contract().validate_journey_body(f)
     # each endpoint absent → its field is null, never a guess
     assert pj.body_fields({}, "2026-09-06") == {"composition": None, "phenoage": None, "bp": None, "tape_date": None}

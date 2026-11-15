@@ -516,7 +516,7 @@ ROUTES = {
     "/api/field_notes": None,  # GET with optional ?week= query param, handled in lambda_handler
     # BL-02: Bloodwork/Labs
     "/api/labs": handle_labs,
-    "/api/phenoage": handle_phenoage,  # P1.5 — transparent Levine PhenoAge (Option A privacy)
+    "/api/phenoage": handle_phenoage,  # Levine PhenoAge, markers only — no figure of his own (owner ruling 2026-11-14)
     "/api/frequent_meals": handle_frequent_meals,
     "/api/protein_sources": handle_protein_sources,
     "/api/weekly_physical_summary": handle_weekly_physical_summary,

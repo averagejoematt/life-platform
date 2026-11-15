@@ -219,6 +219,7 @@ METHOD1_ASOF_READERS = {
     "lambdas/operational/coherence_sentinel_lambda.py",
     "lambdas/operational/data_reconciliation_lambda.py",
     "lambdas/operational/pipeline_health_check_lambda.py",
+    "lambdas/operational/probe_targets.py",  # #5980: the health check's probe rows (names a partition id, reads nothing)
     "lambdas/operational/qa_check_outputs.py",
     "lambdas/web/site_api_rollups.py",  # reads a key no record carries (overall_score): serves nothing from the sheet
 }
