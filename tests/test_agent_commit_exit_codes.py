@@ -343,3 +343,69 @@ def test_unquoted_list_as_single_argument_still_refuses(scratch):
     assert "path does not exist" in r.stderr
     _assert_refused(repo, before, r)
     assert (repo / "docs" / "GUIDE.md").read_text(encoding="utf-8") == EDITED_GUIDE
+
+
+# ── Hooks intact (owner ruling 2026-11-14: no routine hook bypass) ──────────────────────────────
+# Until the ruling the script passed a flag that skipped every hook. It now commits THROUGH them and asks the
+# pre-commit hook, by name, to leave out only its doc-sync sweep. Three shapes are pinned: an aware hook RUNS and sees
+# the request; an old hook (which would sweep doc literals into the commit) is refused; a failing hook blocks the commit.
+
+_AWARE_HOOK = """#!/bin/sh
+# agent-commit-aware:v1
+echo "ran LP_AGENT_COMMIT=${LP_AGENT_COMMIT:-unset}" >> "$(git rev-parse --show-toplevel)/.hook-ran"
+exit ${HOOK_EXIT:-0}
+"""
+
+
+def _install_hook(repo, body):
+    hook = repo / ".git" / "hooks" / "pre-commit"
+    hook.parent.mkdir(parents=True, exist_ok=True)
+    hook.write_text(body, encoding="utf-8")
+    hook.chmod(hook.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+
+def test_the_commit_runs_through_the_installed_hook(scratch):
+    repo, _ = scratch
+    _install_hook(repo, _AWARE_HOOK)
+    (repo / "scripts" / "mod.py").write_text("x = 3\n", encoding="utf-8")
+    r = run_script(scratch, ["feat: through the hook", "scripts/mod.py"])
+    assert r.returncode == 0, r.stderr
+    assert (repo / ".hook-ran").read_text(
+        encoding="utf-8"
+    ).strip() == "ran LP_AGENT_COMMIT=1", "the pre-commit hook did not run — a hook-skipping commit is back"
+
+
+def test_a_failing_hook_blocks_the_commit(scratch):
+    repo, _ = scratch
+    _install_hook(repo, _AWARE_HOOK)
+    before = _head(repo)
+    (repo / "scripts" / "mod.py").write_text("x = 4\n", encoding="utf-8")
+    r = run_script(scratch, ["feat: the hook says no", "scripts/mod.py"], HOOK_EXIT=1)
+    _assert_refused(repo, before, r)
+
+
+def test_a_hook_that_predates_the_path_is_refused_with_the_fix(scratch):
+    """An installed hook without the marker would run its doc-sync sweep and stage doc literals into a lane commit —
+    the reason the old flag existed. The script refuses and names the one command that fixes it; it has no fallback."""
+    repo, _ = scratch
+    _install_hook(repo, '#!/bin/sh\necho swept >> "$(git rev-parse --show-toplevel)/.hook-ran"\nexit 0\n')
+    before = _head(repo)
+    (repo / "scripts" / "mod.py").write_text("x = 5\n", encoding="utf-8")
+    r = run_script(scratch, ["feat: old hook", "scripts/mod.py"])
+    _assert_refused(repo, before, r)
+    assert "bash scripts/install_hooks.sh" in r.stderr and not (repo / ".hook-ran").exists()
+
+
+def test_the_real_installer_writes_an_aware_hook(tmp_path):
+    """The hook scripts/install_hooks.sh writes carries the marker, skips its sweep only for LP_AGENT_COMMIT=1, and
+    only AFTER its format gate — read from the installer's own text, so the two files cannot drift apart."""
+    text = (REPO_ROOT / "scripts" / "install_hooks.sh").read_text(encoding="utf-8")
+    assert text.count("agent-commit-aware:v1") == 1
+    gate, marker, sweep = (
+        text.index('"$BLACK_BIN" --check'),
+        text.index("agent-commit-aware:v1"),
+        text.index('deploy/sync_doc_metadata.py" --apply'),
+    )
+    assert gate < marker < sweep
+    block = text[marker:sweep]
+    assert 'if [[ "${LP_AGENT_COMMIT:-}" == "1" ]]; then' in block and "exit 0" in block

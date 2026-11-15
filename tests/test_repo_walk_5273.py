@@ -134,9 +134,11 @@ def test_no_verify_guard_ignores_a_nested_lane_and_still_sees_the_real_tree(tmp_
     assert cnv._grep_hits(tmp_path) == [], "a lane worktree's copy was read as a bypass site"
     _write(tmp_path, "scripts/evil.sh", line)
     assert cnv._grep_hits(tmp_path) == [("scripts/evil.sh", 1, line.rstrip("\n"))], "control: a real site must be found"
-    # And on the real checkout the registered population is intact (non-vacuity).
+    # And on the real checkout the registered population is intact (non-vacuity). Since the owner's ruling of
+    # 2026-11-14 no line EXECUTES the bypass (deploy/agent_commit.sh commits through the hooks), so the population is
+    # the lines that talk about it — the pinned-formatter resolver's emergency note is one that stays.
     real = cnv._grep_hits()
-    assert any(p == "deploy/agent_commit.sh" for p, _, _ in real)
+    assert any(p == "deploy/lib/pinned_formatters.sh" for p, _, _ in real)
 
 
 def _plant_copies(tmp_path: Path, rel_under_copy: str, text: str) -> None:
