@@ -2121,6 +2121,8 @@ def lambda_handler(event, context):
     _steps_line = brief_lines.steps_line(table, pacific_today(), logger)  # #5056: the day's steps floor/target, owner-only
     # #4972: owner-only heart-rhythm section, window ending on the data day — the email alone; a demo brief omits it
     _rhythm_lines = None if demo_mode else brief_lines.rhythm_lines(table, yesterday, logger)
+    # #5821: the owner's folded emails (protein note, nutrition review, habits to settle) — each fail-soft, owner-only
+    _folded = None if demo_mode else brief_lines.folded_sections(table, pacific_now(), logger, USER_ID)
 
     try:
         html = html_builder.build_html(
@@ -2160,6 +2162,7 @@ def lambda_handler(event, context):
             intake_line=_intake_line,
             steps_line=_steps_line,
             rhythm_lines=_rhythm_lines,
+            folded_sections=_folded,
             journal_coach_absent=_journal_coach_absent,  # #2944: explicit declared-absent label
         )
     except Exception as e:

@@ -285,8 +285,11 @@ def _device(d: Any, hours_key: str, score_key: str) -> dict | None:
         "rem_hours": _num(d.get("rem_hours")),
         "light_hours": _num(d.get("light_hours")),
         "score": _num(d.get(score_key)),
+        # sprint III item 8: the vendor's own "this record is not final" flag, as served (True / False; None = not sent).
+        # True means the night was still recording when read — the Day page marks its figures provisional.
+        "provisional": d["vendor_incomplete"] if isinstance(d.get("vendor_incomplete"), bool) else None,
     }
-    return out if any(v is not None for k, v in out.items() if k != "night_of") else None
+    return out if any(v is not None for k, v in out.items() if k not in ("night_of", "provisional")) else None
 
 
 def night_of(row: dict | None) -> dict | None:
@@ -497,7 +500,9 @@ def check_layers(o: dict, where: str) -> None:
         _keys(n["by_device"], {"eightsleep", "whoop"}, f"{where}.night.by_device")
         for dev in n["by_device"].values():
             if dev is not None:
-                _keys(dev, {"night_of", "hours", "deep_hours", "rem_hours", "light_hours", "score"}, f"{where}.night.device")
+                _keys(dev, {"night_of", "hours", "deep_hours", "rem_hours", "light_hours", "score", "provisional"}, f"{where}.night.device")
+                if dev["provisional"] is not None and not isinstance(dev["provisional"], bool):
+                    raise SchemaError(f"{where}.night.device.provisional: true, false or null")
                 _nums(dev, ("hours", "deep_hours", "rem_hours", "light_hours", "score"), f"{where}.night.device")
     f = o["food"]
     if f is not None:

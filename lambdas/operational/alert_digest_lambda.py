@@ -12,6 +12,11 @@ describe-alarms(StateValue=ALARM) sweep and appends a "STILL IN ALARM"
 section with each standing red's age — and a digest IS sent when standing
 reds exist even if the transition queue is empty.
 
+#5821: besides CloudWatch alarms the queue carries ops notices published through
+common.ops_digest (a content-truth-only QA-smoke failure, the remediation hand-off, a
+budget-tier change below tier 3) in the same alarm-notification JSON shape, so they
+group and render here with no special case.
+
 If the queue is empty AND nothing is standing in ALARM, sends nothing
 (no "all clear" emails).
 
@@ -214,7 +219,8 @@ def _format_email(grouped, standing=None):
         lines.append("A standing red stays in this section every day until it returns to OK.")
         lines.append("")
     lines.append("Urgent alarms (canary, daily-brief, DLQ depth, cost runaway) still")
-    lines.append("page in real time on the life-platform-alerts topic.")
+    lines.append("page in real time on the life-platform-alerts topic, as do a budget-tier-3")
+    lines.append("hard stop and a QA deploy-health failure (#5821).")
     return subject, "\n".join(lines)
 
 

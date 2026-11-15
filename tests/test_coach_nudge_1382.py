@@ -7,6 +7,10 @@ issue's acceptance criteria:
   AC3 — every sent nudge is logged verbatim to the coach's COACH# partition
         and outcome-graded (hit/miss, never left pending) into a Brier record.
   AC4 — gate-blocked copy is dropped silently: no send, NO regeneration.
+
+#5821 (owner rulings 2026-11-15): nothing here mails any more. A note that passes every gate is
+written and settled `folded_into_brief`; the Morning Brief renders it. A fake boto3 records every
+client the shell asks for, so a regression that restores an SES send is caught.
 """
 
 import os
@@ -30,6 +34,7 @@ sys.path.insert(0, os.path.join(_REPO, "tests"))
 
 import emails.coach_nudge_lambda as shell  # noqa: E402
 from coach import coach_nudge_engine as eng  # noqa: E402
+from emails.brief_lines import FOLDED  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
 
 PT = ZoneInfo("America/Los_Angeles")
@@ -372,6 +377,18 @@ class _FakeSes:
         return {"MessageId": "fake"}
 
 
+class _Boto3Recorder:
+    """Stands in for the shell's `boto3`: every client it asks for is recorded and is the fake SES (#5821: none)."""
+
+    def __init__(self, ses):
+        self.ses = ses
+        self.clients = []
+
+    def client(self, service, **kwargs):
+        self.clients.append(service)
+        return self.ses
+
+
 class _FixedDT(datetime):
     _fixed = None
 
@@ -389,7 +406,8 @@ def _wire(monkeypatch, fake, *, now_utc, tier=0, copy_text=None, gate_result="pa
     monkeypatch.setattr(shell, "datetime", _FixedDT)
     monkeypatch.setattr(shell, "_table_ref", fake)
     ses = _FakeSes()
-    monkeypatch.setattr(shell, "_ses_ref", ses)
+    ses.boto3 = _Boto3Recorder(ses)
+    monkeypatch.setattr(shell, "boto3", ses.boto3)
     monkeypatch.setattr(shell, "_lambda_ref", object())
     monkeypatch.setattr(shell, "_coach_name", lambda cid: "Marcus Webb")
     monkeypatch.setattr(budget_guard, "current_tier", lambda: tier)
@@ -441,14 +459,17 @@ CLEAN_COPY = (
 )
 
 
-def test_handler_sends_and_logs_verbatim_nudge(monkeypatch):
+def test_handler_folds_and_logs_verbatim_nudge(monkeypatch):
+    """#5821 must-fail control: a note that passes every gate is NOT mailed — no SES client is even created — and is
+    folded for the Morning Brief (restoring the pre-#5821 `_send_email` puts "sesv2" in `clients` and a send in
+    `ses.sends`)."""
     fake = _fake_table(rows=[ACTIVE_EXPERIMENT])
     ses, calls = _wire(monkeypatch, fake, now_utc=NOW_UTC, copy_text=CLEAN_COPY)
 
     out = shell.lambda_handler({}, None)
-    assert out["nudge"] == "sent"
+    assert out["nudge"] == "folded"
     assert out["trigger"] == eng.TRIGGER_NUTRITION_LOG_GAP
-    assert len(ses.sends) == 1
+    assert ses.sends == [] and ses.boto3.clients == []
     assert calls["phrase"] == 1
 
     # AC3: verbatim record in the sending coach's COACH# partition.
@@ -457,8 +478,8 @@ def test_handler_sends_and_logs_verbatim_nudge(monkeypatch):
     n = nudges[0]
     assert n["pk"] == "COACH#nutrition_coach"
     assert n["copy"] == CLEAN_COPY  # stored exactly as produced (ADR-104)
-    assert n["status"] == "sent"
-    assert n["outcome"] == "pending"
+    assert n["status"] == FOLDED
+    assert "outcome" not in n  # #5821: a folded note is not outcome-graded — no email went out to act on
     assert n["prior"] == "0.4"
     # #3877: the NUDGE row is EXPERIMENT_SCOPED, so it carries BOTH attributes. Before
     # this, it carried `cycle` and never `phase` — and on a tagger-blind COACH# partition
@@ -467,8 +488,10 @@ def test_handler_sends_and_logs_verbatim_nudge(monkeypatch):
     assert n["phase"] == "experiment", "a NUDGE# row with no phase reads as current forever (#3877)"
     # Ledger row claims the day and points at the record for the grading pass.
     ledger = fake.store.get((eng.LEDGER_PK, "DAY#2026-07-24"))
-    assert ledger and ledger["status"] == "sent" and ledger["graded"] is False
+    assert ledger and ledger["status"] == FOLDED and ledger["graded"] is True
     assert (ledger["nudge_pk"], ledger["nudge_sk"]) == (n["pk"], n["sk"])
+    # #5821: the brief renders the note from the ledger row alone — verbatim copy + the coach's display name.
+    assert ledger["brief_text"] == CLEAN_COPY and ledger["coach_name"] == "Marcus Webb"
     # ...and it carries NEITHER, because COACH#nudge_ledger classifies SYSTEM_STATE. This
     # is the half that makes the stamp a per-ROW decision rather than a blanket one: a
     # daily-cap row is not experiment data, and a reset must not wipe it.
@@ -482,7 +505,7 @@ def test_handler_daily_cap_second_run_is_silent(monkeypatch):
     out2 = shell.lambda_handler({}, None)
     assert out2["nudge"] is None
     assert out2["reason"] == "daily_cap"
-    assert len(ses.sends) == 1
+    assert ses.sends == []
     assert calls["phrase"] == 1  # no second model call either
 
 
@@ -656,19 +679,16 @@ def test_grading_pass_item_exists_probe(monkeypatch):
     assert fake.updates[-1]["ExpressionAttributeValues"][":o"] == "hit"
 
 
-def test_sent_nudge_is_always_graded_end_to_end(monkeypatch):
-    """The AC3 invariant: send at T, run the schedule tick at T+3h with no
-    action anywhere — the nudge MUST land on a graded outcome (miss), never
-    stay pending."""
+def test_a_folded_nudge_is_never_outcome_graded_end_to_end(monkeypatch):
+    """#5821: fold at T, run the schedule tick at T+3h — nothing is graded (its 2h window would measure an email nobody
+    received). The AC3 invariant for SENT rows still holds: the grading tests above build them directly."""
     fake = _fake_table(rows=[ACTIVE_EXPERIMENT])
     _wire(monkeypatch, fake, now_utc=NOW_UTC, copy_text=CLEAN_COPY)
-    assert shell.lambda_handler({}, None)["nudge"] == "sent"
+    assert shell.lambda_handler({}, None)["nudge"] == "folded"
 
     later = NOW_UTC + timedelta(hours=3)
     _FixedDT._fixed = later
-    graded = shell.run_grading_pass(later)
-    assert graded == 1
-    assert fake.updates[-1]["ExpressionAttributeValues"][":o"] == "miss"
+    assert shell.run_grading_pass(later) == 0
     assert fake.store[(eng.LEDGER_PK, "DAY#2026-07-24")]["graded"] is True
 
 
@@ -715,3 +735,82 @@ def test_1793_prediction_read_carries_phase_filter(monkeypatch):
     assert len(fake.query_calls) >= 2, "expected one PREDICTION# query per operational coach"
     for c in fake.query_calls:
         assert "FilterExpression" in c and "#phase" in str(c["FilterExpression"]), "#1793: PREDICTION# reads must be phase-filtered"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #5821 — "Protein this morning" is folded into the Morning Brief
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def test_the_protein_pass_no_longer_mails_and_settles_the_day_as_folded(monkeypatch):
+    """Owner ruling 2026-11-15: the breakfast note is a section of the Morning Brief, not its own email.
+
+    A day that IS behind at the 10:10 PT tick (the case that used to mail "Protein this morning") still evaluates,
+    stamps its EVAL dead-man row and claims the day — and makes NO SES call; the claim settles `folded_into_brief`.
+    Must-fail control: restoring the pre-#5821 `_send_steps_email(...)` deliverer puts one send in `ses.sends`."""
+    from emails import protein_nudge_runner as runner
+    from training import training_charter
+
+    monkeypatch.delenv(training_charter.PRIVATE_ENV_VAR, raising=False)
+    monkeypatch.setattr(training_charter, "_from_s3", lambda key: None)
+    training_charter.reset_cache()
+    tick_utc = datetime(2026, 10, 20, 10, 10, tzinfo=PT).astimezone(timezone.utc)  # frozen: the first in-window tick
+    below = float(training_charter.charter_value("nutrition.protein.feeding_threshold_g")) - 5
+    behind_day = {
+        "pk": "USER#matthew#SOURCE#macrofactor",
+        "sk": "DATE#2026-10-20",
+        "date": "2026-10-20",
+        "total_protein_g": below,
+        "food_log": [{"time": "08:15", "protein_g": below, "food_name": "x"}],
+    }
+    fake = _fake_table(rows=[behind_day])
+    ses, _ = _wire(monkeypatch, fake, now_utc=tick_utc)
+    try:
+        out = shell._protein_pass(tick_utc, False)
+    finally:
+        training_charter.reset_cache()
+
+    assert out["send"] is True and out["reason"] == "behind_logged_below", out  # the verdict still fires...
+    assert ses.sends == [], "the protein pass mailed — #5821 folded it into the Morning Brief"  # ...but nothing is mailed
+    assert (runner.LEDGER_PK, "EVAL#2026-10-20") in fake.store
+    settled = [u for u in fake.updates if u["Key"]["sk"] == "PROTEIN_NUDGE#2026-10-20"]
+    assert settled and settled[-1]["ExpressionAttributeValues"][":s"] == FOLDED
+
+
+def test_the_steps_pass_no_longer_mails_and_settles_the_day_as_folded(monkeypatch):
+    """#5821 (owner ruling 2026-11-15): the lifting-day "Steps today" note is a Morning Brief section, not an email.
+
+    A lifting day well behind pace at the 19:10 PT tick (frozen) still evaluates, stamps EVAL and claims the day, makes
+    NO SES call, and settles `folded_into_brief` WITH the text the next brief reads. Must-fail control: restoring the
+    pre-#5821 "Steps today" deliverer puts an SES client in `clients` and a send in `ses.sends`."""
+    from emails import steps_nudge_runner as runner
+
+    tick_utc = datetime(2026, 10, 20, 19, 10, tzinfo=PT).astimezone(timezone.utc)
+    lift = [{"date": "2026-10-20", "exercises": [{"name": "Bench Press", "sets": [{"weight_kg": 80, "reps": 8, "type": "normal"}]}]}]
+    whoop = [
+        {
+            "pk": "USER#matthew#SOURCE#whoop",
+            "sk": "DATE#2026-10-20",
+            "date": "2026-10-20",
+            "cycle_start": "2026-10-20T13:00:00Z",
+            "step_count": 3000,
+            "ingested_at": tick_utc.isoformat(),
+        }
+    ]
+    monkeypatch.setattr(
+        runner, "make_fetch", lambda table, user="matthew": lambda s, a, b: lift if s == "hevy" else (whoop if s == "whoop" else [])
+    )
+    monkeypatch.setattr(
+        runner, "read_ramp", lambda table, date, user="matthew": {"state": "at_floor", "today_target": 12000, "floor": 12000}
+    )
+    fake = _fake_table()
+    ses, _ = _wire(monkeypatch, fake, now_utc=tick_utc)
+
+    out = shell._steps_pass(tick_utc, False)
+
+    assert out["send"] is True and out["reason"] == "behind_pace", out
+    assert ses.sends == [] and ses.boto3.clients == [], "the steps pass mailed — #5821 folded it into the Morning Brief"
+    assert (runner.LEDGER_PK, "EVAL#2026-10-20") in fake.store
+    settled = [u for u in fake.updates if u["Key"]["sk"] == "STEPS_NUDGE#2026-10-20"]
+    assert settled and settled[-1]["ExpressionAttributeValues"][":s"] == FOLDED
+    assert "steps" in settled[-1]["ExpressionAttributeValues"][":t"]

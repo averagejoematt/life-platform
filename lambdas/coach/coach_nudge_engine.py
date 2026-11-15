@@ -589,20 +589,3 @@ def build_expired_ledger_item(row: dict, now_utc: datetime, stuck_hours: float, 
         "error": f"reaped: stuck at '{STATUS_ATTEMPTING}' {age_desc} (> {stuck_hours}h bar), no path to a terminal status (#3651)",
         "graded": True,  # nothing to grade — the record never landed
     }
-
-
-def mark_send_failed(nudge_item: dict, error: str) -> dict:
-    """#3569 — downgrade an already-persisted STATUS_SENT record after the SES
-    send failed.
-
-    The durable write now precedes the irreversible send, so a send failure has
-    to CORRECT the record it already wrote rather than orphan it. Same pk/sk, so
-    the shell's second `_finalize` overwrites both rows in place, and the
-    resulting record is byte-identical to the one the old (send-first) order
-    wrote on its SES-error path.
-    """
-    item = dict(nudge_item)
-    item["status"] = STATUS_BLOCKED
-    item.pop("outcome", None)  # a nudge that never left is not awaiting an outcome
-    item["gate_findings"] = [f"ses_error:{error}"[:300]]
-    return item
