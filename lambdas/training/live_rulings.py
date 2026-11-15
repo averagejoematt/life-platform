@@ -165,3 +165,55 @@ the conditioning-block minutes delivered), and ruling 17 is clarified — glute 
 (`quality_rubric.STRETCH_CAPS` empty, rubric 3.5.0), not a heuristic and so not a hook. The
 doc's "Block-retro hooks" table lists each key (tests/test_owner_rulings_5861.py holds the doc and this dict to each other, and
 each key to a real labelled table)."""
+
+
+# ── 6. the weekly plan's priority line and novelty bar (fix round 14: moved out of live_volume) ─────────────────
+def priority_trade(
+    short_of: list[str],
+    counts: Any,
+    tg: dict[str, dict[str, float]],
+    host: str,
+    full: dict[str, bool],
+    lib: dict[str, Any],
+    rows: list[dict[str, Any]] | None = None,
+    catalog: dict[str, Any] | None = None,
+) -> str:
+    """Owner ruling 2026-11-14 (fix round 12): a priority muscle that cannot reach its own aim is SAID, in one line, with the
+    trade named — never taken. A muscle whose half of the body hosts the week's conditioning dose is short of the dose's
+    reserved minutes (dropping the dose is the owner's choice, `hard_conditioning_doses`); one whose added movement is new to
+    him is short by that movement's first, RPE-7 exposure (fix round 14: the line blamed the 75-minute ceiling while the lower
+    mornings had minutes left); any other is short of the 75-minute morning itself. Nothing is cut to close it."""
+    from training import live_volume
+
+    parts = [f"{m} {counts[m]:g} of its aim {tg[m]['aim']:g}" for m in short_of]
+    reserve = int(live_volume.reserve_minutes())
+    shared = live_volume._settings(lib).get("session_cap_includes_cardio")
+    on_host = [m for m in short_of if shared and live_volume._half_ok(m, host, full.get(host, False))]
+    new = [r for r in rows or [] if r.get("learning") and r.get("fill") in short_of and r.get("fill") not in on_host]
+    names = ", ".join(str(((catalog or {}).get(str(r["key"])) or {}).get("title") or r["key"]) for r in new)
+    trade = (
+        f"the conditioning dose keeps its {reserve} minutes on {host.replace('_', ' ')} — trading it for {', '.join(on_host)} "
+        "sets is your call (hard_conditioning_doses), never automatic"
+        if on_host
+        else (
+            f"{names} {'is' if len(new) == 1 else 'are'} new to you: one RPE-7 session first, counted from next week; nothing is "
+            "cut to close it"
+            if new
+            else "its mornings are at the 75-minute ceiling; nothing is cut to close it"
+        )
+    )
+    return f"priority (live): {'; '.join(parts)} this week — {trade}"
+
+
+def new_for(m: str, key: Any, rows: list[dict[str, Any]], catalog: dict[str, Any], lib: dict[str, Any], logged: frozenset[str]) -> bool:
+    """Fix round 14 (live_volume.week_plan) (B9): True when `key` has no logged set in the block AND the week already serves `m` a movement with none —
+    a normal week meets at most ONE movement new to him per muscle (a rotation's pick or a fill)."""
+
+    from training import live_volume
+
+    def unlogged(k: Any) -> bool:
+        return str(live_volume.lib_entry(k, catalog, lib).get("template_id") or "").upper() not in logged
+
+    return unlogged(key) and any(
+        unlogged(r["key"]) and (r.get("fill") or live_volume.landmark_muscle(r["key"], catalog, lib)) == m for r in rows
+    )

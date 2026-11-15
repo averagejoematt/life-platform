@@ -480,8 +480,8 @@ def _lib(e: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
 
 
 def start_line(note: str, start: dict[str, Any] | None) -> str:
-    """The note with its "find the load" line replaced by the starting point (`start_point`): `Start near 30 lb, the load of your
-    Seated Incline Curl.` under a `New: replaces …` line, else `New to you: start near …` (`Not done lately: …` for a movement
+    """The note with its "find the load" line replaced by the starting point (`start_point`): `Start light near your Seated Incline
+    Curl (30 lb), find the working load.` under a `New: replaces …` line, else `New to you: start light, …` (`Not done lately: …` for a movement
     he logged long ago; `…, for calves` on a fill: the reason it is in the week); with no movement on file, `New to you: W set
     up to 8 easy reps, find the load.` The first form that
     fits the phone budget wins (a fallback line, then the `New: replaces` line, give way); else the note is unchanged."""
@@ -493,7 +493,8 @@ def start_line(note: str, start: dict[str, Any] | None) -> str:
         return note
     head = ("New to you" if start.get("new") else "Not done lately") + (f", for {start['for']}" if start.get("for") else "")
     if start.get("lb"):
-        tail = f"start near {start['lb']:g} lb{' per hand' if start.get('per_hand') else ''}, the load of your {start['title']}."
+        # owner 2026-11-15: comparable history informs the start, never a computed equivalent load
+        tail = f"start light near your {start['title']} ({start['lb']:g} lb{' per hand' if start.get('per_hand') else ''}), find the working load."
         own, said = f"{head}: {tail}", "Start" + tail[len("start") :]
     else:
         own = said = f"{head}: W set up to {g.PICK_LOAD_W_REPS} easy reps, {g.PICK_LOAD_OPEN_TAIL}"

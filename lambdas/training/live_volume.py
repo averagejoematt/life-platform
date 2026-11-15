@@ -238,12 +238,10 @@ def day_rows(
     role: str, week: dict[str, Any], catalog: dict[str, Any], lib: dict[str, Any], in_block: Any = None, variants: Any = None
 ) -> list[dict[str, Any]]:
     """One morning's template rows this week: the role's template, or on a full-body morning its anchors plus the partners'.
-    `in_block`: each anchor as the variant he trains in this block (the plan then counts the warm-ups that lift will take);
-    `variants`: each role's accessories as the selection serves them (fix round 14: the plan counts what is served)."""
+    `in_block`: each anchor as the variant he trains in this block; `variants`: each role's accessory picks (fix round 14)."""
     from training import program_structure as ps
 
-    acc = (variants or {}).get(role) or None
-    rx = ps.session_prescription_for_role(role, catalog_movements=catalog, in_block=in_block, accessory_variants=acc)
+    rx = ps.session_prescription_for_role(role, catalog_movements=catalog, in_block=in_block, accessory_variants=(variants or {}).get(role))
     rows = [_row(role, e, catalog, lib) for e in rx["exposures"] if not _kb_slot(e)]
     hi = int(cfg.value("slot_max_sets"))
     for r in rows:  # fix round 10: a template slot written at 4 sets is served at the slot cap (the calf slots)
@@ -623,15 +621,15 @@ def week_plan(
     set_cap: int | None = None,
 ) -> dict[str, Any]:
     """The week's plan (module doc 1): {week, rows (every drafted morning's rows, sized), targets, counts, under, host, lines}.
-    Pure over the catalog, the library, the mornings and the weekly memory (`last`); the same for every morning of the week.
-    `variants`: the selection's accessory picks by role (`selection_engine._week_variants`), so the plan counts what is served;
-    `set_cap`: the session set ceiling the morning is fitted to."""
+    Pure over the catalog, the library, the mornings and the weekly memory (`last`); the same for every morning of the week."""
+    from training import live_rulings
+
     week = week_shape(mornings)
     rows = [r for role in week["roles"] for r in day_rows(role, week, catalog, lib, in_block, variants)]
 
-    def unlogged(key: Any) -> bool:  # no logged set in the block: the morning writes its "find the load" W row
-        return bool(logged) and str(lib_entry(key, catalog, lib).get("template_id") or "").upper() not in logged
-
+    unlogged = lambda key: bool(logged) and str(lib_entry(key, catalog, lib).get("template_id") or "").upper() not in logged  # noqa: E731
+    for r in rows:  # fix round 14: the plan's minutes count the W row the morning writes for a pick with no logged set
+        r["feeler"] = r.get("feeler") or (r["kind"] == "accessory" and r["intensity"] != "carry" and unlogged(r["key"]))
     lines = _press_trade(rows, lib, press_source)
     tg = targets(lib, week["mornings"])
     lo = int(cfg.value("slot_min_sets"))
@@ -660,7 +658,7 @@ def week_plan(
         known = bool(keys) and (str(entry.get("template_id") or "").upper() in logged or entry.get("pattern") in logged_patterns)
         if keys and not known and logged and m not in prio:
             return 0  # a movement new to him (one RPE-7 exposure) is added only for a priority muscle's aim — never for another
-        if keys and logged and new_for(m, keys[0], rows, catalog, lib, logged):
+        if keys and logged and live_rulings.new_for(m, keys[0], rows, catalog, lib, logged):
             return 0  # fix round 14: at most ONE movement with no logged set (new to him) per muscle in a week
         if not keys or probe:
             return (1 if known and not unlogged(keys[0]) else 2) if keys else 0  # 2: the W row the morning writes
@@ -674,22 +672,17 @@ def week_plan(
 
     def room(role: str, m: Any = None) -> float:  # the ruled dose keeps its minutes (ruling 1); fix round 14: and the session
         # set ceiling holds on the plan as it does on the morning (`fit_sets`) — a 21st planned set was trimmed when served
-        free = free_minutes(rows, role, host, lib)
-        if not set_cap:
-            return free
-        return min(free, (int(set_cap) - sum(r["sets"] for r in rows if r["role"] == role)) * one)
+        left = (int(set_cap) - sum(r["sets"] for r in rows if r["role"] == role)) * one if set_cap else 999.0
+        return min(free_minutes(rows, role, host, lib), left)
 
     lines += spend(rows, tg, roles, full, room, add, last, _redline_sets(), frozenset(prio))  # 2. the one step
     surplus()  # 3. again: a head's aim may have grown its muscle past MAV (ruling 9)
     lines += _redline(rows, tg, prio)
     counts = _count(rows)
     if week["mornings"] <= 3 and counts["abs"] < 1e-9 and tg.get("abs", {}).get("aim"):  # fix round 14 (B24): said, not silent
-        lines.append(
-            f"abs: 0 direct ab sets this week (aim {tg['abs']['aim']:g} on a {week['mornings']}-morning week) — the mornings' "
-            "movements go to the anchors first; the abs return with the next full week"
-        )
+        lines.append(f"abs: 0 direct ab sets this {week['mornings']}-morning week (aim {tg['abs']['aim']:g}) — the anchors come first")
     short_of = [m for m in sorted(prio) if m in tg and counts[m] + 1e-9 < tg[m]["aim"]]
-    priority_line = _priority_trade(short_of, counts, tg, host, full, lib, rows, catalog) if short_of else None
+    priority_line = live_rulings.priority_trade(short_of, counts, tg, host, full, lib, rows, catalog) if short_of else None
     under = [
         {"muscle": m, "sets": round(counts[m], 1), "floor": t["floor"], "aim": t["aim"]}
         for m, t in tg.items()
@@ -705,51 +698,6 @@ def week_plan(
         "lines": lines,
         "priority_line": priority_line,
     }
-
-
-def new_for(m: str, key: Any, rows: list[dict[str, Any]], catalog: dict[str, Any], lib: dict[str, Any], logged: frozenset[str]) -> bool:
-    """Fix round 14 (B9): True when `key` has no logged set in the block AND the week already serves `m` a movement with none —
-    a normal week meets at most ONE movement new to him per muscle (a rotation's pick or a fill)."""
-
-    def unlogged(k: Any) -> bool:
-        return str(lib_entry(k, catalog, lib).get("template_id") or "").upper() not in logged
-
-    return unlogged(key) and any(unlogged(r["key"]) and (r.get("fill") or landmark_muscle(r["key"], catalog, lib)) == m for r in rows)
-
-
-def _priority_trade(
-    short_of: list[str],
-    counts: Counter,
-    tg: dict[str, dict[str, float]],
-    host: str,
-    full: dict[str, bool],
-    lib: dict[str, Any],
-    rows: list[dict[str, Any]] | None = None,
-    catalog: dict[str, Any] | None = None,
-) -> str:
-    """Owner ruling 2026-11-14 (fix round 12): a priority muscle that cannot reach its own aim is SAID, in one line, with the
-    trade named — never taken. A muscle whose half of the body hosts the week's conditioning dose is short of the dose's
-    reserved minutes (dropping the dose is the owner's choice, `hard_conditioning_doses`); one whose added movement is new to
-    him is short by that movement's first, RPE-7 exposure (fix round 14: the line blamed the 75-minute ceiling while the lower
-    mornings had minutes left); any other is short of the 75-minute morning itself. Nothing is cut to close it."""
-    parts = [f"{m} {counts[m]:g} of its aim {tg[m]['aim']:g}" for m in short_of]
-    reserve = int(reserve_minutes())
-    shared = _settings(lib).get("session_cap_includes_cardio")
-    on_host = [m for m in short_of if shared and _half_ok(m, host, full.get(host, False))]
-    new = [r for r in rows or [] if r.get("learning") and r.get("fill") in short_of and r.get("fill") not in on_host]
-    names = ", ".join(str(((catalog or {}).get(str(r["key"])) or {}).get("title") or r["key"]) for r in new)
-    trade = (
-        f"the conditioning dose keeps its {reserve} minutes on {host.replace('_', ' ')} — trading it for {', '.join(on_host)} "
-        "sets is your call (hard_conditioning_doses), never automatic"
-        if on_host
-        else (
-            f"{names} {'is' if len(new) == 1 else 'are'} new to you: one RPE-7 session first, counted from next week; nothing is "
-            "cut to close it"
-            if new
-            else "its mornings are at the 75-minute ceiling; nothing is cut to close it"
-        )
-    )
-    return f"priority (live): {'; '.join(parts)} this week — {trade}"
 
 
 def _surplus(rows: list[dict[str, Any]], tg: dict[str, dict[str, float]], prio: set[str], lines: list[str]) -> Any:

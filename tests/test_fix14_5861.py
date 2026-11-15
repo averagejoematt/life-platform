@@ -32,6 +32,7 @@ from training import (  # noqa: E402
     hevy_note_grammar as g,
     live_load,
     live_program,
+    live_rulings,
     live_shape,
     live_volume,
 )
@@ -177,9 +178,9 @@ def test_a_priority_short_because_its_movement_is_new_says_so():
     tg = {"glutes": {"floor": 6.0, "aim": 8.0, "cap": 16.0}}
     rows = [{"role": "lower_volume", "key": "db_hip_thrust", "fill": "glutes", "learning": True, "sets": 2}]
     cat = {"db_hip_thrust": {"title": "DB Hip Thrust"}}
-    line = live_volume._priority_trade(["glutes"], {"glutes": 7.5}, tg, "shoulders_arms", {}, LIB, rows, cat)
+    line = live_rulings.priority_trade(["glutes"], {"glutes": 7.5}, tg, "shoulders_arms", {}, LIB, rows, cat)
     assert "DB Hip Thrust is new to you" in line and "ceiling" not in line, line
-    assert "ceiling" in live_volume._priority_trade(["glutes"], {"glutes": 7.5}, tg, "shoulders_arms", {}, LIB, [], cat)
+    assert "ceiling" in live_rulings.priority_trade(["glutes"], {"glutes": 7.5}, tg, "shoulders_arms", {}, LIB, [], cat)
 
 
 # ── 4. B2: role-less titles ─────────────────────────────────────────────────────────────────────────────────────────────────
@@ -309,11 +310,16 @@ def test_a_movement_with_no_logged_set_says_so_and_starts_from_the_closest_logge
     per-hand load never starts a cable movement); with none on file, "find the load" stands, said as new."""
     note = "RPE 8–9, last set RPE 9–10\nW set: up to 8 easy reps, find the load.\nBreathe out on the crunch."
     got = live_load.start_line(note, {"lb": 47.0, "title": "Cable Twist", "new": True})
-    assert got.split("\n")[1] == "New to you: start near 47 lb, the load of your Cable Twist." and g.PICK_LOAD_OPEN_TAIL not in got
+    assert (
+        got.split("\n")[1] == "New to you: start light near your Cable Twist (47 lb), find the working load."
+        and g.PICK_LOAD_OPEN_TAIL not in got
+    )
     fill = live_load.start_line(note, {"lb": None, "new": False, "for": "calves"})
     assert fill.split("\n")[1] == "Not done lately, for calves: W set up to 8 easy reps, find the load."
     rotated = "RPE 8–9, last set RPE 9–10\nNew: replaces Side Bend.\nW set: up to 8 easy reps, find the load."
-    assert live_load.start_line(rotated, {"lb": 30.0, "title": "Curl", "new": True}).endswith("Start near 30 lb, the load of your Curl.")
+    assert live_load.start_line(rotated, {"lb": 30.0, "title": "Curl", "new": True}).endswith(
+        "Start light near your Curl (30 lb), find the working load."
+    )
     assert live_load.start_line(note, None) == note  # control: no start point -> the note as composed
     assert all(g.phone_lines(x) <= g.LIFT_MAX_LINES for x in (got, fill))
 
@@ -326,14 +332,14 @@ def test_a_week_meets_at_most_one_movement_new_to_him_per_muscle():
     tid = lambda k: str(live_volume.lib_entry(k, cat, LIB).get("template_id") or "").upper()  # noqa: E731
     logged = frozenset({tid("barbell_bench_press")})
     one = [{"role": "lower_volume", "key": "db_hip_thrust", "fill": "glutes", "learning": True, "sets": 2}]
-    assert live_volume.new_for("glutes", "glute_kickback_machine", one, cat, LIB, logged)  # a second new glute movement: refused
-    assert not live_volume.new_for("glutes", "glute_kickback_machine", [], cat, LIB, logged)  # the first one: allowed
-    assert not live_volume.new_for("glutes", "glute_kickback_machine", one, cat, LIB, logged | {tid("glute_kickback_machine")})
-    assert not live_volume.new_for("calves", "glute_kickback_machine", one, cat, LIB, logged)  # another muscle's new movement
+    assert live_rulings.new_for("glutes", "glute_kickback_machine", one, cat, LIB, logged)  # a second new glute movement: refused
+    assert not live_rulings.new_for("glutes", "glute_kickback_machine", [], cat, LIB, logged)  # the first one: allowed
+    assert not live_rulings.new_for("glutes", "glute_kickback_machine", one, cat, LIB, logged | {tid("glute_kickback_machine")})
+    assert not live_rulings.new_for("calves", "glute_kickback_machine", one, cat, LIB, logged)  # another muscle's new movement
     w = _week(A)
     for s in w["week"]["sessions"]:
         for x in s["lifts"]:
-            if g.PICK_LOAD_OPEN_TAIL in (x["hevy_note"] or "") or "start near" in (x["hevy_note"] or ""):
+            if g.PICK_LOAD_OPEN_TAIL in (x["hevy_note"] or "") or "start light" in (x["hevy_note"] or ""):
                 assert any(h in x["hevy_note"] for h in ("New: replaces", "New to you", "Not done lately")), (s["role"], x["hevy_note"])
 
 
@@ -399,3 +405,68 @@ def test_a_short_week_with_no_ab_sets_says_so():
         said,
     )
     assert not [ln for ln in live_volume.week_plan(cat, lib, 5)["lines"] if ln.startswith("abs: ")]
+
+
+# ── owner requirements of 2026-11-15: pain-aware selection, one duration model, the fallback joint rule ─────────────────────
+def test_a_painful_movement_is_never_replaced_by_one_rated_worse_on_its_joints():
+    """B15: under elbow pain the triceps slot rotated into Lying Db Tricep Extension (elbow high) for the flagged Overhead
+    Triceps Extension (elbow moderate). The pain route keeps only candidates no harder on any joint the flagged movement loads.
+    Control: the rule off -> the elbow-high candidate stays in the route."""
+    from training import selection_engine as se, selection_live as sl
+
+    cat = json.loads((REPO / "config" / "movement_catalog.json").read_text())["movements"]
+    ctx = {"lib": LIB, "idx": se.key_index(LIB, cat)}
+    ranked = [{"movement_id": "lying_db_tricep_extension", "catalog_key": "lying_db_tricep_extension"}]
+    ranked += [{"movement_id": "triceps_pushdown", "catalog_key": "triceps_pushdown"}]
+    kept = [c["catalog_key"] for c in sl.no_worse_for_pain(ranked, "overhead_triceps_extension_cable", ctx)]
+    assert kept == ["triceps_pushdown"], kept
+    assert len(ranked) == 2  # control: without the rule both were in the route (the pick was the elbow-high one)
+
+
+def test_a_low_score_flag_holds_only_the_flagged_lift():
+    """B16: a 2/10 low-back flag on the deadlift changed five other lifts ("Same load: spinal load flag"). A stated score at or
+    under the lift-only line, not sharp, scopes the flag to its lift; a higher score or 'sharp' stays joint-wide."""
+    from training import live_pain
+
+    flag = {"source": "pain", "severity": 2.0, "sharp": False}
+    assert live_pain.scope(flag, set(), "DL") == "lift"
+    assert live_pain.scope(flag | {"severity": 4.0}, set(), "DL") == "joint"  # control: above the line
+    assert live_pain.scope(flag | {"sharp": True}, set(), "DL") == "joint"  # control: sharp
+
+
+def test_no_fallback_rises_to_high_on_a_joint_its_movement_is_below_high():
+    """Owner 2026-11-15 ("never a demonstrably worse option for the affected joint"): 24 fallback links stepped a joint from
+    moderate to high. The equivalence rule now refuses that rise too; the committed library holds none. Control: a planted
+    goblet squat -> zercher squat link (spinal moderate -> high) breaks the rule."""
+    from training import library_integrity as li
+
+    mv = LIB["movements"]
+    rise = [
+        (k, f["movement_id"], j)
+        for k, e in mv.items()
+        for f in e["fallbacks"]
+        for j, v in (mv[f["movement_id"]].get("joint_stress") or {}).items()
+        if v == "high" and (e.get("joint_stress") or {}).get(j) in ("low", "moderate")
+    ]
+    assert rise == [], rise[:5]
+    assert "joint_stress" in li._suitability_breaks(mv["goblet_squat"], mv["zercher_squat"])
+
+
+def test_the_prescription_carries_the_minutes_the_75_minute_fit_enforces():
+    """Owner requirement (duration): the prescription's printed minutes and the 75-minute fit's minutes are ONE model — the
+    routine as written, warm-ups included. Control: the prescription's own pre-routine estimate differs on a served morning."""
+    w = _week(A)
+    rows = [(s["role"], s["lifting_minutes"], s["rx_minutes"]) for s in w["week"]["sessions"]]
+    assert all(lm == rx for _r, lm, rx in rows), rows
+    from training import live_session
+
+    real = live_session.fit_routine
+
+    def stale(blocks, rx, cap, movements, rationale, shape):  # control: the prescription keeps its pre-routine estimate
+        before = dict(rx.get("session_minutes") or {})
+        out = real(blocks, rx, cap, movements, rationale, shape)
+        rx["session_minutes"] = before
+        return out
+
+    off = _week(A, {(live_session, "fit_routine"): stale})
+    assert any(s["lifting_minutes"] != s["rx_minutes"] for s in off["week"]["sessions"])

@@ -392,16 +392,19 @@ def _kb_dl(day: str, name: str = "Kettlebell Deadlift") -> dict[str, Any]:
     return {"date": day, "exercises": [{"template_id": "C0FFEE01", "name": name, "sets": _sets(2, 10), "notes": ""}]}
 
 
-def test_kb_swing_opens_on_two_kb_deadlift_sessions_and_not_one():
-    assert _LIB["gates"]["chain_kb_swing"]["standard"] == {"sessions_min": 2}
-    one = eg.evaluate_gates(_LIB, None, _measured([_kb_dl("2026-11-10")], mean_lb=250))["chain_kb_swing"]
-    assert one["state"] == eg.LOCKED and one["input"] == eg.MEASURED
-    two = eg.evaluate_gates(
-        _LIB, None, _measured([_kb_dl("2026-11-03"), _kb_dl("2026-11-10", "KB Romanian Deadlift (Kettlebell)")], mean_lb=250)
-    )
+def test_kb_swing_opens_on_the_barbell_deadlift_standard_not_kb_deadlift_sessions():
+    """Fix round 14 (H4; owner rulings 2026-11-14): the swing's chain step is measured on the barbell deadlift the engine serves
+    (3 x 5+ at RPE <= 8, 3 sessions across 2 weeks, no pain flag in 28 days); two kettlebell-deadlift sessions no longer open
+    it, and the swing itself still waits on his technique confirmation."""
+    std = _LIB["gates"]["chain_kb_swing"]["standard"]
+    assert std == {"sets": 3, "reps_min": 5, "rpe_max": 8, "prerequisite_sessions_min": 3, "span_weeks_min": 2, "flag_free_days": 28}
+    kb = eg.evaluate_gates(_LIB, None, _measured([_kb_dl("2026-11-03"), _kb_dl("2026-11-10")], mean_lb=250))["chain_kb_swing"]
+    assert kb["state"] == eg.LOCKED
+    dl = [_workout(d, "C6272009", _sets(3, 5, 8)) for d in ("2026-10-27", "2026-11-03", "2026-11-10")]
+    two = eg.evaluate_gates(_LIB, None, _measured(dl, mean_lb=250))
     assert two["chain_kb_swing"]["state"] == eg.UNLOCKED
     swing = eg.movement_states(_LIB, two)["kettlebell_swing"]
-    assert "chain_kb_swing" not in swing["locked_by"]
+    assert "chain_kb_swing" not in swing["locked_by"] and "owner_confirmation_skill" in swing["locked_by"]
 
 
 def test_the_kb_title_rule_needs_both_words():

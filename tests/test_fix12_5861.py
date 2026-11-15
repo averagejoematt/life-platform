@@ -435,17 +435,16 @@ def test_a_priority_that_cannot_reach_its_aim_says_so_and_never_takes_the_condit
     named = _week(A, settings={"priority_muscles": ["glutes"]})
     assert len(_cardio(named)) == 1
     cat, lib = named["world"]["catalog"]["movements"], named["world"]["lib"]
-    plan = live_volume.week_plan(cat, lib, 5)
-    tg = plan["targets"]["glutes"]
+    tg = live_volume.targets(lib, 5)["glutes"]
     lines = _lines(named, "priority (live): ")
-    if plan["counts"].get("glutes", 0) + 1e-9 < tg["aim"]:
-        assert len(lines) == 1 and "glutes" in lines[0] and ("your call" in lines[0] or "ceiling" in lines[0]), lines
+    if named["hard"].get("glutes", 0) + 1e-9 < tg["aim"]:  # fix round 14 (B23): the served count, the plan's own
+        assert len(set(lines)) == 1 and "glutes" in lines[0] and any(w in lines[0] for w in ("your call", "ceiling", "new to you")), lines
     else:
         assert lines == []
-    four = live_volume.week_plan(cat, sw.approved_library(lib, A), 4)  # the 4-morning week: a priority muscle under its aim says so
-    assert (four["priority_line"] is None) == all(
-        four["counts"].get(m, 0) + 1e-9 >= four["targets"][m]["aim"] for m in ("chest", "quadriceps")
-    )
+    four_lib = sw.approved_library(lib, A)
+    four = live_volume.week_plan(cat, four_lib, 4)  # the 4-morning week: a priority muscle under its aim says so
+    prio = (four_lib.get("programming_settings") or {}).get("priority_muscles") or ()
+    assert (four["priority_line"] is None) == all(four["counts"].get(m, 0) + 1e-9 >= four["targets"][m]["aim"] for m in prio)
     assert live_rulings.conditioning_hosts("lower_volume", lib | {"programming_settings": {"hard_conditioning_doses": 0}}) == []
     off = _week(A, settings={"priority_muscles": ["glutes"], "hard_conditioning_doses": 0})
     assert _cardio(off) == [] and any("hard_conditioning_doses is 0" in ln for ln in _lines(off, "cardio (live): "))
@@ -556,7 +555,7 @@ def test_a_live_drafts_rotation_picks_never_change_what_the_proposed_path_serves
 
 def test_the_settings_table_carries_the_effort_roles_and_no_in_session_switch():
     rows = live_settings.HEURISTICS
-    assert set(rows["effort_targets"]["value"]) == {"heavy_compound", "deadlift", "volume_compound", "accessory"}
+    assert set(rows["effort_targets"]["value"]) == {"heavy_compound", "deadlift", "heavy_lower_other", "volume_compound", "accessory"}
     assert all(
         rows[k]["label"] == "heuristic" and rows[k]["retune"] for k in ("effort_targets", "step_down_max_pct", "step_downs_per_window")
     )

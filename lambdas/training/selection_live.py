@@ -622,3 +622,15 @@ def _summary(policy: dict[str, Any]) -> dict[str, Any]:
         "max_hold_weeks": MAX_HOLD_WEEKS,
         "fatigue_cost": FATIGUE_COST_BASIS,
     }
+
+
+def week_variants(by_role: dict[str, dict[str, str]], sel: dict[str, Any], role: Any, gated: bool) -> dict[str, dict[str, str]]:
+    """Fix round 14 (the weekly plan counted the template's accessories, not the picks the mornings serve): every role's
+    accessory as THIS selection serves it — the served role's own variants, each other slot its pick (or the pick the novelty
+    budget held) under the same approval rule as the served role; the pools elsewhere. Read by the week plan only."""
+    out = {r: dict(v) for r, v in by_role.items()}
+    for c in sel.get("slots") or []:
+        pick, op = (c.get("pick") or {}).get("catalog_key"), c.get("owner_pin") or {}
+        if c.get("role") != role and pick and not c.get("pinned") and not (gated and op.get("state") != "held"):
+            out.setdefault(str(c["role"]), {})[str(c["incumbent"])] = c.get("novelty_serve") or pick
+    return out

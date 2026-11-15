@@ -401,8 +401,10 @@ def test_a_slump_trims_about_a_third_of_each_accessory_never_an_anchor():
         {"kind": "anchor", "sets": [{}] * 3}, {"kind": "accessory", "sets": [{}] * 3}, {"kind": "accessory", "sets": [{}] * 4},
         {"kind": "accessory", "sets": [{}] * 2},
     ]}  # fmt: skip
-    lines = live_load.slump_trim(rx)
-    assert [len(e["sets"]) for e in rx["exposures"]] == [3, 2, 3, 2] and lines
+    lines = live_load.slump_trim(rx)  # fix round 14 (B5): a third of the session's 9 accessory sets, as close as whole sets allow
+    assert [len(e["sets"]) for e in rx["exposures"]] == [3, 2, 2, 2] and lines == [
+        "slump (live): non-priority accessories -3 of 9 set(s) (about a third), no load steps up"
+    ]
     rows = _run("d3_honest", 6)
     off = _run("d3_honest", 6, {(live_load, "slump_trim"): lambda rx, keep=None: []})
     acc = lambda rr: sum(sum(len(v) for v in r["loads"].values()) for r in rr)  # noqa: E731 — exposures served
