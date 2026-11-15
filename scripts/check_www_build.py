@@ -231,6 +231,7 @@ def scan(dist: str, require_noindex: bool, forbidden_ids: set[str] | None = None
     if pages == 0:
         issues.append("no html pages in dist")
     issues.extend(heart_coverage(dist, fixture=snapshot_mode(snapshot_dir) == "fixture"))
+    issues.extend(spark_agreement(dist))
     issues.extend(room_leaks(dist))
     issues.extend(lab_leaks(dist))
     issues.extend(story_leaks(dist))
@@ -435,6 +436,34 @@ def heart_coverage(dist: str, fixture: bool = True) -> list[str]:
     front = os.path.join(dist, "index.html")
     if fixture and os.path.exists(front) and re.search(r'href="[^"]*/data/hrv/"', open(front, encoding="utf-8").read()):
         out.append("index.html: the front page links /data/hrv/ — HRV coverage must not move Start's link budget (#5598)")
+    return out
+
+
+_SPARK = re.compile(r'<span class="spark"[^>]*data-spark-of="([^"]+)"(?:[^>]*data-latest="([^"]*)")?[^>]*>(<svg[\s\S]*?</svg>)')
+
+
+def spark_agreement(dist: str) -> list[str]:
+    """One series, one picture (review 2026-11-14 dataviz-2; owner ruling 2026-11-14: "identical measurements presented
+    in multiple places"). Every metric whose weekly spark is drawn on BOTH the front page and the data room must be the
+    same SVG and the same latest reading on both: the two doors once scaled the same eight weekly means differently, so
+    one read as flat and the other as a collapse. The spark comes from www/src/lib/spark.js on both; this is the build's
+    own check that a page has not grown a scale of its own."""
+    seen: dict[str, dict[str, tuple[str, str]]] = {}
+    for page in ("index.html", os.path.join("data", "index.html")):
+        path = os.path.join(dist, page)
+        if not os.path.exists(path):
+            continue
+        for metric, latest, svg in _SPARK.findall(open(path, encoding="utf-8").read()):
+            seen.setdefault(metric, {})[page] = (svg, latest)
+    out = []
+    for metric, pages in sorted(seen.items()):
+        if len(pages) < 2:
+            continue
+        (pa, (svg_a, latest_a)), (pb, (svg_b, latest_b)) = sorted(pages.items())
+        if svg_a != svg_b:
+            out.append(f"{metric}: its weekly spark differs between {pa} and {pb} — one series must be one picture (lib/spark.js)")
+        if latest_a != latest_b:
+            out.append(f"{metric}: latest reading {latest_a!r} on {pa} but {latest_b!r} on {pb}")
     return out
 
 
