@@ -730,6 +730,12 @@ _PENDING_PERMISSIONS_APPLY: dict[str, str] = {
         "github-actions-remediation-role --policy-name remediation-permissions --policy-document "
         "file://infra/iam/github-actions-remediation-role.permissions.json` (or bash deploy/setup_remediation_role.sh)"
     ),
+    "github-actions-golden-eval-role": (
+        "2026-11-15 (#5974): KMSDecryptViaDynamoDB — kms:Decrypt on the table key, conditioned kms:ViaService "
+        "dynamodb.us-west-2, so the eval-harvest EVALRET# Query can decrypt (red since 2026-09-03). Apply: "
+        "`aws iam put-role-policy --role-name github-actions-golden-eval-role --policy-name "
+        "golden-eval-permissions --policy-document file://infra/iam/github-actions-golden-eval-role.permissions.json`"
+    ),
 }
 
 

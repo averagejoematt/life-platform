@@ -250,6 +250,15 @@ the PR.
   `EVALRET#*`). Until applied, `verify_oidc_iam.py` reports it as `MISSING` (expected) and the
   two workflows that use it degrade gracefully (judge step is `continue-on-error`; the harvest
   run fails visibly). **Apply runbook below.**
+- **#5974 (2026-11-15):** the role is live, but `dynamodb:Query` alone never worked — the table
+  is encrypted with a customer-managed key, so every harvest Query since 2026-09-03 died on
+  `kms:Decrypt`. Added `KMSDecryptViaDynamoDB` (the deploy role's statement verbatim: `kms:Decrypt`
+  on the table key only, conditioned `kms:ViaService = dynamodb.us-west-2.amazonaws.com`, so the
+  grant is usable only through DynamoDB and the `EVALRET#*` LeadingKeys scope still bounds what
+  is read). The harvest's only other AWS read, the private training-charter object, is fail-soft
+  by contract and deliberately NOT granted (a CI role on a public repo never reads `.private`
+  config). Apply:
+  `aws iam put-role-policy --role-name github-actions-golden-eval-role --policy-name golden-eval-permissions --policy-document file://infra/iam/github-actions-golden-eval-role.permissions.json`
 
 ### Proposed, NOT yet applied (the staged tighten — see the runbook below)
 - `proposed/github-actions-deploy-role.trust.main-only.json`
