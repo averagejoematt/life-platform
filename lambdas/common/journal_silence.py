@@ -62,7 +62,7 @@ def scrub_document(text: Any, pattern: Any = None) -> str:
 
     ``pattern`` is the compiled pattern whose sentences are removed — the journal's silence by default (read at
     CALL time, never bound at import); a second public-surface guard with its own pattern
-    (``privacy.clinical_guard``, #5947) reuses the same degradation."""
+    (``privacy.clinical_screen``, #5947) reuses the same degradation."""
     pattern = pattern or JOURNAL_SILENCE
     s = "" if text is None else str(text)
     for _ in range(_MAX_PASSES):
@@ -149,7 +149,7 @@ def guard_api_response(response: Any, logger: Any = None) -> Any:
     much journal-silence copy existed — a count about private activity on a public response (owner ruling
     2026-11-05: withheld counts off public responses).
 
-    #5947: the SAME last step then applies the owner-only clinical vocabulary (``privacy.clinical_guard``) — one
+    #5947: the SAME last step then applies the owner-only clinical vocabulary (``privacy.clinical_screen``) — one
     wire door, so a route added tomorrow, or free text stored outside the narrative provenance gate, is screened
     without its handler asking. A no-op while the off-repo channel carries no clinical list."""
     if not isinstance(response, dict) or response.get("isBase64Encoded"):
@@ -171,9 +171,9 @@ def _clinical_pass(response: Any, logger: Any = None) -> Any:
     module, or a guard that raises, is logged and the response served as the provenance gate left it — this layer
     is defence in depth over the whole API, so it never turns one bad read into a site-wide outage."""
     try:
-        from privacy import clinical_guard  # noqa: PLC0415 — lazy: keeps this module import-light and cycle-free
+        from privacy import clinical_screen  # noqa: PLC0415 — lazy: keeps this module import-light and cycle-free
 
-        return clinical_guard.guard_response(response, logger)
+        return clinical_screen.guard_response(response, logger)
     except Exception as e:  # noqa: BLE001 — see docstring
         if logger is not None:
             logger.error("clinical wire guard did not run (%s) — response served without it (#5947)", type(e).__name__)

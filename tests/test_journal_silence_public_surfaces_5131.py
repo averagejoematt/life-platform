@@ -405,7 +405,7 @@ def test_every_site_api_route_and_ai_door_withholds_clinical_copy_and_an_unarmed
     (synthetic) clinical term in a list card and in standalone prose, comes back with the card dropped and the
     sentence removed. Mutation control: with the channel's clinical list removed the same payload reaches the
     wire — the proof this walk can fail. One test, every offender reported."""
-    from privacy import clinical_guard, content_filter_channel
+    from privacy import clinical_screen, content_filter_channel
     from web import site_api_ai_lambda as ai, site_api_lambda as L
 
     from deploy.endpoint_registry import discover_endpoint_paths
@@ -422,7 +422,7 @@ def test_every_site_api_route_and_ai_door_withholds_clinical_copy_and_an_unarmed
             leaked.append(path)
     for path, handler in (("/api/ask", "_handle_ask"), ("/api/board_ask", "_handle_board_ask"), ("/api/explain", "_handle_explain")):
         monkeypatch.setattr(ai, handler, lambda event: _clinical_response())
-        if clinical_guard.mentions(ai.lambda_handler(_event(path, "POST"), None)["body"]):
+        if clinical_screen.mentions(ai.lambda_handler(_event(path, "POST"), None)["body"]):
             leaked.append(path)
     assert not leaked, f"{len(leaked)} door(s) served clinical copy: {leaked[:20]}"
 

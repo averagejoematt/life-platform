@@ -1,4 +1,4 @@
-"""clinical_guard.py — the owner-only clinical record never reaches a public surface (#5947).
+"""clinical_screen.py — the owner-only clinical record never reaches a public surface (#5947).
 
 docs/DATA_GOVERNANCE.md: the owner clinical record is "Never on a public surface — no projection, no
 aggregate, no count". It may enter an AI coach's context (ADR-155 amendment) under a non-disclosure

@@ -16,7 +16,7 @@ THE RULE, the retrospective's own: public by POSITIVE stamp, fail closed.
 
 THE SCREEN (``screen``) is deterministic and never raises: the #1673 gate's spine (the channel-derived
 blocked vocabulary, real public figures, PII) plus the owner-only clinical vocabulary
-(``privacy.clinical_guard``, required). If either vocabulary cannot be loaded the verdict is HELD — a
+(``privacy.clinical_screen``, required). If either vocabulary cannot be loaded the verdict is HELD — a
 screen that could not run vouches for nothing. Category tokens are neutral and no term is ever echoed.
 
 A keyword screen cannot see a paraphrase; the stamp is what makes the default "withheld", and the
@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from privacy import broadcast_sensitivity_gate as gate, clinical_guard
+from privacy import broadcast_sensitivity_gate as gate, clinical_screen
 
 STATUS_ATTR = "pitchStatus"
 CATEGORIES_ATTR = "pitchHoldCategories"
@@ -54,7 +54,7 @@ def screen(text: Any) -> tuple:
     s = str(text or "")
     try:
         cats = list(gate.deterministic_findings(s))
-        if clinical_guard.mentions(s, require=True):
+        if clinical_screen.mentions(s, require=True):
             cats.append(CATEGORY_CLINICAL)
     except Exception:  # noqa: BLE001 — a screen that could not run never clears (fail closed)
         return STATUS_HELD, [CATEGORY_SCREEN_UNAVAILABLE]
