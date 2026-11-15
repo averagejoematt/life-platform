@@ -54,7 +54,12 @@ class _FakeS3:
 def test_week_recap_moment_written_with_iso_week_permalink():
     s3 = _FakeS3()
     out = om._sweep_week_recap(
-        s3, {"journey": {"lost_lbs": 13.4}, "vitals": {"hrv_ms": 52}, "platform": {"days_in": 21, "tier0_streak": 3}}
+        s3,
+        {
+            "journey": {"lost_lbs": 13.4, "weight_as_of": "2026-09-20"},
+            "vitals": {"hrv_ms": 52},
+            "platform": {"days_in": 21, "tier0_streak": 3},
+        },
     )
     assert out and out["current"].startswith("/moments/week/") and "-W" in out["id"]
     shell_key = f"generated/moments/week/{out['id']}/index.html"

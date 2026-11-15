@@ -387,3 +387,50 @@ def test_mutation_control_a_dead_pattern_lets_the_leak_through(monkeypatch):
     monkeypatch.setattr(J, "JOURNAL_SILENCE", re.compile(r"(?!x)x"))
     resp = L.lambda_handler(_event("/api/edition"), None)
     assert real.search(resp["body"]), "with the pattern disarmed the leak must reach the wire"
+
+
+# ── #5947: the same last step withholds the owner-only clinical vocabulary ────────────────────────────
+# Synthetic terms from conftest's NEUTRAL_CONTENT_FILTER; the real list lives only in the off-repo channel.
+_CLINICAL_LEAK = "Six weeks in, and a week after the snorbleitis finding. The essay is short."
+_CLINICAL_CLEAN = "The essay is short."
+
+
+def _clinical_response() -> dict:
+    body = {"items": [{"title": "A", "pitch": _CLINICAL_LEAK}, {"title": "B", "pitch": "about the piece"}], "read": _CLINICAL_LEAK}
+    return {"statusCode": 200, "headers": {"Content-Type": "application/json"}, "body": json.dumps(body)}
+
+
+def test_every_site_api_route_and_ai_door_withholds_clinical_copy_and_an_unarmed_channel_is_the_control(monkeypatch):
+    """Every route in the AST-derived registry and every AI answer door, answered by a stub carrying a
+    (synthetic) clinical term in a list card and in standalone prose, comes back with the card dropped and the
+    sentence removed. Mutation control: with the channel's clinical list removed the same payload reaches the
+    wire — the proof this walk can fail. One test, every offender reported."""
+    from privacy import clinical_screen, content_filter_channel
+    from web import site_api_ai_lambda as ai, site_api_lambda as L
+
+    from deploy.endpoint_registry import discover_endpoint_paths
+
+    monkeypatch.setattr(L, "SITE_API_ORIGIN_SECRET", "", raising=False)
+    monkeypatch.setattr(ai, "SITE_API_ORIGIN_SECRET", "", raising=False)
+    monkeypatch.setattr(L, "_dispatch_route", lambda event, path, method: _clinical_response())
+    paths = [p for p in sorted(discover_endpoint_paths()) if p != "/api/healthz"]
+    assert len(paths) >= 100, f"endpoint registry derived only {len(paths)} routes"
+    leaked = []
+    for path in paths:
+        body = json.loads(L.lambda_handler(_event(path), None)["body"])
+        if body.get("read") != _CLINICAL_CLEAN or [i["title"] for i in body.get("items", [])] != ["B"]:
+            leaked.append(path)
+    for path, handler in (("/api/ask", "_handle_ask"), ("/api/board_ask", "_handle_board_ask"), ("/api/explain", "_handle_explain")):
+        monkeypatch.setattr(ai, handler, lambda event: _clinical_response())
+        if clinical_screen.mentions(ai.lambda_handler(_event(path, "POST"), None)["body"]):
+            leaked.append(path)
+    assert not leaked, f"{len(leaked)} door(s) served clinical copy: {leaked[:20]}"
+
+    monkeypatch.setenv("CONTENT_FILTER_JSON", json.dumps({"blocked_vice_keywords": ["fizzlewick"]}))
+    content_filter_channel.reset_cache()
+    try:
+        unarmed = json.loads(L.lambda_handler(_event(paths[0]), None)["body"])
+    finally:
+        monkeypatch.undo()
+        content_filter_channel.reset_cache()
+    assert unarmed["read"] == _CLINICAL_LEAK, "with no clinical list the wire guard is a no-op"

@@ -1,0 +1,138 @@
+{
+ "_comment": "Epic #5861 FIX5: the fifth red team's STRESS profiles, SYNTHETIC (no personal data: round invented body mass and steps; generated loads are synthetic). Same shape as sample_week_profiles_5861.json; read by tests/test_programming_fix5_5861.py and scripts/sample_weeks_5861.py --profile-file.",
+ "as_of": "2026-11-16",
+ "position": {
+  "week": 10,
+  "block": 2
+ },
+ "defaults": {
+  "roles": [
+   "upper_heavy",
+   "lower_heavy",
+   "shoulders_arms",
+   "upper_volume",
+   "lower_volume"
+  ],
+  "days": [
+   "2026-11-16",
+   "2026-11-17",
+   "2026-11-18",
+   "2026-11-19",
+   "2026-11-20"
+  ],
+  "bodyweight_lb": 250,
+  "readiness": "green",
+  "sleep_hours": 7.5,
+  "acwr": "safe",
+  "steps_per_day": 12000,
+  "trend": "progressing",
+  "trend_overrides": {},
+  "discomfort": [],
+  "pain": [],
+  "unavailable_equipment": [],
+  "sessions_last_14d": 10,
+  "hard_cardio_minutes_7d": 40
+ },
+ "profiles": {
+  "j_hip_pain_hinge": {
+   "label": "(j) RT5 stress: hip pain 6/10 on the RDL, sharp at the bottom",
+   "story": "hip",
+   "pain": [
+    {
+     "movement": "romanian_deadlift_barbell",
+     "note": "sharp hip pain 6/10 at the bottom of the RDL"
+    }
+   ]
+  },
+  "j2_hip_pain_unnamed": {
+   "label": "(j2) RT5 stress: pain with no site named, no number, on the deadlift",
+   "story": "vague",
+   "pain": [
+    {
+     "movement": "deadlift_barbell",
+     "note": "something tweaked, hurts"
+    }
+   ]
+  },
+  "k_elbow_pain_press": {
+   "label": "(k) RT5 stress: elbow pain 5/10 on the bench",
+   "story": "elbow",
+   "pain": [
+    {
+     "movement": "barbell_bench_press",
+     "note": "elbow pain 5/10 on the bench press"
+    }
+   ]
+  },
+  "l_three_day_week": {
+   "label": "(l) RT5 stress: a 3-day week (Mon/Wed/Fri)",
+   "story": "three mornings",
+   "roles": [
+    "upper_heavy",
+    "lower_heavy",
+    "upper_volume"
+   ],
+   "days": [
+    "2026-11-16",
+    "2026-11-18",
+    "2026-11-20"
+   ]
+  },
+  "m_no_barbell": {
+   "label": "(m) RT5 stress: no barbell, no rack, no trap bar, no smith",
+   "story": "hotel/apartment gym with machines and DBs",
+   "unavailable_equipment": [
+    "barbell",
+    "squat_rack",
+    "trap_bar",
+    "smith_machine",
+    "olympic_platform",
+    "ez_bar",
+    "landmine"
+   ]
+  },
+  "n_low_steps_sedentary": {
+   "label": "(n) RT5 stress: 3,000 steps a day, no recent hard cardio",
+   "story": "sedentary week",
+   "steps_per_day": 3000,
+   "hard_cardio_minutes_7d": 0
+  },
+  "o_everything_bad": {
+   "label": "(o) RT5 stress: shoulder pain + knee pain + red + 4.8h sleep + regressing + 2-day week",
+   "story": "worst week",
+   "readiness": "red",
+   "sleep_hours": 4.8,
+   "acwr": "danger",
+   "trend": "regressing",
+   "hard_cardio_minutes_7d": 120,
+   "pain": [
+    {
+     "movement": "barbell_bench_press",
+     "note": "shoulder pain 7/10"
+    },
+    {
+     "movement": "squat_barbell",
+     "note": "knee pain sharp"
+    }
+   ],
+   "roles": [
+    "upper_heavy",
+    "lower_heavy"
+   ],
+   "days": [
+    "2026-11-16",
+    "2026-11-17"
+   ]
+  },
+  "p_discomfort_only": {
+   "label": "(p) RT5 stress: repeated knee discomfort on the BSS 2/10",
+   "story": "discomfort",
+   "discomfort": [
+    {
+     "movement": "bulgarian_split_squat_dumbbell",
+     "note": "knee a bit cranky 2/10"
+    }
+   ]
+  }
+ }
+}

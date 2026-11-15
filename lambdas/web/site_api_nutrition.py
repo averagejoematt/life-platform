@@ -128,7 +128,6 @@ def _mifflin_tdee(weight_lbs, strava_items=None, profile=None, hevy_items=None):
     per cm of height — assuming one would publish a guess as a measurement)."""
     prof = profile if profile is not None else (_get_profile() or {})
     height_in = prof.get("height_inches")
-    age_years, age_basis, _ = health_tdee.resolve_age(prof.get("date_of_birth"))
     wkg = _num(weight_lbs)
     # #3931: the Hevy set log is the worked-set input. Absent, the lifting term uses the
     # stated 0.25 work fraction of logged duration — never the full duration with rest in it.
@@ -136,8 +135,10 @@ def _mifflin_tdee(weight_lbs, strava_items=None, profile=None, hevy_items=None):
     budget = health_tdee.energy_budget(
         weight_lbs=weight_lbs,
         height_inches=height_in,
-        age_years=age_years,
-        age_basis=age_basis,
+        # Owner ruling 2026-11-14: this is a PUBLIC door, so the estimate is computed at the stated reference age and
+        # the birth date is never read here — Mifflin carries -5 kcal per year of age, and a TDEE at his real age
+        # served to the kcal is his age (health.tdee.PUBLIC_REFERENCE_AGE_YEARS; tests/test_age_inversion.py).
+        public=True,
         sex=(prof.get("biological_sex") or "male"),
         exercise_kcal=ex["kcal"],
         exercise_energy_days=ex["days"],
@@ -526,7 +527,7 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
             hevy_items=_g["_query_source"]("hevy", d7, today),
         )
         if est:
-            tdee, tdee_source, tdee_method = est, "estimate_mifflin", health_tdee.METHOD
+            tdee, tdee_source, tdee_method = est, "estimate_mifflin", health_tdee.METHOD_PUBLIC
     avg_cal = round(sum(cal_vals) / len(cal_vals)) if cal_vals else None
     deficit = round(tdee - avg_cal) if tdee and avg_cal else None
     # #3931 box 2/4: the published deficit is checked against the MEASURED weight trend
@@ -1049,7 +1050,7 @@ def deficit_sustainability(*, _g) -> dict:
             hevy_items=_query_source("hevy", _d7, today),
         )
         if est:
-            tdee, tdee_source, tdee_method = est, "estimate_mifflin", health_tdee.METHOD
+            tdee, tdee_source, tdee_method = est, "estimate_mifflin", health_tdee.METHOD_PUBLIC
         else:
             tdee, tdee_source, tdee_method = 2400, "estimate_default", "flat_default_no_weight_or_height"
     deficit_kcal = round(tdee - avg_cal)
