@@ -1,5 +1,5 @@
 // The Coaching Room's coach profiles (src/lib/coach_room.js, CR2): carried values only, the withheld rule, the
-// "what Matt did" rule, the docket from one coach's side, and the record labelled as first graded.
+// "what Matt did" rule, the docket from one coach's side, and the record labelled as graded now.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -174,10 +174,10 @@ test("the calls by day: newest day first, each call keeps its own word, a disput
   assert.equal(disputed.corrected, true);
 });
 
-test("the record is labelled as first graded, carries its interval, and never computes a percentage", () => {
+test("the record is labelled as graded now, carries its interval, and never computes a percentage", () => {
   const cc = CAL.calibration.coaches.find((x) => x.coach_id === "sleep");
   const r = coachRecord(cc, null);
-  assert.match(r.line, /, as first graded$/);
+  assert.match(r.line, /, as graded now$/);
   assert.ok(r.interval.startsWith("95% interval") || r.interval === "no interval served");
   const planted = clone(cc);
   planted.accuracy_pct = 12.3; // deliberately not confirmed/n

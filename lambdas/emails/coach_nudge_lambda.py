@@ -11,7 +11,14 @@ Runs hourly (UTC-fixed cron, email stack). Every invocation:
      grounding gate + coach quality gate (blocked ⇒ dropped silently, never
      regenerated — AC4, ``max_regenerations=0``), and delivers it.
 
-Channel (AC5, decided in the PR): SES email — the platform's existing
+#5821 (owner rulings 2026-11-15): NOTHING here mails any more. The coach note ("A note from
+<coach>"), the lifting-day steps note and the protein breakfast note are sections of the
+Morning Brief. Each pass still evaluates, phrases (the coach note only), gates, claims its day
+and writes its record — settled `folded_into_brief` (emails.brief_lines.FOLDED) instead of
+`sent` — and the brief reads the stored text (emails.brief_lines.folded_sections). A folded
+coach note is not outcome-graded: its 2h window would measure an email nobody received.
+
+Channel (AC5, decided in the PR, superseded by #5821 above): SES email — the platform's existing
 outbound channel (7 email lambdas, verified identity). Native web-push does
 NOT exist here yet (site/sw.js is a cache-only PWA worker: no push handler,
 no VAPID keys, no subscription store), so "whichever the platform already
@@ -40,8 +47,10 @@ from coach import coach_nudge_engine as engine
 from coach.persona_registry import OPERATIONAL_COACH_IDS
 from common.numeric import floats_to_decimal  # #3569: the trigger payload carries real floats
 from common.pacific_time import PACIFIC
-from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
+from common.send_guard import is_dry_run  # #2222: the dry-run vocabulary (nothing is mailed since #5821)
 from experiment.phase_taxonomy import experiment_stamp_for
+
+from emails.brief_lines import FOLDED  # #5821: the status of a note the Morning Brief carries
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -49,8 +58,6 @@ logger.setLevel(logging.INFO)
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
-RECIPIENT = os.environ.get("EMAIL_RECIPIENT", "")
-SENDER = os.environ.get("EMAIL_SENDER", "")
 
 # Fallback display names (persona registry is the live source; this keeps the
 # subject line honest if the S3 read fails).
@@ -65,7 +72,6 @@ PREDICTION_EVALUABLE_STATUSES = {"pending", "confirming"}
 
 # Lazy client refs — tests monkeypatch these module attributes directly.
 _table_ref = None
-_ses_ref = None
 _lambda_ref = None
 
 
@@ -74,13 +80,6 @@ def _table():
     if _table_ref is None:
         _table_ref = boto3.resource("dynamodb", region_name=REGION).Table(TABLE_NAME)
     return _table_ref
-
-
-def _ses():
-    global _ses_ref
-    if _ses_ref is None:
-        _ses_ref = boto3.client("sesv2", region_name=REGION)
-    return _ses_ref
 
 
 def _lambda_client():
@@ -397,30 +396,6 @@ def _gate(copy_text: str, firing: dict, coach_name: str) -> list:
     return findings
 
 
-def _send_email(coach_name: str, copy_text: str, dry_run: bool = False) -> None:
-    subject = f"A note from {coach_name}"
-    html = (
-        "<div style='font-family:Georgia,serif;max-width:540px;margin:0 auto;padding:24px;color:#1a1a1a'>"
-        f"<p style='font-size:16px;line-height:1.6'>{copy_text}</p>"
-        f"<p style='font-size:13px;color:#666;margin-top:24px'>— {coach_name}</p>"
-        "<p style='font-size:12px;color:#999;margin-top:16px'>Proactive nudge · deterministic trigger · "
-        "fine to ignore — nothing is waiting on a reply.</p>"
-        "</div>"
-    )
-    guarded_send_email(
-        _ses(),
-        dry_run,
-        FromEmailAddress=SENDER,
-        Destination={"ToAddresses": [RECIPIENT]},
-        Content={
-            "Simple": {
-                "Subject": {"Data": subject, "Charset": "UTF-8"},
-                "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
-            }
-        },
-    )
-
-
 class NudgeWriteError(RuntimeError):
     """#3569 — the nudge record could not be persisted.
 
@@ -431,7 +406,7 @@ class NudgeWriteError(RuntimeError):
     """
 
 
-def _finalize(date_pt: str, nudge_item: dict) -> None:
+def _finalize(date_pt: str, nudge_item: dict, ledger_extra: dict | None = None) -> None:
     """Write the verbatim COACH# record + the final ledger row (overwrites the
     'attempting' reservation).
 
@@ -472,7 +447,7 @@ def _finalize(date_pt: str, nudge_item: dict) -> None:
     item = _stamped(nudge_item)
     try:
         _table().put_item(Item=item)
-        _table().put_item(Item=_stamped(engine.build_ledger_item(date_pt, item)))
+        _table().put_item(Item=_stamped({**engine.build_ledger_item(date_pt, item), **(ledger_extra or {})}))
     except Exception as e:  # noqa: BLE001 — re-raised below; the ledger is stamped first
         logger.error("[nudge] FAILED to persist nudge record %s/%s: %s", nudge_item.get("pk"), nudge_item.get("sk"), e)
         _mark_ledger_failed(date_pt, nudge_item, e)
@@ -491,31 +466,22 @@ def _mark_ledger_failed(date_pt: str, nudge_item: dict, error: Exception) -> Non
         logger.error("[nudge] could not stamp ledger DAY#%s as failed: %s", date_pt, e)
 
 
-def _send_steps_email(text: str, dry_run: bool = False, subject: str = "Steps today", label: str = "Steps note") -> None:
-    """#5056: the owner-only steps note — plain, no coach persona (it is deterministic, no model). #5098: the protein
-    breakfast note reuses it with its own subject and label."""
-    html = (
-        "<div style='font-family:Georgia,serif;max-width:540px;margin:0 auto;padding:24px;color:#1a1a1a'>"
-        f"<p style='font-size:16px;line-height:1.6'>{text}</p>"
-        f"<p style='font-size:12px;color:#999;margin-top:16px'>{label} · deterministic · once a day at most · "
-        "fine to ignore.</p></div>"
-    )
-    guarded_send_email(
-        _ses(),
-        dry_run,
-        FromEmailAddress=SENDER,
-        Destination={"ToAddresses": [RECIPIENT]},
-        Content={"Simple": {"Subject": {"Data": subject, "Charset": "UTF-8"}, "Body": {"Html": {"Data": html, "Charset": "UTF-8"}}}},
-    )
+def _no_send(_text: str) -> None:
+    """#5821: the deliverer every pass now gets — the Morning Brief renders the note; nothing leaves this Lambda."""
+    return None
 
 
 def _steps_pass(now_utc: datetime, dry_run: bool) -> dict:
-    """#5056: the lifting-day steps nudge — a second, independent pass on this hourly tick (own ledger row; fail-soft)."""
+    """#5056: the lifting-day steps nudge — a second, independent pass on this hourly tick (own ledger row; fail-soft).
+
+    #5821: it no longer mails "Steps today". It still evaluates, stamps its EVAL dead-man row and claims the day, and
+    settles the claim `folded_into_brief` with the note's text; the next Morning Brief carries it (the pass's window
+    is 19:00-20:00 PT, after that day's brief). The deliverer is a no-op — no SES call."""
     try:
         from emails import steps_nudge_runner
 
         return steps_nudge_runner.run(
-            _table(), lambda text: _send_steps_email(text, dry_run), now_utc, budget_guard.current_tier(), user=USER_ID, dry_run=dry_run
+            _table(), _no_send, now_utc, budget_guard.current_tier(), user=USER_ID, dry_run=dry_run, delivered_status=FOLDED
         )
     except Exception as e:  # noqa: BLE001 — never let the steps pass break the coach nudge tick
         logger.error("[steps-nudge] pass failed: %s", e)
@@ -523,14 +489,17 @@ def _steps_pass(now_utc: datetime, dry_run: bool) -> dict:
 
 
 def _protein_pass(now_utc: datetime, dry_run: bool) -> dict:
-    """#5098: the protein breakfast nudge — an independent pass on this hourly tick (own ledger row; fail-soft)."""
+    """#5098: the protein breakfast nudge — an independent pass on this hourly tick (own ledger row; fail-soft).
+
+    #5821 (owner ruling 2026-11-15): it no longer mails "Protein this morning". The Morning Brief carries the note as a
+    section (`protein_nudge_runner.brief_line`); this pass still evaluates, stamps the EVAL dead-man row and claims the
+    day, and settles the claim `folded_into_brief` instead of `sent`. The deliverer is a no-op — no SES call."""
     try:
         from emails import protein_nudge_runner
 
-        def send(text: str) -> None:
-            _send_steps_email(text, dry_run, subject="Protein this morning", label="Protein note")
-
-        return protein_nudge_runner.run(_table(), send, now_utc, budget_guard.current_tier(), user=USER_ID, dry_run=dry_run)
+        return protein_nudge_runner.run(
+            _table(), _no_send, now_utc, budget_guard.current_tier(), user=USER_ID, dry_run=dry_run, delivered_status=FOLDED
+        )
     except Exception as e:  # noqa: BLE001 — never let the protein pass break the coach nudge tick
         logger.error("[protein-nudge] pass failed: %s", e)
         return {"send": False, "reason": f"error:{type(e).__name__}"}
@@ -594,34 +563,18 @@ def _coach_nudge(event: dict, context) -> dict:
         logger.info("[nudge] blocked by gates: %s", findings)
         return {"statusCode": 200, "graded": graded, "nudge": "blocked", "reason": "gate", "findings": findings}
 
-    # #3569: DURABLE WRITE BEFORE THE IRREVERSIBLE SIDE EFFECT. The send used to
-    # come first, so every one of the three float rejections delivered an email
-    # and then lost the record it was supposed to be graded from. `_finalize`
-    # raises NudgeWriteError (after stamping the ledger `failed`) rather than
-    # returning, so an unwritable record means the email is never sent at all.
-    item = engine.build_nudge_item(chosen, copy_text, engine.STATUS_SENT, date_pt=date_pt, now_utc=now_utc)
-    _finalize(date_pt, item)
+    # #5821: FOLDED, NOT SENT. The record is written exactly as before (#3569's durable write), with the
+    # `folded_into_brief` status; the ledger row also carries the verbatim copy and the coach's display name so the
+    # next Morning Brief can render the note with one ledger read and no model call. A dry run writes the record
+    # without the copy on the ledger, so a dry run never reaches the brief.
+    item = engine.build_nudge_item(chosen, copy_text, FOLDED, date_pt=date_pt, now_utc=now_utc)
+    _finalize(date_pt, item, None if dry_run else {"brief_text": copy_text, "coach_name": coach_name})
 
-    try:
-        _send_email(coach_name, copy_text, dry_run=dry_run)
-    except Exception as e:  # noqa: BLE001
-        logger.error("[nudge] SES send failed: %s", e)
-        # Correct the record we already wrote — same pk/sk, so both rows are
-        # overwritten in place and the stored shape matches what the old
-        # send-first order produced on its SES-error path. If even the
-        # correction cannot land, `_finalize` has already stamped the ledger
-        # `failed` — swallow it here so the reported cause stays the SES one.
-        try:
-            _finalize(date_pt, engine.mark_send_failed(item, str(e)))
-        except NudgeWriteError as write_err:
-            logger.error("[nudge] could not downgrade the record after the SES failure: %s", write_err)
-        return {"statusCode": 500, "graded": graded, "nudge": "error", "reason": "ses_error"}
-
-    logger.info("[nudge] SENT %s nudge from %s (%s)", chosen["trigger_type"], chosen["coach_id"], item["sk"])
+    logger.info("[nudge] FOLDED %s nudge from %s into the Morning Brief (%s)", chosen["trigger_type"], chosen["coach_id"], item["sk"])
     return {
         "statusCode": 200,
         "graded": graded,
-        "nudge": "sent",
+        "nudge": "folded",
         "trigger": chosen["trigger_type"],
         "coach_id": chosen["coach_id"],
         "sk": item["sk"],

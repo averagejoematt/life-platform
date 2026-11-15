@@ -524,7 +524,7 @@ def test_tier_crossing_forecast_is_total(gov):
     assert gov._tier_crossing_forecast(None, None, None, None) == {"1": None, "2": None, "3": None}
 
 
-# ── _recent_unique_visitors: reads the traffic digest's CloudWatch metric ────
+# ── _surge_reading_and_baseline: reads the traffic digest's CloudWatch metric ────
 
 
 class _FakeCW:
@@ -537,27 +537,28 @@ class _FakeCW:
         return {"Datapoints": self._datapoints}
 
 
-def test_recent_unique_visitors_returns_latest_datapoint(gov, monkeypatch):
+def test_surge_reading_is_the_latest_datapoint(gov, monkeypatch):
     points = [
         {"Timestamp": datetime(2026, 6, 29, tzinfo=timezone.utc), "Maximum": 165},
         {"Timestamp": datetime(2026, 7, 6, tzinfo=timezone.utc), "Maximum": 288},
     ]
     monkeypatch.setattr(gov, "_cw", _FakeCW(points))
-    assert gov._recent_unique_visitors(datetime(2026, 7, 8, tzinfo=timezone.utc)) == 288
+    # #5936: the older point is the baseline; the reading under test is not in it.
+    assert gov._surge_reading_and_baseline(datetime(2026, 7, 8, tzinfo=timezone.utc)) == (288, [165])
 
 
-def test_recent_unique_visitors_no_datapoints_returns_none(gov, monkeypatch):
+def test_surge_reading_no_datapoints_returns_none(gov, monkeypatch):
     monkeypatch.setattr(gov, "_cw", _FakeCW([]))
-    assert gov._recent_unique_visitors(datetime(2026, 7, 8, tzinfo=timezone.utc)) is None
+    assert gov._surge_reading_and_baseline(datetime(2026, 7, 8, tzinfo=timezone.utc)) == (None, [])
 
 
-def test_recent_unique_visitors_read_failure_returns_none(gov, monkeypatch):
+def test_surge_reading_read_failure_returns_none(gov, monkeypatch):
     class _BrokenCW:
         def get_metric_statistics(self, **kwargs):
             raise RuntimeError("boom")
 
     monkeypatch.setattr(gov, "_cw", _BrokenCW())
-    assert gov._recent_unique_visitors(datetime(2026, 7, 8, tzinfo=timezone.utc)) is None
+    assert gov._surge_reading_and_baseline(datetime(2026, 7, 8, tzinfo=timezone.utc)) == (None, [])
 
 
 # ── #1998: _alert_surge must format from the ACTIVE ceiling pair ────────────
@@ -886,23 +887,74 @@ def test_alert_surge_quotes_the_derived_bar_not_the_floor(gov, monkeypatch):
     assert "(900)" not in body, f"the alert quoted the floor constant as the bar: {body!r}"
 
 
-def test_weekly_uniques_baseline_returns_the_series_oldest_first(gov, monkeypatch):
+def test_surge_baseline_is_the_prior_series_oldest_first(gov, monkeypatch):
     points = [
         {"Timestamp": datetime(2026, 8, 31, tzinfo=timezone.utc), "Maximum": 1011},
         {"Timestamp": datetime(2026, 7, 1, tzinfo=timezone.utc), "Maximum": 972},
         {"Timestamp": datetime(2026, 8, 1, tzinfo=timezone.utc), "Maximum": 973},
     ]
     monkeypatch.setattr(gov, "_cw", _FakeCW(points))
-    assert gov._weekly_uniques_baseline(datetime(2026, 9, 6, tzinfo=timezone.utc)) == [972, 973, 1011]
+    # #5936: 1011 is the reading under test (inside the 14-day lookback), so the baseline
+    # is the readings BEFORE it — never the reading itself.
+    assert gov._surge_reading_and_baseline(datetime(2026, 9, 6, tzinfo=timezone.utc)) == (1011, [972, 973])
 
 
-def test_weekly_uniques_baseline_read_failure_is_empty(gov, monkeypatch):
+def test_surge_baseline_read_failure_is_empty(gov, monkeypatch):
     class _BrokenCW:
         def get_metric_statistics(self, **kwargs):
             raise RuntimeError("boom")
 
     monkeypatch.setattr(gov, "_cw", _BrokenCW())
-    assert gov._weekly_uniques_baseline(datetime(2026, 9, 6, tzinfo=timezone.utc)) == []
+    assert gov._surge_reading_and_baseline(datetime(2026, 9, 6, tzinfo=timezone.utc)) == (None, [])
     # …and the empty series degrades to the documented floor, with the reason stated.
     threshold, rule = gov.surge_threshold_from_baseline([])
     assert threshold == gov.SURGE_UNIQUES_THRESHOLD and "floor" in rule
+
+
+# ── #5821 (owner ruling 2026-11-15): a tier change below the hard cutoff is a digest line ──
+# Only the ADR-125 tier-3 hard stop still emails on the alerts topic; tiers 1-2 and every
+# step down to a tier below 3 become one line in the daily LP digest (common.ops_digest).
+
+
+class _FailingDigestSNS(_FakeSNS):
+    """The governor role before its DigestLine grant deploys: the digest publish is denied."""
+
+    def publish(self, **kwargs):
+        if kwargs.get("TopicArn", "").endswith(":life-platform-alerts-digest"):
+            raise RuntimeError("AuthorizationError: not authorized to perform sns:Publish")
+        self.calls.append(kwargs)
+
+
+def _topics(fake):
+    return [c["TopicArn"].rsplit(":", 1)[1] for c in fake.calls]
+
+
+def test_a_non_cutoff_tier_change_is_a_digest_line_not_an_email(gov, monkeypatch):
+    """THE control: 0→1, 1→2 and 3→2 publish ONE digest line and nothing to the alerts topic."""
+    import json as _json
+
+    for prev, new in ((0, 1), (1, 2), (3, 2), (1, 0)):
+        fake = _FakeSNS()
+        monkeypatch.setattr(gov, "_sns", fake)
+        gov._alert(prev, new, mtd=150.0, projected=190.0, ceiling=215.0)
+        assert _topics(fake) == ["life-platform-alerts-digest"], f"{prev}→{new} reached {_topics(fake)}"
+        line = _json.loads(fake.calls[0]["Message"])
+        assert line["AlarmName"] == f"budget-tier: {'raised' if new > prev else 'lowered'} {prev}→{new}"
+        assert gov._TIER_LABELS[new] in line["NewStateReason"] and "$215" in line["NewStateReason"]
+
+
+def test_the_tier_3_hard_cutoff_still_emails_at_once(gov, monkeypatch):
+    """The urgent case: entering tier 3 (brief data-only, AI CI gates paused) mails immediately."""
+    for prev in (0, 1, 2):
+        fake = _FakeSNS()
+        monkeypatch.setattr(gov, "_sns", fake)
+        gov._alert(prev, 3, mtd=210.0, projected=240.0, ceiling=215.0)
+        assert _topics(fake) == ["life-platform-alerts"], f"{prev}→3 must page the alerts topic, got {_topics(fake)}"
+        assert "🛑" in fake.calls[0]["Subject"]
+
+
+def test_a_failed_digest_publish_falls_back_to_the_alerts_email(gov, monkeypatch):
+    fake = _FailingDigestSNS()
+    monkeypatch.setattr(gov, "_sns", fake)
+    gov._alert(0, 1, mtd=50.0, projected=180.0, ceiling=215.0)
+    assert _topics(fake) == ["life-platform-alerts"], "a denied digest publish lost the tier change"

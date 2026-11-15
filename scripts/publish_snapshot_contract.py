@@ -172,6 +172,9 @@ SCHEMA: dict[str, dict[str, tuple[str, bool]]] = {
         "status": ("enum:published|held|skipped|pending", False),
         "week_start": ("day", True),
         "week_end": ("day", True),
+        "published_at": ("day", True),
+        "covers_start": ("day", True),
+        "covers_end": ("day", True),
         "excerpt": ("str", True),
         "body_html": ("str", True),
         "word_count": ("int", True),
@@ -261,6 +264,7 @@ SCHEMA: dict[str, dict[str, tuple[str, bool]]] = {
         "short_bio": ("str", True),
         "record": ("obj", True),
         "comparison_text": ("str", True),
+        "versus_guess": ("obj", True),
         "quality": ("obj", True),
         "instrument_absent": ("obj", True),
     },
@@ -766,9 +770,14 @@ JOURNEY_COMPOSITION_NUMBERS = (
     "visceral_target_lb",
     "days_since",
 )
-PHENOAGE_KEYS = {"years", "as_of", "drivers"}
+# Owner ruling 2026-11-14: a figure of HIS phenotypic age is never written — at any precision it is his age to about
+# a year (the formula is linear in age, the markers are public). What is written is the markers-only reference line.
+PHENOAGE_KEYS = {"as_of", "drivers", "reference"}
+PHENOAGE_REFERENCE_KEYS = {"points", "offset_low", "offset_high", "slope"}
+PHENOAGE_POINT_KEYS = {"at_years", "reads_years", "offset_years"}
 PHENOAGE_DRIVER_KEYS = {"name", "value", "unit", "direction", "derived"}
-# PhenoAge Option A: no chronological age, birth date or age gap is ever written beside it.
+# No chronological age, birth date or age gap is ever written beside it; inside the `phenoage` object the key sets are
+# exact at every level (validate_journey_body), so a band, a direction or a figure cannot ride along under any name.
 _AGE_KEY = re.compile(r"(^|_)(age|birth|dob|chronological)", re.IGNORECASE)
 
 
@@ -803,13 +812,22 @@ def validate_journey_body(journey: dict) -> None:
             raise SchemaError("journey.json: composition.next_recommended must be a day or null")
     pa = journey.get("phenoage")
     if pa is not None:
+        if not isinstance(pa, dict) or set(pa) != PHENOAGE_KEYS or not ISO_DAY.match(str(pa.get("as_of") or "")):
+            raise SchemaError("journey.json: phenoage must be exactly {as_of, drivers, reference} — never a figure of his own")
+        ref = pa.get("reference")
         if (
-            not isinstance(pa, dict)
-            or set(pa) != PHENOAGE_KEYS
-            or not _is_num(pa.get("years"))
-            or not ISO_DAY.match(str(pa.get("as_of") or ""))
+            not isinstance(ref, dict)
+            or set(ref) != PHENOAGE_REFERENCE_KEYS
+            or not all(_is_num(ref[k]) for k in ("offset_low", "offset_high", "slope"))
         ):
-            raise SchemaError("journey.json: phenoage must be exactly {years, as_of, drivers}")
+            raise SchemaError("journey.json: phenoage.reference must be exactly {points, offset_low, offset_high, slope}")
+        pts = ref.get("points")
+        if (
+            not isinstance(pts, list)
+            or len(pts) < 2
+            or any(not isinstance(pt, dict) or set(pt) != PHENOAGE_POINT_KEYS or not all(_is_num(v) for v in pt.values()) for pt in pts)
+        ):
+            raise SchemaError("journey.json: phenoage.reference.points must be {at_years, reads_years, offset_years} numbers")
         for d in pa.get("drivers") or []:
             if not isinstance(d, dict) or not set(d) <= PHENOAGE_DRIVER_KEYS or not d.get("name"):
                 raise SchemaError(f"journey.json: bad phenoage driver {d!r}")

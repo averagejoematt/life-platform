@@ -35,6 +35,7 @@ byte-identical across journal-only variations.
 from __future__ import annotations
 
 import datetime as _dt
+import re
 import statistics
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -512,6 +513,37 @@ def _habits(table, wk: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _target_day(it: dict) -> str:
+    """The day a graded call was ABOUT — the day its evidence was read from — from the row alone (#5899).
+
+    Order: the point spec's ``evaluation.target_date``; the day the claim's own sentence names (the full claim,
+    not the 220-char dossier excerpt); the end of ``outcome_notes.window``. Nothing else: ``outcome_date`` is when
+    scoring ran, and a guessed target is the bug this exists to stop — so no day means no key, not a fallback."""
+    import json
+
+    from coach.prediction_windows import sentence_target_day
+
+    spec = it.get("evaluation")
+    day = str((spec.get("target_date") if isinstance(spec, dict) else "") or "")[:10]
+    if day:
+        return day
+    day = (sentence_target_day(it.get("claim_natural"), it.get("created_date")) or (None, None))[0]
+    if day:
+        return str(day)[:10]
+    try:
+        window = (json.loads(it.get("outcome_notes") or "{}") or {}).get("window")
+    except (TypeError, ValueError, AttributeError):
+        return ""
+    if isinstance(window, (list, tuple)) and window:
+        return str(window[-1] or "")[:10]
+    if isinstance(window, dict):
+        return str(window.get("end") or window.get("end_date") or "")[:10]
+    if isinstance(window, str):
+        days = re.findall(r"\d{4}-\d{2}-\d{2}", window)
+        return days[-1] if days else ""
+    return ""
+
+
 def _predictions(table, wk: Dict[str, Any], roster: Dict[str, str]) -> Dict[str, Any]:
     from boto3.dynamodb.conditions import Key
 
@@ -546,17 +578,19 @@ def _predictions(table, wk: Dict[str, Any], roster: Dict[str, str]) -> Dict[str,
             if status in ("confirmed", "refuted") and od and od <= wk["end"]:
                 rec["right" if status == "confirmed" else "wrong"] += 1
                 if od >= wk["start"]:
-                    graded.append(
-                        {
-                            "coach": roster.get(cid, cid),
-                            "coach_id": cid,
-                            "made": created,
-                            "graded": od,
-                            "claim": claim,
-                            "result": "right" if status == "confirmed" else "wrong",
-                            "evidence": _outcome_line(it),
-                        }
-                    )
+                    entry = {
+                        "coach": roster.get(cid, cid),
+                        "coach_id": cid,
+                        "made": created,
+                        "graded": od,
+                        "claim": claim,
+                        "result": "right" if status == "confirmed" else "wrong",
+                        "evidence": _outcome_line(it),
+                    }
+                    target = _target_day(it)
+                    if target:
+                        entry["target"] = target  # #5899: the day the call was about; `graded` is only when scoring ran
+                    graded.append(entry)
             if wk["start"] <= created <= wk["end"]:
                 made[cid] = made.get(cid, 0) + 1
             if created == GENESIS:

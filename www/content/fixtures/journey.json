@@ -360,7 +360,33 @@
     "value": 30.0
    }
   ],
-  "years": 31
+  "reference": {
+   "offset_high": -2.1,
+   "offset_low": -5.4,
+   "points": [
+    {
+     "at_years": 30,
+     "offset_years": -2.1,
+     "reads_years": 27.9
+    },
+    {
+     "at_years": 40,
+     "offset_years": -3.2,
+     "reads_years": 36.8
+    },
+    {
+     "at_years": 50,
+     "offset_years": -4.3,
+     "reads_years": 45.7
+    },
+    {
+     "at_years": 60,
+     "offset_years": -5.4,
+     "reads_years": 54.6
+    }
+   ],
+   "slope": 0.892
+  }
  },
  "progress_pct": 16.3,
  "projected_goal_date": "2027-05-20",

@@ -55,6 +55,11 @@ from coach.coach_nudge_engine import (
     STATUSES_WITH_RECORD,
     build_expired_ledger_item,
 )
+from emails.brief_lines import FOLDED
+
+# #5821: a note folded into the Morning Brief writes its NUDGE# record exactly as a sent one did, so its ledger row is
+# held to the same "the record exists" check (the engine's STATUSES_WITH_RECORD predates the fold).
+RECORD_STATUSES = (*STATUSES_WITH_RECORD, FOLDED)
 
 # #1964/#2811: the one Pacific frame and the one ISO parser. Both matter here —
 # a `DAY#` sk is the handler's PACIFIC calendar day (`now_pt.date()`), so both
@@ -190,7 +195,7 @@ def check_nudge_ledger_liveness(table, Check, tier, pt_now, *, stuck_hours=STUCK
         if status == STATUS_FAILED:
             failed.append(f"{sk} ({str(row.get('error') or 'no error recorded')[:160]})")
             continue
-        if status not in STATUSES_WITH_RECORD:
+        if status not in RECORD_STATUSES:
             continue
         terminal += 1
         nudge_pk, nudge_sk = row.get("nudge_pk"), row.get("nudge_sk")

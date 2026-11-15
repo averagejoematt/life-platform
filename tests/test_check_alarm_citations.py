@@ -139,7 +139,10 @@ def test_render_unreachable_degrades_honestly_not_a_false_clean():
 
 
 def test_main_exits_nonzero_on_uncited_and_zero_with_decoded(monkeypatch, capsys):
-    now = datetime(2026, 8, 2, tzinfo=timezone.utc)
+    # The alarm is 100h old against the SAME clock main() reads (#4848): a frozen 2026-08-02
+    # anchor read as >14d once real time passed it, and the #5934 non-decodable leg (correctly)
+    # refused --decoded on what this test means as a 100h red.
+    now = datetime.now(timezone.utc)
     monkeypatch.setattr(cac, "fetch_alarms", lambda: ([_alarm("uncited-alarm", 100, now)], None))
     monkeypatch.setattr(cac, "load_citations", lambda: {})
     # Freeze uncited_long_reds' `now` via a wrapper so the synthetic alarm reads as old
@@ -1533,3 +1536,78 @@ def test_render_reds_and_names_the_field_to_add():
     code, msg = cac.render([], None, undeclared=[("qa-smoke-failures", "cross_surface:vitals")])
     assert code == 1
     assert "cross_surface:vitals" in msg and '"cause"' in msg
+
+
+# ── #5934: >14d without a VALID citation blocks the wrap — --decoded cannot release it ──
+
+_NOW_5934 = datetime(2026, 11, 14, 18, 0, tzinfo=timezone.utc)
+
+
+def test_unowned_ancient_reds_predicate_5934():
+    """One test over every case (a parametrized test is one census gate PER case)."""
+    cases = [
+        ({}, {}, True),  # no entry at all
+        ({"a": {"citation": "prose, expires 2026-11-20"}}, {}, True),  # no #N
+        ({"a": {"citation": "#1 and #2"}}, {"1": "CLOSED", "2": "CLOSED"}, True),  # every #N closed
+        ({"a": {"citation": "#1 and #2"}}, {"1": "CLOSED", "2": "OPEN"}, False),  # one open owner suffices
+        ({"a": {"citation": "#1"}}, {}, False),  # unreadable state is UNKNOWN, never closed
+        ({"a": {"citation": "#1"}}, {"1": "OPEN"}, False),
+    ]
+    wrong = []
+    for citations, states, flagged in cases:
+        out = cac.unowned_ancient_reds([_alarm("a", 15 * 24 + 1, _NOW_5934)], citations, states, now=_NOW_5934)
+        if bool(out) is not flagged:
+            wrong.append((citations, states, out))
+    assert not wrong, wrong
+
+
+def test_unowned_ancient_reds_ignores_young_and_by_construction_5934():
+    young = _alarm("a", 14 * 24 - 1, _NOW_5934)
+    held = dict(_alarm("b", 30 * 24, _NOW_5934), by_construction=True)
+    assert cac.unowned_ancient_reds([young, held], {}, {}, now=_NOW_5934) == []
+
+
+def _wire_main_5934(monkeypatch, alarms, citations, states):
+    monkeypatch.setattr(cac, "fetch_alarms", lambda: (alarms, None))
+    monkeypatch.setattr(cac, "load_citations", lambda: citations)
+    monkeypatch.setattr(cac, "load_alarm_audience", lambda: {})
+    monkeypatch.setattr(cac, "fetch_alarm_history", lambda: ([], None))
+    monkeypatch.setattr(cac, "fetch_all_alarm_names", lambda: ({a["name"] for a in alarms}, None))
+    monkeypatch.setattr(cac, "fetch_issue_states", lambda refs: ({str(r): states.get(str(r), "OPEN") for r in refs}, None))
+    monkeypatch.setattr(cac, "fetch_qa_smoke_causes", lambda: ({}, None))
+
+
+def test_ancient_red_on_a_closed_issue_blocks_even_with_decoded_5934(monkeypatch, capsys):
+    """The must-fail control, through main(): an alarm lit 20 days whose only citation names a
+    CLOSED issue exits 1 WITH --decoded (the #5934 leg), while the same alarm re-pointed at an
+    OPEN issue — everything else identical — is released. The age is measured against the clock
+    main() reads, so the control cannot drift with wall time."""
+    start = datetime.now(timezone.utc) - timedelta(days=20)
+    alarm = {"name": "ancient-alarm", "updated": start.isoformat(), "transitioned": start.isoformat()}
+    fresh = (start + timedelta(days=1)).date().isoformat()
+    entry = {"citation": "#3759", "cause_observed": fresh}
+
+    _wire_main_5934(monkeypatch, [alarm], {"ancient-alarm": entry}, {"3759": "CLOSED"})
+    monkeypatch.setattr(sys, "argv", ["check_alarm_citations.py", "--decoded"])
+    assert cac.main() == 1
+    out = capsys.readouterr().out
+    assert "BLOCKS the wrap" in out and "ancient-alarm" in out and "#3759" in out
+    assert "--decoded acknowledged" not in out
+
+    _wire_main_5934(monkeypatch, [alarm], {"ancient-alarm": entry}, {"3759": "OPEN"})
+    assert cac.main() == 0, capsys.readouterr().out
+
+
+def test_a_young_dead_citation_stays_decodable_5934(monkeypatch, capsys):
+    """Scope control: the non-decodable leg is the >14d one only. A 4-day red on a closed
+    issue is still the #2996 finding — exit 1 bare, released by --decoded as before."""
+    start = datetime.now(timezone.utc) - timedelta(days=4)
+    alarm = {"name": "young-alarm", "updated": start.isoformat(), "transitioned": start.isoformat()}
+    entry = {"citation": "#1", "cause_observed": (start + timedelta(days=1)).date().isoformat()}
+    _wire_main_5934(monkeypatch, [alarm], {"young-alarm": entry}, {"1": "CLOSED"})
+    monkeypatch.setattr(sys, "argv", ["check_alarm_citations.py"])
+    assert cac.main() == 1
+    capsys.readouterr()
+    monkeypatch.setattr(sys, "argv", ["check_alarm_citations.py", "--decoded"])
+    assert cac.main() == 0
+    assert "--decoded acknowledged" in capsys.readouterr().out

@@ -133,7 +133,9 @@ def test_mutation_control_without_the_constraint_no_gate_is_written(monkeypatch)
     assert session_block.split(first)[0] and "Take an ECG" not in first
     assert not [m for m in BAND_MARKERS if m in "\n".join(e.notes for e in ir.exercises)]
     assert structured["exercises"], "the branches are still stored for adherence"
-    assert pick["hr_ceiling_bpm"] == recent_aerobic.HR_CEILING_BPM
+    # #5916 (owner ruling 2026-11-13): the walking HR cap is retired, so the pick carries no HR field on ANY day; what
+    # still separates this day from a constrained one is that no constraint is named on the pick.
+    assert not set(sc.HR_PICK_FIELDS) & set(pick) and "hr_fields_dropped_by" not in pick
 
 
 # ── box 3: a tripped protein_floor_missed omits the 🟢 branch ────────────────────
@@ -189,7 +191,10 @@ def test_the_cardio_pick_is_appended_with_the_talk_test_and_no_hr_fields(monkeyp
     assert not set(sc.HR_PICK_FIELDS) & set(pick) and pick["hr_fields_dropped_by"] == "hr_regime_change_2026_10_10"
     # the served stage-1 pick is the same constrained pick
     assert not set(sc.HR_PICK_FIELDS) & set(recent_aerobic.cardio_pick({"state": "read"}, "upper", DAY))
-    assert set(sc.HR_PICK_FIELDS) <= set(recent_aerobic.cardio_pick({"state": "read"}, "upper"))  # undated: unchanged
+    # #5916: the undated pick has no HR field either (the cap is retired) — its intensity is the talk test plus RPE
+    undated = recent_aerobic.cardio_pick({"state": "read"}, "upper")
+    assert not set(sc.HR_PICK_FIELDS) & set(undated) and undated["intensity"] == recent_aerobic.EASY_EFFORT_CUE
+    assert "hr_fields_dropped_by" not in undated  # mutation control: only a dated pick under the constraint names it
 
 
 # ── box 5: the hand-built routine is the fixture ───────────────────────────────

@@ -267,3 +267,74 @@ def test_paused_checks_are_reported_by_name():
             body = json.loads(json.load(f)["body"])
         assert body["paused"] == ["reader_truth:verdict"]
         assert sod.decide(path)[0] == "PASS"  # a pause is still not a failure
+
+
+# ---------------------------------------------------------------------------
+# 6. #5821 (owner ruling 2026-11-15): a content-truth-only failure is a digest line
+# ---------------------------------------------------------------------------
+# THE URGENCY BOUNDARY is this file's own partition: a deploy_health failure is the rollback
+# class (the site/API is broken now) and still emails at once; a run whose failures are all
+# content_truth becomes one line in the daily LP digest and sends no email of its own.
+
+
+class _FakeSES:
+    def __init__(self):
+        self.sent = []
+
+    def send_email(self, **kw):
+        self.sent.append(kw["Content"]["Simple"]["Subject"]["Data"])
+        return {"MessageId": "fake"}
+
+
+class _FakeSNS:
+    def __init__(self, fail=False):
+        self.lines, self.fail = [], fail
+
+    def publish(self, TopicArn, Message, **_kw):  # noqa: N803 — boto3 kwarg names
+        if self.fail:
+            raise RuntimeError("AuthorizationError: not authorized to perform sns:Publish")
+        assert TopicArn.endswith(":life-platform-alerts-digest"), TopicArn
+        self.lines.append(json.loads(Message))
+
+
+def _run_handler(monkeypatch, partitions, sns=None):
+    """Drive the REAL lambda_handler with one failing check per partition named."""
+
+    def fake_steps():
+        return [
+            (f"stub{i}", (lambda _p=p, _i=i: [qa.Check(f"stub:{_i}", "Stub", _p).fail(f"synthetic {_p} failure")]))
+            for i, p in enumerate(partitions)
+        ]
+
+    ses, sns = _FakeSES(), sns if sns is not None else _FakeSNS()
+    monkeypatch.setattr(qa, "check_steps", fake_steps)
+    monkeypatch.setattr(qa.closure_probe_qa, "check_closure_proof_probes", lambda *_a, **_k: [])
+    monkeypatch.setattr(qa, "ses", ses)
+    monkeypatch.setattr(qa, "sns", sns)
+    result = qa.lambda_handler({}, None)
+    return json.loads(result["body"]), ses, sns
+
+
+def test_content_truth_only_failures_are_a_digest_line_not_an_email(monkeypatch):
+    """THE control: no email, one digest line naming every failing check."""
+    body, ses, sns = _run_handler(monkeypatch, [qa.CONTENT_TRUTH, qa.CONTENT_TRUTH])
+    assert ses.sent == [], f"a content-truth-only run emailed on its own: {ses.sent}"
+    assert len(sns.lines) == 1 and sns.lines[0]["AlarmName"] == "qa-smoke: content-truth failures"
+    assert "Stub/stub:0" in sns.lines[0]["NewStateReason"] and "Stub/stub:1" in sns.lines[0]["NewStateReason"]
+    assert body["failed"] == 2 and body["failed_content_truth"] == 2
+    assert body["emailed"] is False and body["digested"] is True
+
+
+def test_a_deploy_health_failure_still_emails_at_once(monkeypatch):
+    """The urgent case: any deploy_health failure (alone or mixed) is the red email, no digest line."""
+    for partitions in ([qa.DEPLOY_HEALTH], [qa.DEPLOY_HEALTH, qa.CONTENT_TRUTH]):
+        body, ses, sns = _run_handler(monkeypatch, partitions)
+        assert len(ses.sent) == 1 and ses.sent[0].startswith("🔴 QA:"), partitions
+        assert sns.lines == [], f"{partitions}: an urgent run also queued a digest line"
+        assert body["emailed"] is True and body["failed_deploy_health"] == 1
+
+
+def test_a_failed_digest_publish_falls_back_to_the_email(monkeypatch):
+    """Fail towards delivery: qa-smoke's role without its DigestLine grant still mails the failure."""
+    body, ses, sns = _run_handler(monkeypatch, [qa.CONTENT_TRUTH], sns=_FakeSNS(fail=True))
+    assert len(ses.sent) == 1 and body["emailed"] is True and body["digested"] is False

@@ -4,7 +4,7 @@
 // goal with the platform's rate, interval and projection; "where this is heading"; the methods;
 // the rail. Every figure is the platform's (journey.json); the page places them, never recomputes.
 // Layers 2–3 (#5583): the pace with its interval, the ten-pound ladder, the body (DEXA · visceral ·
-// PhenoAge, never an age beside it), resting heart rate and HRV since day one read within device eras,
+// PhenoAge as a markers-only reference line, never a figure of his own), resting heart rate and HRV since day one read within device eras,
 // and the coaches' checked calls on the weight. The heart captions are plain means of the readings
 // shown, computed at build and said as such; nothing else is computed here.
 import { isDisputed, verified } from "../../../lib/disputed.js";
@@ -14,6 +14,7 @@ import Provenance from "../../../components/Provenance.astro";
 import Quote from "../../../components/Quote.astro";
 import { heartChart, heartWeeks, journeyCaption, journeyChart, ladderRows, ordinal, paceBar, rungChapters, visceralBand } from "../../../lib/journey.js";
 import { callOutcome, clip, dayInWords, num } from "../../../lib/format.js";
+import { offsetWords, referenceFigure, spanWords } from "../../../lib/phenoage.js";
 import { loadAll, loadJourney, loadSeries } from "../../../lib/snapshot.js";
 import { href, pathOf } from "../../../lib/url.js";
 
@@ -59,7 +60,11 @@ const band = C ? visceralBand(C.visceral_fat_lb) : null;
 const VF_MAX = 4; // the gauge runs 0–4 lb: low under 1, moderate 1 to 2, elevated over 2 — site-defined bands (the previous site's), not a clinical standard
 const vfAt = (v: number) => `${Math.min(97, Math.max(0, (v / VF_MAX) * 100)).toFixed(1)}%`;
 const missingScan = Boolean(C && C.next_recommended && J.as_of && C.next_recommended < J.as_of);
-const PA = ok ? J.phenoage || null : null;
+// PhenoAge is markers-only since the owner's ruling of 2026-11-14 (lib/phenoage.js): the snapshot carries no figure of his own.
+const PA = ok && J.phenoage && J.phenoage.reference ? J.phenoage : null;
+const paWords = PA ? offsetWords(PA.reference) : null;
+const paSpan = PA ? spanWords(PA.reference) : null;
+const paFigure = PA ? referenceFigure(PA.reference) : null;
 const BP = ok ? J.bp || null : null;
 const heartSpec = [
   { id: "resting_hr", name: "Resting heart rate", unit: "bpm" },
@@ -170,7 +175,7 @@ const headline = ok
         <div class="wrap">
           <h2>Every weigh-in, on one scale</h2>
           <p class="muted" style="font-size:14px;margin-top:8px;max-width:80ch">
-            The whole distance is the frame: the top line is where he started, the dashed line is the goal. Move along the readings to see each morning; the cobalt line is the 7-day mean, read within each side of a device change.
+            The whole distance is the frame (a phone opens on the readings): the top line is where he started, the dashed line is the goal. Move along the readings to see each morning; the cobalt line is the 7-day mean, read within each side of a device change.
           </p>
           <p class="srOnly" id="journey-chart-help">
             The chart can be read with the keyboard: Tab to it, then the left and right arrow keys move between weigh-ins, Home and End jump to the first and last, Escape hides the reading.
@@ -363,11 +368,19 @@ const headline = ok
             ) : (
               <p class="callout">The platform did not serve a body-composition scan for this snapshot.</p>
             )}
-            {PA && (
+            {PA && paWords && (
               <details class="more">
                 <summary>
-                  {`PhenoAge, a biological-age estimate · ${num(PA.years, 0)}, from the blood draw of ${dayInWords(PA.as_of)}${PA.as_of < J.start_date ? " (before day one)" : ""}`}
+                  {`PhenoAge, a blood-marker formula · for a reference adult these nine markers read ${paWords}, from the blood draw of ${dayInWords(PA.as_of)}${PA.as_of < J.start_date ? " (before day one)" : ""}`}
                 </summary>
+                {paFigure && (
+                  <figure class="pa-ref" style="margin:10px 0 4px">
+                    <Fragment set:html={paFigure} />
+                    <figcaption class="label" style="margin-top:4px">
+                      A person of each age with these nine markers · solid: the formula's reading · dashed: the calendar · years
+                    </figcaption>
+                  </figure>
+                )}
                 <div class="rows">
                   {PA.drivers.map((d: any) => (
                     <span>
@@ -382,10 +395,11 @@ const headline = ok
                   ))}
                 </div>
                 <p class="muted" style="font-size:13px;margin-top:8px;max-width:62ch">
-                  Levine's Phenotypic Age (Aging, 2018): the {PA.drivers.length} blood markers above and the chronological age go into a published mortality score, which is turned back into
-                  years. The platform computes it per blood draw (/api/phenoage); this one is from {dayInWords(PA.as_of)}. It is not his age: the chronological age is an input
-                  to the formula and is never published, so no gap between the two can be read here. Each marker is marked by which way it pushes the estimate. A
-                  population-level estimate, volatile to single markers.
+                  Levine's Phenotypic Age (Aging, 2018) turns {PA.drivers.length} blood markers and a person's age into a published mortality score, and that score back into years. His own
+                  figure is not published. The formula moves {num(PA.reference.slope, 2)} years for every year of age and the markers above are public, so the number, at any precision,
+                  would give his age away. What is drawn is the part the blood draw decides: what these markers return for a person of {paSpan}, from the draw of{" "}
+                  {dayInWords(PA.as_of)}. Where he sits on the line is not shown. Each marker is marked by which way it pushes the estimate. A population-level estimate, volatile to single
+                  markers.
                 </p>
               </details>
             )}

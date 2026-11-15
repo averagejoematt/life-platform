@@ -737,6 +737,9 @@ def _write_empty_days(table, candidates: list, api_activity_count: int, stored_b
 
 
 def _emit_store_vendor_metrics(absent_count: int, changed_count: int, emptied_count: int) -> None:
+    # #5888: only EmptiedDayCount is emitted — it audits the one WRITE this pass makes. The absent/changed counts were
+    # unalarmed, undashboarded series (+2 over the namespace budget); they stay in the [RECONCILE] warning log below
+    # (non-zero cases only) and in the run's report body, which is where a human reads them.
     try:
         _cw.put_metric_data(
             Namespace="LifePlatform/IngestReconciliation",
@@ -747,11 +750,7 @@ def _emit_store_vendor_metrics(absent_count: int, changed_count: int, emptied_co
                     "Value": float(value),
                     "Unit": "Count",
                 }
-                for name, value in (
-                    ("StoreOnlyActivityCount", absent_count),
-                    ("ChangedActivityCount", changed_count),
-                    ("EmptiedDayCount", emptied_count),
-                )
+                for name, value in (("EmptiedDayCount", emptied_count),)
             ],
         )
     except Exception as e:  # metric emission must never fail the run

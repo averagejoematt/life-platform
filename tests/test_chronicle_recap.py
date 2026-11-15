@@ -32,6 +32,7 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas", "emails"))
 import chronicle_approve_lambda as approve  # noqa: E402
 import wednesday_chronicle_lambda as chron  # noqa: E402
 from ai import budget_guard  # noqa: E402
+from emails import chronicle_recap as recap_mod  # noqa: E402
 from experiment import phase_taxonomy  # noqa: E402
 from web import site_api_coach as capi  # noqa: E402
 
@@ -147,6 +148,76 @@ def test_a_verbatim_title_carrying_a_figure_is_not_a_raw_vital_4537(monkeypatch)
     # a title that is NOT in the installment list gets no exemption
     _mock_llm(monkeypatch, dict(ok, story_so_far='Week 1, "81% and 3/10", landed.'))
     assert chron.build_recap(_data(prev=prev)) is None
+
+
+# ── #5933: the guard reads spelled units, decimals and where_we_are_now, and GROUNDS each figure ──
+_FIGURE_HISTORY = [
+    {
+        "date": "2026-06-24",
+        "week_number": 2,
+        "title": "The Week That Decided",
+        "status": "published",
+        "content_markdown": "He stepped on the scale at 241.6 pounds, down from 250 lbs, and logged 1,900 calories a day.",
+    },
+    {"date": "2026-06-17", "week_number": 1, "title": "Monday Was a 49", "status": "published", "content_markdown": "Week one prose."},
+]
+
+
+def _figure_recap(**over):
+    base = {
+        "story_so_far": "He began at 250 lbs and the scale started to move.",
+        "recent_beats": [{"week": 2, "date": "2026-06-24", "beat": "The scale read 241.6 pounds."}],
+        "where_we_are_now": "Two weeks in, he sits at 241.6 pounds.",
+        "threads_to_watch": ["Can 1,900 calories hold?"],
+    }
+    base.update(over)
+    return base
+
+
+def test_recap_vital_regex_reads_spelled_units_and_decimals_5933():
+    """The detector itself: every form the pre-#5933 regex let through is now a vital span."""
+    forms = ["318.9 pounds", "318.9 lbs", "318 pounds", "17.6 pounds out", "1,900 calories", "92.5 kg", "8 pounds"]
+    missed = [f for f in forms if recap_mod._recap_raw_vital(f"He was at {f} that week.") is None]
+    assert not missed, f"the raw-vital detector cannot see: {missed}"
+    assert recap_mod._recap_raw_vital("Two weeks in, the baseline is forming.") is None
+
+
+def test_a_wrong_figure_in_where_we_are_now_is_dropped_5933(monkeypatch):
+    """The contract: `where_we_are_now` is checked against the installment text, like every other field."""
+    # control — every figure is printed in an installment, so nothing is dropped
+    _mock_llm(monkeypatch, _figure_recap())
+    r = chron.build_recap(_data(prev=_FIGURE_HISTORY))
+    assert r["where_we_are_now"] == "Two weeks in, he sits at 241.6 pounds."
+    assert len(r["recent_beats"]) == 1 and r["threads_to_watch"] == ["Can 1,900 calories hold?"]
+    assert r["story_so_far"].startswith("He began at 250 lbs")
+
+    # a wrong figure in where_we_are_now — spelled unit, decimal — is dropped; the rest of the recap survives
+    wrong = {
+        "spelled unit + decimal": "Two weeks in, he sits at 239.2 pounds.",
+        "abbreviated unit + decimal": "Two weeks in, he sits at 239.2 lbs.",
+        "spelled unit, whole number": "Two weeks in, he sits at 239 pounds.",
+        "a computed difference": "Two weeks in, he is 8.4 pounds down.",
+    }
+    kept = {}
+    for label, text in wrong.items():
+        _mock_llm(monkeypatch, _figure_recap(where_we_are_now=text))
+        r = chron.build_recap(_data(prev=_FIGURE_HISTORY))
+        if r is None or r["where_we_are_now"] != "" or len(r["recent_beats"]) != 1:
+            kept[label] = r and r["where_we_are_now"]
+    assert not kept, f"a figure no installment printed survived in where_we_are_now (or took the recap with it): {kept}"
+
+    # the same rule reaches the other fields: an ungrounded beat and thread are removed, an ungrounded story rejects
+    _mock_llm(
+        monkeypatch,
+        _figure_recap(
+            recent_beats=[{"week": 2, "date": "2026-06-24", "beat": "The scale read 239.2 pounds."}],
+            threads_to_watch=["Can 1,900 calories hold?", "Will he reach 230 pounds?"],
+        ),
+    )
+    r = chron.build_recap(_data(prev=_FIGURE_HISTORY))
+    assert r["recent_beats"] == [] and r["threads_to_watch"] == ["Can 1,900 calories hold?"]
+    _mock_llm(monkeypatch, _figure_recap(story_so_far="He began at 262.5 pounds."))
+    assert chron.build_recap(_data(prev=_FIGURE_HISTORY)) is None
 
 
 def test_thin_history_blanks_beats(monkeypatch):

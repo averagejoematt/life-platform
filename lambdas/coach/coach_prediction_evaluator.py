@@ -73,6 +73,7 @@ from coach.grading_quality import EVALUATOR_VERSION as ALGO_VERSION  # noqa: E40
 # `if bayesian_update and coach_id` guard below already honours — a claim of Matthew's
 # must never move a coach's Bayesian confidence or write to a coach's LEARNING# trail.
 DIARY_CLAIMS_PK = f"{USER_PREFIX}diary_claims"
+HYPOTHESES_PK = f"{USER_PREFIX}hypotheses"  # #5518: read-only, for the pre-registration overdue count
 
 # Coach IDs — exhaustive list of all coaches that can issue predictions, derived
 # from the canonical persona registry, never re-typed (#2334; guard:
@@ -126,6 +127,7 @@ from coach import (  # noqa: E402  (#4585 baseline; #3553 ledger; #4541 counts; 
     grading_quality,  # #5533: zero-entry days, the HR regime marker, the quality flags
     prediction_count_grader,
     prediction_direction_window as direction_window,  # noqa: E402  (#4617: a direction call graded across its window)
+    prereg_overdue,  # #5518: a sealed row is graded whatever its stamp; the overdue dead-man
 )
 from coach.prediction_grading import (  # noqa: E402  — #2221: the EWMA observation floor + the provisional-grade rules, reasoned out there
     EWMA_MIN_OBSERVATIONS,
@@ -276,8 +278,9 @@ def _fetch_predictions():
                 },
             }
             while True:
-                resp = table.query(**with_phase_filter(kwargs))
-                items = [_decimal_to_float(i) for i in resp.get("Items", [])]
+                # #5518: the phase filter applied item-level, so a sealed row stamped pilot by the wall clock is still graded.
+                resp = table.query(**with_phase_filter(kwargs, include_pilot=True))
+                items = [_decimal_to_float(i) for i in resp.get("Items", []) if prereg_overdue.grader_visible(i)]
                 for item in items:
                     status = item.get("status", "")
                     if not _is_gradeable(item.get("evaluation", {})):
@@ -1573,6 +1576,13 @@ def lambda_handler(event: dict, context) -> dict:
             liveness = emit_grading_liveness(stats, len(predictions), today_str, ungradeable_count=len(ungradeable))
         except Exception as e:
             logger.error("Grading-liveness emit failed (non-fatal): %s", e)
+        # #5518: the pre-registration dead-man — a failed scan emits nothing, and the alarm hears the silence.
+        try:
+            liveness["prereg_overdue"] = prereg_overdue.emit(
+                _cw, prereg_overdue.scan(table, GRADING_COACH_IDS, HYPOTHESES_PK, today_str), logger
+            )
+        except Exception as e:
+            logger.error("[#5518] pre-registration overdue scan failed — no datapoint, so prereg-overdue breaches: %s", e)
 
         return {
             "statusCode": 200,

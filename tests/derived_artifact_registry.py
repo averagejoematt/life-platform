@@ -246,6 +246,14 @@ ARTIFACTS: dict[str, dict] = {
     # Re-running these is a content or deploy decision, not a reconciliation. A drift
     # guard would red on deliberate editorial state. Each entry names the step, because
     # "someone runs it" is exactly how the MCP catalog above went a month stale.
+    "scripts/gen_live_settings_doc_5861.py": _builder(
+        "scripts/gen_live_settings_doc_5861.py",
+        step="by hand after editing lambdas/training/live_settings.py (#5861 fix round 9)",
+        reason=(
+            "Writes the generated settings/heuristics block of docs/coaching/ENGINE_ARCHITECTURE.md and WEEKLY_STRUCTURE.md from "
+            "live_settings; tests/test_live_settings_doc_5861.py fails the build on any drift, so a stale block cannot merge."
+        ),
+    ),
     "scripts/v4_build_game_explained.py": _builder(
         "scripts/v4_build_game_explained.py",
         step="ci-cd.yml run_generators()",
@@ -499,6 +507,18 @@ ARTIFACTS: dict[str, dict] = {
             "the module names a committed docs/ literal and also calls open(..., 'w'). Regenerating the "
             "record from this script would defeat the check, which exists to red when the live set "
             "drifts from what the owner recorded."
+        ),
+    ),
+    "scripts/v9_privacy_policy_twin.py": _excluded(
+        "scripts/v9_privacy_policy_twin.py",
+        reason=(
+            "The #5920 privacy-policy twin. It only READS site/privacy/index.html (the maintained policy, "
+            "the one editable source) and WRITES www/src/privacy/policy.json, which is NOT under an "
+            "artifact root — the same shape as sync_constants_from_config above. Discovery sees the read "
+            "because the module names the source literal and also writes. The twin is still drift-held, "
+            "outside this registry's two lanes: tests/test_privacy_policy_twin_5920.py asserts the "
+            "committed twin equals build() in pr-checks.yml's required full unit suite, which carries no "
+            "path filter, so the PR that edits the policy without regenerating is the one that reds."
         ),
     ),
 }

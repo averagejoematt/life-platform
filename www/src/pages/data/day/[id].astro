@@ -32,7 +32,7 @@ import {
   tileValue,
   unservedText,
 } from "../../../lib/day.js";
-import { callOutcome, dayInWords, num } from "../../../lib/format.js";
+import { callOutcome, chapterCovers, dayInWords, heldCallWords, num } from "../../../lib/format.js";
 import { VISIBLE_CAP, callsAboutDay, leadLine } from "../../../lib/day_coaching.js";
 import StatusTag from "../../../components/StatusTag.astro";
 import { gradeNoteRows } from "../../../lib/corrections.js";
@@ -110,11 +110,19 @@ const engine = d.engine ? { line: engineLine(d.engine), rows: engineRows(d.engin
 // MacroFactor totals; the absence rule covers a missing day, not a stub). Say what the nutrition number measures there.
 const gapPillar = food && food.logging_gap && d.engine ? d.engine.pillars.find((p: any) => p.name === "nutrition" && p.score != null) || null : null;
 const weekSpan = chapter && chapter.week_start && chapter.week_end ? `${words(chapter.week_start)} to ${words(chapter.week_end)}` : null;
+// A published chapter's own dates (2026-11-14): the days it covers and the day it was approved — its `date` is a DATA
+// date and is never called the publication. A day of the program week outside the covered days is not in the chapter.
+const chapterCovered = chapter && chapter.status === "published" ? chapterCovers(chapter) : null;
+const chapterPublishedOn = chapter && chapter.status === "published" && chapter.published_at ? words(chapter.published_at) : null;
+const chapterDataThrough = chapter && chapter.status === "published" && !chapterPublishedOn ? words(chapter.data_through || chapter.date) : null;
+const inChapter = !(chapter && chapter.covers_start && chapter.covers_end) || (d.date >= chapter.covers_start && d.date <= chapter.covers_end);
 const after = next ? next.coach_lines : [];
 const nearest = d.calls_settled.length ? null : nearestGraded(days, i);
 const predHref = (id: string) => (all.get("prediction", id) ? href(pathOf("prediction", id)) : null);
 // A withheld claim's chip carries the hold's own sentence ("Not quoted: …"), authored copy, never the coach's words (#5609).
 const heldWords = (id: string) => Boolean(all.get("prediction", id)?.claim_withheld);
+// A withheld call reads as its frozen test when one is served (lib/format.js::heldCallWords), else the hold's sentence.
+const heldText = (id: string, fallback: string) => heldCallWords(all.get("prediction", id)) || fallback;
 // Owner rulings 2026-11-03: a verdict under classification review is printed as graded, with the dispute beside it.
 const disputedNote = (id: string) => (isDisputed(all.get("prediction", id)) ? ` · ${DISPUTED_NOTE}` : "");
 const coachHref = (id: string) => (all.get("coach", id) ? href(pathOf("coach", id)) : null);
@@ -333,6 +341,11 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                   {night.efficiency != null && ` Efficiency ${num(night.efficiency, 1)} percent.`}
                   {night.score != null && ` Sleep score ${num(night.score, 0)}.`}
                 </p>
+                {bed && bed.provisional === true && (
+                  <p class="small" data-night-provisional>
+                    <b>Still recording.</b> The mattress had not finished this night when it was read, so its hours, score and efficiency are provisional.
+                  </p>
+                )}
                 {night.deep_pct != null && night.rem_pct != null && night.light_pct != null && (
                   <>
                     <div class="stages" role="img" aria-label={stagesLabel(night)}>
@@ -661,7 +674,7 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                       {disputedNote(c.prediction_id)}
                     </span>
                     <span>
-                      {c.coach_name}: {heldWords(c.prediction_id) ? c.claim_short : <Quote text={c.claim_short} />}
+                      {c.coach_name}: {heldWords(c.prediction_id) ? heldText(c.prediction_id, c.claim_short) : <Quote text={c.claim_short} />}
                     </span>
                   </a>
                 ))}
@@ -680,7 +693,7 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                           {disputedNote(c.prediction_id)}
                         </span>
                         <span>
-                          {c.coach_name}: {heldWords(c.prediction_id) ? c.claim_short : <Quote text={c.claim_short} />}
+                          {c.coach_name}: {heldWords(c.prediction_id) ? heldText(c.prediction_id, c.claim_short) : <Quote text={c.claim_short} />}
                         </span>
                       </a>
                     ))}
@@ -698,7 +711,7 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                     <a class="callchip" href={predHref(c.prediction_id)}>
                       <span class="k">settles {words(c.due_date)}</span>
                       <span>
-                        {c.coach_name}: {heldWords(c.prediction_id) ? c.text : <Quote text={c.text} />}
+                        {c.coach_name}: {heldWords(c.prediction_id) ? heldText(c.prediction_id, c.text) : <Quote text={c.text} />}
                       </span>
                     </a>
                   ))}
@@ -735,16 +748,29 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                       <span class="mono">{weekSpan}</span>
                     </span>
                   )}
-                  {chapter.status === "published" && (
+                  {chapterCovered && (
+                    <span>
+                      <span>The chapter covers</span>
+                      <span class="mono">{chapterCovered}</span>
+                    </span>
+                  )}
+                  {chapterPublishedOn && (
                     <span>
                       <span>Published</span>
-                      <span class="mono">{words(chapter.date)}</span>
+                      <span class="mono">{chapterPublishedOn}</span>
+                    </span>
+                  )}
+                  {chapterDataThrough && (
+                    <span>
+                      <span>Data through</span>
+                      <span class="mono">{chapterDataThrough}</span>
                     </span>
                   )}
                 </div>
                 {chapter.status === "published" ? (
                   <p style="margin-top:12px">
-                    This day's figures appear in the chapter; <a href={href(pathOf("chapter", chapter.id))}>read {chapter.week_label}</a>.
+                    {inChapter ? "This day's figures appear in the chapter; " : "This day falls outside the days the chapter covers; "}
+                    <a href={href(pathOf("chapter", chapter.id))}>read {chapter.week_label}</a>.
                   </p>
                 ) : chapter.status === "skipped" ? (
                   <div class="empty" style="margin-top:12px">

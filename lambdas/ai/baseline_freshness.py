@@ -73,6 +73,70 @@ _BASELINE_FRAMING_RE = re.compile(
     re.IGNORECASE,
 )
 
+# ── #5933: the ORIGIN idiom — "from X lbs to Y lbs", "down from X lbs" ────────
+# The framing list above matches WORDS ("starting weight", "started at"). The
+# 2026-10-31 weekly read used none of them: "a 3.9 lb per week fat loss that has
+# brought him from 305 lbs to 296.1 lbs". 305 was a real mid-cycle weigh-in, so
+# the number gate passed it (it was in the allow-list) and this gate never looked
+# (no framing word) — yet an unlabelled "from X" is read as where he STARTED, and
+# the journey started 22 lb higher. The claim's SHAPE is the framing: a body weight
+# in the "from" slot of a from-to pair, or after down/fallen/dropped/brought-him.
+#
+# Three exclusions keep the class on body-weight origin claims:
+#   1. a plausibility band around the baseline (`_ORIGIN_BAND`) — "from 20 lbs to
+#      31 lbs lost" and a 35 lb dumbbell are not body weights;
+#   2. strength vocabulary in the sentence (`_LIFT_NOUN_RE`) — "his deadlift went
+#      from 185 lbs to 225 lbs" is a load, and loads sit inside the band;
+#   3. a LABELLED window in the sentence ("over the last two weeks", "since
+#      October 13") — the owner's labelled-window ruling (#4547): a dated window
+#      is an honest claim about that window. A label that spans the whole journey
+#      ("in the last eight weeks" on day 56, "since the experiment began", "since
+#      <the genesis date>") is not a window, and X must then be the journey start.
+#
+# KNOWN UNCOVERED, stated rather than papered over: whether a labelled window's
+# X is the weight that window really opened at. That needs the weigh-in series,
+# which this pure module is never handed; the number gate still requires X to be
+# a figure in the data.
+_LB_UNIT = r"\s*(?:lbs?|pounds?)\b"
+_ORIGIN_NUM = r"\d{2,3}(?:\.\d+)?"
+_APPROX = r"(?:(?:about|around|roughly|nearly|approximately|almost|just\s+(?:over|under))\s+)?"
+_ORIGIN_RES = (
+    # "from 305 lbs to 296.1 lbs" / "from 305.4 to 296.1 lbs" / "from 305 lbs down to 296"
+    re.compile(
+        r"\bfrom\s+" + _APPROX + r"(?P<x>" + _ORIGIN_NUM + r")(?P<xu>" + _LB_UNIT + r")?"
+        r"\s*,?\s+(?:all\s+the\s+way\s+)?(?:down\s+)?to\s+" + _APPROX + _ORIGIN_NUM + r"(?P<yu>" + _LB_UNIT + r")?",
+        re.IGNORECASE,
+    ),
+    # "down from 305.4 lbs" / "fallen from 305 lbs" / "brought him from 305 lbs"
+    re.compile(
+        r"\b(?:down|fallen|fell|falling|dropped|dropping|"
+        r"brought\s+(?:him|me|you|us|them|it|(?:his|my|your|the)\s+(?:body\s*)?weight)|taken\s+(?:him|me|you|us|them))"
+        r"\s+from\s+" + _APPROX + r"(?P<x>" + _ORIGIN_NUM + r")(?P<xu>" + _LB_UNIT + r")",
+        re.IGNORECASE,
+    ),
+)
+_ORIGIN_BAND = (0.6, 1.4)  # x / baseline — outside it the figure is not a body weight
+_LIFT_NOUN_RE = re.compile(
+    r"\b(?:squats?|deadlifts?|bench|rdls?|lunges?|curls?|kettlebells?|dumbbells?|barbells?|e?1rm|one-rep|reps?|"
+    r"pull-?ups?|chin-?ups?|hip\s+thrusts?|farmer|sled|(?:leg|overhead|shoulder)\s+press|working\s+(?:weight|sets?)|top\s+sets?|"
+    r"carry|carries)\b",
+    re.IGNORECASE,
+)
+_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+|\n+")
+_WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
+
+
+def _sentence_around(text: str, pos: int) -> str:
+    """The sentence containing offset ``pos`` (a decimal point is not a boundary)."""
+    start = 0
+    for m in _SENTENCE_SPLIT_RE.finditer(text):
+        if m.end() <= pos:
+            start = m.end()
+        elif m.start() >= pos:
+            return text[start : m.start()]
+    return text[start:]
+
+
 # "Day N" experiment-day framing. N is captured; N==0 is treated as a non-claim
 # for the pre-start case (a "Day 0"/countdown framing is the CORRECT pre-start form).
 _DAY_N_RE = re.compile(r"\bday\s+(\d{1,4})\b", re.IGNORECASE)
@@ -344,6 +408,141 @@ def _span_to_days(n_token: str, unit_token: str):
     return n * _SPAN_UNIT_DAYS.get((unit_token or "").strip().lower(), 1)
 
 
+# ── #5933: is the origin figure's window LABELLED? ──────────────────────────
+_WINDOW_N = r"\d{1,3}|" + "|".join(sorted(_WORD_NUMBERS, key=len, reverse=True)) + r"|few|couple\s+of"
+_WINDOW_UNIT = r"days?|weeks?|months?|fortnight"
+_WINDOW_SPAN_RES = (
+    # "over the last two weeks" / "the past 17 days" / "last week"
+    re.compile(r"\b(?:last|past|previous)\s+(?:(?P<n>" + _WINDOW_N + r")\s+)?(?P<unit>" + _WINDOW_UNIT + r")\b", re.IGNORECASE),
+    # "in 17 days" / "in just two weeks"
+    re.compile(
+        r"\b(?:in|over|across|within)\s+(?:just\s+|only\s+)?(?P<n>" + _WINDOW_N + r")\s+(?P<unit>" + _WINDOW_UNIT + r")\b", re.IGNORECASE
+    ),
+    # "two weeks ago"
+    re.compile(r"\b(?P<n>" + _WINDOW_N + r")\s+(?P<unit>" + _WINDOW_UNIT + r")\s+ago\b", re.IGNORECASE),
+    # "this week" / "this month"
+    re.compile(r"\bthis\s+(?P<unit>week|month|fortnight)\b", re.IGNORECASE),
+)
+_WINDOW_WORD_RE = re.compile(r"\b(?:yesterday|week[- ]over[- ]week|day[- ]over[- ]day)\b", re.IGNORECASE)
+_WINDOW_SINCE_RE = re.compile(r"\bsince\s+(?P<obj>[^,.;!?\n]{0,40})", re.IGNORECASE)
+_SINCE_DATED_RE = re.compile(
+    r"^(?:last\s+|this\s+(?:past\s+)?)?(?:" + "|".join(_WEEKDAYS) + r")\b"
+    r"|^(?:(?:early|mid|late)[- ]?\s*)?(?:" + "|".join(_MONTHS) + r"|" + "|".join(m[:3] for m in _MONTHS) + r")\b"
+    r"|^(?:yesterday|last\s+(?:week|month))\b"
+    r"|^day\s+(?P<day>\d{1,4})\b"
+    r"|^\d{4}-\d{2}-\d{2}\b",
+    re.IGNORECASE,
+)
+# Whole-journey scope: with any of these in the sentence the "from X" IS the journey start.
+_JOURNEY_SCOPE_RE = re.compile(
+    r"\bsince\s+(?:the\s+|this\s+|my\s+|our\s+|his\s+)?(?:experiment|start|beginning|outset|reset|restart|genesis|launch|cycle)\b"
+    r"|\bsince\s+(?:he|i|we|you|it)\s+(?:started|began)\b"
+    r"|\bsince\s+day\s+(?:1|one)\b"
+    r"|\b(?:of|into)\s+(?:the|this|my|our|his)\s+(?:experiment|journey|cycle)\b"
+    r"|\b(?:whole|entire|full)\s+(?:experiment|journey|cycle|run)\b"
+    r"|\b(?:overall|in\s+total|all\s+told|to\s+date|so\s+far)\b",
+    re.IGNORECASE,
+)
+_WINDOW_UNIT_DAYS = {"day": 1, "week": 7, "month": 30, "fortnight": 14}
+
+
+def _labels_a_window(sentence: str, *, expected_day, start_date_iso: str) -> bool:
+    """True when ``sentence`` names a window SHORTER than the journey (#5933, #4547).
+
+    ``expected_day`` is the 1-indexed experiment day (None pre-start or when the
+    anchors are unparseable). A span at least as long as the days elapsed is the
+    whole journey wearing a window's clothes and is not a label.
+    """
+    if _JOURNEY_SCOPE_RE.search(sentence):
+        return False
+    if _WINDOW_WORD_RE.search(sentence):
+        return True
+    for rx in _WINDOW_SPAN_RES:
+        for m in rx.finditer(sentence):
+            gd = m.groupdict()
+            unit = _WINDOW_UNIT_DAYS.get(gd["unit"].lower().rstrip("s"), 1)
+            tok = re.sub(r"\s+", " ", (gd.get("n") or "1").lower())
+            n = 3 if tok in ("few", "couple of") else _WORD_NUMBERS.get(tok)
+            if n is None:
+                try:
+                    n = int(tok)
+                except ValueError:
+                    continue
+            if expected_day is None or n * unit < expected_day:
+                return True
+    for m in _WINDOW_SINCE_RE.finditer(sentence):
+        obj = m.group("obj").strip()
+        dated = _SINCE_DATED_RE.search(obj)
+        if not dated or _mentions_genesis(obj, start_date_iso):
+            continue
+        if dated.group("day") is not None and int(dated.group("day")) <= 1:
+            continue
+        return True
+    return False
+
+
+def origin_idiom_candidates(text: str, *, baseline: float, expected_day, start_date_iso: str) -> list:
+    """Body-weight ORIGIN claims in ``text`` that must equal the journey start (#5933).
+
+    Returns ``[(offset_of_x, value, matched_phrase)]`` — the weight in the "from"
+    slot of a from-to pair or after down/fallen/dropped/brought-him, minus the three
+    exclusions documented at ``_ORIGIN_RES`` (not a body weight, a lift, a labelled
+    window). The caller compares each value to the baseline.
+    """
+    out = []
+    seen = set()
+    for rx in _ORIGIN_RES:
+        for m in rx.finditer(text):
+            gd = m.groupdict()
+            if not (gd.get("xu") or gd.get("yu")):
+                continue  # "from 12 to 14" carries no weight unit at all
+            pos = m.start("x")
+            if pos in seen:
+                continue
+            try:
+                val = float(gd["x"])
+            except ValueError:
+                continue
+            if not (_ORIGIN_BAND[0] * baseline <= val <= _ORIGIN_BAND[1] * baseline):
+                continue
+            sentence = _sentence_around(text, pos)
+            if _LIFT_NOUN_RE.search(sentence):
+                continue
+            if _labels_a_window(sentence, expected_day=expected_day, start_date_iso=start_date_iso):
+                continue
+            seen.add(pos)
+            out.append((pos, val, m.group(0).strip()))
+    return out
+
+
+def _origin_findings(
+    text: str, *, baseline: float, tolerance: float, seen_tokens: set, generation_date_iso: str, start_date_iso: str
+) -> list:
+    """The ``stale_baseline`` findings of the origin idiom (#5933). ``seen_tokens`` holds the
+    offsets the word-framing pass already judged, so one weight is reported once."""
+    findings = []
+    _, origin_day = _phase_for(generation_date_iso, start_date_iso)
+    for ws, val, phrase in origin_idiom_candidates(text, baseline=baseline, expected_day=origin_day, start_date_iso=start_date_iso):
+        if ws in seen_tokens:
+            continue
+        seen_tokens.add(ws)
+        if abs(val - baseline) > tolerance:
+            findings.append(
+                {
+                    "type": "stale_baseline",
+                    "framing": "origin",
+                    "claimed": round(val, 4),
+                    "expected": round(baseline, 4),
+                    "detail": (
+                        f'the narrative says "{phrase}" with no window named, which reads as where the journey '
+                        f"started, but the journey started at {baseline:g} lb — name the window {val:g} lb belongs to "
+                        f"(e.g. 'over the last two weeks') or measure from the start"
+                    ),
+                }
+            )
+    return findings
+
+
 def absence_span_findings(text: str, *, known_absence_days: dict = None) -> list:
     """#2756: a narrated ABSENCE span must match the measured one.
 
@@ -467,6 +666,10 @@ def baseline_freshness_findings(
       "started at", "Day 1 weight", …) that disagrees with `baseline_lbs` by more
       than `weight_tolerance_lbs`. Current-weight mentions carry no baseline framing
       and never flag. Skipped entirely when `baseline_lbs` is None.
+      #5933: the ORIGIN idiom is the same class — an unlabelled "from X lbs to Y lbs",
+      "down from X lbs", "fallen from X lbs" or "brought him from X lbs" claims X as
+      the journey start (findings carry ``"framing": "origin"``); a sentence that
+      names a window shorter than the journey, or a lift, is not a candidate.
     - "stale_phase": a "Day N" experiment-day framing that disagrees with the true
       phase of `generation_date_iso`. If pre_start (gen < start): ANY "Day N" (N>=1)
       is a finding — correct framing is the pre-start countdown. If in-experiment:
@@ -525,6 +728,17 @@ def baseline_freshness_findings(
                             ),
                         }
                     )
+            # #5933 — the origin idiom: an unlabelled "from X lbs (to Y)" claims X as the start.
+            findings.extend(
+                _origin_findings(
+                    text,
+                    baseline=baseline,
+                    tolerance=weight_tolerance_lbs,
+                    seen_tokens=seen_tokens,
+                    generation_date_iso=generation_date_iso,
+                    start_date_iso=start_date_iso,
+                )
+            )
 
     # ── stale_phase ───────────────────────────────────────────────────────────
     phase, expected_day = _phase_for(generation_date_iso, start_date_iso)

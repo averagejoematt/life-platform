@@ -652,6 +652,8 @@ _sys.path.insert(0, str(Path(__file__).resolve().parent))
 # ── #3509: the infra-fact rules — rate(...) cadence, the EventBridge rule count, the DLQ
 # exception set, an alarm's route vs its `to_digest` flag. Ground truth + precision notes
 # for all four live in scripts/doc_facts_infra.py.
+# #5937: doc_facts_first_contact = CLAUDE.md first-contact claims (approval, format command, stamp age).
+import doc_facts_first_contact as _first  # noqa: E402
 import doc_facts_infra as _infra  # noqa: E402
 from doc_facts_governance import (  # noqa: E402,F401
     _DG_HISTORICAL,
@@ -1191,6 +1193,11 @@ def main():
     # be re-verified from live Cost Explorer within 45 days of its Verified: stamp.
     hits += _cost_tracker_hits(COST_TRACKER_PATH)
 
+    # #5937: CLAUDE.md's first-contact claims, keyed to the ci-cd.yml header + ci-lint.yml Format gate.
+    claude_text, ci_cd_text = _first.CLAUDE_MD.read_text(encoding="utf-8"), _first.CI_CD_YML.read_text(encoding="utf-8")
+    hits += _first.manual_approval_hits(claude_text, ci_cd_text)
+    hits += _first.format_command_hits(claude_text, _first.CI_LINT_YML.read_text(encoding="utf-8"))
+
     # de-dupe (multiple patterns can flag the same number on one line)
     seen, uniq = set(), []
     for h in hits:
@@ -1220,6 +1227,13 @@ def main():
         for w in stale_verified:
             print(f"   {w}")
         print()
+
+    # #5937: the CLAUDE.md status-stamp age — WARN-ONLY, like #1348 above; never in `hits`.
+    stamp_warns, stamp_skip = _first.live_status_stamp_warnings()
+    if stamp_skip:
+        print(f"⚠️  SKIPPED (#5937, not a pass) — {stamp_skip}\n")
+    for w in stamp_warns:
+        print(f"⚠️  Status-stamp advisory (#5937, non-blocking) — {w}\n")
 
     if uniq:
         print(f"❌ {len(uniq)} live doc/source line(s) state a stale platform number as current fact:")

@@ -760,11 +760,18 @@ def pipeline_health_check() -> list[iam.PolicyStatement]:
     Phase 3.2 (2026-05-16): added cloudwatch:PutMetricData (compute-output metric)
     and sns:Publish on alerts-digest topic (compute-incomplete warning).
     """
+    # #5980: read at call time — role_policies_base (imported above) is what puts lambdas/ on sys.path.
+    from operational.probe_targets import probe_function_names
+
     return [
         iam.PolicyStatement(sid="DynamoDB", actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Query"], resources=[TABLE_ARN]),
         iam.PolicyStatement(sid="KMS", actions=["kms:Decrypt", "kms:GenerateDataKey"], resources=[KMS_KEY_ARN]),
+        # #5980: scoped from `function:*` to the functions the boot probe invokes —
+        # operational/probe_targets.py, the same list the Lambda iterates.
         iam.PolicyStatement(
-            sid="LambdaInvoke", actions=["lambda:InvokeFunction"], resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:*"]
+            sid="LambdaInvoke",
+            actions=["lambda:InvokeFunction"],
+            resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:{name}" for name in probe_function_names()],
         ),
         iam.PolicyStatement(
             # ER/elite-review 2026-06-15: the health check only calls describe_secret

@@ -226,6 +226,103 @@ def test_the_numbers_beat_the_self_reported_word():
     assert oc.calibration_verdict({}) == oc.UNSTATED
 
 
+# ── 3b. the withheld control is scored per row (#5914) ────────────────────────
+cf = _load("review_carry_forward")
+
+
+def _calibrated(by_lens: dict, missed: list[str], planted_confirmed=()) -> dict:
+    return {
+        "verdict": "CALIBRATED",
+        "planted_false_findings": {"n": 3, "confirmed_by_verifiers": list(planted_confirmed)},
+        "withheld_known_issues": {"n": len(by_lens), "missed_by_graders": missed, "by_lens": by_lens},
+    }
+
+
+_ONE_ROW_MISSED = {
+    "security": {"withheld": ["#5543"], "found": [], "missed": ["#5543"]},
+    "dataviz": {"withheld": ["#5523"], "found": ["#5523"], "missed": []},
+}
+
+
+def test_a_row_that_missed_its_own_withheld_issue_does_not_advance_and_the_others_do(tmp_path):
+    """The whole story: one grader's recall miss used to void every row of the run. Now the
+    run counts, the clock advances, and only the row that missed keeps its old date."""
+    old = _run("2026-09-01", {"security": "B+", "dataviz": "B", "cost": "A-"})
+    new = _run("2026-10-01", {"security": "B", "dataviz": "B", "cost": "A-"})
+    new[1]["calibration"] = _calibrated(_ONE_ROW_MISSED, ["#5543"])
+    assert cf.calibration_verdict(new[1]) == cf.PARTIAL
+    assert cf.withheld_missed_lenses(new[1]) == {"security"}
+    dates = cf.scratch_dates([old, new])
+    assert dates == {"security": date(2026, 9, 1), "dataviz": date(2026, 10, 1), "cost": date(2026, 10, 1)}
+    repo = _write_runs(tmp_path, [old, new])
+    assert oc.newest_run(_entry_over(repo), repo) == date(2026, 10, 1), "a partially calibrated run must advance the ritual clock"
+    expired = [row["lens"] for row in cf.expired_carry_forward([old, new], date(2026, 10, 5))]
+    assert expired == ["security"], expired
+    lines, _ = cf.carry_forward_report(date(2026, 10, 5), repo)
+    assert "did NOT advance (#5914): security" in "\n".join(lines)
+
+
+def test_the_positive_control_for_the_per_row_rule():
+    """Without this, a rule that held every row back would pass the test above."""
+    old = _run("2026-09-01", {"security": "B+", "dataviz": "B"})
+    new = _run("2026-10-01", {"security": "B", "dataviz": "B"})
+    found = {k: dict(v, found=v["withheld"], missed=[]) for k, v in _ONE_ROW_MISSED.items()}
+    new[1]["calibration"] = _calibrated(found, [])
+    assert cf.calibration_verdict(new[1]) == cf.CALIBRATED
+    assert cf.scratch_dates([old, new])["security"] == date(2026, 10, 1)
+
+
+def test_a_confirmed_planted_finding_still_fails_the_whole_run():
+    """The verifiers read every row, so their control stays run-level whatever the rows say."""
+    new = _run("2026-10-01", {"security": "B", "dataviz": "B"})
+    new[1]["calibration"] = _calibrated(_ONE_ROW_MISSED, ["#5543"], planted_confirmed=["cto-3"])
+    assert cf.calibration_verdict(new[1]) == cf.UNCALIBRATED
+    assert cf.run_counts(new[1], new[0]) is False
+
+
+def test_an_unattributed_miss_keeps_the_run_level_rule():
+    """`by_lens` only buys per-row scoring when it owns EVERY miss. A miss no lens answers
+    for, an artifact in the old shape, and a run in which every graded row missed all fall
+    back to the rule that was there before."""
+    old_shape = {"calibration": {"verdict": "CALIBRATED", "withheld_known_issues": {"n": 1, "missed_by_graders": ["#1"]}}}
+    assert cf.withheld_missed_lenses(old_shape) is None
+    assert cf.calibration_verdict(old_shape) == cf.UNCALIBRATED
+    orphan = _run("2026-10-01", {"security": "B", "dataviz": "B"})
+    orphan[1]["calibration"] = _calibrated(_ONE_ROW_MISSED, ["#5543", "#9999"])
+    assert cf.withheld_missed_lenses(orphan[1]) is None
+    assert cf.calibration_verdict(orphan[1]) == cf.UNCALIBRATED
+    every = _run("2026-10-01", {"security": "B"})
+    every[1]["calibration"] = _calibrated({"security": _ONE_ROW_MISSED["security"]}, ["#5543"])
+    assert cf.calibration_verdict(every[1]) == cf.UNCALIBRATED
+
+
+def test_an_unreported_outcome_is_a_miss_and_the_stated_word_still_loses_to_it():
+    """A lens that lists an issue as withheld and says nothing about finding it has not
+    passed its control, and a run that calls itself UNCALIBRATED is never upgraded."""
+    silent = _run("2026-10-01", {"security": "B", "dataviz": "B"})
+    silent[1]["calibration"] = _calibrated({"security": {"withheld": ["#5543"]}, "dataviz": _ONE_ROW_MISSED["dataviz"]}, [])
+    assert cf.withheld_missed_lenses(silent[1]) == {"security"}
+    assert cf.calibration_verdict(silent[1]) == cf.PARTIAL
+    said_so = _run("2026-10-01", {"security": "B", "dataviz": "B"})
+    said_so[1]["calibration"] = dict(_calibrated(_ONE_ROW_MISSED, ["#5543"]), verdict="UNCALIBRATED")
+    assert cf.calibration_verdict(said_so[1]) == cf.UNCALIBRATED
+
+
+def test_no_committed_artifact_changes_verdict_under_the_per_row_rule():
+    """The rule is not retroactive: the two baselines keep the verdicts they were filed with."""
+    want = {"2026-09-05": cf.UNSTATED, "2026-10-31": cf.UNCALIBRATED}
+    for day, verdict in want.items():
+        with open(os.path.join(REPO, "docs", "reviews", f"fullreview_grades_{day}.json"), encoding="utf-8") as fh:
+            assert cf.calibration_verdict(json.load(fh)) == verdict, day
+
+
+def test_the_spine_states_the_per_row_control_and_how_to_keep_it_blind():
+    with open(SPINE, encoding="utf-8") as fh:
+        spine = fh.read()
+    for needle in ("by_lens", cf.PARTIAL, "Pre-verify every withheld issue", "never the prior run's entry for its lens"):
+        assert needle in spine, f"the review spine no longer states: {needle}"
+
+
 def test_history_is_not_retroactively_disqualified(tmp_path):
     """Every artifact before #3603 states no calibration. UNSTATED counts as a run and says
     so — arming a gate over history is how a gate is born red and then ignored."""

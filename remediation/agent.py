@@ -97,6 +97,7 @@ _cw = boto3.client("cloudwatch", region_name=REGION)
 _logs = boto3.client("logs", region_name=REGION)
 _sqs = boto3.client("sqs", region_name=REGION)
 _ses = boto3.client("sesv2", region_name=REGION)
+_sns = boto3.client("sns", region_name=REGION)  # #5821: the daily LP digest's topic
 _s3 = boto3.client("s3", region_name=REGION)
 _cfn = boto3.client("cloudformation", region_name=REGION)
 
@@ -910,6 +911,55 @@ def triage_incomplete(report):
 
 # ── Reporting ────────────────────────────────────────────────────────────────
 
+# #5821 (owner ruling 2026-11-15): the remediation summary is ops mail, so a changed hand-off on
+# a scheduled or alarm-dispatched run becomes lines in the daily LP digest, not its own email.
+# Nothing this agent reports is the urgent signal itself — an urgent alarm already mailed on the
+# life-platform-alerts topic before it dispatched this run — so the only run that still emails is
+# a manual workflow_dispatch: the owner asked for the report and is waiting on it. Every line goes
+# through common.ops_digest (the digest topic, the alarm-notification JSON shape). If any publish
+# fails, the email goes out instead (fail towards delivery, as email_change already does).
+DIGEST_NEEDS_YOU_LINES = 5  # one digest line per needs-you item up to this; the summary counts the rest
+
+
+def _ops_digest():
+    """common.ops_digest from the checkout this job runs in (appended, so nothing in lambdas/
+    can shadow an installed package such as the agent SDK's own imports)."""
+    lambdas_dir = os.path.join(ROOT, "lambdas")
+    if lambdas_dir not in sys.path:
+        sys.path.append(lambdas_dir)
+    from common import ops_digest  # noqa: PLC0415
+
+    return ops_digest
+
+
+def digest_report(report, mode) -> bool:
+    """Queue the hand-off as digest lines. True only when EVERY line was queued."""
+    af, prs, nh = report.get("auto_fixed", []), report.get("prs", []), report.get("needs_human", [])
+    unt = report.get("untriaged", [])
+    run_url = ""
+    if os.environ.get("GITHUB_RUN_ID"):
+        run_url = f"{os.environ.get('GITHUB_SERVER_URL', 'https://github.com')}/{REPO}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+    summary = f"[{mode}] {len(af)} fixed, {len(prs)} PRs, {len(nh)} need you, {len(report.get('carried', []))} still open"
+    if unt:
+        summary += f", {len(unt)} untriaged"
+    if len(nh) > DIGEST_NEEDS_YOU_LINES:
+        summary += f" ({len(nh) - DIGEST_NEEDS_YOU_LINES} more need-you lines are in the run log)"
+    if prs:
+        summary += ". PRs: " + " ".join(str(i.get("pr", "")) for i in prs if isinstance(i, dict))
+    if run_url:
+        summary += f". Full report: {run_url}"
+    try:
+        od = _ops_digest()
+    except Exception as e:  # noqa: BLE001 — no helper means no digest; the caller emails
+        print(f"[warn] ops digest helper unavailable: {e}")
+        return False
+    lines = [("remediation-agent: hand-off changed", summary)]
+    for item in nh[:DIGEST_NEEDS_YOU_LINES]:
+        sid = item.get("signal_id", "") if isinstance(item, dict) else ""
+        text = f"{item.get('issue', '')} — {item.get('action', '')}" if isinstance(item, dict) else str(item)
+        lines.append((f"remediation-agent: needs you {sid}".rstrip(), text))
+    return all(od.enqueue_digest_line(_sns, name, reason, state="NEEDS YOU" if "needs you" in name else "NOTICE") for name, reason in lines)
+
 
 def email_report(report, mode):
     def block(title, items, fmt):
@@ -927,6 +977,10 @@ def email_report(report, mode):
     if not send:
         print(f"report email skipped: {why}")
         return False
+    if os.environ.get("GITHUB_EVENT_NAME", "") != "workflow_dispatch" and digest_report(report, mode):
+        print(f"report queued as digest lines, no email ({why}; #5821)")
+        email_change.save_last_sent(_s3, LOG_BUCKET, report, f"{datetime.now(timezone.utc):%Y-%m-%dT%H:%M:%SZ}")
+        return True
     subj = f"🤖 Remediation [{mode}]: {len(af)} fixed, {len(prs)} PRs, {len(nh)} need you"
     if unt:
         subj += f", {len(unt)} untriaged"

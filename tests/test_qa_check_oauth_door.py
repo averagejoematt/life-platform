@@ -155,15 +155,15 @@ def test_anonymous_tool_surface_is_fail(monkeypatch):
     assert c.passed is False and "ANONYMOUS" in c.message
 
 
-def test_undiscoverable_url_yields_four_yellows(monkeypatch):
+def test_undiscoverable_url_yields_six_yellows(monkeypatch):
     monkeypatch.setattr(door, "resolve_mcp_url", lambda: "")
     out = door.checks()
-    assert len(out) == 4
+    assert len(out) == 6
     assert all(c.passed is None for c in out)
     assert all("could not observe" in c.message for c in out)
 
 
-def test_all_four_probes_run_when_the_url_resolves(monkeypatch):
+def test_all_six_probes_run_when_the_url_resolves(monkeypatch):
     monkeypatch.setattr(door, "resolve_mcp_url", lambda: BASE)
     _stub(
         monkeypatch,
@@ -179,6 +179,8 @@ def test_all_four_probes_run_when_the_url_resolves(monkeypatch):
         "oauth:consent_form",
         "oauth:token_unbound",
         "oauth:foreign_redirect",
+        "oauth:parser_differential",
+        "oauth:pkce_required",
         "oauth:bearer_required",
     ]
 
@@ -202,3 +204,35 @@ def test_every_check_is_content_truth(monkeypatch, partition_attr):
     which cannot repair an allowlist or a Function-URL auth-mode change."""
     monkeypatch.setattr(door, "resolve_mcp_url", lambda: "")
     assert all(getattr(c, partition_attr) == "content_truth" for c in door.checks())
+
+
+# ── #5979 / #5932: the parser-differential and PKCE probes ──────────────────────────────────────
+def test_the_differential_target_reads_as_allowlisted_to_python_but_foreign_to_a_browser():
+    """The probe is not vacuous: urllib's host IS allowlisted (the defect a weak check would admit), while the
+    browser's reading (backslash as '/') is the inert .invalid host."""
+    from urllib.parse import urlparse
+
+    assert urlparse(door._DIFFERENTIAL_REDIRECT).hostname in _default_redirect_hosts()
+    assert urlparse(door._DIFFERENTIAL_REDIRECT.replace("\\", "/")).hostname == "oauth-probe.invalid"
+
+
+def test_parser_differential_refusal_is_pass_and_the_form_is_fail(monkeypatch):
+    _stub(monkeypatch, {"/authorize": (400, {}, "{}")})
+    assert door._check_parser_differential_refused(BASE).passed is True
+    _stub(monkeypatch, {"/authorize": (200, {}, "<form>")})
+    c = door._check_parser_differential_refused(BASE)
+    assert c.passed is False and "not a refusal" in c.message
+    _stub(monkeypatch, {"/authorize": (302, {"Location": "https://oauth-probe.invalid/cb?code=x"}, "")})
+    assert "OPEN REDIRECT" in door._check_parser_differential_refused(BASE).message
+
+
+def test_pkce_probe_sends_no_challenge_and_needs_a_refusal(monkeypatch):
+    seen = []
+
+    def fake(url, *, method="GET", data=None, headers=None):
+        seen.append(url)
+        return (200, {}, "<form>")
+
+    monkeypatch.setattr(door, "_request", fake)
+    c = door._check_pkce_required(BASE)
+    assert c.passed is False and "code_challenge" not in seen[0]
