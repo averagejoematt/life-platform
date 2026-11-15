@@ -118,6 +118,18 @@
       "Resource": "*"
     },
     {
+      "Sid": "CloudWatchAlarmHistoryRead",
+      "Effect": "Allow",
+      "Action": "cloudwatch:DescribeAlarmHistory",
+      "Resource": "*"
+    },
+    {
+      "Sid": "QaSmokeCauseLogRead",
+      "Effect": "Allow",
+      "Action": "logs:FilterLogEvents",
+      "Resource": "arn:aws:logs:us-west-2:205930651321:log-group:/aws/lambda/life-platform-qa-smoke:*"
+    },
+    {
       "Sid": "SecretsDescribe",
       "Effect": "Allow",
       "Action": "secretsmanager:DescribeSecret",

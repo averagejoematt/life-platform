@@ -38,16 +38,18 @@ COUNT_FROM = "2026-11-11"
 CAP = "novel-again: RPE 7 max, 6-8 reps for exposures 1-3 (owner ruling OD1)"
 
 
-def _logged(ex: dict[str, Any]) -> bool:
+def _logged(ex: dict[str, Any], template_ids: tuple[str, ...] = (ENTRY_TEMPLATE_ID,)) -> bool:
     tid = str(ex.get("template_id") or "").upper()
-    if (tid and tid != ENTRY_TEMPLATE_ID) or (not tid and str(ex.get("name") or ex.get("title") or "") != ENTRY_TITLE):
+    if (tid and tid not in template_ids) or (not tid and str(ex.get("name") or ex.get("title") or "") != ENTRY_TITLE):
         return False  # the template id decides; the title only when the row carries none
     return any(int(s.get("reps") or 0) > 0 or float(s.get("weight_kg") or 0) > 0 for s in ex.get("sets") or [])
 
 
-def exposures(block_workouts: list[dict[str, Any]] | None, before_day: str | None) -> int | None:
+def exposures(
+    block_workouts: list[dict[str, Any]] | None, before_day: str | None, template_ids: tuple[str, ...] = (ENTRY_TEMPLATE_ID,)
+) -> int | None:
     """Distinct days on/after `COUNT_FROM` and before `before_day` that log a set under the entry's template; None when
-    the record was not read."""
+    the record was not read. `template_ids` (#5861 FIX3, live only): also the owner's custom KB template when he sets one."""
     if block_workouts is None:
         return None
     days = {
@@ -55,7 +57,7 @@ def exposures(block_workouts: list[dict[str, Any]] | None, before_day: str | Non
         for w in block_workouts
         if not w.get("tombstone")
         and COUNT_FROM <= str(w.get("date") or "")[:10] < str(before_day or "9999-12-31")
-        and any(_logged(ex) for ex in w.get("exercises") or [])
+        and any(_logged(ex, template_ids) for ex in w.get("exercises") or [])
     }
     return len(days)
 
