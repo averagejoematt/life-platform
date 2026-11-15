@@ -304,7 +304,13 @@ jobs:
     # required. 39m is that measurement, not a round number — the second Set member
     # #3678 enumerated, fixed in the same PR rather than filed as a third stale-budget
     # instance. Re-measure before trusting this number again; do not bump by hand.
-    timeout-minutes: 39
+    # 39 -> 55 (2026-11-15, re-measured): after #5858 every run of this job was cancelled
+    # at the cap, so check_job_timeout_headroom.py (genuine completions only) could not
+    # see it. Measured instead from the post-merge lane, which runs this same selection
+    # split over shards: parallel-1 + parallel-2 + serial summed 31.2min on main before
+    # #5858 (CI/CD run 43692317822; this job's own genuine p95 was 31.4min, so the sum
+    # model holds) and 45.4min after it (run 43696289378). 45.4 x 1.2 = 54.5 -> 55.
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
