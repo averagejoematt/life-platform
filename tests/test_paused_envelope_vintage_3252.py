@@ -520,3 +520,70 @@ def test_the_weekly_analyzer_stamps_data_through_on_every_expert_row_it_writes()
             writers[ast.unparse(keys["sk"])] = "data_through" in keys
     assert len(writers) >= 4, writers  # EXPERT#{key}, integrator, experiment_arc, integrator_month
     assert all(writers.values()), {sk: ok for sk, ok in writers.items() if not ok}
+
+
+# ── #5521: the disclosed spread is not the whole contract — unpaused, no present coach may lag the board ────────────
+def _board(days, paused=False, absent=()):
+    coaches = [{"coach_id": cid, "absent": cid in absent, "analysis_as_of_day_n": d} for cid, d in days.items()]
+    known = [d for d in days.values() if isinstance(d, int)]
+    span = {"oldest_day_n": min(known), "newest_day_n": max(known), "mixed": len(set(known)) > 1} if known else None
+    return {"coaches": coaches, "content_day_span": span, "regeneration_paused": paused}
+
+
+def test_coach_read_freshness_reds_a_present_coach_behind_the_board_while_regeneration_runs(monkeypatch):
+    """#5521 acceptance 3. The 2026-10-31 replay (two coaches at day 40, three at 54, one with no analysis, newest 56,
+    `regeneration_paused: false`) is a FAIL naming all three members; the same board PAUSED is green (the drift is the
+    disclosed #3252 state); an `absent` coach (#4217, no read by design) is never a member; a lag of exactly 7 passes
+    and 8 reds. Mutation controls watched red: drop the `absent` filter (the cgm-less coach reds a healthy board);
+    compare `>=` instead of `>` (the 7-day boundary reds); skip `d is None` (the no-analysis member passes)."""
+    from operational import coach_read_freshness_qa as q
+    from operational.qa_check import CONTENT_TRUTH, Check
+
+    replay = _board(
+        {"nutrition": 40, "physical": 40, "sleep": 54, "mind": 54, "labs": 54, "explorer": 56, "glucose": None},
+    )
+    verdict, msg = q.assess(replay)
+    assert verdict == "fail", msg
+    for member in ("nutrition: day 40, 16 behind", "physical: day 40, 16 behind", "glucose: no stored read"):
+        assert member in msg, msg
+    assert "3 of 7" in msg and "sleep" not in msg and "explorer" not in msg
+    cases = {
+        "the same board, paused": (_board({"a": 40, "b": 56}, paused=True), "ok"),
+        "pause unknown is not a pause": (_board({"a": 40, "b": 56}, paused=None), "fail"),
+        "an absent coach with no read": (_board({"a": 56, "b": 55, "cgm": None}, absent=("cgm",)), "ok"),
+        "a lag of exactly 7": (_board({"a": 49, "b": 56}), "ok"),
+        "a lag of 8": (_board({"a": 48, "b": 56}), "fail"),
+        "the live 2026-11-15 board": (_board({"s": 68, "n": 68, "m": 68, "p": 68, "g": None, "l": 65, "e": 68}, absent=("g",)), "ok"),
+        "no coaches at all": ({"coaches": [], "regeneration_paused": False}, "warn"),
+        "no day anywhere": (_board({"a": None, "b": None}), "warn"),
+    }
+    wrong = {name: (q.assess(board), want) for name, (board, want) in cases.items() if q.assess(board)[0] != want}
+    assert not wrong, wrong
+
+    # the nightly leg: one fetch, one Check, the verdict carried; a fetch error is a WARN, never a green
+    class _Resp:
+        def __init__(self, body):
+            self._b = json.dumps(body).encode()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return self._b
+
+    monkeypatch.setattr(q.urllib.request, "urlopen", lambda req, timeout=15: _Resp(replay))
+    (c,) = q.checks(Check, "https://example.invalid", CONTENT_TRUTH)
+    assert c.passed is False and "3 of 7" in c.message, (c.passed, c.message)
+
+    def _boom(req, timeout=15):
+        raise OSError("down")
+
+    monkeypatch.setattr(q.urllib.request, "urlopen", _boom)
+    (c,) = q.checks(Check, "https://example.invalid", CONTENT_TRUTH)
+    assert c.passed is None and not c.chronic and "fetch failed" in c.message
+    # wired into the nightly run, not only importable
+    src = open(os.path.join(_REPO, "lambdas", "operational", "qa_smoke_lambda.py"), encoding="utf-8").read()
+    assert '("coach_read_freshness", lambda: coach_read_freshness_qa.checks(Check, SITE_BASE_URL, CONTENT_TRUTH))' in src
