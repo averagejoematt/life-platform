@@ -37,6 +37,7 @@ from ai.ai_context import (
     wrap_untrusted_reader_text,
 )  # R22-SEC-04 (#811): delimit untrusted reader text; #743: reader-facing receipts; #1086: mandatory phase block
 from boto3.dynamodb.conditions import Key
+from coach import audience_guard  # #5611 F1: the one public-audience guard, read side of the board stance
 from common.client_ip import client_ip_is_trusted, extract_client_ip, salted_ip_hash  # #1221 / #3620
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from common.journal_silence import guard_api_response  # #5131: defence in depth behind the provenance gate
@@ -610,21 +611,20 @@ def _coach_system(pid: str) -> str:
 
 
 def _coach_stance_bits(pid: str) -> str:
-    """The coach's own current read (STANCE#latest, written weekly by the
-    coach-opinion engine) — one headline + stage label. Empty pre-data.
-
-    Honors the restart tombstone (tombstone=true / phase=pilot, stamped by
-    restart_intelligence_wipe with reason experiment_restart_<genesis>) — get_item
-    bypasses the query-level phase filter, so without this guard the old cycle's
-    stance leaked into board prompts post-reset. Same guard as site_api_coach._stance_latest."""
+    """The coach's own current read (STANCE#latest, written weekly by the coach-opinion engine) — one headline + stage
+    label. Empty pre-data. Honors the restart tombstone (#1085: get_item bypasses the query phase filter; same guard as
+    site_api_coach._stance_latest). #5611 F1 (decision E, stances private by default): the headline passes
+    coach.audience_guard HERE too, not only at write (#4213) — a reject drops the whole stance, never passed raw."""
     try:
         item = table.get_item(Key={"pk": f"COACH#{pid}", "sk": "STANCE#latest"}).get("Item")
         if not singleton_visible(item):  # #1085: normalized onto the shared #946 predicate
             return ""
         item = _decimal_to_float(item)
         bits = []
-        if item.get("headline_read"):
-            bits.append(str(item["headline_read"])[:300])
+        if item.get("headline_read"):  # #5611 F1: the guard reads the FULL headline, before the prompt clip
+            if not (headline := audience_guard.reader_safe(item["headline_read"], pid, logger)):
+                return ""
+            bits.append(headline[:300])
         stage = item.get("stage") or {}
         if isinstance(stage, dict) and stage.get("label"):
             bits.append(f"(stage: {stage['label']})")
