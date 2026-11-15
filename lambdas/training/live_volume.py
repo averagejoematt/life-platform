@@ -632,8 +632,6 @@ def week_plan(
     def unlogged(key: Any) -> bool:  # no logged set in the block: the morning writes its "find the load" W row
         return bool(logged) and str(lib_entry(key, catalog, lib).get("template_id") or "").upper() not in logged
 
-    for r in rows:  # fix round 14: the plan's minutes count the W row the morning writes (a 2-set fill was cut for it)
-        r["feeler"] = r.get("feeler") or (r["kind"] == "accessory" and r["intensity"] != "carry" and unlogged(r["key"]))
     lines = _press_trade(rows, lib, press_source)
     tg = targets(lib, week["mornings"])
     lo = int(cfg.value("slot_min_sets"))
@@ -643,14 +641,19 @@ def week_plan(
     host = _host(week, rows)
     roles = list(week["roles"])
     full = {r: bool((week.get("partners") or {}).get(r)) for r in roles}
-    taken = {str(r["key"]) for r in rows}
+    # the fills already placed; a fill never repeats one, nor a movement on its own morning — a movement the week serves on
+    # ANOTHER morning may (fix round 14: with the served picks now in the rows, a week-wide bar removed the fills the round-13
+    # plan placed because it saw the template's movements, not the picks)
+    taken: set[str] = set()
     by_tid = {str(e.get("template_id") or "").upper(): e for e in (lib.get("movements") or {}).values() if e.get("template_id")}
     logged_patterns = {by_tid[t].get("pattern") for t in logged if t in by_tid} - {None}
 
     def add(m: str, role: str, probe: bool = False) -> Any:
         here = {lib_entry(r["key"], catalog, lib).get("pattern") for r in rows if r["role"] == role}  # never the same pattern twice
         keys = [
-            k for k in _fill_keys(m, catalog, lib, taken, overlay, logged=logged) if lib_entry(k, catalog, lib).get("pattern") not in here
+            k
+            for k in _fill_keys(m, catalog, lib, taken | {str(r["key"]) for r in rows if r["role"] == role}, overlay, logged=logged)
+            if lib_entry(k, catalog, lib).get("pattern") not in here
         ]
         entry = lib_entry(keys[0], catalog, lib) if keys else {}
         # known: logged in this block, or its PATTERN is (the novelty rule's own reading, `live_load.mark_novelty`)

@@ -547,6 +547,13 @@ def fit_routine(blocks: list[Any], rx: dict[str, Any], cap: int, movements: dict
         shape = program_structure.enforce_session_shape(blocks, movements) | {
             "working_sets": sum(warmup_sets.working_set_count(b.sets) for b in blocks)
         }
+    # fix round 14 (the owner's duration requirement): the prescription carries the minutes the 75-minute fit enforced — ONE
+    # model, the routine as written (warm-ups included) — never the pre-routine estimate its exposures were drafted with
+    rx["session_minutes"] = dict(rx.get("session_minutes") or {}) | {
+        "lifting_minutes": shape["lifting_minutes"],
+        "within_cap": shape["lifting_minutes"] <= cap,
+        "basis": "the routine as written, warm-ups included (session_shape.routine_minutes, the 75-minute fit's model)",
+    }
     rx[MARK]["summary"] = summary(blocks, rx, movements)
     rx[MARK]["contradictions"] = contradictions(blocks, rx)
     return shape

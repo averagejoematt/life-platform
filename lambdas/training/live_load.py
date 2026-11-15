@@ -352,6 +352,8 @@ def effort_fit(rows: list[dict[str, Any]], rep_lo: int, target_rpe: float, equip
     top = _top(rows[0])
     if effort_unknown(rows) or top["rpe"] is None or top["rpe"] <= target_rpe or not rep_lo <= top["reps"] <= rep_lo + 1:
         return None
+    if steps_down(rows):  # a calibration, once: after any reduction in this episode only the two-exposure rule moves it down
+        return None
     kg = _floor_to_implement(e1rm(rows[0]) / (1 + (rep_lo + 10.0 - target_rpe) / 30.0), equipment)
     if kg >= top["kg"] - 1e-6:
         return None
