@@ -2,7 +2,7 @@
  "date": "2026-11-14",
  "run_id": "rf-2026-11-14-wf_f7ce5234-e51",
  "method": "Full mode, unseeded, from scratch, all 17 panel rows (owner ruling 2026-11-13c §4). Graded tree origin/main a24ea2796; live site build dbf31ad with #5993/#5994/#5999 deploys in flight. Workflow wf_f7ce5234-e51: 17 graders (13 Sonnet per #4773; the four rows carrying a withheld issue on the session model, the sanctioned exception; reader via the render-qa agent), each piped into one Opus finding-verifier batch with one planted false finding at a row-fixed position. 34 agents, 0 errors, 0 empty records, 1 attempt per row (the in-script retry for an empty record was never needed), 3.18M subagent tokens, 41 min. Phase 0 per the spine: boot brief, review_anchors, seal header (verifies), freeze, and the standing obligation `prediction_publication_registry.py review` (private proposal, approves nothing). Phases 0-3 only: nothing filed, no gh write; the findings are reported for the owner to judge. Security findings appear here at class level; full text held privately. No clock was touched by hand.",
- "headline": "PARTIALLY_CALIBRATED — verifiers awake (17/17 plants refuted) but graders found 0 of 4 withheld issues; 57 confirmed + 10 plausible findings, 4 P1 (one a privacy absolute).",
+ "headline": "PARTIALLY_CALIBRATED, not a successful review (owner ruling 2026-11-14) — verifiers awake (17/17 plants refuted) but graders found 0 of 4 withheld issues; 57 confirmed + 10 plausible findings, 4 P1 (one a privacy absolute).",
  "graded_sha": "a24ea2796399b979fa9b0036b4ab5d92cd6bae5e",
  "experiment_day": 70,
  "cycle": 17,
@@ -206,7 +206,7 @@
    "blind_note": "Graders received only their row's prior path-to-A list, were told not to read docs/reviews FULLREVIEW/fullreview_grades from 2026-10 on and not to run gh issue/pr commands; the withheld issues were removed from their do-not-refile list. Blindness rests on that instruction, not on an enforced sandbox."
   },
   "verdict": "PARTIALLY_CALIBRATED",
-  "verdict_note": "Verifier control PASSED: 17 of 17 planted false findings REFUTED. Grader recall control FAILED in every row that carried one: 0 of 4 withheld issues found (security, observability, cost, devex). Per #5914 those four rows keep their expired from-scratch date; the 13 rows covered by the verifier control alone advance. This run is NOT a success by the owner's 2026-11-13c bar (the graders did not catch the planted issues)."
+  "verdict_note": "Verifier control PASSED: 17 of 17 planted false findings REFUTED. Grader recall control FAILED in every row that carried one: 0 of 4 withheld issues found (security, observability, cost, devex). Owner ruling 2026-11-14: not a successful calibrated review. Per #5914 this run advances none of those four rows (cost, devex, observability stay at 2026-11-13; security stays at 2026-11-14, a date set by the separate calibrated security-only run of the same day, not by this one); the 13 rows with no withheld issue, covered by the verifier control alone, advance to 2026-11-14."
  },
  "lenses": {
   "cto": {
@@ -3689,5 +3689,30 @@
   "PLAUSIBLE": 10,
   "REFUTED": 42
  },
- "disposition": "Not filed. Reported to the owner for judgment (owner ruling 2026-11-13c §4: report the actual findings)."
+ "disposition": "Owner ruling 2026-11-14: findings accepted as findings; the run recorded as PARTIALLY_CALIBRATED and unsuccessful. Fixes authorised for the four P1s (the privacy absolute first) and for reader/integrity defects; the review instrument is to be revised between runs.",
+ "clocks": {
+  "derived_by": "scripts/review_carry_forward.py::scratch_dates, with and without this artifact — nothing written by hand",
+  "advanced_to_2026-11-14": [
+   "a11y",
+   "aiq",
+   "cpo",
+   "cto",
+   "data-architect",
+   "dataviz",
+   "designer",
+   "growth",
+   "integrations",
+   "narrative",
+   "principal",
+   "qs",
+   "reader"
+  ],
+  "not_advanced": {
+   "cost": "2026-11-13",
+   "devex": "2026-11-13",
+   "observability": "2026-11-13",
+   "security": "2026-11-14 (from fullreview_grades_2026-11-14_partial.json, not from this run)"
+  },
+  "ritual_clock_fullreview_full": "last 2026-11-13 -> 2026-11-14 under the established PARTIALLY_CALIBRATED rule"
+ }
 }

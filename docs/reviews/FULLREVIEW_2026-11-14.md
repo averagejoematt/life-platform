@@ -46,9 +46,21 @@ REVIEW ANCHORS — sealed artifact (#3607)
 
 ## Headline
 
-PARTIALLY_CALIBRATED — verifiers awake (17/17 plants refuted) but graders found 0 of 4 withheld issues; 57 confirmed + 10 plausible findings, 4 P1 (one a privacy absolute).
+PARTIALLY_CALIBRATED, not a successful review (owner ruling 2026-11-14) — verifiers awake (17/17 plants refuted) but graders found 0 of 4 withheld issues; 57 confirmed + 10 plausible findings, 4 P1 (one a privacy absolute).
 
-**This run is NOT a success by the owner's bar (ruling 2026-11-13c §4).** The verifiers are proven awake — all 17 planted false findings were REFUTED — but the graders caught **none of the 4 withheld known issues**. Per #5914 the four rows that missed (security, observability, cost, devex) keep their expired from-scratch dates; the 13 rows covered by the verifier control alone advance. No clock was touched by hand.
+**This run is NOT a successful calibrated review (owner ruling 2026-11-14).** The verifiers are proven awake — all 17 planted false findings were REFUTED — but the graders caught **none of the 4 withheld known issues**, the third run in a row with poor recall. The owner accepted the findings below as findings and rejected the run as a calibration: it is recorded as PARTIALLY_CALIBRATED, and the served platform grade carries that sentence beside it.
+
+## What this artifact does to the review clocks
+
+Derived by `scripts/review_carry_forward.py::scratch_dates` with and without this file; no date was written by hand.
+
+| Rows | From-scratch date | Why |
+|---|---|---|
+| a11y, aiq, cpo, cto, data-architect, dataviz, designer, growth, integrations, narrative, principal, qs, reader (13) | 2026-11-13 → **2026-11-14** | No withheld issue was assigned to these rows; under the #5914 rule they are covered by the verifier control, which passed (17 of 17). |
+| cost, devex, observability (3) | **stays 2026-11-13** | Each missed its withheld issue (#5888, #5973, #5906). This run does not advance them. |
+| security (1) | **stays 2026-11-14** | That date comes from the separate, calibrated security-only run earlier the same day (`fullreview_grades_2026-11-14_partial.json`, which found its withheld issue). This run's security row missed #5543 and advances nothing. |
+
+The monthly `fullreview-full` ritual clock reads last = 2026-11-14 (it read 2026-11-13 from the previous partially calibrated run): the established rule counts a PARTIALLY_CALIBRATED run as the ritual having happened. That is a one-day move and it is not a statement that the review passed.
 
 ## Calibration
 
@@ -58,7 +70,7 @@ PARTIALLY_CALIBRATED — verifiers awake (17/17 plants refuted) but graders foun
 | Withheld known issues (4, pre-verified live, blind) | **0 / 4 found** — #5543 (security), #5906 (observability), #5888 (cost), #5973 (devex) all missed; no other row stumbled on them either |
 | Verdict | **PARTIALLY_CALIBRATED** |
 
-The four rows that carried a withheld issue ran on the stronger session model (the sanctioned exception) and still missed — the third consecutive run in which grader recall, not precision, is the weak leg (11-13: 0 of 1 blind; this run: 0 of 4). Each withheld issue sits in a corner the row's sweep did not reach: a read grant on one role among ~100 (#5543), a missing grant visible only by cross-referencing imports with IAM (#5906), a census script the cost row did not run (#5888), and a scheduled workflow's red history (#5973). That is a coverage pattern, not bad luck: graders sample the clauses and the prior path-to-A list well, and do not sweep the estate their area owns.
+The four rows that carried a withheld issue ran on the stronger session model (the sanctioned exception) and still missed — the third consecutive run in which grader recall, not precision, is the weak leg (10-31: uncalibrated on the withheld control; 11-13: 0 of 1 blind; this run: 0 of 4). Each withheld issue sits in a corner the row's sweep did not reach: a read grant on one role among ~100 (#5543), a missing grant visible only by cross-referencing imports with IAM (#5906), a census script the cost row did not run (#5888), and a scheduled workflow's red history (#5973). That is a coverage pattern, not bad luck: graders sample the clauses and the prior path-to-A list well, and do not sweep the estate their area owns.
 
 Candidates checked live before launch and found ALREADY FIXED with the issue still open (so not withheld): #5524 (a, b), #5221, #5519, #5525, #5514.
 
