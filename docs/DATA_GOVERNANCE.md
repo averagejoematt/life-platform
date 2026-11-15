@@ -299,7 +299,15 @@ deprecated doc). On ANY public surface (site, OG images, RSS, podcasts, build be
 - Bereavement content is opt-in only.
 - Correlative framing always ("associated with", never "caused").
 - Down-weeks are always visible — absence of bad data is a lie of omission (ADR-104).
-- Chronological age is never published (PhenoAge Option A — bio-age only).
+- Chronological age is never published, **and neither is anything computed from it** (owner ruling 2026-11-14,
+  superseding PhenoAge "Option A"). A value that is a function of the age is the age, at whatever precision its
+  other inputs allow: the rounded Levine phenotypic age pinned it to about 1.1 years, because the formula is public
+  and linear in age and its nine markers are public. So `/api/phenoage` reads no profile and serves the nine
+  drivers plus a markers-only reference line; no public path may read `date_of_birth`
+  (`tests/test_age_inversion.py` holds the set at zero, `tests/age_inversion_lib.py --live` is the attack, and the PII
+  guard reds on a served phenotypic-age figure). The owner's own figure: `scripts/phenoage_private.py`, run locally.
+  The same rule moved the public Mifflin-St Jeor TDEE estimate to a stated reference age (ADR-152, amendment
+  2026-11-14): the formula carries −5 kcal per year of age, so the estimate at his real age was a second handle.
 - **Coach calls (owner ruling 2026-11-05, method 2, effective 2026-11-05).** A prediction, ask or bet is
   published only when what it is ABOUT and what it is GRADED ON are public sources
   (`lambdas/common/prediction_publication.py`). A call about the private journal (whether, when or what he

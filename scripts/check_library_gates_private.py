@@ -5,7 +5,9 @@ The public test (`tests/test_exercise_library_5769.py`) can only prove each gate
 live in the owner-private overlay. This check loads the public library plus the overlay — by default the S3
 object `config/coaching/exercise_library.private.json` (read-only GetObject), or `--overlay <file>` for a
 writer's `--out` file — and fails (exit 1) on any gate whose private row lacks a measured input, a comparator, a
-value (numeric for a bodyweight threshold), or whose chain prerequisite is not a library movement.
+value, or whose chain prerequisite is not a library movement. ONE exception, by owner ruling (2026-11-13, ruling 19: no
+bodyweight cut-off is ever derived): a bodyweight gate whose threshold is not set is LOCKED and its row is valid — it is
+listed, never failed. A threshold that IS set must be a number.
 
 It prints gate ids, movement ids and MISSING FIELD NAMES ONLY — never a value (its output may land in logs).
 `scripts/approve_exercise_library.py` runs it and refuses to flip `status` to approved on a failure.
@@ -39,7 +41,10 @@ def run(library_path: str | None = None, overlay_path: str | None = None, out=pr
         overlay = xl._overlay_from_s3()
     findings = xl.private_gate_gaps(lib, overlay)
     total = len(lib.get("gates") or {})
+    locked = xl.unset_thresholds(lib, overlay)
     out(f"gates: {total}  complete: {total - len(findings)}  incomplete: {len(findings)}")
+    if locked:  # #5861 fix round 13: no threshold set is the owner's ruling — the gate is locked and the row is valid
+        out(f"  LOCKED with no threshold set (valid; stays locked): {','.join(locked)}")
     for f in findings:
         who = ",".join(f["movement_ids"][:12]) + (f" (+{len(f['movement_ids']) - 12} more)" if len(f["movement_ids"]) > 12 else "")
         out(f"  INCOMPLETE {f['gate_id']}  missing={','.join(f['missing'])}  movements={who or '-'}")

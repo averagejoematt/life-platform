@@ -442,6 +442,14 @@ CONSUMERS[("lambdas/training/workout_identity.py", "apple_workouts")] = _d(
     "cluster sessions; its live caller since #5369 is training.zone2_minutes, which serves minutes only, and every "
     "identity a surface could print goes through public_projection, which strips names, places and owner-only blocks.",
 )
+# #5861 FIX6 (owner ruling 12): the aerobic credit reads the watch's own workout intensity, live only.
+CONSUMERS[("lambdas/training/cardio_model.py", "apple_workouts")] = _d(
+    SAW,
+    "`cardio_model.recorded_aerobic` (#5861 FIX6, owner ruling 12) reads `apple_workouts` records for id, intensity (METs) "
+    "and mean step cadence only, to classify a recorded session's intensity; it emits minutes per day, a class and a basis "
+    "line into the owner's own live draft rationale (no route, place, heart rate or device name), and runs only when the "
+    "exercise library is approved (the cron's `_live_inputs`).",
+)
 # #5369/#5371: the watch backstop in the walking layer reads the watch's own walking/cycling workouts.
 CONSUMERS[("lambdas/training/walking_volume.py", "apple_workouts")] = _d(
     SAW,

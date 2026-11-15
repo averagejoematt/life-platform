@@ -1,0 +1,363 @@
+{
+ "_README": "Hevy template facts the exercise-library builder reads (deploy/exercise_library_integrity.py, #5861 fix round 13). DATA ONLY. `created`: library key -> {template_id, title} for a custom Hevy template created after the owner ruling of 2026-11-14 (the driver adds one row per creation; nothing else changes, and the next rebuild makes the movement loggable). `canonical_mappings`: a movement with no template of its own that is logged under another member of its canonical family, with the reason. `released`: a Hevy template id a library movement no longer logs under (its history, if any, stays where it was logged). `hevy_titles`: for every expansion candidate that names a template id, the title that template carries in Hevy; `differs_because` is required when it is not the candidate's own title. Check the whole file against a copy of the live template index with `python3 deploy/build_exercise_library.py --inputs F --template-index INDEX`.",
+ "created": {
+  "adductor_rock_back": {
+   "template_id": "40e1acf3-2c34-4d8b-a4c9-1e7abc029748",
+   "title": "Adductor Rock Back"
+  },
+  "band_assisted_reverse_nordic": {
+   "template_id": "5046a835-6b36-46e2-a226-b107d4edccdf",
+   "title": "Reverse Nordic (Band)"
+  },
+  "band_finger_extension": {
+   "template_id": "83bd1a2d-47cb-49fc-a0cf-25f96054b23d",
+   "title": "Finger Extension (Band)"
+  },
+  "banded_ankle_inversion_eversion": {
+   "template_id": "a65129d0-0279-42ac-aa81-24211348484e",
+   "title": "Ankle Inversion and Eversion (Band)"
+  },
+  "cable_internal_rotation": {
+   "template_id": "de730ded-9444-478d-8747-95d7f0b7788c",
+   "title": "Internal Rotation (Cable)"
+  },
+  "cable_serratus_punch": {
+   "template_id": "27d64ed6-09de-4919-acce-a22951b4740e",
+   "title": "Serratus Punch (Cable)"
+  },
+  "controlled_forward_step_down": {
+   "template_id": "478ba086-1e5b-4528-8783-e7e8a8c21f30",
+   "title": "Step Down"
+  },
+  "copenhagen_side_plank": {
+   "template_id": "29f11c5c-bd0c-4ef5-8de6-0e6af9a09787",
+   "title": "Copenhagen Plank"
+  },
+  "forearm_rotation_dumbbell": {
+   "template_id": "9e506ff5-e1ee-4be3-b8ac-64077b67d21f",
+   "title": "Forearm Pronation and Supination (Dumbbell)"
+  },
+  "front_rack_carry_kettlebell": {
+   "template_id": "fcb929db-a3c6-45ad-b303-65628818f501",
+   "title": "Front Rack Carry (Kettlebell)"
+  },
+  "hand_gripper_squeeze": {
+   "template_id": "1b15c81a-0a6b-48ba-b06f-e1bf211f31d0",
+   "title": "Hand Gripper"
+  },
+  "hip_airplane": {
+   "template_id": "b75a6a45-6ce5-46a7-887f-80df4c5cbc69",
+   "title": "Hip Airplane"
+  },
+  "hip_cars": {
+   "template_id": "0836a196-e54a-4ad6-b1e9-b77885e20540",
+   "title": "Hip CARs"
+  },
+  "kettlebell_deadlift": {
+   "template_id": "6c4e54c2-c4b8-4e42-b712-e4f879d57d80",
+   "title": "Deadlift (Kettlebell)"
+  },
+  "knee_to_wall_dorsiflexion": {
+   "template_id": "16516b7b-c359-4526-8e6c-9387dbd6056f",
+   "title": "Knee to Wall Ankle Dorsiflexion"
+  },
+  "landmine_squat": {
+   "template_id": "8fb17c14-227c-4285-bc9f-dee26391ec85",
+   "title": "Landmine Squat"
+  },
+  "low_box_step_off_landing": {
+   "template_id": "3e7a1c76-e745-4eca-a55f-aa73f0ab6599",
+   "title": "Step Off Landing"
+  },
+  "mcgill_curl_up": {
+   "template_id": "fb9ed6d7-60e7-48ae-88dd-4486d5630534",
+   "title": "McGill Curl Up"
+  },
+  "medicine_ball_chest_pass": {
+   "template_id": "61f8856e-843a-4884-b2ff-9c58cd9a0652",
+   "title": "Medicine Ball Chest Pass"
+  },
+  "medicine_ball_scoop_toss": {
+   "template_id": "8d4aebad-8966-4bc6-ae21-2f832c7b4e47",
+   "title": "Medicine Ball Scoop Toss"
+  },
+  "neck_isometric_holds": {
+   "template_id": "afc3a5d3-567c-4df8-b2bb-10c46a2c4f21",
+   "title": "Neck Isometric Hold"
+  },
+  "plate_pinch_hold": {
+   "template_id": "f1046566-ecc3-4744-89d8-3888b0c954a6",
+   "title": "Plate Pinch Hold"
+  },
+  "rucking": {
+   "template_id": "7cb091c4-e6c9-4711-8143-e0fc4b784521",
+   "title": "Rucking"
+  },
+  "short_foot": {
+   "template_id": "21cd935b-771b-4b60-98b3-05d803942a0e",
+   "title": "Short Foot"
+  },
+  "shoulder_cars": {
+   "template_id": "c27762a1-69e9-422e-a6b4-0dd6f1e3defd",
+   "title": "Shoulder CARs"
+  },
+  "spanish_squat": {
+   "template_id": "d9d92345-01aa-43fa-9ff7-d90dbed1c283",
+   "title": "Spanish Squat (Band)"
+  },
+  "standing_cable_chest_press": {
+   "template_id": "1575d773-170b-44e0-b2ff-cc8034838bce",
+   "title": "Standing Chest Press (Cable)"
+  },
+  "standing_cable_knee_drive": {
+   "template_id": "4fae371f-8477-49a5-9502-9741e0a2a763",
+   "title": "Standing Knee Drive (Cable)"
+  },
+  "suitcase_deadlift": {
+   "template_id": "4f424c1f-a78c-4d7b-9757-82690c9ac3d2",
+   "title": "Suitcase Deadlift"
+  },
+  "supine_deep_neck_flexor_nod": {
+   "template_id": "d511caec-091a-4e7c-9ec1-68df240be8e7",
+   "title": "Deep Neck Flexor Nod"
+  },
+  "tall_high_pull": {
+   "template_id": "69f7b5d8-5f3e-44e7-98b9-53fc496d10ed",
+   "title": "Tall High Pull (Barbell)"
+  },
+  "tibialis_raise": {
+   "template_id": "5cc1b232-70ed-4574-a469-fa5785b850dd",
+   "title": "Tibialis Raise"
+  },
+  "wrist_deviation_dumbbell": {
+   "template_id": "305324a1-621f-462c-9c87-89ee8b52d360",
+   "title": "Wrist Radial and Ulnar Deviation (Dumbbell)"
+  },
+  "wrist_extension_mobilization": {
+   "template_id": "272c35c2-3b2d-4b64-bba1-f46c34ee176d",
+   "title": "Wrist Extension Mobilization"
+  }
+ },
+ "canonical_mappings": {
+  "kettlebell_suitcase_carry": {
+   "logs_as": "suitcase_carry",
+   "why": "the same carry with a different implement: his Suitcase Carry template names no implement (the curation records it as logged with a dumbbell or a kettlebell), so no other exercise's history is mixed in"
+  }
+ },
+ "released": {
+  "D20D7BBE": {
+   "movement": "kettlebell_deadlift",
+   "why": "Hevy's Sumo Deadlift: a barbell lift's template, so kettlebell sessions logged there would share one history with a different exercise (owner ruling 2026-11-14). Never logged; the kettlebell deadlift waits for its own template."
+  }
+ },
+ "hevy_titles": {
+  "08590920": {
+   "title": "Hanging Knee Raise"
+  },
+  "091737FA": {
+   "title": "Back Extension (Weighted Hyperextension)"
+  },
+  "0E4523F4": {
+   "title": "Wrist Roller"
+  },
+  "108D7A14": {
+   "title": "Nordic Hamstrings Curls"
+  },
+  "11A123F3": {
+   "title": "Seated Leg Curl (Machine)"
+  },
+  "1837BA23": {
+   "title": "Single Arm Landmine Press (Barbell)"
+  },
+  "1B2B1E7C": {
+   "title": "Pull Up"
+  },
+  "1E42FD5F": {
+   "title": "Hack Squat (Machine)"
+  },
+  "20C1A3CB": {
+   "title": "Split Squat (Dumbbell)"
+  },
+  "23A48484": {
+   "title": "Cable Crunch"
+  },
+  "28BB4A95": {
+   "title": "Triceps Dip"
+  },
+  "29083183": {
+   "title": "Chin Up"
+  },
+  "293483AD": {
+   "title": "Low Cable Fly Crossovers"
+  },
+  "2DBCA395": {
+   "title": "Behind the Back Curl (Cable)"
+  },
+  "30E293E3": {
+   "title": "Pendulum Squat (Machine)"
+  },
+  "35E53528-D898-4721-9A36-65BC003EB0CB": {
+   "title": "Recumbent Bike"
+  },
+  "392887AA": {
+   "title": "Push Up"
+  },
+  "39C99849": {
+   "title": "Incline Push Ups"
+  },
+  "3D1CDC75": {
+   "title": "Belt Squat (Machine)"
+  },
+  "3FD83744": {
+   "title": "Single Leg Press (Machine)"
+  },
+  "4377A52C": {
+   "title": "Stair Machine (Steps)"
+  },
+  "4F5866F8": {
+   "title": "Back Extension (Hyperextension)"
+  },
+  "56808FD2": {
+   "title": "Pull Up (Band)"
+  },
+  "582ADA23": {
+   "title": "Overhead Curl (Cable)"
+  },
+  "5D99A2FA": {
+   "title": "Ski Erg"
+  },
+  "5E0DDACE": {
+   "title": "Aerobics",
+   "differs_because": "Hevy's generic 'Aerobics' template is where a low-impact step session is logged; no step-specific template exists"
+  },
+  "5F8903BF": {
+   "title": "Kettlebell Turkish Get Up"
+  },
+  "629AE73D": {
+   "title": "Single Leg Extensions"
+  },
+  "6433CD93": {
+   "title": "Kettlebell Shoulder Press"
+  },
+  "6A8D3193": {
+   "title": "Chest Supported T Bar Row"
+  },
+  "7952B5CD": {
+   "title": "Reverse Crunch"
+  },
+  "7D1BD41D": {
+   "title": "Sled Pull"
+  },
+  "89304423": {
+   "title": "Kettlebell Snatch"
+  },
+  "8BEBFED6": {
+   "title": "Hip Adduction (Machine)"
+  },
+  "923874CA": {
+   "title": "Landmine 180"
+  },
+  "937292AB": {
+   "title": "Single Leg Romanian Deadlift (Dumbbell)"
+  },
+  "98237BA2": {
+   "title": "Knee Raise Parallel Bars"
+  },
+  "983274DD": {
+   "title": "Landmine Squat and Press"
+  },
+  "A127DA73": {
+   "title": "Kettlebell Goblet Squat"
+  },
+  "AC0A1BF3": {
+   "title": "Sled Push"
+  },
+  "B05C2C29": {
+   "title": "Single Leg Standing Calf Raise (Machine)"
+  },
+  "B123DD01": {
+   "title": "Pullover (Machine)"
+  },
+  "B3B1D947": {
+   "title": "Bear Crawl"
+  },
+  "B60A678F": {
+   "title": "Swimming"
+  },
+  "B9380898": {
+   "title": "Dead Hang"
+  },
+  "BD4E7E53": {
+   "title": "Hang Clean"
+  },
+  "C15174B2-39DF-418B-BCB3-C94563278BE7": {
+   "title": "Landmine Press"
+  },
+  "C732C341": {
+   "title": "Meadows Rows (Barbell)"
+  },
+  "CC55119B": {
+   "title": "Cable Core Pallof Press"
+  },
+  "D5AC3808-B3A8-4044-BA20-53DDB08702D5": {
+   "title": "180 Squat Jumps"
+  },
+  "D5CA687B-C387-4F5B-A5B5-EA7A4BF8E8D6": {
+   "title": "Barbell High Pulls"
+  },
+  "D7D7FCCE": {
+   "title": "Landmine Row"
+  },
+  "D8460FA6": {
+   "title": "Reverse Wrist Curl (Dumbbell)"
+  },
+  "D8911FC4": {
+   "title": "Dead Bug"
+  },
+  "DE68C825": {
+   "title": "Single Arm Lateral Raise (Cable)"
+  },
+  "EB5E90DB-F4F0-47EA-9D9B-FCADE21F4EFC": {
+   "title": "Stability Ball Stir The Pot"
+  },
+  "EC02979E": {
+   "title": "Lateral Band Walks",
+   "differs_because": "the same exercise under Hevy's name: a lateral step against a band"
+  },
+  "F21D5693": {
+   "title": "Chest Supported Y Raise (Dumbbell)"
+  },
+  "F4B4C6EE": {
+   "title": "Hip Abduction (Machine)"
+  },
+  "F5DEF1EB": {
+   "title": "Sissy Squat (Weighted)",
+   "differs_because": "Hevy's only sissy squat template is titled 'Sissy Squat (Weighted)'; it logs the bodyweight and the loaded form alike"
+  },
+  "F60BDDF8": {
+   "title": "Negative Pull Up"
+  },
+  "F623B185-7E9E-46C7-BC6E-B587EFD0D64D": {
+   "title": "Hip Flexor Stretch",
+   "differs_because": "his custom 'Hip Flexor Stretch' template is the half-kneeling stretch; the library title names the position"
+  },
+  "F8356514": {
+   "title": "Hanging Leg Raise"
+  },
+  "F8A0FCCA": {
+   "title": "Kettlebell Swing"
+  },
+  "F99C211D": {
+   "title": "Kettlebell Clean"
+  },
+  "FAB6EB2F": {
+   "title": "Preacher Curl (Dumbbell)"
+  },
+  "FAF31231": {
+   "title": "Decline Bench Press (Machine)"
+  },
+  "FBF92739": {
+   "title": "Incline Chest Press (Machine)"
+  }
+ }
+}
