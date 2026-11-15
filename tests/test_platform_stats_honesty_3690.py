@@ -146,6 +146,40 @@ def test_the_distribution_is_served_beside_the_letter():
         assert grade in dist, f"grade {grade!r} ({n} lenses) is missing from the served distribution: {dist!r}"
 
 
+def test_the_calibration_result_is_served_beside_the_letter():
+    """Owner ruling 2026-11-14: "The public platform grade must not imply the full review passed. If C+ is shown,
+    explain the partial calibration and recall failure directly beside it." The served sentence is re-derived from the
+    newest review's own `calibration` block — its verdict, the planted false findings its verifiers rejected, and the
+    withheld known issues its graders found — so it cannot describe an older run or soften a newer one."""
+    s = _stats()
+    note = s.get("review_grade_calibration") or ""
+    date, _lenses = _newest_grades()
+    with open(os.path.join(_REPO, "docs", "reviews", f"fullreview_grades_{date}.json"), encoding="utf-8") as fh:
+        cal = json.load(fh).get("calibration") or {}
+    verdict = str(cal.get("verdict") or "UNSTATED")
+    assert date in note, f"the calibration sentence must carry the review's date ({date}): {note!r}"
+    words = {"CALIBRATED": "calibrated", "PARTIALLY_CALIBRATED": "partially calibrated", "UNCALIBRATED": "uncalibrated"}.get(verdict)
+    assert words, f"the newest review states no usable calibration verdict ({verdict}) — the grade may not be served without one"
+    assert note.lower().startswith(words), f"the sentence must open with the review's verdict ({verdict}): {note!r}"
+    if verdict != "CALIBRATED":
+        assert "not a passed review" in note.lower(), "a review that is not fully calibrated must say so in those words"
+    planted = cal.get("planted_false_findings") or {}
+    n_planted, n_confirmed = int(planted.get("n") or 0), len(planted.get("confirmed_by_verifiers") or [])
+    assert (
+        f"{n_planted - n_confirmed} of {n_planted} planted" in note
+    ), f"planted control: {n_planted - n_confirmed} of {n_planted} rejected — {note!r}"
+    withheld = cal.get("withheld_known_issues") or {}
+    n_withheld, n_found = int(withheld.get("n") or 0), len(withheld.get("found") or [])
+    assert f"found {n_found} of {n_withheld} known issues" in note, f"withheld control: {n_found} of {n_withheld} found — {note!r}"
+
+
+def test_the_platform_page_renders_the_calibration_beside_the_grade():
+    with open(os.path.join(_REPO, "site", "assets", "js", "evidence_meta.js"), encoding="utf-8") as fh:
+        js = fh.read()
+    m = re.search(r"export function renderPlatform\(d\) \{.*", js)
+    assert m and "d.review_grade_calibration" in m.group(0) and "d.review_grade_distribution" in m.group(0)
+
+
 # ── the two count fields that were also wrong ────────────────────────────────
 def test_site_pages_matches_the_single_page_registry():
     import qa_manifest

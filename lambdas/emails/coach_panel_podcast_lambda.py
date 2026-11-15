@@ -286,7 +286,7 @@ def _safety_gate(text: str) -> list:
         if term and re.search(rf"\b{re.escape(term)}\b", low):
             reasons.append(f"blocked-vice:{term}")
             break
-    if body_numbers.BODY_NUM_RE.search(t):  # the desk's detector (#4993)
+    if body_numbers.has_body_number(t):  # the desk's detector (#4993) + the bare/worded shapes (#5949)
         reasons.append("body-number")
     if _GRIEF_RE.search(t):
         reasons.append("grief/family/named-person")
@@ -606,7 +606,7 @@ def _gate_intro(turns: list, allowed_numbers) -> list:
         line = (t.get("line") or "").strip()
         if not line:
             continue
-        if _HALLUCINATION_RE.search(line):
+        if _HALLUCINATION_RE.search(line) or body_numbers.has_body_number(line):  # #5949: no spoken weight in Episode 0
             dropped += 1
             logger.info("[panel] intro: dropped Day-Zero-guard line — %s", line[:90])
             continue
