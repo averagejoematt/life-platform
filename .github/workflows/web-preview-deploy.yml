@@ -10,7 +10,7 @@
 # What makes a root deploy safe (#5534): the site/ deploy excludes every path this build writes
 # (www/owned_paths.json via deploy/www_owned_paths.py, in sync_site_to_s3.sh AND rollback_site.sh),
 # and this workflow's own rollback restores the v9 paths from the previous green v9 build
-# (s3://…/site/_v9_previous/, S3 → S3, v9 keys only) — never from site/. Neither path can
+# (s3://…/www-previous/<LATEST>/, S3 → S3, v9 keys only) — never from site/. Neither path can
 # re-publish the v8 front page over the launch. After a root sync the smoke + visual sweeps judge the
 # live site (qa/qa_manifest.py describes `/` as the v9 page set once the switch is on); a green run
 # records the build as the new previous; a red one rolls the v9 paths back, scope-checked the way
@@ -244,7 +244,7 @@ jobs:
         with:
           name: v9-root-${{ github.sha }}
           path: www/dist
-      - name: Record the build at site/_v9_previous/ (no delete)
+      - name: Record the build at www-previous/<sha>/ (outside site/, never served)
         run: bash deploy/www_preview_sync.sh --target root --record-previous
 
   # ── root only, red: roll the v9 paths back to the previous v9 build — never to site/ ──────────────
