@@ -283,6 +283,37 @@ def test_grounding_present_even_when_answer_is_refused_ungrounded(monkeypatch):
     assert "41" not in json.dumps(body["grounding"])
 
 
+def test_both_board_paths_refuse_when_the_grounding_gate_itself_fails(monkeypatch):
+    """#5929 (aiq-2): the panel answer (site_api_board_panel._generate) and the
+    per-turn follow-up (_handle_board_followup) are reader-facing ADR-104 gates, so
+    they fail CLOSED. Both used to swallow a gate exception and serve the unchecked
+    draft. A raising gate must now serve the in-voice refusal and never leak the
+    draft's figures."""
+    from ai import grounded_generation
+
+    def _boom(*a, **k):
+        raise RuntimeError("gate blew up")
+
+    draft = "Your HRV jumped from 41 to 78 ms overnight, a clear 90% gain."
+    ai = _ai()
+    table = _FakeTable()
+    _wire(ai, monkeypatch, table, bedrock_text=draft, ctx={"recovery_pct": 48.0})
+    token = ai._create_board_session(
+        "203.0.113.9", {"sleep_coach": [{"q": "Is my sleep debt catching up?", "a": "Recovery looks steady."}]}
+    )
+    monkeypatch.setattr(grounded_generation, "grounding_findings", _boom)
+
+    panel = json.loads(ai._handle_board_ask(_post({"question": "Did my HRV change?", "personas": ["sleep_coach"]}))["body"])
+    assert panel["responses"]["sleep_coach"] == ai._BOARD_GROUNDING_REFUSAL
+    followup = ai._handle_board_followup(
+        {"session_token": token, "persona": "sleep_coach", "question": "What about REM specifically?"}, "203.0.113.9"
+    )
+    assert followup["statusCode"] == 200
+    assert json.loads(followup["body"])["response"] == ai._BOARD_GROUNDING_REFUSAL
+    for served in (panel["responses"]["sleep_coach"], json.loads(followup["body"])["response"]):
+        assert "78" not in served and "41" not in served
+
+
 def test_followup_response_carries_a_grounding_field(monkeypatch):
     ai = _ai()
     table = _FakeTable()

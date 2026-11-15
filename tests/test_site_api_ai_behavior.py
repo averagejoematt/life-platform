@@ -1100,6 +1100,37 @@ def test_a_reader_asking_about_sleep_gets_an_answer_and_their_remaining_quota(mo
     assert resp["headers"]["Cache-Control"] == "no-store"
 
 
+def test_ask_serves_the_refusal_when_the_grounding_gate_itself_fails(monkeypatch):
+    """#5929 (aiq-2): /api/ask's ADR-104 gate is reader-facing, so it fails CLOSED.
+    It used to swallow a gate exception (and an ImportError) and serve the model's
+    unchecked draft. Both failure modes must now serve the honest refusal copy, and
+    the draft's figures must not reach the reader."""
+    import importlib
+
+    from ai import grounded_generation
+
+    draft = "Recovery climbed from 31% to 97% in a week."  # figures that appear in no source
+
+    def _boom(*a, **k):
+        raise RuntimeError("gate blew up")
+
+    ai = _ai()
+    for mode in ("raises", "not_bundled"):
+        with monkeypatch.context() as m:
+            _wire_ask(ai, m)
+            _wire_bedrock(m, text=draft)
+            if mode == "raises":
+                m.setattr(grounded_generation, "grounding_findings", _boom)
+            else:  # a partial bundle: the module is absent (see test_explain_endpoint's #2393 helper)
+                m.delattr(importlib.import_module("ai"), "grounded_generation", raising=False)
+                m.setitem(sys.modules, "ai.grounded_generation", None)
+            resp = ai._handle_ask(_event("/api/ask", body={"question": "How has recovery been?"}))
+            assert resp["statusCode"] == 200, mode
+            answer = json.loads(resp["body"])["answer"]
+            assert answer == ai._ASK_GROUNDING_REFUSAL, f"{mode}: served {answer!r}"
+            assert "97" not in answer and "31" not in answer, mode
+
+
 def test_a_one_word_question_is_refused_before_any_model_spend(monkeypatch):
     ai = _ai()
     _wire_ask(ai, monkeypatch)

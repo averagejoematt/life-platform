@@ -65,6 +65,8 @@ from web.site_api_ai_context import (  # noqa: F401
     watch_ask_block as _watch_ask_block,  # #4979
 )
 from web.site_api_ai_prompt import (  # noqa: F401
+    _ASK_GROUNDING_REFUSAL,
+    _BOARD_GROUNDING_REFUSAL,
     _EXPLAIN_GROUNDING_REFUSAL,
     _EXPLAIN_SYSTEM,
     _EXPLAIN_WEEK_DOMAINS,
@@ -1032,15 +1034,10 @@ def _handle_ask(event: dict) -> dict:
 
                 answer, _left, _ = _gg.regen_once(answer, _ask_findings, _ask_regen, surface="api_ask")
                 if _left:
-                    answer = (
-                        "I couldn't ground part of that answer in the data I actually have, "
-                        "so I'd rather not guess at numbers. Try asking about something the "
-                        "current record covers — sleep, recovery, weight trend, training, or nutrition."
-                    )
-        except ImportError:
-            pass  # helper not bundled — serve as before
-        except Exception as _gg_e:
-            logger.warning(f"[site_api_ai] grounding gate error (fail-open): {_gg_e}")
+                    answer = _ASK_GROUNDING_REFUSAL
+        except Exception as _gg_e:  # ImportError included (#5929 aiq-2): a gate that cannot run never serves the draft
+            logger.warning(f"[site_api_ai] grounding gate error — refusing (fail-closed): {_gg_e}")
+            answer = _ASK_GROUNDING_REFUSAL
 
         return {
             "statusCode": 200,
@@ -1582,10 +1579,6 @@ def _handle_board_followup(body: dict, ip_hash: "str | None") -> dict:
             _draft = _txt  # #812/#744: keep the flagged draft for retention
             logger.warning(f"[board_ask] follow-up {persona} ungrounded: {[f['detail'] for f in _gf][:3]}")
             _grounded = False
-            _refusal = (
-                "I'd want to answer that with numbers I can actually stand behind, and I can't "
-                "ground them in today's record — ask me about something the current data covers."
-            )
             try:
                 _corr_messages = list(messages)
                 _corr_messages[-1] = {"role": "user", "content": messages[-1]["content"] + "\n\n" + _gg.correction_prompt(_gf)}
@@ -1604,17 +1597,16 @@ def _handle_board_followup(body: dict, ip_hash: "str | None") -> dict:
                     _grounded = True
                     logger.info(f"[board_ask] follow-up {persona} corrected once — grounded on retry")
                 else:
-                    _txt = _refusal
+                    _txt = _BOARD_GROUNDING_REFUSAL
             except Exception as _rt_e:
                 logger.warning(f"[board_ask] follow-up {persona} correction retry failed: {_rt_e}")
-                _txt = _refusal
+                _txt = _BOARD_GROUNDING_REFUSAL
             _retain_board_flag(
                 persona, "flagged_corrected" if _grounded else "flagged_refused", _draft, _txt, _gf, extra={"endpoint": "board_followup"}
             )
-    except ImportError:
-        pass  # helper not bundled — serve as before
-    except Exception as _gg_e:
-        logger.warning(f"[board_ask] follow-up {persona} grounding gate error (fail-open): {_gg_e}")
+    except Exception as _gg_e:  # ImportError included (#5929 aiq-2): a gate that cannot run never serves the draft
+        logger.warning(f"[board_ask] follow-up {persona} grounding gate error — refusing (fail-closed): {_gg_e}")
+        _txt, _grounded = _BOARD_GROUNDING_REFUSAL, False
 
     # #3413: the ADR-108 quality gate used to run here per turn, synchronously.
     # Removed with the initial-ask call site — same measurement, same reasoning.
