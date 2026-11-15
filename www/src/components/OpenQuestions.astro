@@ -8,14 +8,17 @@
 import { num } from "../lib/format.js";
 import { labEnabled } from "../lib/lab.js";
 import { labCounts } from "../lib/laboratory.js";
+import { dimsFigure, paceFigure, testsFigure } from "../lib/openq.js";
 import { loadJourney, loadLab } from "../lib/snapshot.js";
 import { href } from "../lib/url.js";
 
 interface Props {
   foodText?: string | null;
   measured: number;
+  // the front page's six dimensions (label + whether a public series measures it) — drawn, never re-derived here
+  dimensions?: { label: string; measured: boolean }[];
 }
-const { foodText = null, measured } = Astro.props as Props;
+const { foodText = null, measured, dimensions = [] } = Astro.props as Props;
 const WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
 const w = (n: number) => WORDS[n] || String(n);
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -52,12 +55,16 @@ const questions = [
         ? `Losing about ${num(rate, 1)} lb a week${lo != null && hi != null && level ? ` (${level}% interval ${num(lo, 1)}–${num(hi, 1)})` : ""} — the pace the platform's rate flag watches, and it fired in Week 10.${foodText ? ` ${foodText}` : ""}`
         : "The pace is not served in this snapshot.",
     missing: "No public strength trend yet, and the scale's body-composition reading is too noisy to settle it.",
+    fig: paceFigure({ rate, lo, hi, level }),
+    figCap: "lb lost a week, with its interval",
     link: { to: "/data/", words: "The journey and the daily record" },
   },
   {
     q: "Is getting healthier the same as getting happier?",
     have: `${cap(w(measured))} of six dimensions ${measured === 1 ? "is" : "are"} measured in public every day${measured === 3 ? ": the body, sleep and recovery" : ""}.`,
     missing: "Mind, connection and purpose have no public measure. The journal is private, and nothing here infers a feeling from a heartbeat.",
+    fig: dimsFigure(dimensions),
+    figCap: "filled: measured in public · dashed: no public measure",
     link: { to: "/privacy/", words: "What is measured, and what stays private" },
   },
   {
@@ -66,6 +73,8 @@ const questions = [
       ? `${cap(w(counts.testsOpen))} tests were written down before their data; ${decided ? `${w(decided)} ${decided === 1 ? "has" : "have"} a verdict` : "none has enough paired days for a verdict yet"}. ${counts.running ? `${cap(w(counts.running))} running` : "No experiment is running"}; ${w(counts.ready)} written and ready to start.`
       : "The laboratory is not served in this snapshot.",
     missing: "Nothing has run long enough to show a change it caused.",
+    fig: testsFigure(tests),
+    figCap: "each checked test: its paired days toward a verdict",
     link: { to: "/data/", words: "The laboratory, in the data room" },
   },
 ];
@@ -84,6 +93,12 @@ const questions = [
             <span class="oq-n mono">0{i + 1}</span>
             <h3>{x.q}</h3>
             <p class="oq-have">{x.have}</p>
+            {x.fig && (
+              <figure class="oq-fig">
+                <Fragment set:html={x.fig} />
+                <figcaption class="label">{x.figCap}</figcaption>
+              </figure>
+            )}
             <p class="oq-missing">
               <span class="label">Missing</span> {x.missing}
             </p>
@@ -129,6 +144,16 @@ const questions = [
     font-size: 17px;
     line-height: 1.45;
   }
+  .oq-fig {
+    margin: 0;
+  }
+  .oq-fig svg {
+    display: block;
+    max-width: none;
+  }
+  .oq-fig figcaption {
+    margin-top: 4px;
+  }
   .oq-missing {
     font-size: 13px;
     line-height: 1.5;
@@ -149,12 +174,23 @@ const questions = [
       border-left: 0;
     }
   }
-  /* a phone: the same three questions, tighter (the front page has a 7.5-screen budget) */
+  /* a phone: the same three questions side by side in a row that scrolls across, the next card's edge showing — the
+     front page has a 7.5-screen budget, and the figures would otherwise lengthen it by a third of a screen */
   @media (max-width: 560px) {
+    .oq {
+      display: flex;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      gap: 18px;
+      border-bottom: 1px solid var(--rule);
+    }
     .oq li,
     .oq li + li {
+      flex: 0 0 86%;
+      scroll-snap-align: start;
       gap: 7px;
       padding: 14px 0 16px;
+      border-bottom: 0;
     }
     .oq h3 {
       font-size: 20px;
