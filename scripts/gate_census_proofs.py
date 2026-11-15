@@ -2065,7 +2065,7 @@ STRUCTURAL_HAND_PROOFS.update(
         # /api/phenoage was the age to ~1.1 years (formula public and linear in age, the nine markers public).
         "structural::test_age_inversion.py": {
             "gate_name": "test_age_inversion.py",
-            "command": "python3 -m pytest tests/test_age_inversion.py -q -p no:randomly   # baseline 14 passed",
+            "command": "python3 -m pytest tests/test_age_inversion.py -q -p no:randomly   # baseline 16 passed (14 when proven; two TDEE tests added with the reference-age estimate)",
             "mutation": (
                 "Three plants in the real tracked tree, ONE AT A TIME, each restored from a byte copy: M1 the public handler "
                 "(lambdas/web/site_api_biomarkers.py::phenoage) reads the profile's birth date again and serves "
@@ -2083,7 +2083,7 @@ STRUCTURAL_HAND_PROOFS.update(
             "scope": (
                 "The handler through a fake S3 client and injected globals that raise on any access, the publication snapshot's "
                 "producer and contract, and an AST sweep of lambdas/web, lambdas/coach, lambdas/content and lambdas/emails for a "
-                "`date_of_birth` key read (a dated allow-list of two, shrinking). Synthetic markers and ages only. NOT SEEN: the "
+                "`date_of_birth` key read (allow-list EMPTY since the public Mifflin estimate moved to a reference age). Synthetic markers and ages only. NOT SEEN: the "
                 "live response (tests/age_inversion_lib.py --live is the anonymous live attack; deploy/pii_surface_guard.py reds "
                 "on a served phenotypic-age figure, offline over the committed shape snapshots and live over the payloads), any "
                 "age-derived output computed outside those four packages, and what readers captured before the ruling."

@@ -219,14 +219,42 @@ def test_the_snapshot_carries_the_reference_and_refuses_a_figure_of_his_own(monk
             C.validate_journey_body({"composition": None, "phenoage": {**pa, **leak}, "bp": None, "tape_date": None})
 
 
+# ── the second channel: the Mifflin-St Jeor estimate ─────────────────────────────────────────────
+
+
+def test_a_tdee_computed_at_his_age_is_his_age_and_the_public_form_is_not():
+    """Mifflin carries -5 kcal per year of age. With weight, height and the exercise term known, the private form
+    pins a synthetic age to a fraction of a year; the public form returns the same number for every age."""
+    from health import tdee as T
+
+    kw = dict(weight_lbs=290.0, height_inches=69.0, exercise_kcal=7000, exercise_energy_days=7, deficit_kcal=0)
+    age = 47.3
+    served = T.energy_budget(age_years=age, **kw)["tdee"]
+    lo, hi, width = INV.feasible_window(lambda a: T.energy_budget(age_years=a, **kw)["tdee"] == served)
+    assert lo <= age <= hi and width < 0.5, f"the private form pins the age to {width:.2f} y"
+    public = {T.energy_budget(age_years=a, public=True, **kw)["tdee"] for a in (None, 23.4, 47.3, 66.1)}
+    assert len(public) == 1, "the public form must not move with the age"
+    b = T.energy_budget(age_years=age, public=True, **kw)
+    assert b["method"] == T.METHOD_PUBLIC and b["inputs"]["age_basis"] == T.PUBLIC_AGE_BASIS
+    assert b["inputs"]["age_years"] == float(T.PUBLIC_REFERENCE_AGE_YEARS)
+
+
+def test_the_public_site_estimate_does_not_move_with_the_birth_date():
+    from web import site_api_nutrition as N
+
+    outs = set()
+    for dob in ("1950-01-01", "1995-06-15", "1979-02-28", None):
+        prof = {"height_inches": 69.0, "biological_sex": "male", **({"date_of_birth": dob} if dob else {})}
+        outs.add(N._mifflin_tdee(290.0, strava_items=[], profile=prof, hevy_items=[]))
+    assert len(outs) == 1 and None not in outs, outs
+
+
 # ── the guard: the SET — who may read the birth date ─────────────────────────────────────────────
 
-#: Modules on a PUBLIC path (the site API, and the coach facts that feed published prose) that read the birth date.
-#: The list only shrinks. Each entry is dated and named for the PR that removes it.
-_BIRTH_DATE_READERS_ALLOWED = {
-    "lambdas/web/site_api_nutrition.py": "2026-11-14: the Mifflin TDEE estimate is computed with his age — the next PR moves it to a stated reference age",
-    "lambdas/coach/coach_domain_facts.py": "2026-11-14: same estimate, fed to coach prose — moves with the PR above",
-}
+#: Modules on a PUBLIC path (the site API, and the coach facts, content and emails that feed published prose) that
+#: read the birth date. EMPTY since the Mifflin TDEE estimate moved to a stated reference age (2026-11-14) — and it
+#: stays empty: an output computed from the birth date is a published age. The owner-only MCP tools are not swept.
+_BIRTH_DATE_READERS_ALLOWED: dict = {}
 
 
 def test_no_other_public_path_reads_the_birth_date():
