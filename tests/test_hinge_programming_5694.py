@@ -26,6 +26,12 @@ from training import exercise_history, hevy_compiler, hevy_note_lint, program_st
 from training.full_body_session import full_body_routines
 from training.routine_title import format_why_note
 
+ROLLBACK = pytest.mark.usefixtures("exercise_library_rollback")
+"""#5861 (owner approval 2026-11-14): the marked tests pin the PRE-approval generator — the 11-09 hinge drafts pin the pre-approval shape
+(live: squat before the RDL on lower volume, the heavy pull as top + one back-off). They run on the library's rollback copy (status
+proposed: tests/conftest.py `exercise_library_rollback`), so they keep guarding the rollback path; the approved (live) behaviour is
+pinned by the #5861 tests."""
+
 REPO = pathlib.Path(__file__).resolve().parent.parent
 WIRE = json.loads((REPO / "tests" / "fixtures" / "hinge_programming_5694" / "wire_2026_11_08.json").read_text())
 CATALOG = json.loads((REPO / "config" / "movement_catalog.json").read_text())
@@ -82,6 +88,7 @@ def test_the_wire_is_the_history_the_issue_measured():
     assert [(_lb(s["weight_kg"]), s["reps"], s["rpe"]) for s in rdl["sets"] if s["rpe"] is not None] == [(185, 8, 8.0)] * 3
 
 
+@ROLLBACK
 def test_lower_heavy_pulls_the_conventional_deadlift_loaded_from_its_own_history():
     ideal = _draft("lower_heavy")
     keys = [b.movement_key for b in ideal.exercises]
@@ -98,6 +105,7 @@ def test_lower_heavy_pulls_the_conventional_deadlift_loaded_from_its_own_history
     assert "find the load" not in (dl.notes or "")
 
 
+@ROLLBACK
 def test_lower_volume_pulls_the_rdl_for_8_to_10_loaded_from_its_one_session():
     ideal = _draft("lower_volume")
     assert ideal.exercises[0].movement_key == "romanian_deadlift_barbell"
@@ -110,6 +118,7 @@ def test_lower_volume_pulls_the_rdl_for_8_to_10_loaded_from_its_one_session():
     assert "find the load" not in (rdl.notes or "")
 
 
+@ROLLBACK
 def test_mutation_control_without_its_own_history_the_rdl_has_no_load():
     """The 11-06 defect's shape: with no RDL history the rows carry no load — so the loads above are the RDL's own."""
     ideal = _draft("lower_volume", history={k: v for k, v in WIRE["history"].items() if k != RDL})

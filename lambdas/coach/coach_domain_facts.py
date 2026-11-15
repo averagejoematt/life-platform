@@ -119,7 +119,6 @@ def _nutrition_pack(table, today: str) -> list:
             weight_lbs = _num(_latest(wt_items).get("weight_lbs"))
             height_in = _num(profile.get("height_inches"))
             if weight_lbs and height_in:
-                age_years, age_basis, _ = health_tdee.resolve_age(profile.get("date_of_birth"))
                 strava = _query_source(table, "strava", d7, today)
                 # #3931: the Hevy set log is the worked-set input — the lifting term no
                 # longer charges rest between sets at the cardio duration proxy.
@@ -128,8 +127,10 @@ def _nutrition_pack(table, today: str) -> list:
                 budget = health_tdee.energy_budget(
                     weight_lbs=weight_lbs,
                     height_inches=height_in,
-                    age_years=age_years,
-                    age_basis=age_basis,
+                    # Owner ruling 2026-11-14: these facts feed coach prose that is published, so the estimate is the
+                    # PUBLIC one — computed at the stated reference age, the birth date never read. A real-age figure
+                    # quoted beside the public one would give the age away by subtraction (5 kcal per year).
+                    public=True,
                     sex=(profile.get("biological_sex") or "male"),
                     exercise_kcal=ex["kcal"],
                     exercise_energy_days=ex["days"],
@@ -142,12 +143,12 @@ def _nutrition_pack(table, today: str) -> list:
             logger.warning("[domain_facts] energy budget fallback failed: %s", e)
 
     if tdee:
-        from health.tdee import METHOD as TDEE_METHOD
+        from health.tdee import METHOD_PUBLIC as TDEE_METHOD
 
         label = (
             "MacroFactor adaptive expenditure (measured)"
             if source == "macrofactor_adaptive"
-            else "Mifflin-St Jeor + WORKED-SET 7d exercise energy (estimate, #3931 — rest between sets is not charged)"
+            else "Mifflin-St Jeor at a fixed reference age + WORKED-SET 7d exercise energy (estimate, #3931 — rest between sets is not charged; his real age is not an input)"
         )
         # #3931 box 4: the method name rides with the number, DERIVED from health.tdee so
         # a rename can never leave this surface publishing the old figure's old label.

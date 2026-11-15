@@ -88,7 +88,7 @@ class _FakeS3:
         self.puts[Key] = Body
 
 
-def _recap(lost_lbs):
+def _recap(lost_lbs, weight_as_of="2026-09-20", meta=None, want_footer=False):
     """Sweep the weekly recap and return (card_meta_line, shell_html).
 
     `card_meta_line` is the third argument og_moments hands the card renderer — the
@@ -99,6 +99,7 @@ def _recap(lost_lbs):
 
     def _fake_card(kicker, title, meta_line, footer_note):
         captured["meta"] = meta_line
+        captured["footer"] = footer_note
         return _FakeImg()
 
     real_card = om.build_moment_card
@@ -107,12 +108,89 @@ def _recap(lost_lbs):
         s3 = _FakeS3()
         out = om._sweep_week_recap(
             s3,
-            {"journey": {"lost_lbs": lost_lbs}, "vitals": {"hrv_ms": 52}, "platform": {"days_in": 21, "tier0_streak": 3}},
+            {
+                "_meta": meta or {"generated_at": "2026-09-21T18:01:22+00:00", "refreshed_at": "2026-09-22T04:01:25+00:00"},
+                "journey": {"lost_lbs": lost_lbs, **({"weight_as_of": weight_as_of} if weight_as_of else {})},
+                "vitals": {"hrv_ms": 52},
+                "platform": {"days_in": 21, "tier0_streak": 3},
+            },
         )
     finally:
         om.build_moment_card = real_card
     assert out, "the recap swept to nothing — the fixture no longer exercises the surface"
+    if want_footer:
+        return captured["meta"], captured["footer"]
     return captured["meta"], s3.puts[f"generated/moments/week/{out['id']}/index.html"].decode()
+
+
+# ── review 2026-11-14 (growth-2): a weight on a share card carries the date of its own weigh-in ───────────────────
+def test_the_recap_card_dates_its_weight_by_the_weigh_in_and_never_says_live():
+    """The card printed "36.7 lbs down · live numbers as of 2026-11-14" from the day-before's weigh-in while the site
+    read 38.8 from that morning's. The footer now states each figure's own date."""
+    meta, footer = _recap(36.7, weight_as_of="2026-11-13", meta={"refreshed_at": "2026-11-15T04:01:25+00:00"}, want_footer=True)
+    assert "36.7 lbs down" in meta
+    assert footer == "weight as of 2026-11-13 · other figures as of 2026-11-14", footer  # 04:01Z is the evening before in PT
+    assert "live" not in footer.lower()
+
+
+def test_an_undated_weight_is_not_printed_on_the_recap_card():
+    meta, footer = _recap(36.7, weight_as_of=None, want_footer=True)
+    assert "lbs" not in meta and "HRV 52 ms" in meta, meta
+    assert "weight" not in footer and footer.startswith("figures as of "), footer
+
+
+def test_one_weigh_in_reads_the_same_on_the_api_the_stats_file_and_the_card():
+    """Owner ruling 2026-11-14: "Verify that homepage, API and share-card figures agree for the same data timestamp."
+    /api/journey and the stats refresh both compute through web.journey_progress.displayed_progress, and the card
+    prints the stats file's figure — so for one weigh-in there is one "lbs down"."""
+    import inspect
+
+    from web import journey_progress as jd, site_api_journey, site_stats_refresh_lambda
+
+    current, lost, remaining, pct = jd.displayed_progress(327.34, 185.0, 288.5)
+    assert (current, lost, remaining, pct) == (288.5, 38.8, 103.5, 27.3)
+    api = {"lost_lbs": lost}
+    for mod in (site_api_journey, site_stats_refresh_lambda):
+        src = inspect.getsource(mod)
+        assert "displayed_progress(" in src, f"{mod.__name__} must use the shared arithmetic"
+    assert "round(start_weight_disp - current_weight_disp" not in inspect.getsource(
+        site_api_journey
+    ), "the API kept an arithmetic of its own"
+    meta, _ = _recap(api["lost_lbs"], weight_as_of="2026-11-14", want_footer=True)
+    assert f"{api['lost_lbs']} lbs down" in meta
+    assert jd.displayed_progress(None, 185.0, 288.5) is None and jd.displayed_progress(327.34, 185.0, "x") is None
+
+
+def test_the_stats_refresh_moves_the_journey_block_to_the_newest_dated_weigh_in():
+    """The morning brief's block (yesterday's weigh-in) is replaced by the refresh's newer one, with its date; an
+    undated or older reading changes nothing."""
+    from web.site_stats_refresh_lambda import refresh_journey
+
+    morning = {
+        "start_weight_lbs": 327.34,
+        "goal_weight_lbs": 185.0,
+        "current_weight_lbs": 290.65,
+        "lost_lbs": 36.7,
+        "weight_as_of": "2026-11-13",
+        "weekly_rate_lbs": -2.97,
+    }
+    out = refresh_journey(morning, 288.5, "2026-11-14")
+    assert (out["current_weight_lbs"], out["lost_lbs"], out["remaining_lbs"], out["progress_pct"], out["weight_as_of"]) == (
+        288.5,
+        38.8,
+        103.5,
+        27.3,
+        "2026-11-14",
+    )
+    assert out["weekly_rate_lbs"] == -2.97, "fields this refresh does not own are preserved"
+    assert refresh_journey(morning, 288.5, None) == morning, "an undated reading never moves the block"
+    assert refresh_journey(morning, 292.0, "2026-11-12") == morning, "an older weigh-in never replaces a newer one"
+    assert refresh_journey({"current_weight_lbs": 290.65}, 288.5, "2026-11-14") == {
+        "current_weight_lbs": 290.65
+    }, "no start/goal: nothing is recomputed"
+    # the pre-fix block carried no date at all: the first refresh dates it
+    undated = {k: v for k, v in morning.items() if k != "weight_as_of"}
+    assert refresh_journey(undated, 288.5, "2026-11-14")["weight_as_of"] == "2026-11-14"
 
 
 def _all_three(lost_lbs):

@@ -176,7 +176,7 @@ def revise_intro(turns, fails, invoke, model, extract_json, logger):
         'You are the head writer revising a draft of "The Measured Life" Episode 0 — host ELENA VOSS (embedded '
         "journalist), guest ELI MARSH (the Principal Investigator); MATT is the third-person subject and never "
         "speaks. Fix EVERY issue listed below and keep everything that already works. Invent nothing about Matt (no "
-        "events, losses, dates, numbers, or any weight); turns STRICTLY ALTERNATE — never two consecutive turns from "
+        "events, losses, dates, numbers, or any weight — no body-weight figure from any year, bare or in words); turns STRICTLY ALTERNATE — never two consecutive turns from "
         "the same speaker; every question or challenge is answered substantively by the OTHER speaker in the very "
         f"next turn; every turn is at most {_QA_MAX_WORDS_PER_TURN} words. Return ONLY the full fixed script as a "
         'JSON array: [{"speaker":"elena"|"eli","line":"..."}], 20-28 turns. No prose, no fences.'
@@ -205,8 +205,9 @@ def revise_weekly(turns, fails, guest_name, show_name, invoke, model, extract_js
         "listed below and keep everything that already works. THE BAR: the transcript must read as a real, human-made "
         "podcast — no AI tells. Stay grounded (invent nothing — no facts, scenes, times of day, or numbers not already "
         f"present); keep the guest as {guest_name}; introduce a guest the audience hasn't met; every question gets "
-        "an answer in the next turn; never two consecutive turns from the same speaker; no body weight (numeric or "
-        "spelled-out). Return ONLY the same JSON shape: "
+        "an answer in the next turn; never two consecutive turns from the same speaker; no body-weight figure (with its unit or bare, in "
+        "digits or in words, this experiment's or an earlier year's, or an amount lost or regained — the pace per week is the "
+        "one figure allowed). Return ONLY the same JSON shape: "
         '{"turns":[{"speaker":"elena"|"coach","line":"..."}],"open_bet":"...","last_bet_result":{"outcome":"won"|"lost"|"open"|"none"},'
         '"pull_quote":"..."}. 14-22 turns. No fences.'
     )
