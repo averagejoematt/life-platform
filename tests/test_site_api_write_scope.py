@@ -146,3 +146,253 @@ def test_ai_interaction_write_is_putitem_only():
     m = re.search(r"actions=\[(.*?)\]", block, re.DOTALL)
     assert m and '"dynamodb:PutItem"' in m.group(1)
     assert "UpdateItem" not in m.group(1) and "DeleteItem" not in m.group(1)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #5543: the READ half — every partition a public serving role reaches is granted
+# ══════════════════════════════════════════════════════════════════════════════
+# premerge-gate: repo-shape ratchet — the reached-partition set is read off the Lambdas' import closure (AST), so a new read can red before merge, not after the deploy 403s a public route
+#
+# cdk/stacks/role_policies_serve.py scopes each public role's GetItem/Query with
+# dynamodb:LeadingKeys. An under-grant does not fail a deploy; it fails a reader, as an
+# AccessDenied inside a fail-soft read (a blank section) or a 5xx. So the reach is derived
+# from the code, never hand-listed, two ways:
+#
+#   STATIC  — walk the Lambda's import closure (every `import`/`from` it can execute,
+#             lazy ones included) and collect every string that names a partition:
+#             a USER#… key shape, or any literal the phase taxonomy recognises as a
+#             registered partition (phase_taxonomy.classify — it raises on anything that
+#             is not, which is what separates a partition from a sort key). A read cannot
+#             reach a partition without naming it or its family somewhere in that closure;
+#             data-driven ids (a coach id, a book id, a routine hash) land under the family
+#             the code names. phase_taxonomy.py itself is excluded: it is the classifier
+#             and names every partition in the table.
+#   OBSERVED — a read-only replay of every GET route (+ query-string variants, ~375
+#             requests) against the live table on 2026-11-15, with every non-read AWS call
+#             blocked, recorded the partitions below (families; opaque ids collapsed).
+import ast  # noqa: E402
+
+_LAMBDAS = os.path.join(_REPO, "lambdas")
+_SERVE_POLICIES = os.path.join(_REPO, "cdk", "stacks", "role_policies_serve.py")
+_CLASSIFIER = os.path.join("experiment", "phase_taxonomy.py")
+_UNKNOWN = "\x00"
+
+# Families a closure NAMES but the role never READS — each with the reason. Kept tiny and
+# reasoned: an entry here is a partition the role is denied while the code mentions it.
+_NAMED_NOT_READ = {
+    "EVALRET#": "experiment/eval_retention.retain() is a WRITE (fail-soft); fetch() is the eval-harvest's, never a route's",
+    "PERSONA#": "named as a classification prefix (narrative_publication.NARRATIVE_PK_PREFIXES, pk_census); no public read",
+    "PROGRESS_LINK#": "the progress viewer's one-time nonce, a conditional PutItem; never read",
+}
+
+# OBSERVED, 2026-11-15 (see above). Opaque ids are written as their family.
+_OBSERVED_READS = {
+    "SITE_API_READ_PARTITIONS": [
+        "USER#matthew",
+        "USER#matthew#ROUTINE#5f3f5f1f",
+        "USER#matthew#SOURCE#whoop",
+        "USER#matthew#SOURCE#email_log#daily_brief",
+        "USER#matthew#SOURCE#notion",
+        "COACH#sleep_coach",
+        "COACH#commitments",
+        "COACH#computation",
+        "ENSEMBLE#digest",
+        "ENSEMBLE#dispute",
+        "ENSEMBLE#docket",
+        "READING#PROFILE",
+        "READING#HORIZON",
+        "READING#IDEA_INDEX",
+        "READING#0161d408f99efdfd",
+        "BOOK#0161d408f99efdfd",
+        "BROADCAST_ORIGIN#bluesky",
+        "BROADCAST_ORIGIN#x",
+        "VOICEFIDELITY#scoreboard",
+        "VOTES#challenges",
+        "VOTES#experiment_library",
+        "VOTES#ladder_replicator",
+        "VOTES#predict_week",
+        "VOTES#rate_limit",
+    ],
+    "SITE_API_INDEX_READ_PARTITIONS": [
+        "READING_SESSION",
+        "READING_STATUS#reading",
+        "READING_STATUS#want",
+        "READING_STATUS#finished",
+        "READING_STATUS#abandoned",
+    ],
+    "SITE_API_AI_READ_PARTITIONS": [
+        "USER#matthew",
+        "USER#matthew#SOURCE#computed_metrics",
+        "COACH#sleep_coach",
+        "COACH#explorer_coach",
+    ],
+    "PROGRESS_VIEWER_READ_PARTITIONS": [
+        "USER#matthew#SOURCE#progress_photos",
+        "USER#matthew#SOURCE#withings",
+        "USER#matthew#SOURCE#measurements",
+    ],
+}
+
+
+def _read_partitions(name):
+    """A module-level tuple from role_policies_serve.py, by AST (no CDK import needed)."""
+    tree = ast.parse(_read(_SERVE_POLICIES))
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == name for t in node.targets):
+            return tuple(ast.literal_eval(node.value))
+    raise AssertionError(f"{name} not found in role_policies_serve.py")
+
+
+def _statement_uses(sid_fn, constant):
+    """True when `def <sid_fn>(` passes `constant` to its DynamoDB read condition."""
+    src = _read(_SERVE_POLICIES)
+    start = src.index(f"def {sid_fn}(")
+    nxt = src.find("\ndef ", start + 1)
+    return f"_leading_keys({constant})" in src[start : nxt if nxt > 0 else len(src)]
+
+
+def _module_file(mod):
+    base = os.path.join(_LAMBDAS, *mod.split("."))
+    for cand in (base + ".py", os.path.join(base, "__init__.py")):
+        if os.path.isfile(cand):
+            return cand
+    return None
+
+
+def _import_closure(root):
+    """{path: ast} for every lambdas/ module `root` can import, lazy imports included."""
+    seen, todo = {}, [_module_file(root)]
+    while todo:
+        path = todo.pop()
+        if not path or path in seen:
+            continue
+        tree = ast.parse(_read(path))
+        seen[path] = tree
+        pkg = os.path.relpath(os.path.dirname(path), _LAMBDAS).replace(os.sep, ".")
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                todo += [_module_file(a.name) for a in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                base = node.module or ""
+                if node.level:
+                    parts = pkg.split(".")[: len(pkg.split(".")) - (node.level - 1)]
+                    base = ".".join([*parts, base]) if base else ".".join(parts)
+                todo.append(_module_file(base))
+                todo += [_module_file(f"{base}.{a.name}") for a in node.names]
+    return seen
+
+
+def _strings(tree):
+    """Every str literal, and every f-string rendered with _UNKNOWN for its holes."""
+    for node in ast.walk(tree):
+        if isinstance(node, ast.JoinedStr):
+            yield "".join(str(v.value) if isinstance(v, ast.Constant) else _UNKNOWN for v in node.values)
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+            yield node.value
+
+
+def _probe(s):
+    """A concrete key for a pattern: the owner id for a USER# hole, `x` for any other."""
+    if s.startswith("USER#" + _UNKNOWN):
+        s = "USER#matthew" + s[len("USER#" + _UNKNOWN) :]
+    s = s.replace(_UNKNOWN, "x")
+    return s + "x" if s.endswith("#") else s
+
+
+def _reached_partitions(root):
+    """{probe_key: first site} for every partition the closure of `root` names."""
+    from experiment import phase_taxonomy  # noqa: PLC0415
+
+    head = re.compile(r"^[A-Z][A-Z0-9_]*(#|$)")
+    reached = {}
+    for path, tree in _import_closure(root).items():
+        rel = os.path.relpath(path, _LAMBDAS)
+        if rel == _CLASSIFIER:
+            continue
+        for s in _strings(tree):
+            if " " in s or len(s) > 120 or not head.match(s) or s in ("USER#", "USER#" + _UNKNOWN):
+                continue
+            if any(s.startswith(p) for p in _NAMED_NOT_READ):
+                continue
+            key = _probe(s)
+            if not s.startswith("USER#"):
+                try:
+                    phase_taxonomy.classify(key, "")
+                except KeyError:
+                    continue  # not a registered partition: a sort key, a label, a constant
+            reached.setdefault(key, rel)
+    return reached
+
+
+def _uncovered(keys, patterns):
+    return sorted(k for k in keys if not any(fnmatch(k, p) for p in patterns))
+
+
+# The two public site roles, by the closure each Lambda actually executes.
+_CLOSURE_ROLES = {
+    "SITE_API_READ_PARTITIONS": ("site_api", "web.site_api_lambda"),
+    "SITE_API_AI_READ_PARTITIONS": ("site_api_ai", "web.site_api_ai_lambda"),
+}
+
+
+def test_every_partition_a_public_site_role_reaches_is_granted():
+    """#5543 box 4: a route that reads a partition outside its role's allowlist reds here.
+
+    One test over both roles (not a parametrize): it reports every offender at once."""
+    problems = []
+    for constant, (fn, root) in _CLOSURE_ROLES.items():
+        assert _statement_uses(fn, constant), f"{fn}()'s DynamoDBRead must be conditioned on {constant}"
+        patterns = _read_partitions(constant)
+        reached = _reached_partitions(root)
+        assert len(reached) >= 10, f"{root}: only {len(reached)} partitions reached — the closure walk went blind"
+        for key in _uncovered(reached, patterns):
+            problems.append(f"{fn}: reaches {key!r} (named in lambdas/{reached[key]}) — not in {constant}")
+    assert not problems, (
+        "A public site Lambda names a partition its role cannot read; the read will AccessDenied in "
+        "production. Add the family to the allowlist in cdk/stacks/role_policies_serve.py (an IAM change: "
+        "LifePlatformServe), or, if the code only names it and never reads it, to _NAMED_NOT_READ with "
+        "the reason:\n  " + "\n  ".join(problems)
+    )
+
+
+def test_every_observed_live_read_is_granted_and_the_viewer_reads_three():
+    """The empirical half, plus the progress viewer, whose reach is exact and small enough to pin.
+
+    The viewer's closure is mostly site_api_common, so the closure scan would credit it with
+    every family the site names; its own module is the honest measure. Its read sites are the
+    photo index query and two site_api_common helpers, each with a literal source."""
+    problems = []
+    for constant, observed in _OBSERVED_READS.items():
+        problems += [f"{constant}: live read {k!r} not granted" for k in _uncovered(observed, _read_partitions(constant))]
+    assert _statement_uses("site_api", "SITE_API_INDEX_READ_PARTITIONS"), "the GSI statement must carry its own scope"
+    assert _statement_uses("progress_viewer", "PROGRESS_VIEWER_READ_PARTITIONS")
+
+    viewer = _read(os.path.join(_WEB, "progress_viewer_lambda.py"))
+    sources = re.findall(r"_(?:query_source|latest_item_asof|latest_item)\(\s*\"([a-z_]+)\"", viewer)
+    index_pk = re.search(r'^INDEX_PK = f"\{USER_PREFIX\}([a-z_]+)"', viewer, re.M)
+    assert index_pk, "progress_viewer_lambda.INDEX_PK moved — re-derive the viewer's reach"
+    reached = {f"USER#matthew#SOURCE#{s}" for s in [*sources, index_pk.group(1)]}
+    n_reads = len(re.findall(r"\b(?:table\.(?:query|get_item)|_query_source|_latest_item_asof|_latest_item)\(", viewer))
+    assert n_reads == 3, (
+        f"progress_viewer_lambda.py has {n_reads} DynamoDB read sites, baseline 3 — a read was added/removed. "
+        "Add its partition to PROGRESS_VIEWER_READ_PARTITIONS (LifePlatformWeb), then update this baseline."
+    )
+    granted = set(_read_partitions("PROGRESS_VIEWER_READ_PARTITIONS"))
+    problems += [f"progress_viewer reads {k!r} — not granted" for k in sorted(reached - granted)]
+    problems += [f"progress_viewer grants {k!r} — not read (the grant is wider than the page)" for k in sorted(granted - reached)]
+    assert not problems, "\n".join(problems)
+
+
+def test_the_read_allowlists_keep_out_the_partitions_no_route_serves():
+    """Non-vacuity: the scope actually excludes the families #5543 exists to protect, and a
+    dropped family is caught by the reach check (the mutation, run in-process)."""
+    private = ["PERSONA#elena", "NARRATIVE#arc", "SYSTEM#dlq-ledger", "SUBSCRIBE#x", "CACHE#x", "COACHSIM#x", "PULSE", "EVALRET#board_ask"]
+    for constant in ("SITE_API_READ_PARTITIONS", "SITE_API_AI_READ_PARTITIONS", "PROGRESS_VIEWER_READ_PARTITIONS"):
+        patterns = _read_partitions(constant)
+        assert "*" not in patterns and not any(p in ("USER#*", "USER#matthew*") for p in patterns), f"{constant} is a whole-table grant"
+        leaked = [k for k in private if any(fnmatch(k, p) for p in patterns)]
+        assert not leaked, f"{constant} grants {leaked} — no public route reads these"
+    # Mutation: drop COACH#* from the site-api list and the reach check must name a coach partition.
+    reached = _reached_partitions("web.site_api_lambda")
+    mutated = [p for p in _read_partitions("SITE_API_READ_PARTITIONS") if p != "COACH#*"]
+    assert any(k.startswith("COACH#") for k in _uncovered(reached, mutated)), "dropping COACH#* went unnoticed — the reach check is blind"
