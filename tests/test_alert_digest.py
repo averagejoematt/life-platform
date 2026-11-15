@@ -312,3 +312,43 @@ def test_standing_sweep_paginates_and_includes_composite_alarms(env):
         assert name in body_text
     # Oldest first: composite-red (5d) before page-1-metric (2d) before page-2-metric (3h).
     assert body_text.index("composite-red") < body_text.index("page-1-metric") < body_text.index("page-2-metric")
+
+
+def test_an_ops_digest_line_renders_as_its_own_line_in_the_digest_email(env):
+    """#5821: common.ops_digest is how the QA-smoke failure, the remediation hand-off and a
+    non-cutoff budget-tier change reach the LP digest. Its payload must go through the REAL
+    drain → group → format path as a named line — never collapse into `unparseable`, which is
+    where a plain-text publish lands (and where every plain-text producer shares one line)."""
+    from common import ops_digest
+
+    mod = _import_module()
+    published = []
+    sns = MagicMock()
+    sns.publish.side_effect = lambda **kw: published.append(kw)
+    assert ops_digest.enqueue_digest_line(sns, "budget-tier: raised 0→1", "Caution — internal/dev AI paused", state="TIER 1")
+    assert ops_digest.enqueue_digest_line(sns, "qa-smoke: content-truth failures", "x" * 400, state="FAIL")
+    assert all(p["TopicArn"].endswith(":life-platform-alerts-digest") for p in published)
+    mod._sqs_mock.receive_message.side_effect = [
+        {"Messages": [{"MessageId": str(i), "ReceiptHandle": f"h{i}", "Body": p["Message"]} for i, p in enumerate(published)]},
+        {"Messages": []},
+    ]
+    result = mod.lambda_handler({}, None)
+    assert result["sent"] is True and result["distinct"] == 2
+    body_text = mod._ses_mock.send_email.call_args.kwargs["Content"]["Simple"]["Body"]["Text"]["Data"]
+    assert "• budget-tier: raised 0→1  ×1  [TIER 1]" in body_text
+    assert "Caution — internal/dev AI paused" in body_text
+    assert "• qa-smoke: content-truth failures  ×1  [FAIL]" in body_text
+    assert "unparseable" not in body_text
+    # the reason is held under the digest's own 300-character cut
+    assert "x" * (ops_digest.REASON_MAX - 1) + "…" in body_text
+
+
+def test_an_ops_digest_line_fails_towards_delivery_and_a_dry_run_publishes_nothing():
+    from common import ops_digest
+
+    broken = MagicMock()
+    broken.publish.side_effect = RuntimeError("AuthorizationError")
+    assert ops_digest.enqueue_digest_line(broken, "n", "r") is False, "a failed publish must tell the caller to email"
+    quiet = MagicMock()
+    assert ops_digest.enqueue_digest_line(quiet, "n", "r", dry_run=True) is True
+    quiet.publish.assert_not_called()
