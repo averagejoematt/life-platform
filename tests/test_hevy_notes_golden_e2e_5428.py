@@ -19,10 +19,17 @@ mode at the commit gate.
 
 from __future__ import annotations
 
+import pytest
 from training import hevy_note_lint, routine_title, session_block
 from training.cardio_note import apply_after_lines, compose
 from training.hevy_compiler import to_create_body
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set
+
+ROLLBACK = pytest.mark.usefixtures("exercise_library_rollback")
+"""#5861 (owner approval 2026-11-14): the marked tests pin the PRE-approval generator — the 09-25 / 10-18 golden renders are the
+pre-approval generator's (live: effort table, low-energy line, fitted lifts). They run on the library's rollback copy (status proposed:
+tests/conftest.py `exercise_library_rollback`), so they keep guarding the rollback path; the approved (live) behaviour is pinned by the
+#5861 tests."""
 
 
 def _with_cardio(ir: RoutineSpec) -> RoutineSpec:
@@ -48,6 +55,7 @@ def _compile(ir: RoutineSpec) -> dict:
     return to_create_body(ir, lambda k: "T-" + k, why_note=why)
 
 
+@ROLLBACK
 def test_freshly_rendered_routines_lint_clean():
     offenders = {}
     for name, ir in _renders().items():
@@ -80,6 +88,7 @@ def _block_count(body: dict) -> int:
     return first.count(session_block.LOW_ENERGY_LINE)
 
 
+@ROLLBACK
 def test_exercise_1_carries_the_session_block_exactly_once_on_every_path():
     ir = _renders()["10-18 upper volume re-draft"]
     legacy = _compile(ir)  # a routine drafted before #5428 (no block on the IR): the restamp/cron WHY carries it

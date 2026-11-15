@@ -469,3 +469,34 @@ def _ip_hash_salt_3620(monkeypatch):
 def _goals_private_part_is_synthetic(monkeypatch, tmp_path_factory):
     monkeypatch.setenv("LIFE_PLATFORM_GOALS_PRIVATE_PATH", str(tmp_path_factory.getbasetemp() / "no-goals-private-part.json"))
     yield
+
+
+# #5861 (owner approval 2026-11-14): config/exercise_library.json is APPROVED, so the generator serves the live engine. A test
+# that pins the PRE-approval generator (dated golden IRs, v0.3/v0.4 template behaviour, the shadow rotation wording) runs on the
+# library's ROLLBACK copy — status proposed, approved_on removed, nothing else changed — so it keeps guarding the rollback path
+# (setting the status back to proposed serves exactly that generator). Opt in with
+# `@pytest.mark.usefixtures("exercise_library_rollback")`. Every library read goes through `exercise_library.load_library`
+# (the selection engine's cached `load_library_failsoft` reads it first; the cache is cleared on both sides) or
+# `week_floors.library`.
+def _exercise_library_rollback_copy() -> dict:
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "exercise_library.json")
+    with open(path, encoding="utf-8") as f:
+        lib = _json.load(f)
+    lib["status"] = "proposed"
+    lib.pop("approved_on", None)
+    return lib
+
+
+@pytest.fixture
+def exercise_library_rollback(monkeypatch):
+    import copy
+
+    from training import exercise_library as _xl, selection_engine as _se, week_floors as _wf
+
+    lib = _exercise_library_rollback_copy()
+    assert _se.mode(lib) == _se.MODE_SHADOW
+    monkeypatch.setattr(_xl, "load_library", lambda path=None: copy.deepcopy(lib))
+    monkeypatch.setattr(_wf, "library", lambda path=None: copy.deepcopy(lib))
+    _se._LIB_CACHE.clear()
+    yield lib
+    _se._LIB_CACHE.clear()
