@@ -33,6 +33,67 @@ from stacks.role_policies_base import (
 CLOUDTRAIL_TRAIL_NAME = "life-platform-trail"
 CLOUDTRAIL_TRAIL_ARN = f"arn:aws:cloudtrail:{REGION}:{ACCT}:trail/{CLOUDTRAIL_TRAIL_NAME}"
 
+# ── #5543: the partitions each public serving role may READ (dynamodb:LeadingKeys) ─────────
+# Before #5543 the three roles below read GetItem/Query on the WHOLE table, so privacy rested
+# on lambdas/privacy/field_tiers.py alone and a code bug in a public Lambda could read any
+# partition. These are the allowlists, derived two ways and held by
+# tests/test_site_api_write_scope.py:
+#   1. statically — every registered partition family (phase_taxonomy.classify) and every
+#      USER#… key shape named anywhere in the Lambda's import closure must be covered;
+#   2. empirically — a read-only replay of every GET route against the live table on
+#      2026-11-15 (~375 requests, 115 distinct partitions) recorded the families listed.
+# Granularity is the FAMILY, on purpose: the site legitimately reads ~85 of the ~115 owner
+# source partitions (sensitive ones included, gated by field_tiers), so a per-source list
+# would add an under-grant risk for little protection. What these lists DO keep out is every
+# partition no public route reads: PERSONA#, NARRATIVE#, SYSTEM#, SUBSCRIBE#, CACHE#,
+# COACHSIM#, PULSE, EVALRET#, PROGRESS_LINK#, and any family added later.
+SITE_API_READ_PARTITIONS = (
+    "USER#matthew",  # the profile row (PROFILE#v1)
+    "USER#matthew#SOURCE#*",  # every owner source partition; field_tiers is the per-field gate
+    "USER#matthew#ROUTINE#*",  # /api/routine, /api/protocols (training/routine_repo)
+    "USER#system",  # ingest_health liveness sentinels (/api/source_freshness)
+    "COACH#*",
+    "ENSEMBLE#*",
+    "EVALUATOR#*",  # coach_prediction grade summary
+    "VOICEFIDELITY#*",
+    "READING#*",
+    "BOOK#*",
+    "BROADCAST_ORIGIN#*",  # the social membrane
+    "VOTES#*",
+    "RATE#*",
+    "COHORT#*",
+    "EXPERIMENT_FOLLOWS",
+    "CHALLENGE_FOLLOWS",
+)
+# The GSI half: for a Query on an index, LeadingKeys is the INDEX partition key. GSI2 is the
+# reading state/time index (reading/reading_keys.py); GSI1 (RECALL_DUE, private recall
+# prompts) is deliberately absent — no public route reads it.
+SITE_API_INDEX_READ_PARTITIONS = (
+    "READING_STATUS#*",
+    "READING_SESSION",
+)
+SITE_API_AI_READ_PARTITIONS = (
+    "USER#matthew",
+    "USER#matthew#SOURCE#*",
+    "USER#matthew#ROUTINE#*",  # training/routine_repo is in this Lambda's closure too
+    "COACH#*",
+    "ENSEMBLE#*",
+    "BOARDSESS#*",  # #546 board follow-up sessions
+    "RATE#*",
+    "BROADCAST_ORIGIN#*",
+)
+# The viewer renders one page from three partitions (its docstring); nothing else.
+PROGRESS_VIEWER_READ_PARTITIONS = (
+    "USER#matthew#SOURCE#progress_photos",
+    "USER#matthew#SOURCE#withings",
+    "USER#matthew#SOURCE#measurements",
+)
+
+
+def _leading_keys(partitions: tuple) -> dict:
+    """The one condition shape every scoped DynamoDB statement in this module uses."""
+    return {"ForAllValues:StringLike": {"dynamodb:LeadingKeys": list(partitions)}}
+
 
 def site_api() -> list[iam.PolicyStatement]:
     """Site API Lambda: read access + limited writes for public interaction endpoints.
@@ -60,9 +121,16 @@ def site_api() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="DynamoDBRead",
             actions=["dynamodb:GetItem", "dynamodb:Query"],
-            # ADR-097: /index/* added for the reading GSIs (GSI1/GSI2) — the public
-            # /api/reading_shelf + /api/reading_overview endpoints query GSI2.
-            resources=[TABLE_ARN, f"{TABLE_ARN}/index/*"],
+            resources=[TABLE_ARN],
+            conditions=_leading_keys(SITE_API_READ_PARTITIONS),  # #5543
+        ),
+        iam.PolicyStatement(
+            # ADR-097: the public /api/reading_shelf + /api/reading_overview endpoints query
+            # GSI2. #5543: split from the table statement so each carries its own key scope.
+            sid="DynamoDBIndexRead",
+            actions=["dynamodb:Query"],
+            resources=[f"{TABLE_ARN}/index/*"],
+            conditions=_leading_keys(SITE_API_INDEX_READ_PARTITIONS),
         ),
         iam.PolicyStatement(
             # SEC-01 (AUDIT 2026-06-30): the public site-api write was unconditioned on
@@ -205,7 +273,8 @@ def progress_viewer() -> list[iam.PolicyStatement]:
     Four statements, and each one is the minimum that makes a page render:
 
       * **DDB read** — the photo index (`USER#matthew#SOURCE#progress_photos`), plus the
-        `withings` and `measurements` partitions the weight/tape figures come from. Read-only.
+        `withings` and `measurements` partitions the weight/tape figures come from. Read-only,
+        and since #5543 LeadingKeys-scoped to exactly those three.
       * **DDB write, LeadingKeys `PROGRESS_LINK#*`** — the one-time link nonce, and nothing
         else on the table. This single conditional put is what makes a link single-use; the
         rows are TTL'd auth exhaust (SYSTEM_STATE in `phase_taxonomy`).
@@ -221,6 +290,7 @@ def progress_viewer() -> list[iam.PolicyStatement]:
             sid="DynamoDBRead",
             actions=["dynamodb:GetItem", "dynamodb:Query"],
             resources=[TABLE_ARN],
+            conditions=_leading_keys(PROGRESS_VIEWER_READ_PARTITIONS),  # #5543: the three partitions above
         ),
         iam.PolicyStatement(
             sid="DynamoDBLinkNonceWrite",
@@ -264,6 +334,7 @@ def site_api_ai() -> list[iam.PolicyStatement]:
             sid="DynamoDBRead",
             actions=["dynamodb:GetItem", "dynamodb:Query"],
             resources=[TABLE_ARN],
+            conditions=_leading_keys(SITE_API_AI_READ_PARTITIONS),  # #5543
         ),
         iam.PolicyStatement(
             sid="DynamoDBRateLimit",
