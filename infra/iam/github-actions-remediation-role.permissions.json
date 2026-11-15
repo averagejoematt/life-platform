@@ -215,6 +215,12 @@
       }
     },
     {
+      "Sid": "OpsDigestLine",
+      "Effect": "Allow",
+      "Action": "sns:Publish",
+      "Resource": "arn:aws:sns:us-west-2:205930651321:life-platform-alerts-digest"
+    },
+    {
       "Sid": "SecretsDescribe",
       "Effect": "Allow",
       "Action": "secretsmanager:DescribeSecret",
