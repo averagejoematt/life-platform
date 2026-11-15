@@ -1,56 +1,52 @@
-# Handover — Backlog paydown, the 8-hour block: ten review and accuracy bugs fixed in parallel lanes, 12 PRs merged and deployed, six closed on live proof (2026-11-14)
+# Handover — Sprint III close-out: the age-inference fix live, twelve owner-ruled call wordings published, the review recorded as partially calibrated, 11 PRs merged and deployed (2026-11-15)
 
 ## Driving instruction
-The owner asked for "a fresh new sweep of our backlog, coordinate with other sessions, and make a plan for an autonomous session for the next 8 hours paying more issues down", then "go" on the plan, which carried five calls he accepted with it: merge the surge-baseline fix even though surge engages (ceiling $215 → $252 while it does); no DynamoDB backfill for state_of_matthew; the alarm-citation schedule's IAM goes to him as a draft PR, not deployed; exemption/hold for the emf census to 11-28 and the two rhythm checkpoints left to him; fold the nutrition epic #5094. Mid-block he offered the 2026-11-14 accuracy-review issues; this session took the engine-side three (#5952, #5954, #5955). Lanes were agreed with the peer sessions: training (life-platform-fe: lambdas/training/**, the #5858 conflict set incl. the gate-census files), v9 sprint (session-co-issue-paydown: www/**, site/privacy/, site_api_chapters.py, publish_snapshot*), review (life-platform-34: no paths; #5932 and mcp/handler.py held untouched as its blind control).
+The owner's ruling of 2026-11-14, in his stated order: remove the precise derived-age disclosure first (and prove no age can be reconstructed), merge #6008 only as a partially calibrated run, fix the three other P1s, publish the 13 approved historical call wordings after final checks, change the review instrument between runs, prepare a first-person approval view, then other defects. "No grading corrections, source-policy expansions or new journal disclosures are authorized beyond the explicit decisions above." A second session (the backlog paydown lane) ran beside this one all day and is still running; its own queue is at the end.
 
 ## What is COMPLETE (merged, deployed, verified live)
-- **#5936** PR #5961 (e313b9d42) — the surge baseline ends before the reading under test. cost-governor redeployed 19:07Z; bundle carries `split_reading_and_baseline`. Closed.
-- **#5930 + #5527** PR #5963 (07229169a) — status board pages to the end, derives rows from the registry, unique `apple_health:<field>` ids. Live /api/status 21:38Z: 0 duplicate ids, CGM 79d, Mindful 217d, hevy row, macrofactor_workouts as archive. Both closed.
-- **#5955** PR #5964 (ee56f1697) — /api/presence reconciles against food rows at read time (cause: MacroFactor batch exports land after the 17:35Z presence compute). Live: present, last_log_date = newest food row. Closed.
-- **#5954** PR #5962 (5559e1bbe) — `partial_at_export` rows labelled partial and kept out of headline, averages, floor count, micronutrients, Data room tiles, meal-timing anchor. Live (cache-busted): partial_days [2026-11-13], latest_date 2026-11-12. Closed.
-- **#5952** PR #5960 (2c05f830f) + PR #5988 (ed0d41a24) — monthly_cost derived from the last closed month (~$220 for 2026-10); stack.json and the starter-slice cost note re-grounded. Live /api/platform_stats and /data/stack.json both ~$220. Closed.
-- **#5094** folded: all 19 stories closed; rulings R1–R8 carried verbatim to #5907. Closed.
+- **Age inference** — PR #6036 (25d6aa310) + PR #6047 (06a254eb8), ADR-168. `/api/phenoage` serves no figure of the owner's own (markers-only reference line at fixed ages); the public TDEE estimate is computed at a stated reference age; no public path reads the birth date. Live 19:47Z: `python3 tests/age_inversion_lib.py --live` finds no age-derived statistic on `/api/phenoage`, `/api/deficit_sustainability`, `/api/nutrition_overview`; the Journey page shows the markers-only block. The build runs the same attack (`tests/test_age_inversion.py`); the allow-list of public birth-date readers is empty.
+- **#6008** (6f65d722e) — the 2026-11-14 full review recorded `PARTIALLY_CALIBRATED`, not successful. Clocks advanced to 11-14: a11y, aiq, cpo, cto, data-architect, dataviz, designer, growth, integrations, narrative, principal, qs, reader. Not advanced: cost, devex, observability (11-13). Security keeps 11-14 from the separate calibrated security-only run; its control here is recorded not blind. The served grade carries the calibration sentence beside it.
+- **Weekly charts** — PR #6044 (179f60d03): one spark contract for Home and Data (`www/src/lib/spark.js`); the build compares the two pages.
+- **Share cards** — PR #6050 (21d2741b4): one weigh-in is one figure with its date. Live after the 20:00Z refresh, all for the 2026-11-15 weigh-in: `/api/journey`, `/public_stats.json` (`journey.weight_as_of`), the home page, the v9 home card and the weekly recap card (footer "weight as of 2026-11-15").
+- **Call wordings** — PR #6049 (73ec9bb5a): exactly 12 ledger rows show their words, each matching a record-key + text-hash entry in `common/narrative_allowlist.OWNER_RULED`; grades unchanged (49 confirmed, 46 refuted); each call page frames the words as the coach's claim. 13 were approved; call 1 is held (it dates a cited recovery reading one day off the public series).
+- **Review instrument v2** — PR #6055 (d86498982): `scripts/review_estate.py`, a bounded estate sweep per lens; the bar in `references/full.md` now asks for precision and recall. No new 17-lens run was launched.
+- **Commit path** — PR #6057 (ea12f7186): `deploy/agent_commit.sh` commits through the hooks (`LP_AGENT_COMMIT=1`; the pre-commit hook skips only its doc-sync sweep for that caller); `check_no_verify_sites.py` fails on any hook-skipping commit line.
+- **Receipt replay** — PR #6065 (de8877cf0): the replay sums the pillars in the compute's declared order (`character_engine.HEADLINE_PILLAR_ORDER`). No score, formula or `ENGINE_VERSION` moved.
+- Earlier the same sprint: #5998 moments page, #5999 policy §06/§08, #6000 open-question figures, #6001 provisional night on the Day page. PR #6031 (the paydown lane's one-line CSS fix) was merged by this session because it was failing every site deploy.
 
-## Merged, live proof still owed (Refs, not Fixes)
-- **#5931** PR #5965 (70d8f787f) — the writer's stage map renamed `phase_context`; `tag_record` overwrites a non-string `phase`. Proof: the Sun 19:30Z state-of-matthew run → `/api/state_of_matthew` `available: true`. The payload newly carries `phase_context` (day/week/stage — already public).
-- **#5933** PR #5967 (1ac9a8134) — origin-idiom framings checked against the journey start; recap figures grounded against the installment text incl. `where_we_are_now`. Proof: the next weekly_priority and Wednesday chronicle.
-- **#5934** PR #5958 (445dffa0f) — citations re-pointed; an alarm lit >14 d with no open `#N` now blocks wrap. The unattended schedule is draft PR **#5966** (OWNER-REQUIRED readonly-role grant); the paydown would not widen the remediation role's callers.
-- **#5935** PR #5957 (c8cd41c58) — scheduled-workflow red tenure: the cron-freshness watcher files/refreshes one `auto-filed` tracker at 3 consecutive reds; `WF RED` lines at boot. It filed #5973–#5976 on its first run (each now carries a diagnosis). managed-where re-verified; emf-series-census held to 2026-11-28.
-- **#5937** PR #5971 (8364da1f2) — CLAUDE.md CI/CD paragraph + format command corrected and gated by check_doc_facts; this wrap refreshes the status pointer (the last box).
-
-## AWAITING THE OWNER
-- **#5947 (P1)** — an owner-only clinical fact is live on a public surface (detail held privately). Takedown is his act.
-- **#5949 (P1)** — Panel prologue speaks body-weight figures: re-cut, or rule historical weights allowed in audio.
-- **PR #5966** — apply the readonly-role grant (#5934's schedule). **PR #5910** (#5513) and **#5897** (#5545, after #5858) as before.
-- **#5935** — the two rhythm checkpoints (steps on PR #5957); the accuracy-review artifact landing ("land it" to the review session) resets accuracy-full.
-- **#5974** — eval-harvest's role is KMS-denied on the table (IAM/key policy).
+## AWAITING THE OWNER (nothing to build until he answers)
+- **Core-12 habit id** — the private id is a key in 43 historical computed rows (21 `habit_scores`, 22 `computed_metrics`) and PROFILE#v1; a rename rewrites them, so the migration stopped as his ruling required. It is in two repo files and no API payload.
+- **Calls 1, 2 and 5** (withheld) — publish as written, publish with a dated note, or keep withheld; call 5 could be ruled "could not be checked", which changes a verdict. Calls 6 and 8 are published and rest on call 5's premise without the word "contingent". Findings: `~/Desktop/owner-review-2026-11-15/2_GRADING_CONSISTENCY_CALLS_2_5_AND_1.md`.
+- **First-person passages 1, 2, 4, 5, 6** — approve, trim or reject (`1_FIRST_PERSON_APPROVAL_VIEW.md`, same folder). No `mark_journal_quote` write has been made.
+- **Exact-boundary level** — on 2026-11-14 the weighted mean is exactly 20 and the sheet stores 19; whether it should read 20 is an engine version (#6066).
 
 ## Gotchas learned (each in memory)
-- A new test FILE is a new gate in the census (ceiling 857; census files fenced while #5858 is open) — fold new tests into an existing proven test file. Two lanes hit it.
-- Peer sessions in bypass mode hold this session's cross-session messages; three expired or waited for approval. Put cross-lane notes on the issue instead.
-- A merge-loop's "all checks done" must wait for the main PR workflow to REGISTER — `assert_pr_green.py` caught two expected checks missing on #5988 while "PR checks" sat queued.
-- A site deploy whose change touches site-API code defers itself until the site API serves that commit; it re-dispatches after the CI/CD deploy (stack.json landed ~40 min after merge).
-- CloudFront holds `/api/nutrition_overview` up to 1 h — read live proofs cache-busted.
+- A standing red gate rolls back every later deploy whatever it carries: the v9 visual gate (one 5-px overflow, ~9.5 h) and the deploy-health smoke (a float boundary) each reverted healthy work today. Read the rollback job before believing a merge is live — now in the `land` skill.
+- A floor over a float sum depends on the order of the additions at an exact boundary, and DynamoDB returns a map alphabetically. A replay must use the compute's declared order.
+- CloudFront caches `/api/phenoage` for an hour: a privacy fix to a cached route needs an invalidation before it is live.
+- A fix to a legacy `site/` asset reaches the bucket on the legacy site sync, not on the v9 run — confirm the object's LastModified before re-dispatching the v9 root deploy.
+- A deploy line pasted into the `!` prompt wraps and runs its tail as a second command; `Other CLIs … reading from cdk.out` means another deploy is already running. Do not pull the main checkout under a running `cdk deploy`.
+- The owner wants lookups and briefed write-ups on cheaper models and the context itself on the session model — now in the `wrap` skill.
 
 ## Residual / next picks
-- #5518 — Sun 2026-11-15 12:00 PT the hypothesis-engine writes the two genesis voids; verify both rows `expired_undecided`, then close (also clears `prereg-overdue`).
-- #5931 — read `/api/state_of_matthew` after the Sun 19:30Z run; close on `available: true`.
-- #5933 — close on the next weekly_priority + Wednesday chronicle passing the gates.
-- #5575 — Mon 2026-11-16 weekly run closes it, with #5759, #5761, #5772 and likely #5505.
-- #5802 — last box (one live stage-1 read) blocked by stage-1 latency #5813 (training lane).
-- #5990 — Coaching Room: critics_aerobic.py still prints the retired cap (residual of #5916).
-- #5973 — config-twin drift is training-lane artifacts; #5976 — PII sweep reds on two dark Coaching Room 404s.
-- not-work — the wrap's memory backup (`aws s3 sync … claude-memory-backup/`) was not run: an S3 write is ask-first under the owner's global rules; run it attended.
-- not-work — read the cost-governor's first run on the new code (~2026-11-15T01:00Z): expect `surge_threshold=1769 … recent_uniques=2603 surge_active=True`.
+- #6068 — make `review_carry_forward.scratch_dates` hold back a lens whose estate sweep is incomplete (the rule from #6055 is prose and a checker, not yet a gate).
+- #5953 — two acceptance items left: the still-recording mark on the Data room sleep tile and trend chart (no live instance today), and the general label contract test.
+- #6067 — the comprehension judge scores five public pages 1 of 2; `/` and `/story/` read as a weight-loss experiment since the front page leads with The Line.
+- #5514 — five tests over the 90-s bar; `tests/test_review_estate.py::test_the_emitter_enumerator_crosses_handlers_with_grants` (158.7 s) is this session's and wants a cached import closure.
+- #6066 — the paydown lane's issue on the same receipt symptom; the measured cause and #6065 are on it; what remains is the owner's scoring call above.
+- not-work — verify after tonight's 23:00 PT permanence run that `api/phenoage.json` inside `https://averagejoematt.com/archive/latest.tar.gz` carries `phenoage: null` (the tarball still holds the previous day's copy).
+- not-work — the wrap's memory backup (`aws s3 sync ~/.claude/projects/-Users-matthewwalker-dev-life-platform/memory/ s3://matthew-life-platform/claude-memory-backup/ --region us-west-2`) was not run: an S3 write is ask-first under the owner's global rules; run it attended.
+- not-work — the four owner decisions above; do not clear the other 93 withheld calls and do not act on the core-12 id without his answer.
+- Carried from the paydown lane's 2026-11-14 handover (that session is still running and owns them; not re-verified here): #5931 — close on `/api/state_of_matthew` `available: true`; #5933 — close on the next weekly_priority and Wednesday chronicle; #5575 — Monday 2026-11-16's weekly run closes it with #5759, #5761, #5772; #5802 — one live stage-1 read; #5973 — config-twin drift.
 
-**Build beat:** none — a backlog paydown of ten engine and gate fixes; no single reader-visible story to narrate
-**Docs:** `docs/alarm_citations.json` (qa-smoke-failures re-cited to #5939, new 2026-11-14 episode; qa-smoke-warnings gains its `cause`) · `CLAUDE.md` (status pointer) · CLAUDE.md CI/CD + format lines, `docs/MANAGED_WHERE_LEDGER.md`, `docs/OPERATING_CALENDAR.md` shipped in the lane PRs
-**Decisions:** none needed — every call this block made was the owner's plan answer of 2026-11-14 recorded on the issues; no governance change
-**Main:** green (ed0d41a2)
-**Incidents:** none
-**Stash/hooks:** clean · worktree-reap removed 140 merged lanes, released 14 locks; 1 dirty lane named and untouched (`sprint3/redact-labels`, the v9 sprint session's)
-**Closures:** #5094, #5110, #5371, #5527, #5530, #5533, #5540, #5542, #5558, #5769, #5780, #5792, #5795, #5801, #5817, #5899, #5930, #5936, #5952, #5954, #5955 commented (Shipped + Outcome); #3759/#4772 (folded, not planned) lost `closure:live-proof` with a not-realized verdict · DoD: scanned=37 hits=5 — #5916 unhomed-residual homed on #5990 (the sweep still reads the original close-time verdict); #5899 post-close "Reopen if…" is the owner's week-10 regeneration condition, not a reopen; #5920, #5948, #5956 are the v9 sprint session's closes, verdicts theirs
-**Backlog:** Now live at 12 (sonnet 2 · opus 12 · fable 1 startable); no promotion needed; Later sweep — no stale Later issues. Filed this session: #5990. Open 103 (95 at block start; +12 accuracy-review, +4 auto-filed trackers, +1 #5990)
-**Alarms:** all lit alarms cited; qa-smoke-failures (single 19:32Z FAIL, self-clears ~2026-11-15T19:35Z) → #5939; prereg-overdue → #5518
-**CI warnings:** 6 — 5 the intentional playwright skip (#3640), no action; 1 `test_grant_enumeration_drift.py::test_every_lambda_consumer_is_granted_its_channel` 92.7 s over the 90 s bar under a saturated runner day → #5514 (CI hygiene, per-test timeout)
-**Ledger:** omitted — #5935's tenure pass and #5934's wrap block are legs inside existing gates (cron-freshness, check_alarm_citations), and `docs/PROPORTIONALITY.md` is fenced to the training lane while #5858 is open; its wrap-nightly row still says alarm-citations is "not a leg" (owed with #5966)
+**Build beat:** none — the reader-visible changes are a privacy withdrawal and twelve historical call wordings; narrating a privacy fix publicly is the owner's choice, not a wrap's
+**Docs:** `docs/DECISIONS.md` (ADR-168) · `docs/INCIDENT_LOG.md` (+4 rows) · `docs/alarm_citations.json` (prereg-overdue and qa-smoke-warnings re-cited) · `docs/OPERATING_KNOWLEDGE_LEDGER.md` (+4 rows) · `.claude/skills/land/SKILL.md` and `.claude/skills/wrap/SKILL.md` · `CLAUDE.md` (status pointer); `docs/DATA_GOVERNANCE.md`, `docs/engines/CHARACTER.md`, `docs/CONVENTIONS.md` and ADR-152's amendment shipped in the lane PRs
+**Decisions:** ADR-168 filed (no public output is a function of the birth date); the twelve wordings are a record-specific owner authorization pinned in code, not a policy; "no routine hook bypass" is in `docs/CONVENTIONS.md`
+**Main:** green (de8877cf) · HEAD 15c804ee (the paydown lane's merges) still running at wrap
+**Incidents:** 4 rows added — the derived-age exposure (P2, silent ~145 days), the v9 visual gate rolling back every root deploy ~9.5 h, the receipt-replay smoke rolling back a healthy deploy, main stranded ~70 min at the IAM Plan gate after #5897 (the paydown lane's change; owner-run stack deploy 19:32Z)
+**Stash/hooks:** clean · the pre-commit hook was reinstalled with the `agent-commit-aware:v1` block (previous hooks backed up privately) · worktree-reap removed this session's merged lanes; three more removed by hand (clean), six local branches and one superseded remote branch deleted
+**Closures:** #5950, #5951 commented (Shipped + Outcome, realized) · DoD: scanned=14 hits=9 before commenting — #5518 (`no-live-proof`: its proof comment's format is not the gate's), #5611, #5932, #5976, #5979, #5990, #6051 are the paydown lane's closures and are left to it
+**Backlog:** Now holds 1 startable story in the fable lane and the corpus has none to promote there (opus 12 with #6068, sonnet 2) — the next session should run in the opus lane; Later sweep — no stale Later issues. Filed this session: #6067, #6068. Open 110
+**Alarms:** all lit alarms cited after two re-cites — prereg-overdue → #5928 (its story closed today after the genesis voids landed; expiry 2026-11-17 kept) · qa-smoke-warnings live cause is `public_brief:macrofactor_export_age`, under #5928 with no story of its own
+**CI warnings:** 15 — 5 the intentional playwright skip, no action; 5 per-test duration over 90 s → #5514 (comment names them); 5 comprehension-judge 1-of-2 scores → #6067
+**Ledger:** omitted — `scripts/review_estate.py` is a checker read by the review ritual and `tests/test_age_inversion.py` is a test in the existing gate estate (census pin and proof record moved in #6036); no scheduled writer, watcher, alarm or workflow was added

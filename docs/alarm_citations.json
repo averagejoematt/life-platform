@@ -239,11 +239,11 @@
  },
  "qa-smoke-warnings": {
   "added": "2026-10-28",
-  "cause_observed": "2026-11-14",
-  "updated": "2026-11-14",
+  "cause_observed": "2026-11-15",
+  "updated": "2026-11-15",
   "citation": "#5928 — the 'no red without an owner' review epic owns this standing WARN until a narrower story is filed. RE-DERIVED 2026-11-14 from /aws/lambda/life-platform-qa-smoke (filter-log-events '\"[QA] CAUSE\"'): the 09:22Z run read `[QA] CAUSE warn 29659b98 reader_truth:verdict` — one Reader Truth low/med finding, `audience_violation` (med) on /now/: the rubric read the cockpit's second-person copy ('your read', 'your instinct against the board's') as addressing the owner outside the /coaching/ exception. The next run, 16:44Z, read `[QA] CAUSE warn none -`: the finding did not reproduce, so the alarm is lit on WarnCount's 24h count of the 09:22Z run alone and clears on or about 2026-11-15T09:30Z unless the verdict re-fires. No `cause` is declared because the live channel names none right now (a declared cause would read as contradicted); if `reader_truth:verdict` fires again, the undeclared-cause leg reds and this entry must be re-cited with it. The 2026-11-02 cause (`reader_truth:confirm,reader_truth:verdict` on the v9 Start portrait) is no longer the one firing; WarnCount is count-aggregated, so the episode that began 2026-11-01 spans both.",
-  "note": "Re-cited 2026-11-14 (#5934): the prior entry cited #2741 and #5596, both now closed, and a cause the live run no longer reports.",
-  "cause": "reader_truth:confirm,reader_truth:verdict"
+  "note": "Re-cited 2026-11-15 at wrap: four runs between 19:46Z and 20:53Z all read `[QA] CAUSE warn … public_brief:macrofactor_export_age` (the public brief's MacroFactor export is older than its bar); `reader_truth:confirm` / `reader_truth:verdict` joined it on two of the four and were absent on the other two, so this entry declares the cause every run carried — a run that also carries a reader_truth id will read as a mismatch against it. No story exists for the export age; it stays under #5928 until one is filed. Prior note (2026-11-14, #5934): the entry before that cited #2741 and #5596, both closed, and a cause the live run no longer reported.",
+  "cause": "public_brief:macrofactor_export_age"
  },
  "field-notes-missing": {
   "added": "2026-10-25",
@@ -286,9 +286,9 @@
  },
  "prereg-overdue": {
   "added": "2026-11-14",
-  "cause_observed": "2026-11-14",
+  "cause_observed": "2026-11-15",
   "cause": "dead-man born in ALARM: no PreRegisteredOverdue datapoint emitted yet (missing data breaches); its first emits will count the two genesis hypotheses until their voids are written",
-  "citation": "#5518 — the sealed-pre-registration dead-man shipped by PR 5898 (LifePlatformMonitoring deployed 2026-11-14 04:56Z). Read 2026-11-14 (describe-alarms + list-metrics): ALARM since 2026-11-14T05:12Z on 'no datapoints were received for 2 periods ... treated as [Breaching]' — LifePlatform/Predictions PreRegisteredOverdue had no datapoint yet; the coach-prediction-evaluator emits it on its daily 18:00 UTC run. Per #5518's dry run the overdue count is exactly the two genesis hypotheses (h1, h2), whose voids the scheduled hypothesis-engine run writes on Sun 2026-11-15 12:00 America/Los_Angeles; the first emit after that reads 0 and the alarm clears. EXPIRES 2026-11-17: if it is still lit then, the voids did not land or the emitter is not running — re-open on #5518.",
+  "citation": "#5928 (the 'no red without an owner' epic; the story 5518 closed 2026-11-15T20:13Z after the Sunday hypothesis-engine run wrote both genesis voids at 20:00:55Z) — the sealed-pre-registration dead-man shipped by PR 5898 (LifePlatformMonitoring deployed 2026-11-14 04:56Z). Read 2026-11-14 (describe-alarms + list-metrics): ALARM since 2026-11-14T05:12Z on 'no datapoints were received for 2 periods ... treated as [Breaching]' — LifePlatform/Predictions PreRegisteredOverdue had no datapoint yet; the coach-prediction-evaluator emits it on its daily 18:00 UTC run. Per story 5518's dry run the overdue count is exactly the two genesis hypotheses (h1, h2), whose voids the scheduled hypothesis-engine run writes on Sun 2026-11-15 12:00 America/Los_Angeles; the first emit after that reads 0 and the alarm clears. EXPIRES 2026-11-17: if it is still lit then, the voids did not land or the emitter is not running — re-open on story 5518.",
   "note": "Added 2026-11-14 (#5934): the alarm went red within the hour of its creation and had no row."
  }
 }
