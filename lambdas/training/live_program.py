@@ -246,7 +246,9 @@ def apply_joint_rule(rx: dict[str, Any], ctx: dict[str, Any], rotation: dict[str
     taken = {str(e.get("movement_key")) for e in rx["exposures"]}
     for e in rx["exposures"]:
         entry = _entry(e.get("movement_key"), ctx)
-        hit = live_pain.hit(entry, e, flags, ctx) if entry and e.get("intensity") != "carry" else None  # FIX7: scoped
+        hit = live_pain.hit(entry, e, flags, ctx) if entry else None  # FIX7: scoped
+        if hit and e.get("intensity") == "carry":  # fix round 14 (B11/B15): a carry loading the flagged joint is held, never routed
+            hit = ("hold", hit[1], hit[2])
         swap_of = _avoided_swap(e, ctx, flags)
         if swap_of:
             lines.append(f"skipped (live): {entry.get('title') or e.get('movement_key')} — {swap_of}: the flagged pattern is off today")

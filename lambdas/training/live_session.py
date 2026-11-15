@@ -299,6 +299,7 @@ def for_live_draft(
         if rx.get("session_role") == plan["week"]["roles"][0]:  # once a week, on its first morning
             lines += [str(plan["priority_line"])] if plan.get("priority_line") else []
             lines += [f"moved (live): {ln[len('moved: ') :]}" for ln in plan["lines"] if ln.startswith("moved: ")]
+            lines += [f"abs (live): {ln[len('abs: ') :]}" for ln in plan["lines"] if ln.startswith("abs: ")]
         lines += live_volume.apply(out, ctx, plan)
         lines += fit_exposures(out, rotation or {}, ctx) + _no_new_on_a_strained_day(out, rotation or {}, ctx)
         live_load.mark_novelty(out, ctx, block_workouts)
@@ -713,7 +714,7 @@ def rationale_lines(rx: dict[str, Any]) -> list[str]:
     out += [
         ln
         for ln in rx[MARK].get("lines") or []
-        if ln.startswith(("evidence (live): ", "loss rate (advisory", "priority (live): ", "moved (live): "))
+        if ln.startswith(("evidence (live): ", "loss rate (advisory", "priority (live): ", "moved (live): ", "abs (live): "))
     ]
     fat = rx.get("fatigue") or {}
     if fat:

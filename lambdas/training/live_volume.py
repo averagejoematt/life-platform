@@ -229,6 +229,7 @@ def _row(role: str, e: dict[str, Any], catalog: dict[str, Any], lib: dict[str, A
         "guest": guest,
         "isolation": entry.get("job") != "compound",
         "equipment": str((catalog.get(str(e.get("movement_key"))) or {}).get("equipment") or ""),
+        "family": (catalog.get(str(e.get("movement_key"))) or {}).get("anchor_family"),  # fix round 14: its warm-ups (plan_minutes)
         "rep_top": max((int(st["reps"][-1]) for st in e.get("sets") or [] if isinstance(st, dict) and st.get("reps")), default=0),
     }
 
@@ -354,7 +355,8 @@ def plan_minutes(rows: list[dict[str, Any]]) -> float:
     seconds, climbed, dumbbell = 0.0, False, False
     for r in rows:
         warm = int(bool(r.get("feeler")))
-        if r["kind"] == "anchor" and str(r["pattern"]) in families:
+        # fix round 14: a compound in an accessory slot (a split squat: its catalog anchor family) is warmed as written too
+        if (r["kind"] == "anchor" and str(r["pattern"]) in families) or (r["kind"] != "anchor" and r.get("family") in families):
             if r.get("equipment") == "dumbbell":
                 warm, dumbbell = (0 if dumbbell else 1), True
             else:
@@ -626,6 +628,12 @@ def week_plan(
     `set_cap`: the session set ceiling the morning is fitted to."""
     week = week_shape(mornings)
     rows = [r for role in week["roles"] for r in day_rows(role, week, catalog, lib, in_block, variants)]
+
+    def unlogged(key: Any) -> bool:  # no logged set in the block: the morning writes its "find the load" W row
+        return bool(logged) and str(lib_entry(key, catalog, lib).get("template_id") or "").upper() not in logged
+
+    for r in rows:  # fix round 14: the plan's minutes count the W row the morning writes (a 2-set fill was cut for it)
+        r["feeler"] = r.get("feeler") or (r["kind"] == "accessory" and r["intensity"] != "carry" and unlogged(r["key"]))
     lines = _press_trade(rows, lib, press_source)
     tg = targets(lib, week["mornings"])
     lo = int(cfg.value("slot_min_sets"))
@@ -639,12 +647,6 @@ def week_plan(
     by_tid = {str(e.get("template_id") or "").upper(): e for e in (lib.get("movements") or {}).values() if e.get("template_id")}
     logged_patterns = {by_tid[t].get("pattern") for t in logged if t in by_tid} - {None}
 
-    def unlogged(key: Any) -> bool:
-        return str(lib_entry(key, catalog, lib).get("template_id") or "").upper() not in logged
-
-    def main(r: dict[str, Any]) -> str:
-        return landmark_muscle(r["key"], catalog, lib)
-
     def add(m: str, role: str, probe: bool = False) -> Any:
         here = {lib_entry(r["key"], catalog, lib).get("pattern") for r in rows if r["role"] == role}  # never the same pattern twice
         keys = [
@@ -655,15 +657,15 @@ def week_plan(
         known = bool(keys) and (str(entry.get("template_id") or "").upper() in logged or entry.get("pattern") in logged_patterns)
         if keys and not known and logged and m not in prio:
             return 0  # a movement new to him (one RPE-7 exposure) is added only for a priority muscle's aim — never for another
-        if keys and logged and unlogged(keys[0]) and any(unlogged(r["key"]) and (r.get("fill") or main(r)) == m for r in rows):
+        if keys and logged and new_for(m, keys[0], rows, catalog, lib, logged):
             return 0  # fix round 14: at most ONE movement with no logged set (new to him) per muscle in a week
         if not keys or probe:
-            return (1 if known else 2) if keys else 0
+            return (1 if known and not unlogged(keys[0]) else 2) if keys else 0  # 2: the W row the morning writes
         taken.add(keys[0])
         new = {"kind": "accessory", "slot": f"fill_{m}", "intensity": "accessory", "movement_key": keys[0], "sets": [{}] * lo}
         if not known and logged:  # new to him: its first exposure runs at RPE 7 (novelty) — not a hard set this week
             return _row(role, new, catalog, lib) | {"fill": m, "feeler": True, "learning": True}
-        return _row(role, new, catalog, lib) | {"fill": m, "feeler": not known}  # no load on file: one "find the load" set
+        return _row(role, new, catalog, lib) | {"fill": m, "feeler": not known or unlogged(keys[0])}  # no load: one W set
 
     one = plan_minutes([{"kind": "accessory", "pattern": None, "sets": 1, "intensity": "accessory"}])
 
@@ -678,6 +680,11 @@ def week_plan(
     surplus()  # 3. again: a head's aim may have grown its muscle past MAV (ruling 9)
     lines += _redline(rows, tg, prio)
     counts = _count(rows)
+    if week["mornings"] <= 3 and counts["abs"] < 1e-9 and tg.get("abs", {}).get("aim"):  # fix round 14 (B24): said, not silent
+        lines.append(
+            f"abs: 0 direct ab sets this week (aim {tg['abs']['aim']:g} on a {week['mornings']}-morning week) — the mornings' "
+            "movements go to the anchors first; the abs return with the next full week"
+        )
     short_of = [m for m in sorted(prio) if m in tg and counts[m] + 1e-9 < tg[m]["aim"]]
     priority_line = _priority_trade(short_of, counts, tg, host, full, lib, rows, catalog) if short_of else None
     under = [
@@ -695,6 +702,16 @@ def week_plan(
         "lines": lines,
         "priority_line": priority_line,
     }
+
+
+def new_for(m: str, key: Any, rows: list[dict[str, Any]], catalog: dict[str, Any], lib: dict[str, Any], logged: frozenset[str]) -> bool:
+    """Fix round 14 (B9): True when `key` has no logged set in the block AND the week already serves `m` a movement with none —
+    a normal week meets at most ONE movement new to him per muscle (a rotation's pick or a fill)."""
+
+    def unlogged(k: Any) -> bool:
+        return str(lib_entry(k, catalog, lib).get("template_id") or "").upper() not in logged
+
+    return unlogged(key) and any(unlogged(r["key"]) and (r.get("fill") or landmark_muscle(r["key"], catalog, lib)) == m for r in rows)
 
 
 def _priority_trade(

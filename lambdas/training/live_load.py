@@ -426,7 +426,10 @@ def mark_novelty(rx: dict[str, Any], ctx: dict[str, Any], workouts: Any) -> None
         if start is not None:  # fix round 14: the note's starting point from the closest logged movement, and why it is here
             fill = str(e.get("live_added") or "")
             e["live_start"] = start | ({"for": fill[len("fill_") :].replace("_", " ")} if fill.startswith("fill_") else {})
-        if gap and tid and tid in logged and (tid, role) not in since and (tid, "") not in since:
+        # fix round 14 (B8): an accessory trained since the gap on ANY morning is back — a stale "first session back" line came
+        # from the mark kept per role; an anchor keeps it per role (a heavy and a volume day of one template are two lifts)
+        back = (tid, role) in since or (tid, "") in since or (e.get("kind") != "anchor" and any(t == tid for t, _r in since))
+        if gap and tid and tid in logged and not back:
             e["live_first_back"] = True
             e["live_effort"] = min(int(cfg.value("first_back_rpe")), int(e.get("live_effort") or 99))
             e["live_familiar"] = True
@@ -465,7 +468,8 @@ def start_point(key: Any, ctx: dict[str, Any], workouts: Any, logged: set[str]) 
                 best = (_day(w), kg, str((idx.get(t) or {}).get("title") or (by_tid.get(t) or {}).get("title") or t))
     if best is None:
         return {"lb": None, "new": new}
-    return {"lb": round(best[1] / KG_PER_LB * 2) / 2, "title": best[2], "new": new}
+    hand = (catalog.get(str(key)) or {}).get("load_convention") == "per_hand" or kit == "dumbbell"
+    return {"lb": round(best[1] / KG_PER_LB * 2) / 2, "title": best[2], "new": new} | ({"per_hand": True} if hand else {})
 
 
 def _lib(e: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
@@ -487,7 +491,7 @@ def start_line(note: str, start: dict[str, Any] | None) -> str:
         return note
     head = ("New to you" if start.get("new") else "Not done lately") + (f", for {start['for']}" if start.get("for") else "")
     if start.get("lb"):
-        tail = f"start near {start['lb']:g} lb, the load of your {start['title']}."
+        tail = f"start near {start['lb']:g} lb{' per hand' if start.get('per_hand') else ''}, the load of your {start['title']}."
         own, said = f"{head}: {tail}", "Start" + tail[len("start") :]
     else:
         own = said = f"{head}: W set up to {g.PICK_LOAD_W_REPS} easy reps, {g.PICK_LOAD_OPEN_TAIL}"
