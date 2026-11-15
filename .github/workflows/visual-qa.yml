@@ -226,7 +226,7 @@ jobs:
           if [ -n "${AI_QA_SKIP}" ]; then SKIPPED+=(--ai-qa-skipped "${AI_QA_SKIP}"); fi
           if [ -n "${READER_TRUTH_SKIP}" ]; then SKIPPED+=(--reader-truth-skipped "${READER_TRUTH_SKIP}"); fi
           python3 qa/visual_qa.py --screenshot ${{ steps.cadence.outputs.ai_qa_flag }} ${{ steps.cadence.outputs.reader_truth_flag }} \
-            --color-scheme ${{ steps.cadence.outputs.color_scheme }} "${SKIPPED[@]}"
+            --color-scheme ${{ steps.cadence.outputs.color_scheme }} --a11y-ledger-s3 "${SKIPPED[@]}"
 
       - name: Accuracy gate (per-page resolves + no impossible numbers)
         if: always() && steps.dial.outputs.level != 'off'
