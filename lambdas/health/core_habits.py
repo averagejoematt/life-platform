@@ -17,6 +17,14 @@ twelve ids, each with a label and a BASIS saying how a day is graded —
   * ``wake_consistency`` `health.wake_consistency.grade_day` against `sleep.wake_time` (#5133) — the ONE grader, never
                          a second definition: on_time is done, off is missed, unknown is unknown.
 
+A PUBLIC ALIAS (#6090, owner ruling 2026-11-16): a charter entry marked ``"id_alias": true`` carries a neutral public id
+in place of the id its rows are stored under (that stored id is owner data). The private mapping is the habit registry
+itself — the entries flagged for it carry the STORED id as ``core`` and the public alias as ``core_alias`` (PROFILE#v1,
+owner data, written by ``scripts/apply_habit_core_flags.py --alias``). ``resolve_spec`` swaps the alias for the stored
+id before anything is graded or keyed, so every row (``core_status``, ``component_details``) keeps the key it has always
+carried and no history is rewritten. No mapping is the no-registry-match case: no members, graded unknown (never a
+miss), and a WARNING says which alias went unresolved.
+
 UNKNOWN, never a miss (ADR-104): an unknown core habit is left out of the score. A day with no known core habit has no
 score. ARMED: the set drives the score only once at least one active registry entry carries a ``core`` flag — before
 that, the caller keeps the tier-weighted read and this module says so (``armed: False``), so a deploy ahead of the
@@ -28,14 +36,18 @@ wake times, the check-in state) and passes it in, which keeps this module import
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Callable, Mapping, Optional
 
 from training import training_charter
+
+logger = logging.getLogger(__name__)
 
 MODULE_VERSION = "core-habits@1.0.0"
 DONE, MISSED, UNKNOWN = "done", "missed", "unknown"
 BASES = ("habitify", "steps", "evening_checkin", "wake_consistency")
 FLAG = "core"  # the habit_registry entry field that names the core id it belongs to
+ALIAS_FLAG = "core_alias"  # #6090: the registry field carrying the charter's public alias for the stored `core` id
 
 # reading(registry_key, meta) -> the day's value (>= 1 done, < 1 not done) or None when unobserved / not scheduled
 Reading = Callable[[str, Mapping[str, Any]], Optional[float]]
@@ -48,7 +60,60 @@ def core_spec() -> list[dict[str, Any]]:
     out = []
     for e in raw if isinstance(raw, list) else []:
         if isinstance(e, Mapping) and isinstance(e.get("id"), str) and e.get("basis") in BASES:
-            out.append({k: e[k] for k in ("id", "label", "basis", "rule_ref") if k in e})
+            out.append({k: e[k] for k in ("id", "label", "basis", "rule_ref", "id_alias") if k in e})
+    return out
+
+
+def alias_map(registry: Any) -> dict[str, str]:
+    """#6090: `{public alias: stored id}` — the private mapping, read from the registry entries that carry both a
+    `core` flag and a `core_alias` (any status: the mapping is identity, not scheduling). An alias that two entries map
+    to DIFFERENT stored ids is ambiguous and left out (logged by its alias, which is public), never guessed."""
+    seen: dict[str, set[str]] = {}
+    for meta in (registry or {}).values() if isinstance(registry, Mapping) else ():
+        stored, alias = flag_of(meta), meta.get(ALIAS_FLAG) if isinstance(meta, Mapping) else None
+        if stored and isinstance(alias, str) and alias.strip():
+            seen.setdefault(alias.strip(), set()).add(stored)
+    out = {}
+    for alias, stored in seen.items():
+        if len(stored) == 1:
+            out[alias] = next(iter(stored))
+        else:
+            logger.warning("[core-habits] core alias %s maps to %d different stored ids — left unresolved", alias, len(stored))
+    return out
+
+
+def resolve_spec(spec: Optional[list[dict[str, Any]]], registry: Any) -> list[dict[str, Any]]:
+    """#6090: the spec with each Habitify-basis `id_alias` entry's public id replaced by its STORED id (the registry's
+    private mapping, `alias_map`), so membership, `core_status` keys and `component_details` ids are the ones every
+    stored row already carries. An alias an entry is flagged with directly needs no mapping and is kept. An alias with
+    neither, on an ARMED registry, is kept as is — no member, so graded unknown, never a miss (the no-registry-match
+    case) — and logged as a WARNING naming the alias (public) only. Every other entry is returned unchanged."""
+    spec = list(spec if spec is not None else core_spec())
+    if not any(e.get("id_alias") for e in spec):
+        return spec
+    reg = registry if isinstance(registry, Mapping) else {}
+    amap = alias_map(reg)
+    flags = {flag_of(m) for m in reg.values()} - {None}
+    taken = {e["id"] for e in spec}
+    armed = is_armed(reg)
+    out = []
+    for e in spec:
+        if not e.get("id_alias"):
+            out.append(e)
+            continue
+        e = {k: v for k, v in e.items() if k != "id_alias"}  # resolved once: a second pass is a no-op, never a second log
+        stored = amap.get(e["id"]) if e.get("basis") == "habitify" else None
+        if stored and stored not in taken:
+            e["id"] = stored
+        elif stored:
+            logger.warning("[core-habits] core alias %s maps to a stored id another core habit uses — left unresolved", e["id"])
+        elif e["id"] not in flags and armed:
+            logger.warning(
+                "[core-habits] core alias %s has no private mapping (registry `%s`) — graded unknown, never a miss",
+                e["id"],
+                ALIAS_FLAG,
+            )
+        out.append(e)
     return out
 
 
@@ -69,8 +134,9 @@ def _active(meta: Any) -> bool:
 
 
 def members(registry: Any, spec: Optional[list[dict[str, Any]]] = None) -> dict[str, list[str]]:
-    """`{core_id: [registry_key, ...]}` for every HABITIFY-basis core id (an id with no flagged entry maps to [])."""
-    spec = spec if spec is not None else core_spec()
+    """`{core_id: [registry_key, ...]}` for every HABITIFY-basis core id (an id with no flagged entry maps to []).
+    An aliased id is keyed by its STORED id (`resolve_spec`, #6090)."""
+    spec = resolve_spec(spec, registry)
     out: dict[str, list[str]] = {e["id"]: [] for e in spec if e["basis"] == "habitify"}
     for key, meta in (registry or {}).items() if isinstance(registry, Mapping) else ():
         f = flag_of(meta)
@@ -95,8 +161,11 @@ def flag_drift(registry: Any, spec: Optional[list[dict[str, Any]]] = None) -> di
     core_ids_unflagged   a habitify-basis core id no active registry entry carries
     core_flag_unknown    an entry flagged with an id the charter does not carry, or with a non-habitify id
     core_flag_inactive   an entry flagged core whose status is not active (it can never be read)
+
+    An aliased id is compared by its STORED id (`resolve_spec`, #6090); an unresolved alias reads as one unflagged id
+    plus its stored-id entries as unknown flags, so a missing private mapping is drift the check reports.
     """
-    spec = spec if spec is not None else core_spec()
+    spec = resolve_spec(spec, registry)
     habitify_ids = {e["id"] for e in spec if e["basis"] == "habitify"}
     reg = registry if isinstance(registry, Mapping) else {}
     flagged = [(flag_of(m), _active(m)) for m in reg.values() if flag_of(m)]
@@ -221,8 +290,8 @@ def grade_day(
 
     `checkin`: True (answered), False (prompted, not answered), None (unknown). `wakes`: `{YYYY-MM-DD: "HH:MM"}` Pacific
     main-sleep ends, covering the graded day and the anchor window before it. Every input absent reads unknown."""
-    spec = spec if spec is not None else core_spec()
     reg = registry if isinstance(registry, Mapping) else {}
+    spec = resolve_spec(spec, reg)  # #6090: aliased ids graded and keyed by their stored id
     mem = members(reg, spec)
     rows = []
     for e in spec:

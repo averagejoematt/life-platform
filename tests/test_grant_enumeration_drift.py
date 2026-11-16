@@ -141,12 +141,8 @@ _DYNAMIC_REFERENCES: dict[str, str] = {
     "secret:lambdas.common.secret_cache.get_secret": "the shared cache indirection — every caller's id is its own literal",
     "secret:lambdas.common.secret_cache.get_secret_json": "same, JSON variant",
     "secret:lambdas.ingestion.eightsleep_lambda._cached_secret": "secret id is a parameter of the local cache wrapper",
-    # #2846: appeared the moment health-auto-export-webhook stopped being a raw
-    # `_lambda.Function` and became a create_platform_lambda call — this sweep's
-    # population IS the constructor's call sites (_sweep_fleet), so for as long as
-    # HAE was constructed by hand it was invisible to the grant lockstep. Same
-    # local-cache-wrapper shape as its eightsleep/notion siblings above.
-    "secret:lambdas.ingestion.health_auto_export_lambda._cached_secret": "secret id is a parameter of the local cache wrapper",
+    # (#5513 removed the HAE `_cached_secret` row that #2846 added: the webhook now reads both of its
+    # secret ids as module constants through common.secret_cache, so the lockstep checks them by name.)
     "secret:lambdas.ingestion.ingestion_framework.run_ingestion": "SIMP-2 reads the id from the source registry facet",
     "secret:lambdas.ingestion.notion_lambda._cached_secret": "secret id is a parameter of the local cache wrapper",
     # #3760: both surfaced when `progress-viewer` joined the fleet — this sweep's population
@@ -865,14 +861,10 @@ _PENDING_PERMISSIONS_APPLY: dict[str, str] = {
     # 2026-11-15: the #5974 golden-eval-role entry (KMSDecryptViaDynamoDB, conditioned kms:ViaService
     # dynamodb.us-west-2) was applied ~07:00Z with the put-role-policy command; get-role-policy read back
     # the Sid. Removed here per the same #2824 rule.
-    "github-actions-deploy-role": (
-        "2026-11-15 (#5544): LambdaDeploy (function:*/layer:* in two regions, InvokeFunction, layer writes) "
-        "narrowed to LambdaFleetDeploy (the ci/lambda_map.json fleet) + LambdaSiteApiRecycle; S3 object "
-        "access narrowed from the bucket root to deploys/ site/ config/ www-previous/ and the "
-        "iam-additive-gate ledger. Owner applies with `bash deploy/setup_github_oidc.sh` "
-        "(= aws iam put-role-policy --role-name github-actions-deploy-role --policy-name "
-        "life-platform-cicd-permissions --policy-document file://infra/iam/github-actions-deploy-role.permissions.json)"
-    ),
+    # 2026-11-16: the #5544 deploy-role entry (LambdaDeploy narrowed to LambdaFleetDeploy + LambdaSiteApiRecycle;
+    # S3 object access narrowed to deploys/ site/ config/ www-previous/ and the iam-additive-gate ledger) was
+    # applied with `bash deploy/setup_github_oidc.sh` (owner-approved); post-apply
+    # `deploy/verify_oidc_iam.py --strict` reported CLEAN across all 17 targets. Removed here per the same #2824 rule.
 }
 
 

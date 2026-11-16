@@ -15,6 +15,7 @@ import { scaleWords, weeklySpark } from "../lib/spark.js";
 import { chapterCount, chapterMeta, chapterWindow, dayInWords, nextChapter, domainWords, num, kOfN, clip, heldCallWords } from "../lib/format.js";
 import { connectedTo, loadAll, loadSeries, latestEdition, dayLine, loadCalibration, loadJourney, loadLab } from "../lib/snapshot.js";
 import { labEnabled } from "../lib/lab.js";
+import { bodyChange, fourParts, labVerdicts } from "../lib/standing.js";
 import { lineCounts, theLine } from "../lib/theline.js";
 import { verifiedLead } from "../lib/calibration.js";
 import { roomPublic } from "../lib/room.js";
@@ -208,64 +209,45 @@ const sparkOf = (d: Dim) => weeklySpark(d.bars || [], { faint: d.value == null }
 // the behaviour (the Laboratory's pre-registered tests, and how many have a verdict), the life (the dimensions with a
 // public measure) and the AI (the checked record beside a simple guess on the same calls, with the producer's verdict).
 // A part whose figure is not served says so. Each figure opens its sentence, so it reads as one line on a phone.
-let labTests: { open: number; decided: number } | null = null;
+// The four figures come from lib/standing.js — the one producer the Story, Data and System strips read too
+// (components/FourParts.astro); this page adds its own sentences.
+let labFile: any = null;
 if (labEnabled()) {
   try {
-    const lab: any = await loadLab();
-    if (lab?.state === "ok") {
-      const ts = (lab.lab_tests || []).filter((t: any) => t.status !== "archived");
-      const verdictOf = (t: any) => (t.verdict && typeof t.verdict === "object" ? t.verdict.result : t.verdict);
-      labTests = { open: ts.length, decided: ts.filter((t: any) => verdictOf(t) && verdictOf(t) !== "inconclusive").length };
-    }
+    labFile = await loadLab();
   } catch {
-    labTests = null;
+    labFile = null;
   }
 }
-// the status is this page's short label for the producer's verdict; the sentence is the producer's own words
-const AI_STATUS: Record<string, string> = {
-  no_clear_difference: "no advantage shown",
-  too_few: "too few calls to tell",
-  rule_better: "behind a simple guess",
-  coaches_better: "ahead of a simple guess",
-};
-const aiStatus = soFarLead?.sign?.verdict ? AI_STATUS[soFarLead.sign.verdict] || null : null;
+const body = bodyChange(weightSeries, startDate, lineData?.startValue ?? null);
+const fp = fourParts({ body, lab: labVerdicts(labFile), measured, lead: soFarLead });
+const fig = (id: string) => fp.find((p) => p.id === id)!;
+const labTests = labVerdicts(labFile);
 const aiWords = soFarLead?.sign?.words ? `${soFarLead.sign.words.charAt(0).toUpperCase()}${soFarLead.sign.words.slice(1)}.` : null;
-const lighter = lineLost < 0;
+const lighter = body ? body.lost < 0 : false;
 type Standing = { id: string; part: string; status: string; value: string | null; text: string; to: string };
 const standing: Standing[] = [
   {
-    id: "body",
-    part: "The body",
-    status: "measured",
-    value: lineData ? `${num(Math.abs(lineLost), 1)} lb` : today?.change_lbs != null ? `${num(Math.abs(today.change_lbs), 1)} lb` : null,
-    text: lineData
-      ? `${lighter ? "lighter" : "heavier"} in ${lineCount.days} days, across ${lineCount.readings} weigh-ins. ${lighter ? "The weight loss is real: it" : "It"} is the line below.`
+    ...fig("body"),
+    text: body
+      ? `${lighter ? "lighter" : "heavier"} in ${body.days} days, across ${body.readings} weigh-ins. ${lighter ? "The weight loss is real: it" : "It"} is the line below.`
       : "The weigh-ins are not served in this snapshot.",
     to: "#the-line",
   },
   {
-    id: "behaviour",
-    part: "The behaviour",
-    status: "being tested",
-    value: labTests ? `${labTests.decided} of ${labTests.open}` : null,
+    ...fig("behaviour"),
     text: labTests
       ? `pre-registered tests ${labTests.decided === 1 ? "has" : "have"} a verdict. Whether the new habits hold is not known yet.`
       : "Whether the new habits hold is not known yet; the Laboratory is not served in this snapshot.",
     to: "#open-questions",
   },
   {
-    id: "life",
-    part: "The life",
-    status: "not established",
-    value: `${measured} of ${dims.length}`,
+    ...fig("life"),
     text: `dimensions of a life have a public measure${measured === 3 ? ", all of them the body's" : ""}. Whether I'm happier is not established.`,
     to: "#portrait",
   },
   {
-    id: "ai",
-    part: "The AI",
-    status: aiStatus || "being checked",
-    value: soFarLead?.baseline ? `${soFarLead.k} v ${soFarLead.baseline.right}` : null,
+    ...fig("ai"),
     text: soFarLead?.baseline
       ? `coach forecasts right against a simple guess's, on the same ${soFarLead.n} calls.${aiWords ? ` ${aiWords}` : ""}`
       : "The coaches' checked record is not served in this snapshot.",

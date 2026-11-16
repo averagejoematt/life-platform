@@ -554,9 +554,9 @@ def compute_coach_prediction_evaluator() -> list[iam.PolicyStatement]:
                 actions=["lambda:InvokeFunction"],
                 resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-history-summarizer"],
             ),
-            # #5545: no needs_ai_keys here, so this is the role's ONLY metric grant —
-            # it carries the whole import-closure set, not just Predictions.
-            _put_metric_data_statement("CloudWatchMetrics", NS_AI, NS_COMPUTE, NS_PREDICTIONS),
+            # #5545: no needs_ai_keys here, so this is the role's ONLY metric grant. #5905: NOT LifePlatform/AI —
+            # the role holds no Bedrock grant and no code path from the handler calls an AI emitter (reached only).
+            _put_metric_data_statement("CloudWatchMetrics", NS_COMPUTE, NS_PREDICTIONS),
         ],
     )
 

@@ -103,6 +103,27 @@ HEURISTICS: dict[str, dict[str, Any]] = {
         "HELD and flagged — the load is no longer the likely cause (technique, recovery, the movement itself)",
         "retune": "block retro: every flagged lift — what the cause turned out to be",
     },
+    "step_up_hold_rpe_over": {
+        "charter": "effort_ceilings.overage_tolerance_rpe",
+        "group": "progression",
+        "basis": "#6015 (owner ruling 2026-11-16, hold-and-build): after the engine's own one-step raise, an exposure at the new "
+        "load at or over the rep floor and at most this many RPE over the lift's working target is a normal first exposure — the "
+        "load HOLDS and the reps build; more than this over is a too-heavy step and the effort fit reverts it. READ from the "
+        "charter at every use (`training_charter.charter_value`): the charter's own tolerance for a set over its line, so a "
+        "charter change moves this rule",
+        "retune": "block retro: reps and RPE at the first exposures after each step up; reverts per lift",
+    },
+    "step_up_hold_exposures": {
+        "charter": "progression.stall_rule.consecutive_exposures",
+        "group": "progression",
+        "basis": "#6015: a held load whose last this-many exposures (an excused date skipped: a recorded deload day, "
+        "`live_load.excused_days`) all missed, the newest with no rep gained and no RPE shed since the first, is a STALL — the "
+        "effort fit then reverts it, and that load is not retried inside `history_days` until the top of the range comes "
+        "`step_up_hold_rpe_over` under target. READ from the charter at every use (`training_charter.charter_value`): the "
+        "charter's own stall count — the first exposure at a new load plus the two-exposure evidence every reduction needs "
+        "(`below_floor_exposures`)",
+        "retune": "block retro: held loads that later reached the top vs those reverted; reverted loads retried and held",
+    },
     "implausible_rpe": {
         "value": 9.5,
         "group": "progression",
@@ -270,8 +291,18 @@ def settings(lib: dict[str, Any] | None) -> dict[str, Any]:
 
 
 def value(name: str) -> Any:
-    """One heuristic's value."""
-    return HEURISTICS[name]["value"]
+    """One heuristic's value. A row that names a `charter` path (#6015) holds no number of its own: it is read through
+    `training_charter.charter_value` at every use, so a charter change moves the rule (an explicit `value` — a test's
+    override — still wins)."""
+    row = HEURISTICS[name]
+    if "value" in row or "charter" not in row:
+        return row["value"]
+    from training.training_charter import charter_value
+
+    got = charter_value(row["charter"])
+    if got is None:
+        raise KeyError(f"live_settings.{name}: charter value {row['charter']} not found")
+    return got
 
 
 def defaults() -> dict[str, Any]:
@@ -286,6 +317,7 @@ def settings_table_markdown() -> str:
         out.append(f"| `{k}` | `{row['default']!r}` | {row['ruling']} | {row['what']} |")
     out += ["", "| Heuristic | Value | Rule | Basis | Re-tuned on |", "|---|---|---|---|---|"]
     for k, row in HEURISTICS.items():
-        out.append(f"| `{k}` | `{row['value']!r}` | {row['group']} | {row['basis']} | {row['retune']} |")
+        shown = f"`{row['value']!r}`" if "value" in row else f"charter `{row['charter']}`"
+        out.append(f"| `{k}` | {shown} | {row['group']} | {row['basis']} | {row['retune']} |")
     out += ["", f"Time-fit order: {' -> '.join(TRIM_ORDER)}."]
     return "\n".join(out)

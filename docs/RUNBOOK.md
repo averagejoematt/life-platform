@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-Last updated: 2026-11-15 (v8.6.0 — 92 MCP tools, 96-module package, 107 Lambdas, 20 data sources)
+Last updated: 2026-11-16 (v8.6.0 — 92 MCP tools, 96-module package, 107 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
 - Lambda functions defined (CDK): 107 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
@@ -476,7 +476,8 @@ All secrets are stored in AWS Secrets Manager under `life-platform/` prefix. See
 | `life-platform/mcp-api-key` | life-platform-mcp, canary, qa-smoke, key-rotator | HMAC bearer; 90-day auto-rotation |
 | `life-platform/todoist` | life-platform-mcp (write tools) | Dedicated; bundle still used by ingestion |
 | `life-platform/habitify` | habitify-data-ingestion | API key |
-| `life-platform/ingestion-keys` | todoist-data-ingestion, notion-journal-ingestion, dropbox-poll, health-auto-export-webhook | Bundle: Notion + Dropbox + Todoist + Habitify + HAE webhook key |
+| `life-platform/ingestion-keys` | todoist-data-ingestion, notion-journal-ingestion, dropbox-poll, health-auto-export-webhook (cutover fallback, #5513) | Bundle: Notion + Dropbox + Todoist + Habitify + HAE webhook key |
+| `life-platform/hae-webhook` | health-auto-export-webhook | The webhook's own bearer token (#5513 c), read first |
 | `life-platform/notion` (live, idle) | none read by ingestion — the bundle is authoritative | Retire-candidate; owner decision (`docs/SECRETS_MAP.md`) |
 | `life-platform/dropbox`, `life-platform/anthropic-api-key` | — | Deleted (windows closed 2026-05) |
 

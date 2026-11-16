@@ -108,6 +108,11 @@ KNOWN_SECRETS = [
     "life-platform/continuity-contacts",  # #1400 (2026-08-10): continuity contacts for the Permanence Contract's dead-man's switch — real people's contact details, owner-provisioned, NEVER in git (DATA_GOVERNANCE). The switch runs disarmed (falls back to the operator address and reports contacts_configured=false) until it exists.
     "life-platform",  # Wildcard prefix — pipeline_health_check reads all secrets to verify they exist
     "life-platform/telegram",  # #2364: Telegram coach chat (tokens + allow-list + webhook_secret)
+    # #5513 (c): the HAE webhook's own bearer token, split out of the ingestion-keys bundle (key
+    # `health_auto_export_api_key`). Owner-provisioned by copying the bundle value; the webhook falls back
+    # to the bundle until it exists. Like progress-photos-signing above, it joins ARCHITECTURE.md's live
+    # table on the `--refresh-secrets` run AFTER the create-secret, not before.
+    "life-platform/hae-webhook",
 ]
 
 # Secrets that have been permanently deleted — must not appear in IAM policies.
@@ -270,7 +275,7 @@ def test_s4_known_secrets_count_matches_architecture():
     #   (CDK deploy-time env resolution since #815); first RUNTIME reader is the AI-quality
     #   canary, so it now needs registry membership.
     # Total = 22 actual secrets + 1 wildcard = 23.
-    EXPECTED_COUNT = 31  # +1 2026-09-21: life-platform/progress-photos-signing (#3760)  # +1 2026-09-19: life-platform/ip-hash-salt (#3620)  # +1 2026-08-10: life-platform/continuity-contacts (#1400)  # +1 2026-08-09: life-platform/telegram (#2364)  # #1676: +life-platform/bluesky +life-platform/mastodon (inbound social, epic #1668)
+    EXPECTED_COUNT = 32  # +1 2026-11-15: life-platform/hae-webhook (#5513 c)  # +1 2026-09-21: life-platform/progress-photos-signing (#3760)  # +1 2026-09-19: life-platform/ip-hash-salt (#3620)  # +1 2026-08-10: life-platform/continuity-contacts (#1400)  # +1 2026-08-09: life-platform/telegram (#2364)  # #1676: +life-platform/bluesky +life-platform/mastodon (inbound social, epic #1668)
     actual = len(KNOWN_SECRETS)
     assert actual == EXPECTED_COUNT, (
         f"S4 FAIL: KNOWN_SECRETS has {actual} entries, expected {EXPECTED_COUNT}. "

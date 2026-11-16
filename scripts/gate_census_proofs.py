@@ -4763,6 +4763,26 @@ STRUCTURAL_HAND_PROOFS["structural::test_putmetricdata_namespace_condition_5545.
     "proved_on": "2026-11-15",
 }
 
+STRUCTURAL_HAND_PROOFS["structural::test_core_alias_6090.py"] = {
+    "gate_name": "test_core_alias_6090.py",
+    "command": (
+        "CONTENT_FILTER_JSON=<the real channel object plus a private_identifiers list, in-process only> "
+        "python3 -m pytest tests/test_core_alias_6090.py -q -p no:warnings   # baseline 12 passed (armed); unarmed 11 passed 1 skipped"
+    ),
+    "mutation": (
+        "Two plants in the real tracked tree, ONE AT A TIME, each restored from a byte copy: M1 config/training_charter.json "
+        "restored to origin/main (the core id that spells a private habit, before the neutral alias); M2 "
+        "tests/test_core_habits_5124.py restored to origin/main (its fixtures carried the same id)."
+    ),
+    "observed": "2026-11-16, #6090 lane. BASELINE 12 passed (armed). M1: 1 failed, 11 passed. M2: 1 failed, 11 passed. REVERTED 12 passed.",
+    "scope": (
+        "Every git-tracked text file against the off-repo private_identifiers list of the content-filter channel. NOT SEEN: "
+        "a run with no channel source carrying the list (the test skips visibly), so CI is armed only once the owner adds "
+        "the list to the CONTENT_FILTER_JSON secret; git history (no rewrite, owner ruling 2026-11-16)."
+    ),
+    "proved_on": "2026-11-16",
+}
+
 # #6083 — the public-copies guard, as its v9 deploy step (both targets, after the sync).
 CI_PROOFS["ci::web-preview-deploy.yml::public-copies::2"] = {
     "gate_name": "public-copies / Check every public copy of the site (read-only; a violation is reported, never repaired here)",
@@ -4793,5 +4813,24 @@ CI_PROOFS["ci::web-preview-deploy.yml::public-copies::2"] = {
         "covers); a record dropped whole from a live route (only a record served WITHOUT words is compared); objects under "
         "generated/ other than the archive (Lambda artefacts, classified not-a-copy in PUBLIC_RESOURCES)."
     ),
+    "proved_on": "2026-11-16",
+}
+
+# #6083 — the guard module itself (its CI step is ci::web-preview-deploy.yml::public-copies::2 above; the same plants).
+GUARD_PROOFS["guard::scripts/check_public_copies.py"] = {
+    "gate_name": "scripts/check_public_copies.py",
+    "command": "python3 -m pytest tests/test_check_public_copies_6083.py -q -p no:warnings   # baseline 17 passed",
+    "mutation": (
+        "Five plants in the real tracked file, ONE AT A TIME, each restored from a byte copy (md5 identical before and "
+        "after): M1 the orphan test → False; M2 the withheld-words test → False; M3 the stale-preview lag test → False; "
+        "M4 derived_issues' `if not found:` → `if False:`; M5 archive_admission's refusal → `if False:`. Plus the two "
+        "inventory pins, both directions: `generated/covers/*` dropped from PUBLIC_RESOURCES, and a `/extra` origin added "
+        "to ORIGIN_PATHS — each 1 failed."
+    ),
+    "observed": (
+        "2026-11-16, this lane. M1 3 failed / 14 passed; M2-M5 1 failed / 16 passed each; the two pins 1 failed each. "
+        "RESTORED 17 passed. LIVE read-only `--check` against production: exit 1 on three real rule-A orphans."
+    ),
+    "scope": "See ci::web-preview-deploy.yml::public-copies::2. Fixtures are synthetic; the live run is read-only.",
     "proved_on": "2026-11-16",
 }
