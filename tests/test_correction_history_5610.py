@@ -240,6 +240,20 @@ def test_the_owner_rulings_of_2026_11_09_map_to_registered_words():
     assert cr.explain(["#5533:l+owner-2026-11-09", "#5611:m+owner-2026-11-09"]).startswith("Readings for the call's window")
 
 
+def test_the_owner_ruling_of_2026_11_15_on_a_conditional_call_has_its_own_words():
+    # #6102: registered BEFORE the row is corrected. The reason the ruling writes parses to this id, and the words say
+    # what the ruling says — a stated condition the stored test never checked, no line invented, the grade kept.
+    rid = "#5611:n+owner-2026-11-15"
+    reason = "#5611 (n) + owner ruling 2026-11-15: the stated condition was never tested and names no checkable line"
+    assert ch.rule_ids_of_reason(reason) == [rid]
+    words = cr.explain([rid])
+    assert "could not be checked" in words and "the stated condition was not established" in words
+    assert "outside the accuracy count" in words and "the grade it carried" in words
+    assert "never checked that condition" in words and "after the fact" in words
+    # it is its own rule: the 2026-11-09 words (a condition no record measures) are not this call's
+    assert words != cr.explain(["#5611:n+owner-2026-11-09"])
+
+
 def test_an_open_call_reclassified_as_an_observation_reads_as_withdrawn():
     row = {
         "prediction_id": "p",
