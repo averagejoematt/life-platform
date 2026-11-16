@@ -386,3 +386,15 @@ def test_the_ledger_verdict_vocabulary_maps_onto_the_scoreboard():
     rows = [{"week": w, "bet": f"b{w}", "outcome": "open"} for w in (1, 2, 3)]
     out = {b["week"]: b["outcome"] for b in desk.score_bets(rows, led, 4, WK[4], None)}
     assert out == {1: "lost", 2: "none", 3: "open"}
+
+
+# #6112: every Panel publish now asks the owner-hold store first (emails/panelcast_hold.refuse, fail closed). These
+# tests are about other gates, and their S3 fakes carry no hold store — so the store reads as "no owner holds" here.
+# The hold itself, and the fail-closed read, are tested in tests/test_panel_owner_hold_6112.py.
+import pytest as _pytest_6112  # noqa: E402
+from emails import panelcast_hold as _panelcast_hold_6112  # noqa: E402
+
+
+@_pytest_6112.fixture(autouse=True)
+def _no_owner_holds_6112(monkeypatch):
+    monkeypatch.setattr(_panelcast_hold_6112, "owner_held_weeks", lambda *a, **k: {})

@@ -175,6 +175,7 @@ def test_a_missing_staged_file_refuses(tmp_path):
 def recorder(monkeypatch):
     calls = []
     monkeypatch.setattr(sp, "plan", lambda staging, weeks: {"staging_findings": [], "chronicle": []})
+    monkeypatch.setattr(sp, "owner_hold_gate", lambda weeks, steps: [])  # #6112 — tested in test_panel_owner_hold_6112.py
     for step in ("backup", "apply_chronicle", "apply_ledger", "apply_panel"):
         monkeypatch.setattr(sp, step, lambda *a, _s=step, **k: calls.append(_s))
     for step in ("apply_pages", "apply_effects", "apply_recap"):

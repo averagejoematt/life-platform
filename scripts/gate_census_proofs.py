@@ -4835,6 +4835,32 @@ GUARD_PROOFS["guard::scripts/check_public_copies.py"] = {
     "proved_on": "2026-11-16",
 }
 
+# #6112 — the owner hold on a Panel week: qa-smoke's delivered/held/missing verdict, the publishers' fail-closed refusal
+# and the set-level sweep that no Panel publisher bypasses it.
+STRUCTURAL_HAND_PROOFS["structural::test_panel_owner_hold_6112.py"] = {
+    "gate_name": "test_panel_owner_hold_6112.py",
+    "command": "python3 -m pytest tests/test_panel_owner_hold_6112.py -q -p no:warnings   # baseline 53 passed",
+    "mutation": (
+        "Seven plants, ONE AT A TIME, each restored from a byte copy: M1 story_season_qa's `if wk in owner:` → `if False:` "
+        "(a valid owner hold ignored); M2 owner_holds' `if problems:` → `if False:` (a malformed held line accepted); M3 "
+        "_publish_episode_audio's refusal → `pass`; M4 _published_skip's owner-hold check → `None`; M5 a new untracked "
+        "scripts/ file that writes week 10's audio under the Panel's public prefix (an unregistered publisher); M6 owner_held_weeks' "
+        "HoldStateUnreadable → `return {}` (fail open); M7 panelcast_retire.index_doc's held list → `[]`."
+    ),
+    "observed": (
+        "2026-11-16, #6112 lane. BASELINE 53 passed. M1 5 failed; M2 5 failed; M3 4 failed; M4 9 failed; M5 1 failed; "
+        "M6 4 failed; M7 1 failed. REVERTED 53 passed."
+    ),
+    "scope": (
+        "The Panel's publish chokepoints (_publish_episode_audio, _write_indexes), the weekly run's pre-generation skip, "
+        "season_promote's owner_hold_gate, the qa-smoke episode verdict, and every first-party file under lambdas/ "
+        "scripts/ deploy/ mcp/ that writes near the Panel's public prefix. NOT SEEN: a writer that builds the "
+        "Panel's key from parts the sweep's tokens do not name; an out-of-repo writer (the AWS console, a "
+        "hand-run `aws s3 cp`)."
+    ),
+    "proved_on": "2026-11-16",
+}
+
 # #6116 — a test run cannot perform a real production write: the set of writing deploy scripts carries the guard, and
 # the incident command is refused before its first aws call.
 STRUCTURAL_HAND_PROOFS["structural::test_prod_write_guard_6116.py"] = {

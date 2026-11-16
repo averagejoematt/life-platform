@@ -199,3 +199,15 @@ def test_the_legacy_writer_drops_a_chapter_title_carrying_a_cut_term(monkeypatch
     seen = _stub_legacy(monkeypatch, post, {"episode_title": OWN, "pull_quote": "It kept score."})
     panel._run_weekly(force=True, dry_run=False, approved=True)  # #4694: an owner-approved run
     assert [e["title"] for e in seen["episodes"]] == ["EP2"]
+
+
+# #6112: every Panel publish now asks the owner-hold store first (emails/panelcast_hold.refuse, fail closed). These
+# tests are about other gates, and their S3 fakes carry no hold store — so the store reads as "no owner holds" here.
+# The hold itself, and the fail-closed read, are tested in tests/test_panel_owner_hold_6112.py.
+import pytest as _pytest_6112  # noqa: E402
+from emails import panelcast_hold as _panelcast_hold_6112  # noqa: E402
+
+
+@_pytest_6112.fixture(autouse=True)
+def _no_owner_holds_6112(monkeypatch):
+    monkeypatch.setattr(_panelcast_hold_6112, "owner_held_weeks", lambda *a, **k: {})
