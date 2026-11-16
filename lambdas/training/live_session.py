@@ -357,6 +357,7 @@ def for_live_draft(
         ),  # fix round 10: the morning with the most free minutes
         "week_skip": list(skip),
         "hist": hist,
+        "excused_days": live_load.excused_days(getattr(inputs, "deload_records", None), hist),  # #6015
         "hold_all": hold_all,
         "layoff": (ctx or {}).get("layoff"),
         "plan_rows": plan_rows if ctx is not None else {},

@@ -493,8 +493,8 @@ def test_default_mode_flags_a_deleted_and_a_missing_required_secret(probe_env):
     assert "Secret: life-platform/hevy" in names
     assert not any("notion" in n for n in names), "a non-NotFound error (e.g. AccessDenied) is not evidence the secret is gone"
     assert (
-        len(rec.described) == 11
-    ), "the audited REQUIRED_SECRETS list (#518) — dropbox deliberately absent; garmin secret retired in #4640"
+        len(rec.described) == 12
+    ), "the audited REQUIRED_SECRETS list (#518) — dropbox deliberately absent; garmin secret retired in #4640; hae-webhook added #5513"
     assert "life-platform/dropbox" not in rec.described
     assert (
         "life-platform/garmin" not in rec.described

@@ -27,6 +27,10 @@ outcomes, which outcome. They are derived from what the row stores (``lambdas/we
   fits, v a measured condition that did not happen
 * ``#5533:g+owner-2026-11-09`` / ``#5533:l+owner-2026-11-09`` — the same ruling's re-grades: under the current rules
   on the call's own window (OR-10), and with readings that arrived after the first grade (OR-9)
+* ``#5611:n+owner-2026-11-15`` — the owner's ruling of 2026-11-15 on one conditional call (#6102): its forecast was
+  made to depend on a condition the stored test never checked, and the condition names no line that could be checked
+  without choosing one after the fact — recorded as could not be checked, the stated condition not established; the
+  same class as the 2026-11-09 ``n`` rule, with words that fit a condition that was stated and never tested
 * ``revert`` — ``deploy/revert_regrade.py`` (a reason starting ``REVERT``)
 
 AN UNKNOWN ID IS AN ERROR, NOT A FALLBACK. ``explain`` raises ``UnknownCorrectionRule`` — the
@@ -165,6 +169,13 @@ RULES: dict[str, str] = {
     "#5533:l+owner-2026-11-09": (
         "Readings for the call's window arrived after it was first graded. It was graded again with them, on its original "
         "window and criteria. By the owner's ruling the new result stands and the first grade is kept."
+    ),
+    "#5611:n+owner-2026-11-15": (
+        "The call made its forecast depend on a condition, and the test it was stored with never checked that condition: "
+        "it graded the outcome alone. The condition names no line that could be checked without choosing one after the "
+        "fact, so none was chosen. By the owner's ruling it is recorded as could not be checked — the stated condition was "
+        "not established — and kept on the record outside the accuracy count, with its original wording, its criteria and "
+        "the grade it carried."
     ),
     "revert": "A correction was reversed and the grade before it was restored.",
 }

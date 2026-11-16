@@ -738,16 +738,18 @@ def ingestion_hae() -> list[iam.PolicyStatement]:
     """Health Auto Export webhook: API Gateway trigger, DDB + S3 write.
 
     R8 Finding-2 fix: Added Secrets Manager access for Bearer token auth.
-    Code default reads life-platform/ingestion-keys (health_auto_export_api_key).
     (Note: a dedicated life-platform/webhook-key existed in early 2026 but was
-    deleted 2026-03-14 per HANDOVER_v3.7.84; ingestion-keys is now the only path.)
+    deleted 2026-03-14 per HANDOVER_v3.7.84; the new name below is deliberately different.)
 
-    Already GetSecretValue-only (#499/X-8) — never had UpdateSecret. NOT
-    addressed here: issue #499's second acceptance criterion — moving this
-    internet-facing bearer key out of the shared life-platform/ingestion-keys
-    bundle into its own dedicated secret. That needs an actual new secret
-    provisioned in Secrets Manager plus a code change to read it, which is
-    outside a pure IAM-policy PR; flagged for a follow-up.
+    Already GetSecretValue-only (#499/X-8) — never had UpdateSecret.
+
+    #5513 (c), the split #499 deferred: the token moves out of the shared
+    life-platform/ingestion-keys bundle (notion/todoist/habitify/dropbox keys too) into
+    its own life-platform/hae-webhook secret, read first by
+    `ingestion/health_auto_export_auth.get_api_key`. DURING THE CUTOVER this role reads
+    BOTH: the code falls back to the bundle while the dedicated secret is absent or this
+    grant is not yet deployed. The follow-up drops the bundle ARN below (and the code
+    fallback) once CloudWatch shows `hae_auth_key_source source=dedicated`.
     """
     return [
         iam.PolicyStatement(
@@ -812,7 +814,10 @@ def ingestion_hae() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="Secrets",
             actions=["secretsmanager:GetSecretValue"],
-            resources=[_secret_arn("life-platform/ingestion-keys")],
+            resources=[
+                _secret_arn("life-platform/hae-webhook"),  # #5513 (c): the dedicated token
+                _secret_arn("life-platform/ingestion-keys"),  # cutover fallback ONLY — the #5513 follow-up removes it
+            ],
         ),
         iam.PolicyStatement(
             sid="DLQ",

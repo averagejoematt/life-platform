@@ -558,8 +558,9 @@ def email_chronicle_sender() -> list[iam.PolicyStatement]:
             resources=[TABLE_ARN],
             conditions={"ForAllValues:StringEquals": {"dynamodb:LeadingKeys": ["USER#matthew#SOURCE#email_log#wednesday_chronicle"]}},
         ),
-        # #5545: the heartbeat is LifePlatform/Email; AI + Compute are reached through the bundle's imports.
-        _put_metric_data_statement("DeliveryHeartbeatMetric", NS_AI, NS_COMPUTE, NS_EMAIL),
+        # #5545: the heartbeat is LifePlatform/Email; Compute is reached through the bundle's imports.
+        # #5905: not LifePlatform/AI — reached by import only, never called (no Bedrock grant on this role).
+        _put_metric_data_statement("DeliveryHeartbeatMetric", NS_COMPUTE, NS_EMAIL),
         iam.PolicyStatement(
             sid="BudgetTierRead",
             actions=["ssm:GetParameter"],
@@ -661,8 +662,9 @@ def email_weekly_signal() -> list[iam.PolicyStatement]:
             actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem"],
             resources=[TABLE_ARN],
         ),
-        # #5545: the heartbeat is LifePlatform/Email; AI + Compute are reached through the bundle's imports.
-        _put_metric_data_statement("DeliveryHeartbeatMetric", NS_AI, NS_COMPUTE, NS_EMAIL),
+        # #5545: the heartbeat is LifePlatform/Email; Compute is reached through the bundle's imports.
+        # #5905: not LifePlatform/AI — reached by import only, never called (no Bedrock grant on this role).
+        _put_metric_data_statement("DeliveryHeartbeatMetric", NS_COMPUTE, NS_EMAIL),
         iam.PolicyStatement(
             sid="S3Read",
             actions=["s3:GetObject"],
