@@ -44,6 +44,12 @@ DEFAULT_TIMEOUT_SECONDS = 6.0
 #: reach rather than taking the invocation down with it.
 DEFAULT_BUDGET_SECONDS = 60.0
 
+#: Backstop on the budget's OWN age (#6113). The 60s above is time spent READING; the census
+#: legs are interleaved with unrelated checks, so the budget can be alive far longer than it
+#: has been reading. This caps that age so the census can never push the invocation past its
+#: 240s Lambda ceiling (the whole sweep measures 72-95s live, 2026-11-15).
+DEFAULT_WALL_CAP_SECONDS = 150.0
+
 USER_AGENT = "life-platform-qa-smoke-census"
 
 
@@ -89,8 +95,11 @@ class ProbeBudget:
         per_request_seconds: float = DEFAULT_TIMEOUT_SECONDS,
         opener: Optional[Callable[[str, float], tuple]] = None,
         clock: Optional[Callable[[], float]] = None,
+        wall_cap_seconds: float = DEFAULT_WALL_CAP_SECONDS,
     ):
         self.total_seconds = float(total_seconds)
+        self.wall_cap_seconds = float(wall_cap_seconds)
+        self._spent = 0.0
         self.per_request_seconds = float(per_request_seconds)
         self._opener = opener
         self._clock = clock or time.monotonic
@@ -101,11 +110,18 @@ class ProbeBudget:
 
     @property
     def elapsed(self) -> float:
-        return self._clock() - self._started
+        """Seconds spent INSIDE reads — not seconds since construction (#6113).
+
+        The budget is shared by census legs that run at different points of the sweep, with
+        ~20 unrelated checks between the first leg and the last. Charging wall-clock since
+        construction billed those checks to the census, so on any run where the first leg
+        started more than 60s before the absence leg (live: 72-95s runs, 2026-11-15/16) the
+        last reads were deferred and `weeks:absence_agreement` said NOT OBSERVED on api_status."""
+        return self._spent
 
     @property
     def exhausted(self) -> bool:
-        return self.elapsed >= self.total_seconds
+        return self._spent >= self.total_seconds or (self._clock() - self._started) >= self.wall_cap_seconds
 
     def get(self, url: str) -> Fetched:
         cached = self._cache.get(url)
@@ -117,11 +133,13 @@ class ProbeBudget:
             # would make a later (cheaper) run of the same url inherit the non-verdict.
             return Fetched(url, deferred=True, error=f"census read budget of {self.total_seconds:.0f}s spent")
         self.requests += 1
+        began = self._clock()
         try:
             status, body = self._open(url)
             result = Fetched(url, status=int(status), body=str(body))
         except Exception as exc:  # noqa: BLE001 — a probe never raises into the sweep
             result = Fetched(url, error=str(exc)[:160])
+        self._spent += max(0.0, self._clock() - began)
         self._cache[url] = result
         return result
 
