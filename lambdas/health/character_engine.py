@@ -30,7 +30,6 @@ import math
 import statistics  # #2811 fold: was imported function-locally twice, paying for this slice's lines
 import time
 from datetime import datetime, timedelta, timezone
-from fractions import Fraction
 from typing import Any, Optional
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
@@ -42,6 +41,7 @@ from training import session_count  # #5387: THE session count — one gym visit
 
 from health import character_privacy, character_zone2, personal_baselines, protein_engine  # #5129 owner-only · #5214 · #5056 · #5389 Zone 2
 from health.calorie_target import target_kcal  # #5095: the ONE calorie target
+from health.character_headline import headline_level  # #6066: Step 6's exact mean, shared with the receipt replay
 
 logger = logging.getLogger(__name__)
 
@@ -1704,39 +1704,9 @@ PILLAR_COMPUTERS = {
 }
 
 # The order compute_character_sheet builds the pillars in (Step 1's computers, then Step 2's consistency meta-pillar),
-# and the order progression_receipts replays them in. Until v1.9.0 it was part of the headline's arithmetic: the level
-# was the floor of a FLOAT weighted mean, and at an exact integer boundary the sum's order decided the floor
-# (2026-11-14: exactly 20 — 19.999999999999996 in this order, 20.000000000000004 alphabetically). Since #6066 the mean
-# is exact (headline_level), so no order can move it; the order is kept so the two paths still walk the same sequence.
+# and the order progression_receipts replays them in. Until v1.9.0 the float sum's order decided the floor at an exact
+# boundary (2026-11-14); since #6066 the mean is exact (character_headline), so the order can no longer move the level.
 HEADLINE_PILLAR_ORDER = (*PILLAR_COMPUTERS, "consistency")
-
-
-def _exact(x: Any) -> Fraction:
-    """A number as the exact rational it is CONFIGURED as. A float is read through its shortest repr (0.18 → 9/50, not
-    the binary double 0.17999999999999999334…), so a weight means the decimal literal in config/character_sheet.json;
-    int, Decimal (a DynamoDB read) and str convert exactly as they are."""
-    return Fraction(repr(x)) if isinstance(x, float) else Fraction(x)
-
-
-def headline_level(entries: Any) -> int:
-    """Step 6's headline: floor(Σ level·weight / Σ weight), clamped to 1..100, over (level, weight) pairs for the
-    pillars the headline INCLUDES (the caller applies the #960 not-instrumented exclusion). 1 when no weight remains.
-
-    #6066 (owner ruling 2026-11-16, "an exact boundary counts as reached"): the mean is computed in exact rational
-    arithmetic, so a mean that is mathematically N+1 reads N+1 whatever order the pillars are summed in — float addition
-    used to land it one ulp below and floor it to N. Exact arithmetic promotes nothing that is genuinely below the
-    boundary: with weights in hundredths the mean is K/W for integers K and W ≤ 100, so the largest value under N+1 is
-    N+1-1/W and floors to N. The compute (compute_character_sheet) and the receipt replay
-    (progression_receipts._replay_headline) both call THIS function, so write time and read time cannot disagree."""
-    num = Fraction(0)
-    den = Fraction(0)
-    for level, weight in entries:
-        w = _exact(weight)
-        num += _exact(level) * w
-        den += w
-    if den <= 0:
-        return 1
-    return max(1, min(100, math.floor(num / den)))
 
 
 # Keys a computed record carries that the sheet item never stores: the #1373 fire-time transition capture (it persists

@@ -222,12 +222,12 @@ def _replay_headline(transitions: dict, replayed_pillars: dict, config: dict, en
     the CURRENT config weights — mirrors compute_character_sheet Step 6 (#960
     renormalization included), in the SAME summation order.
 
-    The arithmetic is the engine's own `headline_level` — the SAME function the compute calls, never a copy. Until
-    engine v1.9.0 the level was the floor of a FLOAT mean, and on 2026-11-14 that mean was exactly 20: 19.999999999999996
-    in the compute's order (stored 19), 20.000000000000004 in the alphabetical order a DynamoDB map comes back in
-    (replayed 20). #6065 fixed the replay by summing in `HEADLINE_PILLAR_ORDER`; #6066 made the mean exact, so the order
-    no longer moves the level at all (it is still walked, so both paths visit the pillars identically). A receipt
-    written before v1.9.0 replays as `engine_drift` — the replay judges it by today's rule and labels the change."""
+    The arithmetic is `character_headline.headline_level` (as `engine.headline_level`) — the SAME function the compute
+    calls, never a copy. Until engine v1.9.0 the level was the floor of a FLOAT mean, and on 2026-11-14 that mean was
+    exactly 20: 19.999999999999996 in the compute's order (stored 19), 20.000000000000004 in the alphabetical order a
+    DynamoDB map comes back in (replayed 20). #6065 fixed the replay by summing in `HEADLINE_PILLAR_ORDER`; #6066 made
+    the mean exact, so the order no longer moves the level (it is still walked, so both paths visit the pillars
+    identically). A receipt written before v1.9.0 replays as `engine_drift`: judged by today's rule, labelled."""
     if engine is None:
         from health import character_engine as engine  # bundled module (#781)
 
