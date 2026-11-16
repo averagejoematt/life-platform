@@ -29,6 +29,10 @@ them with ONE model, keyed by SESSION ROLE (a heavy day and a volume day are two
      session's effort; the deadlift is a top set + one back-off capped at RPE 8 (`live_rulings.lead_lift`). Each is an ordinary
      lift of this model: loaded from its NEWEST same-role exposure, down only after two exposures under the floor, up at the top
      of the range at or under its own target (the deadlift's is its cap).
+  6b. HOLD-AND-BUILD (#6015, owner ruling 2026-11-16): the one-time effort fit (D7) never undoes the engine's own step up on one
+     hard first exposure — at the new load a top set at or over the floor and within `step_up_hold_rpe_over` of the target holds
+     and the reps build; a bigger miss, a slide under the floor while held, or a stall over `step_up_hold_exposures` exposures,
+     reverts (`held_step`).
   7. NOVELTY (three rules). A NEW pattern (none logged in ~8 weeks) runs one exposure at RPE <= 7; a FAMILIAR pattern (a
      biomechanically similar swap included) works at normal effort with no re-entry cap; the layoff rule is 5.
 
@@ -280,13 +284,15 @@ def decide(
     target_rpe: float | None = None,
     layoff_days: int | None = None,
     top_set: bool = False,
+    excused: Any = (),
 ) -> dict[str, Any] | None:
     """One lift's load: {kg, mode: up|hold|down, why, clause} from its same-role exposures (most recent first, the NEWEST is the
     reference), or None (no exposure in the window: the engine's own load stands). Two rules (module doc 1-2): DOWN when the top
     set sat under the floor in the last two exposures — first, so nothing blocks it; UP at the top of the range at or under
     `target_rpe` (the lift's own effort cap when it has one: the capped deadlift steps up after an easy top set) unless `hold`
     (the day's or the lift's reason: a slump, a strained day, a pain flag, a first session back) stops it. `layoff_days`: a first
-    session back after `long_layoff_days`+ starts `long_layoff_pct` under the last load (rule 5). Pure."""
+    session back after `long_layoff_days`+ starts `long_layoff_pct` under the last load (rule 5). `excused`: dates of exposures
+    that are never a failed exposure at a held step (a deload day, a red-recovery day — `held_step`). Pure."""
     if not rows:
         return None
     target_rpe = step_rpe() if target_rpe is None else target_rpe
@@ -298,17 +304,18 @@ def decide(
             # flagged for a look (technique, recovery, a swap), never cut again (a stalled lift was halved in eight weeks)
             why = f"still under {rep_lo} reps after {steps_down(rows)} step-downs"
             return {"kg": last, "mode": "hold", "why": why, "clause": f"Same load: {why}.", "flag": True}
-        # at least one step; as far as the last exposure's own read says reaches the floor — never more than step_down_max_pct
-        size = _floor_to_implement(min(last * (1 - float(cfg.value("step_down_pct")) / 100.0), floor_load(rows[0], rep_lo)), equipment)
-        cap = _floor_to_implement(last * (1 - float(cfg.value("step_down_max_pct")) / 100.0), equipment)
-        cap = cap if cap >= last * (1 - float(cfg.value("step_down_max_pct")) / 100.0) - 1e-6 else _step_up(cap, equipment)
-        kg = max(size, min(cap, _floor_to_implement(last * 0.999, equipment)))  # the cap on the implement's grid, never the old load
         return {
-            "kg": kg,
+            "kg": _floor_step(rows, rep_lo, equipment),
             "mode": "down",
             "why": f"under {rep_lo} reps {n} sessions running",
             "clause": f"Lighter today: under {rep_lo} reps {n} sessions running.",
         }
+    if held_step(rows, rep_lo, rep_hi, target_rpe, equipment, excused) == "slipped":
+        # #6015: a held step that slid under the floor is rule 2's evidence a session early (the held exposure missed, this one
+        # is under the floor) — rule 2's step-down at once, never above the load he topped (never blocked: a step down)
+        back = next(_top(r)["kg"] for r in rows if not _same_load(_top(r)["kg"], last))
+        why = f"under {rep_lo} reps at the new load"
+        return {"kg": min(back, _floor_step(rows, rep_lo, equipment)), "mode": "down", "why": why, "clause": f"Lighter today: {why}."}
     if layoff_days is not None and layoff_days >= int(cfg.value("long_layoff_days")):  # rule 5: the dose scales with the gap
         pct = float(cfg.value("long_layoff_pct"))
         return {
@@ -318,18 +325,33 @@ def decide(
             "clause": f"Lighter today: first session back after {layoff_days} days off.",
         }
     if not hold and topped(rows[0], rep_hi, target_rpe, effort_unknown(rows)):
+        up = _step_up(last, equipment)
+        easy = target_rpe - float(cfg.value("step_up_hold_rpe_over"))
+        rpe = _top(rows[0])["rpe"]
+        if (
+            not effort_unknown(rows)
+            and stalled_at(rows, up, rep_lo, rep_hi, target_rpe, equipment, excused)
+            and (rpe is None or rpe > easy)
+        ):
+            # #6015: this lift stalled at that load inside the window and was reverted — retried only on evidence it got stronger
+            why = f"stalled at {_lb(up)} lb: {rep_hi} reps at RPE {easy:g} first"
+            return {"kg": last, "mode": "hold", "why": why, "clause": f"Same load: {rep_hi} reps at RPE {easy:g} or less, then up."}
         return {
-            "kg": _step_up(last, equipment),
+            "kg": up,
             "mode": "up",
             "why": f"{rep_hi} reps reached",
             "clause": f"Heavier: {rep_hi} reps reached.",
         }
-    fit = effort_fit(rows, rep_lo, target_rpe, equipment)
+    fit = effort_fit(rows, rep_lo, target_rpe, equipment, rep_hi=rep_hi, excused=excused)
     if fit is not None:
         return fit
     if hold:
         return {"kg": last, "mode": "hold", "why": hold, "clause": f"Same load: {hold}."}
     top = _top(rows[0])
+    if _fit_due(rows, rep_lo, target_rpe) and held_step(rows, rep_lo, rep_hi, target_rpe, equipment, excused) == "hold":
+        # #6015: the engine's own step up, not yet built — the load holds and the reps climb (the note is the reps-first line)
+        which = "top set" if top_set else "all sets"
+        return {"kg": last, "mode": "hold", "why": "new load: reps first", "clause": f"Same load: {which} to {rep_hi} reps, then up."}
     at = [st for st in rows[0]["sets"] if st["kg"] >= top["kg"] - 0.2]
     if all(st["reps"] >= rep_hi for st in at):  # the top of the range reached, at too high an effort for the lift's target
         return {
@@ -343,27 +365,157 @@ def decide(
     return {"kg": last, "mode": "hold", "why": "reps first", "clause": f"Same load: {which} to {rep_hi} reps, then up."}
 
 
-def effort_fit(rows: list[dict[str, Any]], rep_lo: int, target_rpe: float, equipment: str | None) -> dict[str, Any] | None:
+def _fit_due(rows: list[dict[str, Any]], rep_lo: int, target_rpe: float) -> bool:
+    """The effort fit's evidence (D7): the newest top set logged ABOVE the target RPE at the floor or floor + 1, effort known, and
+    no reduction yet in this episode (a calibration, once: after any reduction only the two-exposure rule moves it down)."""
+    top = _top(rows[0])
+    if effort_unknown(rows) or top["rpe"] is None or top["rpe"] <= target_rpe or not rep_lo <= top["reps"] <= rep_lo + 1:
+        return False
+    return not steps_down(rows)
+
+
+def _floor_step(rows: list[dict[str, Any]], rep_lo: int, equipment: str | None) -> float:
+    """Rule 2's step-down load: at least one step (`step_down_pct`); as far as the last exposure's own read says reaches the floor
+    (`floor_load`) — never more than `step_down_max_pct`, the cap on the implement's grid, never the old load."""
+    last = _top(rows[0])["kg"]
+    size = _floor_to_implement(min(last * (1 - float(cfg.value("step_down_pct")) / 100.0), floor_load(rows[0], rep_lo)), equipment)
+    cap = _floor_to_implement(last * (1 - float(cfg.value("step_down_max_pct")) / 100.0), equipment)
+    cap = cap if cap >= last * (1 - float(cfg.value("step_down_max_pct")) / 100.0) - 1e-6 else _step_up(cap, equipment)
+    return max(size, min(cap, _floor_to_implement(last * 0.999, equipment)))
+
+
+def effort_fit(
+    rows: list[dict[str, Any]],
+    rep_lo: int,
+    target_rpe: float,
+    equipment: str | None,
+    *,
+    rep_hi: int | None = None,
+    excused: Any = (),
+) -> dict[str, Any] | None:
     """Fix round 14 (D7: the target RPE dropped to 8 while the load stayed where he last logged RPE 9 at 4 reps — an impossible
     prescription). ONE rule for every lift: when the newest same-role top set, at the load it would hold, was logged ABOVE the
     target RPE at or near the rep floor (the floor or floor + 1; UNDER the floor is the two-exposure rule's alone), the load is the one that set's own effort-adjusted e1RM (`e1rm`)
     supports at the target RPE for the floor — never above the last load. Effort unknown (no RPE, or RPE 10 on everything): no
-    fit, the reps decide. None when the last set already fits."""
+    fit, the reps decide. None when the last set already fits.
+
+    #6015 (owner ruling 2026-11-16, hold-and-build): NOT on a load the engine's own step just raised while the miss is a normal
+    first exposure at it (`held_step` 'hold', given `rep_hi`) — the load holds and the reps build. A step missed by more than
+    the tolerance, or a stall at the held load, is fitted exactly as before."""
+    if not _fit_due(rows, rep_lo, target_rpe):
+        return None
+    state = held_step(rows, rep_lo, rep_hi, target_rpe, equipment, excused) if rep_hi is not None else None
+    if state == "hold":
+        return None
     top = _top(rows[0])
-    if effort_unknown(rows) or top["rpe"] is None or top["rpe"] <= target_rpe or not rep_lo <= top["reps"] <= rep_lo + 1:
-        return None
-    if steps_down(rows):  # a calibration, once: after any reduction in this episode only the two-exposure rule moves it down
-        return None
     kg = _floor_to_implement(e1rm(rows[0]) / (1 + (rep_lo + 10.0 - target_rpe) / 30.0), equipment)
     if kg >= top["kg"] - 1e-6:
         return None
     why = f"{top['reps']} reps at RPE {top['rpe']:g} last time"
+    if state == "stalled":
+        why = f"{top['reps']} reps at RPE {top['rpe']:g}, {int(cfg.value('step_up_hold_exposures'))} sessions at this load"
     return {
         "kg": kg,
         "mode": "down",
         "why": why,
         "clause": f"Lighter: {top['reps']} reps was RPE {top['rpe']:g} last time; this load is RPE {target_rpe:g} for {rep_lo}.",
     }
+
+
+def _same_load(a: float, b: float) -> bool:
+    return abs(a - b) <= max(0.5, 0.01 * max(a, b))
+
+
+def _missed(r: dict[str, Any], rep_hi: int, target_rpe: float) -> bool:
+    """A failed exposure at a held step: the top set short of the top of the range AND logged above the target RPE."""
+    t = _top(r)
+    return t["rpe"] is not None and t["rpe"] > target_rpe and t["reps"] < rep_hi
+
+
+def _fits(r: dict[str, Any], rep_lo: int, target_rpe: float) -> bool:
+    """He handled the load: the top set at or over the floor, logged at or under the target RPE."""
+    t = _top(r)
+    return t["rpe"] is not None and t["rpe"] <= target_rpe and t["reps"] >= rep_lo
+
+
+def held_step(
+    rows: list[dict[str, Any]], rep_lo: int, rep_hi: int, target_rpe: float, equipment: str | None, excused: Any = ()
+) -> str | None:
+    """#6015 — the hold-and-build rule's read of the newest exposure (most recent first). None unless the load was JUST RAISED
+    BY THE ENGINE'S OWN STEP: the run of newest exposures at one load sits one implement step (`_step_up`) over the exposure
+    before it, that exposure topped the range at or under the target (the step-up's own condition), and no exposure at the new
+    load before the newest has yet come in at or over the floor at or under the target (`_fits` — once he has handled the load,
+    a later miss is a decline, not a first exposure, and the D7 fit reads it exactly as before). Excused dates are skipped. Then:
+
+      * 'hold'    — the newest exposure is a normal first exposure at a new load: at or over the floor (under it is the
+                    two-exposure rule's alone) and at most `step_up_hold_rpe_over` over the target — or it was an excused day;
+      * 'over'    — more than `step_up_hold_rpe_over` over the target: a too-heavy step (the effort fit reverts it);
+      * 'slipped' — under the floor after an earlier exposure at this load was held: the bet that the reps build has failed
+                    (on main the effort fit had already reverted it a session earlier) — `decide` steps back to the load he
+                    topped, at once. A FIRST exposure under the floor stays the two-exposure rule's (None);
+      * 'stalled' — `step_up_hold_exposures` or more failed exposures at this load (`_missed`; an excused date is skipped,
+                    neither counted nor resetting the count), the newest with no rep gained and
+                    no RPE shed since the FIRST of them (the charter's stall: the same load and reps, exposure after exposure —
+                    a lifter who gained even half a point of RPE is building, and keeps the load).
+    """
+    if not rows:
+        return None
+    excused = set(excused or ())
+    load = _top(rows[0])["kg"]
+    run = []
+    for r in rows:
+        if not _same_load(_top(r)["kg"], load):
+            break
+        run.append(r)
+    if len(run) == len(rows):
+        return None  # no exposure before this load in the window: not known to be the engine's step
+    prev = rows[len(run)]
+    p = _top(prev)["kg"]
+    if not (p < load - 0.5 and load <= _step_up(p, equipment) + 0.5 and topped(prev, rep_hi, target_rpe, effort_unknown(rows))):
+        return None
+    counted = [r for r in run if r["date"] not in excused]
+    if any(_fits(r, rep_lo, target_rpe) for r in counted[1:]):
+        return None  # established at the new load: not a first exposure any more
+    newest = run[0]
+    if newest["date"] in excused:
+        return "hold"
+    top = _top(newest)
+    if top["reps"] < rep_lo:
+        return "slipped" if len(counted) > 1 and counted[0] is newest else None
+    if top["rpe"] is not None and top["rpe"] > target_rpe + float(cfg.value("step_up_hold_rpe_over")):
+        return "over"
+    n = int(cfg.value("step_up_hold_exposures"))
+    failed = [r for r in counted if _missed(r, rep_hi, target_rpe)]
+    if len(failed) >= n and failed[0] is newest:
+        a, b = _top(failed[0]), _top(failed[-1])
+        if a["reps"] <= b["reps"] and a["rpe"] >= b["rpe"]:
+            return "stalled"
+    return "hold"
+
+
+def stalled_at(
+    rows: list[dict[str, Any]], kg: float, rep_lo: int, rep_hi: int, target_rpe: float, equipment: str | None, excused: Any = ()
+) -> bool:
+    """#6015: this lift STALLED at load `kg` inside the window (`held_step` 'stalled' at an exposure there) — after the revert the
+    engine retries that load only when the top of the range comes `step_up_hold_rpe_over` under the target (`decide`), so a
+    plateau between two implement steps sits at the lower load instead of bouncing every few weeks."""
+    return any(
+        _same_load(_top(r)["kg"], kg) and held_step(rows[i:], rep_lo, rep_hi, target_rpe, equipment, excused) == "stalled"
+        for i, r in enumerate(rows)
+        if i
+    )
+
+
+def excused_days(deload_records: Any, rows_by_tid: dict[str, list[dict[str, Any]]] | None) -> list[str]:
+    """#6015: the exposure dates a recorded deload covers (`deload_word.active_record` — the owner's word is the only way a
+    deload applies). Never a failed exposure at a held step. A red-recovery day is not recorded per date anywhere the draft reads,
+    so it reaches `decide(excused=...)` only from a caller that has it (#6015 follow-up)."""
+    if not deload_records:
+        return []
+    from training import deload_word
+
+    days = {r["date"] for rows in (rows_by_tid or {}).values() for r in rows}
+    return sorted(d for d in days if deload_word.active_record(deload_records, d))
 
 
 def previous_clause(d: dict[str, Any], rows: list[dict[str, Any]], all_rows: list[dict[str, Any]], kind: str, day: str) -> str | None:
@@ -538,6 +690,7 @@ def set_loads(
         "recovery first" if fat.get("state") in ("strained", "overreached") or fat.get("action") == "deload_recommended" else None
     )
     by_key = {e.get("movement_key"): e for e in rx.get("exposures") or []}
+    excused = set(mark.get("excused_days") or ())  # #6015: a recorded deload's exposures never count as a failed exposure
     rows_out = (load_floors or {}).get("movements") or {}
     from training import selection_engine as se
 
@@ -576,7 +729,7 @@ def set_loads(
         gap = int((mark.get("layoff") or {}).get("gap_days") or 0) if e.get("live_first_back") else None
         target = step_rpe(e)  # the role's working RPE (`effort_targets`), or the lift's own cap
         shaped = any(x.get("kind") == "top" for x in e.get("sets") or [])
-        d = decide(rows, lo, hi, entry.get("equipment"), hold=hold, target_rpe=target, layoff_days=gap, top_set=shaped)
+        d = decide(rows, lo, hi, entry.get("equipment"), hold=hold, target_rpe=target, layoff_days=gap, top_set=shaped, excused=excused)
         if d is None:
             if hold and not unloaded:  # fix round 12: a LOADED lift held for a reason says it with no same-role exposure too
                 out.append({"key": b.movement_key, "kg": None, "mode": "hold", "why": hold, "clause": f"Same load: {hold}."})
