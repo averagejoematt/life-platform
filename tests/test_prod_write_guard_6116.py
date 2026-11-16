@@ -55,8 +55,35 @@ _GUARD_FILES = {"deploy/lib/prod_write_guard.sh", "deploy/lib/prod_write_guard.p
 _READ_VERB = re.compile(
     r"^(get|list|describe|head|wait|ls|lookup|scan|query|filter|search|test|validate|estimate|simulate|batch-get|presign|help|tail)"
 )
-_AWS_CMD = re.compile(r"(?<![\w./$-])aws((?:\s+--[a-z-]+(?:[ =](?![a-z0-9-]+\s+[a-z])\S+)?)*)\s+([a-z0-9-]+)\s+([a-z0-9-]+)(.*)")
-_CDK_CMD = re.compile(r"\bcdk\s+(?:--?\S+\s+)*(deploy|destroy|bootstrap|import|rollback|watch)\b")
+# The command word, then a token walk (no nested quantifiers: CodeQL py/redos flagged the one-regex form).
+_AWS_WORD = re.compile(r"(?<![\w./$-])aws(?=\s)")
+_CDK_WORD = re.compile(r"(?<![\w./$-])cdk(?=\s)")
+_NAME = re.compile(r"[a-z0-9-]+")
+_AWS_GLOBAL_BOOL = {"--debug", "--no-verify-ssl", "--no-paginate", "--no-sign-request", "--no-cli-pager", "--cli-auto-prompt"}
+_CDK_MUTATING = {"deploy", "destroy", "bootstrap", "import", "rollback", "watch"}
+
+
+def _aws_invocations(line: str):
+    """(service, verb, rest-of-line) for every `aws [--global-opt [value]]... <service> <verb>` on the line."""
+    for m in _AWS_WORD.finditer(line):
+        toks, i = line[m.end() :].split(), 0
+        while i < len(toks) and toks[i].startswith("--"):
+            i += 1 if ("=" in toks[i] or toks[i] in _AWS_GLOBAL_BOOL) else 2
+        if i + 1 < len(toks) and _NAME.fullmatch(toks[i]) and _NAME.fullmatch(toks[i + 1]):
+            yield toks[i], toks[i + 1], " ".join(toks[i + 2 :])
+
+
+def _cdk_mutation(line: str) -> str | None:
+    for m in _CDK_WORD.finditer(line):
+        for tok in line[m.end() :].split():
+            if tok.startswith("-"):
+                continue
+            if tok in _CDK_MUTATING:
+                return tok
+            break
+    return None
+
+
 _TOKEN = re.compile(r'"(?:[^"\\]|\\.)*"|\'[^\']*\'|\S+')
 _BOOL_FLAGS = {
     "--recursive",
@@ -130,8 +157,7 @@ def shell_write_hits(text: str) -> list[tuple[int, str]]:
         line = _strip_trailing_comment(line)
         if re.match(r"\s*(echo|printf)\b", line) and not re.search(r"(\||;|&&)\s*(aws|cdk|npx)\b", line):
             continue
-        for m in _AWS_CMD.finditer(line):
-            svc, verb, rest = m.group(2), m.group(3), m.group(4)
+        for svc, verb, rest in _aws_invocations(line):
             if svc == "s3" and verb in ("cp", "sync"):
                 if _s3_copy_is_write(rest):
                     hits.append((start, f"s3 {verb}"))
@@ -139,9 +165,9 @@ def shell_write_hits(text: str) -> list[tuple[int, str]]:
                 hits.append((start, f"s3 {verb}"))
             elif svc != "s3" and not _READ_VERB.match(verb):
                 hits.append((start, f"{svc} {verb}"))
-        m = _CDK_CMD.search(line)
-        if m:
-            hits.append((start, "cdk " + m.group(1)))
+        cdk_verb = _cdk_mutation(line)
+        if cdk_verb:
+            hits.append((start, "cdk " + cdk_verb))
     return hits
 
 
