@@ -120,7 +120,15 @@
   ],
   "claim_withheld": null,
   "classification_review": true,
-  "classification_review_reason": "Disputed: graded on a proxy the call's frozen criteria did not establish; under classification review, verdict preserved."
+  "classification_review_reason": "Disputed: graded on a proxy the call's frozen criteria did not establish; under classification review, verdict preserved.",
+  "claim_with_note": null,
+  "owner_note": {
+   "kind": "scope",
+   "dated": "2026-11-15",
+   "required": false,
+   "text": "A synthetic scope note: this grade tests whether the deep-sleep share rose over the window. The reason the call gives was not tested; the grade neither establishes nor refutes it.",
+   "short": "A synthetic scope note: the grade tests the direction, not the reason given."
+  }
  },
  {
   "absent_text": null,
@@ -179,7 +187,9 @@
   "corrections": [],
   "claim_withheld": null,
   "classification_review": false,
-  "classification_review_reason": null
+  "classification_review_reason": null,
+  "claim_with_note": null,
+  "owner_note": null
  },
  {
   "absent_text": null,
@@ -238,7 +248,9 @@
   "corrections": [],
   "claim_withheld": null,
   "classification_review": false,
-  "classification_review_reason": null
+  "classification_review_reason": null,
+  "claim_with_note": null,
+  "owner_note": null
  },
  {
   "absent_text": null,
@@ -288,7 +300,9 @@
   "corrections": [],
   "claim_withheld": "unsourced",
   "classification_review": false,
-  "classification_review_reason": null
+  "classification_review_reason": null,
+  "claim_with_note": null,
+  "owner_note": null
  },
  {
   "absent_text": null,
@@ -352,7 +366,72 @@
   "corrections": [],
   "claim_withheld": null,
   "classification_review": false,
-  "classification_review_reason": null
+  "classification_review_reason": null,
+  "claim_with_note": null,
+  "owner_note": null
+ },
+ {
+  "absent_text": null,
+  "approved": null,
+  "as_of": "2026-10-31",
+  "claim": "Dated clarification (synthetic): the reading the call cites belongs to the morning after the night it names.",
+  "coach_id": "glucose_coach",
+  "confidence": 0.5,
+  "data_through": "2026-10-14",
+  "due_date": "2026-10-14",
+  "edges": [
+   {
+    "id": "glucose_coach",
+    "rel": "made_by",
+    "type": "coach"
+   },
+   {
+    "id": "recovery_score",
+    "rel": "about",
+    "type": "metric"
+   }
+  ],
+  "grading": {
+   "actual_text": "82 out of 100",
+   "how": "morning recovery score within ±18.59 out of 100 of 59 out of 100 on 14 October 2026",
+   "outcome_notes": "Morning recovery score came in at 82 against a call of 59 — outside its usual day-to-day range",
+   "tolerance_text": null
+  },
+  "id": "glucose-20261013-recovery01",
+  "kind": "number",
+  "logged_date": "2026-10-13",
+  "method_ids": [],
+  "metric_id": "recovery_score",
+  "quality_flags": [],
+  "sample": true,
+  "sealed": false,
+  "settled_date": "2026-10-14",
+  "simple_guess": null,
+  "source": [
+   "fixture"
+  ],
+  "state": "ok",
+  "status": "refuted",
+  "summary": "Wrong.",
+  "title": "Dated clarification (synthetic): the reading the call cites belongs to the morning after the night it names.",
+  "type": "prediction",
+  "verdict_text": "Wrong.",
+  "visibility": "public",
+  "coach_name": "Amara Patel",
+  "retired": false,
+  "metric_key": "recovery_score",
+  "corrections": [],
+  "claim_withheld": "with_note",
+  "classification_review": false,
+  "classification_review_reason": null,
+  "claim_with_note": "A synthetic recovery forecast: it will soften to about 59 tomorrow (from 73 on 2026-10-11).",
+  "owner_note": {
+   "kind": "clarification",
+   "dated": "2026-11-15",
+   "required": true,
+   "text": "A synthetic dated clarification: the reading of 73 the call cites belongs to the night of 11 October and was recorded on the morning of 12 October. The call's words are shown as filed.",
+   "short": "Dated clarification (synthetic): the reading the call cites belongs to the morning after the night it names."
+  }
  },
  {
   "absent_text": "No sensor this cycle.",
@@ -402,7 +481,9 @@
   "corrections": [],
   "claim_withheld": null,
   "classification_review": false,
-  "classification_review_reason": null
+  "classification_review_reason": null,
+  "claim_with_note": null,
+  "owner_note": null
  },
  {
   "absent_text": null,
@@ -461,7 +542,9 @@
   "corrections": [],
   "claim_withheld": null,
   "classification_review": false,
-  "classification_review_reason": null
+  "classification_review_reason": null,
+  "claim_with_note": null,
+  "owner_note": null
  },
  {
   "absent_text": null,
@@ -500,6 +583,8 @@
   "corrections": [],
   "claim_withheld": null,
   "classification_review": false,
-  "classification_review_reason": null
+  "classification_review_reason": null,
+  "claim_with_note": null,
+  "owner_note": null
  }
 ]

@@ -8,6 +8,9 @@ WHAT IS SERVED (additive; no existing field or label changes):
       ``verification``       ``{outcome, verified_at, ruleset_version, classification_validated}`` read off the row's
                              ``latest_verification`` pointer (``coach.verification_record``) — NULL when the call has
                              no verification record. Never inferred from a version number.
+      ``owner_note``         ``{kind, dated, required, text, short}`` — the platform's dated note on an owner-ruled call
+                             (``common.narrative_allowlist.owner_note``, owner ruling 2026-11-15, #6079), served only
+                             when the item serves the call's words; null on every other item.
   * top level on both routes — ``verification_summary``: ``{reproduced, corrected, could_not_verify, none}`` counted
     over the SAME rows the route's own total counts (the ledger's served items; ``/api/predictions``' season rows).
   * ``/api/calibration`` — ``verification_summary`` (``headline``, CR1, owner ruling 2026-11-09): the verified
@@ -30,7 +33,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Iterable
 
 from coach import classification_review, coach_baseline, coach_record, grade_corrections, repeat_family, verification_record
-from common import stats_core
+from common import narrative_allowlist as NA, stats_core
 from experiment import calibration_core, calibration_v2
 from experiment.phase_filter import singleton_visible
 
@@ -43,12 +46,14 @@ SUMMARY_KEYS = verification_record.OUTCOMES + ("none",)
 ROW_FIELDS = (verification_record.POINTER_ATTR, "original_grade", repeat_family.ATTR)
 
 
-def item_fields(row: dict) -> dict:
+def item_fields(row: dict, pk: Any = None, *, words_served: bool = False) -> dict:
     ver = (row or {}).get("evaluator_version")
     return {
         "evaluator_version": None if ver is None else str(ver),
         "algo_version": grade_corrections.grade_text_version(row or {}),
         "verification": verification_record.served(row or {}),
+        # Owner ruling 2026-11-15 (#6079): the platform's dated note on an owner-ruled call, served only beside its words.
+        "owner_note": NA.owner_note(row or {}, pk) if words_served else None,
     }
 
 

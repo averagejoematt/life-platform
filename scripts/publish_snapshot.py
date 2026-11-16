@@ -110,6 +110,7 @@ from publish_snapshot_contract import (  # noqa: E402,F401 — re-exported: the 
     load_fixture_data_files,
     load_fixtures,
     log,
+    noted_claim,
     partition,
     reference_copies,
     validate,
@@ -583,6 +584,8 @@ def _live_ledger(ctx: LiveContext) -> None:
                 # `words_withheld`), and neither does the page — every row without words reads the same,
                 # whatever kept them off the wire. The row keeps its place, its grade and its count.
                 claim_text, withheld = NO_WORDS_SENTENCE, "no_words"
+        # owner ruling 2026-11-15 (#6079): a call published only beside its dated note carries its words apart
+        noted = noted_claim(r, claim_text, withheld, NO_WORDS_SENTENCE)
         pid = _persona(coach)
         if pid not in ctx.coach_ids:
             if not r.get("retired"):
@@ -610,15 +613,14 @@ def _live_ledger(ctx: LiveContext) -> None:
                 as_of=ctx.as_of,
                 data_through=r.get("settled_date") if ISO_DAY.match(str(r.get("settled_date") or "")) else None,
                 source=["/api/ledger_export"],
-                title=claim_text[:120],
+                title=noted["claim"][:120],
                 summary=CALL_OUTCOME.get(status, status),  # the call's own outcome; the simple guess is its own field
                 coach_id=pid,
                 coach_name=str(r.get("coach_name") or pid),
                 retired=bool(r.get("retired")),
                 metric_id=metric,
                 metric_key=r.get("metric") if isinstance(r.get("metric"), str) else None,
-                claim=claim_text,
-                claim_withheld=withheld,
+                **noted,  # claim, claim_withheld, claim_with_note, owner_note
                 logged_date=r.get("logged_date"),
                 due_date=r.get("due_date") if ISO_DAY.match(str(r.get("due_date") or "")) else None,
                 settled_date=r.get("settled_date") if ISO_DAY.match(str(r.get("settled_date") or "")) else None,

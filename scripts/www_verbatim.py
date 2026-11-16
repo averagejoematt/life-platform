@@ -96,6 +96,9 @@ def verbatim_strings(snapshot_dir: str) -> set[str]:
     for p in load("predictions.json"):
         if p.get("claim_withheld"):
             held.add(p.get("id"))
+            # owner ruling 2026-11-15 (#6079): words published only beside their note, quoted on the call's own page
+            if p.get("claim_withheld") == "with_note" and p.get("claim_with_note"):
+                out.add(_norm(p["claim_with_note"]))
         elif p.get("claim"):
             out.add(_norm(p["claim"]))
     for d in load("disagreements.json"):

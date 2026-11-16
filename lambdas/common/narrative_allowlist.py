@@ -50,10 +50,13 @@ class Entry(NamedTuple):
     field: str  # the coach-words field the approval covers (``text`` / ``claim_natural``)
     text_sha256: str
     families: tuple  # the record's families; DERIVED_FROM_CITED for a lead read
+    #: An owner-ruled call approved only WITH its dated note (owner ruling 2026-11-15): pinned here, beside the hash,
+    #: so that removing or emptying the note in ``OWNER_NOTES`` withholds the words instead of serving them bare.
+    note_required: bool = False
 
 
-def _E(pk: str, sk: str, field: str, text_sha256: str, families: tuple = ()) -> Entry:
-    return Entry(pk, sk, field, text_sha256, tuple(families))
+def _E(pk: str, sk: str, field: str, text_sha256: str, families: tuple = (), note_required: bool = False) -> Entry:
+    return Entry(pk, sk, field, text_sha256, tuple(families), bool(note_required))
 
 
 #: A lead read's families are DERIVED, never listed: ``lead_daily_read.provenance_for`` over the row's own stored
@@ -310,9 +313,14 @@ INDEX: dict = {(e.pk, e.sk): e for e in APPROVED}
 #: Coaching Room all read these words through the same gate. Only the words are released: the gate still strips any
 #: provenance field, and nothing about the prompts or sources is served.
 #:
-#: 12 of the 13 are listed. The final accuracy check (the one the CR2 lead reads went through) held one: its text
-#: cites a recovery reading under a date that differs by a day from the public series' dating of the same reading,
-#: so it waits for the owner (publish as is / with a dated note / keep withheld). Keys and hashes only; no words.
+#: 12 of the 13 were listed on 2026-11-14. The final accuracy check (the one the CR2 lead reads went through) held one:
+#: its text cites a recovery reading under a date that differs by a day from the public series' dating of the same
+#: reading. Keys and hashes only; no words.
+#:
+#: OWNER RULING 2026-11-15 (#6079) added two, each approved only WITH a dated note (``note_required``): the held call
+#: (glucose coach, filed 2026-09-14) with a dated clarification of that date, and the explorer coach's sleep-duration
+#: forecast of 2026-09-06 with a prominent explanation of how it was graded. The same ruling keeps the sleep coach's
+#: deep-sleep call of 2026-09-15 WITHHELD: it is not listed and must not be.
 OWNER_RULED_PUBLIC = True
 OWNER_RULED_AT = "2026-11-14"
 OWNER_RULED: tuple = (
@@ -388,9 +396,127 @@ OWNER_RULED: tuple = (
         "claim_natural",
         "70d1f2bb4381bd1157a2d7cb0094a4e70d4c5706f7222b57390df77ea1e70eb6",
     ),
+    # owner ruling 2026-11-15 (#6079): published only with the dated note in ``OWNER_NOTES``
+    _E(
+        "COACH#glucose_coach",
+        "PREDICTION#pred_20260914_recovery_will_soften_to_roughly_59_tomo",
+        "claim_natural",
+        "1e66333650b40068ae15f9a6f90ea775d5514685f687d7dde183c6c8a5a553c6",
+        note_required=True,
+    ),
+    _E(
+        "COACH#explorer_coach",
+        "PREDICTION#pred_20260906_sleep_model_expects_approximately_7_hour",
+        "claim_natural",
+        "b63f90171053f05ee1e8cda02c832eee3c04f3eb7dca8d208117c51d3e8aaffc",
+        note_required=True,
+    ),
 )
 OWNER_RULED_INDEX: dict = {(e.pk, e.sk): e for e in OWNER_RULED}
 _OWNER_RULED_HASHES: frozenset = frozenset(e.text_sha256 for e in OWNER_RULED)
+
+# ── owner-ruled notes (owner ruling 2026-11-15, #6079) ─────────────────────────────────────────────────────────────
+#: THE RULING. Two held calls publish "with the original wording unchanged" beside a clearly marked, dated note — a
+#: clarification of the date a cited reading belongs to; an explanation of how the call was graded ("do not present
+#: it as an uncomplicated forecasting failure or alter its historical grade"). Two published deep-sleep calls keep
+#: their words and grades and gain a note that separates the tested prediction (the direction of deep sleep) from the
+#: coach's untested explanation ("don't imply that the evaluation established or refuted the underlying physiological
+#: mechanism").
+#:
+#: WHAT A NOTE IS. The PLATFORM's dated note, ruled by the owner — not the coach's words and not the grader's verdict:
+#: ``kind`` names what it does (``clarification`` / ``grading_explanation`` / ``scope``), ``dated`` is the day it was
+#: added, ``text`` is the note, ``short`` the one line a surface with no room for the note prints (linking to the
+#: call's own page). It carries only figures the served record states, never the coach's words. It changes nothing
+#: about the record: status, grade, rule and counts stay exactly as stored.
+#:
+#: ``required`` (and the entry's own ``note_required``): the words are published ONLY together with this note —
+#: ``owner_ruled_words`` refuses the record when its note is missing or empty, and the wire (``web.narrative_publication``)
+#: empties the words from any served object that does not carry the note beside them.
+NOTE_KINDS = ("clarification", "grading_explanation", "scope")
+OWNER_NOTES_AT = "2026-11-15"
+
+
+class Note(NamedTuple):
+    kind: str
+    dated: str  # ISO day the note was added
+    required: bool
+    text: str
+    short: str
+
+
+_SCOPE_NOTE_TEXT = (
+    "This grade tests one thing: whether the deep-sleep share rose over the call's window. The reason the call gives for "
+    "it \u2014 Zone 2 training volume building and adenosine accumulating \u2014 was not tested. The grade neither "
+    "establishes nor refutes that mechanism."
+)
+_SCOPE_NOTE_SHORT = "The grade tests the direction of deep sleep, not the reason the call gives."
+
+OWNER_NOTES: dict = {
+    (
+        "COACH#glucose_coach",
+        "PREDICTION#pred_20260914_recovery_will_soften_to_roughly_59_tomo",
+    ): Note(
+        kind="clarification",
+        dated="2026-11-15",
+        required=True,
+        text=(
+            "The recovery score of 73 this call cites refers to the night of 12 September and was recorded on the morning "
+            "of 13 September; the public recovery series dates that reading 13 September. The call's words are shown as "
+            "filed and have not been changed."
+        ),
+        short="Dated clarification: the 73 it cites is the reading of the morning of 13 September.",
+    ),
+    (
+        "COACH#explorer_coach",
+        "PREDICTION#pred_20260906_sleep_model_expects_approximately_7_hour",
+    ): Note(
+        kind="grading_explanation",
+        dated="2026-11-15",
+        required=True,
+        text=(
+            "The grading rule frozen for this call scored its point forecast: about 7 hours, within 1.2 hours either way. "
+            "The night came in at 8.4 hours, so the point forecast is graded wrong. The call also stated an 80% interval "
+            "of 5.4 to 8.7 hours, and the result fell inside it. Both statements are true. The verdict here evaluates the "
+            "point forecast, not whether the interval covered the result, and it has not been changed."
+        ),
+        short="Graded wrong on its point forecast; its own 80% interval contained the result.",
+    ),
+    ("COACH#sleep_coach", "PREDICTION#pred_20260917_deep_sleep_percentage_will_rise_as_zone"): Note(
+        kind="scope", dated="2026-11-15", required=False, text=_SCOPE_NOTE_TEXT, short=_SCOPE_NOTE_SHORT
+    ),
+    ("COACH#sleep_coach", "PREDICTION#pred_20260918_deep_sleep_percentage_will_rise_as_zone"): Note(
+        kind="scope", dated="2026-11-15", required=False, text=_SCOPE_NOTE_TEXT, short=_SCOPE_NOTE_SHORT
+    ),
+}
+
+
+def _note_complete(note: Any) -> bool:
+    return (
+        isinstance(note, Note)
+        and note.kind in NOTE_KINDS
+        and isinstance(note.dated, str)
+        and len(note.dated) == 10
+        and isinstance(note.text, str)
+        and bool(note.text.strip())
+        and isinstance(note.short, str)
+        and bool(note.short.strip())
+    )
+
+
+def _note_required(entry: Entry) -> bool:
+    note = OWNER_NOTES.get((entry.pk, entry.sk))
+    return bool(entry.note_required) or bool(getattr(note, "required", False))
+
+
+def _required_note_hashes() -> frozenset:
+    return frozenset(e.text_sha256 for e in OWNER_RULED_INDEX.values() if _note_required(e))
+
+
+def required_words_served() -> bool:
+    """True when the gate published, in THIS request, the words of a call ruled "publish only with its note" (the wire
+    then checks every object that carries them for the note)."""
+    return bool(_SERVED & _required_note_hashes())
+
 
 #: How many lead daily reads were WRITTEN in the window the record-level check covered (counted read-only from the
 #: table, 2026-11-11: 28 rows under COACH#eli_marsh, LEAD_DAILY#2026-10-01..2026-11-03). Served beside the approved
@@ -495,9 +621,40 @@ def owner_ruled_words(item: Any, pk: Any = None) -> bool:
     text = item.get(entry.field)
     if not isinstance(text, str) or _sha(text) != entry.text_sha256:
         return False
+    # Owner ruling 2026-11-15: a call approved WITH a note is published only while that note exists and says something.
+    if _note_required(entry) and not _note_complete(OWNER_NOTES.get((entry.pk, entry.sk))):
+        return False
     from common import prediction_publication as PP
 
     return not PP.words_name_private_activity(text)
+
+
+def owner_note(item: Any, pk: Any = None) -> Optional[dict]:
+    """The public note served beside an owner-ruled call's words — ``{kind, dated, required, text, short}`` — or None.
+
+    Only for a record whose words the gate publishes (``owner_ruled_words``) and whose note is complete: a note never
+    travels without the words it is about, and (``required``) the words never travel without it."""
+    if not owner_ruled_words(item, pk):
+        return None
+    note = OWNER_NOTES.get((str(item.get("pk", pk) or ""), str(item.get("sk") or "")))
+    if not _note_complete(note):
+        return None
+    return {"kind": note.kind, "dated": note.dated, "required": bool(note.required), "text": note.text, "short": note.short}
+
+
+def required_note_for_text(text: Any) -> Optional[str]:
+    """For a string that IS the words of a call ruled "publish only with its note": that note's ``text`` (what an
+    object serving the words must carry beside them); None for every other string."""
+    if not isinstance(text, str) or not OWNER_RULED_PUBLIC:
+        return None
+    h = _sha(text)
+    if h not in _OWNER_RULED_HASHES:
+        return None
+    for e in OWNER_RULED_INDEX.values():
+        if e.text_sha256 == h and _note_required(e):
+            note = OWNER_NOTES.get((e.pk, e.sk))
+            return note.text if _note_complete(note) else ""
+    return None
 
 
 def note_served(item: Any, pk: Any = None) -> None:
