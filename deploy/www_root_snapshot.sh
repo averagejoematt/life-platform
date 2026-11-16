@@ -20,6 +20,8 @@
 # Every copy is a server-side S3 copy (aws s3 cp --copy-props default): a single-part object keeps its
 # ETag, which is what makes the ETag comparisons below a proof and not a hope.
 set -euo pipefail
+# #6116: under a test runner, real AWS is unreachable from this script (deploy/lib/prod_write_guard.sh)
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prod_write_guard.sh"
 BUCKET="${BUCKET:-matthew-life-platform}"
 SITE="site"
 SNAPS="backups/root-snapshots"

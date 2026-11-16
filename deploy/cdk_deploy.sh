@@ -26,6 +26,8 @@
 #   ALLOW_LIVE_LAMBDA_DRIFT=1 bash deploy/cdk_deploy.sh <Stack>
 #   SKIP_SENSOR_SELF_TEST=1 bash deploy/cdk_deploy.sh <Stack>   # loud; the 35-day dead-man still counts
 set -euo pipefail
+# #6116: under a test runner, real AWS is unreachable from this script (deploy/lib/prod_write_guard.sh)
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prod_write_guard.sh"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 

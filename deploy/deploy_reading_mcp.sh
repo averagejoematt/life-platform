@@ -16,6 +16,8 @@
 #                                + index/* CRUD; no layer version change)
 #   cdk deploy LifePlatformMcp — ships tools_reading + the staged reading/ package
 set -euo pipefail
+# #6116: under a test runner, real AWS is unreachable from this script (deploy/lib/prod_write_guard.sh)
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prod_write_guard.sh"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REGION="${AWS_REGION:-us-west-2}"

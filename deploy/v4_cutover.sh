@@ -39,6 +39,8 @@
 #   S3 object versioning on the bucket also retains the prior objects.
 # =============================================================================
 set -euo pipefail
+# #6116: under a test runner, real AWS is unreachable from this script (deploy/lib/prod_write_guard.sh)
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prod_write_guard.sh"
 
 BUCKET="matthew-life-platform"
 DISTRIBUTION_ID="E3S424OXQZ8NBE"
