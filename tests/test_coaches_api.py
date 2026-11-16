@@ -1076,7 +1076,9 @@ def test_6102_a_call_an_owner_ruling_took_out_of_the_record_never_reads_as_not_e
 def test_6102_the_ruled_reason_survives_the_publication_gate():
     """The gate empties a served string that shares a six-word run with a withheld row's stored text. A ruled row's
     stored notes are the rulings' own sentences, so the reason must share no such run with any of them — the first
-    wording did ("could not be checked as filed"), and was served empty on every ruled call."""
+    wording did ("could not be checked as filed"), and was served empty on every ruled call.
+    #6111: the taint is now the request's own reads — the ruled row is read by the request that serves its reason, so
+    the premise holds on a cold container exactly as on a warm one."""
     from web import narrative_publication as NP, prediction_reason as pr
 
     stored = [

@@ -37,6 +37,18 @@ Outcome vocabulary (no vacuous green — #2828's acceptance):
              BEFORE the rate check, so no 429 is observable. Shown ⏸ like
              every other deliberately-paused surface (#1927), not a fault.
 
+#6114 — an edge rule can now ALSO answer 429. A WAF rate rule (cdk/stacks/
+web_edge_rate_rule.py) blocks POSTs to the reader write doors, board_ask
+included, above a per-IP limit far over this probe's MAX_PROBES (100 per 5 min
+vs 8). Its 429 carries `"limiter": "edge"` in the JSON body and an
+`edge-ratelimit` response header; the backend's never does. A 429 that carries
+either marker is the EDGE answering, which says nothing about the in-Lambda
+limiter this check exists to observe, so it reads YELLOW ("could not observe
+the backend tonight"), never PASS. Without that split a broken backend limiter
+would hide behind a busy egress IP's edge block. The check's subject stays the
+backend limiter: the edge rule is a coarse flood backstop, the per-route
+budgets live in the Lambdas.
+
 Partition: CONTENT_TRUTH. The causal test (qa_check.py): a nightly
 enforcement-drift finding is not evidence about a deploy that landed minutes
 ago, and a fleet rollback would not repair a CloudFront/policy/DDB cause — the
@@ -63,6 +75,13 @@ MAX_PROBES = 8
 _ENDPOINT = "/api/board_ask"
 _TIMEOUT_S = 10
 
+# #6114: the edge rule's markers — mirrored from cdk/stacks/web_edge_rate_rule.py
+# (EDGE_MARKER_HEADER, RESPONSE_BODY["limiter"]) and pinned to it by
+# tests/test_qa_check_edge_429.py; never imported (this module ships in the Lambda
+# bundle, the CDK module does not).
+_EDGE_HEADER_SUFFIX = "edge-ratelimit"
+_EDGE_LIMITER_VALUE = "edge"
+
 
 def _post_once(url):
     """One probe POST. Returns (status:int, headers:dict, body:str).
@@ -82,6 +101,19 @@ def _post_once(url):
             return resp.status, dict(resp.headers), resp.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as e:
         return e.code, dict(e.headers), e.read().decode("utf-8", "replace")
+
+
+def is_edge_answer(headers, body):
+    """True when a 429 came from the edge WAF rule (#6114), not the backend limiter.
+
+    Matches the header by suffix, so it holds whether or not WAF prefixes custom
+    response header names (`x-amzn-waf-`); the body marker is fully ours."""
+    if any(str(k).lower().endswith(_EDGE_HEADER_SUFFIX) for k in (headers or {})):
+        return True
+    try:
+        return json.loads(body).get("limiter") == _EDGE_LIMITER_VALUE
+    except Exception:
+        return False
 
 
 def _is_paused_body(body):
@@ -107,6 +139,15 @@ def checks():
             c.message = f"could not observe (request {i}/{MAX_PROBES}: {type(e).__name__}: {e}) — statuses so far {statuses}"
             return [c]
         statuses.append(status)
+        if status == 429 and is_edge_answer(headers, body):
+            # #6114: the edge rule answered — the backend limiter was never reached,
+            # so tonight is "could not observe", never a PASS and never a FAIL.
+            c.passed = None
+            c.message = (
+                f"could not observe the backend limiter: the EDGE rate rule answered 429 on request {i}/{MAX_PROBES} "
+                f"(this egress IP is over the edge limit) — statuses so far {statuses}"
+            )
+            return [c]
         if status == 429:
             retry_after = headers.get("Retry-After") or headers.get("retry-after")
             try:

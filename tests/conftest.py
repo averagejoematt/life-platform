@@ -100,7 +100,18 @@ os.environ.setdefault("UNSUB_TOKEN_SECRET", "test-unsub-signing-key")
 #
 # Tests that intentionally exercise live AWS are marked `@pytest.mark.integration`
 # (see pytest.ini) and are exempted below.
-_AWS_CRED_KEYS = ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_SECURITY_TOKEN", "AWS_PROFILE")
+_AWS_CRED_KEYS = (
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_SESSION_TOKEN",
+    "AWS_SECURITY_TOKEN",
+    "AWS_PROFILE",
+    # #6116: the credential FILES and the metadata service are credential sources too — stashed and restored with the
+    # keys, so an `integration` test on a laptop (whose real credentials live in ~/.aws) still reaches them.
+    "AWS_CONFIG_FILE",
+    "AWS_SHARED_CREDENTIALS_FILE",
+    "AWS_EC2_METADATA_DISABLED",
+)
 # #3917: the snapshot must happen ONCE, in the controller, BEFORE the fakes go on — and it must
 # survive into xdist workers. A worker is a fresh process forked by the controller AFTER this
 # module already faked the controller's environment, so a plain `os.environ.get(key)` snapshot
@@ -124,6 +135,13 @@ _FAKE_AWS_ENV = {
     "AWS_SECURITY_TOKEN": "testing",
     "AWS_DEFAULT_REGION": "us-west-2",
     "AWS_REGION": "us-west-2",
+    # #6116 (incident 2026-11-16): a test that builds its subprocess env with EMPTY key variables does not get "no
+    # credentials" — the CLI and boto3 treat an empty value as unset and fall back to ~/.aws (there, an admin profile).
+    # Pointing the files at devnull and switching the metadata service off closes those fallbacks for the session and
+    # every child that inherits its env.
+    "AWS_CONFIG_FILE": os.devnull,
+    "AWS_SHARED_CREDENTIALS_FILE": os.devnull,
+    "AWS_EC2_METADATA_DISABLED": "true",
 }
 
 # Force the fakes on at *import* time (i.e. collection), not just per-test setup.
@@ -139,6 +157,18 @@ _FAKE_AWS_ENV = {
 # module-level client hermetic too.
 os.environ.pop("AWS_PROFILE", None)
 os.environ.update(_FAKE_AWS_ENV)
+
+# #6116 — THE TEST-SESSION MARKER AND THE SHIMS. A child that rebuilds its env without the AWS_* keys sheds the
+# fakes above; it does not shed these. LP_TEST_SESSION is the explicit marker the deploy guard reads
+# (deploy/lib/prod_write_guard.sh + its Python twin; PYTEST_CURRENT_TEST and a pytest ancestor process are the other
+# two signals), and the guard's shims go first on PATH so an `aws` / `npx cdk deploy` run BY NAME from any test or
+# script is refused unless the test declares its stub (LP_TEST_AWS_IS_STUB=<path of the stub executable>). The ONE
+# opt-in for live AWS is `@pytest.mark.integration` (below), which restores the real credentials and nothing else:
+# the shims still refuse a CLI call, and no live test uses the CLI.
+_PROD_WRITE_GUARD_SHIMS = os.path.join(_REPO, "deploy", "lib", "prod_write_guard_bin")
+os.environ["LP_TEST_SESSION"] = "1"
+if os.environ.get("PATH", "").split(os.pathsep)[0] != _PROD_WRITE_GUARD_SHIMS:
+    os.environ["PATH"] = _PROD_WRITE_GUARD_SHIMS + os.pathsep + os.environ.get("PATH", "")
 
 # ── #2370: neutral blocked-category vocabulary for the whole unit suite ────────
 # The real vocabulary lives ONLY in the ER-06 non-committed channel (env
@@ -529,6 +559,30 @@ def _ip_hash_salt_3620(monkeypatch):
     except Exception:
         pass
     yield
+
+
+# #6111: a Site API request reads the COMPLETE withheld graded record (web.publication_snapshot) from the table it reads.
+# A unit test that drives the handler over a module-patched fake still leaves site_api_lambda.table as the real boto3
+# handle; with the suite's fake credentials that read would leave the machine and fail (then the request is refused, 503).
+# In the unit suite a REAL boto3 table therefore reads as empty — the record the test's own fake table does not hold — and
+# each test starts with no snapshot held. A fake table is read for real (tests/test_publication_determinism_6111.py).
+@pytest.fixture(autouse=True)
+def _publication_snapshot_hermetic(monkeypatch):
+    try:
+        import boto3.resources.base as _b3res
+        from web import publication_snapshot as _snap
+    except Exception:  # a test tree without the lambdas layer on its path
+        yield
+        return
+    _snap.reset()
+    real = _snap._read_partition
+
+    def _read(raw, pk):
+        return [] if isinstance(raw, _b3res.ServiceResource) else real(raw, pk)
+
+    monkeypatch.setattr(_snap, "_read_partition", _read)
+    yield
+    _snap.reset()
 
 
 # Owner ruling 2026-11-11 (item 2): the plan root's private part lives OFF the repo — on a developer's machine at

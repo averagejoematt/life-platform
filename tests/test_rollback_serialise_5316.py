@@ -166,12 +166,13 @@ exit 1
         encoding="utf-8",
     )
     aws.chmod(aws.stat().st_mode | stat.S_IXUSR)
-    return {"PATH": f"{bindir}:{os.environ['PATH']}", "log": log}
+    # #6116: the rollback scripts source deploy/lib/prod_write_guard.sh, which refuses an undeclared `aws` under pytest
+    return {"PATH": f"{bindir}:{os.environ['PATH']}", "LP_TEST_AWS_IS_STUB": str(aws), "log": log}
 
 
 def _rollback_one(tmp_path, live_sha, expect):
     fake = _fake_aws(tmp_path, live_sha)
-    env = {**os.environ, "PATH": fake["PATH"], "ROLLBACK_EXPECT_SHA": expect}
+    env = {**os.environ, "PATH": fake["PATH"], "LP_TEST_AWS_IS_STUB": fake["LP_TEST_AWS_IS_STUB"], "ROLLBACK_EXPECT_SHA": expect}
     proc = subprocess.run(
         ["bash", str(ROOT / "deploy" / "rollback_lambda.sh"), "daily-brief"], capture_output=True, text=True, env=env, timeout=120
     )
@@ -202,7 +203,13 @@ def test_the_fleet_rollback_tallies_skipped_newer_and_does_not_fail_on_it(tmp_pa
     lm.write_text(
         json.dumps({"lambdas": {"a.py": {"function": "daily-brief"}, "b.py": {"function": "x", "not_deployed": True}}}), encoding="utf-8"
     )
-    env = {**os.environ, "PATH": fake["PATH"], "ROLLBACK_EXPECT_SHA": THIS_RUN, "LAMBDA_MAP": str(lm)}
+    env = {
+        **os.environ,
+        "PATH": fake["PATH"],
+        "LP_TEST_AWS_IS_STUB": fake["LP_TEST_AWS_IS_STUB"],
+        "ROLLBACK_EXPECT_SHA": THIS_RUN,
+        "LAMBDA_MAP": str(lm),
+    }
     proc = subprocess.run(["bash", str(ROOT / "deploy" / "rollback_fleet.sh")], capture_output=True, text=True, env=env, timeout=300)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "0 reverted, 0 no-artifact (left on current code), 3 skipped-newer" in proc.stdout  # daily-brief + both MCP

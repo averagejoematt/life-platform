@@ -136,7 +136,6 @@ DEMOTE_FIELD_RESIDUE: dict[str, str] = {
     "docs/PROPORTIONALITY.md::a3b9816c7206": "2026-09-23",  # Chronicle / Weekly-Signal delivery dead-men (#2820)
     "docs/PROPORTIONALITY.md::40c65ca28322": "2026-09-23",  # Alarm flap detector in the wrap citation gate (#2912)
     "docs/PROPORTIONALITY.md::a09d1fb22f89": "2026-09-23",  # Producer↔gate cron mirror check (#2818)
-    "docs/PROPORTIONALITY.md::0b15797ec3c1": "2026-09-23",  # Nightly edge-429 observation (#3058: qa-smoke `ratelimit:edge_429`, `lambdas/operational/q
     "docs/PROPORTIONALITY.md::6cbc03da2ae4": "2026-09-23",  # Budget-integrity fail-closed channel (#3059: `FAIL_CLOSED_FEATURES` in budget_guard + `bud
     "docs/PROPORTIONALITY.md::86acefeccbad": "2026-09-23",  # Grant-enumeration drift sweep (#2824: `tests/grant_enumeration.py` + `tests/test_grant_enu
     "docs/PROPORTIONALITY.md::2e4528d09321": "2026-09-23",  # Public-claims registry (#3042 Phase D2: `tests/public_claims_registry.py`, `tests/test_pub

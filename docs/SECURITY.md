@@ -53,7 +53,7 @@ See `docs/SECRETS_ROTATION.md` for rotation procedures.
 
 ### Layer 3 — Public endpoints (CloudFront → site-api/site-api-ai)
 
-- ⚠️ **WAF removed** — `life-platform-amj-waf` was **deleted** (2026-06, ~−$8/mo). Rate limiting is now entirely **in-Lambda (DDB-backed)**, which is durable across warm containers and was hardened in PG-10. (The `web_stack.py` cleanup is DONE — `web_acl_id` intentionally omitted with an in-code warning against re-adding a dead ARN.)
+- ✅ **Edge rate rule on the reader write doors** (#6114, owner decision 2026-11-16): ONE WebACL `life-platform-amj-reader-writes` on the main distribution only, default ALLOW, one rate-based rule (`ReaderWritePostRate`) — POSTs to the reader write doors, 100 per IP per 5 min, blocked with a JSON 429 marked `"limiter": "edge"`. Spec + measured limit: `cdk/stacks/web_edge_rate_rule.py`; scope guard: `tests/test_edge_rate_rule_6114.py`. A flood backstop only — WAF counts each IPv6 address separately, so the in-Lambda limiters below stay the per-route, per-network control. (History: the broad SEC-02 `life-platform-amj-waf` was deleted 2026-06; the new ACL is declared in the same stack as the distribution and associated by GetAtt, never a pasted ARN.)
 - ✅ **In-app rate limiting** (DDB-backed, PG-10 hardened):
   - `/api/ask`: 5/hr anon, 20/hr subscriber
   - `/api/board_ask`: 7 Bedrock calls/IP/hour (`BOARD_RATE_LIMIT` in `lambdas/web/site_api_ai_lambda.py` — a fan-out budget, one token per persona, so one full board per IP per hour)
@@ -182,7 +182,8 @@ aws s3api list-buckets --query 'Buckets[].Name' --output text | tr '\t' '\n' \
     | xargs -I{} aws s3api get-bucket-policy-status --bucket {} 2>/dev/null \
     | grep -B1 'IsPublic.*true'
 
-# 4. Review in-Lambda rate-limit hits (WAF removed; rate limiting is DDB-backed)
+# 4. Review in-Lambda rate-limit hits (the per-route limiters are DDB-backed; the #6114 edge rule's
+#    blocks are AWS/WAFV2 BlockedRequests, Rule=ReaderWritePostRate, WebACL=life-platform-amj-reader-writes, us-east-1)
 aws cloudwatch get-metric-statistics --namespace LifePlatform/SiteApiAi \
     --metric-name RateLimitHit --start-time $(date -u -v-7d '+%Y-%m-%dT%H:%M:%S') \
     --end-time $(date -u '+%Y-%m-%dT%H:%M:%S') --period 86400 --statistics Sum --region us-west-2

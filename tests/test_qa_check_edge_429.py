@@ -194,3 +194,52 @@ def test_probe_stops_at_first_terminal_outcome(monkeypatch, arm):
     monkeypatch.setattr(qa_check_edge_429, "_post_once", fake_post)
     qa_check_edge_429.checks()
     assert len(calls) == 1
+
+
+# ── #6114: the edge WAF rule can also answer 429 — it must never read as the backend's PASS ──────────
+
+_EDGE_SPEC = Path(__file__).resolve().parent.parent / "cdk" / "stacks" / "web_edge_rate_rule.py"
+
+
+def _edge_spec():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("web_edge_rate_rule_qa", _EDGE_SPEC)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _edge_429():
+    """The edge rule's real answer, built from the CDK spec (header name + body), not hand-copied."""
+    r = _edge_spec()
+    acl = r.web_acl_properties()
+    resp = acl["Rules"][0]["Action"]["Block"]["CustomResponse"]
+    headers = {h["Name"]: h["Value"] for h in resp["ResponseHeaders"]}
+    return 429, headers, acl["CustomResponseBodies"][resp["CustomResponseBodyKey"]]["Content"]
+
+
+def test_an_edge_429_is_yellow_never_the_backend_pass(monkeypatch):
+    c = _run_with(monkeypatch, [(400, {}, _400_BODY), _edge_429()])
+    assert c.passed is None and c.paused is False
+    assert "EDGE rate rule" in c.message and "request 2/" in c.message
+
+
+def test_an_edge_429_is_recognised_by_the_body_alone_and_by_a_prefixed_header_alone():
+    _status, headers, body = _edge_429()
+    assert qa_check_edge_429.is_edge_answer({}, body)
+    assert qa_check_edge_429.is_edge_answer({"x-amzn-waf-" + next(k for k in headers if k != "Retry-After"): "waf"}, "")
+    assert not qa_check_edge_429.is_edge_answer(_OK_429_HEADERS, _OK_429_BODY)  # the backend's own 429
+    assert not qa_check_edge_429.is_edge_answer({}, "not json")
+
+
+def test_the_edge_markers_are_pinned_to_the_cdk_spec():
+    r = _edge_spec()
+    assert qa_check_edge_429._EDGE_HEADER_SUFFIX == r.EDGE_MARKER_HEADER
+    assert qa_check_edge_429._EDGE_LIMITER_VALUE == r.RESPONSE_BODY["limiter"]
+    # the probe can never trip the edge rule by itself
+    assert qa_check_edge_429.MAX_PROBES < r.LIMIT
+    # and the probed door is inside the rule's scope, so the split above is a real case, not a hypothetical
+    import re
+
+    assert re.search(r.READER_WRITE_REGEX, qa_check_edge_429._ENDPOINT)

@@ -346,4 +346,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    from lib.prod_write_guard import install_prod_write_guard  # #6116: under a test runner, no real AWS write
+
+    install_prod_write_guard()
     sys.exit(main())

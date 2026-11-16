@@ -31,6 +31,8 @@
 # no writes). Needs otherwise: the AWS CLI with a role that may write s3://matthew-life-platform/site/*
 # and call cloudfront:CreateInvalidation (the site deploy's role already can).
 set -euo pipefail
+# #6116: under a test runner, real AWS is unreachable from this script (deploy/lib/prod_write_guard.sh)
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prod_write_guard.sh"
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 BUCKET="${BUCKET:-matthew-life-platform}"

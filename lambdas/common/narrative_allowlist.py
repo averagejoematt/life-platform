@@ -538,6 +538,17 @@ def serving(scope: str) -> Iterator[None]:
         _SCOPE.reset(token)
 
 
+@contextlib.contextmanager
+def closed() -> Iterator[None]:
+    """Run with NO scope open, whatever the caller's request opened (#6111: the complete withheld record is decided the
+    way every route decides — it can only narrow, never open a scope)."""
+    token = _SCOPE.set(None)
+    try:
+        yield
+    finally:
+        _SCOPE.reset(token)
+
+
 def active() -> bool:
     return bool(CR2_PUBLIC) and _SCOPE.get() == SCOPE_CR2
 

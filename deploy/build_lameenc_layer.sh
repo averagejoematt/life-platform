@@ -26,6 +26,8 @@
 # attached only to coach-panel-podcast. audio_encode fails open to WAV if the
 # layer is missing, so a lag between publish and attach can't strand an episode.
 set -euo pipefail
+# #6116: under a test runner, real AWS is unreachable from this script (deploy/lib/prod_write_guard.sh)
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prod_write_guard.sh"
 
 LAYER_NAME="lameenc-layer"
 REGION="us-west-2"

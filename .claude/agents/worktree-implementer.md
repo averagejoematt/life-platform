@@ -72,6 +72,10 @@ write surface is your own worktree and your own branch.
    `AWS_ACCESS_KEY_ID`/`AWS_PROFILE` values are NOT "no credentials" — the CLI falls
    back to the default profile in `~/.aws` (2026-11-16: a draft test ran the real root
    restore from a laptop; docs/INCIDENT_LOG.md). Write the isolation BEFORE the first run.
+   The boundary guard backs this up (#6116): under pytest every writing deploy script
+   refuses `aws`/`cdk deploy` (exit 97) unless the test declares its stub with
+   `LP_TEST_AWS_IS_STUB=<stub path>` (`deploy/lib/prod_write_guard.sh` + `.py`). A refusal
+   in your test means you forgot the stub. It does not mean you should find a way around it.
 3b. **Never run `git stash` (or `stash pop`/`stash apply`) in a lane.** `refs/stash` is
    a repository-level ref — per `git help worktree` §DETAILS, refs are shared across
    all worktrees except `refs/bisect`, `refs/worktree` and `refs/rewritten`, and
