@@ -617,3 +617,74 @@ def test_the_spine_no_longer_sanctions_in_run_anchor_extension():
 )
 def test_the_full_rubric_states_the_cap_and_the_rejected_event_term(needle):
     assert needle in open(FULL_RUBRIC, encoding="utf-8").read(), f"the full rubric no longer states: {needle}"
+
+
+# ── #6068: an incomplete estate sweep holds the row's clock back ────────────
+
+
+def _swept(lenses, drop=None, short=None) -> dict:
+    """A run dated 2026-11-16 whose rows carry their full estate sweep, except `drop` (one sweep
+    absent) and `short` (one sweep recorded `not_run`)."""
+    estate = cf._review_estate().ESTATE
+    body = {"date": "2026-11-16", "lenses": {}, "calibration": _calibrated({}, [])}
+    for lens in lenses:
+        entries = [{"sweep_id": s.id, "examined": 3, "anomalies": [], "evidence": "x"} for s in estate[lens]]
+        if lens == drop:
+            entries = entries[:-1]
+        if lens == short:
+            entries[0] = {"sweep_id": entries[0]["sweep_id"], "status": "not_run", "reason": "no credentials"}
+        body["lenses"][lens] = {"grade": "B", "estate_sweep": entries}
+    return body
+
+
+def test_an_incomplete_estate_sweep_holds_the_row_back_and_a_complete_one_advances():
+    """The rule in full.md made a gate: from REQUIRED_FROM a row that did not walk its estate
+    did not grade its area, so it keeps its old date. A complete sweep is the positive control —
+    without it a rule that held every row back would pass."""
+    assert cf._review_estate().REQUIRED_FROM == "2026-11-15"
+    old = _run("2026-10-01", {"security": "B", "cost": "B", "devex": "B", "cto": "B"})
+    old[1]["calibration"] = _calibrated({}, [])
+    new = (date(2026, 11, 16), _swept(("security", "cost", "devex", "cto"), drop="cost", short="devex"))
+    new[1]["lenses"]["security"]["estate_sweep"][1]["examined"] = 0  # a sweep with no count is not a sweep
+    assert cf.estate_incomplete_lenses(new[1], new[0]) == {"cost", "devex", "security"}
+    assert cf.scratch_dates([old, new]) == {
+        "cto": date(2026, 11, 16),
+        "security": date(2026, 10, 1),
+        "cost": date(2026, 10, 1),
+        "devex": date(2026, 10, 1),
+    }
+    complete = (date(2026, 11, 16), _swept(("security", "cost", "devex", "cto")))
+    assert cf.estate_incomplete_lenses(complete[1], complete[0]) == set()
+    assert set(cf.scratch_dates([old, complete]).values()) == {date(2026, 11, 16)}
+
+
+def test_the_filename_date_governs_the_estate_rule_and_earlier_runs_are_not_held(tmp_path):
+    """A body dated before the rule (or undated) under a post-rule filename is still held; a run
+    filed before the rule, with no sweep at all, advances exactly as it did."""
+    old = {"date": "2026-10-01", "lenses": {"security": {"grade": "B"}, "cto": {"grade": "B"}}, "calibration": _calibrated({}, [])}
+    misdated = _swept(("security", "cto"), drop="security")
+    misdated["date"] = "2026-11-01"
+    repo = _write_named(tmp_path, {"fullreview_grades_2026-10-01.json": old, "fullreview_grades_2026-11-16.json": misdated})
+    assert cf.scratch_dates(cf.load_grade_runs(repo)) == {"security": date(2026, 10, 1), "cto": date(2026, 11, 16)}
+    text = "\n".join(cf.carry_forward_report(date(2026, 11, 17), repo)[0])
+    assert "2026-11-16 run: estate sweep incomplete, so these rows did NOT advance (#6068): security" in text
+    unswept = _run("2026-11-14", {"security": "B", "cto": "B"})
+    unswept[1]["calibration"] = _calibrated({}, [])
+    assert cf.scratch_dates([(date(2026, 10, 1), old), unswept]) == {"security": date(2026, 11, 14), "cto": date(2026, 11, 14)}
+
+
+def test_the_committed_review_history_keeps_every_clock_it_had():
+    """Acceptance 3: every committed run through 2026-11-14 predates the sweep and yields
+    exactly the clocks it yielded before #6068 (pinned here from the pre-change output)."""
+    runs = [(when, run) for when, run in cf.load_grade_runs(REPO) if when <= date(2026, 11, 14)]
+    nov14, nov13 = date(2026, 11, 14), date(2026, 11, 13)
+    want = {lens: nov14 for lens in ("a11y", "aiq", "cpo", "cto", "data-architect", "dataviz", "designer", "growth")}
+    want.update({lens: nov14 for lens in ("integrations", "narrative", "principal", "qs", "reader", "security")})
+    want.update({"cost": nov13, "devex": nov13, "observability": nov13, "ai-quality": date(2026, 7, 16), "data": date(2026, 7, 28)})
+    assert cf.scratch_dates(runs) == want
+    assert all(cf.estate_incomplete_lenses(run, when) == set() for when, run in runs)
+
+
+def test_the_full_rubric_names_the_estate_enforcement_point():
+    text = open(FULL_RUBRIC, encoding="utf-8").read()
+    assert "The enforcement point is `scripts/review_carry_forward.py::scratch_dates`" in text

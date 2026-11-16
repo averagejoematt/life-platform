@@ -1080,7 +1080,8 @@ def run(mode: str, out_dir: str, fixtures_dir: str, base_url: str, timeout: floa
             data_files["story"] = validate_story(story, public)
         except ValueError as exc:
             raise SchemaError(str(exc)) from exc
-    data_files["own_words"] = resolve_own_words(mode, fixtures_dir, lambda p: _get(base_url, p, timeout), log)  # his approved lines
+    # his own words (owner ruling 2026-11-15): a page places a line only where own_words.js pins it AND this file carries it
+    data_files["own_words"] = resolve_own_words(mode, fixtures_dir, lambda p: _get(base_url, p, timeout), log)
     return write_snapshot(out_dir, public, excluded, mode, base_url, build_appendix(), data_files)
 
 

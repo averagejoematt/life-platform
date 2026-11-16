@@ -24,8 +24,9 @@ fix); the pipeline was at the module-size ceiling and this block is a cohesive w
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from decimal import Decimal
 from typing import Any
+
+from common.numeric import floats_to_decimal
 
 from experiment import phase_taxonomy as taxonomy
 
@@ -59,14 +60,11 @@ def open_table(table=None):
 
 
 def to_ddb_decimal(obj: Any) -> Any:
-    """floats → Decimal for DynamoDB (boto3 rejects float). Leaves ints/Decimals as-is."""
-    if isinstance(obj, float):
-        return Decimal(str(obj))
-    if isinstance(obj, dict):
-        return {k: to_ddb_decimal(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [to_ddb_decimal(v) for v in obj]
-    return obj
+    """floats → Decimal for DynamoDB (boto3 rejects float). Leaves ints/Decimals as-is.
+
+    Delegates to the canonical walker (#5524): a NaN/Inf becomes None instead of a
+    write-time TypeError. Kept as a name because deploy/reconcile_prereg_voids.py calls it."""
+    return floats_to_decimal(obj)
 
 
 def query_all(table, pk: str, sk_prefix: str) -> list:

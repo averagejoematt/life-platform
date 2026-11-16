@@ -4030,6 +4030,16 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/5594"
         }
       ]
+    },
+    {
+      "id": "2026-11-15-an-unintended-inference-found-and-closed",
+      "date": "2026-11-15",
+      "title": "A privacy review found an inference nobody intended, and it is closed",
+      "shipped": "A routine privacy review found that a few figures the site published, read together with other public numbers, could have let a careful reader estimate a personal detail the owner has chosen not to publish. Nothing private was ever printed; the gap was in what could be worked out. The affected outputs were changed so they no longer depend on that detail at all, and every copy the site itself serves was replaced: the live pages, a rehearsal copy of the site, and the nightly download of the public record.",
+      "why_it_mattered": "The promise on every page is that only what the owner has deliberately approved appears here. That promise has to cover what a reader can derive, not only what is written down. Privacy protections on this platform are tested and tightened as it grows, and this was one of those tests doing its job. The same test now runs on every build, so a new figure that would reopen the gap fails before it ships.",
+      "gotcha": "Fixing the live page was not the end of it. The site also serves a nightly download of its own public record and kept an older rehearsal copy, and both held the earlier version until they were rebuilt and checked. A correction to something published is finished when every copy the site serves has been read back, not when the page looks right.",
+      "honest_miss": "The test that found this should have existed when the figures first went up, and it did not: they were public for some months first. That cannot be undone, and it is said here rather than left out. Keeping the other copies of the site from falling behind a fix still takes a manual step; closing that is open work.",
+      "prs": []
     }
   ]
 }

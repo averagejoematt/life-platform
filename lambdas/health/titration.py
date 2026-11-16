@@ -464,6 +464,8 @@ def _with_band(out: Dict[str, Any], c: Mapping[str, Any]) -> Dict[str, Any]:
 def _to_ddb(v: Any) -> Any:
     if isinstance(v, bool) or v is None or isinstance(v, str):
         return v
+    if isinstance(v, float) and not math.isfinite(v):
+        return None  # #5524: NaN/Inf would be a write-time TypeError
     if isinstance(v, (int, float)):
         return Decimal(str(v))
     if isinstance(v, dict):
