@@ -34,6 +34,7 @@ hold is the public instrument hold ``unsourced``, ``corrections_withheld: N``).
               simple_guess, quality_flags: [], corrections: [],
               evaluator_version, algo_version, verification: {outcome, verified_at, ruleset_version,
                                                               classification_validated} | null,
+              owner_note: {kind, dated, required, text, short} | null,   # owner ruling 2026-11-15 (#6079)
               grading_held?, grading_held_reason?,     # only on a row under an owner evaluation hold (#5607)
               classification_review?, classification_review_reason?}],  # only on a settled row under review
      total, page, size, pages, as_of,
@@ -246,7 +247,8 @@ def export_item(short_id: str, row: dict, dark: list | None = None) -> dict:
         "corrections": [],
         # Owner 2026-11-09: the version stamp, the grade text's own version and the verification record's pointer
         # (null when the call has none — never inferred from a version number). web.verification_fields.
-        **verification_fields.item_fields(row),
+        # Owner ruling 2026-11-15 (#6079): `owner_note` — the dated note on an owner-ruled call, beside its words only.
+        **verification_fields.item_fields(row, f"COACH#{short_id}_coach", words_served=bool(claim) and not (withheld or held)),
     }
     corrections = corrections_of(row, logged)
     if withheld or held:

@@ -161,6 +161,18 @@ const experiments = defineCollection({
 // null until a publication day is actually recorded. `explanation` is required — reader words, never the
 // stored engineering `reason`, which travels beside it as the audit record.
 const isoDayOrNull = z.string().regex(ISO_DAY).nullable();
+// The platform's dated note on an owner-ruled call (owner ruling 2026-11-15, #6079) — not the coach's words, not the
+// grader's verdict. scripts/publish_snapshot_contract.py owner_note_of / validate_owner_note is the Python half.
+const ownerNote = z
+  .object({
+    kind: z.enum(["clarification", "grading_explanation", "scope"]),
+    dated: z.string().regex(ISO_DAY),
+    required: z.boolean(),
+    text: z.string().min(1),
+    short: z.string().min(1),
+  })
+  .strict();
+
 const correction = z
   .object({
     source: z.enum(["corrections", "verdict_correction", "respecified"]),
@@ -216,7 +228,11 @@ const predictions = defineCollection({
     coach_name: z.string().min(1),
     retired: z.boolean(),
     metric_key: z.string().nullable(),
-    claim_withheld: z.enum(["unsourced", "no_words"]).nullable(),
+    // `with_note` (owner ruling 2026-11-15, #6079): the words are published only beside the platform's dated note;
+    // `claim` is then the note's short form and the words are `claim_with_note`, rendered by the call's own page alone.
+    claim_withheld: z.enum(["unsourced", "no_words", "with_note"]).nullable(),
+    claim_with_note: z.string().min(1).nullable(),
+    owner_note: ownerNote.nullable(),
     // Owner rulings 2026-11-03: the stored verdict, disputed pending classification — shown, never counted as verified.
     classification_review: z.boolean(),
     classification_review_reason: z.string().min(1).nullable(),

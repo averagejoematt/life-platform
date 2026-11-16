@@ -1292,7 +1292,8 @@ def handle_predictions(event, *, _g):
                             **({"reader_plain": False} if _plain_label is False else {}),
                             # Owner ruling 2026-11-03: the stored verdict, shown disputed — not counted as verified.
                             **(classification_review.served_fields(rec, words_held=bool(_held)) if _disputed else {}),
-                            **verification_fields.item_fields(rec),  # owner 2026-11-09: versions + verification (or null)
+                            # owner 2026-11-09: versions + verification (or null); 2026-11-15 (#6079): the owner-ruled note
+                            **verification_fields.item_fields(rec, words_served=bool(_said) and not _held),
                         }
                     )
             except Exception as _qe:

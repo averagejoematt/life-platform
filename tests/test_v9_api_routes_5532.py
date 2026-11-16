@@ -298,6 +298,7 @@ ITEM_KEYS = {
     "evaluator_version",
     "algo_version",
     "verification",
+    "owner_note",  # owner ruling 2026-11-15 (#6079): the dated note beside an owner-ruled call's words, else null
 }
 GRADING_KEYS = {"how", "actual_text", "tolerance_text", "outcome_notes"}
 KINDS = {"number", "direction", "yes_no", "sealed", "observation"}

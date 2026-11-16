@@ -55,8 +55,11 @@ const GROUPS: { key: string; title: string; test: (p: any) => boolean; open?: bo
   { key: "observation", title: "Observations, never graded", test: (p) => p.status === "observation" },
 ];
 const groups = GROUPS.map((g) => ({ ...g, items: mine.filter(g.test) })).filter((g) => g.items.length);
-const withheld = mine.filter((p) => p.claim_withheld).length;
-const callWords = (p: any, max = 110) => (p.claim_withheld ? heldCallWords(p, max) || clip(p.claim, max) : null);
+// `with_note` (owner ruling 2026-11-15, #6079): published, but only beside its dated note — a row here shows the note's
+// short form (`claim`) and links to the call's page, where the words and the note are; it is not counted as withheld.
+const withheld = mine.filter((p) => p.claim_withheld && p.claim_withheld !== "with_note").length;
+const callWords = (p: any, max = 110) =>
+  p.claim_withheld === "with_note" ? clip(p.claim, max) : p.claim_withheld ? heldCallWords(p, max) || clip(p.claim, max) : null;
 ---
 
 <Base title={c.name} top="system" description={c.short_bio || `${c.name} · ${domainWords(c.domain)}`}>
