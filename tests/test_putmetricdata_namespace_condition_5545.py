@@ -26,16 +26,21 @@ THE FAILURE MODE OF THE FIX, WHICH IS WHAT THIS FILE MOSTLY GUARDS
   — CloudWatch extracts them from the log stream with no caller IAM — so they are deliberately
   not counted. The closure is an over-approximation (a module imported for one helper
   contributes every namespace it can emit) — the safe direction: wider than the code needs,
-  never narrower.
+  never narrower. EXCEPT for the CALL_SCOPED_NAMESPACES (#5905): `LifePlatform/AI` and
+  `LifePlatform/Budget` are the series the budget governor reads, so for those two the role is
+  granted only what its handler can CALL — a function-level reachability walk (`CallGraph`)
+  rather than the import closure. A shared module that merely imports an emitter no longer
+  hands every importer a write grant to the cost series.
 
 THE FOUR RULES
   1. No `cloudwatch:PutMetricData` statement in any role_policies* builder lacks a
      `cloudwatch:namespace` StringEquals condition (and no wildcard / cloudwatch:* grant).
   2. The literal action string lives in ONE place — `_put_metric_data_statement()` — so a
      grant spelled by hand anywhere in cdk/stacks/ reds even if it never reaches a builder.
-  3. Coverage: a role's granted namespaces ⊇ the namespaces its code reaches (else: dark metric).
+  3. Coverage: a role's granted namespaces ⊇ the namespaces its code reaches (else: dark metric)
+     — "reaches" being the import closure, narrowed to the call graph for CALL_SCOPED_NAMESPACES.
   4. Justification: granted ⊆ reached ∪ {LifePlatform/AI for a Bedrock caller} (the #3563
-     telemetry grant is owed to every Bedrock caller as such).
+     telemetry grant is owed to every Bedrock caller as such), same narrowing.
 
   A parameterised `put_metric_data(Namespace=<variable>)` cannot be resolved statically. The
   three that exist are resolved by hand in `PARAMETERISED_EMITTERS` from their only callers, and
@@ -257,6 +262,186 @@ def _handler_module(source_file: str) -> str:
     return mod[len("lambdas.") :] if mod.startswith("lambdas.") else mod
 
 
+# ── the call-graph side (#5905): which namespaces can a handler actually CALL? ───────────
+#: The two namespaces whose series feed the cost governor's tier decision. A role may write them
+#: only if its handler can CALL an emitter, not merely import one.
+CALL_SCOPED_NAMESPACES = frozenset({NS_AI, "LifePlatform/Budget"})
+_MODULE_UNIT = "<module>"
+_DEFS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+
+
+class CallGraph:
+    """Function-level reachability over a BundleIndex — deliberately an OVER-approximation, because a
+    missed edge here narrows a grant and darkens a metric.
+
+    Unit = a top-level def/class of a module (a class is one unit: referencing it reaches every
+    method) or the module's own top-level code (`<module>`, which runs on import, as do class
+    bodies' non-def statements, decorators and default arguments). An edge A -> B exists when A
+      * imports B's module (importing runs its `<module>` unit, and its parent packages'),
+      * mentions a name bound by `from m import name` / `import m as alias` (any depth, any
+        spelling — a bare reference counts, so a callback passed by name is followed),
+      * mentions `alias.attr` for a module alias (-> that unit; a re-export is followed), or a
+        bare module alias (-> every unit of the module: it may be handed to getattr), or
+      * mentions a local def, or names the module in DYNAMIC_IMPORTS / import_module("literal").
+    Not modelled (and so a possible miss): string dispatch through globals()/getattr on a name
+    built at runtime. The entry set is EVERY unit of the handler module, not only lambda_handler.
+    """
+
+    def __init__(self, index: BundleIndex):
+        self.index = index
+        self.units: dict = {}
+        self.bind: dict = {}
+        self.edges: dict = {}
+        self.emitters: set = set()
+        for m in index.mods:
+            self._parse(m)
+        for m in index.mods:
+            self._bind(m)
+        for m in index.mods:
+            self._link(m)
+
+    def _parse(self, m: str) -> None:
+        with open(self.index.mods[m], encoding="utf-8") as fh:
+            tree = ast.parse(fh.read(), filename=self.index.mods[m])
+        units: dict = {}
+        top: list = []
+        for n in tree.body:
+            if isinstance(n, _DEFS):
+                units.setdefault(n.name, []).append(n)
+                top.extend(n.decorator_list)
+                if isinstance(n, ast.ClassDef):
+                    top.extend(n.bases)
+                    top.extend(b for b in n.body if not isinstance(b, _DEFS))
+                else:
+                    top.extend(n.args.defaults)
+                    top.extend(d for d in n.args.kw_defaults if d)
+            else:
+                top.append(n)
+        units[_MODULE_UNIT] = top
+        self.units[m] = units
+
+    def _import_targets(self, m: str, node) -> list:
+        """[(bound name | None, ("mod", m) | ("sym", m, attr))] — None = executed but binds nothing."""
+        idx = self.index
+        pkg = m if idx.mods[m].endswith("__init__.py") else m.rpartition(".")[0]
+        out: list = []
+        if isinstance(node, ast.Import):
+            for a in node.names:
+                for x in idx._resolve_absolute(a.name):
+                    out.append((a.asname or a.name.split(".")[0], ("mod", x)))
+            return out
+        if node.level:
+            base = pkg
+            for _ in range(node.level - 1):
+                base = base.rpartition(".")[0]
+            base = f"{base}.{node.module}" if node.module else base
+            found = idx._resolve(base)
+        else:
+            base = node.module or ""
+            found = idx._resolve_absolute(base)
+        for a in node.names:
+            if f"{base}.{a.name}" in idx.mods:
+                out.append((a.asname or a.name, ("mod", f"{base}.{a.name}")))
+            elif a.name == "*":
+                out.extend(("*", ("mod", x)) for x in found)
+            else:
+                out.extend((a.asname or a.name, ("sym", x, a.name)) for x in found)
+        out.extend((None, ("mod", x)) for x in found)
+        return out
+
+    def _bind(self, m: str) -> None:
+        bind: dict = collections.defaultdict(set)
+        self.bind[m] = bind
+        for nodes in self.units[m].values():
+            for n in nodes:
+                for sub in ast.walk(n):
+                    if isinstance(sub, (ast.Import, ast.ImportFrom)):
+                        for name, target in self._import_targets(m, sub):
+                            if name:
+                                bind[name].add(target)
+
+    def _all(self, mod: str) -> set:
+        return {(mod, u) for u in self.units[mod]}
+
+    def _sym(self, mod: str, attr: str, seen: set) -> set:
+        if (mod, attr) in seen or mod not in self.units:
+            return set()
+        seen.add((mod, attr))
+        if f"{mod}.{attr}" in self.index.mods:
+            return self._all(f"{mod}.{attr}")
+        if attr in self.units[mod]:
+            return {(mod, attr), (mod, _MODULE_UNIT)}
+        out = {(mod, _MODULE_UNIT)}
+        for tg in self.bind[mod].get(attr, ()):  # a re-export: `from d import attr` inside `mod`
+            out |= self._all(tg[1]) if tg[0] == "mod" else self._sym(tg[1], tg[2], seen)
+        return out
+
+    def _link(self, m: str) -> None:
+        bind = self.bind[m]
+        for unit, nodes in self.units[m].items():
+            edges: set = set()
+            for e in DYNAMIC_IMPORTS.get(m, ()):
+                for x in self.index._resolve(e):
+                    edges |= self._all(x)
+            for n in nodes:
+                allsub = list(ast.walk(n))
+                attr_bases = {id(x.value) for x in allsub if isinstance(x, ast.Attribute) and isinstance(x.value, ast.Name)}
+                for sub in allsub:
+                    if isinstance(sub, (ast.Import, ast.ImportFrom)):
+                        for _, tg in self._import_targets(m, sub):
+                            edges |= {(tg[1], _MODULE_UNIT)} if tg[0] == "mod" else self._sym(tg[1], tg[2], set())
+                    elif isinstance(sub, ast.Attribute) and isinstance(sub.value, ast.Name):
+                        edges |= {e for tg in bind.get(sub.value.id, ()) if tg[0] == "mod" for e in self._sym(tg[1], sub.attr, set())}
+                    elif isinstance(sub, ast.Name) and isinstance(sub.ctx, ast.Load):
+                        if sub.id in self.units[m]:
+                            edges.add((m, sub.id))
+                        for tg in bind.get(sub.id, ()):
+                            if tg[0] == "sym":
+                                edges |= self._sym(tg[1], tg[2], set())
+                            elif id(sub) not in attr_bases:
+                                edges |= self._all(tg[1])
+                    elif isinstance(sub, ast.Call):
+                        f = sub.func
+                        fname = f.attr if isinstance(f, ast.Attribute) else (f.id if isinstance(f, ast.Name) else None)
+                        if fname == "put_metric_data":
+                            self.emitters.add((m, unit))
+                        elif fname == "import_module" and sub.args and isinstance(sub.args[0], ast.Constant):
+                            for x in self.index._resolve(str(sub.args[0].value)):
+                                edges |= self._all(x)
+            self.edges[(m, unit)] = edges
+
+    def emitter_namespaces(self) -> dict:
+        """{(module, unit): namespaces} — a unit holding a put_metric_data call gets its module's
+        namespaces; a PARAMETERISED_EMITTERS module with no such call marks every unit."""
+        out: dict = {}
+        for m, u in self.emitters:
+            out[(m, u)] = set(self.index.info(m)[1])
+        for m, (ns, _why) in PARAMETERISED_EMITTERS.items():
+            if m not in self.units:  # a planted tree without this module
+                continue
+            for k in [k for k in self.emitters if k[0] == m] or [(m, u) for u in self.units[m]]:
+                out.setdefault(k, set()).update(ns)
+        return out
+
+    def called_namespaces(self, handler: str) -> set:
+        emit = self.emitter_namespaces()
+        seen: set = set()
+        stack = [(handler, u) for u in self.units[handler]]
+        while stack:
+            k = stack.pop()
+            if k not in seen:
+                seen.add(k)
+                stack.extend(self.edges.get(k, ()))
+        return set().union(*(emit.get(k, set()) for k in seen))
+
+
+def needed_namespaces(index: BundleIndex, graph: CallGraph, handler: str) -> set:
+    """What a handler's role must be allowed to write: the import closure's namespaces, except that
+    the CALL_SCOPED_NAMESPACES come from the call graph (#5905)."""
+    reach = index.namespaces(handler)
+    return (reach - CALL_SCOPED_NAMESPACES) | (graph.called_namespaces(handler) & CALL_SCOPED_NAMESPACES)
+
+
 # ── the grant side ───────────────────────────────────────────────────────────────────────
 def _pmd_statements(statements) -> list:
     return [s for s in statements if ACTION in s.actions or "cloudwatch:*" in s.actions or "*" in s.actions]
@@ -316,26 +501,31 @@ def _roles_with_metric_grants():
 
 
 INDEX = BundleIndex()
+GRAPH = CallGraph(INDEX)
 ROLES = _roles_with_metric_grants()
 
 
-def coverage_gaps(index: BundleIndex, roles: dict) -> dict:
+def _graph_for(index: BundleIndex) -> CallGraph:
+    return GRAPH if index is INDEX else CallGraph(index)
+
+
+def coverage_gaps(index: BundleIndex, roles: dict, graph: CallGraph | None = None) -> dict:
     """{policy_fn: {function: missing namespaces}} — code that would be denied (a dark metric)."""
     gaps: dict = {}
     for policy_fn, (stmts, enrolments) in roles.items():
         granted = granted_namespaces(stmts)
         for e in enrolments:
-            missing = index.namespaces(_handler_module(e.source_file)) - granted
+            missing = needed_namespaces(index, graph or _graph_for(index), _handler_module(e.source_file)) - granted
             if missing:
                 gaps.setdefault(policy_fn, {})[e.function_name] = sorted(missing)
     return gaps
 
 
-def surplus_grants(index: BundleIndex, roles: dict) -> dict:
+def surplus_grants(index: BundleIndex, roles: dict, graph: CallGraph | None = None) -> dict:
     """{policy_fn: namespaces granted that no function on the role can reach}."""
     out: dict = {}
     for policy_fn, (stmts, enrolments) in roles.items():
-        reached = set().union(*(index.namespaces(_handler_module(e.source_file)) for e in enrolments))
+        reached = set().union(*(needed_namespaces(index, graph or _graph_for(index), _handler_module(e.source_file)) for e in enrolments))
         if any(a.startswith("bedrock:Invoke") for s in stmts for a in s.actions):
             reached.add(NS_AI)  # #3563: the telemetry grant is owed to every Bedrock caller
         extra = granted_namespaces(stmts) - reached
@@ -407,6 +597,59 @@ def test_no_role_holds_a_namespace_its_code_cannot_reach():
     )
 
 
+#: #5905 — the nine grants the import closure over-approximated: role -> the call-scoped namespace it
+#: REACHES (an importer of a shared module) but whose emitter no handler path CALLS. Each was read
+#: against 14 days of ListMetrics (none of these functions appears under LifePlatform/AI; nothing but
+#: the cost governor writes LifePlatform/Budget) and against the code (see the PR for the per-role chain).
+REACHED_NOT_CALLED = {
+    "compute_coach_prediction_evaluator": NS_AI,
+    "email_chronicle_sender": NS_AI,
+    "email_weekly_signal": NS_AI,
+    "hevy_routine_cron": NS_AI,
+    "hevy_restamp": NS_AI,
+    "operational_freshness_checker": NS_AI,
+    "operational_reading_recall_sweep": NS_AI,
+    "operational_insight_email_parser": NS_AI,
+    "mcp_server": "LifePlatform/Budget",
+}
+
+
+def _role_handlers(policy_fn: str) -> list:
+    return [_handler_module(e.source_file) for e in ROLES[policy_fn][1]]
+
+
+def test_the_nine_surplus_grants_are_reached_but_never_called_and_are_gone():
+    """#5905 — the pin: each role still IMPORTS an emitter of the namespace (so the closure alone would
+    have kept the grant) yet no handler path calls it, and the role no longer holds it."""
+    problems = []
+    for policy_fn, ns in sorted(REACHED_NOT_CALLED.items()):
+        stmts = ROLES[policy_fn][0]
+        handlers = _role_handlers(policy_fn)
+        if not any(ns in INDEX.namespaces(h) for h in handlers):
+            problems.append(f"{policy_fn}: no longer reaches {ns} — delete its REACHED_NOT_CALLED row")
+        for h in handlers:
+            if ns in GRAPH.called_namespaces(h):
+                problems.append(f"{policy_fn}: {h} CAN call a {ns} emitter — the grant is owed, not surplus")
+        if ns in granted_namespaces(stmts):
+            problems.append(f"{policy_fn}: still holds {ns}")
+    assert not problems, "\n  ".join(["#5905 pin broken:", *problems])
+
+
+def test_the_call_graph_still_sees_the_real_callers():
+    """Vacuity guard for the call graph itself: it must find the emitters that really are called, or
+    every call-scoped grant would be 'surplus' and the narrowing would darken the cost series."""
+    assert {NS_AI, "LifePlatform/Budget"} <= GRAPH.called_namespaces("operational.cost_governor_lambda")
+    for handler in ("ai.bedrock_client", "web.site_api_ai_lambda", "coach.coach_ensemble_digest", "coach.coach_quality_gate"):
+        assert NS_AI in GRAPH.called_namespaces(handler), handler
+    # every role holding a call-scoped namespace is either a Bedrock caller or can call its emitter
+    for policy_fn, (stmts, enrolments) in ROLES.items():
+        bedrock = any(a.startswith("bedrock:Invoke") for st in stmts for a in st.actions)
+        for ns in granted_namespaces(stmts) & CALL_SCOPED_NAMESPACES:
+            if bedrock and ns == NS_AI:
+                continue
+            assert any(ns in GRAPH.called_namespaces(_handler_module(e.source_file)) for e in enrolments), (policy_fn, ns)
+
+
 def test_every_parameterised_emitter_is_resolved():
     """A `put_metric_data(Namespace=<variable>)` or `import_module(<variable>)` the index cannot
     resolve must be resolved by hand above — never silently contribute nothing."""
@@ -462,6 +705,42 @@ def test_MUTATION_a_new_namespace_in_a_shared_module_reds_coverage(tmp_path):
     assert coverage_gaps(index, ok) == {}
     assert coverage_gaps(index, narrow) == {"planted": {"planted-fn": ["LifePlatform/Planted"]}}
     assert surplus_grants(index, narrow) == {"planted": [NS_AI]}
+
+
+def test_MUTATION_reached_but_not_called_is_distinguished_from_called(tmp_path):
+    """#5905 — the exact over-approximation: a handler imports a shared module that holds an AI emitter
+    and calls only its OTHER function. The closure says AI; the call graph says not-called, until the
+    handler really calls the emitter."""
+    body = (
+        "NS = 'LifePlatform/AI'\n\ndef emit():\n    cw.put_metric_data(Namespace=NS, MetricData=[])\n\n" "def harmless():\n    return 1\n"
+    )
+    _planted_tree(tmp_path, body)
+    handler = tmp_path / "lambdas" / "ops" / "handler_lambda.py"
+    handler.write_text("from common import shared_emit\n\ndef lambda_handler(e, c):\n    return shared_emit.harmless()\n")
+    index = BundleIndex(str(tmp_path))
+    graph = CallGraph(index)
+    assert NS_AI in index.namespaces("ops.handler_lambda")  # reached through the import
+    assert NS_AI not in graph.called_namespaces("ops.handler_lambda")  # ...never called
+    enrol = family.Enrolment("planted_stack.py", "planted-fn", "lambdas/ops/handler_lambda.py", "planted")
+    bare = {"planted": ([_Stmt("M", [ACTION], {"StringEquals": {COND_KEY: ["LifePlatform/Compute"]}})], [enrol])}
+    assert coverage_gaps(index, bare, graph) == {}
+    handler.write_text("from common import shared_emit\n\ndef lambda_handler(e, c):\n    return shared_emit.emit()\n")
+    index = BundleIndex(str(tmp_path))
+    graph = CallGraph(index)
+    assert NS_AI in graph.called_namespaces("ops.handler_lambda")
+    assert coverage_gaps(index, bare, graph) == {"planted": {"planted-fn": [NS_AI]}}
+
+
+def test_MUTATION_restoring_a_surplus_grant_to_a_real_role_reds():
+    """Against the REAL fleet: put LifePlatform/AI back on the hevy-routine-cron role and Rule 4 names it."""
+    stmts, enrolments = ROLES["hevy_routine_cron"]
+    widened = []
+    for st in stmts:
+        vals = ((getattr(st, "conditions", None) or {}).get("StringEquals") or {}).get(COND_KEY)
+        if vals:
+            st = _Stmt(st.sid, st.actions, {"StringEquals": {COND_KEY: [*vals, NS_AI]}})
+        widened.append(st)
+    assert surplus_grants(INDEX, {"hevy_routine_cron": (widened, enrolments)}) == {"hevy_routine_cron": [NS_AI]}
 
 
 def test_MUTATION_a_parameterised_namespace_is_reported_not_dropped(tmp_path):
