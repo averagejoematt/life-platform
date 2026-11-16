@@ -30,7 +30,8 @@ other work and FAIL CLOSED (#6088); the honeypot field; the timing token (``read
 by the GET, bound to call + identity + instant, between 2 s and 1 h old); the public-pending-call check; the closed
 choice set; the dedup marker. What this stops and does not stop is stated in the PR for #6088: it stops naive
 scripts, replay and token harvesting across networks; it does not stop a distributed botnet holding many /64s — that
-needs an edge rate rule (WAF), an owner decision recorded as overdue in docs/PROPORTIONALITY.md.
+needs a rate rule at the edge — the edge firewall was removed in 2026-06, and whether it returns is an owner decision
+recorded as overdue in docs/PROPORTIONALITY.md.
 """
 
 from __future__ import annotations

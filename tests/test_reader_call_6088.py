@@ -380,7 +380,8 @@ def test_only_a_public_open_direction_or_number_call_takes_a_tap():
         assert _ask(table, _event(params={"call": _call_id(row)}), raw=raw)["statusCode"] == status
     for bad in ("sleep-pred_nope", "nosuchcoach-pred_x", "../etc", "x" * 300):
         assert _ask(table, _event(params={"call": bad}), raw=raw)["statusCode"] == 404, bad
-    assert _body(_ask(table, _event(params={}), raw=raw)) == {"available": True}  # the bare probe the hook census reads
+    bare = _body(_ask(table, _event(params={}), raw=raw))
+    assert {k: v for k, v in bare.items() if k != "_meta"} == {"available": True}  # the bare probe the hook census reads
     # due today: the tally is frozen — the GET serves it, no token, and a POST with a genuine token is refused
     frozen_call = _call_id(DUE_TODAY_ROW)
     frozen = _body(_ask(table, _event(params={"call": frozen_call}), raw=raw))
