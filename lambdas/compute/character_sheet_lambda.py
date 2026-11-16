@@ -28,6 +28,7 @@ v1.2.0 — 2026-03-26: Phase D — Challenge bonus XP wired into pillar xp_total
 
 import json
 import logging
+import math
 import os
 import time
 from datetime import datetime, timedelta, timezone
@@ -1085,7 +1086,7 @@ def lambda_handler(event, context):
                 if isinstance(obj, bool):
                     return obj
                 if isinstance(obj, float):
-                    return Decimal(str(obj))
+                    return Decimal(str(obj)) if math.isfinite(obj) else None  # #5524: NaN/Inf never reach the write
                 if isinstance(obj, int):
                     return Decimal(str(obj))
                 return obj
