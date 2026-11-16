@@ -324,6 +324,12 @@ REPLAY_SEMANTICS: dict[str, tuple[str, str]] = {
         CONTENT_KEY,
         "sk is WORDS#<day>#sha256(channel, prompt, text)[:12] under attribute_not_exists(sk); a replay returns the stored entry and writes nothing",
     ),
+    # ── #6087 ──────────────────────────────────────────────────────────────────
+    "log_challenge_checkin": (
+        DETERMINISTIC_KEY,
+        "one daily_checkins entry per (challenge, date): a replay replaces that day with the same value, under a "
+        "checkin_rev-conditioned update so a concurrent write is retried on a fresh read, never lost",
+    ),
     # ── #4401: read-verb tools reclassified as writes (mcp/audit.py WRITE_TOOLS_BEHIND_READ_VERB) ──
     "get_exercise_notes": (
         DETERMINISTIC_KEY,

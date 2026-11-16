@@ -4,8 +4,8 @@ Hardening for the public write surface on site_api_social.py:
   * challenge_vote — reject catalog_ids that aren't real public challenges
     (previously minted arbitrary VOTES#challenges/CH#<anything> rows); fail-closed
     when the catalog can't load.
-  * challenge_checkin — idempotent per-date write (a double-tap / network retry
-    must not duplicate a day and inflate completion_pct / success_rate).
+  * challenge_checkin — #6087: a reader's check-in never touches the owner's row
+    (it was an idempotent per-date REPLACE of his own entry before).
   * submit_finding — content-based id so a same-day retry overwrites the same S3
     object instead of creating a duplicate pending finding.
 """
@@ -105,39 +105,43 @@ def test_vote_accepts_known_catalog_id(monkeypatch):
     assert json.loads(r["body"])["new_count"] == 1
 
 
-# ── challenge_checkin: per-date idempotency ───────────────────────────────────
+# ── challenge_checkin: a reader never writes the owner's row (#6087) ──────────
+# Replaces `test_checkin_dedups_same_date`, which pinned a same-date REPLACE inside the
+# owner's own `daily_checkins` — the very write that let a stranger overwrite his check-in. The
+# full contract (switch, replay, concurrency, duplicates) is tests/test_challenge_checkin_isolation_6087.py.
 
 
-def test_checkin_dedups_same_date(monkeypatch):
+def _open_reader_door(monkeypatch):
+    from web import site_api_social_challenges as chal
+
+    monkeypatch.setattr(chal, "PUBLIC_CHECKIN_LIVE", True)
+    monkeypatch.setattr(social, "_rate_check", lambda *a, **k: (True, 1, 0))
+
+
+def test_checkin_while_shut_writes_nothing(monkeypatch):
+    ft = _FakeTable(get_item_result={"status": "active", "duration_days": 7, "daily_checkins": []})
+    monkeypatch.setattr(social, "table", ft)
+    r = social._handle_challenge_checkin(_event({"challenge_id": "cs", "completed": True}))
+    assert r["statusCode"] == 403
+    assert ft.update_args is None and ft.put_called is False
+
+
+def test_checkin_same_date_never_replaces_the_owner_entry(monkeypatch):
+    _open_reader_door(monkeypatch)
     existing = {
         "status": "active",
         "duration_days": 7,
-        "daily_checkins": [{"date": "2026-06-15", "completed": False, "logged_at": "earlier"}],
+        "daily_checkins": [{"date": "2026-06-15", "completed": True, "logged_at": "earlier"}],
     }
     ft = _FakeTable(get_item_result=existing)
     monkeypatch.setattr(social, "table", ft)
-    r = social._handle_challenge_checkin(_event({"challenge_id": "cs", "completed": True, "date": "2026-06-15"}))
+    r = social._handle_challenge_checkin(_event({"challenge_id": "cs", "completed": False, "date": "2026-06-15"}))
+    assert r["statusCode"] == 400  # a reader logs today only — never a chosen past day
+    r = social._handle_challenge_checkin(_event({"challenge_id": "cs", "completed": False}))
     assert r["statusCode"] == 200
-    written = ft.update_args["ExpressionAttributeValues"][":cl"]
-    same_day = [c for c in written if c["date"] == "2026-06-15"]
-    assert len(same_day) == 1, "same-date check-in must not duplicate"
-    assert same_day[0]["completed"] is True, "re-check-in must replace with the new value"
-    assert json.loads(r["body"])["total_checkins"] == 1
-
-
-def test_checkin_keeps_distinct_dates(monkeypatch):
-    existing = {
-        "status": "active",
-        "duration_days": 7,
-        "daily_checkins": [{"date": "2026-06-14", "completed": True, "logged_at": "earlier"}],
-    }
-    ft = _FakeTable(get_item_result=existing)
-    monkeypatch.setattr(social, "table", ft)
-    r = social._handle_challenge_checkin(_event({"challenge_id": "cs", "completed": True, "date": "2026-06-15"}))
-    assert r["statusCode"] == 200
-    written = ft.update_args["ExpressionAttributeValues"][":cl"]
-    assert {c["date"] for c in written} == {"2026-06-14", "2026-06-15"}
-    assert json.loads(r["body"])["total_checkins"] == 2
+    assert ft.update_args is None, "the reader door must never update the owner's challenge row"
+    assert ft.put_called is True  # its own reader-partition item
+    assert "total_checkins" not in json.loads(r["body"])  # no owner progress echoed to a stranger
 
 
 # ── submit_finding: content-stable id ─────────────────────────────────────────

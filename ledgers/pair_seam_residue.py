@@ -86,7 +86,6 @@ PAIR_SEAM_RESIDUE: dict[str, str] = {
     "challenges::lambdas/intelligence/challenge_generator_lambda.py::read": SEED_DATE,
     "challenges::lambdas/intelligence/challenge_generator_lambda.py::write": SEED_DATE,
     "challenges::lambdas/web/site_api_social_challenges.py::read": SEED_DATE,
-    "challenges::lambdas/web/site_api_social_challenges.py::write": SEED_DATE,
     "chronicle::lambdas/content/site_writer.py::read": SEED_DATE,
     "chronicle::lambdas/emails/chronicle_approve_lambda.py::read": SEED_DATE,
     "chronicle::lambdas/emails/chronicle_approve_lambda.py::write": SEED_DATE,

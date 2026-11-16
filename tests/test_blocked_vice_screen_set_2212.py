@@ -247,9 +247,13 @@ def test_blocked_vice_call_sites_derivation_is_non_vacuous():
     # so the screen inside that loop went with the surface it screened. The absence is pinned below
     # (test_mind_overview_vice_timeline_carries_no_name_keyed_map) and, across every public route, by
     # tests/test_restraint_labels_5948.py.
-    assert len(sites) == 27, (
-        f"expected 27 distinct _is_blocked_vice call sites (11 from #2212 + 2 from #2238 + 11 from #2240 + 2 from #2221 "
-        f"+ 1 from #4182 + 1 from #4189 - 1 from #5948), "
+    # 27 -> 26 by #6087 (2026-11-16): `_handle_challenge_checkin` no longer accepts or stores a reader note at
+    # all, so the write-door screen went with the field it screened. The read-door screen (`_screened_note`)
+    # stays for rows stored before; the note's absence is pinned by
+    # tests/test_site_api_social_behavior.py::test_a_reader_checkin_note_is_never_stored.
+    assert len(sites) == 26, (
+        f"expected 26 distinct _is_blocked_vice call sites (11 from #2212 + 2 from #2238 + 11 from #2240 + 2 from #2221 "
+        f"+ 1 from #4182 + 1 from #4189 - 1 from #5948 - 1 from #6087), "
         f"got {len(sites)} — a call site was added or removed; update this pin AND give the changed "
         f"site the same mutation-proof treatment as the rest of this file"
     )

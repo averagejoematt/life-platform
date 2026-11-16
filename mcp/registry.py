@@ -18,9 +18,16 @@ from mcp.tools_benchmark import GET_BENCHMARK_DESCRIPTION, tool_get_benchmark
 # #1478: one-call session opener aggregating six pending-capture surfaces.
 from mcp.tools_capture import tool_get_capture_queues
 from mcp.tools_cgm import tool_get_cgm
+from mcp.tools_challenges import CHALLENGE_CHECKIN_DESCRIPTION, CHALLENGE_CHECKIN_INPUT, tool_log_challenge_checkin  # #6087
 
 # #915: ad-hoc coach check-in loop — coaches ask, Matthew answers verbatim.
-from mcp.tools_coach_checkin import tool_get_coach_checkin_queue, tool_log_coach_calibration, tool_log_coach_checkin
+from mcp.tools_coach_checkin import (
+    LOG_COACH_CALIBRATION_INPUT,
+    LOG_COACH_CHECKIN_INPUT,
+    tool_get_coach_checkin_queue,
+    tool_log_coach_calibration,
+    tool_log_coach_checkin,
+)
 
 # #1690 (epic #1687 S3): correct a weekly-review-pack item by number from chat.
 from mcp.tools_coach_corrections import tool_log_coach_correction
@@ -2010,20 +2017,7 @@ TOOLS = {
         "schema": {
             "name": "log_coach_checkin",
             "description": LOG_COACH_CHECKIN_DESCRIPTION,
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "checkin_id": {
-                        "type": "string",
-                        "description": "The question's checkin_id from get_coach_checkin_queue (starts with 'CHECKIN#').",
-                    },
-                    "coach_id": {"type": "string", "description": "Optional: the asking coach's id — speeds up the lookup."},
-                    "answer": {"type": "string", "description": "Matthew's answer, verbatim. Omit when skip=true."},
-                    "skip": {"type": "boolean", "description": "true = Matthew declines this question (zero penalty)."},
-                    "tags": {"type": "array", "items": {"type": "string"}, "description": "Optional topic tags (max 5)."},
-                },
-                "required": ["checkin_id"],
-            },
+            "inputSchema": LOG_COACH_CHECKIN_INPUT,  # #6087: moved beside its tool (pays log_challenge_checkin's lines)
         },
     },
     # #1481: conversational self-calibration — the asking coach re-grades itself from the answer.
@@ -2032,38 +2026,7 @@ TOOLS = {
         "schema": {
             "name": "log_coach_calibration",
             "description": LOG_COACH_CALIBRATION_DESCRIPTION,
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "checkin_id": {
-                        "type": "string",
-                        "description": "The ANSWERED check-in this calibration derives from (starts with 'CHECKIN#').",
-                    },
-                    "coach_id": {"type": "string", "description": "Optional: the asking coach's id — speeds up the lookup."},
-                    "subdomain": {
-                        "type": "string",
-                        "description": "The subdomain being re-graded (reuse existing CONFIDENCE# vocabulary where it fits).",
-                    },
-                    "direction": {
-                        "type": "string",
-                        "enum": ["up", "down", "hold"],
-                        "description": "up = the answer clarified/confirmed the coach's read; down = it revealed a blind spot; hold = record the learning without a confidence move.",
-                    },
-                    "takeaway": {
-                        "type": "string",
-                        "description": "What the coach learned, tightly paraphrasing the answer — no invented context (max 600 chars).",
-                    },
-                    "answer_excerpt": {
-                        "type": "string",
-                        "description": "Optional: the exact phrase of Matthew's answer this rests on — must appear verbatim in the stored answer.",
-                    },
-                    "weight": {
-                        "type": "number",
-                        "description": "Optional confidence-move weight 0.1-1.0 (default 0.5; 1.0 = as strong as one graded prediction, the hard cap).",
-                    },
-                },
-                "required": ["checkin_id", "subdomain", "direction", "takeaway"],
-            },
+            "inputSchema": LOG_COACH_CALIBRATION_INPUT,  # #6087: beside its tool
         },
     },
     # #1478: one-call session opener aggregating six pending-capture surfaces.
@@ -2089,6 +2052,10 @@ TOOLS = {
     },
     # #4078: chat's "queued pending approval" made real — enqueue / list / approve / discard.
     # #4584: his own words from chat, stored verbatim; a clean note is public (owner decision 2026-10-04).
+    "log_challenge_checkin": {  # #6087: the owner's own challenge check-in — the public door can no longer write his row
+        "fn": tool_log_challenge_checkin,
+        "schema": {"name": "log_challenge_checkin", "description": CHALLENGE_CHECKIN_DESCRIPTION, "inputSchema": CHALLENGE_CHECKIN_INPUT},
+    },
     "log_owner_note": {
         "fn": tool_log_owner_note,
         "schema": {"name": "log_owner_note", "description": LOG_OWNER_NOTE_DESCRIPTION, "inputSchema": LOG_OWNER_NOTE_INPUT},
