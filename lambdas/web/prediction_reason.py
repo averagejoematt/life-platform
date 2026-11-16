@@ -129,7 +129,11 @@ _SUFFIX_WORDS = {"_7day_avg": "7-day average", "_14day_avg": "14-day average", "
 _DIRECTIONS = {"up": "up", "down": "down"}
 _NO_VERDICT = ("inconclusive", "expired")
 #: #6102 — what a ruled, no-verdict call says in place of a data sentence (the correction beside it says why).
-RULED_REASON = "could not be checked as filed — the correction recorded on this call says why"
+#: THE WORDS MATTER: the publication gate empties any served string that shares a six-word run with a withheld row's
+#: stored text (``narrative_publication.is_tainted``), and a ruled row's stored notes open "Could not be checked as
+#: filed: …". The first wording here reused that phrase, so the gate emptied it on every ruled call (live, 2026-11-16).
+#: ``tests/test_coaches_api.py`` taints the rulings' stored sentences and holds this one clear of them.
+RULED_REASON = "a ruling took this call out of the accuracy count — the correction on this call says why"
 
 
 def ruled_out(record: dict) -> bool:
