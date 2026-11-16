@@ -30,6 +30,7 @@ import math
 import statistics  # #2811 fold: was imported function-locally twice, paying for this slice's lines
 import time
 from datetime import datetime, timedelta, timezone
+from fractions import Fraction
 from typing import Any, Optional
 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
@@ -48,7 +49,8 @@ logger = logging.getLogger(__name__)
 _config_cache: dict[str, Any] = {"data": None, "ts": 0}  # dict[str, Any]: heterogeneous, see #2638
 _CONFIG_TTL_S = 300  # 5 minutes
 
-ENGINE_VERSION = "1.8.0"  # #1411: fitted-not-authored — active effects carry fit_status/n_eff/CI badges (ADR-105)
+ENGINE_VERSION = "1.9.0"  # #6066: the headline mean is exact arithmetic — an exact integer boundary counts as reached
+# v1.8.0 — #1411: fitted-not-authored — active effects carry fit_status/n_eff/CI badges (ADR-105)
 # #1412 (no version bump — no transition-formula change): component targets may arrive
 # personalized via personal_baselines.apply_character_targets; _weighted_pillar_score
 # surfaces each target's derivation provenance into component details. Target values
@@ -1701,11 +1703,41 @@ PILLAR_COMPUTERS = {
     "relationships": compute_relationships_raw,
 }
 
-# The order compute_character_sheet builds and SUMS the pillars in (Step 1's computers, then Step 2's consistency
-# meta-pillar). It is part of the headline's arithmetic, not a presentation detail: the headline level is the FLOOR of a
-# float weighted mean, and at an exact integer boundary the sum's order decides the floor (2026-11-14: exactly 20 —
-# 19.999999999999996 in this order, 20.000000000000004 alphabetically). progression_receipts replays in this order.
+# The order compute_character_sheet builds the pillars in (Step 1's computers, then Step 2's consistency meta-pillar),
+# and the order progression_receipts replays them in. Until v1.9.0 it was part of the headline's arithmetic: the level
+# was the floor of a FLOAT weighted mean, and at an exact integer boundary the sum's order decided the floor
+# (2026-11-14: exactly 20 — 19.999999999999996 in this order, 20.000000000000004 alphabetically). Since #6066 the mean
+# is exact (headline_level), so no order can move it; the order is kept so the two paths still walk the same sequence.
 HEADLINE_PILLAR_ORDER = (*PILLAR_COMPUTERS, "consistency")
+
+
+def _exact(x: Any) -> Fraction:
+    """A number as the exact rational it is CONFIGURED as. A float is read through its shortest repr (0.18 → 9/50, not
+    the binary double 0.17999999999999999334…), so a weight means the decimal literal in config/character_sheet.json;
+    int, Decimal (a DynamoDB read) and str convert exactly as they are."""
+    return Fraction(repr(x)) if isinstance(x, float) else Fraction(x)
+
+
+def headline_level(entries: Any) -> int:
+    """Step 6's headline: floor(Σ level·weight / Σ weight), clamped to 1..100, over (level, weight) pairs for the
+    pillars the headline INCLUDES (the caller applies the #960 not-instrumented exclusion). 1 when no weight remains.
+
+    #6066 (owner ruling 2026-11-16, "an exact boundary counts as reached"): the mean is computed in exact rational
+    arithmetic, so a mean that is mathematically N+1 reads N+1 whatever order the pillars are summed in — float addition
+    used to land it one ulp below and floor it to N. Exact arithmetic promotes nothing that is genuinely below the
+    boundary: with weights in hundredths the mean is K/W for integers K and W ≤ 100, so the largest value under N+1 is
+    N+1-1/W and floors to N. The compute (compute_character_sheet) and the receipt replay
+    (progression_receipts._replay_headline) both call THIS function, so write time and read time cannot disagree."""
+    num = Fraction(0)
+    den = Fraction(0)
+    for level, weight in entries:
+        w = _exact(weight)
+        num += _exact(level) * w
+        den += w
+    if den <= 0:
+        return 1
+    return max(1, min(100, math.floor(num / den)))
+
 
 # Keys a computed record carries that the sheet item never stores: the #1373 fire-time transition capture (it persists
 # to the receipt partition) and the public variant's own capture (owner ruling 2026-11-05, health.character_public).
@@ -2009,18 +2041,16 @@ def compute_character_sheet(
     # silently capping the reachable headline at floor(93.07) = 93 and pushing
     # Elite out of any horizon. Once a pillar earns its first level it counts
     # forever — going dark later drags honestly instead of vanishing.
-    weighted_level_sum = 0.0
-    total_weight = 0.0
+    # #6066 (v1.9.0): the mean is exact (headline_level) — an exact integer boundary counts as reached.
+    headline_terms = []
     headline_excluded = []
     for pillar_name, result in pillar_results.items():
         if result.get("not_instrumented") and result["level"] <= 1:
             headline_excluded.append(pillar_name)
             continue
-        weight = pillar_configs.get(pillar_name, {}).get("weight", 1.0 / 7)
-        weighted_level_sum += result["level"] * weight
-        total_weight += weight
+        headline_terms.append((result["level"], pillar_configs.get(pillar_name, {}).get("weight", 1.0 / 7)))
 
-    character_level = max(1, min(100, int(math.floor(weighted_level_sum / total_weight)))) if total_weight > 0 else 1
+    character_level = headline_level(headline_terms)
     character_tier = get_tier(character_level, config)
 
     prev_char_level = previous_day_state.get("character_level", 1) if previous_day_state else 1

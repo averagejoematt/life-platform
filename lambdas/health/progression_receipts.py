@@ -222,25 +222,24 @@ def _replay_headline(transitions: dict, replayed_pillars: dict, config: dict, en
     the CURRENT config weights — mirrors compute_character_sheet Step 6 (#960
     renormalization included), in the SAME summation order.
 
-    The order is load-bearing (2026-11-15): the level is the floor of a float weighted mean, and on 2026-11-14 that mean
-    was exactly 20. Summed in the compute's order it is 19.999999999999996 (stored: level 19); summed in the order the
-    receipt's map came back from DynamoDB it is 20.000000000000004 (replayed: level 20, plus a level-up that never
-    happened). The receipt verified at write time, from memory, and failed every read after — the deploy-health alarm,
-    for a difference in the last binary digit. Replay reproduces the compute; it does not improve on it."""
-    import math
+    The arithmetic is the engine's own `headline_level` — the SAME function the compute calls, never a copy. Until
+    engine v1.9.0 the level was the floor of a FLOAT mean, and on 2026-11-14 that mean was exactly 20: 19.999999999999996
+    in the compute's order (stored 19), 20.000000000000004 in the alphabetical order a DynamoDB map comes back in
+    (replayed 20). #6065 fixed the replay by summing in `HEADLINE_PILLAR_ORDER`; #6066 made the mean exact, so the order
+    no longer moves the level at all (it is still walked, so both paths visit the pillars identically). A receipt
+    written before v1.9.0 replays as `engine_drift` — the replay judges it by today's rule and labels the change."""
+    if engine is None:
+        from health import character_engine as engine  # bundled module (#781)
 
     pillar_cfgs = (config or {}).get("pillars", {})
-    weighted = 0.0
-    total_w = 0.0
+    terms = []
     for name in _compute_order(list(replayed_pillars), engine):
         outs = replayed_pillars[name]
         ins = (transitions.get("pillars", {}).get(name) or {}).get("inputs") or {}
         if bool(ins.get("not_instrumented")) and outs["level"] <= 1:
             continue
-        weight = pillar_cfgs.get(name, {}).get("weight", 1.0 / 7)
-        weighted += outs["level"] * weight
-        total_w += weight
-    character_level = max(1, min(100, int(math.floor(weighted / total_w)))) if total_w > 0 else 1
+        terms.append((outs["level"], pillar_cfgs.get(name, {}).get("weight", 1.0 / 7)))
+    character_level = engine.headline_level(terms)
     prev_level = ((transitions.get("headline") or {}).get("inputs") or {}).get("prev_character_level", 1)
     events = []
     if character_level > prev_level:

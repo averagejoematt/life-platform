@@ -23,8 +23,6 @@ import os
 import sys
 from decimal import Decimal
 
-import pytest
-
 # ── Add lambdas/ to import path ──
 LAMBDAS_DIR = os.path.join(os.path.dirname(__file__), "..", "lambdas")
 sys.path.insert(0, os.path.abspath(LAMBDAS_DIR))
@@ -478,16 +476,17 @@ def test_norm_makes_int_float_decimal_agree():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# The summation order is part of the arithmetic (2026-11-15)
+# The summation order is NOT part of the arithmetic any more (#6065 → #6066)
 # ══════════════════════════════════════════════════════════════════════════════
 # On 2026-11-14 the weighted mean of the pillar levels was EXACTLY 20. The compute summed it in its own order and got
 # 19.999999999999996 (level 19, stored); the receipt came back from DynamoDB with its pillars alphabetical, the replay
-# summed in that order and got 20.000000000000004 (level 20 and a level-up that never happened). The receipt had
-# verified at write time. qa-smoke's deploy-health replay then failed and every code deploy auto-rolled back.
+# summed in that order and got 20.000000000000004 (level 20). #6065 made the replay sum in the compute's order; #6066
+# (owner ruling 2026-11-16, "an exact boundary counts as reached", engine v1.9.0) made the mean exact, so every order
+# reads 20 — and a mean genuinely below 20 still reads 19.
+#
+# Fixtures are SYNTHETIC levels (not any stored day) over the config's weights; relationships is never instrumented.
 
-# The real day: levels as stored, weights as the live config carried them, relationships never instrumented.
-_NOV14_LEVELS = {"sleep": 34, "movement": 40, "nutrition": 6, "metabolic": 1, "mind": 8, "relationships": 1, "consistency": 22}
-_NOV14_WEIGHTS = {
+_WEIGHTS = {
     "sleep": 0.2,
     "movement": 0.18,
     "nutrition": 0.18,
@@ -496,41 +495,84 @@ _NOV14_WEIGHTS = {
     "relationships": 0.07,
     "consistency": 0.1,
 }
+# Σ level·weight-hundredths = 1860 = 20 × 93: the mean is exactly 20. Float, in HEADLINE_PILLAR_ORDER: 19.999999999999996.
+_BOUNDARY_LEVELS = {"sleep": 17, "movement": 20, "nutrition": 23, "metabolic": 23, "mind": 20, "relationships": 1, "consistency": 17}
+# Σ = 1859 = 20 × 93 − 1: the mean is 20 − 1/93 = 19.989…, the largest value under 20 these six weights can produce.
+_NEAR_LEVELS = {"sleep": 18, "movement": 18, "nutrition": 22, "metabolic": 22, "mind": 21, "relationships": 1, "consistency": 20}
 
 
-def _nov14(order):
+def _fixture(levels, order, prev=19):
     transitions = {
-        "pillars": {n: {"inputs": {"not_instrumented": n == "relationships"}, "outputs": {"level": _NOV14_LEVELS[n]}} for n in order},
-        "headline": {"inputs": {"prev_character_level": 19}},
+        "pillars": {n: {"inputs": {"not_instrumented": n == "relationships"}, "outputs": {"level": levels[n]}} for n in order},
+        "headline": {"inputs": {"prev_character_level": prev}},
     }
-    replayed = {n: {"level": _NOV14_LEVELS[n]} for n in order}
-    return transitions, replayed, {"pillars": {n: {"weight": w} for n, w in _NOV14_WEIGHTS.items()}}
+    replayed = {n: {"level": levels[n]} for n in order}
+    return transitions, replayed, {"pillars": {n: {"weight": w} for n, w in _WEIGHTS.items()}}
+
+
+def _hundredths_sum(levels):
+    return sum(levels[n] * round(_WEIGHTS[n] * 100) for n in levels if n != "relationships")
 
 
 def test_the_engine_sums_the_pillars_in_the_order_it_declares():
     assert list(_sheet()["progression_transitions"]["pillars"]) == list(ce.HEADLINE_PILLAR_ORDER)
 
 
-def test_the_boundary_day_is_a_real_boundary():
-    """Non-vacuity: this day's level really does depend on the order of the sum — the two orders floor differently."""
+def test_the_boundary_fixture_is_a_real_float_boundary():
+    """Non-vacuity: the boundary fixture's exact mean is 20, and the float sum the engine used before v1.9.0 floors it
+    to 19 in the compute's order and to 20 alphabetically — the 2026-11-14 shape, on synthetic levels."""
     import math
 
-    def summed(order):  # the engine's own accumulation, one term at a time
+    assert _hundredths_sum(_BOUNDARY_LEVELS) == 20 * 93 and _hundredths_sum(_NEAR_LEVELS) == 20 * 93 - 1
+
+    def float_floor(order):  # the pre-v1.9.0 accumulation, one term at a time
         w = t = 0.0
         for n in order:
             if n == "relationships":
                 continue
-            w += _NOV14_LEVELS[n] * _NOV14_WEIGHTS[n]
-            t += _NOV14_WEIGHTS[n]
+            w += _BOUNDARY_LEVELS[n] * _WEIGHTS[n]
+            t += _WEIGHTS[n]
         return math.floor(w / t)
 
-    assert summed(ce.HEADLINE_PILLAR_ORDER) == 19 and summed(sorted(_NOV14_LEVELS)) == 20
+    assert float_floor(ce.HEADLINE_PILLAR_ORDER) == 19 and float_floor(sorted(_BOUNDARY_LEVELS)) == 20
 
 
-@pytest.mark.parametrize("order", [list(ce.HEADLINE_PILLAR_ORDER), sorted(_NOV14_LEVELS), list(reversed(ce.HEADLINE_PILLAR_ORDER))])
-def test_headline_replay_reproduces_the_compute_whatever_order_the_receipt_came_back_in(order):
-    out = pr._replay_headline(*_nov14(order), engine=ce)
-    assert out == {"character_level": 19, "events": []}, f"replayed in {order}: {out}"
+def test_headline_replay_reads_every_pillar_order_the_same_at_and_under_the_boundary():
+    """All 5,040 orders of the seven stored pillars, on both fixtures: the exact boundary reads 20 (with the level-up it
+    is) in every order, and the near-boundary mean 20 − 1/93 reads 19 in every order. One test, every offender named."""
+    import itertools
+
+    want = {
+        "boundary": ({"character_level": 20, "events": [{"type": "character_level_up", "old_level": 19, "new_level": 20}]}),
+        "near": {"character_level": 19, "events": []},
+    }
+    offenders = []
+    for label, levels in (("boundary", _BOUNDARY_LEVELS), ("near", _NEAR_LEVELS)):
+        for order in itertools.permutations(levels):
+            out = pr._replay_headline(*_fixture(levels, list(order)), engine=ce)
+            if out != want[label]:
+                offenders.append((label, order, out))
+    assert not offenders, f"{len(offenders)} order(s) read differently, first: {offenders[:3]}"
+
+
+def test_compute_and_replay_share_one_headline_function(monkeypatch):
+    """The compute and the replay call the SAME ce.headline_level — a spy sees both, with the same terms."""
+    calls = []
+    real = ce.headline_level
+
+    def spy(entries):
+        entries = list(entries)
+        calls.append(sorted(entries))
+        return real(entries)
+
+    monkeypatch.setattr(ce, "headline_level", spy)
+    cfg = _cfg()
+    record = _sheet(config=cfg)
+    receipt = _receipt(record, config=cfg)
+    verdict = pr.replay(_ddb_round_trip(receipt), cfg, engine=ce)
+    assert verdict["verified"] is True, verdict["mismatches"]
+    assert len(calls) == 2, calls
+    assert [float(lv) for lv, _ in calls[0]] == [float(lv) for lv, _ in calls[1]]
 
 
 def test_a_pillar_the_engine_does_not_name_is_still_summed():
