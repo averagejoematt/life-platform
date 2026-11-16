@@ -541,8 +541,9 @@ def test_a_step_up_is_held_and_built_never_undone_by_one_hard_first_exposure():
 
 def test_a_too_heavy_step_reverts_a_stall_reverts_once_and_d7_is_unchanged_off_a_step():
     """#6015 adverse cases. (1) A step missed by MORE than the tolerance (4 reps at RPE 10 / 9.5 on a target of 8) is a too-heavy
-    step: the effort fit reverts it, the same load D7 gave before. (2) Under the floor at the new load stays the two-exposure
-    rule's: once holds, twice steps down. (3) A stall — `step_up_hold_exposures` exposures at the held load with no rep gained and
+    step: the effort fit reverts it, the same load D7 gave before. (2) A FIRST exposure under the floor at the new load stays the
+    two-exposure rule's (once holds, twice steps down); a held step that then slides under the floor goes back to the load he
+    topped at once (the -3 %/week decliner otherwise sat under the floor four sessions running). (3) A stall — `step_up_hold_exposures` exposures at the held load with no rep gained and
     no RPE shed since the first — reverts with its own reason; one where the RPE came down half a point is building and holds.
     (4) After a stall the lower load steps up again only at the top of the range one RPE under target. (5) Off a step (the load
     not just raised by the engine, raised by more than one step, or already handled at target since the raise) the D7 fit is
@@ -553,6 +554,8 @@ def test_a_too_heavy_step_reverts_a_stall_reverts_once_and_d7_is_unchanged_off_a
         assert d["mode"] == "down" and round(d["kg"] / KG) == 60 and d["why"] == f"4 reps at RPE {rpe:g} last time", d
     assert live_load.decide(_rows((65, 3, 9.0), up), 4, 6, "dumbbell", target_rpe=8)["mode"] == "hold"  # under the floor once
     assert live_load.decide(_rows((65, 3, 9.0), (65, 3, 9.0), up), 4, 6, "dumbbell", target_rpe=8)["mode"] == "down"  # twice
+    slid = live_load.decide(_rows((65, 3, 9.0), (65, 4, 9.0), up), 4, 6, "dumbbell", target_rpe=8)  # held, then under the floor:
+    assert slid["mode"] == "down" and round(slid["kg"] / KG) == 60 and slid["why"] == "under 4 reps at the new load", slid  # at once
     stall = live_load.decide(_rows((65, 4, 9.0), (65, 4, 9.0), (65, 4, 9.0), up), 4, 6, "dumbbell", target_rpe=8)
     assert stall["mode"] == "down" and round(stall["kg"] / KG) == 60 and stall["why"] == "4 reps at RPE 9, 3 sessions at this load"
     building = live_load.decide(_rows((65, 4, 8.5), (65, 4, 8.5), (65, 4, 9.0), up), 4, 6, "dumbbell", target_rpe=8)

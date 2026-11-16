@@ -31,7 +31,8 @@ them with ONE model, keyed by SESSION ROLE (a heavy day and a volume day are two
      of the range at or under its own target (the deadlift's is its cap).
   6b. HOLD-AND-BUILD (#6015, owner ruling 2026-11-16): the one-time effort fit (D7) never undoes the engine's own step up on one
      hard first exposure — at the new load a top set at or over the floor and within `step_up_hold_rpe_over` of the target holds
-     and the reps build; a bigger miss, or a stall over `step_up_hold_exposures` exposures, reverts (`held_step`).
+     and the reps build; a bigger miss, a slide under the floor while held, or a stall over `step_up_hold_exposures` exposures,
+     reverts (`held_step`).
   7. NOVELTY (three rules). A NEW pattern (none logged in ~8 weeks) runs one exposure at RPE <= 7; a FAMILIAR pattern (a
      biomechanically similar swap included) works at normal effort with no re-entry cap; the layoff rule is 5.
 
@@ -303,17 +304,18 @@ def decide(
             # flagged for a look (technique, recovery, a swap), never cut again (a stalled lift was halved in eight weeks)
             why = f"still under {rep_lo} reps after {steps_down(rows)} step-downs"
             return {"kg": last, "mode": "hold", "why": why, "clause": f"Same load: {why}.", "flag": True}
-        # at least one step; as far as the last exposure's own read says reaches the floor — never more than step_down_max_pct
-        size = _floor_to_implement(min(last * (1 - float(cfg.value("step_down_pct")) / 100.0), floor_load(rows[0], rep_lo)), equipment)
-        cap = _floor_to_implement(last * (1 - float(cfg.value("step_down_max_pct")) / 100.0), equipment)
-        cap = cap if cap >= last * (1 - float(cfg.value("step_down_max_pct")) / 100.0) - 1e-6 else _step_up(cap, equipment)
-        kg = max(size, min(cap, _floor_to_implement(last * 0.999, equipment)))  # the cap on the implement's grid, never the old load
         return {
-            "kg": kg,
+            "kg": _floor_step(rows, rep_lo, equipment),
             "mode": "down",
             "why": f"under {rep_lo} reps {n} sessions running",
             "clause": f"Lighter today: under {rep_lo} reps {n} sessions running.",
         }
+    if held_step(rows, rep_lo, rep_hi, target_rpe, equipment, excused) == "slipped":
+        # #6015: a held step that slid under the floor is rule 2's evidence a session early (the held exposure missed, this one
+        # is under the floor) — rule 2's step-down at once, never above the load he topped (never blocked: a step down)
+        back = next(_top(r)["kg"] for r in rows if not _same_load(_top(r)["kg"], last))
+        why = f"under {rep_lo} reps at the new load"
+        return {"kg": min(back, _floor_step(rows, rep_lo, equipment)), "mode": "down", "why": why, "clause": f"Lighter today: {why}."}
     if layoff_days is not None and layoff_days >= int(cfg.value("long_layoff_days")):  # rule 5: the dose scales with the gap
         pct = float(cfg.value("long_layoff_pct"))
         return {
@@ -370,6 +372,16 @@ def _fit_due(rows: list[dict[str, Any]], rep_lo: int, target_rpe: float) -> bool
     if effort_unknown(rows) or top["rpe"] is None or top["rpe"] <= target_rpe or not rep_lo <= top["reps"] <= rep_lo + 1:
         return False
     return not steps_down(rows)
+
+
+def _floor_step(rows: list[dict[str, Any]], rep_lo: int, equipment: str | None) -> float:
+    """Rule 2's step-down load: at least one step (`step_down_pct`); as far as the last exposure's own read says reaches the floor
+    (`floor_load`) — never more than `step_down_max_pct`, the cap on the implement's grid, never the old load."""
+    last = _top(rows[0])["kg"]
+    size = _floor_to_implement(min(last * (1 - float(cfg.value("step_down_pct")) / 100.0), floor_load(rows[0], rep_lo)), equipment)
+    cap = _floor_to_implement(last * (1 - float(cfg.value("step_down_max_pct")) / 100.0), equipment)
+    cap = cap if cap >= last * (1 - float(cfg.value("step_down_max_pct")) / 100.0) - 1e-6 else _step_up(cap, equipment)
+    return max(size, min(cap, _floor_to_implement(last * 0.999, equipment)))
 
 
 def effort_fit(
@@ -438,6 +450,9 @@ def held_step(
       * 'hold'    — the newest exposure is a normal first exposure at a new load: at or over the floor (under it is the
                     two-exposure rule's alone) and at most `step_up_hold_rpe_over` over the target — or it was an excused day;
       * 'over'    — more than `step_up_hold_rpe_over` over the target: a too-heavy step (the effort fit reverts it);
+      * 'slipped' — under the floor after an earlier exposure at this load was held: the bet that the reps build has failed
+                    (on main the effort fit had already reverted it a session earlier) — `decide` steps back to the load he
+                    topped, at once. A FIRST exposure under the floor stays the two-exposure rule's (None);
       * 'stalled' — `step_up_hold_exposures` or more failed exposures at this load (`_missed`; an excused date is skipped,
                     neither counted nor resetting the count), the newest with no rep gained and
                     no RPE shed since the FIRST of them (the charter's stall: the same load and reps, exposure after exposure —
@@ -466,7 +481,7 @@ def held_step(
         return "hold"
     top = _top(newest)
     if top["reps"] < rep_lo:
-        return None
+        return "slipped" if len(counted) > 1 and counted[0] is newest else None
     if top["rpe"] is not None and top["rpe"] > target_rpe + float(cfg.value("step_up_hold_rpe_over")):
         return "over"
     n = int(cfg.value("step_up_hold_exposures"))

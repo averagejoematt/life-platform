@@ -236,10 +236,11 @@ LEAD STATE (a lead progresses from its own lead days, never from the capped seco
    the load that set's own e1RM supports at the target — once per episode. Not on a load the engine's OWN step just raised
    (`held_step`: one implement step over an exposure that topped the range, not yet handled at target since): there a top set
    at or over the floor and at most `step_up_hold_rpe_over` RPE over target is a normal first exposure — the load HOLDS and the
-   reps build. It reverts when the miss is larger (a too-heavy step), or when `step_up_hold_exposures` failed exposures at the
+   reps build. It reverts when the miss is larger (a too-heavy step), when a held step slides under the floor (back to the load
+   he topped, at once; a first exposure under the floor stays rule 2's), or when `step_up_hold_exposures` failed exposures at the
    held load gained no rep and shed no RPE since the first (a stall); a stalled load is not retried inside `history_days` until
    the top of the range comes `step_up_hold_rpe_over` under target (`stalled_at`). A recorded deload day (`excused_days`) is never
-   a failed exposure. Under the floor stays rule 2's. Before it, a coarse 5-lb dumbbell step (~8 %) bounced 65 / 60 every week.
+   a failed exposure. Before it, a coarse 5-lb dumbbell step (~8 %) bounced 65 / 60 every week.
 
 Strain, a recommended deload, a slump, a first session back and a joint flag are each a HOLD through the same decision
 (`decide`): they stop a step up, never a step down under the floor. Each lift's note carries ONE reason line, and only where
