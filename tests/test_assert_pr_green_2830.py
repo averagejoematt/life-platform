@@ -327,3 +327,46 @@ if __name__ == "__main__":
         print(f"\n=== {label} === exit={c}")
         print(m)
     sys.exit(0)
+
+
+# ── #6062: only the latest run of a check name is judged ────────────────────
+_GATE = "IAM additive gate (PR delta vs base synth)"
+
+
+def _run(name, conclusion, started, status="COMPLETED", workflow="IAM gate"):
+    return {"name": name, "workflowName": workflow, "status": status, "conclusion": conclusion, "startedAt": started}
+
+
+def test_older_failure_newer_success_is_green():
+    entries = [_run(_GATE, "FAILURE", "2026-11-15T10:00:00Z"), _run(_GATE, "SUCCESS", "2026-11-15T11:00:00Z")]
+    code, _ = apg.render(apg.classify_rollup(entries, expected={_GATE}))
+    assert code == 0
+
+
+def test_older_success_newer_failure_is_red():
+    entries = [_run(_GATE, "SUCCESS", "2026-11-15T10:00:00Z"), _run(_GATE, "FAILURE", "2026-11-15T11:00:00Z")]
+    state = apg.classify_rollup(entries, expected={_GATE})
+    assert apg.render(state)[0] == 1
+    assert state["red"] == [{"name": _GATE, "state": "FAILURE"}]
+
+
+def test_pr5897_shape_two_failures_two_cancels_then_success_is_green():
+    entries = [
+        _run(_GATE, "FAILURE", "2026-11-15T10:00:00Z"),
+        _run(_GATE, "FAILURE", "2026-11-15T10:10:00Z"),
+        _run(_GATE, "CANCELLED", "2026-11-15T10:20:00Z"),
+        _run(_GATE, "CANCELLED", "2026-11-15T10:30:00Z"),
+        _run(_GATE, "SUCCESS", "2026-11-15T10:40:00Z"),
+        _check_run("Collect + deploy-critical + format", "SUCCESS"),
+    ]
+    state = apg.classify_rollup(entries, expected={_GATE})
+    assert apg.render(state)[0] == 0
+    assert state["total"] == 2
+
+
+def test_same_name_in_different_workflows_is_not_collapsed():
+    entries = [
+        _run("lint", "FAILURE", "2026-11-15T10:00:00Z", workflow="A"),
+        _run("lint", "SUCCESS", "2026-11-15T11:00:00Z", workflow="B"),
+    ]
+    assert apg.render(apg.classify_rollup(entries))[0] == 1
