@@ -49,5 +49,5 @@ DISCOVERED_COUNTS = {
     "lambdas": 107,
     "alarms": 147,
     "cdk_stacks": 10,
-    "adrs": 166,
+    "adrs": 167,
 }
