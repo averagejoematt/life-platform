@@ -5725,13 +5725,6 @@
     {
       "direction": "write",
       "lambda": null,
-      "module": "lambdas/web/site_api_social_challenges.py",
-      "partition": "challenges",
-      "via": "pk"
-    },
-    {
-      "direction": "write",
-      "lambda": null,
       "module": "lambdas/web/site_api_social_engage.py",
       "partition": "reader_feedback",
       "via": "pk"
@@ -8331,10 +8324,10 @@
       "contracts_enrolled": 16,
       "contracts_known": 15,
       "contracts_ratchet": 16,
-      "edges": 793,
+      "edges": 792,
       "lambdas": 107,
-      "mcp_tool_modules": 41,
-      "mcp_tools": 92,
+      "mcp_tool_modules": 42,
+      "mcp_tools": 93,
       "partitions": 125,
       "privacy_fields_owner_only": 69,
       "privacy_fields_owner_published": 11,
@@ -8346,8 +8339,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 389,
-        "sites_resolved": 995,
-        "sites_total": 1384
+        "sites_resolved": 993,
+        "sites_total": 1382
       },
       "schedule_resolution": {
         "dynamic": 0,
