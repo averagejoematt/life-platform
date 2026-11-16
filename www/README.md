@@ -53,10 +53,14 @@ Two deploy paths write `s3://matthew-life-platform/site/`: the `site/` tree (`de
 
 | Target | Prefix · invalidation | Base | When |
 |---|---|---|---|
-| **preview** | `site/next/v9/` · `/next/v9/*` | `/next/v9/`, `noindex`, sitemap off | every `www/**` merge while the switch is off; `workflow_dispatch` with `target=preview` |
+| **preview** | `site/next/v9/` · `/next/v9/*` | `/next/v9/`, `noindex`, sitemap off | `workflow_dispatch` with `target=preview` only — and **empty outside a rehearsal** (#6083, below) |
 | **root** | `site/` · `/*` (waits for the invalidation, #1526) | `/`, self-canonical, sitemap on | every `www/**` merge once the switch is on; `workflow_dispatch` with `target=root` (REFUSED while the switch is off) |
 
 A root run also: checks the **live** build's routes against the kept `site/` pages before syncing (`www_owned_paths.py --check-dist` — a v9 route landing on a kept page outside the declared replaced set `/`, `/story/`, `/data/`, `/privacy/` + `404.html`/`sitemap.xml` refuses the sync); runs the same two sweeps `site-deploy.yml` gates on (`deploy/smoke_test_site.sh`, `qa/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1`); on green records the build at `s3://…/site/_v9_previous/`; on red rolls the v9 paths back from that prefix (`deploy/www_root_rollback.sh`, scope-checked like #3352/#3395) — S3 → S3, no delete, v9 keys only, **never from `site/`**. `qa/qa_manifest.py` derives the v9 rows (`owner: "www"`) from `owned_paths.json`'s static routes once the switch is on, so the sweeps know the pages.
+
+**Every public copy is checked after every sync (#6083).** `scripts/check_public_copies.py --check` (the `public-copies` job, both targets) holds every copy a reader can fetch — the root, the preview, the legacy `site/` pages, the retired `/_v9_previous/`, the nightly archive — to four rules: no page the newest build did not write (the sync never deletes), no stale copy, the publication policy against a fresh live snapshot, and no sitemap or feed URL without a served page. A red is reported (SNS, the run goes red) and the rollback job **declines** it: a root revert repairs no other copy. The repair is a human's: `--remediation` prints it.
+
+**The preview is EMPTY outside a rehearsal (decided 2026-11-16, #6083).** Since the cut-over nothing rebuilds `/next/v9/` but a dispatch, so it can only go stale. Of the two ways to stop that — rebuild it beside every root deploy, or empty it when no rehearsal is running — emptying is the smaller change: no second build on every deploy, and a copy that does not exist cannot go stale or be re-published by the archive (which no longer admits `site/next/**`). A rehearsal is `gh workflow run web-preview-deploy.yml -f target=preview`; the guard allows the preview to trail the root by at most 24 h, then it reds until a human empties it: `bash deploy/quarantine_public_copy.sh --prefix site/next/v9/ --apply` (copies every object to `backups/quarantine/`, verifies, then removes the public one).
 
 ### The switch
 

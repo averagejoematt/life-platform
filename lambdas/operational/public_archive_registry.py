@@ -106,6 +106,10 @@ SITE_EXCLUDED_PREFIXES: dict[str, str] = {
         "the superseded pre-v4 site, unlinked and kept only as a rollback target — "
         "archiving it would file retired pages alongside current ones as if they still stood"
     ),
+    "site/next/": (
+        "the rehearsal previews (noindex, robots-disallowed) — at best a duplicate of the live pages, at worst a stale "
+        "copy of pages a later fix withdrew; on 2026-11-15 every stale preview page was re-published nightly (#6083)"
+    ),
 }
 
 SITE_EXCLUDED_SUFFIX_REASON = (

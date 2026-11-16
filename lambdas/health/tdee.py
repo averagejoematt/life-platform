@@ -97,7 +97,7 @@ ASSUMED_AGE_YEARS = 35
 #: THE PUBLIC ESTIMATE IS COMPUTED AT A REFERENCE AGE, NEVER AT HIS (owner ruling 2026-11-14).
 #: Mifflin-St Jeor carries -5 kcal per year of age. His weight and height are public and his exercise log largely is,
 #: so a TDEE computed at his real age and served to the kcal is his age: to (1 + 2U) / 5 years where U is a reader's
-#: error on the exercise term, and to 0.2 years on any week with no exercise logged (tests/age_inversion_lib.py).
+#: error on the exercise term, and to 0.2 years on any week with no exercise logged (qa/age_inversion_lib.py).
 #: Every path whose output can reach a public surface — the site API, and the coach facts that feed published prose —
 #: calls ``energy_budget(..., public=True)``: the age input is this constant, the basis and the method label say so,
 #: and the birth date is never read. The estimate moves by 5 kcal per year of difference — far inside its own error.

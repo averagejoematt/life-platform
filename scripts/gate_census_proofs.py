@@ -2092,7 +2092,7 @@ STRUCTURAL_HAND_PROOFS.update(
                 "The handler through a fake S3 client and injected globals that raise on any access, the publication snapshot's "
                 "producer and contract, and an AST sweep of lambdas/web, lambdas/coach, lambdas/content and lambdas/emails for a "
                 "`date_of_birth` key read (allow-list EMPTY since the public Mifflin estimate moved to a reference age). Synthetic markers and ages only. NOT SEEN: the "
-                "live response (tests/age_inversion_lib.py --live is the anonymous live attack; deploy/pii_surface_guard.py reds "
+                "live response (qa/age_inversion_lib.py --live is the anonymous live attack; deploy/pii_surface_guard.py reds "
                 "on a served phenotypic-age figure, offline over the committed shape snapshots and live over the payloads), any "
                 "age-derived output computed outside those four packages, and what readers captured before the ruling."
             ),
@@ -4761,4 +4761,37 @@ STRUCTURAL_HAND_PROOFS["structural::test_putmetricdata_namespace_condition_5545.
         "live leg reads them after deploy)."
     ),
     "proved_on": "2026-11-15",
+}
+
+# #6083 — the public-copies guard, as its v9 deploy step (both targets, after the sync).
+CI_PROOFS["ci::web-preview-deploy.yml::public-copies::2"] = {
+    "gate_name": "public-copies / Check every public copy of the site (read-only; a violation is reported, never repaired here)",
+    "command": (
+        "python3 scripts/check_public_copies.py --check   # exit 1 on any violation; fixtures: "
+        "python3 -m pytest tests/test_check_public_copies_6083.py -q   # baseline 17 passed"
+    ),
+    "mutation": (
+        "LIVE: the step's own command, read-only, against production as it stood (no plant — the estate carried real "
+        "violations). FIXTURES, five plants in the real tracked scripts/check_public_copies.py, ONE AT A TIME, each restored "
+        "from a byte copy (md5 d23e2f80… before and after; M4's re-run against ef8cfa17…, before black): M1 the orphan test `o['LastModified'] < marker - SYNC_WINDOW` → "
+        "`False`; M2 withheld_words' words test → `False`; M3 the stale-preview lag test → `False`; M4 derived_issues' "
+        "`if not found:` → `if False:` (re-run after the test was tightened to name the branch); M5 archive_admission's "
+        "refusal → `if False:`."
+    ),
+    "observed": (
+        "2026-11-16. LIVE `--check` exit 1: three rule-A orphans at the root (pages under the /story/*/ route family the "
+        "newest root build did not write). LIVE `--remediation` exit 1: the same three, the archive built before the newest "
+        "root build (rule B), and — with site/next/** excluded from admission — 642 archive members the registry now "
+        "refuses (rule A). FIXTURES: M1 3 failed / 14 passed; M2 1 failed / 16; M3 1 failed / 16; M4 1 failed / 16; M5 1 "
+        "failed / 16. RESTORED 17 passed, including the clean estate (no violation) and the red→green orphan mutation."
+    ),
+    "scope": (
+        "Every document a reader can fetch under site/ (the v9 root, the preview, the legacy pages, the retired "
+        "/_v9_previous/) and the downloaded /archive/latest.tar.gz (web/ and api/), against a fresh live snapshot: orphans "
+        "(rule A), stale copies (B), the build scan's publication members + the age-inversion attack + archived words the "
+        "live route withholds (C), sitemap/feed URLs (D), and undeclared locations. NOT SEEN: image content (share cards, "
+        "covers); a record dropped whole from a live route (only a record served WITHOUT words is compared); objects under "
+        "generated/ other than the archive (Lambda artefacts, classified not-a-copy in PUBLIC_RESOURCES)."
+    ),
+    "proved_on": "2026-11-16",
 }

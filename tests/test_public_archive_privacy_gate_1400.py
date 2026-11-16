@@ -219,6 +219,15 @@ def test_legacy_tree_is_excluded_and_the_reason_is_declared():
     assert len(reg.SITE_EXCLUDED_PREFIXES["site/legacy/"]) >= 40
 
 
+def test_rehearsal_previews_are_excluded_and_the_reason_is_declared():
+    """#6083: the archive admitted site/next/v9/** and re-published every stale preview page nightly."""
+    for key in ("site/next/v9/index.html", "site/next/v9/story/week-01/index.html", "site/next/v8/index.html", "site/next/index.html"):
+        assert not reg.admits_site_key(key), key
+    assert reg.admits_site_key("site/story/week-01/index.html")  # the live page at the same address is still archived
+    assert "site/next/" in reg.SITE_EXCLUDED_PREFIXES
+    assert len(reg.SITE_EXCLUDED_PREFIXES["site/next/"]) >= 40
+
+
 # ── Arm 3: /api/* ───────────────────────────────────────────────────────────
 def _write_path_exemptions() -> set[str]:
     with open(os.path.join(SCHEMA_DIR, "_exemptions.json"), encoding="utf-8") as fh:
@@ -318,6 +327,7 @@ _HOSTILE_BUCKET = {
     "site/method/index.html": b"<h1>method</h1>",
     "site/assets/app.deadbeef.js": b"console.log(1)",
     "site/legacy/index.html": b"<h1>legacy</h1>",
+    "site/next/v9/index.html": b"<h1>a stale preview</h1>",
     "raw/matthew/whoop/2026/08/2026-08-01.json": b'{"hrv":42}',
     "exports/2026-08-01/whoop.json": b'{"hrv":42}',
 }
@@ -353,6 +363,7 @@ def test_built_archive_contains_only_admitted_bytes():
         "web/archive/latest.tar.gz",
         "web/assets/app.deadbeef.js",
         "web/legacy/index.html",
+        "web/next/v9/index.html",
     ]
     leaked = [m for m in forbidden if m in members]
     assert not leaked, f"the archive admitted material it must refuse: {leaked}"
@@ -393,7 +404,7 @@ def test_manifest_publishes_what_was_left_out():
     says what it omits (ADR-104)."""
     excluded = _build()["manifest"]["excluded"]
     whats = {x["what"] for x in excluded}
-    for expected in ("/podcast/*", "/panelcast/*", "/qa_archive/", "/coach_daily.json", "/legacy/"):
+    for expected in ("/podcast/*", "/panelcast/*", "/qa_archive/", "/coach_daily.json", "/legacy/", "/next/"):
         assert expected in whats, f"{expected} is excluded but the manifest does not say so"
     for item in excluded:
         assert len(item["why"]) >= 20, f"{item['what']}: exclusion reason too thin to review"
