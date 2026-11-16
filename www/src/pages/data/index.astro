@@ -10,6 +10,7 @@ import { headline, weeklyBars } from "../../lib/chart.js";
 import { scaleWords, weeklySpark } from "../../lib/spark.js";
 import { dayInWords, num } from "../../lib/format.js";
 import { loadAll, loadJourney, loadPairs, loadSeries } from "../../lib/snapshot.js";
+import { PROVISIONAL_WORDS, provisionalNights } from "../../lib/provisional.js";
 import { href, pathOf } from "../../lib/url.js";
 
 const all = await loadAll();
@@ -37,6 +38,13 @@ const DAILY_TOTALS = new Set(["total_calories_kcal", "total_protein_g"]);
 // The spark is the shared contract's (lib/spark.js, review 2026-11-14): this page used to scale each tile's bars from the
 // series' minimum with a 4-px floor, so any change filled the box and the front page's zero-based bars said the opposite.
 const sparkOf = (days: any[]) => weeklySpark(weeklyBars(days, 8));
+// #5953: the caption named "eight weekly means" whatever was drawn — a series shorter than eight weeks drew fewer. It
+// counts the weeks that carry a mean.
+const WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight"];
+const meansWords = (days: any[]) => {
+  const k = weeklyBars(days, 8).filter((v) => v != null).length;
+  return `${WORDS[k] || k} weekly ${k === 1 ? "mean" : "means"}`;
+};
 ---
 
 <Base title="The data room" top="data" description="Every public measurement behind the experiment — weight, sleep, recovery, food, movement — each with its source, and what is not measured.">
@@ -106,6 +114,10 @@ const sparkOf = (days: any[]) => weeklySpark(weeklyBars(days, 8));
           // way, so the weight tile led with yesterday and called this morning's complete weigh-in "so far".
           const partial = Boolean(s && h && h.last != null && s.behavioral && DAILY_TOTALS.has(m.id) && h.lastDate === s.window.to);
           const full = partial ? [...s.days].reverse().find((d: any) => d.date < h.lastDate && d.value != null && !d.gap) : null;
+          // #5953: the night the tile leads with may still have been recording when the snapshot read it — the vendor's
+          // own flag, carried on the Day object of the same snapshot (lib/provisional.js). The tile says so.
+          const shownDate = full ? full.date : h ? h.lastDate : null;
+          const provisional = Boolean(s && shownDate && provisionalNights(days, m.id, s.source_id || m.source_id).includes(shownDate));
           return (
             <a class="tile" href={href(pathOf("metric", m.id))}>
               <span class="label">
@@ -113,7 +125,7 @@ const sparkOf = (days: any[]) => weeklySpark(weeklyBars(days, 8));
                 {m.instrument && ` · ${m.instrument}`}
               </span>
               {h && h.last != null ? (
-                <span class="v num" style="font-size:30px">
+                <span class="v num" style="font-size:30px" data-provisional={provisional ? "" : undefined}>
                   {num(full ? full.value : h.last, m.decimals)} <small>{m.unit}</small>
                 </span>
               ) : (
@@ -126,8 +138,8 @@ const sparkOf = (days: any[]) => weeklySpark(weeklyBars(days, 8));
               <span class="muted" style="font-size:13px;line-height:1.4">
                 {h && h.last != null
                   ? full
-                    ? `${dayInWords(full.date, { short: true })}, the last full day · ${dayInWords(h.lastDate, { short: true })} so far: ${num(h.last, m.decimals)} · ${h.n} of ${s.days.length} days · eight weekly means`
-                    : `${dayInWords(h.lastDate, { short: true })}${partial ? ", so far" : ""} · ${h.n} of ${s.days.length} days · eight weekly means`
+                    ? `${dayInWords(full.date, { short: true })}, the last full day · ${dayInWords(h.lastDate, { short: true })} so far: ${num(h.last, m.decimals)} · ${h.n} of ${s.days.length} days · ${meansWords(s.days)}`
+                    : `${dayInWords(h.lastDate, { short: true })}${partial ? ", so far" : ""}${provisional ? ` · ${PROVISIONAL_WORDS}` : ""} · ${h.n} of ${s.days.length} days · ${meansWords(s.days)}`
                   : m.absent_text || "No series yet."}
               </span>
               <Provenance object={m} />

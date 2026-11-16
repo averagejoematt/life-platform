@@ -139,21 +139,28 @@ function seriesDim(id: string, key: string, label: string, decimals: number, uni
   return { id, label, instrument: m?.instrument || s.source_id || "", value: h.last == null ? null : num(h.last, decimals), unit, bars, note: noteOf(h, bars), href: pathOf("metric", key), measured: h.last != null, key, decimals, latest: h.last };
 }
 const firstBar = (bars: (number | null)[]) => bars.find((v) => v != null);
-const lastBar = (bars: (number | null)[]) => [...bars].reverse().find((v) => v != null);
+// #5953 contract: the notes name how many weeks are drawn (a series shorter than eight weeks draws fewer), and the
+// "last seven nights" mean is the mean of the last seven nights, not the last non-empty bar.
+const weeksDrawn = (bars: (number | null)[]) => `${["no", "one", "two", "three", "four", "five", "six", "seven", "eight"][bars.length] || bars.length} ${bars.length === 1 ? "week" : "weeks"}`;
+const lastSeven = (key: string) => {
+  const got = (series[key]?.days || []).slice(-7).filter((d: any) => d.value != null && !d.gap);
+  return got.length ? { mean: got.reduce((a: number, d: any) => a + d.value, 0) / got.length, n: got.length } : null;
+};
 const dims: Dim[] = [
   seriesDim("body", "weight_lbs", "Body", 1, "lb", (h) => (today?.change_lbs != null && startDate ? `${num(today.change_lbs, 1)} lb since ${dayInWords(startDate, { short: true })}.` : `${h.n} mornings on the scale.`)),
   seriesDim("sleep", "sleep_duration_hours", "Sleep", 1, "h", (h, bars) => {
     const f = firstBar(bars);
-    const l = lastBar(bars);
+    const l = lastSeven("sleep_duration_hours");
     // #5953: the figure is the latest night; the note used to call it "this week's mean" (8.1 h beside a 7.6 h mean).
     // sprint III item 8: the series is dated by the WAKE morning, so its newest point is "last night" only when that
     // morning is the edition's day; an older newest point names its own night (the evening before that morning)
     const night = h.lastDate && edition?.as_of && h.lastDate !== edition.as_of ? `The night before ${dayInWords(h.lastDate, { short: true })}, the latest measured.` : "Last night.";
-    return f != null && l != null ? `${night} The last seven nights average ${num(l, 1)} h; the first of the eight weeks drawn, ${num(f, 1)} h.` : `${h.n} nights measured.`;
+    const lastWords = l ? (l.n === 7 ? "The last seven nights average" : `The ${l.n} measured of the last seven nights average`) : "";
+    return f != null && l ? `${night} ${lastWords} ${num(l.mean, 1)} h; the first of the ${weeksDrawn(bars)} drawn, ${num(f, 1)} h.` : `${h.n} nights measured.`;
   }),
   seriesDim("recovery", "hrv", "Recovery", 0, "ms", (h, bars) => {
     const f = firstBar(bars);
-    return f != null ? `Heart-rate variability, the latest morning. The first of the eight weeks drawn averaged ${num(f, 0)} ms.` : `${h.n} mornings measured.`;
+    return f != null ? `Heart-rate variability, the latest morning. The first of the ${weeksDrawn(bars)} drawn averaged ${num(f, 0)} ms.` : `${h.n} mornings measured.`;
   }),
   {
     // Owner ruling 2026-11-03: journal activity is private — whether, when and how often he writes.

@@ -15,7 +15,8 @@ exits 2 — "blind" — if a planted defect builds clean, and never grades on.
                  static, so the LIVE root deploy holds it too), no Coaching Room output beyond what the
                  committed `room_public` publishes (CR1 at "cr1"; CR1 + CR2 at "cr2"; a CR3 page, coach_room.json,
                  a CR3-only key or a private-build banner is refused whatever it says), no Laboratory output (L1, the same: a WEB_LAB=1 dist is
-                 refused), no Human Story output (HS1, the same: a WEB_STORY=1 dist is refused),
+                 refused), no Human Story output (HS1, the same: a WEB_STORY=1 dist is refused), no tile, series or
+                 Day label naming a number other than the one it prints (scripts/www_label_contract.py, #5953),
                  and (on the preview base) `noindex`
   owned-paths    (#5534) the build's committed route manifest www/owned_paths.json and the reach
                  census www/reach.json equal what the clean build just emitted (drift = someone
@@ -57,6 +58,7 @@ sys.path.insert(0, REPO)
 from deploy import www_owned_paths  # noqa: E402 — the one reader of owned_paths.json (#5534)
 
 sys.path.insert(0, os.path.join(REPO, "scripts"))
+import www_label_contract  # noqa: E402 — #5953: each tile/series/Day label names the number printed beside it, fixture AND live
 import www_launch_switch  # noqa: E402 — the committed go-live constants (LAB_LIVE, STORY_LIVE): a live feature is not a leak
 import www_verbatim  # noqa: E402 — dates in words, quote-aware (owner ruling 2026-11-02); a page-universal rule, fixture AND live
 
@@ -235,6 +237,7 @@ def scan(dist: str, require_noindex: bool, forbidden_ids: set[str] | None = None
     issues.extend(heart_coverage(dist, fixture=snapshot_mode(snapshot_dir) == "fixture"))
     issues.extend(spark_agreement(dist))
     issues.extend(chapter_agreement(dist))
+    issues.extend(www_label_contract.issues(dist, snapshot_dir))
     issues.extend(room_leaks(dist))
     issues.extend(lab_leaks(dist))
     issues.extend(story_leaks(dist))
@@ -771,6 +774,10 @@ def main() -> int:
     blind = www_verbatim.self_test()
     if blind:
         log(f"  ✗ BLIND: the dates-in-words rule misjudged its planted cases: {blind}")
+        return 2
+    blind = www_label_contract.self_test()
+    if blind:
+        log(f"  ✗ BLIND: the label contract missed a planted wrong label: {blind}")
         return 2
     issues = scan(args.dist, require_noindex=preview)
     for i in issues:
