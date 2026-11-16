@@ -366,3 +366,24 @@ def salted_ip_hash(source_ip: str, logger: "logging.Logger | None" = None) -> "s
         log.error("[ip_hash] salt resolved EMPTY — refusing the write (fail-closed)")
         return None
     return hashlib.sha256(f"{salt}:{source_ip}".encode()).hexdigest()[:16]
+
+
+def salt_derived_key(purpose: str, logger: "logging.Logger | None" = None) -> "bytes | None":
+    """A 32-byte key for ONE purpose, derived from the ip-hash salt, or None (fail-closed).
+
+    #6088: the reader-call door signs a short-lived timing token. Rather than mint a new
+    secret (an AWS write this lane does not make), the key is ``sha256(purpose | salt)``:
+    domain-separated from ``salted_ip_hash`` by the ``purpose`` label, so a token key and
+    an ip-hash digest can never be the same value, and rotating the salt rotates both.
+    Callers MUST branch on None and refuse — there is no unkeyed fallback.
+    """
+    log = logger or _LOG
+    try:
+        salt = _get_secret(_IP_HASH_SALT_SECRET_NAME, _salt_secrets_client())
+    except Exception as e:
+        log.error(f"[salt_derived_key] salt unavailable ({type(e).__name__}) — refusing (fail-closed)")
+        return None
+    if not salt or not purpose:
+        log.error("[salt_derived_key] salt or purpose EMPTY — refusing (fail-closed)")
+        return None
+    return hashlib.sha256(f"{purpose}|{salt}".encode()).digest()

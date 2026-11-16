@@ -399,6 +399,7 @@ class TestEveryPathFiles:
             "lambdas/coach/advice_links.py": "a key builder for links to an existing call; writes no prediction",
             "lambdas/web/trail_corrections.py": "reads an existing row by key; writes no prediction",
             "lambdas/web/site_api_coach_brief.py": "reads a brief's filed calls by key (public chokepoint); writes no prediction",
+            "lambdas/web/site_api_reader_call.py": "#6088: reads one public call by key (governed handle); writes only READERCALL# rows",
             "deploy/seed_genesis_preregistration.py": "the one-shot genesis pre-registration seeder; the experiment is terminal (no reset)",
             "scripts/public_brief_dispute_sample.py": "reads both sides' filed calls by key for a read-only sample; writes no prediction",
         }

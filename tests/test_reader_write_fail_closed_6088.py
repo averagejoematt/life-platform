@@ -38,13 +38,15 @@ _LIMITER_NAMES = ("_rate_check", "check_rate_limit", "_ddb_rate_check")
 
 def _sources() -> list[pathlib.Path]:
     family = sorted(WEB.glob("site_api_social*.py"))
-    return family
+    return family + [WEB / "site_api_reader_call.py"]
 
 
 def _endpoint_of(call: ast.Call) -> str | None:
-    """The endpoint the call charges: its first positional arg or ``endpoint=``, as a literal
+    """The endpoint the call charges: ``endpoint=`` or else its first positional arg, as a literal
     or the literal head of an f-string (``f"cohort_submit:{week}"`` → ``cohort_submit``)."""
-    node = call.args[0] if call.args else next((k.value for k in call.keywords if k.arg == "endpoint"), None)
+    node = next((k.value for k in call.keywords if k.arg == "endpoint"), None)
+    if node is None and call.args:
+        node = call.args[0]
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
         return node.value.split(":")[0]
     if isinstance(node, ast.JoinedStr) and node.values and isinstance(node.values[0], ast.Constant):
@@ -87,11 +89,12 @@ def test_every_storing_door_fails_closed_or_is_a_named_exception():
     """The derived set: every limiter call is fail-closed or named above. Also the gate's own
     controls — the sweep found the doors (not vacuous), every named exception still exists (no
     stale reason), and a planted default-open storing call is caught (the gate can fail)."""
+    assert (WEB / "site_api_reader_call.py").exists(), "the reader-call route moved — re-point the sweep"
     offenders = [o for p in _sources() for o in offenders_in(p.read_text(), p.name)]
     assert not offenders, f"limiter calls that fail OPEN on a door that stores reader input: {offenders} — pass fail_open=False"
 
     endpoints = {e for _f, e in _limiter_calls()}
-    for door in ("submit_finding", "board_question", "experiment_suggest", "page_feedback", "cohort_submit", "predict_week"):
+    for door in ("submit_finding", "board_question", "experiment_suggest", "page_feedback", "cohort_submit", "predict_week", "reader_call"):
         assert door in endpoints, f"{door} is no longer rate-checked at all"
     stale = set(FAIL_OPEN_BY_DECISION) - endpoints
     assert not stale, f"named fail-open exceptions with no limiter call left: {stale}"

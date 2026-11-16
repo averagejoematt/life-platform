@@ -55,6 +55,10 @@
     "category": "write-path",
     "reason": "POST-only \u2014 #4182 two-question reader door (did this page make sense?), writes to DynamoDB (write)"
   },
+  "/api/reader_call": {
+    "category": "write-path",
+    "reason": "#6088 (2026-11-16) \u2014 a reader's call beside a coach's open call: POST records a tap, and the GET mints a per-reader, identity-bound timing token (no-store), so no response is a standing artefact to snapshot or archive. Built DARK: 404 'not available' for every request while reader_call_rules.READER_CALL_LIVE is committed off. Its shape is pinned offline by tests/test_reader_call_6088.py; after the owner's go and a deploy, capture the bare GET ({available}) if a live shape is wanted"
+  },
   "/api/replicate_certify": {
     "category": "write-path",
     "reason": "POST-only \u2014 #1393 engagement-ladder Replicator self-cert; deduped per source, increments the VOTES#ladder_replicator aggregate counter (write)"

@@ -66,6 +66,7 @@ _WRITTEN_KEYS = [
     "USER#matthew#SOURCE#evening_ritual",  # #769 (ADR-124): one-tap evening-ritual taps
     "COHORT#resting_heart_rate#2026-W30",  # #1394: anonymous cohort-strip submissions (COHORT#<metric>#<week>)
     "RATE#board_ask#deadbeef",  # shared rate_limiter.py → RATE#{endpoint}#{ip_hash}
+    "READERCALL#sleep-pred_20261114_x",  # #6088: web/site_api_reader_call.py — TAP#<ip_hash> + TALLY#<choice>
 ]
 
 
