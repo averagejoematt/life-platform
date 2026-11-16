@@ -33,16 +33,24 @@ const stripOf = (c: any) => {
 };
 ---
 
-<Base title="The story" top="story" description="Every weekly chapter of the experiment, in order: the ones published, and the weeks held or skipped, said plainly.">
+<Base title="The story" top="story" description="Every weekly chapter of an experiment in changing a life with AI coaches — the weight is the part that's working; the rest is still open. The chapters published, and the weeks held or skipped, said plainly.">
   <section class="section">
     <div class="wrap">
       <p class="label">Story · {published} chapters published{episodes ? ` · ${episodes} with audio` : ""}</p>
       <h1 style="margin-top:10px">The chapters</h1>
       <p class="dek" style="margin-top:14px;max-width:720px">
-        Read them in order, or start with the latest and work back. Each chapter is written by the platform's narrator from that week's
-        data and published only after Matthew approves it. A week with no chapter says so here, in its place.
+        The scale moves in every one of these: that part of the experiment is working, and it runs down the page as a line. The chapters are
+        about what the scale can't say — whether the habits hold, whether life gets any better, whether the AI coaches earn their place. None
+        of that is settled.
       </p>
-      <p style="margin-top:16px;font-size:15px;font-weight:700"><a href={href("/story/moments/")}>New here? Start with the moments that explain it →</a></p>
+      <p class="muted" style="margin-top:12px;max-width:720px;font-size:15px">
+        Each chapter is written by the platform's narrator from that week's data and published only after Matthew approves it. A week with
+        no chapter says so here, in its place.
+      </p>
+      <p style="margin-top:16px;font-size:15px;font-weight:700;display:flex;flex-wrap:wrap;gap:8px 28px">
+        <a href={href("/story/moments/")}>New here? Start with the moments that explain it →</a>
+        <a href="https://averagejoematt.com/subscribe/">Get each chapter by email →</a>
+      </p>
     </div>
   </section>
   {/* "the story so far" (HS1) sits flush against the next tag: with WEB_STORY off the page's bytes are unchanged */}<StoryEntry /><section class="section hair">

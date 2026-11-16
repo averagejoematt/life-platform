@@ -9,6 +9,7 @@ import { loadAll, latestEdition, loadCalibration } from "../../lib/snapshot.js";
 import { coachLead } from "../../lib/calibration.js";
 import { roomPublic } from "../../lib/room.js";
 import VersusGuess from "../../components/VersusGuess.astro";
+import OwnWords from "../../components/OwnWords.astro";
 import { href, pathOf } from "../../lib/url.js";
 
 const all = await loadAll();
@@ -148,6 +149,8 @@ const steps = [
     <div class="wrap" style="display:flex;flex-direction:column;gap:16px;max-width:900px">
       <p class="label">Depth 2 of 3 · the headline, from one producer</p>
       {cal && <VersusGuess record={null} />}
+      {/* his own verdict on the AI (owner ruling 2026-11-15): beside the checked comparison, never in place of it */}
+      {cal && <OwnWords id="ai_verdict" class="system-words" note="My judgement on one day, beside the count above. The count is the measurement; this is what it was like to use." />}
       {
         record ? (
           <>
@@ -229,6 +232,10 @@ const steps = [
 </Base>
 
 <style>
+  :global(figure.system-words) {
+    margin: 6px 0 10px;
+    max-width: 760px;
+  }
   .own-words {
     margin: 12px 0 0;
     padding: 0 0 0 20px;

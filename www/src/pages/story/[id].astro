@@ -9,7 +9,8 @@ import StatusTag from "../../components/StatusTag.astro";
 import Quote from "../../components/Quote.astro";
 import { isDisputed } from "../../lib/disputed.js";
 import { CALL_OUTCOME, chapterCovers, chapterPublished, chapterWindow, clip, dayInWords, heldCallWords, num } from "../../lib/format.js";
-import { latestEdition, loadAll, loadSeries } from "../../lib/snapshot.js";
+import { latestEdition, loadAll, loadOwnWords, loadSeries } from "../../lib/snapshot.js";
+import { ownWords, withinDays } from "../../lib/own_words.js";
 import { dailyBars, placeEvidence, windowValues } from "../../lib/evidence.js";
 import { theLine } from "../../lib/theline.js";
 import { hasPage, href, pathOf } from "../../lib/url.js";
@@ -162,6 +163,17 @@ if (ev && c.status === "published" && rawBody) {
     const html = `<aside class="evidence callcard" data-evidence="call"><p class="label">A graded call · ${esc(name)}</p><p class="callcard-test">${esc(words)}</p>${p.grading?.outcome_notes ? `<p class="callcard-what">${esc(p.grading.outcome_notes)}.</p>` : ""}<p class="callcard-foot"><span class="status ${p.status === "confirmed" ? "confirmed" : "refuted"}">${esc(outcome)}</span> <a href="${href(pathOf("prediction", p.id))}">The call and its grade →</a></p></aside>`;
     figures.push({ key: `call:${name}`, match: new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), html });
   }
+}
+// His own line on the pace (owner ruling 2026-11-15), beside the paragraph that names the rate flag — only on the
+// chapter the flag is the title of, only when the line's day is one of that chapter's days, and only when the platform
+// serves the approved words exactly. The platform's flag and his sentence disagree; the page settles nothing.
+const paceWords = ownWords(await loadOwnWords(), "pace");
+if (paceWords && ev && rawBody && /rate flag/i.test(c.title || "") && withinDays(paceWords.date, ev.from, ev.to)) {
+  figures.push({
+    key: "own-words",
+    match: /\bflag\b/i,
+    html: `<figure class="evidence ownwords-ev" data-evidence="own-words" data-own-words="pace"><figcaption class="label">In my words · ${dayInWords(paceWords.date)}</figcaption><blockquote>“${esc(paceWords.text)}”</blockquote><p class="evidence-note">Written in the days this chapter covers, the week the platform's rate flag fired on the pace of loss. The flag and the sentence disagree, and both are left as they are.</p></figure>`,
+  });
 }
 const body = rawBody ? placeEvidence(rawBody, figures).html : rawBody;
 const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
@@ -336,6 +348,14 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
           </span>
         )
       }
+    </div>
+    {/* coming back (2026-11-15): the end of a chapter is where a reader decides whether to follow */}
+    <div class="wrap" style="margin-top:18px">
+      <p class="muted" style="font-size:14px;display:flex;flex-wrap:wrap;gap:6px 24px;align-items:baseline">
+        <span>A new chapter is published most weeks, once Matthew has approved it.</span>
+        <a href="https://averagejoematt.com/subscribe/" style="font-weight:700;color:var(--ink)">Get the next one by email →</a>
+        <a href={href("/story/")} style="font-weight:700;color:var(--ink)">Every chapter →</a>
+      </p>
     </div>
   </section>
 </Base>

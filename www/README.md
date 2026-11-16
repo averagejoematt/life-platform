@@ -109,6 +109,19 @@ Two objects beyond the eleven collections, both from the publication snapshot, b
 
 Every chart carries `data-points`; `islands/inspect.js` answers pointer, touch and keyboard, and `tests/web_preview_gate.py` treats a chart with points and no inspector as a defect. On a phone a chart's viewBox is its container's width, so SVG text keeps its size (the 11 px floor, #1210; #5597 moves that check into the web gate).
 
+## The frame, and his own words (owner ruling 2026-11-15, #6067)
+
+**The frame.** The front page opened on the weight and a cold reader took the site for a weight-loss experiment. The owner's ruling: keep The Line, change what frames it — "The weight loss is real. Whether the broader transformation succeeds, and whether AI meaningfully contributes, is still an open experiment." So `src/pages/index.astro` states where the experiment stands before The Line: four parts, each from a served figure and never a judgement of the page — **the body** (The Line's own change, *measured*), **the behaviour** (the Laboratory's pre-registered tests and how many have a verdict, *being tested*), **the life** (the dimensions with a public measure, *not established*) and **the AI** (the checked record beside a simple guess on the same calls, with the producer's own verdict words). A part whose figure is not served says so. The Line keeps its figure and loses its headline number, which now sits in the first of the four parts. `/story/` says the same in its dek. `qa/qa_manifest.py`'s declared intents for `/` and `/story/` carry the ruling.
+
+**His own words.** The narrator is the platform; a first-person line reaches a page through one door only — the consent-per-line record (ADR-142, `mark_journal_quote`), whose public projection is `/api/journal_quotes`:
+
+* `scripts/publish_snapshot_own_words.py` carries that route into the snapshot as `own_words.json`: the day and the exact words, nothing else (exact-shape validation; absent when the route did not answer).
+* `src/lib/own_words.js` pins each line he approved — day, exact words, the consent record's key, and the page(s) the approval names. `ownWords(served, key)` returns a line only when the served file carries the same day and the same words, so a revoked line leaves every page on the next build and a served line with no pin is shown nowhere.
+* `src/components/OwnWords.astro` is the one renderer: the words, "My words, &lt;day&gt;", and the page's sentence about what the line is not (a quotation is never a measure). Placements: the first morning's card and the rate-flag card on `/story/moments/`, the portrait on `/`, beside the checked comparison on `/system/`, a dated reflection on `/system/calibration/`, and beside the flag on the rate-flag chapter (only when the line's day is one of that chapter's days).
+* **The proofs:** `scripts/check_www_build.py::own_words_scope` runs on every build and on the deploy's scan — a line outside its approved page, a line the snapshot does not serve, or a served line with no pin fails it; `tests/test_www_own_words.py` recomputes each pin's key from its words (one changed character fails), holds the fixture to the pinned set and plants each failure; `tests/own_words.test.mjs` holds the match rule and the moments placement.
+
+Adding a line is a new owner approval: mark it (`mark_journal_quote`), pin it with its scope, place it, and add it to `APPROVED` in the Python test.
+
 ## The Coaching Room — built dark (CR1)
 
 **CR1 launches ahead of CR2/CR3 (owner ruling 2026-11-09).** The switch is split (`src/lib/room.js`, Python twin `scripts/publish_snapshot_calibration.py::room_scope`):

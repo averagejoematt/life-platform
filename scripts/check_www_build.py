@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import glob
 import hashlib
+import html as html_lib
 import json
 import os
 import re
@@ -235,7 +236,71 @@ def scan(dist: str, require_noindex: bool, forbidden_ids: set[str] | None = None
     issues.extend(room_leaks(dist))
     issues.extend(lab_leaks(dist))
     issues.extend(story_leaks(dist))
+    issues.extend(own_words_scope(dist, snapshot_dir))
     return issues
+
+
+OWN_WORDS_JS = os.path.join(WWW, "src", "lib", "own_words.js")
+_OWN_ENTRY = re.compile(
+    r'^  (\w+): \{\s*date: "(\d{4}-\d{2}-\d{2})",\s*text: "((?:[^"\\\\]|\\\\.)*)",\s*sk: "([^"]+)",\s*scope: \[([^\]]*)\]', re.MULTILINE
+)
+
+
+def own_words_pins(own_js: str = OWN_WORDS_JS) -> dict[str, dict]:
+    """The owner's approved lines as pinned in www/src/lib/own_words.js: key → {date, text, sk, scope}. Read off the
+    file, never a hand copy; an unreadable file is no pins (and `own_words_scope` then refuses every served line)."""
+    try:
+        src = open(own_js, encoding="utf-8").read()
+    except OSError:
+        return {}
+    pins = {}
+    for key, day, text, sk, scope in _OWN_ENTRY.findall(src):
+        pins[key] = {"date": day, "text": json.loads(f'"{text}"'), "sk": sk, "scope": re.findall(r'"([^"]+)"', scope)}
+    return pins
+
+
+def _scope_re(pattern: str) -> re.Pattern:
+    return re.compile("^" + "[^/]+".join(re.escape(p) for p in pattern.split("*")) + "$")
+
+
+def own_words_scope(dist: str, snapshot_dir: str = SNAPSHOT, own_js: str = OWN_WORDS_JS) -> list[str]:
+    """His own words appear only where he approved them (owner ruling 2026-11-15). A built page may show one of the
+    owner's first-person lines only when (a) the line is pinned in own_words.js, (b) the page is inside that pin's
+    scope, and (c) the snapshot's own_words.json — the platform's /api/journal_quotes — serves that day and those words
+    exactly. A served line with no pin is shown nowhere. Runs on every build and on the deploy's scan, so a revoked
+    line, a line moved to a page he did not name, or a line edited by one character cannot reach the site."""
+    pins = own_words_pins(own_js)
+    try:
+        with open(os.path.join(snapshot_dir, "own_words.json"), encoding="utf-8") as fh:
+            doc = json.load(fh)
+    except (OSError, ValueError):
+        doc = {}
+    served = (
+        {(q.get("date"), q.get("quote")) for q in (doc.get("quotes") or []) if isinstance(q, dict)} if doc.get("state") == "ok" else set()
+    )
+    pinned_texts = {(p["date"], p["text"]) for p in pins.values()}
+    out = []
+    for dirpath, _d, files in os.walk(dist):
+        for name in files:
+            if not name.endswith(".html"):
+                continue
+            rel = os.path.relpath(os.path.join(dirpath, name), dist)
+            route = "/" + (os.path.dirname(rel) + "/" if os.path.dirname(rel) else "")
+            page = html_lib.unescape(open(os.path.join(dirpath, name), encoding="utf-8", errors="replace").read())
+            for key in sorted(set(re.findall(r'data-own-words="([^"]+)"', page))):
+                if key not in pins:
+                    out.append(f"{rel}: an own-words placement {key!r} that own_words.js does not pin")
+            for key, pin in sorted(pins.items()):
+                if pin["text"] not in page:
+                    continue
+                if not any(_scope_re(s).match(route) for s in pin["scope"]):
+                    out.append(f"{rel}: the owner's line {key!r} is shown outside the page(s) he approved it for {pin['scope']}")
+                if (pin["date"], pin["text"]) not in served:
+                    out.append(f"{rel}: the owner's line {key!r} is shown but the snapshot does not serve it (revoked, or never marked)")
+            for day, words in sorted(served - pinned_texts):
+                if words and words in page:
+                    out.append(f"{rel}: a served line of {day} with no approved placement is on the page")
+    return out
 
 
 ROOM_JS = os.path.join(WWW, "src", "lib", "room.js")

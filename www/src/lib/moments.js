@@ -4,6 +4,7 @@
 // approved dek, quoted, never paraphrased; a number is the platform's. A moment whose evidence is absent from the
 // snapshot is simply not shown — the list shrinks, it is never filled.
 import { dayInWords, num } from "./format.js";
+import { withinDays } from "./own_words.js";
 
 const published = (chapters) => (chapters || []).filter((c) => c && c.status === "published" && (c.week ?? 0) >= 1);
 const lastDay = (c) => c.covers_end || c.data_through || c.date;
@@ -18,9 +19,12 @@ function chapterBy(chapters, re) {
 /**
  * The moments, oldest first. Inputs are snapshot objects: `journey` (start, rungs), `chapters`, `lead` (the verified
  * record against a guess, lib/calibration.js verifiedLead), `finding` (the correlation listed in every weekly run, with
- * its `seen`/`of`). Each moment: {key, date|null, kicker, title, body, quote|null, links: [{label, path}]}.
+ * its `seen`/`of`), `own` (his approved lines the snapshot serves, by placement: {beginning, pace} → {date} or absent).
+ * Each moment: {key, date|null, kicker, title, body, quote|null, own|null, links: [{label, path}]} — `own` names the
+ * placement (lib/own_words.js) the card carries: the beginning on the first morning; the pace line on the rate-flag
+ * chapter's card only when its day is one of that chapter's days.
  */
-export function moments({ journey, chapters, coaches, lead, finding, dayPath, chapterPath, coachPath }) {
+export function moments({ journey, chapters, coaches, lead, finding, own = {}, dayPath, chapterPath, coachPath }) {
   const out = [];
   if (journey && journey.start_date && journey.start_weight_lbs != null) {
     const prologue = (chapters || []).find((c) => c.status === "published" && c.week === 0);
@@ -31,6 +35,7 @@ export function moments({ journey, chapters, coaches, lead, finding, dayPath, ch
       title: "The first morning on the scale",
       body: `${num(journey.start_weight_lbs, 1)} pounds on ${dayInWords(journey.start_date)}. Every weigh-in since is on the line above; the goal is ${num(journey.goal_weight_lbs, 0)}.`,
       quote: null,
+      own: own.beginning && own.beginning.date === journey.start_date ? "beginning" : null,
       links: [
         { label: "The journey, every reading", path: "/data/journey/" },
         dayPath(journey.start_date) && { label: "That day", path: dayPath(journey.start_date) },
@@ -94,6 +99,7 @@ export function moments({ journey, chapters, coaches, lead, finding, dayPath, ch
       title: "The pace question, again",
       body: `${flag && again.week > flag.week ? `${again.week - flag.week} weeks after ${flag.title}, the` : "The"} flag fired again. Whether the pace can hold without costing muscle is the chapter's own open question.`,
       quote: { text: again.excerpt || again.summary, cite: again.title },
+      own: own.pace && withinDays(own.pace.date, again.covers_start, again.covers_end) ? "pace" : null,
       links: [{ label: `Read ${again.title}`, path: chapterPath(again) }],
     });
   }

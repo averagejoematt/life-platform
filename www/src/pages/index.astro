@@ -2,17 +2,19 @@
 // Start — the entry point. Refined after the owner's 2026-11-01 review against the approved
 // Stage 2/3 home: the six-dimensional portrait returns beside the premise (no photograph needed),
 // the latest chapter is the main feature, the coaches speak in plain words, and every number is
-// the edition's or the snapshot's (one producer). His own words (`his_words`) are still not
-// rendered: owner decision 10 requires an explicit publication approval the served block lacks.
+// the edition's or the snapshot's (one producer). His own words are rendered only through
+// components/OwnWords.astro: a line he approved by name (lib/own_words.js) that the platform serves exactly.
 import Base from "../layouts/Base.astro";
 import Provenance from "../components/Provenance.astro";
 import StatusTag from "../components/StatusTag.astro";
 import VersusGuess from "../components/VersusGuess.astro";
 import OpenQuestions from "../components/OpenQuestions.astro";
+import OwnWords from "../components/OwnWords.astro";
 import { headline, weeklyBars } from "../lib/chart.js";
 import { scaleWords, weeklySpark } from "../lib/spark.js";
 import { chapterCovers, chapterPublished, chapterWindow, dayInWords, domainWords, num, kOfN, clip, heldCallWords } from "../lib/format.js";
-import { connectedTo, loadAll, loadSeries, latestEdition, dayLine, loadCalibration, loadJourney } from "../lib/snapshot.js";
+import { connectedTo, loadAll, loadSeries, latestEdition, dayLine, loadCalibration, loadJourney, loadLab } from "../lib/snapshot.js";
+import { labEnabled } from "../lib/lab.js";
 import { lineCounts, theLine } from "../lib/theline.js";
 import { verifiedLead } from "../lib/calibration.js";
 import { roomPublic } from "../lib/room.js";
@@ -45,11 +47,6 @@ if (roomPublic()) {
     soFarLead = null;
   }
 }
-const COACH_VS_GUESS: Record<string, string> = {
-  no_clear_difference: "the coaches no better than a simple guess yet",
-  rule_better: "a simple guess ahead of the coaches",
-  coach_better: "the coaches ahead of a simple guess",
-};
 
 const chapters = [...all.byType.chapter].sort((a, b) => (a.date < b.date ? 1 : -1));
 const published = chapters.filter((c) => c.status === "published");
@@ -204,6 +201,77 @@ const WORDS = ["none", "one", "two", "three", "four", "five", "six", "seven", "e
 // The spark is the shared contract's (lib/spark.js, review 2026-11-14): bars from zero, or a line on a labelled range when
 // the weeks differ by little against their level — the same picture the data room draws for the same series.
 const sparkOf = (d: Dim) => weeklySpark(d.bars || [], { faint: d.value == null });
+
+// ── Where the experiment stands (2026-11-15, owner ruling on #6067). The front page opened on the weight and read as a
+// weight-loss site. The experiment has four parts and only the first is settled, so the page says that before The
+// Line — each part from a figure the snapshot serves, never a judgement made here: the body (The Line's own change),
+// the behaviour (the Laboratory's pre-registered tests, and how many have a verdict), the life (the dimensions with a
+// public measure) and the AI (the checked record beside a simple guess on the same calls, with the producer's verdict).
+// A part whose figure is not served says so. Each figure opens its sentence, so it reads as one line on a phone.
+let labTests: { open: number; decided: number } | null = null;
+if (labEnabled()) {
+  try {
+    const lab: any = await loadLab();
+    if (lab?.state === "ok") {
+      const ts = (lab.lab_tests || []).filter((t: any) => t.status !== "archived");
+      const verdictOf = (t: any) => (t.verdict && typeof t.verdict === "object" ? t.verdict.result : t.verdict);
+      labTests = { open: ts.length, decided: ts.filter((t: any) => verdictOf(t) && verdictOf(t) !== "inconclusive").length };
+    }
+  } catch {
+    labTests = null;
+  }
+}
+// the status is this page's short label for the producer's verdict; the sentence is the producer's own words
+const AI_STATUS: Record<string, string> = {
+  no_clear_difference: "no advantage shown",
+  too_few: "too few calls to tell",
+  rule_better: "behind a simple guess",
+  coaches_better: "ahead of a simple guess",
+};
+const aiStatus = soFarLead?.sign?.verdict ? AI_STATUS[soFarLead.sign.verdict] || null : null;
+const aiWords = soFarLead?.sign?.words ? `${soFarLead.sign.words.charAt(0).toUpperCase()}${soFarLead.sign.words.slice(1)}.` : null;
+const lighter = lineLost < 0;
+type Standing = { id: string; part: string; status: string; value: string | null; text: string; to: string };
+const standing: Standing[] = [
+  {
+    id: "body",
+    part: "The body",
+    status: "measured",
+    value: lineData ? `${num(Math.abs(lineLost), 1)} lb` : today?.change_lbs != null ? `${num(Math.abs(today.change_lbs), 1)} lb` : null,
+    text: lineData
+      ? `${lighter ? "lighter" : "heavier"} in ${lineCount.days} days, across ${lineCount.readings} weigh-ins. ${lighter ? "The weight loss is real: it" : "It"} is the line below.`
+      : "The weigh-ins are not served in this snapshot.",
+    to: "#the-line",
+  },
+  {
+    id: "behaviour",
+    part: "The behaviour",
+    status: "being tested",
+    value: labTests ? `${labTests.decided} of ${labTests.open}` : null,
+    text: labTests
+      ? `pre-registered tests ${labTests.decided === 1 ? "has" : "have"} a verdict. Whether the new habits hold is not known yet.`
+      : "Whether the new habits hold is not known yet; the Laboratory is not served in this snapshot.",
+    to: "#open-questions",
+  },
+  {
+    id: "life",
+    part: "The life",
+    status: "not established",
+    value: `${measured} of ${dims.length}`,
+    text: `dimensions of a life have a public measure${measured === 3 ? ", all of them the body's" : ""}. Whether I'm happier is not established.`,
+    to: "#portrait",
+  },
+  {
+    id: "ai",
+    part: "The AI",
+    status: aiStatus || "being checked",
+    value: soFarLead?.baseline ? `${soFarLead.k} v ${soFarLead.baseline.right}` : null,
+    text: soFarLead?.baseline
+      ? `coach forecasts right against a simple guess's, on the same ${soFarLead.n} calls.${aiWords ? ` ${aiWords}` : ""}`
+      : "The coaches' checked record is not served in this snapshot.",
+    to: "#coaches",
+  },
+];
 ---
 
 <Base title="Average Joe Matt" top="start" status={status} card="home" description={ogDescription}>
@@ -218,27 +286,40 @@ const sparkOf = (d: Dim) => weeklySpark(d.bars || [], { faint: d.value == null }
           <p class="dek">
             I'm Matt. British, in Seattle. On {startDate ? dayInWords(startDate, { short: true }) : "day one"} I weighed
             {today?.start_weight_lbs ? ` ${num(today.start_weight_lbs, 0)} pounds` : " what the scale said"} and started this: the data sources on my
-            body, a team of AI coaches, one honest journal, and a question I can't answer yet — whether getting healthier and getting happier are the
-            same thing. The weight is the catalyst. It isn't the point.
+            body, a team of AI coaches, one honest journal. The weight is the catalyst, not the point. The point is whether any of it adds up to a
+            better life — healthier, happier, more capable — and whether the AI earns its place. I can't answer that yet.
           </p>
           <p class="margin">
             The "Average" is aspirational. Most of my numbers are currently above it, and I'm working on that in the only direction that counts.
           </p>
         </div>
       </div>
+      <div class="standing" data-standing>
+        <div class="between standing-head">
+          <p class="label">Where the experiment stands{edition?.day_n != null && ` · day ${edition.day_n}`}</p>
+          {lighter && <p class="label standing-gist">The weight loss is real · the rest is still open</p>}
+        </div>
+        <ol class="standing-rows">
+          {
+            standing.map((x) => (
+              <li class={`standing-row st-${x.id}`}>
+                <a class="standing-part" href={x.to}>
+                  <span class="label">{x.part}</span>
+                  <span class={`standing-status ${x.id === "body" ? "is-measured" : ""}`}>{x.status}</span>
+                </a>
+                <p class="standing-text">
+                  <b class={`standing-v num ${x.value == null ? "hollow" : ""}`}>{x.value == null ? "—" : x.value}</b> {x.text}
+                </p>
+              </li>
+            ))
+          }
+        </ol>
+      </div>
       {
         lineData && (
-          <figure class="theline" data-theline data-payload={JSON.stringify(lineData)} data-aria={lineAria}>
+          <figure class="theline" id="the-line" data-theline data-payload={JSON.stringify(lineData)} data-aria={lineAria}>
             <figcaption class="theline-head">
-              <span class="theline-stat">
-                <span class="big num">{num(Math.abs(lineLost), 1)}</span>
-                <span class="theline-unit">
-                  lb {lineLost <= 0 ? "lighter" : "heavier"}
-                  <br />
-                  <span class="muted">in {lineCount.days} days</span>
-                </span>
-              </span>
-              <span class="label theline-fig">Fig. 1 — The Line · every morning on the scale since day one</span>
+              <span class="label theline-fig">Fig. 1 — The Line · the part that is measured · every morning on the scale since day one</span>
             </figcaption>
             <div class="theline-chart" data-theline-chart set:html={lineSvg} />
             <div class="theline-key">
@@ -253,17 +334,6 @@ const sparkOf = (d: Dim) => weeklySpark(d.bars || [], { faint: d.value == null }
           </figure>
         )
       }
-      <p class="sofar mono" data-so-far>
-        {[
-          edition?.day_n != null ? `Day ${edition.day_n}` : null,
-          // the pounds are The Line's headline when it is drawn; the line carries them only when it is not
-          !lineData && today?.change_lbs != null ? `${num(Math.abs(today.change_lbs), 1)} lb ${today.change_lbs <= 0 ? "down" : "up"}` : null,
-          published.length ? `${published.length} ${published.length === 1 ? "chapter" : "chapters"}` : null,
-          soFarLead?.sign?.verdict && COACH_VS_GUESS[soFarLead.sign.verdict] ? COACH_VS_GUESS[soFarLead.sign.verdict] : null,
-        ]
-          .filter(Boolean)
-          .join(" · ")}
-      </p>
       <div class="row" style="margin-top:20px">
         {/* sprint III: a stranger starts with the moments that explain it (each links its chapter); chapter one is a click on */}
         {firstChapter && <a class="btn" href={href("/story/moments/")}>Start here: the moments that explain it</a>}
@@ -274,7 +344,7 @@ const sparkOf = (d: Dim) => weeklySpark(d.bars || [], { faint: d.value == null }
 
   <section class="section hair portrait-band">
     <div class="wrap">
-      <figure class="portrait">
+      <figure class="portrait" id="portrait">
         <figcaption class="between">
           <span class="label">Fig. 2 — The portrait{edition?.day_n != null && `, day ${edition.day_n}`} · six dimensions, eight weekly means</span>
           <span class="verified" style="font-size:11px">{edition ? `As of ${dayInWords(edition.as_of, { short: true })}` : "From the platform"} · blank where nothing is measured in public</span>
@@ -307,14 +377,15 @@ const sparkOf = (d: Dim) => weeklySpark(d.bars || [], { faint: d.value == null }
           {WORDS[6 - measured] || 6 - measured} not yet. That ratio is the project: the body is the easy part to instrument.
         </p>
       </figure>
+      <OwnWords id="content" class="portrait-words" note="One evening's sentence, not a measurement — nothing published here measures how I feel." />
     </div>
   </section>
 
   {
     latestChapter && (
       <section class="section hair" id="week">
-        <div class="wrap" style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
-          <div style="flex:0 0 160px;display:flex;flex-direction:column;gap:6px">
+        <div class="wrap ch-feature">
+          <div class="ch-lead">
             <span class="label">Chapter</span>
             <span class="big cobalt ch-numeral" style="display:block;line-height:.85">{String(latestChapter.week ?? 0).padStart(2, "0")}</span>
             <span class="mono muted" style="font-size:12px">{weekRange(latestChapter) || dayInWords(latestChapter.date, { short: true })}</span>
@@ -401,7 +472,7 @@ const sparkOf = (d: Dim) => weeklySpark(d.bars || [], { faint: d.value == null }
     <div class="wrap">
       <div class="between" style="margin-bottom:24px">
         <h2>What's alive right now</h2>
-        <span class="label">A reason to come back · rebuilt every morning</span>
+        <span class="label wide-only">A reason to come back · rebuilt every morning</span>
       </div>
       {
         sinceAsOf != null && (
@@ -487,7 +558,7 @@ const sparkOf = (d: Dim) => weeklySpark(d.bars || [], { faint: d.value == null }
     </div>
   </section>
 
-  <section class="section inv">
+  <section class="section inv" id="coaches">
     <div class="wrap" style="display:flex;flex-wrap:wrap;gap:40px 56px;align-items:flex-start">
       <div style="flex:1 1 520px;min-width:0;display:flex;flex-direction:column;gap:18px">
         {/* #5615: the record is every checked call since day one, not a week — the label says so */}
@@ -536,7 +607,7 @@ const sparkOf = (d: Dim) => weeklySpark(d.bars || [], { faint: d.value == null }
     <div class="wrap">
       <div class="between" style="margin-bottom:22px">
         <h2>Three doors. Depth behind each, never in front of it.</h2>
-        <span class="label">Simple on arrival · deep on demand</span>
+        <span class="label wide-only">Simple on arrival · deep on demand</span>
       </div>
       <div class="doors">
         <a class="door" href={href("/story/")}>
