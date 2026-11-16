@@ -41,7 +41,7 @@ from test_site_partition_orphans import _pkform_tokens  # noqa: E402
 
 OWNER_PK_PREFIX = "USER#matthew#SOURCE#"
 WRITE_CALLS = frozenset({"put_item", "update_item", "delete_item", "batch_write_item", "transact_write_items", "batch_writer"})
-_GATE_CALL = re.compile(r"^verify_\w*token$")
+_OWNER_TOKEN_VERIFIER = re.compile(r"^verify_\w*token$")
 
 # (module file, function) -> (the owner partitions it writes, why a public caller may write them).
 # Short on purpose. Both are PENDING QUEUES no engine reads: nothing in the owner's experiment record,
@@ -105,7 +105,7 @@ def owner_writing_functions(source: str) -> dict:
                 if isinstance(n, ast.Name) and n.id in constants:
                     tokens |= constants[n.id]
         if tokens:
-            out[fn.name] = (tokens, any(_GATE_CALL.match(_call_name(c)) for c in calls))
+            out[fn.name] = (tokens, any(_OWNER_TOKEN_VERIFIER.match(_call_name(c)) for c in calls))
     return out
 
 
