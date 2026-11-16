@@ -141,12 +141,8 @@ _DYNAMIC_REFERENCES: dict[str, str] = {
     "secret:lambdas.common.secret_cache.get_secret": "the shared cache indirection — every caller's id is its own literal",
     "secret:lambdas.common.secret_cache.get_secret_json": "same, JSON variant",
     "secret:lambdas.ingestion.eightsleep_lambda._cached_secret": "secret id is a parameter of the local cache wrapper",
-    # #2846: appeared the moment health-auto-export-webhook stopped being a raw
-    # `_lambda.Function` and became a create_platform_lambda call — this sweep's
-    # population IS the constructor's call sites (_sweep_fleet), so for as long as
-    # HAE was constructed by hand it was invisible to the grant lockstep. Same
-    # local-cache-wrapper shape as its eightsleep/notion siblings above.
-    "secret:lambdas.ingestion.health_auto_export_lambda._cached_secret": "secret id is a parameter of the local cache wrapper",
+    # (#5513 removed the HAE `_cached_secret` row that #2846 added: the webhook now reads both of its
+    # secret ids as module constants through common.secret_cache, so the lockstep checks them by name.)
     "secret:lambdas.ingestion.ingestion_framework.run_ingestion": "SIMP-2 reads the id from the source registry facet",
     "secret:lambdas.ingestion.notion_lambda._cached_secret": "secret id is a parameter of the local cache wrapper",
     # #3760: both surfaced when `progress-viewer` joined the fleet — this sweep's population

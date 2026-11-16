@@ -228,7 +228,8 @@ def test_the_stale_docstrings_now_name_the_bundle(rel, dead_id):
         assert re.search(r"delet|never existed|outlived", window, re.I), f"{rel} mentions {dead_id} without saying it is gone"
 
 
-@pytest.mark.parametrize("rel", ["lambdas/ingestion/dropbox_poll_lambda.py", "lambdas/ingestion/health_auto_export_lambda.py"])
+# #5513: the HAE bundle read (the `SECRET_NAME` default this compares) moved to the webhook's auth sibling.
+@pytest.mark.parametrize("rel", ["lambdas/ingestion/dropbox_poll_lambda.py", "lambdas/ingestion/health_auto_export_auth.py"])
 def test_the_docstring_matches_the_code_path(rel):
     """The root defect: docstring and code disagreed. Read the actual default, not prose."""
     src = (pathlib.Path(_REPO) / rel).read_text()
