@@ -454,7 +454,7 @@ def _scan_keys(key_iter) -> list:
 
 
 # Owner ruling 2026-11-14: a figure of HIS phenotypic age is his chronological age to about a year — the Levine formula
-# is public and linear in age, and its nine inputs are public lab values (tests/age_inversion_lib.py is the attack).
+# is public and linear in age, and its nine inputs are public lab values (qa/age_inversion_lib.py is the attack).
 # So a NUMBER under one of these keys, anywhere in a public payload, is an age disclosure. The key holding null (the
 # endpoint's own "withheld" shape) or an object (the snapshot's markers-only reference) is the sanctioned form.
 _DERIVED_AGE_KEYS = {"phenoage", "phenotypic_age", "pheno_age", "phenoage_years"}

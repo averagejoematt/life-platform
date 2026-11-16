@@ -39,6 +39,9 @@ import pytest
 import yaml
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Empty AWS_* values are NOT "no credentials": the CLI falls back to ~/.aws. Every subprocess env here also points the
+# two credential files at nothing, so no path through a deploy script can reach a real bucket (INCIDENT_LOG 2026-11-16).
+_NO_AWS_FILES = {"AWS_CONFIG_FILE": os.devnull, "AWS_SHARED_CREDENTIALS_FILE": os.devnull, "AWS_EC2_METADATA_DISABLED": "true"}
 for p in (REPO, os.path.join(REPO, "qa"), os.path.join(REPO, "scripts")):
     if p not in sys.path:
         sys.path.insert(0, p)
@@ -306,7 +309,7 @@ def test_www_sync_script_guards_the_root_sync_and_never_deletes(tmp_path):
     assert 'aws s3 sync "s3://$BUCKET/$PREVIOUS_PREFIX' in restore and "$SITE_DIR" not in restore and "git checkout" not in restore
     # a lane can rehearse every mode without credentials
     env = {k: v for k, v in os.environ.items() if not k.startswith("AWS_")}
-    env.update({"AWS_ACCESS_KEY_ID": "", "AWS_SECRET_ACCESS_KEY": "", "AWS_PROFILE": ""})
+    env.update({"AWS_ACCESS_KEY_ID": "", "AWS_SECRET_ACCESS_KEY": "", "AWS_PROFILE": "", **_NO_AWS_FILES})
     r = subprocess.run(
         ["bash", os.path.join(REPO, "deploy", "www_preview_sync.sh"), "--target", "root", "--restore-previous", "--print"],
         capture_output=True,
@@ -492,7 +495,18 @@ def test_workflow_has_one_target_input_and_root_only_sweeps_and_rollback():
     assert [c["cron"] for c in on["schedule"]] == ["30 15 * * *"]
     jobs = WORKFLOW["jobs"]
     # api-readiness + deferred: tests/test_www_api_readiness.py owns their wiring.
-    assert set(jobs) == {"api-readiness", "deferred", "deploy", "smoke", "visual-qa", "record-previous", "rollback-v9-on-failure"}
+    # public-copies (#6083): both targets; its red reaches the rollback job, whose scope check declines it.
+    assert set(jobs) == {
+        "api-readiness",
+        "deferred",
+        "deploy",
+        "smoke",
+        "visual-qa",
+        "public-copies",
+        "record-previous",
+        "rollback-v9-on-failure",
+    }
+    assert "needs.deploy.outputs.target" not in jobs["public-copies"]["if"] and "public-copies" in jobs["rollback-v9-on-failure"]["needs"]
     for name in ("smoke", "visual-qa", "record-previous", "rollback-v9-on-failure"):
         assert "needs.deploy.outputs.target == 'root'" in jobs[name]["if"], f"{name} must run for the root target only"
     assert "needs.smoke.result == 'failure' || needs.visual-qa.result == 'failure'" in jobs["rollback-v9-on-failure"]["if"]
@@ -531,6 +545,40 @@ def test_root_rollback_script_declines_on_an_unreachable_surface_and_restores_ot
     assert r.returncode == 0 and "DECLINED" in r.stdout and "declined=true" in out.read_text(), r.stdout + r.stderr
 
 
+def test_root_rollback_declines_a_public_copies_red_alone_and_never_restores(tmp_path):
+    """#6083: a violating OTHER copy (orphan, stale preview or archive) is not repaired by a root revert, and during a
+    privacy fix a revert would put the pre-fix build back. A copies-only red declines; a sweep red still rolls back.
+    AWS is a stub on PATH and every credential source is pointed at nothing: this test must never reach a real bucket
+    (an earlier draft fell back to a developer's ~/.aws profile and ran the real restore — 2026-11-16)."""
+    script = os.path.join(REPO, "deploy", "www_root_rollback.sh")
+    bindir, calls, out = tmp_path / "bin", tmp_path / "aws-calls", tmp_path / "out"
+    bindir.mkdir()
+    (bindir / "aws").write_text(f'#!/usr/bin/env bash\necho "$*" >> {calls}\nexit 1\n')
+    (bindir / "aws").chmod(0o755)
+    base = {k: v for k, v in os.environ.items() if not k.startswith("AWS_")}
+    base.update(
+        PATH=f"{bindir}{os.pathsep}{os.environ['PATH']}",
+        AWS_CONFIG_FILE=os.devnull,
+        AWS_SHARED_CREDENTIALS_FILE=os.devnull,
+        AWS_EC2_METADATA_DISABLED="true",
+        GITHUB_OUTPUT=str(out),
+        GITHUB_SHA="abc1234567",
+        SNS_TOPIC_ARN="",
+        COPIES_SUMMARY="1 violation(s) across ['preview']",
+    )
+    env = dict(base, GATE="smoke=success visual-qa=success public-copies=failure")
+    r = subprocess.run(["bash", script], capture_output=True, text=True, env=env, cwd=REPO)
+    assert r.returncode == 0 and "DECLINED" in r.stdout and "restoring" not in r.stdout, r.stdout + r.stderr
+    assert "declined=true" in out.read_text() and "surfaces=public-copies" in out.read_text()
+    assert not calls.exists(), "a declined rollback made an AWS call"
+    # a sweep red beside it takes the existing path: the restore is attempted (against the stub, which refuses it)
+    out.write_text("")
+    env = dict(base, GATE="smoke=failure visual-qa=success public-copies=failure")
+    r = subprocess.run(["bash", script], capture_output=True, text=True, env=env, cwd=REPO, timeout=60)
+    assert "restoring the previous v9 build" in r.stdout and "declined=false" in out.read_text(), r.stdout + r.stderr
+    assert "www-previous/LATEST" in calls.read_text(), "the restore path was not the one taken"
+
+
 # premerge-gate: 5534: a structural sweep of deploy/sync_site_to_s3.sh, deploy/rollback_site.sh, .github/workflows/web-preview-deploy.yml and site/reference/ — a new sync step without the owned excludes, or a new superseded page without its copy, must red on the PR that adds it
 
 
@@ -543,7 +591,7 @@ def test_the_previous_build_is_recorded_outside_the_served_prefix_one_build_per_
     dist.mkdir()
     (dist / "index.html").write_text("<!doctype html>")
     env = {k: v for k, v in os.environ.items() if not k.startswith("AWS_")}
-    env.update({"AWS_ACCESS_KEY_ID": "", "AWS_SECRET_ACCESS_KEY": "", "AWS_PROFILE": "", "GITHUB_SHA": "abc123"})
+    env.update({"AWS_ACCESS_KEY_ID": "", "AWS_SECRET_ACCESS_KEY": "", "AWS_PROFILE": "", "GITHUB_SHA": "abc123", **_NO_AWS_FILES})
     r = subprocess.run(
         [
             "bash",

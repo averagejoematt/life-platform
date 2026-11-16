@@ -208,9 +208,9 @@ ESTATE: dict = {
         Sweep(
             "security.E2",
             "every public route's payload",
-            "python3 deploy/pii_surface_guard.py --endpoints, then python3 tests/age_inversion_lib.py --live",
+            "python3 deploy/pii_surface_guard.py --endpoints, then python3 qa/age_inversion_lib.py --live",
             f"{_N}: every violation, and every route the sweep could not scan",
-            ("deploy/pii_surface_guard.py", "tests/age_inversion_lib.py"),
+            ("deploy/pii_surface_guard.py", "qa/age_inversion_lib.py"),
         ),
         Sweep(
             "security.E3",

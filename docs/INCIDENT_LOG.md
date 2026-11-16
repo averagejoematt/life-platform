@@ -24,6 +24,7 @@ Last updated: 2026-11-16 (+1 row — two other copies of the site outliving the 
 
 | Date | Severity | Summary | Root Cause | TTD* | TTR* | Data Loss? |
 |------|----------|---------|------------|------|------|------------|
+| 2026-11-16 | **P3** (deploy plane; SILENT — nothing alarmed, the lane agent found it in its own log; a real production write from a test, with no content change) | **At 05:00:40Z a draft of a new unit test in the #6083 lane ran the REAL v9 root restore from a developer laptop: `deploy/www_preview_sync.sh --target root --restore-previous` copied `www-previous/<build>/` over `site/` (663 objects) and created a CloudFront invalidation for `/*`.** No content changed: the restored build was the build already live, every object's ETag equals its prior version's (all 663 compared by the lane; three re-checked by the driver against the object version list), no SNS was sent, and two later root deploys superseded it. Side effects: one extra `/*` invalidation and a build marker re-dated to 05:00:45Z. | **An empty `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`/`AWS_PROFILE` in a subprocess env is not "no credentials"** — the AWS CLI treats the empty values as unset and falls back to the default profile in `~/.aws`, here an admin profile. The existing tests in the file survive on that pattern only because they pass `--print`; the draft exercised a path with no dry-run flag. Fix (#6109): the rollback test puts a stub `aws` first on PATH and points `AWS_CONFIG_FILE` and `AWS_SHARED_CREDENTIALS_FILE` at `os.devnull`; the two older tests in `tests/test_v9_cutover_5534.py` now null the same two files; the lane-agent brief (`.claude/agents/worktree-implementer.md` rule 3c) names the pattern. | ~0 (read in the test's own output) | n/a — nothing to restore; verified unchanged within ~2 min, re-verified 07:16Z | No |
 | 2026-11-15 | **P2** (privacy; SILENT — two other copies of the site outlived a fix that was live at the root; nothing alarmed) | **With the ADR-168 fix live at the root, the public archive (`/archive/latest.tar.gz`, built 07:00Z, before the fix) still carried the pre-fix `/api/phenoage` and `/api/deficit_sustainability` responses and two pre-fix Journey pages, and the rehearsal preview at `/next/v9/` (last synced 2026-11-05) still served a pre-fix Journey page plus 500 call pages on retired addresses that printed call wording the owner ruled unpublished on 2026-11-06.** Found 23:40Z by downloading the archive and running the inversion instrument over its members (window 1.12 y on the archived response) — the check the previous handover had deferred to the nightly rebuild. | Three copies, one fix path. Since the root cut-over every push and the daily schedule build the root only; the preview is written by a manual dispatch and had not been rebuilt for ten days. The sync never deletes, so a page the build no longer writes stays served. The archive admits `site/next/v9/**` and is rebuilt at one nightly instant, so it re-published every stale preview page each night and lagged the fix by up to a day. The hand sweeps of 2026-11-05/06 and 2026-11-14 cleaned the root and never looked at the preview. | Preview pages ~10 d (2026-11-06 → 2026-11-15); the archive ~16 h after the fix | ~45 min from detection: preview rebuilt from main (run 43777922789); the 500 orphan pages removed (versioned bucket — prior versions answer 403 to an anonymous reader); archive regenerated 00:08Z and 00:22Z with `/archive/*` and `/next/v9/*` invalidated. The DOWNLOADED archive was then audited member by member: no age-derived statistic (the instrument's window is its whole search range), the reference-age TDEE method, no call page on a retired address; its sha256 matches its manifest. Guard owed, not yet built: #6083 (the preview cannot go stale, a deploy prunes what it no longer writes, the archive does not admit the preview, one step regenerates the archive after a privacy fix). Procedure: `land` skill §4 now lists the three copies. | No data lost; an exposure — copies fetched before the repair cannot be recalled. |
 | 2026-11-15 | **P3** (main's deploys stranded ~70 min; nothing served was wrong — twelve merges were simply not live; loud: Plan red on every run) | **After `48bc50df8` (PR #5897, 18:22Z) every CI/CD run failed "Plan deployments" with IAM OWNER-REQUIRED on six stacks (LifePlatformMcp, Ingestion, Serve, Compute, Operational, Email); twelve merges sat on main undeployed.** Observed by Session 11-15's driver; the change belongs to another session's lane. | #5897 put a `cloudwatch:namespace` condition on every `cloudwatch:PutMetricData` grant — an IAM change across six stacks, which the additive gate (#2834) classes owner-required, and that gate runs only after merge (PR checks do not run Plan). Same class as the 2026-10-20 row. | ~0 min (first Plan run) | ~70 min: `bash deploy/cdk_deploy.sh` for the six stacks, run by the paydown session with the owner's approval, completed 19:32Z; run 43752328226 then passed Plan, Deploy and Smoke. Class tracker #5221 (open). | No |
 | 2026-11-15 | **P3** (deploy plane; LOUD — the smoke-failure email and the auto-rollback fired; a healthy deploy was reverted ~70 min, and every later code deploy would have rolled back until 2026-11-22) | **At 18:12Z qa-smoke `character:receipt_replay` failed ("replay MISMATCH with unchanged config+engine on ['2026-11-14']") and CI/CD run 43743435641 auto-rolled back the healthy deploy of `73ec9bb5a` (PR #6049): Lambda code reverted ~18:28Z, rollback job finished 18:36Z.** Between 18:38Z and 19:40Z the static site (rebuilt while the deploy was live) and the API disagreed about 12 published call wordings. | Floating-point summation order at an exact boundary. The headline character level is `floor(Σ level·weight / Σ weight)`, and on 2026-11-14 that mean is exactly 20: the compute sums in its own pillar order (19.999999999999996 → 19, stored), the replay summed in the order DynamoDB returns the receipt's map, alphabetical (20.000000000000004 → 20). The receipt verified at write time; the replay was the first reader to re-sum it in another order. The day stays in the check's seven-receipt window, so the false mismatch would have reverted every code deploy for a week. | ~26 min (smoke red 18:12Z → found 18:38Z by a live check that the just-published content was gone) | ~94 min: PR #6065 (`de8877cf0`) adds `character_engine.HEADLINE_PILLAR_ORDER` and the replay sums in that order — no score, formula or ENGINE_VERSION change; deployed 19:40Z, smoke green 19:46Z (run 43752328226). Left to the owner: whether an exact integer mean should read as that level (#6066). Procedure: land skill §4 reads the CI/CD rollback job before a must-go-live merge. A second remedy ran beside it: at 19:30Z the paydown session tombstoned the 2026-11-14 receipt with the owner's approval (backup kept privately), which takes that receipt out of the check's window; the re-run of the deploy the smoke had reverted (#6056) then went green. Class tracker: #6066. | No. |
@@ -307,7 +308,7 @@ Last updated: 2026-11-16 (+1 row — two other copies of the site outliving the 
 > that looks maintained and is three months stale is worse than one that is obviously old.
 
 <!-- INCIDENT-PATTERNS:DISTRIBUTION:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**Distribution — 261 dated rows, 226 post-June** (newest row 2026-11-15):
+**Distribution — 262 dated rows, 227 post-June** (newest row 2026-11-16):
 
 | month | rows |
 |---|---|
@@ -320,22 +321,22 @@ Last updated: 2026-11-16 (+1 row — two other copies of the site outliving the 
 | 2026-08 | 126 |
 | 2026-09 | 41 |
 | 2026-10 | 15 |
-| 2026-11 | 8 |
+| 2026-11 | 9 |
 
-**By severity:** P1 6 · P2 39 · P3 102 · P4 109 · Low 3 · Info 1 · DR drill 1.
+**By severity:** P1 6 · P2 39 · P3 103 · P4 109 · Low 3 · Info 1 · DR drill 1.
 
 **By root-cause class** (keyword-derived over Summary + Root Cause; a row may match more
 than one, and 32 match none):
 
 | n | class |
 |---|---|
-| 166 | deployment error |
+| 167 | deployment error |
 | 68 | stale config / literal drift |
 | 51 | QA-oracle false positive |
 | 47 | QA false positive — deploy-race (#2978) |
 | 37 | deploy-plane wedge / strand / race |
 | 36 | lane-subset / union-breach main red |
-| 32 | secret / credential |
+| 33 | secret / credential |
 | 29 | IAM / permission |
 | 23 | timezone / wallclock |
 | 19 | QA false positive — semantic oracle (#2959) |
@@ -366,17 +367,17 @@ scored orthogonally (loud/silent × class) rather than as a tenth category.
 but modest*, and materially weaker than this axis was described as when filed:
 
 <!-- INCIDENT-PATTERNS:SILENCE:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**58 of 261 rows are silent.**
+**58 of 262 rows are silent.**
 
 | | silent | loud |
 |---|---|---|
-| rows | 58 | 203 |
+| rows | 58 | 204 |
 | TTD parseable | 45 | 143 |
 | median TTD | **30 min** | 20 min |
 | mean TTD | 6,277 min | 2,633 min |
 | exceeded 1 day | 7 (16% of parsed) | 14 (10% of parsed) |
 
-Silent rows take **~1.5× longer to detect at the median** and are **~1.6× more likely to run past a day**. But the *means* are only 58% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (7 rows past a week, vs 3 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **73 of 261 TTD cells (28%) state no parseable duration** — they are excluded rather than counted as zero.
+Silent rows take **~1.5× longer to detect at the median** and are **~1.6× more likely to run past a day**. But the *means* are only 58% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (7 rows past a week, vs 3 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **74 of 262 TTD cells (28%) state no parseable duration** — they are excluded rather than counted as zero.
 <!-- INCIDENT-PATTERNS:SILENCE:END -->
 
 The durable finding is not the multiplier. It is that **38 failures in this corpus
@@ -387,7 +388,7 @@ by making a silent class loud.
 ### Pre-July frequencies are FLOORS, not counts
 
 <!-- INCIDENT-PATTERNS:FLOORS:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**April has zero rows, May has one and June has two**, against 36 in July, 126 in August, 41 in September, 15 in October and 8 in November. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
+**April has zero rows, May has one and June has two**, against 36 in July, 126 in August, 41 in September, 15 in October and 9 in November. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
 <!-- INCIDENT-PATTERNS:FLOORS:END -->
 
 ### Row-inclusion rule (extends #1332)

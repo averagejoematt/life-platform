@@ -66,6 +66,12 @@ write surface is your own worktree and your own branch.
    `cdk deploy`, no `deploy/*.sh`, no `aws … put/update/delete/invoke`. Deploys happen
    from main, by the driver, after merge — a deploy from a worktree branch shows a
    deceptive 0-diff.
+3c. **A test that runs a `deploy/*.sh` (or anything that shells `aws`) must make AWS
+   unreachable, not merely unconfigured.** Put a stub `aws` first on `PATH` and set
+   `AWS_CONFIG_FILE` and `AWS_SHARED_CREDENTIALS_FILE` to `os.devnull`. Empty
+   `AWS_ACCESS_KEY_ID`/`AWS_PROFILE` values are NOT "no credentials" — the CLI falls
+   back to the default profile in `~/.aws` (2026-11-16: a draft test ran the real root
+   restore from a laptop; docs/INCIDENT_LOG.md). Write the isolation BEFORE the first run.
 3b. **Never run `git stash` (or `stash pop`/`stash apply`) in a lane.** `refs/stash` is
    a repository-level ref — per `git help worktree` §DETAILS, refs are shared across
    all worktrees except `refs/bisect`, `refs/worktree` and `refs/rewritten`, and
