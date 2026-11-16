@@ -61,6 +61,7 @@ from web import (
     derived_summary_freshness as _cd_fresh,  # owner ruling 2026-11-03: a read a correction overtook is not current
     narrative_publication,  # owner ruling 2026-11-03: the narrative publication chokepoint
     public_call_id,  # owner ruling 2026-11-14: opaque public call identity at the wire
+    publication_snapshot,  # #6111: the complete withheld graded record (complete taint + call-id map)
 )
 from web.narrative_publication import servable as _np_servable, withheld_slot as _np_slot  # the dashboard's withheld slots
 from web.site_api_agents import handle_agent_activity
@@ -1326,6 +1327,10 @@ def lambda_handler(event, context):
     # the dispatch AND the wire half, so the approved rows that route reads are served. Every other path: no scope.
     try:
         result = _in_cr2_scope(path, lambda: _dispatch_route(event, path, method))
+    except publication_snapshot.SnapshotUnavailable as e:
+        logger.error(f"[site_api] {path} refused: {e}")
+        _emit_route_log(503)
+        return _error(503, "Temporarily unavailable")
     except Exception as e:
         logger.error(f"[site_api] {path} failed: {e}")
         _emit_route_log(500)
@@ -1343,7 +1348,7 @@ def publication_begin() -> None:
     """Open one request's publication state. #6111: nothing carries over from an earlier request — the narrative gate's
     taint is this request's reads, and the public call ids are read from the table's complete partitions."""
     narrative_publication.begin_request()  # owner ruling 2026-11-03: count this request's withheld narrative rows
-    public_call_id.begin_request(table)
+    publication_snapshot.begin_request(table)  # the complete record: the gate's complete taint and the call-id map
 
 
 def publication_wire(path, result):
@@ -1351,5 +1356,9 @@ def publication_wire(path, result):
     # The provenance gate (web.narrative_publication) is the policy; the #5131 scrub stays as defence in depth.
     # owner ruling 2026-11-14: every call identity on the wire is its opaque public id, never its stored word-slug
     # (web.public_call_id) — before the taint guard, so an id is never mistaken for withheld words again.
-    result = public_call_id.publicize_response(result)
-    return guard_api_response(_in_cr2_scope(path, lambda: narrative_publication.annotate(result)), logger)
+    try:
+        result = public_call_id.publicize_response(result)
+        return guard_api_response(_in_cr2_scope(path, lambda: narrative_publication.annotate(result)), logger)
+    except publication_snapshot.SnapshotUnavailable as e:  # fail closed: no complete record, no response
+        logger.error(f"[site_api] {path} refused at the wire: {e}")
+        return _error(503, "Temporarily unavailable")

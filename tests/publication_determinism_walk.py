@@ -5,7 +5,8 @@ publication steps (``publication_begin`` → dispatch → ``publication_wire``),
     python3 tests/publication_determinism_walk.py --sequence '["/api/coaches", "/api/coach/mind_coach"]' [--mutate NAME]
 
 A sequence step ``"*"`` expands to every GET request of the narrative route walk; ``"!drop-withheld"`` deletes the
-withheld call from the table between two requests (a handler cache that kept its row would serve its words after).
+withheld call from the table between two requests and lets the snapshot's refresh period pass (a handler cache that
+kept its row would then serve its words).
 
 Prints one JSON document: ``{"bodies": [[request, body], ...]}`` in request order. A fresh interpreter is the honest cold
 container; running other requests first in the same interpreter is the warm one. ``tests/test_publication_determinism_6111.py``
@@ -16,10 +17,12 @@ a pending call (reviewed public, public provenance), a learning whose evidence n
 the lead has a daily read whose citation names a field path. The mind coach also holds ONE withheld call (a private
 provenance record) whose sentence is ``WITHHELD``; its metric label is the words of the lead's field path. Two public rows
 echo the withheld sentence: one in the mind coach's own partition (read by every request that reads the withheld call)
-and one in the sleep coach's daily read (a partition the mind coach's requests never read).
+and one in the sleep coach's daily read (a partition no sleep-page request reads the withheld call from — only the
+complete record can blank it).
 
 ``--mutate container_taint`` restores the defect this lane removes (the taint and the call-id map living for the
 container, filled by whatever earlier requests read): the negative control the determinism test must catch.
+``--mutate per_request_only`` withdraws the complete record from the taint (the design #6111's review overruled);
 ``--mutate no_wire`` skips the wire half, to show the words it removes are really on the page; ``--mutate handler_cache``
 keeps one handler's graded rows across requests (the cache the per-request taint relies on never existing).
 """
@@ -47,6 +50,7 @@ WITHHELD = "The fixture subject will log seven quiet evenings of reading before 
 WITHHELD_RUN = "will log seven quiet evenings of reading"
 ECHO_SAME_PARTITION = f"Mind coach recap: the subject {WITHHELD_RUN} — a synthetic echo."
 ECHO_MARK = "Mind coach recap"  # the same-partition echo's own words (not the withheld sentence's)
+ECHO_OTHER_MARK = "Sleep coach aside"  # the other-partition echo's own words
 ECHO_OTHER_PARTITION = f"Sleep coach aside: we expect the subject {WITHHELD_RUN} this cycle."
 DROP = "!drop-withheld"  # a sequence step, not a request
 FIELD_PATH = "whoop.recovery_score"
@@ -142,7 +146,7 @@ def rows() -> list:
 
 def _mutate(name: str) -> None:
     """The defect, restored: taint and call ids that live for the container (the code before #6111)."""
-    from web import narrative_publication as G, public_call_id as P, site_api_coach_ledger as LED
+    from web import narrative_publication as G, public_call_id as P, publication_snapshot as S, site_api_coach_ledger as LED
 
     if name == "no_wire":  # the wire half skipped: shows what the scrub is there to remove (a non-vacuity control)
         G.annotate = lambda response: response
@@ -153,6 +157,9 @@ def _mutate(name: str) -> None:
         real, kept = latest_checked._query_rows, {}
         latest_checked._query_rows = lambda table, coach_id: kept.setdefault(coach_id, real(table, coach_id))
         return
+    if name == "per_request_only":  # the complete record withdrawn from the taint (ids still read): the design #6111 overruled
+        S.complete = lambda: (frozenset(), frozenset())
+        return
     if name != "container_taint":
         raise SystemExit(f"unknown mutation {name}")
     state = G._STATE
@@ -162,8 +169,8 @@ def _mutate(name: str) -> None:
         state.update(withheld=0, served=0, scrubbed=0)
 
     G.begin_request = begin_request
-    P.begin_request = lambda table=None: None
-    assert LED  # the partition reader still registers what it reads, as before
+    S.begin_request = lambda table=None: S._REQ.update(table=None, checked=False, refreshed=set(), sets=None)
+    assert LED and P  # the partition reader still registers what it reads, as before
 
 
 def _wire():
@@ -235,8 +242,11 @@ def main() -> None:
             _mutate(args.mutate)
         bodies = []
         for t in _expand(L, json.loads(args.sequence)):
-            if t == DROP:  # the withheld call is deleted from the table between two requests
+            if t == DROP:  # the withheld call is deleted from the table, and the snapshot's refresh period passes
+                from web import publication_snapshot as S
+
                 nw.NarrativeTable.rows = [r for r in nw.NarrativeTable.rows if r.get("claim_natural") != WITHHELD]
+                S._PARTS.clear()
                 continue
             bodies.append([t, request(L, t)])
     finally:

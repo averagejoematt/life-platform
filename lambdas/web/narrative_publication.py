@@ -26,16 +26,20 @@ TWO HALVES, ONE DECISION. The row's provenance decides; two mechanisms enforce:
      ADR-104 defect of its own). Those rows reach the handler unchanged and are withheld by half 2.
 
   2. AT THE WIRE (``annotate``, the handler's last step). Every free-text value of every withheld
-     graded-record row THIS REQUEST read is TAINTED; any string in the response that is one
+     graded-record row is TAINTED — the rows this request read, and the COMPLETE record of every coach
+     partition and the docket (``web.publication_snapshot``); any string in the response that is one
      (three words or more), or carries a run of ``SHINGLE`` consecutive words from one (digits
      normalised, so a masked or clipped copy still matches), is emptied — except that a single token
      under a structural key (an id, a date, an enum, a field path) is matched only by the run, never by
      whole-value equality. Numbers, keys and list lengths are untouched.
 
-THE INVARIANT (#6111). What a response blanks is a function of the stored rows, the policy and the request
-— never of what earlier requests in the same container read: ``begin_request`` empties the taint, which then
-holds exactly the withheld graded rows this request read (no handler keeps a graded row across requests;
-``tests/test_publication_determinism_6111.py`` pins cold = warm, order-independence and that no cache does).
+THE INVARIANT (#6111). For the same stored rows and policy version every container makes the same decision,
+cold or warm, in any request order: the taint is this request's reads (``begin_request`` empties them) UNION
+the complete withheld graded record — never what earlier requests happened to read. The one window in which
+two containers can differ is the snapshot's refresh period (``publication_snapshot.TTL_S``) after a withheld
+row is WRITTEN, and only for an echo of it in a partition the request does not read; the request that reads
+the row taints it at once. No complete record, no response (fail closed: 503). Pinned by
+``tests/test_publication_determinism_6111.py``.
 
 The provenance record itself is removed from every narrative item, eligible or not — family names
 are not reader copy. The stored row is never touched: the owner's tools (MCP, Telegram) read the
@@ -56,7 +60,10 @@ from typing import Any, Optional
 
 from common import narrative_allowlist as NA, narrative_provenance as NP, prediction_publication as PP
 
-from web import call_publication  # owner ruling 2026-11-05: a non-eligible call's rows never reach a handler
+from web import (
+    call_publication,  # owner ruling 2026-11-05: a non-eligible call's rows never reach a handler
+    publication_snapshot,  # #6111: the complete withheld graded record, beside this request's reads
+)
 
 logger = logging.getLogger("site_api")
 
@@ -393,19 +400,30 @@ def _taint(row: dict) -> None:
 
 
 def is_tainted(text: Any, *, free_text: bool = True) -> bool:
-    """True when ``text`` is, or carries a ``SHINGLE``-word run of, the text of a withheld graded row THIS request read.
+    """True when ``text`` is, or carries a ``SHINGLE``-word run of, the text of a withheld graded row — one THIS request
+    read, or any in the complete record (``web.publication_snapshot``; raises ``SnapshotUnavailable`` when that record
+    has no good read, so nothing is judged against half of it).
 
     ``free_text=False`` — a single token under a structural key (an id, a date, an enum, a field path) — is never
     matched by whole-value equality, only by a ``SHINGLE``-word run: the run is what a slug built from a sentence
     carries, while equality only made ``whoop.recovery_score`` collide with a label "WHOOP recovery score" (#6111)."""
-    if not isinstance(text, str) or not _TAINT_EXACT or NA.is_approved_text(text):
+    if not isinstance(text, str):
+        return False
+    snap_exact, snap_shingles = publication_snapshot.complete()
+    if (not _TAINT_EXACT and not snap_exact) or NA.is_approved_text(text):
         return False
     words = _norm_words(text)
     if len(words) < EXACT_MIN_WORDS:
         return False
-    if free_text and hash(words) in _TAINT_EXACT:
-        return True
-    return any(hash(words[i : i + SHINGLE]) in _TAINT_SHINGLES for i in range(len(words) - SHINGLE + 1))
+    if free_text:
+        h = hash(words)
+        if h in _TAINT_EXACT or h in snap_exact:
+            return True
+    for i in range(len(words) - SHINGLE + 1):
+        g = hash(words[i : i + SHINGLE])
+        if g in _TAINT_SHINGLES or g in snap_shingles:
+            return True
+    return False
 
 
 def _is_counted(sk: Any) -> bool:
@@ -683,7 +701,8 @@ def annotate(response: Any) -> Any:
     out = dict(response)
     body = response.get("body")
     before = _STATE["scrubbed"]
-    if isinstance(body, str) and (_TAINT_EXACT or NA.required_words_served()) and body.lstrip()[:1] in ("{", "["):
+    snap_exact = publication_snapshot.complete()[0]  # raises SnapshotUnavailable: the response is refused, never unchecked
+    if isinstance(body, str) and (_TAINT_EXACT or snap_exact or NA.required_words_served()) and body.lstrip()[:1] in ("{", "["):
         try:
             parsed = json.loads(body)
         except ValueError:

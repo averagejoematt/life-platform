@@ -531,6 +531,30 @@ def _ip_hash_salt_3620(monkeypatch):
     yield
 
 
+# #6111: a Site API request reads the COMPLETE withheld graded record (web.publication_snapshot) from the table it reads.
+# A unit test that drives the handler over a module-patched fake still leaves site_api_lambda.table as the real boto3
+# handle; with the suite's fake credentials that read would leave the machine and fail (then the request is refused, 503).
+# In the unit suite a REAL boto3 table therefore reads as empty — the record the test's own fake table does not hold — and
+# each test starts with no snapshot held. A fake table is read for real (tests/test_publication_determinism_6111.py).
+@pytest.fixture(autouse=True)
+def _publication_snapshot_hermetic(monkeypatch):
+    try:
+        import boto3.resources.base as _b3res
+        from web import publication_snapshot as _snap
+    except Exception:  # a test tree without the lambdas layer on its path
+        yield
+        return
+    _snap.reset()
+    real = _snap._read_partition
+
+    def _read(raw, pk):
+        return [] if isinstance(raw, _b3res.ServiceResource) else real(raw, pk)
+
+    monkeypatch.setattr(_snap, "_read_partition", _read)
+    yield
+    _snap.reset()
+
+
 # Owner ruling 2026-11-11 (item 2): the plan root's private part lives OFF the repo — on a developer's machine at
 # ~/.config/life-platform/user_goals_private.json (common.user_goals). A test must never read the owner's real private
 # part, so the suite points the loader at a path that does not exist; a test that needs a private part writes a

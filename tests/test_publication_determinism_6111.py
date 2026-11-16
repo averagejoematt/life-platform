@@ -8,8 +8,9 @@ through the partition reader could be named, every other id was emptied). So ``/
 came and went, and the lead's cited ``source_field`` ("whoop.recovery_score") was emptied after any request had read a
 withheld call whose metric label was "WHOOP recovery score".
 
-THE INVARIANT. A response's taint is the withheld graded rows THIS request read; the call ids come from the table's
-complete partitions; a single token under a structural key is never matched by whole-value equality. Each sequence runs
+THE INVARIANT. A response's taint is the withheld graded rows THIS request read UNION the complete withheld graded record
+(``web.publication_snapshot``, one read that also feeds the call ids) — never what earlier requests happened to read; a
+single token under a structural key is never matched by whole-value equality; no complete record, no response (503). Each sequence runs
 in a fresh interpreter (``tests/publication_determinism_walk.py``) — a fresh interpreter is the honest cold container.
 All text is synthetic.
 """
@@ -28,8 +29,8 @@ WALK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "publication_det
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
-from publication_determinism_walk import ECHO_MARK, FIELD_LABEL, FIELD_PATH  # noqa: E402
-from web import narrative_publication as G, public_call_id as P  # noqa: E402
+from publication_determinism_walk import ECHO_MARK, ECHO_OTHER_MARK, FIELD_LABEL, FIELD_PATH, WITHHELD  # noqa: E402
+from web import narrative_publication as G, public_call_id as P, publication_snapshot as S  # noqa: E402
 
 TARGETS = (
     "/api/coaches",
@@ -61,7 +62,8 @@ def runs() -> dict:
     jobs["reverse"] = (tuple(reversed(TARGETS)), None)
     jobs.update({f"mutant-cold:{t}": ([t], "container_taint") for t in TARGETS[:4]})
     jobs["mutant-warm"] = (WARMUP + TARGETS[:4], "container_taint")
-    jobs["no-wire"] = (("/api/coach/mind_coach", "/api/ledger_export", "/api/coaches"), "no_wire")
+    jobs["no-wire"] = (("/api/coach/mind_coach", "/api/ledger_export", "/api/coaches", "/api/coach/sleep_coach"), "no_wire")
+    jobs["per-request-only-cold"] = (["/api/coach/sleep_coach"], "per_request_only")
     with ThreadPoolExecutor(6) as ex:
         futs = {k: ex.submit(_run, seq, mut) for k, (seq, mut) in jobs.items()}
         return {k: f.result() for k, f in futs.items()}
@@ -106,13 +108,23 @@ def test_a_withheld_rows_words_are_blanked_in_every_order(runs):
     for t in ("/api/coach/mind_coach", "/api/ledger_export", "/api/coaches"):
         assert WITHHELD_TAIL in bare[t], f"control: {t} carries the withheld words before the wire"
     assert ECHO_MARK in bare["/api/coach/mind_coach"], "control: the same-partition echo is a served field"
+    assert ECHO_OTHER_MARK in bare["/api/coach/sleep_coach"], "control: the other-partition echo is a served field"
     for key in ("forward", "reverse", "warm"):
         served = _last(runs[key])
         for t in ("/api/coach/mind_coach", "/api/ledger_export", "/api/coaches"):
             assert WITHHELD_TAIL not in served[t], (key, t)
         assert ECHO_MARK not in served["/api/coach/mind_coach"], key
+        assert ECHO_OTHER_MARK not in served["/api/coach/sleep_coach"], key
     for t in ("/api/coach/mind_coach", "/api/ledger_export", "/api/coaches"):
         assert WITHHELD_TAIL not in _cold(runs)[t], ("cold", t)
+
+
+def test_an_echo_in_another_partition_is_blanked_on_a_cold_container(runs):
+    """A withheld call's sentence repeated in the sleep coach's daily read — a request for the sleep page never reads the
+    mind coach's withheld call — is emptied on a COLD container by the complete record. Must-fail control: with the
+    taint limited to the request's own reads it is served."""
+    assert ECHO_OTHER_MARK not in _cold(runs)["/api/coach/sleep_coach"]
+    assert ECHO_OTHER_MARK in runs["per-request-only-cold"][0][1], "per-request-only taint serves the echo"
 
 
 def test_must_fail_control_the_container_lived_state_makes_cold_and_warm_differ(runs):
@@ -125,9 +137,9 @@ def test_must_fail_control_the_container_lived_state_makes_cold_and_warm_differ(
 
 
 def test_no_handler_cache_carries_a_withheld_rows_words_past_its_request():
-    """The taint is this request's reads, which is only complete if no handler serves a graded row read by an EARLIER
-    request. Every GET route runs with the withheld call in the table, the call is deleted, and every route runs again:
-    a cache that kept its row would serve its words untainted in the second pass."""
+    """The per-request half covers a row only while the request reads it. Every GET route runs with the withheld call in
+    the table; the call is deleted and the snapshot's refresh period passes; every route runs again — a handler cache
+    that kept the row would serve its words in the second pass, untainted by either half."""
     bodies = _run(["*", "!drop-withheld", "*"])
     half = len(bodies) // 2
     assert half > 100, half
@@ -147,10 +159,12 @@ def fresh():
     G.reset_taint()
     G.begin_request()
     P.reset()
+    S.reset()
     yield
     G.reset_taint()
     G.begin_request()
     P.reset()
+    S.reset()
 
 
 def test_begin_request_forgets_the_previous_requests_taint(fresh):
@@ -200,25 +214,31 @@ def _filed(coach, slug, at):
     return {"pk": f"COACH#{coach}_coach", "sk": f"PREDICTION#{slug}", "prediction_id": slug, "created_at": at, "claim_natural": "x y z"}
 
 
+def _filed_rows():
+    rows = [_filed("sleep", "pred_20261020_synthetic_sleep_call", "2026-10-20T12:00:00.000001+00:00")]
+    rows += [_filed("mind", "pred_20261021_synthetic_mind_call", "2026-10-21T12:00:00.000002+00:00")]
+    return rows
+
+
 def test_the_id_map_is_the_complete_partition_never_what_a_route_happened_to_read(fresh):
     from call_publication_fixtures import registered
 
-    rows = [_filed("sleep", "pred_20261020_synthetic_sleep_call", "2026-10-20T12:00:00.000001+00:00")]
-    rows += [_filed("mind", "pred_20261021_synthetic_mind_call", "2026-10-21T12:00:00.000002+00:00")]
+    rows = _filed_rows()
     late = _filed("mind", "pred_20261101_synthetic_late_call", "2026-11-01T12:00:00.000003+00:00")
     table = _Partitions(rows)
     with registered(rows + [late]):
-        P.begin_request(table)
+        S.begin_request(table)
         assert P.of(None, "pred_20261021_synthetic_mind_call") == P.public_id("2026-10-21T12:00:00.000002+00:00"), "no read needed"
         first = table.queries
-        P.begin_request(table)
+        S.begin_request(table)
         assert P.of("sleep", "pred_20261020_synthetic_sleep_call") and table.queries == first, "a kept map reads nothing"
         table.rows.append(late)  # a call filed after the map was read
         assert P.of("mind", late["prediction_id"]) == P.public_id(late["created_at"]), "one re-read places it"
         before = table.queries
         assert P.of("mind", "pred_20261102_never_filed") is None
         assert P.of("mind", "pred_20261103_never_filed") is None
-        assert table.queries - before <= len(P.all_coaches()), "an unplaceable key re-reads each coach at most once a request"
+        per_partition = len(G.COUNTED_SK_PREFIXES)
+        assert table.queries - before <= per_partition * len(S.partitions()), "each partition re-read at most once a request"
 
 
 def test_a_map_read_from_one_table_never_answers_for_another(fresh):
@@ -227,7 +247,98 @@ def test_a_map_read_from_one_table_never_answers_for_another(fresh):
     a = _filed("sleep", "pred_20261020_synthetic_shared_key", "2026-10-20T12:00:00.000001+00:00")
     b = dict(a, created_at="2026-10-22T12:00:00.000009+00:00")
     with registered([a, b]):
-        P.begin_request(_Partitions([a]))
+        S.begin_request(_Partitions([a]))
         assert P.of("sleep", a["prediction_id"]) == P.public_id(a["created_at"])
-        P.begin_request(_Partitions([b]))
+        S.begin_request(_Partitions([b]))
         assert P.of("sleep", a["prediction_id"]) == P.public_id(b["created_at"])
+
+
+# ── the complete record: refresh window, failure, and the structural rule under it ─────────────────────────────────
+
+_PRIVATE = {"v": 1, "families": ["journal_presence"], "producer": "t", "stamped_at": "2026-11-02T12:00:00+00:00"}
+
+
+def _withheld(coach, slug, claim, **extra):
+    return {
+        "pk": f"COACH#{coach}_coach",
+        "sk": f"PREDICTION#{slug}",
+        "prediction_id": slug,
+        "claim_natural": claim,
+        "created_at": "2026-11-02T12:00:00.000004+00:00",
+        "provenance": _PRIVATE,
+        **extra,
+    }
+
+
+def test_the_complete_record_blanks_an_echo_no_read_of_this_request_touched(fresh):
+    table = _Partitions([_withheld("mind", "pred_a", WITHHELD, metric_label=FIELD_LABEL)])
+    S.begin_request(table)  # this request reads nothing itself
+    out = G.scrub_payload(
+        {
+            "summary": f"Elsewhere: {WITHHELD}",
+            "source_field": FIELD_PATH,
+            "status": "could_not_verify",
+            "thread_id": "2026-11-02#the_fixture_subject_will_log_seven_quiet_evenings",
+        }
+    )
+    assert out["summary"] == "", "an echo in a partition this request never read"
+    assert out["source_field"] == FIELD_PATH and out["status"] == "could_not_verify", "ids and enums stay served"
+    assert out["thread_id"] == "", "a slug carrying a run of the withheld sentence stays blanked"
+
+
+def test_the_refresh_window_and_the_per_request_half(fresh, monkeypatch):
+    table = _Partitions([])
+    S.begin_request(table)
+    assert not G.is_tainted(WITHHELD)
+    new = _withheld("mind", "pred_new", WITHHELD)
+    table.rows.append(new)  # a withheld call WRITTEN after the record was read
+    S.begin_request(table)
+    G.begin_request()
+    assert not G.is_tainted(WITHHELD), "inside the refresh period the record has not seen it (the one documented window)"
+    G.gate_item(dict(new))  # ...but the request that reads the row taints it at once
+    assert G.is_tainted(WITHHELD)
+    G.begin_request()
+    monkeypatch.setattr(S, "TTL_S", 0)  # the refresh period passes
+    S.begin_request(table)
+    assert G.is_tainted(WITHHELD), "after the refresh the complete record carries it"
+
+
+class _Failing(_Partitions):
+    def __init__(self, rows):
+        super().__init__(rows)
+        self.fail = False
+
+    def query(self, **kw):
+        if self.fail:
+            raise RuntimeError("synthetic read failure")
+        return super().query(**kw)
+
+
+def test_no_complete_record_no_response_and_a_stale_one_is_named(fresh, monkeypatch, caplog):
+    table = _Failing([_withheld("mind", "pred_a", WITHHELD)])
+    table.fail = True
+    S.begin_request(table)
+    with pytest.raises(S.SnapshotUnavailable):
+        G.is_tainted("any served sentence of six words or more")
+    with pytest.raises(S.SnapshotUnavailable):
+        G.annotate({"statusCode": 200, "body": json.dumps({"summary": f"Elsewhere: {WITHHELD}"})})
+    table.fail = False
+    S.begin_request(table)
+    assert G.is_tainted(WITHHELD)
+    table.fail = True
+    monkeypatch.setattr(S, "TTL_S", 0)
+    S.begin_request(table)
+    with caplog.at_level("WARNING", logger="site_api"):
+        assert G.is_tainted(WITHHELD), "the last good record keeps blanking"
+    assert S.STATS["stale_served"] >= 1 and "serving the last good read" in caplog.text
+
+
+def test_the_site_api_refuses_a_response_it_cannot_check(fresh, monkeypatch):
+    from web import site_api_lambda as L
+
+    table = _Failing([])
+    table.fail = True
+    monkeypatch.setattr(L, "table", table)
+    L.publication_begin()
+    out = L.publication_wire("/api/x", {"statusCode": 200, "headers": {}, "body": json.dumps({"summary": f"x {WITHHELD}"})})
+    assert out["statusCode"] == 503 and WITHHELD not in json.dumps(out)
