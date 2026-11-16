@@ -273,7 +273,8 @@ def fallback_problems(lib: dict[str, Any], key: str, fb: str) -> list[str]:
         out.append("unloggable")
     elif b.get("not_for_you_now"):
         out.append("not_for_you_now")
-    return [c for c in FALLBACK_CLAUSES if c in out + _suitability_breaks(a, b)]
+    broken = out + _suitability_breaks(a, b)  # once, not per clause: the comprehension's condition re-ran it 12x per pair (#5514)
+    return [c for c in FALLBACK_CLAUSES if c in broken]
 
 
 def fallback_candidates(lib: dict[str, Any], key: str) -> list[tuple[str, str]]:

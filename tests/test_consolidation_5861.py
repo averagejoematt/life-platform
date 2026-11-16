@@ -94,10 +94,25 @@ REPLACED = {
 }
 
 
+def _memo_key_index():
+    """`se.key_index` rebuilt the library<->catalog join on every `live_volume.lib_entry` call (12,000+ per six profiles, ~75 % of
+    a week's generation, #5514). Within ONE `_week` the library and catalog are fixed, so the join is computed once per
+    (library, catalog) pair; the memo holds its keys alive so an id cannot be reused, and dies with the week."""
+    real, memo = se.key_index, {}
+
+    def key_index(lib, catalog):
+        k = (id(lib), id(catalog))
+        if k not in memo:
+            memo[k] = (lib, catalog, real(lib, catalog))
+        return memo[k][2]
+
+    return patch.object(se, "key_index", key_index)
+
+
 def _week(prof: dict, patches: dict | None = None, settings: dict | None = None) -> dict:
     with patch.dict(sw.SETTINGS, settings or {}):
         world = sw.build_world(prof, "approved")
-        ps_ = [patch.object(m, a, v) for (m, a), v in (patches or {}).items()]
+        ps_ = [patch.object(m, a, v) for (m, a), v in (patches or {}).items()] + [_memo_key_index()]
         for p in ps_:
             p.start()
         try:

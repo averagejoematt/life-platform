@@ -211,6 +211,67 @@ def refs_from_tree(nodes, consts: dict, where: str) -> dict:
     return refs
 
 
+class _RawModule:
+    """The roots-INDEPENDENT half of a module's facts, computed once per file (#5514).
+
+    `consumer_refs` prepends each entrypoint's own directory to the roots, so `facts()` re-keys — and used to rebuild —
+    the same file's `ModuleFacts` once per entrypoint dir: ~3,600 constructions of ~300 files, ~2.5 minutes of `ast.walk`.
+    What a file parses to, which nodes import, which functions it defines, which names it loads and which channel
+    references each scope makes do not depend on the roots; only resolving a name to a module does, and that stays in
+    `ModuleFacts`. Keyed by (path, mtime): a rewritten file is re-read, never served stale.
+    """
+
+    def __init__(self, path: str):
+        with open(path, encoding="utf-8") as fh:
+            self.tree = ast.parse(fh.read(), filename=path)
+        self.imports = [n for n in ast.walk(self.tree) if isinstance(n, (ast.Import, ast.ImportFrom))]
+        self.local_funcs = {n.name for n in ast.walk(self.tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+        bodies: dict[str, list] = {MODULE_SCOPE: []}
+        for n in self.tree.body:
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                bodies.setdefault(n.name, []).append(n)
+            elif isinstance(n, ast.ClassDef):
+                for m in n.body:
+                    if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        bodies.setdefault(m.name, []).append(m)
+                    else:
+                        bodies[MODULE_SCOPE].append(m)
+            else:
+                bodies[MODULE_SCOPE].append(n)
+        self.bodies = bodies
+        self.consts = {}
+        module_consts = _collect_consts(bodies[MODULE_SCOPE], {})
+        for scope, nodes in bodies.items():
+            self.consts[scope] = module_consts if scope == MODULE_SCOPE else _collect_consts(nodes, module_consts)
+        # Loads, not only Calls (see ModuleFacts._targets) — the nodes, resolved per roots later
+        self.loads = {
+            scope: [
+                n
+                for node in nodes
+                for n in ast.walk(node)
+                if isinstance(n, (ast.Name, ast.Attribute)) and isinstance(getattr(n, "ctx", None), ast.Load)
+            ]
+            for scope, nodes in bodies.items()
+        }
+        self._refs: dict[tuple[str, str], dict] = {}
+
+    def refs(self, scope: str, where_name: str) -> dict:
+        key = (scope, where_name)
+        if key not in self._refs:
+            self._refs[key] = refs_from_tree(self.bodies[scope], self.consts[scope], f"{where_name}.{scope}")
+        return self._refs[key]
+
+
+_RAW: dict[tuple[str, int], _RawModule] = {}
+
+
+def _raw_module(path: str) -> _RawModule:
+    key = (path, os.stat(path).st_mtime_ns)
+    if key not in _RAW:
+        _RAW[key] = _RawModule(path)
+    return _RAW[key]
+
+
 class ModuleFacts:
     """Import bindings, per-scope call targets and per-scope channel references."""
 
@@ -218,8 +279,8 @@ class ModuleFacts:
         self.path = path
         self.roots = roots
         self.name = _module_name(path, roots)
-        with open(path, encoding="utf-8") as fh:
-            self.tree = ast.parse(fh.read(), filename=path)
+        self.raw = _raw_module(path)
+        self.tree = self.raw.tree
         self.alias_to_module: dict[str, str] = {}
         self.name_to_target: dict[str, tuple[str, str]] = {}
         self.local_funcs: set[str] = set()
@@ -228,7 +289,7 @@ class ModuleFacts:
 
     # ── imports ───────────────────────────────────────────────────────────────
     def _scan_imports(self):
-        for n in ast.walk(self.tree):
+        for n in self.raw.imports:
             if isinstance(n, ast.Import):
                 for a in n.names:
                     self.alias_to_module[a.asname or a.name.split(".")[0]] = a.name
@@ -243,27 +304,11 @@ class ModuleFacts:
 
     def _scan(self):
         self._scan_imports()
-        for n in ast.walk(self.tree):
-            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                self.local_funcs.add(n.name)
-        bodies: dict[str, list] = {MODULE_SCOPE: []}
-        for n in self.tree.body:
-            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                bodies.setdefault(n.name, []).append(n)
-            elif isinstance(n, ast.ClassDef):
-                for m in n.body:
-                    if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                        bodies.setdefault(m.name, []).append(m)
-                    else:
-                        bodies[MODULE_SCOPE].append(m)
-            else:
-                bodies[MODULE_SCOPE].append(n)
-        module_consts = _collect_consts(bodies[MODULE_SCOPE], {})
-        for scope, nodes in bodies.items():
-            consts = module_consts if scope == MODULE_SCOPE else _collect_consts(nodes, module_consts)
+        self.local_funcs = set(self.raw.local_funcs)
+        for scope in self.raw.bodies:
             self.scopes[scope] = {
-                "calls": self._targets(nodes),
-                "refs": refs_from_tree(nodes, consts, f"{self.name}.{scope}"),
+                "calls": self._targets(self.raw.loads[scope]),
+                "refs": self.raw.refs(scope, self.name),
             }
 
     # ── call/reference targets, resolved ONLY through this module's imports ───
@@ -290,17 +335,15 @@ class ModuleFacts:
                 return (self.name, node.id)
         return None
 
-    def _targets(self, nodes) -> set:
-        # Loads, not only Calls: route tables (`{"ask": handle_ask}`) and decorator
-        # registries bind a handler without ever writing `(`. Missing those is how a
+    def _targets(self, load_nodes) -> set:
+        # `load_nodes`: the Name/Attribute Loads of one scope (`_RawModule.loads`). Loads, not only Calls: route tables
+        # (`{"ask": handle_ask}`) and decorator registries bind a handler without ever writing `(`. Missing those is how a
         # site-API endpoint's whole dependency subtree goes unattributed.
         out = set()
-        for node in nodes:
-            for n in ast.walk(node):
-                if isinstance(n, (ast.Name, ast.Attribute)) and isinstance(getattr(n, "ctx", None), ast.Load):
-                    target = self._target(n)
-                    if target:
-                        out.add(target)
+        for n in load_nodes:
+            target = self._target(n)
+            if target:
+                out.add(target)
         return out
 
 
