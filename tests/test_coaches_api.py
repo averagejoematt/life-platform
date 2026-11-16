@@ -1046,6 +1046,33 @@ def test_4220_every_measurable_metric_has_reader_words():
     assert {base_metric(k) for k in METRIC_SOURCES} == set(prediction_reason.METRIC_WORDS)
 
 
+def test_6102_a_call_an_owner_ruling_took_out_of_the_record_never_reads_as_not_enough_data():
+    """A ruled, no-verdict call WAS graded on readings; "not enough data" is false for it. Its reason points at the
+    correction. The data sentence still stands for a call no ruling touched, and a ruled call that keeps a verdict
+    keeps its verdict's sentence."""
+    from web import prediction_reason as pr
+
+    spec = {"type": "directional", "metric": "deep_pct", "condition": "up"}
+    ruled = {
+        **_pred_row("expired", spec, actual_value=None, reason="Could not be checked as filed: a stated condition was never tested."),
+        "corrections": [{"basis": "ruling"}],
+    }
+    assert pr.reason_words(ruled) == (pr.RULED_REASON, False)
+    assert "not enough" not in pr.RULED_REASON and "correction" in pr.RULED_REASON
+    # the control: the same row with no ruling still says what the grader found — not enough data
+    untouched = _pred_row("expired", spec, actual_value=None, reason="Insufficient data to determine trend for 'deep_pct'")
+    assert pr.reason_words(untouched)[0].startswith("not gradable yet — not enough")
+    # a re-grade (not a ruling) that expires a call is not a ruling; only the LATEST entry decides
+    assert pr.reason_words({**untouched, "corrections": [{"basis": "regrade"}]})[0].startswith("not gradable yet")
+    assert pr.reason_words({**untouched, "corrections": [{"basis": "ruling"}, {"basis": "regrade"}]})[0].startswith("not gradable yet")
+    # a ruled call that still carries a verdict keeps the verdict's own sentence
+    kept = {
+        **_pred_row("refuted", _DIR_DOWN, actual_value=0.4, reason="recovery_score trend=up (slope=0.4), predicted=down"),
+        "corrections": [{"basis": "ruling"}],
+    }
+    assert pr.reason_words(kept)[1] is True and "not enough" not in pr.reason_words(kept)[0] and pr.reason_words(kept)[0] != pr.RULED_REASON
+
+
 def test_4220_predictions_serve_reason_and_graded_on_data_beside_the_raw_notes(monkeypatch):
     table, _rows = _write_live_0926_wire(monkeypatch)
     _coaches, _cal, predictions, _wrong = _served_four(monkeypatch, table)
