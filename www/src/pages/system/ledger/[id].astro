@@ -4,6 +4,7 @@ import Connected from "../../../components/Connected.astro";
 import OwnerNote from "../../../components/OwnerNote.astro";
 import Provenance from "../../../components/Provenance.astro";
 import Quote from "../../../components/Quote.astro";
+import ReaderCall from "../../../components/ReaderCall.astro";
 import StatusTag from "../../../components/StatusTag.astro";
 import { correctionRows, ruleText } from "../../../lib/corrections.js";
 import { isDisputed } from "../../../lib/disputed.js";
@@ -116,7 +117,7 @@ const FLAG_TEXT: Record<string, string> = {
               <p style="font-size:14px;line-height:1.55">{p.simple_guess.text || (p.simple_guess.state === "scored" ? (p.simple_guess.right ? "The simple guess was also right." : "The simple guess was wrong.") : "Not yet scored against a guess.")}</p>
             </div>
           )
-        }
+        }<ReaderCall prediction={p} />
         {
           p.corrections.length > 0 && (
             <div style="border:1px solid var(--ink);padding:16px 18px;display:flex;flex-direction:column;gap:10px">

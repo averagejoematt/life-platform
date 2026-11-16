@@ -138,6 +138,46 @@ def _strip_port(raw: str) -> str:
         return candidate or raw
 
 
+# #6088: an IPv6 client is ONE rate/dedup identity per /64, not per address.
+IPV6_IDENTITY_PREFIX = 64
+
+
+def _rate_identity(address: str) -> str:
+    """The rate-limit and dedup identity for one viewer address (#6088).
+
+    An IPv4 address is its own identity, unchanged. An IPv6 address is reduced to its
+    /64 network (``2001:db8:1:2::/64``): a single subscriber line is routinely handed a
+    whole /64 (RFC 6177's guidance, and every residential ISP that follows it), and
+    SLAAC privacy addressing (RFC 8981) rotates the low 64 bits on its own. Keyed on the
+    full address, ONE household could mint 2**64 identities, so a "3 per hour" or "one
+    vote per experiment" limit meant nothing for an IPv6 caller. The /64 is the unit an
+    ISP assigns, so it is the narrowest identity a caller cannot rotate for free.
+
+    Two side effects, both deliberate:
+      * it also settles the IPv6 port ambiguity ``_strip_port`` documents — a port can
+        only ever land in the low 64 bits, so ``2001:db8::1`` and ``2001:db8::1:5000``
+        are one identity whichever reading the stripper chose;
+      * an IPv4-mapped IPv6 address (``::ffff:198.51.100.7``) is the IPv4 address, so
+        one viewer is one identity whichever socket family the edge reported.
+
+    The cost, stated: readers who genuinely share a /64 (one household, one office
+    network) share one bucket — the same trade every IPv4 NAT already makes. A value
+    that does not parse is returned as given (never raise inside identity derivation).
+    """
+    import ipaddress
+
+    try:
+        ip = ipaddress.ip_address(address)
+    except ValueError:
+        return address
+    if ip.version == 6:
+        mapped = ip.ipv4_mapped
+        if mapped is not None:
+            return str(mapped)
+        return str(ipaddress.IPv6Network((ip, IPV6_IDENTITY_PREFIX), strict=False))
+    return address
+
+
 def _source_ip(event: dict) -> str:
     ctx = event.get("requestContext") or {}
     http = ctx.get("http") or {}
@@ -171,12 +211,18 @@ def extract_client_ip(event: dict, default: str = "unknown") -> str:
     The load-bearing guarantee: **no request header a caller controls can influence
     the identity.** See the module docstring for the measured history of the retired
     fallbacks and why absence of the header is a fault, not a deployment gap.
+
+    #6088: the identity of an IPv6 viewer is its /64 network, not its full address
+    (``_rate_identity``) — every limiter and every per-identity dedup row keys on this
+    value through ``salted_ip_hash``, so one /64 is one bucket everywhere at once.
+    ``extract_idempotency_identity`` deliberately keeps the full address: it keys
+    content-idempotency ids, where two readers must stay APART (#2932).
     """
     headers = _headers(event)
 
     viewer = _strip_port(headers.get(_VIEWER_ADDRESS_HEADER) or "")
     if viewer:
-        return viewer
+        return _rate_identity(viewer)  # #6088: an IPv6 viewer is its /64
 
     # ── FAIL CLOSED (#1221 box 2, 2026-08-21) ────────────────────────────────
     # The interim that used to live here returned the last `X-Forwarded-For` hop.
@@ -320,3 +366,24 @@ def salted_ip_hash(source_ip: str, logger: "logging.Logger | None" = None) -> "s
         log.error("[ip_hash] salt resolved EMPTY — refusing the write (fail-closed)")
         return None
     return hashlib.sha256(f"{salt}:{source_ip}".encode()).hexdigest()[:16]
+
+
+def salt_derived_key(purpose: str, logger: "logging.Logger | None" = None) -> "bytes | None":
+    """A 32-byte key for ONE purpose, derived from the ip-hash salt, or None (fail-closed).
+
+    #6088: the reader-call door signs a short-lived timing token. Rather than mint a new
+    secret (an AWS write this lane does not make), the key is ``sha256(purpose | salt)``:
+    domain-separated from ``salted_ip_hash`` by the ``purpose`` label, so a token key and
+    an ip-hash digest can never be the same value, and rotating the salt rotates both.
+    Callers MUST branch on None and refuse — there is no unkeyed fallback.
+    """
+    log = logger or _LOG
+    try:
+        salt = _get_secret(_IP_HASH_SALT_SECRET_NAME, _salt_secrets_client())
+    except Exception as e:
+        log.error(f"[salt_derived_key] salt unavailable ({type(e).__name__}) — refusing (fail-closed)")
+        return None
+    if not salt or not purpose:
+        log.error("[salt_derived_key] salt or purpose EMPTY — refusing (fail-closed)")
+        return None
+    return hashlib.sha256(f"{purpose}|{salt}".encode()).digest()

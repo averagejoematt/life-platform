@@ -308,6 +308,34 @@ HOOK_REGISTRY: tuple = (
         post_endpoints=("*/cohort_submit",),
         artifacts=(Artifact(id="door", label="POST door mounted", kind=HTTP_DOOR, locator="/api/cohort_submit"),),
     ),
+    Hook(
+        id="reader_call",
+        label="Your call beside the coaches (#6088)",
+        why=(
+            "a reader's own call beside a coach's open call; the v9 control is built only in a private build and the "
+            "route answers 404 while its committed switch is off, so tonight it is dark by declaration"
+        ),
+        post_endpoints=("*/reader_call",),
+        artifacts=(
+            Artifact(
+                id="door",
+                label="the bare GET answers available",
+                kind=HTTP_JSON,
+                locator="/api/reader_call",
+                expect={"truthy_path": "available"},
+                absence=Absence(
+                    contract="declared_dark",
+                    reason=(
+                        "built dark (owner ruling 2026-11-16: develop and test privately): "
+                        "reader_call_rules.READER_CALL_LIVE is committed False, so the route answers 404 'not available' "
+                        "and no page carries the control. Delete this Absence in the go-live PR that flips the switch"
+                    ),
+                    declared_on="2026-11-16",
+                    issue="#6088",
+                ),
+            ),
+        ),
+    ),
 )
 
 

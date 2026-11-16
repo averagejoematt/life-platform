@@ -98,6 +98,7 @@ def site_api() -> list[iam.PolicyStatement]:
                         "CHALLENGE_CHECKINS#*",  # reader challenge check-ins (common/challenge_checkins.py)
                         "USER#matthew#SOURCE#evening_ritual",  # #769 (ADR-124): one-tap ritual taps
                         "COHORT#*",  # #1394 (epic #1366): anonymous cohort-strip submissions (COHORT#<metric>#<week>)
+                        "READERCALL#*",  # #6088: a reader's call beside a coach's call — TAP# dedup + TALLY# counters, DARK
                     ],
                 },
             },

@@ -241,6 +241,7 @@ def scan(dist: str, require_noindex: bool, forbidden_ids: set[str] | None = None
     issues.extend(room_leaks(dist))
     issues.extend(lab_leaks(dist))
     issues.extend(story_leaks(dist))
+    issues.extend(readercall_leaks(dist))
     issues.extend(own_words_scope(dist, snapshot_dir))
     return issues
 
@@ -479,6 +480,28 @@ def story_leaks(dist: str, story_js: str = STORY_JS, live: bool | None = None) -
                 and 'data-story-dark="' in open(os.path.join(dirpath, name), encoding="utf-8", errors="replace").read()
             ):
                 out.append(f"{rel}: carries the Human Story marker data-story-dark — a WEB_STORY=1 build is never deployed")
+    return out
+
+
+READERCALL_NEEDLES = ("data-readercall", "/api/reader_call")
+
+
+def readercall_leaks(dist: str) -> list[str]:
+    """#6088 (built dark, owner ruling 2026-11-16: develop and test privately): the reader-call control is NEVER
+    deployed. A dist with the control's marker (`data-readercall`, on the page and in the island's chunk) or its route
+    (`/api/reader_call`) in any page, script or data file is a WEB_READERCALL=1 build; this scan runs on every deploy
+    (`--scan-only`), so such a dist is refused before it can reach S3. There is no go-live constant yet: launching is
+    a reviewed change to this rule as well as to the switch."""
+    out = []
+    for dirpath, _d, files in os.walk(dist):
+        for name in files:
+            if not name.endswith((".html", ".js", ".mjs", ".json", ".xml")):
+                continue
+            rel = os.path.relpath(os.path.join(dirpath, name), dist)
+            text = open(os.path.join(dirpath, name), encoding="utf-8", errors="replace").read()
+            hits = [n for n in READERCALL_NEEDLES if n in text]
+            if hits:
+                out.append(f"{rel}: carries {', '.join(hits)} — a WEB_READERCALL=1 build is private and is never deployed")
     return out
 
 

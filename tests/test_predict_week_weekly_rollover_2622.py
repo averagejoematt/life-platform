@@ -371,10 +371,14 @@ def test_the_cockpit_states_the_absence_instead_of_hiding(live):
 # ── 5. the write leg still keys on the week actually being served ────────────
 
 
-def test_a_prediction_posts_against_the_rolled_week(live):
+def test_a_prediction_posts_against_the_rolled_week(live, monkeypatch):
     """The POST leg validates against `_predict_subject`, so a reader betting on
     the rolled week is accepted and last week's id is rejected (409) — votes can
     never land in a bucket that has already closed."""
+    # #6088: the door is now metered (fail closed) before validation; this test is about the week
+    # check, so the meter admits — and no real DynamoDB is reached from a unit test.
+    monkeypatch.setattr(social, "_rate_check", lambda *a, **k: (True, 9, 0))
+    monkeypatch.setattr(social._engage, "_salted_ip_hash", lambda ip, _g: "0" * 16)
     live.set_clock(_at(2026, 8, 17, 9, 0))
     assert social._predict_subject()["week_id"] == "2026-W34"
     ev = {"body": json.dumps({"week_id": GENESIS_WEEK, "metric": "steps", "choice": "up"}), "headers": {"x-forwarded-for": "203.0.113.7"}}
