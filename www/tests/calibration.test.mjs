@@ -44,16 +44,16 @@ const FIXTURE = clone(SERVED);
 delete FIXTURE.calibration.verification_summary;
 delete FIXTURE.calibration.platform.strata.coaches.verified;
 
-test("headline, no verified split served: as first graded, labelled unverified, interval said to be unpublished", () => {
+test("headline, no verified split served: as graded now, labelled unverified, interval said to be unpublished", () => {
   const h = recordHeadline(FIXTURE);
   assert.equal(h.mode, "as_graded");
   assert.equal(h.k, 88);
   assert.equal(h.n, 214);
-  assert.match(h.h1, /88 of 214 checked calls, as first graded\./);
+  assert.match(h.h1, /88 of 214 checked calls, as graded now\./);
   assert.match(h.dek, /41\.1%/); // carried from record.accuracy_pct, never 88/214 recomputed
   assert.match(h.dek, /interval for the coaches' record is not published yet/);
   assert.match(h.caveat, /not yet publish which of them were re-verified/);
-  assert.match(h.sentence, /^88 of 214 checked calls right as first graded — 41\.1%, no interval published yet — and a guess that every call/);
+  assert.match(h.sentence, /^88 of 214 checked calls right as graded now — 41\.1%, no interval published yet — and a guess that every call/);
   assert.equal(h.archive, null);
 });
 

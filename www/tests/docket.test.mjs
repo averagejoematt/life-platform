@@ -1,6 +1,6 @@
 // The Coaching Room's docket and "wrong this month" view (src/lib/docket.js, CR3): carried values only, withheld words
 // stay withheld (the API's own message or "not published"), no concession or outcome is composed, a disputed call is
-// never wrong, a corrected grade shows its correction, and every grade is "as first graded". Each with a control.
+// never wrong, a corrected grade shows its correction, and every grade is "as graded now". Each with a control.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -164,7 +164,7 @@ test("an incomplete entry gets no page: topic, BOTH sides' words and the criteri
   assert.match(incompleteText([{ status: "open" }, { status: "resolved" }]), /^1 open and 1 settled entries are incomplete/);
 });
 
-test("wrong this month: served statuses only, disputed never wrong, corrections shown, every grade as first graded", () => {
+test("wrong this month: served statuses only, disputed never wrong, corrections shown, every grade as graded now", () => {
   assert.equal(monthOf("2026-10-31"), "2026-10");
   assert.equal(monthWords("2026-10"), "October 2026");
   assert.equal(previousMonth("2026-01"), "2025-12");
@@ -182,7 +182,7 @@ test("wrong this month: served statuses only, disputed never wrong, corrections 
   assert.equal(only.disputed.length, 1);
   assert.equal(refutedLedger(PREDS, "2026-09").wrong.length, 0);
   const row = refutedRow(v.wrong[0], nameOf);
-  assert.match(row.outcome, /^wrong, as first graded$/);
+  assert.match(row.outcome, /^wrong, as graded now$/);
   assert.doesNotMatch(`${row.how || ""} ${row.notes || ""}`, /\d{4}-\d{2}-\d{2}/, "dates in words");
   assert.deepEqual(callWords({ claim_withheld: "unsourced", claim: "Not quoted: held." }), { text: null, message: "Not quoted: held." });
   assert.equal(callWords({ claim: "" }).message, "The words of this call are not published.");

@@ -37,6 +37,12 @@ from unittest.mock import patch
 
 import pytest
 
+ROLLBACK = pytest.mark.usefixtures("exercise_library_rollback")
+"""#5861 (owner approval 2026-11-14): the marked tests pin the PRE-approval generator — the v0.4 session shapes (role order lifts,
+back-offs, set counts, the red-day wholesale drop) are the pre-approval generator's. They run on the library's rollback copy (status
+proposed: tests/conftest.py `exercise_library_rollback`), so they keep guarding the rollback path; the approved (live) behaviour is
+pinned by the #5861 tests."""
+
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "lambdas"))
@@ -474,6 +480,7 @@ def _generate(day: str, **kw):
         return routine_generator.generate_routines(routine_generator.GeneratorInputs(target_date=day, **kw))
 
 
+@ROLLBACK
 def test_generator_builds_the_committed_lower_heavy_as_the_first_v04_session():
     ideal, floor = _generate("2026-09-25")
     assert ideal.archetype == "lower" and ideal.variant == "ideal"
@@ -491,6 +498,7 @@ def test_generator_builds_the_committed_lower_heavy_as_the_first_v04_session():
     ]
 
 
+@ROLLBACK
 def test_generator_builds_each_role_in_order():
     """Before the cut-over (2026-10-19) the v0.4 order, from lower-heavy (history — #4147)."""
     got = [_generate("2026-10-10", block_workouts=_done(n))[0] for n in range(4)]
@@ -502,12 +510,13 @@ def test_generator_builds_each_role_in_order():
     ]
     assert [b.movement_key for b in got[3].exercises][:3] == [  # #5162: no press on upper-heavy
         "barbell_bench_press",
-        "machine_row",
+        "one_arm_db_row",  # #6014 (coaching decision 2026-11-15): the heavy row is pinned to the dumbbell row
         "lat_pulldown",
     ]
     assert "machine_shoulder_press" not in [b.movement_key for b in got[3].exercises]
 
 
+@ROLLBACK
 def test_generator_builds_the_five_day_order_after_the_cut_over_and_the_fifth_role():
     """From the cut-over the charter's order continues from the role after the last v0.4 session: 25 daily sessions
     09-24..10-18 end on lower-heavy (v0.4 index 24), so the next five are shoulders+arms, upper-volume, lower-volume,
@@ -544,6 +553,7 @@ def test_mutation_control_without_the_sequence_the_nominal_grid_answers():
     assert routines[0].inputs_snapshot["calendar"]["session_role"] == UV, "the weekday answers only when the sequence does not"
 
 
+@ROLLBACK
 def test_generator_back_offs_sit_10_percent_under_the_ramped_top_set():
     lb = 0.45359237
     tid = CATALOG["movements"]["squat_barbell"]["hevy_template_id_hint"]
@@ -566,6 +576,7 @@ def test_generator_back_offs_sit_10_percent_under_the_ramped_top_set():
     assert squat.notes.splitlines()[0] == f"RPE {lo:g}–{hi:g}"  # #5058: the charter's band; #5428: the note's line 1
 
 
+@ROLLBACK
 def test_generator_deload_week_holds_loads_and_cuts_sets():
     # #5070 (owner ruling 2026-10-18): no scheduled deload — it applies only on a record of his word. A word starting
     # 11-04 covers 7 days; index 44 (11-07, week 7) is lower-heavy inside it. Without the record the same day is whole.
@@ -580,6 +591,7 @@ def test_generator_deload_week_holds_loads_and_cuts_sets():
     assert sum(len(_ws(b)) for b in ideal.exercises) == 8
 
 
+@ROLLBACK
 def test_red_recovery_drops_accessories_not_anchors():
     ideal = _generate("2026-09-25", recovery_tier="red")[0]
     assert [b.movement_key for b in ideal.exercises] == ["squat_barbell", "deadlift_barbell"]  # #5694: the conventional pull
@@ -759,10 +771,16 @@ def test_4409_the_0929_upper_heavy_keeps_the_in_block_db_row_and_db_press():
 @pytest.mark.usefixtures("pre_5162_upper_heavy")
 def test_4409_mutation_control_without_the_block_record_the_catalog_default_swaps_them_back():
     """What the 09-29 draft did: the resolver without the in-block record picks the first listed
-    key — the machines with years-old anchors. So the assertion above reds without the fix."""
+    key — the machines with years-old anchors. So the assertion above reds without the fix. #6014 pinned the heavy row to
+    the dumbbell row (its only member, so the in-block record no longer decides it there); the row half of this control runs
+    on the volume day's row, which keeps the family's order."""
     ex = {e["pattern"]: e["movement_key"] for e in _rx(UH)["exposures"] if e["kind"] == "anchor"}
-    assert ex["row"] == "machine_row" and ex["overhead_press"] == "machine_shoulder_press"
-    assert "in_block" not in next(e for e in _rx(UH)["exposures"] if e["pattern"] == "row")
+    assert ex["overhead_press"] == "machine_shoulder_press"
+    assert ex["row"] == "one_arm_db_row" and "in_block" not in next(e for e in _rx(UH)["exposures"] if e["pattern"] == "row")
+    row = next(e for e in _rx(UV)["exposures"] if e["pattern"] == "row")
+    assert row["movement_key"] == "machine_row" and "in_block" not in row  # no block record: the catalog default
+    kept = next(e for e in _rx(UV, in_block=_performed())["exposures"] if e["pattern"] == "row")
+    assert kept["movement_key"] == "one_arm_db_row" and kept["in_block"]["kept"] is True
 
 
 def test_4409_the_same_role_slot_wins_over_the_pattern_most_recently_performed():
@@ -787,13 +805,17 @@ def test_4409_a_variant_change_inside_the_block_is_only_the_listed_swap_and_says
     """Block lock: when the in-block variant is unreachable for THIS session (the Minimum Viable
     Session's tier-1 ceiling, no anchor exemption) the slot takes the pattern's next LISTED key and
     the exposure records the change — never a silent swap, never a key outside the pattern."""
-    rx = _rx(UH, in_block=_performed(), skill_ceiling=1, anchor_exempt=False)
+    rx = _rx(UV, in_block=_performed(), skill_ceiling=1, anchor_exempt=False)  # #6014: the volume day's row keeps the family order
     row = next(e for e in rx["exposures"] if e["pattern"] == "row")
     assert row["movement_key"] == "machine_row" and row["movement_key"] in program_structure.ANCHORS["row"]["catalog_keys"]
     assert row["in_block"]["performed"] == "one_arm_db_row" and row["in_block"]["kept"] is False
     assert "skill_tier 2 > ceiling 1" in row["resolution_note"]
     # no in-block performance at all -> the catalog order, unchanged
-    assert _rx(UH, in_block=[]) == _rx(UH)
+    assert _rx(UV, in_block=[]) == _rx(UV) and _rx(UH, in_block=[]) == _rx(UH)
+    # #6014: the heavy row's pin has one member, out of a tier-1 reach — no swap outside the pin; the slot says so (the same
+    # pinned-slot behaviour the volume day's incline-press pin already has)
+    uh = next(e for e in _rx(UH, in_block=_performed(), skill_ceiling=1, anchor_exempt=False)["exposures"] if e["pattern"] == "row")
+    assert uh["movement_key"] is None and "no reachable member: one_arm_db_row" in uh["resolution_note"]
 
 
 @pytest.mark.usefixtures("pre_5162_upper_heavy")

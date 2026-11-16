@@ -93,8 +93,8 @@ def chronicle_queue_lines(items: list, now: _dt.datetime) -> list[str]:
 
     #4531 (incident 2026-10-14): week 6 was drafted by the legacy writer after the desk
     failed, the preview email went out, and nobody approved it — the 48-hour sweep then
-    HELD it daily (an unaudited draft never auto-publishes, #4694) and the subscribers'
-    Wednesday simply did not arrive. Two sessions booted inside that window with no line
+    HELD it daily (an unaudited draft never auto-publishes, #4694; since the owner's 2026-11-13
+    ruling no draft does) and the subscribers' Wednesday simply did not arrive. Two sessions booted inside that window with no line
     telling them a draft was waiting. This is that line. A tombstoned or non-current-phase
     draft is history the sweep skips; it is still printed, flagged, never hidden.
     """
@@ -247,6 +247,24 @@ def _red_alarms() -> list[str]:
         return [f"  red alarms  UNVERIFIED ({type(exc).__name__}: {exc})"]
 
 
+def _workflow_reds() -> list[str]:
+    """#5935: scheduled workflows red long enough to own an auto-filed tracker, with
+    days-red. One read-only `gh issue list`; any failure prints UNVERIFIED, never a blank."""
+    if os.environ.get("CLAUDE_HOOK_INERT") == "1":
+        return ["  wf reds     UNVERIFIED (hook inert — no gh read; this is not a clean board)"]
+    try:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("_boot_brief_wf_reds", ROOT / "scripts" / "boot_brief.py")
+        mod = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        sys.modules[spec.name] = mod
+        spec.loader.exec_module(mod)
+        return mod.workflow_red_lines()
+    except Exception as exc:  # noqa: BLE001
+        return [f"  wf reds     UNVERIFIED ({type(exc).__name__}: {exc})"]
+
+
 def main() -> int:
     read_payload()  # records the payload cwd for git(); an empty/garbage stdin is fine
     print("── session pre-flight " + "─" * 46)
@@ -260,6 +278,8 @@ def main() -> int:
     for line in _boot_brief():
         print(line)
     for line in _red_alarms():
+        print(line)
+    for line in _workflow_reds():
         print(line)
     print("  gates       python3 scripts/wrap_gates.py           (headroom per lane)")
     print("              python3 scripts/skill_lint.py --offline  (skill corpus)")

@@ -259,6 +259,13 @@ def main() -> int:
     # manual 301 keeps every historical /now/ link alive.
     redirects.append(("/now/", "/cockpit/"))
 
+    # 2026-11-16 (#6115, the legacy-locations audit): the pilot's published Prologue permalink served a
+    # raw JSON tombstone at 200. The series' prologue, "Before the Numbers", is published today on the v9
+    # site at /story/week-01/ (the address keeps the journal's post number; it is never renumbered). Every
+    # other /chronicle/, /evidence/ and /now/ address either already 301s to its own re-homed page or has
+    # no successor and 404s honestly (tests/test_legacy_locations_redirects_6115.py).
+    redirects.append(("/chronicle/posts/week-00/", "/story/week-01/"))
+
     print(f"\nv4 migration inventory - {len(pages)} preserved page(s) under {LEGACY_DIR}/\n")
     for d in DEST_ORDER:
         print(f"  {d:8} {len(buckets[d]):4}")

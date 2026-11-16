@@ -78,7 +78,7 @@ python3 mcp_bridge.py
 
 **Prompt caching (COST-OPT-2, ADR-049)** — `ai_calls.py`/`retry_utils.py` auto-wrap system messages as cached blocks, but **a `cache_control` block is NOT evidence of caching**: below the model's minimum cacheable prefix it is silently ignored. Read the floors and per-caller record from `lambdas/ai/prompt_cache.py` and the live proof from the `PromptCacheNoOp` metric. Haiku for structured tasks, Sonnet for narrative; `AI_MODEL` overrides.
 
-**Format gate (ENFORCED)** — CI runs `black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/` (line-length 140, `pyproject.toml`) and fails the build; `ruff` and flake8 (`.flake8`) also run. **Format before committing** (`deploy/agent_commit.sh` uses the pinned black). The gates report independently and the CI pins can drift from `requirements-dev.txt` — `docs/CONVENTIONS.md` §4.
+**Format gate (ENFORCED)** — CI runs `black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/ qa/` (line-length 140, `pyproject.toml`) and fails the build; `ruff` and flake8 (`.flake8`) also run. **Format before committing** (`deploy/agent_commit.sh` uses the pinned black). The gates report independently and the CI pins can drift from `requirements-dev.txt` — `docs/CONVENTIONS.md` §4.
 
 ## CDK Structure
 
@@ -86,7 +86,7 @@ The stacks are `cdk/stacks/*_stack.py`, entry point `cdk/app.py`; each stack cre
 
 ## CI/CD
 
-`.github/workflows/ci-cd.yml`: Lint → Test → Plan → Deploy (manual approval, GitHub Environment `production`) → Smoke → auto-rollback; OIDC auth, no long-lived keys. Site QA (ADR-076) is `deploy/smoke_test_site.sh`, `lambdas/operational/qa_smoke_lambda.py` and the gating Playwright + AI-vision sweep `qa/visual_qa.py --screenshot --ai-qa` (the `/qa` skill); how the visual gate gates and when it rolls back is `docs/CONVENTIONS.md` §4b.
+`.github/workflows/ci-cd.yml`: Lint → Test → Plan → Deploy → Smoke → auto-rollback, OIDC auth. Code ships on green (ADR-158), only `deploy-iam` (IAM) waits on manual approval. Site QA (ADR-076) is `deploy/smoke_test_site.sh`, `lambdas/operational/qa_smoke_lambda.py` and the gating Playwright + AI-vision sweep `qa/visual_qa.py --screenshot --ai-qa` (the `/qa` skill); how the visual gate gates and rolls back is `docs/CONVENTIONS.md` §4b.
 
 ## AI Inference (Bedrock + Budget Guard)
 
@@ -137,4 +137,4 @@ channel are functional and stay. Why earlier history was left intact: ADR-159.
 
 The live session state is `handovers/HANDOVER_LATEST.md`, the only handover on `main` (#1650; prior ones are on the `session-archive` branch, `handovers/README.md`). `/wrap` (`.claude/skills/wrap/SKILL.md`) archives it, overwrites it, and replaces the ONE pointer line below — never a paragraph, never stacked.
 
-**Status:** see handovers/HANDOVER_LATEST.md (Verified 2026-11-02)
+**Status:** see handovers/HANDOVER_LATEST.md (Verified 2026-11-16)

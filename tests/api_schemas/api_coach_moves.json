@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-10-10T02:31:42.242728+00:00",
+  "captured_at": "2026-11-13T18:14:41.730906+00:00",
   "fetch_path": "/api/coach_moves",
   "is_prefix_sample": false,
   "path": "/api/coach_moves",
@@ -22,6 +22,11 @@
         },
         "type": "object"
       },
+      "absent": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
       "absent_text": {
         "type": "string"
       },
@@ -29,33 +34,8 @@
         "type": "string"
       },
       "lines": {
-        "items": {
-          "keys": {
-            "bet_settles": {
-              "type": "null"
-            },
-            "coach": {
-              "type": "string"
-            },
-            "coach_id": {
-              "type": "string"
-            },
-            "move": {
-              "type": "string"
-            },
-            "move_label": {
-              "type": "string"
-            },
-            "replies_to": {
-              "type": "null"
-            },
-            "text": {
-              "type": "string"
-            }
-          },
-          "type": "object"
-        },
-        "length_sample": 2,
+        "items": null,
+        "length_sample": 0,
         "type": "array"
       },
       "source": {

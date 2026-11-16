@@ -39,6 +39,7 @@ Pure derivation (`entries_from_metrics`, `derive_night`) is separate from the on
 """
 
 import logging
+import math
 import re
 from collections import defaultdict
 from datetime import timedelta, timezone
@@ -298,7 +299,7 @@ def _plain(obj):
 
 def _to_ddb(obj):
     if isinstance(obj, float):
-        return Decimal(str(round(obj, 4))) if obj == obj else None
+        return Decimal(str(round(obj, 4))) if math.isfinite(obj) else None  # #5524: Inf too, not only NaN
     if isinstance(obj, dict):
         return {k: _to_ddb(v) for k, v in obj.items() if v is not None}
     return obj

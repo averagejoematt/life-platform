@@ -3,7 +3,7 @@
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-11-12 (v8.6.0 — 107 Lambdas, 26 active secrets, 92 MCP tools, ~146 alarms)
+> Last updated: 2026-11-16 (v8.6.0 — 107 Lambdas, 26 active secrets, 93 MCP tools, ~147 alarms)
 
 ---
 
@@ -79,7 +79,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Function URL (remote) | `<not committed — SEC-02 #780; read live: aws lambda get-function-url-config --function-name life-platform-mcp --region us-west-2>` |
 | Auth (remote) | OAuth 2.1 auto-approve + HMAC Bearer via `life-platform/mcp-api-key` secret (auto-rotates every 90 days) |
 | Auth (local) | `mcp_bridge.py` → `.config.json` → Function URL |
-| Tools | **92** across **41** tool modules (`mcp/tools_*.py`) |
+| Tools | **93** across **42** tool modules (`mcp/tools_*.py`) |
 | Cache warmer | `life-platform-mcp-warmer` pre-computes the `steps` list in `mcp/warmer.py` nightly into the DDB cache (count: read the list) |
 
 ---
@@ -134,7 +134,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Field | Value |
 |-------|-------|
 | Alert topics | `life-platform-alerts` (urgent → email to `awsdev@mattsusername.com`) · `life-platform-alerts-digest` (drained daily via the digest queue, ADR-050) · `life-platform-paging` (SMS, the named P1 set only, ADR-143) · `life-platform-ses-events` |
-| CloudWatch alarms | **~146 metric alarms** (base + invocation-count + DDB item size + canary + duration + freshness + pipeline health) |
+| CloudWatch alarms | **~147 metric alarms** (base + invocation-count + DDB item size + canary + duration + freshness + pipeline health) |
 
 ---
 
@@ -173,7 +173,8 @@ All under prefix `life-platform/`. No values stored in this doc — access via A
 | `withings` | OAuth | Auto-refreshed by Lambda |
 | `garmin` | Session | garth OAuth tokens. Garmin is paused (ADR-074); AWS shows this secret in its deletion window since 2026-10-12, though `tests/test_secret_references.py` `KNOWN_SECRETS` still lists it — see the PR note on that drift |
 | `ai-keys` | JSON bundle | `anthropic_api_key` + `mcp_api_key` (90-day auto-rotation) |
-| `ingestion-keys` | JSON bundle | `notion_api_key` + `todoist_api_key` + `habitify_api_key` + `dropbox_app_key` + `health_auto_export_api_key`. COST-B pattern — single secret, per-service key fields. Now the **sole** source for Notion + Dropbox creds after the dedicated secrets were soft-deleted 2026-05-17. |
+| `ingestion-keys` | JSON bundle | `notion_api_key` + `todoist_api_key` + `habitify_api_key` + `dropbox_app_key` + `health_auto_export_api_key`. COST-B pattern — single secret, per-service key fields. The `health_auto_export_api_key` field is the webhook's cutover FALLBACK only since #5513 (c) (primary: `hae-webhook`); it leaves the bundle in the follow-up. Now the **sole** source for Notion + Dropbox creds after the dedicated secrets were soft-deleted 2026-05-17. |
+| `hae-webhook` | JSON | `health_auto_export_api_key` only — the internet-facing HAE webhook's bearer token, split out of `ingestion-keys` by #5513 (c) so a leaked webhook role reads one token, not five services' keys. **Owner-provisioned** (a copy of the bundle value; the phone app's token does not change). Until it exists the webhook falls back to the bundle field and logs `hae_auth_key_fallback`; the follow-up removes the fallback, the role's bundle grant and the bundle field. +$0.40/month. |
 | `habitify` | API key | Dedicated Habitify API token. Also present in `ingestion-keys` — see ADR-014 for governing principle. |
 | `todoist` | API key | Todoist API token used by MCP write tools (TD-23). |
 | `mcp-api-key` | Rotation target | MCP server bearer token consumed by `ai-keys`. 90-day auto-rotation via `life-platform-key-rotator`. |

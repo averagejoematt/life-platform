@@ -61,6 +61,7 @@ _SUBJECT = {"week_id": "2026-W26", "metrics": {"weight": "scale weight", "recove
 
 def test_predict_week_fails_closed_without_subject(monkeypatch):
     monkeypatch.setattr(social, "_predict_subject", lambda: None)
+    monkeypatch.setattr(social, "table", _FakeTable())  # #6088: the door is metered first — never the real table
     r = social._handle_predict_week(_event({"week_id": "x", "metric": "weight", "choice": "down"}))
     assert r["statusCode"] == 404
 

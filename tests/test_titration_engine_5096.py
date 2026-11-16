@@ -55,6 +55,10 @@ CFG = {
     "walking_first_action": "walking first; then food",
     "target_kcal": 2100,
     "band_kcal": [2000, 2100],
+    # the titrated band's rule values (#5794, owner ruling 2026-11-13): the live charter's floors and lifting uplift
+    "floor_any_day_kcal": 1600,
+    "floor_lifting_day_kcal": 1900,
+    "band_uplift_kcal": 150,
     "minimum_kcal": 1700,
     # the pre-ruling 'up' arm keeps the step mechanics covered; the charter's live value is 'warn' (owner ruling
     # 2026-10-23 R1) — test_above_the_ceiling_the_charter_warns_and_never_pushes_food_up pins it
@@ -128,7 +132,8 @@ def test_insufficient_data_holds_and_never_guesses(kw, detail):
 def test_a_hold_carries_the_previous_target_forward_and_stamps_the_charter():
     d = decide(history=[{"week": PREV, "action": "down", "kcal": 1950, "position": "below"}])
     assert (d["action"], d["reason_code"], d["kcal"], d["new_target_kcal"], d["base_kcal"]) == ("hold", "in_band", 1950, 1950, 1950)
-    assert (d["band_low"], d["band_high"]) == (1850, 1950)  # the prescribed band moved by the titration's offset
+    # #5794 (owner ruling 2026-11-13): a titrated band is [max(base, any-day floor), max(base + uplift, lifting floor)]
+    assert (d["band_low"], d["band_high"]) == (1950, 2100)
     assert d["charter_version"] == "9.9.9" and d["engine_version"] == ti.ENGINE_VERSION
     assert d["inputs"]["base_source"] == f"titration record WEEK#{PREV}"
 

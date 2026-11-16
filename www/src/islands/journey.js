@@ -11,6 +11,13 @@ export function mount(root = document.querySelector("[data-journey]")) {
   const caption = root.querySelector("[data-journey-caption]");
   const state = { frame: "distance", range: null, show: { mean: true, projection: true, rungs: true, chapters: false, events: true } };
   const mobile = () => window.innerWidth < 640;
+  // A phone opens on the readings (2026-11-14, sprint II): the whole distance runs the axis out to the goal date, so on a
+  // 350 px column every weigh-in sat in the top-left corner. The whole distance is one tap away, and the build-time
+  // figure (no script) is unchanged.
+  if (mobile()) {
+    state.frame = "readings";
+    root.querySelectorAll("[data-frame]").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.frame === "readings")));
+  }
   const draw = () => {
     // the viewBox follows the container on a phone, so text keeps its pixel size (#1210)
     const width = mobile() ? Math.max(280, Math.round(chart.clientWidth || 350)) : undefined;

@@ -129,6 +129,9 @@
      rule in site/assets/css and fails if one is missing from it. */
   --ink-faint-on-wash: #B2A78F;   /* 5.5:1 on wash at the thinnest ramp step */
   --ink-muted-on-wash: #BDB29A;   /* stays a step CLEARER than faint, as on bare paper */
+  /* #5526 — the third ink on a wash: --ember TEXT (kickers, pills, strips) on an --ember-wash ground. The accent
+     #DD7A37 falls to 4.3:1 on the wash over --surface-raised; this lift holds 5.1:1 on every ramp step. */
+  --ember-on-wash: #E68A48;
   --alert:       #CB634C;   /* restrained oxblood — 5.1:1 on --page / 4.8:1 on --surface (WCAG AA
                                — #579 bump from #B14A33, which measured 3.6:1 on --page, failing
                                AA for the .vr-alert .vr-v ring-center label). RESERVED state alert
@@ -409,6 +412,7 @@
        darker, not lighter. */
     --ink-faint-on-wash: #625A4A;   /* 5.0:1 on wash at the thinnest ramp step */
     --ink-muted-on-wash: #5C5546;   /* stays a step CLEARER than faint */
+    --ember-on-wash: #91440E;   /* #5526 — ember text on the ember wash: >= 5.1:1 on every ramp step (#A34E13 is 4.45:1) */
     --ember:     #A34E13;   /* AA-compliant on paper — 5.0:1 on #F4EFE4 (small ember text: nav, footer headers, labels) */
     --alert:     #9E4732;   /* light-mode oxblood — 5.4:1 on #F4EFE4 / 5.8:1 on #FBF8F1 (WCAG AA — dark-root
                               #CB634C measured only 3.37:1 on --page, failing AA for the .vr-alert .vr-v
@@ -451,6 +455,7 @@
   --ink-faint: #6F6757;   /* 4.9:1 on --page (WCAG AA) */
   --ink-faint-on-wash: #625A4A;   /* #3726 — must stay identical to the OS-preference block */
   --ink-muted-on-wash: #5C5546;
+  --ember-on-wash: #91440E;   /* #5526 — must stay identical to the OS-preference block */
   --ember:     #A34E13;
   --alert:     #9E4732;   /* light-mode oxblood — 5.4:1 on #F4EFE4 / 5.8:1 on #FBF8F1 (WCAG AA — see #1222) */
   --rule:        rgba(34, 30, 23, 0.13);
@@ -2210,4 +2215,5 @@ a.vg-lit:hover,
 .hspine-gap {
   --ink-faint: var(--ink-faint-on-wash);
   --ink-muted: var(--ink-muted-on-wash);
+  --ember: var(--ember-on-wash); /* #5526: ember text on the wash (.read-priority .dx-kicker, .df-btn, .hb-fr.fr-auto) */
 }

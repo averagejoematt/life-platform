@@ -100,7 +100,18 @@ os.environ.setdefault("UNSUB_TOKEN_SECRET", "test-unsub-signing-key")
 #
 # Tests that intentionally exercise live AWS are marked `@pytest.mark.integration`
 # (see pytest.ini) and are exempted below.
-_AWS_CRED_KEYS = ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_SECURITY_TOKEN", "AWS_PROFILE")
+_AWS_CRED_KEYS = (
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_SESSION_TOKEN",
+    "AWS_SECURITY_TOKEN",
+    "AWS_PROFILE",
+    # #6116: the credential FILES and the metadata service are credential sources too — stashed and restored with the
+    # keys, so an `integration` test on a laptop (whose real credentials live in ~/.aws) still reaches them.
+    "AWS_CONFIG_FILE",
+    "AWS_SHARED_CREDENTIALS_FILE",
+    "AWS_EC2_METADATA_DISABLED",
+)
 # #3917: the snapshot must happen ONCE, in the controller, BEFORE the fakes go on — and it must
 # survive into xdist workers. A worker is a fresh process forked by the controller AFTER this
 # module already faked the controller's environment, so a plain `os.environ.get(key)` snapshot
@@ -124,6 +135,13 @@ _FAKE_AWS_ENV = {
     "AWS_SECURITY_TOKEN": "testing",
     "AWS_DEFAULT_REGION": "us-west-2",
     "AWS_REGION": "us-west-2",
+    # #6116 (incident 2026-11-16): a test that builds its subprocess env with EMPTY key variables does not get "no
+    # credentials" — the CLI and boto3 treat an empty value as unset and fall back to ~/.aws (there, an admin profile).
+    # Pointing the files at devnull and switching the metadata service off closes those fallbacks for the session and
+    # every child that inherits its env.
+    "AWS_CONFIG_FILE": os.devnull,
+    "AWS_SHARED_CREDENTIALS_FILE": os.devnull,
+    "AWS_EC2_METADATA_DISABLED": "true",
 }
 
 # Force the fakes on at *import* time (i.e. collection), not just per-test setup.
@@ -139,6 +157,18 @@ _FAKE_AWS_ENV = {
 # module-level client hermetic too.
 os.environ.pop("AWS_PROFILE", None)
 os.environ.update(_FAKE_AWS_ENV)
+
+# #6116 — THE TEST-SESSION MARKER AND THE SHIMS. A child that rebuilds its env without the AWS_* keys sheds the
+# fakes above; it does not shed these. LP_TEST_SESSION is the explicit marker the deploy guard reads
+# (deploy/lib/prod_write_guard.sh + its Python twin; PYTEST_CURRENT_TEST and a pytest ancestor process are the other
+# two signals), and the guard's shims go first on PATH so an `aws` / `npx cdk deploy` run BY NAME from any test or
+# script is refused unless the test declares its stub (LP_TEST_AWS_IS_STUB=<path of the stub executable>). The ONE
+# opt-in for live AWS is `@pytest.mark.integration` (below), which restores the real credentials and nothing else:
+# the shims still refuse a CLI call, and no live test uses the CLI.
+_PROD_WRITE_GUARD_SHIMS = os.path.join(_REPO, "deploy", "lib", "prod_write_guard_bin")
+os.environ["LP_TEST_SESSION"] = "1"
+if os.environ.get("PATH", "").split(os.pathsep)[0] != _PROD_WRITE_GUARD_SHIMS:
+    os.environ["PATH"] = _PROD_WRITE_GUARD_SHIMS + os.pathsep + os.environ.get("PATH", "")
 
 # ── #2370: neutral blocked-category vocabulary for the whole unit suite ────────
 # The real vocabulary lives ONLY in the ER-06 non-committed channel (env
@@ -159,6 +189,9 @@ REAL_CONTENT_FILTER_ENV = os.environ.get("CONTENT_FILTER_JSON")
 NEUTRAL_CONTENT_FILTER = {
     "blocked_vices": ["No fizzlewick", "No grumbleflax"],
     "blocked_vice_keywords": ["fizzlewick", "grumbleflax", "zzq"],
+    # #5947: the owner-only clinical vocabulary is channel-only too — synthetic terms here, one of
+    # them multi-word (the screen matches a phrase across whitespace or a hyphen).
+    "blocked_clinical_keywords": ["snorbleitis", "quibbled wumpus"],
 }
 os.environ["CONTENT_FILTER_JSON"] = _json.dumps(NEUTRAL_CONTENT_FILTER)
 
@@ -373,6 +406,73 @@ def pytest_collection_modifyitems(config, items):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# THE CHECKOUT IS ONE SHARED FIXTURE — `serial` MUST MEAN ALONE  (#6024)
+# ══════════════════════════════════════════════════════════════════════════════
+# `serial` (pytest.ini, #3025) marks a test that MUTATES THE REAL CHECKOUT (plants a file
+# under lambdas/, rewrites docs/PROPORTIONALITY.md, ...). The marker was only ever a
+# convention for the invocation — `-m "not serial"` for the parallel pass, `-m serial`
+# afterwards. A bare `pytest tests/ -n 8` runs those writers concurrently with every
+# whole-tree scan, and `scripts/check_doc_facts.py` (test_doc_facts_ops_1957/2003
+# `test_gate_passes_on_the_repo`, via tests/repo_scan_cache.py) reads docs/ + lambdas/ for
+# 7-15 s: any writer that lands inside that window flips it red; it passes alone because
+# nothing else is writing. Reproduced 2026-11-15: the two gate tests + the registered writers under
+# `-n 8` failed in 1 of 3 runs for the gate tests (and the writers failed each other).
+#
+# The fix is at the cause: under xdist, every test takes a SHARED lock on a per-checkout lock
+# file for its whole setup/call/teardown and a `serial` test takes it EXCLUSIVELY, so a
+# serial test genuinely runs alone whatever the command line. A turnstile lock stops a
+# stream of shared holders starving the exclusive waiter. Outside xdist (the second pass,
+# a single-file run) the hook is a no-op: one process cannot race itself.
+try:
+    import fcntl as _fcntl
+except ImportError:  # pragma: no cover - non-POSIX
+    _fcntl = None
+
+
+_TREE_LOCK_HELD_ENV = "LIFE_PLATFORM_TREE_LOCK_HELD"
+
+
+def _tree_lock_paths():
+    import hashlib
+    import tempfile
+
+    tag = hashlib.sha256(os.path.dirname(os.path.abspath(__file__)).encode()).hexdigest()[:16]
+    base = os.path.join(tempfile.gettempdir(), f"life-platform-tree-lock-{tag}")
+    return base + ".turnstile", base + ".tree"
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_protocol(item, nextitem):
+    # A test that shells out to `pytest` inherits PYTEST_XDIST_WORKER; if the child took the lock too it would
+    # wait on its own parent (parent holds shared, child's serial test wants exclusive) — a deadlock found
+    # in the first verification loop. The parent's hold already covers the child, so a nested run skips.
+    if _fcntl is None or not os.environ.get("PYTEST_XDIST_WORKER") or os.environ.get(_TREE_LOCK_HELD_ENV):
+        yield
+        return
+    exclusive = item.get_closest_marker("serial") is not None
+    turnstile_path, tree_path = _tree_lock_paths()
+    turnstile = os.open(turnstile_path, os.O_CREAT | os.O_RDWR)
+    tree = os.open(tree_path, os.O_CREAT | os.O_RDWR)
+    try:
+        _fcntl.flock(turnstile, _fcntl.LOCK_EX)  # one entrant at a time; new entrants queue behind a waiting serial test
+        try:
+            _fcntl.flock(tree, _fcntl.LOCK_EX if exclusive else _fcntl.LOCK_SH)
+        finally:
+            if not exclusive:
+                _fcntl.flock(turnstile, _fcntl.LOCK_UN)
+        os.environ[_TREE_LOCK_HELD_ENV] = "1"
+        yield
+    finally:
+        os.environ.pop(_TREE_LOCK_HELD_ENV, None)
+        try:
+            _fcntl.flock(tree, _fcntl.LOCK_UN)
+            _fcntl.flock(turnstile, _fcntl.LOCK_UN)
+        finally:
+            os.close(tree)
+            os.close(turnstile)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # PER-TEST DURATION WARNER  (#3025, folding #2692)
 # ══════════════════════════════════════════════════════════════════════════════
 # The total wall-clock budget (tests/test_duration_budget_ratchet.py) cannot
@@ -461,6 +561,30 @@ def _ip_hash_salt_3620(monkeypatch):
     yield
 
 
+# #6111: a Site API request reads the COMPLETE withheld graded record (web.publication_snapshot) from the table it reads.
+# A unit test that drives the handler over a module-patched fake still leaves site_api_lambda.table as the real boto3
+# handle; with the suite's fake credentials that read would leave the machine and fail (then the request is refused, 503).
+# In the unit suite a REAL boto3 table therefore reads as empty — the record the test's own fake table does not hold — and
+# each test starts with no snapshot held. A fake table is read for real (tests/test_publication_determinism_6111.py).
+@pytest.fixture(autouse=True)
+def _publication_snapshot_hermetic(monkeypatch):
+    try:
+        import boto3.resources.base as _b3res
+        from web import publication_snapshot as _snap
+    except Exception:  # a test tree without the lambdas layer on its path
+        yield
+        return
+    _snap.reset()
+    real = _snap._read_partition
+
+    def _read(raw, pk):
+        return [] if isinstance(raw, _b3res.ServiceResource) else real(raw, pk)
+
+    monkeypatch.setattr(_snap, "_read_partition", _read)
+    yield
+    _snap.reset()
+
+
 # Owner ruling 2026-11-11 (item 2): the plan root's private part lives OFF the repo — on a developer's machine at
 # ~/.config/life-platform/user_goals_private.json (common.user_goals). A test must never read the owner's real private
 # part, so the suite points the loader at a path that does not exist; a test that needs a private part writes a
@@ -469,3 +593,34 @@ def _ip_hash_salt_3620(monkeypatch):
 def _goals_private_part_is_synthetic(monkeypatch, tmp_path_factory):
     monkeypatch.setenv("LIFE_PLATFORM_GOALS_PRIVATE_PATH", str(tmp_path_factory.getbasetemp() / "no-goals-private-part.json"))
     yield
+
+
+# #5861 (owner approval 2026-11-14): config/exercise_library.json is APPROVED, so the generator serves the live engine. A test
+# that pins the PRE-approval generator (dated golden IRs, v0.3/v0.4 template behaviour, the shadow rotation wording) runs on the
+# library's ROLLBACK copy — status proposed, approved_on removed, nothing else changed — so it keeps guarding the rollback path
+# (setting the status back to proposed serves exactly that generator). Opt in with
+# `@pytest.mark.usefixtures("exercise_library_rollback")`. Every library read goes through `exercise_library.load_library`
+# (the selection engine's cached `load_library_failsoft` reads it first; the cache is cleared on both sides) or
+# `week_floors.library`.
+def _exercise_library_rollback_copy() -> dict:
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "exercise_library.json")
+    with open(path, encoding="utf-8") as f:
+        lib = _json.load(f)
+    lib["status"] = "proposed"
+    lib.pop("approved_on", None)
+    return lib
+
+
+@pytest.fixture
+def exercise_library_rollback(monkeypatch):
+    import copy
+
+    from training import exercise_library as _xl, selection_engine as _se, week_floors as _wf
+
+    lib = _exercise_library_rollback_copy()
+    assert _se.mode(lib) == _se.MODE_SHADOW
+    monkeypatch.setattr(_xl, "load_library", lambda path=None: copy.deepcopy(lib))
+    monkeypatch.setattr(_wf, "library", lambda path=None: copy.deepcopy(lib))
+    _se._LIB_CACHE.clear()
+    yield lib
+    _se._LIB_CACHE.clear()

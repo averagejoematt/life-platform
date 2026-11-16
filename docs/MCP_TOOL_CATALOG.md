@@ -1,8 +1,8 @@
 # Life Platform — MCP Tool Catalog
 
-> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-11-13
+> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-11-15
 
-**Version:** v8.6.0 | **Last updated:** 2026-11-13 | **Total tools:** 92
+**Version:** v8.6.0 | **Last updated:** 2026-11-15 | **Total tools:** 93
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;
@@ -21,7 +21,7 @@
 
 ---
 
-## All 92 Tools — by module
+## All 93 Tools — by module
 
 | Module | Tools |
 |---|---|
@@ -59,6 +59,7 @@
 | `mcp/tools_coach_checkin.py` | 3 |
 | `mcp/tools_capture.py` | 1 |
 | `mcp/tools_coach_corrections.py` | 1 |
+| `mcp/tools_challenges.py` | 1 |
 | `mcp/tools_owner_words.py` | 1 |
 | `mcp/tools_pending_writes.py` | 1 |
 | `mcp/tools_surfaces.py` | 2 |
@@ -141,7 +142,7 @@
 
 | Tool | Key Params | Description |
 |------|-----------|-------------|
-| `get_coach_session_packet` | target_date= | CALL FIRST in any training-coaching conversation (#4082). ONE read of the coaching input packet a chat otherwise spends 10+ calls re-verifying: working sets per muscle over the 7 and 28 completed days, the last session of each type (and each v0.4 session role — the order-based sequence) with every set and every note, MacroFactor kcal + protein over 7 days with the protein-floor count, weekly walking hours (THE one definition), daily steps over the 7 completed days (one named winning source per day, the losers kept, a no-source day null — never 0), the loss rate, the active-day and loaded-lifting streaks, readiness + the readiness-floor streak, the v0.4 sequence position (the next undone session, #4110), `today` (#4311) — every activity on the day BEFORE target_date (what a night-before debrief reviews) from Hevy AND Strava on every device (WHOOP, Garmin, Apple), de-duplicated in time, each with device, type, PT start, moving time, distance, avg/max HR and zones, plus walking hours so far and a flag on any walk over the HR ceiling; it is labelled PARTIAL while the day is in progress — and the owner's MORNING NOTE — his own four words before he opened any number (#4189; quote them verbatim or not at all), and `lift_history` (#5501) — for each lift the program serves on target_date, its newest performed sessions (top set, working sets, note) and latest note + pain flag: this IS the pre-flight get_exercise_history + get_exercise_notes read for those lifts, and `note_requests` (#5573) — what Matthew ASKED for in a Hevy note (form guidance, a question, a rule): open ones to answer once in the chat, overdue count, recent replies, and `training_phase` (#5576) — the computed phase, the next one and the closest unmet gate with its value. Every field states `measured`, `absent` (read, nothing there) or `read_failed` (with the error class) — a failed read is never an empty week — and names the canonical function it came from; nothing here is a second computation of any number. Quote it rather than re-pulling a measured field. Every date carries a Pacific `weekday` ("Fri") — quote it, never compute a weekday yourself (#5274). It is the planner's INPUTS, not its verdict: plan_next_session still builds the constraint block. |
+| `get_coach_session_packet` | target_date= | CALL FIRST in any training-coaching conversation (#4082). ONE read of the coaching input packet a chat otherwise spends 10+ calls re-verifying: working sets per muscle over the 7 and 28 completed days, the last session of each type (and each v0.4 session role — the order-based sequence) with every set and every note, MacroFactor kcal + protein over 7 days with the protein-floor count, weekly walking hours (THE one definition), daily steps over the 7 completed days (one named winning source per day, the losers kept, a no-source day null — never 0), the loss rate, the active-day and loaded-lifting streaks, readiness + the readiness-floor streak, the v0.4 sequence position (the next undone session, #4110), `today` (#4311) — every activity on the day BEFORE target_date (what a night-before debrief reviews) from Hevy AND Strava on every device (WHOOP, Garmin, Apple), de-duplicated in time, each with device, type, PT start, moving time, distance, avg/max HR and zones, plus walking hours so far and each walk's average heart rate as a measurement with its basis (never graded: the walking line is the talk test plus RPE); it is labelled PARTIAL while the day is in progress — and the owner's MORNING NOTE — his own four words before he opened any number (#4189; quote them verbatim or not at all), and `lift_history` (#5501) — for each lift the program serves on target_date, its newest performed sessions (top set, working sets, note) and latest note + pain flag: this IS the pre-flight get_exercise_history + get_exercise_notes read for those lifts, and `note_requests` (#5573) — what Matthew ASKED for in a Hevy note (form guidance, a question, a rule): open ones to answer once in the chat, overdue count, recent replies, and `training_phase` (#5576) — the computed phase, the next one and the closest unmet gate with its value. Every field states `measured`, `absent` (read, nothing there) or `read_failed` (with the error class) — a failed read is never an empty week — and names the canonical function it came from; nothing here is a second computation of any number. Quote it rather than re-pulling a measured field. Every date carries a Pacific `weekday` ("Fri") — quote it, never compute a weekday yourself (#5274). It is the planner's INPUTS, not its verdict: plan_next_session still builds the constraint block. |
 
 ### Strength Training (`mcp/tools_strength.py`)
 
@@ -161,7 +162,7 @@
 
 | Tool | Key Params | Description |
 |------|-----------|-------------|
-| `get_zone2_breakdown` | start_date=, end_date=, weekly_target_minutes=, min_duration_minutes= | Zone 2 training tracker and weekly breakdown. Classifies Strava activities into 5 HR zones based on average heartrate as a percentage of max HR (from profile). Aggregates weekly Zone 2 minutes and compares to the 150 min/week target (Attia, Huberman, WHO moderate-intensity guidelines). Shows full 5-zone training distribution, sport type breakdown for Zone 2, weekly trend analysis, and training polarization alerts (Zone 3 'no man's land' warning per Seiler). Zone 2 (60-70% max HR) is the highest-evidence longevity training modality — builds mitochondrial density, fat oxidation capacity, and cardiovascular base. Use for: 'how much Zone 2 am I doing?', 'am I hitting my Zone 2 target?', 'show my training zone distribution', 'weekly Zone 2 minutes', 'zone 2 trend', 'am I doing enough easy cardio?', 'training polarization check'. Requires Strava data with HR. |
+| `get_zone2_breakdown` | start_date=, end_date=, weekly_target_minutes=, min_duration_minutes= | Zone 2 training tracker and weekly breakdown. Counts the minutes actually spent in each recording device's OWN Zone 2 band (Whoop workout zones, Strava activity zones; each session counted once across sources). Basis: the vendors' own zone formulas as stored — not a percent of the profile max HR, and not thresholds measured or re-derived for him; a measurement of past sessions, never a heart-rate target. Hevy bike/elliptical/treadmill blocks are reported as cardio minutes, never Zone 2. Aggregates weekly Zone 2 minutes and compares to the 150 min/week target (Attia, Huberman, WHO moderate-intensity guidelines). Shows full 5-zone training distribution, sport type breakdown for Zone 2, weekly trend analysis, and training polarization alerts (Zone 3 'no man's land' warning per Seiler). Zone 2 is the highest-evidence longevity training modality — builds mitochondrial density, fat oxidation capacity, and cardiovascular base. Use for: 'how much Zone 2 am I doing?', 'am I hitting my Zone 2 target?', 'show my training zone distribution', 'weekly Zone 2 minutes', 'zone 2 trend', 'am I doing enough easy cardio?', 'training polarization check'. Requires Whoop or Strava sessions with HR zones. |
 
 ### Insights, Experiments & Field Notes (`mcp/tools_lifestyle.py`)
 
@@ -318,6 +319,12 @@
 | Tool | Key Params | Description |
 |------|-----------|-------------|
 | `log_coach_correction` | item_number=, signal=, coach=, surface=, correction, error_class= | #1690 (epic #1687) + #4083: log a correction to the corrections ledger, via EXACTLY ONE of two paths. Path 1 — item_number: correct a weekly AI-review-pack item by its NUMBER. Matthew reads the ranked review-pack email (each generation carries a stable #N) and corrects an item that's wrong or misleading — this resolves #N back to the exact archived generation the pack numbered and writes ONE row to the corrections ledger, tagged by error-class. An unknown or out-of-range number is REPORTED (with how many items the week's pack has), never silently dropped. Twin of the email-reply channel — a reply of '#N <correction>' lines lands the same rows. Path 2 — signal: use this DURING A LIVE CHAT SESSION (daily-debrief, speak-to-coaches, open-checkin) when Matthew overrides a coach's flag/verdict and there is no pack number to resolve — name the SIGNAL that was wrong (the metric/flag id, e.g. 'readiness_low_streak_days' or 'toe_flag'), optionally coach (bare id, e.g. 'physical') and surface (defaults 'chat_coaching'). Always required: correction (what's wrong + what it should say, VERBATIM), error_class (OPTIONAL override — one of stale-baseline, ungrounded-behavioral, cross-coach-inconsistency, framing, checkable-metric, hedged-safe, defense-held, other; an unrecognized value is stored as 'other', never rejected). Every logged correction, from either path, feeds `get_intelligence_quality`'s signal false-positive ranking — always name the signal so that ranking can attribute it. |
+
+### mcp.tools_challenges (`mcp/tools_challenges.py`)
+
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `log_challenge_checkin` | challenge_id, completed, date= | #6087: log Matthew's OWN daily check-in on one of his ACTIVE challenges (did he do today's rep). Call it only when he says he did or missed a challenge day. challenge_id = the challenge's id (the part after 'CHALLENGE#', as /api/challenges serves it); completed = true (done) or false (missed); date = YYYY-MM-DD, default today (Pacific), never a future day. One entry per day: logging the same day again REPLACES that day. Readers' check-ins are stored elsewhere and never count here. |
 
 ### mcp.tools_owner_words (`mcp/tools_owner_words.py`)
 

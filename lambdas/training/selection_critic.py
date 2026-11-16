@@ -1,6 +1,8 @@
 """selection_critic.py — the deterministic stage-2 `selection` critic, as a pure function (#5775 S6; first cut #5773).
 
-WHAT IT ASKS, PER SLOT. Was a HIGHER-TIER movement available for this accessory slot? "Available" means not excluded by
+WHAT IT ASKS, PER SLOT. Was a HIGHER-TIER movement available for this accessory slot, outside the slot's programmable pool
+(owner ruling 2026-11-12: a slot's top two non-empty bands are both programmable, so a pick inside them stands as
+`pool_fit`)? "Available" means not excluded by
 one of the exclusions the critic honours (`HONORED_EXCLUSIONS` — a locked gate, a pain flag, equipment, the library's
 not-for-you-now, the catalog unable to write it, the week's family floor), not held off by an owner pin or approval
 (`owner_pin`), and not already served elsewhere this program week (`week_repeat`, owner ruling 2026-11-11: no repeats per
@@ -12,7 +14,7 @@ The FACTS (each library movement's tier for the slot's muscle, and which exclusi
 (`selection_engine.candidates`, the engine's exclusion predicates over library + inventory + overlay); the DECISION is this
 module's — the critic re-ranks every movement of the slot's job, eligible or excluded, and decides for itself which
 exclusions stand. So the critic is a red team over the draft, not a replay of the engine's pick: a departure, a stale
-rotation, or an engine bug that served a C where an A was open is caught here.
+rotation, or an engine bug that served a C where an S was open is caught here. Tiers are the library's QUALITY tiers (S-D, #5857).
 
 Every served exercise (a slot or not) whose library entry is UNAVAILABLE at home_gym, PAIN-EXCLUDED or not-for-you-now gets
 `change` too — to the slot's best available movement (any tier), else the selection record's ranked fallback.
@@ -126,7 +128,7 @@ def judge_slot(
     entry = xl.movements(ctx["lib"]).get(lid or "")
     served = next((c for c in pool if c.get("catalog_key") == key), None)
     title = (served or {}).get("title") or (entry or {}).get("title") or key
-    tier = se.tier_for(entry, ctx["spec"]["muscle"]) if entry else "C"
+    tier = se.tier_for(entry, ctx["spec"]["muscle"]) if entry else se.UNRATED_TIER
     base = {"served_tier": tier, "muscle": ctx["spec"]["muscle"]}
     own, own_why = (served or {}).get("code"), (served or {}).get("why")
     if served is None and entry:  # served outside the slot's job (a departure): the engine's predicates still judge it
@@ -142,6 +144,12 @@ def judge_slot(
     above = sorted((c for c in pool if se.TIER_RANK[c["tier"]] < se.TIER_RANK[tier]), key=lambda c: se.rank_key(c, set()))
     open_ = [c for c in above if _blocker(c, taken) is None]
     best = _best(open_, prefer)
+    # owner ruling 2026-11-12 (board rec 2): the slot's top two non-empty bands are both programmable — a pick inside that
+    # pool stands even with a higher-tier member open (it ranked first on N=1 fit or slot variety)
+    servable = [c for c in pool if c is served or _blocker(c, taken) is None]
+    if best and served is not None and tier in se.pool_tiers(servable):
+        why = f"{title} (tier {tier}) is inside the slot's top-two-band pool {list(se.pool_tiers(servable))}; {best['title']} (tier {best['tier']}) is its peer"
+        return base | {"verdict": "pass", "stands": "pool_fit", "blocked": best["movement_id"], "why": why}
     if best:
         why = f"{best['title']} (tier {best['tier']}) was available for {slot.get('slot_id')} — {title} is tier {tier} with no exclusion"
         return base | _flip(best, why)
@@ -152,9 +160,22 @@ def judge_slot(
     return base | {"verdict": "pass", "stands": "best_available", "why": f"no movement for this slot's job ranks above tier {tier}"}
 
 
-def _record_slot(key: str, entry: dict[str, Any], slot: dict[str, Any], rec: dict[str, Any] | None, library: dict) -> dict | None:
+def _record_slot(
+    key: str,
+    entry: dict[str, Any],
+    slot: dict[str, Any],
+    rec: dict[str, Any] | None,
+    library: dict,
+    policy: dict | None = None,
+    mid: str | None = None,
+) -> dict | None:
     """No catalog: judge against the selection record the draft carries (its pick is the best the engine could serve)."""
-    gates = se.locked_gates(entry, library)
+    if policy is not None:  # #5861 L3, live only: the stored gate evaluation (fail-closed)
+        from training import selection_live
+
+        gates = selection_live.gate_locked(entry, library, str(mid or key), policy.get("gate_eval"))
+    else:
+        gates = se.locked_gates(entry, library)
     if gates:
         return {
             "verdict": "change",
@@ -165,7 +186,8 @@ def _record_slot(key: str, entry: dict[str, Any], slot: dict[str, Any], rec: dic
     if not pick:
         return {"verdict": "not_evaluated", "why": "no selection record for this slot"}
     served = se.tier_for(entry, (rec or {}).get("muscle") or ((entry.get("target") or {}).get("primary")))
-    if se.TIER_RANK[served] > se.TIER_RANK[pick["tier"]]:
+    pool = ((rec or {}).get("top_band") or {}).get("tiers") or [pick["tier"]]
+    if served not in pool and se.TIER_RANK[served] > se.TIER_RANK[pick["tier"]]:
         return {"verdict": "change", "why": f"tier {served} served where tier {pick['tier']} is selectable", "to": pick.get("catalog_key")}
     if se.is_novel(entry, None) and not (pick.get("catalog_key") == key and pick.get("novel_terms")):
         return {"verdict": "change", "why": "new to him with no recorded novel-again caps and cue sheet", "to": pick.get("catalog_key")}
@@ -249,6 +271,8 @@ def _one(i: int, key: str, ir: Any, env: dict | None, taken: Counter, records: d
         spec_slot = next((s for s in vr.slots() if s["slot_id"] == slot["slot_id"]), None)
         if spec_slot:
             ctx = se._ctx(spec_slot, env, step)  # the engine's own per-slot context (muscle, job, floor)
+            if args.get("policy") is not None:  # #5861 L3, live only: the engine's live facts (evaluated gates, objective tier)
+                ctx |= {"policy": args["policy"], "slot_id": slot["slot_id"]}
             pin = _pinned(slot, rec, key, args["owner_pins"])
             prefer = ((rec or {}).get("pick") or {}).get("catalog_key")
             return head | {"movement_id": lid, "slot_id": slot["slot_id"]} | judge_slot(key, slot, ctx, taken, pin=pin, prefer=prefer)
@@ -261,7 +285,7 @@ def _one(i: int, key: str, ir: Any, env: dict | None, taken: Counter, records: d
         swap = next((f.get("catalog_key") for f in (rec or {}).get("fallbacks") or [] if f.get("catalog_key") != key), None)
         return head | {"verdict": "change", "why": why, "to": swap}
     if slot and not _pinned(slot, rec, key, args["owner_pins"]):
-        return head | (_record_slot(key, entry, slot, rec, library) or {"verdict": "pass"})
+        return head | (_record_slot(key, entry, slot, rec, library, args.get("policy"), lid) or {"verdict": "pass"})
     return head | {"verdict": "pass"}
 
 
@@ -276,8 +300,13 @@ def evaluate(
     owner_pins: dict[str, dict[str, Any]] | None = None,
     missing: list[str] | None = None,
     skill_ceiling: int = 2,
+    gate_eval: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The `selection` critic over one draft (`RoutineSpec` or its dict). Pure.
+
+    #5861 L3: with an APPROVED library the critic judges by the engine's LIVE facts (`selection_live`: the evaluated gates —
+    `gate_eval` is the stored #5772 row, None = every gate locked — and the slot objective's tier); while proposed it is
+    the #5775 critic exactly.
 
     `catalog` (the movement catalog) arms the per-slot red team (`judge_slot`); without it each slot is judged against the
     selection record the draft carries. `week_commitments` is stage 1's #5774 result, when the caller holds it.
@@ -290,7 +319,13 @@ def evaluate(
     kmap = env["idx"]["to_lib"] if env else {c["catalog_key"]: c["movement_id"] for s in records.values() for c in _named(s)}
     rot = snap.get("rotation") if isinstance(snap.get("rotation"), dict) else {}
     taken = week_taken(ir, rot, catalog)
-    args = {"library": library, "overlay": overlay, "inventory": inventory, "owner_pins": owner_pins}
+    args = {
+        "library": library,
+        "overlay": overlay,
+        "inventory": inventory,
+        "owner_pins": owner_pins,
+        "policy": _live_policy(library, rot, ir, gate_eval),
+    }
     verdicts = []
     for i, key in enumerate(_keys(ir)):
         verdicts.append(_one(i, key, ir, env, taken, records, kmap, args))
@@ -311,6 +346,19 @@ def evaluate(
         "week_source": week_source,
     }
     return out | {"stage2": as_critic_verdict(out)}  # the stage-2 verdict the registry appends (#5784)
+
+
+def _live_policy(library: dict[str, Any], rot: dict[str, Any], ir: Any, gate_eval: dict[str, Any] | None) -> dict[str, Any] | None:
+    """#5861 L3: the engine's live policy for the critic — None unless the library is approved (no Hevy record: trends
+    unknown; the critic judges availability and tier, never a hold)."""
+    if se.mode(library) != se.MODE_LIVE:
+        return None
+    from training import selection_live
+
+    ge = {"state": "read", "row": gate_eval} if isinstance(gate_eval, dict) else None
+    return selection_live.build_policy(
+        library, position=rot.get("position"), rows=None, block_workouts=None, as_of=getattr(ir, "target_date", None), gate_eval=ge
+    )
 
 
 def _named(s: dict[str, Any]) -> list[dict[str, Any]]:

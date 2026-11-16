@@ -265,3 +265,51 @@ def blocked_vices(require: bool = False) -> List[str]:
     if data is None:
         return []
     return [v for v in data.get("blocked_vices", []) if isinstance(v, str) and v.strip()]
+
+
+# The owner-only clinical record's vocabulary (#5947). docs/DATA_GOVERNANCE.md puts that record on
+# no public surface — "no projection, no aggregate, no count" — and, like the category names above,
+# the words that name it are themselves the guarded data, so they live ONLY in this channel.
+CLINICAL_KEY = "blocked_clinical_keywords"
+
+
+def clinical_keywords(require: bool = False) -> List[str]:
+    """The clinical-record vocabulary (lowercased), or [] when the channel carries none.
+
+    The key is OPTIONAL in the config object (a channel armed before #5947 has no such list), so
+    "absent" has two causes: no channel source at all, or a source without the key. ``require=True``
+    refuses both — a clinical screen with an empty vocabulary guards nothing — and raises
+    ``ContentFilterUnavailable``. The message never echoes vocabulary.
+    """
+    data = load(require=require)
+    terms = [] if data is None else data.get(CLINICAL_KEY)
+    out = [t.strip().lower() for t in terms if isinstance(t, str) and t.strip()] if isinstance(terms, list) else []
+    if require and not out:
+        raise ContentFilterUnavailable(
+            f"content-filter channel carries no '{CLINICAL_KEY}' list — the clinical screen is not armed; failing closed. "
+            "See config/content_filter.example.json for the shape."
+        )
+    return out
+
+
+# Private identifiers (#6090): strings — a private habit's name, the id its rows are stored under — that must never
+# appear in a TRACKED file of this public repository. Like the vocabulary above they are themselves the guarded data,
+# so they live ONLY in this channel; tests/test_core_alias_6090.py sweeps `git ls-files` against them.
+PRIVATE_IDENTIFIERS_KEY = "private_identifiers"
+
+
+def private_identifiers(require: bool = False) -> List[str]:
+    """The private-identifier list (lowercased), or [] when the channel carries none.
+
+    OPTIONAL in the config object, like ``blocked_clinical_keywords``: absent means no channel source or a source
+    without the key, and ``require=True`` refuses both. The message never echoes an identifier.
+    """
+    data = load(require=require)
+    terms = [] if data is None else data.get(PRIVATE_IDENTIFIERS_KEY)
+    out = [t.strip().lower() for t in terms if isinstance(t, str) and t.strip()] if isinstance(terms, list) else []
+    if require and not out:
+        raise ContentFilterUnavailable(
+            f"content-filter channel carries no '{PRIVATE_IDENTIFIERS_KEY}' list — the repository sweep is not armed; "
+            "failing closed. See config/content_filter.example.json for the shape."
+        )
+    return out

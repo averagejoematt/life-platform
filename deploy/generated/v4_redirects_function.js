@@ -22,6 +22,7 @@ var R = {
 "/character/": "/cockpit/",
 "/chronicle/": "/story/chronicle/",
 "/chronicle/archive/": "/story/chronicle/",
+"/chronicle/posts/week-00/": "/story/week-01/",
 "/chronicle/sample/": "/story/chronicle/",
 "/community/": "/",
 "/cost/": "/method/cost/",

@@ -2,7 +2,7 @@
 name: wrap
 description: "Close out the current session: run the gate battery, archive the outgoing handover, replace the CLAUDE.md status block, update memory, sweep the backlog and commit. Use at the end of a working session, or when asked to wrap up."
 user-invocable: true
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task, Agent, TodoWrite
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, TodoWrite
 ---
 
 Close out the current session: archive the outgoing handover, replace the CLAUDE.md
@@ -32,6 +32,11 @@ could only judge docs Phase 2 was about to rewrite. **(e7) and closure detectors
 nightly instead** (`.github/workflows/wrap-nightly.yml`, #4262 — `--list` prints them as
 `nightly`): each failing check files or comments on ONE `auto-filed` tracker; read any open one in (e9).
 
+**Which model does which leg (owner, 2026-11-15).** The lookups behind (e9), (e10) and (e11) — open-issue
+searches, the citation entries, the refill plan — and the (e3) incident rows are self-contained: brief a cheaper
+model for them (Sonnet for read-only lookups, `issue-filer` for filing, Opus for the incident write-up) and run them
+beside Phase 2. The handover (a) and the memory files (c) ARE the session's context; write those yourself.
+
 ## Phase 2 — Write everything once (steps (a)–(e))
 
 Write the handover ONCE in step (a), with the corrected draft plus the judgment lines from
@@ -51,6 +56,12 @@ on the (e4) residual section; the scripts behind the lines still block on their 
 3. **Overwrite** `handovers/HANDOVER_LATEST.md` in place, in the archived files' shape:
    driving instruction, what shipped (PRs, merged/deployed), what was verified, gotchas, the
    residual/next-picks queue (required — `scripts/check_handover_lines.py`) and the marker lines.
+4. **Another session still live in this repo** (`ListAgents` shows it busy): message it before
+   writing, then carry its outgoing handover body VERBATIM as its own section
+   (`## <session> — carried verbatim from its <date> wrap (<sha>)`, headings demoted), note only the
+   lines this session superseded, and merge both residual queues into one list. The handover is
+   shared state; a second wrap that overwrites drops the other session's owner decisions
+   (precedents ece40817a, and the 2026-11-16 paydown wrap).
 
 ### (b) Replace — never stack — the CLAUDE.md session-status block
 
@@ -234,7 +245,9 @@ Every issue closed this session gets an outcome verdict from the session that me
 cross-references `docs/alarm_citations.json`: an alarm in ALARM >72h needs an entry, one
 >14 days needs a filed issue `#N` (#2378), and a fired-and-cleared flap inside the window
 is answered the same way (#2912). Add the entry (file the issue first), or write the
-shortfall into the handover and re-run with `--decoded`. AWS unreachable → `UNVERIFIED`,
+shortfall into the handover and re-run with `--decoded`. **One leg `--decoded` cannot release** (#5934): an
+alarm lit >14 days whose citation has no OPEN `#N` (no entry, prose only, or every cited issue closed)
+exits 1 regardless and blocks the wrap — fix it or re-point it at an open issue. AWS unreachable → `UNVERIFIED`,
 exit 0 — say so. The handover carries one line either way: `**Alarms:** <N> red >72h, all cited`,
 `**Alarms:** <M> uncited — named: <alarm names>`, or `**Alarms:** unverified — AWS unreachable`.
 

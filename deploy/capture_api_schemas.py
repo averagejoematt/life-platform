@@ -370,8 +370,13 @@ def diff_shape(old, new, path="$") -> list:
     if t == "object":
         old_keys = old.get("keys", {}) or {}
         new_keys = new.get("keys", {}) or {}
+        # `_merge_object_shapes` lists the keys it saw absent from some element as `optional`; one absent again is that
+        # same variance (a trend row that is not `discounted`), not a removal — the #3354 rule, read back on compare.
+        optional = set(old.get("optional") or [])
         for k in sorted(old_keys):
-            if k not in new_keys:
+            if k not in new_keys and k in optional:
+                diffs.append(f"{path}.{k}: optional key absent (informational)")
+            elif k not in new_keys:
                 diffs.append(f"{path}.{k}: key removed")
             else:
                 diffs.extend(diff_shape(old_keys[k], new_keys[k], f"{path}.{k}"))

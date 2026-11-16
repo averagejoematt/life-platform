@@ -16,9 +16,12 @@ WHAT IT IS
 WHO MAY READ IT (owner ruling (c), 2026-10-17: heart-rhythm data is owner-only)
   Every field this module writes is declared `TIER_OWNER_ONLY` in
   `privacy.field_tiers.FIELD_TIERS["clinical"]`, and the `RHYTHM#` prefix is deliberately
-  NOT one of the families `clinical_facts.render_clinical_block` renders — the coach fact
-  pack is #4977's scope, not this one. No `/api/*` route and no public reader may name the
-  prefix or a field (`tests/test_rhythm_channel_privacy_4972.py`, sweep + route walk).
+  NOT one of the families `clinical_facts.render_clinical_block` renders (that block also
+  feeds published prompts). The ONE read-back is `read_events` below, which hands neutral
+  events (no medication name or dose, no device, no reading) to `health.rhythm_owner`, the
+  owner-only renderer. No `/api/*` route and no public reader may name the prefix or a field
+  (`tests/test_rhythm_channel_privacy_4972.py`, sweep + route walk;
+  `tests/test_rhythm_owner_4972.py` holds the renderer's importer set).
 
 ABSENCE (docs/NEW_SIGNAL_PLAYBOOK.md, day 1)
   No event = no row. Nothing here writes to the `apple_health` day row, so a day row never
@@ -362,3 +365,74 @@ def webhook_ingest(table, data: Any, *, user_id: str = "matthew") -> dict:
     except Exception as e:  # noqa: BLE001 — one data type never sinks the webhook
         logger.error("rhythm_channel_error: %s", type(e).__name__)
         return {"error": type(e).__name__}
+
+
+# ── The owner-only read (#4972 part 2, folded from #4977) ─────────────────────
+# The one place a stored channel row is read back. It returns NEUTRAL event dicts so the
+# owner-only renderer (`health.rhythm_owner`) never handles a row: the medication name and
+# dose text, the device names and the notification readings never leave this function.
+_READ_MAX_PAGES = 10
+
+
+def _day_of(row: dict, at: str) -> Optional[str]:
+    day = str(row.get("event_date") or at)[:10]
+    try:
+        datetime.strptime(day, "%Y-%m-%d")
+    except ValueError:
+        return None
+    return day
+
+
+def event_of(row: dict) -> Optional[dict]:
+    """One stored channel row as `{family, day, at, ...}`, or None for a row it cannot read.
+
+    family `ecg`          + `result` (the device's classification, verbatim; None when absent)
+    family `notification` + `kind` (high/low/irregular/hypertension/unknown) and `kind_inferred`
+    family `medication`   + `status` (the logged status, lower-case; None when absent) — never the name or dose
+    """
+    sk = str(row.get("sk") or "")
+    for family, prefix in (("ecg", ECG_PREFIX), ("notification", NOTIF_PREFIX), ("medication", MEDLOG_PREFIX)):
+        if not sk.startswith(prefix):
+            continue
+        at = sk[len(prefix) :][:19]
+        day = _day_of(row, at)
+        if day is None:
+            return None
+        event: dict = {"family": family, "day": day, "at": at}
+        if family == "ecg":
+            event["result"] = str(row.get("rhythm_ecg_classification") or "").strip() or None
+        elif family == "notification":
+            kind = str(row.get("rhythm_notification_kind") or "").strip().lower()
+            event["kind"] = kind if kind in NOTIFICATION_KINDS else "unknown"
+            event["kind_inferred"] = bool(row.get("rhythm_notification_kind_inferred"))
+        else:
+            event["status"] = str(row.get("rhythm_med_status") or "").strip().lower() or None
+        return event
+    return None
+
+
+def read_events(table, *, user_id: str = "matthew") -> Optional[list]:
+    """Every channel row in the clinical partition as neutral events, or None when the read failed.
+
+    Raises nothing: a failed read is None (the caller renders nothing, never "zero events"), and
+    the log names the exception class only — never a value."""
+    pk = f"USER#{user_id}#SOURCE#clinical"
+    kwargs: dict = {"KeyConditionExpression": "pk = :pk AND begins_with(sk, :p)", "ExpressionAttributeValues": {":pk": pk, ":p": PREFIX}}
+    events: list = []
+    try:
+        for _page in range(_READ_MAX_PAGES):
+            resp = table.query(**kwargs)
+            if not isinstance(resp, dict):
+                return None
+            for item in resp.get("Items") or []:
+                event = event_of(item) if isinstance(item, dict) else None
+                if event is not None:
+                    events.append(event)
+            if not resp.get("LastEvaluatedKey"):
+                return events
+            kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+    except Exception as e:  # noqa: BLE001 — the owner surfaces run without the channel
+        logger.warning("rhythm_channel_read_error: %s", type(e).__name__)
+        return None
+    logger.warning("rhythm_channel_read: still paginating after %d pages — using what was read", _READ_MAX_PAGES)
+    return events

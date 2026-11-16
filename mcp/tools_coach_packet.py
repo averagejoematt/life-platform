@@ -53,7 +53,8 @@ import the counting / estimating primitives themselves):
   today                    `coach_packet_today.today_view` (#4311): every activity on target_date - 1
                            (Pacific) from Hevy AND Strava, each once — `walking_volume.dedup_strava`
                            (the #4068 time rule), walking hours by `shared_quantities.walking_layer_for_day`,
-                           the HR ceiling from `owner_redlines`. Labelled PARTIAL while the day is in
+                           each walk's average heart rate as a measurement with its basis (#5916: never
+                           graded; the walking line is the talk test plus RPE). Labelled PARTIAL while the day is in
                            progress. The one window that is NOT completed days: it is the day a
                            night-before debrief reviews.
   guidance_freshness       `health.guidance_freshness.read_freshness` (#5059) — the owner guidance record's
@@ -128,7 +129,8 @@ SOURCES: dict[str, str] = {
     "today": (
         "mcp.coach_packet_today.today_view (#4311): Hevy via tools_strength._read_hevy_all_phases + Strava via core.query_source_range, "
         "de-dup = training.walking_volume.dedup_strava (#4068), walking = mcp.shared_quantities.walking_layer_for_day, "
-        "HR ceiling = owner_redlines.REDLINES['walking_floor_hr_wk']['hr_ceiling_bpm']"
+        "walking intensity = training.recent_aerobic.EASY_EFFORT_CUE (the talk test plus the redline's easy-effort RPE, #5916); a walk's "
+        "average heart rate is a measurement with its basis (walk_hr_measured), never graded against a ceiling"
     ),
     "fitness_tests": "mcp.tools_fitness_tests.read_view -> training.fitness_tests (#5078): the BATTERY# record + Hevy over "
     "plan_hevy_windows._block_workouts, each test's trend in its better direction and the cadence state (upcoming/due/overdue/missed, counted in program weeks) with its prompt",
@@ -165,7 +167,7 @@ COACH_PACKET_DESCRIPTION = (
     "rate, the active-day and loaded-lifting streaks, readiness + the readiness-floor streak, the v0.4 "
     "sequence position (the next undone session, #4110), `today` (#4311) — every activity on the day BEFORE target_date (what a "
     "night-before debrief reviews) from Hevy AND Strava on every device (WHOOP, Garmin, Apple), de-duplicated in time, each with device, "
-    "type, PT start, moving time, distance, avg/max HR and zones, plus walking hours so far and a flag on any walk over the HR ceiling; "
+    "type, PT start, moving time, distance, avg/max HR and zones, plus walking hours so far and each walk's average heart rate as a measurement with its basis (never graded: the walking line is the talk test plus RPE); "
     "it is labelled PARTIAL while the day is in progress — and the owner's MORNING NOTE — his own four words "
     "before he opened any number (#4189; quote them verbatim or not at all), and `lift_history` (#5501) — for each lift the program "
     "serves on target_date, its newest performed sessions (top set, working sets, note) and latest note + pain flag: this IS the "

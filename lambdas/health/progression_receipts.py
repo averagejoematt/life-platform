@@ -209,16 +209,31 @@ def _replay_pillar(pillar: str, transition: dict, config: dict, day_number, engi
     }
 
 
-def _replay_headline(transitions: dict, replayed_pillars: dict, config: dict) -> dict:
+def _compute_order(names, engine=None) -> list:
+    """The pillars in the order compute_character_sheet sums them (`engine.HEADLINE_PILLAR_ORDER`), then any name that
+    order does not know, as stored. A receipt read back from DynamoDB carries its pillars as a map, whose keys come
+    back ALPHABETICAL — not the order they were summed in when the receipt was written."""
+    order = [n for n in getattr(engine, "HEADLINE_PILLAR_ORDER", ()) if n in names]
+    return order + [n for n in names if n not in order]
+
+
+def _replay_headline(transitions: dict, replayed_pillars: dict, config: dict, engine=None) -> dict:
     """Recompute the headline character level from the REPLAYED pillar levels +
     the CURRENT config weights — mirrors compute_character_sheet Step 6 (#960
-    renormalization included)."""
+    renormalization included), in the SAME summation order.
+
+    The order is load-bearing (2026-11-15): the level is the floor of a float weighted mean, and on 2026-11-14 that mean
+    was exactly 20. Summed in the compute's order it is 19.999999999999996 (stored: level 19); summed in the order the
+    receipt's map came back from DynamoDB it is 20.000000000000004 (replayed: level 20, plus a level-up that never
+    happened). The receipt verified at write time, from memory, and failed every read after — the deploy-health alarm,
+    for a difference in the last binary digit. Replay reproduces the compute; it does not improve on it."""
     import math
 
     pillar_cfgs = (config or {}).get("pillars", {})
     weighted = 0.0
     total_w = 0.0
-    for name, outs in replayed_pillars.items():
+    for name in _compute_order(list(replayed_pillars), engine):
+        outs = replayed_pillars[name]
         ins = (transitions.get("pillars", {}).get(name) or {}).get("inputs") or {}
         if bool(ins.get("not_instrumented")) and outs["level"] <= 1:
             continue
@@ -281,7 +296,7 @@ def replay(receipt: dict, config: dict, engine=None) -> dict:
         replayed_pillars[name] = outs
         _diff(name, transition.get("outputs"), outs, "", mismatches)
 
-    replayed_headline = _replay_headline(transitions, replayed_pillars, config)
+    replayed_headline = _replay_headline(transitions, replayed_pillars, config, engine)
     _diff("headline", (transitions.get("headline") or {}).get("outputs"), replayed_headline, "", mismatches)
 
     replayed_transitions = {

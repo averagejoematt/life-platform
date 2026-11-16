@@ -141,7 +141,6 @@ FUNCTION_LENGTH_COUNTS = {
     "lambdas/intelligence/ai_expert_analyzer_lambda.py::gather_data_for_expert": 224,
     "lambdas/intelligence/ai_expert_analyzer_lambda.py::generate_and_cache": 210,
     "lambdas/intelligence/intelligence_common.py::build_coach_preamble": 182,
-    "lambdas/operational/pipeline_health_check_lambda.py::lambda_handler": 154,
     "lambdas/training/plan_engine.py::_tripwire_states": 250,  # 253 -> 250 (#5074: the rate_ceiling row folded)
     "lambdas/training/plan_engine.py::constraint_block": 213,  # 283 -> 276 (#5068) -> 242 (#5070: the reference block extracted, the deload recommendation added) -> 239 (#5088: the rate target extracted, the disruption block added; 241 once #5052/#5077/#5082 stacked) -> 228 (#5069 merge: the program-conflict honesty lines extracted) -> 217 (#5074 merge: the program-active + accessory-layer honesty lines extracted) -> 213 (#5146: the accessory-rotation call extracted, the event-signal input added)
     "lambdas/web/recap_card_lambda.py::render_for_date": 190,
@@ -152,18 +151,17 @@ FUNCTION_LENGTH_COUNTS = {
     "lambdas/web/site_api_coach_ledger.py::handle_predictions": 156,  # owner 2026-11-09: the overall block moved to _overall_block
     "lambdas/web/site_api_coach_narrative.py::handle_coach_analysis": 190,
     "lambdas/web/site_api_coach_narrative.py::handle_coach_timeline": 163,
-    "lambdas/web/site_api_habits.py::habits": 275,
+    "lambdas/web/site_api_habits.py::habits": 260,  # #5948: _pearson and _count_unnamed lifted out
     "lambdas/web/site_api_journey.py::journey_timeline": 237,
     "lambdas/web/site_api_lambda.py::_dispatch_route": 296,
     "lambdas/web/site_api_ledger.py::discoveries": 188,
-    "lambdas/web/site_api_mind.py::mind_overview": 222,
     "lambdas/web/site_api_nutrition.py::deficit_sustainability": 158,
-    "lambdas/web/site_api_nutrition.py::nutrition_overview": 532,
+    "lambdas/web/site_api_nutrition.py::nutrition_overview": 508,
     "lambdas/web/site_api_physical.py::physical_overview": 231,
     "lambdas/web/site_api_pulse.py::pulse": 432,
     "lambdas/web/site_api_rollups.py::observatory_week": 249,
     "lambdas/web/site_api_sleep.py::sleep_detail": 225,
-    "lambdas/web/site_api_status.py::status": 715,
+    "lambdas/web/site_api_status.py::status": 454,  # #5930: the board table + readers moved to module level
     "lambdas/web/site_api_training.py::training_overview": 389,
     "mcp/tools_cgm.py::_get_fasting_glucose_validation": 327,
     "mcp/tools_health.py::_get_hydration_score": 176,

@@ -41,7 +41,9 @@ import {
 import { dayInWords, domainWords, kOfN, num } from "../lib/format.js";
 import { ROOM_MARKER, roomCr2, roomEnabled, roomPublic } from "../lib/room.js";
 import CommentaryFeature from "../components/CommentaryFeature.astro"; // CR2: renders nothing unless CR2 is on
-import { loadAll, loadCalibration } from "../lib/snapshot.js";
+import OwnWords from "../components/OwnWords.astro";
+import { ownWords } from "../lib/own_words.js";
+import { loadAll, loadCalibration, loadOwnWords } from "../lib/snapshot.js";
 import { href, pathOf } from "../lib/url.js";
 
 if (!roomEnabled()) throw new Error("src/room/calibration.astro rendered with the room off — the room route must not be injected");
@@ -93,6 +95,10 @@ const funnel = [
 ].filter((r) => typeof r[1] === "number");
 const widest = Math.max(1, ...funnel.map((r) => r[1] as number));
 const room = { [ROOM_MARKER]: "calibration" };
+// A dated first-person reflection (owner ruling 2026-11-15): shown beside the measured record, only when the platform
+// serves the approved line exactly. It is how the coaching seemed to him on one day — never a count, and never evidence
+// that the coaching had no effect (whether advice changed what he did is not recorded in public).
+const reflection = ownWords(await loadOwnWords(), "coaches_changed");
 ---
 
 <Base title="The coaches, graded" top="system" description={head ? head.sentence : "The coaches' record, graded by code."} status={asOf}>
@@ -161,6 +167,7 @@ const room = { [ROOM_MARKER]: "calibration" };
                   {why.archive && (
                     <p class="muted" style="font-size:14px">
                       As first graded: <b class="mono">{kOfN(why.archive.k, why.archive.n)}</b>{why.archive.pct ? ` · ${why.archive.pct}` : ""}. Kept, every grade with it, in <a href="#archive">the archive</a>.
+                      {Number.isInteger(rec.decided) && Number.isInteger(rec.confirmed) && ` The ledger as graded now, recorded corrections applied: ${kOfN(rec.confirmed, rec.decided)} — the count the other pages label "as graded now".`}
                     </p>
                   )}
                 </div>
@@ -183,13 +190,13 @@ const room = { [ROOM_MARKER]: "calibration" };
             <div style="padding:22px 18px;border-bottom:1px solid var(--rule)">
               <p class="label">How often they were right</p>
               <p style="font-size:28px;font-weight:700;margin-top:8px" class="num">{kOfN(head.k, head.n)}</p>
-              <p class="muted" style="font-size:13px;margin-top:6px">{head.mode === "verified" ? "calls that pass the current checks only" : "as first graded — not re-verified"}{pct(rec.accuracy_pct) && head.mode !== "verified" ? ` · ${pct(rec.accuracy_pct)}` : ""}</p>
+              <p class="muted" style="font-size:13px;margin-top:6px">{head.mode === "verified" ? "calls that pass the current checks only" : "as graded now — not re-verified"}{pct(rec.accuracy_pct) && head.mode !== "verified" ? ` · ${pct(rec.accuracy_pct)}` : ""}</p>
             </div>
             <div style="padding:22px 18px;border-bottom:1px solid var(--rule)">
               <p class="label">Against a simple guess</p>
               <p style="font-size:17px;font-weight:700;margin-top:8px;line-height:1.3">{lead && lead.baseline ? `A prediction that nothing changes: ${kOfN(lead.baseline.right, lead.baseline.n)}${lead.baseline.pct ? ` · ${lead.baseline.pct}` : ""}` : head.skill || "Not compared yet."}</p>
               <p class="muted" style="font-size:13px;margin-top:6px">
-                {versusGuess(head.records, "direction") && `Direction calls: coaches ${versusGuess(head.records, "direction")!.coach}, a guess that nothing changes ${versusGuess(head.records, "direction")!.guess}, of ${versusGuess(head.records, "direction")!.of}${head.mode === "verified" ? "" : ", as first graded"}.`}
+                {versusGuess(head.records, "direction") && `Direction calls: coaches ${versusGuess(head.records, "direction")!.coach}, a guess that nothing changes ${versusGuess(head.records, "direction")!.guess}, of ${versusGuess(head.records, "direction")!.of}${head.mode === "verified" ? "" : ", as graded now"}.`}
               </p>
             </div>
             <div style="padding:22px 0 22px 18px;border-bottom:1px solid var(--rule)">
@@ -199,6 +206,20 @@ const room = { [ROOM_MARKER]: "calibration" };
             </div>
           </div>
         </section>
+
+        {
+          reflection && (
+            <section class="section" {...room} style="padding-top:26px;padding-bottom:26px;border-top:1px solid var(--rule)" data-own-reflection>
+              <div class="wrap" style="max-width:900px">
+                <OwnWords
+                  id="coaches_changed"
+                  label="A dated reflection, in my words"
+                  note="How it seemed to me on that day — beside the record on this page, not instead of it. The record counts whether forecasts came true; whether the coaching changed what I did is not measured here, and this sentence does not measure it either."
+                />
+              </div>
+            </section>
+          )
+        }
 
         {
           lead && (
@@ -359,7 +380,7 @@ const room = { [ROOM_MARKER]: "calibration" };
             </div>
             <div>
               <h2 style="font-size:30px">Against a guess that nothing changes</h2>
-              <p class="muted" style="font-size:14px;margin-top:10px">Each checked call is also scored by a rule that says the measure stays where it was. Kinds of call are never added together.{head.mode === "verified" ? " Re-verified calls only." : " On the grades as first written."}</p>
+              <p class="muted" style="font-size:14px;margin-top:10px">Each checked call is also scored by a rule that says the measure stays where it was. Kinds of call are never added together.{head.mode === "verified" ? " Re-verified calls only." : " On the grades as they stand now."}</p>
               {sub ? (
                 <p style="font-size:15px;line-height:1.5;margin-top:12px">
                   For the {sub.n} verified forecasts, the comparison split by kind of call, with its adjusted p-values, is <a href="#by-kind">above, as an exploratory result</a>.
@@ -394,7 +415,7 @@ const room = { [ROOM_MARKER]: "calibration" };
               <p style="font-size:15px;line-height:1.55">
                 Calibration compares how confident a call said it was with how often such calls came true. When nearly every call is stated at one value there
                 is nothing to compare across, so no curve is drawn and no coach is called calibrated on that evidence.
-                {head.mode === "verified" ? "" : " Drawn from the grades as first written; none is yet published as re-verified."}
+                {head.mode === "verified" ? "" : " Drawn from the grades as they stand now; none is yet published as re-verified."}
               </p>
               <div class="rows">
                 {coaches.map((c: any) => (
@@ -419,7 +440,7 @@ const room = { [ROOM_MARKER]: "calibration" };
         <section class="section" {...room} style="border-top:1px solid var(--ink)">
           <div class="wrap">
             <h2 style="font-size:30px">Each coach</h2>
-            <p class="muted" style="font-size:14px;margin-top:8px;max-width:70ch">Every seat that made a checked call this cycle, retired seats included. A wide interval means the record could still move a long way. {head.mode === "verified" ? "Where a coach's re-verified record is served it leads; the first grading sits beside it." : "Each record is the grades as first written; none is yet published as re-verified."}</p>
+            <p class="muted" style="font-size:14px;margin-top:8px;max-width:70ch">Every seat that made a checked call this cycle, retired seats included. A wide interval means the record could still move a long way. {head.mode === "verified" ? "Where a coach's re-verified record is served it leads; the ledger's record as graded now (corrections applied, not re-verified) sits beside it." : "Each record is the grades as they stand now; none is yet published as re-verified."}</p>
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:0 28px;margin-top:16px;border-top:1px solid var(--ink)">
               {coaches.map((c: any) => {
                 const obj = c.coach_ref ? all.get("coach", c.coach_ref) : null;
@@ -436,7 +457,7 @@ const room = { [ROOM_MARKER]: "calibration" };
                     {cv ? (
                       <>
                         <p class="mono" style="font-size:14px" data-coach-verified>{kOfN(cv.k, cv.n)} that pass the current checks{cv.pct ? ` · ${cv.pct}` : ""}</p>
-                        <p class="mono muted" style="font-size:12px">{cv.ci || "no interval served"} · first graded {kOfN(c.confirmed, c.n)}</p>
+                        <p class="mono muted" style="font-size:12px">{cv.ci || "no interval served"} · as graded now {kOfN(c.confirmed, c.n)}</p>
                       </>
                     ) : (
                       <>

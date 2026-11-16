@@ -14,6 +14,8 @@
 # no other stack changes. The cover Lambda is on-demand only (no EventBridge
 # rule). Re-running is safe (GSIs idempotent; cdk is declarative).
 set -euo pipefail
+# #6116: under a test runner, real AWS is unreachable from this script (deploy/lib/prod_write_guard.sh)
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prod_write_guard.sh"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REGION="${AWS_REGION:-us-west-2}"

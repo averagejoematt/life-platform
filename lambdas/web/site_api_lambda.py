@@ -60,6 +60,8 @@ from web import (
     day_window,  # #5584 — the optional ?date= / ?from=&to= window on three read routes
     derived_summary_freshness as _cd_fresh,  # owner ruling 2026-11-03: a read a correction overtook is not current
     narrative_publication,  # owner ruling 2026-11-03: the narrative publication chokepoint
+    public_call_id,  # owner ruling 2026-11-14: opaque public call identity at the wire
+    publication_snapshot,  # #6111: the complete withheld graded record (complete taint + call-id map)
 )
 from web.narrative_publication import servable as _np_servable, withheld_slot as _np_slot  # the dashboard's withheld slots
 from web.site_api_agents import handle_agent_activity
@@ -200,6 +202,7 @@ from web.site_api_observatory import (
     handle_workouts,
 )
 from web.site_api_pairs import handle_pairs  # #5532 — precomputed pair statistics for the v9 data room (ADR-105)
+from web.site_api_reader_call import handle_reader_call  # #6088 — a reader's call beside a coach's open call (DARK)
 
 # P1.1 Phase B step 5 (2026-05-26): vitals cluster extracted.
 from web.site_api_reading import (
@@ -469,6 +472,7 @@ ROUTES = {
     # #5532 (epic #5529): the four v9 reads — query-string routes, so each is a GET entry in _SIMPLE_ROUTES below.
     "/api/series": None,  # one metric's daily series with presence/gap flags
     "/api/ledger_export": None,  # the whole prediction ledger, paged, with the grader's flags and corrections
+    "/api/reader_call": None,  # #6088: GET tally + token / POST a reader's tap — 404 while the switch is off (DARK)
     "/api/chapters": None,  # every program week since genesis: published | held | skipped | pending
     "/api/coach_brief": None,  # owner ruling 2026-11-09 (third, E): the public-safe coaching brief — 404 while dark
     "/api/coach_room_words": None,  # owner ruling 2026-11-09 (third, D): approved historical coach words (CR2) — 404 while dark
@@ -515,7 +519,7 @@ ROUTES = {
     "/api/field_notes": None,  # GET with optional ?week= query param, handled in lambda_handler
     # BL-02: Bloodwork/Labs
     "/api/labs": handle_labs,
-    "/api/phenoage": handle_phenoage,  # P1.5 — transparent Levine PhenoAge (Option A privacy)
+    "/api/phenoage": handle_phenoage,  # Levine PhenoAge, markers only — no figure of his own (owner ruling 2026-11-14)
     "/api/frequent_meals": handle_frequent_meals,
     "/api/protein_sources": handle_protein_sources,
     "/api/weekly_physical_summary": handle_weekly_physical_summary,
@@ -616,6 +620,7 @@ _SIMPLE_ROUTES = {
     # #5532: the v9 reads (read-only, query-string GETs; privacy through field_tiers + the dossier filter)
     "/api/series": ({"GET"}, handle_series),
     "/api/ledger_export": ({"GET"}, handle_ledger_export),
+    "/api/reader_call": ({"GET", "POST"}, handle_reader_call),  # #6088: reader_call_rules.READER_CALL_LIVE, committed off
     "/api/chapters": ({"GET"}, handle_chapters),
     "/api/pairs": ({"GET"}, handle_pairs),
     "/api/coach_brief": ({"GET"}, handle_coach_brief),  # 2026-11-09 E: query-string GET (?coach=<id>); 404 while dark
@@ -1317,12 +1322,16 @@ def lambda_handler(event, context):
         _emit_route_log(200)
         return {"statusCode": 200, "headers": CORS_HEADERS, "body": json.dumps(health)}
 
-    narrative_publication.begin_request()  # owner ruling 2026-11-03: count this request's withheld narrative rows
+    publication_begin()
     # Owner ruling 2026-11-09 (D): the CR2 scope is opened for /api/coach_room_words ONLY (web.site_api_coach_room), for
     # the dispatch AND the wire half, so the approved rows that route reads are served. Every other path: no scope.
     try:
         result = _in_cr2_scope(path, lambda: _dispatch_route(event, path, method))
     except Exception as e:
+        if isinstance(e, publication_snapshot.SnapshotUnavailable):  # #6111 fail closed: no complete record, no response
+            logger.error(f"[site_api] {path} refused: {e}")
+            _emit_route_log(503)
+            return _error(503, "Temporarily unavailable")
         logger.error(f"[site_api] {path} failed: {e}")
         _emit_route_log(500)
         return _error(500, "Internal error — check CloudWatch logs")
@@ -1332,5 +1341,24 @@ def lambda_handler(event, context):
         return _error(404, "Not found")
 
     _emit_route_log(result.get("statusCode", 200))
+    return publication_wire(path, result)
+
+
+def publication_begin() -> None:
+    """Open one request's publication state. #6111: nothing carries over from an earlier request — the narrative gate's
+    taint is this request's reads, and the public call ids are read from the table's complete partitions."""
+    narrative_publication.begin_request()  # owner ruling 2026-11-03: count this request's withheld narrative rows
+    publication_snapshot.begin_request(table)  # the complete record: the gate's complete taint and the call-id map
+
+
+def publication_wire(path, result):
+    """The response's last steps, in order (the handler's tail; the determinism tests call it the same way)."""
     # The provenance gate (web.narrative_publication) is the policy; the #5131 scrub stays as defence in depth.
-    return guard_api_response(_in_cr2_scope(path, lambda: narrative_publication.annotate(result)), logger)
+    # owner ruling 2026-11-14: every call identity on the wire is its opaque public id, never its stored word-slug
+    # (web.public_call_id) — before the taint guard, so an id is never mistaken for withheld words again.
+    try:
+        result = public_call_id.publicize_response(result)
+        return guard_api_response(_in_cr2_scope(path, lambda: narrative_publication.annotate(result)), logger)
+    except publication_snapshot.SnapshotUnavailable as e:  # fail closed: no complete record, no response
+        logger.error(f"[site_api] {path} refused at the wire: {e}")
+        return _error(503, "Temporarily unavailable")

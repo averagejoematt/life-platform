@@ -1138,11 +1138,16 @@ class TestPersistence:
 
 
 class TestReads:
-    def test_hypothesis_reads_apply_the_adr_058_phase_filter_newest_first(self, table):
-        eng.load_existing_hypotheses()
+    def test_hypothesis_reads_apply_the_adr_058_phase_filter_item_level_newest_first(self, table):
+        """#5518: the filter moved from the server to the item (sealed_hypotheses.grader_visible), so a sealed genesis
+        row stamped pilot by the wall clock is not dropped before the rule can see it. Every OTHER pilot row is
+        still hidden, exactly as the server-side filter hid it."""
+        for sk, phase in (("HYPOTHESIS#a", PHASE_FILTER_VALUES[":phase_experiment"]), ("HYPOTHESIS#b", "pilot"), ("HYPOTHESIS#c", None)):
+            row = {"pk": eng.HYPOTHESES_PK, "sk": sk, "status": "pending", "hypothesis_id": f"hyp_{sk[-1]}"}
+            table.items[(eng.HYPOTHESES_PK, sk)] = {**row, **({"phase": phase} if phase else {})}
+        assert sorted(h["sk"] for h in eng.load_existing_hypotheses()) == ["HYPOTHESIS#a", "HYPOTHESIS#c"]
         kwargs = table.queries[0]
-        assert "FilterExpression" in kwargs
-        assert kwargs["ExpressionAttributeValues"] == PHASE_FILTER_VALUES
+        assert "FilterExpression" not in kwargs
         assert kwargs["ScanIndexForward"] is False
 
     def test_the_hypotheses_partition_is_experiment_scoped_so_filtering_is_correct(self):

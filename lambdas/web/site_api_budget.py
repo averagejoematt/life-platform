@@ -41,6 +41,15 @@ from operational.cost_governor_lambda import (
 
 from web.site_api_common import _error, _ok, logger
 
+# #5545: the closed-month cost read lives in web.site_api_rollups (its only caller), so the rollups no longer
+# import this module and, through it, the cost governor. Re-exported here for existing callers.
+from web.site_api_rollups import (  # noqa: F401
+    _CLOSED_MONTH_ROUND_USD,
+    _CLOSED_MONTH_TAIL_DAYS,
+    _previous_month_bounds,
+    last_closed_month_cost,
+)
+
 __all__ = [
     "_ADR133_BASE_CEILING_USD",
     "_AI_SAFETY_BUFFER",
@@ -58,6 +67,7 @@ __all__ = [
     "_scheduled_share_pct",
     "_typical_day",
     "inference_receipt",
+    "last_closed_month_cost",
     "receipts",
 ]
 

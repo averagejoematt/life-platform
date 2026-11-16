@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-Last updated: 2026-11-12 (v8.6.0 — 92 MCP tools, 95-module package, 107 Lambdas, 20 data sources)
+Last updated: 2026-11-16 (v8.6.0 — 93 MCP tools, 97-module package, 107 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
 - Lambda functions defined (CDK): 107 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
@@ -476,7 +476,8 @@ All secrets are stored in AWS Secrets Manager under `life-platform/` prefix. See
 | `life-platform/mcp-api-key` | life-platform-mcp, canary, qa-smoke, key-rotator | HMAC bearer; 90-day auto-rotation |
 | `life-platform/todoist` | life-platform-mcp (write tools) | Dedicated; bundle still used by ingestion |
 | `life-platform/habitify` | habitify-data-ingestion | API key |
-| `life-platform/ingestion-keys` | todoist-data-ingestion, notion-journal-ingestion, dropbox-poll, health-auto-export-webhook | Bundle: Notion + Dropbox + Todoist + Habitify + HAE webhook key |
+| `life-platform/ingestion-keys` | todoist-data-ingestion, notion-journal-ingestion, dropbox-poll, health-auto-export-webhook (cutover fallback, #5513) | Bundle: Notion + Dropbox + Todoist + Habitify + HAE webhook key |
+| `life-platform/hae-webhook` | health-auto-export-webhook | The webhook's own bearer token (#5513 c), read first |
 | `life-platform/notion` (live, idle) | none read by ingestion — the bundle is authoritative | Retire-candidate; owner decision (`docs/SECRETS_MAP.md`) |
 | `life-platform/dropbox`, `life-platform/anthropic-api-key` | — | Deleted (windows closed 2026-05) |
 
@@ -1487,7 +1488,7 @@ nonzero aborts the run and prints what already ran; `--continue-on-error` is the
 14. With `--sync-site` (opt-in, #1092): `bash deploy/sync_site_to_s3.sh` — the full-site
     content-hashed sync + rss.xml regen (deliberately NOT default: heavy + interactive;
     without the flag it stays a printed next command)
-15. `restart_verify_rendered.py --old-genesis <outgoing>` — hard gate over the 111-URL v4 surface (apply mode only)
+15. `restart_verify_rendered.py --old-genesis <outgoing>` — hard gate over the 113-URL v4 surface (apply mode only)
 16. `restart_verify_semantic.py` — **the #1093 semantic hard gate** (apply mode only): deterministic
     assertions on what the live site SAYS pre-start (`pre_start` flags on snapshot/journey, zeroed
     character, no current-cycle findings on /api/discoveries, coach_team dispute null-or-current-cycle,

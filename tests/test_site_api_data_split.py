@@ -128,6 +128,7 @@ EXPECTED_ROUTE_MAP = {
     "/api/morning_note": "_route_morning_note",  # #4189 — GET served note / POST owner write
     "/api/series": "handle_series",  # #5532 — one metric's daily series (v9 data room)
     "/api/ledger_export": "handle_ledger_export",  # #5532 — the whole ledger, paged (v9 ledger)
+    "/api/reader_call": "handle_reader_call",  # #6088 — a reader's call beside a coach's open call (DARK)
     "/api/chapters": "handle_chapters",  # #5532 — program-week chapter states (v9 Story)
     "/api/pairs": "handle_pairs",  # #5532 — precomputed pair statistics (v9 data room)
     "/api/coach_brief": "handle_coach_brief",  # owner ruling 2026-11-09 (third, E) — the public-safe coaching brief (dark)

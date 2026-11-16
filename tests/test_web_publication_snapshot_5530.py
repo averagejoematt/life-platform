@@ -117,6 +117,7 @@ def test_held_and_private_objects_never_reach_the_snapshot(tmp_path):
             "appendix.json",
             "pairs.json",
             "journey.json",
+            "own_words.json",
             "series",
             "lab.json",
             "story.json",
@@ -231,17 +232,22 @@ def test_manifest_hashes_match_the_files(tmp_path):
                     else (
                         data.get("rungs")
                         if "rungs" in data
-                        # the switch-gated data files (in a default export once their go-live line is committed)
+                        # own_words.json: the owner's approved lines, counted by `quotes` (the file carries no `pairs`)
                         else (
-                            data["lab_experiments"]
-                            if "lab_experiments" in data
+                            data["quotes"]
+                            if "quotes" in data and "absent_text" in data
+                            # the switch-gated data files (in a default export once their go-live line is committed)
                             else (
-                                data["installments_index"]
-                                if "installments_index" in data
+                                data["lab_experiments"]
+                                if "lab_experiments" in data
                                 else (
-                                    data["calibration"]["coaches"]
-                                    if "calibration" in data
-                                    else data["coaches"] if "voice_fidelity" in data else data["pairs"]
+                                    data["installments_index"]
+                                    if "installments_index" in data
+                                    else (
+                                        data["calibration"]["coaches"]
+                                        if "calibration" in data
+                                        else data["coaches"] if "voice_fidelity" in data else data["pairs"]
+                                    )
                                 )
                             )
                         )
@@ -792,8 +798,17 @@ _PHYSICAL_OVERVIEW = {  # the shape /api/physical_overview served on 2026-11-02 
     "tape_measurements": {"session_date": "2026-09-06", "waist_navel_in": 55.5},
     "blood_pressure": {"systolic": 121.0, "diastolic": 70.0, "date": "2026-10-13", "status": "normal", "readings_count": 2, "trend": []},
 }
+_PHENOAGE_REFERENCE = {
+    "basis": "markers_only",
+    "points": [{"at_years": 30, "reads_years": 27.4, "offset_years": -2.6}, {"at_years": 60, "reads_years": 54.2, "offset_years": -5.8}],
+    "offset_low": -5.8,
+    "offset_high": -2.6,
+    "slope": 0.892,
+}
 _PHENOAGE = {
-    "phenoage": 28,
+    "phenoage": None,  # owner ruling 2026-11-14: a figure of his own is never served (it is the age to about a year)
+    "withheld": "derived_from_chronological_age",
+    "reference": _PHENOAGE_REFERENCE,
     "as_of": "2026-04-03",
     "chronological_age": 99,  # never served today; planted so the allow-list is measured, not assumed
     "drivers": [{"name": "Albumin", "value": 4.9, "unit": "g/dL", "direction": "younger", "derived": False, "age_delta": 1}],
@@ -808,14 +823,19 @@ def test_journey_body_fields_map_the_served_shapes_and_carry_no_age():
     assert (c["lean_mass_lb"], c["fat_mass_lb"], c["visceral_fat_lb"], c["almi_percentile"]) == (170.6, 133.1, 3.21, 99.0)
     assert (c["visceral_target_lb"], c["next_recommended"], c["days_since"]) == (1.0, "2026-06-28", 217)
     assert f["phenoage"] == {
-        "years": 28,
         "as_of": "2026-04-03",
         "drivers": [{"name": "Albumin", "value": 4.9, "unit": "g/dL", "direction": "younger", "derived": False}],
+        "reference": {k: v for k, v in _PHENOAGE_REFERENCE.items() if k != "basis"},
     }
+    # a response that still carries a figure of his own is not carried into the build at all
+    assert (
+        pj.body_fields({"physical_overview": _PHYSICAL_OVERVIEW, "phenoage": {**_PHENOAGE, "phenoage": 28}}, "2026-09-06")["phenoage"]
+        is None
+    )
     assert f["bp"] == {"systolic": 121.0, "diastolic": 70.0, "date": "2026-10-13", "status": "normal", "readings_count": 2}
     assert f["tape_date"] == "2026-09-06"
     blob = json.dumps(f)
-    assert "age" not in blob.replace("phenoage", ""), "no age field rides along (PhenoAge Option A)"
+    assert "age" not in blob.replace("phenoage", ""), "no age field rides along"
     _contract().validate_journey_body(f)
     # each endpoint absent → its field is null, never a guess
     assert pj.body_fields({}, "2026-09-06") == {"composition": None, "phenoage": None, "bp": None, "tape_date": None}
@@ -873,3 +893,79 @@ def test_coach_persona_id_rendered_as_text_reds_the_build_scan_5572(tmp_path):
     assert any("nutrition_coach" in i for i in cwb.scan(str(dist), False, ids))
     page.write_text("<html><body><p>the call that held was Marcus Webb's</p></body></html>")
     assert not any("nutrition_coach" in i for i in cwb.scan(str(dist), False, ids))
+
+
+# ── owner-ruled notes (owner ruling 2026-11-15, #6079) ─────────────────────────────────────────────────────────────
+def _ledger_row(pid: str, claim: str, note=None) -> dict:
+    return {
+        "item_id": f"glucose:{pid}",
+        "prediction_id": pid,
+        "coach_id": "glucose",
+        "coach_name": "Amara Patel",
+        "retired": False,
+        "metric": "recovery_score",
+        "claim": claim,
+        "logged_date": "2026-09-14",
+        "due_date": "2026-09-15",
+        "settled_date": "2026-09-15",
+        "kind": "number",
+        "status": "refuted",
+        "confidence": 0.5,
+        "sealed": False,
+        "grading": {"how": "recovery within 18 of 59 on 2026-09-15", "actual_text": "82", "tolerance_text": None, "outcome_notes": "82"},
+        "simple_guess": None,
+        "quality_flags": [],
+        "corrections": [],
+        "owner_note": note,
+    }
+
+
+def test_a_call_published_with_a_required_note_carries_its_words_only_beside_it(monkeypatch):
+    """`/api/ledger_export` serves `owner_note` beside the words. A REQUIRED note's call reaches the snapshot as
+    `claim_withheld: "with_note"`: `claim` is the note's short form (what every list surface prints, the way it prints a
+    held call's line), the words are `claim_with_note` (the call's own page alone renders them, beside the note). A
+    scope note leaves the words in `claim`. A note the producer cannot read withholds the words."""
+    note = {"kind": "clarification", "dated": "2026-11-15", "required": True, "text": "A synthetic note.", "short": "Synthetic short."}
+    scope = {**note, "kind": "scope", "required": False}
+    rows = [
+        _ledger_row("pred_a", "A synthetic call (from 73 on 2026-09-12).", note),
+        _ledger_row("pred_b", "A synthetic scoped call.", scope),
+        _ledger_row("pred_c", "A synthetic plain call."),
+        _ledger_row("pred_d", "A synthetic call with a broken note.", {"kind": "clarification", "text": "x"}),
+    ]
+    ctx = ps.LiveContext("https://x", {"edition": {"as_of": "2026-11-15"}})
+    ctx.coach_ids.add("glucose_coach")
+    monkeypatch.setattr(ps, "_ledger_pages", lambda c: rows)
+    ps._live_ledger(ctx)
+    got = {o["prediction_id"] if "prediction_id" in o else o["id"]: o for o in ctx.objs["prediction"]}
+    a, b, c, d = (got[f"glucose-pred_{x}"] for x in "abcd")
+    assert (a["claim"], a["claim_withheld"], a["claim_with_note"], a["owner_note"]) == (
+        "Synthetic short.",
+        "with_note",
+        rows[0]["claim"],
+        note,
+    )
+    assert "2026-09-12" not in a["title"], "the title is the note's short form, never the words"
+    assert (b["claim"], b["claim_withheld"], b["claim_with_note"], b["owner_note"]) == (rows[1]["claim"], None, None, scope)
+    assert (c["claim"], c["claim_withheld"], c["claim_with_note"], c["owner_note"]) == (rows[2]["claim"], None, None, None)
+    assert (d["claim"], d["claim_withheld"], d["owner_note"]) == (ps.NO_WORDS_SENTENCE, "no_words", None)
+    for o in (a, b, c, d):
+        ps.validate(o, "prediction")
+
+
+@pytest.mark.parametrize(
+    "mutation, needle",
+    [
+        (lambda p: p.update(claim_withheld=None), "claim_with_note and claim_withheld"),
+        (lambda p: p.update(claim=p["claim_with_note"]), "the note's short form"),
+        (lambda p: p.update(owner_note={**p["owner_note"], "required": False}), "no required note"),
+        (lambda p: p.update(owner_note={**p["owner_note"], "kind": "owner"}), "malformed"),
+    ],
+)
+def test_a_with_note_call_that_could_show_bare_words_is_refused(mutation, needle):
+    objs = ps.load_fixtures(FIXTURES)
+    p = copy.deepcopy(next(o for o in objs["prediction"] if o.get("claim_withheld") == "with_note"))
+    ps.validate(p, "prediction")
+    mutation(p)
+    with pytest.raises(ps.SchemaError, match=needle):
+        ps.validate(p, "prediction")

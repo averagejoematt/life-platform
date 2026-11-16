@@ -1,5 +1,6 @@
 {
-  "captured_at": "2026-08-31T06:47:34.497546+00:00",
+  "captured_at": "2026-11-15T00:00:00+00:00",
+  "captured_note": "shape written from the handler at the 2026-11-14 owner ruling (the figure is withheld); the next live recapture replaces it",
   "fetch_path": "/api/phenoage",
   "is_prefix_sample": false,
   "path": "/api/phenoage",
@@ -57,8 +58,49 @@
         "length_sample": 0,
         "type": "array"
       },
+      "note": {
+        "type": "string"
+      },
       "phenoage": {
-        "type": "integer"
+        "type": "null"
+      },
+      "reference": {
+        "keys": {
+          "basis": {
+            "type": "string"
+          },
+          "offset_high": {
+            "type": "number"
+          },
+          "offset_low": {
+            "type": "number"
+          },
+          "points": {
+            "items": {
+              "keys": {
+                "at_years": {
+                  "type": "integer"
+                },
+                "offset_years": {
+                  "type": "number"
+                },
+                "reads_years": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 4,
+            "type": "array"
+          },
+          "slope": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "withheld": {
+        "type": "string"
       }
     },
     "type": "object"

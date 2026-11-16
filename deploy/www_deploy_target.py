@@ -6,6 +6,9 @@ The one decision web-preview-deploy.yml makes, held in a tested entrypoint inste
   event      input      live_at_root   → target
   push       —          false            preview   (every www/** merge, as since #5530)
   push       —          true             root      (after the cut-over: every www/** merge rebuilds /)
+  schedule   —          false/true       preview/root  (the daily rebuild: the site is a snapshot of the live
+                                                    API, so without it a published chapter or a new day
+                                                    waits for an unrelated code merge — 2026-11-14)
   dispatch   preview    any              preview   (a manual re-run of the preview)
   dispatch   root       true             root      (a manual re-run of the root deploy)
   dispatch   root       false            REFUSED   (exit 2 — the switch is the one-line merge that
@@ -36,11 +39,11 @@ PREVIEW, ROOT = "preview", "root"
 def resolve(event: str, requested: str, live: bool) -> tuple[str | None, str]:
     """(target or None, reason). Pure — the rule above, nothing read."""
     requested = (requested or "").strip() or PREVIEW
-    if event == "push":
+    if event in ("push", "schedule"):
         return (ROOT if live else PREVIEW), (
-            "push to main: live_at_root=true → the root rebuilds on every www/** merge"
+            f"{event} on main: live_at_root=true → the root rebuilds from the live API"
             if live
-            else "push to main: live_at_root=false → the noindex preview at /next/v9/"
+            else f"{event} on main: live_at_root=false → the noindex preview at /next/v9/"
         )
     if requested == PREVIEW:
         return PREVIEW, "dispatch: preview requested"

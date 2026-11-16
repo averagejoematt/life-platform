@@ -42,6 +42,7 @@ from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-
 from web import (
     claim_sourcing,  # #4673: a dated claim citing a sensor with no reading that day is not quoted
     prediction_reason,  # #4220: a graded call's reason in reader words
+    public_call_id,  # owner ruling 2026-11-14: the opaque public identity of a call
     record_words,  # #4580 round 1: the base-rate guess's exact rate, beside the counts
     site_api_calibration_v2,  # owner requirement 2026-11-09: calibration-v2, dark and additive
     verification_fields,  # owner 2026-11-09: versions + the verification record's pointer, additive
@@ -381,7 +382,7 @@ _PREDICTION_PROJECTION_FIELDS = (
     # #4220: the record producer's two keys — the identity a re-written row shares with its
     # original (`prediction_id`, the `_put_unique` -2…-5 trail of #4216 keeps it) and the
     # resolution date that decides which cycle a graded call belongs to.
-    "prediction_id",
+    *("prediction_id", "created_at"),  # owner ruling 2026-11-14: created_at is a call's public identity (web.public_call_id)
     "outcome_date",
     # #4585: the "nothing changes" rule's frozen verdict (coach.coach_baseline) and the
     # docket marker that makes a docket position a yes/no bet — both read by the
@@ -455,7 +456,7 @@ def _query_partition(pk, sk_prefix, projection_fields=None, paginate=False, *, _
             resp = table.query(**kwargs, ExclusiveStartKey=resp["LastEvaluatedKey"])
             items.extend(resp.get("Items", []))
             pages += 1
-    return [_decimal_to_float(r) for r in items]
+    return public_call_id.remember_read(pk, sk_prefix, [_decimal_to_float(r) for r in items])  # owner 2026-11-14
 
 
 def _commitment_block(*, _g):
@@ -1291,7 +1292,8 @@ def handle_predictions(event, *, _g):
                             **({"reader_plain": False} if _plain_label is False else {}),
                             # Owner ruling 2026-11-03: the stored verdict, shown disputed — not counted as verified.
                             **(classification_review.served_fields(rec, words_held=bool(_held)) if _disputed else {}),
-                            **verification_fields.item_fields(rec),  # owner 2026-11-09: versions + verification (or null)
+                            # owner 2026-11-09: versions + verification (or null); 2026-11-15 (#6079): the owner-ruled note
+                            **verification_fields.item_fields(rec, words_served=bool(_said) and not _held),
                         }
                     )
             except Exception as _qe:

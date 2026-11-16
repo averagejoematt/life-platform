@@ -221,6 +221,10 @@ def _skip(block: Any) -> bool:
     tag = str(getattr(block, "rationale_tag", "") or "")
     if tag.startswith(("cardio", "mobility", "stretch")):
         return True
+    # #6020: a fitness-test block keeps its protocol note. The engine tags it `fitness_test:`, but a `draft_custom` re-tags
+    # every block `custom`, so the note's own `Test ·` line 1 (§3.8) is the other half of the test
+    if tag.startswith("fitness_test:") or hevy_note_grammar.is_test_note(str(getattr(block, "notes", "") or "")):
+        return True
     return any(getattr(s, "duration_seconds", None) for s in block.sets or [])
 
 
@@ -548,6 +552,7 @@ def compose_blocks(
     rotations: dict[str, str] | None = None,
     authored: dict[str, dict[str, str]] | None = None,
     fallbacks: dict[str, list[str]] | None = None,
+    familiar: set[str] | None = None,
 ) -> dict[str, Any]:
     """Rewrite every lift block's note to the standard, IN PLACE, after every load and warm-up pass. Returns the
     `inputs_snapshot` record: `previous_loads` (Hevy's PREVIOUS, for the linter) and `lift_notes` (per movement: the
@@ -582,6 +587,8 @@ def compose_blocks(
     previous_loads: dict[str, Any] = {}
     notes: dict[str, Any] = {}
     seen_families: set[str] = set()
+    # #6020: the titles this session serves — `New: replaces X` is never written beside an X block (a note that contradicts its session)
+    served_titles = {str(((catalog_movements or {}).get(str(b.movement_key)) or {}).get("title") or "") for b in blocks or []} - {""}
     for index, block in enumerate(blocks or []):
         if _skip(block):
             continue
@@ -609,6 +616,8 @@ def compose_blocks(
         caps = (row.get("ramp") or {}).get("exposure_caps")
         stale = is_stale(previous, target_date)
         layoff = is_layoff_return(caps, previous, target_date)
+        if familiar is not None and key in familiar:  # #5861 fix round 9 (live only): a familiar pattern has no re-entry cap
+            caps, layoff = None, False
         line1 = own.get("effort") or exposure_cue(intensity, [{}] * max(1, len(_working(block.sets))))
         line2, pick, reason_kind = "", False, None
         if caps:
@@ -634,7 +643,7 @@ def compose_blocks(
         if layoff:
             line1 = keep_stricter(own.get("effort"), _layoff_return_treatment(block, line1))
         swapped = (rotations or {}).get(key)
-        lead = rotation_line(swapped) if swapped and previous is None and reason_kind != "no_jumps" else ""
+        lead = rotation_line(swapped) if swapped and previous is None and reason_kind != "no_jumps" and swapped not in served_titles else ""
         if lead:
             reason_kind = "rotation"
         pick_line = (_pick_result_line(block, entry) if _has_load(block) else PICK_LOAD_OPEN_LINE) if pick else ""

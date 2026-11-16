@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T06:47:34.497546+00:00",
+  "captured_at": "2026-11-13T18:14:41.730906+00:00",
   "fetch_path": "/api/pulse_history",
   "is_prefix_sample": false,
   "path": "/api/pulse_history",
@@ -22,9 +22,15 @@
         },
         "type": "object"
       },
+      "baseline_change": {
+        "type": "string"
+      },
       "pulse_history": {
         "items": {
           "keys": {
+            "active_kcal": {
+              "type": "null"
+            },
             "date": {
               "type": "string"
             },
@@ -49,20 +55,26 @@
             "steps": {
               "type": "integer"
             },
+            "steps_source": {
+              "type": "string"
+            },
             "strain": {
               "type": "number"
             },
             "weight_delta": {
-              "type": "null"
+              "type": "number"
             },
             "weight_lbs": {
-              "type": "null"
+              "type": "number"
             }
           },
           "type": "object"
         },
-        "length_sample": 14,
+        "length_sample": 69,
         "type": "array"
+      },
+      "watch_first_day": {
+        "type": "string"
       }
     },
     "type": "object"

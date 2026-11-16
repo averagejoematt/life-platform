@@ -151,7 +151,8 @@ An artefact may enter the archive through exactly three arms, each fail-closed:
    AST-derives that behaviour set from the CDK source: **a new public route cannot
    join the archive without a verdict, and a retired one cannot linger.**
 2. **Published site documents.** `.html`, `.json`, `.xml`, `.txt`, `.webmanifest`
-   outside `site/legacy/`. Every admitted suffix is one `deploy/pii_surface_guard.py`
+   outside `site/legacy/` and the rehearsal previews `site/next/` (a duplicate at best, a stale copy at worst —
+   #6083). Every admitted suffix is one `deploy/pii_surface_guard.py`
    actually scans, and the gate test pins that subset relation — the archive can never
    admit a class of file the site's own privacy scanner does not read.
 3. **Anonymous API snapshots.** The route set is derived: every route

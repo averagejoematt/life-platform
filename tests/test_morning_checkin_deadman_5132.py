@@ -3,7 +3,7 @@
 The worker stamps ``COACH#morning_checkin / EVAL#<Pacific day>`` with its outcome on every weekday run
 (``coach.morning_checkin_ledger``); ``nudge_ledger_qa.check_morning_checkin_liveness`` (nightly qa-smoke) reds when
 the two newest completed weekdays carry neither a send nor a sanctioned skip, and warns when the same sanctioned
-skip repeats for a whole week. Every clock below is a fixed instant: the expectations never read the live clock.
+skip repeats for a whole week — except the silence latch, which reads OK with a PAUSED status (owner ruling 2026-11-13). Every clock below is a fixed instant: the expectations never read the live clock.
 
 Calendar (2026): Mon 10-26, Tue 10-27, Wed 10-28, Thu 10-29, Fri 10-30, Sat 10-31, Sun 11-01, Mon 11-02.
 """
@@ -116,15 +116,30 @@ def test_an_unsanctioned_outcome_is_silence():
 def test_a_skip_that_repeats_for_a_week_warns_but_a_send_in_the_window_clears_it():
     today = (2026, 11, 3)  # Tue: the five newest completed weekdays are 11-02, 10-30, 10-29, 10-28, 10-27
     days = ("d_2026_11_02", "d_2026_10_30", "d_2026_10_29", "d_2026_10_28", "d_2026_10_27")
-    latched = _run(_rows(**{d: "silence_respected" for d in days}), today)
-    assert latched.state == "warn" and "silence_respected" in latched.msg
-    four = _run(_rows(**{d: "silence_respected" for d in days[:4]}), today)
+    for skip in ("dark", "budget", "held", "capped", "quiet_hours"):
+        latched = _run(_rows(**{d: skip for d in days}), today)
+        assert latched.state == "warn" and skip in latched.msg, skip
+    four = _run(_rows(**{d: "dark" for d in days[:4]}), today)
     assert four.state == "ok"  # four is not a week
-    mixed = _run(_rows(**{d: ("sent" if d == "d_2026_10_29" else "silence_respected") for d in days}), today)
+    mixed = _run(_rows(**{d: ("sent" if d == "d_2026_10_29" else "dark") for d in days}), today)
     assert mixed.state == "ok"
-    different = _run(_rows(**{d: ("budget" if d == "d_2026_10_29" else "silence_respected") for d in days}), today)
+    different = _run(_rows(**{d: ("budget" if d == "d_2026_10_29" else "dark") for d in days}), today)
     assert different.state == "ok"  # the reason changed: someone is acting on it
     assert _run(_rows(**{d: "sent" for d in days}), today).state == "ok"  # a feature that sends is never warned
+
+
+def test_the_silence_latch_is_a_paused_status_not_a_warning():
+    """Owner ruling 2026-11-13: two unanswered check-ins and the coach stops; that is the design. A week of it reads OK
+    with PAUSED and the day it began, on every run — and a failure underneath it still fails."""
+    today = (2026, 11, 3)
+    days = ("d_2026_11_02", "d_2026_10_30", "d_2026_10_29", "d_2026_10_28", "d_2026_10_27", "d_2026_10_26")
+    paused = _run(_rows(**{d: "silence_respected" for d in days}), today)
+    assert paused.state == "ok"
+    assert "PAUSED (intentional)" in paused.msg and "since 2026-10-26" in paused.msg and "replies" in paused.msg
+    whole = _run(_rows(**{f"d_2026_10_{n}": "silence_respected" for n in range(19, 32)}, d_2026_11_02="silence_respected"), today)
+    assert "since at least 2026-10-20" in whole.msg  # the pause outruns the 14-day lookback: never a false start date
+    broke = _run(_rows(**{d: ("error:KeyError" if d in ("d_2026_11_02", "d_2026_10_30") else "silence_respected") for d in days}), today)
+    assert broke.state == "fail"  # the worker stopped completing: a genuine failure is never hidden by the pause
 
 
 def test_pending_until_armed_and_a_ddb_error_fails_loudly():

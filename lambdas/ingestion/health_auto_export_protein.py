@@ -30,6 +30,7 @@ The contract (docs/SCHEMA.md "HAE intraday protein"):
 """
 
 import logging
+import math
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -93,7 +94,7 @@ def _plain(obj):
 
 def _to_ddb(obj):
     if isinstance(obj, float):
-        return Decimal(str(round(obj, 4)))
+        return Decimal(str(round(obj, 4))) if math.isfinite(obj) else None  # #5524: NaN/Inf never reach the write
     if isinstance(obj, dict):
         return {k: _to_ddb(v) for k, v in obj.items() if v is not None}
     return obj

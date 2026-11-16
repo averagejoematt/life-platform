@@ -21,6 +21,7 @@ from boto3.dynamodb.conditions import Key
 from common.pacific_time import pacific_now, pacific_today  # #2798: reading DAYS are Pacific (pairs with reading_store)
 from reading import (
     horizons_garden,
+    horizons_publication,
     horizons_retrospective,
     horizons_verify,
     reading_constellation,
@@ -463,10 +464,16 @@ def tool_curate_horizon(args=None):
     if follow_up:
         plan["follow_up"] = dict(follow_up)
 
+    # #5947 — the publication stamp. The pick is stored either way (it is the owner's record), but its
+    # coach-written text reaches the public feed only on a positive "published" verdict; the verdict
+    # rides the preview so a held pitch is rewritten BEFORE it is committed.
+    plan.update(horizons_publication.stamp(plan))
+
     if dry_run:
         # #1708: the reaction ledger rides the preview so the coach can calibrate the
         # pick BEFORE committing it — that is what "future picks calibrate" means here.
         preview = _preview("curate_horizon", plan)
+        preview["pitch_publication"] = _pitch_publication_note(plan)
         preview["calibration"] = _horizons_calibration()
         preview["calibration_how_to_use"] = _CALIBRATION_HOW_TO_USE
         return preview
@@ -512,7 +519,20 @@ def tool_curate_horizon(args=None):
         "action": "curate_horizon",
         "pick": item,
         "follow_up_surfaced": bool(checkin_item),
+        "pitch_publication": _pitch_publication_note(plan),
     }
+
+
+def _pitch_publication_note(plan: dict) -> str:
+    """What the curating coach is told about the public feed (never a matched term)."""
+    if plan.get(horizons_publication.STATUS_ATTR) == horizons_publication.STATUS_PUBLISHED:
+        return "published — the pitch cleared the public-text screen"
+    cats = ", ".join(plan.get(horizons_publication.CATEGORIES_ATTR) or [])
+    return (
+        f"HELD ({cats}) — the public feed will not show this pick's pitch. Nothing owner-only "
+        "(health record, private habits, personal identifiers) may be in the pitch, title or source: "
+        "rewrite it about the piece itself and curate again."
+    )
 
 
 def _prior_iso_week() -> str:

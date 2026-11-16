@@ -1,0 +1,29 @@
+{
+ "absent_text": null,
+ "quotes": [
+  {
+   "date": "2026-09-06",
+   "quote": "By my own count the 15th or 16th reset in a few months."
+  },
+  {
+   "date": "2026-11-08",
+   "quote": "Honestly, the AI isn't as clever as I'd hoped, and it's naturally cautious."
+  },
+  {
+   "date": "2026-11-08",
+   "quote": "I feel full, and the scale isn't moving as fast as I'd like — I usually lose faster nearer 300."
+  },
+  {
+   "date": "2026-11-08",
+   "quote": "I feel more content overall. My head's clearer and I have a routine. For once it's less Sunday scaries and more just appreciating the evening."
+  },
+  {
+   "date": "2026-11-08",
+   "quote": "None of the coaches has really changed what I do."
+  }
+ ],
+ "source": [
+  "/api/journal_quotes"
+ ],
+ "state": "ok"
+}

@@ -111,10 +111,6 @@ def _generate(ai, pid: str, user_msg: str, _sys_txt: str) -> dict:
                 out["findings"] = _gf
                 ai.logger.warning(f"[board_ask] {pid} ungrounded: {[f['detail'] for f in _gf][:3]}")
                 out["grounded"] = False
-                _refusal = (
-                    "I'd want to answer that with numbers I can actually stand behind, and I can't "
-                    "ground them in today's record — ask me about something the current data covers."
-                )
                 # #531 follow-up (live drill 2026-07-04): ONE corrective
                 # rewrite before falling back to the refusal — the same
                 # discipline the daily-brief self gets (regen-once). Bounded:
@@ -131,14 +127,13 @@ def _generate(ai, pid: str, user_msg: str, _sys_txt: str) -> dict:
                         out["grounded"] = True
                         ai.logger.info(f"[board_ask] {pid} corrected once — grounded on retry")
                     else:
-                        _txt = _refusal
+                        _txt = ai._BOARD_GROUNDING_REFUSAL
                 except Exception as _rt_e:
                     ai.logger.warning(f"[board_ask] {pid} correction retry failed: {_rt_e}")
-                    _txt = _refusal
-        except ImportError:
-            pass  # helper not bundled — serve as before
-        except Exception as _gg_e:
-            ai.logger.warning(f"[board_ask] {pid} grounding gate error (fail-open): {_gg_e}")
+                    _txt = ai._BOARD_GROUNDING_REFUSAL
+        except Exception as _gg_e:  # ImportError included (#5929 aiq-2): a gate that cannot run never serves the draft
+            ai.logger.warning(f"[board_ask] {pid} grounding gate error — refusing (fail-closed): {_gg_e}")
+            _txt, out["grounded"] = ai._BOARD_GROUNDING_REFUSAL, False
 
         out["txt"] = _txt
     except Exception as e:

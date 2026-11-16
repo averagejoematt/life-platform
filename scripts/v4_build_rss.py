@@ -5,8 +5,12 @@ v4_build_rss.py — generate site/rss.xml from the live chronicle posts.json.
 Replaces the previously hand-maintained (and stale: wrong/duplicate pubDates)
 static feed. Pulls the published chronicle index (the genesis-anchored live feed),
 sorts newest-first, and emits a valid RSS 2.0 feed whose items deep-link to their
-per-post permalink pages. pubDate is derived from each post's own date, and
-lastBuildDate is stamped at generation time.
+per-post permalink pages. A chronicle item's pubDate is its PUBLICATION instant —
+the owner's approval, served as ``published_at`` by /api/chapters — never the post's
+``date``, which is the week's data dateline (#5946: the feed dated an item three days
+before it existed). An item with no recorded publication carries no pubDate (RSS 2.0
+makes it optional): a missing date stays missing. lastBuildDate is stamped at
+generation time.
 
 stdlib only (urllib — matches the repo's no-external-HTTP convention). Run from
 the repo root, then deploy site/ (sync_site_to_s3.sh calls this automatically):
@@ -37,6 +41,9 @@ from content import chronicle_schema  # noqa: E402  — #4191: a stored excerpt 
 # generated/journal/posts.json on S3).  The old /chronicle/posts.json was a
 # dead season-1 snapshot frozen at the pre-reset experiment; don't use it.
 SRC = "https://averagejoematt.com/journal/posts.json"
+# The publication instant of each published chapter (#5946): /api/chapters serves
+# ``published_at`` (the chronicle row's approved_at) per week, keyed here by the post url.
+CHAPTERS_SRC = "https://averagejoematt.com/api/chapters"
 # Matt-authored essays ("In my own words", #741) — a local committed manifest that
 # deploys with site/; read from the tree (not the live URL) so a new post lands in
 # the feed on the same deploy that publishes its permalink page.
@@ -71,6 +78,21 @@ DESC = (
 def rfc822(date_str: str) -> str:
     dt = datetime.strptime(date_str, "%Y-%m-%d").replace(hour=12, tzinfo=timezone.utc)
     return format_datetime(dt)
+
+
+def rfc822_instant(iso: str) -> str | None:
+    """An ISO-8601 instant (``2026-11-14T00:24:35+00:00`` / ``…Z``) as an RFC 822 date, or None."""
+    try:
+        dt = datetime.fromisoformat(str(iso).strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return format_datetime(dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc))
+
+
+def published_at_by_url(chapters) -> dict[str, str]:
+    """``{post url: published_at}`` for every published week /api/chapters serves with one."""
+    weeks = chapters.get("weeks") if isinstance(chapters, dict) else None
+    return {w["url"]: w["published_at"] for w in weeks or [] if isinstance(w, dict) and w.get("url") and w.get("published_at")}
 
 
 def esc(s) -> str:
@@ -224,6 +246,10 @@ def main() -> int:
     posts = data.get("posts", data if isinstance(data, list) else [])
     posts = [p for p in posts if p.get("date") and p.get("title")]
     posts.sort(key=lambda p: p["date"], reverse=True)
+    with urlopen(CHAPTERS_SRC, timeout=20) as r:  # #5946: a fetch failure fails the build, as SRC does
+        published = published_at_by_url(json.load(r))
+    for p in posts:  # chronicle items only: an essay's `date` (blog.json) is its publication day
+        p["_pub"] = rfc822_instant(published[p["url"]]) if p.get("url") in published else None
 
     # Freshness-guard the CHRONICLE feed only (it detects a dead source path);
     # Matt's essays are occasional by nature and must never trip it — merge after.
@@ -249,14 +275,13 @@ def main() -> int:
         excerpt = " ".join(chronicle_schema.body_markdown(p.get("excerpt") or "", p.get("title") or "").split())
         # Word-boundary truncation (#1224 helper) — never a mid-word slice (#1261).
         excerpt = truncate_at_word(excerpt, 360)
+        pub = p["_pub"] if "_pub" in p else rfc822(p["date"])  # #5946: chronicle = published_at; essay = its date
         items.append(
             "    <item>\n"
             f"      <title>{esc(p['title'])}</title>\n"
             f"      <link>{esc(tagged_link)}</link>\n"
             f'      <guid isPermaLink="true">{esc(link)}</guid>\n'
-            f"      <description>{esc(excerpt)}</description>\n"
-            f"      <pubDate>{rfc822(p['date'])}</pubDate>\n"
-            "    </item>"
+            f"      <description>{esc(excerpt)}</description>\n" + (f"      <pubDate>{pub}</pubDate>\n" if pub else "") + "    </item>"
         )
 
     xml = (

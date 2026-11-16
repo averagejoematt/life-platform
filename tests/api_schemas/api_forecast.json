@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T06:47:34.497546+00:00",
+  "captured_at": "2026-11-13T18:14:41.730906+00:00",
   "fetch_path": "/api/forecast",
   "is_prefix_sample": false,
   "path": "/api/forecast",
@@ -148,7 +148,7 @@
           },
           "type": "object"
         },
-        "length_sample": 4,
+        "length_sample": 8,
         "type": "array"
       }
     },

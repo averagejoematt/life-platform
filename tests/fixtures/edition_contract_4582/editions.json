@@ -1014,7 +1014,7 @@
     ],
     "absent_text": "The email schedule is not served right now.",
     "data": {
-     "promise": "At most three emails a week: the Weekly Signal every Sunday, the Chronicle installment on Wednesday (or Friday, when an unapproved draft auto-publishes), and an occasional between-chronicle note on Sunday when there is something new.",
+     "promise": "At most three emails a week: the Weekly Signal every Sunday, the Chronicle installment on Wednesday, and an occasional between-chronicle note on Sunday when there is something new.",
      "sends": [
       {
        "sender": "weekly-signal",
@@ -3361,7 +3361,7 @@
      ],
      "absent_text": "The email schedule is not served right now.",
      "data": {
-      "promise": "At most three emails a week: the Weekly Signal every Sunday, the Chronicle installment on Wednesday (or Friday, when an unapproved draft auto-publishes), and an occasional between-chronicle note on Sunday when there is something new.",
+      "promise": "At most three emails a week: the Weekly Signal every Sunday, the Chronicle installment on Wednesday, and an occasional between-chronicle note on Sunday when there is something new.",
       "sends": [
        {
         "sender": "weekly-signal",
@@ -3525,7 +3525,7 @@
      ],
      "absent_text": "The email schedule is not served right now.",
      "data": {
-      "promise": "At most three emails a week: the Weekly Signal every Sunday, the Chronicle installment on Wednesday (or Friday, when an unapproved draft auto-publishes), and an occasional between-chronicle note on Sunday when there is something new.",
+      "promise": "At most three emails a week: the Weekly Signal every Sunday, the Chronicle installment on Wednesday, and an occasional between-chronicle note on Sunday when there is something new.",
       "sends": [
        {
         "sender": "weekly-signal",

@@ -95,3 +95,92 @@ def test_the_cardio_composer_skips_a_fitness_test_block_and_still_composes_a_men
     n = cardio_cues.attach_cardio_cues(spec, catalog=catalog, cardio_index={}, whoop_index={})
     assert test_block.notes == walk, "the six-minute walk test lost its protocol note"
     assert n == 1 and menu_block.notes and not g.is_test_note(menu_block.notes)  # control: the composer still runs
+
+
+# ── #6020: a custom draft over a test day, and the battery draft's rationale ───────────────────────────────────
+# Seen live 2026-11-15: `draft_custom` tags every block `custom`, so the two passes that skip a test block by its
+# `fitness_test:` tag (the cardio composer, the lift-note composer) rewrote the protocol notes; and the battery draft's
+# rationale still described the full session it replaced.
+
+
+def _catalog() -> dict:
+    return json.loads((_REPO / "config" / "movement_catalog.json").read_text())
+
+
+def test_a_custom_draft_keeps_the_timed_test_note_on_a_custom_tagged_block():
+    walk = fitness_tests.test_note(_SPEC["six_minute_walk"])
+    block = _treadmill("custom", walk)
+    spec = SimpleNamespace(exercises=[block], target_date="2026-11-07", archetype="upper", inputs_snapshot={})
+    cardio_cues.attach_cardio_cues(spec, catalog=_catalog(), cardio_index={}, whoop_index={})
+    assert block.notes == walk, "draft_custom wiped the six-minute walk protocol"
+
+
+def test_a_custom_draft_keeps_every_test_note_through_the_lift_note_composer():
+    from mcp import draft_custom_session
+
+    blocks = []
+    for tid in ("dead_hang", "assisted_pull_up"):
+        row = _SPEC[tid]
+        sets = [Set(rep_range_start=int(row["reps"]), rep_range_end=int(row["reps"]))] if row.get("reps") else [Set()]
+        blocks.append(
+            ExerciseBlock(movement_key=str(row["catalog_key"]), sets=sets, notes=fitness_tests.test_note(row), rationale_tag="custom")
+        )
+    want = [b.notes for b in blocks]
+    ir = SimpleNamespace(exercises=blocks, target_date="2026-11-07", inputs_snapshot={})
+    draft_custom_session.compose_custom_notes(ir, _catalog(), {}, [])
+    assert [b.notes for b in blocks] == want, "draft_custom rewrote a fitness-test protocol note to the lift standard"
+
+
+def test_a_lift_note_that_only_mentions_a_test_is_still_composed_on_the_custom_path():
+    # negative control: the guard is the `Test ·` line 1, not the movement — an authored lift note is still the composer's
+    from mcp import draft_custom_session
+
+    key = str(_SPEC["assisted_pull_up"]["catalog_key"])
+    block = ExerciseBlock(
+        movement_key=key, sets=[Set(rep_range_start=8, rep_range_end=8)], notes="Test day: go light", rationale_tag="custom"
+    )
+    ir = SimpleNamespace(exercises=[block], target_date="2026-11-07", inputs_snapshot={})
+    draft_custom_session.compose_custom_notes(ir, _catalog(), {}, [])
+    assert block.notes != "Test day: go light"
+
+
+def test_the_battery_draft_rationale_describes_the_session_served_not_the_one_it_replaced():
+    anchor = ExerciseBlock(
+        movement_key="db_shoulder_press",
+        sets=[Set(rep_range_start=8, rep_range_end=10) for _ in range(3)],
+        notes="RPE 7",
+        rationale_tag="anchor:overhead_press:moderate",
+    )
+    accessory = ExerciseBlock(
+        movement_key="db_curl", sets=[Set(rep_range_start=10, rep_range_end=12)] * 3, notes="", rationale_tag="accessory:curl"
+    )
+    replaced = [
+        "week grid source=module (synthetic)",
+        "archetype=upper; session_role=shoulders_arms",
+        "rotated: Bicep Curl (Dumbbell) -> Seated Incline Curl (Dumbbell)",
+        "today: new to you, RPE 7 once: Seated Incline Curl (Dumbbell)",
+        "swapped: Seated Shoulder Press (Machine) -> Shoulder Press (Dumbbell)",
+        "14 sets over 6 movements (~49 min) + 0 warm-up set(s)",
+    ]
+    ideal = SimpleNamespace(
+        exercises=[anchor, accessory],
+        title="SHOULDERS+ARMS",
+        notes="",
+        caps={},
+        budget_used={},
+        inputs_snapshot={},
+        rationale=list(replaced),
+        target_date="2026-11-07",
+    )
+    due = {"state": fitness_tests.DUE, "due_on": "2026-11-07", "due_program_week": 6}
+    fitness_tests.apply_battery(ideal, _catalog()["movements"], due)
+    text = "\n".join(ideal.rationale)
+    served = [b.movement_key for b in ideal.exercises]
+    assert "db_curl" not in served
+    for stale in ("14 sets over 6 movements", "Seated Incline Curl", "Seated Shoulder Press"):
+        assert stale not in text, f"the rationale still describes the replaced session: {stale!r}"
+    n_sets = sum(1 for b in ideal.exercises for _ in b.sets)
+    assert f"{n_sets} sets over {len(served)} movements" in text  # what is served
+    assert "week grid source=module" in text  # the session-independent header is kept
+    kept = ideal.inputs_snapshot["fitness_battery"]["replaced_rationale"]
+    assert "14 sets over 6 movements (~49 min) + 0 warm-up set(s)" in kept  # nothing is lost, only moved off the live line

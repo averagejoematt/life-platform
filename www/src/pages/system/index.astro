@@ -5,7 +5,12 @@ import Base from "../../layouts/Base.astro";
 import CommentaryFeature from "../../components/CommentaryFeature.astro"; // the Coaching Room (CR2): renders nothing unless CR2 is on
 import RoomEntry from "../../components/RoomEntry.astro"; // the Coaching Room (CR1): renders nothing unless WEB_ROOM=1
 import { dayInWords, domainWords, kOfN } from "../../lib/format.js";
-import { loadAll, latestEdition } from "../../lib/snapshot.js";
+import { loadAll, latestEdition, loadCalibration } from "../../lib/snapshot.js";
+import { coachLead } from "../../lib/calibration.js";
+import { roomPublic } from "../../lib/room.js";
+import VersusGuess from "../../components/VersusGuess.astro";
+import OwnWords from "../../components/OwnWords.astro";
+import FourParts from "../../components/FourParts.astro"; // the four parts of the experiment; this door holds the AI
 import { href, pathOf } from "../../lib/url.js";
 
 const all = await loadAll();
@@ -15,23 +20,61 @@ const record = recordBlock && recordBlock.state === "ok" ? (recordBlock.data as 
 const coaches = [...all.byType.coach].sort((a, b) => (a.tier === b.tier ? (b.record?.n || 0) - (a.record?.n || 0) : a.tier === "lead" ? -1 : 1));
 const sources = [...all.byType.source].sort((a, b) => (a.status === b.status ? (a.label < b.label ? -1 : 1) : a.status === "live" ? -1 : 1));
 const methods = all.byType.method;
+// Checked first (2026-11-14, sprint II): the front page and each coach page lead with the record checked under the
+// current rules, beside a guess on the same calls; this page led with the ledger's unverified 49 of 95 and listed each
+// coach by it. Each coach row now shows the checked record against the guess (verification_summary.by_coach, as
+// served); the ledger's count as graded now stays beside it, smaller and labelled.
+let cal: any = null;
+if (roomPublic()) {
+  try {
+    const f: any = await loadCalibration();
+    cal = f?.state === "ok" ? f.calibration || null : null;
+  } catch {
+    cal = null;
+  }
+}
+const leadOf = (id: string) => (cal ? coachLead(cal, id) : null);
+// In his own words (2026-11-14, sprint II): the site's narrator is the platform; the one long piece of first-person
+// writing he has published is the essay on how this is built. A pull-quote from it stands on the engineering door —
+// ONLY sentences the published essay's body carries verbatim (checked at build; a sentence the essay no longer holds
+// renders nothing), attributed and linked. Nothing here is written for him.
+const OWN_WORDS = [
+  "A Claude Code session is a competent engineer with total amnesia.",
+  "It arrives knowing nothing about yesterday, works for a few hours, and then ceases to exist.",
+  "Early on I treated that as a limitation to apologize for.",
+  "The unlock was treating it as a constraint to design an organization around — the way real orgs design around the fact that employees quit, sleep, and forget.",
+];
+const essay: any = all.get("essay", "org-chart-of-one");
+const essayText = essay?.body_html
+  ? String(essay.body_html)
+      .replace(/<[^>]+>/g, "")
+      .replace(/&#39;|&#x27;|&rsquo;/g, "'")
+      .replace(/&amp;/g, "&")
+      .replace(/&mdash;/g, "—")
+      .replace(/\s+/g, " ")
+  : "";
+const ownWords = essay && OWN_WORDS.every((q) => essayText.includes(q)) ? OWN_WORDS : null;
 const steps = [
   "<b>Sources arrive nightly.</b> The scale, the strap, the watch, the food log, the lifting log, the running log, habits, supplements, tasks, weather.",
   "<b>Each coach reads one slice.</b> They don't share a brain, which is why they disagree.",
   "<b>Every claim is written down.</b> With a date, the metric it's about, the direction or value expected, and a window.",
   "<b>When the window closes, code grades it.</b> Confirmed, refuted, or expired for lack of readings. The grader is arithmetic with a tolerance band, not a language model.",
-  "<b>I publish the ledger beside a simple guess.</b> A grade that ran through a logging gap, or a band wider than the claim, is flagged by the grader and kept out of the clean rate.",
+  "<b>I publish the ledger beside a simple guess.</b> A grade that ran through a logging gap, or a band wider than the claim, is flagged by the grader. A flagged grade is marked and still counted; it is never counted among the clean grades.",
 ];
 ---
 
 <Base title="The system" top="system" description="Eight AI coaches read my life. Code marks their homework.">
+  <section class="wrap" style="padding-top:28px">
+    <FourParts here="ai" />
+  </section>
   <section class="section">
     <div class="wrap grid cols2" style="gap:56px;align-items:start">
       <div style="display:flex;flex-direction:column;gap:22px">
         <p class="label">Depth 1 of 3 · plain English</p>
         <h1>AI coaches read my life. Code marks their homework.</h1>
         <p class="dek" style="font-size:20px">
-          Every night my data lands in one place. Each coach reads one slice of it and writes down what it believes will happen next, with a date and a
+          Whether the AI adds anything is one of this experiment's open questions, and this is how it gets checked. Every night my data lands in
+          one place. Each coach reads one slice of it and writes down what it believes will happen next, with a date and a
           number. When the date arrives, a separate program checks. I don't grade them and I can't edit the result. Then I publish all of it, including the
           wrong ones. The coaches are software I built with Claude, not people.
         </p>
@@ -47,7 +90,7 @@ const steps = [
         </ol>
       </div>
       <div>
-        <div class="between" style="padding-bottom:10px"><span class="label">The coaches · the record</span></div>
+        <div class="between" style="padding-bottom:10px"><span class="label">The coaches · the record</span><span class="label">{cal ? "checked: coach v a guess" : "right, as graded now"}</span></div>
         <div class="rows">
           {
             coaches.map((c) => (
@@ -56,11 +99,25 @@ const steps = [
                   <b style="font-size:16px">
                     {c.name} <span class="muted" style="font-weight:400">· {domainWords(c.domain)}</span>
                   </b>
-                  <span class="mono muted" style="font-size:12px">
-                    {c.retired ? "Retired." : c.instrument_absent?.absent ? c.instrument_absent.reason || "No instrument." : c.tier === "lead" ? "The lead: no calls of its own." : c.comparison_text || ""}
-                  </span>
+                  {(c.retired || c.instrument_absent?.absent || c.tier === "lead") && (
+                    <span class="mono muted" style="font-size:12px">
+                      {c.retired ? "Retired." : c.instrument_absent?.absent ? c.instrument_absent.reason || "No instrument." : "The lead: no calls of its own."}
+                    </span>
+                  )}
                 </span>
-                <span class="mono" style="font-size:14px;white-space:nowrap">{c.record ? kOfN(c.record.right, c.record.n) : "—"}</span>
+                {leadOf(c.id) ? (
+                  <span style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;white-space:nowrap">
+                    <span class="mono" style="font-size:14px">{leadOf(c.id)!.k} v {leadOf(c.id)!.baseline!.right} <span class="muted">of {leadOf(c.id)!.n}</span></span>
+                    <span class="mono muted" style="font-size:12px">ledger {c.record ? kOfN(c.record.right, c.record.n) : "—"}</span>
+                  </span>
+                ) : cal && c.record ? (
+                  <span style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;white-space:nowrap">
+                    <span class="mono muted" style="font-size:14px">no checked record</span>
+                    <span class="mono muted" style="font-size:12px">ledger {kOfN(c.record.right, c.record.n)}</span>
+                  </span>
+                ) : (
+                  <span class="mono" style="font-size:14px;white-space:nowrap">{c.record ? kOfN(c.record.right, c.record.n) : "—"}</span>
+                )}
               </a>
             ))
           }
@@ -69,9 +126,26 @@ const steps = [
     </div>
   </section>
 
+  {
+    ownWords && (
+      <section class="section hair" data-own-words>
+        <div class="wrap" style="max-width:920px">
+          <p class="label">In my own words · on building it with AI</p>
+          <blockquote class="own-words">
+            {ownWords.join(" ")}
+          </blockquote>
+          <p class="muted" style="font-size:14px;margin-top:12px">
+            From my essay <a href={href(pathOf("essay", essay.id))}><b>{essay.title}</b></a>
+            {essay.date && dayInWords(essay.date) ? `, published ${dayInWords(essay.date)}` : ""}. The weekly chapters are written by the platform's narrator and published after I approve them; the essay is in my voice.
+          </p>
+        </div>
+      </section>
+    )
+  }
+
   <a href={href("/system/ledger/")} class="hair" style="display:block;text-decoration:none;border-bottom:1px solid var(--ink)">
     <div class="wrap between" style="padding:16px var(--pad)">
-      <b style="font-size:15px">↓ Depth 2 · The ledger — every prediction, graded, beside a simple guess</b>
+      <b style="font-size:15px">↓ Depth 2 · The ledger — the coaches' predictions, graded, beside a simple guess</b>
       <span class="mono muted" style="font-size:12px">for the follower who wants receipts</span>
     </div>
   </a>
@@ -79,10 +153,14 @@ const steps = [
   <section class="section">
     <div class="wrap" style="display:flex;flex-direction:column;gap:16px;max-width:900px">
       <p class="label">Depth 2 of 3 · the headline, from one producer</p>
+      {cal && <VersusGuess record={null} />}
+      {/* his own verdict on the AI (owner ruling 2026-11-15): beside the checked comparison, never in place of it */}
+      {cal && <OwnWords id="ai_verdict" class="system-words" note="My judgement on one day, beside the count above. The count is the measurement; this is what it was like to use." />}
       {
         record ? (
           <>
-            <h2 style="font-size:36px">{record.count_text || kOfN(record.right, record.decided)}</h2>
+            <h2 style={cal ? "font-size:22px;margin-top:10px" : "font-size:36px"}>{cal ? `The ledger as graded now: ${record.count_text || kOfN(record.right, record.decided)}` : record.count_text || kOfN(record.right, record.decided)}</h2>
+            <p class="muted" style="font-size:14px">As graded now: every call the ledger holds a right-or-wrong grade for today, with its recorded corrections applied and none re-verified. The re-verified comparison against a guess is above.</p>
             {record.counted_text && <p class="muted">{record.counted_text}</p>}
             {record.comparison_text && <p class="serif" style="font-size:18px">{record.comparison_text}</p>}
           </>
@@ -157,3 +235,19 @@ const steps = [
     </div>
   </section>
 </Base>
+
+<style>
+  :global(figure.system-words) {
+    margin: 6px 0 10px;
+    max-width: 760px;
+  }
+  .own-words {
+    margin: 12px 0 0;
+    padding: 0 0 0 20px;
+    border-left: 3px solid var(--cobalt);
+    font-family: var(--serif);
+    font-size: clamp(21px, 2.4vw, 28px);
+    line-height: 1.35;
+    color: var(--ink);
+  }
+</style>

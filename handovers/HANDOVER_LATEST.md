@@ -1,56 +1,133 @@
-# Handover — Depth restoration, autonomous night: the Journey and the Day live at the root, every chart answers, three pay-downs — 10 PRs merged, 9 root deploys, one rollback fixed within the hour (2026-11-02)
+# Handover — Backlog paydown 2026-11-15/16 beside Sprint IV: 16 PRs merged, three IAM narrowings and the hold-and-build rule live, owner-gated queue walked; Sprint IV's site-and-content wrap carried intact below (2026-11-16)
 
 ## Driving instruction
-After the v9 launch (2026-11-01) the owner commissioned a parity audit (125 historical capabilities: A17 / B41 / C64 / D3), approved the Journey, One Day, Coaching Room and Laboratory prototypes as product directions (revision 2), sent seven prototype sections to keep verbatim, and decided: Journey at `/data/journey/` linked from the weight page · silhouette deferred · projected date off Start · date parameters on three read-only endpoints · coach lines only through the existing filters · nutrition as logged, missing ≠ zero · DEXA scan two shown missing · fluid in-place Day browsing with URL/history in sync (never navigation-only) · Journey visual-QA tier 1, Day pages tier 3 sampled · chapter progress bar retired, other retirements pending. Then: "yes you can do all the production work and merge … continue this plan … use opus/sonnet accordingly to conserve fable." Start stays frozen until his visual review. Fable ran out mid-wrap; the wrap finished on Opus.
+Two sessions ran at once and both are recorded here. **The backlog paydown session** (owner, 2026-11-15): "this session is for everything else and trying to get as much improvements and paydown of our open git issues, plus housekeeping" — everything except the website, which a separate session owns. Mid-session the owner walked every `gate:owner` issue by prompt and ruled each; then "yes approved, go go go" for the waiting PRs and, explicitly, all four AWS steps (deploy-role apply; label, merge and deploy the grant narrowing; create the webhook secret, merge, deploy; S3 housekeeping). **The Sprint IV website session** wrapped first (65d11b4d3); its handover is carried verbatim in its own section below, and it was told by message that this wrap would keep it intact. Whichever session wraps next carries both sections forward.
 
-## What is COMPLETE (merged, deployed, verified live)
-- **M0 every chart answers + M1 the Journey layers 0–1** — PR #5580 (`69afaa072`) + #5582 (`e5ed127a8`, the phone label fix). #5578, #5579 closed with live proof.
-- **Footer "sample content" chip** — PR #5588 (`227e967ff`). #5581 closed.
-- **Coach names in disagreement verdicts** — PR #5587 (`cf4ad8050`); the build refuses a raw persona id. #5572 closed.
-- **M3a date windows** on `/api/workouts`, `/api/sleep_detail`, `/api/nutrition_overview` — PR #5590 (`5a0eba3ad`), fleet deploy run 41396844099; `?date=` / `?from=&to=` (≤ 92 days, clamped, `window` echoed, 400 on a bad date, bare responses unchanged). #5584 closed.
-- **M3b the Day object** — PR #5591 (`2e3fb3804`): `/data/day/<date>/` for all 57 days, readings against their own 7/30-day normals (computed at export), 14-day strip, scrubber, in-place swap with `pushState` + title + canonical in sync (proven on production: zero reloads, back/forward restore). #5585 closed.
-- **M4 the Day's layers 2–3** — PR #5592 (`c6b5da702`): session set by set, night by two devices, recovery decomposed, food as logged with the platform's gap flag, engine score (absent shown as absent), coach lines, calls graded and open; every block has its in-place unavailable state. #5586 closed.
-- **Chapter pages → their seven days** — PR #5594 (`fd0028536`). #5593 closed.
-- **M2 the Journey layers 2–3** — PR #5589 (`c70d77a60`): the pace (the one published rate + 95% interval), the milestones ladder, the body (DEXA baseline, visceral gauge, "Missing: scan two", PhenoAge drivers, no chronological age anywhere), RHR + HRV in device eras, the coaches on the weight. #5583 closed. Root run 41415741597 green.
-- All seven owner keep-verbatim sections are on production. Every root deploy ran smoke + visual + AI-vision QA; only the first (M1) rolled back.
+## Backlog paydown session — what is COMPLETE (merged, deployed, verified live)
+- **Merged:** #6009, #6010, #6034, #6061, #6073, #6074, #6075, #6076, #6078, #6082, #6086, #6093, #6095, #6097, #6098, #6099, #6101 (17 with #6075's blocker fix).
+- **The ADR log's 180-day stamp** expired 2026-11-15 and failed `Wiki drift gates` and the full suite on every PR — PR #6075 re-verified it against the generated index. Main went red→green on it.
+- **Merge gate:** `assert_pr_green.py` judges only the latest run per check (#6073; #6062 closed on live proof against #5897's superseded runs). Posture sentinel: an unreadable repo-settings field is `unavailable`, not drift (#6074).
+- **NaN/Inf guards** on every float→Decimal walker, found by shape (#6034); verified by content in the deployed `character-sheet-compute` and `daily-metrics-compute` bundles. One residual walker in the training package stays on #5524.
+- **Test suite:** five slow tests 57–113 s → 4–19 s (#6078); a `serial` test now runs alone under xdist through a shared/exclusive checkout lock (#6093) — a bare `pytest tests/ -n 8` on main passed 39,201 with 0 failures (#6024 closed).
+- **Review clock:** a lens whose estate sweep is incomplete keeps its old from-scratch date for runs on/after 2026-11-15 (#6076, Refs #6068).
+- **Workout notes:** three contradictions fixed (#6082, Refs #6020).
+- **Hold-and-build (#6015, owner-ruled 2026-11-16)** — PR #6099 (25c332914): after the engine raises a load, it holds while reps build; reverts only on a miss beyond +1 RPE, a slip under the floor, or three stalled exposures. Both thresholds read from the charter at use. Live in `life-platform-mcp` and `hevy-routine-cron` (verified by content). The dumbbell-row 65/60 bounce is gone in the simulator; other lifts unchanged.
+- **Equipment confirmations (#5771/#6014)** — PR #6061 (8b442a395): twelve machines confirmed, gym-start window, heavy row pinned to the one-arm dumbbell row; library 0.4.1 (20 movements unknown→available, rebuilt through the builder). **S3 twin synced to 0.4.1, byte-identical to the repo**; the prior object version stays in the versioned bucket and a private copy is kept.
+- **CI deploy role (#5544, closed realized)** — PR #6097 applied with `bash deploy/setup_github_oidc.sh`: Lambda writes limited to the `ci/lambda_map.json` fleet (no `function:*`, layers or InvokeFunction), S3 to `deploys/ site/ config/ www-previous/` + the IAM-gate ledger. `verify_oidc_iam.py --strict` CLEAN on 17 identities; CI deployed under it with smoke green. PR #6101 retired the pending entry. Pre-apply policy and trust snapshots kept privately.
+- **Nine surplus metric grants (#5905)** — PR #6086 + `bash deploy/cdk_deploy.sh LifePlatformIngestion LifePlatformCompute LifePlatformEmail LifePlatformMcp LifePlatformOperational` (all five ✅, 04:53Z). `LifePlatform/AI` is gone from the narrowed roles.
+- **HAE webhook key split (#5513 c)** — `life-platform/hae-webhook` created by copying the token without displaying it (`MATCH`); PR #6098 merged, Ingestion deployed; the new auth module is in the deployed webhook bundle. The role still reads the bundle during cutover — exposure is NOT reduced until the follow-up.
+- **Account password policy (#5513 f)** applied and read back (14+, four classes, reuse 24, no forced expiry).
+- **Harness (#5515)** — `~/.claude/hooks/notify.sh` expiry fixed in place (backup beside it; stale `.start` files 135→0); ask-list gaps and absolute-path hooks in PR #6095 (no prompt on a plain `git push`, owner's choice).
+- **One-day echo repair (#4968)** applied for 2026-10-25 (steps 144 and active calories 423 echoes removed; row backed up privately).
+- **Closed on live proof:** #5931, #5980, #6062, #5949, #6024; #5779 retired by ruling; #5544 given its verdict. Live proofs recorded on #5611.
+- **Housekeeping:** 16 stale worktrees retired with verified bundles in `~/Documents/Claude/worktree-archive-2026-11-15/`; backlog hygiene 58 → 0 (#6014–#6025 brought to the issue contract); memory backup synced to S3; the block-1 retro rendered to `~/Desktop/Block-1 Training Retro 2026-11-08.pdf` for the owner (#5496).
 
-## TESTED, merged, NOT run against production (owner-authorised acts only)
-- none — everything merged this session is deployed and verified at the root.
+## Backlog paydown session — built and NOT live
+- **#6096 (draft, Refs #6066)** — the exact-boundary rule (owner-ruled 2026-11-16: an exact boundary counts as reached): headline level by exact fractions, engine 1.9.0. **Held until the website sprint ends** (owner ruling 2026-11-15). It also edits `site/method/game/index.html` through its generator — the website session was told. After merge, the 2026-11-14 recompute is an owner step written in the PR body (it un-tombstones that receipt).
 
-## Owner rulings applied after the wrap (2026-11-02, same session)
-- **#5596** — keep both Start statements; fix the QA rule: PR #5601 (`0d90963f0`, rubric clause + structural ruling, qa-smoke Lambda deployed). Open until the next nightly smoke reads `fail none -`.
-- **HRV CI coverage + the 300 lb milestone** — PR #5600 (`e4588e030`, root run 41489096100 green): HRV covered via fixture-only `journey.json` `heart_series` (Start untouched, reach 12); every crossed rung keeps its date, "Week 8 · held" shown unlinked, missing chapters read "no chapter yet". #5598 closed.
-- **#5597** — the render gate measures SVG text at 390/360 against 11 px: PR #5599 (`8386410d1`). Closed.
-- **Production review package** delivered (`~/Desktop/averagejoematt-production-review-journey-day-2026-11-02.zip`): full-page screenshots, three interaction recordings, 20/20 interaction checks, the uncached homepage response (ETag 463cf230…, Last-Modified 15:39:43Z).
-- **Hold:** Coaching Room, Laboratory and Story timeline stay on hold until the owner reviews Journey and Day. No further feature work.
+## Backlog paydown session — awaiting the owner
+- **Read the retro PDF** on the Desktop so #5496 closes.
+- **The two retired coach configs** (`config/coaches/training_coach*.json`) keep Config twin drift (#5973) red. **The bucket policy explicitly denies `s3:DeleteObject` under `config/`, even to the admin SSO role** — a deliberate guardrail, not worked around. Both are backed up privately. Needs a ruling: a sanctioned delete path, or the audit treats the two keys as retired.
+- **The two rhythm checkpoints** (30- and 60-day reads, or a dated exemption) keep the operating-calendar dead-man (#6026/#5935) red.
+- **A MacroFactor export** — Monday's public brief held the nutrition coach for stale calories (the live cause of `qa-smoke-warnings`).
+- **The tape and photo set** that clears `calibration-deadman` (working as designed).
+- **HAE phone-side selections** and `docs/HAE_SETTINGS.md` (#4968).
+- **GitHub notification mail:** the owner's watch is already "Participating"; Dependabot PRs still mail because `.github/CODEOWNERS` requests him as reviewer on every PR. Options given: a mail filter on `review_requested@noreply.github.com`, or change CODEOWNERS (check branch protection first).
 
-## AWAITING THE OWNER
-- **Start's visual review** (stabilization) — the new pages are reached from the data room, the weight page and chapter pages, not from `/`.
-- **His visual and interaction review of the Journey and Day** (acceptance is subject to it).
-- The remaining proposed retirements (S09/A32, A07 deferred, A27, A30, M11) and the next restoration milestones (Coaching Room CR1–CR4, Laboratory L1–L4, Story HS1–HS3) — not started; his review first.
+## Backlog paydown session — gotchas learned
+- **Re-running a failed `IAM additive gate` job replays the original event** — a label added afterwards is invisible to it. Remove and re-add `owner-required-ack` to mint a fresh `labeled` run.
+- **A CI run that plans before an owner-required CDK deploy finishes fails Plan** even after the deploy lands; the first run whose Plan starts after the last stack completes plans clean and carries the accumulated diff. Compare the Plan job's start time with the stack's `LastUpdatedTime` before re-dispatching.
+- **A canonical doc's `Verified:` stamp crossing 180 days reds every open PR at once** (`check_doc_index.py` hard ceiling): it looks like a wave of unrelated failures.
+- **A PR whose rollup has no pending checks may still be missing the full-suite lane** — it attaches late. Watch with `assert_pr_green.py` (it treats a missing expected check as not green), never a bare pending count.
+- **`config/` in the data bucket is delete-denied by resource policy**; `PutObject` overwrite works (the bucket is versioned).
+- `deploy/verify_deployed_symbol.sh` takes three arguments: function, path in bundle, symbol.
 
-## Gotchas learned (each in memory)
-- A fixed mobile viewBox scaled into a phone column shrinks SVG text below the visual sweep's 11 px floor → rollback; pass the container width as the viewBox, and measure effective text before a root deploy (`reference_a_phone_chart_viewbox_must_follow_the_container`; class tracker #5597).
-- A rollback after a www merge restores only the previous build's paths — new pages keep serving beside reverted ones (a mixed root) until the next green run.
-- `scripts/publish_snapshot.py` sits at the module-size guard; new mappers go in their own modules (`publish_snapshot_journey.py`, `publish_snapshot_day.py`).
-- A live build rewrites `www/owned_paths.json` + `www/reach.json`; always re-export the fixture and rebuild before committing.
-- axe cannot be injected under the live CSP; measure it in a `bypass_csp` context only. Playwright taps during smooth scroll miss.
-- An Opus lane agent went silent mid-merge for 2.5 h (conflicts resolved, nothing committed); took the merge over by hand. The commit-msg hook requires a Conventional Commit subject even on merge commits (`chore(merge): …`).
+## Sprint IV website session — carried verbatim from its 2026-11-16 wrap (65d11b4d3)
+Its driving instruction: two owner briefs (2026-11-15 and 2026-11-16) on website and content — the owner's own words on five pages, the four-part standing, calls 1/2 with dated notes and call 5 corrected, the core-12 identifier closed without rewriting history, reader writes isolated in IAM, one guard over every public copy. Private log: `~/Documents/Claude/sprint4-2026-11-15/LOG.md`. Its archived file: `session-archive:handovers/HANDOVER_2026-11-16_Sprint_IV_Site_And_Content.md`. Two of its lines are superseded by the paydown session: PR #6061 is live with the library's S3 twin at 0.4.1, and #5544's verdict is written.
+
+### What is COMPLETE (merged, deployed, verified live)
+- **The owner's own words** — PR #6077 (18b8e23fa) + PR #6080 (b6f4f95fa). Five lines he approved are marked (`mark_journal_quote`), pinned in `www/src/lib/own_words.js` with day, exact text, consent key and the one page each may appear on, and rendered only when pin and served file agree; `check_www_build.py::own_words_scope` refuses a line anywhere else. Candidates 3, 7 and 8 stay private. A per-date cap exception (`OWNER_RULED_DAY_CAPS = {"2026-11-08": 4}`) exists because four approved lines share one entry.
+- **Where the experiment stands** — PR #6080 and PR #6104 (4c1bef846). The front page opens on four parts — body (measured), behaviour (being tested), life (not established), the AI (37 v 39 on the same 72 calls, no detectable difference) — from one producer, `www/src/lib/standing.js`; `/story/`, `/data/` and `/system/` carry the same four as a strip marking the part the page holds. The Line keeps its chart. With the comprehension judge's blind reader on a local live-data build, Home and Story readers no longer describe a weight-loss experiment and `/data/` reads as one part of a broader one. PR #6080 also carried the chapter-window helper (#6081, closed) and the label contract (#5953, closed).
+- **Calls 1 and 2 with dated notes; 6 and 8 say what was tested** — PR #6092 (d41138d29, closes #6079): `narrative_allowlist.OWNER_NOTES`, 14 ledger rows show their words.
+- **Call 5 corrected (#6102, closed)** (owner approval 2026-11-16; classification only — its words stay withheld) — PR #6103 (8ebaf7f9a) registered the reader rule `#5611:n+owner-2026-11-15`; then one ledgered correction (`refuted` → could not be checked, the stated condition was not established) and one verification record at 2026-11-16T05:38Z. No threshold was invented. A diff of the ledger partitions against the pre-write backup (3,848 items) shows that one row changed and two audit rows were added. Stored rows reconcile with the live routes: 208 eligible = 72 + 136; coaches 37 of 72, the no-change guess 39 of 72, verdict unchanged; ledger 49 right, 45 wrong; the sleep coach 15 of 33. The site was rebuilt (run 43811776193); Home, System and the calibration page carry no stale 73.
+- **A ruled call no longer says "not enough data"** — PR #6107 (ff7d0d70d) + PR #6110 (3e28f0020). 91 ruled calls on the ledger now read "a ruling took this call out of the accuracy count — the correction on this call says why". The first wording was served empty: the publication gate blanks a sentence sharing a six-word run with a withheld row's stored text.
+- **Core-12 identifier** — PR #6105 (1e1d24541, closes #6090) and, before it, PR #6089 (c4c028c46). The public charter carries the neutral alias `core_h10`; the stored id is owner data in the habit registry (two `core_alias` entries on the profile record, written by this session after a backup). No historical row was rewritten and no git history was rewritten. A sweep of every tracked file on main for the six private habit names and the id finds none; `check_habit_registry_drift.py --live` is OK.
+- **Reader challenge check-ins isolated (#6087, closed)** — PR #6106 (1333b56ac) + `bash deploy/cdk_deploy.sh LifePlatformServe` from main (54.9 s, sensor self-test 24/24), run under the owner's instruction to enforce isolation in IAM. Live: the public Site API role's write statement no longer names the owner's challenge partition and names `CHALLENGE_CHECKINS#*`; an anonymous `POST /api/challenge_checkin` answers 403; `GET /api/challenges` reports `reader_checkins_open: false`. The owner's own check-in is the MCP tool `log_challenge_checkin`. The public feature stays off until he turns it on.
+- **Privacy build-record entry** — PR #6085 (7c2cac527): one factual beat, an incident row and the three-copies procedure in the `land` skill. The public archive was regenerated and audited from the download on 2026-11-15.
+- **One guard over every public copy (#6083)** — PR #6109 (e57c24e72). `scripts/check_public_copies.py` reads, as an anonymous reader would, the root, the `/next/v9/` preview, the older `site/` pages, the retired `/_v9_previous/` prefix and the downloadable archive, and holds each to four rules: no page the newest build did not write, no stale copy, the publication policy on every copy (own-words scope, withheld words, the age-inversion attack over the archived API), and no dead sitemap or feed address. It runs as the `public-copies` job after every v9 sync and writes nothing. A red guard fails the run and sends one line to the alerts digest; it does NOT roll the root back (a revert repairs no other copy, and during a privacy fix would restore the pre-fix build). Repair is by hand: `python3 scripts/check_public_copies.py --remediation` prints the commands; `deploy/quarantine_public_copy.sh` copies an object to `backups/quarantine/public-copies/<stamp>/`, verifies the copy, then removes the public one. Nothing is deleted outright.
+  - **What it found on production, and what was done:** three orphaned `/story/*` pages (two empty shells from June, one week-10 placeholder from 2026-11-12) and the whole `/next/v9/` preview (667 objects, built 00:03Z) were quarantined on 2026-11-16 at 07:21Z, each private copy verified and answering 403 to an anonymous reader. No live page or sitemap linked to them. **The preview is now EMPTY outside a rehearsal** (`www/README.md`).
+  - **First live runs:** the scheduled 15:39Z deploy (run 43898729599) went red on the guard alone — the 07:03Z nightly archive still carried 642 preview pages and the three quarantined pages — and the rollback job declined, as designed. The archive was regenerated at 16:05Z with the deployed admission rule (1,657 entries, no `web/next/**`), `/archive/*` invalidated, and `--remediation` then exits 0 on production. The next root deploy (run 43905785793) passed the guard job at 16:22Z, and #6083 closed on that proof.
+  - The lane also moved `tests/age_inversion_lib.py` to `qa/` (a shim stays in `tests/`), and this session added a retry: two production runs each aborted on one transient read in about 1,570.
+- **Wrap** — ADR-169 (public participation never writes the owner's record), two alarm re-cites, three ledger rows.
+
+### Built and NOT live (waiting on the owner)
+- **Reader's own call beside the coach's — draft PR #6108** (Refs #6088; branch `issue-6088-reader-prediction-dark`, lane still locked). One tap per open call, counters only under `READERCALL#<call id>`, no text, no account; switch `READER_CALL_LIVE` committed off (the route answers 404 and the build is byte-identical with it off). Its tests show no path writes an owner partition and that the ledger, predictions and calibration responses are identical with and without reader rows. **The same PR carries shared abuse controls that WOULD go live on merge** — one identity per IPv6 /64, a `predict_week` meter, write doors that refuse when the limiter errors — so it stays a draft for his go. It is red on one doc literal (`docs/ONBOARDING.md` endpoint count; `/reconcile-branch` settles it). Screens: `~/Documents/Claude/sprint4-2026-11-15/owner_review/4_reader_call_private_prototype.png`.
+
+### Carried from the other sessions (not re-verified here except where stated)
+- **Training engine live since Monday 2026-11-16** (library 0.4.0; PR #5858). PR #6061 merged overnight (8b442a395, seen on main): equipment confirmations, the gym-start window floor, the heavy row pinned to the dumbbell row. Two-week observation to 2026-11-29 under epic #6014: fix genuine production defects only, no broad red-team cycles, no automatic deactivation. Private files: `~/Documents/Claude/backlog-paydown-2026-11/session-2026-11-15-launch/`.
+- **The paydown session's rollback copies** of live state read before each approved AWS write are kept privately by that session; its merges of 2026-11-15 are on the archived handover (`session-archive:handovers/HANDOVER_2026-11-15_Sprint_III_Close_Out.md`).
+- **This session was suspended for about 7.5 hours** (the laptop slept between 08:35Z and 16:05Z) with #6109 merged and deployed but the archive not yet regenerated; the scheduled 15:39Z deploy therefore ran the new guard against the old archive and went red once. Nothing was running in the background across the gap, and nothing is left running now.
+
+### AWAITING THE OWNER (nothing to build until he answers)
+- **Go or no-go on #6108**, and the **edge-rate (WAF) decision** recorded as overdue since 2026-10-15 in `docs/PROPORTIONALITY.md` — the bot check in #6108 does not stop a botnet spread across many networks.
+- **Three older public locations** the guard lists but does not fail: `site/chronicle/` (31 documents), `site/evidence/` (40) and `site/now/` (1). Keep, redirect or quarantine.
+- **Three old private S3 objects** that hold the core-12 habit's label (two under `dashboard/config`, one under `datadrops-archive`; each answers 403 to an anonymous reader). Cleaning them is an S3 write only he approves.
+- **Turning the public challenge check-in on** (`PUBLIC_CHECKIN_LIVE`), and whether the two reader queues still under owner-named partitions move (#6088).
+- **Week 10's Panel episode** — #6112: published 2026-11-14 with no episode and no hold marker where the check reads one; it holds `qa-smoke-failures` red.
+- Carried, unchanged: the exact-boundary level (#6066), the `security.A.1` review anchor wording, and the owner question before Monday's routine is redrafted (private memory `project_training_engine_live_2026_11_15`).
+
+### Gotchas learned (each in memory or the repo)
+- The publication gate empties any served sentence that shares a six-word run with a withheld row's stored text, and what it blanks depends on what the Lambda container has read (#6111). Test a new API sentence against `narrative_publication.is_tainted`, then read the live field.
+- An empty `AWS_ACCESS_KEY_ID` in a test's environment is not "no credentials": the CLI falls back to `~/.aws`. Stub `aws` on PATH and point both credential files at `os.devnull` (`.claude/agents/worktree-implementer.md` rule 3c).
+- Removing an IAM grant trips the owner-required Plan gate like adding one: label the PR `owner-required-ack`, deploy the stack from main after merge, then re-run the failed Plan.
+- `tests/test_css_tokens.py` pins the v9 breakpoint set; `scripts/publish_snapshot.py` sits at its 1,000-logical-line ceiling (new exporter code goes in its own module); a newly read route needs a fresh shape baseline.
+- A guard that reads ~1,570 documents anonymously loses about one read per run to a transient error; it retries before naming a key.
+- The `~/Desktop/owner-review-*` folders disappeared during the session (not removed by it): owner-review files now live under `~/Documents/Claude/sprint4-2026-11-15/owner_review/`.
 
 ## Residual / next picks
-- #5596 — close on the next nightly smoke reading `[QA] CAUSE fail none -` (the rule fix is deployed).
-- #5577 — the restoration epic: next milestones (CR/L/HS/DM) need the owner's review of tonight's pages first.
-- #5573 — the parallel session's open item: `program_structure.py` still names `romanian_deadlift_*` (held for stabilization); lateral-raise/triceps questions unanswered.
-- not-work — the owner's five-reader review of the launched site is his (2026-11-01 ruling).
+Both sessions' queues, merged; the website session's items are unchanged except where this session's merges moved them.
+- #5905 — the 24-hour check for `AccessDenied` on `PutMetricData` in the nine narrowed functions' logs, due ~2026-11-17T05:00Z; closes on it.
+- #5513 — (c) a CloudWatch read of `hae_auth_key_source source=dedicated` after the phone's next delivery; then, after several days of that, the follow-up that removes the fallback, the webhook's bundle grant and the bundle's token field (an owner-attended Ingestion deploy). (e) and (g) not taken up.
+- #6066 — draft #6096 held until the website sprint ends; then merge and the owner's 2026-11-14 recompute.
+- #6015 — the hold-and-build rule is live; open for its own acceptance, a per-lift prescribed-vs-achieved table over the observation window.
+- #6100 — deload and red-recovery days are not excused on the live progression path (filed this session).
+- #6020 — #6082 merged; the live confirmations remain, plus an unverified lead recorded on the issue (the session-shape step dropping test-day cardio blocks).
+- #6068 — gate merged (#6076); closes on the first real full-review artifact dated on/after 2026-11-15.
+- #6071 — fix merged (#6074); closes on the first sentinel run reading `unavailable` (or `clean`) for repo settings.
+- #5524 — one walker left unguarded in `lambdas/training/variant_rotation.py` (fenced during the training observation window, to 2026-11-29).
+- #5514 — the five-test slice is merged (#6078); the rest of the issue (per-test timeout, visual QA share, action pins) stays.
+- #5973 — Config twin drift: the two retired coach configs cannot be deleted under the bucket's `config/` deny; owner ruling needed.
+- #6026 — operating-calendar dead-man: the two rhythm checkpoints are the owner's.
+- #5496 — closes when the owner has read the retro PDF.
+- #5947 — read the first armed run of the nightly live PII sweep (17:05Z scheduled run).
+- #5857 — its acceptance boxes were not verified against main this session; read them before calling it done (#5856 rides on it).
+- #5797 — closes on the first live paired calibration set.
+- #6108 — draft, Refs #6088: the reader-call prototype and the shared abuse controls; needs the owner's go, `/reconcile-branch` for one doc literal, then an ask-first `cdk_deploy.sh LifePlatformServe` for the `READERCALL#*` key before any go-live PR flips `READER_CALL_LIVE`.
+- #6088 — still owed after #6108: verification on the follow doors, a review path for submitted findings, the bot check on the other four doors, `challenge_checkin` failing closed on a limiter error, the two reader queues under owner-named partitions (ADR-169 item 3), and the owner's edge-rate decision.
+- #6111 — the publication gate blanks by container state: the same request can return different bodies, and it can make the guard's archive-words rule red with no real violation.
+- #6112 — week 10 has no Panel episode and no hold marker; owner-gated; holds `qa-smoke-failures` red.
+- #6113 — `weeks:absence_agreement` spends its 60 s budget on `api_status` and reports NOT OBSERVED.
+- #6067 — open until the scheduled comprehension-judge run reads the four-part strip on main; small literals left on the front page and Story ("Fig. 2 … eight weekly means"; "Start at the beginning · Week 1" though a prologue comes first).
+- #6090 — closed; not-work — an ops verification: after the 2026-11-17T01:00Z daily compute, confirm the new `habit_scores` row's `core_status` keys equal the previous day's (compare sets, never print them) and that `/aws/lambda/daily-metrics-compute` logs no `[core-habits] core alias` warning.
+- #5776 — the block accessory proposal for the owner's approval, now that #6061 is merged.
+- #5813 — closes on a live `plan_next_session` completing on Lambda (three `draft_custom` REPORT lines at or under 18 s).
+- #6025 — the kb_entry repoint.
+- #6040 — draft (site roles read only their partition families, Refs #5543): goes LAST, rebased over #6106, then an ask-first deploy of `LifePlatformServe` and `LifePlatformWeb` and a full `/qa` sweep.
+- #5928 — known flake: `tests/test_site_api_derived_phase_4088.py` fails around midnight Pacific; re-run it.
+- #5550 — open PR codifying the laptop memory-backup IAM user, waiting on the owner; #5678 — a draft moving the local MCP bridge to the SSO profile; Dependabot #5887 (astro, `www/`) is the website session's to triage.
+- #5939 — residual "podcast most weeks" no-JS fallback in five shells; dated follow-ups carried: #5933 on the next weekly_priority and Wednesday chronicle, #5575 with #5759, #5761, #5772 on Monday 2026-11-16's weekly run, #5106 and #5123 after Monday's check-in, #5421 after 2026-11-16, #5821 box 4 on 2026-11-19, #5221 closes 2026-11-20, #5802 on one live plan.
+- not-work — owner-only calls listed under the two AWAITING sections: #6108's go, the three legacy locations, the three private S3 objects, the public check-in switch, the coach-config ruling, the rhythm reads, the MacroFactor export, the tape/photo set.
+- not-work — `backups/quarantine/public-copies/20261116T072125Z/` (3 objects) and `…/20261116T072131Z/` (667) are the private copies of what was taken off the site; `backups/` has no expiry rule.
+- not-work — Monday 2026-11-16's routine is already in Hevy: do not let the nightly debrief overwrite it, and ask the owner the one open question (private memory, `project_training_engine_live_2026_11_15`) before any redraft. The observation window runs to 2026-11-29 under epic #6014; its review routine fires 2026-11-30 at 16:00 UTC.
 
-**Build beat:** 2026-11-02-the-depth-came-back
-**Docs:** `docs/INCIDENT_LOG.md` (+1 P3 row, Patterns regenerated) · `docs/alarm_citations.json` (qa-smoke-failures / -warnings re-cited to #5596) · `docs/OPERATING_KNOWLEDGE_LEDGER.md` (+6 rows, snapshot + counters) · `docs/API.md` (the day window, in #5590) · `www/README.md` (the Journey and Day objects)
-**Decisions:** none needed — every rule shipped tonight is an owner decision of 2026-11-02 recorded on epic #5577 and its stories; no governance change
-**Main:** green (c70d77a6)
-**Incidents:** 1 row added — the Journey's first root deploy rolled back on a 9.1 px SVG label (P3, loud; class tracker #5597)
-**Stash/hooks:** clean · worktree-reap removed 11 merged lanes; no dirty lane
-**Closures:** #5578, #5579, #5581, #5572, #5584, #5585, #5586, #5593, #5583 commented (Shipped + Live proof + Outcome realized) · DoD: scanned=11 hits=0
-**Backlog:** Now live at 10 (sonnet 4 · opus 10 · fable 2 startable); filed this session #5577 (epic), #5583–#5586, #5593, #5596, #5597; no promotion needed
-**Alarms:** qa-smoke-failures / qa-smoke-warnings re-cited to #5596 (new episode 2026-11-02 06:19Z, reader_truth on the Start portrait); the failures citation names `reader_truth:verdict` while the latest run reads `-` because the daily-period alarm still holds the 06:19Z bucket — decoded, it clears at the first clean daily evaluation; calibration-deadman (#3759) and chronicle-delivery-heartbeat (#4531) unchanged
-**CI warnings:** 5 — all the same intentional skip ("SKIPPED in CI — no playwright/chromium installed here", #3640); no action
-**Ledger:** none — no standing machinery shipped (the web gate's new chart-answers check is a check inside the existing gate)
+**Build beat:** none from the paydown session — its reader-visible change is nil (IAM, tests, gates and training defect fixes); Sprint IV's beat `2026-11-15-an-unintended-inference-found-and-closed` landed in PR #6085
+**Docs:** `docs/DECISIONS.md` re-verified (#6075) · `docs/alarm_citations.json` (qa-smoke-warnings re-cited to the live cause `public_brief:cycle_liveness`) · `infra/iam/README.md` (#6097) · `docs/coaching/ENGINE_ARCHITECTURE.md` (hold-and-build, #6099) · `docs/engines/CHARACTER.md` (#6034) · cost/secrets docs with #6098 · `CLAUDE.md` (status pointer); Sprint IV's docs as in its section
+**Decisions:** none needed from the paydown session — every change carries an owner ruling recorded on its issue; Sprint IV filed ADR-169
+**Main:** green (65d11b4d) · HEAD 8994674e (Sprint IV's #6108 is NOT merged; that sha is the website session's later push) had its run in flight at wrap
+**Incidents:** none from the paydown session — main was red on the expired ADR stamp for ~40 min (fixed by #6075) and three CI runs failed Plan in the expected owner-required window around the 04:53Z CDK deploy; named here, not incident-class. Sprint IV added 1 row
+**Stash/hooks:** clean · worktree-reap removed 4 more lanes at this wrap; 16 retired earlier with verified bundles; the 10 `agent-*` worktrees inside the repo stay locked to a live process (pid 93862)
+**Closures:** #5931, #5980, #6062, #5949, #6024, #5544 (verdict written at this wrap), #5779 (retired) commented · DoD: scanned=15 hits=0 blocking=none
+**Backlog:** Now live at 17 in the opus lane (sonnet 2, fable 1); 3 more Now stories are owner-gated; Later sweep — no stale Later issues; hygiene 0 violations. Filed this session: #6100. Open 111
+**Alarms:** all lit alarms cited after one re-cite — qa-smoke-warnings → #5928 (live cause `public_brief:cycle_liveness`: Monday's cycle held nutrition for stale calories and glucose for no source); qa-smoke-failures → #6112
+**CI warnings:** 5 — all five are the intentional playwright/chromium skip in `test / Unit Tests` (#3640): no action
+**Ledger:** none — no standing machinery shipped by the paydown session (the checkout lock is test-harness behaviour inside the existing suite, not a new gate); Sprint IV's public-copies guard row is in `docs/PROPORTIONALITY.md`

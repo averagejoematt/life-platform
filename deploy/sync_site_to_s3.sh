@@ -16,6 +16,8 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
+# #6116: under a test runner, real AWS is unreachable from this script (deploy/lib/prod_write_guard.sh)
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prod_write_guard.sh"
 
 # Portable in-place sed. This script runs both locally (macOS / BSD sed, needs the
 # empty '' suffix arg) AND in CI (GitHub Actions ubuntu / GNU sed, which rejects it).

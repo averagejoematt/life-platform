@@ -59,8 +59,11 @@ from publish_snapshot_calibration import (  # noqa: E402 — the Coaching Room's
 from publish_snapshot_chapters import (
     CALL_OUTCOME,
     apply_week_intervals,
-    clean_excerpt,
+    chapter_summary,
+    quality_counts as _quality_counts,
+    versus_guess,
     week_id as _week_id,  # None for a withdrawn installment: never a chapter (owner ruling 2026-11-10)
+    whole_sentence_summary,
 )  # noqa: E402 — one vocabulary for weeks, excerpts and calls
 from publish_snapshot_coach_room import (  # noqa: E402 — the Coaching Room's coach profiles, WEB_ROOM=1 only (CR2)
     fixture_coach_room,
@@ -107,6 +110,7 @@ from publish_snapshot_contract import (  # noqa: E402,F401 — re-exported: the 
     load_fixture_data_files,
     load_fixtures,
     log,
+    noted_claim,
     partition,
     reference_copies,
     validate,
@@ -125,6 +129,7 @@ from publish_snapshot_lab import (  # noqa: E402 — the Laboratory's data file,
     live_lab,
     resolve_and_validate as resolve_lab,
 )
+from publish_snapshot_own_words import resolve as resolve_own_words  # noqa: E402 — his approved lines, as /api/journal_quotes serves them
 from publish_snapshot_story import (  # noqa: E402 — HS1, WEB_STORY=1 only
     fixture_story,
     live_story,
@@ -298,7 +303,7 @@ def _live_episodes(ctx: LiveContext) -> None:
                 data_through=e.get("date"),
                 source=["/panelcast/episodes.json"],
                 title=e.get("title") or f"Episode {n}",
-                summary=e.get("excerpt"),
+                summary=whole_sentence_summary(e.get("excerpt")),
                 number=n,
                 date=e["date"],
                 duration_sec=int(e["duration_sec"]) if e.get("duration_sec") is not None else None,
@@ -362,7 +367,7 @@ def _live_week_states(ctx: LiveContext) -> None:
             "pending": "No chapter yet for this week.",
         }[status]
         if st.get("reason"):
-            text = str(st["reason"])
+            text = str(st["reason"])[:1].upper() + str(st["reason"])[1:].rstrip(".") + "."  # a sentence, like its siblings
         ctx.objs["chapter"].append(
             envelope(
                 id=f"program-week-{n:02d}",
@@ -420,13 +425,13 @@ def _live_chapters(ctx: LiveContext) -> None:
                 source=["/journal/posts.json"],
                 approved={"by": "owner", "at": p["date"], "via": "chronicle-approve"},
                 title=p.get("title") or cid,
-                summary=clean_excerpt(p.get("excerpt")),
+                summary=(summary := chapter_summary(body := _chapter_body(ctx, p.get("url")), p.get("excerpt"))),
                 week=week,
                 week_label=p.get("label") or (f"Week {week}" if week is not None else cid),
                 date=p["date"],
                 status="published",
-                excerpt=clean_excerpt(p.get("excerpt")),
-                body_html=_chapter_body(ctx, p.get("url")),
+                excerpt=summary,
+                body_html=body,
                 word_count=wc,
                 read_minutes=max(1, round(wc / 230)) if wc else None,
                 url_legacy=p.get("url"),
@@ -437,14 +442,6 @@ def _live_chapters(ctx: LiveContext) -> None:
     for e in ctx.objs["episode"]:
         if e["number"] in ctx.chapter_by_week:
             e["chapter_id"] = ctx.chapter_by_week[e["number"]]
-
-
-def _quality_counts(q: Any) -> dict | None:
-    """The grader's per-coach quality counts (#5533), as served: clean + flagged + unassessed == n."""
-    if not isinstance(q, dict) or not all(isinstance(q.get(k), int) for k in ("clean", "flagged", "unassessed", "n")):
-        return None
-    by_flag = {str(k): int(v) for k, v in (q.get("by_flag") or {}).items() if isinstance(v, int)}
-    return {"clean": q["clean"], "flagged": q["flagged"], "unassessed": q["unassessed"], "n": q["n"], "by_flag": by_flag}
 
 
 def _live_coaches(ctx: LiveContext) -> None:
@@ -473,6 +470,7 @@ def _live_coaches(ctx: LiveContext) -> None:
                 short_bio=c.get("short_bio"),
                 record=record,
                 comparison_text=comp if isinstance(comp, str) and comp else None,
+                versus_guess=versus_guess(bc.get("comparison")),
                 quality=_quality_counts(bc.get("quality")),
                 instrument_absent={"absent": bool(c.get("absent")), "reason": c.get("reason")} if c.get("absent") else None,
             )
@@ -551,6 +549,7 @@ def _retired_coach(ctx: LiveContext, pid: str, short: str, name: str) -> None:
             short_bio="A retired seat: off the active roster, its calls kept under its own byline.",
             record={"right": bc.get("confirmed"), "n": int(decided), "through": rec.get("through")} if isinstance(decided, int) else None,
             comparison_text=None,
+            versus_guess=None,
             quality=_quality_counts(bc.get("quality")),
             instrument_absent=None,
         )
@@ -613,15 +612,14 @@ def _live_ledger(ctx: LiveContext) -> None:
                 as_of=ctx.as_of,
                 data_through=r.get("settled_date") if ISO_DAY.match(str(r.get("settled_date") or "")) else None,
                 source=["/api/ledger_export"],
-                title=claim_text[:120],
                 summary=CALL_OUTCOME.get(status, status),  # the call's own outcome; the simple guess is its own field
                 coach_id=pid,
                 coach_name=str(r.get("coach_name") or pid),
                 retired=bool(r.get("retired")),
                 metric_id=metric,
                 metric_key=r.get("metric") if isinstance(r.get("metric"), str) else None,
-                claim=claim_text,
-                claim_withheld=withheld,
+                # owner ruling 2026-11-15 (#6079): a call published only beside its dated note carries its words apart
+                **noted_claim(r, claim_text, withheld, NO_WORDS_SENTENCE),  # title, claim, claim_withheld, claim_with_note, owner_note
                 logged_date=r.get("logged_date"),
                 due_date=r.get("due_date") if ISO_DAY.match(str(r.get("due_date") or "")) else None,
                 settled_date=r.get("settled_date") if ISO_DAY.match(str(r.get("settled_date") or "")) else None,
@@ -1028,7 +1026,7 @@ def _build_live_ctx(base_url: str, timeout: float) -> "LiveContext":
     _live_episodes(ctx)  # first, so chapters can point at them
     _live_chapters(ctx)
     _live_week_states(ctx)
-    apply_week_intervals(ctx.objs["chapter"], ctx.fetched.get("chapters"), None)  # explicit week intervals on every chapter
+    apply_week_intervals(ctx.objs["chapter"], ctx.fetched.get("chapters"), None)  # week intervals + true published/covered days
     _live_coaches(ctx)
     _live_ledger(ctx)
     _live_disagreements(ctx)
@@ -1082,6 +1080,8 @@ def run(mode: str, out_dir: str, fixtures_dir: str, base_url: str, timeout: floa
             data_files["story"] = validate_story(story, public)
         except ValueError as exc:
             raise SchemaError(str(exc)) from exc
+    # his own words (owner ruling 2026-11-15): a page places a line only where own_words.js pins it AND this file carries it
+    data_files["own_words"] = resolve_own_words(mode, fixtures_dir, lambda p: _get(base_url, p, timeout), log)
     return write_snapshot(out_dir, public, excluded, mode, base_url, build_appendix(), data_files)
 
 

@@ -12,7 +12,7 @@ absolutes:
   * `/api/labs` runs every panel through ``_strip_genetic_biomarkers``
     (``_GENETIC_CATEGORY_RE`` / ``_GENETIC_TEXT_RE``) so a pharmacogenomic marker
     filed as an ordinary lab cannot leak through the labs door instead.
-  * `/api/phenoage` follows Option A: chronological age is NEVER returned.
+  * `/api/phenoage` is markers-only (owner ruling 2026-11-14): no profile read, no figure of his own.
 
 ``tests/test_public_genetic_privacy_absolute.py`` guards all three by reading this
 module's source; it scans the whole site_api_vitals family, so the guard follows
@@ -31,7 +31,6 @@ pre-split module).
 import json
 import os
 import re as _re  # genetic-biomarker strip regexes (labs)
-from datetime import timezone
 
 import boto3
 from health.sensor_absence import absence_verdict, is_stale
@@ -41,7 +40,6 @@ from web.site_api_common import (
     S3_REGION,
     USER_ID,
     _error,
-    _get_profile,
     _ok,
     _window_span,
     logger,
@@ -284,11 +282,58 @@ def _compute_phenoage(vals: dict, age_years: float):
         return None
 
 
-def phenoage(*, _g) -> dict:
-    """GET /api/phenoage — transparent Levine Phenotypic Age. Option A privacy: returns the
-    phenotypic age + the 9 driver markers ONLY; never chronological age or the gap."""
-    datetime = _g["datetime"]
+#: The Levine formula is LINEAR in chronological age: one year of age moves the result by this many years
+#: (0.0804 / 0.090165). That slope is why a published phenotypic age — at ANY precision — is a published age:
+#: the nine markers are public, so `(published − markers-only part) / slope` is the age (owner ruling 2026-11-14).
+PHENOAGE_YEARS_PER_YEAR_OF_AGE = 0.0804 / 0.090165
 
+#: The ages the public reference line is stated at. A fixed grid, chosen once: it never moves with the reader, the
+#: date or the owner, so nothing about it carries information.
+PHENOAGE_REFERENCE_AGES = (30, 40, 50, 60)
+
+
+def phenoage_reference(vals: dict) -> dict | None:
+    """The MARKERS-ONLY reading of the nine markers: what the Levine formula returns for a person of each reference
+    age who had exactly these markers, and how far that sits from the reference age. A pure function of public lab
+    values — the owner's age, birth date and the clock are not inputs, so no output of this function can narrow them.
+    None when the formula cannot be evaluated (a marker outside its domain)."""
+    at = {}
+    for age in PHENOAGE_REFERENCE_AGES:
+        v = _compute_phenoage(vals, float(age))
+        if v is None:
+            return None
+        at[age] = v
+    offsets = {age: at[age] - age for age in PHENOAGE_REFERENCE_AGES}
+    return {
+        "basis": "markers_only",
+        # one point per reference person: "someone `at_years` old with these nine markers reads `reads_years`"
+        "points": [{"at_years": a, "reads_years": round(at[a], 1), "offset_years": round(offsets[a], 1)} for a in PHENOAGE_REFERENCE_AGES],
+        "offset_low": round(min(offsets.values()), 1),
+        "offset_high": round(max(offsets.values()), 1),
+        "slope": round(PHENOAGE_YEARS_PER_YEAR_OF_AGE, 3),
+    }
+
+
+PHENOAGE_WITHHELD = "derived_from_chronological_age"
+PHENOAGE_NOTE = (
+    "His own phenotypic age is not published: the formula is linear in chronological age and the nine markers are "
+    "public, so the number at any precision would give his age away. What is published is the markers-only reading: "
+    "what the same nine markers return for a person of each reference age."
+)
+
+
+def phenoage(*, _g) -> dict:
+    """GET /api/phenoage — the Levine Phenotypic Age formula applied to the nine public markers, MARKERS ONLY.
+
+    Owner ruling 2026-11-14 (supersedes Option A, 2026-06-23). Option A returned the rounded phenotypic age and
+    withheld the chronological age and the gap. That was not enough: the formula is public and linear in age
+    (``PHENOAGE_YEARS_PER_YEAR_OF_AGE``), the nine inputs are public, so the rounded figure pinned the age to a
+    window of about 1.1 years — and a five-year band or a younger/older flag would only widen the window, then
+    narrow it again with every new draw. So the public path does not compute with his age AT ALL: it reads no
+    profile, no birth date and no clock, and returns the nine drivers plus ``phenoage_reference`` (a pure function
+    of the public markers). ``phenoage`` is always null and ``withheld`` says why. The precise figure stays
+    private (``scripts/phenoage_private.py``, run by the owner). ``tests/test_age_inversion.py`` holds the
+    line: the response is byte-identical whatever the birth date and whatever the day."""
     try:
         S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
         s3 = boto3.client("s3", region_name=S3_REGION)
@@ -341,22 +386,11 @@ def phenoage(*, _g) -> dict:
             "WBC": raw["wbc"],
         }
         missing = [k for k, v in required.items() if v is None]
-        # Chronological age (compute-only; never returned). From profile DOB.
-        prof = _get_profile() or {}
-        dob = prof.get("date_of_birth")
-        age_years = None
-        if dob:
-            try:
-                d = datetime.strptime(str(dob)[:10], "%Y-%m-%d")
-                age_years = (datetime.now(timezone.utc).replace(tzinfo=None) - d).days / 365.25
-            except (ValueError, TypeError):
-                age_years = None
-
-        if missing or age_years is None:
+        if missing:
             return _ok(
                 {
                     "phenoage": None,
-                    "missing": missing or (["chronological age (profile)"] if age_years is None else []),
+                    "missing": missing,
                     "as_of": labs.get("latest_draw_date"),
                     "lymphocyte_derived": lymph_derived,
                 },
@@ -375,8 +409,8 @@ def phenoage(*, _g) -> dict:
             "alp_UL": raw["alp"],
             "wbc_1000": raw["wbc"],
         }
-        pheno = _compute_phenoage(vals, age_years)
-        if pheno is None:
+        reference = phenoage_reference(vals)
+        if reference is None:
             return _ok({"phenoage": None, "missing": ["computation failed"], "as_of": labs.get("latest_draw_date")}, cache_seconds=3600)
 
         # Per-marker driver direction (younger/older) vs healthy reference — transparent, but
@@ -414,10 +448,13 @@ def phenoage(*, _g) -> dict:
                 }
             )
 
-        # Round to the nearest year for display; chronological age and the gap are NOT returned.
+        # The owner's own figure is never computed here (see the docstring): `phenoage` stays null by construction.
         return _ok(
             {
-                "phenoage": round(pheno),
+                "phenoage": None,
+                "withheld": PHENOAGE_WITHHELD,
+                "note": PHENOAGE_NOTE,
+                "reference": reference,
                 "as_of": labs.get("latest_draw_date"),
                 "drivers": drivers,
                 "lymphocyte_derived": lymph_derived,

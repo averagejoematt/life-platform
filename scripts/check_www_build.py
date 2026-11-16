@@ -15,7 +15,8 @@ exits 2 — "blind" — if a planted defect builds clean, and never grades on.
                  static, so the LIVE root deploy holds it too), no Coaching Room output beyond what the
                  committed `room_public` publishes (CR1 at "cr1"; CR1 + CR2 at "cr2"; a CR3 page, coach_room.json,
                  a CR3-only key or a private-build banner is refused whatever it says), no Laboratory output (L1, the same: a WEB_LAB=1 dist is
-                 refused), no Human Story output (HS1, the same: a WEB_STORY=1 dist is refused),
+                 refused), no Human Story output (HS1, the same: a WEB_STORY=1 dist is refused), no tile, series or
+                 Day label naming a number other than the one it prints (scripts/www_label_contract.py, #5953),
                  and (on the preview base) `noindex`
   owned-paths    (#5534) the build's committed route manifest www/owned_paths.json and the reach
                  census www/reach.json equal what the clean build just emitted (drift = someone
@@ -38,12 +39,14 @@ from __future__ import annotations
 import argparse
 import glob
 import hashlib
+import html as html_lib
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+from html.parser import HTMLParser
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WWW = os.path.join(REPO, "www")
@@ -55,6 +58,7 @@ sys.path.insert(0, REPO)
 from deploy import www_owned_paths  # noqa: E402 — the one reader of owned_paths.json (#5534)
 
 sys.path.insert(0, os.path.join(REPO, "scripts"))
+import www_label_contract  # noqa: E402 — #5953: each tile/series/Day label names the number printed beside it, fixture AND live
 import www_launch_switch  # noqa: E402 — the committed go-live constants (LAB_LIVE, STORY_LIVE): a live feature is not a leak
 import www_verbatim  # noqa: E402 — dates in words, quote-aware (owner ruling 2026-11-02); a page-universal rule, fixture AND live
 
@@ -231,10 +235,78 @@ def scan(dist: str, require_noindex: bool, forbidden_ids: set[str] | None = None
     if pages == 0:
         issues.append("no html pages in dist")
     issues.extend(heart_coverage(dist, fixture=snapshot_mode(snapshot_dir) == "fixture"))
+    issues.extend(spark_agreement(dist))
+    issues.extend(chapter_agreement(dist))
+    issues.extend(www_label_contract.issues(dist, snapshot_dir))
     issues.extend(room_leaks(dist))
     issues.extend(lab_leaks(dist))
     issues.extend(story_leaks(dist))
+    issues.extend(readercall_leaks(dist))
+    issues.extend(own_words_scope(dist, snapshot_dir))
     return issues
+
+
+OWN_WORDS_JS = os.path.join(WWW, "src", "lib", "own_words.js")
+_OWN_ENTRY = re.compile(
+    r'^  (\w+): \{\s*date: "(\d{4}-\d{2}-\d{2})",\s*text: "((?:[^"\\\\]|\\\\.)*)",\s*sk: "([^"]+)",\s*scope: \[([^\]]*)\]', re.MULTILINE
+)
+
+
+def own_words_pins(own_js: str = OWN_WORDS_JS) -> dict[str, dict]:
+    """The owner's approved lines as pinned in www/src/lib/own_words.js: key → {date, text, sk, scope}. Read off the
+    file, never a hand copy; an unreadable file is no pins (and `own_words_scope` then refuses every served line)."""
+    try:
+        src = open(own_js, encoding="utf-8").read()
+    except OSError:
+        return {}
+    pins = {}
+    for key, day, text, sk, scope in _OWN_ENTRY.findall(src):
+        pins[key] = {"date": day, "text": json.loads(f'"{text}"'), "sk": sk, "scope": re.findall(r'"([^"]+)"', scope)}
+    return pins
+
+
+def _scope_re(pattern: str) -> re.Pattern:
+    return re.compile("^" + "[^/]+".join(re.escape(p) for p in pattern.split("*")) + "$")
+
+
+def own_words_scope(dist: str, snapshot_dir: str = SNAPSHOT, own_js: str = OWN_WORDS_JS) -> list[str]:
+    """His own words appear only where he approved them (owner ruling 2026-11-15). A built page may show one of the
+    owner's first-person lines only when (a) the line is pinned in own_words.js, (b) the page is inside that pin's
+    scope, and (c) the snapshot's own_words.json — the platform's /api/journal_quotes — serves that day and those words
+    exactly. A served line with no pin is shown nowhere. Runs on every build and on the deploy's scan, so a revoked
+    line, a line moved to a page he did not name, or a line edited by one character cannot reach the site."""
+    pins = own_words_pins(own_js)
+    try:
+        with open(os.path.join(snapshot_dir, "own_words.json"), encoding="utf-8") as fh:
+            doc = json.load(fh)
+    except (OSError, ValueError):
+        doc = {}
+    served = (
+        {(q.get("date"), q.get("quote")) for q in (doc.get("quotes") or []) if isinstance(q, dict)} if doc.get("state") == "ok" else set()
+    )
+    pinned_texts = {(p["date"], p["text"]) for p in pins.values()}
+    out = []
+    for dirpath, _d, files in os.walk(dist):
+        for name in files:
+            if not name.endswith(".html"):
+                continue
+            rel = os.path.relpath(os.path.join(dirpath, name), dist)
+            route = "/" + (os.path.dirname(rel) + "/" if os.path.dirname(rel) else "")
+            page = html_lib.unescape(open(os.path.join(dirpath, name), encoding="utf-8", errors="replace").read())
+            for key in sorted(set(re.findall(r'data-own-words="([^"]+)"', page))):
+                if key not in pins:
+                    out.append(f"{rel}: an own-words placement {key!r} that own_words.js does not pin")
+            for key, pin in sorted(pins.items()):
+                if pin["text"] not in page:
+                    continue
+                if not any(_scope_re(s).match(route) for s in pin["scope"]):
+                    out.append(f"{rel}: the owner's line {key!r} is shown outside the page(s) he approved it for {pin['scope']}")
+                if (pin["date"], pin["text"]) not in served:
+                    out.append(f"{rel}: the owner's line {key!r} is shown but the snapshot does not serve it (revoked, or never marked)")
+            for day, words in sorted(served - pinned_texts):
+                if words and words in page:
+                    out.append(f"{rel}: a served line of {day} with no approved placement is on the page")
+    return out
 
 
 ROOM_JS = os.path.join(WWW, "src", "lib", "room.js")
@@ -411,6 +483,28 @@ def story_leaks(dist: str, story_js: str = STORY_JS, live: bool | None = None) -
     return out
 
 
+READERCALL_NEEDLES = ("data-readercall", "/api/reader_call")
+
+
+def readercall_leaks(dist: str) -> list[str]:
+    """#6088 (built dark, owner ruling 2026-11-16: develop and test privately): the reader-call control is NEVER
+    deployed. A dist with the control's marker (`data-readercall`, on the page and in the island's chunk) or its route
+    (`/api/reader_call`) in any page, script or data file is a WEB_READERCALL=1 build; this scan runs on every deploy
+    (`--scan-only`), so such a dist is refused before it can reach S3. There is no go-live constant yet: launching is
+    a reviewed change to this rule as well as to the switch."""
+    out = []
+    for dirpath, _d, files in os.walk(dist):
+        for name in files:
+            if not name.endswith((".html", ".js", ".mjs", ".json", ".xml")):
+                continue
+            rel = os.path.relpath(os.path.join(dirpath, name), dist)
+            text = open(os.path.join(dirpath, name), encoding="utf-8", errors="replace").read()
+            hits = [n for n in READERCALL_NEEDLES if n in text]
+            if hits:
+                out.append(f"{rel}: carries {', '.join(hits)} — a WEB_READERCALL=1 build is private and is never deployed")
+    return out
+
+
 HEART_CHARTS = ("Resting heart rate", "Heart-rate variability")
 
 
@@ -435,6 +529,176 @@ def heart_coverage(dist: str, fixture: bool = True) -> list[str]:
     front = os.path.join(dist, "index.html")
     if fixture and os.path.exists(front) and re.search(r'href="[^"]*/data/hrv/"', open(front, encoding="utf-8").read()):
         out.append("index.html: the front page links /data/hrv/ — HRV coverage must not move Start's link budget (#5598)")
+    return out
+
+
+_SPARK = re.compile(r'<span class="spark"[^>]*data-spark-of="([^"]+)"(?:[^>]*data-latest="([^"]*)")?[^>]*>(<svg[\s\S]*?</svg>)')
+
+
+def spark_agreement(dist: str) -> list[str]:
+    """One series, one picture (review 2026-11-14 dataviz-2; owner ruling 2026-11-14: "identical measurements presented
+    in multiple places"). Every metric whose weekly spark is drawn on BOTH the front page and the data room must be the
+    same SVG and the same latest reading on both: the two doors once scaled the same eight weekly means differently, so
+    one read as flat and the other as a collapse. The spark comes from www/src/lib/spark.js on both; this is the build's
+    own check that a page has not grown a scale of its own."""
+    seen: dict[str, dict[str, tuple[str, str]]] = {}
+    for page in ("index.html", os.path.join("data", "index.html")):
+        path = os.path.join(dist, page)
+        if not os.path.exists(path):
+            continue
+        for metric, latest, svg in _SPARK.findall(open(path, encoding="utf-8").read()):
+            seen.setdefault(metric, {})[page] = (svg, latest)
+    out = []
+    for metric, pages in sorted(seen.items()):
+        if len(pages) < 2:
+            continue
+        (pa, (svg_a, latest_a)), (pb, (svg_b, latest_b)) = sorted(pages.items())
+        if svg_a != svg_b:
+            out.append(f"{metric}: its weekly spark differs between {pa} and {pb} — one series must be one picture (lib/spark.js)")
+        if latest_a != latest_b:
+            out.append(f"{metric}: latest reading {latest_a!r} on {pa} but {latest_b!r} on {pb}")
+    return out
+
+
+# ── One chapter, one name (#6081) ──────────────────────────────────────────────────────────────────────────────────
+# Every page that names a chapter marks it: an element carrying data-chapter="<id>" holds the number (data-ch-no, or the
+# moment card's data-ch-week), the days (data-ch-window) and the publication (data-published) it prints. The chapter page
+# is the reference; every other page in the set must print the same three, short forms read as their long forms.
+_CH_FIELDS = ("data-ch-no", "data-ch-week", "data-ch-window", "data-published")
+_VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
+_MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+_SPELLED = "no one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty".split()
+
+
+class _ChapterMarks(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.depth, self.open, self.field, self.marks, self.counts, self.nexts = 0, [], None, [], [], []
+        self.loose = None  # a data-ch-count / data-next-chapter being read
+
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        if tag in _VOID:
+            return
+        self.depth += 1
+        if "data-chapter" in a and a["data-chapter"]:
+            self.open.append(
+                {"id": a["data-chapter"], "status": a.get("data-status"), "tag": tag, "href": a.get("href"), "at": self.depth, "f": {}}
+            )
+            self.marks.append(self.open[-1])
+        if "data-next-chapter" in a:
+            self.nexts.append(a["data-next-chapter"] or "")
+        if "data-ch-count" in a and self.loose is None:
+            self.loose = [self.depth, ""]
+        hit = next((k for k in _CH_FIELDS if k in a), None)
+        if hit and self.open and self.field is None:
+            self.field = [hit, self.depth, ""]
+
+    def handle_endtag(self, tag):
+        if tag in _VOID:
+            return
+        if self.field and self.depth == self.field[1]:
+            self.open[-1]["f"][self.field[0]] = self.field[2]
+            self.field = None
+        if self.loose and self.depth == self.loose[0]:
+            self.counts.append(self.loose[1])
+            self.loose = None
+        if self.open and self.depth == self.open[-1]["at"]:
+            self.open.pop()
+        self.depth -= 1
+
+    def handle_data(self, data):
+        if self.field:
+            self.field[2] += data
+        if self.loose:
+            self.loose[1] += data
+
+
+def _norm_number(key: str, text: str) -> str | None:
+    t = " ".join(text.split())
+    if key == "data-ch-week" and t.lower().startswith("prologue"):
+        return "00"
+    m = re.search(r"\d+", t)
+    return m.group(0).zfill(2) if m else None
+
+
+def _norm_window(text: str) -> str:
+    t = " ".join(text.split())
+    for full in _MONTHS:
+        t = re.sub(rf"\b{full[:3]}\b(?!\w)", full, t)
+    head, _, dates = t.rpartition(" · ") if t.lower().startswith("day") else ("", "", t)
+    pre = re.match(r"(program week )?(.*)$", dates)
+    dates = re.sub(r"^(\d+)–(\d+) ", r"\1 to \2 ", pre.group(2).replace(" – ", " to "))
+    return (f"{head} · " if head else "") + (pre.group(1) or "") + dates
+
+
+def _norm_count(text: str) -> str:
+    words = " ".join(text.lower().split()).split(" ")
+    return " ".join(str(_SPELLED.index(w)) if w in _SPELLED else w for w in words)
+
+
+def chapter_agreement(dist: str) -> list[str]:
+    """#6081 — one number, one window and one publication date for a chapter on every page that names it (the front page,
+    /story/, the chapter page, /story/so-far/, /story/moments/); the count of chapters said once; the next chapter's
+    number the one /story/ lists unpublished; no unpublished /story/ row linking to another chapter's address."""
+
+    def marks(rel):
+        path = os.path.join(dist, rel)
+        if not os.path.exists(path):
+            return None
+        p = _ChapterMarks()
+        p.feed(open(path, encoding="utf-8").read())
+        return p
+
+    out: list[str] = []
+    ref: dict[str, dict] = {}
+    for path in sorted(glob.glob(os.path.join(glob.escape(dist), "story", "*", "index.html"))):
+        rel = os.path.relpath(path, dist)
+        p = marks(rel)
+        own = [m for m in p.marks if m["id"] == os.path.basename(os.path.dirname(path))] if p else []
+        if own:
+            ref[own[0]["id"]] = own[0]
+    pages = {rel: marks(rel) for rel in ("index.html", "story/index.html", "story/so-far/index.html", "story/moments/index.html")}
+    want = lambda m, k: m["f"].get(k)  # noqa: E731
+    for rel, p in pages.items():
+        for m in p.marks if p else []:
+            r = ref.get(m["id"])
+            if r is None:
+                if m["tag"] == "a" and m["href"] and not m["href"].rstrip("/").endswith(f"/story/{m['id']}"):
+                    out.append(f"{rel}: the {m['status']} row {m['id']} links to {m['href']}, another chapter's address")
+                continue
+            got_no = (
+                _norm_number("data-ch-no", m["f"]["data-ch-no"])
+                if "data-ch-no" in m["f"]
+                else _norm_number("data-ch-week", m["f"].get("data-ch-week", ""))
+            )
+            if got_no != _norm_number("data-ch-no", want(r, "data-ch-no") or ""):
+                out.append(f"{rel}: {m['id']} is numbered {got_no!r}, its page {_norm_number('data-ch-no', want(r, 'data-ch-no') or '')!r}")
+            for key, norm in (("data-ch-window", _norm_window), ("data-published", lambda t: " ".join(t.lower().split()))):
+                a, b = want(m, key), want(r, key)
+                if (a is None) != (b is None) or (a is not None and norm(a) != norm(b)):
+                    out.append(f"{rel}: {m['id']} {key[5:]} {a!r}, its page {b!r}")
+    for cid, r in sorted(ref.items()):
+        if r["status"] != "published":
+            continue
+        for rel in ("story/index.html", "story/so-far/index.html"):
+            if pages[rel] is not None and not any(m["id"] == cid for m in pages[rel].marks):
+                out.append(f"{rel}: the published chapter {cid} is not named")
+    story = pages["story/index.html"]
+    if story is not None and not story.marks:
+        out.append("story/index.html: names no chapter with data-chapter — the chapter agreement cannot be read (#6081)")
+    for m in story.marks if story else []:
+        if m["status"] == "published" and m["id"] not in ref:
+            out.append(f"story/index.html: {m['id']} is listed published but its page carries no chapter marks")
+    counts = {_norm_count(c) for p in pages.values() if p for c in p.counts}
+    if len(counts) > 1:
+        out.append(f"the chapters are counted {len(counts)} ways: {sorted(counts)}")
+    pending = {
+        _norm_number("data-ch-no", m["f"].get("data-ch-no", "")) for m in (story.marks if story else []) if m["status"] != "published"
+    }
+    for n in {x for p in pages.values() if p for x in p.nexts if x}:
+        if n.zfill(2) not in pending:
+            out.append(f"index.html: the next chapter is numbered {n}, which /story/ does not list as an unpublished week")
     return out
 
 
@@ -533,6 +797,10 @@ def main() -> int:
     blind = www_verbatim.self_test()
     if blind:
         log(f"  ✗ BLIND: the dates-in-words rule misjudged its planted cases: {blind}")
+        return 2
+    blind = www_label_contract.self_test()
+    if blind:
+        log(f"  ✗ BLIND: the label contract missed a planted wrong label: {blind}")
         return 2
     issues = scan(args.dist, require_noindex=preview)
     for i in issues:

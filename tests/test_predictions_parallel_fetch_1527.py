@@ -248,6 +248,8 @@ class TestProjectionCarriesEveryEmittedField:
             "evaluator_version": None,
             "algo_version": None,
             "verification": None,
+            # owner ruling 2026-11-15 (#6079): additive — null on every call that is not an owner-ruled, noted call.
+            "owner_note": None,
         }
         assert body["by_coach"]["sleep"]["lifetime"]["confirmed"] == 1
 

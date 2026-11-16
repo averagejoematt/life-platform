@@ -761,6 +761,34 @@ def test_the_one_thing_prefers_the_public_ask(monkeypatch):
     assert _analysis_body(monkeypatch, "mind", rows)["key_recommendation"] == _PUBLIC_ASK
 
 
+# #5611 F4 (owner ruling 2026-11-15): a THREAD# row's `summary` never rides /api/coach_analysis
+# as `thread_reference`. The control row is reader-safe third-person prose (so the reader register
+# would have passed it) AND carries a provenance stamp the publication chokepoint deems eligible —
+# the field must still be absent. Synthetic text only.
+_SYNTHETIC_THREAD_5611 = "SYNTHETIC-5611 the coach is following a placeholder thread about his routine."
+
+
+def test_an_open_thread_summary_is_never_served_even_when_stamped_eligible_5611(monkeypatch):
+    from common import narrative_provenance as NP
+
+    stamp = NP.stamp(["strava"], producer="test_5611")
+    for domain in ("sleep", "nutrition", "mind"):
+        cid = _WIRE[domain]["coach_id"]
+        thread = {
+            "pk": f"COACH#{cid}",
+            "sk": "THREAD#2026-09-26#synthetic_5611",
+            "status": "open",
+            "last_referenced": "2026-09-26",
+            "summary": _SYNTHETIC_THREAD_5611,
+            NP.PROVENANCE_KEY: stamp,
+        }
+        assert NP.is_publishable(thread), "the control must carry a stamp the chokepoint would publish"
+        assert audience_guard.reader_prose(_SYNTHETIC_THREAD_5611) == _SYNTHETIC_THREAD_5611, "the reader register would pass it"
+        body = _analysis_body(monkeypatch, domain, [*_wire_rows(domain, _WIRE[domain]), thread])
+        assert "thread_reference" not in body, domain
+        assert "SYNTHETIC-5611" not in json.dumps(body), domain
+
+
 def _absent_glucose_body(monkeypatch, cgm_dark, domain="glucose"):
     live = dict(glucose_output_row(), observatory_summary=_WIRE["glucose"]["analysis"], public_summary=_WIRE["glucose"]["public_read"])
     rows = [sentinel_item(cgm_dark=cgm_dark), *fresh_instrument_rows(), live]

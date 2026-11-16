@@ -46,6 +46,7 @@ v1.5.0 — 2026-07-27: #1843 diary_sessions — video-diary/solo-recording sessi
 """
 
 import logging
+import math
 import os
 import time
 from datetime import datetime, timedelta, timezone
@@ -540,7 +541,7 @@ def _deep_dec(obj):
     if isinstance(obj, bool):
         return obj
     if isinstance(obj, float):
-        return Decimal(str(round(obj, 4)))
+        return Decimal(str(round(obj, 4))) if math.isfinite(obj) else None  # #5524: NaN/Inf never reach the write
     if isinstance(obj, int):
         return Decimal(str(obj))
     return obj

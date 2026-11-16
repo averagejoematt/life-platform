@@ -91,6 +91,7 @@ def _words_in_text(value: str) -> str:
 VERBATIM_PATHS = frozenset(
     {
         ("prediction", "claim"),
+        ("prediction", "claim_with_note"),
         ("disagreement", "claim_a"),
         ("disagreement", "claim_b"),
         ("day", "coach_lines[].text"),
@@ -172,6 +173,9 @@ SCHEMA: dict[str, dict[str, tuple[str, bool]]] = {
         "status": ("enum:published|held|skipped|pending", False),
         "week_start": ("day", True),
         "week_end": ("day", True),
+        "published_at": ("day", True),
+        "covers_start": ("day", True),
+        "covers_end": ("day", True),
         "excerpt": ("str", True),
         "body_html": ("str", True),
         "word_count": ("int", True),
@@ -235,7 +239,14 @@ SCHEMA: dict[str, dict[str, tuple[str, bool]]] = {
         "retired": ("bool", False),
         "metric_key": ("str", True),
         "corrections": ("list[obj]", False),
-        "claim_withheld": ("enum:unsourced|no_words", True),
+        # `with_note` (owner ruling 2026-11-15, #6079): the call's words are published ONLY beside the platform's dated
+        # note (`owner_note.required`). `claim` then carries the note's short form — so every surface that shows a held
+        # call's line shows the note, never the bare words — and the words travel in `claim_with_note`, which the call's
+        # own page alone renders, beside the note.
+        "claim_withheld": ("enum:unsourced|no_words|with_note", True),
+        "claim_with_note": ("str", True),
+        # {kind, dated, required, text, short} as /api/ledger_export serves it (common.narrative_allowlist.owner_note)
+        "owner_note": ("obj", True),
         # Owner rulings 2026-11-03: a settled verdict under classification review — `status` stays the stored
         # verdict; the page shows it disputed and no count treats it as verified. The reason is the API's public one.
         "classification_review": ("bool", False),
@@ -261,6 +272,7 @@ SCHEMA: dict[str, dict[str, tuple[str, bool]]] = {
         "short_bio": ("str", True),
         "record": ("obj", True),
         "comparison_text": ("str", True),
+        "versus_guess": ("obj", True),
         "quality": ("obj", True),
         "instrument_absent": ("obj", True),
     },
@@ -451,8 +463,58 @@ def validate(obj: dict, type_: str) -> None:
             raise SchemaError(f"prediction {obj['id']}: unknown quality flag(s) {bad}")
         for i, c in enumerate(obj["corrections"]):
             validate_correction(c, f"prediction {obj['id']}.corrections[{i}]")
+        validate_owner_note(obj)
     if "decimals" in obj and not 0 <= obj["decimals"] <= 3:
         raise SchemaError(f"metric {obj['id']}: decimals out of range")
+
+
+#: The owner-ruled note's kinds and keys (owner ruling 2026-11-15, #6079; ``common.narrative_allowlist.NOTE_KINDS``).
+OWNER_NOTE_KINDS = ("clarification", "grading_explanation", "scope")
+OWNER_NOTE_FIELDS = ("kind", "dated", "required", "text", "short")
+
+
+def owner_note_of(value: Any) -> dict | None:
+    """The served note in the snapshot's shape, or None when the API served none or a malformed one (strict keys)."""
+    if not isinstance(value, dict) or set(value) != set(OWNER_NOTE_FIELDS):
+        return None
+    if value["kind"] not in OWNER_NOTE_KINDS or not isinstance(value["dated"], str) or not ISO_DAY.match(value["dated"]):
+        return None
+    if not isinstance(value["required"], bool):
+        return None
+    if not all(isinstance(value[k], str) and value[k].strip() for k in ("text", "short")):
+        return None
+    return {k: value[k] for k in OWNER_NOTE_FIELDS}
+
+
+def noted_claim(row: dict, claim: str, withheld: str | None, no_words: str) -> dict:
+    """A ledger row's words and the owner-ruled note beside them, as the prediction's title and four fields. A REQUIRED note's
+    words move to `claim_with_note` and `claim` becomes the note's short form (`claim_withheld: "with_note"`), so no list
+    surface can print them bare; a note this producer cannot read withholds the words (fail closed)."""
+    served = row.get("owner_note")
+    note = owner_note_of(served) if not withheld else None
+    out = {"claim": claim, "claim_withheld": withheld, "claim_with_note": None, "owner_note": note}
+    if served and not withheld and note is None:
+        out.update(claim=no_words, claim_withheld="no_words")
+    elif note and note["required"]:
+        out.update(claim=note["short"], claim_withheld="with_note", claim_with_note=claim)
+    return {"title": out["claim"][:120], **out}
+
+
+def validate_owner_note(obj: dict) -> None:
+    """A prediction's note is well formed, and the words of a call ruled "publish only with its note" travel only
+    in `claim_with_note`, beside that note — never in `claim`, which every list surface prints."""
+    note, where = obj.get("owner_note"), f"prediction {obj.get('id')}"
+    if note is not None and owner_note_of(note) != note:
+        raise SchemaError(f"{where}.owner_note: malformed {note!r}")
+    with_note = obj.get("claim_withheld") == "with_note"
+    if with_note != (obj.get("claim_with_note") is not None):
+        raise SchemaError(f"{where}: claim_with_note and claim_withheld='with_note' must come together")
+    if with_note and not (note and note["required"]):
+        raise SchemaError(f"{where}: words held for a note, but no required note is served")
+    if note and note["required"] and not with_note:
+        raise SchemaError(f"{where}: a required note's words must travel in claim_with_note, not claim")
+    if with_note and obj.get("claim") != note["short"]:
+        raise SchemaError(f"{where}: a with_note call's claim is the note's short form")
 
 
 def envelope(**kw: Any) -> dict:
@@ -662,6 +724,18 @@ def _write_data_files(out_dir: str, data_files: dict, files: dict) -> None:
     with open(os.path.join(out_dir, "journey.json"), "w", encoding="utf-8") as fh:
         fh.write(text)
     files["journey.json"] = {"count": len(journey.get("rungs") or []), "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
+    # own_words.json — the owner's approved first-person lines as /api/journal_quotes serves them (the day and the words
+    # only; scripts/publish_snapshot_own_words.py). Always written: absent when the route did not answer.
+    own_words = data_files.get("own_words") or {
+        "state": "absent",
+        "source": ["/api/journal_quotes"],
+        "absent_text": "The platform did not serve the owner's approved lines for this snapshot.",
+        "quotes": [],
+    }
+    text = _dump(own_words)
+    with open(os.path.join(out_dir, "own_words.json"), "w", encoding="utf-8") as fh:
+        fh.write(text)
+    files["own_words.json"] = {"count": len(own_words.get("quotes") or []), "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
     # calibration.json — the Coaching Room's data file, present ONLY on a WEB_ROOM=1 export (CR1, built dark;
     # scripts/publish_snapshot_calibration.py). Absent key = nothing written, so a flag-off snapshot is unchanged.
     cal_path = os.path.join(out_dir, "calibration.json")
@@ -766,9 +840,14 @@ JOURNEY_COMPOSITION_NUMBERS = (
     "visceral_target_lb",
     "days_since",
 )
-PHENOAGE_KEYS = {"years", "as_of", "drivers"}
+# Owner ruling 2026-11-14: a figure of HIS phenotypic age is never written — at any precision it is his age to about
+# a year (the formula is linear in age, the markers are public). What is written is the markers-only reference line.
+PHENOAGE_KEYS = {"as_of", "drivers", "reference"}
+PHENOAGE_REFERENCE_KEYS = {"points", "offset_low", "offset_high", "slope"}
+PHENOAGE_POINT_KEYS = {"at_years", "reads_years", "offset_years"}
 PHENOAGE_DRIVER_KEYS = {"name", "value", "unit", "direction", "derived"}
-# PhenoAge Option A: no chronological age, birth date or age gap is ever written beside it.
+# No chronological age, birth date or age gap is ever written beside it; inside the `phenoage` object the key sets are
+# exact at every level (validate_journey_body), so a band, a direction or a figure cannot ride along under any name.
 _AGE_KEY = re.compile(r"(^|_)(age|birth|dob|chronological)", re.IGNORECASE)
 
 
@@ -803,13 +882,22 @@ def validate_journey_body(journey: dict) -> None:
             raise SchemaError("journey.json: composition.next_recommended must be a day or null")
     pa = journey.get("phenoage")
     if pa is not None:
+        if not isinstance(pa, dict) or set(pa) != PHENOAGE_KEYS or not ISO_DAY.match(str(pa.get("as_of") or "")):
+            raise SchemaError("journey.json: phenoage must be exactly {as_of, drivers, reference} — never a figure of his own")
+        ref = pa.get("reference")
         if (
-            not isinstance(pa, dict)
-            or set(pa) != PHENOAGE_KEYS
-            or not _is_num(pa.get("years"))
-            or not ISO_DAY.match(str(pa.get("as_of") or ""))
+            not isinstance(ref, dict)
+            or set(ref) != PHENOAGE_REFERENCE_KEYS
+            or not all(_is_num(ref[k]) for k in ("offset_low", "offset_high", "slope"))
         ):
-            raise SchemaError("journey.json: phenoage must be exactly {years, as_of, drivers}")
+            raise SchemaError("journey.json: phenoage.reference must be exactly {points, offset_low, offset_high, slope}")
+        pts = ref.get("points")
+        if (
+            not isinstance(pts, list)
+            or len(pts) < 2
+            or any(not isinstance(pt, dict) or set(pt) != PHENOAGE_POINT_KEYS or not all(_is_num(v) for v in pt.values()) for pt in pts)
+        ):
+            raise SchemaError("journey.json: phenoage.reference.points must be {at_years, reads_years, offset_years} numbers")
         for d in pa.get("drivers") or []:
             if not isinstance(d, dict) or not set(d) <= PHENOAGE_DRIVER_KEYS or not d.get("name"):
                 raise SchemaError(f"journey.json: bad phenoage driver {d!r}")

@@ -517,8 +517,8 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
                 "An edit (re-typed workout, revised score) inside the 2-day trailing re-fetch overwrites the "
                 "stored record by id; older edits are never re-fetched. The daily _reconcile compares the vendor's "
                 "trailing workout list with the store inside its 14-day window and REPORTS stored workout ids the "
-                "vendor no longer lists, and changed sport or start/end, as StoreOnlyActivityCount / "
-                'ChangedActivityCount with Source=whoop. Since the owner\'s 2026-10-17 ruling on #4638 ("write it") a '
+                "vendor no longer lists, and changed sport or start/end, in the [RECONCILE] log and the run "
+                'report (no metric since #5888). Since the owner\'s 2026-10-17 ruling on #4638 ("write it") a '
                 "delete propagates as an empty day: when every stored workout of a day strictly inside the window is "
                 "gone from a non-empty vendor list, each row is replaced by a tombstone (the day's recovery/sleep row "
                 "is untouched); changed rows are reported only."
@@ -644,7 +644,7 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
                 "deleted is rewritten as an explicit empty, tombstoned day by the daily _reconcile (store → vendor, "
                 "#4638) anywhere inside its 14-day window except the first and last day, at most 3 days per run, and "
                 "never when the vendor list comes back wholly empty. An edit, or a partial delete, older than 3 days "
-                "is not written: _reconcile REPORTS it (StoreOnlyActivityCount / ChangedActivityCount, Source=strava) "
+                "is not written: _reconcile REPORTS it (log + run report; no metric since #5888) "
                 "and the store keeps what it first saw — unless that day also gains an activity the store lacks: "
                 "every ingest run re-fetches the start day of a vendor id missing from the store within the last "
                 "30 days (#5753, late manual entries), and that full replace carries the day's edits too."

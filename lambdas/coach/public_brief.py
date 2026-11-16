@@ -56,6 +56,7 @@ from typing import Any, Callable, Iterable, Optional
 
 from ai.model_routing import model_for  # #4770: the one model registry
 from common import narrative_provenance as NP, public_brief_policy as POL
+from common.numeric import floats_to_decimal  # #5524: the one float->Decimal walker (NaN/Inf guarded)
 from experiment.phase_filter import singleton_visible, with_phase_filter
 
 from coach import public_brief_disputes as DISP
@@ -682,20 +683,10 @@ def _plain(v: Any) -> Any:
     return v
 
 
-def _ddb(v: Any) -> Any:
-    if isinstance(v, float):
-        return Decimal(str(v))
-    if isinstance(v, dict):
-        return {k: _ddb(x) for k, x in v.items()}
-    if isinstance(v, list):
-        return [_ddb(x) for x in v]
-    return v
-
-
 def _put_new(table: Any, item: dict) -> bool:
     """Append-only: a row is written once and never overwritten."""
     try:
-        table.put_item(Item=_ddb(item), ConditionExpression="attribute_not_exists(sk)")
+        table.put_item(Item=floats_to_decimal(item), ConditionExpression="attribute_not_exists(sk)")
         return True
     except Exception as e:  # noqa: BLE001 — ConditionalCheckFailed (already written) or a transport error
         logger.info("[public_brief] not written %s/%s: %s", item.get("pk"), item.get("sk"), e)
@@ -1079,7 +1070,7 @@ def stamp_run(table: Any, today: str, result: dict, merge: bool = False) -> bool
         if result.get(k):
             row[k] = str(result[k])[:300]
     try:
-        table.put_item(Item=_ddb(row))
+        table.put_item(Item=floats_to_decimal(row))
         return True
     except Exception as e:  # noqa: BLE001
         logger.warning("[public_brief] run stamp not written for %s: %s", cycle, e)

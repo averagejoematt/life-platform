@@ -852,8 +852,21 @@ class TestPredictionScan:
         assert [p["prediction_id"] for p in ev._fetch_predictions()[0]] == ["p2"]
 
     def test_prediction_reads_exclude_other_experiment_cycles(self, table):
-        ev._fetch_predictions()
-        assert all("FilterExpression" in q for q in table.queries)
+        """#5518: the ADR-058 filter is applied item-level (prereg_overdue.grader_visible) so a sealed row of THIS
+        cycle stamped pilot by the wall clock is graded; every other pilot row stays hidden, a prior cycle's sealed
+        copy included (it carries the reset's tombstone)."""
+        genesis = ev.prereg_overdue.EXPERIMENT_START_DATE
+        seed(
+            table,
+            prediction(pred_id="current", phase="experiment"),
+            prediction(pred_id="no_phase"),
+            prediction(pred_id="old_cycle", phase="pilot"),
+            prediction(pred_id="sealed_pilot", phase="pilot", pre_registered=True, created_date=genesis),
+            prediction(pred_id="old_sealed", phase="pilot", pre_registered=True, created_date=genesis, tombstone=True),
+        )
+        got = sorted(p["prediction_id"] for p in ev._fetch_predictions()[0])
+        assert got == ["current", "no_phase", "sealed_pilot"]
+        assert not any("FilterExpression" in q for q in table.queries)
 
 
 class TestSourceReads:
@@ -1471,6 +1484,8 @@ class TestHandler:
             # #3046: pending-corpus composition — no pending rows, so no share to judge.
             "ungradeable_pending_count": 0,
             "gradable_share": None,
+            # #5518: the pre-registration dead-man's count rides every completed run, a zero included.
+            "prereg_overdue": {"count": 0, "as_of": TODAY},
         }
 
     def test_commitments_are_graded_even_on_a_day_with_no_open_predictions(self, table, quiet_docket):
@@ -1507,7 +1522,12 @@ class TestHandler:
         self._due_directional(table, TestEwmaTrend.RISING)
         monkeypatch.setattr(ev, "emit_grading_liveness", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
         out = ev.lambda_handler({}, None)
-        assert (out["statusCode"], out["liveness"], out["predictions_evaluated"]) == (200, {}, 1)
+        # #5518: the overdue scan is its own fail-soft step — a heartbeat failure does not silence it.
+        assert (out["statusCode"], out["liveness"], out["predictions_evaluated"]) == (
+            200,
+            {"prereg_overdue": {"count": 0, "as_of": TODAY}},
+            1,
+        )
 
     def test_the_docket_resolver_is_run_in_the_same_deterministic_lane(self, table, monkeypatch):
         seen = {}

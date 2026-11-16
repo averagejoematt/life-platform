@@ -45,6 +45,12 @@ from unittest.mock import patch
 
 import pytest
 
+ROLLBACK = pytest.mark.usefixtures("exercise_library_rollback")
+"""#5861 (owner approval 2026-11-14): the marked tests pin the PRE-approval generator — the v0.3 ramp's loads and back-offs are the
+pre-approval generator's (live loads from the same-role record, swaps the machine row). They run on the library's rollback copy (status
+proposed: tests/conftest.py `exercise_library_rollback`), so they keep guarding the rollback path; the approved (live) behaviour is
+pinned by the #5861 tests."""
+
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "lambdas"))
@@ -63,8 +69,9 @@ LB = 0.45359237
 # at a bodyweight inside the same 10-lb band as the target-date weigh-in. #4080: the heavy
 # day's squat is `squat_barbell` (owner option B exempts the squat family from skill_ceiling
 # 2, and it is the squat's first key); `leg_press` stays for §8's non-v0.3 path test.
-ANCHOR_LB = {"squat_barbell": 300.0, "leg_press": 400.0, "machine_row": 200.0, "lat_pulldown": 180.0, "barbell_bench_press": 250.0}
-ANCHOR_REPS = {"squat_barbell": 5, "leg_press": 8, "machine_row": 10, "lat_pulldown": 10, "barbell_bench_press": 5}
+# #6014 (coaching decision 2026-11-15): the heavy-upper row is pinned to the one-arm dumbbell row (synthetic 100 lb x 10).
+ANCHOR_LB = {"squat_barbell": 300.0, "leg_press": 400.0, "one_arm_db_row": 100.0, "lat_pulldown": 180.0, "barbell_bench_press": 250.0}
+ANCHOR_REPS = {"squat_barbell": 5, "leg_press": 8, "one_arm_db_row": 10, "lat_pulldown": 10, "barbell_bench_press": 5}
 HISTORY = {
     MOVEMENTS[k]["hevy_template_id_hint"]: [
         {"date": "2025-01-10", "top_weight_kg": lb * LB, "sets": [{"weight_kg": lb * LB, "reps": ANCHOR_REPS[k]}]}
@@ -74,7 +81,7 @@ HISTORY = {
 WEIGHTS = {"2025-01-10": 316.0, "2026-09-23": 315.0, "2026-09-27": 315.0, "2026-11-17": 314.0}
 # The v0.4 upper-heavy session's heavy anchors (#4147) — each has a `hevy_template_id_hint`, the
 # key `_enforce_load_floors` looks the history up by (the bench's is the live-verified 79D0BB3A).
-HEAVY_ANCHORS = ("barbell_bench_press", "machine_row")
+HEAVY_ANCHORS = ("barbell_bench_press", "one_arm_db_row")
 BENCH = "barbell_bench_press"
 DAY = "2026-09-27"  # week 1, after three completed sessions (lower-heavy, upper-volume, lower-volume)
 
@@ -143,6 +150,7 @@ def test_moving_the_redline_moves_the_ramp_and_an_out_of_band_start_refuses():
 
 
 # ── 2. week 1 ────────────────────────────────────────────────────────────────
+@ROLLBACK
 def test_week_1_heavy_top_sets_land_at_60_to_65_percent_of_the_discounted_anchor():
     ideal = _generate()[0]
     assert ideal.inputs_snapshot["calendar"]["week"] == 1 and ideal.inputs_snapshot["calendar"]["session_role"] == "upper_heavy"
@@ -168,6 +176,7 @@ def test_the_barbell_bench_heavy_anchor_is_loaded_through_its_verified_template_
     assert status != "no_template_id"
 
 
+@ROLLBACK
 def test_back_offs_stay_10_percent_under_the_ramped_top_set_and_the_cue_names_the_ramp():
     ideal = _generate()[0]
     for key in HEAVY_ANCHORS:
@@ -196,6 +205,7 @@ def test_moderate_anchors_ride_the_same_ramp():
 
 
 # ── 3. week 9 ────────────────────────────────────────────────────────────────
+@ROLLBACK
 def test_week_9_is_capped_at_85_percent():
     # #4161: weeks are hybrid (the cycle AND >= 7 days) — lifting daily, week 9 opens on day 56 (11-19); #5069: past the
     # cut-over the five-day order continues from the last v0.4 session (index 24, lower-heavy), so index 58 (11-21) is upper-heavy
@@ -223,6 +233,7 @@ def test_rounding_never_crosses_the_e1rm_cap():
 
 
 # ── 4. mutation control ──────────────────────────────────────────────────────
+@ROLLBACK
 def test_mutation_control_without_the_ramp_week_1_reads_100_percent():
     with patch.object(load_ramp, "ramp_floor", side_effect=lambda f, _w: f):
         ideal = _generate()[0]
@@ -239,6 +250,7 @@ def test_no_band_matched_anchor_means_no_ramped_load():
 
 
 # ── 5. the commit gate ───────────────────────────────────────────────────────
+@ROLLBACK
 def test_the_commit_gate_accepts_the_ramped_session_and_refuses_without_the_back_off_floor():
     from mcp.hevy_prescription_gate import prescription_gate
 
@@ -294,6 +306,7 @@ def test_mutation_control_the_pre_4090_shape_breaks_delts():
 
 
 # ── 7. the planner carries the same loads ────────────────────────────────────
+@ROLLBACK
 def test_plan_next_session_2026_09_24_carries_week_1_ramp_loads():
     from mcp import handler as h
     from tests.test_program_session_4064_4147 import _stage1_patches
@@ -840,6 +853,7 @@ def test_4397_an_absent_rpe_set_below_the_target_reps_is_read_at_the_ceiling():
     assert _held(_one_set(160, 8, None), MODERATE_SLOT)["floor_kg"] == pytest.approx(160 * LB)
 
 
+@ROLLBACK
 def test_4397_generator_planner_and_chat_gate_read_one_rep_capped_number_at_week_6():
     """#4149: at week 6 the generator writes the rep-capped loads, the planner shows them, and the chat gate
     derives the same floors — and a hand draft with no rationale tag (intensity unknown -> the lowest program

@@ -488,7 +488,7 @@ def run(apply: bool = False, no_invalidate: bool = False) -> int:
     invalidation_paths = ["/journal/posts.json"]
 
     for item in installments:
-        if chronicle_schema.is_withdrawn(item):
+        if chronicle_schema.is_withdrawn(item) or chronicle_schema.is_unpublished(item):
             continue
         date_str = item.get("date", "")
         week_num = int(item.get("week_number", 0) or 0)
@@ -578,4 +578,7 @@ def main():
 
 
 if __name__ == "__main__":
+    from lib.prod_write_guard import install_prod_write_guard  # #6116: under a test runner, no real AWS write
+
+    install_prod_write_guard()
     sys.exit(main())

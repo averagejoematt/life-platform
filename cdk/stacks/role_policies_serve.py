@@ -18,6 +18,14 @@ from stacks.role_policies_base import (
     BUCKET_ARN,
     DLQ_ARN,
     KMS_KEY_ARN,
+    NS_AI,
+    NS_COMPUTE,
+    NS_HEVY_ROUTINE,
+    NS_INGEST_LIVENESS,
+    NS_INGEST_SHARED,
+    NS_PIPELINE,
+    NS_PREDICTIONS,
+    NS_TELEGRAM,
     REGION,
     SES_IDENTITY,
     SES_SITE_IDENTITY,
@@ -25,6 +33,7 @@ from stacks.role_policies_base import (
     _bedrock_statement,
     _bedrock_telemetry_statement,
     _charter_twin_list,
+    _put_metric_data_statement,
     _s3,
     _secret_arn,
 )
@@ -67,7 +76,7 @@ def site_api() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             # SEC-01 (AUDIT 2026-06-30): the public site-api write was unconditioned on
             # the WHOLE table. Scope it to the exact interactive partitions the code
-            # writes (votes, follows, challenge check-ins, experiment suggestions, and
+            # writes (votes, follows, reader challenge check-ins, experiment suggestions, and
             # the shared rate limiter), mirroring site_api_ai's RATE#* LeadingKeys.
             # tests/test_site_api_write_scope.py greps the site-api code and FAILS if a
             # new write partition appears that isn't covered here — keep them in lockstep.
@@ -84,9 +93,12 @@ def site_api() -> list[iam.PolicyStatement]:
                         "USER#matthew#SOURCE#experiment_suggestions",  # reader experiment suggestions
                         "USER#matthew#SOURCE#reader_feedback",  # #4182: /api/page_feedback two-question reader door
                         "USER#matthew#SOURCE#morning_note",  # #4189: /api/morning_note — the owner's four words (owner-token write)
-                        "USER#matthew#SOURCE#challenges",  # challenge daily check-ins
+                        # #6087: NOT USER#matthew#SOURCE#challenges — the owner's challenge record is written only
+                        # by the MCP tool log_challenge_checkin. A reader's check-in lands in its own partition:
+                        "CHALLENGE_CHECKINS#*",  # reader challenge check-ins (common/challenge_checkins.py)
                         "USER#matthew#SOURCE#evening_ritual",  # #769 (ADR-124): one-tap ritual taps
                         "COHORT#*",  # #1394 (epic #1366): anonymous cohort-strip submissions (COHORT#<metric>#<week>)
+                        "READERCALL#*",  # #6088: a reader's call beside a coach's call — TAP# dedup + TALLY# counters, DARK
                     ],
                 },
             },
@@ -389,11 +401,7 @@ def site_api_ai() -> list[iam.PolicyStatement]:
         # dropped. Same class as coach_state_updater / coach_prediction_evaluator;
         # surfaced by the test_put_metric_data_grant_lockstep gate. PutMetricData
         # only accepts "*".
-        iam.PolicyStatement(
-            sid="CloudWatchMetrics",
-            actions=["cloudwatch:PutMetricData"],
-            resources=["*"],
-        ),
+        _put_metric_data_statement("CloudWatchMetrics", NS_AI, NS_COMPUTE),  # #5545
     ]
 
 
@@ -550,6 +558,13 @@ def mcp_server() -> list[iam.PolicyStatement]:
         # #4439: invoke implies record (#3563) — without it every MCP Bedrock call's
         # EstimatedCostUSD is dropped AccessDenied and the cost governor never sees it.
         _bedrock_telemetry_statement(),
+        # #5545: the namespaces the MCP bundle reaches besides LifePlatform/AI. It is the widest
+        # closure in the fleet because the surface waiter runs the site-api handlers in-process
+        # (#4774): Budget via site_api_budget -> cost_governor_lambda (DevSessionSpendMTD),
+        # Predictions via dispute_docket -> coach_prediction_evaluator, DynamoDB/OAuth via the
+        # ingestion framework, Compute via compute_metadata. #5905: NOT Budget — site_api_budget imports
+        # constants from cost_governor_lambda, whose Budget emitters run only from its own lambda_handler.
+        _put_metric_data_statement("SharedModuleMetrics", NS_COMPUTE, NS_PREDICTIONS, *NS_INGEST_SHARED),
         # #4774: the surface waiter (mcp/tools_surfaces._dispatch) runs the site-api
         # handlers IN-PROCESS, so they execute under THIS role, not site_api()'s. With no
         # CloudWatch read here, get_platform_cost's inference_receipt 503'd on
@@ -619,11 +634,7 @@ def hevy_routine_cron() -> list[iam.PolicyStatement]:
             actions=["sqs:SendMessage"],
             resources=[DLQ_ARN],
         ),
-        iam.PolicyStatement(
-            sid="CloudWatchMetrics",
-            actions=["cloudwatch:PutMetricData"],
-            resources=["*"],
-        ),
+        _put_metric_data_statement("CloudWatchMetrics", NS_COMPUTE, NS_HEVY_ROUTINE),  # #5545; #5905: no AI (reached, never called)
     ]
 
 
@@ -670,11 +681,7 @@ def hevy_restamp() -> list[iam.PolicyStatement]:
                 f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/hevy/restamp_enabled",
             ],
         ),
-        iam.PolicyStatement(
-            sid="CloudWatchMetrics",
-            actions=["cloudwatch:PutMetricData"],
-            resources=["*"],
-        ),
+        _put_metric_data_statement("CloudWatchMetrics", NS_COMPUTE),  # #5905: no AI (reached, never called)
     ]
 
 
@@ -755,11 +762,18 @@ def pipeline_health_check() -> list[iam.PolicyStatement]:
     Phase 3.2 (2026-05-16): added cloudwatch:PutMetricData (compute-output metric)
     and sns:Publish on alerts-digest topic (compute-incomplete warning).
     """
+    # #5980: read at call time — role_policies_base (imported above) is what puts lambdas/ on sys.path.
+    from operational.probe_targets import probe_function_names
+
     return [
         iam.PolicyStatement(sid="DynamoDB", actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Query"], resources=[TABLE_ARN]),
         iam.PolicyStatement(sid="KMS", actions=["kms:Decrypt", "kms:GenerateDataKey"], resources=[KMS_KEY_ARN]),
+        # #5980: scoped from `function:*` to the functions the boot probe invokes —
+        # operational/probe_targets.py, the same list the Lambda iterates.
         iam.PolicyStatement(
-            sid="LambdaInvoke", actions=["lambda:InvokeFunction"], resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:*"]
+            sid="LambdaInvoke",
+            actions=["lambda:InvokeFunction"],
+            resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:{name}" for name in probe_function_names()],
         ),
         iam.PolicyStatement(
             # ER/elite-review 2026-06-15: the health check only calls describe_secret
@@ -770,7 +784,8 @@ def pipeline_health_check() -> list[iam.PolicyStatement]:
             actions=["secretsmanager:DescribeSecret"],
             resources=[f"arn:aws:secretsmanager:{REGION}:{ACCT}:secret:life-platform/*"],
         ),
-        iam.PolicyStatement(sid="CloudWatchMetrics", actions=["cloudwatch:PutMetricData"], resources=["*"]),
+        # #5545: IngestLiveness (CloudTrail delivery, sensor self-test, unhealthy-source gauges) + Pipeline.
+        _put_metric_data_statement("CloudWatchMetrics", NS_INGEST_LIVENESS, NS_PIPELINE),
         iam.PolicyStatement(
             sid="SnsPublishDigest",
             actions=["sns:Publish"],
@@ -956,9 +971,5 @@ def telegram_worker() -> list[iam.PolicyStatement]:
         _charter_twin_list(),
         # Fail-loud partner of the same fix: an empty persona/registry now emits
         # TelegramPersonaMissing instead of a WARN nobody reads.
-        iam.PolicyStatement(
-            sid="Metrics",
-            actions=["cloudwatch:PutMetricData"],
-            resources=["*"],
-        ),
+        _put_metric_data_statement("Metrics", NS_AI, NS_COMPUTE, NS_TELEGRAM),  # #5545
     ]

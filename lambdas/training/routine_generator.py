@@ -144,9 +144,12 @@ def _schedule_entry_for_date(
         from training import deload_word, session_sequence
 
         records = deload_records if deload_records is not None else deload_word.load_records_failsoft()  # #5070: his word
-        seq = session_sequence.next_session(target_date, block_workouts, records)
+        from training import live_sequence  # #5861 FIX5: LIVE only — the short / dip week's skipped roles; None today
+
+        skip, lib = live_sequence.cron_skip(block_workouts)
+        seq = session_sequence.next_session(target_date, block_workouts, records, skip=skip)
         if seq is not None and seq.get("source") == "session_sequence":
-            return seq
+            return live_sequence.cron_entry(seq, target_date, block_workouts, lib) if skip is not None else seq
         if seq is not None:
             # #4110 review: a non-lifting placeholder that names the unreadable record — the one
             # outcome that cannot prescribe a session the sequence did not choose (walking is every day).

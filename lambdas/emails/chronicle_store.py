@@ -211,6 +211,21 @@ def _set_chronicle_pending(week_num, reason, display, *, _g):
         logger.warning(f"[chronicle] _set_chronicle_pending failed (non-fatal): {e}")
 
 
+# #5520: the pending-marker reason a preview-routed draft writes.
+AWAITING_APPROVAL = "awaiting_approval"
+
+
+def mark_awaiting_approval(week_num, *, _g):
+    """#5520: a preview-routed draft is a held week too. The preview route used to write no marker, so
+    /api/edition served ``held: null`` and every door said "the next draft is due" over a draft that already
+    existed (Week 8 sat 18 days that way). The approve path's publish rewrites posts.json without a ``pending``
+    key, so the marker clears itself when the week ships. Non-content: the week number and a fixed sentence —
+    never the draft's title, prose or a craft finding. Fail-open, like every marker write."""
+    display = f"Week {week_num} is drafted and waiting for Matthew's approval before it publishes."
+    _set_chronicle_pending(week_num, AWAITING_APPROVAL, display, _g=_g)
+    _g["logger"].info(f"FEAT-12: Draft Week {week_num} stored — awaiting approval")
+
+
 def held_week(week_num, reason, display, body, status_code=500, dry_run=False, *, _g):
     """#803/#2221: end a week WITHOUT publishing, but never silently.
 

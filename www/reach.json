@@ -3,15 +3,15 @@
   "depth1": [
     "/data/",
     "/data/deep_pct/",
-    "/data/weight_lbs/",
+    "/data/journey/",
     "/privacy/",
     "/story/",
+    "/story/moments/",
     "/story/week-06/",
     "/subscribe/",
     "/system/",
     "/system/ledger/",
     "/system/ledger/disagreements/protein-deep-sleep-2026-10-29/",
-    "/system/ledger/nutrition-20261029-carbcut01/",
     "/system/ledger/sleep-20261005-deepsleep01/"
   ],
   "depth1_count": 12,
@@ -53,7 +53,9 @@
     "/data/total_protein_g/",
     "/data/weight_lbs/",
     "/privacy/",
+    "/privacy/policy/",
     "/story/",
+    "/story/moments/",
     "/story/program-week-09/",
     "/story/so-far/",
     "/story/week-06/",
@@ -74,6 +76,7 @@
     "/system/ledger/",
     "/system/ledger/disagreements/protein-deep-sleep-2026-10-29/",
     "/system/ledger/glucose-20260920-cgm01/",
+    "/system/ledger/glucose-20261013-recovery01/",
     "/system/ledger/nutrition-20261015-protein01/",
     "/system/ledger/nutrition-20261029-carbcut01/",
     "/system/ledger/physical-20261015-weight01/",
@@ -91,5 +94,5 @@
     "/system/sources/whoop/",
     "/system/sources/withings/"
   ],
-  "transitive_count": 70
+  "transitive_count": 73
 }

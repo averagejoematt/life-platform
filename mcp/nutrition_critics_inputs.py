@@ -157,7 +157,12 @@ def whoop_series(rows: list[dict[str, Any]] | None, keys: list[str], field: str 
     night, None when the partition could not be read."""
     if rows is None:
         return None
-    by_day = {str(r.get("date") or str(r.get("sk") or "").replace("DATE#", ""))[:10]: r for r in rows}
+    by_day: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        sk = str(r.get("sk") or "")
+        if sk.count("#") > 1:  # `DATE#<day>#WORKOUT#<id>` sub-rows share the day's prefix and carry no daily fields
+            continue
+        by_day[str(r.get("date") or sk.replace("DATE#", ""))[:10]] = r
     return [_num((by_day.get(k) or {}).get(field)) for k in keys]
 
 

@@ -26,6 +26,14 @@ import re
 import sys
 from unittest.mock import patch
 
+import pytest
+
+ROLLBACK = pytest.mark.usefixtures("exercise_library_rollback")
+"""#5861 (owner approval 2026-11-14): the marked tests pin the PRE-approval generator — the generator's sets are compared with the shadow
+prescription (`program_structure`); live plans its own volume. They run on the library's rollback copy (status proposed:
+tests/conftest.py `exercise_library_rollback`), so they keep guarding the rollback path; the approved (live) behaviour is pinned by the
+#5861 tests."""
+
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "lambdas"))
@@ -182,6 +190,7 @@ def test_a4_the_charter_carries_a_ceiling_and_no_floor():
     assert "under_range" not in est and "range" not in est and est["cap"] == 75
 
 
+@ROLLBACK
 def test_a4_a_draft_under_60_min_with_the_week_at_75_raises_no_warning_and_adds_no_sets():
     """Acceptance: 'a draft under 60 min with weekly sets at or under 75 raises no warning and adds no sets.' Shoulders+arms
     is ~38 lifting minutes and the week is 75 sets: the prescription is untrimmed and unpadded, the generator's blocks carry
@@ -235,7 +244,7 @@ def test_b2_the_anchor_tripwire_still_reads_the_barbell_bench():
     uh_bench = next(e for e in _rx(UH)["exposures"] if e["pattern"] == "bench")
     assert (uh_bench["movement_key"], uh_bench["intensity"]) == ("barbell_bench_press", "heavy")
     assert program_structure.ANCHORS["bench"]["catalog_keys"][0] == "barbell_bench_press"
-    assert "anchor_keys" not in program_structure.SESSION_TEMPLATES[UH]
+    assert "bench" not in (program_structure.SESSION_TEMPLATES[UH].get("anchor_keys") or {})  # #6014 pins only the heavy row
     assert "bench" in program_structure.CORE_ANCHORS
     from mcp import plan_draft_evidence
 

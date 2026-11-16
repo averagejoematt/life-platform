@@ -28,8 +28,10 @@ WHAT IT REUSES (no second derivation)
                   the one day, labelled partial, never extrapolated to a week.
   the type        `training.routine_title.resolve_archetype` (the performed-type resolver the
                   packet's `last_session_by_type` uses), `training_streaks.is_loaded_session`.
-  the ceiling     `owner_redlines.REDLINES["walking_floor_hr_wk"]["hr_ceiling_bpm"]` — read,
-                  never a literal.
+  the intensity   `training.recent_aerobic.EASY_EFFORT_CUE` — the talk test plus the redline's
+                  easy-effort RPE (#5916, owner ruling 2026-11-13). There is no heart-rate
+                  ceiling: a walk's average is listed as a measurement with its basis
+                  (`walk_hr_measured`) and graded against nothing.
 
 READ STATES (#4072's vocabulary)
 
@@ -49,7 +51,9 @@ from typing import Any, Callable
 from common.pacific_time import pacific_clock_label, pacific_today, pacific_weekday, parse_iso_utc, shift_day_key
 from training import walking_volume
 
-TODAY_VIEW_VERSION = "coach-packet-today@1.1.0"  # 1.1.0 #5373: a Hevy session's carries — steps + the estimated distance
+# 1.1.0 #5373: a Hevy session's carries — steps + the estimated distance; 1.2.0 #5916: `hr_ceiling_flags` is gone — a
+# walk's average heart rate is a measurement (`walk_hr_measured`), and the walking line is the talk test plus RPE
+TODAY_VIEW_VERSION = "coach-packet-today@1.2.0"
 
 RowReader = Callable[[str], list[dict[str, Any]]]
 
@@ -286,8 +290,8 @@ def today_view(
 ) -> tuple[dict[str, Any] | None, dict[str, Any]]:
     """(value, status) for the packet's `today` field: the day BEFORE `target_date` (Pacific) —
     what a night-before debrief reviews. Readers are injectable for the fixture; the
-    definition (the day, the de-dup, the walking layer, the ceiling) is not."""
-    from training import owner_redlines
+    definition (the day, the de-dup, the walking layer, the walking intensity line) is not."""
+    from training import recent_aerobic
     from training.plan_engine import ABSENT, MEASURED, READ_FAILED, error_label, input_status
 
     from mcp import shared_quantities
@@ -343,23 +347,19 @@ def today_view(
         else None
     )
 
-    redline = owner_redlines.REDLINES["walking_floor_hr_wk"]
-    ceiling = redline["hr_ceiling_bpm"]
-    flags = [
+    # #5916 (owner ruling 2026-11-13): a walk's average heart rate is a MEASUREMENT — listed with its basis, graded
+    # against nothing. Every walk that carries one is here, a de-duplicated one included; none is a flag.
+    walk_hr = [
         {
             "id": it["id"],
             "title": it.get("title"),
             "device": it.get("device"),
             "avg_hr": it["avg_hr"],
-            "hr_ceiling_bpm": ceiling,
-            "over_by_bpm": round(float(it["avg_hr"]) - float(ceiling), 1),
+            "basis": recent_aerobic.AVG_HR_BASIS_DEVICE,
             "deduplicated": it in removed,
         }
         for it in items + removed
-        if it.get("source") == "strava"
-        and it.get("modality") == "walking"
-        and it.get("avg_hr") is not None
-        and float(it["avg_hr"]) > float(ceiling)
+        if it.get("source") == "strava" and it.get("modality") == "walking" and it.get("avg_hr") is not None
     ]
 
     partial = day >= now
@@ -388,10 +388,11 @@ def today_view(
         "walking_hours_today": (layer or {}).get("total_hr"),
         "walking": walking,
         "walking_floor_hr_wk": {
-            "hr_ceiling_bpm": ceiling,
-            "source": "training.owner_redlines.REDLINES['walking_floor_hr_wk']['hr_ceiling_bpm']",
+            "intensity": recent_aerobic.EASY_EFFORT_CUE,
+            "heart_rate": f"a recorded measurement; {recent_aerobic.HR_NOT_GRADED}",
+            "source": "training.recent_aerobic.EASY_EFFORT_CUE <- owner_redlines.REDLINES['walking_floor_hr_wk']['easy_rpe_max']",
         },
-        "hr_ceiling_flags": flags,
+        "walk_hr_measured": walk_hr,
         "honesty": honesty,
         "version": TODAY_VIEW_VERSION,
     }

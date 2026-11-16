@@ -30,6 +30,12 @@ from unittest.mock import patch
 
 import pytest
 
+ROLLBACK = pytest.mark.usefixtures("exercise_library_rollback")
+"""#5861 (owner approval 2026-11-14): the marked tests pin the PRE-approval generator — the 10-26 rotation notes and lint offenders are the
+shadow rotation's (live selection replaces the pools and swaps the unconfirmed machine row). They run on the library's rollback copy
+(status proposed: tests/conftest.py `exercise_library_rollback`), so they keep guarding the rollback path; the approved (live) behaviour
+is pinned by the #5861 tests."""
+
 os.environ.setdefault("TABLE_NAME", "life-platform")
 os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
@@ -112,6 +118,7 @@ ROTATED_10_26 = {
 }
 
 
+@ROLLBACK
 def test_each_rotated_accessory_names_the_exercise_it_replaces():
     ideal = _generate_10_26()
     cal = ideal.inputs_snapshot["calendar"]
@@ -130,6 +137,7 @@ def test_each_rotated_accessory_names_the_exercise_it_replaces():
     assert rec["reason"] == "rotation" and rec["reason_line"] == "New: replaces Cable Fly Crossovers."
 
 
+@ROLLBACK
 def test_before_and_after_the_10_26_chest_fly():
     """The published 10-26 Chest Fly (Machine) note (bodyweights scrubbed) against today's render of the same slot."""
     before = (
@@ -143,6 +151,7 @@ def test_before_and_after_the_10_26_chest_fly():
     assert banned_hits([before]) and not banned_hits([fly.notes])
 
 
+@ROLLBACK
 def test_no_rotation_line_when_the_slot_did_not_rotate():
     """Mutation controls: block 1's first phase serves the template (step 0), a REFUSED rotation serves the template,
     and a held variant (the ledger holds what the previous phase served) is no swap — none of them writes the line."""
@@ -160,6 +169,7 @@ def test_no_rotation_line_when_the_slot_did_not_rotate():
     assert vr.swaps(pinned, CATALOG["movements"]) == {}
 
 
+@ROLLBACK
 def test_the_rotation_note_lands_in_the_render_check_and_is_missing_when_the_wire_drops_it():
     """#5083 box 3: the rotation has no Hevy field, so it rides the note (the documented fallback) — `render_check`
     finds it there, and an IR that records the swap but a wire that lost it reads `missing`, never `absent`."""
@@ -459,6 +469,7 @@ def _lint(ir: RoutineSpec) -> list[str]:
     return hevy_note_lint.lint_wire(to_create_body(ir, lambda k: "T-" + k, why_note=why), ir).to_dict()["problems"]
 
 
+@ROLLBACK
 def test_every_path_lints_clean_and_the_lint_fires_on_the_old_copy():
     step = [{"movement_key": "lat_pulldown", "sets": [{"weight_lbs": 160, "rep_range_start": 8, "rep_range_end": 12, "count": 2}]}]
     paths = {

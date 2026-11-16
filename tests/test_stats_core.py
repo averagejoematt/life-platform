@@ -14,6 +14,9 @@ import os
 import random
 import sys
 
+import pytest
+
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
 from common import stats_core  # noqa: E402
@@ -577,3 +580,80 @@ class TestCorrelationEvidence:
         assert ev["score"] == 0.0
         assert ev["n"] == 0 and ev["n_eff"] == 0.0
         assert ev["ci95"] is None and ev["level"] == "low"
+
+
+class TestCorrelationTier:
+    """#5523: ONE correlation-tier rule for the sleep signal board and the habits keystone (ADR-104/105)."""
+
+    def test_the_specimen_r_003_at_n_30_is_weak_and_carries_its_interval(self):
+        t = stats_core.correlation_tier(0.03, 30)
+        assert t["tier"] == "weak" and t["ci_excludes_zero"] is False
+        assert (
+            t["ci95"] == [t["ci_lo"], t["ci_hi"]]
+            and t["ci_lo"] == pytest.approx(-0.33, abs=0.01)
+            and t["ci_hi"] == pytest.approx(0.39, abs=0.01)
+        )
+
+    def test_abs_r_sets_the_ceiling_and_the_interval_can_only_demote(self):
+        assert stats_core.correlation_tier(0.7, 60)["tier"] == "strong"
+        assert stats_core.correlation_tier(-0.45, 60)["tier"] == "moderate"
+        assert stats_core.correlation_tier(0.29, 200)["tier"] == "weak"  # tight interval, still under the floor
+        assert stats_core.correlation_tier(0.32, 30)["tier"] == "weak"  # over the floor, interval crosses zero
+        assert stats_core.correlation_tier(0.7, 6)["tier"] == "weak"  # n=6: [-0.27, 0.96] cannot tell the sign
+        assert stats_core.correlation_tier(0.7, 60, n_eff=6)["tier"] == "weak"  # effective n can only shrink the claim
+        assert stats_core.correlation_tier(0.7, 6, n_eff=600)["tier"] == "weak"  # ...never inflate it past n
+
+    def test_no_interval_no_claim(self):
+        assert stats_core.correlation_tier(0.9, 3) == {**stats_core.correlation_tier(0.9, 3), "tier": "weak", "ci95": None}
+        for bad in ((None, 30), ("x", 30), (float("nan"), 30), (0.5, None)):
+            assert stats_core.correlation_tier(*bad)["tier"] is None, bad
+
+    def test_contract_abs_r_under_03_at_n_30_plus_is_never_moderate(self):
+        """The issue's contract, swept; the old sleep rule ('moderate' at n >= 30) is the positive control."""
+
+        def old_rule(r, n):
+            return "low confidence" if n < 30 else "moderate"
+
+        grid = [(r / 100.0, n) for r in range(-29, 30) for n in (30, 45, 90, 365)]
+        assert any(old_rule(r, n) == "moderate" for r, n in grid), "control: the n-only rule must fail this contract"
+        for r, n in grid:
+            t = stats_core.correlation_tier(r, n)
+            assert t["tier"] == "weak" and t["ci95"] is not None, (r, n, t)
+
+
+def _sleep_card(xs, ys):
+    from datetime import datetime
+
+    from web import site_api_sleep as sl
+
+    days = [f"2026-10-{d:02d}" for d in range(1, len(xs) + 1)]
+    return sl._corr_card("T", "t", "x", "y", dict(zip(days, xs)), dict(zip(days, ys)), _g={"datetime": datetime})
+
+
+def test_every_sleep_card_with_a_coefficient_carries_its_interval_and_the_shared_tier():
+    """#5523: A1 served n=30 r=0.03 'moderate' with no interval. A near-zero r at n=30 is now 'low confidence' and every
+    coefficient ships ci95 / ci_lo / ci_hi; a card with no coefficient ships none."""
+    rng = random.Random(5523)
+    xs = [rng.gauss(0, 1) for _ in range(30)]
+    noise = _sleep_card(xs, [rng.gauss(0, 1) for _ in range(30)])
+    assert noise["coefficient"] is not None and abs(noise["coefficient"]) < 0.3
+    assert noise["confidence"] == "low confidence" and noise["tier"] == "weak"
+    assert noise["ci95"] == [noise["ci_lo"], noise["ci_hi"]] and noise["ci_lo"] < noise["coefficient"] < noise["ci_hi"]
+    strong = _sleep_card(xs, [x + rng.gauss(0, 0.3) for x in xs])
+    assert strong["confidence"] == "strong" and strong["ci_lo"] > 0
+    early = _sleep_card(xs[:10], xs[:10])  # under 14 days: direction only, no coefficient, no interval
+    assert early["coefficient"] is None and early["ci95"] is None and early["tier"] is None
+
+
+def test_the_boards_share_one_tier_function():
+    """No board grades a correlation by its own rule: both import stats_core.correlation_tier, and the habits page
+    reads the served tier instead of thresholding |r| itself."""
+    for mod in ("site_api_sleep.py", "site_api_habits.py"):
+        src = open(os.path.join(_REPO, "lambdas", "web", mod), encoding="utf-8").read()
+        assert (
+            "from common.stats_core import correlation_tier" in src and "correlation_tier(" in src.split("import correlation_tier", 1)[1]
+        ), mod
+    sleep_src = open(os.path.join(_REPO, "lambdas", "web", "site_api_sleep.py"), encoding="utf-8").read()
+    assert 'if n < 30 else "moderate"' not in sleep_src
+    js = open(os.path.join(_REPO, "site", "assets", "js", "evidence_habits.js"), encoding="utf-8").read()
+    assert "absr >= 0.3" not in js and "Math.abs(k.correlation_r) >= 0.3" not in js and "k.tier" in js

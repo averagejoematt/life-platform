@@ -169,6 +169,10 @@ def attach_cardio_cues(
     # #5428 (2026-11-08): a fitness-test block's note IS the charter's protocol (fitness_tests.test_note). Composing a
     # menu dose over it sent the 11-01 and 11-07 six-minute walk out as "Treadmill · 8% · RPE 4–5" — the wrong test.
     targets = [ex for ex in targets if not str(getattr(ex, "rationale_tag", "") or "").startswith(FITNESS_TEST_TAG_PREFIX)]
+    # #6020: `draft_custom` re-tags every block `custom`, so a test block is also known by its `Test ·` note line (§3.8)
+    from training.hevy_note_grammar import is_test_note
+
+    targets = [ex for ex in targets if not is_test_note(str(getattr(ex, "notes", "") or ""))]
     if not targets:
         return 0
     if cardio_index is None:
@@ -248,7 +252,7 @@ def attach_cardio_cues(
             treadmill_sessions=hist["by_machine"].get(cardio_menu.TREADMILL),
             aerobic_block=aerobic_block,
             constraint=constraint,
-            hr_ceiling_bpm=None if constraint else recent_aerobic.HR_CEILING_BPM,
+            hr_ceiling_bpm=None,  # #5916: the walking HR cap is retired (owner ruling 2026-11-13); the note never printed it
             placement_why=why,
             previous=previous,
             # #5428: the watch step when a Hevy block follows (owner protocol 2026-10-27), and an author's route why

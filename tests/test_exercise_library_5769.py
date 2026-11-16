@@ -27,7 +27,6 @@ with open(os.path.join(ROOT, "config", "movement_catalog.json"), encoding="utf-8
 with open(os.path.join(ROOT, "config", "training_charter.json"), encoding="utf-8") as _f:
     CHARTER = json.load(_f)
 TIDS = {str(e["template_id"]).upper(): k for k, e in MV.items() if e.get("template_id")}
-FIDX = xl.fallback_index(LIB)
 
 
 # ── schema ──────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -38,10 +37,21 @@ def test_library_is_schema_valid():
     assert errors == [], "\n".join(errors[:30])
 
 
-def test_library_ships_proposed_and_versioned():
-    assert LIB["status"] == "proposed"
+def test_library_ships_approved_and_versioned():
+    """Owner approval 2026-11-14 (scripts/approve_exercise_library.py): approved with its day at 0.4.0; every later data
+    change is an owner-ruled, versioned line after it (0.4.1: #6014, owner ruling 2026-11-15). Rollback is status back to
+    proposed — that copy is shadow."""
+    from training import selection_engine as se
+
+    assert (LIB["status"], LIB.get("approved_on"), LIB["version"]) == ("approved", "2026-11-14", "0.4.1")
     assert re.match(r"^\d+\.\d+\.\d+$", LIB["version"])
     assert LIB["change_log"][0]["version"] == "0.1.0"
+    versions = [x["version"] for x in LIB["change_log"]]
+    approval = LIB["change_log"][versions.index("0.4.0")]
+    assert approval["date"] == "2026-11-14" and approval["what"].startswith("approved: status proposed -> approved")
+    after = LIB["change_log"][versions.index("0.4.0") + 1 :]
+    assert [x["version"] for x in after] == ["0.4.1"] and all("owner ruling" in x["by"] for x in after)
+    assert se.mode(LIB) == se.MODE_LIVE and se.mode(LIB | {"status": "proposed"}) == se.MODE_SHADOW
 
 
 def test_validator_catches_a_broken_entry():
@@ -50,7 +60,7 @@ def test_validator_catches_a_broken_entry():
     k = next(iter(bad["movements"]))
     bad["movements"][k]["family"] = "vibes"
     bad["movements"][k]["equipment"] = ["a_gym_named_thing"]
-    bad["movements"][k]["fallbacks"] = []
+    bad["movements"][k]["fallbacks"] = [{"movement_id": k, "reason": "same_stimulus"}]  # itself: never a fallback
     errs = xl.validate(bad)
     assert any("family" in e for e in errs) and any("equipment" in e for e in errs) and any("fallback" in e for e in errs)
 
@@ -64,7 +74,11 @@ def test_every_movement_catalog_template_is_in_the_library():
         for k, v in CATALOG["movements"].items()
         if v.get("hevy_template_id_hint") and str(v["hevy_template_id_hint"]).upper() not in TIDS
     ]
-    assert missing == []
+    # #5861 fix round 13 (owner ruling 2026-11-14): the kettlebell deadlift no longer logs under Hevy's Sumo Deadlift; it has its
+    # own custom template now. The catalog (today's path) still carries the Sumo hint until the driver reconciles it; the library
+    # has RELEASED that id (deploy/exercise_library_templates.json).
+    assert missing == [("kettlebell_deadlift", "D20D7BBE")]
+    assert MV["kettlebell_deadlift"]["template_id"] and str(MV["kettlebell_deadlift"]["template_id"]).upper() != "D20D7BBE"
 
 
 def test_every_logged_template_is_a_history_entry():
@@ -94,7 +108,7 @@ def test_alias_ids_stay_their_own_movement():
         assert alias.upper() in TIDS
         assert MV[TIDS[alias.upper()]].get("alias_of")
     e = MV[TIDS["B5EFBF9C"]]
-    assert e["length_bias"] == "lengthened" and any(r["tier"] == "A" for r in e["hypertrophy"])
+    assert e["length_bias"] == "lengthened" and any(r["tier"] == "S" and r["evidence_confidence"] == "rct_direct" for r in e["hypertrophy"])
 
 
 def test_expansion_covers_the_owner_spec():
@@ -131,10 +145,11 @@ def test_expansion_covers_the_owner_spec():
 # ── citations ──────────────────────────────────────────────────────────────────────────────────────────────────
 
 
-def test_tier_a_b_rows_cite_a_doi_or_pmid():
+def test_reviewed_evidence_rows_cite_a_doi_or_pmid():
+    """#5857: evidence is its own field — a row whose evidence_confidence is above none_reviewed cites a DOI/PMID."""
     cites = LIB["citations"]
-    rows = [(k, r) for k, e in MV.items() for r in e["hypertrophy"] if r["tier"] in ("A", "B")]
-    assert rows, "no tier A/B rows at all"
+    rows = [(k, r) for k, e in MV.items() for r in e["hypertrophy"] if r["evidence_confidence"] != "none_reviewed"]
+    assert rows, "no reviewed evidence rows at all"
     for k, r in rows:
         assert r["citations"], k
         for c in r["citations"]:
@@ -142,11 +157,12 @@ def test_tier_a_b_rows_cite_a_doi_or_pmid():
         assert r["last_reviewed"] != "unreviewed"
 
 
-def test_unreviewed_rows_are_tier_c():
+def test_unreviewed_rows_carry_no_evidence_and_sit_on_their_rubric_tier():
     for k, e in MV.items():
         for r in e["hypertrophy"]:
             if r["last_reviewed"] == "unreviewed":
-                assert r["tier"] == "C", k
+                assert r["evidence_confidence"] == "none_reviewed" and not r.get("evidence_adjustment"), k
+                assert r["tier"] == r["rubric_tier"], k
 
 
 def test_every_registered_citation_is_well_formed():
@@ -167,6 +183,12 @@ _NUMBER_ALLOWED_PATHS = (
     re.compile(r"^movements\.[^.]+\.history\.exposures$"),
     re.compile(r"^citations\.[^.]+\.year$"),
     re.compile(r"^gates\.[^.]+\.standard\.[a-z_]+$"),
+    re.compile(r"^quality_rubric\."),  # #5857: the public rubric's weights and bands
+    re.compile(r"^movements\.[^.]+\.hypertrophy\[\d+\]\.(rubric_score|evidence_adjustment\.bands)$"),
+    # #5861 FIX6: two owner-ruled programming settings (a set count, an advisory %-of-bodyweight reference) — no personal value
+    re.compile(
+        r"^programming_settings\.(press_sets|rate_ceiling_pct_bw|hard_conditioning_doses|abs_direct_sets_per_week)$"
+    ),  # FIX7/8: counts
 )
 _UNIT_NUMBER_RE = re.compile(r"\b\d{2,3}(?:\.\d)?\s*(?:lb|lbs|pounds|kg|kilos?)\b", re.I)
 
@@ -187,7 +209,8 @@ def test_no_private_numbers_in_the_committed_library():
     offenders = []
     for path, val in _walk(LIB):
         leaf = path.rsplit(".", 1)[-1].split("[")[0]
-        if _PRIVATE_KEY_RE.search(leaf) and leaf not in _KEY_ALLOWED and not path.startswith("equipment_vocabulary"):
+        vocabulary = path.startswith(("equipment_vocabulary", "quality_rubric"))  # resistance-profile names, not data
+        if _PRIVATE_KEY_RE.search(leaf) and leaf not in _KEY_ALLOWED and not vocabulary:
             offenders.append(f"key {path}")
         if isinstance(val, (int, float)) and not isinstance(val, bool) and not any(rx.match(path) for rx in _NUMBER_ALLOWED_PATHS):
             offenders.append(f"number at {path}")
@@ -276,10 +299,15 @@ def test_named_gate_chains():
     assert {"bw_pull", "chain_pull"} <= set(MV["pull_up"]["gates"])
     assert g["chain_pull"]["chain_prerequisites"] == ["pull_up_negative"]
     assert g["chain_pull_negative"]["chain_prerequisites"] == [TIDS["2C37EC5E"]]  # assisted pull-up
-    assert "chain_kb_swing" in MV["kettlebell_swing"]["gates"] and g["chain_kb_swing"]["chain_prerequisites"] == ["kettlebell_deadlift"]
+    # fix round 14 (H4): the swing is measured on the barbell deadlift the engine serves weekly, plus his technique confirmation
+    assert "chain_kb_swing" in MV["kettlebell_swing"]["gates"] and g["chain_kb_swing"]["chain_prerequisites"] == ["deadlift_barbell"]
+    for k in ("kettlebell_swing", "swing", "double_swings"):
+        assert {"chain_kb_swing", "owner_confirmation_skill"} <= set(MV[k]["gates"]), k
     assert g["chain_kb_clean"]["chain_prerequisites"] == ["kettlebell_swing"]
     assert g["chain_hang_high_pull"]["chain_prerequisites"] == ["tall_high_pull"]
-    assert g["chain_hang_power_clean"]["chain_prerequisites"] == ["hang_high_pull"]
+    assert g["chain_hang_power_clean"]["chain_prerequisites"] == ["barbell_high_pulls"]  # fix round 13: the real hang high pull
+    assert MV["barbell_high_pulls"]["title"] == "Barbell High Pulls" and "chain_hang_high_pull" in MV["barbell_high_pulls"]["gates"]
+    assert MV["hang_high_pull"]["title"] == "180 Squat Jumps" and "chain_hang_high_pull" not in MV["hang_high_pull"]["gates"]
     assert "chain_hang_power_clean" in MV["hang_power_clean"]["gates"]
     for k in ("triceps_dip", "nordic_hamstring_curl", "hanging_leg_raise", "push_up"):
         assert "bodyweight_threshold" in _kinds(MV[k]), k
@@ -327,42 +355,35 @@ def test_not_for_you_now_entries_carry_reason_and_unlock():
 # ── fallbacks + availability ───────────────────────────────────────────────────────────────────────────────────
 
 
-def test_every_movement_has_a_ranked_fallback_matching_the_rule():
+def test_every_fallback_list_is_the_rules_own_ranking():
+    """#5861 fix round 13: a movement's fallbacks are the first candidates THE equivalence rule ranks (`library_integrity`),
+    at most three, and an empty list is valid — nothing is added to fill it. The rule itself, clause by clause, is held in
+    tests/test_library_integrity_5861.py."""
     for k, e in MV.items():
-        assert len(e["fallbacks"]) >= 1, k
-        want = [{"movement_id": m, "reason": r} for m, r in xl.fallback_candidates(LIB, k, FIDX)[: len(e["fallbacks"])]]
+        want = [{"movement_id": m, "reason": r} for m, r in xl.fallback_candidates(LIB, k)[: xl.integrity.MAX_FALLBACKS]]
         assert e["fallbacks"] == want, k
-
-
-def test_first_fallback_avoids_the_primarys_equipment_where_avoidable():
-    """If the first fallback shares equipment with the primary, no candidate of the same reason was equipment-disjoint."""
-    offenders = []
-    for k, e in MV.items():
-        first = e["fallbacks"][0]
-        if not set(MV[first["movement_id"]]["equipment"]) & set(e["equipment"]):
-            continue
-        same_reason = [m for m, r in xl.fallback_candidates(LIB, k, FIDX) if r == first["reason"]]
-        if any(not set(MV[m]["equipment"]) & set(e["equipment"]) for m in same_reason):
-            gated_first = bool(xl._locking_gate_kinds(LIB, MV[first["movement_id"]]) & {"bodyweight_threshold", "chain_prerequisite"})
-            if not gated_first:
-                offenders.append(k)
-    assert offenders == []
+    assert any(not e["fallbacks"] for e in MV.values())
 
 
 def test_availability_follows_the_owner_rule():
+    """Owner rulings 2026-11-11 and 2026-11-14: five evidence states; `state` follows from the evidence; an owner note wins."""
     inv = LIB["gym_inventory"]["items"]
-    assert inv["preacher_machine"]["home_gym"] == {"state": "unavailable", "source": "owner note 2026-11-08", "owner_confirmable": True}
+    assert inv["preacher_machine"]["home_gym"] == {
+        "state": "unavailable",
+        "evidence": "confirmed_unavailable",
+        "source": "owner note 2026-11-08",
+        "owner_confirmable": True,
+    }
     for k, e in MV.items():
         if "preacher_machine" in e["equipment"]:
             assert e["availability"]["home_gym"]["state"] == "unavailable", k
-    m = re.search(r"on or after (\d{4}-\d{2}-\d{2})", LIB["gym_inventory"]["rule"])
-    cutoff = m.group(1)
-    for k, e in MV.items():
-        bad = any(inv[x]["home_gym"]["state"] == "unavailable" for x in e["equipment"])
-        recent = (e.get("history") or {}).get("last_done", "") >= cutoff
-        if recent and not bad:
-            assert e["availability"]["home_gym"]["state"] == "available", k
-    assert all(inv[x]["home_gym"]["state"] in xl.AVAILABILITY_STATES for x in inv)
+    for x, row in inv.items():
+        st = row["home_gym"]
+        assert st["state"] in xl.AVAILABILITY_STATES and st["evidence"] in xl.integrity.AVAILABILITY_EVIDENCE, x
+        assert st["state"] == xl.integrity.EVIDENCE_STATE[st["evidence"]], x
+    assert not re.search(
+        r"\d{4}-\d{2}-\d{2}", LIB["gym_inventory"]["rule"].split("owner rulings")[1].split(":")[1]
+    ), "no log date in the rule"
 
 
 # ── pure classifiers (synthetic sentences — never his notes) ───────────────────────────────────────────────────
@@ -449,8 +470,8 @@ def test_private_check_passes_on_a_complete_overlay():
 @pytest.mark.parametrize("mutation", ["null_value", "missing_gate", "dangling_chain", "no_overlay", "non_numeric_bodyweight"])
 def test_private_check_fails_each_incomplete_shape(mutation):
     ov = _complete_overlay()
-    if mutation == "null_value":
-        ov["gates"]["bw_pull"]["value"] = None
+    if mutation == "null_value":  # a chain gate with no standard (an unset BODYWEIGHT threshold is valid: fix round 13)
+        ov["gates"]["chain_pull"]["value"] = None
     elif mutation == "missing_gate":
         del ov["gates"]["chain_kb_swing"]
     elif mutation == "dangling_chain":
@@ -467,7 +488,7 @@ def test_private_check_script_prints_no_values(tmp_path):
     import check_library_gates_private as chk
 
     ov = _complete_overlay()
-    ov["gates"]["bw_pull"]["value"] = None
+    ov["gates"]["bw_pull"]["value"] = "soon"  # set, but not a number (an UNSET threshold is valid and locked: fix round 13)
     p = tmp_path / "ov.json"
     p.write_text(json.dumps(ov))
     lines: list[str] = []
@@ -486,10 +507,11 @@ def test_approval_refuses_without_a_complete_private_check(tmp_path):
     import approve_exercise_library as appr
 
     lib_path = tmp_path / "lib.json"
-    lib_path.write_text(json.dumps(LIB))
+    rollback = {k: v for k, v in LIB.items() if k != "approved_on"} | {"status": "proposed"}  # the approval runs on a proposed copy
+    lib_path.write_text(json.dumps(rollback))
     bad = tmp_path / "bad.json"
     ov = _complete_overlay()
-    ov["gates"]["bw_nordic"]["value"] = None
+    ov["gates"]["chain_nordic"]["value"] = None  # a chain gate with no standard
     bad.write_text(json.dumps(ov))
     before = lib_path.read_text()
     assert appr.approve("test", str(lib_path), str(bad), today="2026-11-11", out=lambda *_: None) == 1
@@ -498,7 +520,9 @@ def test_approval_refuses_without_a_complete_private_check(tmp_path):
     good.write_text(json.dumps(_complete_overlay()))
     assert appr.approve("owner ruling (test)", str(lib_path), str(good), today="2026-11-11", out=lambda *_: None) == 0
     after = json.loads(lib_path.read_text())
-    assert after["status"] == "approved" and after["version"] == "0.2.0" and after["change_log"][-1]["by"] == "owner ruling (test)"
+    major, minor, _patch = (int(x) for x in LIB["version"].split("."))
+    assert after["status"] == "approved" and after["version"] == f"{major}.{minor + 1}.0"
+    assert after["change_log"][-1]["by"] == "owner ruling (test)"
 
 
 def test_approval_doc_names_the_check():

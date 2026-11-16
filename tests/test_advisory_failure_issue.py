@@ -349,14 +349,18 @@ def test_wrap_nightly_legs_cover_the_wrap_only_checks_it_claims():
     # degrade rule + per-leg tracker), but they are not wrap gates — they are the legs that
     # carry an aws-role, and only they may.
     aws_legs = {leg["slug"]: leg for leg in all_legs if leg.get("aws-role")}
-    assert set(aws_legs) == {"fleet-drift", "alarm-census"}, sorted(aws_legs)
+    assert set(aws_legs) == {"fleet-drift", "alarm-census", "wrap-alarm-citations"}, sorted(aws_legs)
     for leg in aws_legs.values():
         assert leg["aws-role"].endswith(":role/github-actions-readonly-role"), leg
     assert aws_legs["fleet-drift"]["cmd"] == "python3 deploy/check_fleet_drift.py --expect-deploy-base"
     assert aws_legs["alarm-census"]["cmd"] == "python3 scripts/check_alarm_census.py"
-    legs = [leg for leg in all_legs if not leg.get("aws-role")]
     import wrap_gates
 
+    # #5934: the wrap's own (e10) alarm-citation gate, run unattended — the bare blocking
+    # invocation, and it stays in the interactive battery too.
+    assert aws_legs["wrap-alarm-citations"]["cmd"] == "python3 scripts/check_alarm_citations.py"
+    assert aws_legs["wrap-alarm-citations"]["cmd"] in {" ".join(g.cmd) for g in wrap_gates.GATHER}
+    legs = [leg for leg in all_legs if not leg.get("aws-role")]
     nightly = {" ".join(g.cmd) for g in wrap_gates.NIGHTLY}
     assert len({leg["slug"] for leg in legs}) == len(legs) == 5
     for leg in legs:
@@ -368,5 +372,5 @@ def test_wrap_nightly_legs_cover_the_wrap_only_checks_it_claims():
     interactive = {" ".join(g.cmd) for g in wrap_gates.GATHER + wrap_gates.VERIFY}
     moved = {" ".join(g.cmd) for g in wrap_gates.NIGHTLY if g.name not in ("handover-lines", "residual-queue")}
     assert moved and not (moved & interactive), f"#4262: moved to nightly but still in the wrap battery: {sorted(moved & interactive)}"
-    for left_out in ("proportionality-ledger", "alarm-citations"):
+    for left_out in ("proportionality-ledger",):  # alarm-citations became a leg in #5934
         assert re.search(rf"{left_out}\s+NOT a leg", text), f"{left_out} must be named, with its reason, as deliberately left out"

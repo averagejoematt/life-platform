@@ -3,7 +3,7 @@ name: reconcile-branch
 description: "Merge a queue of concurrent PRs that each touch the doc-sync literals, without opening a red-main window. Use when several open PRs collide on generated counts, or a merge left the tree drifted."
 user-invocable: true
 argument-hint: "[PR numbers]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Task, Agent, TodoWrite
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, TodoWrite
 ---
 
 Merge a queue of concurrent PRs that each touch the doc-sync literals
@@ -109,7 +109,7 @@ pre-commit-hook interference during the rebase's internal commit; not yet promot
 CONVENTIONS.md). Don't fight it:
 
 ```bash
-git commit --no-verify -C "$(cat .git/rebase-merge/stopped-sha)"   # commit the resolved index as-is
+LP_AGENT_COMMIT=1 git commit -C "$(cat .git/rebase-merge/stopped-sha)"   # commit the resolved index; hooks run, the doc-sync sweep is left out
 git rebase --quit                                                    # discard the wedged rebase state
 git checkout -B <branch> HEAD                                        # reattach the branch
 ```

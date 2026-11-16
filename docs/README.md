@@ -50,7 +50,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Full system design (the 10 stacks, ingest→store→serve; counts auto-synced) |
 | [INFRASTRUCTURE.md](INFRASTRUCTURE.md) | The AWS account by the numbers |
 | [DEPENDENCY_GRAPH.md](DEPENDENCY_GRAPH.md) | What calls what; single points of failure |
-| [MCP_TOOL_CATALOG.md](MCP_TOOL_CATALOG.md) | All 92 MCP tools by domain (generated — never hand-edit) |
+| [MCP_TOOL_CATALOG.md](MCP_TOOL_CATALOG.md) | All 93 MCP tools by domain (generated — never hand-edit) |
 | [MCP_TOOL_AUDIT.md](MCP_TOOL_AUDIT.md) | The tool-removal ledger (#395 prune ratchet) |
 | [API.md](API.md) | Site-API endpoints |
 | [engines/](engines/) | The algorithm pages: [SCORING](engines/SCORING.md) · [CHARACTER](engines/CHARACTER.md) · [READINESS](engines/READINESS.md) · [HYPOTHESIS](engines/HYPOTHESIS.md) · [COACH_STANCE](engines/COACH_STANCE.md) |
@@ -83,7 +83,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | Doc | |
 |---|---|
 | [PLATFORM_NORTH_STAR.md](PLATFORM_NORTH_STAR.md) | The durable why — purpose, thesis, audiences, success bar |
-| [DECISIONS.md](DECISIONS.md) | **ADRs (001–167)** — every significant decision with rationale; index auto-generated |
+| [DECISIONS.md](DECISIONS.md) | **ADRs (001–169)** — every significant decision with rationale; index auto-generated |
 | [CONVENTIONS.md](CONVENTIONS.md) | **The load-bearing reflexes** (one-bundle rule #781, deploy-from-main, squash-drift, CI gate ordering, asset-staging trap) + drift-discovery commands |
 | [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) | **The "definition of an A" for craft** — the 10-dimension rubric + naming/size/gate standards `/review craft` grades against |
 | [OPERATING_DISCIPLINE.md](OPERATING_DISCIPLINE.md) | **The work-adjudication + session reflexes** — verifying a finding, closing an issue, judging an epic, concurrent lanes, watchers; plus the dated memory-corpus audit and the residual gap list (#2848) |
@@ -94,6 +94,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | [OPERATOR_SUBSTRATE_SPIKE.md](OPERATOR_SUBSTRATE_SPIKE.md) | The resident-operator substrate decision (#2849): composite — cloud routines for scheduled judgment, Actions+Bedrock for repo work, AgentCore declined per ADR-103; rent per leg, Architect leg live |
 | [NEW_SIGNAL_PLAYBOOK.md](NEW_SIGNAL_PLAYBOOK.md) | A new metric/device/source lands through one ordered checklist — absence semantics + privacy tier first (ADR-154, from the BodyScan 2 spike #2782) |
 | [DATA_GOVERNANCE.md](DATA_GOVERNANCE.md) | PII classification + retention |
+| [COACH_RECORD_INVENTORY.md](COACH_RECORD_INVENTORY.md) | Every coach stance / prompt / reasoning record type — where it lives, its public reader, exposable or private (#5611, decision E); no content |
 | [PUBLICATION_REGISTRY.md](PUBLICATION_REGISTRY.md) | Proposed: one publication registry for every public surface, and the staged migration from today's privacy modules (owner ruling 2026-11-05) |
 | [PERMANENCE_CONTRACT.md](PERMANENCE_CONTRACT.md) | **The written commitment** — nightly public archive, its admission gate, the continuity clock, and what none of it promises (#1400) |
 | [FRONTIER.md](FRONTIER.md) | **The parked quantified-life register** — the folded Roadmap vision (#3943) plus the variant-slot (#4423) and conditioning-stage (#4424) training programs, scores and acceptance verbatim; one promotion per cycle (ADR-099 amendment 2026-08-22) |

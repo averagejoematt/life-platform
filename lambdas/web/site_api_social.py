@@ -198,6 +198,7 @@ FINDING_RATE_LIMIT = 3  # per IP per hour
 PAGE_FEEDBACK_RATE_LIMIT = 5  # per IP per hour — /api/page_feedback (#4182)
 MORNING_NOTE_RATE_LIMIT = 10  # per IP per hour — /api/morning_note (#4189): the owner's door; a token guess costs a slot
 FOLLOW_RATE_LIMIT = 10  # per IP per hour — shared by the experiment and challenge follow doors
+PREDICT_WEEK_RATE_LIMIT = 10  # per IP per hour — /api/predict_week (#6088: it had no meter, only the per-metric dedup row)
 # A run is DONE (not still running) in any of these terminal states. Read by BOTH the
 # library pillar stats and the experiment-detail page so the two can't disagree (#2221).
 COMPLETED_RUN_STATUSES = ("completed", "partial", "failed")
@@ -355,10 +356,17 @@ def _rate_check(endpoint: str, ip_hash: str, limit: int, window_seconds: int, fa
     """The single door every rate-limited write in this module passes through.
 
     Uses the shared DynamoDB limiter when it is available and the bounded
-    in-memory fallback when it is not — but NEVER returns "allowed" without having
-    applied a limit. `_RATE_LIMITER_READY` is read here and nowhere else, which is
-    what `tests/test_site_api_social_behavior.py` pins: a future write door that
-    forgets its fallback is not expressible, because there is only one fallback.
+    in-memory fallback when it is not. `_RATE_LIMITER_READY` is read here and
+    nowhere else, which is what `tests/test_site_api_social_behavior.py` pins: a
+    future write door that forgets its fallback is not expressible, because there
+    is only one fallback.
+
+    What happens when the DynamoDB limiter itself ERRORS is the caller's
+    `fail_open`, and it is not a detail (#6088): with the default (True) a limiter
+    outage ADMITS the request unmetered. Every door that STORES reader content or a
+    reader-moved counter passes `fail_open=False` — an outage refuses the write
+    rather than letting it through unmetered. The doors left on the default, and
+    why, are named in `tests/test_reader_write_fail_closed_6088.py`.
     """
     if _RATE_LIMITER_READY:
         return _ddb_rate_check(table, endpoint=endpoint, ip_hash=ip_hash, limit=limit, window_seconds=window_seconds, fail_open=fail_open)
@@ -489,8 +497,10 @@ def handle_challenge_catalog() -> dict:
 
 
 # ── #2238: the check-in `note` screen ────────────────────────────────────────
-# `note` is the only reader-supplied FREE TEXT in this module that reaches a
-# public payload. It is captured by an anonymous POST (_handle_challenge_checkin),
+# #6087: the reader door no longer stores a note at all, and never writes the owner's
+# row; the read-side screen below stays for rows stored before that. History:
+# `note` was the only reader-supplied FREE TEXT in this module that reached a
+# public payload. It was captured by an anonymous POST (_handle_challenge_checkin),
 # stored inside the challenge row's `daily_checkins`, and `handle_challenges`
 # publishes that row WHOLE on GET /api/challenges. Until #2238 it was only
 # length-capped: no HTML strip (unlike _handle_submit_finding / _handle_board_question,

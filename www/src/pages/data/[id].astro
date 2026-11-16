@@ -9,6 +9,7 @@ import { headline, presentCount, svgChart } from "../../lib/chart.js";
 import { dayInWords, num } from "../../lib/format.js";
 import { findPair, pairSentence, partnersOf, strengthInWords } from "../../lib/pairs.js";
 import { loadAll, loadJourney, loadPairs, loadSeries } from "../../lib/snapshot.js";
+import { PROVISIONAL_RING, PROVISIONAL_WORDS, markProvisional, provisionalNights } from "../../lib/provisional.js";
 import { href, pathOf } from "../../lib/url.js";
 
 export async function getStaticPaths() {
@@ -25,9 +26,15 @@ const labels = Object.fromEntries(all.byType.metric.map((x) => [x.id, x.label]))
 const withSeries = all.byType.metric.filter((x) => x.id !== m.id && x.series_url).sort((a, b) => (a.label < b.label ? -1 : 1));
 const labelDay = (iso: string) => dayInWords(iso, { short: true }) || "";
 const head = series ? headline(series.days) : null;
+// #5953: a night still recording when the snapshot read it (the vendor's flag, on the same snapshot's Day objects) is
+// drawn as a hollow ring and labelled on the chart, and the "Latest" figure says so when it is that night.
+const provisional = series ? provisionalNights(all.byType.day, m.id, series.source_id || m.source_id) : [];
+const chartDays = series ? markProvisional(series.days, provisional) : [];
+const latestProvisional = Boolean(head && head.lastDate && provisional.includes(head.lastDate));
+const anyProvisional = chartDays.some((d: any) => d.provisional);
 const svg = series
   ? svgChart({
-      series: [{ days: series.days, color: "#1B3FD6", name: m.label }],
+      series: [{ days: chartDays, color: "#1B3FD6", name: m.label }],
       markers: series.markers || [],
       labelDay,
       unit: m.unit,
@@ -63,12 +70,13 @@ const latestDays = m.id === "weight_lbs" ? [...all.byType.day].sort((a, b) => (a
         <div class="facts" style="margin-bottom:22px">
           <div>
             <span class="label">Latest</span>
-            <span class="v num">
+            <span class="v num" data-provisional={latestProvisional ? "" : undefined}>
               {num(head.last, m.decimals)} <small>{m.unit}</small>
             </span>
             <span class="muted" style="font-size:13px">
               {dayInWords(head.lastDate, { weekday: true })}
               {series.behavioral && head.lastDate === series.window.to ? " · logged so far that day" : ""}
+              {latestProvisional ? ` · ${PROVISIONAL_WORDS}` : ""}
             </span>
           </div>
           <div>
@@ -133,6 +141,7 @@ const latestDays = m.id === "weight_lbs" ? [...all.byType.day].sort((a, b) => (a
           data-decimals={m.decimals}
           data-unit={m.unit}
           data-labels={JSON.stringify(labels)}
+          data-provisional={JSON.stringify(provisional)}
         >
           <div class="controls" data-needs-js hidden>
             <span class="seg" role="group" aria-label="Range">
@@ -167,6 +176,7 @@ const latestDays = m.id === "weight_lbs" ? [...all.byType.day].sort((a, b) => (a
           <p class="muted" style="font-size:13px;margin-top:8px" data-caption>
             {presentCount(series.days)} of {series.days.length} days with a reading
             {series.markers && series.markers.length ? " · the dashed ochre rule is the baseline change" : ""}
+            {anyProvisional ? ` · ${PROVISIONAL_RING}` : ""}
           </p>
           <div class="chart" data-chart-b hidden />
           <p class="serif" style="font-size:16px;line-height:1.55;margin-top:12px;max-width:760px" data-pair-stats>

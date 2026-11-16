@@ -17,6 +17,8 @@
 #
 # Usage:  bash deploy/deploy_fleet.sh [--dry-run]
 set -euo pipefail
+# #6116: under a test runner, real AWS is unreachable from this script (deploy/lib/prod_write_guard.sh)
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prod_write_guard.sh"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
