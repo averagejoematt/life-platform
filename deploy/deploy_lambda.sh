@@ -28,6 +28,8 @@
 #   Run: bash deploy/rollback_lambda.sh <function-name>
 
 set -euo pipefail
+# #6116: under a test runner, real AWS is unreachable from this script (deploy/lib/prod_write_guard.sh)
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prod_write_guard.sh"
 
 # Default region. Per-Lambda overrides come from ci/lambda_map.json's "region"
 # field — see the resolution block below. 2026-05-29 incident: email-subscriber

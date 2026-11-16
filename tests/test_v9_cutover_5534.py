@@ -558,6 +558,7 @@ def test_root_rollback_declines_a_public_copies_red_alone_and_never_restores(tmp
     base = {k: v for k, v in os.environ.items() if not k.startswith("AWS_")}
     base.update(
         PATH=f"{bindir}{os.pathsep}{os.environ['PATH']}",
+        LP_TEST_AWS_IS_STUB=str(bindir / "aws"),  # #6116: declared, so the guard lets the restore reach the stub
         AWS_CONFIG_FILE=os.devnull,
         AWS_SHARED_CREDENTIALS_FILE=os.devnull,
         AWS_EC2_METADATA_DISABLED="true",

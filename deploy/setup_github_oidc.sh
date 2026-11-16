@@ -37,6 +37,8 @@
 # v2.0.0 — 2026-08-30 (#3336: derived from infra/iam/, no inline documents)
 
 set -euo pipefail
+# #6116: under a test runner, real AWS is unreachable from this script (deploy/lib/prod_write_guard.sh)
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prod_write_guard.sh"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IAM_DIR="${REPO_ROOT}/infra/iam"

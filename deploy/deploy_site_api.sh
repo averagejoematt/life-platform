@@ -11,6 +11,8 @@
 # Usage:  bash deploy/deploy_site_api.sh [verify_path]
 #   verify_path defaults to /api/status. Pass e.g. /api/coach_team to check a route.
 set -euo pipefail
+# #6116: under a test runner, real AWS is unreachable from this script (deploy/lib/prod_write_guard.sh)
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prod_write_guard.sh"
 
 REGION="us-west-2"
 FN="life-platform-site-api"

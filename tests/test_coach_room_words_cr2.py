@@ -5,8 +5,8 @@ What is pinned, end to end through the site API's ``lambda_handler`` and the rea
 over a fake raw table):
 
   * DARK: with ``CR2_PUBLIC`` off the route is a 404 for every coach; called outside the CR2 scope it is a 404 too;
-  * ON: inside the route, an approved, unchanged, unrecorded row is served — even when an earlier out-of-scope request
-    in the same container tainted its words at the wire;
+  * ON: inside the route, an approved, unchanged, unrecorded row is served — an earlier out-of-scope request's taint
+    never reaches it (#6111: the taint is the request's own reads);
   * NOT WIDENED: every other routed path runs with no scope, so a probe that reads the same approved rows through the
     gated table and echoes their words gets them withheld (emptied at the read, or scrubbed at the wire);
   * NEGATIVE CONTROLS through the route: a listed row whose words changed, a listed row that carries a provenance
@@ -259,8 +259,8 @@ def test_the_lead_window_counts_at_least_every_listed_lead_read_and_rides_with_t
 def test_words_tainted_by_an_earlier_request_are_still_served_inside_the_route(
     monkeypatch, cr2_on, lead_entry, dossier_ok, ldl_counterfactual
 ):
-    """The container's taint set persists across requests: the gate's own publication of an approved row is what
-    exempts its words at the wire — for that request only."""
+    """An earlier out-of-scope request taints the words for ITS response; the route serves them (#6111: a request's
+    taint is its own reads, never an earlier request's), and the next out-of-scope read withholds them again."""
     _install(monkeypatch, _rows())
     G.begin_request()
     for r in _rows():  # an out-of-scope read (any other route) withholds them; a graded row's words are tainted
@@ -270,7 +270,10 @@ def test_words_tainted_by_an_earlier_request_are_still_served_inside_the_route(
     b = _body(_get(R.ROUTE, {"coach": COACH}))
     assert len(b["sealed_calls"]) == 2 and all(c["claim"] for c in b["sealed_calls"])
     assert _body(_get(R.ROUTE, {"coach": LEAD}))["lead_reads"][0]["text"] == LEAD_TEXT
-    assert all(G.is_tainted(c) for c in calls), "outside the route they stay withheld at the wire"
+    G.begin_request()
+    for r in _rows():
+        G.gate_item(dict(r))
+    assert all(G.is_tainted(c) for c in calls), "outside the route a request that reads them withholds them at the wire"
 
 
 # ── not widened: every other path reads the same rows withheld ─────────────────────────────

@@ -31,6 +31,8 @@
 # (attended, by hand).
 
 set -euo pipefail
+# #6116: under a test runner, real AWS is unreachable from this script (deploy/lib/prod_write_guard.sh)
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prod_write_guard.sh"
 
 # DEFAULT_REGION is the fallback for the Lambda API calls (get/update/wait).
 # S3_REGION is a SEPARATE, fixed constant: the matthew-life-platform bucket
