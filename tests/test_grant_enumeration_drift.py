@@ -865,14 +865,10 @@ _PENDING_PERMISSIONS_APPLY: dict[str, str] = {
     # 2026-11-15: the #5974 golden-eval-role entry (KMSDecryptViaDynamoDB, conditioned kms:ViaService
     # dynamodb.us-west-2) was applied ~07:00Z with the put-role-policy command; get-role-policy read back
     # the Sid. Removed here per the same #2824 rule.
-    "github-actions-deploy-role": (
-        "2026-11-15 (#5544): LambdaDeploy (function:*/layer:* in two regions, InvokeFunction, layer writes) "
-        "narrowed to LambdaFleetDeploy (the ci/lambda_map.json fleet) + LambdaSiteApiRecycle; S3 object "
-        "access narrowed from the bucket root to deploys/ site/ config/ www-previous/ and the "
-        "iam-additive-gate ledger. Owner applies with `bash deploy/setup_github_oidc.sh` "
-        "(= aws iam put-role-policy --role-name github-actions-deploy-role --policy-name "
-        "life-platform-cicd-permissions --policy-document file://infra/iam/github-actions-deploy-role.permissions.json)"
-    ),
+    # 2026-11-16: the #5544 deploy-role entry (LambdaDeploy narrowed to LambdaFleetDeploy + LambdaSiteApiRecycle;
+    # S3 object access narrowed to deploys/ site/ config/ www-previous/ and the iam-additive-gate ledger) was
+    # applied with `bash deploy/setup_github_oidc.sh` (owner-approved); post-apply
+    # `deploy/verify_oidc_iam.py --strict` reported CLEAN across all 17 targets. Removed here per the same #2824 rule.
 }
 
 
