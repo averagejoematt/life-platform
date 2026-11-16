@@ -241,7 +241,7 @@ SK: DATE#YYYY-MM-DD
 
 **Lambda:** `life-platform-mcp` | **Tools:** 93 | **Memory:** 768 MB | **Runtime:** python3.12 | **Modules:** 97 (`mcp/tools_*.py` + helpers)
 **Remote MCP:** `<not committed — SEC-02 #780; read live: aws lambda get-function-url-config --function-name life-platform-mcp --region us-west-2>`
-**Auth:** OAuth 2.1 auto-approve + HMAC Bearer (remote). Source of truth for tool count: AST parse of top-level `TOOLS` dict keys via `deploy/sync_doc_metadata.py::_auto_discover_tool_count` (see CLAUDE.md — `grep '"name":'` over-counts nested schema fields).
+**Auth:** OAuth 2.1 auto-approve + HMAC Bearer (remote). Source of truth for tool count: AST parse of top-level `TOOLS` dict keys via `deploy/sync_doc_metadata.py::_auto_discover_tool_count` (`grep -c '"name":'` over-counts nested schema fields).
 
 Cold start: ~700–800ms. Warm: 23–30ms. Cached tools: <100ms.
 
