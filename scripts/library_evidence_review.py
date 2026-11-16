@@ -618,7 +618,7 @@ def apply_review(lib: dict[str, Any], decided: dict[str, Any]) -> dict[str, Any]
         b.integrity_inputs.apply_templates(
             mv, {}, b._templates(), b.declared_keys()
         )  # a candidate with no Hevy template is never selectable
-        inventory = b.integrity_inputs.home_gym_inventory(mv, {"last": last}, b.cur.SEEDED_AVAILABILITY)
+        inventory = b.integrity_inputs.home_gym_inventory(mv, {"last": last}, b.cur.SEEDED_AVAILABILITY, b.cur.HOME_GYM_SINCE["date"])
         out["gym_inventory"]["items"] = inventory
         for e in mv.values():
             e["availability"] = {xl.LOCATION_ID: b.integrity_inputs.movement_availability(e, inventory)}

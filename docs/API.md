@@ -164,7 +164,7 @@ The only writes the site API makes (CLAUDE.md: the site API is primarily read-on
 | `/api/experiment_vote` | POST | Vote on a self-experiment |
 | `/api/experiment_follow` | POST | Follow an experiment |
 | `/api/experiment_suggest` | POST | Suggest an experiment |
-| `/api/challenge_vote`, `/api/challenge_follow`, `/api/challenge_checkin` | POST | Challenge vote / follow / daily check-in |
+| `/api/challenge_vote`, `/api/challenge_follow`, `/api/challenge_checkin` | POST | Challenge vote / follow / a READER's daily check-in (#6087: shut by default — 403; when open it writes the reader partition, never Matthew's own challenge record) |
 | `/api/submit_finding` | POST | User-submitted finding (reviewed before it surfaces) |
 | `/api/page_feedback` | POST | The two-question reader door (#4182) |
 | `/api/predict_week` | GET, POST | Weekly prediction tallies / record a prediction |

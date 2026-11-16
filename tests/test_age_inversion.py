@@ -3,7 +3,7 @@
 THE DEFECT. /api/phenoage served the rounded Levine phenotypic age beside its nine markers ("Option A": the
 chronological age and the gap withheld). The formula is public and LINEAR in age, the markers are public, so the
 rounded figure was the age to a window of about 1.1 years. The first tests below reproduce that on synthetic data —
-they are the proof this file's instrument (tests/age_inversion_lib.py) can see the mechanism — and show why a
+they are the proof this file's instrument (qa/age_inversion_lib.py) can see the mechanism — and show why a
 five-year band or a younger/older flag was not adopted: each is still a function of his age, and windows from
 successive draws intersect.
 
@@ -273,6 +273,6 @@ def test_no_other_public_path_reads_the_birth_date():
     new = readers - set(_BIRTH_DATE_READERS_ALLOWED)
     assert (
         not new
-    ), f"a public path reads date_of_birth: {sorted(new)} — an output computed from it is a published age (tests/age_inversion_lib.py)"
+    ), f"a public path reads date_of_birth: {sorted(new)} — an output computed from it is a published age (qa/age_inversion_lib.py)"
     gone = set(_BIRTH_DATE_READERS_ALLOWED) - readers
     assert not gone, f"no longer reads the birth date — remove from the allow-list (it only shrinks): {sorted(gone)}"

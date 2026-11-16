@@ -232,9 +232,11 @@ export async function renderChallenges(d) {
     }).join("");
     return `<div class="cg" role="img" aria-label="Daily check-ins, ${dur} days">${cells}</div>`;
   };
-  // Reader participation switch-on: a reader following along can log whether
-  // they did today's rep too — POST /api/challenge_checkin (public, rate-limited
-  // 1/IP/challenge/day). No fake counts: the button just confirms the tap landed.
+  // Reader participation: a reader following along can log whether they did today's
+  // rep too — POST /api/challenge_checkin (rate-limited 1/IP/challenge/day), stored apart
+  // from Matthew's own record (#6087). Drawn ONLY when the API says the door is open
+  // (`reader_checkins_open`); while it is shut there is no button to appear to work.
+  const readerOpen = d.reader_checkins_open === true;
   const checkinControl = (c) => `<div class="part-row" data-checkin data-challenge-id="${esc(c.challenge_id || c.id)}">` +
     `<button class="part-btn" type="button" data-checkin-btn="true">Doing this too? Log today — done</button>` +
     `<button class="part-btn" type="button" data-checkin-btn="false">Log today — missed</button>` +
@@ -259,7 +261,7 @@ export async function renderChallenges(d) {
     const progFigs = active && pr.duration_days
       ? `<p class="rd-meta label">${[pr.checkin_days != null && `${pr.checkin_days}/${pr.duration_days} days checked in`, pr.completion_pct != null && `${fmt(pr.completion_pct)}% complete`, pr.success_rate != null && `${fmt(pr.success_rate)}% success`].filter(Boolean).join("  ·  ")}</p>`
       : "";
-    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(c.name || ttl(c.challenge_id || "Challenge"))}</h3><span class="rd-badge ${active ? "rd-badge-live" : ""}">${done ? "completed" : active ? "active" : "candidate"}</span></header>${c.description && !isBad(c.description) ? `<p class="rd-why">${esc(c.description)}</p>` : ""}${loopBlock(c)}${checkinGrid(c)}${progFigs}<p class="rd-meta label">${[c.character_xp_awarded != null && c.character_xp_awarded + " XP", c.badge_earned && `${icon("milestone")} badge`].filter(Boolean).join("  ·  ")}</p>${active ? checkinControl(c) : ""}</article>`;
+    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(c.name || ttl(c.challenge_id || "Challenge"))}</h3><span class="rd-badge ${active ? "rd-badge-live" : ""}">${done ? "completed" : active ? "active" : "candidate"}</span></header>${c.description && !isBad(c.description) ? `<p class="rd-why">${esc(c.description)}</p>` : ""}${loopBlock(c)}${checkinGrid(c)}${progFigs}<p class="rd-meta label">${[c.character_xp_awarded != null && c.character_xp_awarded + " XP", c.badge_earned && `${icon("milestone")} badge`].filter(Boolean).join("  ·  ")}</p>${active && readerOpen ? checkinControl(c) : ""}</article>`;
   };
   // P2.2 — catalog cards carry their evidence: the summary, the tier chip, and
   // the recommending board persona. The served `icon` field is emoji — never drawn (§8).
@@ -285,7 +287,7 @@ export async function renderChallenges(d) {
   // catalog ideas not yet taken on. One backlog.
   const candidates = avail.concat(backlog);
   const backSec = candidates.length ? sec(`Backlog (${candidates.length})`, `<div class="rd-cards">${candidates.slice(0, 80).map(catCard).join("")}</div>`) : "";
-  return banner + head + liveSec + backSec + note("An N=1 instrument — vote for what's next, or log along on the active one.");
+  return banner + head + liveSec + backSec + note(readerOpen ? "An N=1 instrument — vote for what's next, or log along on the active one." : "An N=1 instrument — vote for what's next.");
 }
 
 // Wired after renderChallenges mounts (evidence.js WIRE.challenges): the generic

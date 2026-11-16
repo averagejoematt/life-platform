@@ -2,6 +2,7 @@
 import Base from "../../layouts/Base.astro";
 import StatusTag from "../../components/StatusTag.astro";
 import StoryEntry from "../../components/StoryEntry.astro"; // the Human Story (HS1): renders nothing unless WEB_STORY=1
+import FourParts from "../../components/FourParts.astro"; // the four parts of the experiment; the chapters tell all four
 import { chapterCount, chapterMeta, dayInWords, num, rangeInWords } from "../../lib/format.js";
 import { loadAll, loadJourney, loadSeries } from "../../lib/snapshot.js";
 import { weekStrip } from "../../lib/theline.js";
@@ -53,6 +54,9 @@ const stripOf = (c: any) => {
         <a href="https://averagejoematt.com/subscribe/">Get each chapter by email →</a>
       </p>
     </div>
+  </section>
+  <section class="wrap" style="padding-bottom:28px">
+    <FourParts />
   </section>
   {/* "the story so far" (HS1) sits flush against the next tag: with WEB_STORY off the page's bytes are unchanged */}<StoryEntry /><section class="section hair">
     <div class="wrap">

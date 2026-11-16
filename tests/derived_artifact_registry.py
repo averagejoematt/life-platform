@@ -497,6 +497,14 @@ ARTIFACTS: dict[str, dict] = {
             "tests/test_platform_timezone_4284.py from a frozen snapshot, not regenerated."
         ),
     ),
+    "scripts/check_public_copies.py": _excluded(
+        "scripts/check_public_copies.py",
+        reason=(
+            "#6083's public-copies guard writes nothing in the repo: `site/index.html` is the S3 KEY whose LastModified "
+            "is the root build marker, read from the bucket listing, never the committed file. Its only writes are a temp "
+            "dir of downloaded copies and the optional --orphans-out list a human passes to quarantine_public_copy.sh."
+        ),
+    ),
     "scripts/raw_kms_readability_inventory.py": _excluded(
         "scripts/raw_kms_readability_inventory.py",
         reason=(

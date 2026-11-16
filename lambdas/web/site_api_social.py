@@ -497,8 +497,10 @@ def handle_challenge_catalog() -> dict:
 
 
 # ── #2238: the check-in `note` screen ────────────────────────────────────────
-# `note` is the only reader-supplied FREE TEXT in this module that reaches a
-# public payload. It is captured by an anonymous POST (_handle_challenge_checkin),
+# #6087: the reader door no longer stores a note at all, and never writes the owner's
+# row; the read-side screen below stays for rows stored before that. History:
+# `note` was the only reader-supplied FREE TEXT in this module that reached a
+# public payload. It was captured by an anonymous POST (_handle_challenge_checkin),
 # stored inside the challenge row's `daily_checkins`, and `handle_challenges`
 # publishes that row WHOLE on GET /api/challenges. Until #2238 it was only
 # length-capped: no HTML strip (unlike _handle_submit_finding / _handle_board_question,

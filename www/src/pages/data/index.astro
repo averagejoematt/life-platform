@@ -5,6 +5,7 @@
 import Base from "../../layouts/Base.astro";
 import Provenance from "../../components/Provenance.astro";
 import LabEntry from "../../components/LabEntry.astro"; // the Laboratory (L1): renders nothing unless WEB_LAB=1
+import FourParts from "../../components/FourParts.astro"; // the four parts of the experiment; this room holds the body
 import { labEnabled } from "../../lib/lab.js";
 import { headline, weeklyBars } from "../../lib/chart.js";
 import { scaleWords, weeklySpark } from "../../lib/spark.js";
@@ -48,14 +49,16 @@ const meansWords = (days: any[]) => {
 ---
 
 <Base title="The data room" top="data" description="Every public measurement behind the experiment — weight, sleep, recovery, food, movement — each with its source, and what is not measured.">
+  <section class="wrap" style="padding-top:28px">
+    <FourParts here="body" />
+  </section>
   <section class="section" style="padding-bottom:20px">
     <div class="wrap between" style="align-items:flex-end">
       <div style="max-width:760px">
         <h1 style="font-size:48px">The data room</h1>
         <p class="dek" style="margin-top:10px;font-size:19px">
-          The body is the part of this experiment that can be measured, and this is where it is — with what is still missing said as plainly.
           Pick a dimension, read the latest reading, stop there if you like — or open it, compare it with another at a lag of a day or two, and
-          read what the platform found when it paired them. {window ? `The window is ${dayInWords(window.from)} to ${dayInWords(window.to)}.` : ""}
+          read what the platform found when it paired them. These readings are one part of the experiment, not its verdict. {window ? `The window is ${dayInWords(window.from)} to ${dayInWords(window.to)}.` : ""}
         </p>
       </div>
       <p class="muted" style="font-size:13px;max-width:300px">

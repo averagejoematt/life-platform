@@ -10,6 +10,7 @@ import { coachLead } from "../../lib/calibration.js";
 import { roomPublic } from "../../lib/room.js";
 import VersusGuess from "../../components/VersusGuess.astro";
 import OwnWords from "../../components/OwnWords.astro";
+import FourParts from "../../components/FourParts.astro"; // the four parts of the experiment; this door holds the AI
 import { href, pathOf } from "../../lib/url.js";
 
 const all = await loadAll();
@@ -63,6 +64,9 @@ const steps = [
 ---
 
 <Base title="The system" top="system" description="Eight AI coaches read my life. Code marks their homework.">
+  <section class="wrap" style="padding-top:28px">
+    <FourParts here="ai" />
+  </section>
   <section class="section">
     <div class="wrap grid cols2" style="gap:56px;align-items:start">
       <div style="display:flex;flex-direction:column;gap:22px">

@@ -747,6 +747,11 @@ _PK_RULES: list = [
     # reader emails awaiting a "challenge started" notification. Audience state like
     # SUBSCRIBE#/VOTES#: kept across resets, ignored by the phase machinery.
     (lambda pk, sk: pk.startswith("CHALLENGE_FOLLOWS"), SYSTEM_STATE),
+    # #6087: reader challenge check-ins (CHALLENGE_CHECKINS#<id> / READER#<ip_hash>#DATE#<d>,
+    # common/challenge_checkins.py) — a READER's "doing this too", kept apart from Matthew's own
+    # challenge row. Audience state like COHORT#/VOTES#: never his run intelligence, 180-day TTL,
+    # ignored by the phase machinery (no tag, no wipe, no filter).
+    (lambda pk, sk: pk.startswith("CHALLENGE_CHECKINS#"), SYSTEM_STATE),
     # ── #930/#951: the ops pk families, classified deliberately (all were previously
     # unclassified — classify() raised). None are traversed by the restart tooling
     # (the tagger scans USER#…#SOURCE# only); these rules make the registry total.
