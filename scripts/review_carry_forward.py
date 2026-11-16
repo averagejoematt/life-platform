@@ -30,6 +30,9 @@ The assembler for the carried set, and the reader of a run's planted-control res
   keeps its expired from-scratch date and every other lens in the run advances. Two
   consecutive full runs (2026-10-31, 2026-11-13) refuted every planted control and were
   still voided whole — 17 rows each — by a single row's miss.
+* ``estate_incomplete_lenses`` — the estate sweep as a gate, not prose (#6068). From
+  ``review_estate.REQUIRED_FROM`` a row whose sweep is absent, unrun or uncounted keeps its
+  old from-scratch date, exactly as a row that missed its withheld issue does.
 
 * ``control_defects`` / ``check_control_plan`` / ``grader_context`` — the two control-DESIGN
   defects of 2026-11-13, made checkable (#5914). A withheld issue nobody reproduced before
@@ -238,6 +241,45 @@ def carried_lenses(run: dict) -> dict[str, date | None]:
     return out
 
 
+_ESTATE_MOD = None
+
+
+def _review_estate():
+    """scripts/review_estate.py, loaded by path: this module is itself loaded by path (from
+    operating_calendar and the tests), so `scripts/` is not reliably on sys.path."""
+    global _ESTATE_MOD
+    if _ESTATE_MOD is None:
+        import importlib.util
+        import sys
+
+        name = "_review_estate_6068"
+        mod = sys.modules.get(name)
+        if mod is None:
+            path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "review_estate.py")
+            spec = importlib.util.spec_from_file_location(name, path)
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[name] = mod  # @dataclass resolves its module through sys.modules while the body runs
+            try:
+                spec.loader.exec_module(mod)
+            except BaseException:
+                sys.modules.pop(name, None)
+                raise
+        _ESTATE_MOD = mod
+    return _ESTATE_MOD
+
+
+def estate_incomplete_lenses(run: dict, when: date | None) -> set[str]:
+    """The rows of one run whose ESTATE SWEEP is absent, unrun or uncounted (#6068) — empty for
+    a run dated before `review_estate.REQUIRED_FROM`, which could not have carried one.
+
+    The run's date is the one `scratch_dates` keys on (the filename's), stamped over the JSON's
+    own `date` before `review_estate.incomplete_lenses` reads it: an artifact whose body is
+    undated or misdated must not slip out from under the rule its filename puts it under.
+    """
+    stamped = dict(run, date=when.isoformat()) if when is not None else run
+    return {str(lens).strip().lower() for lens in _review_estate().incomplete_lenses(stamped)}
+
+
 def scratch_dates(runs: list[tuple[date, dict]]) -> dict[str, date | None]:
     """{lens: the newest date it was graded FROM SCRATCH} across a run history.
 
@@ -245,6 +287,10 @@ def scratch_dates(runs: list[tuple[date, dict]]) -> dict[str, date | None]:
     graded by that run. A lens the run carried forward inherits the date it cites, never
     the run's own date — the one-line statement of the whole defect — and a citation can
     only ever make a grade OLDER, never fresher (see the loop).
+
+    From `review_estate.REQUIRED_FROM` (2026-11-15) a row whose estate sweep is incomplete
+    was not graded from scratch either (#6068): it keeps its old date, and the rest of the
+    run advances. Runs dated earlier are scored exactly as before.
     """
     out: dict[str, date | None] = {}
     for run_date, run in sorted(runs, key=lambda r: r[0]):
@@ -255,6 +301,8 @@ def scratch_dates(runs: list[tuple[date, dict]]) -> dict[str, date | None]:
         # #5914: a lens that missed its own withheld issue was not graded by an instrument
         # anyone can vouch for — the run counts, that row does not.
         graded -= withheld_missed_lenses(run) or set()
+        # #6068: a row that did not walk its estate graded a sample, not its area.
+        graded -= estate_incomplete_lenses(run, run_date)
         for lens in graded:
             if lens not in out or out[lens] is None or run_date > out[lens]:
                 out[lens] = run_date
@@ -493,6 +541,10 @@ def carry_forward_report(today: date, repo: str = REPO) -> tuple[list[str], list
     for when, run in claiming:
         for lens, why in control_defects(run, [r for d, r in runs if d < when]):
             lines.append(f"   ⚠️  withheld control, {when} run, {lens}: {why} (#5914) — the row's result says less than it reads")
+    for when, run in claiming:
+        held = ", ".join(sorted(estate_incomplete_lenses(run, when)))
+        if held:
+            lines.append(f"   {when} run: estate sweep incomplete, so these rows did NOT advance (#6068): {held}")
     if not expired:
         lines.append("   ✅ every graded lens is within the cap.")
         return lines, expired

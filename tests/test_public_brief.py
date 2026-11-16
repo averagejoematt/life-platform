@@ -39,6 +39,7 @@ from common import (  # noqa: E402
     prediction_publication as PP,
     public_brief_policy as POL,
 )
+from common.numeric import floats_to_decimal  # noqa: E402  (#5524: public_brief's private _ddb walker retired)
 from experiment.measurable_metrics import METRIC_SOURCES  # noqa: E402
 from web import narrative_publication as NPUB, site_api_coach_brief as API  # noqa: E402
 
@@ -211,7 +212,7 @@ def _brief_with(families):
 def test_a_brief_whose_inputs_include_a_private_family_is_withheld(private_family):
     if NP.classify(private_family) != NP.PRIVATE:
         pytest.skip(f"{private_family} is not a registered private family in this tree")
-    row = PB._ddb(_brief_with(POL.families_for(PB.coach_metrics(COACH)) + ["persona", private_family]))
+    row = floats_to_decimal(_brief_with(POL.families_for(PB.coach_metrics(COACH)) + ["persona", private_family]))
     gated = NPUB.gate_item(row)
     assert NPUB.is_withheld(gated)
     assert gated["interpretations"][0]["text"] == ""
@@ -221,7 +222,7 @@ def test_a_brief_whose_inputs_include_a_private_family_is_withheld(private_famil
 
 
 def test_negative_control_the_same_brief_with_public_inputs_is_served():
-    row = PB._ddb(_brief_with(POL.families_for(PB.coach_metrics(COACH)) + ["persona"]))
+    row = floats_to_decimal(_brief_with(POL.families_for(PB.coach_metrics(COACH)) + ["persona"]))
     assert not NPUB.is_withheld(NPUB.gate_item(row))
     _resp, body = _served(Table([row]))
     assert body["briefs"][0]["interpretations"][0]["text"].startswith("Daily calories")
@@ -229,9 +230,9 @@ def test_negative_control_the_same_brief_with_public_inputs_is_served():
 
 
 def test_an_unrecorded_or_unknown_family_is_withheld_too():
-    row = PB._ddb(_brief_with(["persona", "a_family_nobody_classified"]))
+    row = floats_to_decimal(_brief_with(["persona", "a_family_nobody_classified"]))
     assert NPUB.is_withheld(NPUB.gate_item(row))
-    row2 = PB._ddb(_brief_with(["persona"]))
+    row2 = floats_to_decimal(_brief_with(["persona"]))
     row2.pop("provenance")
     assert NPUB.is_withheld(NPUB.gate_item(row2))
 

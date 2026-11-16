@@ -199,6 +199,9 @@ does not repair it. So coverage is now part of the instrument:
   between runs (`tests/test_review_estate.py` holds the registry to the sealed panel).
 
 The registry is `scripts/review_estate.py::ESTATE`. A run dated before `REQUIRED_FROM` there is not held to it.
+**The enforcement point is `scripts/review_carry_forward.py::scratch_dates`** (#6068): for a run dated on or after
+`REQUIRED_FROM`, every row `review_estate.incomplete_lenses` names keeps its previous from-scratch date — the boot
+brief and the carry-forward cap go on showing the old date — and the carry-forward sweep prints the held rows.
 
 ## Artifacts (the filenames ARE the contract the calendar probes)
 
