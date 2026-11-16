@@ -36,8 +36,10 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+
+from common.pacific_time import parse_iso_utc  # #3609: THE ISO-8601 parser
 
 OWNER_CLASS = "owner"
 STATUS_HELD = "held"  # neither "delivered" nor "missing" — the third state qa-smoke reads
@@ -64,11 +66,9 @@ def _int(v: Any) -> Optional[int]:
         return None
 
 
-def _iso_day(v: Any) -> Optional[date]:
-    try:
-        return date.fromisoformat(str(v)[:10]) if v else None
-    except ValueError:
-        return None
+def _iso_day(v: Any) -> Optional[datetime]:
+    """The day a hold was decided, as midnight UTC — through THE ISO parser (#3609), never a hand-rolled one."""
+    return parse_iso_utc(str(v)[:10]) if v else None
 
 
 def _text(v: Any) -> bool:

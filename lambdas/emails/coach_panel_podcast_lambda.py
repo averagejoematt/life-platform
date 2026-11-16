@@ -319,7 +319,7 @@ def _publish_episode_audio(week, wav_audio: bytes) -> dict:
     default in ``panelcast_ident``, so the two can never both open an episode. The ident
     mix is still invoked — it is a no-op while disabled, and remains the one place the
     behaviour can be restored by env flag without a code change."""
-    _panel_hold().refuse([week], _g=globals())  # #6112: an owner-held week never publishes — every caller, fail closed
+    _panel_retire().panelcast_hold.refuse([week], _g=globals())  # #6112: owner-held never publishes; fail closed
     from ai import audio_encode
 
     try:  # #1179: no-op while PANELCAST_IDENT is off (superseded by #1187's frozen open)
@@ -385,7 +385,7 @@ def _enclosure_type(url: str) -> str:
 
 
 def _write_indexes(episodes: list) -> None:
-    _panel_hold().refuse([e.get("week") for e in episodes], _g=globals())  # #6112: the feed never lists an owner-held week
+    _panel_retire().panelcast_hold.refuse([e.get("week") for e in episodes], _g=globals())  # #6112: never an owner-held week
     episodes = _panel_desk().by_date(episodes)  # #4536: newest air date first, whatever order the writer passed
     s3.put_object(
         Bucket=S3_BUCKET,
@@ -1232,7 +1232,7 @@ def _hold_and_alert(week, reasons: list, draft: dict, hold_class: str = "safety"
         indent=1,
     )
     try:
-        if not _panel_hold().is_owner_hold(prior):  # #6112: an automated hold never overwrites the owner's
+        if not _panel_retire().panelcast_hold.is_owner_hold(prior):  # #6112: keep the owner's record
             s3.put_object(Bucket=S3_BUCKET, Key=f"{HOLD_PREFIX}/wk{week}.json", Body=body.encode("utf-8"), ContentType="application/json")
     except Exception as e:
         logger.error("[panel] hold draft write failed — %s", e)
@@ -1547,10 +1547,6 @@ def _panel_retire():
     return panelcast_retire
 
 
-def _panel_hold():
-    return _panel_retire().panelcast_hold  # #6112: the owner hold — one refusal for every publisher
-
-
 def _panel_desk():
     try:
         from emails import panelcast_desk
@@ -1561,7 +1557,7 @@ def _panel_desk():
 
 
 def _published_skip(week, force: bool, dry_run: bool):
-    if held := _panel_hold().run_skip(week, dry_run, _g=globals()):  # #6112: an owner hold outranks force — asked first
+    if held := _panel_retire().panelcast_hold.run_skip(week, dry_run, _g=globals()):  # #6112: outranks force
         return held
     published_key = None if force else _episode_exists(week)  # read-only, so a dry run proves it too (#4365)
     if not published_key:
@@ -1888,10 +1884,8 @@ def lambda_handler(event, context):
             logger.error("[panel] intro failed — %s", e)
             return {"statusCode": 500, "body": json.dumps({"intro": "failed", "error": str(e)[:200]})}
 
-    # SS-02 hold-aging sweep: a scheduled rule passes {"sweep_holds": true} to auto-
-    # retry a soft (quality) HOLD on the current week so the show can't stall forever on
-    # a fixable flag. Safety/sensitivity holds are never auto-retried. Routed BEFORE the
-    # weekly run, and distinct from the Friday cron (which carries no sweep_holds key).
+    # SS-02 hold-aging sweep ({"sweep_holds": true} from its rule; see _sweep_held_episodes). Routed BEFORE the weekly
+    # run; safety/sensitivity and owner holds are never auto-retried.
     if event.get("sweep_holds"):
         try:
             return {"statusCode": 200, "body": json.dumps(_sweep_held_episodes(dry_run=dry_run))}

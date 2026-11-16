@@ -4844,7 +4844,7 @@ STRUCTURAL_HAND_PROOFS["structural::test_panel_owner_hold_6112.py"] = {
         "Seven plants, ONE AT A TIME, each restored from a byte copy: M1 story_season_qa's `if wk in owner:` → `if False:` "
         "(a valid owner hold ignored); M2 owner_holds' `if problems:` → `if False:` (a malformed held line accepted); M3 "
         "_publish_episode_audio's refusal → `pass`; M4 _published_skip's owner-hold check → `None`; M5 a new untracked "
-        "scripts/ file that PUTs generated/panelcast/wk10.mp3 (an unregistered publisher); M6 owner_held_weeks' "
+        "scripts/ file that writes week 10's audio under the Panel's public prefix (an unregistered publisher); M6 owner_held_weeks' "
         "HoldStateUnreadable → `return {}` (fail open); M7 panelcast_retire.index_doc's held list → `[]`."
     ),
     "observed": (
@@ -4855,7 +4855,7 @@ STRUCTURAL_HAND_PROOFS["structural::test_panel_owner_hold_6112.py"] = {
         "The Panel's publish chokepoints (_publish_episode_audio, _write_indexes), the weekly run's pre-generation skip, "
         "season_promote's owner_hold_gate, the qa-smoke episode verdict, and every first-party file under lambdas/ "
         "scripts/ deploy/ mcp/ that writes near the Panel's public prefix. NOT SEEN: a writer that builds the "
-        "generated/panelcast key from parts the sweep's tokens do not name; an out-of-repo writer (the AWS console, a "
+        "Panel's key from parts the sweep's tokens do not name; an out-of-repo writer (the AWS console, a "
         "hand-run `aws s3 cp`)."
     ),
     "proved_on": "2026-11-16",

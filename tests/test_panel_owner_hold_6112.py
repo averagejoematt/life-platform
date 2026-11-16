@@ -545,7 +545,7 @@ PUBLISHERS = {
 }
 # the refusal a publisher must call, checked in source
 _REFUSAL_CALLS = {
-    "lambdas/emails/coach_panel_podcast_lambda.py": ("_panel_hold().refuse(", "_panel_hold().run_skip("),
+    "lambdas/emails/coach_panel_podcast_lambda.py": ("_panel_retire().panelcast_hold.refuse(", "_panel_retire().panelcast_hold.run_skip("),
     "scripts/season_promote.py": ("owner_hold_gate(weeks, steps)",),
     "scripts/panel_recut.py": ("panel._publish_episode_audio(", "panel._write_indexes("),
     "lambdas/emails/panelcast_desk.py": ('_g["_publish_episode_audio"](', '_g["_write_indexes"]('),
@@ -588,7 +588,7 @@ def test_SET_both_chokepoints_call_the_refusal_first():
     fns = {n.name: n for n in tree.body if isinstance(n, ast.FunctionDef)}
     for name in ("_publish_episode_audio", "_write_indexes"):
         body = [s for s in fns[name].body if not (isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant))]
-        assert "_panel_hold().refuse(" in ast.unparse(body[0]), f"{name} does not refuse a held week before anything else"
+        assert "panelcast_hold.refuse(" in ast.unparse(body[0]), f"{name} does not refuse a held week before anything else"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
