@@ -19,7 +19,6 @@ from stacks.role_policies_base import (
     DLQ_ARN,
     KMS_KEY_ARN,
     NS_AI,
-    NS_BUDGET,
     NS_COMPUTE,
     NS_HEVY_ROUTINE,
     NS_INGEST_LIVENESS,
@@ -560,9 +559,9 @@ def mcp_server() -> list[iam.PolicyStatement]:
         # closure in the fleet because the surface waiter runs the site-api handlers in-process
         # (#4774): Budget via site_api_budget -> cost_governor_lambda (DevSessionSpendMTD),
         # Predictions via dispute_docket -> coach_prediction_evaluator, DynamoDB/OAuth via the
-        # ingestion framework, Compute via compute_metadata. Budget here is import-reachable,
-        # not observed — narrowing it needs a call-graph, not an import closure (follow-up).
-        _put_metric_data_statement("SharedModuleMetrics", NS_BUDGET, NS_COMPUTE, NS_PREDICTIONS, *NS_INGEST_SHARED),
+        # ingestion framework, Compute via compute_metadata. #5905: NOT Budget — site_api_budget imports
+        # constants from cost_governor_lambda, whose Budget emitters run only from its own lambda_handler.
+        _put_metric_data_statement("SharedModuleMetrics", NS_COMPUTE, NS_PREDICTIONS, *NS_INGEST_SHARED),
         # #4774: the surface waiter (mcp/tools_surfaces._dispatch) runs the site-api
         # handlers IN-PROCESS, so they execute under THIS role, not site_api()'s. With no
         # CloudWatch read here, get_platform_cost's inference_receipt 503'd on
@@ -632,7 +631,7 @@ def hevy_routine_cron() -> list[iam.PolicyStatement]:
             actions=["sqs:SendMessage"],
             resources=[DLQ_ARN],
         ),
-        _put_metric_data_statement("CloudWatchMetrics", NS_AI, NS_COMPUTE, NS_HEVY_ROUTINE),  # #5545
+        _put_metric_data_statement("CloudWatchMetrics", NS_COMPUTE, NS_HEVY_ROUTINE),  # #5545; #5905: no AI (reached, never called)
     ]
 
 
@@ -679,7 +678,7 @@ def hevy_restamp() -> list[iam.PolicyStatement]:
                 f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/hevy/restamp_enabled",
             ],
         ),
-        _put_metric_data_statement("CloudWatchMetrics", NS_AI, NS_COMPUTE),  # #5545 (HevyRoutine no longer reached)
+        _put_metric_data_statement("CloudWatchMetrics", NS_COMPUTE),  # #5905: no AI (reached, never called)
     ]
 
 
