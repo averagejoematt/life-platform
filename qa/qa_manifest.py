@@ -130,7 +130,7 @@ _V9_INTENTS = {
     # owner ruling 2026-11-16 (#6067): these measurements are one part of a broader experiment, not its verdict
     "/data/": (
         "The data room: the measurable part of a four-part experiment — each published series with its latest "
-        "reading and source; open one to compare it with another and see what is missing."
+        "reading; open one to compare it with another and see what is missing."
     ),
     "/system/": (
         "How the platform works: the AI coaches' graded record beside a simple guess, the ledger of every prediction, "
