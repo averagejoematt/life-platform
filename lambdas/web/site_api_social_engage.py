@@ -671,10 +671,12 @@ def _handle_predict_week(event: dict, *, _g) -> dict:
     """
     # Facade state injected via `_g` (the delegator's globals()) — the same
     # module object the tests patch (see web/site_api_social.py's header).
+    PREDICT_WEEK_RATE_LIMIT = _g["PREDICT_WEEK_RATE_LIMIT"]
     _PREDICT_CHOICES = _g["_PREDICT_CHOICES"]
     _envelope = _g["_envelope"]
     _error = _g["_error"]
     _predict_subject = _g["_predict_subject"]
+    _rate_check = _g["_rate_check"]
     _rate_limited = _g["_rate_limited"]
     _sanitise_text = _g["_sanitise_text"]
     datetime = _g["datetime"]
@@ -684,6 +686,15 @@ def _handle_predict_week(event: dict, *, _g) -> dict:
     table = _g["table"]
     timezone = _g["timezone"]
     source_ip = extract_client_ip(event)
+    # #6088: this door had no meter — its only control was the per-metric dedup row, so a caller could
+    # mint dedup rows and counter writes as fast as it could send. Charged before validation (the
+    # submit_finding order) and FAIL CLOSED: it stores a counter, so a limiter outage refuses the tap.
+    ip_hash = _salted_ip_hash(source_ip, _g)
+    if ip_hash is None:
+        return _salt_unavailable(_g)
+    allowed, _rem, retry_after = _rate_check("predict_week", ip_hash, limit=PREDICT_WEEK_RATE_LIMIT, window_seconds=3600, fail_open=False)
+    if not allowed:
+        return _rate_limited("predict_week", "Too many predictions from this network. Try again later.", retry_after=retry_after or 60)
     try:
         body = json.loads(event.get("body") or "{}")
     except Exception:
@@ -707,9 +718,6 @@ def _handle_predict_week(event: dict, *, _g) -> dict:
     if choice not in _PREDICT_CHOICES:
         return _error(400, "choice must be up, down, or flat")
 
-    ip_hash = _salted_ip_hash(source_ip, _g)
-    if ip_hash is None:
-        return _salt_unavailable(_g)
     now_epoch = int(datetime.now(timezone.utc).timestamp())
     try:
         table.put_item(

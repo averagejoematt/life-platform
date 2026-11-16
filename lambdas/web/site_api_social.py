@@ -198,6 +198,7 @@ FINDING_RATE_LIMIT = 3  # per IP per hour
 PAGE_FEEDBACK_RATE_LIMIT = 5  # per IP per hour — /api/page_feedback (#4182)
 MORNING_NOTE_RATE_LIMIT = 10  # per IP per hour — /api/morning_note (#4189): the owner's door; a token guess costs a slot
 FOLLOW_RATE_LIMIT = 10  # per IP per hour — shared by the experiment and challenge follow doors
+PREDICT_WEEK_RATE_LIMIT = 10  # per IP per hour — /api/predict_week (#6088: it had no meter, only the per-metric dedup row)
 # A run is DONE (not still running) in any of these terminal states. Read by BOTH the
 # library pillar stats and the experiment-detail page so the two can't disagree (#2221).
 COMPLETED_RUN_STATUSES = ("completed", "partial", "failed")
