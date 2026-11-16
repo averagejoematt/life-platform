@@ -195,7 +195,9 @@ def test_in_scope_an_approved_unchanged_call_is_served(cr2_on, ldl_counterfactua
         G.gate_item({"pk": "COACH#mind_coach", "sk": "PREDICTION#pred_20261102_fixture", "claim_natural": other})
         body = json.loads(G.annotate({"statusCode": 200, "body": json.dumps({"a": row["claim_natural"], "b": other})})["body"])
         assert body == {"a": row["claim_natural"], "b": ""}, "the approved words are served; every other withheld text is not"
-    assert G.is_tainted(row["claim_natural"]), "out of the scope again, the words are withheld at the wire"
+    G.begin_request()
+    G.gate_item(dict(row))
+    assert G.is_tainted(row["claim_natural"]), "out of the scope again, a request that reads the row withholds its words"
 
 
 def test_negative_control_a_historical_row_not_on_the_list_stays_withheld(cr2_on):

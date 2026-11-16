@@ -26,10 +26,16 @@ TWO HALVES, ONE DECISION. The row's provenance decides; two mechanisms enforce:
      ADR-104 defect of its own). Those rows reach the handler unchanged and are withheld by half 2.
 
   2. AT THE WIRE (``annotate``, the handler's last step). Every free-text value of every withheld
-     graded-record row read in this container is TAINTED; any string in the response that is one
+     graded-record row THIS REQUEST read is TAINTED; any string in the response that is one
      (three words or more), or carries a run of ``SHINGLE`` consecutive words from one (digits
-     normalised, so a masked or clipped copy still matches), is emptied. Numbers, keys and list lengths are untouched. The taint set lives
-     for the container (a handler's module cache can serve a row read by an earlier request).
+     normalised, so a masked or clipped copy still matches), is emptied — except that a single token
+     under a structural key (an id, a date, an enum, a field path) is matched only by the run, never by
+     whole-value equality. Numbers, keys and list lengths are untouched.
+
+THE INVARIANT (#6111). What a response blanks is a function of the stored rows, the policy and the request
+— never of what earlier requests in the same container read: ``begin_request`` empties the taint, which then
+holds exactly the withheld graded rows this request read (no handler keeps a graded row across requests;
+``tests/test_publication_determinism_6111.py`` pins cold = warm, order-independence and that no cache does).
 
 The provenance record itself is removed from every narrative item, eligible or not — family names
 are not reader copy. The stored row is never touched: the owner's tools (MCP, Telegram) read the
@@ -186,6 +192,7 @@ STRUCTURAL_KEYS = frozenset(
         "experiment_phase",
         "experiment_cycle",
         "genesis",
+        "source_field",  # #6111: a cited number's field path (``whoop.recovery_score``) — an engine identifier
     }
 )
 _STRUCTURAL_SUFFIXES = ("_at", "_date", "_id", "_ids", "_day", "_through", "_as_of", "_on", "_until", "_since", "_n", "_status")
@@ -250,15 +257,30 @@ def _withhold_value(value: Any, key: Any = None, in_list: bool = False) -> Any:
 _STATE = {"withheld": 0, "served": 0, "scrubbed": 0}
 SHINGLE = 6
 EXACT_MIN_WORDS = 3  # a one- or two-word value (a habit name, a label) is never matched by equality
+# THIS REQUEST's taint: the withheld graded rows this request read. Emptied by ``begin_request`` (#6111: it used to live
+# for the container, so what a response blanked depended on which rows earlier requests had read).
 _TAINT_EXACT: set = set()
 _TAINT_SHINGLES: set = set()
+# The raw table this request's gated reads went through — the one the public call ids are read from too
+# (``web.public_call_id``), so the id map and the rows it names come from the same table.
+_REQUEST_TABLE: dict = {"raw": None}
+
+
+def request_table() -> Any:
+    """The raw table this request first read through a ``PublicationTable`` (None before any read)."""
+    return _REQUEST_TABLE["raw"]
 
 
 def begin_request() -> None:
+    """Start one request: zero the counts, forget the served-words exemptions AND the previous request's taint."""
     NA.reset_served()
     _STATE["withheld"] = 0
     _STATE["served"] = 0
     _STATE["scrubbed"] = 0
+    _TAINT_EXACT.clear()
+    _TAINT_SHINGLES.clear()
+    _TAINT_SEEN.clear()
+    _REQUEST_TABLE["raw"] = None
 
 
 def withheld_count() -> int:
@@ -305,39 +327,56 @@ TAINT_SKIP_KEYS = frozenset(
 )
 
 
-# The texts already tainted into the sets above. Tainting is a pure function of the text (its exact
-# hash and its wordy shingles), so a text tainted once adds nothing the second time: every request
-# re-reads the same graded rows, and re-shingling their unchanged words was the route's CPU (#5728).
-# Strings, not hashes — a skip must be exact, never a collision. Emptied whenever the taint is.
+# The texts already tainted into THIS request's sets. A text tainted once adds nothing the second time
+# (#5728: re-shingling the same unchanged words was the route's CPU). Strings, not hashes — a skip must
+# be exact, never a collision. Emptied whenever the taint is.
 _TAINT_SEEN: set = set()
+# text -> (its exact hash or None, its wordy shingle hashes): a PURE function of the text, so remembering it
+# across requests changes no decision — it only spares the re-shingling. Bounded; cleared when full.
+_TEXT_HASHES: dict = {}
+_TEXT_HASHES_MAX = 200_000
 
 
 def reset_taint() -> None:
-    """Forget every taint (the sets and the seen-texts memo together)."""
+    """Forget every taint (this request's sets and the seen-texts memo together, and the pure hash memo)."""
     _TAINT_EXACT.clear()
     _TAINT_SHINGLES.clear()
     _TAINT_SEEN.clear()
+    _TEXT_HASHES.clear()
+
+
+def _text_hashes(text: str) -> tuple:
+    got = _TEXT_HASHES.get(text)
+    if got is not None:
+        return got
+    words = _norm_words(text)
+    n = len(words)
+    exact = hash(words) if n >= EXACT_MIN_WORDS else None
+    shingles: list = []
+    if n >= SHINGLE:
+        # A run worth matching (a "wordy" window): at least four REAL words — three letters or more, not a figure —
+        # in the ``SHINGLE`` window, since a run of masked figures matches anything. Kept as one running count
+        # across the windows rather than a recount per window: the same windows, the same test.
+        real = [len(w) >= 3 and not w.isdigit() for w in words]
+        count = sum(real[:SHINGLE])
+        for i in range(n - SHINGLE + 1):
+            if i:
+                count += real[i + SHINGLE - 1] - real[i - 1]
+            if count >= 4:
+                shingles.append(hash(words[i : i + SHINGLE]))
+    got = (exact, tuple(shingles))
+    if len(_TEXT_HASHES) >= _TEXT_HASHES_MAX:
+        _TEXT_HASHES.clear()
+    _TEXT_HASHES[text] = got
+    return got
 
 
 def _taint_text(text: str) -> None:
-    words = _norm_words(text)
-    n = len(words)
-    if n < EXACT_MIN_WORDS:
+    exact, shingles = _text_hashes(text)
+    if exact is None:
         return
-    _TAINT_EXACT.add(hash(words))
-    if n < SHINGLE:
-        return
-    # A run worth matching (a "wordy" window): at least four REAL words — three letters or more, not a figure —
-    # in the ``SHINGLE`` window, since a run of masked figures matches anything. Kept as one running count
-    # across the windows rather than a recount per window: the same windows, the same test.
-    real = [len(w) >= 3 and not w.isdigit() for w in words]
-    count = sum(real[:SHINGLE])
-    shingles = _TAINT_SHINGLES
-    for i in range(n - SHINGLE + 1):
-        if i:
-            count += real[i + SHINGLE - 1] - real[i - 1]
-        if count >= 4:
-            shingles.add(hash(words[i : i + SHINGLE]))
+    _TAINT_EXACT.add(exact)
+    _TAINT_SHINGLES.update(shingles)
 
 
 def _taint(row: dict) -> None:
@@ -353,20 +392,49 @@ def _taint(row: dict) -> None:
             _TAINT_SEEN.add(text)
 
 
-def is_tainted(text: Any) -> bool:
-    """True when ``text`` is, or carries a ``SHINGLE``-word run of, a withheld row's text."""
+def is_tainted(text: Any, *, free_text: bool = True) -> bool:
+    """True when ``text`` is, or carries a ``SHINGLE``-word run of, the text of a withheld graded row THIS request read.
+
+    ``free_text=False`` — a single token under a structural key (an id, a date, an enum, a field path) — is never
+    matched by whole-value equality, only by a ``SHINGLE``-word run: the run is what a slug built from a sentence
+    carries, while equality only made ``whoop.recovery_score`` collide with a label "WHOOP recovery score" (#6111)."""
     if not isinstance(text, str) or not _TAINT_EXACT or NA.is_approved_text(text):
         return False
     words = _norm_words(text)
     if len(words) < EXACT_MIN_WORDS:
         return False
-    if hash(words) in _TAINT_EXACT:
+    if free_text and hash(words) in _TAINT_EXACT:
         return True
     return any(hash(words[i : i + SHINGLE]) in _TAINT_SHINGLES for i in range(len(words) - SHINGLE + 1))
 
 
 def _is_counted(sk: Any) -> bool:
     return str(sk or "").startswith(COUNTED_SK_PREFIXES)
+
+
+def _decide(item: dict, pk: Any) -> tuple:
+    """``(ok, reason, noted)`` — the publication decision for one narrative item, with no side effect (no count, no
+    taint, no served-note: ``noted`` says the caller should record the approved words as served in this request)."""
+    ok, reason = NP.eligibility(item)
+    if ok or reason != NP.R_UNRECORDED:
+        return ok, reason, False
+    # Owner ruling 2026-11-09 (D): a historical row approved BY RECORD KEY, unchanged, with no record of its own,
+    # inside the CR2 scope with the CR2 switch on — published under the allowlist's public record. Everything
+    # else (the switch off, any other scope, any row carrying a record) is decided exactly as before.
+    approved = NA.record_for(item, pk)
+    if approved is None:
+        # owner ruling 2026-11-11 (second message, item 3): an approved annotated read, words unchanged — the CR2
+        # route serves it only beside its dated correction (common.narrative_annotations)
+        approved = NA.record_for_annotated(item, pk)
+    if approved is not None:
+        ok, reason = NP.eligibility(approved)
+        return ok, reason, ok
+    if NA.owner_ruled_words(item, pk):
+        # Owner ruling 2026-11-14 (wording batch v1): an exact historical call the owner approved BY RECORD — the
+        # listed key, no record of its own, words byte-identical. An owner exception, not a provenance claim, and
+        # honoured on every route so the ledger and the Coaching Room obey one decision.
+        return True, "owner_ruled_words", True
+    return ok, reason, False
 
 
 def gate_item(item: Any, pk_hint: Any = None, *, strict: bool = False) -> Any:
@@ -377,26 +445,9 @@ def gate_item(item: Any, pk_hint: Any = None, *, strict: bool = False) -> Any:
     pk = item.get("pk", pk_hint)
     if not is_narrative_row(pk, item.get("sk")):
         return item
-    ok, reason = NP.eligibility(item)
-    if not ok and reason == NP.R_UNRECORDED:
-        # Owner ruling 2026-11-09 (D): a historical row approved BY RECORD KEY, unchanged, with no record of its own,
-        # inside the CR2 scope with the CR2 switch on — published under the allowlist's public record. Everything
-        # else (the switch off, any other scope, any row carrying a record) is decided exactly as before.
-        approved = NA.record_for(item, pk)
-        if approved is None:
-            # owner ruling 2026-11-11 (second message, item 3): an approved annotated read, words unchanged — the CR2
-            # route serves it only beside its dated correction (common.narrative_annotations)
-            approved = NA.record_for_annotated(item, pk)
-        if approved is not None:
-            ok, reason = NP.eligibility(approved)
-            if ok:
-                NA.note_served(item, pk)  # the wire exempts these words for this request only
-        elif NA.owner_ruled_words(item, pk):
-            # Owner ruling 2026-11-14 (wording batch v1): an exact historical call the owner approved BY RECORD — the
-            # listed key, no record of its own, words byte-identical. An owner exception, not a provenance claim, and
-            # honoured on every route so the ledger and the Coaching Room obey one decision.
-            ok, reason = True, "owner_ruled_words"
-            NA.note_served(item, pk)
+    ok, reason, noted = _decide(item, pk)
+    if noted:
+        NA.note_served(item, pk)  # the wire exempts these words for this request only
     out = {k: v for k, v in item.items() if k != NP.PROVENANCE_KEY}
     if ok:
         _STATE["served"] += 1
@@ -516,7 +567,12 @@ class PublicationTable:
     def _calls_lookup(self) -> Any:
         return call_publication.make_lookup(self._npg_table)
 
+    def _note_read(self) -> None:
+        if _REQUEST_TABLE["raw"] is None:
+            _REQUEST_TABLE["raw"] = self._npg_table
+
     def query(self, **kwargs: Any) -> Any:
+        self._note_read()
         pk = _requested_pk(
             kwargs.get("KeyConditionExpression"), kwargs.get("ExpressionAttributeValues"), kwargs.get("ExpressionAttributeNames")
         )
@@ -532,10 +588,12 @@ class PublicationTable:
         return _gate_response(resp, "Items", pk, self._npg_strict) if narrative else resp
 
     def scan(self, **kwargs: Any) -> Any:
+        self._note_read()
         resp = call_publication.scan(self._npg_table, _with_gate_projection(kwargs), self._calls_lookup())
         return _gate_response(resp, "Items", None, self._npg_strict)
 
     def get_item(self, **kwargs: Any) -> Any:
+        self._note_read()
         key = kwargs.get("Key") or {}
         pk = key.get("pk")
         narrative = pk is None or is_narrative_row(pk, key.get("sk"))
@@ -584,11 +642,20 @@ def _bare_required_words(text: str, note_text: Any) -> bool:
     return required is not None and (not required or note_text != required)
 
 
-def scrub_payload(node: Any, _note_text: Any = None) -> Any:
+def wire_free_text(text: str, key: Any) -> bool:
+    """Whether a served string is matched against withheld text by whole-value EQUALITY as well as by a run: everything
+    except a single token under a structural key (an id, a date, an enum, a field path — ``_structural_key``), which is a
+    machine value at the wire exactly as at the read (``_withhold_value``). A ``PROSE_KEYS`` value is always free text."""
+    k = str(key or "")
+    return k in PROSE_KEYS or bool(_WS.search(text)) or not _structural_key(k)
+
+
+def scrub_payload(node: Any, _note_text: Any = None, _key: Any = None) -> Any:
     """A JSON-shaped payload with every tainted string emptied (numbers, keys, lengths untouched) — and the words of a
-    call ruled "publish only with its note" emptied wherever the object holding them does not carry the note."""
+    call ruled "publish only with its note" emptied wherever the object holding them does not carry the note. A list's
+    elements are judged under the list's key."""
     if isinstance(node, str):
-        if is_tainted(node) or _bare_required_words(node, _note_text):
+        if is_tainted(node, free_text=wire_free_text(node, _key)) or _bare_required_words(node, _note_text):
             _STATE["scrubbed"] += 1
             return ""
         return node
@@ -598,9 +665,9 @@ def scrub_payload(node: Any, _note_text: Any = None) -> Any:
         # words_withheld flag") — a mark would say which items rest on private or unrecorded sources.
         note = node.get(OWNER_NOTE_KEY)
         note_text = note.get("text") if isinstance(note, dict) else None
-        return {k: (v if (k in WIRE_SKIP_KEYS and isinstance(v, str)) else scrub_payload(v, note_text)) for k, v in node.items()}
+        return {k: (v if (k in WIRE_SKIP_KEYS and isinstance(v, str)) else scrub_payload(v, note_text, k)) for k, v in node.items()}
     if isinstance(node, list):
-        return [scrub_payload(v) for v in node]
+        return [scrub_payload(v, None, _key) for v in node]
     return node
 
 
