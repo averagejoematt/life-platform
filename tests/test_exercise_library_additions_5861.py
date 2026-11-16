@@ -294,6 +294,8 @@ def _pre_approval(lib: dict) -> dict:
     assert (line["version"], line["date"]) == (APPROVAL["version"], APPROVAL["approved_on"])
     assert line["what"] == "approved: status proposed -> approved (schema valid, private gate check passed)"
     pre["status"] = "proposed"
+    # #6014: the `_README` states the header's status (`build_exercise_library._status_line`) — before approval it said PROPOSED
+    pre["_README"] = pre["_README"].replace(b._status_line(lib), b._status_line(pre))
     return pre
 
 
@@ -318,7 +320,8 @@ def test_the_committed_library_is_the_builders_output_and_the_build_is_determini
     log = built["change_log"][:i] + [LIB["change_log"][i]] + built["change_log"][i:]
     approved = built | {"status": "approved", "change_log": log}
     approved["approved_on"] = APPROVAL["approved_on"]
-    assert _text(approved) == committed
+    # #6014: the approval script writes the status; the builder's next rebuild states it in the `_README` (byte for byte)
+    assert _text(b.build_library(copy.deepcopy(approved), history, copy.deepcopy(CATALOG), aliases)) == committed
     # control: the builder never emits an approval it did not read — no current file builds proposed, unstamped
     fresh = b.build_library(None, history, copy.deepcopy(CATALOG), aliases)
     assert fresh["status"] == "proposed" and "approved_on" not in fresh
