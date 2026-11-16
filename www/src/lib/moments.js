@@ -3,11 +3,12 @@
 // drama: every moment is selected from published objects and says only what they say. A chapter's own words are its
 // approved dek, quoted, never paraphrased; a number is the platform's. A moment whose evidence is absent from the
 // snapshot is simply not shown — the list shrinks, it is never filled.
-import { dayInWords, num } from "./format.js";
+import { chapterMeta, dayInWords, num } from "./format.js";
 import { withinDays } from "./own_words.js";
 
 const published = (chapters) => (chapters || []).filter((c) => c && c.status === "published" && (c.week ?? 0) >= 1);
-const lastDay = (c) => c.covers_end || c.data_through || c.date;
+// a chapter's place on the line: the last of its days, as the front page's tick (format.js chapterMeta, #6081)
+const lastDay = (c) => chapterMeta(c)?.tick?.date || c.date;
 
 /** The first published chapter whose title matches `re` (the flag chapter, the coach's blind spot …). */
 function chapterBy(chapters, re) {
@@ -20,7 +21,9 @@ function chapterBy(chapters, re) {
  * The moments, oldest first. Inputs are snapshot objects: `journey` (start, rungs), `chapters`, `lead` (the verified
  * record against a guess, lib/calibration.js verifiedLead), `finding` (the correlation listed in every weekly run, with
  * its `seen`/`of`), `own` (his approved lines the snapshot serves, by placement: {beginning, pace} → {date} or absent).
- * Each moment: {key, date|null, kicker, title, body, quote|null, own|null, links: [{label, path}]} — `own` names the
+ * Each moment: {key, date|null, kicker, title, body, quote|null, own|null, chapter?, links: [{label, path}]} — `chapter` is
+ * the chapter object a chapter's moment is about (the page prints its days and publication from it, never `date`, which
+ * is only its place on the line); `own` names the
  * placement (lib/own_words.js) the card carries: the beginning on the first morning; the pace line on the rate-flag
  * chapter's card only when its day is one of that chapter's days.
  */
@@ -48,6 +51,7 @@ export function moments({ journey, chapters, coaches, lead, finding, own = {}, d
     out.push({
       key: "first-flag",
       date: lastDay(flag),
+      chapter: flag,
       kicker: flag.week_label,
       title: `The rate flag, ${String(flag.week_label || "").toLowerCase()}`,
       body: "The platform's own rate flag — a heuristic about pace, not a measurement of muscle — in the experiment's second week.",
@@ -62,6 +66,7 @@ export function moments({ journey, chapters, coaches, lead, finding, own = {}, d
     out.push({
       key: "blind-spot",
       date: lastDay(blind),
+      chapter: blind,
       kicker: blind.week_label,
       title: blind.title,
       body: "The chapter is named for a coach's miss; its record, every call checked against a simple guess, is one click away.",
@@ -95,6 +100,7 @@ export function moments({ journey, chapters, coaches, lead, finding, own = {}, d
     out.push({
       key: "rate-flag",
       date: lastDay(again),
+      chapter: again,
       kicker: again.week_label,
       title: "The pace question, again",
       body: `${flag && again.week > flag.week ? `${again.week - flag.week} weeks after ${flag.title}, the` : "The"} flag fired again. Whether the pace can hold without costing muscle is the chapter's own open question.`,

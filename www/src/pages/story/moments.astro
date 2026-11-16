@@ -11,7 +11,7 @@ import { verifiedLead } from "../../lib/calibration.js";
 import { latestFindings, pairTitle } from "../../lib/laboratory.js";
 import { roomPublic } from "../../lib/room.js";
 import { labEnabled } from "../../lib/lab.js";
-import { dayInWords } from "../../lib/format.js";
+import { chapterMeta, dayInWords } from "../../lib/format.js";
 import { href, pathOf } from "../../lib/url.js";
 
 const all = await loadAll();
@@ -54,6 +54,7 @@ const list = moments({
   chapterPath: (c: any) => pathOf("chapter", c.id),
   coachPath: (id: string) => pathOf("coach", id),
 });
+const chMeta = (c: any) => chapterMeta(c) || ({} as any);
 const dated = list.map((m, i) => ({ ...m, n: String(i + 1) })).filter((m) => m.date);
 const start = journey?.start_date || null;
 const lineData =
@@ -97,13 +98,22 @@ const lineSvg = lineData ? theLine({ ...lineData, aria: lineAria }) : null;
       <ol class="moments">
         {
           list.map((m, i) => (
-            <li class="moment" id={m.key}>
+            <li class="moment" id={m.key} data-chapter={m.chapter ? m.chapter.id : undefined}>
               <span class="moment-n num">{i + 1}</span>
               <div class="moment-body">
-                <p class="label">
-                  {m.kicker}
-                  {m.date ? ` · ${dayInWords(m.date)}` : ""}
-                </p>
+                {m.chapter ? (
+                  // #6081: a chapter's moment names it as the chapter page does — its week, its days, its publication
+                  <p class="label">
+                    <span data-ch-week>{m.kicker}</span>
+                    {chMeta(m.chapter).window && <> · <span data-ch-window>{chMeta(m.chapter).window}</span></>}
+                    {chMeta(m.chapter).published && <> · <span data-published>{chMeta(m.chapter).published}</span></>}
+                  </p>
+                ) : (
+                  <p class="label">
+                    {m.kicker}
+                    {m.date ? ` · ${dayInWords(m.date)}` : ""}
+                  </p>
+                )}
                 <h2 class="moment-title">{m.title}</h2>
                 <p class="moment-text">{m.body}</p>
                 {m.quote && m.quote.text && (
