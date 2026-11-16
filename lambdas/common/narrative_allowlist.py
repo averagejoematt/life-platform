@@ -637,7 +637,7 @@ def owner_note(item: Any, pk: Any = None) -> Optional[dict]:
     if not owner_ruled_words(item, pk):
         return None
     note = OWNER_NOTES.get((str(item.get("pk", pk) or ""), str(item.get("sk") or "")))
-    if not _note_complete(note):
+    if note is None or not _note_complete(note):
         return None
     return {"kind": note.kind, "dated": note.dated, "required": bool(note.required), "text": note.text, "short": note.short}
 
@@ -653,7 +653,7 @@ def required_note_for_text(text: Any) -> Optional[str]:
     for e in OWNER_RULED_INDEX.values():
         if e.text_sha256 == h and _note_required(e):
             note = OWNER_NOTES.get((e.pk, e.sk))
-            return note.text if _note_complete(note) else ""
+            return note.text if note is not None and _note_complete(note) else ""
     return None
 
 
