@@ -119,7 +119,77 @@ OWNER_NONE = "unowned"
 # encodes the WRITER's cadence, so it has to come from the writer).
 _TTL_NAME_PATTERNS = ("*TTL*", "*MAX_AGE*", "*REFRESH_SECONDS*", "*REFRESH_INTERVAL*")
 
-_ICON = {"ok": "🟢", "warn": "🟡", "fail": "🔴"}
+_ICON = {"ok": "🟢", "warn": "🟡", "fail": "🔴", "retired": "⚫"}
+
+OWNER_RETIRED = "retired"
+
+
+@dataclass(frozen=True)
+class RetiredKey:
+    """A live object whose seat is retired and which the bucket policy will not let anyone delete.
+
+    ``s3:DeleteObject`` under `config/` is denied even for admins (deliberate, and it stays), so an
+    object belonging to a retired seat can never be removed — and without a ruling it would sit in
+    this audit as UNOWNED forever, a red that teaches people to ignore the workflow (#5973: 27
+    straight red days on two keys). This is the ruling, as data.
+
+    Fail-closed on purpose — the entry buys exactly one thing, "do not call this UNOWNED":
+      * ``key`` is an EXACT key. A glob/prefix is refused at validation (``validate_retired``),
+        so a retirement can never swallow a live object by pattern.
+      * the audit still FAILS if a deployed module reads the key by a LITERAL edge (a retired seat
+        that something still loads is not retired), and
+      * still FAILS if the object's LastModified is after ``ruled_on`` — a write to a retired key
+        means someone is using it again, and the entry no longer describes reality.
+    Templated reads (``f"config/coaches/{coach_id}.json"``) reach this key only as a glob edge; they
+    are reported in the detail, not treated as a literal read, because they resolve only for ids the
+    persona registry marks operational (see tests/test_config_mirror_audit.py).
+    """
+
+    key: str
+    ruled_on: str  # YYYY-MM-DD, UTC midnight is the cut-off for "modified after the ruling"
+    issue: str
+    reason: str
+
+
+# Owner ruling 2026-11-16 on #5973: "Mark retired". The Performance seat absorbed training at the
+# cycle-13 genesis (`persona_registry.RETIRED_COACH_IDS`); both objects were last written before that
+# ruling (voice spec 2026-10-12, stance 2026-08-13).
+RETIRED_DELETE_LOCKED: tuple[RetiredKey, ...] = (
+    RetiredKey(
+        "config/coaches/training_coach.json",
+        "2026-11-16",
+        "#5973",
+        "training_coach seat retired (persona_registry.RETIRED_COACH_IDS); delete-locked bucket policy",
+    ),
+    RetiredKey(
+        "config/coaches/training_coach_stance.json",
+        "2026-11-16",
+        "#5973",
+        "training_coach seat retired (persona_registry.RETIRED_COACH_IDS); delete-locked bucket policy",
+    ),
+)
+
+_GLOB_CHARS = set("*?[]{}")
+
+
+def validate_retired(entries) -> None:
+    """Raise ValueError unless every entry is an exact key with a ruling date and an issue."""
+    seen: set[str] = set()
+    for e in entries:
+        if not e.key.startswith(S3_CONFIG_PREFIX) or e.key.endswith("/") or _GLOB_CHARS & set(e.key):
+            raise ValueError(f"retired entry {e.key!r} must be one exact object key under {S3_CONFIG_PREFIX!r} — no prefix, no glob")
+        if e.key in seen:
+            raise ValueError(f"retired entry {e.key!r} listed twice")
+        seen.add(e.key)
+        try:
+            datetime.strptime(e.ruled_on, "%Y-%m-%d")
+        except ValueError:
+            raise ValueError(f"retired entry {e.key!r} needs a YYYY-MM-DD ruling date, got {e.ruled_on!r}") from None
+        if not (e.issue.startswith("#") and e.issue[1:].isdigit()) or not e.reason.strip():
+            raise ValueError(f"retired entry {e.key!r} needs an issue like '#5973' and a reason")
+
+
+validate_retired(RETIRED_DELETE_LOCKED)
 
 
 @dataclass
@@ -129,7 +199,7 @@ class Finding:
     detail: str
     consumers: list[str] = field(default_factory=list)
     serving: bool = False
-    verdict: str = "ok"  # ok | warn | fail
+    verdict: str = "ok"  # ok | warn | fail | retired (#5973: ruled retired — shown, not a failure)
     age_seconds: int | None = None
     max_age_seconds: int | None = None
     source: str | None = None
@@ -331,14 +401,56 @@ def build_report(registry: Registry, live: dict[str, datetime], repo_root: str, 
     return summarize(audit(registry, live, repo_root, now))
 
 
-def audit(registry: Registry, live: dict[str, datetime], repo_root: str, now: datetime) -> list[Finding]:
+def _literal_readers(registry: Registry, key: str, repo_root: str) -> list[str]:
+    """Modules that read EXACTLY this key — an edge whose pattern is the key itself, or a bare-filename
+    read of a repo file of that name. Glob/templated edges are deliberately not counted here."""
+    modules = set(registry.read_patterns.get(key, ()))
+    basename = key.rsplit("/", 1)[-1]
+    if basename in registry.bare_reads and os.path.exists(os.path.join(repo_root, key.replace("/", os.sep))):
+        modules.update(registry.bare_reads[basename])
+    return sorted(modules)
+
+
+def _retired_finding(entry: RetiredKey, modified: datetime, registry: Registry, repo_root: str) -> Finding:
+    consumers = readers_of(registry, entry.key, repo_root)
+    finding = Finding(key=entry.key, owner=OWNER_RETIRED, detail="", consumers=consumers, verdict="retired")
+    literal = _literal_readers(registry, entry.key, repo_root)
+    cutoff = datetime.strptime(entry.ruled_on, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    if literal:
+        finding.verdict = "fail"
+        finding.serving = True
+        finding.detail = f"listed RETIRED ({entry.issue}) but read by name from {', '.join(literal)} — a retired seat something still loads is not retired"
+    elif modified > cutoff:
+        finding.verdict = "fail"
+        finding.serving = True
+        finding.detail = f"listed RETIRED ({entry.issue}, ruled {entry.ruled_on}) but LastModified {modified.isoformat()} is after the ruling — it is being written again"
+    else:
+        finding.detail = (
+            f"RETIRED, delete-locked — ruled {entry.ruled_on} ({entry.issue}): {entry.reason}; last modified {modified.date()}; "
+            f"{len(consumers)} templated/glob reader module(s), none by name"
+        )
+    return finding
+
+
+def audit(
+    registry: Registry,
+    live: dict[str, datetime],
+    repo_root: str,
+    now: datetime,
+    retired: tuple[RetiredKey, ...] | None = None,
+) -> list[Finding]:
     """Classify every live `config/` object a deployed module reads."""
+    retired_by_key = {e.key: e for e in (RETIRED_DELETE_LOCKED if retired is None else retired)}
+    validate_retired(retired_by_key.values())
     twin_keys = set(registry.by_key())
     alias_twins = {t.key: t for t in expand_alias_twins(registry, list(live))}
     sources = repo_sources_by_basename(repo_root)
     findings: list[Finding] = []
 
     for key in sorted(live):
+        if key in retired_by_key:
+            findings.append(_retired_finding(retired_by_key[key], live[key], registry, repo_root))
+            continue
         consumers = readers_of(registry, key, repo_root)
         if not consumers:
             continue  # nothing deployed reads it — not a serving-truth question
@@ -393,6 +505,7 @@ def summarize(findings: list[Finding]) -> dict:
         "by_owner": {owner: sum(1 for f in findings if f.owner == owner) for owner in sorted({f.owner for f in findings})},
         "failures": [f.key for f in failures],
         "warnings": [f.key for f in findings if f.verdict == "warn"],
+        "retired": [f.key for f in findings if f.verdict == "retired"],
         "findings": [asdict(f) for f in findings],
         "clean": not failures,
     }

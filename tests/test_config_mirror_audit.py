@@ -419,3 +419,101 @@ def test_annassign_with_no_value_is_ignored_not_crashed_on(mirror_repo):
     seconds, declared_by = audit_mod.writer_max_age(mirror_repo, ("lambdas/compute/fake_writer.py",))
     assert seconds == 3600  # the real CACHE_TTL_SECONDS assign, unaffected
     assert declared_by == "lambdas/compute/fake_writer.py:CACHE_TTL_SECONDS"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# #5973 — a ruled-retired, delete-locked object is reported RETIRED, fail-closed
+# ─────────────────────────────────────────────────────────────────────────────
+
+_RETIRED_KEYS = ("config/coaches/training_coach.json", "config/coaches/training_coach_stance.json")
+_RULED = datetime(2026, 11, 16, tzinfo=timezone.utc)
+_REAL_LIVE_MODIFIED = {
+    "config/coaches/training_coach.json": datetime(2026, 10, 12, 17, 53, 6, tzinfo=timezone.utc),
+    "config/coaches/training_coach_stance.json": datetime(2026, 8, 13, 4, 46, 48, tzinfo=timezone.utc),
+}
+
+
+def _real_live(extra=None):
+    registry = registry_mod.derive(REPO_ROOT)
+    live = {t.key: NOW for t in registry.twins}
+    live.update(_REAL_LIVE_MODIFIED)
+    live.update(extra or {})
+    return registry, live
+
+
+def test_the_registry_names_exactly_the_two_ruled_keys():
+    assert tuple(e.key for e in audit_mod.RETIRED_DELETE_LOCKED) == _RETIRED_KEYS
+    for e in audit_mod.RETIRED_DELETE_LOCKED:
+        assert e.issue == "#5973" and e.ruled_on == "2026-11-16" and e.reason
+
+
+def test_the_two_retired_keys_report_retired_not_fail():
+    registry, live = _real_live()
+    found = {f.key: f for f in audit_mod.audit(registry, live, REPO_ROOT, datetime(2026, 11, 17, tzinfo=timezone.utc))}
+    for key in _RETIRED_KEYS:
+        assert found[key].verdict == "retired" and found[key].owner == audit_mod.OWNER_RETIRED
+        assert "RETIRED" in found[key].detail and "#5973" in found[key].detail
+    report = audit_mod.summarize(list(found.values()))
+    assert report["clean"] and sorted(report["retired"]) == sorted(_RETIRED_KEYS)
+
+
+def test_retired_findings_are_printed_not_silently_skipped(capsys):
+    registry, live = _real_live()
+    audit_mod._print_human(audit_mod.summarize(audit_mod.audit(registry, live, REPO_ROOT, NOW)))
+    out = capsys.readouterr().out
+    for key in _RETIRED_KEYS:
+        assert key in out
+    assert "RETIRED" in out
+
+
+def test_no_deployed_module_reads_a_retired_key_by_name():
+    """Why SERVING was a false alarm: the only edges reaching these keys are templated
+    (`config/coaches/{coach_id}.json`), i.e. globs. A literal read would fail the audit."""
+    registry = registry_mod.derive(REPO_ROOT)
+    for key in _RETIRED_KEYS:
+        assert audit_mod._literal_readers(registry, key, REPO_ROOT) == []
+    pers = json.load(open(os.path.join(REPO_ROOT, "config", "personas.json"), encoding="utf-8"))
+    assert pers["personas"]["training_coach"]["retired"] is True and not pers["personas"]["training_coach"].get("operational")
+
+
+def test_control_unlisted_unowned_serving_key_still_fails():
+    registry, live = _real_live({"config/coaches/ghost_coach.json": NOW})
+    found = {f.key: f for f in audit_mod.audit(registry, live, REPO_ROOT, NOW)}
+    assert found["config/coaches/ghost_coach.json"].verdict == "fail"
+    assert "UNOWNED" in found["config/coaches/ghost_coach.json"].detail
+
+
+def test_control_a_retired_key_modified_after_the_ruling_fails():
+    registry, live = _real_live({_RETIRED_KEYS[0]: _RULED + timedelta(hours=1)})
+    found = {f.key: f for f in audit_mod.audit(registry, live, REPO_ROOT, NOW)}
+    assert found[_RETIRED_KEYS[0]].verdict == "fail"
+    assert "after the ruling" in found[_RETIRED_KEYS[0]].detail
+    assert found[_RETIRED_KEYS[1]].verdict == "retired"
+    assert audit_mod.summarize(list(found.values()))["clean"] is False
+
+
+def test_control_a_retired_key_read_by_name_fails(mirror_repo):
+    entry = audit_mod.RetiredKey("config/mystery.json", "2026-08-01", "#5973", "control")
+    registry = registry_mod.derive(mirror_repo)
+    live = {"config/mystery.json": datetime(2026, 7, 1, tzinfo=timezone.utc)}
+    found = audit_mod.audit(registry, live, mirror_repo, NOW, retired=(entry,))
+    assert found[0].verdict == "fail" and "read by name" in found[0].detail
+
+
+@pytest.mark.parametrize(
+    "bad", ["config/coaches/*.json", "config/coaches/", "config/coaches/training_coach*", "config/{a,b}.json", "seeds/x.json"]
+)
+def test_control_a_glob_or_prefix_retirement_is_refused(bad):
+    entry = audit_mod.RetiredKey(bad, "2026-11-16", "#5973", "glob attempt")
+    with pytest.raises(ValueError):
+        audit_mod.validate_retired([entry])
+    registry, live = _real_live()
+    with pytest.raises(ValueError):
+        audit_mod.audit(registry, live, REPO_ROOT, NOW, retired=(entry,))
+
+
+def test_control_an_entry_without_date_or_issue_is_refused():
+    with pytest.raises(ValueError):
+        audit_mod.validate_retired([audit_mod.RetiredKey("config/x.json", "soon", "#5973", "r")])
+    with pytest.raises(ValueError):
+        audit_mod.validate_retired([audit_mod.RetiredKey("config/x.json", "2026-11-16", "", "r")])
