@@ -102,8 +102,11 @@ CAUSE IDENTITY — A CITATION MATCHES A NAME, NOT A DEFECT (#3501)
       an honestly-cited episode. An entry with neither date is UNKNOWN, never flagged —
       the same deliberate under-catch as the #3258 check, and the safe direction.
     * `cause_mismatches` — an entry may declare the `cause` it explains (a qa-smoke
-      check id, e.g. `reader_truth:frozen_artifacts`). When the LIVE cause is readable
-      and differs from the cited one, the alarm reads as uncited-for-this-cause. The
+      check id, e.g. `reader_truth:frozen_artifacts`). When the LIVE cause names an id the
+      citation does not declare, the alarm reads as uncited-for-this-cause. (#5934: live ⊆
+      declared, not equality — an any-WARN alarm's cause line is a union of intermittent
+      ids no citation can equal run to run; a declared id unseen for 7 days is reported
+      instead, `scripts/alarm_citation_causes.py`.) The
       live side comes from qa-smoke's own `[QA] CAUSE` log line (emitted every run since
       #3501, format + parser owned by `lambdas/operational/qa_check.py`, never
       re-implemented here), read through `fetch_qa_smoke_causes()`. Unreadable logs are
@@ -616,28 +619,33 @@ def parse_cause_events(messages, parse):
     return latest
 
 
-# Page cap for the qa-smoke cause read (#3729). The 48h window holds ~2 CAUSE lines
-# per daily run, so a handful of pages is already generous; the cap exists so a
-# pathological stream layout cannot spin the wrap, and hitting it degrades to an
-# explicit error rather than a silently partial answer.
-_CAUSE_PAGE_CAP = 20
+# Page cap for the qa-smoke cause read (#3729). The cap exists so a pathological stream
+# layout cannot spin the wrap, and hitting it degrades to an explicit error rather than a
+# silently partial answer. #5934 measured 2026-11-16: 12 pages for 48h, 30 for the 168h
+# stale-cause window (pages are per log stream, mostly near-empty) — 100 is ~3x headroom.
+_CAUSE_PAGE_CAP = 100
 
 
 def fetch_qa_smoke_causes(window_hours=QA_SMOKE_CAUSE_LOOKBACK_HOURS):
     """Live `filter_log_events` on qa-smoke's `[QA] CAUSE` lines — read-only.
 
-    Returns ({alarm_name: [check ids]}, error) in the same degrade-honestly shape as the
-    two CloudWatch reads: on any failure the map is {} and `error` is a human string, and
-    the caller must report the cause check UNVERIFIED rather than as a clean cause.
+    Returns ({alarm_name: [check ids]}, error, seen) in the same degrade-honestly shape as the
+    two CloudWatch reads: on any failure the map is {}, `seen` is None and `error` is a human
+    string, and the caller must report the cause check UNVERIFIED rather than as a clean cause.
+    The latest-run map reads `window_hours`; `seen` ({alarm: set(ids)}, #5934) is the union
+    over the longer DECLARED_CAUSE_STALE_HOURS window, from the same one read.
     """
+    from alarm_citation_causes import DECLARED_CAUSE_STALE_HOURS, seen_cause_ids
+
     qa_check = _qa_check_module()
     if qa_check is None:
-        return {}, "lambdas/operational/qa_check.py unreadable — cause format/parser unavailable"
+        return {}, "lambdas/operational/qa_check.py unreadable — cause format/parser unavailable", None
+    now_ms = datetime.now(timezone.utc).timestamp() * 1000
     try:
         import boto3
 
         logs = boto3.client("logs", region_name=REGION)
-        start_ms = int((datetime.now(timezone.utc).timestamp() - window_hours * 3600) * 1000)
+        start_ms = int(now_ms - max(window_hours, DECLARED_CAUSE_STALE_HOURS) * 3600 * 1000)
         # PAGINATE (#3729). CloudWatch pages filter_log_events BY LOG STREAM, not
         # chronologically, so page 1 routinely holds the OLDEST matching events and
         # returns a nextToken. Reading one page and stopping made parse_cause_events
@@ -669,43 +677,26 @@ def fetch_qa_smoke_causes(window_hours=QA_SMOKE_CAUSE_LOOKBACK_HOURS):
         else:
             # Cap hit with a token still outstanding: the read is INCOMPLETE, and a
             # partial map presented as complete is the defect this fix exists to end.
-            return {}, f"qa-smoke cause read exceeded {_CAUSE_PAGE_CAP} pages — window too wide to read honestly"
+            return {}, f"qa-smoke cause read exceeded {_CAUSE_PAGE_CAP} pages — window too wide to read honestly", None
     except Exception as e:  # noqa: BLE001 — any AWS/boto3 failure must degrade, not crash
-        return {}, str(e)
-    ordered = [m for _ts, m in sorted(messages, key=lambda pair: pair[0])]
-    return parse_cause_events(ordered, qa_check.parse_cause_line), None
+        return {}, str(e), None
+    latest_from = now_ms - window_hours * 3600 * 1000
+    ordered = [m for ts, m in sorted(messages, key=lambda pair: pair[0]) if ts >= latest_from]
+    seen = seen_cause_ids([m for _ts, m in messages], qa_check.parse_cause_line, QA_SMOKE_CAUSE_ALARMS)
+    return parse_cause_events(ordered, qa_check.parse_cause_line), None, seen
 
 
 def cause_mismatches(alarms, citations, live_causes):
-    """(alarm_name, cited_cause, live_cause) for every lit alarm whose citation declares
-    a `cause` that the live cause channel contradicts (#3501).
+    """(alarm_name, declared_ids, undeclared_live_ids) for every lit alarm whose latest live run
+    names a cause id its citation's `cause` does not declare (#3501; live ⊆ declared since #5934).
 
-    Deliberately narrow, so it cannot manufacture a red:
-      * an entry with no `cause` is never flagged — prose citations stay valid, and the
-        two age bars already force those to be answered;
-      * an alarm with no live cause reading is UNKNOWN, never mismatched (a cause channel
-        that went dark is the caller's UNVERIFIED line, not this function's red);
-      * comparison is on the SET of ids, order- and duplicate-insensitive, because the
-        emitter sorts and the citation is written by hand.
-
-    Pure and deterministic — `live_causes` is injected, exactly like `issue_states`.
+    Narrow, so it cannot manufacture a red: an entry with no `cause` is `undeclared_causes`'
+    finding, an alarm with no live reading is UNKNOWN, and comparison is set-wise. The rule and
+    its stale-declaration counterpart live in scripts/alarm_citation_causes.py.
     """
-    out = []
-    for a in alarms:
-        name = a.get("name") or "?"
-        if a.get("by_construction"):
-            continue
-        entry = citations.get(name) or {}
-        cited = entry.get("cause")
-        if not cited:
-            continue
-        cited_set = {c.strip() for c in (cited if isinstance(cited, list) else str(cited).split(",")) if str(c).strip()}
-        live = live_causes.get(name)
-        if live is None:
-            continue
-        if set(live) != cited_set:
-            out.append((name, ",".join(sorted(cited_set)) or "-", ",".join(sorted(live)) or "-"))
-    return out
+    from alarm_citation_causes import uncovered_live_causes
+
+    return uncovered_live_causes(alarms, citations, live_causes)
 
 
 def undeclared_causes(alarms, citations, live_causes):
@@ -989,8 +980,8 @@ def render(
             f">{ALARM_TENURE_ISSUE_DAYS}d cites a filed issue (#N) — or none are that old. "
             f"No uncited fired-and-cleared episodes in the last {FLAP_WINDOW_HOURS}h (#2912). "
             "Every lit alarm's cited `#N` is OPEN (#2996), and no citation predates its "
-            "alarm's current episode, names a cause the live run contradicts, or leaves a live "
-            "cause channel undeclared (#3501/#3793)."
+            "alarm's current episode, leaves a live cause id undeclared, or declares one the "
+            "channel has not named in 7 days (#3501/#3793/#5934)."
         )
         if retired_lines:
             message += "\n" + "\n".join(retired_lines)
@@ -1073,9 +1064,9 @@ def render(
             "entry, and stamp it with `cause_observed` (or `added`) — or say so in the handover and --decoded."
         )
     if mismatched:
-        lines.append(f"❌ {len(mismatched)} lit alarm(s) whose citation names a cause the LIVE run contradicts (#3501):")
+        lines.append(f"❌ {len(mismatched)} lit alarm(s) whose LIVE run names a cause id the citation does not declare (#3501/#5934):")
         for name, cited, live in sorted(mismatched):
-            lines.append(f"   - {name}  (cited cause: {cited} · live cause: {live})")
+            lines.append(f"   - {name}  (declared: {cited} · live but undeclared: {live})")
         lines.append(
             "   Re-cite against the cause that is actually firing, or fix it — the alarm is red for a reason nobody has written down."
         )
@@ -1121,7 +1112,7 @@ def main():
     if err:
         history, history_err, flapped, flapped_retired = [], None, [], []  # whole board already UNVERIFIED
         issue_err, dead = None, []
-        cause_err, mismatched, undeclared = None, [], []
+        cause_err, mismatched, undeclared, seen_causes = None, [], [], None
     else:
         history, history_err = fetch_alarm_history()
         if history_err:
@@ -1139,7 +1130,8 @@ def main():
                 flapped, flapped_retired = flapped_uncited(history, citations, live_alarm_names=live_names)
         issue_states, issue_err = fetch_issue_states(cited_issue_refs(alarms, citations))
         dead = [] if issue_err else dead_citations(alarms, citations, issue_states)
-        live_causes, cause_err = fetch_qa_smoke_causes()
+        live_causes, cause_err, *read_rest = fetch_qa_smoke_causes()
+        seen_causes = None if cause_err or not read_rest else read_rest[0]  # #5934; a 2-tuple stub = UNKNOWN
         mismatched = [] if cause_err else cause_mismatches(alarms, citations, live_causes)
         undeclared = [] if cause_err else undeclared_causes(alarms, citations, live_causes)
     code, message = render(
@@ -1159,8 +1151,10 @@ def main():
     )
     # #4034: the 72h AGE predicate — its own module (scripts/alarm_citation_age.py).
     from alarm_citation_age import aged_unrefreshed_citations, render_lines
+    from alarm_citation_causes import render_stale_lines, stale_declared_causes
 
     aged_lines = [] if err else render_lines(aged_unrefreshed_citations(alarms, citations))
+    aged_lines += render_stale_lines(stale_declared_causes(alarms, citations, seen_causes))  # #5934: declared ⊆ seen-in-7d
     code, message = (1, "\n".join(aged_lines) + ("\n" + message if code else "")) if aged_lines else (code, message)
     # #5934: >14d with no valid citation blocks the wrap outright — the one leg --decoded cannot release.
     unowned_lines = [] if err else render_unowned(unowned_ancient_reds(alarms, citations, {} if issue_err else issue_states))
