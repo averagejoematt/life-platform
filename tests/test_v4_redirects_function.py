@@ -124,6 +124,13 @@ KNOWN_UNRESOLVED_4588 = {
 #: so it is a prefix here, not a list that drifts.
 KNOWN_UNRESOLVED_PREFIXES_4588 = ("/journal/posts/week-",)
 
+#: Redirect destinations the v9 build writes from data (a `/story/*/` route the committed www/owned_paths.json fixture
+#: does not list), each with its live evidence. Exact-match, not the route pattern: `/data/*/` would also "match" the
+#: unserved /data/stack/. #6115: the pilot Prologue's old permalink 301s to the series' prologue on the v9 site.
+KNOWN_V9_DESTINATIONS_6115 = {
+    "/story/week-01/": "v9 'Before the Numbers', Prologue Part I — 200, canonical to itself, in sitemap-0.xml (2026-11-16)",
+}
+
 #: Pages under site/ that a 301 already shadowed before #4588 (the 301 is the intended URL).
 KNOWN_SHADOWED_4588 = {
     "/mind/": "#313: the retired standalone reading page; the manual 301 to /data/reading/ wins",
@@ -147,7 +154,7 @@ def _resolves(path: str, table: dict, pages: set) -> bool:
         if not dst:
             break
         path = dst
-    return path in pages or (SITE / path.lstrip("/")).is_file()
+    return path in pages or (SITE / path.lstrip("/")).is_file() or path in KNOWN_V9_DESTINATIONS_6115
 
 
 def _existing_urls(table: dict, pages: set) -> set:
