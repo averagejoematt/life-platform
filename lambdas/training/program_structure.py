@@ -82,6 +82,7 @@ from typing import Any
 
 from training import effort_ceilings, in_block_variant, program_conflicts, program_v03, program_v04, recent_aerobic, variant_rotation
 from training.accessory_check import CARDIO_NAME_HINTS, accessory_rotation, classify_movement  # noqa: F401 — re-exported (#5069 split)
+from training.movement_resolver import resolve_movement as _resolve_movement  # noqa: F401 — #6014: moved out, same entrypoint
 from training.program_v03 import BLOCK_CALENDAR  # noqa: F401 — v0.3 history; `load_ramp.block_1_start()` reads it (#4107)
 from training.session_cues import CARRY_EXPOSURE, _default_sets, exposure_cue  # noqa: F401 — #5317/#5318, re-exported
 from training.session_shape import (  # noqa: F401 — #5069: a session's length and shape (ruling 5), re-exported from here
@@ -833,50 +834,6 @@ def _deload_trim(exposures: list[dict[str, Any]], pct: int) -> dict[str, Any]:
                 total -= 1
                 progressed = True
     return {"sets_before": before, "sets_after": total, "pct": pct, "loads": "held"}
-
-
-def _resolve_movement(
-    keys: list[str],
-    catalog_movements: dict[str, Any] | None,
-    skill_ceiling: int,
-    taken: set[str],
-    *,
-    family: str | None = None,
-    allow_anchor_exemption: bool = True,
-):
-    """The first catalog key of a pattern the generator may prescribe, in the listed order.
-
-    `family` is the anchor pattern name ("squat", "hinge", "bench", "row", …) when this call
-    is resolving one anchor's `catalog_keys`; `None` for an accessory, which never qualifies
-    for the exemption below regardless of `allow_anchor_exemption`.
-
-    When `family` is one of `program_conflicts.ANCHOR_SKILL_CEILING_RULING["exempt_families"]`
-    AND `allow_anchor_exemption` is True, THIS resolution uses that ruling's
-    `effective_ceiling` instead of `skill_ceiling` (owner ruling 2026-09-23, #4080,
-    option B) — every other pattern and every accessory still uses `skill_ceiling` unchanged.
-    `allow_anchor_exemption=False` is how a deliberately-lower ceiling (the Minimum Viable
-    Session's skill_ceiling=1) opts OUT of the exemption rather than being silently raised.
-    """
-    if catalog_movements is None:
-        return None, "movement catalog not read — the pattern is prescribed, the movement is unresolved"
-    ruling = program_conflicts.ANCHOR_SKILL_CEILING_RULING
-    exempt = allow_anchor_exemption and family is not None and family in ruling["exempt_families"]
-    ceiling = max(int(skill_ceiling), int(ruling["effective_ceiling"])) if exempt else skill_ceiling
-    skipped: list[str] = []
-    for k in keys:
-        m = catalog_movements.get(k)
-        if m is None:
-            skipped.append(f"{k} (not in catalog)")
-            continue
-        tier = int(m.get("skill_tier", 99))
-        if tier > ceiling:
-            skipped.append(f"{k} (skill_tier {tier} > ceiling {ceiling}" + (", anchor-exempt" if exempt else "") + ")")
-            continue
-        if k in taken:
-            skipped.append(f"{k} (already in this session)")
-            continue
-        return k, ("skipped: " + ", ".join(skipped)) if skipped else None
-    return None, "no reachable member: " + ", ".join(skipped)
 
 
 def session_prescription_for_role(
