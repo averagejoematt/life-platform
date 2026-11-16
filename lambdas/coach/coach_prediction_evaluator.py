@@ -982,7 +982,7 @@ def _evaluate_all(predictions, today_str, write=True):
     for pred in predictions:
         # #5607: BEFORE any window, grading or expiry logic — a held row emits nothing (no grade, no
         # confidence move, no learning row, no expiry) until the hold is released.
-        if evaluation_hold.skip_held(pred, logger, stats):
+        if evaluation_hold.skip_held(pred, logger, stats) or conditional_branches.skip_misfiled(pred, logger, stats):  # #5611
             continue
         eval_spec = pred.get("evaluation", {})
         eval_type = eval_spec.get("type", "machine")

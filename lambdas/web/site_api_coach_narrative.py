@@ -272,7 +272,6 @@ def _reader_register(resp, output):
     for field in (
         "elena_quote",
         "journaling_prompt",
-        "thread_reference",
         "revision_signal",
         "cross_coach_reference",
         "cross_domain_note",
@@ -364,23 +363,11 @@ def handle_coach_analysis(event, *, _g):
         if "[AI_UNAVAILABLE]" in (analysis_text or ""):
             analysis_text = None
 
-        # 2. Open threads
-        thread_reference = None
-        try:
-            thread_resp = table.query(
-                **with_phase_filter(
-                    {  # ADR-058: hide pilot coach threads
-                        "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("THREAD#"),
-                    }
-                )
-            )
-            threads = [_decimal_to_float(t) for t in thread_resp.get("Items", []) if t.get("status") == "open"]
-            if threads:
-                # Pick most recently referenced thread
-                threads.sort(key=lambda t: t.get("last_referenced", ""), reverse=True)
-                thread_reference = threads[0].get("summary", "")
-        except Exception:
-            pass
+        # 2. Open threads — none on this wire (owner ruling 2026-11-15, #5611 F4). A THREAD# row's
+        # `summary` is the coach's working note on the owner's open thread, owner register by
+        # construction; `thread_reference` used to serve it here and was kept off the wire only by
+        # the absence of a provenance stamp. It is not read at all now, so no later stamp can
+        # publish it. The owner-side reader (coach.coach_observatory_renderer) keeps its own copy.
 
         # 3. Ensemble digest — cross-coach references (#1085: tombstone/phase-guarded)
         cross_coach_reference = None
@@ -521,7 +508,6 @@ def handle_coach_analysis(event, *, _g):
             # #5607: the journaling prompt's only producer is the owner-register ai_analysis
             # EXPERT# row (#3172), which is withheld from every public surface — never re-served here.
             "journaling_prompt": None,
-            "thread_reference": thread_reference,
             "revision_signal": revision_signal,
             "cross_coach_reference": cross_coach_reference,
             # #2333: True only when the newest ENSEMBLE#digest CYCLE# record was

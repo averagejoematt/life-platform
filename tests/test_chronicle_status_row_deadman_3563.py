@@ -600,3 +600,106 @@ def test_the_story_season_leg_is_wired_into_the_nightly_run_list():
     import qa_smoke_lambda as qa
 
     assert "story_season" in [label for label, _ in qa.check_steps()]
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #5520 — the Story door's dead-man (story_season:chapter_door, read from /api/chapters)
+#
+# THE FIXTURE IS THE LIVE ROUTE, read 2026-11-15T06:49Z: ten program weeks, weeks 1-6 and 10
+# published, 7 skipped, 8 and 9 held. Week 6 was approved 2026-10-18T04:29Z and the next
+# approval was Week 10 on 2026-11-14T00:24Z — 27 days the door showed nothing new.
+# ══════════════════════════════════════════════════════════════════════════════
+
+_PUBLISHED_AT = {
+    1: "2026-09-11T18:00:44.191941+00:00",
+    2: "2026-09-18T18:00:44.273958+00:00",
+    3: "2026-09-25T18:00:43.932235+00:00",
+    4: "2026-10-02T18:31:37Z",
+    5: "2026-10-09T18:00:45.541066+00:00",
+    6: "2026-10-18T04:29:30.949081+00:00",
+    10: "2026-11-14T00:24:35.088197+00:00",
+}
+_HELD = {8: "2026-10-28T15:03:53.828371+00:00", 9: "2026-11-04T16:06:15.355401+00:00"}
+
+
+def _chapters_doc(through_week=10, published=None):
+    published = _PUBLISHED_AT if published is None else published
+    weeks = []
+    for wk in range(1, through_week + 1):
+        if wk in published:
+            weeks.append({"week": wk, "status": "published", "date": published[wk][:10], "published_at": published[wk], "reason": None})
+        elif wk in _HELD:
+            weeks.append({"week": wk, "status": "held", "drafted_at": _HELD[wk], "reason": None})
+        elif wk == through_week:
+            weeks.append({"week": wk, "status": "pending", "reason": None})
+        else:
+            weeks.append({"week": wk, "status": "skipped", "reason": "no chapter was published"})
+    return {"genesis": "2026-09-06", "as_of": None, "week_length_days": 7, "weeks": weeks, "held": None, "source": "/api/chapters"}
+
+
+def _door(iso_utc, doc=None, http=(200, None)):
+    body = json.dumps(_chapters_doc() if doc is None else doc) if http[1] is None else http[1]
+    fetched = []
+
+    def opener(url, timeout):
+        fetched.append(url)
+        return http[0], body
+
+    out = ssq.check_chapter_door(Check, CONTENT_TRUTH, _pt_now(iso_utc), site_base_url=SITE, budget=ProbeBudget(opener=opener))
+    assert [c.name for c in out] == [ssq.DOOR_CHECK] and fetched == [SITE + "/api/chapters"]
+    return out[0]
+
+
+def test_the_live_door_is_green_and_names_the_open_weeks():
+    c = _door("2026-11-15T06:49:00")
+    assert c.passed is True and c.partition == CONTENT_TRUTH, c.message
+    assert "week 7 skipped" in c.message and "week 8 drafted 2026-10-28, awaiting approval" in c.message and "week 9" in c.message
+
+
+def test_HISTORY_the_27_day_gap_after_week_6_would_have_alarmed_on_its_eleventh_day():
+    as_of = {wk: at for wk, at in _PUBLISHED_AT.items() if wk <= 6}
+    c = _door("2026-10-28T03:00:00", doc=_chapters_doc(through_week=8, published=as_of))
+    assert c.passed is True, c.message  # 9.9 days: inside the limit
+    c = _door("2026-10-29T06:00:00", doc=_chapters_doc(through_week=8, published=as_of))
+    assert c.passed is False and "days old (limit 10)" in c.message and "week 8 drafted" in c.message, c.message
+
+
+def test_MUTATION_a_week_served_with_no_state_or_no_reason_reds_by_name():
+    doc = _chapters_doc()
+    doc["weeks"][6] = {"week": 7, "status": "skipped", "reason": ""}
+    c = _door("2026-11-15T06:49:00", doc=doc)
+    assert c.passed is False and "week 7 skipped with no reason" in c.message
+    doc["weeks"][6] = {"week": 7, "status": None}
+    c = _door("2026-11-15T06:49:00", doc=doc)
+    assert c.passed is False and "week 7 served with status None" in c.message
+
+
+def test_MUTATION_no_published_week_is_a_red_not_a_green():
+    c = _door("2026-11-15T06:49:00", doc=_chapters_doc(published={}))
+    assert c.passed is False and "no program week has a published chapter" in c.message
+
+
+def test_the_door_without_a_readable_route_is_no_verdict():
+    for http in ((503, "upstream"), (200, "<html>"), (200, '{"held": null}')):
+        c = _door("2026-11-15T06:49:00", http=http)
+        assert c.passed is None and "no verdict" in c.message, http
+    c = _door("2026-11-15T06:49:00", doc={**_chapters_doc(), "weeks": []})
+    assert c.passed is None
+
+
+def test_the_door_fixture_is_the_routes_shape():
+    """Fixture must be the wire: the statuses and keys this check reads are what site_api_chapters.compose serves."""
+    from web import site_api_chapters as ch
+
+    assert ssq.CHAPTERS_PATH == ch.SOURCE
+    doc = ch.compose([], {"posts": [{"week": 1, "date": "2026-09-08", "title": "t", "url": "/u"}]}, "2026-09-06", "2026-09-30")
+    statuses = {w["status"] for w in doc["weeks"]}
+    assert statuses <= set(ssq.WEEK_STATUSES) and statuses >= {"published", "skipped", "pending"}
+    assert all({"week", "status", "reason", "drafted_at", "date"} <= set(w) for w in doc["weeks"])
+    assert "published_at" in doc["weeks"][0]
+
+
+def test_the_chapter_door_leg_is_wired_into_the_nightly_run_list():
+    import qa_smoke_lambda as qa
+
+    assert "chapter_door" in [label for label, _ in qa.check_steps()]

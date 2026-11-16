@@ -8,7 +8,12 @@
     "captured_at_mobile": "2026-09-19T16:49:38+00:00",
     "note_mobile": "Mobile-viewport sibling ledger (#3277) \u2014 same honest-capture contract as 'pages'/note above, scoped to axe findings observed at 390x844 after the mobile scroll/reveal pass (dark theme). Written by the SAME `python3 qa/visual_qa.py --update-baseline` run that writes 'pages' (one sweep captures both viewports); seeded 2026-08-31 from all 92 sweep paths against live production. Two things it states out loud: (1) `scrollable-region-focusable` is deliberately ABSENT \u2014 #3277 drove it from 15 pages / 33 nodes to zero (the motion.js scroll-region focus primitive), so a reappearance is a NEW serious violation and reds the gate; (2) the serious debt it DOES carry (color-contrast on the chart labels of /data/{vitals,training,character,badges}/, svg-img-alt on /method/build/) is PRE-EXISTING \u2014 re-measured unpatched on live at 390px, node-for-node identical, and the same rule set the desktop ledger already accepts. It is dated debt seen for the first time at this viewport, not a pass.",
     "captured_at_light_mobile": "2026-09-19T17:08:21+00:00",
-    "note_light_mobile": "Light-theme mobile-viewport ledger (#3277) \u2014 the light sibling of 'pages_mobile', captured at 390x844 under color_scheme='light'. Written by `python3 qa/visual_qa.py --color-scheme light --update-baseline`; the weekly standalone alternates dark/light by ISO-week parity, so this is the ledger the light run gates against. Same two statements as 'pages_mobile': no `scrollable-region-focusable` anywhere, and its serious rows (19 pages of color-contrast + svg-img-alt) are the SAME set 'pages_light' already accepts on desktop \u2014 light theme simply carries more contrast debt than dark, at either viewport."
+    "note_light_mobile": "Light-theme mobile-viewport ledger (#3277) \u2014 the light sibling of 'pages_mobile', captured at 390x844 under color_scheme='light'. Written by `python3 qa/visual_qa.py --color-scheme light --update-baseline`; the weekly standalone alternates dark/light by ISO-week parity, so this is the ledger the light run gates against. Same two statements as 'pages_mobile': no `scrollable-region-focusable` anywhere, and its serious rows (19 pages of color-contrast + svg-img-alt) are the SAME set 'pages_light' already accepts on desktop \u2014 light theme simply carries more contrast debt than dark, at either viewport.",
+    "owner_states": {
+      "#5526": "OPEN"
+    },
+    "owner_states_checked_at": "2026-11-15",
+    "note_owner_states": "#5526 \u2014 the offline snapshot of every cited owner's state (gh issue view --json state), read by tests/test_a11y_ledger_3548.py: a serious row whose owner is CLOSED, or absent from this snapshot, reds. Refresh with `python3 qa/a11y_audit.py --refresh-owner-states` whenever an owner issue changes state."
   },
   "pages": {
     "/coaching/by-coach/#training_coach": [
@@ -25,7 +30,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 9,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/method/board/": [
@@ -52,7 +57,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/coaching/by-coach/": [
@@ -61,7 +66,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/coaching/by-coach/#eli_marsh": [
@@ -70,7 +75,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/coaching/by-coach/#training_coach": [
@@ -87,7 +92,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/data/": [
@@ -96,7 +101,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 5,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/data/character/": [
@@ -105,7 +110,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/data/habits/": [
@@ -114,7 +119,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 18,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/data/mind/": [
@@ -123,7 +128,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 2,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/data/physical/": [
@@ -132,7 +137,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 5,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/data/training/": [
@@ -141,7 +146,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 13,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/journal/essays/org-chart-of-one/": [
@@ -150,7 +155,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 2,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/method/board/": [
@@ -159,7 +164,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1,
-        "issue": "#3673"
+        "issue": "#5526"
       },
       {
         "id": "heading-order",
@@ -174,7 +179,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 4,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/method/survival/": [
@@ -183,7 +188,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 8,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/protocols/discoveries/": [
@@ -192,7 +197,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/protocols/experiments/": [
@@ -201,7 +206,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/story/agents/": [
@@ -220,7 +225,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 9,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/method/board/": [
@@ -247,7 +252,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/coaching/by-coach/": [
@@ -256,7 +261,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/coaching/by-coach/#eli_marsh": [
@@ -265,7 +270,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/coaching/read/": [
@@ -274,7 +279,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/data/": [
@@ -283,7 +288,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 5,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/data/character/": [
@@ -292,7 +297,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/data/habits/": [
@@ -301,7 +306,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 18,
-        "issue": "#3897"
+        "issue": "#5526"
       }
     ],
     "/data/mind/": [
@@ -310,7 +315,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 2,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/data/physical/": [
@@ -319,7 +324,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 5,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/data/training/": [
@@ -328,7 +333,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 13,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/journal/essays/org-chart-of-one/": [
@@ -337,7 +342,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 2,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/method/board/": [
@@ -346,7 +351,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1,
-        "issue": "#3673"
+        "issue": "#5526"
       },
       {
         "id": "heading-order",
@@ -361,7 +366,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 4,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/method/survival/": [
@@ -370,7 +375,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 8,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/protocols/discoveries/": [
@@ -379,7 +384,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/protocols/experiments/": [
@@ -388,7 +393,7 @@
         "impact": "serious",
         "help": "Elements must meet minimum color contrast ratio thresholds",
         "nodes": 1,
-        "issue": "#3673"
+        "issue": "#5526"
       }
     ],
     "/story/agents/": [

@@ -123,6 +123,12 @@ def main(vqa=None, argv=None):
         default=None,
         help="The same record for the reader-truth judge. Refused with --reader-truth.",
     )
+    ap.add_argument(
+        "--a11y-ledger-s3",
+        action="store_true",
+        help="#5526 (the scheduled sweep only): restore the a11y shrink ledger from S3 first, persist it after, and exit "
+        "non-zero when its dead-man finds a stale row or a silent ledger. The sweep's own verdict wins.",
+    )
     args = ap.parse_args(argv)
     if (args.ai_qa and args.ai_qa_skipped is not None) or (args.reader_truth and args.reader_truth_skipped is not None):
         ap.error("a judge cannot be both run and recorded as skipped (--ai-qa with --ai-qa-skipped, or the reader-truth pair)")
@@ -140,6 +146,8 @@ def main(vqa=None, argv=None):
         f"{', light' if args.color_scheme == 'light' else ''}]"
     )
     print(f"v4 Visual QA Sweep — {vqa.SITE_URL}{profile if profile != ' [chromium]' else ''}\n{'=' * 56}")
+    if args.a11y_ledger_s3:
+        vqa.a11y_audit.restore_shrink_ledger()
     ok = vqa.run_sweep(
         pages=pages,
         save_screenshots=args.screenshot,
@@ -157,6 +165,13 @@ def main(vqa=None, argv=None):
         ai_qa_skipped=args.ai_qa_skipped,
         reader_truth_skipped=args.reader_truth_skipped,
     )
+    if args.a11y_ledger_s3:
+        vqa.a11y_audit.persist_shrink_ledger()
+        problems = vqa.a11y_audit.check_shrink_ledger(vqa.a11y_audit.load_shrink_ledger(), vqa.a11y_audit.ledger_today())
+        for p in problems:
+            print(f"::error::a11y shrink dead-man (#5526): {p}")
+        if ok and problems:
+            return 1
     return 0 if ok else 1
 
 

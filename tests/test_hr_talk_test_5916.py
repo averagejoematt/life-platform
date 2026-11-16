@@ -245,6 +245,24 @@ def _load_basis() -> dict:
     return basis
 
 
+def _critic_swap() -> dict:
+    """The joints_tendons critic's swap flag for a treadmill block drafted onto a lower session after a long walk."""
+    from coach import critics_aerobic
+
+    block = json.loads(json.dumps(_block()))
+    block["totals"]["walks_over_75_min_48h"] = 1  # legs loaded: the rule fires
+    draft = {
+        "archetype": "lower",
+        "exercises": [{"idx": 4, "label": "Treadmill", "movement_key": "treadmill", "duration_seconds": 1800, "top_weight_lbs": None}],
+    }
+    numbers: dict = {}
+    flags: list = []
+    critics_aerobic.aerobic_flags(draft, block, numbers, flags, [])
+    assert flags, "the critic produced no swap — the surface was not exercised"
+    assert recent_aerobic.EASY_EFFORT_CUE in flags[0]["reason"], flags[0]["reason"]
+    return {"numbers": numbers, "flags": flags}
+
+
 # name -> (builder, any_bpm): the payload as it is served on DAY, and whether a bare bpm figure is also refused there
 def _surfaces(monkeypatch) -> dict[str, tuple[Callable[[], Any], bool]]:
     from mcp import tools_coach_packet, tools_descriptions
@@ -270,6 +288,8 @@ def _surfaces(monkeypatch) -> dict[str, tuple[Callable[[], Any], bool]]:
         "tools_descriptions.GET_ZONE2_BREAKDOWN_DESCRIPTION": (lambda: tools_descriptions.GET_ZONE2_BREAKDOWN_DESCRIPTION, True),
         "tools_training periodization methodology": (lambda: _periodization_methodology(monkeypatch), True),
         "training_load basis (z1_ceiling_bpm and its provenance)": (_load_basis, True),
+        # #5990: its swap reason quotes the block's MEASURED average (a bpm figure), so only caps/targets are refused
+        "coach.critics_aerobic swap reason and numbers": (_critic_swap, False),
     }
 
 
@@ -289,7 +309,7 @@ def test_no_training_surface_prints_a_heart_rate_target_a_cap_or_a_percent_of_ma
     assert not offenders, "a heart-rate target, cap or percent-of-max phrase is printed:\n" + json.dumps(
         offenders, indent=1, ensure_ascii=False
     )
-    assert len(surfaces) >= 17  # the issue's set; a surface dropped from the enumeration is a hole in the sweep
+    assert len(surfaces) >= 18  # the issue's set; a surface dropped from the enumeration is a hole in the sweep
 
 
 def test_the_sweep_itself_catches_each_retired_sentence():
@@ -418,9 +438,10 @@ def test_the_cardio_pick_and_the_chat_warning_carry_the_talk_test_on_every_path(
     for day in (DAY, BEFORE):
         (warning,) = _cardio_warnings(day)
         assert f"cycling (recumbent) ({recent_aerobic.EASY_EFFORT_CUE})" in warning and "bpm" not in warning, warning
-    # the two retired names (`recent_aerobic.HR_CEILING_BPM` / `HR_TARGET_BPM`) are read by none of the surfaces this
-    # issue owns — the one reader left is `coach.critics_aerobic`, another lane's file
+    # the two retired names (`recent_aerobic.HR_CEILING_BPM` / `HR_TARGET_BPM`) are read by none of these surfaces —
+    # #5990 retired the last reader, `coach.critics_aerobic`
     for rel in (
+        "lambdas/coach/critics_aerobic.py",
         "lambdas/training/cardio_cues.py",
         "lambdas/training/program_structure.py",
         "mcp/plan_cardio_pick.py",

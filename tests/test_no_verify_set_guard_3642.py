@@ -88,7 +88,7 @@ class TestMustFailCases:
         # here is the SECOND-execution-site shape, asserted directly below.
         assert rogue.bucket == cnv.EXECUTION
         failures = cnv.check([rogue], _real_settings_hits())
-        assert failures, "a second EXECUTION site (not deploy/agent_commit.sh) must fail the gate"
+        assert failures, "an EXECUTION site must fail the gate — none is registered"
         assert any("EXECUTION" in f for f in failures)
 
     def test_a_line_that_matches_no_bucket_at_all_is_unregistered_and_fails(self):
@@ -106,7 +106,7 @@ class TestMustFailCases:
         """THE proof for the corrected model: if one of the four bypass affordances
         moved from `ask` to `allow` — the actual dangerous event, since `allow`
         means no prompt at all — the gate must say so loudly, named."""
-        execution = _hit("deploy/agent_commit.sh", 431, 'git commit --no-verify -m "${MSG}" || refuse 1')
+        execution = _hit("deploy/agent_commit.sh", 30, "# until 2026-11-14 this script committed with --no-verify.")
         escalated = [
             _sh("allow", "Bash(git commit --no-verify:*)"),  # moved out of `ask`
             _sh("ask", "Bash(git commit -n:*)"),
@@ -122,18 +122,23 @@ class TestMustFailCases:
         `ask` list entirely (removed, or moved to `deny` where it would be an
         unconditional block rather than a per-use prompt) must be caught — it is
         still a change to a boundary this guard is supposed to know about."""
-        execution = _hit("deploy/agent_commit.sh", 431, 'git commit --no-verify -m "${MSG}" || refuse 1')
+        execution = _hit("deploy/agent_commit.sh", 30, "# until 2026-11-14 this script committed with --no-verify.")
         only_three = [_sh(ln, entry) for ln, entry in _REAL_ASK_ENTRIES[:3]]
         failures = cnv.check([execution], only_three)
         assert any("at least 4" in f for f in failures), failures
 
-    def test_zero_execution_sites_fails(self):
-        """If deploy/agent_commit.sh's bypass line disappeared entirely (e.g. an
-        edit accidentally dropped `--no-verify` from the invocation, silently
-        re-enabling the hook's doc-sync sweep on every agent commit), the gate must
-        say so rather than reporting a clean, vacuously-empty pass."""
-        failures = cnv.check([], _real_settings_hits())
-        assert any("EXECUTION" in f for f in failures)
+    def test_the_old_registered_site_coming_back_fails(self):
+        """Owner ruling 2026-11-14: no routine hook bypass. deploy/agent_commit.sh was the one registered execution
+        site until then; it now commits through the hooks, so that very line reappearing — in that script or any
+        other — must fail by name. (Before the ruling the must-fail case was the opposite one: the line going away.)"""
+        back = _hit("deploy/agent_commit.sh", 479, 'git commit --no-verify -m "${MSG}" || refuse 1')
+        failures = cnv.check([back], _real_settings_hits())
+        assert any("EXECUTION" in f and "deploy/agent_commit.sh:479" in f for f in failures), failures
+
+    def test_zero_execution_sites_is_the_registered_state(self):
+        """No line runs a hook-skipping commit, the four ask-gated affordances are in place: the gate passes."""
+        doc = _hit("deploy/agent_commit.sh", 30, "# until 2026-11-14 this script committed with --no-verify.")
+        assert cnv.check([doc], _real_settings_hits()) == []
 
     def test_an_empty_population_fails_the_floor(self):
         """The whole scan returning nothing (a moved directory, a renamed script, a
@@ -188,11 +193,16 @@ class TestSettingsJsonStructural:
 # ── 3. The real repo scan — floor + exact shape ────────────────────────────────
 
 
-def test_real_repo_scan_has_exactly_one_execution_site_named_agent_commit_sh():
+def test_real_repo_scan_has_no_execution_site_and_the_helper_commits_through_the_hooks():
     hits = [h for h in cnv.enumerate_sites() if h.path != cnv.SETTINGS_PATH]
-    executions = [h for h in hits if h.bucket == cnv.EXECUTION]
-    assert len(executions) == 1, executions
-    assert executions[0].path == "deploy/agent_commit.sh"
+    assert [h for h in hits if h.bucket == cnv.EXECUTION] == [], "a hook-skipping commit is back in the tree"
+    script = (cnv.REPO_ROOT / "deploy" / "agent_commit.sh").read_text(encoding="utf-8")
+    commits = [ln.strip() for ln in script.splitlines() if ln.strip().startswith(("git commit", "LP_AGENT_COMMIT=1 git commit"))]
+    assert commits == ['LP_AGENT_COMMIT=1 git commit -m "${MSG}" || refuse 1'], commits
+    hook = (cnv.REPO_ROOT / "scripts" / "install_hooks.sh").read_text(encoding="utf-8")
+    assert "agent-commit-aware:v1" in hook and 'LP_AGENT_COMMIT:-}" == "1"' in hook
+    # the sweep is skipped AFTER the format gate has run, never before it
+    assert hook.index('"$BLACK_BIN" --check') < hook.index("agent-commit-aware:v1") < hook.index('deploy/sync_doc_metadata.py" --apply')
 
 
 def test_real_settings_json_has_all_four_known_affordances_in_the_ask_list():

@@ -2,7 +2,7 @@
 
 > **Status:** log · **Owner:** Matthew · **Verified:** 2026-05-19
 
-Last updated: 2026-10-31 Session CQ Fable (#1332 gate; +1 row — the 115-day CloudTrail delivery gap, #5512, with its twin-document root cause and the new dead-man)
+Last updated: 2026-11-15 (+4 rows — the PhenoAge age-inversion exposure, the v9 visual gate rolling back every root deploy ~9.5 h, a floating-point receipt-replay smoke rolling back a healthy deploy, and #5897's IAM Plan strand)
 
 > Tracks operational incidents, outages, and bugs that affected data flow or system behavior.
 > For full details on any incident, check the corresponding CHANGELOG entry or handover file.
@@ -24,6 +24,10 @@ Last updated: 2026-10-31 Session CQ Fable (#1332 gate; +1 row — the 115-day Cl
 
 | Date | Severity | Summary | Root Cause | TTD* | TTR* | Data Loss? |
 |------|----------|---------|------------|------|------|------------|
+| 2026-11-15 | **P3** (main's deploys stranded ~70 min; nothing served was wrong — twelve merges were simply not live; loud: Plan red on every run) | **After `48bc50df8` (PR #5897, 18:22Z) every CI/CD run failed "Plan deployments" with IAM OWNER-REQUIRED on six stacks (LifePlatformMcp, Ingestion, Serve, Compute, Operational, Email); twelve merges sat on main undeployed.** Observed by Session 11-15's driver; the change belongs to another session's lane. | #5897 put a `cloudwatch:namespace` condition on every `cloudwatch:PutMetricData` grant — an IAM change across six stacks, which the additive gate (#2834) classes owner-required, and that gate runs only after merge (PR checks do not run Plan). Same class as the 2026-10-20 row. | ~0 min (first Plan run) | ~70 min: `bash deploy/cdk_deploy.sh` for the six stacks, run by the paydown session with the owner's approval, completed 19:32Z; run 43752328226 then passed Plan, Deploy and Smoke. Class tracker #5221 (open). | No |
+| 2026-11-15 | **P3** (deploy plane; LOUD — the smoke-failure email and the auto-rollback fired; a healthy deploy was reverted ~70 min, and every later code deploy would have rolled back until 2026-11-22) | **At 18:12Z qa-smoke `character:receipt_replay` failed ("replay MISMATCH with unchanged config+engine on ['2026-11-14']") and CI/CD run 43743435641 auto-rolled back the healthy deploy of `73ec9bb5a` (PR #6049): Lambda code reverted ~18:28Z, rollback job finished 18:36Z.** Between 18:38Z and 19:40Z the static site (rebuilt while the deploy was live) and the API disagreed about 12 published call wordings. | Floating-point summation order at an exact boundary. The headline character level is `floor(Σ level·weight / Σ weight)`, and on 2026-11-14 that mean is exactly 20: the compute sums in its own pillar order (19.999999999999996 → 19, stored), the replay summed in the order DynamoDB returns the receipt's map, alphabetical (20.000000000000004 → 20). The receipt verified at write time; the replay was the first reader to re-sum it in another order. The day stays in the check's seven-receipt window, so the false mismatch would have reverted every code deploy for a week. | ~26 min (smoke red 18:12Z → found 18:38Z by a live check that the just-published content was gone) | ~94 min: PR #6065 (`de8877cf0`) adds `character_engine.HEADLINE_PILLAR_ORDER` and the replay sums in that order — no score, formula or ENGINE_VERSION change; deployed 19:40Z, smoke green 19:46Z (run 43752328226). Left to the owner: whether an exact integer mean should read as that level (#6066). Procedure: land skill §4 reads the CI/CD rollback job before a must-go-live merge. A second remedy ran beside it: at 19:30Z the paydown session tombstoned the 2026-11-14 receipt with the owner's approval (backup kept privately), which takes that receipt out of the check's window; the re-run of the deploy the smoke had reverted (#6056) then went green. Class tracker: #6066. | No. |
+| 2026-11-15 | **P3** (public site; SILENT in practice — each rollback published one line to the `life-platform-alerts-digest` SNS topic and the run went red, but nothing paged and no session read it for ~8 h; it held a privacy fix's page half off the site) | **Every v9 root deploy from 08:22Z to 17:51Z failed "Visual + AI-vision QA (root deploy)" on one gating finding — `/method/tone/` "Horizontal overflow at 390px — content exceeds viewport by 5px" — and auto-rolled back the v9 paths (runs 43694198244, 43730507856, 43736678135).** Nothing merged after ~07:40Z reached the static site, including the Journey-page half of the `/api/phenoage` fix (row below). The defect was already tracked (#5525) and its one-line CSS fix, PR #6031, had sat green and unmerged ~9 h. Found ~16:07Z by a live content check of the Journey page, not by an alert. | A standing red gate rolls back every later deploy whatever it carries, and no step between merge and live read whether the plane's last deploy had been reverted: land §4 read `site-deploy.yml` only, not `web-preview-deploy.yml`, and the rollback's only signal is a digest line, so the class runs silent until someone looks. The third failure was a race: #6031 merged 16:09Z (`1034a9738`), but the legacy site sync put the fixed stylesheet in the bucket only at 16:56Z, after the dispatched sweep had measured the page. A recurrence: the lesson lived only in a memory note, in no procedure. | ~7.75 h (first red run 08:22Z → live content check ~16:07Z) | ~9.5 h: re-dispatched run 43739744539 green 17:51Z. Procedure: land skill §4 now reads both rollback jobs (v9 root and CI/CD) before a must-go-live merge and whenever a live check finds content missing. | No. |
+| 2026-11-15 | **P2** (privacy; SILENT — a public route served a figure a reader could invert to the owner's chronological age for ~145 days; nothing alarmed; past exposure cannot be recalled) | **From 2026-06-23 to 2026-11-15 `/api/phenoage` served a rounded Levine PhenoAge figure; PhenoAge is exactly linear in chronological age and its nine marker inputs are published, so the figure inverted to chronological age within roughly a one-year window.** The combination test found a second channel: the public Mifflin-St Jeor TDEE estimate on `/api/deficit_sustainability` carries an age term. Found by the 2026-11-14 `/review full` (a P1 privacy finding, `docs/reviews/FULLREVIEW_2026-11-14.md`), not by any check — silent for ~145 days; owner ruled 2026-11-14 to remove it. | The 2026-06-23 "Option A" design guarded the age VALUE (never returned) but not what is derived from it: a public output that is a closed-form function of age plus public inputs is the age. Option A named that residual and rated it low urgency, and no guard ran the inversion as an attack or tested whether two public outputs together recover a private input. | ~145 d (2026-06-23 → 2026-11-14 review) | ~1 d from detection: PR #6036 (`25d6aa310`) — the route reads no birth date and serves a markers-only reference line; PR #6047 (`06a254eb8`) — the public TDEE estimate is computed at a stated reference age. API live ~07:55Z after a CloudFront invalidation (the old response was cached an hour); the static Journey page live 17:51Z, ~9 h late (visual-gate row above). Guard: `tests/test_age_inversion.py` runs the inversion attack on every build (instrument `tests/age_inversion_lib.py`, `--live` against production); `deploy/pii_surface_guard.py` arm `pii-age-derived`; the allow-list of public birth-date readers is empty. Residual: the public archive tarball carries the previous day's copy until its nightly rebuild (23:00 PT 2026-11-15). Focused review: none launched — the incident was itself found by the 11-14 full review's privacy rows, and the owner asked that no further 17-lens run start immediately. | No data lost; an exposure — past responses cannot be recalled. |
 | 2026-11-02 | **P3** (public site; LOUD — the root deploy's visual sweep caught it and auto-rolled back; the new Journey page kept serving beside the reverted weight page for ~50 min) | **The Journey's first root deploy (PR #5580, run 41385325049) rolled back on one finding: a 9.1 px effective SVG label at 390 px (#1210 floor).** Smoke and the AI-vision read were clean; the PR's web gate had passed. | Phone charts drew into a fixed 480-unit viewBox that a 350 px column scales 0.73×, so 12.5-unit labels rendered at 9.1 px. The www render gate measures overflow and axe, not effective SVG text — the root sweep was the first check that looked. A rollback after a www merge restores only the paths the previous build owned, so new pages keep serving (a mixed root until the next green run). | ~23 min (merge 03:51Z → sweep red 04:16Z) | PR #5582 (`e5ed127a8`, ~45 min): the islands pass the container width as the viewBox on a phone; root run 41390202779 green, min effective text 12.5 px at 390/360. Class tracker #5597 (the web gate measures effective SVG text before merge). | No. |
 | 2026-11-01 | **P3** (public data; SILENT — a public route served short pages and a reachable-looking total for 20 hours; no reader harm beyond a smaller ledger) | **`/api/ledger_export` served 97 of 100 items a page with `total` 468 (#5532).** Found by the v9 Phase 3 exporter's own count (456 of 468 rows after paging), not by a check. Twelve rows' claims and stored ids carried the journal-silence pattern; the Lambda's last-step wire guard (`common.journal_silence.guard_api_response`, #5131) dropped them AFTER the handler had counted and sliced. | A guard that prunes the serialised body cannot tell the handler what it removed; the handler paged a set the wire would never serve whole. The 48 "empty claims" found alongside were NOT a defect — the #4701 `unsourced` holds the row already names. | ~20 h (route live 03:50Z, measured 23:5xZ) | PR #5559 (`1771e3a2a`, +~13 h to deploy): the handler runs the same scrub BEFORE paging; `total` = served, `record_total` = counted, `withheld.journal_silence` named; verified live 16:45Z (5 whole pages → 456 unique = total; 0 journal-silence spans on the wire). Lesson in memory: count after the guard, and diagnose handler → Function URL → CDN. | No. |
 | 2026-11-01 | **P3** (CI; LOUD — three pre-merge full suites red on the same two tests, ~1 h of merge delay each) | **NCBI eutils throttled: `esummary` answered 200 with `uids: []` for every PMID (efetch 429), so `tests/test_citation_resolution_1892.py` and `test_experiment_library_citations_1983.py` reported forty "withdrawn" citations** on PRs #5554, #5555, #5551 and a laptop at once (04:0x–06:4xZ). | `check_pubmed` treated an all-empty answer as per-row drift; only Crossref's 429/5xx had an UNVERIFIED path. A network check marked `integration` still ran in the unit lane. | immediate (the suite reds) | PR #5556 (`b4e11b417`, ~45 min): an all-empty / 429 / 5xx eutils answer is `UNVERIFIED …` (the vocabulary `split_unverified` already reserved), both tests skip on it; an offline test pins all-empty → unverified vs one-missing → drift. | No. |
@@ -302,7 +306,7 @@ Last updated: 2026-10-31 Session CQ Fable (#1332 gate; +1 row — the 115-day Cl
 > that looks maintained and is three months stale is worse than one that is obviously old.
 
 <!-- INCIDENT-PATTERNS:DISTRIBUTION:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**Distribution — 256 dated rows, 221 post-June** (newest row 2026-11-02):
+**Distribution — 260 dated rows, 225 post-June** (newest row 2026-11-15):
 
 | month | rows |
 |---|---|
@@ -315,27 +319,27 @@ Last updated: 2026-10-31 Session CQ Fable (#1332 gate; +1 row — the 115-day Cl
 | 2026-08 | 126 |
 | 2026-09 | 41 |
 | 2026-10 | 15 |
-| 2026-11 | 3 |
+| 2026-11 | 7 |
 
-**By severity:** P1 6 · P2 37 · P3 99 · P4 109 · Low 3 · Info 1 · DR drill 1.
+**By severity:** P1 6 · P2 38 · P3 102 · P4 109 · Low 3 · Info 1 · DR drill 1.
 
 **By root-cause class** (keyword-derived over Summary + Root Cause; a row may match more
-than one, and 31 match none):
+than one, and 32 match none):
 
 | n | class |
 |---|---|
-| 163 | deployment error |
+| 166 | deployment error |
 | 67 | stale config / literal drift |
-| 49 | QA-oracle false positive |
-| 45 | QA false positive — deploy-race (#2978) |
+| 51 | QA-oracle false positive |
+| 47 | QA false positive — deploy-race (#2978) |
 | 37 | deploy-plane wedge / strand / race |
 | 36 | lane-subset / union-breach main red |
 | 32 | secret / credential |
-| 28 | IAM / permission |
+| 29 | IAM / permission |
 | 23 | timezone / wallclock |
 | 19 | QA false positive — semantic oracle (#2959) |
 | 8 | data quality / scoring |
-| 31 | *(unclassified)* |
+| 32 | *(unclassified)* |
 <!-- INCIDENT-PATTERNS:DISTRIBUTION:END -->
 
 > **The QA-oracle false-positive rows have an owner: #2978** (the #2841 decision — umbrella,
@@ -348,7 +352,7 @@ than one, and 31 match none):
 > 2026-08-22: 14 rows in July (1 per 2.2 days), 15 in 2026-08-01→22 (1 per 1.5 days).
 
 <!-- INCIDENT-PATTERNS:TOPCLASSES:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-The three classes the old list omitted entirely — **QA-oracle false positives (49)**, **lane-subset/union-breach main reds (36)** and **deploy-plane wedges/strands/races (37)** — are now the 3rd, 6th and 5th largest. They are the shape of this platform's failures *today*; **deployment error** remains the largest single class but is increasingly a co-tag on those three rather than a category of its own.
+The three classes the old list omitted entirely — **QA-oracle false positives (51)**, **lane-subset/union-breach main reds (36)** and **deploy-plane wedges/strands/races (37)** — are now the 3rd, 6th and 5th largest. They are the shape of this platform's failures *today*; **deployment error** remains the largest single class but is increasingly a co-tag on those three rather than a category of its own.
 <!-- INCIDENT-PATTERNS:TOPCLASSES:END -->
 
 ### Silence is an axis, not a class
@@ -361,17 +365,17 @@ scored orthogonally (loud/silent × class) rather than as a tenth category.
 but modest*, and materially weaker than this axis was described as when filed:
 
 <!-- INCIDENT-PATTERNS:SILENCE:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**56 of 256 rows are silent.**
+**58 of 260 rows are silent.**
 
 | | silent | loud |
 |---|---|---|
-| rows | 56 | 200 |
-| TTD parseable | 43 | 140 |
-| median TTD | **28 min** | 20 min |
-| mean TTD | 1,703 min | 2,587 min |
-| exceeded 1 day | 6 (14% of parsed) | 13 (9% of parsed) |
+| rows | 58 | 202 |
+| TTD parseable | 45 | 142 |
+| median TTD | **30 min** | 20 min |
+| mean TTD | 6,277 min | 2,551 min |
+| exceeded 1 day | 7 (16% of parsed) | 13 (9% of parsed) |
 
-Silent rows take **~1.4× longer to detect at the median** and are **~1.6× more likely to run past a day**. But the *means* are only 34% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (6 rows past a week, vs 2 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **73 of 256 TTD cells (29%) state no parseable duration** — they are excluded rather than counted as zero.
+Silent rows take **~1.5× longer to detect at the median** and are **~1.8× more likely to run past a day**. But the *means* are only 59% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (6 rows past a week, vs 3 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **73 of 260 TTD cells (28%) state no parseable duration** — they are excluded rather than counted as zero.
 <!-- INCIDENT-PATTERNS:SILENCE:END -->
 
 The durable finding is not the multiplier. It is that **38 failures in this corpus
@@ -382,7 +386,7 @@ by making a silent class loud.
 ### Pre-July frequencies are FLOORS, not counts
 
 <!-- INCIDENT-PATTERNS:FLOORS:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**April has zero rows, May has one and June has two**, against 36 in July, 126 in August, 41 in September, 15 in October and 3 in November. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
+**April has zero rows, May has one and June has two**, against 36 in July, 126 in August, 41 in September, 15 in October and 7 in November. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
 <!-- INCIDENT-PATTERNS:FLOORS:END -->
 
 ### Row-inclusion rule (extends #1332)

@@ -27,7 +27,9 @@
 #     placement charged.
 #
 # This script keeps the gate and drops the sweep: it runs black + ruff itself,
-# stages ONLY the named paths, and commits with --no-verify. The driver reconciles
+# stages ONLY the named paths, and commits THROUGH the hooks with LP_AGENT_COMMIT=1,
+# which tells the pre-commit hook to leave its doc-sync sweep out (owner ruling
+# 2026-11-14 — until then this script skipped every hook). The driver reconciles
 # the literals once per merge on main, which is the only place that arithmetic is
 # stable.
 #
@@ -136,11 +138,13 @@ if [ -f "$(git rev-parse --git-dir)/MERGE_HEAD" ]; then
 fi
 
 # ── Refuse a subject the commit-msg hook would also refuse (#3642) ────────────
-# --no-verify below is deliberate for the hook's OTHER job (the doc-sync sweep,
-# wrong on a feature branch) — but it also skips the hook's Conventional-Commits
-# subject gate, which this script never replaced. That let a subject the hook
-# refuses land anyway, every time a caller used this script instead of a plain
-# `git commit`. Applying the identical shared pattern here closes that gap: the
+# Until 2026-11-14 this script skipped every hook (to keep the doc-sync sweep off a
+# feature branch), which also skipped the hook's Conventional-Commits subject gate
+# — so a subject the hook refuses landed anyway, every time a caller used this
+# script instead of a plain `git commit`. The commit now runs through the hooks
+# (see the commit step), and this check stays so the refusal comes BEFORE anything
+# is staged, with this script's own message. Applying the identical shared pattern
+# here is what keeps the two from disagreeing: the
 # decision on what the pattern admits (including the repo's own multi-issue
 # scope form, `fix(#3535,#3537): …`) lives in ONE place,
 # deploy/lib/commit_subject_pattern.sh, sourced by both this script and the
@@ -474,9 +478,20 @@ if [ "${PUSH}" = "1" ]; then
   fi
 fi
 
-# --no-verify is deliberate: the gate above replaces the hook's useful half, and
-# skipping the hook is the entire point (it would re-stage the doc literals).
-git commit --no-verify -m "${MSG}" || refuse 1
+# HOOKS INTACT (owner ruling 2026-11-14: "Remove routine hook bypassing. Use the established commit and CI path.").
+# This script used to pass a flag that skipped every hook, to keep the pre-commit hook's doc-sync sweep off a lane commit.
+# It now commits through the hooks: the pre-commit format gate and the commit-msg subject gate both run. The one
+# thing it asks the hook to leave out is that sweep — by name, through LP_AGENT_COMMIT, which the installed hook
+# honours (scripts/install_hooks.sh, marker `agent-commit-aware:v1`). An installed hook WITHOUT the marker would run
+# the sweep and stage doc literals into this commit, so that case is refused with the one command that fixes it.
+# No hook installed at all (a fresh clone, CI, a test repository) is nothing to skip: the commit is a plain one.
+_HOOK="$(git rev-parse --git-path hooks/pre-commit)"
+if [ -f "${_HOOK}" ] && ! grep -q "agent-commit-aware:v1" "${_HOOK}"; then
+  echo "[agent-commit] ❌ the installed pre-commit hook predates the hooks-intact commit path — it would sweep doc literals into this commit." >&2
+  echo "[agent-commit]    Run once:  bash scripts/install_hooks.sh   then re-run this command. There is no hook-skipping fallback." >&2
+  refuse 1
+fi
+LP_AGENT_COMMIT=1 git commit -m "${MSG}" || refuse 1
 
 echo "[agent-commit] ✅ committed $(printf '%s\n' "${STAGED}" | wc -l | tr -d ' ') path(s)"
 if [ "${PUSH}" != "1" ]; then

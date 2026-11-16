@@ -28,8 +28,9 @@ THE FIX
   classified into one of three buckets:
 
     EXECUTION      — a line that actually RUNS `git commit ... --no-verify`. There
-                     must be exactly ONE of these, and it must be the registered
-                     site (deploy/agent_commit.sh).
+                     must be NONE (owner ruling 2026-11-14: no routine hook bypass —
+                     deploy/agent_commit.sh, the one site registered until then, now
+                     commits through the hooks).
     UNRELATED_FLAG — `--no-verify-boot` (deploy/build_bundle.py's bundle-boot
                      check, scripts/verify_bundle_boot.py's docstring) is a
                      DIFFERENT flag that merely shares the substring
@@ -96,9 +97,9 @@ UNREGISTERED = "UNREGISTERED"  # not a real bucket — the failure state
 
 REASONS: dict[str, str] = {
     EXECUTION: (
-        "the one place a commit actually bypasses the hook — deploy/agent_commit.sh's own "
-        "format gate replaces the hook's useful half (black+ruff), so skipping the hook's OTHER "
-        "job (the doc-sync sweep, wrong on a feature branch) is the deliberate point (#3642)."
+        "a line that RUNS a hook-skipping commit. Until 2026-11-14 exactly one was registered "
+        "(deploy/agent_commit.sh, #3642); the owner then ruled routine bypassing out, the script commits "
+        "through the hooks, and the registered population is zero — any hit in this bucket fails the gate."
     ),
     ASK_GATED_BYPASS: (
         "a hook-bypass affordance (git commit --no-verify/-n, or removing the pre-commit hook "
@@ -258,11 +259,15 @@ def check(hits: list[Hit] | None = None, settings_hits: list[SettingsHit] | None
     for h in unregistered:
         failures.append(f"UNREGISTERED --no-verify site: {h.path}:{h.lineno}: {h.text.strip()!r} — classify it or fix it.")
 
+    # Owner ruling 2026-11-14: "Remove routine hook bypassing." The one registered execution site
+    # (deploy/agent_commit.sh) now commits THROUGH the hooks, so the registered population is ZERO — any line that
+    # runs `git commit ... --no-verify` is a routine bypass coming back, and it fails by name.
     executions = [h for h in hits if h.bucket == EXECUTION]
-    if len(executions) != 1:
-        failures.append(f"expected exactly 1 EXECUTION site, found {len(executions)}: {[(h.path, h.lineno) for h in executions]}")
-    elif executions[0].path != "deploy/agent_commit.sh":
-        failures.append(f"the registered EXECUTION site is deploy/agent_commit.sh — found a different one: {executions[0].path}")
+    for h in executions:
+        failures.append(
+            f"EXECUTION site {h.path}:{h.lineno} runs a hook-skipping commit — none is registered since 2026-11-14 "
+            "(commit through the hooks; deploy/agent_commit.sh shows how to leave out only the doc-sync sweep)"
+        )
 
     ask_hits = [sh for sh in settings_hits if sh.list_name == "ask"]
     escalated = [sh for sh in settings_hits if sh.list_name != "ask"]

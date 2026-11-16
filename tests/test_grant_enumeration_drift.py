@@ -732,6 +732,9 @@ _PENDING_PERMISSIONS_APPLY: dict[str, str] = {
     # 2026-11-15: the #5821 remediation-role entry (OpsDigestLine) was applied by the owner ~06:20Z with
     # `bash deploy/setup_remediation_role.sh`; its post-apply verifier no longer listed the role as drifted.
     # Removed here per the same #2824 rule.
+    # 2026-11-15: the #5974 golden-eval-role entry (KMSDecryptViaDynamoDB, conditioned kms:ViaService
+    # dynamodb.us-west-2) was applied ~07:00Z with the put-role-policy command; get-role-policy read back
+    # the Sid. Removed here per the same #2824 rule.
 }
 
 
