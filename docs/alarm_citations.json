@@ -241,9 +241,9 @@
   "added": "2026-10-28",
   "cause_observed": "2026-11-16",
   "updated": "2026-11-16",
-  "citation": "#5928 — the 'no red without an owner' review epic owns this standing WARN; #6113 owns the newer of its two causes. Live cause 2026-11-16 (qa-smoke `[QA] CAUSE warn`): `public_brief:macrofactor_export_age` (the MacroFactor export is older than the public brief's bar; no story of its own, under #5928) plus `weeks:absence_agreement`, which since the 2026-11-16T01:59Z run reads 'absence agreement NOT OBSERVED on api_status (census read budget of 60s spent)' — a probe-budget WARN (#6113), first seen 28 minutes before that night's site merge, so not caused by it.",
-  "note": "Re-cited 2026-11-16 at wrap. `reader_truth:confirm` / `reader_truth:verdict` join intermittently and will read as a mismatch on those runs. Prior note (2026-11-15): cited macrofactor_export_age alone.",
-  "cause": "public_brief:macrofactor_export_age,weeks:absence_agreement"
+  "citation": "#5928 — the 'no red without an owner' review epic owns this standing WARN; #6113 owns the census-budget cause when it recurs. Live cause 2026-11-16 ~19:50Z (Monday's public-brief cycle 2026-11-16, run status ok): `public_brief:cycle_liveness` warns because 2 of 4 coaches were held, not failed — nutrition_coach `inputs_stale` (`total_calories_kcal`: no MacroFactor export after 2026-11-13, the owner upload the earlier `macrofactor_export_age` cause asked for) and glucose_coach `required_inputs_absent` (`blood_glucose_avg`: no glucose source, chronic). Both are sanctioned holds; the WARN clears on the next cycle once an export is uploaded.",
+  "note": "Re-cited 2026-11-16 at the paydown session's wrap: the earlier causes (`public_brief:macrofactor_export_age`, `weeks:absence_agreement`) were replaced in the live run by the Monday cycle's held coaches. `reader_truth:confirm` / `reader_truth:verdict` join intermittently and will read as a mismatch on those runs.",
+  "cause": "public_brief:cycle_liveness"
  },
  "field-notes-missing": {
   "added": "2026-10-25",

@@ -56,6 +56,12 @@ on the (e4) residual section; the scripts behind the lines still block on their 
 3. **Overwrite** `handovers/HANDOVER_LATEST.md` in place, in the archived files' shape:
    driving instruction, what shipped (PRs, merged/deployed), what was verified, gotchas, the
    residual/next-picks queue (required — `scripts/check_handover_lines.py`) and the marker lines.
+4. **Another session still live in this repo** (`ListAgents` shows it busy): message it before
+   writing, then carry its outgoing handover body VERBATIM as its own section
+   (`## <session> — carried verbatim from its <date> wrap (<sha>)`, headings demoted), note only the
+   lines this session superseded, and merge both residual queues into one list. The handover is
+   shared state; a second wrap that overwrites drops the other session's owner decisions
+   (precedents ece40817a, and the 2026-11-16 paydown wrap).
 
 ### (b) Replace — never stack — the CLAUDE.md session-status block
 
