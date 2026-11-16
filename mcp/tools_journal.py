@@ -473,9 +473,8 @@ def tool_mark_journal_quote(args):
         if not jq.is_revoked(e)
     ]
     sk = jq.quote_sk(date, quote)
-    cap = jq.day_cap(date)  # 0–2 per close, or the owner's dated ruling for this entry (jq.OWNER_RULED_DAY_CAPS)
-    if len([e for e in existing if e.get("sk") != sk]) >= cap:
-        return {"error": f"refused: {cap} lines are already marked for {date} — the cap is 0–{cap} for this entry."}
+    if len([e for e in existing if e.get("sk") != sk]) >= jq.day_cap(date):  # 0–2 per close, or the owner's dated ruling
+        return {"error": f"refused: {jq.day_cap(date)} lines are already marked for {date} — the cap for this entry."}
 
     # Featured-slot stability (2026-07-26 review): an idempotent re-mark must not
     # refresh marked_at — featured_for_week keys on first-marked, and an overwrite
