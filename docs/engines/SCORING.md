@@ -119,7 +119,9 @@ recovery 0.15, movement 0.15, habits_mvp 0.15, hydration 0.05, journal 0.05, glu
   component returns None and drops out of the grade.
   **The core-12 calculation set (#5124, owner ruling 2026-10-18; charter `habits.core`, v1.25.0).** Once the
   registry is ARMED — any active entry carries a `core` field naming a charter core id (set by the owner-run
-  `scripts/apply_habit_core_flags.py`) — the composite is NOT the tier blend above: it is
+  `scripts/apply_habit_core_flags.py`; a charter entry marked `id_alias` is a neutral public id that
+  `health.core_habits.resolve_spec` swaps for the stored id its registry entries carry as `core` beside it as `core_alias`,
+  so verdicts keep their stored keys — #6090; no mapping grades it unknown and logs a WARNING) — the composite is NOT the tier blend above: it is
   `round(100 · done / known)` over the twelve core habits, each weighted equally, graded by `health.core_habits.grade_day`
   through `_core_day` (:467-491; `core_day`, :452-464, is the same read for the coaches). A Habitify-basis core habit
   is its flagged members read exactly as the tier loop reads them (all must be done; any observed not-done is a miss);

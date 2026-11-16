@@ -290,3 +290,26 @@ def clinical_keywords(require: bool = False) -> List[str]:
             "See config/content_filter.example.json for the shape."
         )
     return out
+
+
+# Private identifiers (#6090): strings — a private habit's name, the id its rows are stored under — that must never
+# appear in a TRACKED file of this public repository. Like the vocabulary above they are themselves the guarded data,
+# so they live ONLY in this channel; tests/test_core_alias_6090.py sweeps `git ls-files` against them.
+PRIVATE_IDENTIFIERS_KEY = "private_identifiers"
+
+
+def private_identifiers(require: bool = False) -> List[str]:
+    """The private-identifier list (lowercased), or [] when the channel carries none.
+
+    OPTIONAL in the config object, like ``blocked_clinical_keywords``: absent means no channel source or a source
+    without the key, and ``require=True`` refuses both. The message never echoes an identifier.
+    """
+    data = load(require=require)
+    terms = [] if data is None else data.get(PRIVATE_IDENTIFIERS_KEY)
+    out = [t.strip().lower() for t in terms if isinstance(t, str) and t.strip()] if isinstance(terms, list) else []
+    if require and not out:
+        raise ContentFilterUnavailable(
+            f"content-filter channel carries no '{PRIVATE_IDENTIFIERS_KEY}' list — the repository sweep is not armed; "
+            "failing closed. See config/content_filter.example.json for the shape."
+        )
+    return out

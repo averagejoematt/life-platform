@@ -66,16 +66,16 @@ HABITIFY_IDS = [
     "planned_session_done",
     "no_alcohol",
     "no_solo_takeout",
-    "no_sweets_or_fried",
+    "core_h10",
     "one_connection",
 ]
 
 
 def _registry(flagged: bool = True) -> dict:
-    """A synthetic registry: one entry per Habitify-basis core id (two for the sweets/fried pair) plus two retained."""
+    """A synthetic registry: one entry per Habitify-basis core id (two for the core_h10 pair) plus two retained."""
     reg = {f"Habit {cid}": {"status": "active", "tier": 1, **({"core": cid} if flagged else {})} for cid in HABITIFY_IDS}
-    reg["Habit no_sweets_or_fried"]["vice"] = True
-    reg["Habit fried"] = {"status": "active", "tier": 2, "vice": True, **({"core": "no_sweets_or_fried"} if flagged else {})}
+    reg["Habit core_h10"]["vice"] = True
+    reg["Habit second_member"] = {"status": "active", "tier": 2, "vice": True, **({"core": "core_h10"} if flagged else {})}
     reg["Retained floss"] = {"status": "active", "tier": 0}
     reg["Retained read"] = {"status": "active", "tier": 2, "target_frequency": 3}
     return reg
@@ -117,7 +117,7 @@ def test_the_charter_names_no_registry_entry():
 def test_membership_arming_and_flag_drift():
     reg = _registry()
     assert core_habits.is_armed(reg) and not core_habits.is_armed(_registry(flagged=False))
-    assert core_habits.members(reg)["no_sweets_or_fried"] == ["Habit no_sweets_or_fried", "Habit fried"]
+    assert core_habits.members(reg)["core_h10"] == ["Habit core_h10", "Habit second_member"]
     assert core_habits.flag_drift(reg) == {
         "core_ids": 12,
         "core_flagged_entries": 10,
@@ -134,13 +134,13 @@ def test_membership_arming_and_flag_drift():
 def test_grade_day_reads_each_basis_and_never_counts_an_unknown_as_a_miss():
     reg = _registry()
     readings = {k: 1.0 for k in reg}
-    readings["Habit fried"] = 0.0  # one member of the pair broken -> the pair is missed
+    readings["Habit second_member"] = 0.0  # one member of the pair broken -> the pair is missed
     readings.pop("Habit one_connection")  # unobserved -> unknown
     floor = tc.charter_value("steps.floor")
     wakes = {f"2026-10-{d:02d}": "06:00" for d in range(7, 21)} | {DAY: "06:10"}
     g = core_habits.grade_day(reg, day=DAY, reading=lambda k, m: readings.get(k), steps=floor, wakes=wakes, checkin=False)
     st = {r["id"]: r["state"] for r in g["habits"]}
-    assert st["no_sweets_or_fried"] == "missed" and st["one_connection"] == "unknown"
+    assert st["core_h10"] == "missed" and st["one_connection"] == "unknown"
     assert st["steps_floor"] == "done" and st["out_of_bed_on_time"] == "done" and st["evening_checkin"] == "missed"
     assert (g["done"], g["missed"], g["unknown"], g["known"]) == (9, 2, 1, 11)
     assert g["score"] == round(9 / 11 * 100) and g["missed_labels"] == ["evening check-in", "a food restraint (named privately)"]
@@ -262,7 +262,12 @@ def test_the_flag_script_refuses_what_it_cannot_apply():
     import apply_habit_core_flags as ap
 
     reg = _registry(flagged=False)
-    writes, errors = ap.plan(reg, ["weigh_in=Habit weigh_in", "no_sweets_or_fried=Habit fried"])
-    assert writes == [("Habit weigh_in", "weigh_in"), ("Habit fried", "no_sweets_or_fried")] and not errors
+    writes, errors = ap.plan(reg, ["weigh_in=Habit weigh_in", "no_alcohol=Habit second_member"])
+    assert writes == [("Habit weigh_in", "weigh_in"), ("Habit second_member", "no_alcohol")] and not errors
+    # #6090: core_h10 is a public alias — refused while no entry carries it or maps it (tests/test_core_alias_6090.py)
+    _, errors = ap.plan(reg, ["core_h10=Habit second_member"])
+    assert len(errors) == 1 and "no private mapping yet" in errors[0]
+    writes, errors = ap.plan(_registry(), ["core_h10=Retained floss"])
+    assert writes == [("Retained floss", "core_h10")] and not errors, "an alias an entry already carries is flagged as-is"
     _, errors = ap.plan(reg, ["steps_floor=Habit weigh_in", "nope=Habit weigh_in", "weigh_in=Missing", "weigh_in"])
     assert len(errors) == 4 and not any("Habit weigh_in" in e for e in errors)

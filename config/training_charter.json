@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.51.0",
+  "version": "1.52.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -351,6 +351,13 @@
       "by": "owner ruling 2026-11-12 on #5857 (all eight board recommendations adopted)",
       "what": "concession_ledger.dan_john.in_return gains 'a free-weight press, pull, squat and hinge weekly': stage 1's weekly commitments (training/week_commitments.py, row free_weight_compounds) BLOCK a program week that serves no free-weight compound in any one of the four patterns (anchors count), read from the exercise library's job / pattern / resistance profile. Ruling B (1.50.0) is amended: a pick held at a phase boundary is accepted only when it is the single servable member of the slot's S and A bands (both programmable). No number changes.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.52.0",
+      "date": "2026-11-16",
+      "by": "owner ruling 2026-11-16 on #6090 (remove the private habit identifier from the current public repository; no rewrite of historical computed records, no history rewrite)",
+      "what": "One core-12 habit's id is now the neutral alias core_h10, marked id_alias (habits.core and disruption.whole_day.paused_habits). The id its rows are stored under is owner data: the registry entries flagged for it carry the stored id as `core` and this alias as `core_alias` (PROFILE#v1), and health.core_habits.resolve_spec swaps the alias for the stored id before grading, so every historical and new row keeps the same key and every score is unchanged. A missing mapping grades the habit unknown (never a miss) and logs a WARNING. No number, basis, weight or prescription changes.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
   "governing_goal": {
@@ -556,9 +563,10 @@
         "basis": "habitify"
       },
       {
-        "id": "no_sweets_or_fried",
+        "id": "core_h10",
         "label": "a food restraint (named privately)",
-        "basis": "habitify"
+        "basis": "habitify",
+        "id_alias": true
       },
       {
         "id": "out_of_bed_on_time",
@@ -578,6 +586,7 @@
       "evening_checkin": "the day's evening check-in row (coach.evening_checkin) exists; no row on an evening whose prompt went out is a miss; no row and no prompt is unknown",
       "wake_consistency": "health.wake_consistency.grade_day against sleep.wake_time: on_time is done, off is missed, unknown stays unknown, never a second definition"
     },
+    "id_alias": "an entry marked id_alias carries a neutral public id in place of the id its rows are stored under (owner data). The registry entries flagged for it carry the stored id as `core` and this alias as `core_alias`; health.core_habits.resolve_spec grades and keys the habit by the stored id, so no stored row changes key. With no mapping the habit has no members: unknown, never a miss, and a WARNING names the alias (#6090, owner ruling 2026-11-16)",
     "membership": "a habitify-basis core habit's members are the habit_registry entries (the PROFILE#v1 row, owner data) that carry `core: <id>`; several entries may carry one id (all must be held). This file never names a registry entry: habit names are owner data. A `core` flag on a non-habitify id, or an id this list does not carry, is drift (scripts/check_habit_registry_drift.py)",
     "armed_when": "at least one active registry entry carries a `core` flag; until then the habit score stays the tier-weighted read of every habit and says it is unarmed",
     "score": "once armed, the habit score is the share of the day's KNOWN core habits that are done, each core habit weighted equally; an unknown core habit is left out, never a miss, and a day with none known has no habit score",
@@ -1232,7 +1241,7 @@
         "calories_in_band",
         "planned_session_done",
         "no_solo_takeout",
-        "no_sweets_or_fried"
+        "core_h10"
       ],
       "habits_rule": "every habits.core id is either held or paused, never both and never neither; a held habit is still asked for, a paused one is not asked for and is never a miss; one short session (split.minimum_session) stands in for planned_session_done",
       "paused_targets": [
