@@ -149,7 +149,8 @@ BUILDER_CHANGE_LOG = [
         "(ruling B: owner unsure). The recent-inferred window never starts before the day he began training at home_gym "
         "(`HOME_GYM_SINCE`, May 2026, ruling C): a log from an earlier gym is no evidence a machine is here (no state moves "
         "on today's history). 20 movements become available; fallback lists recompute under the one equivalence rule (79 "
-        "movements), since an available movement can now be a fallback. No tier, gate, rating or setting changes.",
+        "movements), since an available movement can now be a fallback. No tier, gate, rating or setting changes. The `_README` "
+        "states the header's own status (it still said PROPOSED after the owner's approval; text only).",
         "rule": "data and one window rule, by owner ruling; status stays approved (approved_on unchanged)",
     },
 ]

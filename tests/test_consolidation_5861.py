@@ -40,10 +40,12 @@ from training import (  # noqa: E402
     live_session as ls,
     live_settings,
     live_volume,
+    routine_generator as rg,
     selection_engine as se,
 )
 
 PROFILES = sw.load_profiles()
+CATALOG = rg._load_json("movement_catalog.json")["movements"]
 FIXTURES = REPO / "tests" / "fixtures"
 FIX9 = sw.load_profiles(FIXTURES / "sample_week_stress_profiles_fix9_5861.json")
 FIX8 = sw.load_profiles(FIXTURES / "sample_week_stress_profiles_fix8_5861.json")
@@ -160,7 +162,36 @@ def test_no_athlete_loses_load_without_evidence_or_oscillates(name):
     if name == "over":  # the over-performer climbs every exposure
         assert all((s[-1] or 0) > (s[0] or 0) for (k, r), s in loads.items() if k in ("barbell_bench_press", "lat_pulldown"))
     if name in ("rpe10", "norpe"):  # unreliable RPE never collapses a lift (the red team: bench 185 -> 105 in five weeks)
-        assert all(min(x for x in s if x) >= 0.94 * next(x for x in s if x) for s in loads.values() if any(s))
+        assert _collapses(loads) == {}, (name, _collapses(loads))
+        # controls (owner ruling 2026-11-16, #6061): the bound stays tight — a fine-grid lift down more than 6 %, and the
+        # dumbbell row down more than one 5-lb step, still fail; the dumbbell row down exactly one step (7.7 %) does not
+        assert _collapses({("barbell_bench_press", "upper_heavy"): [190.0, 175.0]})  # 7.9 % on a 5-lb barbell grid
+        assert _collapses({("one_arm_db_row", "upper_heavy"): [65.0, 55.0]})  # two dumbbell steps
+        assert not _collapses({("one_arm_db_row", "upper_heavy"): [65.0, 60.0]})  # one dumbbell step
+
+
+COLLAPSE_PCT = 0.06
+
+
+def _collapses(loads: dict) -> dict:
+    """(key, role) -> its largest fall under its first served load, for each series that fell more than its bound: the larger of
+    `COLLAPSE_PCT` and ONE implement step at that load (`rep_scheme.implement_step_lb`). Owner ruling 2026-11-16 (#6061, after
+    #6015's hold-and-build): a lifter who logs 4 reps at RPE 10 at a just-raised load is correctly reverted one step, and on a
+    coarse 5-lb dumbbell grid one step is ~7.7 % at 65 lb — a flat 6 % called that one correct step a collapse. A fine grid
+    (a 5-lb barbell step is 2.6 % at 190 lb) keeps the 6 %."""
+    from training.rep_scheme import implement_step_lb
+
+    out = {}
+    for (key, role), seq in loads.items():
+        got = [x for x in seq if x]
+        if not got:
+            continue
+        first = got[0]
+        step = implement_step_lb((CATALOG.get(key) or {}).get("equipment"), first) or 0.0
+        bound = max(COLLAPSE_PCT * first, step) + 1e-6
+        if first - min(got) > bound:
+            out[(key, role)] = round(1 - min(got) / first, 3)
+    return out
 
 
 @pytest.mark.parametrize("name", sorted(DECLINERS))

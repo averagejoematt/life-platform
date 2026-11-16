@@ -510,7 +510,7 @@ def test_generator_builds_each_role_in_order():
     ]
     assert [b.movement_key for b in got[3].exercises][:3] == [  # #5162: no press on upper-heavy
         "barbell_bench_press",
-        "machine_row",
+        "one_arm_db_row",  # #6014 (coaching decision 2026-11-15): the heavy row is pinned to the dumbbell row
         "lat_pulldown",
     ]
     assert "machine_shoulder_press" not in [b.movement_key for b in got[3].exercises]
@@ -771,10 +771,16 @@ def test_4409_the_0929_upper_heavy_keeps_the_in_block_db_row_and_db_press():
 @pytest.mark.usefixtures("pre_5162_upper_heavy")
 def test_4409_mutation_control_without_the_block_record_the_catalog_default_swaps_them_back():
     """What the 09-29 draft did: the resolver without the in-block record picks the first listed
-    key — the machines with years-old anchors. So the assertion above reds without the fix."""
+    key — the machines with years-old anchors. So the assertion above reds without the fix. #6014 pinned the heavy row to
+    the dumbbell row (its only member, so the in-block record no longer decides it there); the row half of this control runs
+    on the volume day's row, which keeps the family's order."""
     ex = {e["pattern"]: e["movement_key"] for e in _rx(UH)["exposures"] if e["kind"] == "anchor"}
-    assert ex["row"] == "machine_row" and ex["overhead_press"] == "machine_shoulder_press"
-    assert "in_block" not in next(e for e in _rx(UH)["exposures"] if e["pattern"] == "row")
+    assert ex["overhead_press"] == "machine_shoulder_press"
+    assert ex["row"] == "one_arm_db_row" and "in_block" not in next(e for e in _rx(UH)["exposures"] if e["pattern"] == "row")
+    row = next(e for e in _rx(UV)["exposures"] if e["pattern"] == "row")
+    assert row["movement_key"] == "machine_row" and "in_block" not in row  # no block record: the catalog default
+    kept = next(e for e in _rx(UV, in_block=_performed())["exposures"] if e["pattern"] == "row")
+    assert kept["movement_key"] == "one_arm_db_row" and kept["in_block"]["kept"] is True
 
 
 def test_4409_the_same_role_slot_wins_over_the_pattern_most_recently_performed():
@@ -799,13 +805,17 @@ def test_4409_a_variant_change_inside_the_block_is_only_the_listed_swap_and_says
     """Block lock: when the in-block variant is unreachable for THIS session (the Minimum Viable
     Session's tier-1 ceiling, no anchor exemption) the slot takes the pattern's next LISTED key and
     the exposure records the change — never a silent swap, never a key outside the pattern."""
-    rx = _rx(UH, in_block=_performed(), skill_ceiling=1, anchor_exempt=False)
+    rx = _rx(UV, in_block=_performed(), skill_ceiling=1, anchor_exempt=False)  # #6014: the volume day's row keeps the family order
     row = next(e for e in rx["exposures"] if e["pattern"] == "row")
     assert row["movement_key"] == "machine_row" and row["movement_key"] in program_structure.ANCHORS["row"]["catalog_keys"]
     assert row["in_block"]["performed"] == "one_arm_db_row" and row["in_block"]["kept"] is False
     assert "skill_tier 2 > ceiling 1" in row["resolution_note"]
     # no in-block performance at all -> the catalog order, unchanged
-    assert _rx(UH, in_block=[]) == _rx(UH)
+    assert _rx(UV, in_block=[]) == _rx(UV) and _rx(UH, in_block=[]) == _rx(UH)
+    # #6014: the heavy row's pin has one member, out of a tier-1 reach — no swap outside the pin; the slot says so (the same
+    # pinned-slot behaviour the volume day's incline-press pin already has)
+    uh = next(e for e in _rx(UH, in_block=_performed(), skill_ceiling=1, anchor_exempt=False)["exposures"] if e["pattern"] == "row")
+    assert uh["movement_key"] is None and "no reachable member: one_arm_db_row" in uh["resolution_note"]
 
 
 @pytest.mark.usefixtures("pre_5162_upper_heavy")

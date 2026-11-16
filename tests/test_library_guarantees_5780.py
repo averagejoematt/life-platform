@@ -46,6 +46,7 @@ from training import (  # noqa: E402
     exercise_gates as eg,
     exercise_library as xl,
     kb_entry,
+    program_structure as ps,
     selection_engine as se,
     training_charter as tc,
     variant_rotation as vr,
@@ -578,16 +579,36 @@ def test_g4_the_approved_week_meets_the_free_weight_compound_floor():
 
 
 def test_g4_control_the_floor_judges_the_planned_machine_without_the_live_swap(monkeypatch):
-    """Must-fail controls for #6051: (1) with the swap disabled the approved week blocks on PULL again; (2) the swap only
-    replaces an UNAVAILABLE anchor — an anchor whose equipment is available keeps its key."""
-    pos, rot = _serve_program(_lib("approved"), CAT0, kb=kb_entry.ENTRY_EXPOSURES, day=BLOCK_DAY)[2]
+    """Must-fail controls for #6051, re-pointed by #6014: the owner confirmed the row machine (2026-11-15, ruling A) and the heavy
+    row is pinned to the dumbbell row, so the control's subject is now a machine anchor he has NOT confirmed — the incline chest
+    press machine (bench family). (1) Both upper days' bench slot planned on it: with the live swap the week meets the
+    free-weight press floor (served as a dumbbell bench press); with the swap disabled it blocks on PRESS again. (2) The swap
+    replaces only an UNAVAILABLE anchor — the now-confirmed row machine keeps its key — and only an anchor: the standing calf
+    raise machine (owner: unsure) is unavailable but no anchor, so it is never swapped (why it cannot be this control's subject)."""
+    unconfirmed = "incline_chest_press_machine"
+    tmpl = copy.deepcopy(ps.SESSION_TEMPLATES)
+    for role in ("upper_heavy", "upper_volume"):
+        tmpl[role]["anchor_keys"] = dict(tmpl[role].get("anchor_keys") or {}, bench=[unconfirmed])
+    monkeypatch.setattr(ps, "SESSION_TEMPLATES", tmpl)
+    lib = _lib("approved")
+    pos, rot = _serve_program(lib, CAT0, kb=kb_entry.ENTRY_EXPOSURES, day=BLOCK_DAY)[2]
+    floor = lambda: [
+        o for o in _commitment_offenders(rot, pos, on=BLOCK_DAY, lib=lib) if o.startswith("free_weight_compounds")
+    ]  # noqa: E731
+    assert floor() == [], "the live swap serves a free-weight press for the unconfirmed machine"
     monkeypatch.setattr(wc, "live_anchor_swaps", lambda served, lib, catalog, overlay=...: served)
-    assert any(o.startswith("free_weight_compounds: block") for o in _commitment_offenders(rot, pos, on=BLOCK_DAY, lib=_lib("approved")))
+    assert any("no free-weight compound press" in o for o in floor()), "control: without the swap the planned machine blocks"
     monkeypatch.undo()
-    served = [{"key": "squat_barbell", "role": "lower_heavy"}, {"key": "machine_row", "role": "upper_heavy"}]
+    served = [
+        {"key": "squat_barbell", "role": "lower_heavy"},
+        {"key": "machine_row", "role": "upper_heavy"},
+        {"key": unconfirmed, "role": "upper_heavy"},
+        {"key": "standing_calf_raise_machine", "role": "lower_volume"},
+    ]
     swapped = wc.live_anchor_swaps(served, _lib("approved"), CAT0, overlay=None)
-    assert swapped[0] == served[0]  # available: untouched
-    assert swapped[1]["planned"] == "machine_row" and swapped[1]["key"] != "machine_row"
+    assert swapped[0] == served[0] and swapped[1] == served[1]  # available (the row machine now confirmed): untouched
+    assert swapped[2]["planned"] == unconfirmed and swapped[2]["key"] != unconfirmed  # unconfirmed anchor: swapped
+    assert swapped[3] == served[3]  # unconfirmed but not an anchor: never swapped
 
 
 def test_g4_the_served_week_still_meets_rotation_once_the_library_is_approved():

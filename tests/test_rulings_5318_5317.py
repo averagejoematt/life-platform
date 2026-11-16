@@ -244,7 +244,7 @@ def test_b2_the_anchor_tripwire_still_reads_the_barbell_bench():
     uh_bench = next(e for e in _rx(UH)["exposures"] if e["pattern"] == "bench")
     assert (uh_bench["movement_key"], uh_bench["intensity"]) == ("barbell_bench_press", "heavy")
     assert program_structure.ANCHORS["bench"]["catalog_keys"][0] == "barbell_bench_press"
-    assert "anchor_keys" not in program_structure.SESSION_TEMPLATES[UH]
+    assert "bench" not in (program_structure.SESSION_TEMPLATES[UH].get("anchor_keys") or {})  # #6014 pins only the heavy row
     assert "bench" in program_structure.CORE_ANCHORS
     from mcp import plan_draft_evidence
 
