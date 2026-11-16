@@ -1199,6 +1199,23 @@ def test_github_config_required_checks_drift_when_absent(monkeypatch):
     assert res["surfaces"]["main_ruleset"]["status"] == "clean"
 
 
+def test_repo_settings_absent_field_is_unavailable_not_drift_6071(monkeypatch):
+    # #6071: a declared field ABSENT from repos/<repo> (token cannot see it) is UNVERIFIED,
+    # never drift; a field that is PRESENT and differs is still drift.
+    _posture_applied(monkeypatch)
+    blind = {"full_name": "averagejoematt/life-platform"}  # no allow_auto_merge key at all
+    _fake_gh(monkeypatch, _config_routes(env=(_ENV_WITH_REVIEWERS, None), repo=(blind, None)))
+    res = ds.check_github_config()
+    rs = res["surfaces"]["repo_settings"]
+    assert rs["status"] == "unavailable", rs
+    assert "allow_auto_merge" in rs["detail"] and "scope" in rs["detail"] and "drift" in rs["detail"]
+    assert "allow_auto_merge" in res["needs_owner"]
+    assert res["status"] != "clean"  # an unread surface is never a clean pass
+    # present-but-different is still drift
+    _fake_gh(monkeypatch, _config_routes(env=(_ENV_WITH_REVIEWERS, None), repo=(_REPO_AUTO_MERGE_OFF, None)))
+    assert ds.check_github_config()["surfaces"]["repo_settings"]["status"] == "drift"
+
+
 def test_github_config_required_checks_drift_when_a_context_is_dropped(monkeypatch):
     weakened = json.loads(json.dumps(_RC_RULESET))
     weakened["rules"][0]["parameters"]["required_status_checks"] = [

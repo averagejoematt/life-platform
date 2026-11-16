@@ -1,0 +1,267 @@
+{
+ "metric": "deep_pct",
+ "unit": "%",
+ "source_id": "eightsleep",
+ "behavioral": false,
+ "window": {
+  "from": "2026-09-06",
+  "to": "2026-10-17"
+ },
+ "n_present": 40,
+ "n_gap": 0,
+ "markers": [],
+ "days": [
+  {
+   "date": "2026-09-06",
+   "value": 16.2,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-09-07",
+   "value": 17.8,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-09-08",
+   "value": 15.1,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-09-09",
+   "value": 18.4,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-09-10",
+   "value": 19.0,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-09-11",
+   "value": 14.7,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-09-12",
+   "value": 16.9,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-09-13",
+   "value": 17.5,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-09-14",
+   "value": null,
+   "present": false,
+   "gap": false
+  },
+  {
+   "date": "2026-09-15",
+   "value": 18.1,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-09-16",
+   "value": 16.4,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-09-17",
+   "value": 15.8,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-09-18",
+   "value": 14.9,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-09-19",
+   "value": 17.2,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-09-20",
+   "value": 18.8,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-09-21",
+   "value": 16.0,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-09-22",
+   "value": 15.4,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-09-23",
+   "value": 17.9,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-09-24",
+   "value": 19.3,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-09-25",
+   "value": 16.6,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-09-26",
+   "value": 15.2,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-09-27",
+   "value": 14.8,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-09-28",
+   "value": 16.7,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-09-29",
+   "value": 18.2,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-09-30",
+   "value": 17.0,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-10-01",
+   "value": 15.9,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-10-02",
+   "value": 16.3,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-10-03",
+   "value": 18.6,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-10-04",
+   "value": 17.4,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-10-05",
+   "value": 15.0,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-10-06",
+   "value": 16.8,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-10-07",
+   "value": 19.1,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-10-08",
+   "value": 17.7,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-10-09",
+   "value": 16.1,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-10-10",
+   "value": 15.5,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-10-11",
+   "value": 18.0,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-10-12",
+   "value": 16.5,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-10-13",
+   "value": 17.1,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-10-14",
+   "value": 15.7,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-10-15",
+   "value": 15.6,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-10-16",
+   "value": 15.6,
+   "present": true,
+   "gap": false
+  },
+  {
+   "date": "2026-10-17",
+   "value": null,
+   "present": false,
+   "gap": false
+  }
+ ]
+}

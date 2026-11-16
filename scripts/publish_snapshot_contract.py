@@ -724,6 +724,18 @@ def _write_data_files(out_dir: str, data_files: dict, files: dict) -> None:
     with open(os.path.join(out_dir, "journey.json"), "w", encoding="utf-8") as fh:
         fh.write(text)
     files["journey.json"] = {"count": len(journey.get("rungs") or []), "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
+    # own_words.json — the owner's approved first-person lines as /api/journal_quotes serves them (the day and the words
+    # only; scripts/publish_snapshot_own_words.py). Always written: absent when the route did not answer.
+    own_words = data_files.get("own_words") or {
+        "state": "absent",
+        "source": ["/api/journal_quotes"],
+        "absent_text": "The platform did not serve the owner's approved lines for this snapshot.",
+        "quotes": [],
+    }
+    text = _dump(own_words)
+    with open(os.path.join(out_dir, "own_words.json"), "w", encoding="utf-8") as fh:
+        fh.write(text)
+    files["own_words.json"] = {"count": len(own_words.get("quotes") or []), "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
     # calibration.json — the Coaching Room's data file, present ONLY on a WEB_ROOM=1 export (CR1, built dark;
     # scripts/publish_snapshot_calibration.py). Absent key = nothing written, so a flag-off snapshot is unchanged.
     cal_path = os.path.join(out_dir, "calibration.json")

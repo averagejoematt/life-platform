@@ -117,6 +117,7 @@ def test_held_and_private_objects_never_reach_the_snapshot(tmp_path):
             "appendix.json",
             "pairs.json",
             "journey.json",
+            "own_words.json",
             "series",
             "lab.json",
             "story.json",
@@ -231,17 +232,22 @@ def test_manifest_hashes_match_the_files(tmp_path):
                     else (
                         data.get("rungs")
                         if "rungs" in data
-                        # the switch-gated data files (in a default export once their go-live line is committed)
+                        # own_words.json: the owner's approved lines, counted by `quotes` (the file carries no `pairs`)
                         else (
-                            data["lab_experiments"]
-                            if "lab_experiments" in data
+                            data["quotes"]
+                            if "quotes" in data and "absent_text" in data
+                            # the switch-gated data files (in a default export once their go-live line is committed)
                             else (
-                                data["installments_index"]
-                                if "installments_index" in data
+                                data["lab_experiments"]
+                                if "lab_experiments" in data
                                 else (
-                                    data["calibration"]["coaches"]
-                                    if "calibration" in data
-                                    else data["coaches"] if "voice_fidelity" in data else data["pairs"]
+                                    data["installments_index"]
+                                    if "installments_index" in data
+                                    else (
+                                        data["calibration"]["coaches"]
+                                        if "calibration" in data
+                                        else data["coaches"] if "voice_fidelity" in data else data["pairs"]
+                                    )
                                 )
                             )
                         )

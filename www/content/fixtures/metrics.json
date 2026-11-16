@@ -31,33 +31,27 @@
   "visibility": "public"
  },
  {
-  "absent_text": "No series is served for this measure yet.",
+  "absent_text": null,
   "approved": null,
   "as_of": "2026-10-31",
-  "data_through": null,
+  "data_through": "2026-10-17",
   "decimals": 1,
-  "edges": [
-   {
-    "id": "whoop",
-    "rel": "measured_by",
-    "type": "source"
-   }
-  ],
+  "edges": [],
   "id": "deep_pct",
-  "instrument": "WHOOP · overnight",
+  "instrument": "Eight Sleep · overnight",
   "label": "Sleep · deep share",
   "method_ids": [
    "effective_sample_size"
   ],
   "sample": true,
-  "sentence": "Wrist staging is an estimate; treat stage percentages as trends.",
-  "series_url": null,
+  "sentence": "Mattress staging is an estimate; treat stage percentages as trends.",
+  "series_url": "/api/series?metric=deep_pct",
   "source": [
    "fixture"
   ],
-  "source_id": "whoop",
-  "state": "absent",
-  "summary": "WHOOP staging.",
+  "source_id": null,
+  "state": "ok",
+  "summary": "Eight Sleep staging; the series carries its own source.",
   "title": "Deep sleep share",
   "type": "metric",
   "unit": "%",

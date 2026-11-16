@@ -6,6 +6,7 @@ import { lastDays, presentCount, svgChart } from "../lib/chart.js";
 import { dayInWords, num } from "../lib/format.js";
 import { findPair, pairSentence, strengthInWords } from "../lib/pairs.js";
 import { mountAll } from "./inspect.js";
+import { PROVISIONAL_RING, markProvisional } from "../lib/provisional.js";
 
 const COBALT = "#1B3FD6";
 const OCHRE = "#B97A12";
@@ -34,6 +35,9 @@ export function mount(root = document.querySelector("[data-explorer]")) {
   const metric = root.dataset.metric;
   const decimals = Number(root.dataset.decimals || 1);
   const labels = JSON.parse(root.dataset.labels || "{}");
+  // #5953: the nights the page marked still recording (the build read them off the snapshot's Day objects); the
+  // redraw keeps the same rings and caption, never re-deciding which night is provisional
+  const provisional = JSON.parse(root.dataset.provisional || "[]");
   const chartA = root.querySelector("[data-chart-a]");
   const chartB = root.querySelector("[data-chart-b]");
   const stats = root.querySelector("[data-pair-stats]");
@@ -50,7 +54,7 @@ export function mount(root = document.querySelector("[data-explorer]")) {
 
   async function draw() {
     const a = await seriesFor(metric);
-    const days = lastDays(a.days, state.range);
+    const days = markProvisional(lastDays(a.days, state.range), provisional);
     const width = mobile() ? Math.max(280, Math.round(chartA.clientWidth || 350)) : undefined;
     chartA.innerHTML = svgChart({
       series: [{ days, color: COBALT, name: labels[metric] || metric }],
@@ -68,7 +72,7 @@ export function mount(root = document.querySelector("[data-explorer]")) {
       const n = presentCount(days);
       caption.textContent = `${n} of ${days.length} days with a reading${state.smooth ? " · 7-day mean, readings as dots" : ""}${
         a.markers && a.markers.length ? " · the dashed ochre rule is the baseline change" : ""
-      }`;
+      }${days.some((d) => d.provisional) ? ` · ${PROVISIONAL_RING}` : ""}`;
     }
     if (!state.b) {
       chartB.innerHTML = "";
