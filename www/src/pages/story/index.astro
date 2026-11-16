@@ -2,14 +2,15 @@
 import Base from "../../layouts/Base.astro";
 import StatusTag from "../../components/StatusTag.astro";
 import StoryEntry from "../../components/StoryEntry.astro"; // the Human Story (HS1): renders nothing unless WEB_STORY=1
-import { chapterCovers, chapterPublished, dayInWords, num, rangeInWords } from "../../lib/format.js";
+import { chapterCount, chapterMeta, dayInWords, num, rangeInWords } from "../../lib/format.js";
 import { loadAll, loadJourney, loadSeries } from "../../lib/snapshot.js";
 import { weekStrip } from "../../lib/theline.js";
 import { hasPage, href, pathOf } from "../../lib/url.js";
 
 const all = await loadAll();
 const chapters = [...all.byType.chapter].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.week ?? 0) - (a.week ?? 0)));
-const published = chapters.filter((c) => c.status === "published").length;
+// #6081: counted the way every page counts them — the numbered chapters, and the prologue said as such (format.js)
+const count = chapterCount(chapters);
 const episodes = all.byType.episode.length;
 // The line through the chapters (2026-11-14, sprint II): each row carries its week's weigh-ins on the whole journey's
 // weight scale, so reading down the list the line steps back through the weeks — including the weeks with no chapter,
@@ -36,7 +37,7 @@ const stripOf = (c: any) => {
 <Base title="The story" top="story" description="Every weekly chapter of an experiment in changing a life with AI coaches — the weight is the part that's working; the rest is still open. The chapters published, and the weeks held or skipped, said plainly.">
   <section class="section">
     <div class="wrap">
-      <p class="label">Story · {published} chapters published{episodes ? ` · ${episodes} with audio` : ""}</p>
+      <p class="label">Story · <span data-ch-count>{count.words}</span> published{episodes ? ` · ${episodes} with audio` : ""}</p>
       <h1 style="margin-top:10px">The chapters</h1>
       <p class="dek" style="margin-top:14px;max-width:720px">
         The scale moves in every one of these: that part of the experiment is working, and it runs down the page as a line. The chapters are
@@ -72,10 +73,12 @@ const stripOf = (c: any) => {
             // A held week is listed in words, never linked: it has no page (url.js::hasPage, owner ruling 2026-11-10 item 5).
             const Row = hasPage("chapter", c) ? "a" : "div";
             const strip = stripOf(c);
+            // #6081: the number, the days and the publication as the chapter page prints them (format.js chapterMeta)
+            const meta = chapterMeta(c)!;
             return (
-            <Row class="chapter-row" href={Row === "a" ? href(pathOf("chapter", c.id)) : undefined} style={c.status !== "published" ? "color:var(--muted)" : ""}>
-              <span class={`mono ch-no ${c.status === "published" ? "cobalt" : "faint"}`}>
-                {c.week == null ? "—" : String(c.week).padStart(2, "0")}
+            <Row class="chapter-row" href={Row === "a" ? href(pathOf("chapter", c.id)) : undefined} style={c.status !== "published" ? "color:var(--muted)" : ""} data-chapter={c.id} data-status={c.status}>
+              <span class={`mono ch-no ${c.status === "published" ? "cobalt" : "faint"}`} data-ch-no>
+                {meta.number}
               </span>
               <span class="ch-text">
                 <b style="font-size:18px;letter-spacing:-.02em;line-height:1.15">{c.status === "published" ? c.title : c.week_label}</b>
@@ -85,12 +88,15 @@ const stripOf = (c: any) => {
               </span>
               <span class="ch-strip" set:html={strip ? strip.svg : ""} />
               <span class="ch-when">
-                <span class="mono muted" style="font-size:12px">
-                  {(c.status === "published" && (chapterCovers(c, { short: true }) || rangeInWords(c.week_start, c.week_end, { short: true }))) || rangeInWords(c.week_start, c.week_end, { short: true }) || dayInWords(c.date, { short: true })}
-                </span>
+                {meta.windowShort && (
+                  <span class="mono muted" style="font-size:12px" data-ch-window>
+                    {meta.windowShort}
+                  </span>
+                )}
                 {strip && (
                   <span class="mono" style="font-size:12px" data-strip-weights>
-                    {c.status === "published" && c.covers_start ? `${rangeInWords(c.week_start, c.week_end, { short: true })}: ` : ""}
+                    {/* the strip is the program week; its range is printed only where the line above is the covered days, and labelled */}
+                    {meta.windowShort && !meta.windowShort.startsWith("program week") ? `program week ${rangeInWords(c.week_start, c.week_end, { short: true })}: ` : ""}
                     {strip.n > 1 ? `${num(strip.first.value, 1)} → ${num(strip.last.value, 1)} lb` : `${num(strip.last.value, 1)} lb`}
                     {strip.missing > 0 ? ` · ${strip.missing} blank` : ""}
                   </span>
@@ -100,9 +106,9 @@ const stripOf = (c: any) => {
                     crossed {r.lb} lb · {dayInWords(r.date, { short: true })}
                   </span>
                 ))}
-                {c.status === "published" && c.published_at && (
+                {meta.published && (
                   <span class="mono muted" style="font-size:12px" data-published>
-                    {chapterPublished(c)}
+                    {meta.published}
                   </span>
                 )}
                 {c.status !== "published" && <StatusTag status={c.status} />}

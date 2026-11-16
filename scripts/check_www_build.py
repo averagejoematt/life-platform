@@ -45,6 +45,7 @@ import re
 import shutil
 import subprocess
 import sys
+from html.parser import HTMLParser
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WWW = os.path.join(REPO, "www")
@@ -233,6 +234,7 @@ def scan(dist: str, require_noindex: bool, forbidden_ids: set[str] | None = None
         issues.append("no html pages in dist")
     issues.extend(heart_coverage(dist, fixture=snapshot_mode(snapshot_dir) == "fixture"))
     issues.extend(spark_agreement(dist))
+    issues.extend(chapter_agreement(dist))
     issues.extend(room_leaks(dist))
     issues.extend(lab_leaks(dist))
     issues.extend(story_leaks(dist))
@@ -529,6 +531,148 @@ def spark_agreement(dist: str) -> list[str]:
             out.append(f"{metric}: its weekly spark differs between {pa} and {pb} — one series must be one picture (lib/spark.js)")
         if latest_a != latest_b:
             out.append(f"{metric}: latest reading {latest_a!r} on {pa} but {latest_b!r} on {pb}")
+    return out
+
+
+# ── One chapter, one name (#6081) ──────────────────────────────────────────────────────────────────────────────────
+# Every page that names a chapter marks it: an element carrying data-chapter="<id>" holds the number (data-ch-no, or the
+# moment card's data-ch-week), the days (data-ch-window) and the publication (data-published) it prints. The chapter page
+# is the reference; every other page in the set must print the same three, short forms read as their long forms.
+_CH_FIELDS = ("data-ch-no", "data-ch-week", "data-ch-window", "data-published")
+_VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
+_MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+_SPELLED = "no one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty".split()
+
+
+class _ChapterMarks(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.depth, self.open, self.field, self.marks, self.counts, self.nexts = 0, [], None, [], [], []
+        self.loose = None  # a data-ch-count / data-next-chapter being read
+
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        if tag in _VOID:
+            return
+        self.depth += 1
+        if "data-chapter" in a and a["data-chapter"]:
+            self.open.append(
+                {"id": a["data-chapter"], "status": a.get("data-status"), "tag": tag, "href": a.get("href"), "at": self.depth, "f": {}}
+            )
+            self.marks.append(self.open[-1])
+        if "data-next-chapter" in a:
+            self.nexts.append(a["data-next-chapter"] or "")
+        if "data-ch-count" in a and self.loose is None:
+            self.loose = [self.depth, ""]
+        hit = next((k for k in _CH_FIELDS if k in a), None)
+        if hit and self.open and self.field is None:
+            self.field = [hit, self.depth, ""]
+
+    def handle_endtag(self, tag):
+        if tag in _VOID:
+            return
+        if self.field and self.depth == self.field[1]:
+            self.open[-1]["f"][self.field[0]] = self.field[2]
+            self.field = None
+        if self.loose and self.depth == self.loose[0]:
+            self.counts.append(self.loose[1])
+            self.loose = None
+        if self.open and self.depth == self.open[-1]["at"]:
+            self.open.pop()
+        self.depth -= 1
+
+    def handle_data(self, data):
+        if self.field:
+            self.field[2] += data
+        if self.loose:
+            self.loose[1] += data
+
+
+def _norm_number(key: str, text: str) -> str | None:
+    t = " ".join(text.split())
+    if key == "data-ch-week" and t.lower().startswith("prologue"):
+        return "00"
+    m = re.search(r"\d+", t)
+    return m.group(0).zfill(2) if m else None
+
+
+def _norm_window(text: str) -> str:
+    t = " ".join(text.split())
+    for full in _MONTHS:
+        t = re.sub(rf"\b{full[:3]}\b(?!\w)", full, t)
+    head, _, dates = t.rpartition(" · ") if t.lower().startswith("day") else ("", "", t)
+    pre = re.match(r"(program week )?(.*)$", dates)
+    dates = re.sub(r"^(\d+)–(\d+) ", r"\1 to \2 ", pre.group(2).replace(" – ", " to "))
+    return (f"{head} · " if head else "") + (pre.group(1) or "") + dates
+
+
+def _norm_count(text: str) -> str:
+    words = " ".join(text.lower().split()).split(" ")
+    return " ".join(str(_SPELLED.index(w)) if w in _SPELLED else w for w in words)
+
+
+def chapter_agreement(dist: str) -> list[str]:
+    """#6081 — one number, one window and one publication date for a chapter on every page that names it (the front page,
+    /story/, the chapter page, /story/so-far/, /story/moments/); the count of chapters said once; the next chapter's
+    number the one /story/ lists unpublished; no unpublished /story/ row linking to another chapter's address."""
+
+    def marks(rel):
+        path = os.path.join(dist, rel)
+        if not os.path.exists(path):
+            return None
+        p = _ChapterMarks()
+        p.feed(open(path, encoding="utf-8").read())
+        return p
+
+    out: list[str] = []
+    ref: dict[str, dict] = {}
+    for path in sorted(glob.glob(os.path.join(glob.escape(dist), "story", "*", "index.html"))):
+        rel = os.path.relpath(path, dist)
+        p = marks(rel)
+        own = [m for m in p.marks if m["id"] == os.path.basename(os.path.dirname(path))] if p else []
+        if own:
+            ref[own[0]["id"]] = own[0]
+    pages = {rel: marks(rel) for rel in ("index.html", "story/index.html", "story/so-far/index.html", "story/moments/index.html")}
+    want = lambda m, k: m["f"].get(k)  # noqa: E731
+    for rel, p in pages.items():
+        for m in p.marks if p else []:
+            r = ref.get(m["id"])
+            if r is None:
+                if m["tag"] == "a" and m["href"] and not m["href"].rstrip("/").endswith(f"/story/{m['id']}"):
+                    out.append(f"{rel}: the {m['status']} row {m['id']} links to {m['href']}, another chapter's address")
+                continue
+            got_no = (
+                _norm_number("data-ch-no", m["f"]["data-ch-no"])
+                if "data-ch-no" in m["f"]
+                else _norm_number("data-ch-week", m["f"].get("data-ch-week", ""))
+            )
+            if got_no != _norm_number("data-ch-no", want(r, "data-ch-no") or ""):
+                out.append(f"{rel}: {m['id']} is numbered {got_no!r}, its page {_norm_number('data-ch-no', want(r, 'data-ch-no') or '')!r}")
+            for key, norm in (("data-ch-window", _norm_window), ("data-published", lambda t: " ".join(t.lower().split()))):
+                a, b = want(m, key), want(r, key)
+                if (a is None) != (b is None) or (a is not None and norm(a) != norm(b)):
+                    out.append(f"{rel}: {m['id']} {key[5:]} {a!r}, its page {b!r}")
+    for cid, r in sorted(ref.items()):
+        if r["status"] != "published":
+            continue
+        for rel in ("story/index.html", "story/so-far/index.html"):
+            if pages[rel] is not None and not any(m["id"] == cid for m in pages[rel].marks):
+                out.append(f"{rel}: the published chapter {cid} is not named")
+    story = pages["story/index.html"]
+    if story is not None and not story.marks:
+        out.append("story/index.html: names no chapter with data-chapter — the chapter agreement cannot be read (#6081)")
+    for m in story.marks if story else []:
+        if m["status"] == "published" and m["id"] not in ref:
+            out.append(f"story/index.html: {m['id']} is listed published but its page carries no chapter marks")
+    counts = {_norm_count(c) for p in pages.values() if p for c in p.counts}
+    if len(counts) > 1:
+        out.append(f"the chapters are counted {len(counts)} ways: {sorted(counts)}")
+    pending = {
+        _norm_number("data-ch-no", m["f"].get("data-ch-no", "")) for m in (story.marks if story else []) if m["status"] != "published"
+    }
+    for n in {x for p in pages.values() if p for x in p.nexts if x}:
+        if n.zfill(2) not in pending:
+            out.append(f"index.html: the next chapter is numbered {n}, which /story/ does not list as an unpublished week")
     return out
 
 
