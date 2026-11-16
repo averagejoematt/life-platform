@@ -67,6 +67,17 @@ def fixture_own_words(fixtures_dir: str) -> dict:
         return json.load(fh)
 
 
+def resolve(mode: str, fixtures_dir: str, get: Callable[[str], Any], log: Callable[[str], None]) -> dict:
+    """The producer's one call: the fixture's file or the live route, validated. A malformed file is a schema error
+    (exit 2), raised as the contract's own exception so the producer needs no wrapper."""
+    from publish_snapshot_contract import SchemaError  # noqa: PLC0415 — the contract module is the producer's, imported at call time
+
+    try:
+        return validate(fixture_own_words(fixtures_dir) if mode == "fixture" else live_own_words(get, log))
+    except ValueError as exc:
+        raise SchemaError(str(exc)) from exc
+
+
 def validate(doc: Any) -> dict:
     """Exact shape, or ValueError: a field that is not the day or the words cannot ride along under any name."""
     if not isinstance(doc, dict) or set(doc) != KEYS:
