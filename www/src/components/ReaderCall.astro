@@ -1,11 +1,10 @@
 ---
-// "Your call beside the coaches" (#6088), built DARK. SELF-GATING: with WEB_READERCALL off (src/lib/readercall.js) this
-// component renders nothing — no element, no style block, no script tag — so a call's page is byte-identical to a build
-// without it. With the switch on (a private, never-deployed build) it renders the frame the island fills: the reader's
-// own one-tap call while the coach's call is open, and once it is graded the three things side by side — the coach,
-// the simple guess and the readers — with the readers' tally kept apart from the coach's record.
-import { callOutcome } from "../lib/format.js";
-import { READERCALL_API, READERCALL_MARKER, readerCallEnabled, readerCallFor } from "../lib/readercall.js";
+// "Your call beside the coaches" (#6088, #6114), built DARK. SELF-GATING: with WEB_READERCALL off (src/lib/readercall.js)
+// this component renders nothing — no element, no style block, no script tag — so a call's page is byte-identical to a
+// build without it. With the switch on it renders the frame the island fills from /api/reader_call: while the call is
+// open, the question and one tap, then what the reader called and when to come back (never a count); once closed, the
+// reader calls; once graded, the coach, the simple guess and the reader calls side by side — apart from the record.
+import { READERCALL_API, READERCALL_MARKER, itemIdOf, readerCallEnabled, readerCallFor } from "../lib/readercall.js";
 import { COPY } from "../lib/readercall_view.js";
 
 interface Props {
@@ -20,29 +19,28 @@ const guess = p.simple_guess;
 
 {
   on && (
-    <section {...mark} data-call={p.id} data-api={READERCALL_API} aria-labelledby={`rc-h-${p.id}`} style="border:1px solid var(--ink);padding:16px 18px;display:flex;flex-direction:column;gap:12px">
-      <p class="chip" style="align-self:flex-start">Private build · not published</p>
+    <section {...mark} data-call={itemIdOf(p.id)} data-api={READERCALL_API} aria-labelledby={`rc-h-${p.id}`} style="border:1px solid var(--ink);padding:16px 18px;display:flex;flex-direction:column;gap:12px">
       {
         graded ? (
           <>
-            <h2 class="label" id={`rc-h-${p.id}`} style="font-size:13px">Three calls, side by side</h2>
+            <h2 class="label" id={`rc-h-${p.id}`} style="font-size:13px">The coach, a simple guess and the reader calls</h2>
             <div class="rows" style="font-size:14px">
-              <span><span>The coach</span><span>{callOutcome(p.status)}</span></span>
+              <span><span>The coach</span><span data-rc-coach>…</span></span>
               <span><span>A simple guess</span><span>{guess && guess.state === "scored" ? (guess.right ? "right" : "wrong") : "not scored"}</span></span>
-              <span><span>Readers</span><span data-rc-readers>…</span></span>
+              <span><span>Reader calls</span><span data-rc-readers>…</span></span>
             </div>
-            <p style="font-size:14px;line-height:1.5" data-rc-body aria-live="polite">Reading the readers' calls…</p>
+            <p style="font-size:14px;line-height:1.5" data-rc-body aria-live="polite">Reading the reader calls…</p>
           </>
         ) : (
           <>
             <h2 class="label" id={`rc-h-${p.id}`} style="font-size:13px">Your call</h2>
             <p style="font-size:14px;line-height:1.5">{COPY}</p>
-            <div data-rc-body aria-live="polite"><p class="muted" style="font-size:13px">Reading the readers' calls…</p></div>
+            <div data-rc-body aria-live="polite"><p class="muted" style="font-size:13px">Reading the reader calls…</p></div>
             <div hidden><label>Leave this empty<input name="hp" type="text" autocomplete="off" data-rc-hp /></label></div>
           </>
         )
       }
-      <p class="muted" style="font-size:12px" data-rc-note>A count of readers' taps. It is not evidence about the experiment and is never part of the coach's record.</p>
+      <p class="muted" style="font-size:12px" data-rc-note>A count of reader calls. It is not evidence about the experiment and is never part of the coach's record.</p>
     </section>
   )
 }

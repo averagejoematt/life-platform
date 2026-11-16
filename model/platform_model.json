@@ -774,6 +774,12 @@
       "stack": "monitoring_stack",
       "via": "factory:_alarm"
     },
+    "reader-call-accepted-spike": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "serve_stack",
+      "via": "declaration"
+    },
     "recall-index-failed-chronicle-approve": {
       "kind": "metric",
       "routing": "digest",
@@ -1124,7 +1130,7 @@
   ],
   "cost_surface": {
     "ai_features": 30,
-    "alarms": 151,
+    "alarms": 152,
     "emf_namespaces": 34,
     "schedules": 97,
     "secrets": 31
@@ -8310,9 +8316,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time UTC cron; a zoned row (#4284) carries tz + local instead"
     },
     "counts": {
-      "alarms": 151,
+      "alarms": 152,
       "alarms_by_routing": {
-        "digest": 107,
+        "digest": 108,
         "digest+paging": 2,
         "digest+urgent": 10,
         "paging": 2,

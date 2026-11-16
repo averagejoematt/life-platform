@@ -5,6 +5,7 @@ import Base from "../../../layouts/Base.astro";
 import StatusTag from "../../../components/StatusTag.astro";
 import Quote from "../../../components/Quote.astro";
 import Glossary from "../../../components/Glossary.astro";
+import ReaderCallList from "../../../components/ReaderCallList.astro";
 import { DISPUTED_NOTE, isDisputed, verified } from "../../../lib/disputed.js";
 import { callOutcome, dayInWords } from "../../../lib/format.js";
 import { loadAll, latestEdition, loadCalibration } from "../../../lib/snapshot.js";
@@ -89,7 +90,7 @@ const KIND_WORDS: Record<string, string> = { number: "a number", direction: "a d
         <p class="muted" style="margin-top:8px;font-size:13px" data-method>
           Method {method.version}, from {dayInWords(method.effective)}: {method.note}
         </p>
-      )}
+      )}<ReaderCallList rows={rows} measureOf={(p: any) => (p.metric_id && all.get("metric", p.metric_id)?.label) || (p.metric_key || "").replace(/_/g, " ")} />
     </div>
   </section>
   <section class="wrap" style="padding-bottom:56px" data-ledger>
