@@ -77,7 +77,7 @@ def site_api() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             # SEC-01 (AUDIT 2026-06-30): the public site-api write was unconditioned on
             # the WHOLE table. Scope it to the exact interactive partitions the code
-            # writes (votes, follows, challenge check-ins, experiment suggestions, and
+            # writes (votes, follows, reader challenge check-ins, experiment suggestions, and
             # the shared rate limiter), mirroring site_api_ai's RATE#* LeadingKeys.
             # tests/test_site_api_write_scope.py greps the site-api code and FAILS if a
             # new write partition appears that isn't covered here — keep them in lockstep.
@@ -94,7 +94,9 @@ def site_api() -> list[iam.PolicyStatement]:
                         "USER#matthew#SOURCE#experiment_suggestions",  # reader experiment suggestions
                         "USER#matthew#SOURCE#reader_feedback",  # #4182: /api/page_feedback two-question reader door
                         "USER#matthew#SOURCE#morning_note",  # #4189: /api/morning_note — the owner's four words (owner-token write)
-                        "USER#matthew#SOURCE#challenges",  # challenge daily check-ins
+                        # #6087: NOT USER#matthew#SOURCE#challenges — the owner's challenge record is written only
+                        # by the MCP tool log_challenge_checkin. A reader's check-in lands in its own partition:
+                        "CHALLENGE_CHECKINS#*",  # reader challenge check-ins (common/challenge_checkins.py)
                         "USER#matthew#SOURCE#evening_ritual",  # #769 (ADR-124): one-tap ritual taps
                         "COHORT#*",  # #1394 (epic #1366): anonymous cohort-strip submissions (COHORT#<metric>#<week>)
                     ],

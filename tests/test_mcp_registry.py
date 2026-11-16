@@ -37,7 +37,7 @@ REGISTRY_PATH = os.path.join(MCP_DIR, "registry.py")
 # Expected tool count range — update when consolidating or adding tools
 EXPECTED_MIN_TOOLS = 50  # #395 ER-04 prune (2026-07-08): registry cut 143 -> 60 against 30d usage telemetry
 EXPECTED_MAX_TOOLS = (
-    91  # #395 held 70; +2 Horizons (#1705); +1 log_coach_calibration (#1481); +1 mark_journal_quote (#1568);
+    92  # #395 held 70; +2 Horizons (#1705); +1 log_coach_calibration (#1481); +1 mark_journal_quote (#1568);
     # +1 audit_coach_dossier (#1387); +1 manage_diary_claims (#1841) — deliberate additions.
     # +5 (#3668): describe_platform_surfaces + get_platform_surface (the index and the waiter — TWO tools
     # covering 59 unreachable owner-relevant endpoints, deliberately NOT 59 tools, because an oversized
@@ -78,6 +78,10 @@ EXPECTED_MAX_TOOLS = (
     # +1 (2026-11-11): get_advice_link_queue — the read-only queue of the coaches' recent asks beside what Matthew
     # recorded (owner-approved coach accountability, 2026-11-12). Not a `view` on get_decisions: it spans the coach
     # partitions, his notes and check-ins, and labelled activity context, and it must stay provably write-free.
+    # +1 (#6087): log_challenge_checkin — owner ruling 2026-11-16: a public interaction must never overwrite his
+    # challenge record, so the anonymous door lost its write on his row and his own check-in needed an
+    # owner-authenticated door. An MCP tool rather than a Site API owner-token route, so the public role holds no
+    # write grant on the partition at all.
 )
 
 
