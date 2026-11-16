@@ -1187,12 +1187,20 @@ _BUNDLE = "life-platform/ingestion-keys"
 _BUNDLE_BEARER = "bundle-bearer-value"  # not a real credential
 
 
-class _ClientError(Exception):
-    """botocore ClientError's shape: the code lives in `.response["Error"]["Code"]`."""
+class ClientError(Exception):
+    """botocore's shape: the code lives in `.response["Error"]["Code"]`. An UNMODELLED code
+    (AccessDeniedException on Secrets Manager) is raised as this generic class name."""
 
     def __init__(self, code):
         super().__init__(f"An error occurred ({code})")
         self.response = {"Error": {"Code": code}}
+
+
+class ResourceNotFoundException(ClientError):
+    """A MODELLED code: botocore names the raised class after it (verified with `from_code`)."""
+
+    def __init__(self):
+        super().__init__("ResourceNotFoundException")
 
 
 class _FakeSecrets:
@@ -1202,7 +1210,7 @@ class _FakeSecrets:
 
     def get_secret_value(self, SecretId):
         self.reads.append(SecretId)
-        value = self.store.get(SecretId, _ClientError("ResourceNotFoundException"))
+        value = self.store.get(SecretId, ResourceNotFoundException())
         if isinstance(value, Exception):
             raise value
         return {"SecretString": value}
@@ -1260,10 +1268,10 @@ class TestBearerTokenSource:
     def test_an_ungranted_dedicated_secret_falls_back_too(self, token_source):
         """Code ships on merge; the CDK grant waits for the owner's deploy — AccessDenied must not 500."""
         auth, fake, lines = token_source(
-            {_DEDICATED: _ClientError("AccessDeniedException"), _BUNDLE: json.dumps({"health_auto_export_api_key": _BUNDLE_BEARER})}
+            {_DEDICATED: ClientError("AccessDeniedException"), _BUNDLE: json.dumps({"health_auto_export_api_key": _BUNDLE_BEARER})}
         )
         assert auth.get_api_key() == _BUNDLE_BEARER
-        assert any("AccessDeniedException" in line for line in lines.lines)
+        assert any("reason=ClientError" in line for line in lines.lines)
 
     def test_a_dedicated_secret_without_the_field_falls_back(self, token_source):
         auth, fake, lines = token_source(
@@ -1289,6 +1297,18 @@ class TestBearerTokenSource:
         )
         auth.get_api_key()
         assert lines.lines and not any(_VALID_BEARER in line or _BUNDLE_BEARER in line for line in lines.lines)
+
+    def test_the_logged_reason_is_the_class_name_never_the_response(self, token_source):
+        """#5513 / CodeQL py/clear-text-logging-sensitive-data: the reason never reads the error's
+        response or message, and no line names a secret id — fixed labels only."""
+        planted = "PLANTED-VALUE-IN-RESPONSE"
+        auth, _, lines = token_source(
+            {_DEDICATED: ClientError(planted), _BUNDLE: json.dumps({"health_auto_export_api_key": _BUNDLE_BEARER})}
+        )
+        assert auth.get_api_key() == _BUNDLE_BEARER
+        assert any("reason=ClientError" in line for line in lines.lines)
+        assert not any(planted in line for line in lines.lines)
+        assert not any(_DEDICATED in line or _BUNDLE in line for line in lines.lines)
 
     def test_the_handler_admits_the_dedicated_token(self, wired, token_source):
         token_source({_DEDICATED: json.dumps({"health_auto_export_api_key": _VALID_BEARER})})

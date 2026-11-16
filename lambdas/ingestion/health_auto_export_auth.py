@@ -9,8 +9,8 @@ its own Secrets Manager secret, `life-platform/hae-webhook`, JSON `{"health_auto
 The cutover is zero-downtime, in this order: the dedicated secret is read first; if it does not
 exist yet, the role cannot read it yet (the CDK grant not deployed), it is unparseable or it
 lacks the field, the lookup falls back to the bundle key exactly as before. Every lookup logs
-which source answered (`hae_auth_key_source source=dedicated|bundle`), never the value. A
-failed dedicated read is not retried for 15 minutes, the same window as the value cache.
+which source answered (`hae_auth_key_source source=dedicated|bundle`, fixed labels), never a
+secret id or value. A failed dedicated read is not retried for 15 minutes, the same window as the value cache.
 
 The fallback and the bundle grant are TEMPORARY. Once CloudWatch shows `source=dedicated`, the
 follow-up removes both (and the bundle's health_auto_export field); until then the role reads
@@ -46,10 +46,13 @@ _dedicated_retry_at = 0.0
 
 
 def _failure_reason(exc):
-    """A log-safe reason: the AWS error code or the exception class, never its message."""
-    response = getattr(exc, "response", None)
-    code = response.get("Error", {}).get("Code") if isinstance(response, dict) else None
-    return code or type(exc).__name__
+    """A log-safe reason: the exception CLASS name only — never its message, never its response.
+
+    botocore names a modelled error's class after its code, so an absent secret reads
+    `ResourceNotFoundException`; an unmodelled one (AccessDenied while the CDK grant is not yet
+    deployed) reads `ClientError`; an unparseable secret reads `JSONDecodeError`/`AttributeError`.
+    """
+    return type(exc).__name__
 
 
 def get_api_key():
@@ -57,6 +60,9 @@ def get_api_key():
 
     Raises only when the bundle read itself fails, which the handler already answers with 500;
     a bundle without the field returns None, which the handler answers with 403.
+
+    The log lines carry fixed labels only (`source=dedicated` / `source=bundle`) and an
+    exception class name — never a secret id, never anything read from a secret.
     """
     global _dedicated_retry_at
     if time.time() >= _dedicated_retry_at:
@@ -66,10 +72,10 @@ def get_api_key():
         except Exception as exc:  # noqa: BLE001 — any dedicated failure falls back to the bundle
             key, reason = None, _failure_reason(exc)
         if key:
-            logger.info("hae_auth_key_source source=dedicated secret=%s", DEDICATED_SECRET_NAME)
+            logger.info("hae_auth_key_source source=dedicated")
             return key
         _dedicated_retry_at = time.time() + _DEDICATED_RETRY_SECONDS
-        logger.warning("hae_auth_key_fallback secret=%s reason=%s retry_in_s=%d", DEDICATED_SECRET_NAME, reason, _DEDICATED_RETRY_SECONDS)
-    secret = json.loads(get_secret(SECRET_NAME, secrets_client))
-    logger.info("hae_auth_key_source source=bundle secret=%s", SECRET_NAME)
-    return secret.get(KEY_FIELD) or secret.get("api_key")
+        logger.warning("hae_auth_key_fallback source=bundle reason=%s retry_in_s=%d", reason, _DEDICATED_RETRY_SECONDS)
+    bundle = json.loads(get_secret(SECRET_NAME, secrets_client))
+    logger.info("hae_auth_key_source source=bundle")
+    return bundle.get(KEY_FIELD) or bundle.get("api_key")
