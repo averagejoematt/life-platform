@@ -1,6 +1,6 @@
 # Life Platform — Architecture Decision Records (ADR)
 
-> **Status:** canonical (append-only) · **Owner:** Matthew · **Verified:** 2026-05-19
+> **Status:** canonical (append-only) · **Owner:** Matthew · **Verified:** 2026-11-15
 
 > Permanent log of significant architectural, design, and operational decisions.
 > Each ADR captures the decision, context, alternatives considered, and outcome.
