@@ -184,6 +184,35 @@ def _entry_kind(entry: dict) -> tuple[str, str]:
     return "red", conclusion or status or "UNKNOWN"
 
 
+def _entry_time(entry: dict) -> str:
+    """Sortable run timestamp, '' when the entry carries none. An in-flight run's
+    completedAt is the zero value 0001-01-01, so startedAt leads."""
+    return str(entry.get("startedAt") or entry.get("completedAt") or "")
+
+
+def latest_runs(entries: list[dict]) -> list[dict]:
+    """Keep only the most recent run per (workflowName, name) (#6062). Pure.
+
+    A re-run, or a label-triggered gate with cancel-in-progress concurrency, leaves
+    superseded FAILURE / CANCELLED runs in the rollup beside the run that finally
+    passed; judging them makes a permanent false red. Entries with no timestamp
+    (the `gh pr checks --json name,bucket` dialect) cannot be ordered and are all
+    kept, exactly as before.
+    """
+    latest: dict[tuple[str, str], dict] = {}
+    kept: list[dict] = []
+    for e in entries:
+        t = _entry_time(e)
+        if not t:
+            kept.append(e)
+            continue
+        key = (str(e.get("workflowName") or ""), _entry_name(e))
+        cur = latest.get(key)
+        if cur is None or t >= _entry_time(cur):
+            latest[key] = e
+    return kept + list(latest.values())
+
+
 def classify_rollup(entries: list[dict], expected: set[str] | None = None) -> dict:
     """Classify a PR's statusCheckRollup. Pure — no `gh`, unit-tested offline.
 
@@ -200,6 +229,7 @@ def classify_rollup(entries: list[dict], expected: set[str] | None = None) -> di
                           rollup but never green (e.g. only ever SKIPPED, or
                           only ever FAILURE)
     """
+    entries = latest_runs(entries)
     total = len(entries)
     red: list[dict] = []
     skipped: list[dict] = []
