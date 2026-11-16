@@ -1073,6 +1073,31 @@ def test_6102_a_call_an_owner_ruling_took_out_of_the_record_never_reads_as_not_e
     assert pr.reason_words(kept)[1] is True and "not enough" not in pr.reason_words(kept)[0] and pr.reason_words(kept)[0] != pr.RULED_REASON
 
 
+def test_6102_the_ruled_reason_survives_the_publication_gate():
+    """The gate empties a served string that shares a six-word run with a withheld row's stored text. A ruled row's
+    stored notes are the rulings' own sentences, so the reason must share no such run with any of them — the first
+    wording did ("could not be checked as filed"), and was served empty on every ruled call."""
+    from web import narrative_publication as NP, prediction_reason as pr
+
+    stored = [
+        "Could not be checked as filed: it depends on a condition that no record measures. The original grade is kept.",
+        "Could not be checked as filed: the forecast depends on a stated condition that the stored test never checked, and the condition "
+        "names no line that could be checked without choosing one after the fact. The stated condition was not established. The original grade is kept.",
+        "Could not be checked as filed: the stored test checks a different claim from the sentence. The original grade is kept.",
+        "Its condition was measured over the call's own window and did not happen, so the forecast was never tested. It was never graded.",
+        "Not a forecast: what it reported was already on the record when the call was made. Kept as an observation. The original grade is kept.",
+    ]
+    NP.reset_taint()
+    try:
+        for text in stored:
+            NP._taint_text(text)
+        assert not NP.is_tainted(pr.RULED_REASON)
+        # the control: the wording that was served empty is caught by the same check
+        assert NP.is_tainted("could not be checked as filed — the correction recorded on this call says why")
+    finally:
+        NP.reset_taint()
+
+
 def test_4220_predictions_serve_reason_and_graded_on_data_beside_the_raw_notes(monkeypatch):
     table, _rows = _write_live_0926_wire(monkeypatch)
     _coaches, _cal, predictions, _wrong = _served_four(monkeypatch, table)
