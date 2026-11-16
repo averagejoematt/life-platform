@@ -153,6 +153,8 @@ revoke the old app password. 15-min `secret_cache.py` TTL applies.
 
 These three keys now live inside `life-platform/ingestion-keys`. Rotate by editing the bundle (see `ingestion-keys` procedure below).
 
+**HAE webhook key, #5513 (c):** the webhook reads `life-platform/hae-webhook` (`health_auto_export_api_key`) first and the bundle field only as a cutover fallback. Until the follow-up removes that fallback, a rotation writes the new value to BOTH secrets, then into the Health Auto Export app; the webhook's value cache is 15 minutes.
+
 ### `ingestion-keys` (bundled)
 
 This is a single secret containing keys for multiple sources (Notion + Habitify + Todoist + Dropbox + HAE webhook). When rotating any one of them:

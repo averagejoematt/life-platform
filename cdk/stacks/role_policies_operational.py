@@ -152,7 +152,7 @@ def operational_freshness_checker() -> list[iam.PolicyStatement]:
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
             resources=[KMS_KEY_ARN],
         ),
-        _put_metric_data_statement("CloudWatchMetrics", NS_AI, NS_COMPUTE, NS_FRESHNESS),  # #5545
+        _put_metric_data_statement("CloudWatchMetrics", NS_COMPUTE, NS_FRESHNESS),  # #5545; #5905: no AI (reached, never called)
         iam.PolicyStatement(
             sid="SES",
             actions=["ses:SendEmail", "sesv2:SendEmail"],
@@ -751,7 +751,7 @@ def operational_reading_recall_sweep() -> list[iam.PolicyStatement]:
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
             resources=[KMS_KEY_ARN],
         ),
-        _put_metric_data_statement("CloudWatchMetrics", NS_AI, NS_COMPUTE, NS_READING),  # #5545
+        _put_metric_data_statement("CloudWatchMetrics", NS_COMPUTE, NS_READING),  # #5545; #5905: no AI (reached, never called)
     ]
 
 
@@ -1116,7 +1116,7 @@ def operational_insight_email_parser() -> list[iam.PolicyStatement]:
                 resources=[BUCKET_ARN],
                 conditions={"StringLike": {"s3:prefix": ["generated/qa_archive/text/*"]}},
             ),
-            _put_metric_data_statement("CloudWatchMetrics", NS_AI, NS_COMPUTE, NS_EMAIL),  # #5545
+            _put_metric_data_statement("CloudWatchMetrics", NS_COMPUTE, NS_EMAIL),  # #5545; #5905: no AI (reached, never called)
             _experiment_cycle_read(),  # #3599/#3513: save_insight stamps through experiment_stamp_for
         ],
     )
