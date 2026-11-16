@@ -356,10 +356,17 @@ def _rate_check(endpoint: str, ip_hash: str, limit: int, window_seconds: int, fa
     """The single door every rate-limited write in this module passes through.
 
     Uses the shared DynamoDB limiter when it is available and the bounded
-    in-memory fallback when it is not — but NEVER returns "allowed" without having
-    applied a limit. `_RATE_LIMITER_READY` is read here and nowhere else, which is
-    what `tests/test_site_api_social_behavior.py` pins: a future write door that
-    forgets its fallback is not expressible, because there is only one fallback.
+    in-memory fallback when it is not. `_RATE_LIMITER_READY` is read here and
+    nowhere else, which is what `tests/test_site_api_social_behavior.py` pins: a
+    future write door that forgets its fallback is not expressible, because there
+    is only one fallback.
+
+    What happens when the DynamoDB limiter itself ERRORS is the caller's
+    `fail_open`, and it is not a detail (#6088): with the default (True) a limiter
+    outage ADMITS the request unmetered. Every door that STORES reader content or a
+    reader-moved counter passes `fail_open=False` — an outage refuses the write
+    rather than letting it through unmetered. The doors left on the default, and
+    why, are named in `tests/test_reader_write_fail_closed_6088.py`.
     """
     if _RATE_LIMITER_READY:
         return _ddb_rate_check(table, endpoint=endpoint, ip_hash=ip_hash, limit=limit, window_seconds=window_seconds, fail_open=fail_open)

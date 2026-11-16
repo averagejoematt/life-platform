@@ -1908,6 +1908,32 @@ def test_the_same_write_endpoint_does_limit_while_the_shared_limiter_is_present(
     assert 429 in statuses
 
 
+#: #6088 — the doors that STORE reader content or a reader-moved counter; each fails CLOSED when
+#: the limiter errors. The AST set guard is tests/test_reader_write_fail_closed_6088.py; this is the wire half.
+_STORING_DOORS = (
+    "_handle_submit_finding",
+    "_handle_board_question",
+    "_handle_experiment_suggest",
+    "_handle_page_feedback",
+    "_handle_cohort_submit",
+    "_handle_predict_week",
+)
+
+
+def test_a_storing_door_refuses_and_writes_nothing_when_the_limiter_errors_6088(monkeypatch):
+    """A DynamoDB error inside the limiter (update_item raises) must refuse the request with no
+    stored row and no stored object. Before #6088 five of these six admitted it unmetered."""
+    admitted = {}
+    for name in _STORING_DOORS:
+        table = _active_challenge_table()
+        table.fail = {"update_item"}
+        _t, s3, _sec = wire(monkeypatch, table=table, s3=_cohort_and_challenge_s3())
+        resp = ENDPOINTS[name](_FLAG_DRIVERS[name]())
+        if resp["statusCode"] == 200 or table.puts or s3.puts:
+            admitted[name] = (resp["statusCode"], len(table.puts), len(s3.puts))
+    assert not admitted, f"doors that wrote through a limiter error: {admitted}"
+
+
 def test_the_degraded_limiter_refuses_rather_than_admits_once_its_store_is_full(monkeypatch):
     """The in-memory fallback is per-container, so it can only be a bound if it is
     itself bounded. At capacity it FAILS CLOSED — the distributed flood ends in

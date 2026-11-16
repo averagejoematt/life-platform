@@ -300,7 +300,9 @@ def _handle_submit_finding(event: dict, *, _g) -> dict:
 
     # Rate limit: FINDING_RATE_LIMIT per IP per hour — DynamoDB-backed (survives
     # cold starts; bounded in-memory fallback only, #2237).
-    allowed, remaining, _retry = _rate_check("submit_finding", ip_hash, limit=FINDING_RATE_LIMIT, window_seconds=3600)
+    allowed, remaining, _retry = _rate_check(
+        "submit_finding", ip_hash, limit=FINDING_RATE_LIMIT, window_seconds=3600, fail_open=False
+    )  # #6088
     if not allowed:
         return _rate_limited("submit_finding", f"Rate limit reached. {FINDING_RATE_LIMIT} submissions per hour.", retry_after=3600)
 
@@ -433,7 +435,9 @@ def _handle_page_feedback(event: dict, *, _g) -> dict:
         return _salt_unavailable(_g)
 
     # 2. Rate limit before any parsing work.
-    allowed, _remaining, _retry = _rate_check("page_feedback", ip_hash, limit=PAGE_FEEDBACK_RATE_LIMIT, window_seconds=3600)
+    allowed, _remaining, _retry = _rate_check(
+        "page_feedback", ip_hash, limit=PAGE_FEEDBACK_RATE_LIMIT, window_seconds=3600, fail_open=False
+    )  # #6088
     if not allowed:
         return _rate_limited("page_feedback", f"Rate limit reached. {PAGE_FEEDBACK_RATE_LIMIT} per hour.", retry_after=3600)
 
@@ -825,7 +829,9 @@ def _handle_board_question(event: dict, *, _g) -> dict:
     # #2237: this door's old `else` branch set `allowed = True` unconditionally —
     # an unmetered S3 write path whenever the shared limiter was unavailable. It
     # now shares the module chokepoint with every other door.
-    allowed, remaining, _retry = _rate_check("board_question", ip_hash, limit=BOARD_QUESTION_RATE_LIMIT, window_seconds=3600)
+    allowed, remaining, _retry = _rate_check(
+        "board_question", ip_hash, limit=BOARD_QUESTION_RATE_LIMIT, window_seconds=3600, fail_open=False
+    )  # #6088
     if not allowed:
         return _rate_limited("board_question", f"Rate limit reached. {BOARD_QUESTION_RATE_LIMIT} questions per hour.", retry_after=3600)
 

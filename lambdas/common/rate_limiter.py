@@ -68,6 +68,17 @@ def check_rate_limit(
     Bedrock calls) pass fail_open=False so a DDB outage can't become an
     unmetered AI bill; they return a short retry_after since DDB blips are
     transient. Errors are logged for observability.
+
+    #6088 amends the default's reach, honestly: "non-cost endpoint" was the
+    stated reason for failing open, but a door that STORES reader content or a
+    reader-moved public counter has a cost that is not dollars — an outage
+    window in which one network can write without a meter, into a queue the
+    owner reads or a number readers see. Those doors (`submit_finding`,
+    `board_question`, `experiment_suggest`, `page_feedback`, `cohort_submit`,
+    `predict_week`, `reader_call`) now pass fail_open=False too. What stays on
+    the default is named, with its reason, in
+    `tests/test_reader_write_fail_closed_6088.py` — a click counter, the owner's
+    own token-gated doors, and the challenge check-in pending #6087.
     """
     now = int(time.time())
     bucket_start = _bucket_for_window(now, window_seconds)
