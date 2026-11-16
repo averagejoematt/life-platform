@@ -532,13 +532,13 @@ class TestHabitStreaks:
         assert dmc.compute_habit_streaks(_profile(registry), YESTERDAY)["tier01_streak"] == 3
 
     def test_vice_streaks_are_tracked_per_habit_and_break_independently(self, table, frozen_clock):
-        _habit_days(table, 4, lambda i: {"no_weed": 1, "no_porn": 0 if i == 1 else 1})
+        _habit_days(table, 4, lambda i: {"no_weed": 1, "restraint_habit_b": 0 if i == 1 else 1})
         registry = {
             "no_weed": {"status": "active", "tier": 2, "vice": True},
-            "no_porn": {"status": "active", "tier": 2, "vice": True},
+            "restraint_habit_b": {"status": "active", "tier": 2, "vice": True},
         }
         out = dmc.compute_habit_streaks(_profile(registry), YESTERDAY)
-        assert out["vice_streaks"] == {"no_weed": 4, "no_porn": 1}
+        assert out["vice_streaks"] == {"no_weed": 4, "restraint_habit_b": 1}
 
     def test_an_empty_registry_falls_back_to_the_mvp_habit_list(self, table, frozen_clock):
         _habit_days(table, 3, lambda i: {"sleep": 1})
