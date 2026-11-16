@@ -79,6 +79,28 @@ ACTIVE_API_SOURCES = active_api_source_ids()
 # sleep/HRV/recovery are covered by Whoop + Eight Sleep. Flagged best_effort in the registry.
 BEST_EFFORT_SOURCES = best_effort_source_ids()
 
+# #518: audited against `aws secretsmanager list-secrets` 2026-07-04.
+# `life-platform/dropbox` NEVER existed (dropbox creds live in
+# ingestion-keys) — it had this check red every day since 2026-05-25.
+# todoist + hevy added: real, load-bearing secrets the list was missing.
+# #5513: hoisted to module scope (the handler sat at its #4880 length ceiling).
+REQUIRED_SECRETS = [
+    "life-platform/whoop",
+    "life-platform/withings",
+    "life-platform/strava",
+    "life-platform/todoist",
+    "life-platform/eightsleep",
+    "life-platform/habitify",
+    "life-platform/notion",
+    "life-platform/hevy",
+    "life-platform/ai-keys",
+    "life-platform/site-api-ai-key",
+    "life-platform/ingestion-keys",
+    # #5513 (c): the HAE webhook's dedicated bearer token. MISSING here while the webhook still
+    # answers is the cutover state (it falls back to the bundle) — the owner's create-secret clears it.
+    "life-platform/hae-webhook",
+]
+
 # Per-source attempt-gap overrides were an EMPTY dict read with a 1560 fallback —
 # an inert mechanism (#2309 census note, ADR-103/144): deleted; every source uses
 # the 1560-minute (~26h) default below. Reintroduce a map only WITH a first entry.
@@ -510,23 +532,6 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
     # tally must reconcile: passed + failed + paused == total (ADR-105).
     secrets_failed = 0
     sm = boto3.client("secretsmanager", region_name=REGION)
-    # #518: audited against `aws secretsmanager list-secrets` 2026-07-04.
-    # `life-platform/dropbox` NEVER existed (dropbox creds live in
-    # ingestion-keys) — it had this check red every day since 2026-05-25.
-    # todoist + hevy added: real, load-bearing secrets the list was missing.
-    REQUIRED_SECRETS = [
-        "life-platform/whoop",
-        "life-platform/withings",
-        "life-platform/strava",
-        "life-platform/todoist",
-        "life-platform/eightsleep",
-        "life-platform/habitify",
-        "life-platform/notion",
-        "life-platform/hevy",
-        "life-platform/ai-keys",
-        "life-platform/site-api-ai-key",
-        "life-platform/ingestion-keys",
-    ]
     for secret_name in REQUIRED_SECRETS:
         try:
             desc = sm.describe_secret(SecretId=secret_name)

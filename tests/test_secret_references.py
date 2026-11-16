@@ -119,6 +119,7 @@ KNOWN_SECRETS = {
     "life-platform/progress-photos-signing",  # #3760: HMAC key for the private progress viewer (mint: telegram-coach-worker, verify: progress-viewer)
     "life-platform/site-api-origin-secret",  # #815 R22-SEC-03 / #1589: the x-amj-origin CloudFront gate value, read at runtime by the AI-quality canary
     "life-platform/ip-hash-salt",  # #3620 (security ROW4): the salt for every reader ip_hash in site_api_social_engage.py. Owner-provisioned random value; the doors fail CLOSED (503) until it exists.
+    "life-platform/hae-webhook",  # #5513 (c): the HAE webhook's own bearer token, split from ingestion-keys. Owner-provisioned (a copy of the bundle value); the webhook falls back to the bundle until it exists.
     # life-platform/google-calendar removed — retired ADR-030 (v3.7.46)
 }
 
