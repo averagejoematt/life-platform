@@ -32,6 +32,7 @@ import { fileURLToPath } from "node:url";
 import { ROOM_ENV, ROOM_PUBLIC_VALUES, roomPrivate, roomScope, scopeRoutes } from "../src/lib/room.js";
 import { LAB_ROUTES, labEnabled, labPrivate } from "../src/lib/lab.js";
 import { STORY_ROUTES, storyEnabled, storyPrivate } from "../src/lib/story_dark.js";
+import { readerCallEnabled } from "../src/lib/readercall.js";
 
 const WWW = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = join(WWW, "dist");
@@ -54,7 +55,9 @@ const rawBase = process.env.WEB_BASE || "/";
 const lab = labPrivate();
 const story = storyPrivate();
 const privateRoom = roomScope() !== "off" && roomPrivate();
-const room = privateRoom || lab || story;
+// #6088: a WEB_READERCALL=1 build (the reader-call control, built dark) is private and local in exactly the same way.
+const readercall = readerCallEnabled();
+const room = privateRoom || lab || story || readercall;
 const base = "/" + rawBase.replace(/^\/+|\/+$/g, "");
 
 function walk(dir, out = []) {
@@ -233,7 +236,7 @@ if (!room) writeFileSync(REACH_OUT, JSON.stringify(reach, null, 2) + "\n");
 
 if (room) {
   console.log(
-    `postbuild: ${lab ? "WEB_LAB=1 — a private Laboratory build" : story ? "WEB_STORY=1 — a private Human Story build" : `WEB_ROOM=${process.env[ROOM_ENV]} — a private Coaching Room build`} (${routes.size} routes); owned_paths.json and reach.json left as committed. Never deploy this dist.`
+    `postbuild: ${lab ? "WEB_LAB=1 — a private Laboratory build" : story ? "WEB_STORY=1 — a private Human Story build" : readercall ? "WEB_READERCALL=1 — a private reader-call build" : `WEB_ROOM=${process.env[ROOM_ENV]} — a private Coaching Room build`} (${routes.size} routes); owned_paths.json and reach.json left as committed. Never deploy this dist.`
   );
 } else {
   console.log(
