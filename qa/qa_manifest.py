@@ -127,9 +127,10 @@ _V9_INTENTS = {
         "The narration: weekly chapters of an experiment in changing a life, not only a weight; "
         "the latest chapter and its episode, then every chapter in order."
     ),
+    # owner ruling 2026-11-16 (#6067): these measurements are one part of a broader experiment, not its verdict
     "/data/": (
-        "The data room: the published series behind the experiment, paired against each other, "
-        "with how each number is measured and what is missing."
+        "The data room: the measurable part of a four-part experiment — each published series with its latest "
+        "reading and source; open one to compare it with another and see what is missing."
     ),
     "/system/": (
         "How the platform works: the AI coaches' graded record beside a simple guess, the ledger of every prediction, "

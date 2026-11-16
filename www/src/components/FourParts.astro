@@ -1,0 +1,154 @@
+---
+// One experiment, four parts (owner ruling 2026-11-16): the strip the Story, Data and System doors carry so a reader
+// who lands on one of them sees which part of the experiment it holds and where the other three live. The figures are
+// lib/standing.js's — the same ones the front page's block prints — and each part links to the page that holds it.
+// `here` names the part this page is about (none on Story, which tells all four).
+import { verifiedLead } from "../lib/calibration.js";
+import { labEnabled } from "../lib/lab.js";
+import { roomPublic } from "../lib/room.js";
+import { bodyChange, fourParts, labVerdicts, measuredDimensions } from "../lib/standing.js";
+import { latestEdition, loadCalibration, loadJourney, loadLab, loadSeries } from "../lib/snapshot.js";
+import { href } from "../lib/url.js";
+
+interface Props {
+  here?: "body" | "behaviour" | "life" | "ai" | null;
+}
+const { here = null } = Astro.props as Props;
+async function safe<T>(f: () => Promise<T>): Promise<T | null> {
+  try {
+    return await f();
+  } catch {
+    return null;
+  }
+}
+const series: any = (await safe(loadSeries)) || {};
+const edition: any = await safe(latestEdition);
+const journey: any = await safe(loadJourney);
+const startDate = edition?.blocks?.today?.data?.start_date || edition?.start_date || null;
+const lab: any = labEnabled() ? await safe(loadLab) : null;
+const calFile: any = roomPublic() ? await safe(loadCalibration) : null;
+const lead = calFile?.state === "ok" ? verifiedLead(calFile.calibration || {}) : null;
+const parts = fourParts({
+  body: bodyChange(series["weight_lbs"], startDate, journey?.start_weight_lbs ?? edition?.blocks?.today?.data?.start_weight_lbs ?? null),
+  lab: labVerdicts(lab),
+  measured: measuredDimensions(series),
+  lead,
+});
+// where each part lives; the part this page holds is not a link
+const HOME: Record<string, string> = {
+  body: "/data/",
+  behaviour: labEnabled() ? "/data/lab/" : "/data/",
+  life: "/",
+  ai: roomPublic() ? "/system/calibration/" : "/system/",
+};
+const HERE_WORDS: Record<string, string> = { body: "the body", behaviour: "the behaviour", life: "the life", ai: "the AI" };
+const hereWords = here ? HERE_WORDS[here] : null;
+---
+
+<nav class="fourparts" aria-label="The four parts of the experiment" data-four-parts={here || "all"}>
+  <p class="label fourparts-head">
+    One experiment, four parts{hereWords ? ` · this page holds ${hereWords}` : ""}
+  </p>
+  <ol>
+    {
+      parts.map((p) => {
+        const Tag = p.id === here ? "span" : "a";
+        return (
+          <li class:list={[`fp-${p.id}`, { "is-here": p.id === here }]}>
+            <Tag class="fp-cell" href={Tag === "a" ? href(HOME[p.id]) : undefined} aria-current={p.id === here ? "page" : undefined}>
+              <span class="label">{p.part}</span>
+              <span class="fp-fig">
+                <b class={`num ${p.value == null ? "hollow" : ""}`}>{p.value == null ? "—" : p.value}</b> {p.short}
+              </span>
+              <span class="fp-status">{p.status}</span>
+            </Tag>
+          </li>
+        );
+      })
+    }
+  </ol>
+</nav>
+
+<style>
+  .fourparts {
+    border-top: 2px solid var(--ink);
+    border-bottom: 1px solid var(--rule);
+    padding: 10px 0 0;
+  }
+  .fourparts ol {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    border-top: 1px solid var(--rule);
+  }
+  .fourparts li + li {
+    border-left: 1px solid var(--rule);
+  }
+  .fp-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px 14px 12px;
+    height: 100%;
+    text-decoration: none;
+    color: var(--ink);
+  }
+  .fourparts li:first-child .fp-cell {
+    padding-left: 0;
+  }
+  .fp-fig {
+    font-size: 14px;
+    line-height: 1.35;
+  }
+  .fp-fig b {
+    font-family: var(--sans);
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: -0.01em;
+  }
+  .fp-fig b.hollow {
+    color: var(--muted);
+  }
+  .fp-status {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .fp-body .fp-fig b {
+    color: var(--cobalt);
+  }
+  .is-here .fp-cell {
+    background: var(--rule2);
+    padding-left: 14px;
+  }
+  .is-here .fp-status {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  a.fp-cell:hover .label {
+    text-decoration: underline;
+  }
+  @media (max-width: 720px) {
+    .fourparts ol {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .fourparts li:nth-child(3) {
+      border-left: 0;
+    }
+    .fourparts li:nth-child(n + 3) {
+      border-top: 1px solid var(--rule);
+    }
+    .fp-cell,
+    .fourparts li:first-child .fp-cell {
+      padding: 8px 10px 9px;
+    }
+    .fp-fig {
+      font-size: 13px;
+    }
+    .fp-fig b {
+      font-size: 17px;
+    }
+  }
+</style>
