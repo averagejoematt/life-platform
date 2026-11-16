@@ -69,8 +69,9 @@ LB = 0.45359237
 # at a bodyweight inside the same 10-lb band as the target-date weigh-in. #4080: the heavy
 # day's squat is `squat_barbell` (owner option B exempts the squat family from skill_ceiling
 # 2, and it is the squat's first key); `leg_press` stays for §8's non-v0.3 path test.
-ANCHOR_LB = {"squat_barbell": 300.0, "leg_press": 400.0, "machine_row": 200.0, "lat_pulldown": 180.0, "barbell_bench_press": 250.0}
-ANCHOR_REPS = {"squat_barbell": 5, "leg_press": 8, "machine_row": 10, "lat_pulldown": 10, "barbell_bench_press": 5}
+# #6014 (coaching decision 2026-11-15): the heavy-upper row is pinned to the one-arm dumbbell row (synthetic 100 lb x 10).
+ANCHOR_LB = {"squat_barbell": 300.0, "leg_press": 400.0, "one_arm_db_row": 100.0, "lat_pulldown": 180.0, "barbell_bench_press": 250.0}
+ANCHOR_REPS = {"squat_barbell": 5, "leg_press": 8, "one_arm_db_row": 10, "lat_pulldown": 10, "barbell_bench_press": 5}
 HISTORY = {
     MOVEMENTS[k]["hevy_template_id_hint"]: [
         {"date": "2025-01-10", "top_weight_kg": lb * LB, "sets": [{"weight_kg": lb * LB, "reps": ANCHOR_REPS[k]}]}
@@ -80,7 +81,7 @@ HISTORY = {
 WEIGHTS = {"2025-01-10": 316.0, "2026-09-23": 315.0, "2026-09-27": 315.0, "2026-11-17": 314.0}
 # The v0.4 upper-heavy session's heavy anchors (#4147) — each has a `hevy_template_id_hint`, the
 # key `_enforce_load_floors` looks the history up by (the bench's is the live-verified 79D0BB3A).
-HEAVY_ANCHORS = ("barbell_bench_press", "machine_row")
+HEAVY_ANCHORS = ("barbell_bench_press", "one_arm_db_row")
 BENCH = "barbell_bench_press"
 DAY = "2026-09-27"  # week 1, after three completed sessions (lower-heavy, upper-volume, lower-volume)
 

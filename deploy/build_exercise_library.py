@@ -96,6 +96,16 @@ INITIAL_HEADER = {
 # ruling and provenance) — written whole by every rebuild; a later ruling edits that table, never this file.
 
 
+def _status_line(head: dict[str, Any]) -> str:
+    """The `_README`'s status sentence, from the header it sits on (#6014: the text said PROPOSED after the owner approved it)."""
+    if head.get("status") == "approved":
+        return (
+            f"APPROVED (owner, {head.get('approved_on') or 'date not stamped'}) — the live drafting path reads it; rollback is "
+            "`status` back to `proposed` (the shadow path)."
+        )
+    return "PROPOSED — nothing in the drafting path reads it until the owner approves it."
+
+
 def with_builder_changes(head: dict[str, Any]) -> dict[str, Any]:
     """The header with every builder-owned change-log line present once (a line with the builder's version AND `by` is the
     builder's own, so it is rewritten to the current text; any other line is never touched) and `version` at the highest."""
@@ -892,7 +902,7 @@ def build_library(
         raise SystemExit(f"evidence-review ledger: evidence change for a movement not in the library: {missing}")
     reviews.finalize_tiers(movements)  # #5857 + #5861: every row's tier (+ at most one recorded band) and every objective rating
 
-    inventory = integrity_inputs.home_gym_inventory(movements, history, cur.SEEDED_AVAILABILITY)
+    inventory = integrity_inputs.home_gym_inventory(movements, history, cur.SEEDED_AVAILABILITY, cur.HOME_GYM_SINCE["date"])
     for e in movements.values():
         e["availability"] = {lib_rules.LOCATION_ID: integrity_inputs.movement_availability(e, inventory)}
     proto = {"gates": gates_out, "movements": movements}
@@ -907,8 +917,9 @@ def build_library(
     src = Counter(e["source"] for e in movements.values())
     out = {
         "_README": (
-            "The owner's exercise library (#5769). PROPOSED — nothing in the drafting path reads it until the owner approves "
-            "it. Public half only: no bodyweight, no loads, no note text — the N=1 half (best set per bodyweight band, coded "
+            "The owner's exercise library (#5769). "
+            + _status_line(head | {"approved_on": (current or {}).get("approved_on")})
+            + " Public half only: no bodyweight, no loads, no note text — the N=1 half (best set per bodyweight band, coded "
             "note signals, gate threshold values) is the owner-private overlay s3://matthew-life-platform/config/coaching/"
             "exercise_library.private.json, joined at selection time by lambdas/training/exercise_library.py (fail-closed). "
             "Built by deploy/build_exercise_library.py from the full Hevy history + deploy/exercise_library_curation.py. "

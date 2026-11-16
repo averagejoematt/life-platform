@@ -290,9 +290,16 @@ def test_the_critic_makes_no_model_call_and_reads_no_clock():
 
 
 def test_the_free_weight_pull_finding_blocks_the_approved_week(monkeypatch):
-    """#5857 finding (owner ruling 2026-11-12, board rec 4): the program's pulls are machine/cable anchors, so the approved
-    week misses the free-weight compound floor on PULL only, and the critic fails on it. Press, squat and hinge are met."""
+    """#5857 finding (owner ruling 2026-11-12, board rec 4): the program's pulls were machine/cable anchors, so the approved
+    week missed the free-weight compound floor on PULL only, and the critic failed on it. #6014 (coaching decision 2026-11-15)
+    closes it by pinning the heavy row to the one-arm dumbbell row: the critic now passes the floor. Control: the pin removed
+    (the row family's own order, the confirmed row machine first) -> the critic fails on PULL again, press/squat/hinge met."""
     monkeypatch.setattr(wc, "_free_weight", _REAL_FREE_WEIGHT)
+    out = _run(_best_ir())
+    assert [r for r in out["week"] if r["check"] == "free_weight_compounds"] == [], out["week"]
+    tmpl = copy.deepcopy(ps.SESSION_TEMPLATES)
+    tmpl["upper_heavy"].pop("anchor_keys", None)
+    monkeypatch.setattr(ps, "SESSION_TEMPLATES", tmpl)
     out = _run(_best_ir())
     assert out["verdict"] == "fail" and [r["check"] for r in out["week"]] == ["free_weight_compounds"], out["week"]
     assert out["week"][0]["why"] == "no free-weight compound pull this week"
