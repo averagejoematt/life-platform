@@ -656,6 +656,24 @@ script's module docstring.
 
 ---
 
+## Reader calls — the kill switch (#6114)
+
+The reader-call door (`/api/reader_call`, a reader's own call beside a coach's open call) is open only when BOTH the
+committed `lambdas/web/reader_call_rules.py` `READER_CALL_LIVE` is `True` AND SSM `/life-platform/reader-call` reads
+exactly `on`. Anything else — the parameter missing, unreadable, empty or any other value — shuts it (fail closed).
+
+```bash
+# Shut the door now, without a deploy (takes effect within 60 s — the Lambda's cache):
+aws ssm put-parameter --name /life-platform/reader-call --value off --type String --overwrite
+# Re-open it:
+aws ssm put-parameter --name /life-platform/reader-call --value on --type String --overwrite
+```
+
+Shut, the route answers 404 "Reader calls are not available." before it parses, meters, reads or writes; the call
+pages say the calls are not open. Nothing already recorded is touched. Watch: the `reader-call-accepted-spike` alarm
+(digest, >= 60 accepted reader calls in one hour); refusals by reason in Logs Insights on the site-api log group:
+`fields Reason | filter ReaderCallEvent = "refused" | stats count(*) by Reason`.
+
 ## Common Issues
 
 ### Whoop/Withings/Strava: "Token expired" error
