@@ -176,6 +176,13 @@ def site_api() -> list[iam.PolicyStatement]:
             actions=["ssm:GetParameter"],
             resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier"],
         ),
+        # #6114: the reader-call door's runtime kill switch (web/site_api_reader_call.SWITCH_PARAM). Read-only, one
+        # parameter; the door fails CLOSED when this read is denied or the parameter is missing.
+        iam.PolicyStatement(
+            sid="ReaderCallSwitchRead",
+            actions=["ssm:GetParameter"],
+            resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/reader-call"],
+        ),
         # #1371 follow-up: /api/source_freshness stamps carried/carried_from_cycle
         # provenance from the experiment-cycle param; without this read the payload
         # fail-softs to experiment.cycle=null and chips say "a previous attempt".

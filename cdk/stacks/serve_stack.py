@@ -395,6 +395,34 @@ class ServeStack(Stack):
         )
         _site_api_spike_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
+        # #6114: the reader-call door (web/site_api_reader_call.py) emits ReaderCallAccepted (dimensionless EMF) per
+        # accepted reader call. Threshold from measured traffic (Logs Insights over the site-api log group,
+        # 2026-10-17 -> 2026-11-16): 6 POSTs to ALL existing reader write doors in 30 days. One network may make one
+        # call per open call (3 open at most so far) and 30 taps an hour, so 60 accepted calls in one hour needs at
+        # least 20 distinct networks inside an hour — an unusual spike for this site, never a quiet day. Digest only;
+        # the runtime kill switch (SSM /life-platform/reader-call = off) is the response. docs/RUNBOOK.md.
+        _reader_call_spike = cloudwatch.Alarm(
+            self,
+            "ReaderCallAcceptedSpike",
+            alarm_name="reader-call-accepted-spike",
+            alarm_description=(
+                "Reader calls (#6114): >= 60 accepted reader calls in one hour. Digest only. If unwelcome, shut the "
+                "door without a deploy: aws ssm put-parameter --name /life-platform/reader-call --value off "
+                "--type String --overwrite (docs/RUNBOOK.md)."
+            ),
+            metric=cloudwatch.Metric(
+                namespace="LifePlatform/SiteAPI",
+                metric_name="ReaderCallAccepted",
+                period=Duration.hours(1),
+                statistic="Sum",
+            ),
+            threshold=60,
+            evaluation_periods=1,
+            comparison_operator=GTE,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+        _reader_call_spike.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+
         # ── #1328: Throttles alarms — one per serve-stack Lambda ──
         # A throttle on a Function-URL origin is a synchronous 429 to a real reader.
         # 627 throttles/30d ran unobserved (zero Throttles alarms existed anywhere)

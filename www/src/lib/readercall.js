@@ -34,11 +34,20 @@ export function readerCallEnabled(env = process.env) {
   return Boolean(env) && env[READERCALL_ENV] === "1";
 }
 
-/** Does this call's page carry the control? Its words must be published (a held call's page never asks), and it
- *  must be a one-tap kind; the page shows the control while it is open and the three-way comparison once graded. */
+/** Does this call's page carry the control? A one-tap kind, not sealed, not retired, not disputed. Its WORDS need not
+ *  be published (#6114): the API states the question from the fields the page already prints, and decides at runtime
+ *  whether the call is open, closed or graded. */
 export function readerCallFor(p) {
-  if (!p || !READERCALL_KINDS.includes(p.kind) || p.sealed || p.claim_withheld) return false;
+  if (!p || !READERCALL_KINDS.includes(p.kind) || p.sealed || p.retired) return false;
   return ["pending", "confirmed", "refuted"].includes(p.status) && !p.classification_review;
+}
+
+/** The call's PUBLIC item id, as /api/ledger_export serves it (`<coach short id>:<prediction id>`), from the page id
+ *  the snapshot builds (`<coach short id>-<prediction id>`; a coach short id carries no hyphen). */
+export function itemIdOf(pageId) {
+  const s = String(pageId || "");
+  const i = s.indexOf("-");
+  return i > 0 ? `${s.slice(0, i)}:${s.slice(i + 1)}` : null;
 }
 
 /** The Astro integration that injects the island — and nothing at all when the switch is off. */
