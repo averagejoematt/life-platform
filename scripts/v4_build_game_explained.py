@@ -479,7 +479,7 @@ def _headline_section(config: dict) -> str:
     prose = (
         '<p class="rd-prose">The headline <strong>Character Level</strong> is the weight-averaged mean of the seven pillar levels, '
         "renormalized over the pillars that have ever been instrumented, then <strong>floored</strong> — never rounded up. "
-        "It understates by construction.</p>"
+        "It understates by construction. The mean is computed exactly, so a mean that lands precisely on a level reads as that level.</p>"
         '<p class="rd-prose">The character\'s <strong>mood</strong> — dormant · fading · steady · thriving — is equally deterministic '
         "(ADR-105): pure code over the presence signal and the 7-day composite raw-score trend. <em>Dormant</em> is a confirmed dark stretch; "
         "<em>fading</em> is quiet logging or a trend of −5 or worse; <em>thriving</em> demands active logging, a trend of +3 or better, "
