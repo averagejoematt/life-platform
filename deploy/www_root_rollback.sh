@@ -22,6 +22,8 @@
 # Writes declined=true|false (+ surfaces/verdict) to $GITHUB_OUTPUT when set. Always exits 0 once it
 # has decided — a second failure mode here would only give the rollback a new way not to happen.
 set -uo pipefail
+# #6116: under a test runner, real AWS is unreachable from this script (deploy/lib/prod_write_guard.sh)
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prod_write_guard.sh"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SHORT="${GITHUB_SHA:0:7}"
 RUN_URL="${RUN_URL:-}"

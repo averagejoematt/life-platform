@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# The PATH shim of deploy/lib/prod_write_guard.sh (#6116) — one file, three names (aws, cdk, npx). It goes first on
+# PATH only under a test runner; outside one it is never on PATH, and if it were it would exec the real tool.
+_lp_pwg_self=$0
+while [ -L "$_lp_pwg_self" ]; do
+  _lp_pwg_link=$(readlink "$_lp_pwg_self")
+  case "$_lp_pwg_link" in /*) _lp_pwg_self=$_lp_pwg_link ;; *) _lp_pwg_self="$(dirname "$_lp_pwg_self")/$_lp_pwg_link" ;; esac
+done
+# shellcheck source=../prod_write_guard.sh
+source "$(cd -P "$(dirname "$_lp_pwg_self")/.." && pwd)/prod_write_guard.sh"
+_lp_pwg_tool=${0##*/}
+if [ -n "${LP_PWG_REASON:-}" ]; then
+  lp_pwg_run "$_lp_pwg_tool" "$@"
+  exit
+fi
+_lp_pwg_real=$(lp_pwg_resolve "$_lp_pwg_tool") || { echo "$_lp_pwg_tool: command not found" >&2; exit 127; }
+exec "$_lp_pwg_real" "$@"

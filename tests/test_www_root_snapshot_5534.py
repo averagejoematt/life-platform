@@ -59,6 +59,7 @@ def _env(tmp_path, owned):
     env = {
         **os.environ,
         "PATH": f"{bindir}:{os.environ['PATH']}",
+        "LP_TEST_AWS_IS_STUB": str(aws),  # #6116: the script sources deploy/lib/prod_write_guard.sh; this declares the stub
         "AWS_LOG": str(log),
         "OWNED_PATHS": str(owned_path),
         "MANIFEST_FIXTURE": str(fixture),

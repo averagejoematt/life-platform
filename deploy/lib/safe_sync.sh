@@ -9,6 +9,8 @@
 #   - og-*.png            (og-image-generator Lambda)
 #   - avatar/*            (character avatar assets)
 
+# #6116: under a test runner, real AWS is unreachable from this script (deploy/lib/prod_write_guard.sh)
+source "$(dirname "${BASH_SOURCE[0]}")/prod_write_guard.sh"
 # ADR-046: Lambda-generated content now lives in generated/ prefix (not site/).
 # The only remaining exclude is config/ — manually-uploaded config files that
 # live in site/config/ but not in the local site/ directory.
