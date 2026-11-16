@@ -595,12 +595,25 @@ def test_a_deload_or_red_recovery_day_is_never_a_failed_exposure_at_a_held_step(
     assert live_load.excused_days(None, {"T": rows}) == []
 
 
-def test_the_hold_and_build_thresholds_are_the_charters_own_numbers():
-    """#6015: the two thresholds are named settings (`live_settings.HEURISTICS`) whose values are the charter's: the +1 RPE overage
-    tolerance (`effort_ceilings.overage_tolerance_rpe`) and the three-exposure stall (`progression.stall_rule.consecutive_exposures`).
-    A charter change that moves either one fails here until the engine's row is re-read with it."""
-    from training import live_settings
+def test_the_hold_and_build_thresholds_are_read_from_the_charter():
+    """#6015: the two thresholds are named settings (`live_settings.HEURISTICS`) that hold no number of their own — each is READ
+    through `training_charter.charter_value` at every use (`effort_ceilings.overage_tolerance_rpe`,
+    `progression.stall_rule.consecutive_exposures`), so a charter change moves the rule. Control: a charter whose tolerance is
+    one point wider makes the same RPE-10 first exposure hold instead of revert, and a stall count of four keeps three
+    exposures without gain held."""
+    from training import live_settings, training_charter
     from training.training_charter import charter_value
 
-    assert live_settings.value("step_up_hold_rpe_over") == charter_value("effort_ceilings", {})["overage_tolerance_rpe"]
-    assert live_settings.value("step_up_hold_exposures") == charter_value("progression", {})["stall_rule"]["consecutive_exposures"]
+    rows = live_settings.HEURISTICS
+    assert "value" not in rows["step_up_hold_rpe_over"] and "value" not in rows["step_up_hold_exposures"]
+    assert live_settings.value("step_up_hold_rpe_over") == charter_value("effort_ceilings.overage_tolerance_rpe")
+    assert live_settings.value("step_up_hold_exposures") == charter_value("progression.stall_rule.consecutive_exposures")
+    up = (60, 6, 8.0)
+    real = training_charter.charter_value
+    moved = {"effort_ceilings.overage_tolerance_rpe": real("effort_ceilings.overage_tolerance_rpe") + 1}
+    moved["progression.stall_rule.consecutive_exposures"] = real("progression.stall_rule.consecutive_exposures") + 1
+    with patch.object(training_charter, "charter_value", lambda dotted, default=None: moved.get(dotted, real(dotted, default))):
+        assert live_load.decide(_rows((65, 4, 10.0), up), 4, 6, "dumbbell", target_rpe=8)["mode"] == "hold"
+        stall = _rows((65, 4, 9.0), (65, 4, 9.0), (65, 4, 9.0), up)
+        assert live_load.decide(stall, 4, 6, "dumbbell", target_rpe=8)["mode"] == "hold"
+    assert live_load.decide(_rows((65, 4, 10.0), up), 4, 6, "dumbbell", target_rpe=8)["mode"] == "down"  # the real charter
