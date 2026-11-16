@@ -585,8 +585,6 @@ def _live_ledger(ctx: LiveContext) -> None:
                 # `words_withheld`), and neither does the page — every row without words reads the same,
                 # whatever kept them off the wire. The row keeps its place, its grade and its count.
                 claim_text, withheld = NO_WORDS_SENTENCE, "no_words"
-        # owner ruling 2026-11-15 (#6079): a call published only beside its dated note carries its words apart
-        noted = noted_claim(r, claim_text, withheld, NO_WORDS_SENTENCE)
         pid = _persona(coach)
         if pid not in ctx.coach_ids:
             if not r.get("retired"):
@@ -614,14 +612,14 @@ def _live_ledger(ctx: LiveContext) -> None:
                 as_of=ctx.as_of,
                 data_through=r.get("settled_date") if ISO_DAY.match(str(r.get("settled_date") or "")) else None,
                 source=["/api/ledger_export"],
-                title=noted["claim"][:120],
                 summary=CALL_OUTCOME.get(status, status),  # the call's own outcome; the simple guess is its own field
                 coach_id=pid,
                 coach_name=str(r.get("coach_name") or pid),
                 retired=bool(r.get("retired")),
                 metric_id=metric,
                 metric_key=r.get("metric") if isinstance(r.get("metric"), str) else None,
-                **noted,  # claim, claim_withheld, claim_with_note, owner_note
+                # owner ruling 2026-11-15 (#6079): a call published only beside its dated note carries its words apart
+                **noted_claim(r, claim_text, withheld, NO_WORDS_SENTENCE),  # title, claim, claim_withheld, claim_with_note, owner_note
                 logged_date=r.get("logged_date"),
                 due_date=r.get("due_date") if ISO_DAY.match(str(r.get("due_date") or "")) else None,
                 settled_date=r.get("settled_date") if ISO_DAY.match(str(r.get("settled_date") or "")) else None,
@@ -1082,8 +1080,7 @@ def run(mode: str, out_dir: str, fixtures_dir: str, base_url: str, timeout: floa
             data_files["story"] = validate_story(story, public)
         except ValueError as exc:
             raise SchemaError(str(exc)) from exc
-    # his own words (owner ruling 2026-11-15): a page places a line only where own_words.js pins it AND this file carries it
-    data_files["own_words"] = resolve_own_words(mode, fixtures_dir, lambda p: _get(base_url, p, timeout), log)
+    data_files["own_words"] = resolve_own_words(mode, fixtures_dir, lambda p: _get(base_url, p, timeout), log)  # his approved lines
     return write_snapshot(out_dir, public, excluded, mode, base_url, build_appendix(), data_files)
 
 

@@ -487,7 +487,7 @@ def owner_note_of(value: Any) -> dict | None:
 
 
 def noted_claim(row: dict, claim: str, withheld: str | None, no_words: str) -> dict:
-    """A ledger row's words and the owner-ruled note beside them, as the prediction's four fields. A REQUIRED note's
+    """A ledger row's words and the owner-ruled note beside them, as the prediction's title and four fields. A REQUIRED note's
     words move to `claim_with_note` and `claim` becomes the note's short form (`claim_withheld: "with_note"`), so no list
     surface can print them bare; a note this producer cannot read withholds the words (fail closed)."""
     served = row.get("owner_note")
@@ -497,7 +497,7 @@ def noted_claim(row: dict, claim: str, withheld: str | None, no_words: str) -> d
         out.update(claim=no_words, claim_withheld="no_words")
     elif note and note["required"]:
         out.update(claim=note["short"], claim_withheld="with_note", claim_with_note=claim)
-    return out
+    return {"title": out["claim"][:120], **out}
 
 
 def validate_owner_note(obj: dict) -> None:
