@@ -66,7 +66,7 @@ Last reconciled: **2026-10-17**. 28 active us-west-2 + 2 us-east-1, 1 in deletio
 | Todoist (MCP write tools) | `life-platform/todoist` | API key | static | rotate manually | ✅ 2026-07-10 |
 | Notion | `life-platform/ingestion-keys` (notion fields) — dedicated `life-platform/notion` also LIVE but idle (see Cleanup) | Integration token | static | rotate via Notion settings | ⚠️ Bundle path is authoritative for ingestion |
 | Dropbox (MacroFactor poll) | `life-platform/ingestion-keys` (dropbox fields) — dedicated `life-platform/dropbox` **deleted** (window closed 2026-05) | OAuth2 | refresh on expiry | re-auth Dropbox if expired | ✅ 2026-07-10 bundle-only |
-| Apple Health (HAE) webhook key | `life-platform/ingestion-keys` (`health_auto_export_api_key` field) | bearer | static | regenerate if exposed | ✅ 2026-07-10 |
+| Apple Health (HAE) webhook key | `life-platform/hae-webhook` (`health_auto_export_api_key`), #5513 (c) — owner-provisioned; until it exists the webhook falls back to the `life-platform/ingestion-keys` field of the same name | bearer | static | regenerate if exposed — during the cutover put the new value in BOTH secrets | ⚠️ cutover (#5513): fallback + bundle grant removed by the follow-up |
 | Function Health | n/a | n/a | n/a | manual PDF acquisition + ingest script | ✅ no secret needed (PDF-driven, no API) |
 | MacroFactor | n/a (uses Dropbox) | n/a | n/a | re-auth Dropbox if expired | ✅ no MacroFactor-side secret; flows via Dropbox |
 | Weather | **none** — Open-Meteo is a free, keyless API (`lambdas/ingestion/weather_lambda.py`) | n/a | n/a | n/a | ✅ 2026-07-10 — the old "env var API key" claim was stale; no key exists in the Lambda |
@@ -180,7 +180,8 @@ Cache TTL note: COST-OPT-1 uses `secret_cache.py` (15-min in-memory TTL — a bu
 | `life-platform/hevy-write` | `life-platform-mcp` (`tools_hevy_routine.py` via `hevy_write_client.py`) | routine/rest-seconds writes |
 | `life-platform/notion` | referenced by `life-platform-freshness-checker` + `pipeline-health-check` only; **last accessed 2026-03-09** | ingestion reads the bundle — retire-candidate (below) |
 | `life-platform/todoist` | `life-platform-mcp` (via `mcp/tools_todoist.py`), `life-platform-freshness-checker`, `pipeline-health-check` | MCP write tools |
-| `life-platform/ingestion-keys` | `todoist-data-ingestion`, `notion-journal-ingestion`, `dropbox-poll`, `health-auto-export-webhook`, `life-platform-freshness-checker`, `pipeline-health-check` | bundled — multiple keys per source |
+| `life-platform/ingestion-keys` | `todoist-data-ingestion`, `notion-journal-ingestion`, `dropbox-poll`, `health-auto-export-webhook` (cutover fallback only, #5513), `life-platform-freshness-checker`, `pipeline-health-check` | bundled — multiple keys per source |
+| `life-platform/hae-webhook` | `health-auto-export-webhook` (`ingestion/health_auto_export_auth.py`; grant `role_policies_ingestion.ingestion_hae`), `pipeline-health-check` | the webhook's own bearer token (#5513 c); owner-provisioned |
 | `life-platform/ai-keys` | legacy direct-API fallback (`AI_SECRET_NAME` in `intelligence_common.py`); referenced across intelligence/email Lambdas — `grep -lrn life-platform/ai-keys lambdas/ mcp/` for the live list | Bedrock/IAM is the primary inference path (ADR-062) |
 | `life-platform/site-api-ai-key` | `life-platform-site-api`, `life-platform-site-api-ai`, `site_api_social`, `life-platform-freshness-checker`, `pipeline-health-check` | Isolated per R17-04 |
 | `life-platform/mcp-api-key` | `life-platform-mcp` (config), `life-platform-canary`, `life-platform-qa-smoke`, `life-platform-key-rotator` | HMAC bearer; auto-rotates 90d |

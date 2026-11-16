@@ -476,7 +476,8 @@ All secrets are stored in AWS Secrets Manager under `life-platform/` prefix. See
 | `life-platform/mcp-api-key` | life-platform-mcp, canary, qa-smoke, key-rotator | HMAC bearer; 90-day auto-rotation |
 | `life-platform/todoist` | life-platform-mcp (write tools) | Dedicated; bundle still used by ingestion |
 | `life-platform/habitify` | habitify-data-ingestion | API key |
-| `life-platform/ingestion-keys` | todoist-data-ingestion, notion-journal-ingestion, dropbox-poll, health-auto-export-webhook | Bundle: Notion + Dropbox + Todoist + Habitify + HAE webhook key |
+| `life-platform/ingestion-keys` | todoist-data-ingestion, notion-journal-ingestion, dropbox-poll, health-auto-export-webhook (cutover fallback, #5513) | Bundle: Notion + Dropbox + Todoist + Habitify + HAE webhook key |
+| `life-platform/hae-webhook` | health-auto-export-webhook | The webhook's own bearer token (#5513 c), read first |
 | `life-platform/notion` (live, idle) | none read by ingestion — the bundle is authoritative | Retire-candidate; owner decision (`docs/SECRETS_MAP.md`) |
 | `life-platform/dropbox`, `life-platform/anthropic-api-key` | — | Deleted (windows closed 2026-05) |
 
