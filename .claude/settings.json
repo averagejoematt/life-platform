@@ -3,6 +3,20 @@
     "ask": [
       "Bash(git push --force:*)",
       "Bash(git push -f:*)",
+      "Bash(git push --force-with-lease:*)",
+      "Bash(git push * --force*)",
+      "Bash(git push * +*)",
+      "Bash(git commit * --no-verify*)",
+      "Bash(aws lambda update-function-configuration:*)",
+      "Bash(aws lambda delete-function:*)",
+      "Bash(aws lambda add-permission:*)",
+      "Bash(aws dynamodb batch-write-item:*)",
+      "Bash(aws dynamodb delete-table:*)",
+      "Bash(aws secretsmanager delete-secret:*)",
+      "Bash(aws ssm delete-parameter:*)",
+      "Bash(aws s3 mv:*)",
+      "Bash(aws s3 sync:*)",
+      "Bash(aws s3 rb:*)",
       "Bash(cdk deploy:*)",
       "Bash(npx cdk deploy:*)",
       "Bash(aws lambda update-function-code:*)",
@@ -184,7 +198,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/hooks/session_preflight.py\"",
+            "command": "sh -c 'P=/opt/homebrew/bin/python3; [ -x \"$P\" ] || P=python3; exec \"$P\" \"$CLAUDE_PROJECT_DIR/scripts/hooks/session_preflight.py\"'",
             "timeout": 45
           }
         ]
@@ -196,7 +210,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/hooks/guard_bash.py\"",
+            "command": "sh -c 'P=/opt/homebrew/bin/python3; [ -x \"$P\" ] || P=python3; exec \"$P\" \"$CLAUDE_PROJECT_DIR/scripts/hooks/guard_bash.py\"'",
             "timeout": 30
           }
         ]
@@ -209,13 +223,13 @@
           {
             "type": "command",
             "if": "Bash(git push *)",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/hooks/post_push_swallow.py\"",
+            "command": "sh -c 'P=/opt/homebrew/bin/python3; [ -x \"$P\" ] || P=python3; exec \"$P\" \"$CLAUDE_PROJECT_DIR/scripts/hooks/post_push_swallow.py\"'",
             "timeout": 40
           },
           {
             "type": "command",
             "if": "Bash(git -C *)",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/hooks/post_push_swallow.py\"",
+            "command": "sh -c 'P=/opt/homebrew/bin/python3; [ -x \"$P\" ] || P=python3; exec \"$P\" \"$CLAUDE_PROJECT_DIR/scripts/hooks/post_push_swallow.py\"'",
             "timeout": 40
           }
         ]

@@ -218,6 +218,19 @@ def test_a_rotated_lift_he_logged_weeks_ago_is_not_new_and_not_find_the_load():
     assert rec["lift_notes"]["face_pull"]["reason"] is None and rec["lift_notes"]["face_pull"]["pick_load"] is False
 
 
+def test_a_new_lift_never_says_it_replaces_an_exercise_the_same_session_still_serves():
+    """#6020: `New: replaces Bicep Curl (Dumbbell)` beside a Bicep Curl (Dumbbell) block in the same routine is a note that
+    contradicts its own session (the approval package's Cable Crunch / Side Bend). The line is dropped, the swap stays stored."""
+    hammer, curl = _accessory("hammer_curl_dumbbell", 22.5), _accessory("db_curl", 20)
+    rotations = {"hammer_curl_dumbbell": "Bicep Curl (Dumbbell)"}
+    rec = _compose([hammer, curl], {}, rotations, target="2026-10-29")
+    assert "replaces" not in hammer.notes, hammer.notes
+    assert rec["lift_notes"]["hammer_curl_dumbbell"]["rotation_of"] == "Bicep Curl (Dumbbell)"
+    alone = _accessory("hammer_curl_dumbbell", 22.5)  # control: the replaced lift is NOT served, so the line is still written
+    _compose([alone], {}, rotations, target="2026-10-29")
+    assert "New: replaces Bicep Curl (Dumbbell)." in alone.notes, alone.notes
+
+
 def test_MUTATION_the_28_day_line_brings_back_the_graded_wire(monkeypatch):
     """Control: put the old 28-day line back and the same inputs fall back into the pick-load form. Re-grade #2
     (2026-10-31) closed the second door too: `New: replaces …` needs NO PREVIOUS at all, so even at 28 days the hammer

@@ -221,6 +221,10 @@ def _skip(block: Any) -> bool:
     tag = str(getattr(block, "rationale_tag", "") or "")
     if tag.startswith(("cardio", "mobility", "stretch")):
         return True
+    # #6020: a fitness-test block keeps its protocol note. The engine tags it `fitness_test:`, but a `draft_custom` re-tags
+    # every block `custom`, so the note's own `Test ·` line 1 (§3.8) is the other half of the test
+    if tag.startswith("fitness_test:") or hevy_note_grammar.is_test_note(str(getattr(block, "notes", "") or "")):
+        return True
     return any(getattr(s, "duration_seconds", None) for s in block.sets or [])
 
 
@@ -583,6 +587,8 @@ def compose_blocks(
     previous_loads: dict[str, Any] = {}
     notes: dict[str, Any] = {}
     seen_families: set[str] = set()
+    # #6020: the titles this session serves — `New: replaces X` is never written beside an X block (a note that contradicts its session)
+    served_titles = {str(((catalog_movements or {}).get(str(b.movement_key)) or {}).get("title") or "") for b in blocks or []} - {""}
     for index, block in enumerate(blocks or []):
         if _skip(block):
             continue
@@ -637,7 +643,7 @@ def compose_blocks(
         if layoff:
             line1 = keep_stricter(own.get("effort"), _layoff_return_treatment(block, line1))
         swapped = (rotations or {}).get(key)
-        lead = rotation_line(swapped) if swapped and previous is None and reason_kind != "no_jumps" else ""
+        lead = rotation_line(swapped) if swapped and previous is None and reason_kind != "no_jumps" and swapped not in served_titles else ""
         if lead:
             reason_kind = "rotation"
         pick_line = (_pick_result_line(block, entry) if _has_load(block) else PICK_LOAD_OPEN_LINE) if pick else ""

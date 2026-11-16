@@ -502,8 +502,23 @@ def iam_statements() -> list:
     return out
 
 
+_IMPORTS_MEMO: dict = {}
+
+
 def _local_imports(path: str) -> set:
-    """The repo modules a file imports, as paths under lambdas/ (``from ai import bedrock_client`` → ai/bedrock_client.py)."""
+    """The repo modules a file imports, as paths under lambdas/ (``from ai import bedrock_client`` → ai/bedrock_client.py).
+    Memoised per (path, mtime): the closure of every handler re-reads the same few hundred shared modules, and re-parsing
+    them per handler was minutes of ast work (#5514). A changed file changes its mtime, so a stale answer is not served."""
+    try:
+        key = (path, os.stat(path).st_mtime_ns)
+    except OSError:
+        return set()
+    if key not in _IMPORTS_MEMO:
+        _IMPORTS_MEMO[key] = _parse_local_imports(path)
+    return set(_IMPORTS_MEMO[key])
+
+
+def _parse_local_imports(path: str) -> set:
     import ast
 
     root = os.path.join(REPO, "lambdas")

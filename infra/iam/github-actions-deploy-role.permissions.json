@@ -2,28 +2,87 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "LambdaDeploy",
+      "Sid": "LambdaFleetDeploy",
       "Effect": "Allow",
       "Action": [
         "lambda:UpdateFunctionCode",
-        "lambda:UpdateFunctionConfiguration",
-        "lambda:GetFunctionConfiguration",
         "lambda:GetFunction",
-        "lambda:InvokeFunction",
-        "lambda:WaitForFunctionUpdated",
-        "lambda:ListLayerVersions",
-        "lambda:GetLayerVersion",
-        "lambda:PublishLayerVersion",
-        "lambda:AddLayerVersionPermission",
-        "lambda:GetLayerVersionPolicy",
-        "lambda:ListTags"
+        "lambda:GetFunctionConfiguration"
       ],
       "Resource": [
-        "arn:aws:lambda:us-west-2:205930651321:function:*",
-        "arn:aws:lambda:us-west-2:205930651321:layer:*",
-        "arn:aws:lambda:us-east-1:205930651321:function:*",
-        "arn:aws:lambda:us-east-1:205930651321:layer:*"
+        "arn:aws:lambda:us-east-1:205930651321:function:email-subscriber",
+        "arn:aws:lambda:us-east-1:205930651321:function:progress-viewer",
+        "arn:aws:lambda:us-west-2:205930651321:function:activity-enrichment",
+        "arn:aws:lambda:us-west-2:205930651321:function:acwr-compute",
+        "arn:aws:lambda:us-west-2:205930651321:function:adaptive-mode-compute",
+        "arn:aws:lambda:us-west-2:205930651321:function:ai-*",
+        "arn:aws:lambda:us-west-2:205930651321:function:anomaly-detector",
+        "arn:aws:lambda:us-west-2:205930651321:function:between-chronicle",
+        "arn:aws:lambda:us-west-2:205930651321:function:bluesky-social-ingestion",
+        "arn:aws:lambda:us-west-2:205930651321:function:challenge-generator",
+        "arn:aws:lambda:us-west-2:205930651321:function:character-sheet-compute",
+        "arn:aws:lambda:us-west-2:205930651321:function:chronicle-*",
+        "arn:aws:lambda:us-west-2:205930651321:function:circadian-compliance",
+        "arn:aws:lambda:us-west-2:205930651321:function:coach-*",
+        "arn:aws:lambda:us-west-2:205930651321:function:daily-*",
+        "arn:aws:lambda:us-west-2:205930651321:function:dashboard-refresh",
+        "arn:aws:lambda:us-west-2:205930651321:function:dropbox-poll",
+        "arn:aws:lambda:us-west-2:205930651321:function:eightsleep-data-ingestion",
+        "arn:aws:lambda:us-west-2:205930651321:function:elena-state-updater",
+        "arn:aws:lambda:us-west-2:205930651321:function:episode-detect",
+        "arn:aws:lambda:us-west-2:205930651321:function:evening-nudge",
+        "arn:aws:lambda:us-west-2:205930651321:function:failure-pattern-compute",
+        "arn:aws:lambda:us-west-2:205930651321:function:field-notes-generate",
+        "arn:aws:lambda:us-west-2:205930651321:function:food-delivery-ingestion",
+        "arn:aws:lambda:us-west-2:205930651321:function:forecast-engine",
+        "arn:aws:lambda:us-west-2:205930651321:function:habit-skip-review",
+        "arn:aws:lambda:us-west-2:205930651321:function:habitify-data-ingestion",
+        "arn:aws:lambda:us-west-2:205930651321:function:health-auto-export-webhook",
+        "arn:aws:lambda:us-west-2:205930651321:function:hevy-*",
+        "arn:aws:lambda:us-west-2:205930651321:function:hypothesis-engine",
+        "arn:aws:lambda:us-west-2:205930651321:function:inbound-auth-gate",
+        "arn:aws:lambda:us-west-2:205930651321:function:insight-email-parser",
+        "arn:aws:lambda:us-west-2:205930651321:function:inter-coach-dialogue",
+        "arn:aws:lambda:us-west-2:205930651321:function:journal-*",
+        "arn:aws:lambda:us-west-2:205930651321:function:life-platform-*",
+        "arn:aws:lambda:us-west-2:205930651321:function:macrofactor-data-ingestion",
+        "arn:aws:lambda:us-west-2:205930651321:function:mastodon-social-ingestion",
+        "arn:aws:lambda:us-west-2:205930651321:function:measurements-ingestion",
+        "arn:aws:lambda:us-west-2:205930651321:function:milestone-digest",
+        "arn:aws:lambda:us-west-2:205930651321:function:monday-compass",
+        "arn:aws:lambda:us-west-2:205930651321:function:monthly-digest",
+        "arn:aws:lambda:us-west-2:205930651321:function:notion-journal-ingestion",
+        "arn:aws:lambda:us-west-2:205930651321:function:nutrition-review",
+        "arn:aws:lambda:us-west-2:205930651321:function:og-image-generator",
+        "arn:aws:lambda:us-west-2:205930651321:function:partner-weekly-email",
+        "arn:aws:lambda:us-west-2:205930651321:function:personal-baselines-compute",
+        "arn:aws:lambda:us-west-2:205930651321:function:pipeline-health-check",
+        "arn:aws:lambda:us-west-2:205930651321:function:reading-*",
+        "arn:aws:lambda:us-west-2:205930651321:function:recap-card-generator",
+        "arn:aws:lambda:us-west-2:205930651321:function:scenario-explorer",
+        "arn:aws:lambda:us-west-2:205930651321:function:site-stats-refresh",
+        "arn:aws:lambda:us-west-2:205930651321:function:social-enrichment",
+        "arn:aws:lambda:us-west-2:205930651321:function:state-of-matthew",
+        "arn:aws:lambda:us-west-2:205930651321:function:strava-data-ingestion",
+        "arn:aws:lambda:us-west-2:205930651321:function:subscriber-onboarding",
+        "arn:aws:lambda:us-west-2:205930651321:function:telegram-*",
+        "arn:aws:lambda:us-west-2:205930651321:function:todoist-data-ingestion",
+        "arn:aws:lambda:us-west-2:205930651321:function:voice-fidelity-harness",
+        "arn:aws:lambda:us-west-2:205930651321:function:weather-data-ingestion",
+        "arn:aws:lambda:us-west-2:205930651321:function:wednesday-chronicle",
+        "arn:aws:lambda:us-west-2:205930651321:function:weekly-*",
+        "arn:aws:lambda:us-west-2:205930651321:function:whoop-data-ingestion",
+        "arn:aws:lambda:us-west-2:205930651321:function:withings-data-ingestion",
+        "arn:aws:lambda:us-west-2:205930651321:function:youtube-social-ingestion"
       ]
+    },
+    {
+      "Sid": "LambdaSiteApiRecycle",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:UpdateFunctionConfiguration"
+      ],
+      "Resource": "arn:aws:lambda:us-west-2:205930651321:function:life-platform-site-api"
     },
     {
       "Sid": "LambdaListAccountLevel",
@@ -38,16 +97,31 @@
       "Effect": "Allow",
       "Action": [
         "s3:GetObject",
-        "s3:PutObject",
-        "s3:HeadObject",
-        "s3:HeadBucket",
+        "s3:PutObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::matthew-life-platform/deploys/*",
+        "arn:aws:s3:::matthew-life-platform/site/*",
+        "arn:aws:s3:::matthew-life-platform/config/*",
+        "arn:aws:s3:::matthew-life-platform/www-previous/*"
+      ]
+    },
+    {
+      "Sid": "S3IamAdditiveGateLedger",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::matthew-life-platform/remediation-log/iam-additive-gate/*"
+    },
+    {
+      "Sid": "S3BucketList",
+      "Effect": "Allow",
+      "Action": [
         "s3:ListBucket",
         "s3:GetBucketLocation"
       ],
-      "Resource": [
-        "arn:aws:s3:::matthew-life-platform",
-        "arn:aws:s3:::matthew-life-platform/*"
-      ]
+      "Resource": "arn:aws:s3:::matthew-life-platform"
     },
     {
       "Sid": "S3DeployArtifactTagging",

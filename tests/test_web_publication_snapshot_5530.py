@@ -893,3 +893,79 @@ def test_coach_persona_id_rendered_as_text_reds_the_build_scan_5572(tmp_path):
     assert any("nutrition_coach" in i for i in cwb.scan(str(dist), False, ids))
     page.write_text("<html><body><p>the call that held was Marcus Webb's</p></body></html>")
     assert not any("nutrition_coach" in i for i in cwb.scan(str(dist), False, ids))
+
+
+# ── owner-ruled notes (owner ruling 2026-11-15, #6079) ─────────────────────────────────────────────────────────────
+def _ledger_row(pid: str, claim: str, note=None) -> dict:
+    return {
+        "item_id": f"glucose:{pid}",
+        "prediction_id": pid,
+        "coach_id": "glucose",
+        "coach_name": "Amara Patel",
+        "retired": False,
+        "metric": "recovery_score",
+        "claim": claim,
+        "logged_date": "2026-09-14",
+        "due_date": "2026-09-15",
+        "settled_date": "2026-09-15",
+        "kind": "number",
+        "status": "refuted",
+        "confidence": 0.5,
+        "sealed": False,
+        "grading": {"how": "recovery within 18 of 59 on 2026-09-15", "actual_text": "82", "tolerance_text": None, "outcome_notes": "82"},
+        "simple_guess": None,
+        "quality_flags": [],
+        "corrections": [],
+        "owner_note": note,
+    }
+
+
+def test_a_call_published_with_a_required_note_carries_its_words_only_beside_it(monkeypatch):
+    """`/api/ledger_export` serves `owner_note` beside the words. A REQUIRED note's call reaches the snapshot as
+    `claim_withheld: "with_note"`: `claim` is the note's short form (what every list surface prints, the way it prints a
+    held call's line), the words are `claim_with_note` (the call's own page alone renders them, beside the note). A
+    scope note leaves the words in `claim`. A note the producer cannot read withholds the words."""
+    note = {"kind": "clarification", "dated": "2026-11-15", "required": True, "text": "A synthetic note.", "short": "Synthetic short."}
+    scope = {**note, "kind": "scope", "required": False}
+    rows = [
+        _ledger_row("pred_a", "A synthetic call (from 73 on 2026-09-12).", note),
+        _ledger_row("pred_b", "A synthetic scoped call.", scope),
+        _ledger_row("pred_c", "A synthetic plain call."),
+        _ledger_row("pred_d", "A synthetic call with a broken note.", {"kind": "clarification", "text": "x"}),
+    ]
+    ctx = ps.LiveContext("https://x", {"edition": {"as_of": "2026-11-15"}})
+    ctx.coach_ids.add("glucose_coach")
+    monkeypatch.setattr(ps, "_ledger_pages", lambda c: rows)
+    ps._live_ledger(ctx)
+    got = {o["prediction_id"] if "prediction_id" in o else o["id"]: o for o in ctx.objs["prediction"]}
+    a, b, c, d = (got[f"glucose-pred_{x}"] for x in "abcd")
+    assert (a["claim"], a["claim_withheld"], a["claim_with_note"], a["owner_note"]) == (
+        "Synthetic short.",
+        "with_note",
+        rows[0]["claim"],
+        note,
+    )
+    assert "2026-09-12" not in a["title"], "the title is the note's short form, never the words"
+    assert (b["claim"], b["claim_withheld"], b["claim_with_note"], b["owner_note"]) == (rows[1]["claim"], None, None, scope)
+    assert (c["claim"], c["claim_withheld"], c["claim_with_note"], c["owner_note"]) == (rows[2]["claim"], None, None, None)
+    assert (d["claim"], d["claim_withheld"], d["owner_note"]) == (ps.NO_WORDS_SENTENCE, "no_words", None)
+    for o in (a, b, c, d):
+        ps.validate(o, "prediction")
+
+
+@pytest.mark.parametrize(
+    "mutation, needle",
+    [
+        (lambda p: p.update(claim_withheld=None), "claim_with_note and claim_withheld"),
+        (lambda p: p.update(claim=p["claim_with_note"]), "the note's short form"),
+        (lambda p: p.update(owner_note={**p["owner_note"], "required": False}), "no required note"),
+        (lambda p: p.update(owner_note={**p["owner_note"], "kind": "owner"}), "malformed"),
+    ],
+)
+def test_a_with_note_call_that_could_show_bare_words_is_refused(mutation, needle):
+    objs = ps.load_fixtures(FIXTURES)
+    p = copy.deepcopy(next(o for o in objs["prediction"] if o.get("claim_withheld") == "with_note"))
+    ps.validate(p, "prediction")
+    mutation(p)
+    with pytest.raises(ps.SchemaError, match=needle):
+        ps.validate(p, "prediction")

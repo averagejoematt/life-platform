@@ -67,5 +67,7 @@ def test_the_snapshot_contract_and_the_site_schema_agree_on_claim_withheld():
     contract_values = set(re.search(r'"claim_withheld": \("enum:([^"]+)"', src).group(1).split("|"))
     schema = (ROOT / "www/src/content.config.ts").read_text()
     schema_values = set(re.findall(r'"(\w+)"', re.search(r"claim_withheld: z\.enum\(\[([^\]]+)\]\)", schema).group(1)))
-    assert contract_values == schema_values == {"unsourced", "no_words"}
+    # `with_note` (owner ruling 2026-11-15, #6079) is not a privacy hold: the words ARE published, on the call's own page
+    # beside the platform's dated note; list surfaces print the note's short form. Still no value names a private hold.
+    assert contract_values == schema_values == {"unsourced", "no_words", "with_note"}
     assert contract is not None

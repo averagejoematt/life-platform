@@ -6,7 +6,7 @@ and production."
 
 Three halves, each pinned here:
   1. the exporter (`scripts/publish_snapshot_contract.word_dates`) no longer rewrites ISO dates inside the
-     seven VERBATIM_PATHS — a claim reaches the snapshot byte-identical to the `/api/ledger_export` row —
+     eight VERBATIM_PATHS — a claim reaches the snapshot byte-identical to the `/api/ledger_export` row —
      while every authored key (grading.how, the title, a summary) is still written in words;
   2. the rule (`scripts/www_verbatim.py`): an ISO date outside a `data-verbatim="coach"` quotation fails,
      inside one passes, inside a correction fails, inside a heading fails, and a fake `data-verbatim` on
@@ -116,6 +116,7 @@ def test_verbatim_paths_name_only_the_coachs_own_words():
     let ISO dates back into authored copy."""
     assert contract.VERBATIM_PATHS == {
         ("prediction", "claim"),
+        ("prediction", "claim_with_note"),  # owner ruling 2026-11-15 (#6079): the words, served only beside their note
         ("disagreement", "claim_a"),
         ("disagreement", "claim_b"),
         ("day", "coach_lines[].text"),
