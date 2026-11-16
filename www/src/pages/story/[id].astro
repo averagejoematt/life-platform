@@ -8,8 +8,9 @@ import Provenance from "../../components/Provenance.astro";
 import StatusTag from "../../components/StatusTag.astro";
 import Quote from "../../components/Quote.astro";
 import { isDisputed } from "../../lib/disputed.js";
-import { CALL_OUTCOME, chapterCovers, chapterPublished, chapterWindow, clip, dayInWords, heldCallWords, num } from "../../lib/format.js";
-import { latestEdition, loadAll, loadSeries } from "../../lib/snapshot.js";
+import { CALL_OUTCOME, chapterMeta, chapterPublished, chapterWindow, clip, dayInWords, gapWords, heldCallWords, num } from "../../lib/format.js";
+import { latestEdition, loadAll, loadOwnWords, loadSeries } from "../../lib/snapshot.js";
+import { ownWords, withinDays } from "../../lib/own_words.js";
 import { dailyBars, placeEvidence, windowValues } from "../../lib/evidence.js";
 import { theLine } from "../../lib/theline.js";
 import { hasPage, href, pathOf } from "../../lib/url.js";
@@ -33,9 +34,8 @@ const prev = i > 0 ? walk[i - 1] : null;
 const next = i >= 0 && i < walk.length - 1 ? walk[i + 1] : null;
 const between = (a: any, b: any) => {
   if (!a || !b || c.status !== "published" || !(a.week >= 0) || !(b.week >= 0) || b.week - a.week < 2) return null;
-  const from = a.week + 1;
-  const to = b.week - 1;
-  return from === to ? `Week ${from} has no published chapter.` : `Weeks ${from} to ${to} have no published chapter.`;
+  // #6081: the weeks between are named with the statuses /story/ shows for them (skipped, held), one helper for both
+  return gapWords(all.byType.chapter, a.week + 1, b.week - 1);
 };
 const gapBefore = between(prev, c);
 const gapAfter = between(c, next);
@@ -75,7 +75,10 @@ const stateCopy: Record<string, string> = {
 // A published chapter shows the days it covers and the day Matthew approved it (2026-11-14: Week 10 read "8 November to
 // 14 November 2026 · Published 10 November 2026" — its program week and its DATA date — while it covers 4–10 November and
 // was approved on 13 November). Without the served dates: the program week, and the data date said as one.
-const span = (c.status === "published" && chapterCovers(c)) || (c.week_start && c.week_end ? `${(dayInWords(c.week_start) || "").replace(/ \d{4}$/, "")} to ${dayInWords(c.week_end)}` : null);
+// #6081: the number, the days and the publication come from format.js chapterMeta — the one rule every page that names a
+// chapter reads (the program week, when it is shown, is said as "program week").
+const meta = chapterMeta(c)!;
+const span = meta.window;
 const publishedWords = chapterPublished(c, { lower: true });
 const legacyNo = /^week-(\d+)$/.exec(c.id);
 const idNote = legacyNo && c.week != null && Number(legacyNo[1]) !== c.week ? `This page's address keeps the journal's post number (${legacyNo[1]}); the chapter is program ${c.week >= 1 ? `week ${c.week}` : "prologue"}.` : null;
@@ -163,25 +166,36 @@ if (ev && c.status === "published" && rawBody) {
     figures.push({ key: `call:${name}`, match: new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), html });
   }
 }
+// His own line on the pace (owner ruling 2026-11-15), beside the paragraph that names the rate flag — only on the
+// chapter the flag is the title of, only when the line's day is one of that chapter's days, and only when the platform
+// serves the approved words exactly. The platform's flag and his sentence disagree; the page settles nothing.
+const paceWords = ownWords(await loadOwnWords(), "pace");
+if (paceWords && ev && rawBody && /rate flag/i.test(c.title || "") && withinDays(paceWords.date, ev.from, ev.to)) {
+  figures.push({
+    key: "own-words",
+    match: /\bflag\b/i,
+    html: `<figure class="evidence ownwords-ev" data-evidence="own-words" data-own-words="pace"><figcaption class="label">In my words · ${dayInWords(paceWords.date)}</figcaption><blockquote>“${esc(paceWords.text)}”</blockquote><p class="evidence-note">Written in the days this chapter covers, the week the platform's rate flag fired on the pace of loss. The flag and the sentence disagree, and both are left as they are.</p></figure>`,
+  });
+}
 const body = rawBody ? placeEvidence(rawBody, figures).html : rawBody;
 const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
 ---
 
 <Base title={c.title} top="story" description={c.excerpt || c.title} status={dayInWords(c.published_at || c.date)} card={c.status === "published" ? c.id : null} ogType={c.status === "published" ? "article" : "website"}>
-  <section class="section" style="padding-bottom:24px">
+  <section class="section" style="padding-bottom:24px" data-chapter={c.id} data-status={c.status}>
     <div class="wrap" style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-end">
       <div style="flex:0 0 150px">
         <p class="label">Chapter</p>
-        <span class={`big ${c.status === "published" ? "cobalt" : "faint"}`} style="font-size:96px;display:block">{c.week == null ? "—" : String(c.week).padStart(2, "0")}</span>
+        <span class={`big ${c.status === "published" ? "cobalt" : "faint"}`} style="font-size:96px;display:block" data-ch-no>{meta.number}</span>
       </div>
       <div style="flex:1 1 520px;min-width:0;display:flex;flex-direction:column;gap:14px">
         <div class="row mono muted" style="font-size:12px;letter-spacing:.1em;text-transform:uppercase">
           <span>{c.week_label}</span>
           <span>·</span>
-          {span ? <span>{span}</span> : <span>{dayInWords(c.date)}</span>}
-          {span && publishedWords && (
+          {span ? <span data-ch-window>{span}</span> : !publishedWords && <span>{dayInWords(c.date)}</span>}
+          {publishedWords && (
             <>
-              <span>·</span>
+              {span && <span>·</span>}
               <span data-published>{publishedWords}</span>
             </>
           )}
@@ -189,6 +203,11 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
         </div>
         <h1>{c.title}</h1>
         {c.excerpt && <p class="dek">{c.excerpt}</p>}
+        {meta.weekNote && (
+          <p class="muted" style="font-size:13px" data-week-note>
+            {meta.weekNote}
+          </p>
+        )}
         {idNote && (
           <p class="muted" style="font-size:13px" data-id-note>
             {idNote}
@@ -336,6 +355,14 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
           </span>
         )
       }
+    </div>
+    {/* coming back (2026-11-15): the end of a chapter is where a reader decides whether to follow */}
+    <div class="wrap" style="margin-top:18px">
+      <p class="muted" style="font-size:14px;display:flex;flex-wrap:wrap;gap:6px 24px;align-items:baseline">
+        <span>A new chapter is published most weeks, once Matthew has approved it.</span>
+        <a href="https://averagejoematt.com/subscribe/" style="font-weight:700;color:var(--ink)">Get the next one by email →</a>
+        <a href={href("/story/")} style="font-weight:700;color:var(--ink)">Every chapter →</a>
+      </p>
     </div>
   </section>
 </Base>

@@ -1,0 +1,80 @@
+---
+// His own words, placed (owner ruling 2026-11-15). Renders ONE pinned line when the snapshot serves it exactly
+// (lib/own_words.js::ownWords) and nothing otherwise. The caption always says whose words they are and the day they
+// were written; `note` is the page's own sentence about what the line is and is not (a quotation is never a measure).
+import { ownWords } from "../lib/own_words.js";
+import { loadOwnWords } from "../lib/snapshot.js";
+import { dayInWords } from "../lib/format.js";
+
+interface Props {
+  id: string; // a key of OWN_WORDS
+  note?: string | null; // the page's framing sentence; falls back to the pin's own frame
+  label?: string | null; // a mono label above the line ("A dated reflection, in my words")
+  inverse?: boolean; // on an ink band
+  compact?: boolean; // a margin-sized placement
+  class?: string; // the placement's own spacing class
+}
+const { id, note = null, label = null, inverse = false, compact = false, class: extra = "" } = Astro.props as Props;
+const line = ownWords(await loadOwnWords(), id);
+const framing = note ?? line?.frame ?? null;
+---
+
+{
+  line && (
+    <figure class:list={["ownwords", extra, { inv: inverse, compact }]} data-own-words={line.key}>
+      {label && <p class="label ownwords-label">{label}</p>}
+      <blockquote>{line.text}</blockquote>
+      <figcaption>
+        <span class="ownwords-who">My words, {dayInWords(line.date)}.</span>
+        {framing && <span class="ownwords-note"> {framing}</span>}
+      </figcaption>
+    </figure>
+  )
+}
+
+<style>
+  .ownwords {
+    margin: 16px 0 0;
+    padding: 0 0 0 18px;
+    border-left: 3px solid var(--cobalt);
+  }
+  .ownwords blockquote {
+    margin: 0;
+    font-family: var(--serif);
+    font-size: clamp(19px, 2vw, 24px);
+    line-height: 1.4;
+    color: var(--ink);
+  }
+  .ownwords blockquote::before {
+    content: "“";
+  }
+  .ownwords blockquote::after {
+    content: "”";
+  }
+  .ownwords-label {
+    margin-bottom: 8px;
+  }
+  .ownwords figcaption {
+    margin-top: 8px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+  .ownwords-who {
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .ownwords.compact blockquote {
+    font-size: 17px;
+  }
+  .ownwords.inv {
+    border-left-color: var(--inklink);
+  }
+  .ownwords.inv blockquote,
+  .ownwords.inv .ownwords-who {
+    color: var(--paper);
+  }
+  .ownwords.inv figcaption {
+    color: var(--inkmuted);
+  }
+</style>

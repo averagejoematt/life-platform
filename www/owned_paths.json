@@ -5,6 +5,7 @@
     "404.html",
     "data/days.json",
     "data/pairs.json",
+    "data/series/deep_pct.json",
     "data/series/recovery_score.json",
     "data/series/resting_hr.json",
     "data/series/total_protein_g.json",

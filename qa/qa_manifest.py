@@ -118,11 +118,15 @@ _V9_EXTRA = {
 }
 # The doors' declared intent (qa/comprehension_qa.py grades a newcomer's read against it; <=30 words each).
 _V9_INTENTS = {
+    # owner ruling 2026-11-15 (#6067): the weight is the catalyst; the purpose is the broader experiment
     "/": (
-        "The front page: who Matthew is, the six-dimensional portrait of how he is doing, the latest chapter, "
-        "and the doors into the story, the data and the system."
+        "The front page: an experiment in engineering a better life with AI coaches. The weight loss is measured; "
+        "the rest is open. The portrait, the latest chapter and three doors."
     ),
-    "/story/": "The narration: the latest weekly chapter and its episode, then every chapter in order.",
+    "/story/": (
+        "The narration: weekly chapters of an experiment in changing a life, not only a weight; "
+        "the latest chapter and its episode, then every chapter in order."
+    ),
     "/data/": (
         "The data room: the published series behind the experiment, paired against each other, "
         "with how each number is measured and what is missing."
