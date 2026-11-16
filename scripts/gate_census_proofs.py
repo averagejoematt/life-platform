@@ -4762,3 +4762,23 @@ STRUCTURAL_HAND_PROOFS["structural::test_putmetricdata_namespace_condition_5545.
     ),
     "proved_on": "2026-11-15",
 }
+
+STRUCTURAL_HAND_PROOFS["structural::test_core_alias_6090.py"] = {
+    "gate_name": "test_core_alias_6090.py",
+    "command": (
+        "CONTENT_FILTER_JSON=<the real channel object plus a private_identifiers list, in-process only> "
+        "python3 -m pytest tests/test_core_alias_6090.py -q -p no:warnings   # baseline 12 passed (armed); unarmed 11 passed 1 skipped"
+    ),
+    "mutation": (
+        "Two plants in the real tracked tree, ONE AT A TIME, each restored from a byte copy: M1 config/training_charter.json "
+        "restored to origin/main (the core id that spells a private habit, before the neutral alias); M2 "
+        "tests/test_core_habits_5124.py restored to origin/main (its fixtures carried the same id)."
+    ),
+    "observed": "2026-11-16, #6090 lane. BASELINE 12 passed (armed). M1: 1 failed, 11 passed. M2: 1 failed, 11 passed. REVERTED 12 passed.",
+    "scope": (
+        "Every git-tracked text file against the off-repo private_identifiers list of the content-filter channel. NOT SEEN: "
+        "a run with no channel source carrying the list (the test skips visibly), so CI is armed only once the owner adds "
+        "the list to the CONTENT_FILTER_JSON secret; git history (no rewrite, owner ruling 2026-11-16)."
+    ),
+    "proved_on": "2026-11-16",
+}
