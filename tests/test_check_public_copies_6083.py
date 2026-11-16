@@ -140,6 +140,16 @@ def test_a_retired_location_must_hold_nothing(snapshot, site_dir):
     assert ("retired", "B") in rules(v)
 
 
+def test_a_retired_legacy_location_must_hold_nothing_6115(snapshot, site_dir):
+    """#6115: /chronicle/, /evidence/ and /now/ were audited page by page and emptied (redirected or quarantined). A page
+    re-published there — by a restart's chronicle archive step, a stray sync — fails rule B; it is not a declared
+    legacy location any more, so rules C and D are not the only thing between it and a reader."""
+    assert G.LEGACY_LOCATIONS == {}, "a retained legacy location needs its own reason and an audit row (#6115)"
+    for key in ("site/chronicle/archive/cycle-18/posts/week-00/index.html", "site/evidence/stack/index.html", "site/now/index.html"):
+        v, _ = run(clean_bucket() + [obj(key, T0 - timedelta(days=1))], clean_archive(), snapshot, site_dir)
+        assert rules(v) == [("retired", "B")] and key in v[0][2], (key, v)
+
+
 def test_an_archive_older_than_the_deploy_fails_remediation_and_an_old_one_fails_check(snapshot, site_dir):
     before = clean_archive()  # built 03:50, after the 03:47 build
     assert run(clean_bucket(), before, snapshot, site_dir, mode="remediation")[0] == []
