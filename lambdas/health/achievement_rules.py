@@ -55,6 +55,8 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any, Callable, NamedTuple
 
+from common.challenge_checkins import owner_entries  # #6087: the owner's own check-ins only
+
 from health import character_privacy  # owner ruling 2026-11-06: level badges credit the public method, never a recalculation
 
 # ── The first-earn ledger's DDB coordinates ───────────────────────────────────
@@ -459,7 +461,7 @@ def _completed_challenge_stats(challenges: list[dict]) -> tuple[int, int]:
         if ch.get("status") != "completed":
             continue
         completed += 1
-        checkins = ch.get("daily_checkins") or []
+        checkins = owner_entries(ch.get("daily_checkins"))  # #6087: never a reader's tap
         if checkins and all(c.get("completed") for c in checkins):
             perfect += 1
     return completed, perfect

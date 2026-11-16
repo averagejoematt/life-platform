@@ -62,7 +62,7 @@ _WRITTEN_KEYS = [
     "USER#matthew#SOURCE#experiment_suggestions",  # reader experiment suggestions
     "USER#matthew#SOURCE#reader_feedback",  # #4182: /api/page_feedback
     "USER#matthew#SOURCE#morning_note",  # #4189: /api/morning_note — the owner's four words (owner-token write)
-    "USER#matthew#SOURCE#challenges",  # challenge daily check-ins
+    "CHALLENGE_CHECKINS#cold-shower-finish",  # #6087: reader challenge check-ins (never the owner's challenges row)
     "USER#matthew#SOURCE#evening_ritual",  # #769 (ADR-124): one-tap evening-ritual taps
     "COHORT#resting_heart_rate#2026-W30",  # #1394: anonymous cohort-strip submissions (COHORT#<metric>#<week>)
     "RATE#board_ask#deadbeef",  # shared rate_limiter.py → RATE#{endpoint}#{ip_hash}

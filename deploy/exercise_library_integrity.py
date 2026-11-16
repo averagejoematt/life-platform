@@ -121,8 +121,9 @@ INVENTORY_RULE = (
     "owner rulings 2026-11-11 and 2026-11-14: every equipment id carries one of five evidence states for home_gym — "
     "owner_confirmed, recent_inferred, historical_only, unknown, confirmed_unavailable — and `state` follows from it: only "
     "owner_confirmed and recent_inferred are `available`. recent_inferred is a HEURISTIC: used by a movement logged in "
-    f"{WINDOW} (the window ends on the history's last workout); used only by older logs is historical_only; never logged is "
-    "unknown. The basic classes (`basic: true` — free weights, flat and adjustable benches, the rack, cable stations, the "
+    f"{WINDOW} (the window ends on the history's last workout, and never starts before the day he began training at "
+    "home_gym — owner ruling 2026-11-15: no log from an earlier gym is evidence); used only by older logs is historical_only; "
+    "never logged is unknown. The basic classes (`basic: true` — free weights, flat and adjustable benches, the rack, cable stations, the "
     "pull-up bar, bands, bodyweight) are inferred as a class and never confirmed one by one. A 'gym doesn't have X' note, or "
     "an owner ruling, overrides the logs. Contention ('X was taken') never changes a state. The gym is never named."
 )
@@ -134,10 +135,13 @@ def _months_before(day: str, months: int) -> str:
     return f"{total // 12:04d}-{total % 12 + 1:02d}-{min(d, 28):02d}"
 
 
-def home_gym_inventory(movements: dict[str, dict[str, Any]], history: dict[str, Any], seeds: dict[str, dict[str, Any]]) -> dict[str, Any]:
+def home_gym_inventory(
+    movements: dict[str, dict[str, Any]], history: dict[str, Any], seeds: dict[str, dict[str, Any]], since: str | None = None
+) -> dict[str, Any]:
     """Equipment id -> {home_gym: {state, evidence, source[, basic]}} (`library_integrity` rule 2). Deterministic: the
-    window ends on the history's own last workout. A seed (an owner note or ruling) wins over the logs."""
-    cutoff = _months_before(history.get("last") or "1970-01-01", rules.RECENT_WINDOW_MONTHS)
+    window ends on the history's own last workout. A seed (an owner note or ruling) wins over the logs. `since` (the
+    curation's `HOME_GYM_SINCE`, owner ruling 2026-11-15): the window never starts before it."""
+    cutoff = max(_months_before(history.get("last") or "1970-01-01", rules.RECENT_WINDOW_MONTHS), since or "")
     logged = [e for e in movements.values() if e.get("history")]
     recent = {x for e in logged if e["history"].get("last_done", "") >= cutoff for x in e["equipment"]}
     older = {x for e in logged for x in e["equipment"]}

@@ -82,6 +82,7 @@ from typing import Any
 
 from training import effort_ceilings, in_block_variant, program_conflicts, program_v03, program_v04, recent_aerobic, variant_rotation
 from training.accessory_check import CARDIO_NAME_HINTS, accessory_rotation, classify_movement  # noqa: F401 — re-exported (#5069 split)
+from training.movement_resolver import resolve_movement as _resolve_movement  # noqa: F401 — #6014: moved out, same entrypoint
 from training.program_v03 import BLOCK_CALENDAR  # noqa: F401 — v0.3 history; `load_ramp.block_1_start()` reads it (#4107)
 from training.session_cues import CARRY_EXPOSURE, _default_sets, exposure_cue  # noqa: F401 — #5317/#5318, re-exported
 from training.session_shape import (  # noqa: F401 — #5069: a session's length and shape (ruling 5), re-exported from here
@@ -604,6 +605,13 @@ SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
         # #5162 (owner ruling 2026-10-23, "trade inside 75"): the press's 3 sets became 3 lateral-raise sets
         "anchors": [["bench", "heavy"], ["row", "heavy"], ["vertical_pull", "moderate"]],
         "anchor_sets": {"vertical_pull": 2},
+        # #6014 (coaching decision 2026-11-15, owner-vetoable): the heavy row is the free-weight one-arm dumbbell row, pinned. With
+        # the seated row machine confirmed (owner ruling 2026-11-15, A) the row family's own order would serve `machine_row` here,
+        # the week would carry no free-weight pull and stage 1 (`week_commitments` free_weight_compounds, owner ruling 2026-11-12)
+        # would block every commit. The dumbbell row alone, so an in-block machine row on the volume day never takes this slot
+        # (`in_block_variant.prefer` only reorders the pinned members); a pain or equipment swap still walks the whole family
+        # (`live_session._anchor_candidates`). The volume day keeps the family's order.
+        "anchor_keys": {"row": ["one_arm_db_row"]},
         # #5053: the rear-delt slot (delts 14–18/wk, charter `volume_priorities`) — the upper heavy day carries the pec deck
         # the traded delt slot leads the accessories: a time trim drops last-listed first, so it goes last
         "accessories": ["db_lateral_raise", "cable_tricep_pushdown", "db_curl", "reverse_pec_deck"],
@@ -826,50 +834,6 @@ def _deload_trim(exposures: list[dict[str, Any]], pct: int) -> dict[str, Any]:
                 total -= 1
                 progressed = True
     return {"sets_before": before, "sets_after": total, "pct": pct, "loads": "held"}
-
-
-def _resolve_movement(
-    keys: list[str],
-    catalog_movements: dict[str, Any] | None,
-    skill_ceiling: int,
-    taken: set[str],
-    *,
-    family: str | None = None,
-    allow_anchor_exemption: bool = True,
-):
-    """The first catalog key of a pattern the generator may prescribe, in the listed order.
-
-    `family` is the anchor pattern name ("squat", "hinge", "bench", "row", …) when this call
-    is resolving one anchor's `catalog_keys`; `None` for an accessory, which never qualifies
-    for the exemption below regardless of `allow_anchor_exemption`.
-
-    When `family` is one of `program_conflicts.ANCHOR_SKILL_CEILING_RULING["exempt_families"]`
-    AND `allow_anchor_exemption` is True, THIS resolution uses that ruling's
-    `effective_ceiling` instead of `skill_ceiling` (owner ruling 2026-09-23, #4080,
-    option B) — every other pattern and every accessory still uses `skill_ceiling` unchanged.
-    `allow_anchor_exemption=False` is how a deliberately-lower ceiling (the Minimum Viable
-    Session's skill_ceiling=1) opts OUT of the exemption rather than being silently raised.
-    """
-    if catalog_movements is None:
-        return None, "movement catalog not read — the pattern is prescribed, the movement is unresolved"
-    ruling = program_conflicts.ANCHOR_SKILL_CEILING_RULING
-    exempt = allow_anchor_exemption and family is not None and family in ruling["exempt_families"]
-    ceiling = max(int(skill_ceiling), int(ruling["effective_ceiling"])) if exempt else skill_ceiling
-    skipped: list[str] = []
-    for k in keys:
-        m = catalog_movements.get(k)
-        if m is None:
-            skipped.append(f"{k} (not in catalog)")
-            continue
-        tier = int(m.get("skill_tier", 99))
-        if tier > ceiling:
-            skipped.append(f"{k} (skill_tier {tier} > ceiling {ceiling}" + (", anchor-exempt" if exempt else "") + ")")
-            continue
-        if k in taken:
-            skipped.append(f"{k} (already in this session)")
-            continue
-        return k, ("skipped: " + ", ".join(skipped)) if skipped else None
-    return None, "no reachable member: " + ", ".join(skipped)
 
 
 def session_prescription_for_role(

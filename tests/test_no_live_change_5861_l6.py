@@ -32,15 +32,17 @@ for _p in (REPO, REPO / "lambdas", REPO / "scripts"):
 import sample_weeks_5861 as sw  # noqa: E402
 
 PINNED = {
-    "a_large_deficit_experienced": "482036aa60a4ad1e",
-    "b_shoulder_flag_low_recovery": "c44c886a72aa40c0",
-    "c_equipment_limited": "482036aa60a4ad1e",
-    "d_stalled_anchor_adherence_dip": "f9f775a9435653f1",
-    "e_short_week": "8ae572edb08aac5c",
-    "f_high_fatigue_poor_sleep": "696de7e8a021a19a",
+    "a_large_deficit_experienced": "e828efca824b15b4",
+    "b_shoulder_flag_low_recovery": "50970ff1f7245821",
+    "c_equipment_limited": "e828efca824b15b4",
+    "d_stalled_anchor_adherence_dip": "87644a161b4901de",
+    "e_short_week": "42372f68d3525bc1",
+    "f_high_fatigue_poor_sleep": "c4d8502303612cda",
 }
 """Computed on the base tree (ea3906604) and on this branch — identical. (a) and (c) agree because today's path ignores the
-equipment profile: the gap the live session fit closes."""
+equipment profile: the gap the live session fit closes. #6014 (coaching decision 2026-11-15, owner-vetoable) moved every pin
+ON PURPOSE: the heavy-upper row is pinned to the one-arm dumbbell row (`SESSION_TEMPLATES['upper_heavy']['anchor_keys']`),
+so the rollback path serves it too. With that pin removed the previous pins (482036aa60a4ad1e, ...) come back exactly."""
 
 
 def test_the_proposed_drafts_serve_exactly_what_the_base_tree_served():

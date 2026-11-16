@@ -1,6 +1,6 @@
 {
- "_README": "The owner's exercise library (#5769). PROPOSED — nothing in the drafting path reads it until the owner approves it. Public half only: no bodyweight, no loads, no note text — the N=1 half (best set per bodyweight band, coded note signals, gate threshold values) is the owner-private overlay s3://matthew-life-platform/config/coaching/exercise_library.private.json, joined at selection time by lambdas/training/exercise_library.py (fail-closed). Built by deploy/build_exercise_library.py from the full Hevy history + deploy/exercise_library_curation.py. Doc: docs/coaching/EXERCISE_LIBRARY.md.",
- "version": "0.4.0",
+ "_README": "The owner's exercise library (#5769). APPROVED (owner, 2026-11-14) — the live drafting path reads it; rollback is `status` back to `proposed` (the shadow path). Public half only: no bodyweight, no loads, no note text — the N=1 half (best set per bodyweight band, coded note signals, gate threshold values) is the owner-private overlay s3://matthew-life-platform/config/coaching/exercise_library.private.json, joined at selection time by lambdas/training/exercise_library.py (fail-closed). Built by deploy/build_exercise_library.py from the full Hevy history + deploy/exercise_library_curation.py. Doc: docs/coaching/EXERCISE_LIBRARY.md.",
+ "version": "0.4.1",
  "status": "approved",
  "change_log": [
   {
@@ -98,6 +98,13 @@
    "date": "2026-11-14",
    "by": "owner ruling 2026-11-14: APPROVE FOR PERMANENT PRODUCTION ACTIVATION (v14 approval package, library 0.3.9)",
    "what": "approved: status proposed -> approved (schema valid, private gate check passed)"
+  },
+  {
+   "version": "0.4.1",
+   "date": "2026-11-15",
+   "by": "#6014 (owner ruling 2026-11-15, A and C; the library stays approved)",
+   "what": "Equipment the owner confirmed present at home_gym is owner_confirmed and served: the seated row, shoulder press, hip thrust, hack squat, pullover and triceps machines, the chest-supported T-bar row, the 45-degree back extension and decline benches, the ab wheel, the Smith machine and the captain's chair (ruling A). The standing calf raise machine is unchanged (ruling B: owner unsure). The recent-inferred window never starts before the day he began training at home_gym (`HOME_GYM_SINCE`, May 2026, ruling C): a log from an earlier gym is no evidence a machine is here (no state moves on today's history). 20 movements become available; fallback lists recompute under the one equivalence rule (79 movements), since an available movement can now be a fallback. No tier, gate, rating or setting changes. The `_README` states the header's own status (it still said PROPOSED after the owner's approval; text only).",
+   "rule": "data and one window rule, by owner ruling; status stays approved (approved_on unchanged)"
   }
  ],
  "_provenance": {
@@ -370,22 +377,22 @@
    "none_reviewed": 640
   },
   "integrity": {
-   "fallback_links": 1109,
-   "movements_without_fallbacks": 235,
+   "fallback_links": 1110,
+   "movements_without_fallbacks": 234,
    "template_id_null": 1,
    "not_loggable": 0,
    "movements_by_availability_evidence": {
-    "owner_confirmed": 0,
-    "recent_inferred": 560,
-    "historical_only": 49,
-    "unknown": 16,
+    "owner_confirmed": 17,
+    "recent_inferred": 563,
+    "historical_only": 31,
+    "unknown": 14,
     "confirmed_unavailable": 1
    },
    "equipment_by_availability_evidence": {
-    "owner_confirmed": 0,
+    "owner_confirmed": 12,
     "recent_inferred": 38,
-    "historical_only": 16,
-    "unknown": 15,
+    "historical_only": 6,
+    "unknown": 13,
     "confirmed_unavailable": 1
    }
   },
@@ -823,7 +830,7 @@
  },
  "gym_inventory": {
   "location_id": "home_gym",
-  "rule": "owner rulings 2026-11-11 and 2026-11-14: every equipment id carries one of five evidence states for home_gym — owner_confirmed, recent_inferred, historical_only, unknown, confirmed_unavailable — and `state` follows from it: only owner_confirmed and recent_inferred are `available`. recent_inferred is a HEURISTIC: used by a movement logged in the last 12 months of the Hevy history (the window ends on the history's last workout); used only by older logs is historical_only; never logged is unknown. The basic classes (`basic: true` — free weights, flat and adjustable benches, the rack, cable stations, the pull-up bar, bands, bodyweight) are inferred as a class and never confirmed one by one. A 'gym doesn't have X' note, or an owner ruling, overrides the logs. Contention ('X was taken') never changes a state. The gym is never named.",
+  "rule": "owner rulings 2026-11-11 and 2026-11-14: every equipment id carries one of five evidence states for home_gym — owner_confirmed, recent_inferred, historical_only, unknown, confirmed_unavailable — and `state` follows from it: only owner_confirmed and recent_inferred are `available`. recent_inferred is a HEURISTIC: used by a movement logged in the last 12 months of the Hevy history (the window ends on the history's last workout, and never starts before the day he began training at home_gym — owner ruling 2026-11-15: no log from an earlier gym is evidence); used only by older logs is historical_only; never logged is unknown. The basic classes (`basic: true` — free weights, flat and adjustable benches, the rack, cable stations, the pull-up bar, bands, bodyweight) are inferred as a class and never confirmed one by one. A 'gym doesn't have X' note, or an owner ruling, overrides the logs. Contention ('X was taken') never changes a state. The gym is never named.",
   "items": {
    "ab_crunch_machine": {
     "home_gym": {
@@ -834,9 +841,9 @@
    },
    "ab_wheel": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
-     "source": "used only by movements logged before the last 12 months of the Hevy history"
+     "state": "available",
+     "evidence": "owner_confirmed",
+     "source": "owner ruling 2026-11-15 (A): confirmed present at home_gym"
     }
    },
    "assisted_pullup_dip_machine": {
@@ -848,9 +855,9 @@
    },
    "back_extension_45": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
-     "source": "used only by movements logged before the last 12 months of the Hevy history"
+     "state": "available",
+     "evidence": "owner_confirmed",
+     "source": "owner ruling 2026-11-15 (A): confirmed present at home_gym"
     }
    },
    "barbell": {
@@ -878,9 +885,9 @@
    },
    "bench_decline": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
-     "source": "used only by movements logged before the last 12 months of the Hevy history"
+     "state": "available",
+     "evidence": "owner_confirmed",
+     "source": "owner ruling 2026-11-15 (A): confirmed present at home_gym"
     }
    },
    "bench_flat": {
@@ -930,9 +937,9 @@
    },
    "captains_chair": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "unknown",
-     "source": "never logged: named only by expansion candidates"
+     "state": "available",
+     "evidence": "owner_confirmed",
+     "source": "owner ruling 2026-11-15 (A): confirmed present at home_gym"
     }
    },
    "chest_press_machine": {
@@ -988,9 +995,9 @@
    },
    "hack_squat_machine": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
-     "source": "used only by movements logged before the last 12 months of the Hevy history"
+     "state": "available",
+     "evidence": "owner_confirmed",
+     "source": "owner ruling 2026-11-15 (A): confirmed present at home_gym"
     }
    },
    "hand_gripper": {
@@ -1016,9 +1023,9 @@
    },
    "hip_thrust_machine": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
-     "source": "used only by movements logged before the last 12 months of the Hevy history"
+     "state": "available",
+     "evidence": "owner_confirmed",
+     "source": "owner ruling 2026-11-15 (A): confirmed present at home_gym"
     }
    },
    "incline_press_machine": {
@@ -1159,9 +1166,9 @@
    },
    "pullover_machine": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "unknown",
-     "source": "never logged: named only by expansion candidates"
+     "state": "available",
+     "evidence": "owner_confirmed",
+     "source": "owner ruling 2026-11-15 (A): confirmed present at home_gym"
     }
    },
    "pullup_bar": {
@@ -1203,16 +1210,16 @@
    },
    "seated_row_machine": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
-     "source": "used only by movements logged before the last 12 months of the Hevy history"
+     "state": "available",
+     "evidence": "owner_confirmed",
+     "source": "owner ruling 2026-11-15 (A): confirmed present at home_gym"
     }
    },
    "shoulder_press_machine": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
-     "source": "used only by movements logged before the last 12 months of the Hevy history"
+     "state": "available",
+     "evidence": "owner_confirmed",
+     "source": "owner ruling 2026-11-15 (A): confirmed present at home_gym"
     }
    },
    "ski_erg": {
@@ -1231,9 +1238,9 @@
    },
    "smith_machine": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
-     "source": "used only by movements logged before the last 12 months of the Hevy history"
+     "state": "available",
+     "evidence": "owner_confirmed",
+     "source": "owner ruling 2026-11-15 (A): confirmed present at home_gym"
     }
    },
    "squat_rack": {
@@ -1281,9 +1288,9 @@
    },
    "t_bar_row_machine": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
-     "source": "used only by movements logged before the last 12 months of the Hevy history"
+     "state": "available",
+     "evidence": "owner_confirmed",
+     "source": "owner ruling 2026-11-15 (A): confirmed present at home_gym"
     }
    },
    "torso_rotation_machine": {
@@ -1309,9 +1316,9 @@
    },
    "triceps_machine": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
-     "source": "used only by movements logged before the last 12 months of the Hevy history"
+     "state": "available",
+     "evidence": "owner_confirmed",
+     "source": "owner ruling 2026-11-15 (A): confirmed present at home_gym"
     }
    },
    "weight_plate": {
@@ -2656,7 +2663,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "standing_cable_chest_press",
+     "movement_id": "decline_bench_press_dumbbell",
      "reason": "same_stimulus"
     }
    ]
@@ -3647,7 +3654,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "knee_push_up",
+     "movement_id": "decline_bench_press_barbell",
      "reason": "same_stimulus"
     }
    ],
@@ -4537,11 +4544,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "inverted_db_tricep_kickbacks",
+     "movement_id": "tricep_pushaway",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "incline_db_kickbacks",
+     "movement_id": "tricep_pushaways",
      "reason": "same_stimulus"
     }
    ]
@@ -5163,15 +5170,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "seated_shoulder_press_machine",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "landmine_shoulder_press",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "shoulder_press",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "landmine_press",
      "reason": "same_stimulus"
     }
    ],
@@ -5615,11 +5622,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "seated_cable_row_v_grip_cable",
+     "movement_id": "t_bar_row",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "underhand_barbell_dead_rows",
+     "movement_id": "seated_cable_row_v_grip_cable",
      "reason": "same_stimulus"
     }
    ]
@@ -5761,11 +5768,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "underhand_barbell_dead_rows",
+     "movement_id": "t_bar_row",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_chest_supported_rows",
+     "movement_id": "underhand_barbell_dead_rows",
      "reason": "same_stimulus"
     }
    ],
@@ -6210,7 +6217,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "standing_cable_chest_press",
+     "movement_id": "decline_bench_press_barbell",
      "reason": "same_stimulus"
     }
    ],
@@ -6368,7 +6375,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "underhand_bench_press",
+     "movement_id": "decline_bench_press_barbell",
      "reason": "same_stimulus"
     }
    ]
@@ -7153,15 +7160,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "hip_thrust_machine",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "cable_kickback",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "db_hip_thrust",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "hip_thrust_barbell",
      "reason": "same_stimulus"
     }
    ],
@@ -7308,8 +7315,8 @@
    "not_for_you_now": null,
    "availability": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
+     "state": "available",
+     "evidence": "owner_confirmed",
      "source": "the worst of its equipment: t_bar_row_machine"
     }
    },
@@ -7644,11 +7651,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "inverted_db_tricep_kickbacks",
+     "movement_id": "tricep_pushaway",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "incline_db_kickbacks",
+     "movement_id": "tricep_pushaways",
      "reason": "same_stimulus"
     }
    ],
@@ -8266,7 +8273,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "straight_arm_pulldown",
+     "movement_id": "pullover_machine",
      "reason": "same_stimulus"
     }
    ],
@@ -8752,7 +8759,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "seated_cable_row_v_grip_cable",
+     "movement_id": "t_bar_row",
      "reason": "same_stimulus"
     }
    ],
@@ -9389,11 +9396,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "underhand_barbell_dead_rows",
+     "movement_id": "t_bar_row",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_chest_supported_rows",
+     "movement_id": "underhand_barbell_dead_rows",
      "reason": "same_stimulus"
     }
    ],
@@ -10614,11 +10621,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_hip_thrust",
+     "movement_id": "hip_thrust_machine",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "glute_machine_kickback",
+     "movement_id": "db_hip_thrust",
      "reason": "same_stimulus"
     }
    ],
@@ -11386,8 +11393,8 @@
    "not_for_you_now": null,
    "availability": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
+     "state": "available",
+     "evidence": "owner_confirmed",
      "source": "the worst of its equipment: hip_thrust_machine"
     }
    },
@@ -12183,7 +12190,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "straight_arm_lat_pulldown_cable",
+     "movement_id": "pullover_machine",
      "reason": "same_stimulus"
     }
    ],
@@ -12951,15 +12958,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "hack_squat_machine",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "squat_bodyweight",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "kettlebell_goblet_squat",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "wall_squat",
      "reason": "same_stimulus"
     }
    ],
@@ -16146,11 +16153,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "inverted_db_tricep_kickbacks",
+     "movement_id": "tricep_pushaway",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "incline_db_kickbacks",
+     "movement_id": "tricep_pushaways",
      "reason": "same_stimulus"
     }
    ],
@@ -18689,7 +18696,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "seated_cable_row_v_grip_cable",
+     "movement_id": "t_bar_row",
      "reason": "same_stimulus"
     }
    ],
@@ -18843,15 +18850,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "seated_shoulder_press_machine",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "landmine_shoulder_press",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "shoulder_press",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "landmine_press",
      "reason": "same_stimulus"
     }
    ],
@@ -19006,11 +19013,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_hip_thrust",
+     "movement_id": "hip_thrust_machine",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "glute_machine_kickback",
+     "movement_id": "db_hip_thrust",
      "reason": "same_stimulus"
     }
    ],
@@ -19482,11 +19489,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "seated_cable_row_v_grip_cable",
+     "movement_id": "t_bar_row",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "underhand_barbell_dead_rows",
+     "movement_id": "seated_cable_row_v_grip_cable",
      "reason": "same_stimulus"
     }
    ],
@@ -20732,15 +20739,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "seated_shoulder_press_machine",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "landmine_shoulder_press",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "shoulder_press",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "landmine_press",
      "reason": "same_stimulus"
     }
    ],
@@ -21869,8 +21876,8 @@
    "not_for_you_now": null,
    "availability": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
+     "state": "available",
+     "evidence": "owner_confirmed",
      "source": "the worst of its equipment: ab_wheel"
     }
    },
@@ -22975,11 +22982,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "cable_kickback",
+     "movement_id": "hip_thrust_machine",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "glute_machine_kickback",
+     "movement_id": "cable_kickback",
      "reason": "same_stimulus"
     }
    ],
@@ -23136,11 +23143,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "seated_cable_row_v_grip_cable",
+     "movement_id": "t_bar_row",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "underhand_barbell_dead_rows",
+     "movement_id": "seated_cable_row_v_grip_cable",
      "reason": "same_stimulus"
     }
    ],
@@ -23466,11 +23473,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "seated_cable_row_v_grip_cable",
+     "movement_id": "t_bar_row",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "underhand_barbell_dead_rows",
+     "movement_id": "seated_cable_row_v_grip_cable",
      "reason": "same_stimulus"
     }
    ],
@@ -24057,11 +24064,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "inverted_db_tricep_kickbacks",
+     "movement_id": "tricep_pushaway",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "incline_db_kickbacks",
+     "movement_id": "tricep_pushaways",
      "reason": "same_stimulus"
     }
    ],
@@ -25241,8 +25248,8 @@
    "not_for_you_now": null,
    "availability": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
+     "state": "available",
+     "evidence": "owner_confirmed",
      "source": "the worst of its equipment: back_extension_45"
     }
    },
@@ -25855,7 +25862,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "underhand_bench_press",
+     "movement_id": "decline_bench_press_barbell",
      "reason": "same_stimulus"
     }
    ],
@@ -28736,11 +28743,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "underhand_barbell_dead_rows",
+     "movement_id": "t_bar_row",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_chest_supported_rows",
+     "movement_id": "underhand_barbell_dead_rows",
      "reason": "same_stimulus"
     }
    ],
@@ -28884,8 +28891,8 @@
    "not_for_you_now": null,
    "availability": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
+     "state": "available",
+     "evidence": "owner_confirmed",
      "source": "the worst of its equipment: shoulder_press_machine"
     }
    },
@@ -29619,8 +29626,8 @@
    "not_for_you_now": null,
    "availability": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
+     "state": "available",
+     "evidence": "owner_confirmed",
      "source": "the worst of its equipment: triceps_machine"
     }
    },
@@ -29784,8 +29791,8 @@
    "not_for_you_now": null,
    "availability": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
+     "state": "available",
+     "evidence": "owner_confirmed",
      "source": "the worst of its equipment: triceps_machine"
     }
    },
@@ -31248,15 +31255,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "hack_squat_machine",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "squat_bodyweight",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "kettlebell_goblet_squat",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "wall_squat",
      "reason": "same_stimulus"
     }
    ],
@@ -31411,15 +31418,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "hack_squat_machine",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "squat_bodyweight",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "kettlebell_goblet_squat",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "wall_squat",
      "reason": "same_stimulus"
     }
    ],
@@ -33173,7 +33180,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "knee_push_up",
+     "movement_id": "decline_bench_press_barbell",
      "reason": "same_stimulus"
     }
    ],
@@ -33494,15 +33501,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "hip_thrust_machine",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "cable_kickback",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "db_hip_thrust",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "hip_thrust_barbell",
      "reason": "same_stimulus"
     }
    ],
@@ -33938,11 +33945,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "cable_kickback",
+     "movement_id": "hip_thrust_machine",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "glute_machine_kickback",
+     "movement_id": "cable_kickback",
      "reason": "same_stimulus"
     }
    ]
@@ -34216,11 +34223,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "cable_kickback",
+     "movement_id": "hip_thrust_machine",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_hip_thrust",
+     "movement_id": "cable_kickback",
      "reason": "same_stimulus"
     }
    ],
@@ -35401,7 +35408,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "seated_cable_row_v_grip_cable",
+     "movement_id": "t_bar_row",
      "reason": "same_stimulus"
     }
    ]
@@ -36163,7 +36170,7 @@
     "home_gym": {
      "state": "unknown",
      "evidence": "historical_only",
-     "source": "the worst of its equipment: back_extension_45, machine_unspecified"
+     "source": "the worst of its equipment: machine_unspecified"
     }
    },
    "fallbacks": [
@@ -36176,7 +36183,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "cable_kickback",
+     "movement_id": "hip_thrust_machine",
      "reason": "same_stimulus"
     }
    ],
@@ -37441,15 +37448,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "hack_squat_machine",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "squat_bodyweight",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "kettlebell_goblet_squat",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "wall_squat",
      "reason": "same_stimulus"
     }
    ],
@@ -38080,7 +38087,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "straight_arm_pulldown",
+     "movement_id": "pullover_machine",
      "reason": "same_stimulus"
     }
    ],
@@ -39617,15 +39624,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "seated_shoulder_press_machine",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "landmine_shoulder_press",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "shoulder_press",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "landmine_press",
      "reason": "same_stimulus"
     }
    ],
@@ -40853,7 +40860,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "seated_cable_row_v_grip_cable",
+     "movement_id": "t_bar_row",
      "reason": "same_stimulus"
     }
    ],
@@ -42809,15 +42816,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "hack_squat_machine",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "squat_bodyweight",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "kettlebell_goblet_squat",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "wall_squat",
      "reason": "same_stimulus"
     }
    ],
@@ -43279,11 +43286,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "seated_cable_row_v_grip_cable",
+     "movement_id": "t_bar_row",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "underhand_barbell_dead_rows",
+     "movement_id": "seated_cable_row_v_grip_cable",
      "reason": "same_stimulus"
     }
    ],
@@ -43596,15 +43603,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "seated_shoulder_press_machine",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "landmine_shoulder_press",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "shoulder_press",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "landmine_press",
      "reason": "same_stimulus"
     }
    ],
@@ -44034,9 +44041,9 @@
    "not_for_you_now": null,
    "availability": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
-     "source": "the worst of its equipment: bench_decline"
+     "state": "available",
+     "evidence": "recent_inferred",
+     "source": "the worst of its equipment: barbell, squat_rack"
     }
    },
    "fallbacks": [
@@ -44208,15 +44215,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "hack_squat_machine",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "squat_bodyweight",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "kettlebell_goblet_squat",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "wall_squat",
      "reason": "same_stimulus"
     }
    ],
@@ -44790,8 +44797,8 @@
    "not_for_you_now": null,
    "availability": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
+     "state": "available",
+     "evidence": "owner_confirmed",
      "source": "the worst of its equipment: hack_squat_machine"
     }
    },
@@ -48796,11 +48803,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "seated_cable_row_v_grip_cable",
+     "movement_id": "t_bar_row",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "underhand_barbell_dead_rows",
+     "movement_id": "seated_cable_row_v_grip_cable",
      "reason": "same_stimulus"
     }
    ],
@@ -49153,7 +49160,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "seated_cable_row_v_grip_cable",
+     "movement_id": "t_bar_row",
      "reason": "same_stimulus"
     }
    ],
@@ -52071,11 +52078,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "bodyweight_tricep_extensions",
+     "movement_id": "triceps_extension_machine",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "incline_db_triceps_x_tensions",
+     "movement_id": "bodyweight_tricep_extensions",
      "reason": "same_stimulus"
     }
    ],
@@ -52392,11 +52399,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "bodyweight_tricep_extensions",
+     "movement_id": "triceps_extension_machine",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "triceps_extension_barbell",
+     "movement_id": "bodyweight_tricep_extensions",
      "reason": "same_stimulus"
     }
    ],
@@ -52549,8 +52556,8 @@
    "not_for_you_now": null,
    "availability": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
+     "state": "available",
+     "evidence": "owner_confirmed",
      "source": "the worst of its equipment: triceps_machine"
     }
    },
@@ -52738,7 +52745,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "standing_cable_chest_press",
+     "movement_id": "decline_bench_press_barbell",
      "reason": "same_stimulus"
     }
    ],
@@ -54844,12 +54851,17 @@
    "not_for_you_now": null,
    "availability": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
-     "source": "the worst of its equipment: back_extension_45"
+     "state": "available",
+     "evidence": "recent_inferred",
+     "source": "the worst of its equipment: weight_plate"
     }
    },
-   "fallbacks": []
+   "fallbacks": [
+    {
+     "movement_id": "back_extension_45",
+     "reason": "same_stimulus"
+    }
+   ]
   },
   "banded_alt_cross_body_hammer_curls": {
    "title": "Banded Alt Cross Body Hammer Curls",
@@ -56600,7 +56612,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "standing_cable_chest_press",
+     "movement_id": "decline_bench_press_barbell",
      "reason": "same_stimulus"
     }
    ],
@@ -57100,7 +57112,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "incline_db_triceps_x_tensions",
+     "movement_id": "triceps_extension_machine",
      "reason": "same_stimulus"
     }
    ],
@@ -60226,15 +60238,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "hack_squat_machine",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "squat_bodyweight",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "kettlebell_goblet_squat",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "wall_squat",
      "reason": "same_stimulus"
     }
    ],
@@ -61763,11 +61775,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "landmine_shoulder_press",
+     "movement_id": "seated_shoulder_press_machine",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "shoulder_press",
+     "movement_id": "landmine_shoulder_press",
      "reason": "same_stimulus"
     }
    ],
@@ -62081,15 +62093,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "hack_squat_machine",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "squat_bodyweight",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "kettlebell_goblet_squat",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "wall_squat",
      "reason": "same_stimulus"
     }
    ],
@@ -62666,9 +62678,9 @@
    "not_for_you_now": null,
    "availability": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
-     "source": "the worst of its equipment: bench_decline"
+     "state": "available",
+     "evidence": "recent_inferred",
+     "source": "the worst of its equipment: dumbbell"
     }
    },
    "fallbacks": [
@@ -64902,11 +64914,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "cable_kickback",
+     "movement_id": "hip_thrust_machine",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_hip_thrust",
+     "movement_id": "cable_kickback",
      "reason": "same_stimulus"
     }
    ],
@@ -65236,7 +65248,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "seated_cable_row_v_grip_cable",
+     "movement_id": "t_bar_row",
      "reason": "same_stimulus"
     }
    ],
@@ -66692,11 +66704,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "underhand_barbell_dead_rows",
+     "movement_id": "t_bar_row",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_chest_supported_rows",
+     "movement_id": "underhand_barbell_dead_rows",
      "reason": "same_stimulus"
     }
    ],
@@ -67981,11 +67993,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "bodyweight_tricep_extensions",
+     "movement_id": "triceps_extension_machine",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "triceps_extension_barbell",
+     "movement_id": "bodyweight_tricep_extensions",
      "reason": "same_stimulus"
     }
    ],
@@ -68314,8 +68326,8 @@
    "not_for_you_now": null,
    "availability": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
+     "state": "available",
+     "evidence": "owner_confirmed",
      "source": "the worst of its equipment: smith_machine"
     }
    },
@@ -68329,7 +68341,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "seated_cable_row_v_grip_cable",
+     "movement_id": "t_bar_row",
      "reason": "same_stimulus"
     }
    ],
@@ -68480,11 +68492,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "inverted_db_tricep_kickbacks",
+     "movement_id": "tricep_pushaway",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "incline_db_kickbacks",
+     "movement_id": "tricep_pushaways",
      "reason": "same_stimulus"
     }
    ],
@@ -69586,7 +69598,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "straight_arm_pulldown",
+     "movement_id": "pullover_machine",
      "reason": "same_stimulus"
     }
    ],
@@ -69723,8 +69735,8 @@
    "not_for_you_now": null,
    "availability": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
+     "state": "available",
+     "evidence": "owner_confirmed",
      "source": "the worst of its equipment: triceps_machine"
     }
    },
@@ -70477,7 +70489,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "seated_cable_row_v_grip_cable",
+     "movement_id": "t_bar_row",
      "reason": "same_stimulus"
     }
    ],
@@ -71254,7 +71266,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "seated_cable_row_v_grip_cable",
+     "movement_id": "t_bar_row",
      "reason": "same_stimulus"
     }
    ]
@@ -71806,11 +71818,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "underhand_barbell_dead_rows",
+     "movement_id": "t_bar_row",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_chest_supported_rows",
+     "movement_id": "underhand_barbell_dead_rows",
      "reason": "same_stimulus"
     }
    ],
@@ -76379,11 +76391,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "cable_kickback",
+     "movement_id": "hip_thrust_machine",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_hip_thrust",
+     "movement_id": "cable_kickback",
      "reason": "same_stimulus"
     }
    ],
@@ -77777,8 +77789,8 @@
    "not_for_you_now": null,
    "availability": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
+     "state": "available",
+     "evidence": "owner_confirmed",
      "source": "the worst of its equipment: seated_row_machine"
     }
    },
@@ -77792,7 +77804,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "seated_cable_row_v_grip_cable",
+     "movement_id": "t_bar_row",
      "reason": "same_stimulus"
     }
    ],
@@ -79744,15 +79756,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "seated_shoulder_press_machine",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "landmine_shoulder_press",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "shoulder_press",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "landmine_press",
      "reason": "same_stimulus"
     }
    ],
@@ -79892,8 +79904,8 @@
    "not_for_you_now": null,
    "availability": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
+     "state": "available",
+     "evidence": "owner_confirmed",
      "source": "the worst of its equipment: seated_row_machine"
     }
    },
@@ -79907,7 +79919,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "seated_cable_row_v_grip_cable",
+     "movement_id": "t_bar_row",
      "reason": "same_stimulus"
     }
    ],
@@ -82628,15 +82640,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "hack_squat_machine",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "squat_bodyweight",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "kettlebell_goblet_squat",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "wall_squat",
      "reason": "same_stimulus"
     }
    ],
@@ -83623,11 +83635,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "inverted_db_tricep_kickbacks",
+     "movement_id": "tricep_pushaway",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "incline_db_kickbacks",
+     "movement_id": "tricep_pushaways",
      "reason": "same_stimulus"
     }
    ],
@@ -83789,11 +83801,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "inverted_db_tricep_kickbacks",
+     "movement_id": "tricep_pushaway",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "incline_db_kickbacks",
+     "movement_id": "tricep_pushaways",
      "reason": "same_stimulus"
     }
    ],
@@ -83962,7 +83974,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "bodyweight_tricep_extensions",
+     "movement_id": "triceps_extension_machine",
      "reason": "same_stimulus"
     }
    ],
@@ -84813,8 +84825,8 @@
    "not_for_you_now": null,
    "availability": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
+     "state": "available",
+     "evidence": "owner_confirmed",
      "source": "the worst of its equipment: seated_row_machine"
     }
    },
@@ -84828,7 +84840,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "seated_cable_row_v_grip_cable",
+     "movement_id": "t_bar_row",
      "reason": "same_stimulus"
     }
    ],
@@ -86106,15 +86118,15 @@
    },
    "fallbacks": [
     {
+     "movement_id": "captains_chair_knee_raise",
+     "reason": "same_stimulus"
+    },
+    {
      "movement_id": "v_up",
      "reason": "same_stimulus"
     },
     {
      "movement_id": "sit_up",
-     "reason": "same_stimulus"
-    },
-    {
-     "movement_id": "starfish_crunch",
      "reason": "same_stimulus"
     }
    ]
@@ -86238,8 +86250,8 @@
    "not_for_you_now": null,
    "availability": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "historical_only",
+     "state": "available",
+     "evidence": "owner_confirmed",
      "source": "the worst of its equipment: t_bar_row_machine"
     }
    },
@@ -87093,11 +87105,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "v_up",
+     "movement_id": "captains_chair_knee_raise",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "sit_up",
+     "movement_id": "v_up",
      "reason": "same_stimulus"
     }
    ]
@@ -87242,11 +87254,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "v_up",
+     "movement_id": "captains_chair_knee_raise",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "sit_up",
+     "movement_id": "v_up",
      "reason": "same_stimulus"
     }
    ]
@@ -87936,7 +87948,7 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "standing_cable_chest_press",
+     "movement_id": "decline_bench_press_barbell",
      "reason": "same_stimulus"
     }
    ],
@@ -88461,8 +88473,8 @@
    "not_for_you_now": null,
    "availability": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "unknown",
+     "state": "available",
+     "evidence": "owner_confirmed",
      "source": "the worst of its equipment: captains_chair"
     }
    },
@@ -90109,8 +90121,8 @@
    "not_for_you_now": null,
    "availability": {
     "home_gym": {
-     "state": "unknown",
-     "evidence": "unknown",
+     "state": "available",
+     "evidence": "owner_confirmed",
      "source": "the worst of its equipment: pullover_machine"
     }
    },
@@ -91479,11 +91491,11 @@
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "cable_kickback",
+     "movement_id": "hip_thrust_machine",
      "reason": "same_stimulus"
     },
     {
-     "movement_id": "db_hip_thrust",
+     "movement_id": "cable_kickback",
      "reason": "same_stimulus"
     }
    ],

@@ -2,7 +2,7 @@
 
 > **Status:** generated · **Owner:** Matthew · **Verified:** 2026-11-15
 
-**Version:** v8.6.0 | **Last updated:** 2026-11-15 | **Total tools:** 92
+**Version:** v8.6.0 | **Last updated:** 2026-11-15 | **Total tools:** 93
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;
@@ -21,7 +21,7 @@
 
 ---
 
-## All 92 Tools — by module
+## All 93 Tools — by module
 
 | Module | Tools |
 |---|---|
@@ -59,6 +59,7 @@
 | `mcp/tools_coach_checkin.py` | 3 |
 | `mcp/tools_capture.py` | 1 |
 | `mcp/tools_coach_corrections.py` | 1 |
+| `mcp/tools_challenges.py` | 1 |
 | `mcp/tools_owner_words.py` | 1 |
 | `mcp/tools_pending_writes.py` | 1 |
 | `mcp/tools_surfaces.py` | 2 |
@@ -318,6 +319,12 @@
 | Tool | Key Params | Description |
 |------|-----------|-------------|
 | `log_coach_correction` | item_number=, signal=, coach=, surface=, correction, error_class= | #1690 (epic #1687) + #4083: log a correction to the corrections ledger, via EXACTLY ONE of two paths. Path 1 — item_number: correct a weekly AI-review-pack item by its NUMBER. Matthew reads the ranked review-pack email (each generation carries a stable #N) and corrects an item that's wrong or misleading — this resolves #N back to the exact archived generation the pack numbered and writes ONE row to the corrections ledger, tagged by error-class. An unknown or out-of-range number is REPORTED (with how many items the week's pack has), never silently dropped. Twin of the email-reply channel — a reply of '#N <correction>' lines lands the same rows. Path 2 — signal: use this DURING A LIVE CHAT SESSION (daily-debrief, speak-to-coaches, open-checkin) when Matthew overrides a coach's flag/verdict and there is no pack number to resolve — name the SIGNAL that was wrong (the metric/flag id, e.g. 'readiness_low_streak_days' or 'toe_flag'), optionally coach (bare id, e.g. 'physical') and surface (defaults 'chat_coaching'). Always required: correction (what's wrong + what it should say, VERBATIM), error_class (OPTIONAL override — one of stale-baseline, ungrounded-behavioral, cross-coach-inconsistency, framing, checkable-metric, hedged-safe, defense-held, other; an unrecognized value is stored as 'other', never rejected). Every logged correction, from either path, feeds `get_intelligence_quality`'s signal false-positive ranking — always name the signal so that ranking can attribute it. |
+
+### mcp.tools_challenges (`mcp/tools_challenges.py`)
+
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `log_challenge_checkin` | challenge_id, completed, date= | #6087: log Matthew's OWN daily check-in on one of his ACTIVE challenges (did he do today's rep). Call it only when he says he did or missed a challenge day. challenge_id = the challenge's id (the part after 'CHALLENGE#', as /api/challenges serves it); completed = true (done) or false (missed); date = YYYY-MM-DD, default today (Pacific), never a future day. One entry per day: logging the same day again REPLACES that day. Readers' check-ins are stored elsewhere and never count here. |
 
 ### mcp.tools_owner_words (`mcp/tools_owner_words.py`)
 

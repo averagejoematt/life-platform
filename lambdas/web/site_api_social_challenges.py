@@ -31,6 +31,8 @@ so there is no import cycle.
 #     for it to be true of); in-cycle it serves stamped with its as-of date.
 #   * NO stamp but a digit in the summary — fail CLOSED, dropped. An unstamped number
 #     can never reach a reader, so the guard cannot be defeated by forgetting it.
+import re
+
 _EVIDENCE_LITERATURE = "literature"
 _EVIDENCE_PERSONAL = "personal"
 
@@ -441,11 +443,14 @@ def _public_checkins(checkins, *, _g) -> list:
     Keeps the check-in day itself — that is Matthew's own progress data, and the
     completion arithmetic reads `completed`, never `note` — and withholds only the
     stranger-supplied text when it fails the screen.
+
+    #6087: OWNER entries only (`common.challenge_checkins.owner_entries`) — an entry the retired
+    anonymous door stamped `source: "website"` is never served and never counted.
     """
+    from common.challenge_checkins import owner_entries
+
     out = []
-    for entry in checkins or []:
-        if not isinstance(entry, dict):
-            continue
+    for entry in owner_entries(checkins):
         row = dict(entry)
         note = _screened_note(row.get("note"), _g=_g)
         if note:
@@ -506,7 +511,8 @@ def handle_challenges(*, _g) -> dict:
             # ER-06: check name AND id — a blocked keyword often lives only in the id; `name or id` missed it.
             if _is_blocked_vice(ch.get("name", "")) or _is_blocked_vice(ch.get("id", "")):
                 continue
-            # #2238: reader-supplied check-in notes publish with this row — screen them, incl. rows stored pre-#2238.
+            # #2238: check-in notes publish with this row — screen them, incl. rows stored pre-#2238.
+            # #6087: owner entries only — progress below derives from what this leaves, never a reader's tap.
             if "daily_checkins" in ch:
                 ch["daily_checkins"] = _public_checkins(ch.get("daily_checkins"), _g=_g)
             ch["origin"] = "live"
@@ -572,29 +578,63 @@ def handle_challenges(*, _g) -> dict:
         "backlog": sum(1 for c in catalog if c["status"] == "backlog"),
         "completed": sum(1 for c in live if c.get("status") == "completed"),
     }
-    return _ok({"challenges": challenges, "count": len(challenges), "summary": summary, "source": "catalog+live"}, cache_seconds=300)
+    payload = {"challenges": challenges, "count": len(challenges), "summary": summary, "source": "catalog+live"}
+    # #6087: whether the reader check-in door is open — the legacy page draws its button only when true.
+    payload["reader_checkins_open"] = reader_checkins_open()
+    return _ok(payload, cache_seconds=300)
+
+
+# ── #6087: the reader check-in door ──────────────────────────────────────────
+#
+# Owner ruling 2026-11-16: a public interaction must never overwrite the canonical personal
+# experiment record. Before #6087 this door read the OWNER's challenge row, dropped the entry for
+# the request's date and wrote the list back — so an anonymous caller could replace the owner's
+# check-in for any day of any active challenge. Now:
+#   * a reader's "doing this too" lands in its OWN partition (common.challenge_checkins: one item
+#     per reader x challenge x day, conditional put — a replay or a concurrent duplicate is a no-op,
+#     never a read-modify-write), and no free-text note is stored at all;
+#   * the owner's row is only READ here (is the challenge active?) — the owner's own check-in is the
+#     MCP tool `log_challenge_checkin`, and the Site API role has no write grant on that partition;
+#   * the door stays SHUT until the owner flips PUBLIC_CHECKIN_LIVE (read only in `reader_checkins_open`);
+#     a shut door answers 403 before it parses anything and writes nothing, not even a rate bucket.
+#     tests/test_challenge_checkin_isolation_6087.py pins it off.
+PUBLIC_CHECKIN_LIVE = False
+
+
+def reader_checkins_open() -> bool:
+    """The ONE read of the switch (the door and the GET payload's `reader_checkins_open` both ask here)."""
+    return PUBLIC_CHECKIN_LIVE is True
+
+
+# An owner challenge sk suffix: a lowercase slug, optionally `_<YYYY-MM-DD>` (challenge_generator_lambda).
+_CHALLENGE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,119}$")
+
+
+def _owner_challenge_status(challenge_id: str, *, _g):
+    """READ-only: the owner's challenge row status, or None when there is no row. Raises on a DDB error."""
+    USER_ID = _g["USER_ID"]
+    item = _g["table"].get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#challenges", "sk": f"CHALLENGE#{challenge_id}"}).get("Item")
+    return None if not item else (item.get("status") or "candidate")
 
 
 def _handle_challenge_checkin(event: dict, *, _g) -> dict:
-    """POST /api/challenge_checkin — Public check-in for active challenges.
+    """POST /api/challenge_checkin — a READER's check-in on an active challenge (#6087).
 
-    Body: {"challenge_id": "...", "completed": true/false, "note": "...", "date": "YYYY-MM-DD"}
-    Uses localStorage on the client to prevent double-taps.
-    Rate-limited: 1 check-in per IP per challenge per day (#358).
+    Body: {"challenge_id": "...", "completed": true/false[, "date": "<today, Pacific>"]}. Any `note`
+    is ignored and never stored. Shut (403, no write of any kind) while PUBLIC_CHECKIN_LIVE is False.
+    Open: 1 per IP per challenge per day (#358), then one conditional put into the reader partition.
     """
-    # Facade state injected via `_g` (the delegator's globals()) — the same
-    # module object the tests patch (see web/site_api_social.py's header).
-    PT = _g["PT"]
-    USER_ID = _g["USER_ID"]
     _error = _g["_error"]
-    _is_blocked_vice = _g["_is_blocked_vice"]
+    if not reader_checkins_open():
+        return _error(403, "Reader check-ins are not open yet.")
+    from common.challenge_checkins import READER_CHECKIN_TTL_DAYS, reader_checkin_key
+
+    PT = _g["PT"]
     _ok = _g["_ok"]
     _rate_check = _g["_rate_check"]
     _rate_limited = _g["_rate_limited"]
     _sanitise_text = _g["_sanitise_text"]
     datetime = _g["datetime"]
-    extract_client_ip = _g["extract_client_ip"]
-    salted_ip_hash = _g["salted_ip_hash"]
     json = _g["json"]
     logger = _g["logger"]
     table = _g["table"]
@@ -603,101 +643,59 @@ def _handle_challenge_checkin(event: dict, *, _g) -> dict:
         body = json.loads(event.get("body") or "{}")
     except (json.JSONDecodeError, TypeError):
         return _error(400, "Invalid JSON body")
-
     # #2679 — see _handle_challenge_vote.
     if not isinstance(body, dict):
         return _error(400, "Body must be a JSON object")
 
     challenge_id = _sanitise_text(body.get("challenge_id"))
     completed = body.get("completed")
-    # #2238: the note is free text from an anonymous stranger that ends up on the
-    # public GET /api/challenges payload. HTML-strip it (sibling capture doors do
-    # the same) and refuse blocked-vice vocabulary outright, as _handle_board_question does.
-    note = _sanitise_note(body.get("note"), _g=_g)
-    date_str = _sanitise_text(body.get("date"))
-
-    if not challenge_id:
+    if not _CHALLENGE_ID_RE.match(challenge_id or ""):
         return _error(400, "challenge_id required")
-    if completed is None:
+    if not isinstance(completed, bool):
         return _error(400, "completed (true/false) required")
-    if _is_blocked_vice(note):
-        return _error(400, "That note can't be submitted.")
-    # #2221: `date` was written verbatim into Matthew's own challenge row with no
-    # format check and no length cap, and the dedup key IS that field — so every
-    # bogus value minted a NEW check-in row (which is how completion_pct got past
-    # 100). A supplied date must be a real ISO calendar day.
-    if date_str and not _is_iso_date(date_str, _g=_g):
-        return _error(400, "date must be YYYY-MM-DD")
+    # A reader logs TODAY only (Pacific, the site clock). A supplied date that is not today is refused —
+    # a past or future day is never a reader's to write.
+    today = datetime.now(PT).strftime("%Y-%m-%d")
+    date_str = _sanitise_text(body.get("date")) or today
+    if date_str != today:
+        return _error(400, f"date must be today (Pacific): {today}")
 
-    # Rate limit: 1 check-in per IP per challenge per day (#358). Applied
-    # unconditionally via the module chokepoint (#2237) — never skipped.
-    ip = extract_client_ip(event)
-    ip_hash = salted_ip_hash(ip, logger)
+    # Rate limit: 1 check-in per IP per challenge per day (#358), via the module chokepoint (#2237).
+    ip_hash = _g["salted_ip_hash"](_g["extract_client_ip"](event), logger)
     if ip_hash is None:
         return _error(503, "Service temporarily unavailable. Please try again shortly.")
     allowed, _rem, _retry = _rate_check(f"challenge_checkin:{challenge_id}", ip_hash, limit=1, window_seconds=86400)
     if not allowed:
         return _rate_limited("challenge_checkin", "Already checked in for this challenge today.", retry_after=86400)
 
-    if not date_str:  # #2414: a check-in with no date lands on the reader's Pacific day
-        date_str = datetime.now(PT).strftime("%Y-%m-%d")
-
-    challenges_pk = f"USER#{USER_ID}#SOURCE#challenges"
-    sk = f"CHALLENGE#{challenge_id}"
-
-    # Verify challenge exists and is active
     try:
-        item = table.get_item(Key={"pk": challenges_pk, "sk": sk}).get("Item")
+        status = _owner_challenge_status(challenge_id, _g=_g)
     except Exception as e:
         logger.error(f"[challenge_checkin] DDB get failed: {e}")
         return _error(500, "Database error")
-
-    if not item:
+    if status is None:
         return _error(404, "Challenge not found")
-    if item.get("status") != "active":
-        return _error(400, f"Challenge is not active (status: {item.get('status')})")
+    if status != "active":
+        return _error(400, "Challenge is not active")
 
-    # Build checkin
-    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
-    checkin = {
+    now = datetime.now(timezone.utc)
+    item = {
+        **reader_checkin_key(challenge_id, ip_hash, date_str),
+        "challenge_id": challenge_id,
         "date": date_str,
-        "completed": bool(completed),
-        "logged_at": now_iso,
-        "source": "website",
+        "completed": completed,
+        "logged_at": now.strftime("%Y-%m-%dT%H:%M:%S"),
+        "ttl": int(now.timestamp()) + READER_CHECKIN_TTL_DAYS * 86400,
     }
-    if note:
-        checkin["note"] = note
-
-    # Idempotent write: replace any existing check-in for the same date instead
-    # of blindly appending. A double-tap or a network retry must not create a
-    # duplicate day — that would inflate completion_pct / success_rate. (Residual:
-    # a truly simultaneous double-tap can still race this read-modify-write; the
-    # common retry/double-tap case — writes seconds apart — is fully covered.)
-    existing = item.get("daily_checkins", []) or []
-    deduped = [c for c in existing if c.get("date") != date_str]
-    deduped.append(checkin)
+    duplicate = False
     try:
-        table.update_item(
-            Key={"pk": challenges_pk, "sk": sk},
-            UpdateExpression="SET daily_checkins = :cl",
-            ExpressionAttributeValues={":cl": deduped},
-        )
+        table.put_item(Item=item, ConditionExpression="attribute_not_exists(pk)")
     except Exception as e:
-        logger.error(f"[challenge_checkin] DDB update failed: {e}")
-        return _error(500, "Failed to record check-in")
-
-    total = len(deduped)
-    duration = int(item.get("duration_days", 7) if item.get("duration_days") else 7)
-
+        if "ConditionalCheckFailedException" not in str(e):
+            logger.error(f"[challenge_checkin] DDB put failed: {e}")
+            return _error(500, "Failed to record check-in")
+        duplicate = True  # the first write of the day stands; a replay changes nothing
     return _ok(
-        {
-            "checked_in": True,
-            "challenge_id": challenge_id,
-            "date": date_str,
-            "completed": bool(completed),
-            "total_checkins": total,
-            "duration_days": duration,
-            "completion_pct": min(100, round(total / duration * 100)) if duration else 0,
-        },
+        {"checked_in": True, "challenge_id": challenge_id, "date": date_str, "completed": completed, "duplicate": duplicate},
         cache_seconds=0,
     )
