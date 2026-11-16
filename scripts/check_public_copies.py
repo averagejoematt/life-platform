@@ -56,6 +56,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -440,8 +441,16 @@ def s3_object_url(key: str) -> str:
     return f"{S3_ORIGIN}/{urllib.parse.quote(key, safe='/')}"
 
 
-def download(keys: list[str], tree: str, strip: str, get=None) -> list[str]:
-    """Fetch each key anonymously into tree/<key minus strip>. Returns the keys that could not be read."""
+#: A read that fails is tried again this many times, one at a time, before the key is called unreadable. Measured on
+#: production 2026-11-16: two consecutive runs over ~1,570 documents each lost ONE read to a transient error (a
+#: different key each time), and a guard that aborts on that is red most days for nothing.
+DOWNLOAD_RETRIES = 3
+RETRY_PAUSE_S = 1.5
+
+
+def download(keys: list[str], tree: str, strip: str, get=None, pause: float = RETRY_PAUSE_S) -> list[str]:
+    """Fetch each key anonymously into tree/<key minus strip>. Returns the keys that could not be read — after
+    ``DOWNLOAD_RETRIES`` further tries each, so a key named here is one a reader persistently cannot fetch."""
     get = get or (lambda k: http_get(s3_object_url(k)))
     failed: list[str] = []
 
@@ -453,6 +462,13 @@ def download(keys: list[str], tree: str, strip: str, get=None) -> list[str]:
 
     with ThreadPoolExecutor(max_workers=16) as pool:
         list(pool.map(one, keys))
+    for _ in range(DOWNLOAD_RETRIES):
+        if not failed:
+            break
+        again, failed[:] = sorted(failed), []
+        time.sleep(pause)
+        for key in again:
+            one(key)
     return failed
 
 

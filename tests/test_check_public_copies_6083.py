@@ -243,6 +243,26 @@ def test_every_s3_origin_path_is_classified():
     assert paths and paths == set(G.ORIGIN_PATHS), f"origin paths {sorted(paths)} vs classified {sorted(G.ORIGIN_PATHS)}"
 
 
+def test_a_transient_read_failure_is_retried_and_a_persistent_one_is_still_named(tmp_path):
+    """Measured on production 2026-11-16: two consecutive runs each lost one read in ~1,570 to a transient error and
+    aborted. A read that fails once is tried again; a key a reader persistently cannot fetch is still reported."""
+    import urllib.error
+
+    calls: dict[str, int] = {}
+
+    def flaky(key):
+        calls[key] = calls.get(key, 0) + 1
+        if key == "site/gone/index.html" or (key == "site/b/index.html" and calls[key] == 1):
+            raise urllib.error.URLError("reset")
+        return b"<html></html>"
+
+    keys = ["site/a/index.html", "site/b/index.html", "site/gone/index.html"]
+    failed = G.download(keys, str(tmp_path), "site/", flaky, pause=0)
+    assert failed == ["site/gone/index.html"]
+    assert calls == {"site/a/index.html": 1, "site/b/index.html": 2, "site/gone/index.html": 1 + G.DOWNLOAD_RETRIES}
+    assert (tmp_path / "b" / "index.html").read_bytes() == b"<html></html>" and not (tmp_path / "gone").exists()
+
+
 def test_the_guard_writes_nothing_and_runs_no_remediation():
     src = open(os.path.join(REPO, "scripts", "check_public_copies.py"), encoding="utf-8").read()
     for verb in ("put_object", "delete_object", "copy_object", "create_invalidation(", "lambda_client", ".invoke("):
