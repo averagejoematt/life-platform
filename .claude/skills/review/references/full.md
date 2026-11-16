@@ -173,6 +173,36 @@ letter grade for its area, and what an A looks like.
 
 Output cap: ≤10 findings per row plus a top-5 path-to-A and an honest coverage statement.
 
+## The estate sweep — every row walks what it owns before it grades (instrument v2, owner ruling 2026-11-14)
+
+Three full runs in a row had awake verifiers and poor recall: 2026-10-31 uncalibrated on the withheld control,
+2026-11-13 0 of 1 blind, 2026-11-14 **0 of 4** on the stronger grader. Every missed issue sat in a corner its row
+never reached — one read grant among the roles, a grant missing only when emitters are crossed with policies, a
+census the row did not run, a scheduled workflow red for days. The graders sampled their clauses and the prior
+path-to-A list well and did not walk the estate their area owns. That is a coverage failure, and a stronger model
+does not repair it. So coverage is now part of the instrument:
+
+- **`python3 scripts/review_estate.py --lens <lens>` prints the row's sweeps; put that block into the row's brief
+  verbatim.** Each sweep names a SET — every role's statements, every alarm, every scheduled workflow, every source,
+  every public route — and the one command or read that enumerates it. Two to five per row; a sweep costs minutes.
+- **The row runs every sweep before it grades a clause**, and returns `estate_sweep[{sweep_id, examined, anomalies[],
+  evidence}]` — one entry per sweep id. `examined` is a count; "no anomalies" is a result only beside one. Findings
+  come from the sweeps as well as from the clauses.
+- **A sweep that was not run is written down, never skipped**: `{sweep_id, status: "not_run", reason}`. The row is
+  then INCOMPLETE: it cannot be graded A, and it does not count as a from-scratch grading of its area.
+- **Before the artifact is written, run `python3 scripts/review_estate.py --check <grades.json>`.** It names every
+  row with an absent, unrun or uncounted sweep. List those rows in the artifact as `estate_incomplete: [...]` and in
+  the report's grade table; do not edit a sweep entry to make the check pass.
+- **The sweeps are not the answer key.** A sweep names a set to walk, not a defect to find. No sweep names an issue,
+  and the withheld controls stay out of every brief exactly as before (the spine, Phase 2). Do not add a sweep
+  because of what a particular withheld issue was; add one when a row's estate has a member no sweep reaches, by PR,
+  between runs (`tests/test_review_estate.py` holds the registry to the sealed panel).
+
+The registry is `scripts/review_estate.py::ESTATE`. A run dated before `REQUIRED_FROM` there is not held to it.
+**The enforcement point is `scripts/review_carry_forward.py::scratch_dates`** (#6068): for a run dated on or after
+`REQUIRED_FROM`, every row `review_estate.incomplete_lenses` names keeps its previous from-scratch date — the boot
+brief and the carry-forward cap go on showing the old date — and the carry-forward sweep prints the held rows.
+
 ## Artifacts (the filenames ARE the contract the calendar probes)
 
 - **Full run** — `docs/reviews/FULLREVIEW_<date>.md` + `docs/reviews/fullreview_grades_<date>.json`.
@@ -194,6 +224,11 @@ Output cap: ≤10 findings per row plus a top-5 path-to-A and an honest coverage
 
 A `/review full` succeeds when, on top of the spine's bar: (1) every seed item traces to a verified
 root cause with a regression guard, not just a patch; (2) at least one same-class defect the human
-missed was found and confirmed; (3) the QA machinery is stronger at wrap than at start; and (4) no
+missed was found and confirmed; (3) the QA machinery is stronger at wrap than at start; (4) no
 grade in the artifact is older than the carry-forward cap — a row that could not be re-graded is
-reported as expired, never carried a week further.
+reported as expired, never carried a week further; and (5) **the run shows precision AND recall** (owner ruling
+2026-11-14): its calibration verdict is `CALIBRATED` — every planted false finding refuted and every withheld
+control found by its own row — and no row's estate sweep is incomplete. A run with awake verifiers and missed
+controls is recorded as `PARTIALLY_CALIBRATED` and reported as not successful, in those words, in the report's
+headline and beside any grade a public page shows; its findings are still findings. Do not launch another full
+run to turn a letter green: the next full run is owed on the monthly clock or after a material change.

@@ -41,7 +41,9 @@ import {
 import { dayInWords, domainWords, kOfN, num } from "../lib/format.js";
 import { ROOM_MARKER, roomCr2, roomEnabled, roomPublic } from "../lib/room.js";
 import CommentaryFeature from "../components/CommentaryFeature.astro"; // CR2: renders nothing unless CR2 is on
-import { loadAll, loadCalibration } from "../lib/snapshot.js";
+import OwnWords from "../components/OwnWords.astro";
+import { ownWords } from "../lib/own_words.js";
+import { loadAll, loadCalibration, loadOwnWords } from "../lib/snapshot.js";
 import { href, pathOf } from "../lib/url.js";
 
 if (!roomEnabled()) throw new Error("src/room/calibration.astro rendered with the room off — the room route must not be injected");
@@ -93,6 +95,10 @@ const funnel = [
 ].filter((r) => typeof r[1] === "number");
 const widest = Math.max(1, ...funnel.map((r) => r[1] as number));
 const room = { [ROOM_MARKER]: "calibration" };
+// A dated first-person reflection (owner ruling 2026-11-15): shown beside the measured record, only when the platform
+// serves the approved line exactly. It is how the coaching seemed to him on one day — never a count, and never evidence
+// that the coaching had no effect (whether advice changed what he did is not recorded in public).
+const reflection = ownWords(await loadOwnWords(), "coaches_changed");
 ---
 
 <Base title="The coaches, graded" top="system" description={head ? head.sentence : "The coaches' record, graded by code."} status={asOf}>
@@ -200,6 +206,20 @@ const room = { [ROOM_MARKER]: "calibration" };
             </div>
           </div>
         </section>
+
+        {
+          reflection && (
+            <section class="section" {...room} style="padding-top:26px;padding-bottom:26px;border-top:1px solid var(--rule)" data-own-reflection>
+              <div class="wrap" style="max-width:900px">
+                <OwnWords
+                  id="coaches_changed"
+                  label="A dated reflection, in my words"
+                  note="How it seemed to me on that day — beside the record on this page, not instead of it. The record counts whether forecasts came true; whether the coaching changed what I did is not measured here, and this sentence does not measure it either."
+                />
+              </div>
+            </section>
+          )
+        }
 
         {
           lead && (

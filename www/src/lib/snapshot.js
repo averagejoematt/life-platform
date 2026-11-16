@@ -112,6 +112,20 @@ export async function loadJourney() {
   return _journey;
 }
 
+let _ownWords = null;
+/** The owner's approved first-person lines as the platform serves them (owner ruling 2026-11-15): the exporter always
+ *  writes the file (absent when the route did not answer). A snapshot made before it existed reads as absent, so every
+ *  placement renders nothing — never a guess. Pages read it only through lib/own_words.js::ownWords. */
+export async function loadOwnWords() {
+  if (_ownWords) return _ownWords;
+  try {
+    _ownWords = JSON.parse(await readFile(join(SNAPSHOT_DIR, "own_words.json"), "utf8"));
+  } catch {
+    _ownWords = { state: "absent", quotes: [] };
+  }
+  return _ownWords;
+}
+
 let _calibration = null;
 /** The Coaching Room's data file (CR1, built dark): written by the producer ONLY on a WEB_ROOM=1 export and read only
  *  by room pages, which exist only on a room build. Throws when absent — a room build over a flag-off snapshot is a

@@ -9,6 +9,7 @@
 // The device-era rule (A04/A29): the line breaks at every marker date and the rolling mean
 // restarts there, so a series is read within each side of a baseline change, never across.
 import { dayInWords, num } from "./format.js";
+import { PROVISIONAL_WORDS } from "./provisional.js";
 
 /** A 7-day trailing mean over a daily series; windows with fewer than 3 readings are null. */
 export function rollingMean(values, window = 7, minReadings = 3) {
@@ -149,6 +150,13 @@ export function svgChart(o) {
       }
     }
     if (lastI >= 0) paths += `<circle cx="${x(lastI).toFixed(1)}" cy="${y(s.vals[lastI]).toFixed(1)}" r="4" fill="${s.color}"/>`;
+    // a night still recording when it was read (#5953, lib/provisional.js): a hollow ring over the reading, drawn after
+    // the latest-reading dot so a provisional newest night never reads as a settled one
+    s.days.forEach((d, i) => {
+      if (d.provisional && s.raw[i] != null) {
+        paths += `<circle cx="${x(i).toFixed(1)}" cy="${y(s.raw[i]).toFixed(1)}" r="4.5" fill="#F4F4F0" stroke="${s.color}" stroke-width="1.5" data-provisional/>`;
+      }
+    });
     // gaps (a logging gap, vermillion, hollow) and missing readings (a small hollow square on the baseline)
     s.days.forEach((d, i) => {
       if (d.gap) {
@@ -187,6 +195,7 @@ export function pointLabel(day, value, o, mean) {
   if (day.gap) return `${dayInWords(day.date, { weekday: true })} · a logging gap`;
   if (value == null) return `${dayInWords(day.date, { weekday: true })} · no reading`;
   let label = `${dayInWords(day.date, { weekday: true })} · ${num(value, dec)}${unit}`;
+  if (day.provisional) label += ` · ${PROVISIONAL_WORDS}`;
   if (o.smooth && mean != null) label += ` · 7-day mean ${num(mean, dec)}${unit}`;
   return label;
 }

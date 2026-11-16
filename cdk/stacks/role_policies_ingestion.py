@@ -18,10 +18,16 @@ from stacks.role_policies_base import (
     BUCKET_ARN,
     DLQ_ARN,
     KMS_KEY_ARN,
+    NS_AI,
+    NS_COMPUTE,
+    NS_HEVY_ROUTINE,
+    NS_INGEST_RECONCILIATION,
+    NS_INGEST_SHARED,
     REGION,
     TABLE_ARN,
     _bedrock_statement,
     _bedrock_telemetry_statement,
+    _put_metric_data_statement,
     _s3,
     _secret_arn,
 )
@@ -54,9 +60,15 @@ def _ingestion_base(
     extra_statements: list[iam.PolicyStatement] = None,
     no_s3: bool = False,
     no_secret: bool = False,
+    metric_namespaces: tuple = NS_INGEST_SHARED,
     delete_pks: list[str] = None,
 ) -> list[iam.PolicyStatement]:
     """Build standard ingestion role policies.
+
+    #5545: `metric_namespaces` conditions the CloudWatchMetrics grant. The default is what the
+    shared ingestion framework reaches in every source: `common.item_size_guard`
+    (LifePlatform/DynamoDB) and `common.auth_breaker` (LifePlatform/OAuth). Per-run liveness
+    (`ingest_health`, LifePlatform/IngestLiveness) is EMF — logs, no IAM — so it is not here.
 
     #5513 (b): `dynamodb:DeleteItem` is NOT in the table-wide `DynamoDB` statement. Until
     2026-11-13 it was, so every role built here could delete any item in any partition —
@@ -160,14 +172,9 @@ def _ingestion_base(
     )
 
     # CloudWatch metrics (ADR-052): OAuth refresh writeback failures and other
-    # custom ingestion metrics. PutMetricData only accepts "*" as a resource.
-    stmts.append(
-        iam.PolicyStatement(
-            sid="CloudWatchMetrics",
-            actions=["cloudwatch:PutMetricData"],
-            resources=["*"],
-        )
-    )
+    # custom ingestion metrics. PutMetricData only accepts "*" as a resource, so the
+    # #5545 cloudwatch:namespace condition is the only scope it can carry.
+    stmts.append(_put_metric_data_statement("CloudWatchMetrics", *metric_namespaces))
 
     # Extra statements
     if extra_statements:
@@ -190,6 +197,7 @@ def ingestion_whoop() -> list[iam.PolicyStatement]:
         "whoop",
         secret_name="life-platform/whoop",
         extra_secret_actions=["secretsmanager:UpdateSecret"],
+        metric_namespaces=(*NS_INGEST_SHARED, NS_INGEST_RECONCILIATION),  # #5545: TR-07 provider-diff (_reconcile)
         # #5513: the only delete is the auth-breaker clear (AUTH_FAILURE row) in this source's own partition.
         delete_pks=[_source_pk("whoop")],
     )
@@ -231,6 +239,7 @@ def ingestion_youtube() -> list[iam.PolicyStatement]:
         secret_name="life-platform/youtube",
         s3_prefix="raw/matthew/youtube/*",
         extra_s3_read=["config/content_filter.json"],
+        metric_namespaces=(*NS_INGEST_SHARED, NS_AI),  # #5545: + the bedrock_client telemetry (sensitivity gate Haiku pass)
         # #5513: the only delete is the auth-breaker clear (AUTH_FAILURE row) in this source's own partition.
         delete_pks=[_source_pk("youtube")],
     ) + [_bedrock_statement()]
@@ -257,6 +266,7 @@ def ingestion_bluesky() -> list[iam.PolicyStatement]:
         secret_name="life-platform/bluesky",
         s3_prefix="raw/matthew/bluesky/*",
         extra_s3_read=["config/content_filter.json"],
+        metric_namespaces=(*NS_INGEST_SHARED, NS_AI),  # #5545: + the bedrock_client telemetry (sensitivity gate Haiku pass)
         # #5513: the only delete is the auth-breaker clear (AUTH_FAILURE row) in this source's own partition.
         delete_pks=[_source_pk("bluesky")],
     ) + [_bedrock_statement()]
@@ -284,6 +294,7 @@ def ingestion_mastodon() -> list[iam.PolicyStatement]:
         secret_name="life-platform/mastodon",
         s3_prefix="raw/matthew/mastodon/*",
         extra_s3_read=["config/content_filter.json"],
+        metric_namespaces=(*NS_INGEST_SHARED, NS_AI),  # #5545: + the bedrock_client telemetry (sensitivity gate Haiku pass)
         # #5513: the only delete is the auth-breaker clear (AUTH_FAILURE row) in this source's own partition.
         delete_pks=[_source_pk("mastodon")],
     ) + [_bedrock_statement()]
@@ -328,6 +339,7 @@ def ingestion_strava() -> list[iam.PolicyStatement]:
         "strava",
         secret_name="life-platform/strava",
         extra_secret_actions=["secretsmanager:UpdateSecret"],
+        metric_namespaces=(*NS_INGEST_SHARED, NS_INGEST_RECONCILIATION),  # #5545: TR-07 provider-diff (_reconcile)
         # #5513: the only delete is the auth-breaker clear (AUTH_FAILURE row) in this source's own partition.
         delete_pks=[_source_pk("strava")],
     )
@@ -385,6 +397,9 @@ def ingestion_hevy_backfill() -> list[iam.PolicyStatement]:
         # previous copy (to refuse a shrink that would mean a partial walk) and writes the new one.
         extra_s3_read=["config/movement_catalog.json", "config/hevy_template_cache.json", "config/hevy_template_index.json"],
         extra_s3_write=["config/hevy_template_index.json"],
+        # #5545: + AI (training-notes Haiku tail), Compute (insight_writer -> compute_metadata), HevyRoutine
+        # (TemplateIndexRebuilt) and IngestReconciliation (the hevy provider diff).
+        metric_namespaces=(*NS_INGEST_SHARED, NS_AI, NS_COMPUTE, NS_HEVY_ROUTINE, NS_INGEST_RECONCILIATION),
         # #5513: three delete sites, two partitions. In the hevy partition: auth_breaker.clear_failure
         # (source_name=SOURCE="hevy") and training.hevy_common.delete_workout_records (#475 — relocated and
         # tombstoned workouts). Under USER#system: _clear_event_failure(), the per-event quarantine counter
@@ -466,17 +481,15 @@ def ingestion_journal_enrichment() -> list[iam.PolicyStatement]:
             actions=["lambda:InvokeFunction"],
             resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-quality-gate"],
         ),
-        iam.PolicyStatement(
-            # G1: every AI-calling role needs PutMetricData — bedrock_client.invoke()
-            # emits per-feature token/EstimatedCostUSD at the chokepoint, and the
-            # ADR-108 gate emits CoachQualityGateHeld when it holds a reaction. This
-            # role called Bedrock without it (the emits failed AccessDenied fail-open,
-            # so the enrichment cost telemetry was silently dropped). PutMetricData
-            # only accepts "*" as a resource.
-            sid="AICostMetrics",
-            actions=["cloudwatch:PutMetricData"],
-            resources=["*"],
-        ),
+        # G1: every AI-calling role needs PutMetricData — bedrock_client.invoke()
+        # emits per-feature token/EstimatedCostUSD at the chokepoint, and the
+        # ADR-108 gate emits CoachQualityGateHeld when it holds a reaction. This
+        # role called Bedrock without it (the emits failed AccessDenied fail-open,
+        # so the enrichment cost telemetry was silently dropped). PutMetricData
+        # only accepts "*" as a resource.
+        # #5545: namespace-conditioned — AI (bedrock_client + the ADR-108 gate), Compute (insight_writer ->
+        # compute_metadata) and the ingestion framework's DynamoDB/OAuth.
+        _put_metric_data_statement("AICostMetrics", NS_AI, NS_COMPUTE, *NS_INGEST_SHARED),
         iam.PolicyStatement(
             sid="DLQ",
             actions=["sqs:SendMessage"],
@@ -556,15 +569,13 @@ def ingestion_social_enrichment() -> list[iam.PolicyStatement]:
             actions=["lambda:InvokeFunction"],
             resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-quality-gate"],
         ),
-        iam.PolicyStatement(
-            # G1: every AI-calling role needs PutMetricData — bedrock_client.invoke()
-            # emits per-feature token/EstimatedCostUSD at the chokepoint, and the
-            # ADR-108 gate emits CoachQualityGateHeld when it holds a reaction.
-            # PutMetricData only accepts "*" as a resource.
-            sid="AICostMetrics",
-            actions=["cloudwatch:PutMetricData"],
-            resources=["*"],
-        ),
+        # G1: every AI-calling role needs PutMetricData — bedrock_client.invoke()
+        # emits per-feature token/EstimatedCostUSD at the chokepoint, and the
+        # ADR-108 gate emits CoachQualityGateHeld when it holds a reaction.
+        # PutMetricData only accepts "*" as a resource.
+        # #5545: namespace-conditioned — AI (bedrock_client + the ADR-108 gate), Compute (insight_writer ->
+        # compute_metadata) and the ingestion framework's DynamoDB/OAuth.
+        _put_metric_data_statement("AICostMetrics", NS_AI, NS_COMPUTE, *NS_INGEST_SHARED),
         iam.PolicyStatement(
             sid="DLQ",
             actions=["sqs:SendMessage"],
@@ -634,6 +645,7 @@ def ingestion_activity_enrichment() -> list[iam.PolicyStatement]:
         # record for it (the function's Bedrock path did not run in the 30d window),
         # so this is fixed as the same structural pairing, not as a measured incident.
         _bedrock_telemetry_statement(),
+        _put_metric_data_statement("SharedModuleMetrics", NS_COMPUTE, *NS_INGEST_SHARED),  # #5545: compute_metadata + framework
         iam.PolicyStatement(
             sid="DLQ",
             actions=["sqs:SendMessage"],

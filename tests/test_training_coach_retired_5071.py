@@ -21,6 +21,7 @@ training_coach config are removed." Three things went, and this file holds each 
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 _REPO = Path(__file__).resolve().parent.parent
@@ -107,3 +108,55 @@ def test_the_brief_module_no_longer_exports_the_retired_wrapper():
     assert not hasattr(ai_calls, _RETIRED_FN)
     # the operational seats are untouched
     assert callable(ai_calls.call_physical_coach_v2) and callable(ai_calls.call_sleep_coach_v2)
+
+
+# ── #5990: the retired walking heart-rate cap stays retired from the coach tree ─────────────
+# #5916 (owner ruling 2026-11-13) retired the fixed walking heart-rate cap and target: easy aerobic work is the talk
+# test plus RPE (`training.recent_aerobic.EASY_EFFORT_CUE`), heart rate is a measurement only. `coach.critics_aerobic`
+# was out of that lane's reach and kept printing the cap in its swap reason. A cap is caught in either form a coach
+# module could print it: a literal sentence shape, or the two retired legacy names / the retired grade key read into an
+# f-string (whose literal parts alone, e.g. "HR avg ≤ ", carry no number).
+_RETIRED_HR_NAMES = ("HR_CEILING_BPM", "HR_TARGET_BPM", "over_ceiling", "over_hr_ceiling")
+_RETIRED_HR_SHAPES = {
+    "a cap in bpm": re.compile(r"[≤<]=?\s*\d{2,3}(?:\.\d)?\s*[- ]?bpm", re.I),
+    "a heart-rate cap": re.compile(r"(?:\bHR|heart[ -]rate)\s+(?:avg|average)?\s*[≤<]", re.I),
+    "a heart-rate target": re.compile(r"bpm\s*\(?\s*target\b|\b\d{2,3}\s*(?:bpm\s+)?the target\b", re.I),
+    "a grade against a ceiling": re.compile(r"over the (?:HR|heart[ -]rate) (?:ceiling|cap)|bpm walking line", re.I),
+}
+
+
+def _retired_hr_hits(text: str, rel: str) -> list[str]:
+    out: list[str] = []
+    for node in ast.walk(ast.parse(text)):
+        if isinstance(node, ast.Attribute) and node.attr in _RETIRED_HR_NAMES:
+            out.append(f"{rel}:{node.lineno}: reads the retired `{node.attr}`")
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+            if any(name in node.value for name in _RETIRED_HR_NAMES[2:]):
+                out.append(f"{rel}:{node.lineno}: the retired grade key {node.value!r}")
+            for shape, pat in _RETIRED_HR_SHAPES.items():
+                m = pat.search(node.value)
+                if m:
+                    out.append(f"{rel}:{node.lineno}: {shape} — {m.group(0)!r}")
+    return out
+
+
+# premerge-gate: #5990 — sweeps lambdas/coach for the retired walking heart-rate cap; a coach string that prints it again must red before the merge.
+def test_no_coach_module_states_the_retired_walking_heart_rate_cap():
+    """Every offender across lambdas/coach, reported together. Mutation control: restore the pre-#5990 swap sentence in
+    `coach/critics_aerobic.py` (`HR avg ≤ {recent_aerobic.HR_CEILING_BPM} bpm (target …)`) — this reds."""
+    root = _REPO / "lambdas" / "coach"
+    files = sorted(root.rglob("*.py"))
+    assert len(files) >= 50, f"lambdas/coach has gone blind: {len(files)} modules"
+    offenders: list[str] = []
+    for path in files:
+        offenders += _retired_hr_hits(path.read_text(encoding="utf-8"), str(path.relative_to(_REPO)))
+    assert not offenders, "a coach module states the retired walking heart-rate cap:\n  " + "\n  ".join(offenders)
+    # the detector itself reds on the retired sentence's shapes (its own must-fail control)
+    retired = (
+        'f"HR avg ≤ {recent_aerobic.HR_CEILING_BPM} bpm (target {recent_aerobic.HR_TARGET_BPM})."',
+        '"swap to cycling, HR avg ≤ 120 bpm (target 105)"',
+        'numbers["last_cardio_block_over_hr_ceiling"] = last["over_ceiling"]',
+    )
+    for src in retired:
+        assert _retired_hr_hits(src, "<retired>"), src
+    assert not _retired_hr_hits('"ran at 116.9 bpm avg — a measurement, never graded"', "<measured>")

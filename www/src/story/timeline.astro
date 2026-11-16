@@ -8,7 +8,7 @@
 // chapter's own published excerpt (the same words /story/ already shows), and, folded, the week's days as links to the
 // existing Day pages. No audio, no journal / State of Mind / diary field: a week without an installment says only that.
 import Base from "../layouts/Base.astro";
-import { dayInWords } from "../lib/format.js";
+import { chapterMeta, countWords, dayInWords, gapWords } from "../lib/format.js";
 import { timelineRows, soFar, weekRecords } from "../lib/story.js";
 import { STORY_MARKER, storyEnabled, storyPrivate } from "../lib/story_dark.js";
 import { latestEdition, loadAll, loadStory } from "../lib/snapshot.js";
@@ -33,6 +33,17 @@ const excerptOf = (id: string) => {
   return c && c.status === "published" && typeof c.excerpt === "string" && c.excerpt.trim() ? c.excerpt.trim() : null;
 };
 const lastIdx = rows.length - 1;
+// #6081: an installment is named as the chapter page names it — its number, its days and its publication read off the
+// chapter OBJECT (looked up by id; installments_index keeps its four keys), never the index's data date as "Published".
+const metaOf = (id: string) => chapterMeta(all.get("chapter", id));
+// a week with no installment says what /story/ says of it (skipped, held, pending), from the chapter list — no title
+const weekState = (week: number) => {
+  const c = all.byType.chapter.find((x: any) => x.week === week);
+  return c && c.status !== "published" ? gapWords(all.byType.chapter, week, week) : null;
+};
+// the prologue is on this timeline as it is on /story/: before Day 1, never counted as a chapter
+const prologue = ok ? all.byType.chapter.find((x: any) => x.status === "published" && x.week === 0) || null : null;
+const prologueMeta = prologue ? chapterMeta(prologue) : null;
 // "That week in the record": one quiet line per RELEASED week, from the public Day objects only (src/lib/story.js
 // weekRecords — a week without an approved, published installment gets no line). A call counts only with a public
 // ledger page; each element links to its Day page or call page.
@@ -52,7 +63,7 @@ const linkOf = (seg: any) => (seg.type === "prediction" ? href(pathOf("predictio
       {
         so && so.count > 0 && (
           <p class="muted" style="margin-top:10px;font-size:15px">
-            {so.weeksWords} so far · {so.count === 1 ? "one installment" : `${so.count} installments`} on this timeline
+            {so.weeksWords} so far · <span data-ch-count>{countWords(so.count, Boolean(prologue))}</span> on this timeline
           </p>
         )
       }
@@ -69,6 +80,23 @@ const linkOf = (seg: any) => (seg.type === "prediction" ? href(pathOf("predictio
           </div>
         ) : (
           <ol style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column">
+            {prologue && prologueMeta && (
+              <li style="display:flex;gap:18px;align-items:flex-start;padding:18px 0;border-bottom:1px solid var(--rule)" data-chapter={prologue.id} data-status={prologue.status}>
+                <span class="mono cobalt" style="font-size:14px;flex:0 0 56px;padding-top:3px" data-ch-no>
+                  {prologueMeta.number}
+                </span>
+                <span style="display:flex;flex-direction:column;gap:6px;min-width:0;flex:1 1 auto">
+                  <span class="label">{prologue.week_label || "Prologue"} · before the first week</span>
+                  <a href={href(pathOf("chapter", prologue.id))} style="text-decoration:none;display:flex;flex-direction:column;gap:4px">
+                    <b style="font-size:21px;letter-spacing:-.02em;line-height:1.2">{prologue.title}</b>
+                    <span class="mono muted" style="font-size:12px">
+                      {prologueMeta.window && <><span data-ch-window>{prologueMeta.window}</span> · </>}
+                      {prologueMeta.published && <><span data-published>{prologueMeta.published}</span> · </>}read the prologue →
+                    </span>
+                  </a>
+                </span>
+              </li>
+            )}
             {genesisWords && (
               <li style="display:flex;gap:18px;align-items:baseline;padding:14px 0;border-bottom:1px solid var(--rule)">
                 <span class="mono cobalt" style="font-size:14px;flex:0 0 56px">Day 1</span>
@@ -87,15 +115,16 @@ const linkOf = (seg: any) => (seg.type === "prediction" ? href(pathOf("predictio
             {rows.map((r, i) => {
               const excerpt = r.installment ? excerptOf(r.installment.id) : null;
               const current = i === lastIdx && r.days.length < 7;
+              const m = r.installment ? metaOf(r.installment.id) : null;
               return (
-                <li style="display:flex;gap:18px;align-items:flex-start;padding:18px 0;border-bottom:1px solid var(--rule)" id={`week-${r.week}`}>
-                  <span class={`mono ${r.installment ? "cobalt" : "faint"}`} style="font-size:14px;flex:0 0 56px;padding-top:3px">
-                    {String(r.week).padStart(2, "0")}
+                <li style="display:flex;gap:18px;align-items:flex-start;padding:18px 0;border-bottom:1px solid var(--rule)" id={`week-${r.week}`} data-chapter={m ? r.installment.id : undefined}>
+                  <span class={`mono ${r.installment ? "cobalt" : "faint"}`} style="font-size:14px;flex:0 0 56px;padding-top:3px" data-ch-no={m ? "" : undefined}>
+                    {m ? m.number : String(r.week).padStart(2, "0")}
                   </span>
                   <span style="display:flex;flex-direction:column;gap:6px;min-width:0;flex:1 1 auto">
                     <span class="label">
                       {r.weekLabel}
-                      {r.span ? ` · ${r.span}` : ""}
+                      {r.span ? ` · program week ${r.span}` : ""}
                     </span>
                     {r.installment ? (
                       <a href={href(pathOf("chapter", r.installment.id))} style="text-decoration:none;display:flex;flex-direction:column;gap:4px">
@@ -106,12 +135,13 @@ const linkOf = (seg: any) => (seg.type === "prediction" ? href(pathOf("predictio
                           </span>
                         )}
                         <span class="mono muted" style="font-size:12px">
-                          Published {r.installment.dateWords} · read the installment →
+                          {m && m.window && <><span data-ch-window>{m.window}</span> · </>}
+                          {m && m.published && <><span data-published>{m.published}</span> · </>}read the chapter →
                         </span>
                       </a>
                     ) : (
                       <span class="muted" style="font-size:15px">
-                        {current ? "This week is under way." : "No published installment for this week."}
+                        {current ? "This week is under way." : weekState(r.week) || "No published chapter for this week."}
                       </span>
                     )}
                     {records.get(r.week) && (
@@ -157,7 +187,7 @@ const linkOf = (seg: any) => (seg.type === "prediction" ? href(pathOf("predictio
       }
       <p class="muted" style="font-size:13px;margin-top:24px;max-width:70ch">
         The weeks are the platform's own seven-day program weeks. An installment appears here only when the platform records it as approved and
-        published; drafts and held installments are not part of this timeline. The record line under a published week is read
+        published; a week without one is named as the story page names it (skipped, held, pending), with no title and no draft. The record line under a published week is read
         off that week's own day pages: weights only from a recorded weigh-in, sessions and food as logged, and the calls settled
         that week on the ledger (a verdict under review is not counted). A figure the week's days cannot answer is left out.
         Every chapter is on <a

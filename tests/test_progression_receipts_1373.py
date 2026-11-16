@@ -23,6 +23,8 @@ import os
 import sys
 from decimal import Decimal
 
+import pytest
+
 # ── Add lambdas/ to import path ──
 LAMBDAS_DIR = os.path.join(os.path.dirname(__file__), "..", "lambdas")
 sys.path.insert(0, os.path.abspath(LAMBDAS_DIR))
@@ -473,3 +475,65 @@ def test_norm_makes_int_float_decimal_agree():
     assert pr.canonical_json({"a": 3}) == pr.canonical_json({"a": 3.0}) == pr.canonical_json({"a": Decimal("3")})
     assert pr.canonical_json({"a": 2.5}) == pr.canonical_json({"a": Decimal("2.5")})
     assert pr.canonical_json({"a": True}) != pr.canonical_json({"a": 1})  # bools stay bools
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# The summation order is part of the arithmetic (2026-11-15)
+# ══════════════════════════════════════════════════════════════════════════════
+# On 2026-11-14 the weighted mean of the pillar levels was EXACTLY 20. The compute summed it in its own order and got
+# 19.999999999999996 (level 19, stored); the receipt came back from DynamoDB with its pillars alphabetical, the replay
+# summed in that order and got 20.000000000000004 (level 20 and a level-up that never happened). The receipt had
+# verified at write time. qa-smoke's deploy-health replay then failed and every code deploy auto-rolled back.
+
+# The real day: levels as stored, weights as the live config carried them, relationships never instrumented.
+_NOV14_LEVELS = {"sleep": 34, "movement": 40, "nutrition": 6, "metabolic": 1, "mind": 8, "relationships": 1, "consistency": 22}
+_NOV14_WEIGHTS = {
+    "sleep": 0.2,
+    "movement": 0.18,
+    "nutrition": 0.18,
+    "metabolic": 0.12,
+    "mind": 0.15,
+    "relationships": 0.07,
+    "consistency": 0.1,
+}
+
+
+def _nov14(order):
+    transitions = {
+        "pillars": {n: {"inputs": {"not_instrumented": n == "relationships"}, "outputs": {"level": _NOV14_LEVELS[n]}} for n in order},
+        "headline": {"inputs": {"prev_character_level": 19}},
+    }
+    replayed = {n: {"level": _NOV14_LEVELS[n]} for n in order}
+    return transitions, replayed, {"pillars": {n: {"weight": w} for n, w in _NOV14_WEIGHTS.items()}}
+
+
+def test_the_engine_sums_the_pillars_in_the_order_it_declares():
+    assert list(_sheet()["progression_transitions"]["pillars"]) == list(ce.HEADLINE_PILLAR_ORDER)
+
+
+def test_the_boundary_day_is_a_real_boundary():
+    """Non-vacuity: this day's level really does depend on the order of the sum — the two orders floor differently."""
+    import math
+
+    def summed(order):  # the engine's own accumulation, one term at a time
+        w = t = 0.0
+        for n in order:
+            if n == "relationships":
+                continue
+            w += _NOV14_LEVELS[n] * _NOV14_WEIGHTS[n]
+            t += _NOV14_WEIGHTS[n]
+        return math.floor(w / t)
+
+    assert summed(ce.HEADLINE_PILLAR_ORDER) == 19 and summed(sorted(_NOV14_LEVELS)) == 20
+
+
+@pytest.mark.parametrize("order", [list(ce.HEADLINE_PILLAR_ORDER), sorted(_NOV14_LEVELS), list(reversed(ce.HEADLINE_PILLAR_ORDER))])
+def test_headline_replay_reproduces_the_compute_whatever_order_the_receipt_came_back_in(order):
+    out = pr._replay_headline(*_nov14(order), engine=ce)
+    assert out == {"character_level": 19, "events": []}, f"replayed in {order}: {out}"
+
+
+def test_a_pillar_the_engine_does_not_name_is_still_summed():
+    """A stored pillar the declared order does not know is appended, never dropped (an older receipt, a new pillar)."""
+    assert pr._compute_order(["zeta", "sleep", "consistency"], ce) == ["sleep", "consistency", "zeta"]
+    assert pr._compute_order(["b", "a"], None) == ["b", "a"]

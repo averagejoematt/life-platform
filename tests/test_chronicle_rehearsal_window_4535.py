@@ -254,7 +254,9 @@ def test_a_craft_week_is_stored_as_a_draft_with_the_findings_in_the_preview_emai
     from content import autopublish_audit
 
     out, updates = _publish_run(monkeypatch, CRAFT, preview_mode=False)
-    assert [k.get("status") for k in out["stored"]] == ["draft"] and out["markers"] == []
+    assert [k.get("status") for k in out["stored"]] == ["draft"]
+    # #5520: a craft-routed draft is announced like any preview draft — awaiting approval, never a craft hold for readers.
+    assert [a[:2] for a in out["markers"]] == [(4, "awaiting_approval")] and "craft" not in out["markers"][0][2].lower()
     assert all(k.get("write_to_s3") is False for k in out["journal"])  # nothing written to the public journal
     (mail,) = out["mail"]
     assert mail["Content"]["Simple"]["Subject"]["Data"].startswith("[PREVIEW · CRAFT HOLD]")

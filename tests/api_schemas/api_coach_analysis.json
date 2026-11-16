@@ -76,9 +76,6 @@
       "regeneration_paused": {
         "type": "boolean"
       },
-      "thread_reference": {
-        "type": "string"
-      },
       "weekly_priority": {
         "type": "string"
       }

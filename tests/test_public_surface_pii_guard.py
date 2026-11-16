@@ -244,6 +244,22 @@ def test_every_endpoint_violation_names_its_path_and_never_its_value():
         assert value not in joined, f"a violation line echoed a matched value: {joined}"
 
 
+def test_clinical_arm_names_the_path_masks_the_term_and_is_off_unless_handed_a_pattern():
+    """#5947: the endpoint arm reads a payload against the owner-only clinical vocabulary when handed its
+    compiled pattern (synthetic term here). The violation names the JSON path and never the term; a phrase
+    matches across a hyphen; and without a pattern the arm is off — every other caller is unchanged."""
+    import re
+
+    pattern = re.compile(r"(?<!\w)(?:zzzclinicalterm|zzz[\s\-]+phrase)(?!\w)", re.IGNORECASE)
+    payload = json.dumps({"items": [{"pitch": "a week after the ZzzClinicalTerm finding"}], "note": "the zzz-phrase again"})
+    hits = guard.scan_endpoint_payload(payload, vice=[], literals=[], clinical=pattern)
+    assert sorted(d.split(" ")[0] for arm, d in hits if arm == "clinical-record") == ["$.items[].pitch", "$.note"], hits
+    assert all("zzz" not in d.lower() for _, d in hits), f"a violation line echoed the term: {hits}"
+    assert guard.scan_endpoint_payload(payload, vice=[], literals=[]) == []
+    fallback = guard.scan_endpoint_payload("plain text with zzzclinicalterm", vice=[], literals=[], clinical=pattern)
+    assert [arm for arm, _ in fallback] == ["clinical-record"] and "zzz" not in fallback[0][1]
+
+
 def test_non_json_body_violations_are_masked_too():
     """The non-JSON fallback has no path to give, but it still never gives the value."""
     hits = guard.scan_endpoint_payload("plain text: someone.personal@gmail.com and 123-45-6789", vice=[], literals=[])
@@ -259,6 +275,34 @@ def test_live_arm_unreachable_endpoint_is_a_violation_never_a_pass():
     assert res["scanned"] == []
     assert res["violations"], "an unreadable surface must red, not pass"
     assert all(arm == "endpoint-not-scanned" for _, arm, _ in res["violations"])
+
+
+def test_live_arm_classifies_a_dark_route_404_but_still_reds_everything_else(monkeypatch):
+    """#5976: a 404 on a registered DARK route is skipped with its reason; a 404 on any
+    other route, a 5xx on a dark route, and a leak in a dark route's 200 all still red."""
+
+    dark = set(guard.DARK_ROUTES)
+
+    def run(dark_status, other_status=200, dark_body=None):
+        def stub(fetch_path):
+            path = fetch_path.split("?")[0]
+            if path in dark:
+                return dark_status, dark_body, None
+            if path == "/api/vitals":
+                return other_status, ({"ok": 1} if other_status == 200 else None), None
+            return 200, {"ok": 1}, None
+
+        return guard.scan_endpoints("https://unit-test.invalid", fetcher=stub)
+
+    res = run(404)
+    assert not [v for v in res["violations"] if v[0] in guard.DARK_ROUTES], res["violations"]
+    assert all(r in res["skipped"] and "dark route" in res["skipped"][r] for r in guard.DARK_ROUTES)
+    # must-fail controls
+    assert [v for v in run(500)["violations"] if v[0] in guard.DARK_ROUTES], "5xx on a dark route must red"
+    leak = run(200, dark_body={"user": {"birth_year": 1985}})
+    assert any(arm == "pii-age-key" for _, arm, _ in leak["violations"]), "a launched dark route is scanned"
+    monkeypatch.setattr(guard, "DARK_ROUTES", {})
+    assert [v for v in run(404)["violations"] if v[0] in ("/api/coach_brief", "/api/coach_room_words")], "undeclared 404 must red"
 
 
 def test_live_arm_fires_on_a_planted_payload_and_never_fetches_post_only_routes(monkeypatch):

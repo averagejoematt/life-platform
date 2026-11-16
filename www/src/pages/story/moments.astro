@@ -2,14 +2,16 @@
 // The moments that explain it (2026-11-14, sprint III): the few documented events that best explain the experiment so
 // far, numbered on The Line, each a card tied to its evidence (lib/moments.js picks them by rule from published objects).
 import Base from "../../layouts/Base.astro";
-import { loadAll, loadCalibration, loadJourney, loadLab, loadSeries } from "../../lib/snapshot.js";
+import { loadAll, loadCalibration, loadJourney, loadLab, loadOwnWords, loadSeries } from "../../lib/snapshot.js";
+import OwnWords from "../../components/OwnWords.astro";
+import { ownWords } from "../../lib/own_words.js";
 import { moments, heldEveryWeek } from "../../lib/moments.js";
 import { theLine } from "../../lib/theline.js";
 import { verifiedLead } from "../../lib/calibration.js";
 import { latestFindings, pairTitle } from "../../lib/laboratory.js";
 import { roomPublic } from "../../lib/room.js";
 import { labEnabled } from "../../lib/lab.js";
-import { dayInWords } from "../../lib/format.js";
+import { chapterMeta, dayInWords } from "../../lib/format.js";
 import { href, pathOf } from "../../lib/url.js";
 
 const all = await loadAll();
@@ -34,16 +36,25 @@ if (labEnabled()) {
   }
 }
 const days = new Map(all.byType.day.map((d: any) => [d.date, d]));
+// His approved lines the snapshot serves (owner ruling 2026-11-15): the beginning on the first morning's card, the pace
+// line on the rate-flag chapter's card. lib/moments.js decides the card; components/OwnWords.astro renders the line.
+const served = await loadOwnWords();
+const OWN_NOTES: Record<string, string | null> = {
+  beginning: null,
+  pace: "Written in the week the platform's rate flag fired on the pace of loss. The flag and the sentence disagree, and both are left as they are.",
+};
 const list = moments({
   journey: journey && journey.state !== "absent" ? journey : null,
   chapters: all.byType.chapter,
   coaches: all.byType.coach,
   lead,
   finding,
+  own: { beginning: ownWords(served, "beginning"), pace: ownWords(served, "pace") },
   dayPath: (iso: string) => (days.get(iso) ? pathOf("day", (days.get(iso) as any).id) : null),
   chapterPath: (c: any) => pathOf("chapter", c.id),
   coachPath: (id: string) => pathOf("coach", id),
 });
+const chMeta = (c: any) => chapterMeta(c) || ({} as any);
 const dated = list.map((m, i) => ({ ...m, n: String(i + 1) })).filter((m) => m.date);
 const start = journey?.start_date || null;
 const lineData =
@@ -68,7 +79,7 @@ const lineSvg = lineData ? theLine({ ...lineData, aria: lineAria }) : null;
       <h1 style="margin-top:10px">The moments that explain it</h1>
       <p class="dek" style="margin-top:14px">
         {list.length} {list.length === 1 ? "moment" : "moments"} from the first {journey?.day_n ?? "few"} days, chosen because the record can show each one. Every number is the platform's,
-        every quotation is an approved chapter's own words, and each card leads to the evidence.
+        every quotation is an approved chapter's own words — or mine, where it says so — and each card leads to the evidence.
       </p>
     </div>
   </section>
@@ -87,13 +98,22 @@ const lineSvg = lineData ? theLine({ ...lineData, aria: lineAria }) : null;
       <ol class="moments">
         {
           list.map((m, i) => (
-            <li class="moment" id={m.key}>
+            <li class="moment" id={m.key} data-chapter={m.chapter ? m.chapter.id : undefined}>
               <span class="moment-n num">{i + 1}</span>
               <div class="moment-body">
-                <p class="label">
-                  {m.kicker}
-                  {m.date ? ` · ${dayInWords(m.date)}` : ""}
-                </p>
+                {m.chapter ? (
+                  // #6081: a chapter's moment names it as the chapter page does — its week, its days, its publication
+                  <p class="label">
+                    <span data-ch-week>{m.kicker}</span>
+                    {chMeta(m.chapter).window && <> · <span data-ch-window>{chMeta(m.chapter).window}</span></>}
+                    {chMeta(m.chapter).published && <> · <span data-published>{chMeta(m.chapter).published}</span></>}
+                  </p>
+                ) : (
+                  <p class="label">
+                    {m.kicker}
+                    {m.date ? ` · ${dayInWords(m.date)}` : ""}
+                  </p>
+                )}
                 <h2 class="moment-title">{m.title}</h2>
                 <p class="moment-text">{m.body}</p>
                 {m.quote && m.quote.text && (
@@ -102,6 +122,7 @@ const lineSvg = lineData ? theLine({ ...lineData, aria: lineAria }) : null;
                     <cite>— {m.quote.cite}, as published</cite>
                   </blockquote>
                 )}
+                {m.own && <OwnWords id={m.own} compact class="moment-own" note={OWN_NOTES[m.own] ?? null} />}
                 <p class="moment-links">
                   {m.links.map((l: any) => (
                     <a href={href(l.path)}>{l.label} →</a>

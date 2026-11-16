@@ -1,8 +1,8 @@
 """critics_aerobic.py — the joints_tendons critic reads what his legs did in the last 48 h (#4387).
 
 On 2026-09-27 the red team approved 60 min of incline treadmill after a trap-bar + squat lower
-session, the morning after a 4.4 h walking weekend (walks of 102 and 165 min at ~116 bpm, both
-over the owner's then ≤ 75 min / ≤ 105 bpm walking redlines). No critic held the walks: the joints
+session, the morning after a 4.4 h walking weekend (walks of 102 and 165 min, both over the owner's
+75-min walk-length redline). No critic held the walks: the joints
 packet carried pain flags, novelty and the fatigue trigger, and nothing about weight-bearing load.
 
 THE RULE (computed here, never by the model — the #4149 determinism ruling)
@@ -11,10 +11,12 @@ THE RULE (computed here, never by the model — the #4149 determinism ruling)
             (#4412: the numbers also carry the last Hevy cardio block's own joined HR,
             `last_cardio_block_avg_hr` — None/unknown when no wearable covered its minutes);
   AND       the draft is a LOWER session carrying a weight-bearing cardio block (treadmill/walk);
-  THEN      `change`: that block becomes cycling (recumbent), the same duration, HR average under the
-            redline cap (120 since OD2, #4503) with its 105 target named.
-  The 75-min line and the HR cap/target are the owner's (`owner_redlines.walking_floor_hr_wk`). The
-  3.0 h trigger is POPULATION-DERIVED and the flag says so at the point of use (ADR-105).
+  THEN      `change`: that block becomes cycling (recumbent), the same duration, at the talk-test easy
+            effort (`recent_aerobic.EASY_EFFORT_CUE`). #5990: the walking heart-rate cap/target retired
+            2026-11-13 (#5916) — no bpm line is prescribed here; the block's own heart rate is quoted as a
+            measurement only, and no over-the-ceiling number is carried.
+  The 75-min line is the owner's (`owner_redlines.walking_floor_hr_wk`). The 3.0 h trigger is
+  POPULATION-DERIVED and the flag says so at the point of use (ADR-105).
 
 The flag is `governed` (the model cannot re-escalate it into a different change) and
 `independent`: it rides as an ADDITIONAL change beside whatever change the packet's first flag
@@ -55,16 +57,15 @@ def aerobic_flags(
     # #4412: the last Hevy cardio block's OWN heart rate, joined from the wearable over its minutes
     last = recent_aerobic.last_cardio_block_hr(block)
     numbers["last_cardio_block_avg_hr"] = last["avg_hr"] if last else None
-    numbers["last_cardio_block_over_hr_ceiling"] = last["over_ceiling"] if last else None
     if last is None and any(r.get("source") == "hevy" for r in (block or {}).get("rows") or []):
         # a Hevy cardio block WAS logged, and no wearable covered its minutes: unread, not "no cardio"
-        unknown.extend(["last_cardio_block_avg_hr", "last_cardio_block_over_hr_ceiling"])
+        unknown.append("last_cardio_block_avg_hr")
     if loaded is None:
         unknown.extend([METRIC, "walks_over_75_min_48h"])
         return
     hr_note = (
         f" His last Hevy {last['modality']} block ({last['date']}) ran at {last['avg_hr']:g} bpm avg — wearable HR joined over "
-        f"its inferred minutes, coverage {last['hr_coverage']} (#4412)."
+        f"its inferred minutes, coverage {last['hr_coverage']} (#4412) — a measurement, never graded (#5916)."
         if last
         else ""
     )
@@ -78,9 +79,9 @@ def aerobic_flags(
             "change",
             (
                 f"{ex['label']} {minutes} min on a lower session after {why} — swap to cycling (recumbent), same {minutes} min, "
-                f"HR avg ≤ {recent_aerobic.HR_CEILING_BPM} bpm (target {recent_aerobic.HR_TARGET_BPM}). The {recent_aerobic.WALK_MAX_MIN}-min / "
-                f"{recent_aerobic.HR_CEILING_BPM}-bpm walking lines are the owner's; the {recent_aerobic.WEIGHT_BEARING_48H_TRIGGER_HR} h / 48 h trigger is "
-                "POPULATION-DERIVED, not his variance (ADR-105, #4387)" + hr_note
+                f"{recent_aerobic.EASY_EFFORT_CUE} The {recent_aerobic.WALK_MAX_MIN}-min walking line is the owner's; the "
+                f"{recent_aerobic.WEIGHT_BEARING_48H_TRIGGER_HR} h / 48 h trigger is POPULATION-DERIVED, not his variance (ADR-105, #4387)"
+                + hr_note
             ),
             provenance="owner-history",
             field=f"exercises[{ex['idx']}].movement_key",

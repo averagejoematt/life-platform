@@ -120,7 +120,18 @@ def _catalog_movements() -> dict[str, Any]:
         return {}
 
 
-def _label(movement_key: str, row: dict[str, Any]) -> str:
+def _catalog_once(cache: dict[str, Any] | None) -> dict[str, Any]:
+    """`_catalog_movements()`, read at most once per `cache` (#5813). On the Lambda the catalog is not in the bundle, so
+    every read is a 430 KB S3 GET + parse: one per LABEL made a plan call's stage 1 read it ~540 times (~25 s). The
+    catalog cannot change inside one `weekly_excess`, so one read per call gives every label the same answer."""
+    if cache is None:
+        return _catalog_movements()
+    if "movements" not in cache:
+        cache["movements"] = _catalog_movements()
+    return cache["movements"]
+
+
+def _label(movement_key: str, row: dict[str, Any], _catalog: dict[str, Any] | None = None) -> str:
     """A readable name for an adherence movement key — ALWAYS the Hevy title when one is known (#5008 C4).
 
     The 10-16 report mixed namespaces: a chat-authored `tmpl:<id>` key printed its title ("Squat (Barbell)")
@@ -128,7 +139,7 @@ def _label(movement_key: str, row: dict[str, Any]) -> str:
     the catalog's `hevy_template_id_hint`; a catalog key resolves to its catalog title; only a key with no
     title anywhere is printed as the key."""
     key = str(movement_key or "")
-    movements = _catalog_movements()
+    movements = _catalog_once(_catalog)
     if key.startswith("tmpl:"):
         tid = key[5:]
         for ex in row.get("exercises") or []:
@@ -167,8 +178,11 @@ def _week(start: Any, end_date: Any, end_day_complete: bool = False) -> dict[str
     }
 
 
-def _movement_adds(adh: dict[str, Any], row: dict[str, Any], day: Any, bucket: dict[str, Any], **extra: Any) -> None:
-    """Accumulate one matched session's per-movement programmed/performed counts into `bucket`."""
+def _movement_adds(
+    adh: dict[str, Any], row: dict[str, Any], day: Any, bucket: dict[str, Any], _catalog: dict[str, Any] | None = None, **extra: Any
+) -> None:
+    """Accumulate one matched session's per-movement programmed/performed counts into `bucket` (`_catalog`: the caller's
+    read-once catalog cache, #5813)."""
     for m in adh["movements"]:
         # #5008 C4: working sets when the row carries them (adherence stores both since #5008); older rows
         # carry only the warm-up-inclusive counts and fall back to them, unchanged
@@ -177,14 +191,16 @@ def _movement_adds(adh: dict[str, Any], row: dict[str, Any], day: Any, bucket: d
         bucket["programmed_sets"] += prog
         bucket["performed_sets"] += perf
         if "by_movement" in bucket and m.get("movement_key"):
-            mv = bucket["by_movement"].setdefault(str(m["movement_key"]), {"movement": _label(m.get("movement_key"), row), "sessions": []})
+            mv = bucket["by_movement"].setdefault(
+                str(m["movement_key"]), {"movement": _label(m.get("movement_key"), row, _catalog), "sessions": []}
+            )
             mv["sessions"].append({"date": day.isoformat(), "programmed_sets": prog, "performed_sets": perf})
         if perf > prog:
             bucket["added_sets"] += perf - prog
             bucket["added"].append(
                 {
                     "date": day.isoformat(),
-                    "movement": _label(m.get("movement_key"), row),
+                    "movement": _label(m.get("movement_key"), row, _catalog),
                     "programmed_sets": prog,
                     "performed_sets": perf,
                     "max_rpe": _num((m.get("intensity") or {}).get("max_rpe")) if isinstance(m.get("intensity"), dict) else None,
@@ -207,6 +223,7 @@ def weekly_excess(
     from training import session_sequence
     from training.routine_title import routine_archetype
 
+    catalog: dict[str, Any] = {}  # #5813: the movement catalog, read at most once for every label below
     for row in sorted(hevy_rows or [], key=lambda r: (str(r.get("date") or ""), str(r.get("sk") or ""))):
         if row.get("tombstone"):
             continue
@@ -223,7 +240,7 @@ def weekly_excess(
             if off not in op["archetypes"]:
                 op["archetypes"].append(off)
             if matched and adh is not None:
-                _movement_adds(adh, row, day, op, archetype=off)
+                _movement_adds(adh, row, day, op, catalog, archetype=off)
             continue
         if routine_archetype(row) == (None, None):
             wk["sessions_archetype_unresolved"] += 1
@@ -235,7 +252,7 @@ def weekly_excess(
             continue
         wk["sessions_matched"] += 1
         wk["unprogrammed_exercises"] += len(adh.get("extra") or [])
-        _movement_adds(adh, row, day, wk)
+        _movement_adds(adh, row, day, wk, catalog)
     for wk in out:
         wk["net_sets"] = wk["performed_sets"] - wk["programmed_sets"]
         if wk["sessions_matched"]:

@@ -9,6 +9,7 @@ import { loadAll, latestEdition, loadCalibration } from "../../lib/snapshot.js";
 import { coachLead } from "../../lib/calibration.js";
 import { roomPublic } from "../../lib/room.js";
 import VersusGuess from "../../components/VersusGuess.astro";
+import OwnWords from "../../components/OwnWords.astro";
 import { href, pathOf } from "../../lib/url.js";
 
 const all = await loadAll();
@@ -68,7 +69,8 @@ const steps = [
         <p class="label">Depth 1 of 3 · plain English</p>
         <h1>AI coaches read my life. Code marks their homework.</h1>
         <p class="dek" style="font-size:20px">
-          Every night my data lands in one place. Each coach reads one slice of it and writes down what it believes will happen next, with a date and a
+          Whether the AI adds anything is one of this experiment's open questions, and this is how it gets checked. Every night my data lands in
+          one place. Each coach reads one slice of it and writes down what it believes will happen next, with a date and a
           number. When the date arrives, a separate program checks. I don't grade them and I can't edit the result. Then I publish all of it, including the
           wrong ones. The coaches are software I built with Claude, not people.
         </p>
@@ -148,6 +150,8 @@ const steps = [
     <div class="wrap" style="display:flex;flex-direction:column;gap:16px;max-width:900px">
       <p class="label">Depth 2 of 3 · the headline, from one producer</p>
       {cal && <VersusGuess record={null} />}
+      {/* his own verdict on the AI (owner ruling 2026-11-15): beside the checked comparison, never in place of it */}
+      {cal && <OwnWords id="ai_verdict" class="system-words" note="My judgement on one day, beside the count above. The count is the measurement; this is what it was like to use." />}
       {
         record ? (
           <>
@@ -229,6 +233,10 @@ const steps = [
 </Base>
 
 <style>
+  :global(figure.system-words) {
+    margin: 6px 0 10px;
+    max-width: 760px;
+  }
   .own-words {
     margin: 12px 0 0;
     padding: 0 0 0 20px;

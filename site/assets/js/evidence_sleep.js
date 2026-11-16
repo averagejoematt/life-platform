@@ -99,7 +99,9 @@ export function sleepCorrelationBoard(cards) {
     if (c.withheld) {
       read = `<p class="cb-dir cb-withheld">coefficient withheld — too noisy to trust in the water-weight phase</p>`;
     } else if (c.coefficient != null) {
-      read = `<p class="cb-dir mono">r = ${fmt(c.coefficient)}</p>` + correlationChip([{ label: c.predictor, r: c.coefficient, n: c.n }], { outcome: c.outcome });
+      // #5523: every served coefficient carries its 95% Fisher interval; it renders beside r, never omitted.
+      const ci = Array.isArray(c.ci95) && c.ci95.length === 2 ? ` <span class="cb-ci">(95% CI ${fmt(c.ci95[0])} to ${fmt(c.ci95[1])})</span>` : "";
+      read = `<p class="cb-dir mono">r = ${fmt(c.coefficient)}${ci}</p>` + correlationChip([{ label: c.predictor, r: c.coefficient, n: c.n }], { outcome: c.outcome });
     } else {
       read = `<p class="cb-dir">${c.direction === "insufficient" ? "too early to call a direction" : esc(c.direction) + " — direction only, no coefficient yet"}</p>`;
     }

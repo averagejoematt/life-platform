@@ -513,8 +513,12 @@ def test_deploy_role_needs_no_new_grant_for_the_additive_deploy():
         a for a in actions if a.lower() in ("secretsmanager:getsecretvalue", "secretsmanager:batchgetsecretvalue", "secretsmanager:*")
     )
     assert not leaked, f"the CI deploy role must not read secret values (#5513): {leaked}"
-    s3 = stmts["S3DeployArtifacts"]
-    assert "s3:PutObject" in s3["Action"] and f"arn:aws:s3:::{constants.S3_BUCKET}/*" in s3["Resource"]
+    # #5544: the ledger put rides its own prefix-scoped statement, not a bucket-wide one.
+    ledger = stmts["S3IamAdditiveGateLedger"]
+    assert ledger["Action"] == ["s3:PutObject"]
+    assert ledger["Resource"] == f"arn:aws:s3:::{constants.S3_BUCKET}/remediation-log/iam-additive-gate/*"
+    workflow = (ROOT / ".github" / "workflows" / "ci-cd.yml").read_text(encoding="utf-8")
+    assert 'AUDIT_BASE="remediation-log/iam-additive-gate/' in workflow, "the ledger moved prefix — move the grant with it"
     cfn = stmts["CloudFormationDiff"]
     assert "cloudformation:GetTemplate" in cfn["Action"], "the gate's read side (--live) uses GetTemplate"
     # R4's SNS line rides an EXISTING grant — verified here rather than added. If this ever

@@ -282,6 +282,55 @@ def correlation_evidence(r, n, n_eff=None, fdr_significant=None):
     }
 
 
+# #5523: the ONE correlation-tier rule. |r| sets the ceiling, the 95% Fisher interval can only demote it.
+CORRELATION_TIER_FLOORS = ((0.6, "strong"), (0.3, "moderate"))
+
+
+def correlation_tier(r, n, n_eff=None):
+    """The shared confidence tier for a served correlation (#5523, ADR-104/105).
+
+    Two boards used to grade one claim type by two rules: the sleep signal board by n alone
+    (n >= 30 read "moderate" whatever |r| was, so r = 0.03 at n = 30 was "moderate") and the habits
+    keystone by |r| alone, client-side. One rule now, computed here and served:
+
+      * |r| sets the ceiling: >= 0.6 "strong", >= 0.3 "moderate", else "weak".
+      * the 95% Fisher-z interval on r (at `n_eff` when supplied, never above n) can only DEMOTE: an
+        interval that crosses zero cannot tell the sign, so the tier is "weak" whatever |r| is. No
+        computable interval (n <= 3, |r| >= 1) is "weak" too: no interval, no claim.
+
+    Returns ``{"tier", "ci95", "ci_lo", "ci_hi", "ci_excludes_zero"}``; for r None every field is None.
+    Pure and deterministic; tolerant of garbage (a public serving path).
+    """
+    empty = {"tier": None, "ci95": None, "ci_lo": None, "ci_hi": None, "ci_excludes_zero": None}
+    try:
+        r_f = float(r)
+        n_f = float(n)
+    except (TypeError, ValueError):
+        return empty
+    if not math.isfinite(r_f) or not math.isfinite(n_f):
+        return empty
+    try:
+        ne = min(n_f, float(n_eff)) if n_eff is not None else n_f
+    except (TypeError, ValueError):
+        ne = n_f
+    ci = fisher_ci(r_f, ne)
+    tier = "weak"
+    for floor, name in CORRELATION_TIER_FLOORS:
+        if abs(r_f) >= floor:
+            tier = name
+            break
+    excludes_zero = None
+    lo = hi = None
+    if ci is None:
+        tier = "weak"
+    else:
+        lo, hi = round(ci[0], 2), round(ci[1], 2)
+        excludes_zero = ci[0] > 0.0 or ci[1] < 0.0
+        if not excludes_zero:
+            tier = "weak"
+    return {"tier": tier, "ci95": [lo, hi] if ci else None, "ci_lo": lo, "ci_hi": hi, "ci_excludes_zero": excludes_zero}
+
+
 def wilson_interval(k, n, confidence=0.95):
     """Wilson score interval for a binomial proportion k/n (ADR-105, #3450).
 

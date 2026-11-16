@@ -13,7 +13,7 @@ import Connected from "../../../components/Connected.astro";
 import Provenance from "../../../components/Provenance.astro";
 import Quote from "../../../components/Quote.astro";
 import { heartChart, heartWeeks, journeyCaption, journeyChart, ladderRows, ordinal, paceBar, rungChapters, visceralBand } from "../../../lib/journey.js";
-import { callOutcome, clip, dayInWords, num } from "../../../lib/format.js";
+import { callOutcome, chapterMeta, clip, dayInWords, num } from "../../../lib/format.js";
 import { offsetWords, referenceFigure, spanWords } from "../../../lib/phenoage.js";
 import { loadAll, loadJourney, loadSeries } from "../../../lib/snapshot.js";
 import { href, pathOf } from "../../../lib/url.js";
@@ -27,8 +27,9 @@ const series = ok ? allSeries[J.metric_id] || null : null;
 const methods = (J.method_ids || []).map((id) => all.get("method", id)).filter(Boolean);
 const source = metric && metric.source_id ? all.get("source", metric.source_id) : null;
 const published = all.byType.chapter.filter((c) => c.status === "published");
-const chapters = published
-  .map((c) => ({ date: c.week_start || c.date, label: c.week_label.replace("Prologue · Part ", "P").replace("Week ", "W") }));
+// #6081: a chapter tick is the chapter's number at the last of its days — the same tick the front page draws
+// (format.js chapterMeta); it was "W6" at the program week's first day, "P1" for a prologue before the line begins.
+const chapters = published.map((c) => chapterMeta(c)?.tick).filter(Boolean).map((t: any) => ({ date: t.date, label: t.n }));
 const provenance = { state: J.state, as_of: J.as_of || "", data_through: J.data_through, sample: Boolean(J.sample), source: J.source || [], absent_text: J.absent_text };
 const payload = ok && series ? { days: series.days, journey: J, rungs: J.rungs || [], markers: J.markers || [], chapters, unit: J.unit, decimals: 1 } : null;
 const initial = payload ? { ...payload, frame: "distance", range: null, show: { mean: true, projection: true, rungs: true, chapters: false, events: true } } : null;

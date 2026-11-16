@@ -376,6 +376,73 @@ def pytest_collection_modifyitems(config, items):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# THE CHECKOUT IS ONE SHARED FIXTURE — `serial` MUST MEAN ALONE  (#6024)
+# ══════════════════════════════════════════════════════════════════════════════
+# `serial` (pytest.ini, #3025) marks a test that MUTATES THE REAL CHECKOUT (plants a file
+# under lambdas/, rewrites docs/PROPORTIONALITY.md, ...). The marker was only ever a
+# convention for the invocation — `-m "not serial"` for the parallel pass, `-m serial`
+# afterwards. A bare `pytest tests/ -n 8` runs those writers concurrently with every
+# whole-tree scan, and `scripts/check_doc_facts.py` (test_doc_facts_ops_1957/2003
+# `test_gate_passes_on_the_repo`, via tests/repo_scan_cache.py) reads docs/ + lambdas/ for
+# 7-15 s: any writer that lands inside that window flips it red; it passes alone because
+# nothing else is writing. Reproduced 2026-11-15: the two gate tests + the registered writers under
+# `-n 8` failed in 1 of 3 runs for the gate tests (and the writers failed each other).
+#
+# The fix is at the cause: under xdist, every test takes a SHARED lock on a per-checkout lock
+# file for its whole setup/call/teardown and a `serial` test takes it EXCLUSIVELY, so a
+# serial test genuinely runs alone whatever the command line. A turnstile lock stops a
+# stream of shared holders starving the exclusive waiter. Outside xdist (the second pass,
+# a single-file run) the hook is a no-op: one process cannot race itself.
+try:
+    import fcntl as _fcntl
+except ImportError:  # pragma: no cover - non-POSIX
+    _fcntl = None
+
+
+_TREE_LOCK_HELD_ENV = "LIFE_PLATFORM_TREE_LOCK_HELD"
+
+
+def _tree_lock_paths():
+    import hashlib
+    import tempfile
+
+    tag = hashlib.sha256(os.path.dirname(os.path.abspath(__file__)).encode()).hexdigest()[:16]
+    base = os.path.join(tempfile.gettempdir(), f"life-platform-tree-lock-{tag}")
+    return base + ".turnstile", base + ".tree"
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_protocol(item, nextitem):
+    # A test that shells out to `pytest` inherits PYTEST_XDIST_WORKER; if the child took the lock too it would
+    # wait on its own parent (parent holds shared, child's serial test wants exclusive) — a deadlock found
+    # in the first verification loop. The parent's hold already covers the child, so a nested run skips.
+    if _fcntl is None or not os.environ.get("PYTEST_XDIST_WORKER") or os.environ.get(_TREE_LOCK_HELD_ENV):
+        yield
+        return
+    exclusive = item.get_closest_marker("serial") is not None
+    turnstile_path, tree_path = _tree_lock_paths()
+    turnstile = os.open(turnstile_path, os.O_CREAT | os.O_RDWR)
+    tree = os.open(tree_path, os.O_CREAT | os.O_RDWR)
+    try:
+        _fcntl.flock(turnstile, _fcntl.LOCK_EX)  # one entrant at a time; new entrants queue behind a waiting serial test
+        try:
+            _fcntl.flock(tree, _fcntl.LOCK_EX if exclusive else _fcntl.LOCK_SH)
+        finally:
+            if not exclusive:
+                _fcntl.flock(turnstile, _fcntl.LOCK_UN)
+        os.environ[_TREE_LOCK_HELD_ENV] = "1"
+        yield
+    finally:
+        os.environ.pop(_TREE_LOCK_HELD_ENV, None)
+        try:
+            _fcntl.flock(tree, _fcntl.LOCK_UN)
+            _fcntl.flock(turnstile, _fcntl.LOCK_UN)
+        finally:
+            os.close(tree)
+            os.close(turnstile)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # PER-TEST DURATION WARNER  (#3025, folding #2692)
 # ══════════════════════════════════════════════════════════════════════════════
 # The total wall-clock budget (tests/test_duration_budget_ratchet.py) cannot

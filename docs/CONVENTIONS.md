@@ -1843,8 +1843,14 @@ touches (`docs/`, `CLAUDE.md`, `.claude/README.md`, and — **on `main` only, #3
 `lambdas/web/platform_counts.py`; off main the hook restores the counter to HEAD and stages
 only the docs). If you run the script by hand outside a commit
 (or add a new doc to its `RULES` table that falls outside that stage glob), fold
-the changes into the commit yourself (`git add … && git commit --amend --no-edit
---no-verify`) or `test_platform_stats_truth.py` reds CI.
+the changes into the commit yourself (`git add … && LP_AGENT_COMMIT=1 git commit --amend --no-edit` —
+hooks intact, the sweep left out so it does not run a second time) or `test_platform_stats_truth.py` reds CI.
+
+**No routine hook bypass (owner ruling 2026-11-14).** Nothing in this repository commits with a hook-skipping flag:
+`deploy/agent_commit.sh` commits through the hooks and asks the pre-commit hook, by name (`LP_AGENT_COMMIT=1`), to
+leave out only its doc-sync sweep. `scripts/check_no_verify_sites.py` holds the set of execution sites at zero. A
+genuine emergency bypass is the owner's call each time: the four hook-bypass affordances stay in the `ask` list, and
+the commit message must say why.
 
 **On a branch, none of that applies — the counters are not yours to carry (#3101).**
 `deploy/agent_commit.sh` refuses `lambdas/web/platform_counts.py` outright (no

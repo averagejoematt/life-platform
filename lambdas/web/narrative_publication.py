@@ -391,6 +391,12 @@ def gate_item(item: Any, pk_hint: Any = None, *, strict: bool = False) -> Any:
             ok, reason = NP.eligibility(approved)
             if ok:
                 NA.note_served(item, pk)  # the wire exempts these words for this request only
+        elif NA.owner_ruled_words(item, pk):
+            # Owner ruling 2026-11-14 (wording batch v1): an exact historical call the owner approved BY RECORD — the
+            # listed key, no record of its own, words byte-identical. An owner exception, not a provenance claim, and
+            # honoured on every route so the ledger and the Coaching Room obey one decision.
+            ok, reason = True, "owner_ruled_words"
+            NA.note_served(item, pk)
     out = {k: v for k, v in item.items() if k != NP.PROVENANCE_KEY}
     if ok:
         _STATE["served"] += 1
@@ -567,10 +573,22 @@ def wrap(table: Any, *, strict: bool = False) -> Any:
 WIRE_SKIP_KEYS = frozenset({"explanation", "method", "rule_sentence", "rule_words", "formula", "limitations"})
 
 
-def scrub_payload(node: Any) -> Any:
-    """A JSON-shaped payload with every tainted string emptied (numbers, keys, lengths untouched)."""
+#: The key an object carries an owner-ruled note under (``narrative_allowlist.owner_note``).
+OWNER_NOTE_KEY = "owner_note"
+
+
+def _bare_required_words(text: str, note_text: Any) -> bool:
+    """True for the words of a call ruled "publish only with its note" (owner ruling 2026-11-15) served in an object
+    that does not carry that note beside them — a list element, another route's object, a note emptied or changed."""
+    required = NA.required_note_for_text(text)
+    return required is not None and (not required or note_text != required)
+
+
+def scrub_payload(node: Any, _note_text: Any = None) -> Any:
+    """A JSON-shaped payload with every tainted string emptied (numbers, keys, lengths untouched) — and the words of a
+    call ruled "publish only with its note" emptied wherever the object holding them does not carry the note."""
     if isinstance(node, str):
-        if is_tainted(node):
+        if is_tainted(node) or _bare_required_words(node, _note_text):
             _STATE["scrubbed"] += 1
             return ""
         return node
@@ -578,7 +596,9 @@ def scrub_payload(node: Any) -> Any:
         # The object keeps its place, numbers and grade; its emptied words read exactly like an object with
         # no words. No flag says they were withheld (owner ruling 2026-11-06: "Remove the per-item
         # words_withheld flag") — a mark would say which items rest on private or unrecorded sources.
-        return {k: (v if (k in WIRE_SKIP_KEYS and isinstance(v, str)) else scrub_payload(v)) for k, v in node.items()}
+        note = node.get(OWNER_NOTE_KEY)
+        note_text = note.get("text") if isinstance(note, dict) else None
+        return {k: (v if (k in WIRE_SKIP_KEYS and isinstance(v, str)) else scrub_payload(v, note_text)) for k, v in node.items()}
     if isinstance(node, list):
         return [scrub_payload(v) for v in node]
     return node
@@ -596,7 +616,7 @@ def annotate(response: Any) -> Any:
     out = dict(response)
     body = response.get("body")
     before = _STATE["scrubbed"]
-    if isinstance(body, str) and _TAINT_EXACT and body.lstrip()[:1] in ("{", "["):
+    if isinstance(body, str) and (_TAINT_EXACT or NA.required_words_served()) and body.lstrip()[:1] in ("{", "["):
         try:
             parsed = json.loads(body)
         except ValueError:

@@ -751,6 +751,20 @@ def session_note(due_info: Mapping[str, Any], proto: Optional[Mapping[str, Any]]
     return f"Fitness tests today, then a short lift. Why: {why}. Log each result."[:_NOTE_CHARS]
 
 
+# The usual-session rationale lines that stay true on the battery day: the grid, the calendar position, the ramp that loads
+# the kept anchors, the floors, the warm-up pass and the day's fatigue read. Anything else names the session replaced.
+_SESSION_INDEPENDENT_RATIONALE = (
+    "week grid source=",
+    "archetype=",
+    "session sequence:",
+    "loads:",
+    "load floors",
+    "warm-ups:",
+    "fatigue (",
+    "z2 7d",
+)
+
+
 def apply_battery(ideal: Any, movements: Mapping[str, Any], due_info: Mapping[str, Any], proto: Optional[Mapping[str, Any]] = None) -> Any:
     """Turn the test-day role's ideal routine into the battery session, in place: the minimum session plus the
     tests in the charter's `order`. Loads on the kept anchor sets are the ideal's (the load floors hold)."""
@@ -770,6 +784,12 @@ def apply_battery(ideal: Any, movements: Mapping[str, Any], due_info: Mapping[st
                 unresolved.append(f"{step}: catalog key {spec[step].get('catalog_key')!r} not in the movement catalog")
                 continue
             blocks.append(_test_block(step, spec[step], movements))
+    # #6020: the rationale the usual session wrote describes movements and a set count this routine no longer serves
+    # ("14 sets over 6 movements (~49 min)", the swaps and rotations of accessories that were cut). Only the lines that hold
+    # for any session stay; the rest move to the snapshot, so nothing is lost and none reads as what was written.
+    old_rationale = [str(x) for x in (ideal.rationale or [])]
+    kept_rationale = [x for x in old_rationale if x.startswith(_SESSION_INDEPENDENT_RATIONALE)]
+    replaced_rationale = [x for x in old_rationale if x not in kept_rationale]
     ideal.exercises = blocks
     ideal.title = f"{BATTERY_TITLE} — {ideal.title}"
     ideal.notes = session_note(due_info, p)
@@ -785,6 +805,7 @@ def apply_battery(ideal: Any, movements: Mapping[str, Any], due_info: Mapping[st
             "unresolved": unresolved,
             "charter_version": charter_version(),
             "issue": ISSUE,
+            "replaced_rationale": replaced_rationale,
         },
     }
     ideal.rationale = [
@@ -796,7 +817,8 @@ def apply_battery(ideal: Any, movements: Mapping[str, Any], due_info: Mapping[st
             else ""
         ),
         *[f"UNRESOLVED — {u}" for u in unresolved],
-        *list(ideal.rationale or []),
+        *kept_rationale,
+        f"{n_sets} sets over {len(blocks)} movements (the tests plus the minimum session)",
     ]
     return ideal
 

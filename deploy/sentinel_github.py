@@ -417,13 +417,24 @@ def _check_secret_scanning(repo, want_ss, scope_gaps):
     }
 
 
-def _check_repo_settings(repo, want_settings):
-    """#1662 — repo-level merge toggles (auto-merge is the mechanism ADR-148 depends on)."""
+def _check_repo_settings(repo, want_settings, scope_gaps=None):
+    """#1662 — repo-level merge toggles (auto-merge is the mechanism ADR-148 depends on).
+
+    #6071: a declared key ABSENT from the response is `unavailable` (token visibility), never
+    drift — only a key that was read and differs is drift. Drift on a readable key wins."""
     data, err = _gh_api_result(f"repos/{repo}")
     if err:
         return {"status": "error", "detail": err["detail"]}
     declared = {k: v for k, v in want_settings.items() if k not in _POSTURE_META_KEYS}
-    mismatches = {k: {"documented": v, "live": data.get(k)} for k, v in declared.items() if data.get(k) != v}
+    absent = [k for k in declared if k not in data]
+    mismatches = {k: {"documented": v, "live": data.get(k)} for k, v in declared.items() if k in data and data.get(k) != v}
+    if absent and not mismatches:
+        if scope_gaps is not None:
+            scope_gaps.append(f"repo_settings field(s) {', '.join(absent)} (absent from repos/<repo>; token likely lacks the scope)")
+        return {
+            "status": "unavailable",
+            "detail": f"repos/<repo> returned no {', '.join(absent)} field(s) — UNVERIFIED, not drift (token likely lacks the scope)",
+        }
     if mismatches:
         verdict = {
             "status": "drift",
@@ -579,7 +590,7 @@ def check_github_config():
     # 2c. repo-level merge settings — auto-merge is the mechanism ADR-148 depends on
     want_settings = posture.get("repo_settings")
     if want_settings:
-        surfaces["repo_settings"] = _check_repo_settings(repo, want_settings)
+        surfaces["repo_settings"] = _check_repo_settings(repo, want_settings, scope_gaps)
 
     # 2d. repository secret scanning + push protection (#4887) — both live `enabled`, so
     # nothing alarmed if either was switched off. Same `repos/<repo>` payload as 2c, field

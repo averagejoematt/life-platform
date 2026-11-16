@@ -1,0 +1,18 @@
+---
+// The platform's dated note on an owner-ruled call (owner ruling 2026-11-15, #6079). Set apart from the coach's words and
+// from the grader's verdict: its own box, labelled by what it does, dated in words. It never rewrites either — the
+// words are shown as filed and the grade as graded; the note says so.
+import { dayInWords } from "../lib/format.js";
+
+interface Props {
+  note: { kind: string; dated: string; required: boolean; text: string; short: string };
+  label: string;
+}
+const { note, label } = Astro.props;
+---
+
+<aside role="note" data-owner-note={note.kind} style="border:2px solid var(--ink);padding:16px 18px;display:flex;flex-direction:column;gap:8px">
+  <span class="label">{label} · added {dayInWords(note.dated)}</span>
+  <p style="font-size:15px;line-height:1.55;max-width:60ch">{note.text}</p>
+  <span class="muted" style="font-size:12px">A note the platform added on the owner's ruling. It is not the coach's words and it changes no grade.</span>
+</aside>

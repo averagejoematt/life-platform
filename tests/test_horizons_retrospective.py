@@ -424,3 +424,37 @@ def test_the_pending_line_is_promised_only_inside_the_retrospective_window(fake_
     rs.set_horizon_retrospective("2026-W29", {"status": "published", "text": "the coach's grounded note", "curator": "mind"})
     flags = {i["week"]: i["retrospective_pending"] for i in _parse(sar.handle_horizons())["items"]}
     assert flags == {"2026-W30": True, "2026-W29": False, "2026-W28": False}
+
+
+import sys as _sys  # noqa: E402
+
+
+def test_the_feed_is_in_the_live_privacy_sweep_and_a_planted_clinical_term_reds_it(unarmed_clinical_channel, monkeypatch):
+    """The nightly sweep (deploy/pii_surface_guard.py --endpoints) fetches this feed's route and reads its
+    payload against the clinical vocabulary. Must-fail control: a planted synthetic term in a card's pitch is
+    a violation that names the JSON path and never the term; the same payload without it is clean; and an
+    unarmed channel raises instead of reporting a surface it could not screen."""
+    _sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "deploy"))
+    import pii_surface_guard as guard  # noqa: PLC0415
+
+    def sweep(feed_payload):
+        def fetch(fetch_path):
+            return 200, (feed_payload if fetch_path.split("?")[0] == feed_route else {"ok": True}), None
+
+        return guard.scan_endpoints("https://unit-test.invalid", fetcher=fetch)
+
+    feed_route = "/api/" + sar.handle_horizons.__name__.removeprefix("handle_")
+
+    with pytest.raises(_channel.ContentFilterUnavailable):
+        sweep({"items": []})
+
+    monkeypatch.setenv(
+        "CONTENT_FILTER_JSON", _json.dumps({"blocked_vice_keywords": ["fizzlewick"], "blocked_clinical_keywords": ["Snorbleitis"]})
+    )
+    _channel.reset_cache()
+    planted = sweep({"items": [{"title": "A Piece", "pitch": f"a week after the {_SYNTHETIC_CLINICAL} finding"}], "count": 1})
+    assert feed_route in planted["scanned"], "the feed's route must be in the live sweep's scan set"
+    assert [(w, a) for w, a, _ in planted["violations"]] == [(feed_route, "clinical-record")]
+    detail = planted["violations"][0][2]
+    assert detail.startswith("$.items[].pitch ") and _SYNTHETIC_CLINICAL not in detail.lower()
+    assert sweep({"items": [{"title": "A Piece", "pitch": "about the piece itself"}], "count": 1})["violations"] == []

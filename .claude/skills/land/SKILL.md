@@ -97,6 +97,33 @@ rolls itself back on a red QA, or fails before publishing, and nothing pages eit
 sha is. A generator change is outside the workflow's `paths` — dispatch it
 (`gh workflow run site-deploy.yml`) and read that run.
 
+**Before merging anything that must go live — and again whenever a live check finds content
+missing — read whether the plane's LAST deploy was rolled back.** A standing red gate rolls
+back every later deploy whatever it carries (2026-11-15: one 5 px overflow reverted the v9
+root ~9.5 h, a privacy fix with it; a smoke boundary reverted a healthy fleet). `success` on
+the rollback job = reverted; `skipped` = not. Fix or land the red first — a green merge is
+not a live change.
+
+```bash
+gh run view "$(gh run list --workflow web-preview-deploy.yml --branch main --status completed --limit 1 --json databaseId -q '.[0].databaseId')" --json headSha,jobs -q '.headSha[0:9] + "  " + ([.jobs[] | select(.name | startswith("Auto-rollback")) | .name + ": " + .conclusion] | join(", "))'   # v9 root
+gh run view "$(gh run list --workflow ci-cd.yml --branch main --status completed --limit 1 --json databaseId -q '.[0].databaseId')" --json headSha,jobs -q '.headSha[0:9] + "  " + ([.jobs[] | select(.name | startswith("Auto-rollback")) | .name + ": " + .conclusion] | join(", "))'   # Lambda fleet
+```
+
+**A privacy fix to the site has three copies, not one (2026-11-15, #6083).** The root being right says
+nothing about the other two addresses the site serves:
+
+- **the rehearsal preview** `/next/v9/` — written only by `gh workflow run web-preview-deploy.yml -f target=preview`,
+  never by a push or the schedule. Rebuild it, then list what the rebuild did NOT overwrite
+  (`aws s3api list-objects-v2 --prefix site/next/v9/ --query "Contents[?LastModified<'<today>'].Key"`): the sync
+  never deletes, and on 2026-11-15 that list was 500 pages on retired addresses still printing withheld words.
+- **the public archive** `/archive/latest.tar.gz` — rebuilt once a night, and it packages the preview. After the
+  preview is clean, invoke `life-platform-permanence`, invalidate `/archive/*`, then DOWNLOAD the file and read its
+  members (for an age-derived figure: `tests/age_inversion_lib.py::invert_phenoage` over the archived
+  `api/phenoage.json`). Checking the new API response, or waiting for tonight's run, is not that check.
+
+A CloudFront path is cached (`/archive/latest.tar.gz` for an hour, and a query string is not part of its key), so
+"I re-fetched it" proves nothing until the invalidation completes.
+
 **Merged is not deployed. Deployed is not verified.**
 
 A `Fixes` auto-closure proves the merge and nothing else — if CI/CD died before the deploy

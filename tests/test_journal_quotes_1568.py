@@ -238,6 +238,33 @@ def test_mark_is_idempotent_and_capped_at_two_per_day(fake_table):
     assert "error" in out3 and "cap" in out3["error"]
 
 
+def test_an_owner_ruled_date_takes_the_lines_the_ruling_names_and_no_more(fake_table, monkeypatch):
+    """Owner ruling 2026-11-15: a dated ruling may approve more lines of one entry than a close may nominate. The
+    ruled date takes exactly its number; a line past it is refused; a date with no ruling keeps the cap of two; and
+    the per-line gates (approval, taboo, grounding) are not relaxed by the ruling."""
+    monkeypatch.setattr(jq, "OWNER_RULED_DAY_CAPS", {"2026-07-25": 3})
+    assert jq.day_cap("2026-07-25") == 3 and jq.day_cap("2026-07-26") == jq.MAX_QUOTES_PER_DAY == jq.day_cap(None)
+    fake_table.put_item(
+        Item={"pk": ENTRY_PK, "sk": "DATE#2026-07-25#journal#morning", "raw_text": "Second line here. Third line too. A fourth one."}
+    )
+    for line in (CLEAN_LINE, "Second line here.", "Third line too."):
+        assert tj.tool_mark_journal_quote({"date": "2026-07-25", "quote": line, "approved": True}).get("status") == "marked"
+    fourth = tj.tool_mark_journal_quote({"date": "2026-07-25", "quote": "A fourth one.", "approved": True})
+    assert "error" in fourth and "cap" in fourth["error"]
+    assert "error" in tj.tool_mark_journal_quote({"date": "2026-07-25", "quote": "Third line too.", "approved": False})
+    assert "grounding" in tj.tool_mark_journal_quote({"date": "2026-07-25", "quote": "Never written that day.", "approved": True}).get(
+        "error", ""
+    )
+    # a ruling below the nomination cap cannot lower it
+    monkeypatch.setattr(jq, "OWNER_RULED_DAY_CAPS", {"2026-07-25": 1})
+    assert jq.day_cap("2026-07-25") == jq.MAX_QUOTES_PER_DAY
+
+
+def test_the_owner_ruled_dates_are_exactly_the_rulings_on_record():
+    """A ratchet, not a convenience: adding a date here is a new owner ruling, never a way round the cap."""
+    assert jq.OWNER_RULED_DAY_CAPS == {"2026-11-08": 4}
+
+
 def test_mark_without_ingested_entry_records_pending_grounding(fake_table):
     out = tj.tool_mark_journal_quote({"date": "2026-07-26", "quote": "A brand new day deserves a brand new sentence.", "approved": True})
     assert out.get("status") == "marked" and out["grounding"] == "pending_ingestion"

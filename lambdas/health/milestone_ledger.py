@@ -94,10 +94,10 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
-from decimal import Decimal
 from typing import Any, NamedTuple
 
 from common.macrofactor_fields import intake_window  # #5431: intake reads bounded at the Pacific today
+from common.numeric import floats_to_decimal  # #5524: the one float->Decimal walker (NaN/Inf guarded)
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from training import session_count  # #5387: its zone2_by_date reads THE Zone 2 computation
 
@@ -406,19 +406,6 @@ def evaluate(signals: dict, existing_ids: set[str], last_event_date: str | None,
 # ── DDB I/O ───────────────────────────────────────────────────────────────────
 
 
-def _dec(obj):
-    """Decimal-safe deep copy — boto3 rejects Python floats."""
-    if isinstance(obj, list):
-        return [_dec(v) for v in obj]
-    if isinstance(obj, dict):
-        return {k: _dec(v) for k, v in obj.items()}
-    if isinstance(obj, bool):
-        return obj
-    if isinstance(obj, float):
-        return Decimal(str(obj))
-    return obj
-
-
 def read_ledger(table, user_prefix: str) -> dict:
     """The whole partition, in one paginated pk-only query.
 
@@ -545,7 +532,7 @@ def _put_once(table, user_prefix: str, entry: dict, stamp: dict | None) -> bool:
     CROSS_PHASE — the restart wipe never tombstones it — so an occupied key
     always means a genuinely consumed rung.
     """
-    item = _dec(dict(entry))
+    item = floats_to_decimal(dict(entry))  # #5524: the canonical walker — NaN/Inf become None, never a write-time TypeError
     if stamp:
         item.update(stamp)
     try:
