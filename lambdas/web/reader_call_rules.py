@@ -30,7 +30,7 @@ import hashlib
 import hmac
 import math
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, Optional
 
 #: The master switch, COMMITTED OFF (#6088). Going public is a reviewed one-line change, after the owner's go.
@@ -79,7 +79,7 @@ def _fmt(v: float) -> str:
 
 def _day(iso: Any) -> Optional[date]:
     try:
-        return date.fromisoformat(str(iso)[:10])
+        return datetime.strptime(str(iso)[:10], "%Y-%m-%d").date()  # a calendar day, never an instant
     except (TypeError, ValueError):
         return None
 
