@@ -243,7 +243,8 @@ _HARD_RULES = (
     "HARD RULES: correlative only (never causal); use ONLY numbers present in the material; hedge anything on a small sample; "
     "process over outcome — never a report-card tone; handle a hard week with compassion; never open a line with 'Matt'. "
     "NEVER mention or allude to: a death, grief, a funeral, cancer, or any named family member; any specific vice or substance; "
-    "or any body weight at all — numeric OR spelled-out. Stay on training, sleep, recovery, habits, the deficit's effects, the bet, "
+    "or any body weight at all — no figure with its unit or bare, in digits or in words, from this experiment or an earlier year, "
+    "and no amount lost or regained (the pace per week is the one figure allowed). Stay on training, sleep, recovery, habits, the deficit's effects, the bet, "
     "and the week's effort. Do NOT invent scenes, settings, times of day, anecdotes, or sensory detail — if it isn't in the data, "
     "it didn't happen. No AI tells: never say 'in this episode'; no tidy three-item lists; no neat bow at the end."
 )

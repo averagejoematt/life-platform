@@ -5,7 +5,9 @@ Two callers, both owner-only:
     nudge — its own ledger row (`COACH#steps_nudge` / `STEPS_NUDGE#<date>`), so a steps nudge never spends the coach's
     one-a-day slot, and the coach's day never blocks the walk. No new EventBridge rule: the existing hourly cron already
     covers 19:00-20:00 PT in both PDT and PST (see `steps_nudge.WINDOW_*`).
-  * `daily_brief_lambda` reads `brief_line(...)` — the day's steps floor/target line.
+  * `daily_brief_lambda` reads `brief_line(...)` — the day's steps floor/target line — and, since #5821 (owner ruling
+    2026-11-15: the evening steps note is no longer its own email), `folded_note(...)` — the text the pass settled
+    `folded_into_brief` on the previous evening (its 19:00-20:00 PT window runs after that day's brief).
 
 DEAD-MAN: every in-window tick (sent or not) overwrites `COACH#steps_nudge` / `EVAL#<date>` with its verdict;
 `nudge_ledger_qa.check_steps_nudge_liveness` reds when a recent day has no eval row (the pass never ran).
@@ -78,6 +80,13 @@ def brief_line(table, date: str) -> Optional[str]:
     except Exception as e:  # noqa: BLE001
         logger.warning("[steps-nudge] brief line failed (non-fatal): %s", e)
         return None
+
+
+def folded_note(table, date: str, folded_status: str) -> Optional[str]:
+    """#5821: the note the pass folded into the brief for `date` (status `folded_status`), or None. Read-only. A dry
+    run settles `dry_run`, so it never reaches the brief."""
+    row = table.get_item(Key={"pk": LEDGER_PK, "sk": steps_nudge.idempotency_key(date)}).get("Item") or {}
+    return str(row["text"]) if row.get("status") == folded_status and row.get("text") else None
 
 
 def _first_session_pt(hevy_rows: list) -> Optional[datetime]:
@@ -153,8 +162,18 @@ def _stamp_eval(table, date: str, verdict: dict, now_utc: datetime) -> None:
         logger.warning("[steps-nudge] eval stamp failed: %s", e)
 
 
-def run(table, send: Callable[[str], None], now_utc: datetime, budget_tier: int, *, user: str = "matthew", dry_run: bool = False) -> dict:
-    """One steps-nudge pass. `send(text)` delivers the owner email. Never raises into the coach nudge's tick."""
+def run(
+    table,
+    send: Callable[[str], None],
+    now_utc: datetime,
+    budget_tier: int,
+    *,
+    user: str = "matthew",
+    dry_run: bool = False,
+    delivered_status: str = "sent",
+) -> dict:
+    """One steps-nudge pass. `send(text)` delivers the note (#5821: a no-op since the brief carries it, settled
+    `delivered_status`). Never raises into the coach nudge's tick."""
     now_pt = now_utc.astimezone(PACIFIC)
     date = now_pt.date().isoformat()
     if not steps_nudge.WINDOW_START_HOUR_PT <= now_pt.hour < steps_nudge.WINDOW_END_HOUR_PT:
@@ -189,5 +208,5 @@ def run(table, send: Callable[[str], None], now_utc: datetime, budget_tier: int,
         logger.error("[steps-nudge] send failed: %s", e)
         _settle(table, date, "failed", error=str(e))
         return {"send": False, "reason": "send_failed"}
-    _settle(table, date, "dry_run" if dry_run else "sent", text=verdict["text"])
+    _settle(table, date, "dry_run" if dry_run else delivered_status, text=verdict["text"])
     return {"send": True, "reason": verdict["reason"], "key": verdict["key"]}

@@ -20,6 +20,18 @@ from stacks.role_policies_base import (
     DLQ_ARN,
     KMS_KEY_ARN,
     KMS_KEY_ID,
+    NS_AI,
+    NS_AI_CANARY,
+    NS_BUDGET,
+    NS_CANARY,
+    NS_COHERENCE,
+    NS_COMPUTE,
+    NS_EMAIL,
+    NS_FRESHNESS,
+    NS_INGEST_SHARED,
+    NS_QA,
+    NS_READING,
+    NS_TRAFFIC,
     REGION,
     S3_BUCKET,
     SES_CONFIG_SET_ARN,
@@ -28,6 +40,7 @@ from stacks.role_policies_base import (
     _bedrock_statement,
     _charter_twin_list,
     _charter_twin_read,
+    _put_metric_data_statement,
     _s3,
     _secret_arn,
     _ses_reader_resources,
@@ -139,11 +152,7 @@ def operational_freshness_checker() -> list[iam.PolicyStatement]:
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
             resources=[KMS_KEY_ARN],
         ),
-        iam.PolicyStatement(
-            sid="CloudWatchMetrics",
-            actions=["cloudwatch:PutMetricData"],
-            resources=["*"],
-        ),
+        _put_metric_data_statement("CloudWatchMetrics", NS_AI, NS_COMPUTE, NS_FRESHNESS),  # #5545
         iam.PolicyStatement(
             sid="SES",
             actions=["ses:SendEmail", "sesv2:SendEmail"],
@@ -297,9 +306,12 @@ def operational_traffic_digest() -> list[iam.PolicyStatement]:
             actions=["ses:SendEmail", "sesv2:SendEmail"],
             resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
         ),
+        # #5545: the write is namespace-conditioned; the reads are a SEPARATE statement because
+        # cloudwatch:namespace is absent from a Get* request and would deny it.
+        _put_metric_data_statement("CloudWatchMetrics", NS_TRAFFIC),
         iam.PolicyStatement(
-            sid="CloudWatchMetrics",
-            actions=["cloudwatch:PutMetricData", "cloudwatch:GetMetricData", "cloudwatch:GetMetricStatistics"],
+            sid="CloudWatchMetricsRead",
+            actions=["cloudwatch:GetMetricData", "cloudwatch:GetMetricStatistics"],
             resources=["*"],
         ),
         iam.PolicyStatement(
@@ -317,6 +329,9 @@ def operational_dlq_consumer() -> list[iam.PolicyStatement]:
     """DLQ consumer: reads the DLQ, re-drives transient failures to the source
     Lambda, tracks retries in a durable DDB ledger, archives + escalates
     permanent/repeated failures (S3 + SNS page + SES summary). ADR-115 / #402."""
+    # #5980: read at call time — role_policies_base (imported above) is what puts lambdas/ on sys.path.
+    from operational.redrive_targets import REDRIVE_TARGETS
+
     return [
         iam.PolicyStatement(
             sid="SQS",
@@ -366,10 +381,12 @@ def operational_dlq_consumer() -> list[iam.PolicyStatement]:
             actions=["events:ListTargetsByRule"],
             resources=[f"arn:aws:events:{REGION}:{ACCT}:rule/LifePlatform*"],
         ),
+        # #5980: scoped from `function:*` to the functions the consumer is allowed to re-drive —
+        # operational/redrive_targets.py, the same set the Lambda checks before every invoke.
         iam.PolicyStatement(
             sid="RedriveInvoke",
             actions=["lambda:InvokeFunction"],
-            resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:*"],
+            resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:{name}" for name in sorted(REDRIVE_TARGETS)],
         ),
     ]
 
@@ -422,10 +439,13 @@ def operational_cost_governor() -> list[iam.PolicyStatement]:
                 "cloudwatch:GetMetricData",
                 "cloudwatch:GetMetricStatistics",
                 "cloudwatch:ListMetrics",
-                "cloudwatch:PutMetricData",
             ],
             resources=["*"],
         ),
+        # #5545: the governor WRITES LifePlatform/Budget (tier, projections, surge flips) and
+        # LifePlatform/AI (TokenAlarmGenesisWindowActive) — and, after this, it is the only role
+        # that can write Budget. Reads above stay unconditioned (they read AWS/Bedrock too).
+        _put_metric_data_statement("CloudWatchMetrics", NS_AI, NS_BUDGET),
         iam.PolicyStatement(
             sid="BudgetTierParam",
             actions=["ssm:GetParameter", "ssm:PutParameter"],
@@ -443,6 +463,14 @@ def operational_cost_governor() -> list[iam.PolicyStatement]:
             sid="Alert",
             actions=["sns:Publish"],
             resources=[f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"],
+        ),
+        # #5821: a tier change below the tier-3 hard cutoff is one line in the daily LP digest
+        # (common.ops_digest). Fail-soft in the lambda — without this grant the publish fails and
+        # the change is emailed on the alerts topic exactly as before.
+        iam.PolicyStatement(
+            sid="DigestLine",
+            actions=["sns:Publish"],
+            resources=[f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"],
         ),
     ]
 
@@ -472,11 +500,7 @@ def operational_canary() -> list[iam.PolicyStatement]:
             actions=["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
             resources=_s3("canary/*"),
         ),
-        iam.PolicyStatement(
-            sid="CloudWatchMetrics",
-            actions=["cloudwatch:PutMetricData"],
-            resources=["*"],
-        ),
+        _put_metric_data_statement("CloudWatchMetrics", NS_AI, NS_CANARY),  # #5545
         iam.PolicyStatement(
             sid="Secrets",
             # MCP check needs the Bearer token from life-platform/mcp-api-key.
@@ -535,11 +559,9 @@ def operational_qa_smoke() -> list[iam.PolicyStatement]:
     """
     return [
         _bedrock_statement(),
-        iam.PolicyStatement(
-            sid="CloudWatchMetrics",
-            actions=["cloudwatch:PutMetricData"],
-            resources=["*"],  # PutMetricData only accepts "*"
-        ),
+        # #5545: QA (reader_truth_qa budget-pause), Freshness, AI/Compute and the ingestion framework's
+        # DynamoDB/OAuth — every namespace qa_smoke's import closure can write.
+        _put_metric_data_statement("CloudWatchMetrics", NS_AI, NS_COMPUTE, NS_FRESHNESS, NS_QA, *NS_INGEST_SHARED),
         iam.PolicyStatement(
             sid="SSMBudgetTier",
             actions=["ssm:GetParameter"],
@@ -679,6 +701,14 @@ def operational_qa_smoke() -> list[iam.PolicyStatement]:
             actions=["s3:PutObject"],
             resources=_s3("remediation-log/closure-probe/*"),
         ),
+        # #5821: a run whose failures are all content_truth is one line in the daily LP digest
+        # (common.ops_digest), not an email. Fail-soft in the lambda — without this grant the
+        # publish fails and the failure email goes out exactly as before.
+        iam.PolicyStatement(
+            sid="DigestLine",
+            actions=["sns:Publish"],
+            resources=[f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"],
+        ),
     ]
 
 
@@ -721,11 +751,7 @@ def operational_reading_recall_sweep() -> list[iam.PolicyStatement]:
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
             resources=[KMS_KEY_ARN],
         ),
-        iam.PolicyStatement(
-            sid="CloudWatchMetrics",
-            actions=["cloudwatch:PutMetricData"],
-            resources=["*"],
-        ),
+        _put_metric_data_statement("CloudWatchMetrics", NS_AI, NS_COMPUTE, NS_READING),  # #5545
     ]
 
 
@@ -824,11 +850,7 @@ def operational_coherence_sentinel() -> list[iam.PolicyStatement]:
     return _operational_base(
         ddb_actions=["dynamodb:GetItem", "dynamodb:Query"],
         extra_statements=[
-            iam.PolicyStatement(
-                sid="CoherenceMetrics",
-                actions=["cloudwatch:PutMetricData"],
-                resources=["*"],  # PutMetricData only accepts "*"
-            ),
+            _put_metric_data_statement("CoherenceMetrics", NS_AI, NS_COHERENCE, NS_COMPUTE),  # #5545
             iam.PolicyStatement(
                 sid="CoherenceAuditLog",
                 # Durable findings record so the remediation agent (and a human) can
@@ -868,11 +890,7 @@ def operational_ai_quality_canary() -> list[iam.PolicyStatement]:
                 actions=["lambda:InvokeFunction"],
                 resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:life-platform-site-api-ai"],
             ),
-            iam.PolicyStatement(
-                sid="CanaryMetrics",
-                actions=["cloudwatch:PutMetricData"],
-                resources=["*"],  # PutMetricData only accepts "*"
-            ),
+            _put_metric_data_statement("CanaryMetrics", NS_AI, NS_AI_CANARY, NS_COMPUTE),  # #5545
             iam.PolicyStatement(
                 # #1589: the probes must present x-amj-origin or site-api-ai's
                 # R22-SEC-03 gate 403s every synthetic event (canary blind).
@@ -1098,11 +1116,7 @@ def operational_insight_email_parser() -> list[iam.PolicyStatement]:
                 resources=[BUCKET_ARN],
                 conditions={"StringLike": {"s3:prefix": ["generated/qa_archive/text/*"]}},
             ),
-            iam.PolicyStatement(
-                sid="CloudWatchMetrics",
-                actions=["cloudwatch:PutMetricData"],
-                resources=["*"],  # PutMetricData only accepts "*"
-            ),
+            _put_metric_data_statement("CloudWatchMetrics", NS_AI, NS_COMPUTE, NS_EMAIL),  # #5545
             _experiment_cycle_read(),  # #3599/#3513: save_insight stamps through experiment_stamp_for
         ],
     )

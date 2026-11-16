@@ -100,6 +100,19 @@ _EXPLAIN_GROUNDING_REFUSAL = (
     "I'd rather not narrate numbers I can't ground in this page's data. " "The chart itself is the honest read — try again in a moment."
 )
 
+#: The same ADR-104 fail-closed refusal for /api/ask and for both board paths (the panel
+#: answer and the per-turn follow-up). Served when the gate finds numbers it cannot ground
+#: AND when the gate itself raises or fails to import (#5929 aiq-2): an unchecked draft is
+#: never served to a reader.
+_ASK_GROUNDING_REFUSAL = (
+    "I couldn't ground part of that answer in the data I actually have, so I'd rather not guess at numbers. "
+    "Try asking about something the current record covers — sleep, recovery, weight trend, training, or nutrition."
+)
+_BOARD_GROUNDING_REFUSAL = (
+    "I'd want to answer that with numbers I can actually stand behind, and I can't "
+    "ground them in today's record — ask me about something the current data covers."
+)
+
 
 _EXPLAIN_SYSTEM = (
     "You are the plain-English tour guide for averagejoematt.com — Matthew's public, single-subject (N=1) "

@@ -4,8 +4,9 @@ qa_smoke_lambda.py — Life Platform QA Smoke Test
 Runs daily at 18:30 UTC — 11:30 AM PDT / 10:30 AM PST (the cron is fixed UTC;
 a single hand-typed "PT" label here was the #2818 drift class), after the
 morning compute + brief pipeline completes. Checks data freshness, score
-sanity, link integrity, and key output files. Sends a concise email report —
-green summary if all pass, red alert if anything fails.
+sanity, link integrity, and key output files. A clean run sends nothing; a
+deploy_health failure sends the red email at once; a run whose failures are all
+content_truth is one line in the daily LP digest instead (#5821).
 
 Trigger: EventBridge cron(30 18 ? * * *)
 Handler: qa_smoke_lambda.lambda_handler
@@ -25,6 +26,7 @@ from datetime import date, timedelta
 import boto3
 from boto3.dynamodb.conditions import Key
 from common.mcp_url import resolve_mcp_url  # SEC-02 #780: discover the URL at runtime, not a committed env var
+from common.ops_digest import enqueue_digest_line  # #5821: a content-truth-only failure is a digest line, not an email
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
@@ -62,6 +64,7 @@ from operational import (
     chronicle_status_row_qa,  # noqa: E402  (#3563 dead-man)
     closure_probe_qa,  # noqa: E402  (#4022 close-on-first-live-output)
     coach_checkin_queue_qa,  # noqa: E402  (#5127: the check-in queue served past rotation / on a paused source)
+    coach_read_freshness_qa,  # noqa: E402  (#5521: a present coach's read more than 7 days behind the board, unpaused)
     ensemble_digest_qa,  # noqa: E402  (#3829 dead-man)
     habit_cross_source_qa,  # noqa: E402  (#3666 cross-source contract)
     hae_additive_integrity_qa,  # noqa: E402  (#4628: a stored Apple Health day total below the delivered readings)
@@ -126,6 +129,7 @@ dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
 s3 = boto3.client("s3", region_name=REGION)
 ses = boto3.client("sesv2", region_name=REGION)
+sns = boto3.client("sns", region_name=REGION)  # #5821: the daily LP digest's topic
 MCP_SECRET_NAME = os.environ.get("MCP_SECRET_NAME", "life-platform/mcp-api-key")
 
 
@@ -1250,6 +1254,11 @@ def check_steps():
                 table, USER_PREFIX, Check, CONTENT_TRUTH, pt_now, site_base_url=SITE_BASE_URL, budget=census_budget()
             ),
         ),
+        # #5520: every elapsed program week is served with a state, and the newest chapter is under 10 days old
+        (
+            "chapter_door",
+            lambda: story_season_qa.check_chapter_door(Check, CONTENT_TRUTH, pt_now, site_base_url=SITE_BASE_URL, budget=census_budget()),
+        ),
         # #3485: the served journal manifest never carries a tombstoned / previous-cycle post
         (
             "chronicle_manifest_provenance",
@@ -1257,6 +1266,7 @@ def check_steps():
         ),  # #1243: a same-title podcast episode must date-match its journal article
         ("published_permalink_reachable", check_published_permalink_reachable),  # #3284: no published post url may be a redirect source
         ("weight_truth", lambda: weight_truth_qa.checks(Check, SITE_BASE_URL, CONTENT_TRUTH, table=table)),  # #1894/#4025
+        ("coach_read_freshness", lambda: coach_read_freshness_qa.checks(Check, SITE_BASE_URL, CONTENT_TRUTH)),  # #5521
         ("receipt_replay", check_receipt_replay),  # #1373: progression-receipt drift alarm (deterministic replay)
         ("redirect_spotcheck", check_redirect_spotcheck),  # #1430: weekly legacy-redirect sample, rotates over redirects.map
         ("notion_template_schema", check_notion_template_schema),  # #1840: code TEMPLATE_SK vs live Notion schema drift gate
@@ -1438,7 +1448,7 @@ def lambda_handler(event, context):
         # failed_deploy_health gates the pipeline. `paused` names ride along as
         # the #1920 execution receipt, so a caller can tell a green run from a
         # run where the check never executed.
-        def _body(emailed):
+        def _body(emailed, digested=False):
             return json.dumps(
                 {
                     "failed": len(fails),
@@ -1451,6 +1461,8 @@ def lambda_handler(event, context):
                     "warned_chronic": len(warns_chronic),
                     "paused": sorted(c.name for c in paused),
                     "emailed": emailed,
+                    # #5821: ADDITIVE — True when the failures went to the daily digest instead.
+                    "digested": digested,
                 }
             )
 
@@ -1460,6 +1472,30 @@ def lambda_handler(event, context):
                 "0 failures — no email (warnings not emailed standalone)"
             )
             return {"statusCode": 200, "body": _body(False)}
+
+        # #5821 (owner ruling 2026-11-15): the failure email folds into the daily LP digest.
+        # THE URGENCY BOUNDARY is #1921's partition split. A deploy_health failure is the class
+        # that gates ci-cd's smoke job and fires the rollback (smoke_oracle_decision reads
+        # failed_deploy_health): the site or API is broken now, so it still mails at once. A run
+        # whose failures are ALL content_truth — stale data, a dead-man, a wrong number — cannot
+        # be fixed by a revert and reverts nothing; it becomes one digest line. The
+        # qa-smoke-failures alarm still digests its own transition; this line names the checks.
+        # If the digest publish fails, the email goes out as before (fail towards delivery).
+        if not fails_deploy:
+            ids = ", ".join(f"{c.category}/{c.name}" for c in fails_content)
+            digested = enqueue_digest_line(
+                sns,
+                "qa-smoke: content-truth failures",
+                f"{len(fails_content)} content-truth failure(s) {run_time.strftime('%b %-d')}: {ids}. "
+                "Per-check detail: the [QA] FAIL lines in /aws/lambda/life-platform-qa-smoke.",
+                state="FAIL",
+                dry_run=dry_run,
+            )
+            if digested:
+                print(
+                    f"[QA] Done — {len(fails_content)} content_truth failure(s), {len(warns)} warnings, digest line queued (no email, #5821)"
+                )
+                return {"statusCode": 200, "body": _body(False, digested=True)}
 
         subject = (
             f"🔴 QA: {len(fails)} failure{'s' if len(fails) > 1 else ''} "

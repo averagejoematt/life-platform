@@ -108,6 +108,7 @@ except ImportError:
     logger = logging.getLogger("cost-governor")
     logger.setLevel(logging.INFO)
 
+from common.ops_digest import enqueue_digest_line  # #5821: a non-cutoff tier change is a digest line
 from common.token_alarm_window import is_within_token_alarm_window
 
 # #3554: the premise guard on the word "episodic" — rule, bar and measurement.
@@ -942,6 +943,16 @@ def _alert(prev: int, new: int, mtd: float, projected: float, ceiling: float = N
         f"Auto-resumes at month rollover. AI = Bedrock (per-model token metrics "
         f"× price, +{int((_AI_SAFETY_BUFFER - 1) * 100)}% buffer); non-AI = Cost Explorer."
     )
+    # #5821 (owner ruling 2026-11-15): only the ADR-125 tier-3 hard cutoff still mails at once
+    # (the brief goes data-only, the ask endpoints and both AI CI gates stop). Tiers 1-2 pause
+    # internal and reader AI that resumes by itself, and stepping DOWN to a tier below 3 restores
+    # features; both become one line in the daily LP digest. A failed digest publish falls back
+    # to the alerts-topic email below (fail towards delivery).
+    if not urgent:
+        reason = f"{_TIER_LABELS[new]}. MTD ${mtd:.2f}, projected ${projected:.2f}, ceiling ${ceiling:.0f}."
+        if enqueue_digest_line(_sns, f"budget-tier: {direction} {prev}→{new}", reason, state=f"TIER {new}"):
+            logger.info(f"Tier-change digest line queued: {prev}→{new}")
+            return
     try:
         _sns.publish(TopicArn=ALERTS_TOPIC, Subject=subj[:99], Message=body)
         logger.info(f"Tier-change alert sent: {prev}→{new}")

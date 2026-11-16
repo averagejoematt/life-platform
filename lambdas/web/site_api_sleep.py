@@ -22,6 +22,7 @@ pre-split module).
 from datetime import timedelta
 
 from common.pacific_time import parse_iso_utc  # #1964: the ONE ISO-8601 parser
+from common.stats_core import correlation_tier  # #5523: the ONE correlation-tier rule
 from health import nutrition_logging  # #5954: the partial-export predicate
 
 from web.site_api_common import (
@@ -279,6 +280,8 @@ def _log_stage_consistency(label, block):
 _CORR_MIN_COEF_DAYS = 14  # >=2 weeks of overlap before any coefficient
 
 _CORR_MIN_DIR_DAYS = 4  # below this, not even a direction
+# #5523: the served words for the shared tier (stats_core.correlation_tier). "weak" keeps the board's old words.
+_CORR_TIER_LABEL = {"strong": "strong", "moderate": "moderate", "weak": "low confidence"}
 
 
 def _shift_date(d, lag, *, _g):
@@ -313,6 +316,10 @@ def _corr_card(cid, label, predictor, outcome, pred_series, outc_series, lag=0, 
         "confidence": "watching — too early",
         "noise": False,
         "note": note,
+        "tier": None,
+        "ci95": None,
+        "ci_lo": None,
+        "ci_hi": None,
     }
     if n >= _CORR_MIN_DIR_DAYS:
         mx, my = sum(xs) / n, sum(ys) / n
@@ -328,7 +335,10 @@ def _corr_card(cid, label, predictor, outcome, pred_series, outc_series, lag=0, 
         sx = sum((a - mx) ** 2 for a in xs) ** 0.5
         sy = sum((b - my) ** 2 for b in ys) ** 0.5
         card["coefficient"] = round(cov / (sx * sy), 2) if sx > 0 and sy > 0 else None
-        card["confidence"] = "low confidence" if n < 30 else "moderate"
+        # #5523: the shared tier (|r| ceiling, Fisher interval demotes) and the interval itself — never n alone.
+        tier = correlation_tier(cov / (sx * sy), n) if card["coefficient"] is not None else {"tier": None}
+        card["confidence"] = _CORR_TIER_LABEL.get(tier["tier"], "low confidence")
+        card.update(tier=tier["tier"], ci95=tier.get("ci95"), ci_lo=tier.get("ci_lo"), ci_hi=tier.get("ci_hi"))
     return card
 
 

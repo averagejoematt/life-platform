@@ -109,7 +109,7 @@ pre-commit-hook interference during the rebase's internal commit; not yet promot
 CONVENTIONS.md). Don't fight it:
 
 ```bash
-git commit --no-verify -C "$(cat .git/rebase-merge/stopped-sha)"   # commit the resolved index as-is
+LP_AGENT_COMMIT=1 git commit -C "$(cat .git/rebase-merge/stopped-sha)"   # commit the resolved index; hooks run, the doc-sync sweep is left out
 git rebase --quit                                                    # discard the wedged rebase state
 git checkout -B <branch> HEAD                                        # reattach the branch
 ```

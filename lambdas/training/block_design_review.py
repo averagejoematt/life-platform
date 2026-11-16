@@ -4,8 +4,9 @@ WHAT IT IS. Block accessories used to change with no reviewed proposal: he saw t
 not veto a pick before it was drafted. At each new 6-week block (`block_model.block_weeks()`), this turns the selection
 engine's own record (`selection_engine.select_week`, #5773) into a proposal, per accessory slot:
 
-    pick           what the engine ranks first, with WHY THIS AND WHY NOW — its tier for the slot's muscle, his N=1 fit,
-                   variety (served in the lookback or not, new to him or familiar), a C pick's recorded reason, a
+    pick           what the engine ranks first, with WHY THIS AND WHY NOW — its quality tier (S-D, #5857) for the slot's
+                   muscle and its evidence confidence, his N=1 fit, variety (served in the lookback or not, new to him or
+                   familiar), a C/D pick's recorded reason, a
                    lengthened-bias swap — all read off the record, nothing re-ranked here;
     replaces       what the slot served last block: the prior block's approved pick, else the rotation ledger's last
                    variant for the slot, else the template accessory;
@@ -166,19 +167,25 @@ def replaces(
 
 
 def why(slot: Mapping[str, Any], recent: set[str], replaced: Mapping[str, Any]) -> dict[str, str]:
-    """Why this (tier, N=1 fit, variety, a C pick's reason) and why now, read off the engine's record."""
+    """Why this (quality tier + evidence, N=1 fit, variety, a C/D pick's reason) and why now, read off the engine's record."""
     p = slot.get("pick") or {}
     muscle = slot.get("muscle") or "the slot's muscle"
     n1 = p.get("n1") or {}
     fit = "his N=1 fit is unknown (no overlay read)" if n1.get("fit") != "known" else f"his N=1 fit scores {n1.get('score'):+d}"
     variety = "new to him (novel-again caps and a cue sheet ride it)" if p.get("novel") else "familiar"
     variety += ", served in the last block's rotation" if p.get("catalog_key") in recent else ", not served in the lookback"
-    parts = [f"tier {p.get('tier')} for {muscle}", fit, variety]
+    evidence = f" (evidence: {p['evidence']})" if p.get("evidence") else ""
+    parts = [f"tier {p.get('tier')} for {muscle}{evidence}", fit, variety]
     if p.get("c_reason"):
-        parts.append(f"C because {p['c_reason'].get('code')}: {p['c_reason'].get('why')}")
+        parts.append(f"{p.get('tier')} because {p['c_reason'].get('code')}: {p['c_reason'].get('why')}")
     if slot.get("lengthened_swap"):
         parts.append(f"taken as the week's lengthened-bias movement for {muscle}")
-    if p.get("catalog_key") == replaced.get("catalog_key"):
+    rot = p.get("rotation") or {}  # #5861 L6: a LIVE pick carries its hold/rotate decision; a shadow pick never does
+    if rot.get("action") == "hold":
+        now = f"held: {rot.get('reason')} (trend {rot.get('trend') or 'unknown'}) — the live policy rotates only for a named trigger"
+    elif rot.get("action") == "rotate":
+        now = f"rotates for a named trigger — {rot.get('trigger')}: {rot.get('why')}; it replaces {replaced.get('title')} ({replaced.get('source')})"
+    elif p.get("catalog_key") == replaced.get("catalog_key"):
         now = f"it holds from last block ({replaced.get('source')}); nothing ranked above it is servable"
     else:
         now = f"block start: the slot rotates, and it now outranks {replaced.get('title')} ({replaced.get('source')})"
@@ -269,7 +276,11 @@ def build_proposal(
             "muscle": s.get("muscle"),
             "incumbent": s["incumbent"],
             "pinned": s.get("pinned"),
-            "pick": {k: pick.get(k) for k in ("movement_id", "catalog_key", "title", "tier", "novel", "length_bias")} if pick else None,
+            "pick": (
+                {k: pick.get(k) for k in ("movement_id", "catalog_key", "title", "tier", "evidence", "novel", "length_bias")}
+                if pick
+                else None
+            ),
             "replaces": replaced,
             "changes": bool(pick) and pick.get("catalog_key") != replaced.get("catalog_key"),
             "alternatives": [] if s.get("pinned") else alternatives(s, lib, idx),
@@ -545,6 +556,41 @@ def load_rows(block: int, table: Any = None, user_id: str = "matthew") -> list[d
         table = exercise_history._table()
     cond = Key("pk").eq(pk(user_id)) & Key("sk").between(approval_sk(max(1, int(block) - 1)), approval_sk(int(block)))
     return list(table.query(KeyConditionExpression=cond).get("Items") or [])
+
+
+EVALUATION_SK_PREFIX = "EXGATE#EVAL#"  # #5772's weekly evaluation row (`mcp/exercise_gates_leg.SK_EVAL`)
+EVALUATION_MAX_AGE_DAYS = 14  # #5861 L3 (platform-proposed): an evaluation older than two weekly runs is stale -> locked
+
+
+def load_gate_eval_failsoft(as_of: str, table: Any = None) -> dict[str, Any]:
+    """#5861 L3: the newest #5772 gate evaluation for LIVE selection (read-only): `{state, row, week_end}`. `state` is
+    `read`, `stale` (its week ended more than EVALUATION_MAX_AGE_DAYS before `as_of`), `none` (nothing stored) or
+    `read_failed: <type>`. Only `read` carries a row — every other state is FAIL-CLOSED: the caller reads every locking
+    gate as locked, as before #5772 was read at all."""
+    from boto3.dynamodb.conditions import Key
+    from common.pacific_time import parse_day_key
+
+    try:
+        if table is None:
+            from training import exercise_history
+
+            table = exercise_history._table()
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(pk()) & Key("sk").begins_with(EVALUATION_SK_PREFIX), ScanIndexForward=False, Limit=1
+        )
+        items = resp.get("Items") or []
+    except Exception as e:  # noqa: BLE001 — an unread evaluation locks every gate, never blocks a draft
+        logger.warning("block_design_review: the gate evaluation read failed (%s) — every gate reads locked", type(e).__name__)
+        return {"state": f"read_failed: {type(e).__name__}", "row": None, "week_end": None}
+    if not items:
+        return {"state": "none", "row": None, "week_end": None}
+    row = json.loads(json.dumps(items[0], default=float))
+    end = str(row.get("week_end") or row.get("as_of") or "")[:10]
+    a, b = parse_day_key(str(as_of)[:10]), parse_day_key(end)  # calendar-day keys, never instants (#3609)
+    age = (a - b).days if a and b else None
+    if age is None or age > EVALUATION_MAX_AGE_DAYS:
+        return {"state": "stale", "row": None, "week_end": end or None}
+    return {"state": "read", "row": row, "week_end": end}
 
 
 def load_failsoft(block: int, table: Any = None) -> dict[str, Any]:

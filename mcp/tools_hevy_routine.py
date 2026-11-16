@@ -110,7 +110,9 @@ def _make_resolver():
         except MovementUnmappable:
             return reconcile_custom(movement_key, wc.list_templates)
 
-    return _resolve
+    from training.live_balance import template_resolver  # #5861 FIX3: the KB template setting (approved library only)
+
+    return template_resolver(_resolve)
 
 
 def _generator_inputs(args: dict[str, Any]):

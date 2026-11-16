@@ -246,6 +246,14 @@ ARTIFACTS: dict[str, dict] = {
     # Re-running these is a content or deploy decision, not a reconciliation. A drift
     # guard would red on deliberate editorial state. Each entry names the step, because
     # "someone runs it" is exactly how the MCP catalog above went a month stale.
+    "scripts/gen_live_settings_doc_5861.py": _builder(
+        "scripts/gen_live_settings_doc_5861.py",
+        step="by hand after editing lambdas/training/live_settings.py (#5861 fix round 9)",
+        reason=(
+            "Writes the generated settings/heuristics block of docs/coaching/ENGINE_ARCHITECTURE.md and WEEKLY_STRUCTURE.md from "
+            "live_settings; tests/test_live_settings_doc_5861.py fails the build on any drift, so a stale block cannot merge."
+        ),
+    ),
     "scripts/v4_build_game_explained.py": _builder(
         "scripts/v4_build_game_explained.py",
         step="ci-cd.yml run_generators()",
@@ -314,7 +322,7 @@ ARTIFACTS: dict[str, dict] = {
         "scripts/v4_build_rss.py",
         step="deploy/sync_site_to_s3.sh",
         reason=(
-            "Generates site/rss.xml + feed.xml from the live chronicle posts.json. Its input is LIVE "
+            "Generates site/rss.xml + feed.xml from the live chronicle posts.json (pubDate: /api/chapters published_at, #5946). Its input is LIVE "
             "DATA, not repo state, so a repo-tree drift guard could not evaluate it — regenerating at "
             "publish time is the only correct moment."
         ),

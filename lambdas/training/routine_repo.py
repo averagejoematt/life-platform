@@ -217,7 +217,7 @@ def _record_rotation(ir: RoutineSpec) -> RoutineSpec:
     from training import variant_rotation
 
     rotation = (getattr(ir, "inputs_snapshot", None) or {}).get("rotation")
-    if rotation and rotation.get("ledger_writes"):
+    if rotation and (rotation.get("ledger_writes") or rotation.get("live_ledger_writes")):  # #5861: a live draft's own list
         variant_rotation.record_failsoft(rotation, _table, datetime.now(timezone.utc).isoformat(timespec="seconds"))
     return ir
 
@@ -233,17 +233,24 @@ def list_by_date_range(start_date: str, end_date: str, limit: int = 100) -> list
         KeyConditionExpression=Key("pk").eq(INDEX_PK) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}#￿"),
         Limit=limit,
     )
-    routines: list[RoutineSpec] = []
-    seen: set[str] = set()
+    rids: list[str] = []
     for idx in resp.get("Items", []):
         rid = idx.get("routine_id")
-        if not rid or rid in seen:
-            continue
-        seen.add(rid)
-        ir = get_current(rid)
-        if ir:
-            routines.append(ir)
-    return routines
+        if rid and rid not in rids:
+            rids.append(rid)
+    return [ir for ir in _current_many(rids) if ir]
+
+
+def _current_many(rids: list[str]) -> list[RoutineSpec | None]:
+    """`[get_current(rid) for rid in rids]`, in that order, with the GetItems in flight together (#5813: a plan call's week
+    check read ~35 pointers one after another, ~0.8 s). The first raise in `rids` order is re-raised, as the loop would."""
+    if len(rids) < 2:
+        return [get_current(rid) for rid in rids]
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=min(len(rids), 8)) as pool:
+        futures = [pool.submit(get_current, rid) for rid in rids]
+    return [f.result() for f in futures]
 
 
 def _live_genesis() -> str | None:

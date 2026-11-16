@@ -248,3 +248,38 @@ def test_the_predicates():
     assert nutrition_logging.complete_logs([stub, part, whole]) == [whole]
     assert nutrition_logging.incomplete_days([stub, part, whole]) == ["2026-05-01", "2026-05-02"]
     assert nutrition_logging.partial_days([stub, part, whole]) == ["2026-05-02"]
+
+
+def test_pulse_counts_complete_days_in_a_seven_day_window():
+    """#5929 (aiq-3): Pulse's "N/7 days logged" counted a partial export as a logged day, over an eight-date
+    window (today-7 .. today). The count now reads complete days among the seven finished days before today.
+    The expected 6 is derived here (seven dates, one partial); the controls show each defect would move it."""
+    from datetime import date, timedelta
+
+    from web import site_api_pulse as pulse_mod
+
+    class _Table:
+        def __init__(self, items):
+            self.items, self.bounds = items, None
+
+        def query(self, KeyConditionExpression):
+            # boto3 And(Equals(pk), Between(sk, lo, hi)) — record the sk bounds actually asked for.
+            self.bounds = list(KeyConditionExpression.get_expression()["values"][1].get_expression()["values"][1:])
+            return {"Items": list(self.items)}  # ignores the bounds on purpose: the date filter must hold on its own
+
+    end = date.fromisoformat(TODAY)
+    days = [(end - timedelta(days=k)).isoformat() for k in range(8, -1, -1)]  # today-8 .. today: nine dates
+    week = days[1:8]  # today-7 .. today-1, the seven finished days
+
+    def _rows(partial_flag=True):
+        rows = [_day_row(d, 1800.0, FLOOR) for d in days]
+        rows[days.index(week[-1])] = _day_row(week[-1], 80.0, 15.0, entries=1, partial=partial_flag)
+        return rows
+
+    table = _Table(_rows())
+    assert pulse_mod._nutrition_logged_7d(table, TODAY) == len(week) - 1
+    assert table.bounds == [f"DATE#{week[0]}", f"DATE#{week[-1]}~"], "the query window is the seven finished days"
+    # Controls: without the flag the partial day counts; the count can never exceed the 7 in its label.
+    assert pulse_mod._nutrition_logged_7d(_Table(_rows(partial_flag=False)), TODAY) == len(week)
+    src = open(pulse_mod.__file__).read()
+    assert "{nutrition_logged_7d} of the 7 days before today fully logged" in src

@@ -32,6 +32,11 @@ could only judge docs Phase 2 was about to rewrite. **(e7) and closure detectors
 nightly instead** (`.github/workflows/wrap-nightly.yml`, #4262 — `--list` prints them as
 `nightly`): each failing check files or comments on ONE `auto-filed` tracker; read any open one in (e9).
 
+**Which model does which leg (owner, 2026-11-15).** The lookups behind (e9), (e10) and (e11) — open-issue
+searches, the citation entries, the refill plan — and the (e3) incident rows are self-contained: brief a cheaper
+model for them (Sonnet for read-only lookups, `issue-filer` for filing, Opus for the incident write-up) and run them
+beside Phase 2. The handover (a) and the memory files (c) ARE the session's context; write those yourself.
+
 ## Phase 2 — Write everything once (steps (a)–(e))
 
 Write the handover ONCE in step (a), with the corrected draft plus the judgment lines from
