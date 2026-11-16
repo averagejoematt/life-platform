@@ -1919,12 +1919,14 @@ _STORING_DOORS = (
     "_handle_page_feedback",
     "_handle_cohort_submit",
     "_handle_predict_week",
+    "_handle_challenge_checkin",  # #6087 isolated it; #6088 makes its meter fail closed
 )
 
 
 def test_a_storing_door_refuses_and_writes_nothing_when_the_limiter_errors_6088(monkeypatch):
     """A DynamoDB error inside the limiter (update_item raises) must refuse the request with no
     stored row and no stored object. Before #6088 five of these six admitted it unmetered."""
+    _open_checkins(monkeypatch)  # #6087 ships the check-in door shut; drive it open so its meter is what is tested
     admitted = {}
     for name in _STORING_DOORS:
         table = _active_challenge_table()

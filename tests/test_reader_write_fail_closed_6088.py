@@ -27,10 +27,6 @@ FAIL_OPEN_BY_DECISION = {
     "nudge": "a click counter held in memory; it stores no reader content and moves no stored count",
     "ritual_log": "the owner's own HMAC-signed one-tap link (lambdas/ritual_link.py); a stranger cannot reach the write",
     "morning_note": "the owner's token-gated door; a stranger's request fails the token check before any write",
-    "challenge_checkin": (
-        "stores a reader check-in, so it SHOULD fail closed — left for #6087, which owns "
-        "site_api_social_challenges.py in a concurrent lane; recorded here so it is not forgotten"
-    ),
 }
 
 _LIMITER_NAMES = ("_rate_check", "check_rate_limit", "_ddb_rate_check")

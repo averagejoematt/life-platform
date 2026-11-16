@@ -75,10 +75,10 @@ def check_rate_limit(
     window in which one network can write without a meter, into a queue the
     owner reads or a number readers see. Those doors (`submit_finding`,
     `board_question`, `experiment_suggest`, `page_feedback`, `cohort_submit`,
-    `predict_week`, `reader_call`) now pass fail_open=False too. What stays on
+    `predict_week`, `challenge_checkin`, `reader_call`) now pass fail_open=False too. What stays on
     the default is named, with its reason, in
-    `tests/test_reader_write_fail_closed_6088.py` — a click counter, the owner's
-    own token-gated doors, and the challenge check-in pending #6087.
+    `tests/test_reader_write_fail_closed_6088.py` — a click counter and the owner's
+    own token-gated doors. The challenge check-in (#6087) fails closed too.
     """
     now = int(time.time())
     bucket_start = _bucket_for_window(now, window_seconds)

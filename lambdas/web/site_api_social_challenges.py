@@ -664,7 +664,9 @@ def _handle_challenge_checkin(event: dict, *, _g) -> dict:
     ip_hash = _g["salted_ip_hash"](_g["extract_client_ip"](event), logger)
     if ip_hash is None:
         return _error(503, "Service temporarily unavailable. Please try again shortly.")
-    allowed, _rem, _retry = _rate_check(f"challenge_checkin:{challenge_id}", ip_hash, limit=1, window_seconds=86400)
+    allowed, _rem, _retry = _rate_check(
+        f"challenge_checkin:{challenge_id}", ip_hash, limit=1, window_seconds=86400, fail_open=False
+    )  # #6088: it stores a reader row, so a limiter error refuses
     if not allowed:
         return _rate_limited("challenge_checkin", "Already checked in for this challenge today.", retry_after=86400)
 
