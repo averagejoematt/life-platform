@@ -21,6 +21,8 @@
 #   bash deploy/quarantine_public_copy.sh --prefix site/next/v9/ [--apply]   # every object under a prefix (emptying the preview)
 # Without --apply it is a dry run: it lists the keys and prints every command, and runs nothing that writes.
 set -euo pipefail
+# #6116: under a test runner, real AWS is unreachable from this script (deploy/lib/prod_write_guard.sh)
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prod_write_guard.sh"
 
 BUCKET="${BUCKET:-matthew-life-platform}"
 STACK="${WEB_STACK:-LifePlatformWeb}"

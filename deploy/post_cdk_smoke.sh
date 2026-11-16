@@ -23,6 +23,8 @@
 # v1.0.0 — 2026-03-10 (Item 1, board review sprint v3.5.0)
 
 set -euo pipefail
+# #6116: under a test runner, real AWS is unreachable from this script (deploy/lib/prod_write_guard.sh)
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prod_write_guard.sh"
 
 REGION="us-west-2"
 SKIP_MCP=false

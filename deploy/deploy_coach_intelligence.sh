@@ -2,6 +2,8 @@
 # deploy_coach_intelligence.sh — Deploy Coach Intelligence Architecture Lambdas
 # Usage: bash deploy/deploy_coach_intelligence.sh [--skip-seed] [--skip-configs]
 set -euo pipefail
+# #6116: under a test runner, real AWS is unreachable from this script (deploy/lib/prod_write_guard.sh)
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prod_write_guard.sh"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"

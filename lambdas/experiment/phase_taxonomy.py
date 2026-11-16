@@ -738,6 +738,11 @@ _PK_RULES: list = [
     # submits — blocking every future reset until the fix lands (the bug this rule
     # closes, filed adversarially before any live COHORT# row existed).
     (lambda pk, sk: pk.startswith("COHORT#"), SYSTEM_STATE),
+    # #6088: readers' own calls beside a coach's open call (READERCALL#<call id> / TAP#<ip_hash>, TALLY#<choice>).
+    # Audience data about the READER population, like VOTES#/COHORT# above — never Matthew's evidence and never a
+    # coach's record (the owner's hard line, 2026-11-16). SYSTEM_STATE: the phase machinery ignores it (no tag, no
+    # wipe, no filter); the TAP# markers carry their own TTL, and a tally names one call id, which a reset never reuses.
+    (lambda pk, sk: pk.startswith("READERCALL#"), SYSTEM_STATE),
     # Challenge-follow interest records (site_api_social.handle_challenge_follow) —
     # reader emails awaiting a "challenge started" notification. Audience state like
     # SUBSCRIBE#/VOTES#: kept across resets, ignored by the phase machinery.

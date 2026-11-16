@@ -13,7 +13,8 @@ tests/test_check_public_copies_6083.py fails on one that is not classified — g
   root      the v9 build's documents at site/            (rules A C D)
   preview   site/next/v9/                                  (rules A B C)
   legacy    site/ documents the v9 build does not own      (rules C D; the location check)
-  retired   site/_v9_previous/ — the old public rollback copy, retired 2026-11-14   (rule B: must hold nothing)
+  retired   site/_v9_previous/ — the old public rollback copy, retired 2026-11-14; site/chronicle/, site/evidence/ and
+            site/now/ — the pre-v9 legacy locations, retired 2026-11-16 (#6115)   (rule B: must hold nothing)
   archive   /archive/latest.tar.gz (generated/archive/)    (rules A B C)
   private, not in scope: www-previous/ (the rollback copies since 2026-11-14), backups/, and prior object versions —
   no anonymous s3:GetObject / s3:GetObjectVersion is granted on them (deploy/bucket_policy.json; GET answers 403).
@@ -82,7 +83,15 @@ SITE_DIR = os.path.join(REPO, "site")
 DOC_SUFFIXES = reg.SITE_DOCUMENT_SUFFIXES  # the documents the archive admits are the documents this guard reads
 
 PREVIEW_PREFIX = "site/next/v9/"
-RETIRED_PREFIXES = {"site/_v9_previous/": "the previous green root build, public under site/ until 2026-11-14 (now www-previous/)"}
+RETIRED_PREFIXES = {
+    "site/_v9_previous/": "the previous green root build, public under site/ until 2026-11-14 (now www-previous/)",
+    # #6115 (owner ruling 2026-11-16, per-page audit in docs/audits/LEGACY_LOCATIONS_6115.md): every document in these three
+    # locations was redirected to its real successor at the edge (redirects.map), or quarantined to a private copy. A page
+    # that comes back here is a re-publication of retired content and fails rule B.
+    "site/chronicle/": "the pre-v9 chronicle (pilot and cycle-17 copies, tombstones), retired 2026-11-16 (#6115)",
+    "site/evidence/": "the v4 evidence pages (written 2026-06-24), retired 2026-11-16 (#6115); /evidence/* 301s to each page's home",
+    "site/now/": "the v4 /now/ page (written 2026-07-12), retired 2026-11-16 (#6115); /now/ 301s to /cockpit/",
+}
 SYNC_WINDOW = timedelta(minutes=15)  # a v9 sync writes ~1,300 objects in seconds (measured 2026-11-16: 3 s and 6 s)
 PREVIEW_MAX_LAG = timedelta(hours=24)  # a rehearsal lives one root cycle (the daily 15:30 UTC rebuild); then empty it
 ARCHIVE_MAX_AGE = timedelta(hours=26)  # the nightly cadence plus two hours of slack
@@ -92,7 +101,7 @@ COPIES = {
     "root": ("site/ (the v9 build's paths)", "/", "A C D"),
     "preview": (PREVIEW_PREFIX, "/next/v9/", "A B C"),
     "legacy": ("site/ (not the v9 build's)", "/", "C D"),
-    "retired": (", ".join(RETIRED_PREFIXES), "/_v9_previous/", "B"),
+    "retired": ("site/{_v9_previous,chronicle,evidence,now}/", "(none: must be empty)", "B"),
     "archive": (reg.ARCHIVE_TARBALL_KEY, reg.ARCHIVE_PUBLIC_PATH, "A B C"),
 }
 PRIVATE = {
@@ -128,11 +137,9 @@ ORIGIN_PATHS = {
     "/buddy": "another distribution; the bucket policy grants no anonymous read on buddy/ — not public",
 }
 #: Top-level site/ locations neither the repo's site/ tree nor the v9 build writes, each in scope for rules C and D.
-LEGACY_LOCATIONS = {
-    "chronicle": "the pre-v9 chronicle and its archive copies (deploy/restart_chronicle_handler.py); /chronicle/ 301s at the edge",
-    "evidence": "the v4 evidence pages (last written 2026-06-24); 301 at the edge, still readable at the S3 website endpoint",
-    "now": "the v4 /now/ page (last written 2026-07-12); 301 at the edge, still readable at the S3 website endpoint",
-}
+#: Empty since #6115: the three it held (chronicle, evidence, now) were audited page by page and moved to
+#: RETIRED_PREFIXES. A location the owner decides to RETAIN is declared here, with its reason, and stays under C and D.
+LEGACY_LOCATIONS: dict[str, str] = {}
 _ID_KEYS = ("id", "item_id", "prediction_id", "topic_slug")
 _COMPOSITE = ("coach_id", "date", "metric", "due_date", "eval_type")
 

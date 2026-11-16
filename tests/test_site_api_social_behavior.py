@@ -1871,6 +1871,7 @@ _FLAG_DRIVERS = {
     "_handle_submit_finding": lambda: post(GOOD_FINDING),
     "_handle_page_feedback": lambda: post({"page": "/data/", "made_sense": "yes"}),  # #4182
     "_handle_morning_note": lambda: post(_signed_morning_note_body()),  # #4189 — the owner's door; the driver carries today's token
+    "_handle_predict_week": lambda: post({"week_id": CURRENT_WEEK, "metric": "weight", "choice": "up"}),  # #6088 — now metered
     # #2239 — a GET, not a POST, but it goes through the same chokepoint and so
     # joins the derived sweep automatically. Driven with an address that is NOT on
     # the roster: the 404 branch is the one an enumerator actually uses.
@@ -1907,6 +1908,34 @@ def test_the_same_write_endpoint_does_limit_while_the_shared_limiter_is_present(
     wire(monkeypatch, table=_active_challenge_table(), s3=_cohort_and_challenge_s3())
     statuses = {ENDPOINTS[name](_FLAG_DRIVERS[name]())["statusCode"] for _ in range(40)}
     assert 429 in statuses
+
+
+#: #6088 — the doors that STORE reader content or a reader-moved counter; each fails CLOSED when
+#: the limiter errors. The AST set guard is tests/test_reader_write_fail_closed_6088.py; this is the wire half.
+_STORING_DOORS = (
+    "_handle_submit_finding",
+    "_handle_board_question",
+    "_handle_experiment_suggest",
+    "_handle_page_feedback",
+    "_handle_cohort_submit",
+    "_handle_predict_week",
+    "_handle_challenge_checkin",  # #6087 isolated it; #6088 makes its meter fail closed
+)
+
+
+def test_a_storing_door_refuses_and_writes_nothing_when_the_limiter_errors_6088(monkeypatch):
+    """A DynamoDB error inside the limiter (update_item raises) must refuse the request with no
+    stored row and no stored object. Before #6088 five of these six admitted it unmetered."""
+    _open_checkins(monkeypatch)  # #6087 ships the check-in door shut; drive it open so its meter is what is tested
+    admitted = {}
+    for name in _STORING_DOORS:
+        table = _active_challenge_table()
+        table.fail = {"update_item"}
+        _t, s3, _sec = wire(monkeypatch, table=table, s3=_cohort_and_challenge_s3())
+        resp = ENDPOINTS[name](_FLAG_DRIVERS[name]())
+        if resp["statusCode"] == 200 or table.puts or s3.puts:
+            admitted[name] = (resp["statusCode"], len(table.puts), len(s3.puts))
+    assert not admitted, f"doors that wrote through a limiter error: {admitted}"
 
 
 def test_the_degraded_limiter_refuses_rather_than_admits_once_its_store_is_full(monkeypatch):
@@ -2496,6 +2525,28 @@ def test_the_prediction_dedup_row_expires_after_the_eight_day_window(monkeypatch
     social._handle_predict_week(post({"week_id": CURRENT_WEEK, "metric": "weight", "choice": "up"}))
     row = next(r for r in table.puts if str(r["sk"]).startswith("PRED#"))
     assert row["ttl"] - row["voted_at"] == 8 * 86400
+
+
+def test_predict_week_is_rate_limited_per_network_6088(monkeypatch):
+    """#6088: the door had no meter — only the per-metric dedup row. Hand-derived: the limit is
+    PREDICT_WEEK_RATE_LIMIT per hour and the charge precedes validation, so limit+1 requests from one
+    network (each an invalid metric, so no dedup row is minted) end in a 429."""
+    table, _s3, _sec = wire(monkeypatch, s3=_predict_s3())
+    statuses = [
+        social._handle_predict_week(post({"week_id": CURRENT_WEEK, "metric": "nope", "choice": "up"}))["statusCode"]
+        for _ in range(social.PREDICT_WEEK_RATE_LIMIT + 1)
+    ]
+    assert statuses[:-1] == [404] * social.PREDICT_WEEK_RATE_LIMIT and statuses[-1] == 429
+    assert table.puts == []
+
+
+def test_predict_week_fails_closed_when_the_limiter_errors_6088(monkeypatch):
+    """It stores a counter, so a DynamoDB limiter error refuses the tap — no dedup row, no tally."""
+    table = FakeSocialTable(fail={"update_item"})
+    wire(monkeypatch, table=table, s3=_predict_s3())
+    resp = social._handle_predict_week(post({"week_id": CURRENT_WEEK, "metric": "weight", "choice": "up"}))
+    assert resp["statusCode"] == 429
+    assert table.puts == [] and all(str(u["Key"]["pk"]).startswith("RATE#") for u in table.updates)
 
 
 def test_a_prediction_for_a_closed_window_is_refused_with_a_conflict(monkeypatch):

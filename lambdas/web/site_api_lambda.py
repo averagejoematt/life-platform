@@ -201,6 +201,7 @@ from web.site_api_observatory import (
     handle_workouts,
 )
 from web.site_api_pairs import handle_pairs  # #5532 — precomputed pair statistics for the v9 data room (ADR-105)
+from web.site_api_reader_call import handle_reader_call  # #6088 — a reader's call beside a coach's open call (DARK)
 
 # P1.1 Phase B step 5 (2026-05-26): vitals cluster extracted.
 from web.site_api_reading import (
@@ -470,6 +471,7 @@ ROUTES = {
     # #5532 (epic #5529): the four v9 reads — query-string routes, so each is a GET entry in _SIMPLE_ROUTES below.
     "/api/series": None,  # one metric's daily series with presence/gap flags
     "/api/ledger_export": None,  # the whole prediction ledger, paged, with the grader's flags and corrections
+    "/api/reader_call": None,  # #6088: GET tally + token / POST a reader's tap — 404 while the switch is off (DARK)
     "/api/chapters": None,  # every program week since genesis: published | held | skipped | pending
     "/api/coach_brief": None,  # owner ruling 2026-11-09 (third, E): the public-safe coaching brief — 404 while dark
     "/api/coach_room_words": None,  # owner ruling 2026-11-09 (third, D): approved historical coach words (CR2) — 404 while dark
@@ -617,6 +619,7 @@ _SIMPLE_ROUTES = {
     # #5532: the v9 reads (read-only, query-string GETs; privacy through field_tiers + the dossier filter)
     "/api/series": ({"GET"}, handle_series),
     "/api/ledger_export": ({"GET"}, handle_ledger_export),
+    "/api/reader_call": ({"GET", "POST"}, handle_reader_call),  # #6088: reader_call_rules.READER_CALL_LIVE, committed off
     "/api/chapters": ({"GET"}, handle_chapters),
     "/api/pairs": ({"GET"}, handle_pairs),
     "/api/coach_brief": ({"GET"}, handle_coach_brief),  # 2026-11-09 E: query-string GET (?coach=<id>); 404 while dark

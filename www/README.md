@@ -181,6 +181,15 @@ Owner brief 2026-11-08: "Proceed with the Human Story timeline and episode index
 * **The proofs (switch off):** `tests/story_dark.test.mjs` + `scripts/story_audit.mjs` (the six checks, each with its planted control), `tests/story.test.mjs` (the helpers), `tests/test_www_human_story_dark_hs1.py` (the producer, the approval rule, the deploy scan). The master proof is a recursive diff of `dist/` against a build of `main` from the same snapshot.
 * **A private look (local only — never a preview deploy, never `/next/v9/`):** as for the room, with `WEB_STORY=1` in place of `WEB_ROOM=1`, then `npm run snapshot:fixture && npm run build` to return to a publishable dist.
 
+## Your call beside the coaches — built dark (#6088)
+
+Owner ruling 2026-11-16: readers may make their own call alongside the coaches, but nothing a reader does may alter his evidence, grading records or experiments, and it is developed and tested privately. One private switch, **`WEB_READERCALL=1`**, read only through `src/lib/readercall.js`. There is no go-live constant: launching is a reviewed change after the owner's go, together with the API's own committed switch (`lambdas/web/reader_call_rules.py` `READER_CALL_LIVE`, off).
+
+* **What it adds (switch on only):** on a call's own page (`/system/ledger/<id>/`), for a published, undisputed direction or number call, `components/ReaderCall.astro` — while the call is open, one tap from the API's closed set (up / down / about the same, or above / within / below the coach's level), then the reader's choice and the split; once graded, the coach, the simple guess and the readers side by side. The island (`src/islands/readercall.js`, vanilla, same origin, no cookie, no storage) reaches the page only through `readerCallIntegration()`'s `injectScript`; its words are `src/lib/readercall_view.js`.
+* **Off (every CI build, every deploy):** the component renders nothing and carries no style or script, nothing is injected, so the dist is byte-identical to a build without it. `postbuild.mjs` leaves `owned_paths.json` / `reach.json` as committed on a private build, and `scripts/check_www_build.py`'s scan (`readercall_leaks`, run by every deploy) refuses a dist carrying `data-readercall` or `/api/reader_call`.
+* **The proofs:** `tests/readercall.test.mjs` (the switch, the injection, the self-gating component, the words), `tests/test_www_readercall_dark_6088.py` (the deploy scan with its planted controls), and the master proof — a recursive diff of `dist/` against a build of `main` from the same snapshot.
+* **A private look (local only — never a preview deploy):** `WEB_READERCALL=1 npm run build` over a local snapshot, served beside a local stand-in for `/api/reader_call`; then `npm run snapshot:fixture && npm run build` to return to a publishable dist.
+
 ## Going live — the split switches (L1, HS1; 2026-11-09)
 
 The Lab and the Human Story each launch independently with ONE committed line, never an env var on a deploy:

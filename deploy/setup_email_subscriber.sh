@@ -3,6 +3,8 @@
 # Run ONCE before deploy_v3755_session.sh
 # After this script succeeds, subsequent deploys use deploy_lambda.sh normally.
 set -e
+# #6116: under a test runner, real AWS is unreachable from this script (deploy/lib/prod_write_guard.sh)
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prod_write_guard.sh"
 ACCT="205930651321"
 REGION="us-west-2"
 TABLE_ARN="arn:aws:dynamodb:${REGION}:${ACCT}:table/life-platform"

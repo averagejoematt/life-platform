@@ -60,6 +60,8 @@
 #   bash deploy/apply_s3_replication.sh --apply    # writes the configuration
 
 set -euo pipefail
+# #6116: under a test runner, real AWS is unreachable from this script (deploy/lib/prod_write_guard.sh)
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prod_write_guard.sh"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUCKET="${S3_BUCKET:-matthew-life-platform}"

@@ -4860,3 +4860,80 @@ STRUCTURAL_HAND_PROOFS["structural::test_panel_owner_hold_6112.py"] = {
     ),
     "proved_on": "2026-11-16",
 }
+
+# #6116 — a test run cannot perform a real production write: the set of writing deploy scripts carries the guard, and
+# the incident command is refused before its first aws call.
+STRUCTURAL_HAND_PROOFS["structural::test_prod_write_guard_6116.py"] = {
+    "gate_name": "test_prod_write_guard_6116.py",
+    "command": "python3 -m pytest tests/test_prod_write_guard_6116.py -q -p no:cacheprovider   # baseline 9 passed",
+    "mutation": (
+        "Four plants in the real tracked tree, ONE AT A TIME, each restored from a byte copy: M1 the `source …/lib/"
+        "prod_write_guard.sh` line removed from deploy/www_preview_sync.sh; M2 `return 1` as the first line of "
+        "lp_pwg_test_context in deploy/lib/prod_write_guard.sh (the guard never arms); M3 the install_prod_write_guard "
+        "lines removed from deploy/restart_pipeline.py; M4 the `_patch_botocore(reason)` call removed from "
+        "deploy/lib/prod_write_guard.py. Plus the in-file must-fail control test_the_set_scan_is_not_blind (seven planted "
+        "unguarded writers named, five clean files not)."
+    ),
+    "observed": (
+        "2026-11-16, #6116 lane. BASELINE 9 passed. M1: 2 failed (the set test names www_preview_sync.sh; the incident "
+        "control sees the stub called), 7 passed. M2: 2 failed (incident control; the session shim test), 7 passed. M3: 1 "
+        "failed (the set test), 8 passed. M4: 1 failed (the Python twin test), 8 passed. REVERTED 9 passed."
+    ),
+    "scope": (
+        "Every git-tracked deploy/**/*.sh and deploy/**/*.py whose text performs an AWS write (shell: `aws <svc> <verb>` "
+        "with a non-read verb, an s3 cp/sync whose destination is not provably local, `cdk deploy`; Python: a boto3 write "
+        "method, an aws/cdk argv, an aws command-line string). NOT SEEN: deploy/archive/ (excluded by name); scripts/ and "
+        "qa/ writers (43, owner-run; covered only by the conftest session layer); an `aws` invoked by absolute path; a "
+        "write built from a computed verb string."
+    ),
+    "proved_on": "2026-11-16",
+}
+
+# #6116 — the two guard modules themselves (their set + incident controls are structural::test_prod_write_guard_6116.py).
+GUARD_PROOFS["guard::deploy/lib/prod_write_guard.sh"] = {
+    "gate_name": "deploy/lib/prod_write_guard.sh",
+    "command": (
+        "python3 -m pytest tests/test_prod_write_guard_6116.py -q -p no:cacheprovider   # baseline 9 passed; the incident "
+        "control runs the REAL deploy/www_preview_sync.sh --target root --restore-previous against a recording stub aws"
+    ),
+    "mutation": (
+        "In the real tracked file, restored from a byte copy (cmp identical): M2 `return 1` as the first line of "
+        "lp_pwg_test_context — the guard never arms under a test runner."
+    ),
+    "observed": (
+        "2026-11-16, #6116 lane. BASELINE 9 passed. M2 RED: 2 failed, 7 passed — the restore reached the stub in the "
+        "careless, markers-stripped and env -i environments (calls recorded, exit 0), and the session's `aws` shim passed "
+        "an `s3 rm` through to the stub. REVERTED 9 passed. During development the same control caught a refusal inside "
+        "`$(aws … || true)` being read as 'nothing to restore' (exit 0) — fixed by signalling the main shell."
+    ),
+    "scope": (
+        "Every `aws` and every mutating `cdk`/`npx cdk` call from a script that sources it, and from any child resolving "
+        "them by name through PATH (the deploy/lib/prod_write_guard_bin shims). Inert outside a test runner (proved by "
+        "test_outside_a_test_runner_the_guard_changes_nothing). NOT SEEN: an absolute-path aws; a host without `ps` (the "
+        "ancestry signal; the two env signals remain)."
+    ),
+    "proved_on": "2026-11-16",
+}
+
+GUARD_PROOFS["guard::deploy/lib/prod_write_guard.py"] = {
+    "gate_name": "deploy/lib/prod_write_guard.py",
+    "command": (
+        "python3 -m pytest tests/test_prod_write_guard_6116.py -q -p no:cacheprovider   # baseline 9 passed; the twin test "
+        "runs a subprocess that installs the guard and calls s3 PutObject (boto3 imported lazily, then at module level)"
+    ),
+    "mutation": (
+        "Two, ONE AT A TIME, each restored from a byte copy: M4 the `_guard_botocore(reason)` call removed from "
+        "install_prod_write_guard; M5 `return None` after the in-process check (the twin never arms)."
+    ),
+    "observed": (
+        "2026-11-16, #6116 lane. BASELINE 9 passed. M4 RED: 1 failed, 8 passed (the PutObject reached the network). M5 RED: "
+        "1 failed, 8 passed. REVERTED 9 passed."
+    ),
+    "scope": (
+        "Every non-read botocore operation in a Python deploy entry point whose __main__ block installs it (the set is "
+        "held by structural::test_prod_write_guard_6116.py), plus `aws`/`npx cdk deploy` via subprocess through the PATH "
+        "shims. NOT SEEN: the pytest process itself (deliberately inert there — conftest's hermetic credentials govern); a "
+        "botocore client class other than BaseClient."
+    ),
+    "proved_on": "2026-11-16",
+}

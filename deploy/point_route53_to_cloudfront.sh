@@ -13,6 +13,8 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
+# #6116: under a test runner, real AWS is unreachable from this script (deploy/lib/prod_write_guard.sh)
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prod_write_guard.sh"
 
 REGION="us-east-1"  # LifePlatformWeb deploys to us-east-1 (CloudFront requirement)
 ACCT="205930651321"
