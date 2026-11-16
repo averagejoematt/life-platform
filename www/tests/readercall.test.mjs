@@ -59,7 +59,9 @@ test("both components gate on the switch before they render anything, and carry 
     assert.match(src, /const on = readerCallEnabled\(\)/, name);
     assert.match(src, /^\{\s*on && \(/m, name);
     assert.doesNotMatch(src, /<style/, name);
-    assert.deepEqual(src.match(/<script>[\s\S]*?<\/script>/g), ['<script>\n  import "../islands/readercall.js";\n</script>'], name);
+    // counted by plain string search (no tag-matching regex): exactly one script block, the island import
+    assert.equal(src.toLowerCase().split("<script").length - 1, 1, name);
+    assert.ok(src.includes('<script>\n  import "../islands/readercall.js";\n</script>'), name);
   }
 });
 

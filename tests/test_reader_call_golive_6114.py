@@ -37,6 +37,7 @@ from reader_call_support import (
     _body,
     _call_id,
     _event,
+    _is_shut,
     _row,
     _table,
     _tally,
@@ -256,7 +257,7 @@ def test_the_kill_switch_shuts_the_door_with_the_committed_switch_on():
     raw, table = _table()
     for ev in (_event(params={"call": _call_id(DIR_ROW)}), _event("POST", body={"call": _call_id(DIR_ROW), "choice": "up"})):
         resp = rc.handle_reader_call(ev, table=table, live=True, runtime=lambda: False, now=NOW, today=TODAY)
-        assert resp["statusCode"] == 404 and _body(resp)["error"] == rc.NOT_AVAILABLE
+        assert _is_shut(resp, ev), resp
     assert raw.reads == [] and raw.writes == []
 
 
@@ -324,8 +325,8 @@ def test_a_words_withheld_call_is_eligible_and_its_question_uses_only_what_its_p
 def test_a_held_or_unworded_measure_is_not_eligible():
     held = _row("Held: weight will fall over the next two weeks.", DIRECTION_SPEC, evaluation_hold={"reason": "under review"})
     raw, table = _table(rows=(held,))
-    status = _ask(table, _event(params={"call": _call_id(held)}), raw=raw)["statusCode"]
-    assert status in (404, 409)
+    ev = _event(params={"call": _call_id(held)})
+    assert _is_shut(_ask(table, ev, raw=raw), ev)
     assert R.question(DIRECTION_SPEC, "", "2026-11-14", 14) is None  # no reader words for the measure: no question
 
 
@@ -340,6 +341,6 @@ def test_committed_on_with_the_parameter_absent_or_off_keeps_the_door_shut(_fres
         raw, table = _table()
         for ev in (_event(params={"call": _call_id(DIR_ROW)}), _event(), _event("POST", body={"call": _call_id(DIR_ROW), "choice": "up"})):
             resp = rc.handle_reader_call(ev, table=table, now=NOW, today=TODAY)  # committed default + the real runtime reader
-            assert resp["statusCode"] == 404 and _body(resp)["error"] == rc.NOT_AVAILABLE
+            assert _is_shut(resp, ev), resp
         assert raw.reads == [] and raw.writes == []
         assert ssm.calls == 1, "read once, then cached"

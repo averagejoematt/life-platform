@@ -669,8 +669,9 @@ aws ssm put-parameter --name /life-platform/reader-call --value off --type Strin
 aws ssm put-parameter --name /life-platform/reader-call --value on --type String --overwrite
 ```
 
-Shut, the route answers 404 "Reader calls are not available." before it parses, meters, reads or writes; the call
-pages say the calls are not open. Nothing already recorded is touched. Watch: the `reader-call-accepted-spike` alarm
+Shut, the route answers before it parses, meters, reads or writes: a GET gets `{"available": false}` (200, so no page
+logs an error), a POST 404 "Reader calls are not available."; call pages hide the control and the ledger index's
+"Make your own call" block reads as empty. Nothing already recorded is touched. Watch: the `reader-call-accepted-spike` alarm
 (digest, >= 60 accepted reader calls in one hour); refusals by reason in Logs Insights on the site-api log group:
 `fields Reason | filter ReaderCallEvent = "refused" | stats count(*) by Reason`.
 

@@ -203,3 +203,13 @@ def _tap(raw, table, call, choice, ip="203.0.113.7", at=NOW, delay=5, token=None
 
 def _tally(raw):
     return {s[len(R.TALLY_SK_PREFIX) :]: v["count"] for (p, s), v in raw.reader_rows().items() if s.startswith(R.TALLY_SK_PREFIX)}
+
+
+def _is_shut(resp, event) -> bool:
+    """The shut / not-callable answer (#6114): a POST is refused 404 "not available"; a GET gets the uniform non-error
+    ``{"available": false}`` so no call page logs a failed request."""
+    method = ((event.get("requestContext") or {}).get("http") or {}).get("method", "GET")
+    body = {k: v for k, v in _body(resp).items() if k != "_meta"}
+    if method == "POST":
+        return resp["statusCode"] == 404 and body.get("error") == rc.NOT_AVAILABLE
+    return resp["statusCode"] == 200 and body == {"available": False}

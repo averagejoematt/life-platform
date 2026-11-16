@@ -4,7 +4,8 @@ Owner rulings 2026-11-16 (ADR-169 binds the isolation): "Can an ordinary reader 
 coaches?" — shown as audience participation beside the formal coach and baseline records, never as equivalent evidence.
 Two switches, both must say open: the committed ``reader_call_rules.READER_CALL_LIVE`` (on since #6114) AND the runtime kill
 switch, SSM ``/life-platform/reader-call`` = ``on`` (read with a 60-second cache, FAIL CLOSED: missing, unreadable or
-any other value shuts the door). A shut door answers 404 "not available" before it parses, meters, reads or writes.
+any other value shuts the door). A shut door answers before it parses, meters, reads or writes: a POST with 404 "not available", a GET with the uniform
+non-error ``{"available": false}`` (every call page asks; none should log a failed request).
 
 ELIGIBLE CALLS. Public (read through the governed ``PublicationTable``, so a private call reads as absent), counted in
 this cycle, built by the ledger's own ``export_item`` and kept by its journal-silence scrub, a direction or number call,
@@ -53,6 +54,8 @@ TAP_LIMIT_PER_HOUR = 30
 MAX_BODY_BYTES = 2048
 BODY_KEYS = frozenset({"call", "choice", "token", "hp"})
 NOT_AVAILABLE = "Reader calls are not available."
+#: The one GET answer for a shut door or a call readers cannot call (#6114): 200, so no page logs a failed request.
+NOT_AVAILABLE_BODY = {"available": False}
 NOT_OPEN = "This call is not open for reader calls."
 CLOSED = "Reader calls on this one are closed."
 UNAVAILABLE = "Reader calls are unavailable right now. Please try again shortly."
@@ -292,7 +295,10 @@ def _get(event, table, now, today, genesis, presence, key_fn, deps) -> dict:
         return refusal
     view, err = load_call(table, item_id, today, genesis=genesis, presence=presence)
     if err:
-        return _refuse(deps, *err)
+        # #6114: a GET for a call readers cannot call — unknown, private, ineligible — is one uniform, non-error answer,
+        # so a call page never logs a failed request and a private call is indistinguishable from a missing one.
+        emit("refused", err[2])
+        return _envelope(200, NOT_AVAILABLE_BODY)
     mine = _your_call(table, item_id, ip_hash)
     payload = view_payload(view, None if view["open"] else _tally(table, item_id, view["spec"]), mine)
     if view["open"] and mine is None:
@@ -411,7 +417,9 @@ def handle_reader_call(
     genesis, _envelope, _error, logger, default_table = _deps()
     committed = R.READER_CALL_LIVE if live is None else live
     if not committed or not (runtime or runtime_switch_on)():
-        return _error(404, NOT_AVAILABLE)  # shut: no parse, no meter, no read, no write
+        # shut: no parse, no meter, no read, no write. A GET (every call page asks) gets the uniform non-error answer the
+        # page reads as "nothing to show"; a POST is refused outright.
+        return _error(404, NOT_AVAILABLE) if _method(event) == "POST" else _envelope(200, NOT_AVAILABLE_BODY)
     table = default_table if table is None else table
     now = int(time.time()) if now is None else int(now)
     today = today or pacific_today()

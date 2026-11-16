@@ -313,8 +313,8 @@ HOOK_REGISTRY: tuple = (
         label="Your call beside the coaches (#6088, #6114)",
         why=(
             "a reader's own call beside a coach's open call; the bare GET answers {available: true} while the door is "
-            "open (committed READER_CALL_LIVE AND SSM /life-platform/reader-call = on) — a 404 here means the kill "
-            "switch is off or the route is gone, and the 'Make your own call' block reads as empty"
+            "open (committed READER_CALL_LIVE AND SSM /life-platform/reader-call = on) — {available: false} means the "
+            "kill switch is off, a 404 that the route is gone, and either way the 'Make your own call' block reads empty"
         ),
         post_endpoints=("*/reader_call",),
         artifacts=(

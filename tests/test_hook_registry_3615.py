@@ -484,9 +484,9 @@ def test_fetched_json_never_raises_on_garbage():
 
 
 def test_a_shut_reader_call_door_is_a_FAIL_not_an_absence(monkeypatch):
-    """#6114: once live, the reader-call door has no absence contract — a 404 (the kill switch off, or the route gone)
-    is reported, never tolerated, so a forgotten `off` is visible the next night."""
-    table, s3, budget = _ctx(overrides={"/api/reader_call": (404, json.dumps({"error": "Reader calls are not available."}))})
+    """#6114: once live, the reader-call door has no absence contract — `{available: false}` (the kill switch off) or a
+    404 (the route gone) is reported, never tolerated, so a forgotten `off` is visible the next night."""
+    table, s3, budget = _ctx(overrides={"/api/reader_call": (200, json.dumps({"available": False}))})  # the shut door's GET
     check = hq.check_hook_liveness(table, s3, "bucket", Check, CONTENT_TRUTH, _frozen_pt_now, site_base_url="https://site", budget=budget)[
         0
     ]
