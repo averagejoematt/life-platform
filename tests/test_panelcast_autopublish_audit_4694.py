@@ -276,3 +276,15 @@ def test_the_panel_held_token_is_one_literal_in_the_module_and_the_metric_filter
     assert f"FilterPattern.literal('\"{autopublish_audit.PANEL_HELD_TOKEN}\"')" in block
     assert 'alarm_name="panelcast-autopublish-held"' in block
     assert "threshold=1," in block
+
+
+# #6112: every Panel publish now asks the owner-hold store first (emails/panelcast_hold.refuse, fail closed). These
+# tests are about other gates, and their S3 fakes carry no hold store — so the store reads as "no owner holds" here.
+# The hold itself, and the fail-closed read, are tested in tests/test_panel_owner_hold_6112.py.
+import pytest as _pytest_6112  # noqa: E402
+from emails import panelcast_hold as _panelcast_hold_6112  # noqa: E402
+
+
+@_pytest_6112.fixture(autouse=True)
+def _no_owner_holds_6112(monkeypatch):
+    monkeypatch.setattr(_panelcast_hold_6112, "owner_held_weeks", lambda *a, **k: {})

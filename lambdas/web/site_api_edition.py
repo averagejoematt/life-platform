@@ -312,6 +312,9 @@ def _podcast_part(panelcast: dict | None, week: Any, persona_of: Callable[[str],
         retired = {str(r.get("week")) for r in panelcast.get("retired") or [] if isinstance(r, dict)}
         if str(week) in retired:  # #4536: retired by name — there will be no episode, so never "yet"
             return _block("absent", None, src, "This chapter has no podcast episode.")
+        held = {str(h.get("week")) for h in panelcast.get("held") or [] if isinstance(h, dict)}
+        if str(week) in held:  # #6112: the owner holds it — say so, never "yet" (no reason or date: those stay off the page)
+            return _block("absent", None, src, "This chapter's podcast episode is on hold.")
         return _block("absent", None, src, "No podcast episode for this chapter yet.")
     ep = max(eps, key=lambda e: str(e.get("date") or ""))
     secs = ep.get("duration_sec")

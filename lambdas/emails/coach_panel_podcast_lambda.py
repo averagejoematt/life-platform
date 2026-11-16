@@ -319,6 +319,7 @@ def _publish_episode_audio(week, wav_audio: bytes) -> dict:
     default in ``panelcast_ident``, so the two can never both open an episode. The ident
     mix is still invoked — it is a no-op while disabled, and remains the one place the
     behaviour can be restored by env flag without a code change."""
+    _panel_hold().refuse([week], _g=globals())  # #6112: an owner-held week never publishes — every caller, fail closed
     from ai import audio_encode
 
     try:  # #1179: no-op while PANELCAST_IDENT is off (superseded by #1187's frozen open)
@@ -384,6 +385,7 @@ def _enclosure_type(url: str) -> str:
 
 
 def _write_indexes(episodes: list) -> None:
+    _panel_hold().refuse([e.get("week") for e in episodes], _g=globals())  # #6112: the feed never lists an owner-held week
     episodes = _panel_desk().by_date(episodes)  # #4536: newest air date first, whatever order the writer passed
     s3.put_object(
         Bucket=S3_BUCKET,
@@ -1230,7 +1232,8 @@ def _hold_and_alert(week, reasons: list, draft: dict, hold_class: str = "safety"
         indent=1,
     )
     try:
-        s3.put_object(Bucket=S3_BUCKET, Key=f"{HOLD_PREFIX}/wk{week}.json", Body=body.encode("utf-8"), ContentType="application/json")
+        if not _panel_hold().is_owner_hold(prior):  # #6112: an automated hold never overwrites the owner's
+            s3.put_object(Bucket=S3_BUCKET, Key=f"{HOLD_PREFIX}/wk{week}.json", Body=body.encode("utf-8"), ContentType="application/json")
     except Exception as e:
         logger.error("[panel] hold draft write failed — %s", e)
     try:
@@ -1341,7 +1344,7 @@ def _sweep_held_episodes(dry_run: bool = False) -> dict:
             _delete_hold(week)
         return {"swept": [], "week": week, "cleaned_stale_hold": True}
     if hold_class != "quality":
-        return _skip("safety/sensitivity hold — human review only")
+        return _skip(f"{hold_class} hold — human review only (an owner hold lifts only on the owner's release, #6112)")
     if age < HOLD_RETRY_HOURS / 24.0:
         return _skip(f"too fresh ({age:.1f}d < {HOLD_RETRY_HOURS/24.0:.1f}d review window)")
     if age > HOLD_MAX_DAYS:
@@ -1544,6 +1547,10 @@ def _panel_retire():
     return panelcast_retire
 
 
+def _panel_hold():
+    return _panel_retire().panelcast_hold  # #6112: the owner hold — one refusal for every publisher
+
+
 def _panel_desk():
     try:
         from emails import panelcast_desk
@@ -1554,6 +1561,8 @@ def _panel_desk():
 
 
 def _published_skip(week, force: bool, dry_run: bool):
+    if held := _panel_hold().run_skip(week, dry_run, _g=globals()):  # #6112: an owner hold outranks force — asked first
+        return held
     published_key = None if force else _episode_exists(week)  # read-only, so a dry run proves it too (#4365)
     if not published_key:
         return None
@@ -1575,7 +1584,7 @@ def _run_weekly(force: bool, dry_run: bool = False, week=None, approved: bool = 
     post = _select_week_post(week) if week is not None else _select_week_post()
     week = post["week"]
     skip = _panel_retire().run_skip(post, week, dry_run, _g=globals()) or _published_skip(week, force, dry_run)
-    if skip:  # #4536: a week retired by name is not generated — force and owner_approved included
+    if skip:  # #4536/#6112: a week retired by name or held by the owner is not generated — force and owner_approved included
         return skip
 
     # #4536: when the week's chronicle was written by the Story Desk, the episode script was written WITH it — from the
