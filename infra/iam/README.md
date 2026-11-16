@@ -44,6 +44,96 @@ future trust change into a reviewable PR with `git revert` as the rollback.
 > any-ref trust) live for ≈6 minutes — `docs/INCIDENT_LOG.md`. `tests/test_iam_twin_free_3336.py`
 > fails the suite if an inline policy document for any role listed here reappears under `deploy/`.
 
+### PENDING APPLY — the deploy role writes only the Lambda fleet and the deploy prefixes (#5544, 2026-11-15)
+
+> **Status: the checked-in JSON is AHEAD of live — narrowings only, no new grant.** Until the
+> apply below runs, `python3 deploy/verify_oidc_iam.py --strict` reports one deploy-role DRIFT
+> (`github-actions-deploy-role:life-platform-cicd-permissions`, expected), and
+> `_PENDING_PERMISSIONS_APPLY` in `tests/test_grant_enumeration_drift.py` carries the role.
+> Owner-attended: `bash deploy/setup_github_oidc.sh`.
+
+| Statement | before | after |
+| --- | --- | --- |
+| `LambdaDeploy` → `LambdaFleetDeploy` | 12 actions (`UpdateFunctionCode`, `UpdateFunctionConfiguration`, `InvokeFunction`, 5 layer actions, `ListTags`, …) on `function:*` + `layer:*` in us-west-2 and us-east-1 | `UpdateFunctionCode`, `GetFunction`, `GetFunctionConfiguration` on the fleet: the `ci/lambda_map.json` functions + `life-platform-mcp`/`-warmer`, 64 resources (exact names, and `<token>-*` where 2+ fleet functions share a first hyphen token) |
+| `LambdaSiteApiRecycle` (new, carved out) | — | `UpdateFunctionConfiguration` on `function:life-platform-site-api` only |
+| `S3DeployArtifacts` | `GetObject`/`PutObject` (+ the non-actions `HeadObject`/`HeadBucket`) on `matthew-life-platform/*` | `GetObject`/`PutObject` on `deploys/*`, `site/*`, `config/*`, `www-previous/*` |
+| `S3IamAdditiveGateLedger` (new, carved out) | — | `PutObject` on `remediation-log/iam-additive-gate/*` |
+| `S3BucketList` (moved, unchanged scope) | `ListBucket`, `GetBucketLocation` on the bucket | same |
+
+**The enumeration (2026-11-15).** Every job whose credential step assumes this role
+(`tests/grant_enumeration.py::ci_jobs()`: `ci-cd.yml` `deploy-iam`, `deploy`,
+`rollback-on-smoke-failure`; `site-deploy.yml` `deploy-site`, `rollback-site-on-failure`;
+`web-preview-deploy.yml` `deploy`, `record-previous`, `rollback-v9-on-failure`), every script
+they execute and every Python module those import:
+
+| Job | Runs | Lambda (actions → functions) | S3 (actions → prefixes) |
+| --- | --- | --- | --- |
+| `ci-cd` `deploy` | `deploy_fleet.sh` (+ `verify_bundle_ancestry.sh`), `check_fleet_drift.py` | `GetFunctionConfiguration` (handler probe, `wait function-updated`), `GetFunction` (ancestry + drift sha), `UpdateFunctionCode` → the fleet | `PutObject` `deploys/_fleet/*`; S3→S3 `cp` `deploys/<fn>/latest.zip`→`previous.zip` (`Get`/`Put` + `Get`/`PutObjectTagging`, #3186); `ListBucket` (`aws s3 ls`); Lambda reads `deploys/_fleet/*.zip` with the caller's `GetObject` |
+| `ci-cd` `rollback-on-smoke-failure` | `rollback_fleet.sh` → `rollback_lambda.sh` (+ `check_fleet_drift.py --owner-check`) | `GetFunctionConfiguration`, `GetFunction`, `UpdateFunctionCode` → the fleet | `ListBucket` + `GetObject` `deploys/<fn>/previous.zip` |
+| `ci-cd` `deploy-iam` | `iam_additive_gate.py`, `cdk deploy` (via the bootstrap roles, `CDKBootstrapRoleAssume`) | none on this role | `PutObject` `remediation-log/iam-additive-gate/YYYY/MM/DD/*` |
+| `site-deploy` `deploy-site` | `deploy_site.sh` → `sync_site_to_s3.sh` (+ its `v4_build_*`), fonts sync, `config_twin_sync.py --apply` | `UpdateFunctionConfiguration` → `life-platform-site-api` only (the twin sync's warm-container recycle) | `ListBucket` + `PutObject` `site/*`; `ListBucket` + `GetObject`/`PutObject` `config/*`; `GetObject` `config/personas.json`, `config/content_filter.json` (build-script imports) |
+| `site-deploy` `rollback-site-on-failure` | `rollback_site.sh` → `sync_site_to_s3.sh` | none | as `deploy-site`'s sync: `site/*`, `config/*` reads |
+| `web-preview-deploy` `deploy` | `www_build_target.sh`, `www_preview_sync.sh` (`publish_snapshot.py` reads the PUBLIC API, no AWS) | none | `ListBucket` + `PutObject` `site/*` (incl. `site/next/v9/*`) |
+| `web-preview-deploy` `record-previous` | `www_preview_sync.sh --record-previous` | none | `PutObject` `www-previous/*` |
+| `web-preview-deploy` `rollback-v9-on-failure` | `www_root_rollback.sh` → `www_preview_sync.sh` rollback | none | `GetObject` `www-previous/*` (or legacy `site/_v9_previous/*`), `PutObject` `site/*`, `ListBucket` |
+
+Cross-checked against CloudTrail (read-only `lookup-events` + the trail's S3 data events):
+since 2026-08-18 this role called `UpdateFunctionConfiguration` 27 times, every one on
+`life-platform-site-api`; over 2026-11-12→15 its `UpdateFunctionCode` calls hit exactly the
+106 us-west-2 + 2 us-east-1 fleet functions and nothing else; since 2026-08-18 it made **zero**
+`PublishLayerVersion`, `AddLayerVersionPermission`, `GetLayerVersion`, `ListLayerVersions`,
+`GetLayerVersionPolicy` or `ListTags` calls in either region; and over 2026-11-12→14 it made
+zero S3 data events on `raw/` or `uploads/` (the two prefixes the trail logs at object level).
+`InvokeFunction` is a Lambda *data* event the trail does not log; its removal rests on the
+static enumeration — no `aws lambda invoke` and no Lambda-client `invoke` in anything these
+jobs execute (smoke's two invokes run on `github-actions-readonly-role` since #4257).
+`aws iam simulate-custom-policy` against the new document: 346 required (action, resource)
+pairs `allowed`, 27 negative controls `implicitDeny`/`explicitDeny` (Lambda@Edge `cf-auth`/
+`buddy-auth`, `og-image`, the CDK LogRetention functions, any invoke, any layer write,
+`raw/`, `uploads/`, `generated/`, `backups/`, `exports/`, `cloudtrail/`, the bucket root).
+`aws accessanalyzer validate-policy`: zero findings (the old document carried three
+`INVALID_ACTION` errors — `lambda:WaitForFunctionUpdated`, `s3:HeadObject`, `s3:HeadBucket`
+are not IAM actions; the waiter and the HEADs authorize as `GetFunctionConfiguration`,
+`GetObject` and `ListBucket`).
+
+**Why patterns, not 108 exact ARNs.** IAM caps a role's inline policies at 10,240 non-blank
+characters. 108 exact function ARNs are 7,587 characters on their own and put the document at
+~12,000 — the apply would be rejected. Folding by first hyphen token gives 64 resources and a
+9,013-character document. The patterns are DERIVED (`_fleet_lambda_resources` in
+`tests/test_grant_enumeration_drift.py`), and
+`test_deploy_role_lambda_and_s3_scope_is_the_fleet_and_the_deploy_prefixes` reds when the
+policy and the map disagree in either direction, when a pattern reaches a Lambda@Edge function,
+or when the document passes 10,240. Checked against live `list-functions` on 2026-11-15: no
+pattern matches any non-fleet function in either region.
+
+**What a new Lambda costs now.** A new fleet function whose first token is already a pattern
+(`coach-…`, `daily-…`, `life-platform-…`, …) needs nothing. Any other new name changes the
+derived list: the test reds in its PR with the replacement list, and the owner re-runs
+`bash deploy/setup_github_oidc.sh` before that function's first CI deploy — otherwise
+`deploy_fleet.sh` records it `❌` (AccessDenied) and the deploy job fails.
+
+**Not narrowed, on purpose.** `S3BucketList` keeps `s3:ListBucket` on the whole bucket (key
+names, never object bodies). Two reasons: S3 answers a GET for a missing key with 404 only when
+the caller holds `ListBucket` on the bucket, and `config_twin_sync.py` tells a never-deployed
+twin from a failure by `NoSuchKey` — whether an `s3:prefix`-conditioned grant still earns the
+404 is not something a simulator answers, and a wrong guess reds every site deploy that adds a
+twin. Prefix-conditioning it is a follow-up to prove live, not to guess here.
+`generated/*` (named in the issue) is not granted: no deploy-role job reads or writes it.
+
+**Apply (owner, attended), then prove it:**
+
+```bash
+bash deploy/setup_github_oidc.sh               # put-role-policy file://…deploy-role.permissions.json, ends with the verifier
+python3 deploy/verify_oidc_iam.py --strict     # deploy-role: CLEAN
+```
+
+Then delete the `github-actions-deploy-role` entry from `_PENDING_PERMISSIONS_APPLY`, and watch
+ONE full CI deploy (`plan → deploy → smoke → post-deploy-checks`) and one `site-deploy` go green.
+A too-tight grant surfaces as `❌ <fn>` lines in the fleet step, `AccessDenied` on `s3 cp`/`sync`,
+or `FAILED life-platform-site-api` from the twin sync.
+**Rollback:** `git show 271de816d:infra/iam/github-actions-deploy-role.permissions.json > /tmp/deploy-perms.pre-5544.json && aws iam put-role-policy --role-name github-actions-deploy-role --policy-name life-platform-cicd-permissions --policy-document file:///tmp/deploy-perms.pre-5544.json`
+(or `git revert` the PR and re-run `bash deploy/setup_github_oidc.sh`).
+
 ### PENDING APPLY — the deploy role sheds `GetSecretValue` and names its CDK bootstrap roles (#5513, 2026-11-13)
 
 > **Status: the checked-in JSON is AHEAD of live — two NARROWINGS, no new grant.** Until the
@@ -770,7 +860,7 @@ mutation):
 | asset upload | `cdk-hnb659fds-file-publishing-role-<acct>-<region>` (assumed, same `CDKBootstrapRoleAssume` statement) | S3 put to the bootstrap assets bucket | yes (bootstrap) |
 | CloudFormation → resources | `cdk-hnb659fds-cfn-exec-role-<acct>-<region>` | **`AdministratorAccess`** (the CDK bootstrap default) | yes (bootstrap) |
 | the gate's read side | `github-actions-deploy-role` | `cloudformation:GetTemplate` (statement `CloudFormationDiff`) | yes |
-| the ledger | `github-actions-deploy-role` | `s3:PutObject` on `matthew-life-platform/*` (statement `S3DeployArtifacts`) — writes `remediation-log/iam-additive-gate/YYYY/MM/DD/` | yes |
+| the ledger | `github-actions-deploy-role` | `s3:PutObject` on `matthew-life-platform/remediation-log/iam-additive-gate/*` (statement `S3IamAdditiveGateLedger`; `S3DeployArtifacts` on the bucket root until #5544) — writes `remediation-log/iam-additive-gate/YYYY/MM/DD/` | yes |
 
 `tests/test_iam_additive_gate_guards_2834.py::test_deploy_role_needs_no_new_grant_for_the_additive_deploy`
 pins the three deploy-role statements from the committed JSON, so a future shed of any of
