@@ -189,7 +189,9 @@ _DATE_RE_GROUPS = 1  # every probe regex carries exactly one capture group: the 
 REVIEW_SPINE = "review"
 
 
-def _entry(skill, cadence_days, grace_days, attendance, probe, obligations, reason, hold=None, lens=None, starts=None, qualifier=None):
+def _entry(
+    skill, cadence_days, grace_days, attendance, probe, obligations, reason, hold=None, lens=None, starts=None, qualifier=None, skipped=()
+):
     return {
         "skill": skill,  # resolved via skill_registry.skill_path(), or None for a doc-only ritual
         # The `/review <lens>` rubric this entry schedules — a name under
@@ -216,6 +218,11 @@ def _entry(skill, cadence_days, grace_days, attendance, probe, obligations, reas
         # entries pass `calibrated_run`, so an artifact whose own calibration block says its
         # verifiers confirmed a planted false finding does not advance the clock.
         "qualifier": qualifier,
+        # Dated, OCCURRENCE-scoped skips (#6026): ((occurrence due date, ruling date, reason), ...).
+        # An occurrence is named by the due date the clock computes for it. A skip discharges
+        # exactly that missed occurrence (state EXEMPT, no red) and nothing else: a run, a
+        # later occurrence or a re-anchor moves the due date and the skip stops matching.
+        "skipped": tuple(skipped),
     }
 
 
@@ -436,6 +443,7 @@ CALENDAR: dict[str, dict] = {
         attendance=OWNER,
         starts="2026-09-01",
         probe=(REGEX_IN_FILE, "docs/OPERATING_RHYTHM.md", r"^- 30-day checkpoint: (\d{4}-\d{2}-\d{2})"),
+        skipped=(("2026-10-01", "2026-11-16", "missed; superseded by the 90-day checkpoint (owner ruling 2026-11-16, #6026)"),),
         obligations=(
             "Answer the monthly use read in docs/OPERATING_RHYTHM.md from OBSERVED behaviour "
             "(which surfaces were opened, which were not, which coaches were texted) rather "
@@ -459,6 +467,7 @@ CALENDAR: dict[str, dict] = {
         attendance=OWNER,
         starts="2026-09-01",
         probe=(REGEX_IN_FILE, "docs/OPERATING_RHYTHM.md", r"^- 60-day checkpoint: (\d{4}-\d{2}-\d{2})"),
+        skipped=(("2026-10-31", "2026-11-16", "missed; superseded by the 90-day checkpoint (owner ruling 2026-11-16, #6026)"),),
         obligations=(
             "Read the latest closed month in docs/COST_TRACKER.md against what the platform "
             "actually DID for the owner that month — named, specific things, not a feeling; "
@@ -637,6 +646,7 @@ NEVER = "NEVER-RUN"  # #3250 — the artifact has never existed; an anchor is no
 HELD = "HELD"  # a dated, reasoned, one-time deferral is in force (see `hold`)
 SCHEDULED = "SCHEDULED"  # #3378 — declared `starts`; the first occurrence has not arrived yet
 DUE = "DUE"  # inside the grace window — run it now, nothing screams yet
+SKIPPED = "SKIPPED"  # #6026 — this occurrence carries a dated, reasoned owner skip (see `skipped`)
 OVERDUE = "OVERDUE"  # past cadence + grace — the scheduled workflow reds on this
 
 # The exit codes `main()` returns under --due. Named because the workflow log and the
@@ -690,6 +700,14 @@ def _hold_dates(entry: dict) -> tuple[date, date] | None:
     return d, u
 
 
+def skip_for(entry: dict, due_by: date) -> tuple[str, str, str] | None:
+    """The dated skip that names THIS occurrence (its due date), else None."""
+    for occurrence, ruled, reason in entry.get("skipped") or ():
+        if _parse_date(occurrence) == due_by:
+            return occurrence, ruled, reason
+    return None
+
+
 def status(entry: dict, today: date, repo: str = REPO) -> dict:
     """One ritual's dead-man verdict.
 
@@ -727,7 +745,11 @@ def status(entry: dict, today: date, repo: str = REPO) -> dict:
         state = HELD
     else:
         state = OK
+    skip = skip_for(entry, due_by)
+    if skip and state in (DUE, OVERDUE):
+        state = SKIPPED
     return {
+        "skip": skip,
         "last": last,
         "clock": clock,
         "due_by": due_by,
@@ -746,6 +768,7 @@ def due_report(today: date, repo: str = REPO) -> tuple[str, list[str], list[str]
     never: list[str] = []
     held: list[str] = []
     scheduled: list[str] = []
+    skipped: list[str] = []
     width = max(len(n) for n in CALENDAR)
     for name in sorted(CALENDAR, key=lambda n: CALENDAR[n]["cadence_days"]):
         st = status(CALENDAR[name], today, repo)
@@ -770,6 +793,8 @@ def due_report(today: date, repo: str = REPO) -> tuple[str, list[str], list[str]
             never.append(name)
         if st["state"] == HELD:
             held.append(name)
+        if st["state"] == SKIPPED:
+            skipped.append(name)
         if st["state"] == SCHEDULED:
             scheduled.append(name)
     if held:
@@ -777,6 +802,11 @@ def due_report(today: date, repo: str = REPO) -> tuple[str, list[str], list[str]
         for name in held:
             declared, until, reason = CALENDAR[name]["hold"]
             lines.append(f"   {name}: declared {declared}, resumes {until} — {reason.split('.')[0]}.")
+    if skipped:
+        lines += ["", "⏭  occurrence skipped by a dated owner ruling (scoped to that one occurrence, #6026):"]
+        for name in skipped:
+            occurrence, ruled, reason = status(CALENDAR[name], today, repo)["skip"]
+            lines.append(f"   {name}: occurrence due {occurrence}, ruled {ruled} — {reason}")
     if scheduled:
         lines += ["", "🗓  scheduled — declared first occurrence has not arrived (never-run is not late here):"]
         for name in scheduled:
@@ -966,6 +996,20 @@ def render_doc() -> str:
             out.append(f"| {name} | {e['starts']} | {first} | {hard} |")
     else:
         out.append("_None declared._")
+    out += ["", "## Dated occurrence skips (#6026)", ""]
+    skips = [(n, k) for n in sorted(CALENDAR) for k in CALENDAR[n]["skipped"]]
+    if skips:
+        for name, (occurrence, ruled, reason) in skips:
+            out.append(f"- **{name}** — occurrence due {occurrence}, ruled {ruled}. {reason}")
+    else:
+        out.append("_None in force._")
+    out += [
+        "",
+        "A skip discharges ONE missed occurrence, named by the due date the clock computes for it,",
+        "with the ruling date and a written reason. It scopes to that occurrence only: a run, a later",
+        "occurrence or a re-anchor moves the due date and the skip stops matching, so it can never",
+        "exempt a future checkpoint. An undated or reasonless skip fails the well-formedness test.",
+    ]
     out += ["", "## Dated holds (a deferral is a decision, #3250)", ""]
     holds = [n for n in sorted(CALENDAR) if CALENDAR[n]["hold"]]
     if holds:

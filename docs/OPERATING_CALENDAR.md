@@ -107,6 +107,16 @@ never be late is decoration.
 | rhythm-checkpoint-60d | 2026-09-01 | 2026-10-31 | 2026-11-07 |
 | rhythm-checkpoint-90d | 2026-09-01 | 2026-11-30 | 2026-12-07 |
 
+## Dated occurrence skips (#6026)
+
+- **rhythm-checkpoint-30d** — occurrence due 2026-10-01, ruled 2026-11-16. missed; superseded by the 90-day checkpoint (owner ruling 2026-11-16, #6026)
+- **rhythm-checkpoint-60d** — occurrence due 2026-10-31, ruled 2026-11-16. missed; superseded by the 90-day checkpoint (owner ruling 2026-11-16, #6026)
+
+A skip discharges ONE missed occurrence, named by the due date the clock computes for it,
+with the ruling date and a written reason. It scopes to that occurrence only: a run, a later
+occurrence or a re-anchor moves the due date and the skip stops matching, so it can never
+exempt a future checkpoint. An undated or reasonless skip fails the well-formedness test.
+
 ## Dated holds (a deferral is a decision, #3250)
 
 - **emf-series-census** — declared 2026-11-14, resumes 2026-11-28. #5888: the census cannot pass before its window ends. The 2026-11-13 `--strict` run is red (4 namespaces, 21 series over budget) and this entry's own obligation forbids appending the dated line over a red, so the ritual is deferred to 2026-11-28 by owner ruling 2026-11-14 (#5935) while #5888 cuts or re-prices those rows.

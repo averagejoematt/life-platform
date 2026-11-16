@@ -758,3 +758,70 @@ def test_anchor_is_not_refloated():
 
 
 # premerge-gate: #2832: calendar registry + set guard sweeps the skill registry + docs/reviews — repo-shape, pre-merge
+
+
+# ── #6026: dated, occurrence-scoped skips ─────────────────────────────────────
+_SKIP_REASON = "missed; superseded by the 90-day checkpoint (owner ruling 2026-11-16, #6026)"
+
+
+def _skip_entry(tmp_path, *skips):
+    return dict(_synthetic(tmp_path, "grades_2026-09-01.json"), skipped=tuple(skips))  # due 2026-09-08, hard 09-11
+
+
+def test_a_skip_clears_exactly_the_named_occurrence(tmp_path):
+    e = _skip_entry(tmp_path, ("2026-09-08", "2026-11-16", _SKIP_REASON))
+    st = oc.status(e, date(2026, 11, 16), str(tmp_path))
+    assert st["state"] == oc.SKIPPED, "the named missed occurrence must not red the sweep"
+
+
+def test_a_skip_does_not_cover_a_different_occurrence(tmp_path):
+    """Control: the same ritual, its due date moved (a later run), the old skip no longer matches."""
+    e = _skip_entry(tmp_path, ("2026-09-08", "2026-11-16", _SKIP_REASON))
+    (tmp_path / "reviews" / "grades_2026-10-01.json").write_text("{}")  # next occurrence due 10-08
+    assert oc.status(e, date(2026, 11, 16), str(tmp_path))["state"] == oc.OVERDUE
+
+
+def test_a_skip_for_another_date_does_not_clear_an_overdue_ritual(tmp_path):
+    e = _skip_entry(tmp_path, ("2026-08-01", "2026-11-16", _SKIP_REASON))
+    assert oc.status(e, date(2026, 11, 16), str(tmp_path))["state"] == oc.OVERDUE
+
+
+def test_the_90d_is_enforced_past_its_hard_date(monkeypatch):
+    """Control: the live 90d carries no skip, so once past its hard date it is OVERDUE."""
+    e = oc.CALENDAR["rhythm-checkpoint-90d"]
+    assert not e["skipped"]
+    assert oc.status(e, date(2026, 12, 8))["state"] == oc.OVERDUE
+    assert oc.status(e, date(2026, 12, 1))["state"] == oc.DUE
+
+
+def test_the_live_30d_and_60d_are_skipped_and_nothing_else_is():
+    today = date(2026, 11, 16)
+    assert oc.status(oc.CALENDAR["rhythm-checkpoint-30d"], today)["state"] == oc.SKIPPED
+    assert oc.status(oc.CALENDAR["rhythm-checkpoint-60d"], today)["state"] == oc.SKIPPED
+    assert {n for n, e in oc.CALENDAR.items() if e["skipped"]} == {"rhythm-checkpoint-30d", "rhythm-checkpoint-60d"}
+    _t, overdue, never = oc.due_report(today)
+    assert "rhythm-checkpoint-30d" not in overdue and "rhythm-checkpoint-60d" not in overdue
+
+
+def _skip_defects(skip):
+    occurrence, ruled, reason = skip
+    bad = []
+    if not (oc._parse_date(occurrence) and oc._parse_date(ruled)):
+        bad.append("undated")
+    if len(reason) < 40 or not re.search(r"#\d+", reason):
+        bad.append("reasonless")
+    return bad
+
+
+@pytest.mark.parametrize("name", sorted(oc.CALENDAR))
+def test_every_skip_is_dated_and_reasoned(name):
+    for skip in oc.CALENDAR[name]["skipped"]:
+        assert not _skip_defects(skip), f"{name}: {skip} is {_skip_defects(skip)}"
+        assert oc._parse_date(skip[1]) <= date.today(), f"{name}: a skip ruled in the future"
+
+
+def test_the_skip_well_formedness_check_rejects_undated_and_reasonless_skips():
+    """Control: the check above can fail."""
+    assert _skip_defects(("2026-10-01", "", _SKIP_REASON)) == ["undated"]
+    assert _skip_defects(("2026-10-01", "2026-11-16", "x")) == ["reasonless"]
+    assert _skip_defects(("2026-10-01", "2026-11-16", _SKIP_REASON)) == []
