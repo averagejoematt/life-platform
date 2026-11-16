@@ -1327,11 +1327,11 @@ def lambda_handler(event, context):
     # the dispatch AND the wire half, so the approved rows that route reads are served. Every other path: no scope.
     try:
         result = _in_cr2_scope(path, lambda: _dispatch_route(event, path, method))
-    except publication_snapshot.SnapshotUnavailable as e:
-        logger.error(f"[site_api] {path} refused: {e}")
-        _emit_route_log(503)
-        return _error(503, "Temporarily unavailable")
     except Exception as e:
+        if isinstance(e, publication_snapshot.SnapshotUnavailable):  # #6111 fail closed: no complete record, no response
+            logger.error(f"[site_api] {path} refused: {e}")
+            _emit_route_log(503)
+            return _error(503, "Temporarily unavailable")
         logger.error(f"[site_api] {path} failed: {e}")
         _emit_route_log(500)
         return _error(500, "Internal error — check CloudWatch logs")
