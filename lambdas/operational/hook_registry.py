@@ -310,10 +310,11 @@ HOOK_REGISTRY: tuple = (
     ),
     Hook(
         id="reader_call",
-        label="Your call beside the coaches (#6088)",
+        label="Your call beside the coaches (#6088, #6114)",
         why=(
-            "a reader's own call beside a coach's open call; the v9 control is built only in a private build and the "
-            "route answers 404 while its committed switch is off, so tonight it is dark by declaration"
+            "a reader's own call beside a coach's open call; the bare GET answers {available: true} while the door is "
+            "open (committed READER_CALL_LIVE AND SSM /life-platform/reader-call = on) — a 404 here means the kill "
+            "switch is off or the route is gone, and the 'Make your own call' block reads as empty"
         ),
         post_endpoints=("*/reader_call",),
         artifacts=(
@@ -323,16 +324,6 @@ HOOK_REGISTRY: tuple = (
                 kind=HTTP_JSON,
                 locator="/api/reader_call",
                 expect={"truthy_path": "available"},
-                absence=Absence(
-                    contract="declared_dark",
-                    reason=(
-                        "built dark (owner ruling 2026-11-16: develop and test privately): "
-                        "reader_call_rules.READER_CALL_LIVE is committed False, so the route answers 404 'not available' "
-                        "and no page carries the control. Delete this Absence in the go-live PR that flips the switch"
-                    ),
-                    declared_on="2026-11-16",
-                    issue="#6088",
-                ),
             ),
         ),
     ),

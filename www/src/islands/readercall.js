@@ -3,7 +3,7 @@
 // Vanilla, no dependency, same origin (CSP connect-src 'self'), no cookie and no storage: the server's per-reader
 // marker remembers a call, and a reload asks again. The server decides what may be shown: while a call is open no
 // count reaches this script at all.
-import { NOT_OPEN, UNREAD, closedSentence, coachLine, gradedSentence, labelOf, openSentence, splitRows, splitSentence } from "../lib/readercall_view.js";
+import { afterSentence, closedSentence, coachLine, gradedSentence, labelOf, listRow, openSentence, splitRows, splitSentence, viewState } from "../lib/readercall_view.js";
 
 const MIN_WAIT_MS = 2500; // the server refuses a call whose token is under 2 s old; a quick tap simply waits
 
@@ -75,7 +75,7 @@ async function tap(root, body, view, choice, fetchedAt, row, status) {
   if (r && r.ok && out && out.recorded) {
     body.replaceChildren(
       para(view.question, "font-size:15px;font-weight:700;line-height:1.4"),
-      para(openSentence({ ...view, your_call: out.your_call }), "font-size:14px;line-height:1.5", { role: "status" }),
+      para(afterSentence({ ...view, your_call: out.your_call }), "font-size:14px;line-height:1.5", { role: "status" }),
     );
     return;
   }
@@ -115,28 +115,27 @@ export async function mount(root) {
   try {
     res = await getView(root.dataset.api, root.dataset.call);
   } catch {
-    res = { ok: false, status: 0, body: null };
+    res = null;
   }
-  const fetchedAt = Date.now();
-  if (!res.ok || !res.body || !res.body.available) {
-    body.replaceChildren(para(res.status === 0 ? UNREAD : NOT_OPEN, "font-size:13px", { class: "muted" }));
-    return;
-  }
+  const state = viewState(res);
+  if (state === "hidden") return; // a shut door, an ineligible call or an unread answer: nothing reader-facing
   const view = res.body;
-  if (view.graded) renderGraded(root, body, view);
-  else if (view.open) renderOpen(root, body, view, fetchedAt);
+  if (state === "graded") renderGraded(root, body, view);
+  else if (state === "open") renderOpen(root, body, view, Date.now());
   else renderClosed(root, body, view);
+  root.style.display = "flex";
 }
 
 export async function mountList(root) {
   const none = root.querySelector("[data-rc-none]");
+  const record = root.querySelector("[data-rc-record]");
   let open = 0;
   for (const li of root.querySelectorAll("[data-rc-item]")) {
     try {
       const res = await getView(root.dataset.api, li.dataset.rcItem);
-      if (res.ok && res.body && res.body.open) {
-        const slot = li.querySelector("[data-rc-closes]");
-        if (slot) slot.textContent = res.body.your_call ? `you called · closes ${res.body.closes_on_words}` : `open until ${res.body.closes_on_words}`;
+      if (viewState(res) === "open") {
+        const a = li.querySelector("[data-rc-row]");
+        if (a) a.textContent = listRow(li.dataset.coachName, res.body);
         li.style.display = "";
         open += 1;
       }
@@ -144,8 +143,12 @@ export async function mountList(root) {
       /* an unread call simply stays hidden */
     }
   }
-  if (none) none.textContent = open ? "" : "No coach call is open for reader calls right now. New calls open when a coach makes one.";
-  if (none && open) none.style.display = "none";
+  if (open) {
+    if (none) none.style.display = "none";
+    return;
+  }
+  if (none) none.textContent = root.dataset.empty;
+  if (record) record.style.display = "";
 }
 
 if (typeof document !== "undefined") {

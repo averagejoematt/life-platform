@@ -13,9 +13,11 @@ about a reader's call that needs no AWS and no clock of its own:
     words are withheld (the measure in reader words, the day it was made, the call's kind, and the grading line —
     ``grading.how`` — which already carries the window length, the level and the tolerance). Never the claim, never
     stored prose, never an id slug.
-  * THE LOCK — ``closes_on``: the earlier of the call's due day and the day its outcome can be read (a direction call's
-    measured window ends; a number call's target day). A call is OPEN only before that day, while it is pending and
-    while no outcome field is present (``is_open``).
+  * THE LOCK — ``open_until``: the LAST day a reader may call, the earliest of three bounds — the day before the due
+    day; the day before the outcome can first be read (the grading window's last day); and, for fairness, the
+    window's MIDPOINT (for a window shorter than 4 days, the day after the call was filed), so a reader never has more
+    than half the window in hand when the coach called it blind. A call is OPEN only through that day, while it is
+    pending and while no outcome field is present (``is_open``).
   * THE CLOSED CHOICE SET for each kind — direction: up / down / about the same; number: above / within / below.
   * THE TIMING TOKEN — ``mint_token`` / ``check_token``: an HMAC over (purpose, call, identity, issued-at).
   * THE READING'S SIDE — ``reading_side``: which choice the graded reading came down on, from the grader's stored fields.
@@ -33,8 +35,10 @@ import re
 from datetime import date, datetime, timedelta
 from typing import Any, Optional
 
-#: The master switch, COMMITTED OFF (#6088). Going public is a reviewed one-line change, after the owner's go.
-READER_CALL_LIVE = False
+#: The committed switch — ON since the go-live PR (#6114, the owner's standing GO once the controls passed). It is ANDed
+#: with the runtime kill switch (SSM /life-platform/reader-call = "on", fail closed), so the door stays shut until the
+#: parameter is set, and `--value off` shuts it again without a deploy.
+READER_CALL_LIVE = True
 
 #: The partition every reader-call row lives in, keyed by the call's public item id. Never ``USER#…`` / ``COACH#…``.
 PK_PREFIX = "READERCALL#"
@@ -143,33 +147,50 @@ def valid_choice(spec: dict, choice: Any) -> bool:
 
 
 def window(spec: dict, made_on: Any, effective_days: Any) -> Optional[tuple]:
-    """``(start, end)`` ISO days the grade reads. Direction: the day the call was made to that day plus the window the
-    grader uses (the spec's stated ``evaluation_window_days``, else ``effective_days``) — the same rule as
-    ``coach_prediction_evaluator._evaluate_directional``. Number: the target day, both ends."""
+    """``(start, end)`` ISO days of the call's grading window: from the day the call was made to the day its outcome
+    is read. Direction: that day plus the window the grader uses (the spec's stated ``evaluation_window_days``, else
+    ``effective_days``) — the same rule as ``coach_prediction_evaluator._evaluate_directional``. Number: to the target
+    day."""
     kind = call_kind(spec)
+    start = _day(made_on)
+    if start is None:
+        return None
     if kind == NUMBER:
         t = _day(spec.get("target_date"))
-        return (t.isoformat(), t.isoformat()) if t else None
-    start = _day(made_on)
+        return (start.isoformat(), t.isoformat()) if t and t >= start else None
     days = spec.get("evaluation_window_days") or effective_days
     try:
         n = int(days)
     except (TypeError, ValueError):
         return None
-    if start is None or n <= 0:
+    if n <= 0:
         return None
     return start.isoformat(), (start + timedelta(days=n)).isoformat()
 
 
-def closes_on(spec: dict, made_on: Any, effective_days: Any, due: Any) -> Optional[str]:
-    """The day reader calls close: the earlier of the due day and the day the outcome can first be read (the window's
-    last day). None when either is unknown — such a call never opens."""
+#: Below this many days a window has no useful midpoint; the fairness bound is then the day after the call was filed.
+SHORT_WINDOW_DAYS = 4
+
+
+def open_until(spec: dict, made_on: Any, effective_days: Any, due: Any) -> Optional[str]:
+    """The LAST day a reader may call (inclusive) — the earliest of:
+      * the day before the due day (the grader may read it from the due day);
+      * the day before the window's last day (that day's reading is the outcome);
+      * the window's midpoint, start + floor(n/2) — or, for a window shorter than SHORT_WINDOW_DAYS, start + 1 (the
+        end of the day after the call was filed): a reader never holds more than half the window the coach called blind.
+    None when the window or the due day is unknown, or when the earliest bound falls before the day the call was made
+    (such a call never opens)."""
     w = window(spec, made_on, effective_days)
     d = _day(due)
-    end = _day(w[1]) if w else None
-    if end is None or d is None:
+    if not w or d is None:
         return None
-    return min(end, d).isoformat()
+    start, end = _day(w[0]), _day(w[1])
+    if start is None or end is None:
+        return None
+    n = (end - start).days
+    fair = start + timedelta(days=(n // 2) if n >= SHORT_WINDOW_DAYS else 1)
+    last = min(d - timedelta(days=1), end - timedelta(days=1), fair)
+    return last.isoformat() if last >= start else None
 
 
 def outcome_present(row: dict) -> bool:
@@ -177,9 +198,9 @@ def outcome_present(row: dict) -> bool:
     return any(row.get(f) not in (None, "", {}, []) for f in OUTCOME_FIELDS)
 
 
-def is_open(row: dict, status: Any, close_day: Optional[str], today: str) -> bool:
-    """Open = pending AND no outcome field AND today is before the close day. Whichever fails first closes it."""
-    return status == "pending" and not outcome_present(row) and bool(close_day) and str(today) < str(close_day)
+def is_open(row: dict, status: Any, last_day: Optional[str], today: str) -> bool:
+    """Open = pending AND no outcome field AND today is on or before the last open day. Whichever fails first closes it."""
+    return status == "pending" and not outcome_present(row) and bool(last_day) and str(today) <= str(last_day)
 
 
 def question(spec: dict, measure: str, made_on: Any, effective_days: Any, unit: Optional[str] = None) -> Optional[str]:
@@ -192,6 +213,19 @@ def question(spec: dict, measure: str, made_on: Any, effective_days: Any, unit: 
         return f"From {day_words(w[0])} to {day_words(w[1])}, will the {measure} go up, go down, or stay about the same?"
     level, tol = _fmt(_num(spec["threshold"])), _fmt(_num(spec["tolerance"]))
     return f"On {day_words(w[1])}, will the {measure} be above, within {tol} of, or below {level}{_unit(unit)}?"
+
+
+def short_question(spec: dict, measure: str, made_on: Any, effective_days: Any, unit: Optional[str] = None) -> Optional[str]:
+    """The question in a list row's few words, from the same fields: ``weight — up, down or about the same by 28
+    November`` / ``weight on 30 November — above, within 1.5 of, or below 180 lb``."""
+    kind = call_kind(spec)
+    w = window(spec, made_on, effective_days)
+    if not kind or not w or not measure:
+        return None
+    if kind == DIRECTION:
+        return f"{measure} — up, down or about the same by {day_words(w[1])}"
+    level, tol = _fmt(_num(spec["threshold"])), _fmt(_num(spec["tolerance"]))
+    return f"{measure} on {day_words(w[1])} — above, within {tol} of, or below {level}{_unit(unit)}"
 
 
 def reading_side(spec: dict, notes: Any) -> Optional[str]:

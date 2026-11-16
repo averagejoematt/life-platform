@@ -1,16 +1,18 @@
 ---
-// "Make your own call" (#6114) — the ONE entry point to the reader-call door, on the ledger index. SELF-GATING: with
-// WEB_READERCALL off it renders nothing, so the page is byte-identical to a build without it. With the switch on it
-// lists the snapshot's candidate calls (open coach calls of a one-tap kind) as links to their own pages; the island asks
-// /api/reader_call about each and shows only the ones the API says are open, with the day calls close.
+// "Make your own call" (#6114) — the ONE entry point to the reader-call door, on the ledger index. SELF-GATING on
+// src/lib/readercall.js. On, it always renders: the intro (the owner's product line, 2026-11-16), the candidate calls
+// (open coach calls of a one-tap kind in the snapshot) as hidden rows the island asks /api/reader_call about — each
+// row it shows names the coach, the question and the last open day — and, when none is open (or the door is shut), an
+// empty state that says so and points to the record of past calls below. It never reads as broken.
 import { READERCALL_API, READERCALL_MARKER, itemIdOf, readerCallEnabled, readerCallFor } from "../lib/readercall.js";
+import { LIST_CHECKING, LIST_EMPTY, LIST_INTRO } from "../lib/readercall_view.js";
 import { href, pathOf } from "../lib/url.js";
 
 interface Props {
   rows: any[];
-  measureOf: (p: any) => string;
+  recordAnchor: string;
 }
-const { rows, measureOf } = Astro.props;
+const { rows, recordAnchor } = Astro.props;
 const on = readerCallEnabled();
 const candidates = on ? rows.filter((p) => p.status === "pending" && readerCallFor(p)) : [];
 const mark = { [READERCALL_MARKER]: "list" };
@@ -18,20 +20,22 @@ const mark = { [READERCALL_MARKER]: "list" };
 
 {
   on && (
-    <section {...mark} data-api={READERCALL_API} aria-labelledby="rc-list-h" style="margin-top:22px;border:1px solid var(--ink);padding:16px 18px;display:flex;flex-direction:column;gap:10px;max-width:760px">
+    <section {...mark} data-api={READERCALL_API} data-empty={LIST_EMPTY} aria-labelledby="rc-list-h" style="margin-top:22px;border:1px solid var(--ink);padding:16px 18px;display:flex;flex-direction:column;gap:10px;max-width:760px">
       <h2 class="label" id="rc-list-h" style="font-size:13px">Make your own call</h2>
-      <p style="font-size:14px;line-height:1.5">Can you call it as well as the coaches? Pick an open coach call and make your own. Reader calls are counted apart from the coaches' record.</p>
+      <p style="font-size:14px;line-height:1.5">{LIST_INTRO}</p>
       <ul class="rows" style="list-style:none;padding:0;margin:0" data-rc-list>
         {candidates.map((p) => (
-          <li data-rc-item={itemIdOf(p.id)} style="display:none">
-            <a href={href(pathOf("prediction", p.id))}>
-              <span><b>{p.coach_name}</b> · {measureOf(p)}</span>
-              <span class="mono muted" style="font-size:12px" data-rc-closes>open</span>
-            </a>
+          <li data-rc-item={itemIdOf(p.id)} data-coach-name={p.coach_name} style="display:none">
+            <a href={href(pathOf("prediction", p.id))} data-rc-row>{p.coach_name}</a>
           </li>
         ))}
       </ul>
-      <p class="muted" style="font-size:13px" data-rc-none>Checking which calls are open…</p>
+      <p style="font-size:13px;line-height:1.5" data-rc-none aria-live="polite">{LIST_CHECKING}</p>
+      <p data-rc-record style="display:none;font-size:13px"><a href={recordAnchor}>See the record of past calls</a></p>
     </section>
   )
 }
+
+<script>
+  import "../islands/readercall.js";
+</script>

@@ -2,7 +2,7 @@
 
 Owner rulings 2026-11-16 (ADR-169 binds the isolation): "Can an ordinary reader predict the outcome as well as the AI
 coaches?" — shown as audience participation beside the formal coach and baseline records, never as equivalent evidence.
-Two switches, both must say open: the committed ``reader_call_rules.READER_CALL_LIVE`` (off) AND the runtime kill
+Two switches, both must say open: the committed ``reader_call_rules.READER_CALL_LIVE`` (on since #6114) AND the runtime kill
 switch, SSM ``/life-platform/reader-call`` = ``on`` (read with a 60-second cache, FAIL CLOSED: missing, unreadable or
 any other value shuts the door). A shut door answers 404 "not available" before it parses, meters, reads or writes.
 
@@ -13,10 +13,11 @@ not sealed, not retired, not under an owner grading hold or classification revie
 its own page already prints for a words-withheld call (``reader_call_rules.question``). The coach's direction is not
 repeated by this route before the call is graded.
 
-THE LOCK. Taps are accepted only while the call is OPEN: pending, no outcome field on the row, and before the close day
-(the earlier of the due day and the day the outcome can first be read). A late, replayed or post-outcome request moves
-no counter. Before the close day no response carries a count or a split — only the reader's own recorded call and the
-day the reader calls open. Once closed, the counts of reader calls are served; once graded, beside the coach's call.
+THE LOCK. Taps are accepted only while the call is OPEN: pending, no outcome field on the row, and through the last open day
+(``reader_call_rules.open_until``: the earliest of the day before the due day, the day before the outcome can first be
+read, and the window's midpoint). A late, replayed or post-outcome request moves
+no counter. While open no response carries a count or a split — only the reader's own recorded call and the last
+day reader calls are open. Once closed, the counts of reader calls are served; once graded, beside the coach's call.
 
 WHAT IS STORED (all under ``READERCALL#<public item id>``): ``TAP#<salted identity>`` — the dedup marker carrying the
 reader's own choice and a TTL (no address, no text); ``TALLY#<choice>`` — a counter moved only by an atomic ``ADD``.
@@ -176,10 +177,10 @@ def load_call(table: Any, item_id: str, today: str, *, genesis: Optional[str], p
         return None, (409, NOT_OPEN, "not_eligible")
     eff = prediction_windows.effective_window_days(spec, row.get("subdomain", ""))
     made = item.get("logged_date")
-    close = R.closes_on(spec, made, eff, item.get("due_date"))
+    last = R.open_until(spec, made, eff, item.get("due_date"))
     unit = metric_unit(spec.get("metric"))
     q = R.question(spec, measure, made, eff, unit)
-    if not q or not close:
+    if not q or not last:
         return None, (409, NOT_OPEN, "not_eligible")
     status = item.get("status")
     view = {
@@ -188,10 +189,12 @@ def load_call(table: Any, item_id: str, today: str, *, genesis: Optional[str], p
         "kind": kind,
         "status": status,
         "question": q,
+        "short_question": R.short_question(spec, measure, made, eff, unit),
+        "made": made,
         "unit": unit,
         "due": item.get("due_date"),
-        "closes_on": close,
-        "open": R.is_open(row, status, close, today),
+        "open_until": last,
+        "open": R.is_open(row, status, last, today),
         "graded": status in _GRADED,
         "notes": _notes(row.get("outcome_notes")),
     }
@@ -248,7 +251,7 @@ def _identity(event: dict, table: Any, tap: bool, deps) -> tuple:
 
 
 def view_payload(view: dict, reader_calls: Optional[dict], your_call: Optional[str]) -> dict:
-    """What a reader may see. Before the close day: the question, the choices, the reader's own call and the day the
+    """What a reader may see. While open: the question, the choices, the reader's own call and the last day the
     reader calls open — NO count and NO split (so an early majority cannot steer later calls). Closed: the counts of
     reader calls. Graded: the coach's call and the side the reading came down on, beside them."""
     payload = {
@@ -256,10 +259,12 @@ def view_payload(view: dict, reader_calls: Optional[dict], your_call: Optional[s
         "call": view["item_id"],
         "kind": view["kind"],
         "question": view["question"],
+        "short_question": view["short_question"],
         "choices": R.choices(view["spec"], view["unit"]),
         "open": view["open"],
-        "closes_on": view["closes_on"],
-        "closes_on_words": R.day_words(view["closes_on"]),
+        "called_on_words": R.day_words(view["made"]),
+        "open_until": view["open_until"],
+        "open_until_words": R.day_words(view["open_until"]),
         "result_due": view["due"],
         "result_due_words": R.day_words(view["due"]),
         "your_call": your_call,
@@ -336,8 +341,8 @@ def _record(table, view: dict, ip_hash: str, choice: str, now: int, deps) -> dic
             "recorded": True,
             "call": view["item_id"],
             "your_call": choice,
-            "closes_on": view["closes_on"],
-            "closes_on_words": R.day_words(view["closes_on"]),
+            "open_until": view["open_until"],
+            "open_until_words": R.day_words(view["open_until"]),
             "result_due_words": R.day_words(view["due"]),
         },
     )

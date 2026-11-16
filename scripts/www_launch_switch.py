@@ -28,6 +28,7 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LAB_JS = os.path.join(REPO, "www", "src", "lib", "lab.js")
 STORY_JS = os.path.join(REPO, "www", "src", "lib", "story_dark.js")
+READERCALL_JS = os.path.join(REPO, "www", "src", "lib", "readercall.js")
 
 
 def read_flag(path: str, name: str) -> bool | None:
@@ -53,6 +54,11 @@ def story_live(path: str = STORY_JS) -> bool:
     return read_flag(path, "STORY_LIVE") is True
 
 
+def readercall_live(path: str = READERCALL_JS) -> bool:
+    """Is the reader-call control committed live? (www/src/lib/readercall.js READERCALL_LIVE; unreadable = dark.)"""
+    return read_flag(path, "READERCALL_LIVE") is True
+
+
 if __name__ == "__main__":
-    print(f"LAB_LIVE={lab_live()} STORY_LIVE={story_live()}")
+    print(f"LAB_LIVE={lab_live()} STORY_LIVE={story_live()} READERCALL_LIVE={readercall_live()}")
     sys.exit(0)

@@ -32,7 +32,7 @@ import { fileURLToPath } from "node:url";
 import { ROOM_ENV, ROOM_PUBLIC_VALUES, roomPrivate, roomScope, scopeRoutes } from "../src/lib/room.js";
 import { LAB_ROUTES, labEnabled, labPrivate } from "../src/lib/lab.js";
 import { STORY_ROUTES, storyEnabled, storyPrivate } from "../src/lib/story_dark.js";
-import { readerCallEnabled } from "../src/lib/readercall.js";
+import { readerCallPrivate } from "../src/lib/readercall.js";
 
 const WWW = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = join(WWW, "dist");
@@ -55,8 +55,9 @@ const rawBase = process.env.WEB_BASE || "/";
 const lab = labPrivate();
 const story = storyPrivate();
 const privateRoom = roomScope() !== "off" && roomPrivate();
-// #6088: a WEB_READERCALL=1 build (the reader-call control, built dark) is private and local in exactly the same way.
-const readercall = readerCallEnabled();
+// #6088: a PRIVATE reader-call build (WEB_READERCALL=1 while READERCALL_LIVE is false) is local in exactly the same way;
+// once live (#6114) the control is ordinary build output.
+const readercall = readerCallPrivate();
 const room = privateRoom || lab || story || readercall;
 const base = "/" + rawBase.replace(/^\/+|\/+$/g, "");
 

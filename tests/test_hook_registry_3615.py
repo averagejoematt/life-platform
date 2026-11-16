@@ -293,6 +293,8 @@ def _opener_factory(overrides=None):
             return 200, _MANIFEST
         if "/api/predict_week" in url:
             return 200, json.dumps({"active": True, "week_id": "2026-W38"})
+        if url.endswith("/api/reader_call"):  # #6114: the live door's bare GET (open: both switches on)
+            return 200, json.dumps({"available": True})
         if url.endswith("/podcast/feed.xml"):
             return 200, "<rss><channel><item>one</item></channel></rss>"
         if "/journal/posts/" in url:
@@ -479,3 +481,13 @@ def test_fetched_json_never_raises_on_garbage():
 
 
 # premerge-gate: 3615 box 1: an rglob sweep of site/**/*.js for every reader POST door, each of which must be claimed by a HOOK_REGISTRY row. Pure repo shape, and the failure is a PR's own diff — a hook added to the site without a registry row is exactly the thing that must red before it merges, because after the merge it simply joins the set of hooks nothing probes (which was all of them but one).
+
+
+def test_a_shut_reader_call_door_is_a_FAIL_not_an_absence(monkeypatch):
+    """#6114: once live, the reader-call door has no absence contract — a 404 (the kill switch off, or the route gone)
+    is reported, never tolerated, so a forgotten `off` is visible the next night."""
+    table, s3, budget = _ctx(overrides={"/api/reader_call": (404, json.dumps({"error": "Reader calls are not available."}))})
+    check = hq.check_hook_liveness(table, s3, "bucket", Check, CONTENT_TRUTH, _frozen_pt_now, site_base_url="https://site", budget=budget)[
+        0
+    ]
+    assert check.passed is False and "reader_call/door" in check.message

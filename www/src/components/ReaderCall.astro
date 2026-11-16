@@ -1,7 +1,9 @@
 ---
-// "Your call beside the coaches" (#6088, #6114), built DARK. SELF-GATING: with WEB_READERCALL off (src/lib/readercall.js)
-// this component renders nothing — no element, no style block, no script tag — so a call's page is byte-identical to a
-// build without it. With the switch on it renders the frame the island fills from /api/reader_call: while the call is
+// "Your call beside the coaches" (#6088, #6114). SELF-GATING on src/lib/readercall.js (READERCALL_LIVE, or the private
+// WEB_READERCALL=1): off, it renders nothing (its island script is still bundled for the page: READERCALL_LIVE is no rollback lever —
+// the kill switch is SSM /life-platform/reader-call). On, it renders a HIDDEN frame
+// the island fills and reveals from /api/reader_call; a shut door, an ineligible call or an unread answer leaves it
+// hidden, so the page never shows an error and nothing reader-facing appears. Once revealed: while the call is
 // open, the question and one tap, then what the reader called and when to come back (never a count); once closed, the
 // reader calls; once graded, the coach, the simple guess and the reader calls side by side — apart from the record.
 import { READERCALL_API, READERCALL_MARKER, itemIdOf, readerCallEnabled, readerCallFor } from "../lib/readercall.js";
@@ -19,7 +21,7 @@ const guess = p.simple_guess;
 
 {
   on && (
-    <section {...mark} data-call={itemIdOf(p.id)} data-api={READERCALL_API} aria-labelledby={`rc-h-${p.id}`} style="border:1px solid var(--ink);padding:16px 18px;display:flex;flex-direction:column;gap:12px">
+    <section {...mark} data-call={itemIdOf(p.id)} data-api={READERCALL_API} aria-labelledby={`rc-h-${p.id}`} data-rc-frame style="display:none;border:1px solid var(--ink);padding:16px 18px;flex-direction:column;gap:12px">
       {
         graded ? (
           <>
@@ -44,3 +46,7 @@ const guess = p.simple_guess;
     </section>
   )
 }
+
+<script>
+  import "../islands/readercall.js";
+</script>

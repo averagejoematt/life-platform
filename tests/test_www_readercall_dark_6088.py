@@ -35,14 +35,15 @@ CLEAN = {
 
 def test_a_clean_dist_passes_and_every_planted_leak_is_refused(tmp_path):
     """The clean control passes; each of the three shapes a WEB_READERCALL=1 build leaves is refused by name."""
-    assert check_www_build.readercall_leaks(_dist(tmp_path / "clean", CLEAN)) == []
+    assert check_www_build.readercall_leaks(_dist(tmp_path / "clean", CLEAN), live=False) == []
     planted = {
         "marker on a page": {"system/ledger/sleep-x/index.html": '<section data-readercall="open" data-call="sleep-x"></section>'},
         "the island chunk": {"_astro/page.def.js": 'document.querySelectorAll("[data-readercall]")'},
         "the route in data": {"data/x.json": '{"api": "/api/reader_call"}'},
     }
     for name, extra in planted.items():
-        leaks = check_www_build.readercall_leaks(_dist(tmp_path / name.replace(" ", "_"), {**CLEAN, **extra}))
+        leaks = check_www_build.readercall_leaks(_dist(tmp_path / name.replace(" ", "_"), {**CLEAN, **extra}), live=False)
+        assert check_www_build.readercall_leaks(_dist(tmp_path / (name.replace(" ", "_") + "_live"), {**CLEAN, **extra}), live=True) == []
         assert len(leaks) == 1 and "WEB_READERCALL=1" in leaks[0], (name, leaks)
 
 
@@ -54,18 +55,20 @@ def test_the_deploy_scan_runs_the_readercall_clause():
 
 
 def test_a_private_build_never_rewrites_the_committed_deploy_maps():
-    """postbuild leaves owned_paths.json / reach.json as committed on a WEB_READERCALL=1 build (the room's rule)."""
+    """postbuild leaves owned_paths.json / reach.json as committed on a PRIVATE reader-call build (the room's rule)."""
     src = open(os.path.join(_REPO, "www", "scripts", "postbuild.mjs"), encoding="utf-8").read()
-    assert "const readercall = readerCallEnabled();" in src
+    assert "const readercall = readerCallPrivate();" in src
     assert "const room = privateRoom || lab || story || readercall;" in src
     assert "if (!room) writeFileSync(OWNED_OUT" in src and "if (!room) writeFileSync(REACH_OUT" in src
 
 
-def test_the_api_switch_and_the_page_switch_are_both_off():
-    """Two switches, both off: the API's committed constant and the page's private-only env switch (no go-live line)."""
+def test_the_api_switch_and_the_page_switch_are_both_committed_on():
+    """#6114 go-live: both committed switches are on — the API's READER_CALL_LIVE and the page's READERCALL_LIVE (read by
+    the deploy scan through www_launch_switch). The door still opens only with SSM /life-platform/reader-call = on."""
     sys.path.insert(0, os.path.join(_REPO, "lambdas"))
+    import www_launch_switch
     from web import reader_call_rules
 
-    assert reader_call_rules.READER_CALL_LIVE is False
-    lib = open(os.path.join(_REPO, "www", "src", "lib", "readercall.js"), encoding="utf-8").read()
-    assert 'env[READERCALL_ENV] === "1"' in lib and "LIVE" not in lib.replace("READER_CALL_LIVE", "")
+    assert reader_call_rules.READER_CALL_LIVE is True
+    assert www_launch_switch.readercall_live() is True
+    assert check_www_build.readercall_leaks("/nonexistent") == []  # live: the control is ordinary build output

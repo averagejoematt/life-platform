@@ -97,7 +97,7 @@ def test_a_once_valid_token_replayed_after_the_lock_moves_nothing():
     b = _token(raw, table, call, ip="198.51.100.32")
     assert _tap(raw, table, call, "up", ip="198.51.100.31", token=a)["statusCode"] == 200
     before = (dict(raw.reader_rows()), len(raw.writes))
-    late = "2026-11-28"  # the close day: the measured window's last day
+    late = "2026-11-22"  # the day after the last open day (the 14-day window's midpoint, 21 November)
     for ip, tok in (("198.51.100.31", a), ("198.51.100.32", b)):
         resp = _tap(raw, table, call, "down", ip=ip, token=tok, delay=30, today=late)
         assert resp["statusCode"] == 409, resp
@@ -106,13 +106,40 @@ def test_a_once_valid_token_replayed_after_the_lock_moves_nothing():
     assert _tally(raw) == {"up": 1}
 
 
-def test_the_close_day_is_the_earlier_of_the_due_day_and_the_window_end():
-    assert R.closes_on(DIRECTION_SPEC, "2026-11-14", 28, "2026-12-12") == "2026-11-28"  # window ends first
-    assert R.closes_on({**DIRECTION_SPEC, "evaluation_window_days": 1}, "2026-11-09", 14, "2026-11-23") == "2026-11-10"
-    assert R.closes_on(DIRECTION_SPEC, "2026-11-14", 14, "2026-11-20") == "2026-11-20"  # due first
+def test_open_until_is_the_earliest_of_the_due_day_the_outcome_day_and_the_midpoint():
+    """The last day a reader may call (inclusive). Owner/driver ruling 2026-11-16: a reader never holds more than half
+    the window the coach called blind."""
+    d14 = DIRECTION_SPEC  # 14-day window
+    # 14-day call made 14 Nov, window 14 -> 28 Nov, due 12 Dec: midpoint 14 + 7 = 21 Nov wins
+    assert R.open_until(d14, "2026-11-14", 28, "2026-12-12") == "2026-11-21"
+    # the due bound wins when the due day is early: due 18 Nov -> the day before, 17 Nov
+    assert R.open_until(d14, "2026-11-14", 14, "2026-11-18") == "2026-11-17"
+    # the outcome bound: a 4-day window made 14 Nov ends 18 Nov -> midpoint 16 Nov < the day before the end (17 Nov)
+    four = {**d14, "evaluation_window_days": 4}
+    assert R.open_until(four, "2026-11-14", 14, "2026-12-12") == "2026-11-16"
+    # the short-window rule (< 4 days): the day after filing, unless the outcome bound is earlier
+    three = {**d14, "evaluation_window_days": 3}
+    assert R.open_until(three, "2026-11-14", 14, "2026-12-12") == "2026-11-15"  # day after filing; outcome day-before = 16
+    one = {**d14, "evaluation_window_days": 1}
+    assert R.open_until(one, "2026-11-09", 14, "2026-11-23") == "2026-11-09"  # 1-day: only the filing day itself
+    # a number call: made 14 Nov, target 30 Nov (16 days) -> midpoint 22 Nov
     point = {"type": "point", "metric": "weight_lbs", "threshold": 1, "tolerance": 1, "target_date": "2026-11-30"}
-    assert R.closes_on(point, "2026-11-14", 1, "2026-11-30") == "2026-11-30"
-    assert R.closes_on(DIRECTION_SPEC, None, 14, "2026-11-30") is None  # an undated call never opens
+    assert R.open_until(point, "2026-11-14", 1, "2026-11-30") == "2026-11-22"
+    # a number call for the very next day: the outcome bound leaves only the filing day
+    assert R.open_until({**point, "target_date": "2026-11-15"}, "2026-11-14", 1, "2026-11-15") == "2026-11-14"
+    assert R.open_until(d14, None, 14, "2026-11-30") is None  # an undated call never opens
+    # a due day before the call was made can never open
+    assert R.open_until(d14, "2026-11-14", 14, "2026-11-14") is None
+
+
+def test_the_midpoint_lock_closes_the_door_the_day_after():
+    raw, table = _table()
+    call = _call_id(DIR_ROW)
+    assert _body(_ask(table, _event(params={"call": call}), today="2026-11-21", raw=raw))["open"] is True  # the last day
+    assert _body(_ask(table, _event(params={"call": call}), today="2026-11-22", raw=raw))["open"] is False
+    tok = R.mint_token(KEY, call, _salted("203.0.113.7"), NOW)
+    resp = _ask(table, _event("POST", body={"call": call, "choice": "up", "token": tok}), now=NOW + 5, today="2026-11-22", raw=raw)
+    assert resp["statusCode"] == 409 and raw.reader_rows() == {}
 
 
 # ── no count or split while open ───────────────────────────────────────────────────────────────────────
@@ -129,8 +156,8 @@ def test_no_count_or_split_is_served_while_open_and_counts_appear_once_closed():
         leaked = _keys(payload) & COUNT_KEYS
         assert not leaked, f"served while open: {leaked}"
         assert not re.search(r"\b\d+ (?:reader|call)", json.dumps(payload)), "no number of calls in any open text"
-    assert post_open["your_call"] == "up" and post_open["closes_on_words"] == "28 November"
-    closed = _body(_ask(table, _event(params={"call": call}), today="2026-11-28", raw=raw))
+    assert post_open["your_call"] == "up" and post_open["open_until_words"] == "21 November"
+    closed = _body(_ask(table, _event(params={"call": call}), today="2026-11-22", raw=raw))
     assert closed["open"] is False and closed["reader_calls"] == {"counts": {"up": 1, "down": 3, "same": 0}, "total": 4}
     assert "graded" not in closed, "the coach's call is shown at grading, not at close"
 
@@ -300,3 +327,19 @@ def test_a_held_or_unworded_measure_is_not_eligible():
     status = _ask(table, _event(params={"call": _call_id(held)}), raw=raw)["statusCode"]
     assert status in (404, 409)
     assert R.question(DIRECTION_SPEC, "", "2026-11-14", 14) is None  # no reader words for the measure: no question
+
+
+def test_committed_on_with_the_parameter_absent_or_off_keeps_the_door_shut(_fresh_switch, monkeypatch):
+    """The deploy order: the committed switch ships ON, the SSM parameter is set to `on` only after the deploy is
+    verified. Until then — parameter absent, or any value but `on` — every request is the shut door's 404, nothing is
+    read or written, and the page degrades to its empty / closed state (www/tests/readercall.test.mjs, viewState)."""
+    assert R.READER_CALL_LIVE is True
+    for ssm in (_Ssm(error=RuntimeError("ParameterNotFound")), _Ssm("off"), _Ssm("")):
+        monkeypatch.setattr(rc, "_SWITCH", {"at": 0.0, "on": False})
+        monkeypatch.setattr(rc, "_ssm", lambda ssm=ssm: type("C", (), {"get_parameter": staticmethod(ssm)})())
+        raw, table = _table()
+        for ev in (_event(params={"call": _call_id(DIR_ROW)}), _event(), _event("POST", body={"call": _call_id(DIR_ROW), "choice": "up"})):
+            resp = rc.handle_reader_call(ev, table=table, now=NOW, today=TODAY)  # committed default + the real runtime reader
+            assert resp["statusCode"] == 404 and _body(resp)["error"] == rc.NOT_AVAILABLE
+        assert raw.reads == [] and raw.writes == []
+        assert ssm.calls == 1, "read once, then cached"
