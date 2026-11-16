@@ -22,6 +22,15 @@ THE CHOKEPOINT. ``remember`` is called by the ONE partition reader every public 
 identity; a stored key the map cannot place is EMPTIED (fail closed — an unmapped slug is withheld wording, never a link),
 and a non-call record id (an ask's slug) is emptied outright. The stored rows are untouched: the owner's tools, the graders and
 every internal join keep the stored keys.
+
+ONE ANSWER FOR ONE TABLE (#6111). The map used to be only what this container's routes had happened to read, so a route
+that never read a coach's ledger through the partition reader (``/api/coaches``' ``latest_checked``, a coach page's
+learning evidence) served ``""`` on a cold container and the id on a warm one. Now, in a Site API request, a coach's map
+is built from the COMPLETE read of that coach's partition (``web.publication_snapshot`` — the same read the gate's
+complete taint comes from), restricted to the calls the call publication policy passes; it is fresh within the
+snapshot's TTL and re-read once in the request when a key is missing (a call filed since). A lookup without a coach, or
+a membership check of an already-public id, reads every coach first. A filed call's id never changes (its first filing
+instant is written once), so a kept map gives the answer a fresh read would.
 """
 
 from __future__ import annotations
@@ -38,6 +47,9 @@ _ORIGINAL: dict[tuple[str, str], str] = {}  # (coach short id, stored key) -> ea
 _PUBLIC: dict[tuple[str, str], str] = {}  # (coach short id, stored key) -> public id
 _BY_KEY: dict[str, set] = {}  # stored key -> {public ids} (a key filed by two coaches maps to two ids)
 _ISSUED: set = set()  # every public id issued
+
+_APPLIED: dict[str, int] = {}  # coach -> the snapshot read version its map was built from
+_SOURCE: dict[str, Any] = {"raw": None}  # the raw table the map was built from (another table: the map starts over)
 
 _PK = re.compile(r"^COACH#([a-z0-9]+)_coach$")
 PUBLIC_ID = re.compile(r"^\d{8}-[0-9a-z]{1,8}(-\d+)?$")
@@ -117,12 +129,74 @@ def remember_read(pk: Any, sk_prefix: Any, rows: list) -> list:
     return rows
 
 
-def reset() -> None:
+def reset_map() -> None:
+    """Forget every coach's map (not the request): a map read from one table never answers for another."""
     with _LOCK:
         _ORIGINAL.clear()
         _PUBLIC.clear()
         _BY_KEY.clear()
         _ISSUED.clear()
+        _APPLIED.clear()
+
+
+def reset() -> None:
+    reset_map()
+    _SOURCE["raw"] = None
+
+
+def _forget(coach: str) -> None:
+    """Drop one coach's map (a complete read replaces it, never merges into it)."""
+    with _LOCK:
+        for k in [k for k in _ORIGINAL if k[0] == coach]:
+            del _ORIGINAL[k]
+        for k in [k for k in _PUBLIC if k[0] == coach]:
+            del _PUBLIC[k]
+        _BY_KEY.clear()
+        for (_c, key), pub in _PUBLIC.items():
+            _BY_KEY.setdefault(key, set()).add(pub)
+        _ISSUED.clear()
+        _ISSUED.update(_PUBLIC.values())
+
+
+def all_coaches() -> tuple:
+    """Every coach whose partition can hold calls (``COACH#<short>_coach``): the operational and the retired seats."""
+    from coach.persona_registry import OPERATIONAL_COACH_IDS, RETIRED_COACH_IDS
+
+    return tuple(sorted({c[: -len("_coach")] for c in (*OPERATIONAL_COACH_IDS, *RETIRED_COACH_IDS) if c.endswith("_coach")}))
+
+
+def _ensure(coach: str, force: bool = False) -> None:
+    _ensure_many((coach,), force)
+
+
+def _ensure_all(force: bool = False) -> None:
+    _ensure_many(all_coaches(), force)
+
+
+def _refreshed(coach: str) -> bool:
+    from web import publication_snapshot as S
+
+    return S.coach_pk(coach) in S._REQ["refreshed"]
+
+
+def _ensure_many(coaches: Iterable[str], force: bool = False) -> None:
+    """Each coach's map built from the complete read of its partition (``web.publication_snapshot``: fresh within its
+    TTL, or — with ``force`` — re-read once in this request); a no-op outside a request opened with a table."""
+    from web import publication_snapshot as S
+
+    if not S.active():
+        return
+    coaches = [c for c in dict.fromkeys(coaches) if c]
+    S.ensure([S.coach_pk(c) for c in coaches], force)
+    if _SOURCE["raw"] is not S._STATE["raw"]:
+        reset_map()
+        _SOURCE["raw"] = S._STATE["raw"]
+    for c in coaches:
+        got = S.calls(S.coach_pk(c))
+        if got is not None and _APPLIED.get(c) != got[0]:
+            _forget(c)
+            remember(c, got[1])
+            _APPLIED[c] = got[0]
 
 
 def of(coach: Optional[str], key: Any) -> Optional[str]:
@@ -130,13 +204,23 @@ def of(coach: Optional[str], key: Any) -> Optional[str]:
     k = str(key or "").strip()
     if not k:
         return None
+    if PUBLIC_ID.match(k):
+        _ensure_all()  # membership is only an answer against every coach's complete map
     if k in _ISSUED:
         return k  # already public (a payload built from an already-publicized one) — by membership, never by shape
     if coach:
+        _ensure(coach)
         p = _PUBLIC.get((coach, k))
+        if p is None and not _refreshed(coach):
+            _ensure(coach, force=True)  # a call filed since the map was read
+            p = _PUBLIC.get((coach, k))
         if p:
             return p
+    _ensure_all()
     ids = _BY_KEY.get(k) or set()
+    if not ids:
+        _ensure_all(force=True)
+        ids = _BY_KEY.get(k) or set()
     return next(iter(ids)) if len(ids) == 1 else None
 
 
