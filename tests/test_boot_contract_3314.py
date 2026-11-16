@@ -203,8 +203,9 @@ def test_charter_points_the_boot_at_the_model():
 # concurrent edits like BASELINE_TOTAL_GATES and re-measure at merge, never by arithmetic.
 # Demote when: CLAUDE.md sits at or below the 3,500-token target for 30 days — the
 # ratchet becomes a flat cap and test 2 is deleted.
-# 7081 (2026-10-01, fd20ad99f, 28,326 B) -> 3497 (2026-10-01, boxes 1-3 on 1b3177f8b, 13,990 B).
-CLAUDE_MD_TOKEN_CEILING = 3497  # Target 3500 (#4271) — met. Down-only.
+# 7081 (2026-10-01, fd20ad99f, 28,326 B) -> 3497 (2026-10-01, boxes 1-3 on 1b3177f8b, 13,990 B)
+# -> 2647 (2026-11-16, #5515 box 5: budget/remediation/restart/serve sections to pointers, 10,588 B).
+CLAUDE_MD_TOKEN_CEILING = 2647  # Target 3500 (#4271) — met. Down-only.
 CLAUDE_MD_TOKEN_SLACK = 100  # ~400 B a PR may shrink by before it must lower the ceiling
 # Box 3 landed: the status block is the convention paragraph plus ONE pointer line, which
 # `/wrap` step (b) rewrites in place (date only). Its pre-box-3 byte cap is retired.

@@ -47,14 +47,11 @@ python3 mcp_bridge.py
 
 **Ingest → Store → Serve** on AWS (us-west-2):
 
-1. **Ingest**: scheduled ingestion Lambdas on EventBridge, mostly through the shared SIMP-2 framework (exemptions: ADR-056/060; Garmin paused: ADR-074). **Per-source cadence, paused state and staleness are the `method`/`paused`/`stale_hours` facets in `lambdas/ingestion/source_registry.py` — read the registry, never hand-state a schedule** (#2003, guarded by `scripts/check_doc_facts.py`). Backfill is gap-aware (fetch only missing `DATE#` records, today included); the HAE webhook sources dedup at reading level for cumulative fields.
+1. **Ingest**: scheduled ingestion Lambdas, mostly through the shared SIMP-2 framework (exemptions: `docs/ARCHITECTURE.md` §Ingest Layer). **Per-source cadence, paused state and staleness are the `method`/`paused`/`stale_hours` facets in `lambdas/ingestion/source_registry.py` — read the registry, never hand-state a schedule** (#2003, guarded by `scripts/check_doc_facts.py`). Backfill is gap-aware (fetch only missing `DATE#` records, today included); the HAE webhook sources dedup at reading level for cumulative fields.
 
 2. **Store**: raw JSON in S3, whose layout is fractured — **each source's prefix, scheme AND leaf filename is its `raw_layout` facet in `source_registry.py`; read it, never construct keys** (no mass-move: `raw/*` is delete-protected; history: the raw-layout note in `docs/DECISIONS.md`, #4271). A `raw_layout` facet is not a registry entry — a source can pass `scripts/check_raw_zone_drift.py` and still be invisible to every freshness check. Normalized metrics in DynamoDB single-table `life-platform`, PK `USER#matthew#SOURCE#{source}`, SK `DATE#{YYYY-MM-DD}`.
 
-3. **Serve/Compute**:
-   - **MCP Lambda** — the tools in `mcp/tools_*.py`, wired by `mcp/registry.py`; the count is the top-level keys of its `TOOLS` dict (`deploy/sync_doc_metadata.py::_auto_discover_tool_count`) — `grep -c '"name":'` over-counts nested schema fields. Removals go through `docs/MCP_TOOL_AUDIT.md`'s dated AUDITED_AT ratchet, never silently. Run `tests/test_wiring_coverage.py` after adding a tool.
-   - **Compute Lambdas** (`character-sheet`, `adaptive-mode`, `daily-metrics-compute`, `daily-insight-compute`, weekly `hypothesis-engine`) store pre-computed results to DynamoDB before the 17:00 UTC daily brief; the **email Lambdas** read them. Schedules are each function's `schedule=` in `cdk/stacks/`.
-   - **Site API Lambda** — serves averagejoematt.com (the endpoint set is `ROUTES` in `lambdas/web/site_api_lambda.py`). **Multi-module package: code deploys via `deploy_site_api.sh` (the full-tree bundle, never single-file)**; infra is CDK-owned in `serve_stack.py` (`LifePlatformServe`, #793/#794 — see `.claude/skills/deploy/SKILL.md`).
+3. **Serve/Compute** (`docs/ARCHITECTURE.md` §Serve Layer, §Compute + Email Lambdas): **MCP** tools are `mcp/tools_*.py` wired by `mcp/registry.py` — run `tests/test_wiring_coverage.py` after adding one; removals go through `docs/MCP_TOOL_AUDIT.md`'s AUDITED_AT ratchet, never silently. Compute Lambdas pre-compute to DynamoDB before the daily brief. **Site API** (endpoints = `ROUTES` in `lambdas/web/site_api_lambda.py`) is a multi-module package: **code deploys via `deploy_site_api.sh` (the full-tree bundle, never single-file).**
 
 ## Key Technical Conventions
 
@@ -68,57 +65,41 @@ python3 mcp_bridge.py
 
 **S3 safety (ADR-032/033/046)** — never `aws s3 sync --delete` to the bucket root; use `deploy/lib/safe_sync.sh`. Lambda-generated files live under `generated/`, NOT `site/` (CloudFront routes them to S3GeneratedOrigin), which is what makes a `site/` sync structurally safe.
 
-**Site API is primarily read-only** — limited writes exist only for interactive features (votes, follows, checkins, suggestions, user-submitted findings). Core data queries must never write. Rate limiting is DynamoDB-backed per-IP atomic counters (`rate_limiter.py`; the in-memory dict is fail-open fallback only).
+**Site API is primarily read-only** — limited writes exist only for interactive features (votes, follows, checkins, suggestions, user-submitted findings). Core data queries must never write. Rate limiting: `rate_limiter.py` (DynamoDB-backed; `docs/ARCHITECTURE.md` §Site API).
 
 **Crons follow `platform_timezone`** (CONVENTIONS §1b).
 
 **Shared code — ONE bundle, no layer (#781)** — `docs/CONVENTIONS.md` §1.
 
-**`lambdas/` is packaged by domain (ADR-146)** — no loose modules at the `lambdas/` root (`tests/test_lambdas_packaging_guard.py`); the bundle stages the tree at the zip root, so imports read `from common import constants`. Two rules that bite: (a) `scripts/mypy_clean_set.py`'s `CLEAN_DIRS` globs are **non-recursive** — add a new package there or its modules silently leave the mypy gate; (b) never resolve a data file as `dirname(dirname(__file__))/config/...` — use `common.repo_config`.
+**`lambdas/` is packaged by domain (ADR-146)** — no loose modules at the `lambdas/` root (`tests/test_lambdas_packaging_guard.py`; imports read `from common import constants`). Two rules that bite: (a) `scripts/mypy_clean_set.py`'s `CLEAN_DIRS` globs are **non-recursive** — add a new package there or its modules silently leave the mypy gate; (b) never resolve a data file as `dirname(dirname(__file__))/config/...` — use `common.repo_config`.
 
-**Prompt caching (COST-OPT-2, ADR-049)** — `ai_calls.py`/`retry_utils.py` auto-wrap system messages as cached blocks, but **a `cache_control` block is NOT evidence of caching**: below the model's minimum cacheable prefix it is silently ignored. Read the floors and per-caller record from `lambdas/ai/prompt_cache.py` and the live proof from the `PromptCacheNoOp` metric. Haiku for structured tasks, Sonnet for narrative; `AI_MODEL` overrides.
+**Prompt caching (ADR-049)** — **a `cache_control` block is NOT evidence of caching** (silently ignored below the model's floor); floors, per-caller record and model tiering: `docs/ARCHITECTURE.md`, `lambdas/ai/prompt_cache.py`.
 
 **Format gate (ENFORCED)** — CI runs `black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/ qa/` (line-length 140, `pyproject.toml`) and fails the build; `ruff` and flake8 (`.flake8`) also run. **Format before committing** (`deploy/agent_commit.sh` uses the pinned black). The gates report independently and the CI pins can drift from `requirements-dev.txt` — `docs/CONVENTIONS.md` §4.
 
 ## CDK Structure
 
-The stacks are `cdk/stacks/*_stack.py`, entry point `cdk/app.py`; each stack creates its own least-privilege role per Lambda. **A non-default-region stack must be added to BOTH region maps** (`drift_sentinel.STACKS`, `check_lambda_config_drift.STACK_FILE_REGION`) with a string-literal `region=` in `app.py` (`tests/test_drift_checker_stack_regions.py`).
+`cdk/stacks/*_stack.py`, entry `cdk/app.py` (`docs/INFRASTRUCTURE.md`). **A non-default-region stack must be added to BOTH region maps** (`drift_sentinel.STACKS`, `check_lambda_config_drift.STACK_FILE_REGION`) with a string-literal `region=` in `app.py` (`tests/test_drift_checker_stack_regions.py`).
 
 ## CI/CD
 
-`.github/workflows/ci-cd.yml`: Lint → Test → Plan → Deploy → Smoke → auto-rollback, OIDC auth. Code ships on green (ADR-158), only `deploy-iam` (IAM) waits on manual approval. Site QA (ADR-076) is `deploy/smoke_test_site.sh`, `lambdas/operational/qa_smoke_lambda.py` and the gating Playwright + AI-vision sweep `qa/visual_qa.py --screenshot --ai-qa` (the `/qa` skill); how the visual gate gates and rolls back is `docs/CONVENTIONS.md` §4b.
+`.github/workflows/ci-cd.yml`: Lint → Test → Plan → Deploy → Smoke → auto-rollback, OIDC auth. Code ships on green (ADR-158), only `deploy-iam` (IAM) waits on manual approval. Site QA layers (ADR-076) and how the visual gate gates and rolls back: `docs/CONVENTIONS.md` §4b, the `/qa` skill.
 
 ## AI Inference (Bedrock + Budget Guard)
 
-**Single chokepoint:** every Claude call goes through `bedrock_client.invoke()` (ADR-062), IAM auth, cross-region inference profiles (`us.anthropic.claude-sonnet-4-6`, `us.anthropic.claude-haiku-4-5-20251001-v1:0`).
+**Every Claude call goes through `bedrock_client.invoke()` (ADR-062).** **$215/month hard ceiling, $252 in reader-traffic surge mode** (ADR-063/ADR-133); a ceiling change also needs `cdk deploy LifePlatformCore`. Tiers 0–3 from SSM `/life-platform/budget-tier` gate AI (tier 3 = hard cutoff, `BudgetExceeded`): `docs/RUNBOOK.md` §Budget Guardrails.
 
-**$215/month hard ceiling, $252 in reader-traffic surge mode** (ADR-063/ADR-133; history is ADR-133's amendment trail). **The AWS Budgets backstop is resolved at CDK synth time from the governor source, so `cdk deploy LifePlatformCore` is required whenever the ceiling changes, even with no CDK diff.** One AWS budget covers ALL spend (`life-platform-monthly-75` — the name is historical, never rename it). `cost_governor_lambda` writes a tier 0–3 to SSM `/life-platform/budget-tier` (bands ≈73%/87%/97% of the effective ceiling); `lambdas/ai/budget_guard.py` gates by tier (ADR-125):
-- **0**: all AI runs. **1**: internal/dev AI paused. **2**: + reader narratives paused.
-- **3**: hard cutoff — website AI returns "paused", the daily brief skips AI, the AI CI gates (`reader_truth_qa`, `visual_ai_qa`) pause here and ONLY here, and `invoke()` raises `BudgetExceeded`.
+## Remediation Agent (ADR-064/065/129)
 
-The daily brief is "protect longest". Manual reset: `aws ssm put-parameter --name /life-platform/budget-tier --value 0 --type String --overwrite`.
-
-## Self-healing Remediation Agent (ADR-064/065/129 — a triage instrument, shadow permanently)
-
-`.github/workflows/remediation-agent.yml` runs Mon/Wed/Fri (its cron is the schedule) plus on-demand via `repository_dispatch`; it classifies alarms, failed CI, DLQ depth and QA-smoke per `docs/REMEDIATION_TAXONOMY.md`, opens PRs a human merges and emails the needs-human items. **It merges nothing, in any mode** — `gh pr merge` is in its `disallowed_tools`. Auth: OIDC → `github-actions-remediation-role` (no deploy/IAM mutate). Kill-switch: SSM `/life-platform/remediation-mode` = `off | shadow` (budget tier 3 also no-ops it); **`auto` is retired** — a stale `auto` is coerced to `shadow` and never honoured, and reopening it is a new ADR, not an SSM flip. **CI's production approval gate is untouched — a merged PR is never a deployed one.** Audit log: `s3://matthew-life-platform/remediation-log/`. Rent: `docs/PROPORTIONALITY.md`.
+A triage instrument, **shadow permanently**: runs Mon/Wed/Fri, opens PRs a human merges; **it merges nothing, in any mode**, and `auto` is retired. Kill-switch, audit log, role: `docs/RUNBOOK.md` §Remediation Agent, `docs/REMEDIATION_TAXONOMY.md`.
 
 ## Experiment Restart Pipeline (ADR-058/059/077)
 
-The experiment is anchored by `EXPERIMENT_START_DATE` in `lambdas/common/constants.py` (read the live value there). Re-anchoring is one idempotent command:
-
-```bash
-python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --apply
-# Override Withings baseline when the genesis date has no weigh-in yet:
-python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --override-weight-lbs <weight> --apply
-# Carry forward selected chronicle issues as pre-genesis lead-ins (ADR-077):
-python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --keep-chronicle DATE#... --apply
-```
-
-It regenerates constants, deploys, phase-tags DDB, wipes intelligence, rolls the ledger (`deploy/restart_ledger_reset.py`), rebuilds, syncs site + docs and verifies the rendered surface (`deploy/restart_verify_rendered.py`). Rollback: `deploy/restart_rollback.py`. **What resets vs. what's kept is `lambdas/experiment/phase_taxonomy.py`** (`docs/PHASE_TAXONOMY.md`) — preview with the tagger/wipe in dry-run (no `--apply`).
+Anchored by `EXPERIMENT_START_DATE` in `lambdas/common/constants.py` (read the live value there). Re-anchoring is one idempotent command, `python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --apply`; flags, steps, the required pre-reset drill and rollback are `docs/RUNBOOK.md` §Restart Pipeline, and what resets vs. what's kept is `docs/PHASE_TAXONOMY.md`.
 
 ## Public Website (ADR-071)
 
-`averagejoematt.com` is a static site (S3 + CloudFront `E3S424OXQZ8NBE`) over the unchanged engine: vanilla-JS ES modules, `tokens.css`, self-hosted fonts, inline-SVG charts, no framework/deps. The doors are `docs/SITE_MAP_AND_INTENT.md`; redirects regenerate from `redirects.map` via `scripts/v4_migration_inventory.py`. **A shell with a `scripts/v4_build_*.py` generator is changed in the generator, then regenerated.** Deploy is **automatic on merge** (`.github/workflows/site-deploy.yml`); attended path: `bash deploy/sync_site_to_s3.sh` + an explicit fonts sync. **Never link `/legacy` from the UI; engine/`/api/*` contracts are read-only from the front-end.**
+`averagejoematt.com` is a static site (S3 + CloudFront `E3S424OXQZ8NBE`) over the unchanged engine: vanilla-JS ES modules, `tokens.css`, self-hosted fonts, inline-SVG charts, no framework/deps; deploy is automatic on merge (`site-deploy.yml`; redirects and the attended path: ADR-071). **A shell with a `scripts/v4_build_*.py` generator is changed in the generator, then regenerated.** **Never link `/legacy` from the UI; engine/`/api/*` contracts are read-only from the front-end.**
 
 ## Authorship — no tool attribution (owner decision, 2026-08-12)
 
