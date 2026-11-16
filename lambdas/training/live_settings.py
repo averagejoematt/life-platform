@@ -103,6 +103,27 @@ HEURISTICS: dict[str, dict[str, Any]] = {
         "HELD and flagged — the load is no longer the likely cause (technique, recovery, the movement itself)",
         "retune": "block retro: every flagged lift — what the cause turned out to be",
     },
+    "step_up_hold_rpe_over": {
+        "value": 1,
+        "group": "progression",
+        "basis": "#6015 (owner ruling 2026-11-16, hold-and-build): after the engine's own one-step raise, an exposure at the new "
+        "load at or over the rep floor and at most this many RPE over the lift's working target is a normal first exposure — the "
+        "load HOLDS and the reps build; more than this over is a too-heavy step and the effort fit reverts it. The number is the "
+        "charter's own tolerance for a set over its line (`effort_ceilings.overage_tolerance_rpe`: within +1 RPE is not a "
+        "breach), and on a heavy anchor it is the approved last-set allowance (`effort_targets` heavy_compound 8 -> 9)",
+        "retune": "block retro: reps and RPE at the first three exposures after each step up; reverts per lift",
+    },
+    "step_up_hold_exposures": {
+        "value": 3,
+        "group": "progression",
+        "basis": "#6015: a held load whose last this-many exposures (an excused date skipped: a recorded deload day, `live_load.excused_days`) all "
+        "missed, the newest with no rep gained and no RPE shed since the first, is a STALL — the effort fit then reverts it, "
+        "and that load is not retried inside `history_days` until the top of the range comes `step_up_hold_rpe_over` "
+        "under target. The number is the charter's stall (`progression.stall_rule.consecutive_exposures`: the same load and "
+        "reps three same-type exposures running) — the first exposure at a new load plus the two-exposure evidence every "
+        "reduction needs (`below_floor_exposures`)",
+        "retune": "block retro: held loads that later reached the top vs those reverted; reverted loads retried and held",
+    },
     "implausible_rpe": {
         "value": 9.5,
         "group": "progression",

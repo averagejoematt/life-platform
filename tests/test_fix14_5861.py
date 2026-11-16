@@ -490,3 +490,114 @@ def test_a_held_carrys_stop_line_keeps_its_logging_line():
     w = _week(PROFILES["a_large_deficit_experienced"])  # an unflagged week: the cue stays
     carry = next(x for s in w["week"]["sessions"] for x in s["lifts"] if x["key"] == "farmers_walk")
     assert g.CARRY_CUE in carry["hevy_note"] and g.CARRY_STEPS_LINE in carry["hevy_note"]
+
+
+# ── #6015: hold-and-build — the engine's own step up is held and built, not undone ──────────────────────────────────────────────
+def _lifter(e1rm_lb: float, weeks: int, start: tuple[float, int, float], equipment: str = "dumbbell", rep_lo: int = 4, rep_hi: int = 6):
+    """A closed loop over `live_load.decide`: a synthetic lifter of FIXED strength (`e1rm_lb`, Epley) performs each prescribed load
+    to the target RPE 8 (two in reserve) — the floor ground out at one in reserve when two in reserve cannot reach it — and the
+    exposure feeds the next decision (the simulator athlete's own model, `progression_sim_5861.Physiological`, without the
+    draft path). Returns [(lb, reps, rpe, mode)] per exposure, oldest first."""
+    import math
+
+    from common.pacific_time import shift_day_key
+
+    rows = _rows(start)
+    out = []
+    for i in range(weeks):
+        d = live_load.decide(rows, rep_lo, rep_hi, equipment, target_rpe=8)
+        lb = round(d["kg"] / KG, 1)
+        rtf = 30 * (e1rm_lb / lb - 1)
+        reps = min(rep_hi, math.floor(rtf - 2 + 1e-9))
+        if reps < rep_lo:
+            reps = max(1, min(rep_lo, math.floor(rtf - 1 + 1e-9)))
+        rpe = min(10.0, round((10.0 - (rtf - reps)) * 2) / 2)
+        out.append((lb, reps, rpe, d["mode"]))
+        day = shift_day_key(rows[0]["date"], 7)  # one exposure a week, newest first
+        rows = [{"date": day, "role": "upper_heavy", "sets": [{"kg": d["kg"], "reps": reps, "rpe": rpe}]}] + rows
+    return out
+
+
+def test_a_step_up_is_held_and_built_never_undone_by_one_hard_first_exposure():
+    """#6015 (the row bounce, owner ruling 2026-11-16): a steady lifter whose dumbbell row tops 60 x 6 at RPE 8 steps to 65, lands
+    4 at RPE 9 there — a normal first exposure at a load one coarse 5-lb step (~8 %) heavier — and the D7 fit stepped it back to
+    60 every other week (65, 60, 65, 60, ...). Hold-and-build: the raised load HOLDS while the miss is inside the tolerance (the
+    floor reached, at most `step_up_hold_rpe_over` RPE over target); a lifter who builds nothing at it for
+    `step_up_hold_exposures` exposures reverts ONCE, and the stalled load is not retried until the top comes one RPE easier.
+    Twelve exposures, the load never climbs back to a load it was taken off. Control: the rule off (`held_step` -> None, the
+    code on main) -> the bounce returns, every other exposure."""
+    e1 = 60 * (1 + 8 / 30)  # 60 x 6 at RPE 8, exactly
+    seq = _lifter(e1, 12, (60, 6, 8.0))
+    loads = [lb for lb, *_ in seq]
+    assert loads[:3] == [65, 65, 65] and seq[0][1:3] == (4, 9.0), seq  # stepped up, then HELD at the new load
+    assert seq[3][0] == 60 and seq[3][3] == "down", seq  # three exposures with no rep and no RPE gained: a stall, reverted once
+    assert set(loads[3:]) == {60} and all(m == "hold" for *_, m in seq[4:]), seq  # ... and the stalled load is not retried
+    with patch.object(live_load, "held_step", lambda *a, **k: None):  # control: the rule off -> the bounce
+        old = [lb for lb, *_ in _lifter(e1, 12, (60, 6, 8.0))]
+    assert old[:6] == [65, 60, 65, 60, 65, 60], old
+    gaining = _lifter(e1 * 1.03, 12, (60, 6, 8.0))  # a lifter 3 % stronger than the 60 x 6 says: holds and builds, never bounces
+    assert [lb for lb, *_ in gaining][:4] == [65, 65, 65, 65] and "down" not in [m for *_, m in gaining], gaining
+
+
+def test_a_too_heavy_step_reverts_a_stall_reverts_once_and_d7_is_unchanged_off_a_step():
+    """#6015 adverse cases. (1) A step missed by MORE than the tolerance (4 reps at RPE 10 / 9.5 on a target of 8) is a too-heavy
+    step: the effort fit reverts it, the same load D7 gave before. (2) Under the floor at the new load stays the two-exposure
+    rule's: once holds, twice steps down. (3) A stall — `step_up_hold_exposures` exposures at the held load with no rep gained and
+    no RPE shed since the first — reverts with its own reason; one where the RPE came down half a point is building and holds.
+    (4) After a stall the lower load steps up again only at the top of the range one RPE under target. (5) Off a step (the load
+    not just raised by the engine, raised by more than one step, or already handled at target since the raise) the D7 fit is
+    exactly as before."""
+    up = (60, 6, 8.0)  # the exposure that earned the step
+    for rpe in (10.0, 9.5):
+        d = live_load.decide(_rows((65, 4, rpe), up), 4, 6, "dumbbell", target_rpe=8)
+        assert d["mode"] == "down" and round(d["kg"] / KG) == 60 and d["why"] == f"4 reps at RPE {rpe:g} last time", d
+    assert live_load.decide(_rows((65, 3, 9.0), up), 4, 6, "dumbbell", target_rpe=8)["mode"] == "hold"  # under the floor once
+    assert live_load.decide(_rows((65, 3, 9.0), (65, 3, 9.0), up), 4, 6, "dumbbell", target_rpe=8)["mode"] == "down"  # twice
+    stall = live_load.decide(_rows((65, 4, 9.0), (65, 4, 9.0), (65, 4, 9.0), up), 4, 6, "dumbbell", target_rpe=8)
+    assert stall["mode"] == "down" and round(stall["kg"] / KG) == 60 and stall["why"] == "4 reps at RPE 9, 3 sessions at this load"
+    building = live_load.decide(_rows((65, 4, 8.5), (65, 4, 8.5), (65, 4, 9.0), up), 4, 6, "dumbbell", target_rpe=8)
+    assert building["mode"] == "hold" and round(building["kg"] / KG) == 65, building
+    two = live_load.decide(_rows((65, 4, 9.0), (65, 4, 9.0), up), 4, 6, "dumbbell", target_rpe=8)
+    assert two["mode"] == "hold" and two["why"] == "new load: reps first", two  # two of three: still held
+    after = _rows((60, 6, 8.0), (65, 4, 9.0), (65, 4, 9.0), (65, 4, 9.0), up)
+    held = live_load.decide(after, 4, 6, "dumbbell", target_rpe=8)
+    assert held["mode"] == "hold" and held["why"] == "stalled at 65 lb: 6 reps at RPE 7 first", held
+    after[0]["sets"][0]["rpe"] = 7.0
+    assert live_load.decide(after, 4, 6, "dumbbell", target_rpe=8)["mode"] == "up"  # stronger: retried
+    assert live_load.held_step(_rows((65, 4, 9.0), (65, 5, 8.5)), 4, 6, 8, "dumbbell") is None  # not raised: D7 as before
+    assert live_load.decide(_rows((65, 4, 9.0), (65, 5, 8.5)), 4, 6, "dumbbell", target_rpe=8)["mode"] == "down"
+    assert live_load.held_step(_rows((70, 4, 9.0), up), 4, 6, 8, "dumbbell") is None  # two steps at once: not the engine's step
+    assert live_load.held_step(_rows((65, 4, 9.0), (60, 5, 8.0)), 4, 6, 8, "dumbbell") is None  # 60 never topped: not its step
+    owned = _rows((65, 4, 9.0), (65, 4, 8.5), (65, 5, 8.0), up)  # he handled 65 at target once: a later miss is a decline
+    assert live_load.held_step(owned, 4, 6, 8, "dumbbell") is None
+    assert live_load.decide(owned, 4, 6, "dumbbell", target_rpe=8)["mode"] == "down"  # the D7 fit, exactly as before
+    with patch.dict(live_load.cfg.HEURISTICS["step_up_hold_rpe_over"], {"value": 2}):  # control: a wider tolerance holds RPE 10
+        assert live_load.decide(_rows((65, 4, 10.0), up), 4, 6, "dumbbell", target_rpe=8)["mode"] == "hold"
+
+
+def test_a_deload_or_red_recovery_day_is_never_a_failed_exposure_at_a_held_step():
+    """#6015 adverse case: three exposures at a held step, the middle one on a recorded deload (the owner's DELOAD# word — the only
+    way a deload applies) or a red-recovery hold day, is NOT a stall: the excused day neither counts nor resets the count. An
+    excused newest exposure holds even above the tolerance. Controls: the same three exposures with nothing excused -> the stall reverts;
+    `excused_days` reads only the dates a deload record covers."""
+    up = (60, 6, 8.0)
+    rows = _rows((65, 4, 9.0), (65, 4, 9.0), (65, 4, 9.0), up)
+    assert live_load.decide(rows, 4, 6, "dumbbell", target_rpe=8)["mode"] == "down"  # control: nothing excused -> the stall
+    d = live_load.decide(rows, 4, 6, "dumbbell", target_rpe=8, excused={rows[1]["date"]})
+    assert d["mode"] == "hold" and round(d["kg"] / KG) == 65, d
+    hard = _rows((65, 4, 10.0), up)
+    assert live_load.decide(hard, 4, 6, "dumbbell", target_rpe=8, excused={hard[0]["date"]})["mode"] == "hold"
+    records = [{"start_date": rows[1]["date"], "days": 1}]
+    assert live_load.excused_days(records, {"T": rows}) == [rows[1]["date"]]
+    assert live_load.excused_days(None, {"T": rows}) == []
+
+
+def test_the_hold_and_build_thresholds_are_the_charters_own_numbers():
+    """#6015: the two thresholds are named settings (`live_settings.HEURISTICS`) whose values are the charter's: the +1 RPE overage
+    tolerance (`effort_ceilings.overage_tolerance_rpe`) and the three-exposure stall (`progression.stall_rule.consecutive_exposures`).
+    A charter change that moves either one fails here until the engine's row is re-read with it."""
+    from training import live_settings
+    from training.training_charter import charter_value
+
+    assert live_settings.value("step_up_hold_rpe_over") == charter_value("effort_ceilings", {})["overage_tolerance_rpe"]
+    assert live_settings.value("step_up_hold_exposures") == charter_value("progression", {})["stall_rule"]["consecutive_exposures"]
