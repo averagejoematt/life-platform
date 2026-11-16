@@ -688,3 +688,84 @@ def test_the_committed_review_history_keeps_every_clock_it_had():
 def test_the_full_rubric_names_the_estate_enforcement_point():
     text = open(FULL_RUBRIC, encoding="utf-8").read()
     assert "The enforcement point is `scripts/review_carry_forward.py::scratch_dates`" in text
+
+
+# ── #5914 + #6068 together: a run that advanced no lens does not move the ritual clock ──
+
+
+def _held_run(sweep_cost_fully: bool) -> dict:
+    """A 2026-11-16 run of two rows: security misses its own withheld issue (#5914) and cost's
+    estate sweep is complete or not (#6068). Its calibration verdict reads PARTIAL either way."""
+    body = _swept(("security", "cost"), drop=None if sweep_cost_fully else "cost")
+    body["calibration"] = _calibrated({"security": _control("W1", found=False)}, ["W1"])
+    return body
+
+
+def test_a_run_whose_every_graded_row_was_held_back_does_not_reset_the_ritual_clock(tmp_path):
+    """Acceptance 3 under the estate rule: the two per-row holds can between them hold back
+    every row of a run whose verdict alone reads PARTIAL. That run re-dated no grade, so it is
+    not evidence the ritual happened, and `calibrated_run` skips it."""
+    prior = {"date": "2026-10-01", "lenses": {"security": {"grade": "B"}, "cost": {"grade": "B"}}, "calibration": _calibrated({}, [])}
+    held = _held_run(sweep_cost_fully=False)
+    assert cf.calibration_verdict(held) == cf.PARTIAL, "the verdict alone would have moved the clock"
+    assert cf.advanced_lenses(held, date(2026, 11, 16)) == set()
+    repo = _write_named(tmp_path, {"fullreview_grades_2026-10-01.json": prior, "fullreview_grades_2026-11-16.json": held})
+    assert cf.calibrated_run(os.path.join(repo, "docs", "reviews", "fullreview_grades_2026-11-16.json")) is False
+    assert oc.newest_run(_entry_over(repo), repo) == date(2026, 10, 1)
+    assert cf.scratch_dates(cf.load_grade_runs(repo)) == {"security": date(2026, 10, 1), "cost": date(2026, 10, 1)}
+    text = "\n".join(cf.carry_forward_report(date(2026, 11, 17), repo)[0])
+    assert "2026-11-16 run advanced NO lens" in text and "does not move the fullreview-full clock" in text
+    assert "W1" not in text
+
+
+def test_the_positive_control_a_run_that_advanced_one_lens_moves_the_ritual_clock(tmp_path):
+    """Without this, a qualifier that refused every PARTIAL run would pass the test above."""
+    prior = {"date": "2026-10-01", "lenses": {"security": {"grade": "B"}, "cost": {"grade": "B"}}, "calibration": _calibrated({}, [])}
+    moved = _held_run(sweep_cost_fully=True)
+    assert cf.advanced_lenses(moved, date(2026, 11, 16)) == {"cost"}
+    repo = _write_named(tmp_path, {"fullreview_grades_2026-10-01.json": prior, "fullreview_grades_2026-11-16.json": moved})
+    assert oc.newest_run(_entry_over(repo), repo) == date(2026, 11, 16)
+    assert cf.scratch_dates(cf.load_grade_runs(repo)) == {"security": date(2026, 10, 1), "cost": date(2026, 11, 16)}
+    assert "advanced NO lens" not in "\n".join(cf.carry_forward_report(date(2026, 11, 17), repo)[0])
+
+
+def test_a_same_day_partial_is_named_as_the_partial_and_checked_against_its_whole_run(tmp_path):
+    """A whole run and a partial share a date (2026-11-14). A control-design line about one must
+    not read as a line about the other, and a partial that re-uses the same-day whole run's
+    control is re-using a spent control — `d < when` alone could not see it."""
+    whole = {"date": "2026-11-14", "lenses": {"security": {"grade": "B"}, "cost": {"grade": "B"}}}
+    whole["calibration"] = _calibrated({"security": _control("W1", found=False)}, ["W1"])
+    whole["calibration"]["withheld_known_issues"]["by_lens"]["security"]["blind"] = False
+    partial = {"date": "2026-11-14", "lenses": {"security": {"grade": "B"}}}
+    partial["calibration"] = _calibrated({"security": _control("W1", found=True)}, [])
+    repo = _write_named(tmp_path, {"fullreview_grades_2026-11-14.json": whole, "fullreview_grades_2026-11-14_partial.json": partial})
+    lines = cf.carry_forward_report(date(2026, 11, 15), repo)[0]
+    assert "   ⚠️  withheld control, 2026-11-14 run, security: recorded as not blind (#5914)" in "\n".join(lines)
+    reuse = [line for line in lines if "re-uses a control" in line]
+    assert len(reuse) == 1 and "2026-11-14 partial run, security" in reuse[0], lines
+    assert not any("W1" in line for line in lines)
+
+
+def test_every_committed_artifact_keeps_its_clock_verdict_and_recorded_dates():
+    """No committed run changes how it reads: the ritual-clock verdict of every artifact through
+    2026-11-14 (pinned from the output before this change), and every lens's from-scratch date
+    equals the run date the artifact itself records — `advanced_lenses` adds no hold to them."""
+    want = {
+        "fullreview_grades_2026-07-16.json": True,
+        "fullreview_grades_2026-07-28_partial.json": True,
+        "fullreview_grades_2026-08-02_delta.json": True,
+        "fullreview_grades_2026-08-09_delta.json": True,
+        "fullreview_grades_2026-08-16_delta.json": True,
+        "fullreview_grades_2026-09-05.json": True,
+        "fullreview_grades_2026-10-31.json": False,
+        "fullreview_grades_2026-11-13.json": True,
+        "fullreview_grades_2026-11-14.json": True,
+        "fullreview_grades_2026-11-14_partial.json": True,
+    }
+    reviews = os.path.join(REPO, "docs", "reviews")
+    assert {name: cf.calibrated_run(os.path.join(reviews, name)) for name in want} == want
+    for when, run in cf.load_grade_runs(REPO):
+        if run["_artifact"] in want:
+            assert str(run.get("date", ""))[:10] == when.isoformat(), f"{run['_artifact']}: its recorded date moved"
+            if want[run["_artifact"]]:
+                assert cf.advanced_lenses(run, when), f"{run['_artifact']} counted before and must still advance a lens"

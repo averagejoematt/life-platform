@@ -250,7 +250,10 @@ own controls and reports whether they fired:
   one grader's recall in one area: the run is PARTIALLY_CALIBRATED, it resets the ritual clock,
   and `scripts/review_carry_forward.py::scratch_dates` holds back only the rows that missed — the
   boot brief keeps printing them as expired until a run re-grades them. A run in which every
-  graded row missed is UNCALIBRATED. A `_partial` artifact re-grades the rows it names and
+  graded row missed is UNCALIBRATED. **A run that advanced no lens does not reset the ritual
+  clock** — when the per-row holds (a missed withheld issue, an incomplete estate sweep) between
+  them hold back every graded row, `calibrated_run` skips it whatever its verdict reads
+  (`advanced_lenses` is the one definition both clocks read). A `_partial` artifact re-grades the rows it names and
   retires none: the sweep reads the newest whole run and every partial after it together.
 - **An UNCALIBRATED run does not reset the calendar clock.** `scripts/operating_calendar.py`
   reads that block (`calibrated_run`) and skips the artifact, so the lens still counts down
