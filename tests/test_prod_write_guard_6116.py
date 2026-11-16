@@ -416,11 +416,13 @@ def test_the_ancestry_signal_names_pytest_and_not_a_shell_that_mentions_it():
 # ── the Python twin ──────────────────────────────────────────────────────────────────────────────────────────────
 
 _PY_PROBE = f"""
-import sys
+import os, sys
 sys.path.insert(0, {str(GUARD_PY_DIR)!r})
+if os.environ.get("PROBE_IMPORT_BOTO3_FIRST"):  # a script that imports boto3 at module level, before __main__
+    import boto3
 from prod_write_guard import install_prod_write_guard
 print("reason=" + str(install_prod_write_guard()), flush=True)
-import boto3
+import boto3  # a script that imports it lazily, inside main()
 s3 = boto3.client("s3", region_name="us-west-2", endpoint_url="http://127.0.0.1:9", aws_access_key_id="x", aws_secret_access_key="x")
 try:
     s3.list_objects_v2(Bucket="b")
@@ -438,10 +440,12 @@ def test_the_python_twin_refuses_a_write_from_a_test_subprocess_and_honours_a_de
     # (no AWS_PROFILE="": botocore, unlike the CLI, raises ProfileNotFound on an empty profile name)
     env.update(AWS_ACCESS_KEY_ID="", AWS_SECRET_ACCESS_KEY="", HOME=str(tmp_path), AWS_MAX_ATTEMPTS="1")
     env["PYTHONUSERBASE"] = site.getuserbase()  # HOME moved; boto3 may live in the user site
-    r = subprocess.run([sys.executable, "-c", _PY_PROBE], capture_output=True, text=True, env=env, timeout=120)
-    assert r.returncode == EXIT_REFUSED, r.stdout + r.stderr
-    assert "read-reached-network" in r.stdout, "a read must stay allowed (a dry-run path is unchanged)"
-    assert "write-reached-network" not in r.stdout and "REFUSED `s3 PutObject`" in r.stderr, r.stdout + r.stderr
+    for order in ("lazy", "module-level"):
+        probe_env = dict(env, PROBE_IMPORT_BOTO3_FIRST="1") if order == "module-level" else env
+        r = subprocess.run([sys.executable, "-c", _PY_PROBE], capture_output=True, text=True, env=probe_env, timeout=120)
+        assert r.returncode == EXIT_REFUSED, f"{order}: " + r.stdout + r.stderr
+        assert "read-reached-network" in r.stdout, f"{order}: a read must stay allowed (a dry-run path is unchanged)"
+        assert "write-reached-network" not in r.stdout and "REFUSED `s3 PutObject`" in r.stderr, f"{order}: " + r.stdout + r.stderr
     env["LP_TEST_AWS_IS_STUB"] = "http://127.0.0.1:9"
     r = subprocess.run([sys.executable, "-c", _PY_PROBE], capture_output=True, text=True, env=env, timeout=120)
     assert r.returncode == 0 and "write-reached-network" in r.stdout, r.stdout + r.stderr

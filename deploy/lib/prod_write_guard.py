@@ -20,6 +20,7 @@ runs under tests/conftest.py's hermetic credentials, and patching botocore there
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import re
 import subprocess
@@ -106,12 +107,8 @@ def refuse(what: str, reason: str) -> None:
     os._exit(EXIT_CODE)
 
 
-def _patch_botocore(reason: str) -> None:
-    try:
-        from botocore.client import BaseClient
-    except ImportError:  # no boto3 in this interpreter: nothing to guard
-        return
-    original = BaseClient._make_api_call
+def _guard_client_class(client_cls, reason: str) -> None:
+    original = client_cls._make_api_call
     if getattr(original, "_lp_prod_write_guard", False):
         return
 
@@ -121,7 +118,41 @@ def _patch_botocore(reason: str) -> None:
         return original(self, operation_name, api_params)
 
     setattr(guarded, "_lp_prod_write_guard", True)
-    BaseClient._make_api_call = guarded
+    client_cls._make_api_call = guarded
+
+
+class _GuardBotocoreOnImport:
+    """A one-shot meta-path finder: when the script first imports botocore.client, guard its BaseClient. The twin itself
+    never imports botocore — it acts only if (and when) the script loads it, so a script that imports boto3 lazily
+    inside main() is covered as well as one that imported it at module level."""
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+
+    def find_spec(self, name, path=None, target=None):
+        if name != "botocore.client":
+            return None
+        sys.meta_path.remove(self)
+        spec = importlib.util.find_spec(name)
+        if spec is None or spec.loader is None:
+            return spec
+        loader, reason = spec.loader, self.reason
+        original_exec = loader.exec_module
+
+        def exec_module(module):
+            original_exec(module)
+            _guard_client_class(module.BaseClient, reason)
+
+        loader.exec_module = exec_module
+        return spec
+
+
+def _guard_botocore(reason: str) -> None:
+    loaded = sys.modules.get("botocore.client")
+    if loaded is not None:
+        _guard_client_class(loaded.BaseClient, reason)
+    elif not any(isinstance(f, _GuardBotocoreOnImport) for f in sys.meta_path):
+        sys.meta_path.insert(0, _GuardBotocoreOnImport(reason))
 
 
 def install_prod_write_guard(environ=None) -> str | None:
@@ -135,5 +166,5 @@ def install_prod_write_guard(environ=None) -> str | None:
     env.setdefault(SESSION_ENV, "1")
     if SHIM_DIR not in env.get("PATH", "").split(os.pathsep):
         env["PATH"] = SHIM_DIR + os.pathsep + env.get("PATH", "")
-    _patch_botocore(reason)
+    _guard_botocore(reason)
     return reason
