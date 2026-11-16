@@ -39,6 +39,9 @@ import pytest
 import yaml
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Empty AWS_* values are NOT "no credentials": the CLI falls back to ~/.aws. Every subprocess env here also points the
+# two credential files at nothing, so no path through a deploy script can reach a real bucket (INCIDENT_LOG 2026-11-16).
+_NO_AWS_FILES = {"AWS_CONFIG_FILE": os.devnull, "AWS_SHARED_CREDENTIALS_FILE": os.devnull, "AWS_EC2_METADATA_DISABLED": "true"}
 for p in (REPO, os.path.join(REPO, "qa"), os.path.join(REPO, "scripts")):
     if p not in sys.path:
         sys.path.insert(0, p)
@@ -306,7 +309,7 @@ def test_www_sync_script_guards_the_root_sync_and_never_deletes(tmp_path):
     assert 'aws s3 sync "s3://$BUCKET/$PREVIOUS_PREFIX' in restore and "$SITE_DIR" not in restore and "git checkout" not in restore
     # a lane can rehearse every mode without credentials
     env = {k: v for k, v in os.environ.items() if not k.startswith("AWS_")}
-    env.update({"AWS_ACCESS_KEY_ID": "", "AWS_SECRET_ACCESS_KEY": "", "AWS_PROFILE": ""})
+    env.update({"AWS_ACCESS_KEY_ID": "", "AWS_SECRET_ACCESS_KEY": "", "AWS_PROFILE": "", **_NO_AWS_FILES})
     r = subprocess.run(
         ["bash", os.path.join(REPO, "deploy", "www_preview_sync.sh"), "--target", "root", "--restore-previous", "--print"],
         capture_output=True,
@@ -588,7 +591,7 @@ def test_the_previous_build_is_recorded_outside_the_served_prefix_one_build_per_
     dist.mkdir()
     (dist / "index.html").write_text("<!doctype html>")
     env = {k: v for k, v in os.environ.items() if not k.startswith("AWS_")}
-    env.update({"AWS_ACCESS_KEY_ID": "", "AWS_SECRET_ACCESS_KEY": "", "AWS_PROFILE": "", "GITHUB_SHA": "abc123"})
+    env.update({"AWS_ACCESS_KEY_ID": "", "AWS_SECRET_ACCESS_KEY": "", "AWS_PROFILE": "", "GITHUB_SHA": "abc123", **_NO_AWS_FILES})
     r = subprocess.run(
         [
             "bash",
