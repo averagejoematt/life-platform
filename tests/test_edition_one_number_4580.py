@@ -166,12 +166,13 @@ def test_the_record_and_the_scorecard_say_the_same_sentence_and_serve_the_rate()
     assert f"{record['baseline']['rate_pct']}% chance of coming true" in record["baseline"]["text"]
     # the calibration's own base rate is the same number the field serves
     assert abs(wire["calibration"]["platform"]["strata"]["coaches"]["base_rate"] - record["baseline"]["rate"]) < 0.002
-    # a skill reading above zero flips BOTH to the same beats sentence
+    # owner 2026-11-09: a skill point estimate above zero is NOT a demonstrated advantage — BOTH still say "not yet"
     cal = copy.deepcopy(wire["calibration"])
     cal["platform"]["strata"]["coaches"]["brier_skill"] = 0.05
     beats = _compose({**wire, "calibration": cal})
-    assert beats["record"]["data"]["comparison_text"] == rw.GUESS_BEATS
-    assert beats["scorecard"]["data"]["rows"]["ai"]["data"]["verdict_text"] + "." == rw.GUESS_BEATS
+    assert beats["record"]["data"]["beats_simple_guess"] is False
+    assert beats["record"]["data"]["comparison_text"] == rw.GUESS_NOT_YET
+    assert beats["scorecard"]["data"]["rows"]["ai"]["data"]["verdict_text"] + "." == rw.GUESS_NOT_YET
 
 
 # ── 3. one quantity, one unit ──────────────────────────────────────────────────────────

@@ -1329,8 +1329,39 @@ def test_a_draft_carries_the_prebuilt_artifacts_the_approver_will_publish(env):
 
 
 def test_preview_mode_writes_nothing_to_the_public_journal(env):
+    """No post, no page: the ONLY public write is the non-content pending marker (#5520)."""
     m.lambda_handler({}, None)
-    assert [p["Key"] for p in env["s3"].puts] == []
+    assert [p["Key"] for p in env["s3"].puts] == ["generated/journal/posts.json"]
+    doc = json.loads(env["s3"].puts[0]["Body"])
+    assert doc["posts"] == [] and set(doc) == {"posts", "pending"}
+
+
+def test_a_preview_routed_draft_marks_its_week_awaiting_approval(env):
+    """#5520: Week 8 sat as a draft for 18 days while every door said "the next draft is due" — the preview route
+    wrote no marker, so /api/edition served held=null. The marker names the week and says it waits on approval."""
+    m.lambda_handler({}, None)
+    marker = _pending_marker(env)
+    assert marker is not None, "a preview-routed draft wrote no pending marker"
+    assert marker["week"] == 5 and marker["reason"] == m._store.AWAITING_APPROVAL == "awaiting_approval"
+    assert "drafted" in marker["display"] and "approval" in marker["display"] and TITLE not in marker["display"]
+
+
+def test_a_preview_whose_draft_was_never_stored_marks_nothing(env):
+    """The #2254 refusal path stops before the marker: no draft exists, so none is announced."""
+
+    class _Refusing(Exception):
+        pass
+
+    _Refusing.__name__ = "ConditionalCheckFailedException"
+
+    def _put(Item=None, **kwargs):
+        if Item.get("source") == "chronicle" and "ConditionExpression" in kwargs:
+            raise _Refusing("The conditional request failed")
+        return FakeTable.put_item(env["table"], Item=Item, **kwargs)
+
+    env["table"].put_item = _put
+    m.lambda_handler({}, None)
+    assert _pending_marker(env) is None
 
 
 def test_the_preview_email_carries_approve_and_request_changes_links(env):

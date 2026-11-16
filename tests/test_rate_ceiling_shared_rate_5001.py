@@ -240,7 +240,7 @@ def test_every_reader_of_the_rate_reaches_the_shared_quantity():
     """Mutation control: point any one site at its own derivation — the offender is named."""
     sites = {
         ("mcp/tools_plan.py", "tool_plan_next_session"): "loss_rate_lb_wk",  # stage 1 reads it
-        ("mcp/tools_plan.py", "_run_stage_2"): "_block_rate",  # the advocate's rate IS the block's quantity
+        ("mcp/plan_stage2_run.py", "packet_builder"): "_block_rate",  # the advocate's rate IS the block's quantity (#5781)
         ("mcp/tools_nutrition.py", "_get_macro_targets"): "_shared_loss_rate",  # get_nutrition view=macros
         ("mcp/tools_nutrition.py", "_shared_loss_rate"): "loss_rate_lb_wk",
         ("lambdas/training/plan_engine.py", "_tripwire_states"): "rate_ceiling_check",

@@ -16,6 +16,7 @@ const SEAL = {
   artifact_url: "https://averagejoematt.com/experiments/prereg/genesis-2026-07-27.json",
   stamp_url: "https://averagejoematt.com/experiments/prereg/genesis-2026-07-27.sha256.json",
   verify: "curl -s https://averagejoematt.com/experiments/prereg/genesis-2026-07-27.json | shasum -a 256",
+  verifiable: true,
 };
 
 const CAL_BASE = { platform: {}, coaches: [], hypotheses: {}, voided: { n: 0 }, cycle: 11 };
@@ -59,7 +60,39 @@ test("renderPredictions renders nothing when prereg_seal is absent", () => {
   assert.doesNotMatch(html, /frozen pre-registration/);
 });
 
-test("a seal missing sha256 or artifact_url is treated as absent (never a half-broken block)", () => {
+test("a seal missing sha256 is treated as absent (never a half-broken block)", () => {
   const html = ei.renderCalibration({ ...CAL_BASE, prereg_seal: { verify: "curl ..." } });
   assert.doesNotMatch(html, /frozen pre-registration/);
+});
+
+// Owner ruling 2026-11-11 (item 3): a seal whose served file no longer matches publishes the digest and the reason, and
+// offers no link to the file, no verify command and no "anyone can check" sentence.
+const WITHDRAWN = {
+  genesis: "2026-09-06",
+  sha256: "bd225d24f67381c253a34671107ba1bc1a8a3c9cc35dadbca1a5edd061b9782d",
+  stamp_url: "https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.sha256.json",
+  verifiable: false,
+  unverifiable_text: "The sealed file itself is no longer served.",
+};
+
+for (const [name, seal] of [
+  ["verifiable: false", WITHDRAWN],
+  // an older API that still serves the command but says nothing about verifiability: fail closed
+  ["verifiable absent", { ...SEAL, verifiable: undefined }],
+]) {
+  for (const render of ["renderCalibration", "renderPredictions"]) {
+    test(`${render}: an unverifiable seal (${name}) shows the digest and offers no check`, () => {
+      const html = ei[render]({ ...(render === "renderCalibration" ? CAL_BASE : PRED_BASE), prereg_seal: seal });
+      assert.match(html, new RegExp(seal.sha256));
+      assert.doesNotMatch(html, /shasum/);
+      assert.doesNotMatch(html, /rd-copy-btn/);
+      assert.doesNotMatch(html, /Anyone can run/);
+      assert.doesNotMatch(html, /experiments\/prereg\/genesis-[0-9-]+\.json"/);
+    });
+  }
+}
+
+test("the withdrawal's reason is rendered as served", () => {
+  const html = ei.renderCalibration({ ...CAL_BASE, prereg_seal: WITHDRAWN });
+  assert.match(html, /The sealed file itself is no longer served\./);
 });

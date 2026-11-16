@@ -59,6 +59,7 @@ for _p in (REPO / "lambdas", REPO / "lambdas" / "compute"):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
+import sealed_prereg  # noqa: E402
 from experiment import (
     experiment_gates as gates,  # noqa: E402
     prereg_effect,  # noqa: E402
@@ -71,7 +72,9 @@ with mock.patch("boto3.resource"), mock.patch("boto3.client"):
 _SEEDER_SRC = REPO / "deploy" / "seed_genesis_preregistration.py"
 _API_SRC = REPO / "lambdas" / "web" / "site_api_discovery.py"
 # The real wire: the frozen, hash-stamped, published genesis artifact.
-_REAL_FROZEN = json.loads((REPO / "deploy" / "generated" / "genesis_preregistration.json").read_text())
+# The sealed file is private since 2026-11-11 (owner ruling item 3): the private original when present (tests/sealed_prereg.py), else
+# the old path, which no longer exists, so a test that reads it skips (sealed_prereg.require_sealed_path()).
+_REAL_FROZEN = sealed_prereg.load_sealed()
 
 # A series with real spread — a flat one derives a bar of 0, which prereg_effect rejects.
 _SERIES = [200.0, 203.0, 199.0, 204.0, 198.0, 205.0, 197.0, 206.0]
@@ -320,6 +323,7 @@ def test_the_engine_never_stores_a_hypothesis_outside_the_chokepoint():
 
 def test_the_frozen_artifact_keeps_every_key_it_already_had():
     """The real wire, from the repo's own published artifact — not a hand-rolled shape."""
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     seeder = _load_seeder()
     goals = json.loads((REPO / "config" / "user_goals.json").read_text())
     built = {h["hypothesis_id"]: h for h in seeder.build_hypotheses(goals, series_reader=fixture_series)}
@@ -330,6 +334,7 @@ def test_the_frozen_artifact_keeps_every_key_it_already_had():
 
 
 def test_the_frozen_artifact_ships_the_facet_and_no_published_literal():
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     seeder = _load_seeder()
     goals = json.loads((REPO / "config" / "user_goals.json").read_text())
     built = {h["hypothesis_id"]: h for h in seeder.build_hypotheses(goals, series_reader=fixture_series)}

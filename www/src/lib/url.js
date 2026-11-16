@@ -25,6 +25,17 @@ export function href(path, base = import.meta.env.BASE_URL) {
   return `${b}${p}`;
 }
 
+/**
+ * Whether an object has a page of its own. A HELD chapter does not (owner ruling 2026-11-10, item 5): a week whose
+ * installment is drafted but not approved gets no public route, no sitemap entry and no link anywhere — the week's
+ * state may still be said in words where it is listed, never as a destination. Skipped and pending weeks keep their
+ * state pages (no draft exists behind them). Every template that links a chapter asks this first.
+ */
+export function hasPage(type, obj) {
+  if (type === "chapter") return !!obj && obj.status !== "held";
+  return true;
+}
+
 /** The canonical path of an object (without base). Episodes live on their chapter page. */
 export function pathOf(type, id, data) {
   if (type === "episode" && data && data.chapter_id) return `/story/${data.chapter_id}/#listen`;

@@ -59,6 +59,15 @@ latest complete week. The weekly digest passes it (its `end_date` is yesterday);
 the critic do not (theirs is a day still being planned or lived). Before #4111's fix a Monday
 digest run treated the week that ended the day before as in progress, so the report skipped
 the just-ended week. Pure: rows are injected, nothing is fetched.
+
+THE PROPOSAL (#5796). The report stopped at the count: a set he added to the same movement week
+after week left the program prescribing the lower number. Each week now also keeps, per prescribed
+movement, every matched program session's (prescribed, performed) working sets (`by_movement`).
+A movement above its prescription in each of the last `progression.set_raise_proposal.weeks_running`
+complete weeks (a charter platform default) becomes a PROPOSAL (`propose_set_raises`): the weeks'
+counts, the proposed per-session count, and the headroom under the `volume_ceiling` redline. It
+rides the plan's constraint block beside the ceiling-change proposal (`set_raise_for_plan`) and is
+never applied here (`auto_applied` is always False) — the owner approves it.
 """
 
 from __future__ import annotations
@@ -111,7 +120,18 @@ def _catalog_movements() -> dict[str, Any]:
         return {}
 
 
-def _label(movement_key: str, row: dict[str, Any]) -> str:
+def _catalog_once(cache: dict[str, Any] | None) -> dict[str, Any]:
+    """`_catalog_movements()`, read at most once per `cache` (#5813). On the Lambda the catalog is not in the bundle, so
+    every read is a 430 KB S3 GET + parse: one per LABEL made a plan call's stage 1 read it ~540 times (~25 s). The
+    catalog cannot change inside one `weekly_excess`, so one read per call gives every label the same answer."""
+    if cache is None:
+        return _catalog_movements()
+    if "movements" not in cache:
+        cache["movements"] = _catalog_movements()
+    return cache["movements"]
+
+
+def _label(movement_key: str, row: dict[str, Any], _catalog: dict[str, Any] | None = None) -> str:
     """A readable name for an adherence movement key — ALWAYS the Hevy title when one is known (#5008 C4).
 
     The 10-16 report mixed namespaces: a chat-authored `tmpl:<id>` key printed its title ("Squat (Barbell)")
@@ -119,7 +139,7 @@ def _label(movement_key: str, row: dict[str, Any]) -> str:
     the catalog's `hevy_template_id_hint`; a catalog key resolves to its catalog title; only a key with no
     title anywhere is printed as the key."""
     key = str(movement_key or "")
-    movements = _catalog_movements()
+    movements = _catalog_once(_catalog)
     if key.startswith("tmpl:"):
         tid = key[5:]
         for ex in row.get("exercises") or []:
@@ -149,14 +169,20 @@ def _week(start: Any, end_date: Any, end_day_complete: bool = False) -> dict[str
         "added": [],
         "unprogrammed_exercises": 0,
         "unmatched": [],
+        # #5796: per prescribed movement, every matched program session's (prescribed, performed) working sets — the
+        # set-raise proposal's evidence (off-program complements never land here)
+        "by_movement": {},
         # #4312: off-program complements (Flex) — their own line, never counted against the plan
         "off_program": {"sessions": 0, "archetypes": [], "programmed_sets": 0, "performed_sets": 0, "added_sets": 0, "added": []},
         "sessions_archetype_unresolved": 0,
     }
 
 
-def _movement_adds(adh: dict[str, Any], row: dict[str, Any], day: Any, bucket: dict[str, Any], **extra: Any) -> None:
-    """Accumulate one matched session's per-movement programmed/performed counts into `bucket`."""
+def _movement_adds(
+    adh: dict[str, Any], row: dict[str, Any], day: Any, bucket: dict[str, Any], _catalog: dict[str, Any] | None = None, **extra: Any
+) -> None:
+    """Accumulate one matched session's per-movement programmed/performed counts into `bucket` (`_catalog`: the caller's
+    read-once catalog cache, #5813)."""
     for m in adh["movements"]:
         # #5008 C4: working sets when the row carries them (adherence stores both since #5008); older rows
         # carry only the warm-up-inclusive counts and fall back to them, unchanged
@@ -164,12 +190,17 @@ def _movement_adds(adh: dict[str, Any], row: dict[str, Any], day: Any, bucket: d
         perf = _int(m["performed_working_sets"] if "performed_working_sets" in m else m.get("performed_sets"))
         bucket["programmed_sets"] += prog
         bucket["performed_sets"] += perf
+        if "by_movement" in bucket and m.get("movement_key"):
+            mv = bucket["by_movement"].setdefault(
+                str(m["movement_key"]), {"movement": _label(m.get("movement_key"), row, _catalog), "sessions": []}
+            )
+            mv["sessions"].append({"date": day.isoformat(), "programmed_sets": prog, "performed_sets": perf})
         if perf > prog:
             bucket["added_sets"] += perf - prog
             bucket["added"].append(
                 {
                     "date": day.isoformat(),
-                    "movement": _label(m.get("movement_key"), row),
+                    "movement": _label(m.get("movement_key"), row, _catalog),
                     "programmed_sets": prog,
                     "performed_sets": perf,
                     "max_rpe": _num((m.get("intensity") or {}).get("max_rpe")) if isinstance(m.get("intensity"), dict) else None,
@@ -192,6 +223,7 @@ def weekly_excess(
     from training import session_sequence
     from training.routine_title import routine_archetype
 
+    catalog: dict[str, Any] = {}  # #5813: the movement catalog, read at most once for every label below
     for row in sorted(hevy_rows or [], key=lambda r: (str(r.get("date") or ""), str(r.get("sk") or ""))):
         if row.get("tombstone"):
             continue
@@ -208,7 +240,7 @@ def weekly_excess(
             if off not in op["archetypes"]:
                 op["archetypes"].append(off)
             if matched and adh is not None:
-                _movement_adds(adh, row, day, op, archetype=off)
+                _movement_adds(adh, row, day, op, catalog, archetype=off)
             continue
         if routine_archetype(row) == (None, None):
             wk["sessions_archetype_unresolved"] += 1
@@ -220,7 +252,7 @@ def weekly_excess(
             continue
         wk["sessions_matched"] += 1
         wk["unprogrammed_exercises"] += len(adh.get("extra") or [])
-        _movement_adds(adh, row, day, wk)
+        _movement_adds(adh, row, day, wk, catalog)
     for wk in out:
         wk["net_sets"] = wk["performed_sets"] - wk["programmed_sets"]
         if wk["sessions_matched"]:
@@ -312,3 +344,119 @@ def evaluate(
         "observed": f"{run} consecutive complete week(s) above the prescription (threshold {threshold_weeks})",
         "detail": "a week the verdict depends on held no session matched to a committed routine — " + lines + now,
     }
+
+
+# ── #5796: a set added three weeks running comes back as a proposed raise ─────────────────────────────────────────────
+SET_RAISE_KEY = "progression.set_raise_proposal.weeks_running"
+SET_RAISE_APPLIES = "a proposal only — the owner approves it; nothing here changes a prescription (auto_applied is always False)"
+
+
+def set_raise_weeks() -> int:
+    """The charter's run length (`progression.set_raise_proposal.weeks_running`, a platform default pending his ruling).
+    Read with no fallback: a missing key is a loud error, never a silently different rule."""
+    from training.training_charter import charter_value
+
+    n = charter_value(SET_RAISE_KEY)
+    if not isinstance(n, int) or isinstance(n, bool) or n < 1:
+        raise KeyError(f"training charter has no usable {SET_RAISE_KEY} ({n!r})")
+    return n
+
+
+def _volume_headroom(key: str, latest: dict[str, Any], added_per_wk: int, catalog: dict[str, Any]) -> dict[str, Any]:
+    """The raise against the `volume_ceiling` redline (`owner_redlines`, sets per muscle per week): the latest complete
+    week's prescribed working sets on the movement's primary muscle (catalog), the ceiling, the headroom left and
+    whether the raise fits in it. An uncatalogued muscle is named, never guessed."""
+    from health.adherence_calc import _catalog_entry_for
+
+    from training import owner_redlines
+
+    ceiling = int(next(t for t in owner_redlines.TRIPWIRES if t["id"] == "volume_ceiling")["threshold"]["sets_per_muscle_wk"])
+    muscle_of = {k: _catalog_entry_for(k, catalog).get("primary_muscle") for k in latest["by_movement"]}
+    muscle = muscle_of.get(key)
+    out: dict[str, Any] = {"redline": "volume_ceiling", "ceiling_sets_per_muscle_wk": ceiling, "muscle": muscle}
+    if not muscle:
+        return {**out, "headroom_sets": None, "fits": None, "reason": "the movement's primary muscle is not in the catalog"}
+    prescribed = sum(s["programmed_sets"] for k, mv in latest["by_movement"].items() if muscle_of.get(k) == muscle for s in mv["sessions"])
+    headroom = ceiling - prescribed
+    return {
+        **out,
+        "prescribed_sets_per_wk": prescribed,
+        "added_sets_per_wk": added_per_wk,
+        "headroom_sets": headroom,
+        "fits": added_per_wk <= headroom,
+    }
+
+
+def _raise_for(key: str, run: list[dict[str, Any]], catalog: dict[str, Any]) -> dict[str, Any] | None:
+    """One movement's proposal, or None. Above in a week = its sessions' performed working sets exceed the prescribed
+    (net over the week); every week of the run must be above. The proposed count is the fewest he performed in any
+    session of the run — the count he reached every time — and only a count above today's prescription is proposed."""
+    mvs = [w["by_movement"].get(key) for w in run]
+    if any(not mv or sum(s["performed_sets"] for s in mv["sessions"]) <= sum(s["programmed_sets"] for s in mv["sessions"]) for mv in mvs):
+        return None
+    latest = mvs[-1]["sessions"]
+    current = latest[-1]["programmed_sets"]
+    proposed = min(s["performed_sets"] for mv in mvs for s in mv["sessions"])
+    if proposed <= current:
+        return None
+    weeks = [
+        {
+            "week_start": w["week_start"],
+            "sessions": [{k: s[k] for k in ("date", "programmed_sets", "performed_sets")} for s in mv["sessions"]],
+        }
+        for w, mv in zip(run, mvs)
+    ]
+    headroom = _volume_headroom(key, run[-1], (proposed - current) * len(latest), catalog)
+    fits = {True: "fits under", False: "would go past", None: "could not be checked against"}[headroom["fits"]]
+    return {
+        "movement_key": key,
+        "movement": mvs[-1]["movement"],
+        "weeks": weeks,
+        "prescribed_sets_per_session": current,
+        "proposed_sets_per_session": proposed,
+        "volume_ceiling": headroom,
+        "text": (
+            f"{mvs[-1]['movement']}: above its prescription {len(run)} weeks running, at least {proposed} working sets every "
+            f"session against {current} prescribed. Proposal: prescribe {proposed}. The raise {fits} the weekly volume ceiling "
+            f"for {headroom['muscle'] or 'its muscle'}. Nothing changes until you approve."
+        ),
+    }
+
+
+def propose_set_raises(weeks: list[dict[str, Any]], weeks_running: int, catalog: dict[str, Any] | None = None) -> dict[str, Any]:
+    """`proposed` / `none` / `insufficient` over `weekly_excess`'s weeks: a movement above its prescription in each of the
+    last `weeks_running` complete weeks becomes a proposal to raise its prescribed working sets. Pure over its inputs."""
+    base: dict[str, Any] = {"weeks_running": weeks_running, "proposals": [], "auto_applied": False, "applies": SET_RAISE_APPLIES}
+    run = [w for w in weeks if w.get("complete")][-weeks_running:]
+    if len(run) < weeks_running or any(not w.get("sessions_matched") for w in run):
+        return {**base, "state": "insufficient", "reason": f"fewer than {weeks_running} complete weeks with a matched program session"}
+    cat = catalog if catalog is not None else {"movements": _catalog_movements()}
+    proposals = [p for p in (_raise_for(k, run, cat) for k in sorted(run[-1]["by_movement"])) if p]
+    return {**base, "state": "proposed" if proposals else "none", "proposals": proposals}
+
+
+def set_raise_for_plan(
+    date: str, rows: list[dict[str, Any]] | None, read_state: str | None, catalog_movements: dict[str, Any] | None
+) -> dict[str, Any]:
+    """`plan_engine.constraint_block['set_raise_proposal']`, beside the ceiling-change proposal it mirrors (#5058): the
+    proposals, or `unknown` when the prescription window was not read — never "no proposal" from a read that did not
+    happen (#4072). `date` is the planned day, so its week is in progress and never counts."""
+    try:
+        weeks_running: int | None = set_raise_weeks()
+    except KeyError as e:  # an unread charter is named on the block, never a failed plan and never a silent default
+        weeks_running, unread = None, f"the charter run length was not read ({e})"
+    else:
+        unread = (
+            None if rows is not None and read_state is not None else f"the prescription window was not read ({read_state or 'read_failed'})"
+        )
+    if unread or weeks_running is None:
+        return {
+            "state": "unknown",
+            "reason": unread,
+            "weeks_running": weeks_running,
+            "proposals": [],
+            "auto_applied": False,
+            "applies": SET_RAISE_APPLIES,
+        }
+    catalog = {"movements": catalog_movements} if catalog_movements is not None else None
+    return {"date": date, **propose_set_raises(weekly_excess(rows, date, max(weeks_running, LOOKBACK_WEEKS)), weeks_running, catalog)}

@@ -37,6 +37,12 @@ from unittest.mock import patch
 
 import pytest
 
+ROLLBACK = pytest.mark.usefixtures("exercise_library_rollback")
+"""#5861 (owner approval 2026-11-14): the marked tests pin the PRE-approval generator — the v0.4 session shapes (role order lifts,
+back-offs, set counts, the red-day wholesale drop) are the pre-approval generator's. They run on the library's rollback copy (status
+proposed: tests/conftest.py `exercise_library_rollback`), so they keep guarding the rollback path; the approved (live) behaviour is
+pinned by the #5861 tests."""
+
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "lambdas"))
@@ -67,7 +73,7 @@ UH, LH, SA, UV, LV = "upper_heavy", "lower_heavy", "shoulders_arms", "upper_volu
 # `tmpl:` machines (leg_press / leg_curl / calf_raise_machine).
 COMMITTED_LOWER_HEAVY = [
     ("squat_barbell", 3),
-    ("romanian_deadlift_barbell", 3),
+    ("deadlift_barbell", 3),  # #5694 (owner ruling 2026-11-08): the conventional pull replaced the committed RDL
     ("leg_press", 2),
     ("leg_curl", 2),
     ("calf_raise_machine", 4),  # #5053: calves at their MEV floor (8/wk) across the two lower days
@@ -139,7 +145,8 @@ def test_heavy_days_are_a_top_set_plus_two_back_offs_and_volume_days_are_8_to_12
     for role in (UV, LV):
         anchors = [e for e in _rx(role)["exposures"] if e["kind"] == "anchor"]
         assert anchors and all(e["intensity"] == "volume" for e in anchors), role
-        assert all(s["reps"] == [8, 12] for e in anchors for s in e["sets"]), role
+        # #5694 (owner ruling 2026-11-08): Lower-volume's RDL runs 8–10, inside the volume band (`anchor_reps`)
+        assert all(s["reps"] == ([8, 10] if (role, e["pattern"]) == (LV, "hinge") else [8, 12]) for e in anchors for s in e["sets"]), role
 
 
 def test_exposure_numbers_match_the_redline_rep_scheme_prose():
@@ -232,15 +239,27 @@ def test_sessions_fit_the_ceiling_and_the_week_total_sits_in_the_redline_band():
             assert 2 <= len(tmpl["accessories"]) <= 3, role
 
 
-def test_the_hinge_is_the_trap_bar_and_the_rdl_only_as_the_moderate_hinge():
+def test_5694_the_hinges_are_the_conventional_deadlift_heavy_and_the_rdl_on_the_volume_day():
+    """#5694 (owner ruling 2026-11-08): Lower-heavy pulls the conventional deadlift as its heavy hinge, Lower-volume the
+    Romanian deadlift (barbell) for 8–10; the trap-bar-until-a-bodyweight rule is retired (charter
+    `gated_movements.conventional_deadlift` is open by owner ruling; the trap bar stays a listed family member only)."""
     lh = {e["pattern"]: e for e in _rx(LH)["exposures"] if e["kind"] == "anchor"}
     lv = {e["pattern"]: e for e in _rx(LV)["exposures"] if e["kind"] == "anchor"}
-    assert (lh["hinge"]["intensity"], lh["hinge"]["movement_key"]) == ("moderate", "romanian_deadlift_barbell")
-    assert (lv["hinge"]["intensity"], lv["hinge"]["movement_key"]) == ("volume", "deadlift_trap_bar")
-    assert owner_redlines.REDLINES["load_anchoring"]["trap_bar_until_lb"] == 275
-    assert program_structure.ANCHORS["hinge"]["catalog_keys"][0] == "deadlift_trap_bar"
-    # the RDL is never a non-moderate hinge: it is not in the family's general keys
+    assert (lh["hinge"]["intensity"], lh["hinge"]["movement_key"]) == ("heavy", "deadlift_barbell")
+    assert [s["kind"] for s in lh["hinge"]["sets"]] == ["top", "back_off", "back_off"] and lh["hinge"]["sets"][0]["reps"] == [4, 6]
+    assert (lv["hinge"]["intensity"], lv["hinge"]["movement_key"]) == ("volume", "romanian_deadlift_barbell")
+    assert [s["reps"] for s in lv["hinge"]["sets"]] == [[8, 10]] * 3
+    assert "trap_bar_until_lb" not in owner_redlines.REDLINES["load_anchoring"]
+    assert "#5694" in owner_redlines.REDLINES["load_anchoring"]["trap_bar_rule"]
+    assert program_structure.ANCHORS["hinge"]["catalog_keys"][0] == "deadlift_barbell"
+    assert charter_value("gated_movements.conventional_deadlift.status") == "open"
+    assert charter_value("gated_movements.conventional_deadlift.until_then") is None
+    # the RDL is still never a GENERAL hinge key: it reaches a slot only as a moderate member or through a role's pin
     assert not any("romanian" in k for k in program_structure.ANCHORS["hinge"]["catalog_keys"])
+    # no pin lists the trap bar or the leg curl: either would be taken as the slot's in-block variant (#4409 rule 1)
+    for role in (LH, LV):
+        pin = program_structure.SESSION_TEMPLATES[role]["anchor_keys"]["hinge"]
+        assert "deadlift_trap_bar" not in pin and "leg_curl" not in pin, role
 
 
 def test_no_plyometrics_and_no_max_effort_singles():
@@ -324,12 +343,19 @@ def test_every_session_fits_the_charters_lifting_minutes_untrimmed():
     """Each role's estimate (working + assumed warm-up sets x (set time + the exposure's rest)) is inside the charter's
     cap with nothing trimmed. Upper-heavy by hand before #5162: bench 3+3 warm-up and row 3+1 at 180 s rest, the press 3+1 and
     the pulldown 2 at 120 s, two accessories x 2 at 90 s, set time 45 s -> (6+4)x225 + 4x165 + 2x165 + 4x135 = 3780 s = 63.0 min.
-    #5162 traded the press (3 sets + a warm-up at 120 s) for a 3-set lateral raise at 90 s: 67.5 -> 63.2 min."""
+    #5162 traded the press (3 sets + a warm-up at 120 s) for a 3-set lateral raise at 90 s: 67.5 -> 63.2 min.
+    #5799: the set time is his MEASURED median (`session_time.MEASURED_SET_SECONDS`, 99 s), not the platform's 45 s, so every
+    estimate grew; upper-heavy (82.2 min) now fits by pairing its accessories as the charter's two antagonist supersets
+    (the first member's rest goes), and still nothing is trimmed."""
     cap = charter_value("split.session_minutes.lifting_ceiling")
     assert program_structure.lifting_minutes_cap() == cap == 75
     got = {r: _rx(r)["session_minutes"]["lifting_minutes"] for r in program_structure.SESSION_TEMPLATES}
-    # #5162: were 67.5 / 51.5 / 39 / 57.5 / 45.5 (#5053: 63 / 47 / 39 / 57.5 / 41)
-    assert got == {UH: 63.2, LH: 51.5, SA: 38.0, UV: 53.2, LV: 45.5}
+    # #5162: were 67.5 / 51.5 / 39 / 57.5 / 45.5 (#5053: 63 / 47 / 39 / 57.5 / 41). #5694: Lower-heavy's hinge became a
+    # heavy pull (top set + 2 back-offs at 180 s rest, not 3 moderate sets at 120 s): 51.5 -> 55.5. #5799: at the measured
+    # 99 s a set they were 82.2 / 71.7 / 52.4 / 72.2 / 61.7; upper-heavy's two supersets bring it to 74.7
+    assert program_structure.SESSION_TIME_MODEL["set_seconds"] == 99
+    assert got == {UH: 74.7, LH: 71.7, SA: 52.4, UV: 72.2, LV: 61.7}
+    assert _rx(UH)["supersets"]["estimate_before_min"] == 82.2 and [_rx(r)["supersets"] for r in (LH, SA, UV, LV)] == [None] * 4
     for role in program_structure.SESSION_TEMPLATES:
         rx = _rx(role)
         assert rx["time_trim"] is None and rx["session_minutes"]["within_cap"] and rx["session_minutes"]["cap"] == cap, role
@@ -347,26 +373,28 @@ def test_every_session_fits_the_charters_lifting_minutes_untrimmed():
 
 
 def test_mutation_control_a_session_over_the_cap_trims_accessories_first_and_records_it():
-    """Rest at 300 s on every accessory puts upper-volume over 75 min: the trim drops accessories, last-listed first,
-    until it fits, and says what it dropped; the anchors are untouched."""
+    """Rest at 300 s on every accessory puts upper-volume over 75 min: the curl and the pushdown are paired first (#5799),
+    then the trim drops accessories, last-listed first, until it fits, and says what it dropped; the anchors are untouched.
+    A cut superset member leaves its partner unpaired before the partner is weighed."""
     with patch.dict(program_structure.EXPOSURES["accessory"], {"rest_seconds": 300}):
         rx = _rx(UV)
     t = rx["time_trim"]
     assert t["estimate_before_min"] > t["cap_minutes"] == 75 >= t["estimate_after_min"] == rx["session_minutes"]["lifting_minutes"]
-    assert t["dropped_accessories"] == ["db_curl"] and t["over_cap_after_trim"] is False
-    assert [e["kind"] for e in rx["exposures"]].count("anchor") == 3 and [e["movement_key"] for e in rx["exposures"]][
-        -1
-    ] == "cable_tricep_pushdown"
+    assert [p["movements"] for p in rx["supersets"]["pairs"]] == [["db_curl", "cable_tricep_pushdown"]]
+    assert t["dropped_accessories"] == ["cable_tricep_pushdown", "db_curl", "cable_chest_fly"] and t["over_cap_after_trim"] is False
+    assert [e["kind"] for e in rx["exposures"]].count("anchor") == 3 and [e["movement_key"] for e in rx["exposures"]][-1] == "face_pull"
+    assert not [e for e in rx["exposures"] if e.get("superset_id") is not None]
 
 
 def test_anchors_are_never_cut_for_time_an_anchors_only_overrun_is_flagged():
     with patch.dict(program_structure.EXPOSURES["heavy"], {"rest_seconds": 900}):
         rx = _rx(UH)
     t = rx["time_trim"]
+    # #5799: paired first (curl + pushdown, lateral raise + rear delt), so the last-listed order is the paired order
     assert t["over_cap_after_trim"] is True and t["dropped_accessories"] == [
-        "reverse_pec_deck",
-        "db_curl",
         "cable_tricep_pushdown",
+        "db_curl",
+        "reverse_pec_deck",
         "db_lateral_raise",
     ]
     assert [e["pattern"] for e in rx["exposures"]] == ["bench", "row", "vertical_pull"]  # #5162: the press is on shoulders+arms
@@ -396,7 +424,7 @@ def test_the_session_shape_keeps_one_cardio_block_and_cuts_cardio_and_stretching
     assert shape["cardio_blocks"] == [{"movement_key": "treadmill", "minutes": 30.0}] and shape["stretching_minutes"] == 10.0
     assert len(shape["actions"]) == 3 and program_structure.session_shape_problems(blocks, movements) == []
     # a weighted walking lunge is a LIFT (by its set shape), never the session's cardio block
-    assert shape["lifting_minutes"] == round(2 * (45 + 90) / 60.0, 1)
+    assert shape["lifting_minutes"] == round(2 * (program_structure.SESSION_TIME_MODEL["set_seconds"] + 90) / 60.0, 1)
 
 
 def test_mutation_control_a_routine_inside_the_shape_reports_nothing_and_is_left_alone():
@@ -452,6 +480,7 @@ def _generate(day: str, **kw):
         return routine_generator.generate_routines(routine_generator.GeneratorInputs(target_date=day, **kw))
 
 
+@ROLLBACK
 def test_generator_builds_the_committed_lower_heavy_as_the_first_v04_session():
     ideal, floor = _generate("2026-09-25")
     assert ideal.archetype == "lower" and ideal.variant == "ideal"
@@ -469,6 +498,7 @@ def test_generator_builds_the_committed_lower_heavy_as_the_first_v04_session():
     ]
 
 
+@ROLLBACK
 def test_generator_builds_each_role_in_order():
     """Before the cut-over (2026-10-19) the v0.4 order, from lower-heavy (history — #4147)."""
     got = [_generate("2026-10-10", block_workouts=_done(n))[0] for n in range(4)]
@@ -480,12 +510,13 @@ def test_generator_builds_each_role_in_order():
     ]
     assert [b.movement_key for b in got[3].exercises][:3] == [  # #5162: no press on upper-heavy
         "barbell_bench_press",
-        "machine_row",
+        "one_arm_db_row",  # #6014 (coaching decision 2026-11-15): the heavy row is pinned to the dumbbell row
         "lat_pulldown",
     ]
     assert "machine_shoulder_press" not in [b.movement_key for b in got[3].exercises]
 
 
+@ROLLBACK
 def test_generator_builds_the_five_day_order_after_the_cut_over_and_the_fifth_role():
     """From the cut-over the charter's order continues from the role after the last v0.4 session: 25 daily sessions
     09-24..10-18 end on lower-heavy (v0.4 index 24), so the next five are shoulders+arms, upper-volume, lower-volume,
@@ -522,6 +553,7 @@ def test_mutation_control_without_the_sequence_the_nominal_grid_answers():
     assert routines[0].inputs_snapshot["calendar"]["session_role"] == UV, "the weekday answers only when the sequence does not"
 
 
+@ROLLBACK
 def test_generator_back_offs_sit_10_percent_under_the_ramped_top_set():
     lb = 0.45359237
     tid = CATALOG["movements"]["squat_barbell"]["hevy_template_id_hint"]
@@ -544,6 +576,7 @@ def test_generator_back_offs_sit_10_percent_under_the_ramped_top_set():
     assert squat.notes.splitlines()[0] == f"RPE {lo:g}–{hi:g}"  # #5058: the charter's band; #5428: the note's line 1
 
 
+@ROLLBACK
 def test_generator_deload_week_holds_loads_and_cuts_sets():
     # #5070 (owner ruling 2026-10-18): no scheduled deload — it applies only on a record of his word. A word starting
     # 11-04 covers 7 days; index 44 (11-07, week 7) is lower-heavy inside it. Without the record the same day is whole.
@@ -558,9 +591,10 @@ def test_generator_deload_week_holds_loads_and_cuts_sets():
     assert sum(len(_ws(b)) for b in ideal.exercises) == 8
 
 
+@ROLLBACK
 def test_red_recovery_drops_accessories_not_anchors():
     ideal = _generate("2026-09-25", recovery_tier="red")[0]
-    assert [b.movement_key for b in ideal.exercises] == ["squat_barbell", "romanian_deadlift_barbell"]
+    assert [b.movement_key for b in ideal.exercises] == ["squat_barbell", "deadlift_barbell"]  # #5694: the conventional pull
 
 
 @pytest.mark.parametrize("archetype, folder", [("upper", "Upper"), ("lower", "Lower")])
@@ -670,7 +704,7 @@ def test_plan_next_session_through_the_mcp_handler_serves_lower_heavy_first():
     assert rx["hevy_folder"] == "Lower"
     assert [(e["pattern"], e["intensity"], e["movement_key"]) for e in rx["exposures"] if e["kind"] == "anchor"] == [
         ("squat", "heavy", "squat_barbell"),
-        ("hinge", "moderate", "romanian_deadlift_barbell"),
+        ("hinge", "heavy", "deadlift_barbell"),  # #5694 (owner ruling 2026-11-08)
     ]
     assert rx["total_sets"] == 14
     assert out["constraint_block"]["program"]["program_version"] == "1.0"
@@ -737,34 +771,51 @@ def test_4409_the_0929_upper_heavy_keeps_the_in_block_db_row_and_db_press():
 @pytest.mark.usefixtures("pre_5162_upper_heavy")
 def test_4409_mutation_control_without_the_block_record_the_catalog_default_swaps_them_back():
     """What the 09-29 draft did: the resolver without the in-block record picks the first listed
-    key — the machines with years-old anchors. So the assertion above reds without the fix."""
+    key — the machines with years-old anchors. So the assertion above reds without the fix. #6014 pinned the heavy row to
+    the dumbbell row (its only member, so the in-block record no longer decides it there); the row half of this control runs
+    on the volume day's row, which keeps the family's order."""
     ex = {e["pattern"]: e["movement_key"] for e in _rx(UH)["exposures"] if e["kind"] == "anchor"}
-    assert ex["row"] == "machine_row" and ex["overhead_press"] == "machine_shoulder_press"
-    assert "in_block" not in next(e for e in _rx(UH)["exposures"] if e["pattern"] == "row")
+    assert ex["overhead_press"] == "machine_shoulder_press"
+    assert ex["row"] == "one_arm_db_row" and "in_block" not in next(e for e in _rx(UH)["exposures"] if e["pattern"] == "row")
+    row = next(e for e in _rx(UV)["exposures"] if e["pattern"] == "row")
+    assert row["movement_key"] == "machine_row" and "in_block" not in row  # no block record: the catalog default
+    kept = next(e for e in _rx(UV, in_block=_performed())["exposures"] if e["pattern"] == "row")
+    assert kept["movement_key"] == "one_arm_db_row" and kept["in_block"]["kept"] is True
 
 
 def test_4409_the_same_role_slot_wins_over_the_pattern_most_recently_performed():
-    """Rule 1 before rule 2: lower-heavy's moderate hinge stays the RDL it was on 09-24 although
-    the trap bar was pulled more recently (09-28, lower-volume) — and lower-volume keeps the trap
-    bar. A heavy pull never takes the owner's RDL-as-moderate-hinge slot (#4147)."""
+    """Rule 1 before rule 2, on the block-1 wire (09-24 lower-heavy: squat, RDL; 09-28 lower-volume: trap bar, squat, leg
+    curl). Since #5694 both lower hinges are PINNED (`anchor_keys`), so only a pinned member is ever a candidate: neither
+    the 09-24 RDL nor the 09-28 trap bar can take Lower-heavy's conventional-deadlift slot, and Lower-volume takes the RDL by
+    rule 2 (performed 09-24) — not the trap bar it pulled itself, and not the 09-28 leg curl, which a pin that listed
+    `leg_curl` would have served as the hinge (rule 1: Lower-volume no longer carries the curl as an accessory)."""
     perf = _performed()
     lh = {e["pattern"]: e for e in _rx(LH, in_block=perf)["exposures"] if e["kind"] == "anchor"}
-    assert lh["hinge"]["movement_key"] == "romanian_deadlift_barbell" and lh["hinge"]["in_block"]["basis"] == "same_role"
+    assert lh["hinge"]["movement_key"] == "deadlift_barbell" and "in_block" not in lh["hinge"]
     lv = {e["pattern"]: e for e in _rx(LV, in_block=perf)["exposures"] if e["kind"] == "anchor"}
-    assert lv["hinge"]["movement_key"] == "deadlift_trap_bar" and lv["hinge"]["in_block"]["role"] == LV
+    assert lv["hinge"]["movement_key"] == "romanian_deadlift_barbell"
+    assert (lv["hinge"]["in_block"]["basis"], lv["hinge"]["in_block"]["role"]) == ("same_pattern", LH)
+    # mutation control: a pin that lists the leg curl serves the 09-28 curl as Lower-volume's hinge
+    with patch.dict(program_structure.SESSION_TEMPLATES[LV]["anchor_keys"], {"hinge": ["romanian_deadlift_barbell", "leg_curl"]}):
+        bad = {e["pattern"]: e for e in _rx(LV, in_block=perf)["exposures"] if e["kind"] == "anchor"}
+    assert bad["hinge"]["movement_key"] == "leg_curl"
 
 
 def test_4409_a_variant_change_inside_the_block_is_only_the_listed_swap_and_says_so():
     """Block lock: when the in-block variant is unreachable for THIS session (the Minimum Viable
     Session's tier-1 ceiling, no anchor exemption) the slot takes the pattern's next LISTED key and
     the exposure records the change — never a silent swap, never a key outside the pattern."""
-    rx = _rx(UH, in_block=_performed(), skill_ceiling=1, anchor_exempt=False)
+    rx = _rx(UV, in_block=_performed(), skill_ceiling=1, anchor_exempt=False)  # #6014: the volume day's row keeps the family order
     row = next(e for e in rx["exposures"] if e["pattern"] == "row")
     assert row["movement_key"] == "machine_row" and row["movement_key"] in program_structure.ANCHORS["row"]["catalog_keys"]
     assert row["in_block"]["performed"] == "one_arm_db_row" and row["in_block"]["kept"] is False
     assert "skill_tier 2 > ceiling 1" in row["resolution_note"]
     # no in-block performance at all -> the catalog order, unchanged
-    assert _rx(UH, in_block=[]) == _rx(UH)
+    assert _rx(UV, in_block=[]) == _rx(UV) and _rx(UH, in_block=[]) == _rx(UH)
+    # #6014: the heavy row's pin has one member, out of a tier-1 reach — no swap outside the pin; the slot says so (the same
+    # pinned-slot behaviour the volume day's incline-press pin already has)
+    uh = next(e for e in _rx(UH, in_block=_performed(), skill_ceiling=1, anchor_exempt=False)["exposures"] if e["pattern"] == "row")
+    assert uh["movement_key"] is None and "no reachable member: one_arm_db_row" in uh["resolution_note"]
 
 
 @pytest.mark.usefixtures("pre_5162_upper_heavy")

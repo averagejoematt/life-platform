@@ -765,7 +765,7 @@ def _record(predictions: dict | None, calibration: dict | None, today: str) -> d
         return _block("absent", as_of, src, "No coach call has been checked yet.")
     skill = coaches_stratum.get("brier_skill")
     known = isinstance(skill, (int, float))
-    beats = bool(known and skill > 0)
+    beats = bool(known and record_words.claimable_advantage(skill))  # owner 2026-11-09: no win claimed untested
     data = {
         "right": right,
         "decided": decided,

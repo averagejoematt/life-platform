@@ -19,8 +19,16 @@ Sources (additive, per the user's choice — see plan / ADR):
   - macrofactor_export      legacy daily aggregate partition `macrofactor_workouts`;
                             `workouts[].exercises[].sets[].{distance_miles, distance_yards}`.
 
-Hevy/MacroFactor MAY overlap Strava (same ride logged twice). That's accepted by
-design; the per-source breakdown surfaces it and `manual_adjustment_usd` corrects it.
+Strava and Hevy are joined, not just added (#5695). Since the owner's 2026-10-26 recording
+protocol the watch records the treadmill walk INSIDE the Hevy session whose Treadmill set
+logs the same distance, so summing both counted those miles twice. A Strava activity that
+`training.workout_identity.resolve_workout_identities` places in one identity with a Hevy
+block that logged a distance is counted ONCE, at Hevy's distance (the resolver's precedence:
+the logged block first). It is the same time-overlap rule `training.session_count` and the
+brief's cardio list (#5697) use — no rule of the fund's own. A watch block whose Hevy block
+logged no distance keeps the watch's miles (the only measurement of it).
+MacroFactor is a retired archive with no clock, so it cannot be joined; it MAY still overlap
+— the per-source breakdown surfaces it and `manual_adjustment_usd` corrects it.
 
 No mcp.* imports — this module lives in the bundled lambdas/*.py tree and uses
 boto3 directly. Read-only: queries DDB + reads S3 config; never writes.
@@ -33,7 +41,7 @@ import logging
 import os
 from datetime import date
 from decimal import Decimal
-from typing import Any
+from typing import AbstractSet, Any
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -42,6 +50,7 @@ from common.repo_config import config_dir
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from training.legacy_workouts import LEGACY_WORKOUTS_PARTITION, day_workouts  # #4636: the ONE retired-shape reader
 from training.logging_conventions import is_step_count  # #5373: a carry's distance is a step count, never miles
+from training.workout_identity import hevy_block_family, resolve_workout_identities  # #5695: the one same-session join
 
 logger = logging.getLogger("vacation_fund")
 
@@ -153,17 +162,22 @@ def _query_range(partition: str, start_date: str, end_date: str) -> list[dict]:
     return strava_read_seam(partition, items)
 
 
-def _strava_miles(start_date: str, end_date: str, included_sport_types):
-    """Return (total_miles, per_sport_type). When included_sport_types is a list,
-    only those Strava sport_types count; otherwise use the daily total."""
-    records = _query_range("strava", start_date, end_date)
+def _counted(a: dict[str, Any], once: AbstractSet[str]) -> bool:
+    """False for a Strava activity whose miles Hevy already logged (#5695)."""
+    return str(a.get("strava_id") or "") not in once
+
+
+def _strava_miles(records: list[dict], included_sport_types, once: AbstractSet[str] = frozenset()):
+    """Return (total_miles, per_sport_type) over seamed Strava day rows. When
+    included_sport_types is a list, only those Strava sport_types count; otherwise use the
+    daily total. An activity in ``once`` (its block's miles are Hevy's) counts in neither."""
     filter_set = None
     if isinstance(included_sport_types, (list, tuple)):
         filter_set = {str(s).strip().lower() for s in included_sport_types}
     total = 0.0
     per_sport: dict[str, float] = {}
     for rec in records:
-        activities = rec.get("activities") or []
+        activities = [a for a in rec.get("activities") or [] if _counted(a, once)]
         # Per-sport breakdown always comes from the activity list.
         for a in activities:
             sport = a.get("sport_type") or "Unknown"
@@ -172,7 +186,8 @@ def _strava_miles(start_date: str, end_date: str, included_sport_types):
                 continue
             per_sport[sport] = round(per_sport.get(sport, 0.0) + miles, 2)
         if filter_set is None:
-            total += _f(rec.get("total_distance_miles"))
+            dropped = sum(_f(a.get("distance_miles")) for a in rec.get("activities") or [] if not _counted(a, once))
+            total += _f(rec.get("total_distance_miles")) - dropped
         else:
             total += sum(_f(a.get("distance_miles")) for a in activities if (a.get("sport_type") or "").lower() in filter_set)
     return round(total, 2), per_sport
@@ -184,9 +199,44 @@ def _step_count(ex: dict[str, Any]) -> bool:
     return is_step_count(ex.get("name") or ex.get("title"), ex.get("template_id"), ex.get("sets"))
 
 
-def _hevy_miles(start_date: str, end_date: str) -> float:
+def _hevy_block_metres(w: dict[str, Any]) -> dict[str, float]:
+    """``{"<workout id>#<family>": metres}`` for one Hevy session's blocks that logged a distance —
+    keyed like `workout_identity.hevy_members` keys the block's member. Carries never count (#5373)."""
+    wid = str(w.get("workout_id") or w.get("id") or str(w.get("sk") or "").partition("#WORKOUT#")[2])
+    out: dict[str, float] = {}
+    for ex in w.get("exercises") or []:
+        fam = hevy_block_family(str(ex.get("name") or ex.get("exercise_name") or ""))
+        if fam is None or _step_count(ex):
+            continue
+        metres = sum(_f(s.get("distance_m")) for s in ex.get("sets") or [])
+        if metres > 0:
+            out[f"{wid}#{fam}"] = out.get(f"{wid}#{fam}", 0.0) + metres
+    return out
+
+
+def logged_by_hevy(strava_rows: list[dict], hevy_rows: list[dict]) -> dict[str, float]:
+    """#5695: ``{strava_id: miles}`` for each Strava activity WITH miles whose block a Hevy session
+    already logged with a distance — the watch's treadmill walk inside the gym session (the owner's
+    protocol since 2026-10-26). The join is `resolve_workout_identities` (Strava through the read
+    seam and the Hevy-echo drop, then the shared time-overlap rule); the fund counts that
+    identity's miles once, at Hevy's distance."""
+    if not strava_rows or not hevy_rows:
+        return {}
+    logged = {k for w in hevy_rows for k in _hevy_block_metres(w)}
+    miles = {str(a.get("strava_id") or ""): _f(a.get("distance_miles")) for r in strava_rows for a in r.get("activities") or []}
+    once: dict[str, float] = {}
+    for ident in resolve_workout_identities(strava=strava_rows, hevy=hevy_rows):
+        if not logged.intersection(ident["members"].get("hevy") or []):
+            continue
+        for sid in ident["members"].get("strava") or []:
+            if miles.get(sid, 0.0) > 0:  # a watch ride with no distance doubled nothing
+                once[sid] = miles[sid]
+    return once
+
+
+def _hevy_miles(rows: list[dict]) -> float:
     miles = 0.0
-    for w in _query_range("hevy", start_date, end_date):
+    for w in rows:
         for ex in w.get("exercises") or []:
             if _step_count(ex):
                 continue
@@ -212,6 +262,41 @@ def _macrofactor_miles(start_date: str, end_date: str) -> float:
     return round(miles, 2)
 
 
+def _miles_by_source(start: str, end: str, included, enabled_extras: list[str], warnings: list[str]):
+    """(total_miles, per_source, per_sport_type). Strava always counts; the extra sources only
+    when no sport-type filter is in effect (they can't be sport-type-classified). A Strava
+    activity whose block Hevy logged with a distance counts once, at Hevy's miles (#5695)."""
+    strava_rows = _query_range("strava", start, end)
+    if isinstance(included, (list, tuple)):
+        strava_miles, per_sport = _strava_miles(strava_rows, included)
+        if enabled_extras:
+            warnings.append(
+                "included_sport_types filter is active; Hevy/MacroFactor extra sources "
+                "skipped (they have no Strava sport_type to filter on)."
+            )
+        return strava_miles, {"strava": strava_miles}, per_sport
+    hevy_rows = _query_range("hevy", start, end) if "hevy" in enabled_extras else []
+    once = logged_by_hevy(strava_rows, hevy_rows)
+    strava_miles, per_sport = _strava_miles(strava_rows, included, set(once))
+    per_source: dict[str, float] = {"strava": strava_miles}
+    total_miles = strava_miles
+    for src in enabled_extras:
+        m = _hevy_miles(hevy_rows) if src == "hevy" else _macrofactor_miles(start, end)
+        per_source[src] = m
+        total_miles += m
+    if once:
+        warnings.append(
+            f"{len(once)} Strava activities ({round(sum(once.values()), 2)} mi) were recorded inside a Hevy session that "
+            "logged the same block's distance; each is counted once, at Hevy's distance."
+        )
+    if "macrofactor_export" in enabled_extras:
+        warnings.append(
+            "MacroFactor archive miles are added on top of Strava and may overlap it (the archive has no clock "
+            "to join on). Per-source breakdown shows each; use manual_adjustment_usd to correct."
+        )
+    return total_miles, per_source, per_sport
+
+
 def compute_vacation_fund(start_date: str | None = None, end_date: str | None = None) -> dict[str, Any]:
     """Total workout miles -> USD vacation fund. See module docstring. Never raises
     on missing data/config — returns zeros with a warning instead."""
@@ -226,29 +311,7 @@ def compute_vacation_fund(start_date: str | None = None, end_date: str | None = 
     enabled_extras = [s for s in (cfg.get("extra_sources") or []) if s in _VALID_EXTRA_SOURCES]
     type_filter_active = isinstance(included, (list, tuple))
 
-    strava_miles, per_sport = _strava_miles(start, end, included)
-    per_source: dict[str, float] = {"strava": strava_miles}
-    total_miles = strava_miles
-
-    # Extra sources can't be sport-type-classified, so they're only added when no
-    # type filter is in effect (the default "all" case).
-    if type_filter_active and enabled_extras:
-        warnings.append(
-            "included_sport_types filter is active; Hevy/MacroFactor extra sources "
-            "skipped (they have no Strava sport_type to filter on)."
-        )
-    else:
-        for src in enabled_extras:
-            m = _hevy_miles(start, end) if src == "hevy" else _macrofactor_miles(start, end)
-            per_source[src] = m
-            total_miles += m
-        if enabled_extras:
-            warnings.append(
-                "Hevy/MacroFactor miles are added on top of Strava and may overlap it "
-                "(a ride logged in both is counted twice). Per-source breakdown shows each; "
-                "use manual_adjustment_usd to correct."
-            )
-
+    total_miles, per_source, per_sport = _miles_by_source(start, end, included, enabled_extras, warnings)
     total_miles = round(total_miles, 2)
     miles_usd = round(total_miles * rate, 2)
     total_usd = round(miles_usd + manual_adj, 2)

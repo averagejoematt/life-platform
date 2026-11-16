@@ -67,7 +67,7 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, _REPO)
 
-from common.client_ip import client_ip_is_trusted, extract_client_ip  # noqa: E402
+from common.client_ip import client_ip_is_trusted, extract_client_ip, extract_idempotency_identity  # noqa: E402
 
 VIEWER = "198.51.100.11"
 EDGE = "203.0.113.9"
@@ -134,9 +134,11 @@ def test_the_trusted_header_collapses_every_adversarial_chain_to_one_identity():
         ("198.51.100.11:16225", "198.51.100.11"),
         ("198.51.100.11", "198.51.100.11"),
         ("  198.51.100.11:443  ", "198.51.100.11"),
-        ("2001:db8::1:5000", "2001:db8::1"),  # v6: port split off the RIGHT
-        ("[2001:db8::1]:443", "2001:db8::1"),  # bracketed v6
-        ("2001:db8::1", "2001:db8::1"),
+        # #6088: an IPv6 viewer's identity is its /64 (pins updated deliberately — before
+        # #6088 these expected the full address, which let one /64 mint 2**64 buckets).
+        ("2001:db8::1:5000", "2001:db8::/64"),  # v6: port split off the RIGHT, then the /64
+        ("[2001:db8::1]:443", "2001:db8::/64"),  # bracketed v6
+        ("2001:db8::1", "2001:db8::/64"),
     ],
 )
 def test_viewer_address_is_used_and_its_port_stripped(raw, expected):
@@ -163,8 +165,54 @@ def test_a_bare_address_survives_stripping():
     sends a port so this is not an observed input, but a mangled identity would be
     silently wrong rather than loudly broken, which is the worst failure mode here.
     """
-    assert extract_client_ip(_event(viewer="2001:db8::1")) == "2001:db8::1"
+    assert extract_client_ip(_event(viewer="2001:db8::1")) == "2001:db8::/64"  # #6088: the /64, not a mangled value
     assert extract_client_ip(_event(viewer="198.51.100.11")) == "198.51.100.11"
+
+
+# ── #6088: an IPv6 viewer is ONE identity per /64 ─────────────────────────────
+
+
+def test_two_addresses_in_one_ipv6_64_are_one_identity():
+    """Privacy addressing rotates the low 64 bits; one subscriber line holds a whole /64.
+    Before #6088 each address was its own bucket, so one household had 2**64 identities."""
+    a = extract_client_ip(_event(viewer="[2001:db8:aa:bb:1111:2222:3333:4444]:51000"))
+    b = extract_client_ip(_event(viewer="[2001:db8:aa:bb:ffff:eeee:dddd:cccc]:443"))
+    assert a == b == "2001:db8:aa:bb::/64"
+
+
+def test_addresses_in_different_ipv6_64s_are_different_identities():
+    a = extract_client_ip(_event(viewer="[2001:db8:aa:bb::1]:443"))
+    b = extract_client_ip(_event(viewer="[2001:db8:aa:bc::1]:443"))
+    assert a != b
+
+
+def test_ipv4_identity_is_unchanged_by_the_ipv6_rule():
+    for raw, expected in (("198.51.100.11:443", "198.51.100.11"), ("198.51.100.12:443", "198.51.100.12")):
+        assert extract_client_ip(_event(viewer=raw)) == expected
+
+
+def test_an_ipv4_mapped_ipv6_viewer_is_its_ipv4_identity():
+    assert extract_client_ip(_event(viewer="[::ffff:198.51.100.7]:443")) == "198.51.100.7"
+
+
+def test_one_64_hashes_to_one_salted_identity(monkeypatch):
+    """The /64 reaches every limiter through `salted_ip_hash` — the hash input IS the identity,
+    so two addresses in one /64 produce one salted hash and two /64s produce two."""
+    import common.client_ip as cip
+
+    monkeypatch.setattr(cip, "_get_secret", lambda name, client: "test-salt")
+    same = {
+        cip.salted_ip_hash(extract_client_ip(_event(viewer=v)))
+        for v in ("[2001:db8:1:2::a]:1", "[2001:db8:1:2:9:8:7:6]:2", "2001:db8:1:2::5:443")
+    }
+    other = cip.salted_ip_hash(extract_client_ip(_event(viewer="[2001:db8:1:3::a]:1")))
+    assert len(same) == 1 and other not in same
+
+
+def test_idempotency_identity_keeps_the_full_address():
+    """#2932's opposite failure direction: content-idempotency ids keep readers APART, so the
+    /64 rule is deliberately NOT applied there."""
+    assert extract_idempotency_identity(_event(viewer="[2001:db8:1:2::a]:1")) == "2001:db8:1:2::a"
 
 
 def test_viewer_address_beats_a_forged_forwarded_for():

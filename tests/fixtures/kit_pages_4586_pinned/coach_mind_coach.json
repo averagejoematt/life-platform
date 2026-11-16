@@ -1677,13 +1677,13 @@
    },
    {
     "kind": "learning",
-    "record_id": "LEARNING#2026-09-19#pred-20260906-sleep-duration-will-consistently-reach-o-confi",
+    "record_id": "LEARNING#2026-09-19#pred-20260906-withheld-call-a-confi",
     "date": "2026-09-19",
     "status": "confirmed",
     "metric": "sleep_duration_hours",
     "reason": "sleep_duration_hours trend=up (slope=0.0603), predicted=up",
     "evidence": {
-     "prediction_id": "pred_20260906_sleep_duration_will_consistently_reach_o",
+     "prediction_id": "pred_20260906_withheld_call_a",
      "actual_value": 0.06031,
      "condition": "up"
     },

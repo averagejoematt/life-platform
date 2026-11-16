@@ -94,6 +94,7 @@ from common.digest_utils import (
     filter_day_rows,
 )
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from common.query_pages import query_pages  # #5656: whole-history reads follow every page
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from training import session_count  # #5387: THE session count; its zone2_total reads THE Zone 2 computation
 
@@ -738,13 +739,14 @@ def gather_all():
         def _cs_fetch(s, e):
             from experiment.phase_filter import with_phase_filter
 
-            resp = table.query(
+            resp = query_pages(
+                table,
                 **with_phase_filter(
                     {
                         "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
                         "ExpressionAttributeValues": {":pk": cs_pk, ":s": f"DATE#{s}", ":e": f"DATE#{e}"},
                     }
-                )
+                ),
             )
             return [d2f(i) for i in resp.get("Items", [])]
 

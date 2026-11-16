@@ -423,7 +423,7 @@ The meal response table shows real food entries (Cobb Salad +24, Greek Yogurt +3
 
 The nocturnal glucose patterns section (Dawn Phenomenon, Overnight Stability, Sleep Architecture × Glucose) demonstrates genuine scientific depth.
 
-**Dr. Rhonda Patrick:** The genomic context section mentioning FADS2 and MTHFR variants is scientifically appropriate — these do affect carbohydrate metabolism. The framing is correctly personalized: "population averages for glycemic index don't account for these variants — which is exactly why N=1 CGM data matters."
+**Dr. Rhonda Patrick:** The genomic context section mentioning the owner's variants [genes removed 2026-11-11] is scientifically appropriate. The framing is correctly personalized: "population averages for glycemic index don't account for these variants — which is exactly why N=1 CGM data matters."
 
 ### ② Visual & Layout Audit
 
@@ -489,7 +489,7 @@ Amber color theme. Follows the observatory pattern. Dense but well-organized wit
 
 This page reveals the most honest gap: **only 3 of 30 days logged.** The gauges show: 1,227 cal avg, 0% protein target hit rate, 3 days logged. The TDEE adaptation tracker shows historical data (2,680 → 2,350 cal over months) which adds longitudinal context.
 
-The micronutrient gaps section with genomic rationale (PEMT variant for choline, VDR for vitamin D, FADS1 for omega-3, MTHFR for folate) is a genuine differentiator.
+The micronutrient gaps section with genomic rationale [owner-specific genes removed 2026-11-11] is a genuine differentiator.
 
 ### ④ Graphs & Analysis Audit
 
@@ -719,7 +719,7 @@ Most charts are empty frameworks labeled "Awaiting sufficient data." The sentime
 
 ### ① Content Audit
 
-The page displays 74 biomarkers from 7 draws with 9 flagged values. The "What I'm Watching" section correctly highlights the concerning values: ApoB 107 (high), LDL-C 133 (high), LDL particle number 1787 (high), WBC 3.4 (low), Vitamin D 117 (high). This is real clinical data honestly displayed.
+The page displays 74 biomarkers from 7 draws with 9 flagged values. The "What I'm Watching" section correctly highlights the concerning values [lipid values removed 2026-11-11], WBC 3.4 (low), Vitamin D 117 (high). This is real clinical data honestly displayed.
 
 The Elena Voss quote — *"He used to get his labs done at the finish line... This week, for the first time, he's getting them at the starting line"* — is perfect editorial positioning.
 
@@ -750,7 +750,7 @@ The data is real and comprehensive. Last draw: April 17, 2025 — nearly a year 
 1. 🔴 **Flag data staleness** — "Last draw: 2025-04-17" is nearly a year old. Add a prominent banner: "This data is 352 days old. Next draw scheduled: [date]." *Effort: XS.*
 2. 🟡 **Add AI coaching analysis** — Dr. Okafor or Dr. Reyes should interpret the flagged lipid values in context of current nutrition and training. *Effort: M.*
 3. 🟡 **Apply observatory design pattern** — Add hero with gauge rings (% in range, flagged count), pull-quotes, editorial sections. Currently the weakest visual design of any Data page. *Effort: L.*
-4. 🟢 **Add "What I'm doing about it" for each flagged marker** — Link ApoB 107 to the nutrition protocol, Vitamin D 117 to the supplement regimen. Close the action loop. *Effort: M.*
+4. 🟢 **Add "What I'm doing about it" for each flagged marker** — Link the flagged lipid marker to the nutrition protocol, Vitamin D 117 to the supplement regimen. Close the action loop. *Effort: M.*
 
 ---
 

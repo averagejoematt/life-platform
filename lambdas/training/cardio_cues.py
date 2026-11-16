@@ -74,12 +74,55 @@ def previous_of(spec: Any, target_date: str) -> dict[str, Any] | None:
     return cardio_menu.previous_performed((cal or {}).get("advanced_by") if isinstance(cal, dict) else None, target_date)
 
 
+def week_routines(target_date: str, supplied: list[Any] | None = None) -> list[Any] | None:
+    """This Mon-start week's routine records before `target_date` (#5505: the offers a missed block is counted from).
+    `supplied` wins (tests, replays); else one fail-soft read — None on a failure, so the count is the performed kinds
+    alone (named in the log), never a guessed miss."""
+    if supplied is not None:
+        return supplied
+    from common.pacific_time import parse_day_key
+
+    day = parse_day_key(str(target_date or "")[:10])
+    if day is None:
+        return None
+    start = day.fromordinal(day.toordinal() - day.weekday()).isoformat()
+    if start >= day.isoformat():
+        return []  # Monday: no earlier day this week
+    try:
+        from training.routine_repo import list_by_date_range
+
+        return list_by_date_range(start, day.isoformat())
+    except Exception as e:  # noqa: BLE001 — the count then reads the performed blocks alone
+        logger.warning(f"cardio cue: this week's routine read failed ({type(e).__name__}: {e}); missed offers not counted")
+        return None
+
+
+def _plan_audit(hist: dict[str, Any], audits: list[dict[str, Any]], placed: list[str], exercises: list[Any]) -> dict[str, Any]:
+    """The `cardio_plan` audit stored on the routine's inputs snapshot (split out of attach_cardio_cues, #4880)."""
+    from training import cardio_menu
+
+    return {
+        "version": cardio_menu.CARDIO_MENU_VERSION,
+        "charter_version": audits[0].get("charter_version") if audits else None,
+        "kinds": placed,
+        "week_kinds_before": hist["week_kinds"],
+        # #5505: the offers he missed this week and the ones dropped past the re-offer allowance (counted as done)
+        "missed_kinds": hist["missed_kinds"],
+        "dropped_kinds": hist["dropped_kinds"],
+        # #5796: swaps done with no effort logged — their own count, never conditioning and never a miss
+        "effort_not_logged_kinds": hist.get("effort_not_logged_kinds", []),
+        # the gym cardio minutes this routine adds to the day's steps/movement goal (#5076 -> #5056)
+        "movement_minutes": cardio_menu.movement_minutes(exercises),
+    }
+
+
 def attach_cardio_cues(
     spec: Any,
     catalog: dict[str, Any] | None = None,
     cardio_index: dict[str, list] | None = None,
     whoop_index: dict[str, list] | None = None,
     aerobic_block: dict[str, Any] | None = None,
+    routines_this_week: list[Any] | None = None,
 ) -> int:
     """Write the prescription-first note onto every cardio block of a RoutineSpec (#3700, #5048).
 
@@ -121,6 +164,15 @@ def attach_cardio_cues(
     movements = (catalog or {}).get("movements", {})
     targets = [ex for ex in exercises if cardio_note.machine_for(str(getattr(ex, "movement_key", "") or ""))]
     targets = [ex for ex in targets if sum(int(getattr(s, "duration_seconds", 0) or 0) for s in getattr(ex, "sets", None) or [])]
+    from training.fitness_tests import FITNESS_TEST_TAG_PREFIX
+
+    # #5428 (2026-11-08): a fitness-test block's note IS the charter's protocol (fitness_tests.test_note). Composing a
+    # menu dose over it sent the 11-01 and 11-07 six-minute walk out as "Treadmill · 8% · RPE 4–5" — the wrong test.
+    targets = [ex for ex in targets if not str(getattr(ex, "rationale_tag", "") or "").startswith(FITNESS_TEST_TAG_PREFIX)]
+    # #6020: `draft_custom` re-tags every block `custom`, so a test block is also known by its `Test ·` note line (§3.8)
+    from training.hevy_note_grammar import is_test_note
+
+    targets = [ex for ex in targets if not is_test_note(str(getattr(ex, "notes", "") or ""))]
     if not targets:
         return 0
     if cardio_index is None:
@@ -154,8 +206,9 @@ def attach_cardio_cues(
         return movements.get(key, {}).get("hevy_template_id_hint") or (key[5:] if key.startswith("tmpl:") else None)
 
     # #5076: the week's placement reads every cardio machine's history, not only this block's
-    hist = cardio_menu.history_context(cardio_index, catalog, target_date)
-    prior_kinds = hist["week_kinds"]
+    hist = cardio_menu.history_context(cardio_index, catalog, target_date, routines=week_routines(target_date, routines_this_week))
+    # #5505: the count reads performed kinds plus the missed offers beyond the week's re-offer allowance
+    prior_kinds = hist["counted_kinds"]
     loaded, _why = recent_aerobic.legs_loaded(aerobic_block)
     replaced: list[dict[str, Any]] = []
     audits: list[dict[str, Any]] = []
@@ -199,7 +252,7 @@ def attach_cardio_cues(
             treadmill_sessions=hist["by_machine"].get(cardio_menu.TREADMILL),
             aerobic_block=aerobic_block,
             constraint=constraint,
-            hr_ceiling_bpm=None if constraint else recent_aerobic.HR_CEILING_BPM,
+            hr_ceiling_bpm=None,  # #5916: the walking HR cap is retired (owner ruling 2026-11-13); the note never printed it
             placement_why=why,
             previous=previous,
             # #5428: the watch step when a Hevy block follows (owner protocol 2026-10-27), and an author's route why
@@ -215,14 +268,7 @@ def attach_cardio_cues(
         stamped += 1
     # #5428: the After line follows the list's order as it stands now (a block placed after the cardio one adds it)
     cardio_note.apply_after_lines(exercises)
-    plan = {
-        "version": cardio_menu.CARDIO_MENU_VERSION,
-        "charter_version": audits[0].get("charter_version") if audits else None,
-        "kinds": placed,
-        "week_kinds_before": prior_kinds,
-        # the gym cardio minutes this routine adds to the day's steps/movement goal (#5076 -> #5056)
-        "movement_minutes": cardio_menu.movement_minutes(exercises),
-    }
+    plan = _plan_audit(hist, audits, placed, exercises)
     snap = getattr(spec, "inputs_snapshot", None)
     if isinstance(snap, dict) or snap is None:
         try:

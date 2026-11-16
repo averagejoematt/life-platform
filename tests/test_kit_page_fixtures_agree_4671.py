@@ -115,6 +115,22 @@ def test_a_coaches_list_from_another_day_is_reported_against_the_sum_and_the_coa
     assert any(s.startswith("coach_sleep_coach.json: the Coaches list says") for s in got), got
 
 
+def test_a_retired_coachs_graded_call_counts_by_its_bucket_and_only_when_flagged_retired():
+    # A retired coach has no card, so its graded call is summed from its own `retired` predictions bucket.
+    fx = copy.deepcopy(FX)
+    overall = fx["predictions.json"]["overall"]
+    overall["refuted"] = (overall.get("refuted") or 0) + 1
+    overall["decided"] = (overall.get("confirmed") or 0) + overall["refuted"]
+    ed = fx["edition.json"]["blocks"]["record"]["data"]
+    ed["decided"] += 1
+    fx["predictions.json"]["by_coach"]["retired_x"] = {"retired": True, "confirmed": 0, "refuted": 1, "decided": 1}
+    assert cap.record_disagreements(fx) == []
+    # The same bucket WITHOUT the retired flag is not a card's stand-in: the sum is short again, and says so.
+    fx["predictions.json"]["by_coach"]["retired_x"]["retired"] = False
+    got = cap.record_disagreements(fx)
+    assert any(s.startswith("the coaches' checked calls sum to") for s in got), got
+
+
 def test_a_coach_page_from_another_day_is_reported():
     fx = copy.deepcopy(FX)
     fx["coach_physical_coach.json"]["report_card"]["track_record"]["record"]["refuted"] += 2

@@ -35,6 +35,7 @@ byte-identical across journal-only variations.
 from __future__ import annotations
 
 import datetime as _dt
+import re
 import statistics
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -46,6 +47,7 @@ from common import (  # owner ruling 2026-11-06: one publication decision, the A
 )
 from common.constants import EXPERIMENT_START_DATE as GENESIS  # noqa: E402 — one genesis (ADR-058)
 from common.metric_truth import resolve_steps, steps_sources  # #4630: the ONE steps resolver
+from health import character_privacy, day_grade_public  # owner rulings 2026-11-05/06: the chronicle reads the public variants
 from health.protein_floor import met_floor  # #5098: THE protein hit predicate (strict, #5003)
 
 USER = "matthew"
@@ -511,6 +513,37 @@ def _habits(table, wk: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _target_day(it: dict) -> str:
+    """The day a graded call was ABOUT — the day its evidence was read from — from the row alone (#5899).
+
+    Order: the point spec's ``evaluation.target_date``; the day the claim's own sentence names (the full claim,
+    not the 220-char dossier excerpt); the end of ``outcome_notes.window``. Nothing else: ``outcome_date`` is when
+    scoring ran, and a guessed target is the bug this exists to stop — so no day means no key, not a fallback."""
+    import json
+
+    from coach.prediction_windows import sentence_target_day
+
+    spec = it.get("evaluation")
+    day = str((spec.get("target_date") if isinstance(spec, dict) else "") or "")[:10]
+    if day:
+        return day
+    day = (sentence_target_day(it.get("claim_natural"), it.get("created_date")) or (None, None))[0]
+    if day:
+        return str(day)[:10]
+    try:
+        window = (json.loads(it.get("outcome_notes") or "{}") or {}).get("window")
+    except (TypeError, ValueError, AttributeError):
+        return ""
+    if isinstance(window, (list, tuple)) and window:
+        return str(window[-1] or "")[:10]
+    if isinstance(window, dict):
+        return str(window.get("end") or window.get("end_date") or "")[:10]
+    if isinstance(window, str):
+        days = re.findall(r"\d{4}-\d{2}-\d{2}", window)
+        return days[-1] if days else ""
+    return ""
+
+
 def _predictions(table, wk: Dict[str, Any], roster: Dict[str, str]) -> Dict[str, Any]:
     from boto3.dynamodb.conditions import Key
 
@@ -545,17 +578,19 @@ def _predictions(table, wk: Dict[str, Any], roster: Dict[str, str]) -> Dict[str,
             if status in ("confirmed", "refuted") and od and od <= wk["end"]:
                 rec["right" if status == "confirmed" else "wrong"] += 1
                 if od >= wk["start"]:
-                    graded.append(
-                        {
-                            "coach": roster.get(cid, cid),
-                            "coach_id": cid,
-                            "made": created,
-                            "graded": od,
-                            "claim": claim,
-                            "result": "right" if status == "confirmed" else "wrong",
-                            "evidence": _outcome_line(it),
-                        }
-                    )
+                    entry = {
+                        "coach": roster.get(cid, cid),
+                        "coach_id": cid,
+                        "made": created,
+                        "graded": od,
+                        "claim": claim,
+                        "result": "right" if status == "confirmed" else "wrong",
+                        "evidence": _outcome_line(it),
+                    }
+                    target = _target_day(it)
+                    if target:
+                        entry["target"] = target  # #5899: the day the call was about; `graded` is only when scoring ran
+                    graded.append(entry)
             if wk["start"] <= created <= wk["end"]:
                 made[cid] = made.get(cid, 0) + 1
             if created == GENESIS:
@@ -667,7 +702,9 @@ def _coaches(table, wk: Dict[str, Any], roster: Dict[str, str]) -> List[Dict[str
 
 
 def _character(table, wk: Dict[str, Any]) -> Dict[str, Any]:
-    days = _days(table, "character_sheet", wk["start"], wk["end"])
+    # Owner ruling 2026-11-06: the chronicle's character facts are the public variant's; a recalculated week carries no
+    # level event (character_privacy.public_sheet) and a record without a variant is not read.
+    days = {d: v for d, r in _days(table, "character_sheet", wk["start"], wk["end"]).items() if (v := character_privacy.public_sheet(r))}
     if not days:
         return {}
     last = days[max(days)]
@@ -691,7 +728,7 @@ def _character(table, wk: Dict[str, Any]) -> Dict[str, Any]:
 
 def _grades(table, wk: Dict[str, Any]) -> Dict[str, Any]:
     days = _days(table, "day_grade", wk["start"], wk["end"])
-    scores = [_f(r.get("total_score")) for r in days.values()]
+    scores = [day_grade_public.public_score(r) for r in days.values()]  # owner ruling 2026-11-05: the public variant only
     return {
         "day_grade_mean": _mean(scores),
         "explain": "the platform scores each day 0-100 across sleep, training, food, recovery and habits",
@@ -779,23 +816,15 @@ def _body_composition(table, wk: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _goals() -> Dict[str, Any]:
-    """The plan root: the repo file when present (scripts, tests), else S3 config/ (the Lambda runtime — config/ is
-    not bundled), the same order experiment.plan_facts.load_plan_facts uses."""
-    import json
-    import os
+    """The plan root's PUBLIC part (``common.user_goals.load_public``): the repo file when present (scripts, tests),
+    else the S3 twin (the Lambda runtime — config/ is not bundled). The dossier feeds published narrative, so it never
+    reads the private part (owner ruling 2026-11-11)."""
+    from common import user_goals
 
-    try:
-        from common.repo_config import config_path
-
-        with open(config_path("user_goals.json"), encoding="utf-8") as fh:
-            return json.load(fh)
-    except Exception:  # noqa: BLE001 — fall through to S3
-        import boto3
-
-        s3 = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-west-2"))
-        return json.loads(
-            s3.get_object(Bucket=os.environ.get("S3_BUCKET", "matthew-life-platform"), Key="config/user_goals.json")["Body"].read()
-        )
+    goals = user_goals.load_public()
+    if goals is None:
+        raise RuntimeError("plan root unavailable")
+    return goals
 
 
 _PLAN_FACTS_CACHE: Dict[str, Any] = {}

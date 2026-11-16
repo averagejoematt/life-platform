@@ -4,15 +4,22 @@
 // experiments. Nothing here is computed beyond a mean of the week's readings for a bar.
 import Base from "../../layouts/Base.astro";
 import Provenance from "../../components/Provenance.astro";
+import LabEntry from "../../components/LabEntry.astro"; // the Laboratory (L1): renders nothing unless WEB_LAB=1
+import FourParts from "../../components/FourParts.astro"; // the four parts of the experiment; this room holds the body
+import { labEnabled } from "../../lib/lab.js";
 import { headline, weeklyBars } from "../../lib/chart.js";
+import { scaleWords, weeklySpark } from "../../lib/spark.js";
 import { dayInWords, num } from "../../lib/format.js";
 import { loadAll, loadJourney, loadPairs, loadSeries } from "../../lib/snapshot.js";
+import { PROVISIONAL_WORDS, provisionalNights } from "../../lib/provisional.js";
 import { href, pathOf } from "../../lib/url.js";
 
 const all = await loadAll();
 const series = await loadSeries();
 const pairs = await loadPairs();
 const metrics = [...all.byType.metric].sort((a, b) => (a.series_url && !b.series_url ? -1 : !a.series_url && b.series_url ? 1 : a.label < b.label ? -1 : 1));
+const served = metrics.filter((m) => series[m.id]);
+const namedOnly = metrics.filter((m) => !series[m.id]);
 const insights = [...all.byType.insight].sort((a, b) => (a.date < b.date ? 1 : -1));
 const experiments = all.byType.experiment;
 const withSeries = metrics.filter((m) => series[m.id]);
@@ -26,35 +33,32 @@ const latestDay = days[days.length - 1] || null;
 const journey = await loadJourney();
 const hasJourney = journey && journey.state !== "absent";
 
-function bars(days: any[]) {
-  const b = weeklyBars(days, 8);
-  const vals = b.filter((v) => v != null) as number[];
-  if (!vals.length) return null;
-  const lo = Math.min(...vals);
-  const hi = Math.max(...vals);
-  const W = 8 * 12;
-  const H = 28;
-  let out = "";
-  b.forEach((v, i) => {
-    if (v == null) {
-      out += `<rect x="${i * 12 + 2}" y="${H - 3}" width="8" height="2" fill="#F4F4F0" stroke="#5C5C58" stroke-width="1"/>`;
-      return;
-    }
-    const h = hi === lo ? H * 0.6 : 4 + ((v - lo) / (hi - lo)) * (H - 6);
-    out += `<rect x="${i * 12 + 2}" y="${(H - h).toFixed(1)}" width="8" height="${h.toFixed(1)}" fill="${i === b.length - 1 ? "#1B3FD6" : "#C9C9C3"}"/>`;
-  });
-  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="weekly means, latest week in cobalt">${out}</svg>`;
-}
+// The series whose day is a running total (logged through the day), so the newest day can still be filling up.
+const DAILY_TOTALS = new Set(["total_calories_kcal", "total_protein_g"]);
+
+// The spark is the shared contract's (lib/spark.js, review 2026-11-14): this page used to scale each tile's bars from the
+// series' minimum with a 4-px floor, so any change filled the box and the front page's zero-based bars said the opposite.
+const sparkOf = (days: any[]) => weeklySpark(weeklyBars(days, 8));
+// #5953: the caption named "eight weekly means" whatever was drawn — a series shorter than eight weeks drew fewer. It
+// counts the weeks that carry a mean.
+const WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight"];
+const meansWords = (days: any[]) => {
+  const k = weeklyBars(days, 8).filter((v) => v != null).length;
+  return `${WORDS[k] || k} weekly ${k === 1 ? "mean" : "means"}`;
+};
 ---
 
-<Base title="The data room" top="data" description="One dimension at a time: one series, one source, one method.">
+<Base title="The data room" top="data" description="Every public measurement behind the experiment — weight, sleep, recovery, food, movement — each with its source, and what is not measured.">
+  <section class="wrap" style="padding-top:28px">
+    <FourParts here="body" />
+  </section>
   <section class="section" style="padding-bottom:20px">
     <div class="wrap between" style="align-items:flex-end">
       <div style="max-width:760px">
         <h1 style="font-size:48px">The data room</h1>
         <p class="dek" style="margin-top:10px;font-size:19px">
-          One dimension at a time. Pick one, read the latest reading, stop there if you like — or open it, compare it with another at a lag of a day or
-          two, and read what the platform found when it paired them. {window ? `The window is ${dayInWords(window.from)} to ${dayInWords(window.to)}.` : ""}
+          Pick a dimension, read the latest reading, stop there if you like — or open it, compare it with another at a lag of a day or two, and
+          read what the platform found when it paired them. These readings are one part of the experiment, not its verdict. {window ? `The window is ${dayInWords(window.from)} to ${dayInWords(window.to)}.` : ""}
         </p>
       </div>
       <p class="muted" style="font-size:13px;max-width:300px">
@@ -98,13 +102,25 @@ function bars(days: any[]) {
       </section>
     )
   }
-  <section class="wrap" style="padding-bottom:40px">
+  {/* the Laboratory entry (L1) sits flush against the next tag: with WEB_LAB off the page's bytes are unchanged */}<LabEntry /><section class="wrap" style="padding-bottom:40px">
     <div class="tiles" style="grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr))">
       {
-        metrics.map((m) => {
+        served.map((m) => {
           const s = series[m.id];
           const h = s ? headline(s.days) : null;
-          const spark = s ? bars(s.days) : null;
+          const spark = s ? sparkOf(s.days) : null;
+          const scale = spark ? scaleWords(spark.plan, { decimals: m.decimals, unit: m.unit }) : null;
+          // 2026-11-14: a behavioral series' newest day is often partial ("13 Nov, so far" read 80 kcal and 15 g of
+          // protein at breakfast), and the tile set it as the headline. The headline is the last FULL day; the partial
+          // day stays in the caption, labelled.
+          // Only a DAILY TOTAL can be partial (2026-11-14, sprint II): the rule first read every behavioral series that
+          // way, so the weight tile led with yesterday and called this morning's complete weigh-in "so far".
+          const partial = Boolean(s && h && h.last != null && s.behavioral && DAILY_TOTALS.has(m.id) && h.lastDate === s.window.to);
+          const full = partial ? [...s.days].reverse().find((d: any) => d.date < h.lastDate && d.value != null && !d.gap) : null;
+          // #5953: the night the tile leads with may still have been recording when the snapshot read it — the vendor's
+          // own flag, carried on the Day object of the same snapshot (lib/provisional.js). The tile says so.
+          const shownDate = full ? full.date : h ? h.lastDate : null;
+          const provisional = Boolean(s && shownDate && provisionalNights(days, m.id, s.source_id || m.source_id).includes(shownDate));
           return (
             <a class="tile" href={href(pathOf("metric", m.id))}>
               <span class="label">
@@ -112,18 +128,21 @@ function bars(days: any[]) {
                 {m.instrument && ` · ${m.instrument}`}
               </span>
               {h && h.last != null ? (
-                <span class="v num" style="font-size:30px">
-                  {num(h.last, m.decimals)} <small>{m.unit}</small>
+                <span class="v num" style="font-size:30px" data-provisional={provisional ? "" : undefined}>
+                  {num(full ? full.value : h.last, m.decimals)} <small>{m.unit}</small>
                 </span>
               ) : (
                 <span class="v num muted" style="font-size:22px">
                   —
                 </span>
               )}
-              {spark && <span class="spark" set:html={spark} />}
+              {spark && spark.plan.kind !== "empty" && <span class="spark" data-spark-of={m.id} data-latest={h ? h.last : null} set:html={spark.svg} />}
+              {scale && <span class="spark-scale mono">{scale}</span>}
               <span class="muted" style="font-size:13px;line-height:1.4">
                 {h && h.last != null
-                  ? `${dayInWords(h.lastDate, { short: true })}${s.behavioral && h.lastDate === s.window.to ? ", so far" : ""} · ${h.n} of ${s.days.length} days · eight weekly means`
+                  ? full
+                    ? `${dayInWords(full.date, { short: true })}, the last full day · ${dayInWords(h.lastDate, { short: true })} so far: ${num(h.last, m.decimals)} · ${h.n} of ${s.days.length} days · ${meansWords(s.days)}`
+                    : `${dayInWords(h.lastDate, { short: true })}${partial ? ", so far" : ""}${provisional ? ` · ${PROVISIONAL_WORDS}` : ""} · ${h.n} of ${s.days.length} days · ${meansWords(s.days)}`
                   : m.absent_text || "No series yet."}
               </span>
               <Provenance object={m} />
@@ -132,8 +151,27 @@ function bars(days: any[]) {
         })
       }
     </div>
+    {/* 2026-11-14: a metric a coach's call names but no public series backs read as a full tile of dashes; it is a
+        footnote now, each still linked to its page. */}
+    {
+      namedOnly.length > 0 && (
+        <p class="muted" style="font-size:13px;margin-top:12px" data-named-only>
+          Named in a coach's call, with no public series behind it:{" "}
+          {namedOnly.map((m, i) => (
+            <>
+              {i > 0 && ", "}
+              <a href={href(pathOf("metric", m.id))}>{m.label}</a>
+            </>
+          ))}
+          .
+        </p>
+      )
+    }
   </section>
-  <section class="wrap" style="padding-bottom:56px">
+  {/* 2026-11-14: with the Laboratory on, two empty boxes here ("Insights · 0", "Experiments · 0 — None running.") sat
+      under the Lab's own line (6 tests being checked, 2 ready) and read as a contradiction. They render only when they
+      carry something, or when there is no Lab to say it. */}
+  {(insights.length > 0 || experiments.length > 0 || !labEnabled()) && <section class="wrap" style="padding-bottom:56px">
     <div class="grid cols2" style="gap:48px;align-items:start">
       <div>
         <p class="label" style="margin-bottom:8px">Insights · {insights.length}</p>
@@ -179,5 +217,5 @@ function bars(days: any[]) {
         }
       </div>
     </div>
-  </section>
+  </section>}
 </Base>

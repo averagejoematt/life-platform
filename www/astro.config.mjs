@@ -10,6 +10,15 @@
 import { defineConfig } from "astro/config";
 import sitemap from "@astrojs/sitemap";
 
+// The Coaching Room, built dark (CR1): routes injected only when WEB_ROOM=1 (src/lib/room.js). Off = no route at all.
+import { notRoomPage, roomIntegration } from "./src/lib/room.js";
+// The Laboratory, built dark (L1): routes injected only when WEB_LAB=1 (src/lib/lab.js). Off = no route at all.
+import { labIntegration, notLabPage } from "./src/lib/lab.js";
+// The Human Story, built dark (HS1): routes injected only when WEB_STORY=1 (src/lib/story_dark.js). Off = no route at all.
+import { notStoryPage, storyIntegration } from "./src/lib/story_dark.js";
+// "Your call beside the coaches" (#6088), built dark: the island is injected only when WEB_READERCALL=1 (src/lib/readercall.js).
+import { readerCallIntegration } from "./src/lib/readercall.js";
+
 const base = process.env.WEB_BASE || "/";
 const noindex = process.env.WEB_NOINDEX === "1";
 
@@ -41,5 +50,13 @@ export default defineConfig({
       assetsInlineLimit: 0,
     },
   },
-  integrations: noindex ? [] : [sitemap()],
+  integrations: noindex
+    ? [roomIntegration(), labIntegration(), storyIntegration(), readerCallIntegration()]
+    : [
+        roomIntegration(),
+        labIntegration(),
+        storyIntegration(),
+        readerCallIntegration(),
+        sitemap({ filter: (url) => notRoomPage(url) && notLabPage(url) && notStoryPage(url) }),
+      ],
 });

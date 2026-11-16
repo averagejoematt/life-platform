@@ -185,8 +185,9 @@ class TestGatherCalibrationSection:
     def test_shape_when_graded(self):
         section = eng.gather_calibration_section(_calibration_summary(n=12))
         assert section["n"] == 12
-        assert section["calibration"] == "well-calibrated"
         assert section["brier"] == 0.18
+        # Owner ruling 2026-11-09: the calibration-v1 verdict never reaches the brief (a reader surface).
+        assert "calibration" not in section and "label" not in section
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -289,7 +290,7 @@ class TestNarrate:
         monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
         grounded_text = (
             "The forecast engine expects recovery near 64.2%, with an interval of 55.0 to 73.4. "
-            "Across 12 graded predictions the platform is well-calibrated, with a Brier score of 0.18. "
+            "Across 12 graded predictions the Brier score is 0.18. "
             "One coach disagreement remains open about sleep vs training load."
         )
         monkeypatch.setattr(bedrock_client, "invoke", lambda body, model_name=None: _FakeBedrockResponse(grounded_text).as_dict())

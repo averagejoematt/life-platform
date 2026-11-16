@@ -321,3 +321,61 @@ def test_open_actions_days_overdue_at_the_pt_midnight_boundary(monkeypatch):
     body = _dashboard_body(monkeypatch, today="2026-09-26")
     by_coach = {a["coach_id"]: a["days_overdue"] for a in body["open_actions"]}
     assert by_coach == {"physical": 0, "nutrition": 1, "sleep": 0}
+
+
+# ── the dashboard reads commitments only (LCP regression, 2026-11-09) ─────────────────────
+# Since #5627 a full dossier reads every learning's prediction row. The dashboard serves only
+# `open_actions` (the commitments) from it, yet paid ~25 PREDICTION# reads + the learnings,
+# relationship and docket reads per coach — route p50 ~1.1 s -> ~2.2 s from 2026-11-03, and
+# the coaching door's LCP waits on this route.
+
+
+def _recording_dossier_table(reads):
+    def q(table, **kw):
+        pk, sk = _cond_parts(kw["KeyConditionExpression"])
+        reads.append(("query", pk, sk))
+        return _query_hook(table, **kw)
+
+    def g(table, key, **kw):
+        reads.append(("get", key.get("pk"), key.get("sk")))
+        return _get_item_hook(table, key, **kw)
+
+    return FakeDdbTable(query_hook=q, get_item_hook=g)
+
+
+def _dossier_sections_read(reads):
+    """The dossier sections the dashboard did NOT need, as read: LEARNING#, RELATIONSHIP#, docket."""
+    return [
+        r
+        for r in reads
+        if str(r[2] or "").startswith(("LEARNING#", "RELATIONSHIP#", "PREDICTION#", "OPEN#"))
+        or str(r[1] or "").startswith("ENSEMBLE#docket")
+    ]
+
+
+def _dashboard_reads(monkeypatch):
+    reads = []
+    monkeypatch.setattr(coach_api, "table", _recording_dossier_table(reads))
+    monkeypatch.setattr(L, "table", FakeDdbTable())
+    monkeypatch.setattr(L, "_integrator_digest", lambda: None)
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+    monkeypatch.setattr("common.pacific_time.pacific_today", lambda: _TODAY)
+    resp = L.lambda_handler(dict(_DASHBOARD_EVENT), None)
+    assert resp["statusCode"] == 200, resp
+    return reads, json.loads(resp["body"])
+
+
+def test_the_dashboard_reads_only_the_commitments_of_each_dossier(monkeypatch):
+    reads, body = _dashboard_reads(monkeypatch)
+    assert any(str(r[2] or "").startswith("COMMITMENT#") for r in reads), "the fixture does not exercise the dossier read"
+    assert len(body["open_actions"]) == 3, body["open_actions"]
+    assert _dossier_sections_read(reads) == [], f"the dashboard read dossier sections it never serves: {_dossier_sections_read(reads)}"
+
+
+def test_the_commitments_only_guard_can_fail(monkeypatch):
+    """Mutation control: drop the flag (every dossier read in full) and the guard above sees
+    the learnings / relationship / docket reads."""
+    real = coach_api._dossier_block
+    monkeypatch.setattr(L, "_dossier_block", lambda coach_id, **kw: real(coach_id))
+    reads, _body = _dashboard_reads(monkeypatch)
+    assert _dossier_sections_read(reads), "a full dossier read went unseen — the guard is blind"

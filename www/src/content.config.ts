@@ -78,6 +78,12 @@ const chapters = defineCollection({
     // the program week's explicit interval (/api/chapters), null for a prologue — never inferred from `date`
     week_start: z.string().regex(ISO_DAY).nullable(),
     week_end: z.string().regex(ISO_DAY).nullable(),
+    // a published chapter's TRUE dates (/api/chapters, published weeks only): the owner's approval as a Pacific day,
+    // and the days the chapter covers (its "Day A to Day B" stats line). `date` is the chronicle's DATA date. Null when
+    // not served — a page then never calls `date` the publication date.
+    published_at: z.string().regex(ISO_DAY).nullable(),
+    covers_start: z.string().regex(ISO_DAY).nullable(),
+    covers_end: z.string().regex(ISO_DAY).nullable(),
     excerpt: z.string().nullable(),
     body_html: z.string().nullable(),
     word_count: z.number().int().nullable(),
@@ -155,6 +161,18 @@ const experiments = defineCollection({
 // null until a publication day is actually recorded. `explanation` is required — reader words, never the
 // stored engineering `reason`, which travels beside it as the audit record.
 const isoDayOrNull = z.string().regex(ISO_DAY).nullable();
+// The platform's dated note on an owner-ruled call (owner ruling 2026-11-15, #6079) — not the coach's words, not the
+// grader's verdict. scripts/publish_snapshot_contract.py owner_note_of / validate_owner_note is the Python half.
+const ownerNote = z
+  .object({
+    kind: z.enum(["clarification", "grading_explanation", "scope"]),
+    dated: z.string().regex(ISO_DAY),
+    required: z.boolean(),
+    text: z.string().min(1),
+    short: z.string().min(1),
+  })
+  .strict();
+
 const correction = z
   .object({
     source: z.enum(["corrections", "verdict_correction", "respecified"]),
@@ -210,7 +228,11 @@ const predictions = defineCollection({
     coach_name: z.string().min(1),
     retired: z.boolean(),
     metric_key: z.string().nullable(),
-    claim_withheld: z.enum(["unsourced", "no_words"]).nullable(),
+    // `with_note` (owner ruling 2026-11-15, #6079): the words are published only beside the platform's dated note;
+    // `claim` is then the note's short form and the words are `claim_with_note`, rendered by the call's own page alone.
+    claim_withheld: z.enum(["unsourced", "no_words", "with_note"]).nullable(),
+    claim_with_note: z.string().min(1).nullable(),
+    owner_note: ownerNote.nullable(),
     // Owner rulings 2026-11-03: the stored verdict, disputed pending classification — shown, never counted as verified.
     classification_review: z.boolean(),
     classification_review_reason: z.string().min(1).nullable(),
@@ -252,6 +274,19 @@ const coaches = defineCollection({
       })
       .nullable(),
     comparison_text: z.string().nullable(),
+    versus_guess: z
+      .object({
+        kinds: z.array(
+          z.object({
+            kind: z.enum(["number", "direction", "yes_no", "sealed"]),
+            scored: z.number().int(),
+            coach_right: z.number().int(),
+            rule_right: z.number().int(),
+            verdict: z.string(),
+          }),
+        ),
+      })
+      .nullable(),
     quality: z
       .object({ clean: z.number().int(), flagged: z.number().int(), unassessed: z.number().int(), n: z.number().int(), by_flag: z.record(z.number().int()) })
       .nullable(),
@@ -326,7 +361,7 @@ const workout = z
   })
   .strict();
 const device = z
-  .object({ night_of: z.string().regex(ISO_DAY).nullable(), hours: n, deep_hours: n, rem_hours: n, light_hours: n, score: n })
+  .object({ night_of: z.string().regex(ISO_DAY).nullable(), hours: n, deep_hours: n, rem_hours: n, light_hours: n, score: n, provisional: z.boolean().nullable() })
   .strict()
   .nullable();
 const night = z
@@ -348,6 +383,8 @@ const engine = z
     composite: n,
     delta: n,
     pillars: z.array(z.object({ name: z.string().min(1), score: n, not_instrumented: z.boolean() }).strict()),
+    // owner ruling 2026-11-05: which method computed the score (character_privacy.PUBLIC_METHOD_LABELS), or null
+    method: z.string().min(1).nullable(),
   })
   .strict();
 // One correction beside a quotation — the same served shape as the coach APIs' summary_corrections / grade_corrections

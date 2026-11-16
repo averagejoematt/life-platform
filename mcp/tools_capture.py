@@ -52,6 +52,9 @@ reader, never a copy of its key shape):
                       (`SOURCE#pending_writes`, `lambdas/coach/pending_writes.py`)
                       — it is the surfacing half of that queue, so a write queued
                       in one chat is in front of him at the start of the next.
+  note_requests    — #5573: requests Matthew made in a Hevy exercise note (form guidance, a question, a rule)
+                      still open, with the overdue count (open more than 7 days after the note). Read through
+                      `mcp.tools_training_notes`; the full notes and replies are on get_coach_session_packet.
 
 Fail-soft per section (#1478 hard requirement): each section is computed
 inside its own try/except via `_section()`. One broken sub-queue (a DynamoDB
@@ -195,6 +198,14 @@ def _pending_writes_section():
     }
 
 
+def _note_requests_section():
+    """#5573: what Matthew ASKED for in a Hevy note and has not been answered — read through the module that owns
+    the rows (`mcp.tools_training_notes`' #5573 block, over `training.note_requests`), never a copy of their key shape."""
+    from mcp.tools_training_notes import note_requests_capture_section
+
+    return note_requests_capture_section()
+
+
 def tool_get_capture_queues(args):
     """One-call session opener: every pending capture surface in one read (#1478),
     plus the platform's own checkpoint proposals (#1578).
@@ -218,11 +229,13 @@ def tool_get_capture_queues(args):
         "freshness_flags": freshness,
         "suggested_rituals": _section("suggested_rituals", lambda: _suggested_rituals_section(freshness)),
         "pending_writes": _section("pending_writes", _pending_writes_section),  # #4078
+        "note_requests": _section("note_requests", _note_requests_section),  # #5573
         "how_to_use": (
             "One call, six pending-capture surfaces — the canonical session opener for workout debriefs, "
             "journal interviews, speak-to-the-coaches, and open check-ins. Everything here is optional: skip "
             "anything empty or 'unavailable' without penalty, and never nag Matthew about what's pending. "
             "The one exception is pending_writes: those are writes an earlier chat queued for his approval — "
-            "name them once and ask approve or discard (manage_pending_writes), because nothing else will."
+            "name them once and ask approve or discard (manage_pending_writes), because nothing else will. "
+            "note_requests are things he asked for in a Hevy note: answer each once (get_coach_session_packet has the notes)."
         ),
     }

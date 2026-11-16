@@ -170,7 +170,12 @@ def render_for(ir: Any, band: Any = None, read: Callable[..., Any] | None = None
     day = day_label(cal.get("session_role"), getattr(ir, "archetype", None))
     exercises = getattr(ir, "exercises", None) or []
     first, others = rule_args(exercises)
-    return render(day, band if band is not None else compounds_band(read), step_lb(read), cardio_kinds_of(exercises), first, others)
+    out = render(day, band if band is not None else compounds_band(read), step_lb(read), cardio_kinds_of(exercises), first, others)
+    if "live_session" in ((getattr(ir, "inputs_snapshot", None) or {}).get("session_prescription") or {}):
+        from training.live_safety import block_rule  # #5861 fix round 12: a LIVE draft carries no in-session load rule
+
+        out = block_rule(out)
+    return out
 
 
 def split(note: str | None) -> tuple[str, str]:
@@ -269,7 +274,10 @@ def why_note_for(ir: Any, fallback: str) -> str:
     load rule onto a one-set exercise 1 and "+ easy cardio" onto an intervals-only session)."""
     if block_of(ir):
         return ""
-    return conform_block(fallback, ir) if split(fallback)[0] == fallback.strip() and fallback.strip() else fallback
+    out = conform_block(fallback, ir) if split(fallback)[0] == fallback.strip() and fallback.strip() else fallback
+    from training.live_balance import why_effort
+
+    return why_effort(out, ir)  # #5861 FIX3, live only (the live mark): one effort target on exercise 1 — shadow: `out`
 
 
 def conform_block(block: str, ir: Any) -> str:
@@ -331,7 +339,7 @@ def change_reason(verdict: dict[str, Any] | None, gap_days: Any = None) -> str |
 def layoff_capped(gap_days: int | None, note: str | None) -> bool:
     """OD1 (owner ruling 2026-09-30, `layoff_tiers`): exposures 1–3 after a gap of more than 90 days, or a novel-again
     lift, run at RPE ≤ 7 — the effort treatment `lift_note` gives a capped exposure. True when the gap is over that line
-    or unknown, or the lift's note already carries the composer's `No jumps` line."""
+    or unknown, or the lift's note already carries the composer's layoff line (`Same load all sets: …`)."""
     from training.layoff_tiers import REENTRY_MAX_GAP_DAYS
 
     if any(ln.startswith(hevy_note_grammar.NO_JUMPS) for ln in split(note)[1].split("\n")):
@@ -340,18 +348,15 @@ def layoff_capped(gap_days: int | None, note: str | None) -> bool:
 
 
 def capped_clause(working_sets: int, gap_days: Any = None, existing: str | None = None) -> str:
-    """A critic's set cap on a capped exposure, as the lift's ONE `No jumps` line (≤ one phone line, so the pick-load W
-    line and the family cue still fit): `No jumps: 3 sets today, 19 weeks off.` The gap is the composer's own `No jumps`
-    line's when there is one (`existing`), so the two never disagree."""
-    head = f"{hevy_note_grammar.NO_JUMPS}: {working_sets} set{'' if working_sets == 1 else 's'} today"
-    m = re.search(r"session (\d+) back", existing or "")
-    if m:
-        return f"{head}, session {m.group(1)} back."
-    m = re.search(r"first time in (.+?)\.$", existing or "")
-    gap = m.group(1) if m else hevy_note_grammar.gap_text(gap_days)
-    if gap:
-        return f"{head}, {gap} off."
-    return f"{head}, {NEW_TO_LOG_WORDS}." if gap_days is None else f"{head}, {BREAK_WORDS}."
+    """A critic's set cap on a capped exposure, as the lift's ONE layoff line (re-grade #6, 2026-11-08: one grammar,
+    `hevy_note_grammar.layoff_line`): `Same load all sets: first time in 18 months.` The composer's own layoff line
+    (`existing`) is kept as it is, so the two never disagree; else the gap from `gap_days` (`layoff_gap`), else
+    `back after a break`. No set count — the rows show it (the 11-06 draft read `No jumps: 3 sets today, 18 months off.`).
+    `working_sets` stays in the signature for the critic pass that calls it."""
+    del working_sets
+    if existing and hevy_note_grammar.LAYOFF_RE.match(existing.strip()):
+        return existing.strip()
+    return hevy_note_grammar.layoff_line(hevy_note_grammar.layoff_gap_words(gap_days, 1))
 
 
 def applied_clause(kind: str, *, working_sets: int | None = None, lighter: bool | None = None, reason: str | None = None) -> str | None:
@@ -371,18 +376,19 @@ def applied_clause(kind: str, *, working_sets: int | None = None, lighter: bool 
 
 
 # what a critic clause opens with (`applied_clause`): one is never displaced by another — each is a safety change (§6.3)
-CLAUSE_RE = re.compile(r"^(?:\d+ sets? today|Lighter today|Heavier today|Fewer reps today)[:.]|^No jumps: \d+ sets? today, ")
+CLAUSE_RE = re.compile(r"^(?:\d+ sets? today|Lighter today|Heavier today|Fewer reps today)[:.]")
 
 
 def _displaceable(line: str) -> bool:
-    """A computed reason that yields the one reason slot to a critic clause. A capped exposure's `No jumps` line opts the
+    """A computed reason that yields the one reason slot to a critic clause. A capped exposure's layoff line opts the
     lift out of the load rule (a safety cap after a break), so it keeps its line, as does an earlier critic clause."""
     return bool(hevy_note_grammar.REASON_RE.match(line)) and not CLAUSE_RE.match(line) and not line.startswith(hevy_note_grammar.NO_JUMPS)
 
 
 def _fit(block: str, lines: list[str]) -> list[str]:
     """Drop the optional #5049 prep clause (R8: "if overkill skip") from the cue line when a critic's clause has pushed
-    the lift past its phone budget (§7: lift note ≤ 4, exercise 1 ≤ 11). The family cue itself stays (§6.1)."""
+    the lift past its phone budget (§7: lift note ≤ 4, exercise 1 ≤ 11); then the #5771 fallback line (to one name, then
+    gone); then an anchor's sheet cue. The family cue itself stays (§6.1)."""
 
     def over(ls: list[str]) -> bool:
         own = "\n".join(ls)
@@ -391,11 +397,31 @@ def _fit(block: str, lines: list[str]) -> list[str]:
 
     if not over(lines):
         return lines
-    out = []
-    for ln in lines:
-        prep = next((p for p in hevy_note_grammar.PREP_CUES.values() if ln.startswith(p + " ")), None)
-        out.append(ln[len(prep) + 1 :] if prep else ln)
-    return out
+    out = [_drop_lead(ln, hevy_note_grammar.PREP_CUES.values()) for ln in lines]
+    if not over(out):
+        return out
+    # #5771: then the fallback line (one name, then none) — it yields before the sheet cue and the family cue
+    fb = next((i for i, ln in enumerate(out) if hevy_note_grammar.FALLBACK_RE.match(ln)), None)
+    if fb is not None:
+        first = out[fb][len(hevy_note_grammar.FALLBACK_HEAD) : -1].split(hevy_note_grammar.FALLBACK_JOIN)[0]
+        one = hevy_note_grammar.fallback_line([first])
+        out = out[:fb] + ([one] if one else []) + out[fb + 1 :]
+        if not over(out):
+            return out
+        out = [ln for ln in out if not hevy_note_grammar.FALLBACK_RE.match(ln)]
+        if not over(out):
+            return out
+    # #5817: then an anchor's sheet cue (`form_cue_sheets.anchor_note_cue`) — it rode ahead of the family cue, which stays
+    from training import form_cue_sheets
+
+    sheet = form_cue_sheets.anchor_note_cues()
+    return [ln2 for ln2 in (_drop_lead(ln, sheet) for ln in out) if ln2]
+
+
+def _drop_lead(line: str, leads: Any) -> str:
+    """`line` without the first of `leads` it opens with (and its space); "" when the line is that lead alone."""
+    lead = next((p for p in leads if line == p or line.startswith(p + " ")), None)
+    return line[len(lead) + 1 :] if lead else line
 
 
 def _join(block: str, lines: list[str]) -> str:
@@ -412,7 +438,7 @@ def add_reason(note: str | None, clause: str | None) -> str:
     One reason per lift (standard §3.2, whose reason list includes the critic clause) and the clause is a safety change
     that is never dropped (§6.3), so it takes the reason slot: a computed reason already there (`New: replaces …`,
     `Heavier: …`, `Volume day: …`) gives way to it — the displaced line stays on the stored record
-    (`inputs_snapshot["lift_notes"]`). A capped exposure's `No jumps` line and an earlier critic clause keep their
+    (`inputs_snapshot["lift_notes"]`). A capped exposure's layoff line and an earlier critic clause keep their
     lines, and the clause goes in after line 1 (the effort line). #5428 replay, 2026-10-29: the joints critic's
     `3 sets today: …` stacked on a seated calf raise's rotation line, pick-load line and cue — 5 phone lines > 4. A
     clause that still pushes the note over budget drops the optional prep clause from the cue line (`_fit`)."""
@@ -426,19 +452,35 @@ def add_reason(note: str | None, clause: str | None) -> str:
     return _join(block, lines)
 
 
+def _capped_effort(line1: str, clause: str, rpe_max: Any) -> str:
+    """Line 1 of a capped lift: the layoff-return band on a first session back (or when line 1 already reads it), else
+    the cap's `RPE 7` — never above a line 1 already capped lower (#5782: a draft_custom author's `RPE 6` stands)."""
+    from training.lift_note import keep_stricter, layoff_return_effort
+
+    easy = layoff_return_effort()
+    if easy and (line1 == easy or hevy_note_grammar.FIRST_RETURN_RE.match(clause.strip())):
+        return keep_stricter(line1, easy)
+    return keep_stricter(line1, hevy_note_grammar.effort_line(rpe_max))
+
+
 def add_capped_reason(note: str | None, clause: str, rpe_max: Any) -> str:
     """A critic's set cap on a capped exposure (`layoff_capped`): line 1 becomes the cap's effort (`RPE 7` — the
-    "last set RPE 9–10" of the band would contradict it) and `clause` (`capped_clause`) takes the `No jumps` line's
+    "last set RPE 9–10" of the band would contradict it) and `clause` (`capped_clause`) takes the layoff line's
     slot, else a displaceable computed reason's, else goes in after line 1 — the same effort treatment `lift_note`
     gives a capped exposure (the 2026-10-30 re-grade: a capped seated calf raise kept RPE 9–10 and the +10 lb rule).
-    An earlier critic clause keeps its line. Idempotent."""
+    An earlier critic clause keeps its line. Re-grade #6 (2026-11-08, 4 of 4 voices): the capped exposure HOLDS its
+    load, so the pick-load W step line (`W at RPE 5 or less → one step, no more.`) leaves the note — the 11-06 standing
+    calf raise read "No jumps" and then "one step" on the next line. Owner ruling 2026-11-10 (charter 1.41.0): a FIRST
+    session back (`clause` names `first time in ‹gap›`) reads the layoff-return band instead, and a line 1 already at
+    that band (`lift_note` eased it) is never raised back to the cap's. Idempotent."""
     text = note or ""
     block, own = split(text)
     lines = _own_lines(block, own)
     if not lines:
         return text
     if hevy_note_grammar.EFFORT_RE.match(lines[0]):
-        lines[0] = hevy_note_grammar.effort_line(rpe_max)
+        lines[0] = _capped_effort(lines[0], clause, rpe_max)
+    lines = [lines[0]] + [ln for ln in lines[1:] if not hevy_note_grammar.PICK_LOAD_RESULT_RE.match(ln)]
     if clause not in lines:
         slot = next(
             (i for i, ln in enumerate(lines[1:], start=1) if ln.startswith(hevy_note_grammar.NO_JUMPS)),

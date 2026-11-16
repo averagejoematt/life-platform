@@ -43,12 +43,26 @@ def evaluate_condition(actual, condition, threshold):
     return cond_map.get(condition)
 
 
+def read_anchor(target_date, today_str):
+    """The end day of the point grader's source read: the call's TARGET day, capped at the run day.
+
+    Owner 2026-11-09 (manifest v3 §2.15): the read used to end on the run day with a 60-day
+    look-back, so re-grading an old call read a window that no longer reached its target day —
+    a September call re-run in November found "no reading" and expired although its reading is in
+    the table (Whoop recovery 67 on 2026-09-08). Anchored on the target, the window always covers
+    the readings the verdict is decided on, whenever the grade runs. For a call graded when it
+    falls due the target is within days of the run day, so the readings on or before the target —
+    the only ones the verdict reads — are the same either way (``tests/test_point_lookback_anchor.py``)."""
+    target, today = str(target_date)[:10], str(today_str)[:10]
+    return min(target, today) if today else target
+
+
 def metric_value_on(metric_key, data_cache, today_str, target_date, *, get_source_data, extract_metric_series, after_day=None):
     """(value, date) of `metric_key` ON `target_date` — the reading that day, else the
     latest within POINT_GRACE_DAYS before it; an aggregate key (`_7day_avg`) is the
     mean of the last N readings on or before the target. (None, None) when nothing
-    qualifies. Reads the shared source cache anchored on today (its key is
-    source+lookback, never the end date), then filters by date itself.
+    qualifies. Reads the shared source cache ANCHORED ON THE CALL'S OWN TARGET DAY (never
+    on the run day — ``read_anchor``), then filters by date itself.
 
     `after_day` (#4618) is the day the call was filed: a reading on or before it can
     never settle the call — the coach had already seen it. Without this bound the grace
@@ -66,7 +80,7 @@ def metric_value_on(metric_key, data_cache, today_str, target_date, *, get_sourc
     source = METRIC_SOURCES.get(base)
     if not source or not target_date:
         return None, None
-    records = get_source_data(source, data_cache, today_str, lookback_days=POINT_LOOKBACK_DAYS)
+    records = get_source_data(source, data_cache, read_anchor(target_date, today_str), lookback_days=POINT_LOOKBACK_DAYS)
     filed = str(after_day)[:10] if after_day else None
     series = [(d, v) for d, v in extract_metric_series(records, base) if d <= target_date and not (filed and d <= filed)]
     if not series:

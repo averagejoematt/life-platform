@@ -31,6 +31,7 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
+from common.query_pages import query_pages  # #5656: whole-history reads follow every page
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 try:
@@ -432,7 +433,8 @@ def lambda_handler(event, context):
         )
         habit_records = habit_resp.get("Items", [])
 
-        outcome_resp = table.query(
+        outcome_resp = query_pages(
+            table,
             **with_phase_filter(
                 {
                     "KeyConditionExpression": "pk = :pk AND sk BETWEEN :start AND :end",
@@ -442,7 +444,7 @@ def lambda_handler(event, context):
                         ":end": f"DATE#{today}",
                     },
                 }
-            )
+            ),
         )
         outcome_records = outcome_resp.get("Items", [])
 

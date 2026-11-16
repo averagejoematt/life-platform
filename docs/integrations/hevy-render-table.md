@@ -23,7 +23,7 @@ A field can pass the Hevy API and still never reach the gym floor. #3938 is the 
 | `effort_ceiling` | #5058 | `effort_ceilings (via routine_title / program_structure cues)` | note | `routine.exercises[].notes` | 'RPE a-b' in the session line and the slot cue | no RPE field on the routine wire; the note |
 | `rep_range` | #5052 | `the slot's rep scheme` | native | `routine.exercises[].sets[].rep_range` | the set row's reps column ('6-10') | - |
 | `rest_seconds` | - | `the block's rest` | native | `routine.exercises[].rest_seconds` | the exercise's rest timer | - |
-| `superset_id` | - | `the block's superset` | native | `routine.exercises[].superset_id` | the exercises grouped as a superset | - |
+| `superset_id` | #5799 | `session_shape.pair_supersets` | native | `routine.exercises[].superset_id` | the exercises grouped as a superset | - |
 | `minimum_session` | #5088 #5428 | `disruption.to_routine` | note | `routine.exercises[0].notes (head) + routine.exercises[].notes` | the session block's 'Minimum · ' / 'Travel · ' session line on exercise 1 | the title is the convention's at commit (Phase - Type - N - Y); the label rides the session line |
 | `charter_version` | #5068 #5085 | `training_charter.charter_version` | not_shown | `none (inputs_snapshot.charter_version + inputs_snapshot.nightly_predraft.charter_version)` | not shown in any Hevy note or footer; the IR and the pre-draft's draft mark carry it | - |
 
@@ -51,7 +51,7 @@ One path keeps its block ahead of the reason on purpose: the standing-constraint
 - `status`: `lands`, `not_leading` (in the note but not first), `missing` (the IR records it, the wire lacks it), `absent` (not in this routine), `deferred` or `not_shown`
 - `found`: where each hit sits (for example "exercise 2 note, line 1" or "exercise 1 set rows (3 W)"), its offset and whether it leads its note
 - `session_note` with its length, and `expected_reasons`
-- `note_lint` (#5428): the note linter's result over the body — its mode (`HEVY_NOTE_LINT_MODE`, `warn` today), its problems by rule (L1–L13) and the rules it could not check
+- `note_lint` (#5428): the note linter's result over the body — its mode (`HEVY_NOTE_LINT_MODE`, `warn` today), its problems by rule (L1–L15) and the rules it could not check
 - `problems`: one line for every `not_leading` or `missing` row, a session block not heading exercise 1, a warm-up set after a working set, and every note-lint problem (prefixed `note lint: `). In warn mode none of them refuses a commit.
 
 ## 5. The live proof (owner or driver; never from a lane)

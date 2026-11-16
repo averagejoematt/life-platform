@@ -35,9 +35,22 @@ _PRE_5126_PROSE = (
 )
 
 
+# Owner ruling 2026-11-11 (item 2): the failure_mode prose and signals are PRIVATE and left the tracked plan file
+# (common.user_goals). The owner (response_owner) is public and is read from the repo; the private part here is
+# SYNTHETIC — the shape the coach context reads, never the owner's words.
+_SYNTHETIC_PRIVATE_FM = {
+    "failure_mode": {
+        "coach_response": "Nathan Reeves acknowledges the signal plainly, and the week narrows to ONE thing.",
+        "early_warning_signals": ["synthetic signal one", "synthetic signal two", "synthetic signal three"],
+    }
+}
+
+
 def _goals() -> dict:
+    from common import user_goals
+
     with open(os.path.join(_REPO, "config", "user_goals.json"), encoding="utf-8") as fh:
-        return json.load(fh)
+        return user_goals.merge(json.load(fh), _SYNTHETIC_PRIVATE_FM)
 
 
 def _names() -> dict:
@@ -49,6 +62,9 @@ def _names() -> dict:
 
 
 def test_the_plan_root_names_exactly_one_operational_owner():
+    with open(os.path.join(_REPO, "config", "user_goals.json"), encoding="utf-8") as fh:
+        public_fm = json.load(fh)["failure_mode"]
+    assert "coach_response" not in public_fm and "early_warning_signals" not in public_fm, "private since 2026-11-11"
     fm = _goals()["failure_mode"]
     assert rp.problems(fm, _names(), OPERATIONAL_COACH_IDS) == []
     assert rp.claimants(fm, _names()) == ["mind_coach"]

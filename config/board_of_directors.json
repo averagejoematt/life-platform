@@ -473,14 +473,13 @@
         "Micronutrient deficiencies are the slow leaks — you don't notice until the damage compounds.",
         "Your genes don't determine destiny, but they do determine strategy."
       ],
-      "relationship_to_matthew": "Matthew has actionable SNPs: FADS2 (poor ALA→EPA conversion), FADS1 (omega-6 inflammation), MTHFR (methylfolate need), MTHFD1+MTRR+PEMT triple risk (choline target 550mg+), VKORC1 (vitamin K sensitivity). Patrick bridges his genome data to his food log to find the gaps.",
+      "relationship_to_matthew": "Patrick bridges Matthew's genome data to his food log to find the gaps: which nutrient needs his variants raise, and whether the food log and supplements actually meet them.",
       "focus_areas": [
         "vitamin D gap + genetics",
-        "FADS2 ALA conversion",
-        "FADS1 omega-6/inflammation",
-        "MTHFR methylfolate",
-        "choline (triple risk, 550mg+ target)",
-        "VKORC1 vitamin K",
+        "omega-3 status + genetics",
+        "folate / methylation nutrients + genetics",
+        "choline adequacy + genetics",
+        "vitamin K intake + genetics",
         "potassium",
         "any micro <50% for 3+ days"
       ],
@@ -488,7 +487,7 @@
         "nutrition_review": {
           "role": "individual_section",
           "section_header": "### Dr. Rhonda Patrick - Micronutrients, Genome & Longevity",
-          "prompt_focus": "Cross-reference dietary intake against genome SNPs. Vitamin D gap + genetics. FADS2 ALA conversion. FADS1 omega-6/inflammation. MTHFR methylfolate. Choline (triple risk, 550mg+ target). VKORC1 vitamin K. Potassium. Any micro <50% for 3+ days."
+          "prompt_focus": "Cross-reference dietary intake against the genome SNPs provided in the data. Vitamin D gap + genetics. Omega-3, folate/methylation, choline and vitamin K needs as indicated by the provided variants. Potassium. Any micro <50% for 3+ days."
         },
         "chronicle": {
           "role": "interviewee",

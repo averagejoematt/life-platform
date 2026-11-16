@@ -1,0 +1,111 @@
+{
+  "conversation": "after-2026-11-01T1629Z",
+  "phase": "after",
+  "source": "CloudWatch Logs /aws/lambda/life-platform-mcp, the handler's `Calling tool '<name>' with args` line plus the packet's own `[#5501] coach packet lift_history state=` line in the same request (read-only filter-log-events, 2026-11-08); one conversation = calls with no gap over 45 minutes. The first real planning conversation after #5501 deployed (2026-10-31T18:07Z).",
+  "window_utc": [
+    "2026-11-01T16:29:44Z",
+    "2026-11-01T17:19:51Z"
+  ],
+  "redaction": "tool name only, plus manage_hevy_routine's `action`, whether plan_next_session carried a routine_id, and the packet call's lift_history state; every other argument dropped",
+  "coach_context_failures_logged": 0,
+  "coach_context_failures_basis": "filter-log-events '\"coach context could not be assembled\"' over 2026-11-01T14:30Z..18:30Z: 0 events",
+  "tool_calls": [
+    {
+      "at": "2026-11-01T16:29:44Z",
+      "tool": "get_coach_session_packet",
+      "lift_history": "measured"
+    },
+    {
+      "at": "2026-11-01T16:29:44Z",
+      "tool": "get_freshness_status"
+    },
+    {
+      "at": "2026-11-01T16:29:55Z",
+      "tool": "get_coach_checkin_queue"
+    },
+    {
+      "at": "2026-11-01T16:30:22Z",
+      "tool": "plan_next_session"
+    },
+    {
+      "at": "2026-11-01T16:31:07Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "dry_run"
+      }
+    },
+    {
+      "at": "2026-11-01T16:31:19Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "draft"
+      }
+    },
+    {
+      "at": "2026-11-01T16:31:43Z",
+      "tool": "plan_next_session",
+      "args": {
+        "routine_id": "<present>"
+      }
+    },
+    {
+      "at": "2026-11-01T16:32:14Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "dry_run"
+      }
+    },
+    {
+      "at": "2026-11-01T16:36:49Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "draft_custom"
+      }
+    },
+    {
+      "at": "2026-11-01T16:37:06Z",
+      "tool": "plan_next_session",
+      "args": {
+        "routine_id": "<present>"
+      }
+    },
+    {
+      "at": "2026-11-01T16:37:40Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "dry_run"
+      }
+    },
+    {
+      "at": "2026-11-01T16:37:55Z",
+      "tool": "manage_hevy_routine",
+      "args": {
+        "action": "commit"
+      }
+    },
+    {
+      "at": "2026-11-01T16:41:43Z",
+      "tool": "get_sources"
+    },
+    {
+      "at": "2026-11-01T16:41:44Z",
+      "tool": "get_todoist_snapshot"
+    },
+    {
+      "at": "2026-11-01T17:05:02Z",
+      "tool": "get_sources"
+    },
+    {
+      "at": "2026-11-01T17:05:02Z",
+      "tool": "get_todoist_snapshot"
+    },
+    {
+      "at": "2026-11-01T17:19:51Z",
+      "tool": "get_sources"
+    },
+    {
+      "at": "2026-11-01T17:19:51Z",
+      "tool": "get_todoist_snapshot"
+    }
+  ]
+}

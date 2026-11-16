@@ -3,7 +3,7 @@
 **Date:** 2026-05-03
 **Source:** v6.8.1 handover ("Deferred Work" section) + Technical Board consult on observatory rendering, 2026-05-02.
 **Scope:** Take the FH 2026 draw (already ingested, 153 biomarkers in DDB at `DATE#2026-04-03`) and surface it through the public site and MCP tooling.
-**Out of scope:** Personal Board consult on the FH 2026 *findings* — see the separate Personal Board deliberation document.
+**Out of scope:** the clinical interpretation of the FH 2026 *findings* (owner-only, not in the repo).
 
 ---
 

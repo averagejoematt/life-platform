@@ -83,7 +83,7 @@ jobs:
         run: |
           # pillow (#2973): lets test_visual_ai_qa's real-downscale test run here
           # (visual_ai_qa._prepare_image; pytest.importorskip elsewhere).
-          PINS=$(python3 scripts/ci_pins.py pytest pytest-cov pytest-xdist boto3 botocore hypothesis pyyaml pillow)
+          PINS=$(python3 scripts/ci_pins.py pytest pytest-timeout pytest-cov pytest-xdist boto3 botocore hypothesis pyyaml pillow)
           pip install $PINS
 
       - name: Coverage pass — this leg's share of tests/
@@ -198,7 +198,7 @@ jobs:
         run: |
           # pillow (#2973): lets test_visual_ai_qa's real-downscale test run here
           # (visual_ai_qa._prepare_image; pytest.importorskip elsewhere).
-          PINS=$(python3 scripts/ci_pins.py pytest pytest-cov pytest-xdist boto3 botocore hypothesis pyyaml pillow)
+          PINS=$(python3 scripts/ci_pins.py pytest pytest-timeout pytest-cov pytest-xdist boto3 botocore hypothesis pyyaml pillow)
           pip install $PINS
 
       - name: Name every playwright-gated test skip (#3640)

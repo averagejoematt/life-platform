@@ -36,6 +36,16 @@ ISSUE = "#5000"
 TALK_TEST_CUE = "talk test — full sentences throughout. No HR target."
 HR_PICK_FIELDS = ("hr_ceiling_bpm", "hr_target_bpm")
 
+
+def easy_effort_cue(rpe_max: int) -> str:
+    """The easy-aerobic intensity line (#5916, owner ruling 2026-11-13): the talk test plus an effort ceiling in RPE.
+
+    Pure: the caller hands in the redline's `easy_rpe_max` (`owner_redlines.REDLINES["walking_floor_hr_wk"]`), so the
+    number has one home and this module still reads nothing. No heart-rate number is written: heart rate is recorded as a
+    measurement and never graded against a fixed ceiling."""
+    return f"{TALK_TEST_CUE} Easy effort = RPE {int(rpe_max)} or below."
+
+
 STANDING_CONSTRAINTS: list[dict[str, Any]] = [
     {
         "id": "hr_regime_change_2026_10_10",
@@ -124,13 +134,69 @@ def stop_list_from(summary: Any, rule: int) -> str | None:
 
 
 def talk_test_pick(pick: dict[str, Any], constraint: dict[str, Any] | None) -> dict[str, Any]:
-    """`cardio_pick` under the constraint: the HR fields dropped, the talk-test cue written in their place."""
+    """`cardio_pick` under the constraint: the HR fields dropped, the talk-test cue written in their place.
+
+    #5916: a pick whose `intensity` already leads with the talk test (the redline's line, `easy_effort_cue`, with its
+    easy-effort RPE) keeps its own words; any other intensity is replaced by the cue, as before."""
     if not constraint or constraint.get("hr_prescriptions_allowed", True):
         return pick
     out = {k: v for k, v in pick.items() if k not in HR_PICK_FIELDS}
-    out["intensity"] = TALK_TEST_CUE
+    if TALK_TEST_CUE not in str(out.get("intensity") or ""):
+        out["intensity"] = TALK_TEST_CUE
     out["hr_fields_dropped_by"] = constraint["id"]
     return out
+
+
+# ── a served training recommendation under the constraint (#5916) ─────────────────────
+HR_RECOMMENDATION_FIELDS = ("hr_floor", "hr_ceiling")
+# "60% max", "85-90% max HR", "70 % of max heart rate" — with a leading "at" when the phrase is an adverbial.
+_PCT_OF_MAX = re.compile(r"(?:\bat\s+)?\d{1,3}(?:\s*[-–]\s*\d{1,3})?\s*%\s*(?:of\s+)?max(?:imum)?(?:\s+(?:HR|heart rate))?", re.I)
+_HR_WORD = re.compile(r"\b(?:HR|heart rate)\b", re.I)
+# Intervals and conditioning are open by RPE / talk test (`intensity_gate_retired_from`); "a few words" is the note
+# standard's talk words for a hard effort (`hevy_note_grammar.TALK_WORDS`).
+_EASY_PHRASE = "at an easy effort by the talk test (full sentences; no HR target)"
+_HARD_PHRASE = "at a hard effort by RPE (a few words at a time; no HR target)"
+HARD_EFFORT_CUE = "hard effort by RPE — a few words at a time. No HR target."
+
+
+def _without_pct_of_max(description: Any, hard: bool) -> Any:
+    """`description` with every percent-of-max phrase replaced. A sentence that is itself a heart-rate instruction
+    ("Keep HR below 60% max.") becomes the talk-test cue whole; a phrase inside a prescription ("… at 85-90% max HR with
+    equal rest") becomes an effort phrase, so the sets and minutes around it survive."""
+    if not isinstance(description, str) or not _PCT_OF_MAX.search(description):
+        return description
+    cue = TALK_TEST_CUE[0].upper() + TALK_TEST_CUE[1:]
+    out = []
+    for sentence in re.split(r"(?<=[.!?])\s+", description):
+        m = _PCT_OF_MAX.search(sentence)
+        if m and _HR_WORD.search(sentence[: m.start()]):
+            out.append(cue)
+        else:
+            out.append(_PCT_OF_MAX.sub(_HARD_PHRASE if hard else _EASY_PHRASE, sentence))
+    return " ".join(out)
+
+
+def talk_test_recommendation(served: dict[str, Any], constraints: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """`get_training view=recommendation`'s answer on a day the constraint forbids HR prescriptions (#5916).
+
+    The readiness tier and the session `type` stand. `hr_floor` / `hr_ceiling` become None (a percent-of-max zone is a
+    population formula on a max that predates the regime change, never a prescription here), every percent-of-max
+    phrase in `description` is replaced by the talk-test cue or an RPE phrase, and an aerobic recommendation names its
+    `effort_cue`. A recommendation that carried no heart-rate field and no such phrase (strength, rest) is returned
+    as served. No active constraint on `served["date"]`: returned untouched."""
+    constraint = active_constraint(str(served.get("date") or ""), constraints)
+    rec = served.get("recommendation")
+    if not constraint or constraint.get("hr_prescriptions_allowed", True) or not isinstance(rec, dict):
+        return served
+    hard = "hard" in str(rec.get("intensity") or "").lower()
+    description = _without_pct_of_max(rec.get("description"), hard)
+    had_hr = any(rec.get(k) is not None for k in HR_RECOMMENDATION_FIELDS)
+    if not had_hr and description == rec.get("description"):
+        return served
+    new = {**rec, **{k: None for k in HR_RECOMMENDATION_FIELDS if k in rec}, "description": description}
+    new["effort_cue"] = HARD_EFFORT_CUE if hard else TALK_TEST_CUE
+    new["hr_fields_dropped_by"] = constraint["id"]
+    return {**served, "recommendation": new}
 
 
 def lifting_caps_active(constraint: dict[str, Any] | None, target_date: str | None) -> bool:

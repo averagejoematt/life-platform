@@ -146,6 +146,7 @@ ROUTES: dict[str, Route] = {
     "coach_narrative.quality_gate": Route(feature="coach_narrative", env="AI_MODEL_HAIKU"),
     "coach_narrative.state_update": Route(feature="coach_narrative", env="AI_MODEL_HAIKU"),
     "coach_narrative.lead_read": Route(feature="coach_narrative", env="AI_MODEL_HAIKU"),
+    "coach_narrative.public_brief": Route(feature="coach_narrative", env="AI_MODEL_HAIKU"),  # 2026-11-09 E: the public-safe brief
     "coach_narrative.moves_cast": Route(feature="coach_narrative", env="AI_MODEL_HAIKU"),
     "coach_narrative.moves_line": Route(feature="coach_narrative", tier=_N, env="AI_MODEL"),
     "coach_narrative.memoir": Route(feature="coach_narrative", tier=_N, env="AI_MODEL"),

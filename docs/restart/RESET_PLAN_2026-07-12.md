@@ -20,7 +20,7 @@ adopted for public content.)
 
 - **Truth audit (34 verified serious findings):** the AI layer mostly named the 15-day stall honestly; the
   deterministic/front-end layer papered over it, the character *leveled up* during neglect, and two privacy
-  leaks were live (LPA genotype on /data/labs; real public figures as recommenders).
+  leaks were live (a genotype on /data/labs; real public figures as recommenders).
 - **Stall detection:** the presence engine already existed (#746/#892); gaps were habitify blindness,
   aggregate dilution, missing prompt injection, no acknowledgment enforcement — hardened in PR #921.
 - **Reset protocol:** would have failed Sunday (wipe coverage crash + swallowed errors) — fixed + upleveled

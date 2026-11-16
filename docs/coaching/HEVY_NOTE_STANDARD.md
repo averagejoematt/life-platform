@@ -1,10 +1,10 @@
 # Hevy routine notes: the standard
 
-**Status:** adopted 2026-10-27 (#5428), with the owner's rulings of 2026-10-27 applied (§0). Amended 2026-10-31 after blind re-grade #2 (draft `40f2c0b5`, panel C+/B−): the load rule (§3.1), the low-energy line, `New` vs a stale PREVIOUS and the held-top reason (§3.2), the pick-load W line (§3.3), carry units (§3.5) and intervals (§3.7), each with a linter rule (§8). Amended again after re-grade #3 (B−): no load rule over a one-set exercise 1 and its effort printed once (§3.1), the held-top reason is the load rule's own step (§3.2), the carry's start load and adjust rule (§3.5), and the intervals' easy talk words and two-way escape (§3.7). Re-grade #4 (B/B+): the load rule reaches a one-set exercise 1's other lifts (§3.1), the held-top reason names its timeline (§3.2), the feeler W row is the start load and its line the result rule (§3.3), the carry's load is on its rows (§3.5), and the interval escape uses the talk words and never drops below the hard level (§3.7). **Verified 2026-10-31.**
+**Status:** adopted 2026-10-27 (#5428), with the owner's rulings of 2026-10-27 applied (§0). Amended 2026-10-31 after blind re-grade #2 (draft `40f2c0b5`, panel C+/B−): the load rule (§3.1), the low-energy line, `New` vs a stale PREVIOUS and the held-top reason (§3.2), the pick-load W line (§3.3), carry units (§3.5) and intervals (§3.7), each with a linter rule (§8). Amended again after re-grade #3 (B−): no load rule over a one-set exercise 1 and its effort printed once (§3.1), the held-top reason is the load rule's own step (§3.2), the carry's start load and adjust rule (§3.5), and the intervals' easy talk words and two-way escape (§3.7). Re-grade #4 (B/B+): the load rule reaches a one-set exercise 1's other lifts (§3.1), the held-top reason names its timeline (§3.2), the feeler W row is the start load and its line the result rule (§3.3), the carry's load is on its rows (§3.5), and the interval escape uses the talk words and never drops below the hard level (§3.7). Re-grade #6 (2026-11-08, three live predrafts, panel C+) and the owner's rulings the same night: load-rule line 4 in plain words (§3.1), one layoff line `Same load all sets: ‹gap›.` in place of the three `No jumps` wordings and no W step line on a capped lift (§3.2, §3.8), a barbell or machine compound never asks him to find its load over unloaded rows (§3.3), and intervals at steady + 2 with a clock that names the rep length first and an escape that names the level either way (§3.7, owner ruling 2026-11-08). Amended 2026-11-10 (owner ruling, delegated): a first session back after a long layoff runs at the charter's layoff-return band behind a W row lighter than the work (§3.2, §3.3, lint L14), and a 10+ rep barbell compound climbs two W rows (§3.4, lint L15). **Verified 2026-11-10.**
 
 **The machine half:**
 - `lambdas/training/hevy_note_grammar.py` — the words, line shapes and budgets every note producer builds from.
-- `lambdas/training/hevy_note_lint.py` — the linter (rules L1–L13, §8), over the compiled wire body.
+- `lambdas/training/hevy_note_lint.py` — the linter (rules L1–L15, §8), over the compiled wire body. `GRAMMAR_VERSION` 1.6.0, `LINT_VERSION` 1.6.0 since the owner's 2026-11-10 ruling (an easy first session back after a long layoff; a 10+ rep barbell compound climbs two W rows).
 
 **The proof:** `tests/fixtures/hevy_notes_2026_10/a_grade.json` is the newest 10 of the 30 reviewed routines rewritten to this standard. `originals.json` is the same 10 as they were pushed (scrubbed for the public repo). `tests/test_hevy_note_lint_5428.py` holds that:
 - every rewritten routine lints clean
@@ -21,7 +21,7 @@ The review that produced this standard graded the 30 routines published 2026-09-
 |---|---|---|
 | R1 | "remove AF/ecg/and other references, i am no metorprolol" | No AF, ECG, Sinus, cardiology, beta-blocker or medication text on the wire. Cardio stays RPE- and talk-test-led (§3.7). The beta-blocker-era orthostatic cues ("sit up slowly") are retired. |
 | R2 | Remove the daily gate | No pre-session check block. |
-| R3 | Bigger in-session step | Two load steps (+10 lb) when top reps land at RPE ≤ 7; one step (+5 lb) at RPE 7.5–8.5; once per lift. (Re-grade #2, 2026-10-31: the line said "at RPE 8", so 7.5 and 8.5 — the PREVIOUS on three lifts that day — fell in neither branch; and "pins" read wrong on a dumbbell, where the step is lb per hand, so the line names lb. Re-grade #3: the line is two if/then lines with a unit on every step; a stack's step is its next plate (§5: a stack has no fixed step, and +10 lb on a 50 lb rope is 20 %); the rule heads exercise 1 only when exercise 1 has a later set. Re-grade #4: over a one-set exercise 1 it is addressed to the other lifts, so the session never loses its in-session rule.) The panel added two safeguards: **one step max under 40 lb**, since +10 on a 15 lb raise is +67 %; and the earlier RPE 8 / 7–8 caps **retire to the charter band 8–9**, so RPE 8 is never the top of a band. A capped first exposure (trap bar, crunch) opts out by name: `No jumps …`. The step is the charter's `progression.gain_rule.step_lb`, so the line moves with it. |
+| R3 | Bigger in-session step | Two load steps (+10 lb) when top reps land at RPE ≤ 7; one step (+5 lb) at RPE 7.5–8.5; once per lift. (Re-grade #2, 2026-10-31: the line said "at RPE 8", so 7.5 and 8.5 — the PREVIOUS on three lifts that day — fell in neither branch; and "pins" read wrong on a dumbbell, where the step is lb per hand, so the line names lb. Re-grade #3: the line is two if/then lines with a unit on every step; a stack's step is its next plate (§5: a stack has no fixed step, and +10 lb on a 50 lb rope is 20 %); the rule heads exercise 1 only when exercise 1 has a later set. Re-grade #4: over a one-set exercise 1 it is addressed to the other lifts, so the session never loses its in-session rule.) The panel added two safeguards: **one step max under 40 lb**, since +10 on a 15 lb raise is +67 %; and the earlier RPE 8 / 7–8 caps **retire to the charter band 8–9**, so RPE 8 is never the top of a band. A capped first exposure (trap bar, crunch) opts out by name: `Same load all sets: ‹gap›.` (re-grade #6: was `No jumps …`). The step is the charter's `progression.gain_rule.step_lb`, so the line moves with it. |
 | R4 | Dumbbell warm-up: one row | One W row on the first dumbbell compound ≥ 50 lb per hand, at about 60 %, rounded to the rack, × 8 (× 5 on a 4–6 top set). Barbell warm-ups as ruled 10-23. |
 | R5 | Bookkeeping off Hevy | Protein, rate, badges, streaks and critic verdicts are chat-only. `daily_brief_lambda.py` carries none of them today (verified), so they live in the coach chat until the brief is given them. |
 | R6 | Pinned exercise notes are his setup only | The platform never repeats setup (seat, handles, his treadmill default) and never contradicts it silently (§1.5). |
@@ -68,7 +68,7 @@ The review that produced this standard graded the 30 routines published 2026-09-
 ‹Day› · RPE ‹a–b› on big lifts
 Low energy → first 2 lifts + easy cardio.
 Top reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.     when exercise 1 has 2+ working sets
-Under 40 lb: one step. Stack: next plate at any load. Once per lift.
+Dumbbells under 40 lb or a machine: next step only. One load change per lift.
 ```
 
 - **Line 1, the session line** (`hevy_note_grammar.session_line`):
@@ -83,6 +83,7 @@ Under 40 lb: one step. Stack: next plate at any load. Once per lift.
   - **Who it addresses** (`hevy_note_grammar.rule_mode`). Exercise 1 with 2+ working sets: the rule as above. A one-set exercise 1 has no later set to step, so the rule opens `Other lifts: top reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.` (re-grade #4: dropping it left the session's multi-set lifts with no in-session rule), and exercise 1's own note names the gain rule's next-session step: `One set: 10 reps at RPE 9 or less two sessions running → +5 lb per hand.` No rule at all only when no lift in the session has 2+ working sets (lint L3, L11).
   - A step adds to the row, and a dumbbell row is already per hand, so the rule says no "per hand". A stack has no fixed step (§5): its step is the next plate. No "pins" on a dumbbell (lint L11).
   - **"One step" is §5's step for the implement** — 2.5 lb on a dumbbell under 50, 5 lb on a barbell — so under 40 lb a lift moves one step and no more (R3's safeguard; re-grade #5: "+5 lb max" was two steps on a 30-lb dumbbell). **A stack's next plate wins at any load**, so a stack under 40 lb (the machine lateral raise) still moves one plate.
+  - **Line 4 says it in plain words** (re-grade #6, 2 of 4 voices: `Under 40 lb: one step. Stack: next plate at any load. Once per lift.` was shorthand): `Dumbbells under 40 lb or a machine: next step only. One load change per lift.` Same meaning: a barbell never sits under 40 lb, and the catalog cannot tell a plate machine from a pin stack (§5), so every machine's step is its next plate. One line of at most 80 characters, so the block stays at 7 phone lines (`hevy_note_grammar.LOAD_RULE_LIMITS`).
 - **Exercise 1's effort is printed once.** When its own line 1 would repeat the session line's band (`RPE 8–9`), it is dropped; a different effort (a capped `RPE 7`, `last set RPE 9–10`) stays (lint L6).
 - **No safety line (R7).** The block carries no medical or warning-sign text.
 - **Who writes it:** `routine_title.format_why_note` returns the block for every program role, and for a chat draft whose first note line is a session line. The compiler places it, then a blank line, then exercise 1's own note.
@@ -94,7 +95,13 @@ Under 40 lb: one step. Stack: next plate at any load. Once per lift.
 RPE ‹a–b›[, last set RPE ‹c–d›]        line 1, always
 ‹one reason›                            optional, only when it changes what he does
 ‹one cue›                               optional (§4), first exercise of a family only
+If taken: ‹X›, then ‹Y›.                 the fallback line, when it fits (below)
 ```
+
+**The fallback line (owner ruling 2026-11-11, #5771).** Every lift names its ranked same-stimulus fallback, so a missing or taken item is a swap, not a hole: `If taken: Lateral Raise (Machine), then Lateral Raise (Cable).` — at most two Hevy titles, best first, always the LAST line (`hevy_note_grammar.fallback_line`). It is not a reason (it never takes the reason slot) and not a cue (lint L8 never counts it as one).
+- **Where the names come from** (`selection_engine.note_fallbacks`): an accessory slot's selection (its next eligible candidates, equipment-disjoint first); any other lift, an anchor included, its exercise-library entry's ranked fallbacks, kept only when each is usable today and keeps the lift's volume signature — an anchor whose fallbacks would all move the week's counts carries no line. Equipment the gym does not have (the inventory, or a learned "gym doesn't have X" note) is never named; contention ("X was taken", "no bench free") never removes a name. A lift served elsewhere in the session is not a fallback. Location is `home_gym`; the gym is never named.
+- **On the wire only once the library is approved.** While it is `proposed` the names are recorded on `inputs_snapshot["note_fallbacks"]` (`render: false`) and the note is unchanged.
+- **Priority when the budget (§7) is short:** the optional prep clause goes first; then the fallback line, two names to one, then gone; then an anchor's sheet cue. The family breathing / bracing cue never goes (§6.1). Same order when a critic clause overflows the note later (`session_block._fit`). A carry keeps its own four-line note (§3.5) and carries no fallback line.
 
 **Reasons:**
 - `Lighter: chase 12.`
@@ -107,21 +114,23 @@ RPE ‹a–b›[, last set RPE ‹c–d›]        line 1, always
 - `One set: 10 reps at RPE 9 or less two sessions running → +5 lb per hand.` (a one-set exercise 1, which carries no load rule: the gain rule's next-session step)
 - `Lighter: first time in 2 years.` (a stale PREVIOUS, §3.3, more than one step from the row — re-grade #2)
 - `Set 1 over RPE 9 → sets 2–3 at 195 lb.` (the only place a load appears; a threshold follows its band)
-- `No jumps today: 3rd trap-bar session.` / `No jumps: first time on it.` / `No jumps: first time in 19 weeks.` (a capped lift opts out of the load rule, and its line 1 is the cap's `RPE 7`)
+- `Same load all sets: first time in 19 weeks.` / `Same load all sets: 2nd session back after 5 weeks off.` / `Same load all sets: back after a break.` / `Same load all sets: new lift.` (a capped lift opts out of the load rule, and its line 1 is the cap's `RPE 7` — on a FIRST session back after a long layoff the charter's layoff-return band, `RPE 6–7`, owner ruling 2026-11-10). **One grammar** (re-grade #6, 2026-11-08, 3 of 4 voices: the line was worded three ways, `No jumps: 2 sets today, session 2 back.` / `No jumps today: session 2 back after a break.` / `No jumps: first time in 14 months.`, and "No jumps" next to a split squat read as a movement instruction): `Same load all sets: ‹gap›.`, where ‹gap› is `first time in ‹gap›` on exposure 1, `‹nth› session back after ‹gap› off` on a later exposure, `back after a break` when the gap is unknown, and `new lift` for a first-exposure gate on a lift never logged. Never a set count (the rows show it) and never a bare session ordinal (`hevy_note_grammar.layoff_line`, `LAYOFF_RE`; lint L1 refuses `No jumps`, L4 any other layoff wording).
 - `New: replaces Calf Press (Machine).` (a rotated accessory, only when it is new to him: NO PREVIOUS at all. Hevy shows any PREVIOUS beside the row, however old; re-grade #2 read `New` over a 2024 PREVIOUS of 65 lb × 10 and a 35 lb row.)
 - a critic clause (§3.8)
 
 **Rules for reasons:**
-- **A capped exposure** is one something capped: a critic's layoff set cap (§3.8), a first-exposure gate (trap bar, crunch), or the ramp's OD1 exposure cap where the engine set one on a ramped lift (`layoff_tiers.exposure_caps`). **There is no blanket layoff cap** (owner ruling 2026-10-30): a lift back after a long layoff that nothing capped keeps the normal band, like the leg curl ~23 months off. A capped lift's note is `RPE 7`, then its `No jumps` line; on stale history (§3.3) the pick-load W line follows.
+- **A capped exposure** is one something capped: a critic's layoff set cap (§3.8), a first-exposure gate (trap bar, crunch), or the ramp's OD1 exposure cap where the engine set one on a ramped lift (`layoff_tiers.exposure_caps`). **A first session back after a long layoff is easy** (owner ruling 2026-11-10, charter 1.41.0 `effort_ceilings.layoff_return_rpe`; it supersedes the 2026-10-30 "no blanket layoff cap" for that first session only). "Long" is the OD1 exposure-cap line, `layoff_tiers.REENTRY_MAX_GAP_DAYS` (more than 90 days since his last session of the movement); the session is the ramp's exposure 1, or — where the ramp set no cap — a PREVIOUS older than that line (`lift_note.is_layoff_return`). Its note is `RPE 6–7` (no last-set target) then the one layoff line (`Same load all sets: first time in ‹gap›.`, the load rule is off for it), and its rows carry ONE W row at half the work (`warmup_sets.layoff_warmup`, 50 % × 8 on the 5-lb step) — never the pick-load feeler at the work. A warmed compound already climbs below its work and gets no extra row. The 11-11 torso rotation (2 years off) read `RPE 8–9, last set RPE 9–10` with its W row at the working 100 lb. Exposures 2–3 keep the cap's `RPE 7`; a lift never logged is new, not a return (the pick-load form, §3.3). Lint L14. Otherwise a capped lift's note is `RPE 7`, then its layoff line. **A capped lift holds its load, so it never carries the W step line** (re-grade #6, 4 of 4 voices: the 11-06 standing calf raise read `No jumps: 3 sets today, 18 months off.` then `W at RPE 5 or less → one step, no more.`, one line saying hold and the next saying add). A feeler W row already on a stale lift stays, at the start load, as a warm-up at that load; its step line leaves (`session_block.add_capped_reason`; lint L4).
 - **Every working row more than one step from PREVIOUS gets a reason.** The engine derives the Heavier / Lighter / Volume-day word from PREVIOUS, his last performed load on that template (`hevy_note_grammar.delta_word`; the draft writes PREVIOUS to `inputs_snapshot["previous_loads"]`).
 - **A held load whose PREVIOUS reached the top of its range at RPE ≤ 8.5 gets a reason** (re-grade #2, 2026-10-31). Without it the row reads as "never progresses" (60 × 15 @ 8.5 held at 60). **One timeline** (re-grades #3 and #4): the reason is the load rule applied to this lift's set 1, saying "on later sets" (today) as the rule does, in its implement's step — a stack the next plate, under 40 lb one step, else `+10 lb` at RPE ≤ 7 and `+5 lb` at 7.5–8.5. `Same load: hit 15 again to move it up.` sat beside a load rule that already steps a 15 @ 8.5 today. A one-set lift has no later set, so its reason is the gain rule's next-session step. A reason over such a PREVIOUS that is not the step contradicts the load rule (lint L4).
-- **A stale PREVIOUS still shows in Hevy.** A row more than one step from it gets `Lighter: first time in ‹gap›.` (or `Heavier: …`), never `New:`. Lint L4.
-- **One exception inside a step (owner ruling 2026-10-30, #5428): the same load as a PREVIOUS that ran to RPE 10 gets `Same load: aim to leave one more rep.`** Two of the four 10-30 graders read a bare same-load row after a grind as a copy of the grind; the reason says the intent is a lower effort at the same load. A re-entry lift keeps its layoff clause instead (§6.3), and a lift back after a long layoff that no critic capped keeps the normal band (the owner declined a blanket layoff cap the same day).
+- **A stale PREVIOUS still shows in Hevy.** A row more than one step from it gets a reason, never `New:` (lint L4). With rows that carry a load that reason is now the layoff line above (a stale PREVIOUS is past the OD1 line, so the lift is a first session back); `Lighter: first time in ‹gap›.` remains only over unloaded rows.
+- **One exception inside a step (owner ruling 2026-10-30, #5428): the same load as a PREVIOUS that ran to RPE 10 gets `Same load: aim to leave one more rep.`** Two of the four 10-30 graders read a bare same-load row after a grind as a copy of the grind; the reason says the intent is a lower effort at the same load. A re-entry lift keeps its layoff clause instead (§6.3). (The same day the owner declined a blanket layoff cap; his 2026-11-10 ruling eases the FIRST session back after a long layoff only — the rule above.)
 - A reason never repeats a number the rows already show.
+
+**The RPE calibration line (owner ruling 2026-11-11, #5797; charter `calibration.rpe`).** On every third exposure of a non-barbell eligible lift (lat pulldown, one-arm DB row, the machine presses), the note gains one last line: `Last set to first slow rep; RPE = guess.` It is not a reason (it never explains a load) and it never says failure: the set stops at the first rep whose speed visibly drops (his standing no-grinding rule, 2026-10-10). The Hevy set's RPE field holds his prediction for the row's top rep; its reps hold what he did. Never on a barbell, a deload week, a red day, a capped or first-back exposure, a lift with no PREVIOUS, or a one-set lift; a note with no room for it under §7's budget defers it (`training.rpe_calibration`).
 
 ### 3.3 Pick-load (no history, or stale history)
 
-Used when there is no logged load, or the newest one is over 180 days old or from a bodyweight more than 20 lb away. The engine's start load goes on the working rows, after a no-load **feeler W row of 8**.
+Used when there is no logged load, or the newest one is over 180 days old or from a bodyweight more than 20 lb away. The engine's start load goes on the working rows, after a no-load **feeler W row of 8**. Owner ruling 2026-11-10: a lift whose stale PREVIOUS is on file and whose rows carry a load is a first session back after a long layoff (§3.2) — its W row is half the work and the W step line is not written; the feeler form below stays for a lift never logged, and for unloaded rows.
 
 ```
 RPE ‹a–b›[, last set RPE ‹c–d›]
@@ -130,6 +139,7 @@ W at RPE 5 or less → one step, no more.       the feeler W row is AT the start
 ```
 
 - **The feeler W row is the start load** (8 reps at the working rows' load) and the W line is its result rule: `W at RPE 5 or less → one step, no more.` — §5's step for the implement (a stack's next plate), and **that step IS the lift's "once"** under the load rule: no second step on later sets (re-grade #5: "→ next plate" alone left a double step open on a lift last done years ago). Re-grade #4: a "— lb" W row under "test the load." had nothing to act on. RPE 5 is the top of the talk table's full-sentences row: a start that easy is a step light. One phone line. `W set: up to 8 easy reps, find the load.` stays only where the rows carry no load (a chat draft). This is not an effort cap: the band and last-set target are unchanged (lint L4, L5).
+- **A barbell or machine compound never goes out with no load on any row** (re-grade #6, 4 of 4 voices: the 11-06 Romanian deadlift (barbell) asked him to `find the load` at RPE 8–9 after heavy squats). The engine's start load comes from his history on that template (`routine_generator.prescription_floor`, the v0.3 ramp); with no session on file the floor is `no_history` and there is no basis for a load, and the platform does not invent one. Lint L4 fails the note instead, so the draft is flagged for a coach to choose the lift or the load. (The 11-06 case: on 2026-11-01 the owner relabelled every Romanian deadlift he had logged to Deadlift (Barbell), because those pulls were conventional; the RDL template has no rows left and a true RDL is a new movement. `program_structure.py` still names the RDL as the Lower-heavy moderate hinge, held for the stabilization window.)
 
 ### 3.4 Warm-up
 
@@ -139,7 +149,8 @@ W at RPE 5 or less → one step, no more.       the feeler W row is AT the start
   - hinge: `Hip hinges first.`
   - squat: `Ankles + hips first.`
 - No general warm-up block, no "then the ramp sets".
-- Barbell: as owner-ruled 10-23. Dumbbell: R4.
+- Barbell: as owner-ruled 10-23, and (owner ruling 2026-11-10) a later barbell compound prescribed at 10+ reps (a working rep range whose top is 10 or more) climbs two rows, 50 % × 8 then 70 % × 5, not the single 70 % row: the 11-11 volume squat (225 × 8–12) sat behind one 160 × 5 because the RDL ahead of it took the session's first climb. Lint L15. Dumbbell: R4.
+- A first session back after a long layoff: one W row at half the work (§3.2, lint L14).
 
 ### 3.5 Carry
 
@@ -165,7 +176,7 @@ Optional: one cue at most, ≤ 2 phone lines. The default is no note, because th
 ```
 ‹Machine› · ‹levels› · [hard ]RPE ‹a[–b]› (‹talk words›)     line 1
 ⌚ ride clock: ‹rule›                                          tempo / hills / intervals
-As rep 1 ends: full sentences → L‹hard + 1›; can't talk → 1 min at L‹hard›.     intervals: the escape
+As rep 1 ends: full sentences → reps at L‹hard + 1›; can't talk → reps at L‹hard − 1›.     intervals: the escape
 ‹one why›                                                     optional, a route choice only
 After: end watch cardio, restart Hevy.                        when a Hevy block follows
 ```
@@ -190,18 +201,18 @@ After: end watch cardio, restart Hevy.                        when a Hevy block 
   - The ⌚ line is ≤ 110 characters.
   - Examples:
     - tempo: `⌚ ride clock: at min 5 and 15, full sentences → one level up, a few words → one down`
-    - intervals: `⌚ ride clock: L12 2 min at min 6, 10, 14, 18, 22; else L11 (full sentences).` then its own line `As rep 1 ends: full sentences → L13; can't talk → 1 min at L12.` Line 1 is `Recumbent · L11/L12 · hard RPE 8 (a few words)`. With the After line that is 7 phone lines, the interval budget (§7).
+    - intervals: `⌚ ride clock: 2 min at L13 from min 6, 10, 14, 18, 22; else L11 (full sentences)` then its own line `As rep 1 ends: full sentences → reps at L14; can't talk → reps at L12.` Line 1 is `Recumbent · L11/L13 · hard RPE 8 (a few words)`. With the After line that is 7 phone lines on a 30-min ride; a ride whose five start minutes all have two digits (40 min) takes the clock to three, so the interval budget is 8 (§7). Re-grade #6: `L12 2 min at min 6` set two numbers side by side; the rep length now comes first and the level is named as one.
 - **Intervals** (re-grade #2, 2026-10-31):
   - Every minute that is not a hard rep — the warm-up, the recoveries, the cool-down — is at his steady level (`else L11`), **with its talk words** (re-grade #3: they had none). The old example said `L10 between`, one under his steady L11, and named no level for min 0–6 or after min 24.
   - The talk check lands **as rep 1 ends**, not at a bare minute (min 8 was both the end of rep 1 and the start of the easy minutes).
-  - **The escape uses the talk words** (re-grade #4). "A few words" is the target (line 1). Full sentences as rep 1 ends (too easy) → one level up. Can't talk (too hard) → the hard reps shorten to 1 min at the SAME level, never below it: the old `none → L11` used a word the table does not have and dropped the reps to the recovery level, cancelling the intervals.
+  - **The escape uses the talk words** (re-grade #4). "A few words" is the target (line 1). Full sentences as rep 1 ends (too easy) → the reps one level up. Can't talk (too hard) → the reps one level down, which is still over his steady level: the old `none → L11` used a word the table does not have and dropped the reps to the recovery level, cancelling the intervals. Re-grade #6 (3 of 4 voices): `can't talk → 1 min at L12` could not be parsed mid-rep (L12 was already the rep level); each branch now names the level the reps move to. With hard = steady + 2 the can't-talk level is the old hard level (L12), so the escape still never drops below what the intervals were before the ruling.
   - The low-energy line on a session whose only cardio is intervals promises no easy cardio (§3.1).
   - Lint L9.
     - hills: `⌚ ride clock: 6% to min 6 · +1% every 2 min from min 6 to 14 · 10% to the end`
 - **Levels come from his log:**
   - easy = his logged steady level (L11 today)
   - tempo = steady + 1
-  - intervals: steady before, between and after the reps; hard = steady + 1; the escape one more
+  - intervals: steady before, between and after the reps; **hard = steady + 2** (owner ruling 2026-11-08 on re-grade #6: steady + 1 was the L12 his tempo rides hold for 30 min at RPE 6–7; `hevy_note_grammar.INTERVAL_HARD_STEP`, not a charter number); the escape one level either way
   - hills start no steeper than his steepest logged grade
 - **Treadmill:** speed and grade are settings, so they are prescribed. The note says `today` when they differ from his usual (his own "3.3 / 1.5 incline"), e.g. `Treadmill · today 3.0 mph, 6% → 10% · RPE 4–5 (full sentences)`.
 
@@ -209,10 +220,10 @@ After: end watch cardio, restart Hevy.                        when a Hevy block 
 
 - **A critic that changed a row** gets one plain clause, e.g. `2 sets today: first incline in 5 weeks.` Its set count is checked against the rows. Unchanged verdicts never reach the wire.
   - **A layoff clause always carries its reason** (§6.3): the gap from the verdict, else from PREVIOUS's date, else `back after a break`. It is never a bare `3 sets today.`
-  - **A set cap on a capped exposure** (a gap over 90 days, or unknown) takes the capped treatment: line 1 becomes `RPE 7`, and the clause is the lift's one `No jumps` line, `No jumps: 3 sets today, 19 weeks off.` (one phone line, so the W line and the cue still fit).
-  - The clause takes the lift's one reason slot (§3.2): a computed reason already there (`New: replaces …`, `Heavier: …`) gives way and stays on the stored record. A `No jumps` line and an earlier critic clause keep their lines.
+  - **A set cap on a capped exposure** (a gap over 90 days, or unknown) takes the capped treatment: line 1 becomes `RPE 7`, and the clause is the lift's one layoff line, `Same load all sets: first time in 19 weeks.` — no set count (the rows show it), and the composer's own layoff line when it has one, so the two never disagree. The W step line leaves (§3.2); the family cue still fits.
+  - The clause takes the lift's one reason slot (§3.2): a computed reason already there (`New: replaces …`, `Heavier: …`) gives way and stays on the stored record. A layoff line and an earlier critic clause keep their lines.
 - **Minimum / travel:** the session line's `‹Day›`, then each lift as in §3.2.
-- **Fitness test:** line 1 is `Test · ‹protocol›`.
+- **Fitness test:** line 1 is `Test · ‹protocol›`, then the charter's protocol, one sentence per line, words unchanged (`fitness_tests.test_note`). There's no effort grammar, because the protocol is the effort (the bike test is "at RPE 6"). The cardio composer never writes over a test block. Lint: every line within the 120-character limit, and at most `TEST_MAX_LINES` (6) phone lines. That limit was chosen by the platform to fit the longest charter protocol (the assisted pull-up). A longer protocol gets shortened in the charter, never cut on the wire (#5428, 2026-11-08: the 11-01 and 11-07 predrafts linted the test blocks as lifts, and the six-minute walk went out as an incline menu dose).
 
 ## 4. Cue table (first exercise of each family per session)
 
@@ -229,6 +240,17 @@ After: end watch cardio, restart Hevy.                        when a Hevy block 
 | Carry | `Tall, ribs down, bells off your legs.` |
 
 Chat-era technique cues ("Elbows to hips, no lean-back", "Pause at the top for one count") count as the cue. A cue from the wrong family fails the check. The table is `hevy_note_grammar.FAMILY_CUES`.
+
+**Anchor sheet cue (owner ruling 2026-11-11, #5779 D8; #5817).** Four lifts carry ONE still-visible technique cue from their cue sheet (`form_cue_sheets.anchor_note_cue`), rendered whether or not he films and whether or not he has approved the sheet yet (`reviewed: False` until he does):
+
+| Lift | Sheet cue |
+|---|---|
+| Bench Press (Barbell) | `Stack wrists.` |
+| Squat (Barbell) | `Knees track the toes.` |
+| Deadlift (Barbell) | `Bar over mid-foot.` |
+| Dumbbell Row (one-arm) | `Elbow to hip.` |
+
+It sits on the cue line between the prep clause and the family cue (`Hip hinges first. Bar over mid-foot. Brace; breathe out on the way up.`). It outranks the prep clause and never displaces the family breathing cue (§6.1): the line is `prep + sheet + family` when that fits the budget (§7), else `sheet + family`, else the family cue's own forms; a critic clause that overflows drops the prep, then the sheet cue (`session_block._fit`). An anchor after its family's first exercise carries the sheet cue alone. An author's own cue (`draft_custom`) takes the slot instead. Every other movement's note is unchanged; the barbell bent-over row has no sheet because no program role serves it.
 
 ## 5. Vocabulary, numbers and units
 
@@ -274,7 +296,7 @@ Chat-era technique cues ("Elbows to hips, no lean-back", "Pause at the top for o
 | Session block | ≤ 7 lines | 7 lines (about 200 characters) | 1,395–2,219 characters with the critics' block |
 | Exercise 1 total | ≤ 11 lines | ≤ 11 | 25–60 lines |
 | Lift note | ≤ 4 lines | ≤ 4 | 64 / 532 characters (median / max, compounds) |
-| Cardio note | ≤ 6 lines (an interval ride ≤ 7: its escape line, re-grade #4), ≤ 240 characters, line 1 ≤ 80, ⌚ ≤ 110, After ≤ 40 | ≤ 7 | 227 / 384 characters |
+| Cardio note | ≤ 6 lines (an interval ride ≤ 8: its escape line, re-grade #4, and a clock that names the rep length first, re-grade #6), ≤ 240 characters, line 1 ≤ 80, ⌚ ≤ 110, After ≤ 40 | ≤ 7 | 227 / 384 characters |
 | Mobility | ≤ 2 lines | 0 | — |
 | Any one line | ≤ 120 characters | | |
 | Whole routine | ≤ 1,600 characters; the per-note caps bind first | 486–742 characters | 1,477 median / 5,027 max |
@@ -299,16 +321,18 @@ The 40 characters per line (`hevy_note_grammar.PHONE_CHARS`) is an inference. On
 | L1 | No banned token (§5). |
 | L2 | No restated rows: `N × reps`, `Top 4–6 @`, `@ ‹n› lb`, `Last:` or `‹n› min ·` on cardio line 1. |
 | L3 | Line-1 grammar by type: effort, carry, cardio or session. The session block is its session line, the low-energy line for the session's cardio and the load rule's two lines — addressed to the other lifts over a one-set exercise 1, absent only when no lift has 2+ working sets (§3.1). A cardio line 1's RPE sits inside its talk words' row (§3.7). |
-| L4 | Text agrees with the rows: `‹n› sets today` (and the old `‹n› sets of`) = working rows; `W set: up to ‹n›` = W reps; a row more than one step from PREVIOUS carries a reason in the right direction (a stack or cable load has no fixed step, so it is not judged — the producer's rule too). PREVIOUS comes from `inputs_snapshot["previous_loads"]` (keyed by movement key: one load in lb, or one per working row), and the check reports itself "not checked" when that is absent. One load is his last session's TOP working load, so it is judged against the top row only (a top-set day's back-offs sit under it by design); a per-row list judges every row. Rep counts compare as numbers (a stored `8.0` is the text's `8`). Re-grade #2: the pick-load W line is not a reason; `New: replaces …` over any PREVIOUS fails; a load held at a PREVIOUS that reached the top of its range at RPE ≤ 8.5 needs a reason; `find the load.` over a loaded working row fails. Re-grade #3: a reason over a held top-of-range PREVIOUS must be the load rule's step (§3.2); a carry carries its adjust rule, and its start load when his last carry is on file (§3.5). Re-grade #4: the held-top reason states the step's timeline; a feeler W line over loaded rows carries its result rule; a carry's start load is on its rows. |
+| L4 | Text agrees with the rows: `‹n› sets today` (and the old `‹n› sets of`) = working rows; `W set: up to ‹n›` = W reps; a row more than one step from PREVIOUS carries a reason in the right direction (a stack or cable load has no fixed step, so it is not judged — the producer's rule too). PREVIOUS comes from `inputs_snapshot["previous_loads"]` (keyed by movement key: one load in lb, or one per working row), and the check reports itself "not checked" when that is absent. One load is his last session's TOP working load, so it is judged against the top row only (a top-set day's back-offs sit under it by design); a per-row list judges every row. Rep counts compare as numbers (a stored `8.0` is the text's `8`). Re-grade #2: the pick-load W line is not a reason; `New: replaces …` over any PREVIOUS fails; a load held at a PREVIOUS that reached the top of its range at RPE ≤ 8.5 needs a reason; `find the load.` over a loaded working row fails. Re-grade #3: a reason over a held top-of-range PREVIOUS must be the load rule's step (§3.2); a carry carries its adjust rule, and its start load when his last carry is on file (§3.5). Re-grade #4: the held-top reason states the step's timeline; a feeler W line over loaded rows carries its result rule; a carry's start load is on its rows. Re-grade #6: a barbell or machine compound (catalog anchor family) with no load on any working row and `find the load.` fails; a layoff line is `Same load all sets: ‹gap›.` (`LAYOFF_RE`); a layoff line beside the W step line fails (a capped lift holds its load). |
 | L5 | Loadable steps on every working and W row of a barbell or dumbbell. W rows ascend below the work. |
 | L6 | One effort expression on a lift's line 1; exercise 1 does not repeat the session line's. |
 | L7 | Budgets (§7). |
-| L8 | Safety facts (§6): the first exercise of each family carries a cue and no cue comes from another family (the family comes from the catalog's anchor family, or a caller's classifier; an unknown family is reported "not checked"); a prep cue sits on its own family; no HR as the lead cardio target. |
-| L9 | Clock lines: every number is a level, a grade or carries `min`; ≤ 3 levels, counting the levels a span or a ladder climbs through and the escape line's; a tempo, hill or interval ride has a clock line; intervals list their start minutes, run every other minute at the hard level − 1 with its talk words, check the talk test as rep 1 ends (never `at min ‹n›`), go one level up on full sentences and, on can't talk, shorten the reps at the hard level — never below it. |
+| L8 | Safety facts (§6): the first exercise of each family carries a cue (a fallback line, `If taken: …`, is never counted as one — #5771) and no cue comes from another family (the family comes from the catalog's anchor family, or a caller's classifier; an unknown family is reported "not checked"); a prep cue sits on its own family; no HR as the lead cardio target. |
+| L9 | Clock lines: every number is a level, a grade or carries `min`; ≤ 3 levels, counting the levels a span or a ladder climbs through (the escape line's are not counted: it swaps the hard level for one beside it, so the ride as ridden still uses three — re-grade #6); a tempo, hill or interval ride has a clock line; intervals list their start minutes, put the hard level at his steady level + 2 (owner ruling 2026-11-08) and every other minute at the steady level with its talk words, never set a level beside the rep length (`L12 2 min`), check the talk test as rep 1 ends (never `at min ‹n›`), and move the reps one level up on full sentences and one level down on can't talk — still over the steady level. |
 | L10 | An `After:` line exactly when a Hevy block follows the cardio. |
 | L11 | `per hand` on dumbbell and carry loads only; no `pins` on a dumbbell lift; no `later sets` on a one-set lift; a carry row is a whole step count and its note names no metres (and says where the steps go); no mph off the treadmill. |
 | L12 | Exercise 1 opens with the session block; nothing truncated (`…`). |
 | L13 | R4: the first dumbbell compound ≥ 50 lb per hand has a W row. |
+| L14 | Owner ruling 2026-11-10: a first session back after a long layoff (a reason naming `first time in ‹gap›`: the layoff line or a stale `Lighter:` / `Heavier:`) reads line 1 at no more than the charter's layoff-return band with no last-set target, and has a W row lighter than the work (owed over a working load of 10 lb or more; a W row at or over the work fails). |
+| L15 | Owner ruling 2026-11-10: a barbell compound of the warm-up families at or over the 95-lb warm-up floor whose working rep range tops out at 10 or more has at least 2 W rows. |
 
 **Proof the rules can fail.** Every rule has at least one mutation control, each a one-line break of the golden corpus (`MUTATIONS` in `tests/test_hevy_note_lint_5428.py`):
 - restated rows; a `Last:` line; minutes on cardio line 1
@@ -319,12 +343,14 @@ The 40 characters per line (`hevy_note_grammar.PHONE_CHARS`) is an inference. On
 - an unloadable 192.9 back-off; W rows that don't climb
 - two efforts on line 1
 - exercise 1 off the first screen; a lift note over 4 lines
-- HR as the lead target; the first press without its cue; a cue from the wrong family; a prep cue on the wrong lift
+- HR as the lead target; the first press without its cue; the first press with a fallback line in place of its cue (#5771); a cue from the wrong family; a prep cue on the wrong lift
 - a clock number without `min`; four levels; a tempo ride with no clock line; intervals without start minutes
 - a missing After line; an After line with nothing after
 - re-grade #2 (`REGRADE_2_MUTATIONS`, each asserting its own message): `New` over a PREVIOUS; a drop past a step with only the W line; `find the load` over a loaded row; a held top-of-range PREVIOUS at 8.5 with no reason; pins on a dumbbell; `later sets` on a one-set lift; the load rule on a one-set exercise 1; exercise 1's effort twice; a hold reason against the load rule; a carry with no adjust rule; a carry with a last load and no start; easy interval minutes with no talk words; an escape that steps down to the recovery level; an escape with no too-hard branch; no load rule for a one-set exercise 1's other lifts; a feeler W line with no result rule; a carry's start load only in the note; the old load rule; metres on a carry; a carry row of 45.72 steps; easy cardio promised over intervals; between below steady; no warm-up / cool-down level; a talk check at a bare minute; a two-level escape
+- re-grade #6 (lint 1.5.0, in `REGRADE_2_MUTATIONS`, each asserting its own message): a barbell compound and a machine compound with no load on any row and `find the load`; a W step line on a capped lift; the retired `No jumps` wording; a layoff line with a set count; a layoff line with a bare session ordinal; the old load-rule line 4; intervals at steady + 1; a level beside the rep length on the interval clock; the old one-minute escape at the rep level
 - no session block; a truncated note
 - the first DB compound with no W row
+- (lint 1.6.0, owner ruling 2026-11-10) a first session back at the hard band; a first session back with its W row at the work; a 10+ rep barbell compound with one W row
 
 ## 9. What leaves Hevy
 

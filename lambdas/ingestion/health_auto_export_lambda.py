@@ -8,8 +8,9 @@ glucose readings, but handles any configured HealthKit metrics.
 Architecture:
   Health Auto Export (iOS) → Lambda Function URL → this Lambda → DynamoDB + S3
 
-Auth: Bearer token stored in Secrets Manager (life-platform/ingestion-keys — the
-bundle; a dedicated `life-platform/health-auto-export` secret has never existed).
+Auth: Bearer token in Secrets Manager, looked up by `health_auto_export_auth` (#5513):
+the dedicated life-platform/hae-webhook secret first, falling back during the cutover
+to the life-platform/ingestion-keys bundle; a `life-platform/health-auto-export` secret has never existed.
 
 Data flow:
   1. Validate bearer token from Authorization header
@@ -111,8 +112,6 @@ import math
 import os
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
-from decimal import Decimal
-from typing import Any
 
 import boto3
 
@@ -123,6 +122,7 @@ try:
     from health import glycemic
 except ImportError:
     glycemic = None
+from common.numeric import floats_to_decimal  # #5524: the ONE walker (#1207), never a private copy
 from health import rhythm_channel as _rhythm  # #4972: the owner-only ECG / HR-notification / medication-log channel
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
@@ -159,6 +159,10 @@ from ingestion import (
     watch_presence as _watch_presence,  # #4970: the watch dead-man's presence stamp
 )
 
+# #5513 (c): the bearer-token lookup (dedicated secret, bundle fallback) is the sibling's; bound
+# here so the handler and every test's `monkeypatch.setattr(hae, "get_api_key", ...)` are unchanged.
+from ingestion.health_auto_export_auth import get_api_key
+
 
 def _merge_is_valid(fields, date_str):
     """Gate an apple_health update_item merge on the shared validator (#483/X-3).
@@ -178,7 +182,6 @@ def _merge_is_valid(fields, date_str):
 # ── Config ─────────────────────────────────────────────────────────────────────
 S3_BUCKET = os.environ["S3_BUCKET"]
 DYNAMODB_TABLE = os.environ.get("DYNAMODB_TABLE", "life-platform")
-SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/ingestion-keys")
 REGION = os.environ.get("AWS_DEFAULT_REGION", "us-west-2")
 USER_ID = os.environ.get("USER_ID", "matthew")
 PK = f"USER#{USER_ID}#SOURCE#apple_health"
@@ -187,43 +190,12 @@ PK = f"USER#{USER_ID}#SOURCE#apple_health"
 s3_client = boto3.client("s3", region_name=REGION)
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(DYNAMODB_TABLE)
-secrets_client = boto3.client("secretsmanager", region_name=REGION)
 
-# COST-OPT-1: Cache secrets in warm Lambda containers (15-min TTL)
-_secret_cache: dict[str, tuple[Any, float]] = {}
-
-
-def _cached_secret(client, secret_id):
-    import time as _t
-
-    entry = _secret_cache.get(secret_id)
-    if entry and _t.time() - entry[1] < 900:
-        return entry[0]
-    val = client.get_secret_value(SecretId=secret_id)["SecretString"]
-    _secret_cache[secret_id] = (val, _t.time())
-    return val
-
-
-def get_api_key():
-    secret = json.loads(_cached_secret(secrets_client, SECRET_NAME))
-    return secret.get("health_auto_export_api_key") or secret.get("api_key")
-
-
-def floats_to_decimal(obj):
-    # L-04 note (2026-06-06): DELIBERATELY divergent from the canonical
-    # lambdas/numeric.py impl — HAE payloads carry NaN/Inf (must map to None,
-    # DynamoDB rejects Decimal('NaN')) and high-precision sensor floats
-    # (rounded to 4dp to bound item size). Do not "clean up" to the shared
-    # module without porting both behaviors.
-    if isinstance(obj, float):
-        if math.isnan(obj) or math.isinf(obj):
-            return None
-        return Decimal(str(round(obj, 4)))
-    if isinstance(obj, dict):
-        return {k: floats_to_decimal(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [floats_to_decimal(v) for v in obj]
-    return obj
+# #5524: the float->Decimal walk is the canonical `common.numeric.floats_to_decimal` — the
+# private copy that lived here (citing a `lambdas/numeric.py` that no longer exists) was
+# the same NaN/Inf->None walk plus a fixed 4dp round, which the canonical helper expresses
+# as `precision=`. HAE payloads carry high-precision sensor floats; rounding bounds item size.
+HAE_DECIMAL_PLACES = 4
 
 
 def parse_date_str(date_str):
@@ -1023,7 +995,7 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
         attr_val = f":v{i}"
         set_parts.append(f"{attr_name} = {attr_val}")
         names[attr_name] = key
-        values[attr_val] = floats_to_decimal(val)
+        values[attr_val] = floats_to_decimal(val, precision=HAE_DECIMAL_PLACES)
 
     # Store reading maps for dedup on next sync
     if reading_timestamps:
@@ -1033,7 +1005,7 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
             rd_key = f"_rd_{field_name}"
             set_parts.append(f"{rd_attr} = {rd_val}")
             names[rd_attr] = rd_key
-            values[rd_val] = {ts: floats_to_decimal(qty) for ts, qty in merged_readings.items()}
+            values[rd_val] = {ts: floats_to_decimal(qty, precision=HAE_DECIMAL_PLACES) for ts, qty in merged_readings.items()}
             if getattr(merged_readings, "classes", None):  # #4969: the companion {ts: untagged|watch}
                 set_parts.append(f"#rc{j} = :rc{j}")
                 names[f"#rc{j}"], values[f":rc{j}"] = f"{_echo.CLASS_MAP_PREFIX}{field_name}", merged_readings.classes

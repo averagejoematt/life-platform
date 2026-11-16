@@ -76,14 +76,13 @@ def _plan_prologue(table) -> str:
 
 
 def prologue_dossier(table) -> Dict[str, Any]:
-    import json as _json
-
     from coach import persona_registry
-    from common.repo_config import config_path
+    from common import user_goals
     from ingestion.source_registry import SOURCE_REGISTRY
 
-    with open(config_path("user_goals.json"), encoding="utf-8") as fh:
-        goals = _json.load(fh)
+    # The prologue feeds a PUBLISHED installment: the plan root's public part only (owner ruling 2026-11-11). The
+    # private fields (mission prose, the prior cut's outcome) are not narrator input.
+    goals = user_goals.load_public() or {}
     prof = goals.get("athlete_profile") or {}
     eli = next((v for v in persona_registry.personas().values() if v.get("name") == "Eli Marsh"), {})
     team = story_dossier.roster()

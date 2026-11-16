@@ -1,7 +1,7 @@
 # Strava best practices: one activity per workout, from one uploader
 
-**Issue:** #5371 (epic #4625), with #5370 (the gym half: [gym-workflow-2026-10.md](gym-workflow-2026-10.md)) · **Verified:** 2026-10-26 · **Owner act:** applied 2026-10-26 ~00:30Z (attended, Session CH)
-**Status:** inventory done, recommendation applied in the apps; the 7-day live proof (§5) reads 2026-10-26 → 2026-11-02
+**Issue:** #5371 (epic #4625), with #5370 (the gym half: [gym-workflow-2026-10.md](gym-workflow-2026-10.md)) · **Verified:** 2026-10-26, updated 2026-11-11 (§7) · **Owner act:** applied 2026-10-26 ~00:30Z (attended, Session CH)
+**Status:** inventory done, recommendation applied in the apps, and the proof read (§5) came back as expected on 2026-11-08. §7 is the current page: the 90-day inventory, what the platform now handles itself, and the three things that still matter
 
 Most of this is app settings, not platform code. The platform's part is the inventory, a read-side fold that already absorbs the echoes, and the proof read. **Never call the Strava API to answer a question here.** Its token refresh rotates the stored secret, which is a write. The stored raw rows already carry `device_name`, and that field names the uploader.
 
@@ -84,3 +84,43 @@ The settings above reduce noise. They are not what keeps the numbers right. Ever
 - **`common.strava_read_seam`** folds same-sport copies: a start within 15 minutes, or, across two devices, 80% containment. It runs on every reader of the partition.
 - **`training.workout_identity`** folds every Strava, HealthKit and Whoop record into the Hevy session's parts and drops Hevy's own push as an echo (#5369), unless the push carries its own heart rate and the session holds a lift: then it is the lift's heart-rate member (#5390).
 - **The readers that still count Strava activities directly** are the open defect, #5387. They are listed in the gym-workflow table, row 12.
+
+## 7. Update 2026-11-11: the 90-day inventory, what the platform now handles, what still matters
+
+Read-only, from the stored `strava` day rows (`device_name` × `sport_type`) and the vendor's own activity list. Window 2026-08-10 → 2026-11-08. Counts and dates only. Detail is in the 2026-11-08 comment on #5371.
+
+| Uploader | Before the watch (to 10-16) | Watch arrives, WHOOP still sharing (10-17 → 10-25) | After the owner act (10-26 → 11-08) |
+|---|---|---|---|
+| Hevy | 34 (29 WeightTraining, 5 Workout) | 5 WeightTraining | 10 WeightTraining |
+| WHOOP | 40 (23 Walk, 17 WeightTraining) | 16 (7 Walk, 6 WeightTraining, 3 Ride) | **0** |
+| Garmin epix | 15 Walk | 1 Walk | 0 |
+| Apple Watch Ultra 4 | n/a | 1 Ride, 1 Walk | 3 Ride, 10 Walk (6 indoor, 4 outdoor), 1 Yoga |
+| pliability | 0 | 0 | **0** |
+
+What the data says. pliability never reaches Strava: 11 pliability sessions and 7 Hevy-written strength workouts sit in HealthKit since 10-26 and none is in Strava, so "Automatic uploads" sends only workouts the watch recorded (observed, not documented). A gym visit now yields two Strava activities, Hevy's push of the lift plus one watch cardio block (3 Rides and 6 indoor Walks over 9 of 10 gym days), down from up to four.
+
+### Uploader per activity type
+
+| Activity | Uploader | In effect? |
+|---|---|---|
+| Walk (outdoor), hike, ride | the watch, Strava › Health › Automatic uploads | yes, 4 outdoor walks since 10-26 |
+| Treadmill walk, gym bike | the watch's Workout app; the Hevy block stays the plan of record | yes, 9 of 10 gym days |
+| Lifting | Hevy's push only | yes, 10 of 10 |
+| Yoga, mobility (pliability) | nobody: it stays in HealthKit | yes, with no setting needed |
+| Anything WHOOP detects | nobody: share stays off | yes, 0 since 10-26 |
+
+Apps. Keep WHOOP connected (import on, share off), Hevy's push on, Strava Health "Automatic uploads" on and "Send to Health" off. Disconnect Garmin Connect if it is still listed: its last upload was 10-17 and a dormant uploader is the likeliest source of a history re-sync (inference). Connect nothing new, and accept no "import past activities" offer.
+
+### What the platform now handles on its own (so the settings above are hygiene, not the safety net)
+
+- **Every activity is stored (#5696, PR #5752).** The write-side 120-second drop is gone: 8 vendor activities in 90 days had never been stored. Duplicates are resolved at the read seam (`common.strava_read_seam`), and Hevy's own push now yields to a device recording that covers at least 80% of its interval, so a tie no longer keeps the echo.
+- **Late manual entries are picked up (#5753, PR #5763).** Each ingest run lists the trailing 30 days by start time and stores any activity id it does not hold. A walk typed in two weeks late for 2026-10-06 is the case it was built for. Strava cannot be asked by upload time, so the 30-day window is the limit.
+- **The brief no longer lists the watch's gym ride or treadmill walk as extra cardio (#5697).** It reads the Hevy session that already holds that block.
+- **The vacation fund counts treadmill miles once (#5695, PR #5751).** The watch's indoor walk and Hevy's Treadmill set record the same block. The fund now joins them and counts the Hevy distance. Six gym days since 10-26 had been counted twice, 16.92 mi in all, until the fix.
+- **Sessions, walking volume and zone-2 minutes** already resolve a visit through `training.workout_identity`, so a cardio block inside a Hevy session counts once (#5387).
+
+### What still matters to the owner
+
+1. **Do not use Strava's duplicate or Health pickers to re-upload an old workout.** A 2026-10-06 walk entered about two weeks late is the only out-of-order activity since the watch arrived. PR #5763 identifies it as a manual entry, so it is a real walk and not a copy (this corrects the earlier reading, in the 11-08 comment, that it was a +9 h shifted duplicate). It is stored by the one-day backfill approved on #5753, not by deleting it. If a backdated entry is ever a duplicate, delete it in Strava, and do so within 30 days, because only the last 3 days' edits and deletes are re-read routinely (#4638).
+2. **End and delete an accidental watch workout the same day.** The 67-second watch Yoga of 2026-11-07 is counted as a session until it is deleted in Strava, and a delete older than 3 days no longer reaches the store.
+3. **Leave WHOOP's share off and Send to Health off.** They are the two settings whose reversal brings the echoes back: 0 WHOOP uploads since 10-26 against 16 in the 9 days before. Everything else is covered by the platform.

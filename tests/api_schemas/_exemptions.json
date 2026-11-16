@@ -19,6 +19,14 @@
     "category": "write-path",
     "reason": "POST-only \u2014 votes on a challenge (write)"
   },
+  "/api/coach_brief": {
+    "category": "capture-failed",
+    "reason": "Owner ruling 2026-11-09 (third, E): the public-safe coaching brief is dark \u2014 404 for every coach while common/public_brief_policy.PUBLICATION_LIVE is off; capture a snapshot (?coach=<id>) when the owner turns it on"
+  },
+  "/api/coach_room_words": {
+    "category": "capture-failed",
+    "reason": "Owner ruling 2026-11-09 (third, D); released by the owner's CR2 GO 2026-11-11 (second message): the route answers ?coach=<id> only (bare = 404), so the generic capture fails; its shape is pinned by tests/test_coach_room_words_cr2.py"
+  },
   "/api/cohort_submit": {
     "category": "write-path",
     "reason": "POST-only \u2014 #1394 one-tap weekly cohort single-number submission (write)"
@@ -46,6 +54,10 @@
   "/api/page_feedback": {
     "category": "write-path",
     "reason": "POST-only \u2014 #4182 two-question reader door (did this page make sense?), writes to DynamoDB (write)"
+  },
+  "/api/reader_call": {
+    "category": "write-path",
+    "reason": "#6088 (2026-11-16) \u2014 a reader's call beside a coach's open call: POST records a tap, and the GET mints a per-reader, identity-bound timing token (no-store), so no response is a standing artefact to snapshot or archive. Built DARK: 404 'not available' for every request while reader_call_rules.READER_CALL_LIVE is committed off. Its shape is pinned offline by tests/test_reader_call_6088.py; after the owner's go and a deploy, capture the bare GET ({available}) if a live shape is wanted"
   },
   "/api/replicate_certify": {
     "category": "write-path",

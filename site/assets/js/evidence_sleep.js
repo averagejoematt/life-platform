@@ -13,6 +13,19 @@ import { calendarDay } from "/assets/js/coach_today.js"; // #4182 — the compac
 // the Eight Sleep mattress measure the same night differently — #2921/#3451 show both,
 // never pick one silently), recovery against the served average WITH its window, HRV
 // glossed where it appears, and the usual bedtime.
+// #5953 item 3 (2026-11-14): `recovery_night_of` is the borrowed Whoop block's STORED WAKE DATE (site_api_sleep.py:
+// "the borrowed block's stored wake date"), and the page printed it as "the night of" — a day late. The night is the
+// wake date minus one. And a night the vendor flagged as still recording (`vendor_incomplete`) read as final.
+export function nightBeforeWake(wakeIso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(wakeIso || ""));
+  if (!m) return null;
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]) - 864e5);
+  return d.toISOString().slice(0, 10);
+}
+export function stillRecording(s) {
+  return Boolean(s && (s.vendor_incomplete || (s.eightsleep && s.eightsleep.vendor_incomplete) || (s.figure_scope && s.figure_scope.vendor_incomplete_note)));
+}
+
 export function sleepFold(d) {
   const s = (d && d.sleep_detail) || {};
   const night = String(s.night_of || (s.figure_scope || {}).night_of || "").slice(0, 10);
@@ -21,12 +34,13 @@ export function sleepFold(d) {
   const wh = (s.whoop || {}).total_sleep_hours ?? s.whoop_hours;
   const es = (s.eightsleep || {}).total_sleep_hours ?? ((s.figure_scope || {}).total_sleep_hours_source === "eightsleep" ? s.total_sleep_hours : null);
   const bits = [];
+  if (stillRecording(s)) bits.push(`The mattress was still recording when these figures were read, so its hours are provisional.`);
   if (wh != null && es != null) bits.push(`Night of ${dayInWords(night)}: ${h(wh)} h by Whoop, ${h(es)} h by the Eight Sleep mattress — two instruments, both shown.`);
   else if (wh != null || es != null) bits.push(`Night of ${dayInWords(night)}: ${h(wh ?? es)} h by ${wh != null ? "Whoop" : "the Eight Sleep mattress"}.`);
   else bits.push(`Night of ${dayInWords(night)}.`);
   if (s.recovery_score != null) {
     const avg = s.avg_recovery_window != null && s.avg_window_days != null ? ` against his ${s.avg_window_days}-day average of ${fmt(s.avg_recovery_window)}%` : "";
-    const other = s.recovery_night_of ? ` (from the night of ${dayInWords(String(s.recovery_night_of).slice(0, 10))}, the latest Whoop reading)` : "";
+    const other = s.recovery_night_of ? ` (from the night of ${dayInWords(nightBeforeWake(s.recovery_night_of))}, the latest Whoop reading)` : "";
     bits.push(`Recovery ${fmt(s.recovery_score)}%${avg}${other}.`);
   }
   if (s.hrv != null) bits.push(`HRV (heart-rate variability) ${fmt(s.hrv)} ms — higher usually means better recovered.`);
@@ -85,7 +99,9 @@ export function sleepCorrelationBoard(cards) {
     if (c.withheld) {
       read = `<p class="cb-dir cb-withheld">coefficient withheld — too noisy to trust in the water-weight phase</p>`;
     } else if (c.coefficient != null) {
-      read = `<p class="cb-dir mono">r = ${fmt(c.coefficient)}</p>` + correlationChip([{ label: c.predictor, r: c.coefficient, n: c.n }], { outcome: c.outcome });
+      // #5523: every served coefficient carries its 95% Fisher interval; it renders beside r, never omitted.
+      const ci = Array.isArray(c.ci95) && c.ci95.length === 2 ? ` <span class="cb-ci">(95% CI ${fmt(c.ci95[0])} to ${fmt(c.ci95[1])})</span>` : "";
+      read = `<p class="cb-dir mono">r = ${fmt(c.coefficient)}${ci}</p>` + correlationChip([{ label: c.predictor, r: c.coefficient, n: c.n }], { outcome: c.outcome });
     } else {
       read = `<p class="cb-dir">${c.direction === "insufficient" ? "too early to call a direction" : esc(c.direction) + " — direction only, no coefficient yet"}</p>`;
     }
@@ -111,12 +127,15 @@ export async function renderSleep(d) {
   // §1 — last night, demoted to EVIDENCE beneath the forecast. The "night of" date
   // is sourced from the LIVE sleep_detail wake date (#487 retired sleep_unified —
   // its date ran 1–2 nights stale, which mislabelled these fresher figures).
-  const lastNightHdr = "Last night" + (s.night_of ? ` — ${calendarDay(String(s.night_of).slice(0, 10))}` : lastNightDate(s) ? ` — ${lastNightDate(s)}` : "");
+  const lastNightHdr = "Last night" + (s.night_of ? ` — ${calendarDay(String(s.night_of).slice(0, 10))}` : lastNightDate(s) ? ` — ${lastNightDate(s)}` : "") + (stillRecording(s) ? " · still recording" : "");
   // #495/M-9: when the API substituted an older night's Whoop recovery (its own
   // night rides in recovery_night_of), caption the splice everywhere those
   // figures render — never night-A hours + night-B recovery under one header.
   const recNote = s.recovery_night_of
-    ? `<p class="rd-meta label">Recovery, HRV and resting HR are from the night of ${fmtShort(s.recovery_night_of)} — the latest night with a Whoop reading; last night's isn't in yet.</p>`
+    ? `<p class="rd-meta label">Recovery, HRV and resting HR are from the night of ${fmtShort(nightBeforeWake(s.recovery_night_of))} — the latest night with a Whoop reading; last night's isn't in yet.</p>`
+    : "";
+  const provisional = stillRecording(s)
+    ? `<p class="rd-meta label"><strong>Still recording.</strong> The mattress had not finished this night when it was read; its hours, score and efficiency are provisional and may change.</p>`
     : "";
   // #3451: `total_sleep_hours` is unconditionally Eight Sleep's duration (see
   // site_api_sleep.py's `figure_scope.total_sleep_hours_source`) — a different
@@ -126,7 +145,7 @@ export async function renderSleep(d) {
   // from the API's own disclosure rather than switching which device leads.
   const _hoursSrc = s.figure_scope && s.figure_scope.total_sleep_hours_source === "eightsleep" ? "Eight Sleep" : null;
   if (Object.values(s).some(has)) {
-    parts.push(sec(lastNightHdr, figs([s.total_sleep_hours != null && fig(fmt(s.total_sleep_hours, 1), _hoursSrc ? `hours · ${_hoursSrc}` : "hours"), _hoursSrc && s.whoop_hours != null && fig(fmt(s.whoop_hours, 1), "hours · Whoop"), s.sleep_efficiency != null && fig(fmt(s.sleep_efficiency) + "%", "efficiency"), s.recovery_score != null && fig(fmt(s.recovery_score), "recovery"), s.hrv != null && fig(fmt(s.hrv), "hrv ms"), s.sleep_score != null && fig(fmt(s.sleep_score), "composite score")]) + recNote + `<p class="rd-meta label">One night is noise, not a verdict — it's the evidence tonight's forecast below gets graded against. The composite "score" is Eight Sleep's black box; the hours, efficiency and stages are what actually move it.</p>`));
+    parts.push(sec(lastNightHdr, figs([s.total_sleep_hours != null && fig(fmt(s.total_sleep_hours, 1), _hoursSrc ? `hours · ${_hoursSrc}` : "hours"), _hoursSrc && s.whoop_hours != null && fig(fmt(s.whoop_hours, 1), "hours · Whoop"), s.sleep_efficiency != null && fig(fmt(s.sleep_efficiency) + "%", "efficiency"), s.recovery_score != null && fig(fmt(s.recovery_score), "recovery"), s.hrv != null && fig(fmt(s.hrv), "hrv ms"), s.sleep_score != null && fig(fmt(s.sleep_score), "composite score")]) + provisional + recNote + `<p class="rd-meta label">One night is noise, not a verdict — it's the evidence tonight's forecast below gets graded against. The composite "score" is Eight Sleep's black box; the hours, efficiency and stages are what actually move it.</p>`));
     if (fcHero) { parts.push(fcHero); fcPlaced = true; }
     // #2921: ONE device's own stage hours, not Eight Sleep's total against Whoop's
     // stages (the bug — a total that could read smaller than the stages beside it).
@@ -275,7 +294,13 @@ export function mindRestraint(vices, timeline) {
   if (!vices.length) return "";
   const held = vices.filter((v) => v.holding);
   const reset = vices.filter((v) => !v.holding);
-  const cumulative = (timeline || []).reduce((s, day) => s + (Number(day.held) || 0), 0);
+  // #5956 item 1 (2026-11-14): this sum is over the served timeline (28 days), not since Day 1, and the page called it
+  // "since Day 1" beside streaks that alone add up to more. The label now names the window the sum covers.
+  const tl = (timeline || []).filter((day) => day && /^\d{4}-\d{2}-\d{2}/.test(String(day.date || "")));
+  const cumulative = tl.reduce((s, day) => s + (Number(day.held) || 0), 0);
+  const tlFrom = tl.length ? String(tl[0].date).slice(0, 10) : null;
+  const tlTo = tl.length ? String(tl[tl.length - 1].date).slice(0, 10) : null;
+  const windowWords = tlFrom && tlTo ? `in the ${tl.length} days from ${dayInWords(tlFrom)} to ${dayInWords(tlTo)}` : "in the days shown";
   const longest = vices.reduce((mx, v) => Math.max(mx, Number(v.current_streak) || 0), 0);
   const RUNGS = [1, 3, 7, 14, 30, 60, 90];
   const ladder = RUNGS.map((r) => `<span class="mr-rung ${longest >= r ? "mr-crossed" : "mr-future"}">${r}d</span>`).join("");
@@ -283,7 +308,7 @@ export function mindRestraint(vices, timeline) {
   const resetLine = reset.length
     ? `<p class="mr-reset label">${reset.length} restarting now — a reset isn't a failure shown in red, it's a restart; the cumulative days above still count.</p>` : "";
   return sec("Restraint — held, and held before",
-    `<div class="mr-cum"><span class="mr-cum-v num">${cumulative}</span><span class="mr-cum-k label">cumulative days of restraint held since Day 1 — a reset never erases them</span></div>` +
+    `<div class="mr-cum"><span class="mr-cum-v num">${cumulative}</span><span class="mr-cum-k label">restraint-days held ${esc(windowWords)}, counting each commitment each day — a reset never erases them</span></div>` +
     `<p class="rd-meta label">Across ${vices.length} private commitments (kept unnamed, on purpose), <strong>${held.length} held right now</strong>${longest ? `, the longest running ${longest} day${longest === 1 ? "" : "s"}` : ""}.</p>` +
     (heldChips ? `<div class="mr-chips">${heldChips}</div>` : "") +
     `<div class="mr-ladder" aria-label="restraint milestones">${ladder}</div>` +
@@ -360,9 +385,30 @@ export async function renderMind(d) {
   return parts.join("") || empty("The inner-life view fills in as restraint, mood, and reflection accrue.");
 }
 
+// /data/vices/ — `d` = /api/vice_streaks. #5948: only the two categories the governance rule allows to
+// be named (alcohol, food delivery) arrive as rows in `d.vices`. Every other restraint arrives as ONE
+// unlabelled aggregate, `d.unnamed` — no name, id or slug is in the payload — and renders as one card.
+// The fix is on the wire, not here: this function has no name to print for them.
+export function vicesUnnamedCard(u) {
+  const n = Number(u && u.tracked) || 0;
+  if (!n) return "";
+  const held = Number(u.held) || 0;
+  const longest = Number(u.longest_streak) || 0;
+  const meta = [u.best_streak != null && `best ${fmt(u.best_streak)}d`, u.relapses_90d != null && `${fmt(u.relapses_90d)} resets·90d, all together`].filter(Boolean).join("  ·  ");
+  return (
+    `<article class="vice-card vice-rest ${held ? "vice-hold" : "vice-broke"}">` +
+    `<header class="vice-top"><span class="vice-name">${n} more, named privately</span><span class="vice-flag label">${held} of ${n} holding</span></header>` +
+    `<div class="vice-streak"><span class="vice-days num">${longest}</span><span class="vice-unit label">day${longest === 1 ? "" : "s"} · the longest of them</span></div>` +
+    `<p class="vice-meta label">${meta}</p>` +
+    `</article>`
+  );
+}
+
 export function renderVices(d) {
   const v = d.vices || [];
-  if (!v.length) return empty("No vice tracking yet.");
+  const u = d.unnamed || {};
+  const un = Number(u.tracked) || 0;
+  if (!v.length && !un) return empty("No vice tracking yet.");
   const MILES = [7, 30, 90, 180, 365];
   const card = (x) => {
     const cur = Number(x.current_streak) || 0;
@@ -379,8 +425,10 @@ export function renderVices(d) {
     );
   };
   return (
-    figs([fig(d.total_held ?? 0, "holding"), fig(d.total_tracked ?? v.length, "tracked")]) +
-    `<div class="vice-grid">${v.map(card).join("")}</div>` +
-    note("Shown honestly — held and broken both. Named privately.")
+    figs([fig(d.total_held ?? 0, "holding"), fig(d.total_tracked ?? v.length + un, "tracked")]) +
+    `<div class="vice-grid">${v.map(card).join("")}${vicesUnnamedCard(u)}</div>` +
+    note(un
+      ? `Shown honestly — held and broken both. Only the alcohol and takeout ones are named here; the other ${un} ${un === 1 ? "is" : "are"} counted, and named privately.`
+      : "Shown honestly — held and broken both.")
   );
 }

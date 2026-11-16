@@ -81,10 +81,11 @@ MAX_TOKENS_DERIVATION = {
     "p99": 192,
     "max": 207,
     "growth_head_room_tokens": 58,
-    "projected_post_change_max": 265,
+    "projected_post_change_max": 323,
     "rule": (
         "2x the greater of the measured max (207) and the projected post-change max "
-        "(207 + one calibration element at the measured per-signal max of 148 chars = 58 tok -> 265), "
+        "(207 + one calibration element at the measured per-signal max of 148 chars = 58 tok -> 265, "
+        "+ one owner_request element (#5573) at the same per-signal max = 58 tok -> 323), "
         "rounded up to the next 128-token step"
     ),
     "re_derive_when": "the taxonomy grows, the summary word budget changes, or TruncatedResponse is ever observed live",
@@ -95,7 +96,9 @@ MAX_TOKENS_DERIVATION = {
 # element, sized at the measured per-signal MAXIMUM (148 chars = 58 tok), not its mean.
 # 2 x 265 = 530 -> 640. max_tokens is a CEILING, not a charge — billing is on tokens actually
 # emitted — so the headroom costs $0 until it is used, while a breach degrades LOUDLY.
-MAX_TOKENS = 640
+# #5573 grew the taxonomy by one more class (`owner_request`), the derivation's own re_derive_when:
+# bounded the same way at one extra element at the per-signal max (58 tok) -> 323; 2 x 323 = 646 -> 768.
+MAX_TOKENS = 768
 
 # ── The monthly CALL cap, per lane (#4151) ────────────────────────────────────
 # 300 was written the day this layer shipped (2026-06-21, #187 — "monthly cap ~300" in
@@ -147,7 +150,10 @@ _SYSTEM = (
     "pain_discomfort ONLY for joint/tendon/bad pain (NOT normal muscle burn/soreness). "
     # #3817: the class is new and its whole point is the distinction the model has to make.
     'calibration ONLY for what a level/load MEANS for this athlete in general ("L9-10 is easy '
-    'for my weight") — never for how one session went, which is progression.'
+    'for my weight") — never for how one session went, which is progression. '
+    # #5573: the one class that expects a reply; the subtype decides which reply.
+    "owner_request ONLY when the lifter asks the platform/coach for something; value "
+    '{"subtype": "form_guidance"|"question"|"rule_request"}.'
 )
 
 

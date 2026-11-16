@@ -1,0 +1,118 @@
+{
+ "_comment": "HS1 fixture: a sample of the /api/chapters payload (lambdas/web/site_api_chapters.py), read ONLY on a WEB_STORY=1 fixture export (scripts/publish_snapshot_story.py). Sample content, for layout only.",
+ "genesis": "2026-09-06",
+ "as_of": "2026-10-31",
+ "week_length_days": 7,
+ "weeks": [
+  {
+   "week": 1,
+   "start": "2026-09-06",
+   "end": "2026-09-12",
+   "status": "skipped",
+   "date": null,
+   "title": null,
+   "url": null,
+   "label": null,
+   "drafted_at": null,
+   "reason": "no chapter was published"
+  },
+  {
+   "week": 2,
+   "start": "2026-09-13",
+   "end": "2026-09-19",
+   "status": "skipped",
+   "date": null,
+   "title": null,
+   "url": null,
+   "label": null,
+   "drafted_at": null,
+   "reason": "no chapter was published"
+  },
+  {
+   "week": 3,
+   "start": "2026-09-20",
+   "end": "2026-09-26",
+   "status": "skipped",
+   "date": null,
+   "title": null,
+   "url": null,
+   "label": null,
+   "drafted_at": null,
+   "reason": "no chapter was published"
+  },
+  {
+   "week": 4,
+   "start": "2026-09-27",
+   "end": "2026-10-03",
+   "status": "skipped",
+   "date": null,
+   "title": null,
+   "url": null,
+   "label": null,
+   "drafted_at": null,
+   "reason": "no chapter was published"
+  },
+  {
+   "week": 5,
+   "start": "2026-10-04",
+   "end": "2026-10-10",
+   "status": "skipped",
+   "date": null,
+   "title": null,
+   "url": null,
+   "label": null,
+   "drafted_at": null,
+   "reason": "no chapter was published"
+  },
+  {
+   "week": 6,
+   "start": "2026-10-11",
+   "end": "2026-10-17",
+   "status": "published",
+   "date": "2026-10-13",
+   "title": "The protein argument",
+   "url": "/journal/posts/week-09/",
+   "label": "Week 6",
+   "drafted_at": null,
+   "reason": null
+  },
+  {
+   "week": 7,
+   "start": "2026-10-18",
+   "end": "2026-10-24",
+   "status": "skipped",
+   "date": null,
+   "title": null,
+   "url": null,
+   "label": null,
+   "drafted_at": null,
+   "reason": "no chapter was published"
+  },
+  {
+   "week": 8,
+   "start": "2026-10-25",
+   "end": "2026-10-31",
+   "status": "held",
+   "date": null,
+   "title": null,
+   "url": null,
+   "label": null,
+   "drafted_at": "2026-10-28T15:03:53+00:00",
+   "reason": null
+  },
+  {
+   "week": 9,
+   "start": "2026-11-01",
+   "end": "2026-11-07",
+   "status": "pending",
+   "date": null,
+   "title": null,
+   "url": null,
+   "label": null,
+   "drafted_at": null,
+   "reason": null
+  }
+ ],
+ "held": null,
+ "source": "/api/chapters"
+}

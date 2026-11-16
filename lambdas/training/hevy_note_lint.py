@@ -1,5 +1,5 @@
 """
-hevy_note_lint.py — the style linter for Hevy routine notes (#5428; rules L1–L13 of
+hevy_note_lint.py — the style linter for Hevy routine notes (#5428; rules L1–L15 of
 `docs/coaching/HEVY_NOTE_STANDARD.md` §8).
 
 It reads what Matthew will read: the COMPILED wire body (`hevy_compiler` output) plus the IR it
@@ -36,11 +36,15 @@ from training import hevy_note_grammar as g
 
 logger = logging.getLogger(__name__)
 
-LINT_VERSION = "hevy-note-lint@1.3.0"  # 1.1.0 / 1.2.0 / 1.3.0: the 2026-10-31 re-grade #2 / #3 / #4 classes (see each rule's comment)
+LINT_VERSION = "hevy-note-lint@1.6.0"  # 1.1.0 / 1.2.0 / 1.3.0: the 2026-10-31 re-grade #2 / #3 / #4 classes; 1.4.0: test blocks;
+# 1.5.0: the 2026-11-08 re-grade #6 classes (a pick-load compound with no load, a W step on a capped lift, the one layoff
+# line, intervals at steady + 2 with a two-way one-level escape) — see each rule's comment; 1.6.0: L14 / L15, the owner's
+# 2026-11-10 ruling (an easy first session back after a long layoff; a 10+ rep barbell compound climbs two W rows)
 MODE_ENV = "HEVY_NOTE_LINT_MODE"
 MODES = ("off", "warn", "enforce")
 DEFAULT_MODE = "warn"
 PREVIOUS_LOADS_KEY = "previous_loads"
+LIVE_MARK = "live_session"  # `live_session.MARK`, as a literal: this module is the shadow path's too and imports nothing live
 RULES = {
     "L1": "no banned token",
     "L2": "no restated rows",
@@ -48,18 +52,23 @@ RULES = {
     "over a 2+ set exercise 1)",
     "L4": "text agrees with the rows and PREVIOUS (set count, W reps, a reason for a move past one step or a held top-of-range, "
     "New only with no PREVIOUS, find-the-load only over unloaded rows, a held-top reason that is the load rule's step, a carry's "
-    "start load (on its rows) and adjust rule, a feeler W line's result rule)",
+    "start load (on its rows) and adjust rule, a feeler W line's result rule; a barbell or machine compound never asks him to "
+    "find the load over unloaded rows; a capped lift's one layoff line, and no W step line beside it)",
     "L5": "loadable steps; W rows ascend below the work",
     "L6": "one effort expression on a lift's line 1; exercise 1 does not repeat the session line's",
-    "L7": "phone-line budgets (an interval ride's note 7 with its escape line)",
+    "L7": "phone-line budgets (an interval ride's note 8 with its escape line and rep-first clock; a fitness-test block's 6)",
     "L8": "safety facts present (family cue, cardio effort leads, no HR lead target)",
-    "L9": "clock lines: minutes, at most 3 levels, interval start minutes; intervals: easy = hard − 1 on every other minute "
-    "with its talk words, an escape checked as rep 1 ends (full sentences one level up; can't talk shorter reps at the hard level)",
+    "L9": "clock lines: minutes, at most 3 levels on the ride (the escape swaps the hard level, it adds none), interval start "
+    "minutes; intervals: easy = hard − 2 on every other minute with its talk words, an escape checked as rep 1 ends (full "
+    "sentences the reps one level up; can't talk the reps one level down, still over the easy level)",
     "L10": "an After line exactly when a Hevy block follows the cardio",
     "L11": "per hand on dumbbell and carry loads only; no pins on a dumbbell; no 'later sets' on a one-set lift; a carry row "
     "is whole steps and its note names no metres; no speed off the treadmill",
     "L12": "exercise 1 opens with the session block; nothing truncated",
     "L13": "the first dumbbell compound at 50 lb per hand or more has a W row",
+    "L14": "a first session back after a long layoff (its reason names 'first time in ‹gap›') runs line 1 at the charter's "
+    "layoff-return band with no last-set target, behind a W row lighter than the work",
+    "L15": "a barbell compound prescribed at 10+ reps, at or over the warm-up floor, climbs at least 2 W rows",
 }
 
 KG_PER_LB = 0.45359237
@@ -87,6 +96,7 @@ class LintRoutine:
     previous_supplied: bool = False  # inputs_snapshot carried previous_loads
     title: str = ""
     not_checked: list[str] = field(default_factory=list)
+    live: bool = False  # #5861: the draft ran the live session fit (`LIVE_MARK` on its prescription) — no in-session load rule
 
 
 @dataclass
@@ -158,13 +168,14 @@ def _lint_session(session: str, note: str, out: list[Problem], rt: Optional["Lin
     others = any(_steppable(e) for e in rt.exercises[1:]) if rt is not None else True
     mode = g.rule_mode(ex1_sets, others)
     fits = mode == "ex1"
-    want_rule = g.rule_lines(mode)
+    # #5861 fix round 12: a LIVE draft carries no in-session load rule at all (double progression, each lift's own line)
+    want_rule = [] if (rt is not None and rt.live) else g.rule_lines(mode)
     if is_test:
         if lines != [lines[0]]:
             out.append(Problem("L3", "session block", f"is {len(lines)} line(s); a test day's block is its session line"))
     elif len(lines) >= 2 and lines[1] in g.LOW_ENERGY_LINES:
         # #5428 re-grades #2/#3: each part its own message, so a draft with several defects shows each
-        if lines[1] != low:
+        if lines[1] != low and not (lines[1] == g.LOW_ENERGY_LIFTS_LINE and not (cardio_kinds(rt) if rt is not None else [])):
             # "+ easy cardio" over a session whose only cardio is intervals promises a block it lacks
             out.append(Problem("L3", "session block", f"the low-energy line for this session's cardio is {low!r}"))
         if lines[2:] != want_rule:
@@ -322,7 +333,15 @@ def _lint_previous(ex: LintExercise, lines: list[str], where: str, out: list[Pro
             return
 
 
-def _lint_lift(ex: LintExercise, body: str, where: str, out: list[Problem]) -> None:
+def _lint_test(body: str, where: str, out: list[Problem]) -> None:
+    """A fitness-test block (§3.8): line 1 `Test · ‹protocol›`, then the protocol one sentence per line within the phone
+    budget. No effort grammar: the protocol is the effort (the charter's own bike test is "at RPE 6"). Every line's
+    length and the banned scan run for it as for any note."""
+    if g.phone_lines(body) > g.TEST_MAX_LINES:
+        out.append(Problem("L7", where, f"test note {g.phone_lines(body)} phone lines > {g.TEST_MAX_LINES}"))
+
+
+def _lint_lift(ex: LintExercise, body: str, where: str, out: list[Problem], live: bool = False) -> None:
     lines = body.split("\n")
     l1 = lines[0]
     rx = g.CARRY_LINE1_RE if ex.kind == "carry" else g.EFFORT_RE
@@ -345,6 +364,26 @@ def _lint_lift(ex: LintExercise, body: str, where: str, out: list[Problem]) -> N
     if ex.kind != "carry" and any(r[1] is not None for r in work) and g.PICK_LOAD_OPEN_TAIL in body:
         # #5428 re-grade #2: "find the load" over rows that carry the start load reads as "ignore the rows"
         out.append(Problem("L4", where, f"the W line says {g.PICK_LOAD_OPEN_TAIL!r} but the working rows carry a load"))
+    # #5861 fix round 12: a LIVE draft never invents a load for a lift with no exposure in its window; on a MACHINE the W-set
+    # feeler is the instruction (stable, low skill) — the rule stays for a barbell, and for every shadow draft
+    kinds = ("barbell",) if live else ("barbell", "machine")
+    if ex.kind in kinds and ex.compound and work and all(r[1] is None for r in work) and g.PICK_LOAD_OPEN_TAIL in body:
+        # #5428 re-grade #6 (2026-11-08, 4 of 4 voices): the 11-06 Romanian deadlift asked him to "find the load" at RPE 8–9
+        # after heavy squats, with no load on any row. A barbell or machine compound carries the engine's start load
+        # (§3.3); with no basis for one, the draft is not ready — this fails it rather than shipping the open form
+        out.append(
+            Problem("L4", where, f"a {ex.kind} compound with no load on any working row asks him to {g.PICK_LOAD_OPEN_TAIL!r} (§3.3)")
+        )
+    layoff = [ln for ln in lines[1:] if ln.startswith(g.LAYOFF_HEAD)]
+    for ln in layoff:
+        if not g.LAYOFF_RE.match(ln):
+            # re-grade #6: one layoff grammar — the gap (or `back after a break`), never a set count or a bare ordinal
+            out.append(Problem("L4", where, f"the layoff line is not the standard's `Same load all sets: ‹gap›.`: {ln!r}"))
+    capped = layoff or [ln for ln in lines[1:] if g.RETIRED_LAYOFF_RE.match(ln)]  # the retired wording caps the lift too
+    if capped and any(g.PICK_LOAD_RESULT_RE.match(ln) for ln in lines):
+        # re-grade #6 (4 of 4 voices): `No jumps: 3 sets today, 18 months off.` then `W at RPE 5 or less → one step` —
+        # one line said hold, the next said add. The capped exposure holds its load.
+        out.append(Problem("L4", where, "a capped lift (same load all sets) carries the W step line: it holds its load"))
     w_line = next((ln for ln in body.split("\n") if ln.startswith(("W set", "W at "))), None)
     if w_line and any(r[1] is not None for r in work) and not g.PICK_LOAD_RESULT_RE.match(w_line):
         # #5428 re-grade #4: "test the load." — a test with no result rule has nothing to act on
@@ -361,7 +400,51 @@ def _lint_lift(ex: LintExercise, body: str, where: str, out: list[Problem]) -> N
             out.append(Problem("L5", where, f"warm-up {g.fmt_num(lb)} lb is not on a {g.fmt_num(g.WARMUP_ROUNDING_LB)} lb step"))
     if ex.kind != "carry" and l1.count("RPE") - l1.count("last set RPE") != 1:
         out.append(Problem("L6", where, f"line 1 carries {l1.count('RPE')} RPE expressions"))
+    if any(g.FIRST_RETURN_RE.match(ln) for ln in lines[1:]):
+        _lint_layoff_return(ex, l1, where, out)
     _lint_previous(ex, lines, where, out)
+
+
+LAYOFF_W_FROM_LB = 2 * g.WARMUP_ROUNDING_LB  # under this there is no W row lighter than the work on the 5-lb step
+
+
+def _lint_layoff_return(ex: LintExercise, l1: str, where: str, out: list[Problem]) -> None:
+    """L14 (owner ruling 2026-11-10, charter 1.41.0): the 11-11 torso rotation read `Lighter: first time in 2 years.` under
+    `RPE 8–9, last set RPE 9–10`, with its W row at the working 100 lb. A first session back runs at the charter's
+    layoff-return band, never a last-set target, and its W row sits below the work (one is owed over a load of 10 lb+)."""
+    from training import effort_ceilings
+
+    band = effort_ceilings.layoff_return_band()
+    m = g.EFFORT_RE.match(l1)
+    if band and m and ("last set" in l1 or float(m.group("rpe").split("–")[-1]) > float(band[1])):
+        out.append(
+            Problem("L14", where, f"a first session back after a long layoff reads {l1!r}, over the layoff band RPE {g.fmt_rpe(band)}")
+        )
+    work = [r[1] for r in _working(ex.rows) if r[1] is not None]
+    w = [r[1] for r in ex.rows if r[0] == "W" and r[1] is not None]
+    if work and w and max(w) >= max(work):
+        out.append(Problem("L14", where, f"a first session back has a W row at {g.fmt_num(max(w))} lb, not lighter than the work"))
+    elif work and not w and max(work) >= LAYOFF_W_FROM_LB:
+        out.append(Problem("L14", where, "a first session back after a long layoff has no W row lighter than the work"))
+
+
+def _lint_high_rep_climb(exs: list[LintExercise], out: list[Problem]) -> None:
+    """L15 (owner ruling 2026-11-10): the 11-11 volume squat went out at 225 x 8–12 behind ONE W row (160 x 5) — the RDL
+    ahead of it took the session's first climb. A barbell compound of the warm-up families at or over the warm-up floor
+    whose working rep range tops out at 10 or more climbs at least two W rows (`warmup_sets.WARMUP_PRESCRIPTION`)."""
+    from training.warmup_sets import WARMUP_PRESCRIPTION as rule
+
+    for i, ex in enumerate(exs):
+        if ex.kind != "barbell" or ex.anchor_family not in rule["compound_families"]:
+            continue
+        work = _working(ex.rows)
+        top = _top_load(work)
+        hi = max((t for t in (_rep_top(r[2]) for r in work) if t is not None), default=None)
+        if top is None or top < float(rule["floor_lb"]) or hi is None or hi < int(rule["high_rep_from"]):
+            continue
+        n = sum(1 for r in ex.rows if r[0] == "W")
+        if n < 2:
+            out.append(Problem("L15", f"[{i + 1}] {ex.name}", f"a barbell compound at {g.fmt_num(hi)} reps climbs {n} W row(s), not 2+"))
 
 
 _LEVEL_SPAN = re.compile(r"\bL(\d+) → L(\d+)\b")
@@ -427,11 +510,18 @@ def _lint_set_words(ex: LintExercise, note: str, where: str, out: list[Problem])
 
 def _lint_intervals(m: "re.Match[str]", lines: list[str], clock: list[str], where: str, out: list[Problem]) -> None:
     """L9 on an interval ride (#5428 re-grade #2, standard §3.7): line 1's `La/Lb` is his steady level and the hard level
-    one over it; the clock names the easy level before, between and after the reps; the escape is one level, checked as
-    rep 1 ends, never at a bare minute (that minute is also where the easy minutes start)."""
+    `INTERVAL_HARD_STEP` over it (owner ruling 2026-11-08: two; was one); the clock names the easy level before, between
+    and after the reps; the escape is checked as rep 1 ends, never at a bare minute (that minute is also where the easy
+    minutes start), and moves the reps one level either way — never down to the easy level."""
     pair = re.fullmatch(r"L(\d+)/L(\d+)", m["levels"].strip())
-    if pair and int(pair.group(2)) - int(pair.group(1)) != 1:
-        out.append(Problem("L9", where, f"interval levels {m['levels'].strip()}: between is his steady level, one under the hard level"))
+    if pair and int(pair.group(2)) - int(pair.group(1)) != g.INTERVAL_HARD_STEP:
+        out.append(
+            Problem(
+                "L9",
+                where,
+                f"interval levels {m['levels'].strip()}: the hard level is his steady level + {g.INTERVAL_HARD_STEP} (owner ruling 2026-11-08)",
+            )
+        )
     for c in clock:
         if " between" in c and "before" not in c:
             out.append(Problem("L9", where, "interval clock names no level before and after the reps (warm-up, cool-down)"))
@@ -440,23 +530,42 @@ def _lint_intervals(m: "re.Match[str]", lines: list[str], clock: list[str], wher
         # #5428 re-grade #3: the warm-up, recoveries and cool-down carry their talk words
         if not re.search(rf"L\d+ \(({'|'.join(g.TALK_WORDS)})\)", c):
             out.append(Problem("L9", where, "interval clock gives the easy minutes no talk words"))
+        if re.search(r"\bL\d+ \d+ min\b", c):
+            # re-grade #6: `L12 2 min at min 6` read as one number pair; the rep length comes first, then its level
+            out.append(Problem("L9", where, "interval clock sets a level and the rep length side by side ('L12 2 min')"))
+    easy = int(pair.group(1)) if pair else None
     hard = int(pair.group(2)) if pair else None
     for ln in lines[1:]:
-        for esc in re.findall(r"→ L(\d+)", ln):
+        for esc in re.findall(r"→ (?:reps at )?L(\d+)", ln):
             if hard is not None and abs(int(esc) - hard) > g.INTERVAL_ESCAPE_STEP:
                 out.append(Problem("L9", where, f"interval escape L{hard} → L{esc} is more than one level"))
     if hard is not None and not any(
-        (mm := g.INTERVAL_ESCAPE_RE.match(ln)) and int(mm["up"]) == hard + 1 and int(mm["hard"]) == hard for ln in lines
+        (mm := g.INTERVAL_ESCAPE_RE.match(ln))
+        and int(mm["up"]) == hard + g.INTERVAL_ESCAPE_STEP
+        and int(mm["down"]) == hard - g.INTERVAL_ESCAPE_STEP
+        and int(mm["down"]) > int(easy or 0)
+        for ln in lines
     ):
-        # #5428 re-grade #4: up one level on full sentences; on "can't talk" shorter reps at the SAME level, never the
-        # recovery level (`none → L11` cancelled the intervals) — the standard's talk words, checked as rep 1 ends
+        # #5428 re-grade #4: never the recovery level on "can't talk" (`none → L11` cancelled the intervals). Re-grade #6:
+        # each branch names the level the reps move to (`can't talk → 1 min at L12` could not be parsed mid-rep)
         out.append(
-            Problem("L9", where, "interval escape is not full sentences → one level up, can't talk → shorter reps at the hard level")
+            Problem(
+                "L9",
+                where,
+                "interval escape is not full sentences → reps one level up, can't talk → reps one level down (over the easy level)",
+            )
         )
 
 
 def _lint_cardio(body: str, where: str, followed: bool, out: list[Problem]) -> None:
     lines = body.split("\n")
+    # #5796 (owner ruling 2026-11-11): the RPE capture prompt opens a drafted cardio note; it is an input field, so the
+    # rules below read the note after it. Anywhere else it is a misplaced prompt.
+    if lines[0].strip() == g.CARDIO_RPE_CAPTURE_LINE and len(lines) > 1:
+        lines = lines[1:]
+        body = "\n".join(lines)
+    if any(ln.strip() == g.CARDIO_RPE_CAPTURE_LINE for ln in lines):
+        out.append(Problem("L3", where, f"the {g.CARDIO_RPE_CAPTURE_LINE!r} prompt is the note's first line only"))
     m = g.CARDIO_LINE1_RE.match(lines[0])
     if not m:
         out.append(Problem("L3", where, f"cardio line 1 grammar: {lines[0]!r}"))
@@ -489,11 +598,12 @@ def _lint_cardio(body: str, where: str, followed: bool, out: list[Problem]) -> N
                 continue
             out.append(Problem("L9", where, f"clock number {mt.group(1)} has no 'min' unit"))
             break
-        escape = " ".join(ln for ln in lines if g.INTERVAL_ESCAPE_RE.match(ln))
-        levels = _levels(lines[0], c + " " + escape)
+        # re-grade #6 (owner ruling 2026-11-08, hard = steady + 2): the escape's levels are not counted — it swaps the hard
+        # level for one beside it, so the ride as ridden still uses at most three; the escape is checked on its own below
+        levels = _levels(lines[0], c)
         if len(levels) > g.CLOCK_MAX_LEVELS:
             out.append(Problem("L9", where, f"{len(levels)} levels > {g.CLOCK_MAX_LEVELS}"))
-    if hard and not any(re.search(r"at min \d+(?:, \d+)+", c) for c in clock):
+    if hard and not any(re.search(r"(?:at|from) min \d+(?:, \d+)+", c) for c in clock):
         out.append(Problem("L9", where, "intervals without their start minutes"))
     if hard and m:
         _lint_intervals(m, lines, clock, where, out)
@@ -525,7 +635,12 @@ def _lint_cues(rt: LintRoutine, bodies: list[str], out: list[Problem], not_check
                 out.append(Problem("L8", where, f"a {wrong[0]} cue on a {ex.family} exercise"))
             if ex.family not in seen:
                 lines = body.split("\n")[1:]
-                free = [ln for ln in lines if not g.REASON_RE.match(ln) and not ln.startswith("W set:") and ln not in prep_family]
+                # #5771: the fallback line (`If taken: …`) names other exercises; it is never the family's cue
+                free = [
+                    ln
+                    for ln in lines
+                    if not g.REASON_RE.match(ln) and not ln.startswith("W set:") and ln not in prep_family and not g.FALLBACK_RE.match(ln)
+                ]
                 if ex.family not in present and not free:
                     out.append(Problem("L8", where, f"first {ex.family} exercise without its cue ({g.FAMILY_CUES[ex.family]!r})"))
                 seen.add(ex.family)
@@ -564,14 +679,17 @@ def lint_routine(rt: LintRoutine) -> LintResult:
         total += len(note)
         _banned(note, where, out)
         _lint_set_words(ex, note, where, out)
-        if ex.kind == "cardio":
+        if g.is_test_note(body):
+            # a fitness-test block (§3.8): its own grammar, whatever the movement's kind (#5428, 2026-11-08)
+            _lint_test(body, where, out)
+        elif ex.kind == "cardio":
             followed = any(e.kind != "cardio" for e in exs[i + 1 :])
             _lint_cardio(body, where, followed, out)
         elif ex.kind == "mobility":
             if body and g.phone_lines(body) > g.MOBILITY_MAX_LINES:
                 out.append(Problem("L7", where, f"mobility note {g.phone_lines(body)} phone lines > {g.MOBILITY_MAX_LINES}"))
         else:
-            _lint_lift(ex, body, where, out)
+            _lint_lift(ex, body, where, out, live=rt.live)
         mw = g.W_TEXT_RE.search(body)
         if mw:
             wreps = {r[2] for r in ex.rows if r[0] == "W"}
@@ -581,7 +699,13 @@ def lint_routine(rt: LintRoutine) -> LintResult:
                 out.append(Problem("L4", where, f"the W text says {said} reps, the W rows hold {sorted(str(w) for w in wreps)}"))
         w = [r[1] for r in ex.rows if r[0] == "W" and r[1] is not None]
         work = [r[1] for r in _working(ex.rows) if r[1] is not None]
-        feeler = len(w) == 1 and work and w[0] == max(work) and any(g.PICK_LOAD_RESULT_RE.match(ln) for ln in body.split("\n"))
+        # a capped lift's feeler keeps its row but not its step line (re-grade #6): its layoff line says the load holds
+        feeler = (
+            len(w) == 1
+            and work
+            and w[0] == max(work)
+            and any(g.PICK_LOAD_RESULT_RE.match(ln) or g.LAYOFF_RE.match(ln) for ln in body.split("\n"))
+        )
         if w and not feeler and (w != sorted(w) or (work and w[-1] >= work[0])):
             # (#5428 re-grade #4: the pick-load feeler is a W row AT the start load — it is the test of that load)
             out.append(Problem("L5", where, "warm-up rows do not ascend below the work"))
@@ -592,6 +716,7 @@ def lint_routine(rt: LintRoutine) -> LintResult:
                 if not any(r[0] == "W" for r in ex.rows):
                     out.append(Problem("L13", f"[{i + 1}] {ex.name}", "the first dumbbell compound at 50 lb per hand or more has no W row"))
                 break
+    _lint_high_rep_climb(exs, out)
     _lint_cues(rt, bodies, out, not_checked)
     if not rt.previous_supplied:
         not_checked.append(f"L4 PREVIOUS: inputs_snapshot[{PREVIOUS_LOADS_KEY!r}] absent")
@@ -765,7 +890,11 @@ def from_wire(
             )
         )
     return LintRoutine(
-        exercises=exs, previous_supplied=isinstance(prev_map, dict), title=str(routine.get("title") or ""), not_checked=not_checked
+        exercises=exs,
+        previous_supplied=isinstance(prev_map, dict),
+        title=str(routine.get("title") or ""),
+        not_checked=not_checked,
+        live=LIVE_MARK in (snap.get("session_prescription") or {}),
     )
 
 

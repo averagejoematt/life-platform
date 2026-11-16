@@ -24,7 +24,20 @@ from __future__ import annotations
 import functools
 from typing import Any
 
-from training import in_block_variant, lift_note, load_ramp, program_structure, routine_generator as _rg, variant_rotation, warmup_sets
+from training import (
+    in_block_variant,
+    lift_note,
+    live_load,
+    live_session,
+    load_ramp,
+    program_structure,
+    routine_generator as _rg,
+    rpe_calibration,
+    selection_engine,
+    session_time,
+    variant_rotation,
+    warmup_sets,
+)
 from training.rep_scheme import round_to_implement_kg
 from training.routine_generator import (
     LAYOFF_DAYS_DEFAULT,
@@ -88,7 +101,11 @@ def _blocks_from_prescription(
             (
                 Set(type="normal", distance_meters=int(sp["distance_meters"]))
                 if sp.get("distance_meters")
-                else Set(type="normal", rep_range_start=sp["reps"][0], rep_range_end=sp["reps"][1])
+                else Set(
+                    type="dropset" if sp.get("kind") == "drop" else "normal",  # #5799: the owner-selected short-on-time row
+                    rep_range_start=sp["reps"][0],
+                    rep_range_end=sp["reps"][1],
+                )
             )
             for sp in sets_spec
         ]
@@ -116,6 +133,7 @@ def _blocks_from_prescription(
                 movement_key=key,
                 sets=sets,
                 rest_seconds=e["rest_seconds"],
+                superset_id=e.get("superset_id"),  # #5799: the charter's antagonist pair (`session_shape.pair_supersets`)
                 notes=notes,
                 joint_friendly_score=mdef.get("joint_friendly_score", 3),
                 skill_tier=mdef.get("skill_tier", 1),
@@ -182,18 +200,30 @@ def _compose_notes(
     history_index: dict[str, list],
     target_date: str,
     rotation: dict[str, Any] | None = None,
+    deload: bool = False,
+    red_day: bool = False,
 ) -> dict[str, Any]:
     """#5428: every lift note composed from what the passes decided (`lift_note.compose_blocks`) — the inputs_snapshot record.
-    #5083: a rotated accessory's note names the exercise it replaces (`variant_rotation.swaps`)."""
+    #5083: a rotated accessory's note names the exercise it replaces (`variant_rotation.swaps`). #5771: each lift's ranked
+    same-stimulus fallback (`selection_engine.note_fallbacks`) — on the wire once the library is approved, recorded either way.
+    #5797 (owner ruling 2026-11-11): then the RPE calibration line on a due non-barbell exposure (`rpe_calibration`) —
+    never on a deload or a red day; it outranks the fallback line; its marks and the calibration report ride the record."""
     movements = load_catalog.get("movements") or {}
-    return lift_note.compose_blocks(
+    fb = selection_engine.note_fallbacks(rotation, [str(b.movement_key) for b in blocks], movements)
+    record = lift_note.compose_blocks(
         blocks,
         movements,
         load_floors=load_floors,
         history_index=history_index,
         target_date=target_date,
         rotations=variant_rotation.swaps(rotation, movements),
+        fallbacks=fb["by_key"] if fb.get("render") else None,
+        **({"familiar": set(load_floors["live_familiar"])} if "live_familiar" in (load_floors or {}) else {}),  # #5861 round 9, live
     )
+    ctx = {"deload": deload, "red_day": red_day, "load_floors": load_floors, "history_index": history_index, "target_date": target_date}
+    cal = rpe_calibration.mark_session(blocks, movements, note_record=record, context=ctx)
+    record[rpe_calibration.SNAPSHOT_KEY] = {**cal, "report": rpe_calibration.report(history_index, movements)}
+    return record | {"note_fallbacks": fb}
 
 
 def _sequence_line(day_entry: dict[str, Any]) -> str:
@@ -225,6 +255,11 @@ def _fit_session_shape(
         rationale.append(
             f"OVER the {caps['session_minutes']}-min lifting cap at ~{shape['lifting_minutes']} min — anchors are never cut for time; flagged"
         )
+    # #5861 L6, live only: a fatigue-trimmed lift says so on its note; the routine as written (warm-ups included) is fitted to the
+    # ceiling, accessories first; then the live fit's and the fatigue model's lines. Shadow: nothing changes, `shape` returns.
+    live_session.annotate_blocks(blocks, rx)
+    shape = live_session.fit_routine(blocks, rx, int(caps["session_minutes"]), load_catalog.get("movements") or {}, rationale, shape)
+    rationale += live_session.rationale_lines(rx)
     return shape
 
 
@@ -237,11 +272,13 @@ def _session_loads(
     week_cfg: dict[str, Any],
     rationale: list[str],
     ramp_week: int,
-    ramp_p: dict[str, Any],
+    rx: dict[str, Any],
     deload: bool,
 ) -> dict[str, Any]:
     """The floor (#4107: the ONE v0.3 load path, `load_ramp.v03_floor`) and then the double
-    progression (#5052) — held on a deload the owner applied, whose loads are held as written."""
+    progression (#5052) — held on a deload the owner applied, whose loads are held as written. Then (#5861, LIVE only,
+    `live_load.set_loads`): the one load model — double progression keyed by session role, one evidence-gated step-down — sets the
+    top load before the back-offs and warm-ups, which follow it. Shadow: it returns before reading anything."""
     load_floors = _enforce_load_floors(
         blocks,
         load_catalog,
@@ -254,12 +291,19 @@ def _session_loads(
         floor_fn=functools.partial(load_ramp.v03_floor, week=ramp_week),
         hold_reason="a deload the owner applied holds every load" if deload else None,
     )
-    load_floors["load_rule"] = {"rule": "v0.3 §3 entry ramp", "week": ramp_week, "params": ramp_p}
+    load_floors["load_rule"] = {"rule": "v0.3 §3 entry ramp", "week": ramp_week, "params": load_ramp.params()}
+    live_load.set_loads(blocks, rx, load_floors, load_catalog.get("movements") or {}, inputs.target_date, rationale)
     return load_floors
 
 
 def _prescription(
-    inputs: GeneratorInputs, day_entry: dict[str, Any], catalog: dict[str, Any], block_workouts: Any, deload: bool, skill_ceiling: int
+    inputs: GeneratorInputs,
+    day_entry: dict[str, Any],
+    catalog: dict[str, Any],
+    block_workouts: Any,
+    deload: bool,
+    skill_ceiling: int,
+    week_cfg: dict[str, Any] | None = None,
 ) -> tuple[Any, dict[str, Any], dict[str, Any]]:
     """(in-block record, rotation, prescription) for the served role. #4409: within a block an ANCHOR slot keeps the variant
     he performed in it (`in_block_variant`); #5075: each ACCESSORY slot serves its rotation variant
@@ -267,7 +311,12 @@ def _prescription(
     movements = catalog.get("movements") or {}
     in_block = in_block_variant.performed_in_block(block_workouts, movements, inputs.target_date)
     rotation = variant_rotation.for_session(
-        {**day_entry, "date": inputs.target_date}, movements, rows=inputs.rotation_rows, skill_ceiling=skill_ceiling
+        {**day_entry, "date": inputs.target_date},
+        movements,
+        rows=inputs.rotation_rows,
+        skill_ceiling=skill_ceiling,
+        block_workouts=block_workouts,  # #5774: the kettlebell slot's entry exposures are counted from the record
+        select=True,  # #5773: the selection engine — shadow while the library is proposed
     )
     rx = program_structure.session_prescription_for_role(
         day_entry["session_role"],
@@ -276,7 +325,12 @@ def _prescription(
         skill_ceiling=skill_ceiling,
         in_block=in_block,
         accessory_variants=rotation["variants"],
+        measured_minutes=session_time.role_median_minutes(block_workouts, day_entry["session_role"]),  # #5799
     )
+    # #5861 L3/L6: LIVE only — equipment and pain on every exposure, then the fatigue model; in shadow it returns rx itself
+    # #5861 FIX5: the served day's week plan (`live_sequence`, carried on the entry) and the session set cap, read under live only
+    set_cap = (week_cfg or {}).get("session_set_ceiling")
+    rx = live_session.for_live_draft(rx, rotation, inputs, block_workouts, movements, week=day_entry.get("live_week"), set_cap=set_cap)
     return in_block, rotation, rx
 
 
@@ -297,7 +351,7 @@ def full_body_routines(
     archetype = program_structure.SESSION_TEMPLATES[role]["archetype"]
     deload = bool(day_entry.get("deload"))
     skill_ceiling = int(week_cfg.get("skill_ceiling", 2))
-    in_block, rotation, rx = _prescription(inputs, day_entry, catalog, block_workouts, deload, skill_ceiling)
+    in_block, rotation, rx = _prescription(inputs, day_entry, catalog, block_workouts, deload, skill_ceiling, week_cfg)
     # a kept title-only variant (ADR-069) loads from its wire template id; the snapshot keeps the catalog's own hash
     load_catalog = in_block_variant.with_performed_template_ids(catalog, rx, in_block)  # #4431: the one resolver
     autoreg = _autoreg_multiplier(inputs.recovery_tier, inputs.acwr_flag)
@@ -306,13 +360,13 @@ def full_body_routines(
         f"archetype={archetype}; program=v{program_structure.PROGRAM_VERSION}; session_role={role}; autoreg={autoreg:.2f} (recovery={inputs.recovery_tier}, acwr={inputs.acwr_flag})",
     ]
     rationale.append(_sequence_line(day_entry))
-    rationale += rotation["rationale"]
+    rationale += live_session.rotation_lines(rotation)  # #5861 L6: live drops the pool lines the selection replaced
     if deload and rx.get("deload_trim"):
         t = rx["deload_trim"]
         rationale.append(f"deload: sets {t['sets_before']} -> {t['sets_after']} ({t['pct']}%), loads held")
     if day_entry.get("optional"):
         rationale.append(f"OPTIONAL session — {day_entry.get('gate') or 'not required this week'}")
-    drop_accessories = autoreg <= _AUTOREG_DROP_ACCESSORIES_AT
+    drop_accessories = live_session.drop_accessories(autoreg, rx, rationale, _AUTOREG_DROP_ACCESSORIES_AT)  # shadow: as before
     if drop_accessories:
         rationale.append("recovery/ACWR red: accessories dropped (§3 — the first thing dropped on a bad day); anchors unchanged")
     z2_floor = week_cfg.get("z2_floor_minutes", 90)
@@ -351,13 +405,12 @@ def full_body_routines(
         "a load already moved at the set's rep floor at this band this cycle, no layoff, is held — never ramped under (#4408); "
         "back-offs −10 % of the top set"
     )
-    load_floors = _session_loads(blocks, load_catalog, history_index, weight_index, inputs, week_cfg, rationale, ramp_week, ramp_p, deload)
+    load_floors = _session_loads(blocks, load_catalog, history_index, weight_index, inputs, week_cfg, rationale, ramp_week, rx, deload)
     warmups = _back_offs_then_warmups(blocks, used, rationale, load_floors, load_catalog.get("movements") or {})
     # #5428: the Hevy note is composed LAST, from what every load and warm-up pass decided — the effort, at most one
     # reason (a row more than one step from PREVIOUS, or a scheme change), at most one cue; the passes' own text is kept
     # on inputs_snapshot["lift_notes"], never on the wire
-    note_record = _compose_notes(blocks, load_catalog, load_floors, history_index, inputs.target_date, rotation)
-
+    note_record = _compose_notes(blocks, load_catalog, load_floors, history_index, inputs.target_date, rotation, deload, drop_accessories)
     caps = {
         "total_sets": week_cfg["session_set_ceiling"],
         "session_minutes": week_cfg["session_minutes_ceiling"],
@@ -365,8 +418,8 @@ def full_body_routines(
     }
     total_sets = sum(warmup_sets.working_set_count(b.sets) for b in blocks)
     assert total_sets <= caps["total_sets"], f"BUG: total_sets {total_sets} > cap {caps['total_sets']}"
-    shape = _fit_session_shape(blocks, rx, caps, load_catalog, rationale)  # #5069: the charter's session shape
-    est_minutes = shape["lifting_minutes"]
+    shape = _fit_session_shape(blocks, rx, caps, load_catalog, rationale)  # #5069: the charter's session shape (#5861 L6 live fit)
+    est_minutes, total_sets = shape["lifting_minutes"], shape.get("working_sets", total_sets)  # #5861 L6: after a live time fit
 
     budget_used: dict[str, int] = {}
     for b in blocks:
@@ -407,6 +460,7 @@ def full_body_routines(
             "session_shape": shape,
             "rotation": rotation,  # #5075: routine_repo.draft_versioned records its ledger_writes
         }
+        | selection_engine.snapshot_fields(rotation)  # #5773: selection_shadow (proposed library) or selection (approved)
         | note_record,
         rationale=rationale,
         caps=caps,

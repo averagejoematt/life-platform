@@ -18,10 +18,16 @@ from stacks.role_policies_base import (
     BUCKET_ARN,
     DLQ_ARN,
     KMS_KEY_ARN,
+    NS_AI,
+    NS_COMPUTE,
+    NS_HEVY_ROUTINE,
+    NS_INGEST_RECONCILIATION,
+    NS_INGEST_SHARED,
     REGION,
     TABLE_ARN,
     _bedrock_statement,
     _bedrock_telemetry_statement,
+    _put_metric_data_statement,
     _s3,
     _secret_arn,
 )
@@ -30,6 +36,17 @@ from stacks.role_policies_base import (
 # INGESTION STACK — 15 Lambdas
 # Pattern: DDB write, S3 raw/<source>/*, source-specific secret, DLQ
 # ═══════════════════════════════════════════════════════════════════════════
+
+
+def _source_pk(source_name: str) -> str:
+    """The partition a source's rows live in — `USER#matthew#SOURCE#{source_name}`.
+
+    It is also the auth-breaker's partition: `common.auth_breaker._pk(source_name, user_id)`
+    and `ingestion_framework._auth_breaker_pk` build exactly this string, and the marker
+    `clear_failure()` deletes on every clean run is the `AUTH_FAILURE` row in it. So
+    `source_name` here must be the `source_name=` the HANDLER passes, not the role's label.
+    """
+    return f"USER#matthew#SOURCE#{source_name}"
 
 
 def _ingestion_base(
@@ -43,13 +60,41 @@ def _ingestion_base(
     extra_statements: list[iam.PolicyStatement] = None,
     no_s3: bool = False,
     no_secret: bool = False,
+    metric_namespaces: tuple = NS_INGEST_SHARED,
+    delete_pks: list[str] = None,
 ) -> list[iam.PolicyStatement]:
-    """Build standard ingestion role policies."""
+    """Build standard ingestion role policies.
+
+    #5545: `metric_namespaces` conditions the CloudWatchMetrics grant. The default is what the
+    shared ingestion framework reaches in every source: `common.item_size_guard`
+    (LifePlatform/DynamoDB) and `common.auth_breaker` (LifePlatform/OAuth). Per-run liveness
+    (`ingest_health`, LifePlatform/IngestLiveness) is EMF — logs, no IAM — so it is not here.
+
+    #5513 (b): `dynamodb:DeleteItem` is NOT in the table-wide `DynamoDB` statement. Until
+    2026-11-13 it was, so every role built here could delete any item in any partition —
+    raw health data included — when the only deletes its code makes are a handful of rows
+    in its own partition. A role now deletes only what `delete_pks` names: each caller
+    passes the exact partition keys its handler's reachable code deletes from, and the
+    grant lands in a separate `DynamoDBDeleteOwnPartitions` statement conditioned on
+    `dynamodb:LeadingKeys`. No `delete_pks` means no DeleteItem at all.
+
+    The list is DERIVED, not guessed from `source`: tests/test_role_family_write_scope.py
+    walks each handler's call graph for `delete_item` sites (the auth-breaker clear in
+    common/auth_breaker.py and ingestion_framework.py is a SHARED module, invisible to a
+    handler-file scan) and asserts this list equals what the code reaches, both ways. That
+    matters because a wrong narrowing fails silently — every one of these deletes sits in a
+    try/except that logs and continues.
+    """
     stmts = []
 
-    # DynamoDB — DeleteItem needed for SIMP-2 framework's auth-breaker
-    # clear_failure() path (deletes the AUTH#failures marker on a clean run).
-    actions = ddb_actions or ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:Query", "dynamodb:DeleteItem"]
+    # DynamoDB — table-wide read/write WITHOUT DeleteItem (#5513). An explicit `ddb_actions`
+    # may not smuggle the verb back in table-wide; a delete goes through `delete_pks`.
+    actions = ddb_actions or ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:Query"]
+    if "dynamodb:DeleteItem" in actions:
+        raise ValueError(
+            f"_ingestion_base({source!r}): dynamodb:DeleteItem is not granted table-wide (#5513) — "
+            "name the partitions in delete_pks instead of passing it in ddb_actions"
+        )
     stmts.append(
         iam.PolicyStatement(
             sid="DynamoDB",
@@ -57,6 +102,15 @@ def _ingestion_base(
             resources=[TABLE_ARN],
         )
     )
+    if delete_pks:
+        stmts.append(
+            iam.PolicyStatement(
+                sid="DynamoDBDeleteOwnPartitions",
+                actions=["dynamodb:DeleteItem"],
+                resources=[TABLE_ARN],
+                conditions={"ForAllValues:StringEquals": {"dynamodb:LeadingKeys": list(delete_pks)}},
+            )
+        )
 
     # KMS — DDB CMK only. Phase 2.4 had also granted on the S3 CMK, but the
     # S3 bucket switched to AES256 default encryption (no per-object KMS), so
@@ -118,14 +172,9 @@ def _ingestion_base(
     )
 
     # CloudWatch metrics (ADR-052): OAuth refresh writeback failures and other
-    # custom ingestion metrics. PutMetricData only accepts "*" as a resource.
-    stmts.append(
-        iam.PolicyStatement(
-            sid="CloudWatchMetrics",
-            actions=["cloudwatch:PutMetricData"],
-            resources=["*"],
-        )
-    )
+    # custom ingestion metrics. PutMetricData only accepts "*" as a resource, so the
+    # #5545 cloudwatch:namespace condition is the only scope it can carry.
+    stmts.append(_put_metric_data_statement("CloudWatchMetrics", *metric_namespaces))
 
     # Extra statements
     if extra_statements:
@@ -148,6 +197,9 @@ def ingestion_whoop() -> list[iam.PolicyStatement]:
         "whoop",
         secret_name="life-platform/whoop",
         extra_secret_actions=["secretsmanager:UpdateSecret"],
+        metric_namespaces=(*NS_INGEST_SHARED, NS_INGEST_RECONCILIATION),  # #5545: TR-07 provider-diff (_reconcile)
+        # #5513: the only delete is the auth-breaker clear (AUTH_FAILURE row) in this source's own partition.
+        delete_pks=[_source_pk("whoop")],
     )
 
 
@@ -159,6 +211,9 @@ def ingestion_notion() -> list[iam.PolicyStatement]:
         "notion",
         secret_name="life-platform/ingestion-keys",  # COST-B: bundled 2026-03-10
         s3_prefix="raw/matthew/notion/*",
+        # #5513: two delete sites, one partition — auth_breaker.clear_failure(source_name="notion") and
+        # _reconcile_deleted()'s removal of rekeyed/absent journal rows (notion_lambda.PK).
+        delete_pks=[_source_pk("notion")],
     )
 
 
@@ -184,6 +239,9 @@ def ingestion_youtube() -> list[iam.PolicyStatement]:
         secret_name="life-platform/youtube",
         s3_prefix="raw/matthew/youtube/*",
         extra_s3_read=["config/content_filter.json"],
+        metric_namespaces=(*NS_INGEST_SHARED, NS_AI),  # #5545: + the bedrock_client telemetry (sensitivity gate Haiku pass)
+        # #5513: the only delete is the auth-breaker clear (AUTH_FAILURE row) in this source's own partition.
+        delete_pks=[_source_pk("youtube")],
     ) + [_bedrock_statement()]
 
 
@@ -208,6 +266,9 @@ def ingestion_bluesky() -> list[iam.PolicyStatement]:
         secret_name="life-platform/bluesky",
         s3_prefix="raw/matthew/bluesky/*",
         extra_s3_read=["config/content_filter.json"],
+        metric_namespaces=(*NS_INGEST_SHARED, NS_AI),  # #5545: + the bedrock_client telemetry (sensitivity gate Haiku pass)
+        # #5513: the only delete is the auth-breaker clear (AUTH_FAILURE row) in this source's own partition.
+        delete_pks=[_source_pk("bluesky")],
     ) + [_bedrock_statement()]
 
 
@@ -233,6 +294,9 @@ def ingestion_mastodon() -> list[iam.PolicyStatement]:
         secret_name="life-platform/mastodon",
         s3_prefix="raw/matthew/mastodon/*",
         extra_s3_read=["config/content_filter.json"],
+        metric_namespaces=(*NS_INGEST_SHARED, NS_AI),  # #5545: + the bedrock_client telemetry (sensitivity gate Haiku pass)
+        # #5513: the only delete is the auth-breaker clear (AUTH_FAILURE row) in this source's own partition.
+        delete_pks=[_source_pk("mastodon")],
     ) + [_bedrock_statement()]
 
 
@@ -246,6 +310,8 @@ def ingestion_withings() -> list[iam.PolicyStatement]:
         "withings",
         secret_name="life-platform/withings",
         extra_secret_actions=["secretsmanager:UpdateSecret"],
+        # #5513: the only delete is the auth-breaker clear (AUTH_FAILURE row) in this source's own partition.
+        delete_pks=[_source_pk("withings")],
     )
 
 
@@ -256,6 +322,9 @@ def ingestion_habitify() -> list[iam.PolicyStatement]:
         "habitify",
         secret_name="life-platform/habitify",
         s3_prefix="raw/matthew/habitify/*",
+        # #5513: the auth-breaker clear in its own partition, plus supplement_bridge() (#4632), which deletes a
+        # supplements row left holding nothing once a bridged completion is retracted (_SUPPLEMENTS_PK).
+        delete_pks=[_source_pk("habitify"), _source_pk("supplements")],
     )
 
 
@@ -270,6 +339,9 @@ def ingestion_strava() -> list[iam.PolicyStatement]:
         "strava",
         secret_name="life-platform/strava",
         extra_secret_actions=["secretsmanager:UpdateSecret"],
+        metric_namespaces=(*NS_INGEST_SHARED, NS_INGEST_RECONCILIATION),  # #5545: TR-07 provider-diff (_reconcile)
+        # #5513: the only delete is the auth-breaker clear (AUTH_FAILURE row) in this source's own partition.
+        delete_pks=[_source_pk("strava")],
     )
 
 
@@ -325,9 +397,25 @@ def ingestion_hevy_backfill() -> list[iam.PolicyStatement]:
         # previous copy (to refuse a shrink that would mean a partial walk) and writes the new one.
         extra_s3_read=["config/movement_catalog.json", "config/hevy_template_cache.json", "config/hevy_template_index.json"],
         extra_s3_write=["config/hevy_template_index.json"],
+        # #5545: + AI (training-notes Haiku tail), Compute (insight_writer -> compute_metadata), HevyRoutine
+        # (TemplateIndexRebuilt) and IngestReconciliation (the hevy provider diff).
+        metric_namespaces=(*NS_INGEST_SHARED, NS_AI, NS_COMPUTE, NS_HEVY_ROUTINE, NS_INGEST_RECONCILIATION),
+        # #5513: three delete sites, two partitions. In the hevy partition: auth_breaker.clear_failure
+        # (source_name=SOURCE="hevy") and training.hevy_common.delete_workout_records (#475 — relocated and
+        # tombstoned workouts). Under USER#system: _clear_event_failure(), the per-event quarantine counter
+        # (QUARANTINE_PK). USER#system is shared with other system rows; the cursor itself is put, never deleted.
+        delete_pks=[_source_pk("hevy"), "USER#system"],
     ) + [
         _bedrock_statement(),
         _experiment_cycle_read(),
+        # #5795 — OWNER-REQUIRED (additive IAM + cdk deploy LifePlatformIngestion): the poller starts the nightly
+        # pre-draft when it writes a loaded session (ingestion/predraft_trigger.py, async `Event` invoke). Inert until
+        # the function's PREDRAFT_ON_INGEST env reads `on`; the warmer's own gate (mcp/invoke_gate.py) still applies.
+        iam.PolicyStatement(
+            sid="PredraftOnIngestInvoke",
+            actions=["lambda:InvokeFunction"],
+            resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:life-platform-mcp-warmer"],
+        ),
     ]  # #3599: bundles content.insight_writer (the stamp's SSM fallback)
 
 
@@ -393,17 +481,15 @@ def ingestion_journal_enrichment() -> list[iam.PolicyStatement]:
             actions=["lambda:InvokeFunction"],
             resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-quality-gate"],
         ),
-        iam.PolicyStatement(
-            # G1: every AI-calling role needs PutMetricData — bedrock_client.invoke()
-            # emits per-feature token/EstimatedCostUSD at the chokepoint, and the
-            # ADR-108 gate emits CoachQualityGateHeld when it holds a reaction. This
-            # role called Bedrock without it (the emits failed AccessDenied fail-open,
-            # so the enrichment cost telemetry was silently dropped). PutMetricData
-            # only accepts "*" as a resource.
-            sid="AICostMetrics",
-            actions=["cloudwatch:PutMetricData"],
-            resources=["*"],
-        ),
+        # G1: every AI-calling role needs PutMetricData — bedrock_client.invoke()
+        # emits per-feature token/EstimatedCostUSD at the chokepoint, and the
+        # ADR-108 gate emits CoachQualityGateHeld when it holds a reaction. This
+        # role called Bedrock without it (the emits failed AccessDenied fail-open,
+        # so the enrichment cost telemetry was silently dropped). PutMetricData
+        # only accepts "*" as a resource.
+        # #5545: namespace-conditioned — AI (bedrock_client + the ADR-108 gate), Compute (insight_writer ->
+        # compute_metadata) and the ingestion framework's DynamoDB/OAuth.
+        _put_metric_data_statement("AICostMetrics", NS_AI, NS_COMPUTE, *NS_INGEST_SHARED),
         iam.PolicyStatement(
             sid="DLQ",
             actions=["sqs:SendMessage"],
@@ -483,15 +569,13 @@ def ingestion_social_enrichment() -> list[iam.PolicyStatement]:
             actions=["lambda:InvokeFunction"],
             resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-quality-gate"],
         ),
-        iam.PolicyStatement(
-            # G1: every AI-calling role needs PutMetricData — bedrock_client.invoke()
-            # emits per-feature token/EstimatedCostUSD at the chokepoint, and the
-            # ADR-108 gate emits CoachQualityGateHeld when it holds a reaction.
-            # PutMetricData only accepts "*" as a resource.
-            sid="AICostMetrics",
-            actions=["cloudwatch:PutMetricData"],
-            resources=["*"],
-        ),
+        # G1: every AI-calling role needs PutMetricData — bedrock_client.invoke()
+        # emits per-feature token/EstimatedCostUSD at the chokepoint, and the
+        # ADR-108 gate emits CoachQualityGateHeld when it holds a reaction.
+        # PutMetricData only accepts "*" as a resource.
+        # #5545: namespace-conditioned — AI (bedrock_client + the ADR-108 gate), Compute (insight_writer ->
+        # compute_metadata) and the ingestion framework's DynamoDB/OAuth.
+        _put_metric_data_statement("AICostMetrics", NS_AI, NS_COMPUTE, *NS_INGEST_SHARED),
         iam.PolicyStatement(
             sid="DLQ",
             actions=["sqs:SendMessage"],
@@ -518,6 +602,8 @@ def ingestion_todoist() -> list[iam.PolicyStatement]:
         "todoist",
         secret_name="life-platform/ingestion-keys",  # COST-B: bundled 2026-03-10
         s3_prefix="raw/todoist/*",  # NOTE: no matthew/ prefix — Lambda writes to raw/todoist/ directly
+        # #5513: the only delete is the auth-breaker clear (AUTH_FAILURE row) in this source's own partition.
+        delete_pks=[_source_pk("todoist")],
     )
 
 
@@ -531,6 +617,8 @@ def ingestion_eightsleep() -> list[iam.PolicyStatement]:
         "eightsleep",
         secret_name="life-platform/eightsleep",
         extra_secret_actions=["secretsmanager:UpdateSecret"],
+        # #5513: the only delete is the auth-breaker clear (AUTH_FAILURE row) in this source's own partition.
+        delete_pks=[_source_pk("eightsleep")],
     )
 
 
@@ -557,6 +645,7 @@ def ingestion_activity_enrichment() -> list[iam.PolicyStatement]:
         # record for it (the function's Bedrock path did not run in the 30d window),
         # so this is fixed as the same structural pairing, not as a measured incident.
         _bedrock_telemetry_statement(),
+        _put_metric_data_statement("SharedModuleMetrics", NS_COMPUTE, *NS_INGEST_SHARED),  # #5545: compute_metadata + framework
         iam.PolicyStatement(
             sid="DLQ",
             actions=["sqs:SendMessage"],
@@ -576,7 +665,12 @@ def ingestion_activity_enrichment() -> list[iam.PolicyStatement]:
 
 
 def ingestion_macrofactor() -> list[iam.PolicyStatement]:
-    """MacroFactor: DDB write + S3 raw/macrofactor, reads CSV from uploads/macrofactor/."""
+    """MacroFactor: DDB write + S3 raw/macrofactor, reads CSV from uploads/macrofactor/.
+
+    #5513: NO DeleteItem. This handler is S3-triggered, does not run through the SIMP-2
+    `run_ingestion` loop and never touches the auth breaker; no `delete_item` is reachable
+    from it (tests/test_role_family_write_scope.py derives that), so it passes no `delete_pks`.
+    """
     return _ingestion_base(
         "macrofactor",
         no_secret=True,
@@ -630,6 +724,8 @@ def ingestion_dropbox() -> list[iam.PolicyStatement]:
         secret_name="life-platform/ingestion-keys",  # COST-B: bundled 2026-03-10
         s3_prefix="uploads/macrofactor/*",  # dropbox writes MacroFactor CSVs here
         extra_s3_read=["uploads/macrofactor/*"],
+        # #5513: dropbox_poll calls auth_breaker.clear_failure(source_name="dropbox") directly (no SIMP-2 run).
+        delete_pks=[_source_pk("dropbox")],
     )
 
 
@@ -642,16 +738,18 @@ def ingestion_hae() -> list[iam.PolicyStatement]:
     """Health Auto Export webhook: API Gateway trigger, DDB + S3 write.
 
     R8 Finding-2 fix: Added Secrets Manager access for Bearer token auth.
-    Code default reads life-platform/ingestion-keys (health_auto_export_api_key).
     (Note: a dedicated life-platform/webhook-key existed in early 2026 but was
-    deleted 2026-03-14 per HANDOVER_v3.7.84; ingestion-keys is now the only path.)
+    deleted 2026-03-14 per HANDOVER_v3.7.84; the new name below is deliberately different.)
 
-    Already GetSecretValue-only (#499/X-8) — never had UpdateSecret. NOT
-    addressed here: issue #499's second acceptance criterion — moving this
-    internet-facing bearer key out of the shared life-platform/ingestion-keys
-    bundle into its own dedicated secret. That needs an actual new secret
-    provisioned in Secrets Manager plus a code change to read it, which is
-    outside a pure IAM-policy PR; flagged for a follow-up.
+    Already GetSecretValue-only (#499/X-8) — never had UpdateSecret.
+
+    #5513 (c), the split #499 deferred: the token moves out of the shared
+    life-platform/ingestion-keys bundle (notion/todoist/habitify/dropbox keys too) into
+    its own life-platform/hae-webhook secret, read first by
+    `ingestion/health_auto_export_auth.get_api_key`. DURING THE CUTOVER this role reads
+    BOTH: the code falls back to the bundle while the dedicated secret is absent or this
+    grant is not yet deployed. The follow-up drops the bundle ARN below (and the code
+    fallback) once CloudWatch shows `hae_auth_key_source source=dedicated`.
     """
     return [
         iam.PolicyStatement(
@@ -716,7 +814,10 @@ def ingestion_hae() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="Secrets",
             actions=["secretsmanager:GetSecretValue"],
-            resources=[_secret_arn("life-platform/ingestion-keys")],
+            resources=[
+                _secret_arn("life-platform/hae-webhook"),  # #5513 (c): the dedicated token
+                _secret_arn("life-platform/ingestion-keys"),  # cutover fallback ONLY — the #5513 follow-up removes it
+            ],
         ),
         iam.PolicyStatement(
             sid="DLQ",

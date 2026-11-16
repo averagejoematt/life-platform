@@ -2070,6 +2070,7 @@ class TestCompleteAction:
 # ══════════════════════════════════════════════════════════════════════════════
 
 GOALS_KEY = "config/user_goals.json"
+PRIVATE_GOALS_KEY = "config/private/user_goals_private.json"
 
 
 class TestGoalsLoader:
@@ -2078,7 +2079,25 @@ class TestGoalsLoader:
         monkeypatch.setattr(ic, "s3", s3)
         assert ic.load_goals_config()["mission"] == "recomp"
         assert ic.load_goals_config()["mission"] == "recomp"
-        assert s3.gets == [GOALS_KEY]  # second call served from the warm cache
+        # one public read + one private read (owner ruling 2026-11-11), then the warm cache
+        assert s3.gets == [GOALS_KEY, PRIVATE_GOALS_KEY]
+
+    def test_the_private_part_is_merged_for_coach_context(self, monkeypatch):
+        """SYNTHETIC private part: the coach preamble's private fields come from config/private/, never the repo."""
+        s3 = FakeS3(
+            {
+                GOALS_KEY: {"mission": "recomp", "targets": {"sleep": {"target_hours": 8}}},
+                PRIVATE_GOALS_KEY: {"philosophy": "synthetic", "targets": {"sleep": {"note": "synthetic note"}}},
+            }
+        )
+        monkeypatch.setattr(ic, "s3", s3)
+        cfg = ic.load_goals_config()
+        assert cfg["philosophy"] == "synthetic" and cfg["targets"]["sleep"] == {"target_hours": 8, "note": "synthetic note"}
+
+    def test_a_missing_private_part_degrades_to_the_public_plan(self, monkeypatch):
+        """Fail-soft to ABSENT: no stand-in private field is invented."""
+        monkeypatch.setattr(ic, "s3", FakeS3({GOALS_KEY: {"mission": "recomp"}}))
+        assert ic.load_goals_config() == {"mission": "recomp"}
 
     def test_a_failed_load_is_never_cached(self, monkeypatch):
         """The tranche-2 poisoned-cache class: one transient throttle must not
@@ -2100,7 +2119,7 @@ class TestGoalsLoader:
         clock["t"] += ic._GOALS_CACHE_TTL + 1
         s3.objects[GOALS_KEY] = {"mission": "second"}
         assert ic.load_goals_config()["mission"] == "second"
-        assert len(s3.gets) == 2
+        assert len(s3.gets) == 4  # public + private, twice
 
     def test_the_fallback_config_carries_the_live_experiment_anchors(self, monkeypatch):
         """Derived from constants, never a literal date — a re-anchor must not

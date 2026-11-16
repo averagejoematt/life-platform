@@ -94,7 +94,7 @@ def test_endpoint_arm_coverage_check_fires_on_uncovered_routes(tmp_path):
 def test_endpoint_arm_fires_on_a_planted_genetic_tell():
     """Regression guard (#1945 AC4): a payload carrying the #1943 leak class must
     red — both as a value tell and as a key tell."""
-    payload = json.dumps({"snps": [{"rsid": "rs429358", "genotype": "C/T", "note": "heterozygous"}]})
+    payload = json.dumps({"snps": [{"rsid": "rs0000000", "genotype": "X/Y", "note": "heterozygous"}]})
     arms = {arm for arm, _ in guard.scan_endpoint_payload(payload, vice=[], literals=[])}
     assert "pii-genetic" in arms, "value-level genetic tell (rsID/genotype) must fire"
     assert "pii-genetic-key" in arms, "key-level genetic tell (rsid field) must fire"
@@ -112,11 +112,26 @@ def test_endpoint_arm_fires_on_a_planted_birth_year_field():
 def test_endpoint_arm_allows_aggregate_genetic_counts_and_public_age_scores():
     """The sanctioned shapes must NOT trip: aggregate SNP counts (facts about the
     analysis, #1943) and the public fitness/bio-age scores (Option A keeps those)."""
-    ok = json.dumps({"genome": {"total_snps": 111, "snp_count": 8}, "vitals": {"fitness_age": 44, "bio_age": 39.2, "phenoage": 39.2}})
+    ok = json.dumps({"genome": {"total_snps": 111, "snp_count": 8}, "vitals": {"fitness_age": 44, "bio_age": 39.2, "phenoage": None}})
     hits = [
         h for h in guard.scan_endpoint_payload(ok, vice=[], literals=[]) if h[0].startswith("pii-genetic") or h[0].startswith("pii-age")
     ]
     assert hits == [], f"sanctioned aggregate/public-age shapes must pass, got {hits}"
+
+
+def test_endpoint_arm_fires_on_a_figure_of_his_phenotypic_age():
+    """Owner ruling 2026-11-14: the Levine formula is linear in age and its inputs are public, so a served phenotypic
+    age IS the chronological age to about a year. A number under the key reds at any depth; null and the snapshot's
+    reference object are the sanctioned shapes."""
+    for leak in ({"phenoage": 39}, {"journey": {"phenoage": {"phenotypic_age": 39.2}}}, {"x": [{"pheno_age": 39}]}):
+        hits = guard.scan_endpoint_payload(json.dumps(leak), vice=[], literals=[])
+        assert any(arm == "pii-age-derived" for arm, _ in hits), leak
+    for ok in (
+        {"phenoage": None, "withheld": "derived_from_chronological_age"},
+        {"journey": {"phenoage": {"as_of": "2026-04-03", "reference": {"slope": 0.892}}}},
+    ):
+        hits = guard.scan_endpoint_payload(json.dumps(ok), vice=[], literals=[])
+        assert not any(arm == "pii-age-derived" for arm, _ in hits), ok
 
 
 def test_card_arm_ignores_float_mantissas_but_still_catches_a_card():
@@ -209,7 +224,7 @@ def test_every_endpoint_violation_names_its_path_and_never_its_value():
             "b": [{"contact": email}],
             "c": ssn,
             "d": "born in 1985",
-            "e": "rs429358",
+            "e": "rs0000000",
             email: 1,
         }
     )
@@ -229,6 +244,22 @@ def test_every_endpoint_violation_names_its_path_and_never_its_value():
         assert value not in joined, f"a violation line echoed a matched value: {joined}"
 
 
+def test_clinical_arm_names_the_path_masks_the_term_and_is_off_unless_handed_a_pattern():
+    """#5947: the endpoint arm reads a payload against the owner-only clinical vocabulary when handed its
+    compiled pattern (synthetic term here). The violation names the JSON path and never the term; a phrase
+    matches across a hyphen; and without a pattern the arm is off — every other caller is unchanged."""
+    import re
+
+    pattern = re.compile(r"(?<!\w)(?:zzzclinicalterm|zzz[\s\-]+phrase)(?!\w)", re.IGNORECASE)
+    payload = json.dumps({"items": [{"pitch": "a week after the ZzzClinicalTerm finding"}], "note": "the zzz-phrase again"})
+    hits = guard.scan_endpoint_payload(payload, vice=[], literals=[], clinical=pattern)
+    assert sorted(d.split(" ")[0] for arm, d in hits if arm == "clinical-record") == ["$.items[].pitch", "$.note"], hits
+    assert all("zzz" not in d.lower() for _, d in hits), f"a violation line echoed the term: {hits}"
+    assert guard.scan_endpoint_payload(payload, vice=[], literals=[]) == []
+    fallback = guard.scan_endpoint_payload("plain text with zzzclinicalterm", vice=[], literals=[], clinical=pattern)
+    assert [arm for arm, _ in fallback] == ["clinical-record"] and "zzz" not in fallback[0][1]
+
+
 def test_non_json_body_violations_are_masked_too():
     """The non-JSON fallback has no path to give, but it still never gives the value."""
     hits = guard.scan_endpoint_payload("plain text: someone.personal@gmail.com and 123-45-6789", vice=[], literals=[])
@@ -244,6 +275,34 @@ def test_live_arm_unreachable_endpoint_is_a_violation_never_a_pass():
     assert res["scanned"] == []
     assert res["violations"], "an unreadable surface must red, not pass"
     assert all(arm == "endpoint-not-scanned" for _, arm, _ in res["violations"])
+
+
+def test_live_arm_classifies_a_dark_route_404_but_still_reds_everything_else(monkeypatch):
+    """#5976: a 404 on a registered DARK route is skipped with its reason; a 404 on any
+    other route, a 5xx on a dark route, and a leak in a dark route's 200 all still red."""
+
+    dark = set(guard.DARK_ROUTES)
+
+    def run(dark_status, other_status=200, dark_body=None):
+        def stub(fetch_path):
+            path = fetch_path.split("?")[0]
+            if path in dark:
+                return dark_status, dark_body, None
+            if path == "/api/vitals":
+                return other_status, ({"ok": 1} if other_status == 200 else None), None
+            return 200, {"ok": 1}, None
+
+        return guard.scan_endpoints("https://unit-test.invalid", fetcher=stub)
+
+    res = run(404)
+    assert not [v for v in res["violations"] if v[0] in guard.DARK_ROUTES], res["violations"]
+    assert all(r in res["skipped"] and "dark route" in res["skipped"][r] for r in guard.DARK_ROUTES)
+    # must-fail controls
+    assert [v for v in run(500)["violations"] if v[0] in guard.DARK_ROUTES], "5xx on a dark route must red"
+    leak = run(200, dark_body={"user": {"birth_year": 1985}})
+    assert any(arm == "pii-age-key" for _, arm, _ in leak["violations"]), "a launched dark route is scanned"
+    monkeypatch.setattr(guard, "DARK_ROUTES", {})
+    assert [v for v in run(404)["violations"] if v[0] in ("/api/coach_brief", "/api/coach_room_words")], "undeclared 404 must red"
 
 
 def test_live_arm_fires_on_a_planted_payload_and_never_fetches_post_only_routes(monkeypatch):
@@ -270,7 +329,7 @@ def test_live_arm_fires_on_a_planted_payload_and_never_fetches_post_only_routes(
 
     def stub_fetch(fetch_path):
         fetched.append(fetch_path)
-        return 200, {"user": {"birth_year": 1985}, "snp": "rs429358"}, None
+        return 200, {"user": {"birth_year": 1985}, "snp": "rs0000000"}, None
 
     res = guard.scan_endpoints("https://unit-test.invalid", fetcher=stub_fetch)
     arms = {arm for _, arm, _ in res["violations"]}
@@ -286,7 +345,7 @@ def test_guard_genetic_vocabulary_covers_the_platform_definition():
     lambdas/web/site_api_vitals._GENETIC_TEXT_RE and
     tests/test_public_genetic_privacy_absolute._GENETIC_KEY_RE encode — drift here
     means the arms silently diverged from the labs/genome absolutes."""
-    for probe in ("genotype", "rs429358", "allele"):
+    for probe in ("genotype", "rs0000000", "allele"):
         assert guard._GENETIC_VALUE_RE.search(probe), f"value tell must match {probe!r}"
     for key in ("rsid", "genotype", "snp_id", "allele", "gene", "genes", "gene_name", "rs123"):
         assert guard._GENETIC_KEY_RE.search(key), f"key tell must match key {key!r}"

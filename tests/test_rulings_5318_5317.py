@@ -26,6 +26,14 @@ import re
 import sys
 from unittest.mock import patch
 
+import pytest
+
+ROLLBACK = pytest.mark.usefixtures("exercise_library_rollback")
+"""#5861 (owner approval 2026-11-14): the marked tests pin the PRE-approval generator — the generator's sets are compared with the shadow
+prescription (`program_structure`); live plans its own volume. They run on the library's rollback copy (status proposed:
+tests/conftest.py `exercise_library_rollback`), so they keep guarding the rollback path; the approved (live) behaviour is pinned by the
+#5861 tests."""
+
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "lambdas"))
@@ -182,6 +190,7 @@ def test_a4_the_charter_carries_a_ceiling_and_no_floor():
     assert "under_range" not in est and "range" not in est and est["cap"] == 75
 
 
+@ROLLBACK
 def test_a4_a_draft_under_60_min_with_the_week_at_75_raises_no_warning_and_adds_no_sets():
     """Acceptance: 'a draft under 60 min with weekly sets at or under 75 raises no warning and adds no sets.' Shoulders+arms
     is ~38 lifting minutes and the week is 75 sets: the prescription is untrimmed and unpadded, the generator's blocks carry
@@ -235,7 +244,7 @@ def test_b2_the_anchor_tripwire_still_reads_the_barbell_bench():
     uh_bench = next(e for e in _rx(UH)["exposures"] if e["pattern"] == "bench")
     assert (uh_bench["movement_key"], uh_bench["intensity"]) == ("barbell_bench_press", "heavy")
     assert program_structure.ANCHORS["bench"]["catalog_keys"][0] == "barbell_bench_press"
-    assert "anchor_keys" not in program_structure.SESSION_TEMPLATES[UH]
+    assert "bench" not in (program_structure.SESSION_TEMPLATES[UH].get("anchor_keys") or {})  # #6014 pins only the heavy row
     assert "bench" in program_structure.CORE_ANCHORS
     from mcp import plan_draft_evidence
 
@@ -309,14 +318,14 @@ def test_b3_the_carry_counts_toward_core_and_forearms_and_holds_the_trap_floor()
     cov = program_structure.volume_floor_coverage(MOVEMENTS)
     by = cov["sets_by_muscle"]
     assert by["forearms"] == 2  # the carry's 2 sets (no other forearm work in the week)
-    assert by["abs"] == 4 + 2  # the lower-volume crunch + the carry
-    assert cov["floors"]["core"]["sets"] == 6 and SA in cov["floors"]["core"]["slot_roles"]
+    assert by["abs"] == 2 + 2  # the lower-volume crunch (2 sets since #5774 gave 2 to the kettlebell slot) + the carry
+    assert cov["floors"]["core"]["sets"] == 4 and SA in cov["floors"]["core"]["slot_roles"]  # #5774: at the core MEV (4)
     assert cov["floors"]["traps"]["sets"] == 2 and cov["floors"]["traps"]["slot_roles"] == [SA] and cov["floors"]["traps"]["meets_mev"]
     assert CARRY in volume_floors.FLOOR_MOVEMENTS["core"] and CARRY in volume_floors.FLOOR_MOVEMENTS["traps"]
     # the control: strip the carry's credits and core / forearms fall back to the catalog muscle alone
     with patch.object(volume_floors, "CARRY_CREDITS", ()):
         stripped = program_structure.volume_floor_coverage(MOVEMENTS)["sets_by_muscle"]
-    assert stripped["abs"] == 4 and stripped.get("forearms", 0) == 0
+    assert stripped["abs"] == 2 and stripped.get("forearms", 0) == 0
 
 
 def test_b3_the_carry_is_the_template_he_logs_and_the_custom_one_is_retired():

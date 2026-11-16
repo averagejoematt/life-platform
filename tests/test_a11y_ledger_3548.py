@@ -17,6 +17,7 @@ test_a11y_audit.py` — this file covers the five FIXES the issue names:
 """
 
 import importlib.util
+import json
 import os
 import re
 import sys
@@ -179,3 +180,83 @@ def test_sr_only_class_exists_for_the_corner_th():
 
 
 # premerge-gate: 3548: an os.walk sweep of site/**/*.html for the retired <article data-dx-read> tabpanel host (aria-allowed-role) plus a source-string check that the two generators (v4_build_coaching.py/v4_build_dispatches.py) never re-emit it. Pure repo shape, same idiom as test_no_tool_attribution_3005.py — a PR that reintroduces the pattern must red BEFORE merge, not after the site auto-deploys on it.
+
+
+# ── #5526: a serious row's owner must be OPEN, not merely named ───────────────
+#
+# Every serious row used to cite #3673 (x33) or #3897 (x1) — both CLOSED — so the "names an issue" rule was satisfied
+# by tombstones and no open issue owned any contrast debt. The owner's state is read from the OFFLINE snapshot in the
+# baseline's `_meta.owner_states` (refreshed by `python3 qa/a11y_audit.py --refresh-owner-states`), so this stays a
+# unit test with no network.
+
+
+def _audit():
+    tests_dir = os.path.join(ROOT, "tests")
+    if tests_dir not in sys.path:
+        sys.path.insert(0, tests_dir)
+    import a11y_audit
+
+    return a11y_audit
+
+
+def _planted(issue, impact="serious"):
+    return {
+        "_meta": {},
+        "pages": {"/planted/": [{"id": "color-contrast", "impact": impact, "help": "h", "nodes": 1, "issue": issue}]},
+        "pages_light": {},
+        "pages_mobile": {},
+        "pages_light_mobile": {},
+    }
+
+
+def test_every_serious_baseline_row_is_owned_by_an_open_issue():
+    a = _audit()
+    baseline = a.load_baseline()
+    unowned = a.unowned_serious_entries(baseline)
+    assert unowned == [], (
+        "tests/a11y_baseline.json has serious rows whose owner is CLOSED or missing from _meta.owner_states — re-point "
+        f"them at an open issue (and re-run `python3 qa/a11y_audit.py --refresh-owner-states`): {unowned[:5]}"
+    )
+    assert a.cited_owners(baseline), "no serious row cites any owner — the rule above checked nothing"
+
+
+def test_a_closed_owner_reds_and_an_open_one_does_not():
+    a = _audit()
+    assert a.unowned_serious_entries(_planted("#3673"), {"#3673": "CLOSED"}) == [
+        ("pages", "/planted/", "color-contrast", "#3673", "CLOSED")
+    ]
+    assert a.unowned_serious_entries(_planted("#5526"), {"#5526": "OPEN"}) == []
+
+
+def test_an_owner_the_snapshot_never_checked_is_not_owned():
+    a = _audit()
+    assert a.unowned_serious_entries(_planted("#9999"), {"#5526": "OPEN"}) == [("pages", "/planted/", "color-contrast", "#9999", None)]
+
+
+def test_HISTORY_the_pre_5526_baseline_would_red():
+    """The committed ledger as it stood: every serious row on #3673 or #3897, both closed."""
+    a = _audit()
+    baseline = a.load_baseline()
+    tomb = json.loads(json.dumps(baseline))
+    for key in a.LEDGER_KEYS:
+        for rows in tomb[key].values():
+            for r in rows:
+                if r.get("issue"):
+                    r["issue"] = "#3673"
+    assert len(a.unowned_serious_entries(tomb, {"#3673": "CLOSED"})) == 34
+
+
+def test_moderate_rows_are_outside_the_owner_rule():
+    a = _audit()
+    assert a.unowned_serious_entries(_planted("#3673", impact="moderate"), {"#3673": "CLOSED"}) == []
+
+
+def test_the_owner_refresh_writes_every_cited_ref_and_nothing_else(tmp_path):
+    a = _audit()
+    p = tmp_path / "baseline.json"
+    p.write_text(json.dumps(_planted("#5526")))
+    asked = []
+    states = a.refresh_owner_states(path=str(p), fetch=lambda ref: asked.append(ref) or "OPEN", today_iso="2026-11-15")
+    assert asked == ["#5526"] and states == {"#5526": "OPEN"}
+    meta = json.loads(p.read_text())["_meta"]
+    assert meta["owner_states"] == {"#5526": "OPEN"} and meta["owner_states_checked_at"] == "2026-11-15"

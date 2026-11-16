@@ -493,7 +493,8 @@ def test_the_mcp_reader_uses_the_sanctioned_hevy_path_from_the_block_start():
 @pytest.mark.parametrize("rows", [[], PRE_SWITCH], ids=["empty-record", "pre-switch-lifts"])
 def test_the_first_v04_session_is_the_committed_lower_heavy(day, rows):
     """Nothing performed since the switch: the plan, the generator and the chat gate all serve
-    lower-heavy, week 1, block 1 — barbell squat heavy, RDL as the moderate hinge."""
+    lower-heavy, week 1, block 1 — barbell squat heavy and (#5694, owner ruling 2026-11-08) the conventional deadlift as the
+    heavy hinge, where the committed 09-23 session carried the RDL as the moderate one."""
     from mcp import hevy_prescription_gate
 
     catalog = json.loads((REPO / "config" / "movement_catalog.json").read_text())["movements"]
@@ -502,7 +503,7 @@ def test_the_first_v04_session_is_the_committed_lower_heavy(day, rows):
     assert (ps["source"], ps["sequence_index"], ps["position_label"]) == ("session_sequence", 0, "week 1 · session 1 of 4 · lower-heavy")
     assert ps["program_version"] == "0.4" and ps["advanced_by"] is None
     anchors = [(e["movement_key"], e["intensity"]) for e in ps["prescription"]["exposures"] if e["kind"] == "anchor"]
-    assert anchors == [("squat_barbell", "heavy"), ("romanian_deadlift_barbell", "moderate")]
+    assert anchors == [("squat_barbell", "heavy"), ("deadlift_barbell", "heavy")]
 
     assert plan_engine.program_week(day, rows) == 1
     block = plan_engine.constraint_block(date=day, block_workouts=rows)

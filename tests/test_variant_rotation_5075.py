@@ -14,6 +14,13 @@ import sys
 from decimal import Decimal
 from unittest.mock import patch
 
+import pytest
+
+ROLLBACK = pytest.mark.usefixtures("exercise_library_rollback")
+"""#5861 (owner approval 2026-11-14): the marked tests pin the PRE-approval generator — the rotation lines are the shadow pools' (live
+selection replaces them). They run on the library's rollback copy (status proposed: tests/conftest.py `exercise_library_rollback`), so
+they keep guarding the rollback path; the approved (live) behaviour is pinned by the #5861 tests."""
+
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "lambdas"))
@@ -25,7 +32,11 @@ from training.training_charter import charter_value  # noqa: E402
 
 CATALOG = json.loads((REPO / "config" / "movement_catalog.json").read_text())["movements"]
 ROLES = program_structure.SPLIT_ROLES
-GATED = ("deadlift_barbell", "power_clean", "clean")  # charter gated_movements: the conventional pull (275 lb), power clean
+GATED = (
+    "deadlift_barbell",
+    "power_clean",
+    "clean",
+)  # the conventional pull (an anchor since #5694, never a rotation slot), power clean (gated)
 
 
 def _entry(week: int, role: str = "upper_heavy", date: str = "2026-11-02") -> dict:
@@ -281,6 +292,7 @@ def _generate(day: str, rows: list[dict], **kw):
         return routine_generator.generate_routines(routine_generator.GeneratorInputs(target_date=day, block_workouts=rows, **kw))
 
 
+@ROLLBACK
 def test_the_generated_draft_serves_the_rotation_names_it_and_carries_the_ledger_writes():
     ideal = _generate("2026-11-20", _done(40), rotation_rows=[])[0]
     cal, rot = ideal.inputs_snapshot["calendar"], ideal.inputs_snapshot["rotation"]

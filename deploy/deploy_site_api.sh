@@ -11,6 +11,8 @@
 # Usage:  bash deploy/deploy_site_api.sh [verify_path]
 #   verify_path defaults to /api/status. Pass e.g. /api/coach_team to check a route.
 set -euo pipefail
+# #6116: under a test runner, real AWS is unreachable from this script (deploy/lib/prod_write_guard.sh)
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prod_write_guard.sh"
 
 REGION="us-west-2"
 FN="life-platform-site-api"
@@ -42,3 +44,7 @@ aws lambda invoke --function-name "$FN" --region "$REGION" --cli-binary-format r
 python3 -c "import json,sys; d=json.load(open('/tmp/siteapi_verify.json')); \
 assert 'errorType' not in d, ('HANDLER FAILED: '+json.dumps(d)[:300]); \
 print('✅ site-api OK — status', d.get('statusCode'), 'on $VERIFY_PATH')"
+
+# A site deploy (v9 or site/**) that DEFERRED while this API lagged its commit resumes now (deploy/www_api_readiness.py;
+# web-deploy-resume.yml's hourly schedule is the backstop if this call cannot reach GitHub).
+python3 "$ROOT/deploy/www_api_readiness.py" resume || echo "⚠️  site-deploy resume check did not complete — web-deploy-resume.yml retries hourly"

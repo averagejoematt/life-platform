@@ -16,7 +16,10 @@ import re
 from unittest.mock import patch
 
 from training import hevy_render, warmup_sets
-from training.cardio_note import compose
+from training.cardio_note import (
+    compose,
+    without_capture as _wc,  # noqa: E402  #5796: line 1 follows the RPE prompt
+)
 from training.hevy_compiler import to_create_body
 from training.lift_note import rotation_line
 from training.routine_generator import _progress_block
@@ -146,7 +149,8 @@ def test_every_charter_field_lands_where_the_table_says():
     assert _where(rc, "cardio_speed") == ["exercise 5 note, line 1"]  # the treadmill: incline at mph
     assert _where(rc, "cardio_level") == ["exercise 6 note, line 1"]  # the bike: level N
     assert set(_where(rc, "cardio_rpe")) == {"exercise 5 note, line 1", "exercise 6 note, line 1"}
-    assert _where(rc, "warmup_sets") == ["exercise 1 set rows (3 W)", "exercise 2 set rows (1 W)"]
+    # owner ruling 2026-11-10 (#5428): exercise 2, a later barbell compound at 10+ reps, climbs two W rows (was 1)
+    assert _where(rc, "warmup_sets") == ["exercise 1 set rows (3 W)", "exercise 2 set rows (2 W)"]
     assert set(_where(rc, "superset_id")) == {"exercise 3 superset", "exercise 4 superset"}
 
 
@@ -165,10 +169,10 @@ def test_the_wire_carries_each_field_on_its_declared_field():
     assert note.startswith(why + "\n\n+5 lb to ")
     assert note.index("+5 lb to") < note.index("Last: 185 lb") < note.index(warmup_sets.CUE_MARKER) < note.index("CHOOSE YOUR BRANCH")
     assert row["notes"].startswith("Step due: +2 reps to 10 at 160 lb")
-    assert exs[4]["notes"].split("\n")[0].startswith("Treadmill · ")  # #5428 line 1: "Treadmill · <mph> mph, <grade>% · RPE …"
-    assert exs[5]["notes"].split("\n")[0].startswith("Recumbent · L11 ")  # #5428 line 1
+    assert _wc(exs[4]["notes"]).split("\n")[0].startswith("Treadmill · ")  # #5428 line 1: "Treadmill · <mph> mph, <grade>% · RPE …"
+    assert _wc(exs[5]["notes"]).split("\n")[0].startswith("Recumbent · L11 ")  # #5428 line 1
     # #5428: the session block heads the note and exercise 1's own note follows it directly (no window: notes show in full)
-    assert why.split("\n")[0] == "Upper heavy · RPE 8–9 on big lifts"
+    assert _wc(why).split("\n")[0] == "Upper heavy · RPE 8–9 on big lifts"
     assert note.index("+5 lb to") == len(why) + 2
 
 

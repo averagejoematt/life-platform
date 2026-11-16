@@ -219,6 +219,7 @@ class ComputeStack(Stack):
             handler="compute.character_sheet_lambda.lambda_handler",
             source_file="lambdas/compute/character_sheet_lambda.py",
             # schedule: config/schedules.json (#4284) — Phase 3.1 (2026-05-16): 17:35→16:30 (9:30 AM PT) so character_sheet completes BEFORE daily-brief at 17:00 UTC. Was reading yesterday's sheet.
+            # 2026-11-06 (owner rulings): 09:30→09:50 PT, AFTER daily-metrics and its retries — at 09:30 Mind read the day's habit_scores before they existed.
             timeout_seconds=60,
             memory_mb=512,
             custom_policies=rp.compute_character_sheet(),
@@ -683,7 +684,7 @@ class ComputeStack(Stack):
             **shared,
         )
 
-        create_platform_lambda(
+        coach_history_summarizer = create_platform_lambda(
             self,
             "CoachHistorySummarizer",
             function_name="coach-history-summarizer",
@@ -702,6 +703,16 @@ class ComputeStack(Stack):
             },
             custom_policies=rp.compute_coach_orchestrator(),
             **shared,
+        )
+        # Owner ruling 2026-11-09 (third, E): the public-safe coaching brief's Monday run (coach.public_brief) — its own
+        # schedule and its own inputs on the same function and role (DDB table, Bedrock, config read are all granted).
+        add_table_schedule(
+            self,
+            "PublicBrief",
+            target=coach_history_summarizer,
+            schedule=table_schedule("coach-history-summarizer#PublicBrief"),
+            schedule_input={"mode": "public_brief"},
+            description="2026-11-09 E: the weekly public-safe coaching brief (dark until its switch)",
         )
 
         create_platform_lambda(

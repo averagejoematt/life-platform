@@ -23,12 +23,12 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `anomaly-detector` | compute_stack | `cron(5 8 * * ? *)` (America/Los_Angeles, not UTC) | table |
 | `between-chronicle` | email_stack | `cron(0 10 ? * SUN *)` (America/Los_Angeles, not UTC) | table |
 | `challenge-generator` | compute_stack | `cron(0 15 ? * SUN *)` (America/Los_Angeles, not UTC) | table |
-| `character-sheet-compute` | compute_stack | `cron(30 9 * * ? *)` (America/Los_Angeles, not UTC) | table |
+| `character-sheet-compute` | compute_stack | `cron(50 9 * * ? *)` (America/Los_Angeles, not UTC) | table |
 | `chronicle-approve` | email_stack | `cron(0 11 * * ? *)` (America/Los_Angeles, not UTC) | table |
 | `chronicle-email-sender` | email_stack | `cron(10 8 ? * WED *)` (America/Los_Angeles, not UTC) | table |
 | `circadian-compliance` | compute_stack | `cron(0 19 * * ? *)` (America/Los_Angeles, not UTC) | table |
 | `coach-daily-reflection` | compute_stack | `cron(0 12 * * ? *)` (America/Los_Angeles, not UTC) | table |
-| `coach-history-summarizer` | compute_stack | `cron(0 10 ? * SUN *)` (America/Los_Angeles, not UTC) | table |
+| `coach-history-summarizer` | compute_stack | `cron(0 10 ? * SUN *)` (America/Los_Angeles, not UTC) + `cron(0 9 ? * MON *)` (America/Los_Angeles, not UTC) | table, table |
 | `coach-memoir` | compute_stack | `cron(0 8 1 1,4,7,10 ? *)` (America/Los_Angeles, not UTC) | table |
 | `coach-nudge` | email_stack | `cron(10 8-22 * * ? *)` (America/Los_Angeles, not UTC) | table |
 | `coach-panel-podcast` | email_stack | `cron(0 11 ? * MON,WED *)` (America/Los_Angeles, not UTC) | table |
@@ -100,9 +100,9 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 2. DynamoDB Partitions (ADR-077 census)
 
-### cross_phase (23)
+### cross_phase (24)
 
-`benchmarks`, `calibration`, `checkin_intake_pairs`, `chronicling`, `clinical`, `coach_corrections`, `coach_vision`, `dexa`, `effect_fits`, `eyeball_estimate`, `fitness_tests`, `genome`, `labs`, `may_tracker`, `milestones`, `nutrition_titration`, `progress_photos`, `recall_embeddings`, `subscribers`, `supplements`, `training_constraints`, `training_reference`, `weight_episodes`
+`benchmarks`, `calibration`, `checkin_intake_pairs`, `chronicling`, `clinical`, `coach_corrections`, `coach_vision`, `dexa`, `effect_fits`, `eyeball_estimate`, `fitness_tests`, `genome`, `labs`, `may_tracker`, `milestones`, `nutrition_titration`, `progress_photos`, `public_corrections`, `recall_embeddings`, `subscribers`, `supplements`, `training_constraints`, `training_reference`, `weight_episodes`
 
 ### experiment_scoped (37)
 
@@ -118,7 +118,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-787 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+792 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -135,9 +135,9 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `benchmarks` | — | site_api_training.py |
 | `calibration` | — | state_of_matthew_lambda.py |
 | `centenarian_progress` | weekly_correlation_compute_lambda.py | — |
-| `challenges` | challenge_generator_lambda.py, character_sheet_lambda.py, site_api_social_challenges.py | challenge_generator_lambda.py, site_api_social_challenges.py |
+| `challenges` | challenge_generator_lambda.py, character_sheet_lambda.py | challenge_generator_lambda.py, site_api_social_challenges.py |
 | `character_receipt` | — | qa_smoke_lambda.py, site_api_character.py |
-| `character_sheet` | — | challenge_generator_lambda.py, coherence_sentinel_lambda.py, field_notes_lambda.py, monday_compass_lambda.py, monthly_digest_lambda.py, site_api_ai_context.py, site_api_character.py, site_api_discovery.py, site_api_fulfillment.py, site_api_habits.py, site_api_journey.py, site_api_mind.py, site_api_rollups.py, site_stats_refresh_lambda.py, spiral_breaker.py |
+| `character_sheet` | — | challenge_generator_lambda.py, coherence_sentinel_lambda.py, field_notes_lambda.py, monday_compass_lambda.py, site_api_ai_context.py, site_api_character.py, site_api_fulfillment.py, site_api_mind.py, site_api_rollups.py, site_stats_refresh_lambda.py, spiral_breaker.py |
 | `checkin_intake_pairs` | — | checkin_intake_pairs.py, nudge_ledger_qa.py |
 | `chronicle` | chronicle_approve_lambda.py, chronicle_email_sender_lambda.py, chronicle_store.py, wednesday_chronicle_lambda.py | ask_retrieval.py, chronicle_approve_lambda.py, chronicle_data.py, chronicle_email_sender_lambda.py, chronicle_podcast_lambda.py, chronicle_store.py, coach_panel_podcast_lambda.py, panelcast_desk.py, site_api_coach_narrative.py, site_writer.py, wednesday_chronicle_lambda.py |
 | `circadian` | circadian_compliance_lambda.py | — |
@@ -150,7 +150,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `coach_vision` | — | coach_vision.py |
 | `computed_insights` | daily_brief_lambda.py, daily_insight_compute_lambda.py | daily_insight_compute_lambda.py, weekly_signal_lambda.py |
 | `computed_metrics` | acwr_compute_lambda.py, daily_metrics_compute_lambda.py | ai_calls.py, ai_expert_analyzer_lambda.py, ai_output_validator.py, anomaly_detector_lambda.py, coach_nudge_lambda.py, coherence_sentinel_lambda.py, daily_debrief_lambda.py, field_notes_lambda.py, monday_compass_lambda.py, recap_data.py, site_api_discovery.py, site_api_habits.py, site_stats_refresh_lambda.py, tools_health.py, tools_training.py, weekly_digest_lambda.py |
-| `day_grade` | daily_brief_lambda.py, daily_metrics_compute_lambda.py | adaptive_mode_lambda.py, coherence_sentinel_lambda.py, failure_pattern_compute_lambda.py, monday_compass_lambda.py |
+| `day_grade` | daily_brief_lambda.py, daily_metrics_compute_lambda.py | adaptive_mode_lambda.py, coherence_sentinel_lambda.py, monday_compass_lambda.py, recap_data.py |
 | `decisions` | — | site_api_thirdwall.py |
 | `deletion_log` | delete_user_data_lambda.py | — |
 | `dexa` | — | ai_expert_analyzer_lambda.py, calibration_cadence.py, nutrition_review_lambda.py, shared_quantities.py, site_api_physical.py |
@@ -167,7 +167,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `evening_checkin` | evening_checkin.py | evening_checkin.py |
 | `evening_ritual` | — | site_api_fulfillment.py |
 | `experiment_suggestions` | site_api_social_experiments.py | — |
-| `experiments` | tools_lifestyle.py | ai_expert_analyzer_lambda.py, chronicle_data.py, coach_nudge_lambda.py, daily_insight_compute_lambda.py, site_api_discovery.py, site_api_journey.py, site_api_protocols.py, site_api_rollups.py, tools_lifestyle.py |
+| `experiments` | tools_lifestyle.py | ai_expert_analyzer_lambda.py, chronicle_data.py, coach_nudge_lambda.py, daily_insight_compute_lambda.py, site_api_discovery.py, site_api_protocols.py, site_api_rollups.py, tools_lifestyle.py |
 | `exposures` | — | — |
 | `eyeball_estimate` | — | — |
 | `felt_probe` | — | site_api_fulfillment.py |
@@ -179,14 +179,14 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `food_responses` | — | — |
 | `forecast` | forecast_engine_lambda.py | ai_calls.py, site_api_foresight.py, state_of_matthew_lambda.py |
 | `garmin` | — | ai_expert_analyzer_lambda.py, site_api_fingerprint.py, site_api_physical.py, site_api_pulse.py, site_api_training.py |
-| `genome` | — | nutrition_review_lambda.py, site_api_biomarkers.py |
+| `genome` | — | nutrition_review_lambda.py |
 | `habit_causality` | — | site_api_habits.py |
 | `habit_scores` | daily_brief_lambda.py, daily_metrics_compute_lambda.py | adaptive_mode_lambda.py, coach_prediction_evaluator.py, failure_pattern_compute_lambda.py, monday_compass_lambda.py, recap_data.py, site_api_ai_context.py, site_api_habits.py, site_api_mind.py |
-| `habitify` | — | ai_expert_analyzer_lambda.py, habitify_lambda.py, intelligence_common.py, journal_analyzer_lambda.py, site_api_data.py, site_api_habits.py, site_api_nutrition.py |
+| `habitify` | — | ai_expert_analyzer_lambda.py, habitify_lambda.py, intelligence_common.py, journal_analyzer_lambda.py, site_api_data.py, site_api_habits.py, site_api_nutrition.py, tools_advice_queue.py |
 | `health_check` | pipeline_health_check_lambda.py | site_api_status.py |
-| `hevy` | hevy_common.py | ai_expert_analyzer_lambda.py, authoring_input_age.py, cardio_hr_store.py, coach_packet_today.py, daily_metrics_compute_lambda.py, field_notes_lambda.py, labelled_facts.py, plan_draft_evidence.py, plan_hevy_windows.py, recap_data.py, site_api_autonomic.py, site_api_nutrition.py, site_api_pulse.py, site_api_training.py, tools_coach_packet.py, tools_correlation.py, tools_health.py, tools_nutrition.py, tools_plan.py, tools_strength.py, tools_training.py, tools_training_notes.py, training_notes.py, vacation_fund.py |
+| `hevy` | hevy_common.py | ai_expert_analyzer_lambda.py, authoring_input_age.py, cardio_hr_store.py, coach_packet_today.py, daily_metrics_compute_lambda.py, field_notes_lambda.py, labelled_facts.py, plan_draft_evidence.py, plan_hevy_windows.py, recap_data.py, site_api_autonomic.py, site_api_nutrition.py, site_api_pulse.py, site_api_training.py, tools_advice_queue.py, tools_coach_packet.py, tools_correlation.py, tools_health.py, tools_nutrition.py, tools_plan.py, tools_strength.py, tools_training.py, tools_training_notes.py, training_notes.py, vacation_fund.py |
 | `hevy_id_map` | routine_repo.py | routine_repo.py |
-| `hypotheses` | hypothesis_engine_lambda.py | challenge_generator_lambda.py, hypothesis_engine_lambda.py, state_of_matthew_lambda.py, tools_lifestyle.py |
+| `hypotheses` | hypothesis_engine_lambda.py | challenge_generator_lambda.py, state_of_matthew_lambda.py, tools_lifestyle.py |
 | `ingest_liveness` | pipeline_health_check_lambda.py | — |
 | `insights` | insight_email_parser_lambda.py, tools_lifestyle.py | site_api_ledger.py, tools_lifestyle.py |
 | `intelligence_quality` | — | site_api_foresight.py, tools_data.py |
@@ -196,8 +196,8 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `journal_quotes` | tools_journal.py | site_api_diary.py, site_api_thirdwall.py |
 | `labs` | — | ai_expert_analyzer_lambda.py, calibration_cadence.py, nutrition_review_lambda.py |
 | `ledger` | — | site_api_ledger.py |
-| `life_events` | — | site_api_journey.py |
-| `macrofactor` | — | ai_expert_analyzer_lambda.py, freshness_checker_lambda.py, nutrition_micronutrients.py, protein_nudge_runner.py, recap_data.py, site_api_body.py, site_api_meals.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_stats_refresh_lambda.py, tools_health.py, tools_labs.py, tools_nutrition.py, weekly_digest_extractors.py |
+| `life_events` | — | — |
+| `macrofactor` | — | ai_expert_analyzer_lambda.py, freshness_checker_lambda.py, fuel_loop.py, nutrition_micronutrients.py, protein_nudge_runner.py, recap_data.py, site_api_body.py, site_api_meals.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_stats_refresh_lambda.py, tools_advice_queue.py, tools_health.py, tools_labs.py, tools_nutrition.py, weekly_digest_extractors.py |
 | `macrofactor_meals` | — | — |
 | `macrofactor_workouts` | — | — |
 | `may_tracker` | — | may_tracker.py |
@@ -231,21 +231,21 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `temptations` | — | site_api_mind.py |
 | `time_affluence` | — | — |
 | `todoist` | — | daily_insight_compute_lambda.py, intelligence_common.py, site_api_fulfillment.py, site_api_sleep.py, tools_todoist.py |
-| `training_constraints` | tools_training_notes.py, variant_rotation.py | — |
+| `training_constraints` | tools_training_notes.py, variant_rotation.py | note_requests.py |
 | `training_notes` | training_notes_llm.py | tools_training_notes.py, training_notes_llm.py |
 | `training_reference` | — | episode_detect_lambda.py, site_api_nutrition.py, site_api_training.py |
-| `travel` | — | adaptive_mode_lambda.py, anomaly_detector_lambda.py, tools_lifestyle.py |
+| `travel` | — | anomaly_detector_lambda.py, tools_lifestyle.py |
 | `weather` | tools_lifestyle.py | tools_lifestyle.py |
 | `weekly_correlations` | weekly_correlation_compute_lambda.py | ai_expert_analyzer_lambda.py, daily_insight_compute_lambda.py, site_api_ai_context.py, site_api_discovery.py, site_api_journey.py, site_api_ledger.py, weekly_correlation_compute_lambda.py |
 | `weight_episodes` | — | — |
 | `what_changed` | weekly_correlation_compute_lambda.py | between_chronicle_lambda.py, site_api_ai_context.py, site_api_ledger.py, weekly_correlation_compute_lambda.py |
 | `whoop` | whoop_lambda.py | ai_expert_analyzer_lambda.py, cardio_hr_store.py, enrichment_lambda.py, failure_pattern_compute_lambda.py, hevy_restamp_lambda.py, intake_response.py, monday_compass_lambda.py, site_api_autonomic.py, site_api_body.py, site_api_fingerprint.py, site_api_freshness.py, site_api_lambda.py, site_api_nutrition.py, site_api_physical.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_api_training.py, tools_correlation.py, tools_health.py, tools_hevy_routine.py, tools_plan.py, tools_training.py, weight_truth_qa.py, whoop_cycle_day.py, whoop_lambda.py |
-| `withings` | — | adaptive_mode_lambda.py, ai_expert_analyzer_lambda.py, progress_viewer_lambda.py, recap_data.py, rhythm_channel.py, site_api_body.py, site_api_coach_profile.py, site_api_journey.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_stats_refresh_lambda.py, tools_benchmark.py, tools_health.py, tools_nutrition.py |
+| `withings` | — | ai_expert_analyzer_lambda.py, progress_viewer_lambda.py, recap_data.py, rhythm_channel.py, site_api_body.py, site_api_coach_profile.py, site_api_journey.py, site_api_nutrition.py, site_api_pulse.py, site_api_rollups.py, site_api_sleep.py, site_stats_refresh_lambda.py, tools_benchmark.py, tools_health.py, tools_nutrition.py |
 | `zone2_efficiency` | weekly_correlation_compute_lambda.py | — |
 
 ## 4. MCP Layer
 
-**90 tools across 39 modules** (AST-counted from `mcp/registry.py`;
+**93 tools across 42 modules** (AST-counted from `mcp/registry.py`;
 the same counter `deploy/sync_doc_metadata.py` uses). MCP modules appear in §3 as
 readers under the `life-platform-mcp` lambda.
 
@@ -286,7 +286,7 @@ traced through the stack, the factory body under that call's own arguments, or t
 helper the alarm variable is handed to. `via-composite` = the member routes nowhere
 itself; its composite does. `unresolved` is stated, never guessed.
 
-Routing: digest 100 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 27 · via-composite 3 — of 145 alarms (4 composite)
+Routing: digest 107 · digest+paging 2 · digest+urgent 10 · paging 2 · urgent 27 · via-composite 3 — of 151 alarms (4 composite)
 
 | Alarm | Stack | Kind | Routing | Via | Audience |
 |-------|-------|------|---------|-----|----------|
@@ -308,6 +308,7 @@ Routing: digest 100 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent
 | `budget-tier-unreadable` | monitoring_budget_alarms | metric | digest | declaration |  |
 | `calibration-deadman` | mcp_stack | metric | urgent | declaration |  |
 | `canary-no-invocations-1h` | operational_stack | metric | digest | declaration |  |
+| `character-public-inputs-degraded` | monitoring_compute_alarms | metric | digest | factory:_compute_problem_alarm |  |
 | `chronicle-autopublish-held` | monitoring_silence_alarms | metric | digest | declaration |  |
 | `chronicle-delivery-heartbeat` | email_stack | metric | urgent | declaration |  |
 | `chronicle-status-write-failed` | monitoring_silence_alarms | metric | digest | declaration |  |
@@ -394,7 +395,9 @@ Routing: digest 100 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent
 | `life-platform-remediation-dispatcher-errors` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `life-platform-s3-bucket-size-high` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `life-platform-weekly-signal-kill-switch-skip` | monitoring_stack | metric | digest | declaration |  |
+| `mcp-auth-failures` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `mcp-server-duration-high` | mcp_stack | metric | digest | declaration |  |
+| `mcp-throttles` | mcp_stack | metric | digest | declaration |  |
 | `mcp-warmer-error` | mcp_stack | metric | digest | constructor:create_platform_lambda |  |
 | `mcp-warmer-no-invocations-24h` | mcp_stack | metric | digest | declaration |  |
 | `nightly-predraft-missing` | mcp_stack | metric | digest | declaration |  |
@@ -405,6 +408,7 @@ Routing: digest 100 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent
 | `permanence-errors` | operational_stack | metric | digest | constructor:create_platform_lambda |  |
 | `permanence-heartbeat` | operational_stack | metric | digest | declaration |  |
 | `prediction-gradable-share-low` | monitoring_prediction_alarms | metric | digest | declaration |  |
+| `prereg-overdue` | monitoring_prediction_alarms | metric | digest | declaration |  |
 | `progress-viewer-errors` | web_stack | metric | urgent | helper:add_web_alarms |  |
 | `qa-paused-by-budget` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `qa-smoke-failures` | monitoring_stack | metric | digest | factory:_alarm |  |
@@ -413,13 +417,15 @@ Routing: digest 100 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent
 | `recall-index-failed-chronicle-approve` | monitoring_silence_alarms | metric | digest | declaration |  |
 | `recall-index-failed-wednesday-chronicle` | monitoring_silence_alarms | metric | digest | declaration |  |
 | `recap-card-no-invocations-24h` | operational_stack | metric | digest | declaration |  |
+| `sensor-self-test-stale` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `site-api-ai-errors` | serve_stack | metric | digest+urgent | declaration | reader |
 | `site-api-ai-throttles` | serve_stack | metric | digest+urgent | declaration | reader |
 | `site-api-content-filter-fallback` | serve_stack | metric | digest+urgent | declaration | reader |
 | `site-api-errors` | serve_stack | metric | digest+urgent | declaration | reader |
 | `site-api-handled-5xx` | serve_stack | metric | digest+urgent | declaration | reader |
-| `site-api-invocation-spike` | serve_stack | metric | digest+urgent | declaration | reader |
-| `site-api-p95-latency-high` | serve_stack | metric | digest+urgent | declaration | reader |
+| `site-api-invocation-spike` | serve_stack | metric | digest | declaration | reader |
+| `site-api-p95-latency-high` | serve_stack | metric | digest | declaration |  |
+| `site-api-p95-latency-sustained` | serve_stack | metric | digest+urgent | declaration | reader |
 | `site-api-throttles` | serve_stack | metric | digest+urgent | declaration | reader |
 | `slo-ai-coaching-success` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `slo-daily-brief-delivery` | monitoring_stack | metric | urgent | factory:_alarm |  |
@@ -447,8 +453,12 @@ Routing: digest 100 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent
 - `site-api-errors` — serve_stack (CLAUDE.md: 'public serving path — site-api + site-api-ai, #793') — general error rate serving averagejoematt.com readers.
 - `site-api-handled-5xx` — serve_stack — 5xx served directly to a reader's browser/API client.
 - `site-api-invocation-spike` — serve_stack — an invocation spike on the reader-facing API (capacity/DoS blast radius reaches readers).
-- `site-api-p95-latency-high` — serve_stack — p95 latency a reader directly experiences loading the site.
+- `site-api-p95-latency-sustained` — serve_stack — p95 latency a reader directly experiences loading the site, held for 15 minutes (3 of 3 five-minute periods, #5821); the single-period `site-api-p95-latency-high` is its digest-only early signal and carries no audience tag.
 - `site-api-throttles` — serve_stack — throttling a reader hits directly on the public API.
+
+**Escalation tag without the urgent route (#5821):** every member above also publishes to `life-platform-alerts` (#3499) EXCEPT these, curated in `scripts/platform_model_alarms.py::READER_AUDIENCE_DIGEST_ONLY`:
+
+- `site-api-invocation-spike` — #5821 (owner ruling 2026-11-11) — a traffic counter, not a broken door: 200/5 min is about the p95 of ordinary 5-minute traffic, so it flapped 51 times in 7 days and every email duplicated a digest line. Escalation on first red is kept; the urgent email is not.
 
 ## 5b. Privacy Tiers (field_tiers registry, ADR-155)
 
@@ -582,11 +592,11 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1381 total · 988 resolved · 393 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1382 total · 993 resolved · 389 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 80 resolved · 0 dynamic of 80 scheduled lambdas (107 lambdas total)
-- Alarms: 145 literal-named declarations across three idioms, 4 composite; routing digest 100 · digest+paging 2 · digest+urgent 11 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
+- Alarms: 151 literal-named declarations across three idioms, 4 composite; routing digest 107 · digest+paging 2 · digest+urgent 10 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 25 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only
-- Schedules: 96 (lambda, cron) rows; UTC clock on fixed rows, zone + wall-clock if zoned (#4284)
+- Schedules: 97 (lambda, cron) rows; UTC clock on fixed rows, zone + wall-clock if zoned (#4284)
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)
 
@@ -601,9 +611,9 @@ baseline in the same diff, so a new cost-bearing surface cannot appear silently.
 | Surface | Count | Registry |
 |---------|-------|----------|
 | ai_features | 30 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
-| alarms | 145 | this model's alarms plane (CDK AST) |
+| alarms | 151 | this model's alarms plane (CDK AST) |
 | emf_namespaces | 34 | `deploy/emf_namespace_ledger.py::LEDGER` |
-| schedules | 96 | this model's schedules plane (CDK AST) |
-| secrets | 30 | `tests/test_secret_references.py::KNOWN_SECRETS` |
+| schedules | 97 | this model's schedules plane (CDK AST) |
+| secrets | 31 | `tests/test_secret_references.py::KNOWN_SECRETS` |
 
 Scope cut (#3447 leg d, the alarms scope-cut pattern applied to secrets): `secrets` counts CODE REFERENCES (KNOWN_SECRETS, scanned lambdas/+mcp/ source only), never the live billable Secrets Manager estate — the two have already drifted (28 registry vs 26 live, 2026-09-02); a secret referenced only from `deploy/` (e.g. `life-platform/github-billing`, live+billed) is invisible to this count. `scripts/monthly_close.py` emits a read-only registry-vs-estate reconciliation at close.

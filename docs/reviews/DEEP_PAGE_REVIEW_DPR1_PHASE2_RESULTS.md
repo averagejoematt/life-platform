@@ -50,7 +50,7 @@ The pull-quote — *"The protocols aren't the interesting part. The interesting 
 
 The hero copy is strong — personal, honest about methodology, with a clear "no affiliate links" disclaimer. The Daily Timing section (AM/Pre-Training/PM stacks) is useful and well-organized. The AG1 discontinuation with rationale is excellent content — explaining why something left the stack is as valuable as explaining what's in it.
 
-The evidence rating system (Strong/Moderate/Emerging) and tier hierarchy (Essential/Supporting/Experimental) described in the hero are the right framework. The promise of genome-linked supplementation decisions (connecting to the Nutrition page's PEMT, VDR, FADS1, MTHFR data) is a genuine differentiator.
+The evidence rating system (Strong/Moderate/Emerging) and tier hierarchy (Essential/Supporting/Experimental) described in the hero are the right framework. The promise of genome-linked supplementation decisions (connecting to the Nutrition page's genome data [genes removed 2026-11-11]) is a genuine differentiator.
 
 The main supplement cards were not rendering during capture due to a data pipeline bug being fixed separately. The structure, copy, and design scaffolding are sound.
 

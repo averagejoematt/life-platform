@@ -129,7 +129,8 @@ def test_every_row_without_words_reads_the_same_whatever_kept_them_off(monkeypat
 
 def test_the_www_schema_and_page_name_no_privacy_hold():
     schema = (ROOT / "www/src/content.config.ts").read_text()
-    assert 'claim_withheld: z.enum(["unsourced", "no_words"])' in schema
+    # `with_note` (owner ruling 2026-11-15, #6079): published beside a dated note — not a privacy hold.
+    assert 'claim_withheld: z.enum(["unsourced", "no_words", "with_note"])' in schema
     page = (ROOT / "www/src/pages/system/ledger/[id].astro").read_text()
     # Owner ruling 2026-11-06: no per-row "No words published" chip either; the ledger index carries one sentence.
     assert "privacy filter" not in page and "No words published" not in page

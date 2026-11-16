@@ -604,7 +604,7 @@ def _redline_rules() -> dict[str, Any]:
 
 def _public_provenance(cal: dict[str, Any]) -> str:
     if cal.get("source") == "titration":
-        return "the week's titration record (health.titration); the charter's energy floors are warnings, never a clamp"
+        return "the week's titration record (health.titration); the served target is clamped at the day's energy floor (#5794)"
     return str(cal.get("provenance") or "")
 
 

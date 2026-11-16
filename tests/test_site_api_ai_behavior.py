@@ -26,6 +26,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 
 from bundle_stubs import stub_bundled_module  # noqa: E402
 from fakes import FakeDdbTable, json_safe_put_hook, make_session_update_hook  # noqa: E402
+from public_variant_fixtures import with_public  # noqa: E402 — 2026-11-05: public readers serve the public variant
 
 
 def _ai():
@@ -1043,7 +1044,11 @@ def test_the_character_sheet_falls_back_to_yesterday_when_today_has_not_computed
     class _Sheet(FakeDdbTable):
         def get_item(self, Key=None, **_k):
             if Key and Key.get("sk") == f"DATE#{yday}":
-                return {"Item": {"character_level": 6, "character_tier": "Discipline", "pillar_sleep": {"level": 5, "raw_score": 80}}}
+                return {
+                    "Item": with_public(
+                        {"character_level": 6, "character_tier": "Discipline", "pillar_sleep": {"level": 5, "raw_score": 80}}
+                    )
+                }
             return {}
 
     monkeypatch.setattr(ai, "table", _Sheet(rows=[]))
@@ -1093,6 +1098,37 @@ def test_a_reader_asking_about_sleep_gets_an_answer_and_their_remaining_quota(mo
     assert "sixty-four" in body["answer"]
     assert body["remaining"] == 4
     assert resp["headers"]["Cache-Control"] == "no-store"
+
+
+def test_ask_serves_the_refusal_when_the_grounding_gate_itself_fails(monkeypatch):
+    """#5929 (aiq-2): /api/ask's ADR-104 gate is reader-facing, so it fails CLOSED.
+    It used to swallow a gate exception (and an ImportError) and serve the model's
+    unchecked draft. Both failure modes must now serve the honest refusal copy, and
+    the draft's figures must not reach the reader."""
+    import importlib
+
+    from ai import grounded_generation
+
+    draft = "Recovery climbed from 31% to 97% in a week."  # figures that appear in no source
+
+    def _boom(*a, **k):
+        raise RuntimeError("gate blew up")
+
+    ai = _ai()
+    for mode in ("raises", "not_bundled"):
+        with monkeypatch.context() as m:
+            _wire_ask(ai, m)
+            _wire_bedrock(m, text=draft)
+            if mode == "raises":
+                m.setattr(grounded_generation, "grounding_findings", _boom)
+            else:  # a partial bundle: the module is absent (see test_explain_endpoint's #2393 helper)
+                m.delattr(importlib.import_module("ai"), "grounded_generation", raising=False)
+                m.setitem(sys.modules, "ai.grounded_generation", None)
+            resp = ai._handle_ask(_event("/api/ask", body={"question": "How has recovery been?"}))
+            assert resp["statusCode"] == 200, mode
+            answer = json.loads(resp["body"])["answer"]
+            assert answer == ai._ASK_GROUNDING_REFUSAL, f"{mode}: served {answer!r}"
+            assert "97" not in answer and "31" not in answer, mode
 
 
 def test_a_one_word_question_is_refused_before_any_model_spend(monkeypatch):
@@ -1329,6 +1365,46 @@ def test_a_pilot_phase_stance_never_reaches_a_board_answer(monkeypatch):
     tbl = FakeDdbTable(store_items=[{"pk": "COACH#sleep_coach", "sk": "STANCE#latest", "headline_read": "Pilot read.", "phase": "pilot"}])
     monkeypatch.setattr(ai, "table", tbl)
     assert ai._coach_stance_bits("sleep_coach") == ""
+
+
+def _board_user_turn_with_stance(ai, monkeypatch, headline):
+    """#5611 F1: the PUBLIC board prompt as the panel builds it, with only the stance read real."""
+    from web import site_api_board_panel as panel
+
+    tbl = FakeDdbTable(
+        store_items=[{"pk": "COACH#sleep_coach", "sk": "STANCE#latest", "headline_read": headline, "stage": {"label": "noticing"}}]
+    )
+    monkeypatch.setattr(ai, "table", tbl)
+    monkeypatch.setattr(ai, "_coach_memory_bits", lambda pid: "")
+    monkeypatch.setattr(ai, "_coach_recent_interactions", lambda pid: "")
+    monkeypatch.setattr(ai, "_phase_context_block", lambda: "PHASE: synthetic")
+    monkeypatch.setattr(ai, "_coach_system", lambda pid: "SYSTEM")
+    prepared, failed = panel._prepare(ai, ["sleep_coach"], "How is the plan going?", "FACTS")
+    assert not failed and len(prepared) == 1
+    return prepared[0][1]
+
+
+def test_a_stance_the_audience_guard_rejects_never_reaches_the_public_board_prompt(monkeypatch):
+    """#5611 F1 (owner ruling 2026-11-15, decision E): a coach's stance is private by default, so the
+    board reads it through `coach.audience_guard.reader_safe` and drops the WHOLE stance on a reject —
+    fail closed, never passed raw. Synthetic text only. The guard sees the full stored headline, not the
+    300-char prompt clip: an owner-directed clause past the clip is still caught."""
+    ai = _ai()
+    owner_directed = "Your evenings are the lever this week, and the plan bends around them."
+    late_address = ("The weekly pattern is steady and the plan is holding. " * 6) + "Keep going, you have it."
+    cycle_reference = "This attempt is going better than the last reset did."
+    for headline in (owner_directed, late_address, cycle_reference):
+        turn = _board_user_turn_with_stance(ai, monkeypatch, headline)
+        assert headline[:60] not in turn, f"a guard-rejected stance reached the public board prompt: {headline[:60]!r}"
+        assert "YOUR CURRENT READ" not in turn, "a rejected headline must drop the whole stance, stage label included"
+
+
+def test_a_reader_safe_stance_still_reaches_the_public_board_prompt(monkeypatch):
+    """#5611 F1 positive control: the read-side guard passes third-person prose through unchanged."""
+    ai = _ai()
+    turn = _board_user_turn_with_stance(ai, monkeypatch, "Evenings are the lever this week; the plan bends around them.")
+    assert "YOUR CURRENT READ (your own published stance): Evenings are the lever this week; the plan bends around them." in turn
+    assert "(stage: noticing)" in turn
 
 
 def test_a_coachs_compressed_memory_and_concerns_reach_the_board_prompt(monkeypatch):

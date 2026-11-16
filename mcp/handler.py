@@ -21,7 +21,11 @@ security boundary; it implements a real OAuth 2.1 + PKCE flow, see below):
   compare) OR a live session Bearer, fail-closed with no API key configured
   (R13-F05 — see `_get_bearer_token`/`_validate_bearer` below).
 - Local bridge: AWS IAM/SigV4 on the direct `boto3` Lambda invoke — no HTTP,
-  no Bearer token, a completely different mechanism from the remote path above.
+  no Bearer token, a completely different mechanism from the remote path above —
+  plus the `x-api-key` header, constant-time compared and fail-closed when the
+  key cannot be read (#5540).
+- Privileged branches (the scheduled warmer and the constant-input jobs) run only
+  on the warmer function, checked before any of them (#5540, mcp/invoke_gate.py).
 """
 
 import base64
@@ -39,7 +43,10 @@ from typing import Any, cast
 
 from common.text_guards import residue_fragments  # #4190 — shared, bundled (#781)
 
-from mcp import audit as mcp_audit
+from mcp import (
+    audit as mcp_audit,
+    invoke_gate,  # #5540 — privileged branches gated before they run
+)
 from mcp.config import __version__, logger
 from mcp.core import (
     SESSION_TOKEN_TTL_SECS,
@@ -49,6 +56,7 @@ from mcp.core import (
     session_token_issue,
     session_token_valid,
 )
+from mcp.log_safe import describe_args  # #5542
 from mcp.registry import TOOLS
 from mcp.resources import RESOURCE_NOT_FOUND_CODE, ResourceNotFound, handle_resources_list, handle_resources_read  # #4286 box 3
 from mcp.tool_output_schemas import conformance_errors, is_error_payload, output_schema_for  # #4286 box 2
@@ -234,7 +242,7 @@ def handle_tools_call(params):
     if validation_error:
         logger.warning(f"[SEC-3] Input validation failed for '{name}': {validation_error}")
         raise ValueError(f"Invalid arguments for tool '{name}': {validation_error}")
-    logger.info(f"Calling tool '{name}' with args: {arguments}")
+    logger.info(f"Calling tool '{name}' {describe_args(arguments)}")  # #5542: never the raw values
     # R13-F12: Rate limit write tools before execution
     rate_err = _check_write_rate_limit(name)
     if rate_err:
@@ -503,7 +511,7 @@ def _refuse_tool_call_residue(name: str, arguments) -> dict | None:
         return None
     fields = [{"field": path, "residue": frag} for path, frag in hits]
     named = "; ".join(f"{path!s} carries {frag!r}" for path, frag in hits)
-    logger.warning(f"[#4190] tool-call XML residue refused on '{name}': {named}")
+    logger.warning(f"[#4190] tool-call XML residue refused on '{name}': fields={[path for path, _ in hits]}")  # #5542: no fragment
     _emit_residue_metric(name)
     return mcp_error(
         message=(
@@ -932,18 +940,29 @@ _LOOPBACK_HOSTS = ("localhost", "127.0.0.1", "::1")
 
 
 def _redirect_uri_allowed(redirect_uri: str) -> bool:
-    """True if redirect_uri is an https callback on an allowlisted host (or loopback)."""
-    if not redirect_uri:
+    """True if redirect_uri is an https callback on an allowlisted host (or an http loopback).
+
+    #5979: the check must agree with how a BROWSER reads the URL, not only Python. ``urllib`` reads
+    ``https://evil.example\\@claude.ai/cb`` as host claude.ai; a browser treats the backslash as ``/`` and
+    goes to evil.example. So any URL a browser could resolve differently is refused outright: a backslash,
+    a control or whitespace character anywhere, userinfo (``@``) or a percent-escape in the authority.
+    What is left has one reading, and its host must be an allowlisted one (or a subdomain of one)."""
+    if not redirect_uri or not isinstance(redirect_uri, str):
+        return False
+    if "\\" in redirect_uri or any(ord(ch) <= 0x20 or ord(ch) == 0x7F for ch in redirect_uri):
         return False
     try:
         parsed = urllib.parse.urlparse(redirect_uri)
     except Exception:
         return False
+    netloc = parsed.netloc or ""
+    if not netloc or "@" in netloc or "%" in netloc or parsed.username is not None or parsed.password is not None:
+        return False
     host = (parsed.hostname or "").lower()
     if not host:
         return False
     if host in _LOOPBACK_HOSTS:
-        return True  # native/desktop clients use http://127.0.0.1:<port>/callback
+        return parsed.scheme in ("http", "https")  # native/desktop clients use http://127.0.0.1:<port>/callback
     if parsed.scheme != "https":
         return False
     extra = [h.strip().lower() for h in os.environ.get("OAUTH_REDIRECT_HOSTS", "").split(",") if h.strip()]
@@ -952,9 +971,14 @@ def _redirect_uri_allowed(redirect_uri: str) -> bool:
     return any(host == a or host.endswith("." + a) for a in allowed)
 
 
+def _pkce_request_ok(code_challenge: str, code_challenge_method: str) -> bool:
+    """#5932: PKCE is mandatory and S256-only — the metadata advertises exactly that. A request with no
+    challenge, or any other method, never reaches the consent form or a code."""
+    return bool(code_challenge) and code_challenge_method == "S256" and 43 <= len(code_challenge) <= 128
+
+
 def _verify_pkce(code_verifier: str, code_challenge: str, method: str) -> bool:
-    """RFC 7636 PKCE verification. S256 is required; 'plain' accepted only if the
-    client explicitly registered it (Claude uses S256)."""
+    """RFC 7636 PKCE verification, S256 only (#5932: 'plain' was accepted although no client could register it)."""
     if not code_challenge:
         return False
     if method == "S256":
@@ -963,8 +987,6 @@ def _verify_pkce(code_verifier: str, code_challenge: str, method: str) -> bool:
         digest = hashlib.sha256(code_verifier.encode("ascii")).digest()
         computed = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
         return hmac.compare_digest(computed, code_challenge)
-    if method == "plain":
-        return bool(code_verifier) and hmac.compare_digest(code_verifier, code_challenge)
     return False
 
 
@@ -989,6 +1011,8 @@ def _handle_authorize(event):
     if not _redirect_uri_allowed(redirect_uri):
         logger.warning(f"[OAuth] Rejected disallowed redirect_uri host: {urllib.parse.urlparse(redirect_uri).hostname!r}")
         return _remote_response(400, json.dumps({"error": "invalid_request", "error_description": "redirect_uri not allowed"}))
+    if not _pkce_request_ok(code_challenge, code_challenge_method):
+        return _remote_response(400, json.dumps({"error": "invalid_request", "error_description": "PKCE S256 code_challenge required"}))
 
     # Already-approved browser → refresh without re-prompting; otherwise show the form.
     if _approval_cookie_valid(event):
@@ -1013,6 +1037,8 @@ def _handle_authorize_submit(event):
 
     if not redirect_uri or not _redirect_uri_allowed(redirect_uri):
         return _remote_response(400, json.dumps({"error": "invalid_request", "error_description": "redirect_uri not allowed"}))
+    if not _pkce_request_ok(code_challenge, code_challenge_method):
+        return _remote_response(400, json.dumps({"error": "invalid_request", "error_description": "PKCE S256 code_challenge required"}))
 
     expected = _get_authorize_passcode()
     if expected == "__NO_KEY_CONFIGURED__":
@@ -1055,8 +1081,8 @@ def _handle_token(event):
         logger.warning("[OAuth] Token exchange rejected: redirect_uri mismatch")
         return _remote_response(400, json.dumps({"error": "invalid_grant", "error_description": "redirect_uri mismatch"}))
 
-    # PKCE: if the code was issued with a challenge (Claude always sends S256), it must verify.
-    if binding["code_challenge"] and not _verify_pkce(code_verifier, binding["code_challenge"], binding["code_challenge_method"]):
+    # PKCE (#5932): every code must verify — a code stored without a challenge is refused, never waved through.
+    if not _verify_pkce(code_verifier, binding.get("code_challenge") or "", binding.get("code_challenge_method") or ""):
         logger.warning("[OAuth] Token exchange rejected: PKCE verification failed")
         return _remote_response(400, json.dumps({"error": "invalid_grant", "error_description": "PKCE verification failed"}))
 
@@ -1149,11 +1175,14 @@ def handle_remote_mcp(event, method):
 # ── Bridge transport (direct Lambda invoke via boto3) ─────────────────────────
 def handle_bridge_invoke(event):
     """Handle local bridge invocations (mcp_bridge.py via boto3 lambda.invoke)."""
+    # #5540: fail CLOSED — an unreadable key rejects every request (it used to skip the check),
+    # and the compare is constant-time.
     expected_key = get_api_key()
-    if expected_key:
-        provided_key = (event.get("headers") or {}).get("x-api-key", "")
-        if provided_key != expected_key:
-            return {"statusCode": 401, "body": json.dumps({"error": "Unauthorized"}), "headers": {"Content-Type": "application/json"}}
+    provided_key = (event.get("headers") or {}).get("x-api-key", "")
+    if not expected_key or not isinstance(provided_key, str) or not hmac.compare_digest(provided_key.encode(), expected_key.encode()):
+        if not expected_key:
+            logger.warning("[Bridge] Rejected: API key unavailable — failing closed (#5540)")
+        return {"statusCode": 401, "body": json.dumps({"error": "Unauthorized"}), "headers": {"Content-Type": "application/json"}}
 
     try:
         body = json.loads(event.get("body") or "{}")
@@ -1174,18 +1203,28 @@ def handle_bridge_invoke(event):
 
 # ── Lambda handler (entry point) ─────────────────────────────────────────────
 def lambda_handler(event, context):
-    # 0. #4084: the nightly pre-draft's own rule (constant input, no `source` key) on the warmer
-    if isinstance(event, dict) and event.get("job") == "nightly_predraft":
+    # 0. #5540: the privileged, no-request branches (two constant-input jobs + the scheduled
+    # warmer) are gated BEFORE any of them runs — warmer function only, and a scheduled event must
+    # name one of the MCP stack's schedules (mcp/invoke_gate.py). A refused invoke reaches no job.
+    kind = invoke_gate.privileged_kind(event)
+    if kind is not None:
+        reason = invoke_gate.refusal_reason(kind, event, context)
+        if reason is not None:
+            logger.warning("[lambda_handler] Rejected privileged invoke: %s; event=%s", reason, invoke_gate.describe(event))
+            _emit_auth_failure_metric()
+            return invoke_gate.refusal_response(reason)
+    # 0a. #4084: the nightly pre-draft's own schedule (constant input, no `source` key) on the warmer
+    if kind == "nightly_predraft":
         from mcp.nightly_predraft import lambda_entry
 
         return lambda_entry(event)
-    # 0b. #5072: the weekly panel-rubric grade of the committed plan (constant input; its rule is an owner CDK apply)
-    if isinstance(event, dict) and event.get("job") == "panel_weekly_grade":
+    # 0b. #5072: the weekly panel-rubric grade of the committed plan (constant input)
+    if kind == "panel_weekly_grade":
         from mcp.panel_weekly_grade import lambda_entry as panel_entry
 
         return panel_entry(event)
-    # 1. EventBridge scheduled rule — nightly cache warmer, no auth
-    if event.get("source") == "aws.events" or event.get("detail-type") == "Scheduled Event":
+    # 1. The warmer's own scheduled envelope — nightly cache warmer
+    if kind == invoke_gate.SCHEDULED:
         logger.info("[lambda_handler] EventBridge trigger — running nightly cache warmer")
         result = nightly_cache_warmer()
         return {"statusCode": 200, "body": json.dumps(result), "headers": {"Content-Type": "application/json"}}

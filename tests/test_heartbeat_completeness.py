@@ -812,7 +812,12 @@ COVERAGE = {
     "coach-history-summarizer": (
         CENSUS,
         "2026-07-19",
-        "Context compaction only; a missed run means coaches read slightly longer raw history — no correctness impact.",
+        "Context compaction only; a missed run means coaches read slightly longer raw history — no correctness impact. "
+        "Its Monday public-brief schedule (2026-11-09 E) is NOT waived (2026-11-12): handle_event stamps "
+        "COACH#public_brief/RUN#<cycle> with each coach's outcome, and the nightly qa-smoke leg public_brief_liveness "
+        "(operational/public_brief_qa.py) FAILs when the stamp is missing after the Monday deadline, the run errored or "
+        "a coach was held/errored without a sanctioned reason.",
+        "qa-smoke-failures",
     ),
     "weekly-digest": (
         CENSUS,
@@ -1291,6 +1296,7 @@ STORY_SEASON_DEADMEN = {
     "story_season:episode_or_hold": "a published chronicle week with no Panel episode and no named dated hold, or a hold grown old",
     "story_season:ledger_advanced": "a published week that left no LEDGER# row for the next installment to read",
     "story_season:monday_questions": "the StoryQuestionsMonday rule on wednesday-chronicle not sending (no STORYQ# marker)",
+    "story_season:chapter_door": "the Story door gone stale: no chapter approved for 10 days, or an elapsed week served with no state",
 }
 
 
@@ -1306,7 +1312,15 @@ def _story_season_qa():
                 consts[node.targets[0].id] = ast.literal_eval(node.value)
             except ValueError:
                 continue
-    needed = ("EPISODE_CHECK", "LEDGER_CHECK", "QUESTIONS_CHECK", "QUESTIONS_WEEKDAY", "QUESTIONS_HOUR_PT", "QUESTIONS_MINUTE_PT")
+    needed = (
+        "EPISODE_CHECK",
+        "LEDGER_CHECK",
+        "QUESTIONS_CHECK",
+        "DOOR_CHECK",
+        "QUESTIONS_WEEKDAY",
+        "QUESTIONS_HOUR_PT",
+        "QUESTIONS_MINUTE_PT",
+    )
     missing = [k for k in needed if k not in consts]
     assert not missing, f"story_season_qa no longer declares {missing} as module-level literals — this enrolment reads nothing"
     return type("StorySeasonConstants", (), consts)
@@ -1318,6 +1332,7 @@ def test_story_season_deadmen_are_enrolled():
         ssq.EPISODE_CHECK,
         ssq.LEDGER_CHECK,
         ssq.QUESTIONS_CHECK,
+        ssq.DOOR_CHECK,
     }, "STORY_SEASON_DEADMEN and story_season_qa's check ids diverged — a dead-man was added or dropped on one side only"
     # The leg's registration in the nightly run list is asserted where the detector is exercised
     # (tests/test_chronicle_status_row_deadman_3563.py) — this file stays a static sweep of cdk/.

@@ -249,20 +249,26 @@ def test_item_labels_expose_every_name_a_card_could_draw():
 def test_a_days_card_facts_are_byte_identical_whatever_the_journal_did(monkeypatch):
     """Vary ONLY the private journal: no entry / two entries that day, and the day grade's journal
     component at 0 / 100 (all synthetic). The assembled day — every fact a card is drawn from — is
-    the same bytes, so no template, row or caption can carry it. Mutation control: with the policy's
-    component filter bypassed, the journal component DOES reach the facts."""
+    the same bytes, so no template, row or caption can carry it. Owner ruling 2026-11-05: the card's grade
+    is the day_grade record's PUBLIC variant, built here by the public method's own functions from the
+    day's components. Mutation control: with the journal classified public, it DOES reach the facts."""
     import dataclasses
     import json as _json
 
-    from common import activity_publication
     from content import recap_data
+    from health import day_grade_public as dgp
+
+    weights = {"sleep_quality": 0.2, "journal": 0.05}
 
     def facts_for(journal_on):
+        comps = {"sleep_quality": 80, "journal": 100 if journal_on else 0}
+        score, letter = dgp.total_from_components(comps, weights)
         rows = {
-            "computed_metrics": {
-                "day_grade_letter": "B",
-                "day_grade_score": 80,
-                "component_scores": {"sleep_quality": 80, "journal": 100 if journal_on else 0},
+            "computed_metrics": {"day_grade_letter": "B", "day_grade_score": 80, "component_scores": comps},
+            "day_grade": {
+                "total_score": 80,
+                "letter_grade": "B",
+                dgp.PUBLIC_KEY: dict(dgp.block(score, letter, comps, weights, origin="live"), computed_at="t"),
             },
             "macrofactor": {"total_protein_g": 160, "total_calories_kcal": 2100},
         }
@@ -278,7 +284,7 @@ def test_a_days_card_facts_are_byte_identical_whatever_the_journal_did(monkeypat
     off, on = facts_for(False), facts_for(True)
     assert off == on
     assert "journal" not in on.lower() and "notion" not in on
-    monkeypatch.setattr(activity_publication, "public_component_scores", lambda sc: dict(sc or {}))
+    monkeypatch.setattr(dgp, "PRIVATE_COMPONENTS", {})
     assert facts_for(False) != facts_for(True), "the control could not see the journal — the invariance above is vacuous"
 
 

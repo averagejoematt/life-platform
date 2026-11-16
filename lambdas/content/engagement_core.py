@@ -63,20 +63,35 @@ CHANNEL_STALE_DAYS = {k: v["stale_days"] for k, v in _CHANNELS.items()}
 PUBLIC_CHANNELS = _activity_publication.public_mapping(MANUAL_CHANNELS)
 PUBLIC_PROJECTION_KEY = "public"
 
+
 # ── Presence predicates (#914) ──────────────────────────────────────────────
 # Does a DDB record for this source count as Matthew actually LOGGING that day?
 # Default: any record. habitify's hourly pull writes a record EVERY day even at
 # total_completed=0, so a 14-day zero-completion stall read as gap_days=0 — its
 # predicate counts a day only when at least one habit was completed. Predicates
 # are pure item→bool; the registry facet names them, this dict resolves them.
+def _macrofactor_logged(item):
+    """#5519: a MacroFactor row is a food-log day only when it holds diary entries. A summary-only
+    stub (`entries_count` 0, no `food_log`) — the app's pre-filled scheduled item written from an
+    export, or an emptied #4638 record — reached every presence surface as a logged day. The ONE
+    stub predicate is `health.nutrition_logging.is_stub`; the projection below carries
+    `entries_count` only, so an unprojected `food_log` reads as empty, which is the stub rule.
+    A row without the field (legacy, pre-entries_count) is not judged and still counts."""
+    from health.nutrition_logging import is_stub  # noqa: PLC0415 — keeps this module's import graph lean
+
+    return not is_stub(item or {})
+
+
 PRESENCE_PREDICATES = {
     "habitify_completed": lambda item: _as_float((item or {}).get("total_completed")) > 0,
+    "macrofactor_logged": _macrofactor_logged,
 }
 
 # Extra DDB attributes a predicate needs (the caller's query projects sk only by
 # default — it must widen the projection for these sources).
 PRESENCE_PREDICATE_FIELDS = {
     "habitify_completed": ("total_completed",),
+    "macrofactor_logged": ("entries_count",),
 }
 
 
@@ -339,6 +354,90 @@ def compute_public_presence(today, public_channel_dates, **kwargs):
     kwargs.pop("passive_metrics", None)
     dates = {k: v for k, v in (public_channel_dates or {}).items() if k in PUBLIC_CHANNELS}
     return compute_presence(today, dates, channels=PUBLIC_CHANNELS, **kwargs)
+
+
+# ── read-time reconciliation with the food registry (#5955) ──────────────────
+# The presence record is a once-a-day snapshot (adaptive-mode, 17:35 UTC). MacroFactor arrives in
+# batched exports that can land hours later and back-fill several days at once (the 11-13 export
+# was ingested at 22:54 UTC and carried 11-07 → 11-13), so for up to a day the stored record named
+# a lull over days that already had food rows. A reader of the record therefore re-checks the
+# primary (food) channel and never states a lull the registry contradicts.
+
+LOUD_CLASSES = (LIGHT, QUIET, DARK)
+
+
+def food_logs_inside_stated_gap(record, food_dates):
+    """The food-log days the registry holds AFTER the record's last food log — the days the
+    record's stated gap claims were empty. ``food_dates`` must already be filtered by the
+    channel's presence predicate (a stub row is not a log). A record with no food log this cycle
+    measures its gap from ``experiment_window_start``, so any log on or after it contradicts it.
+    Sorted ascending; [] when the record agrees with the registry."""
+    rec = record or {}
+    last = _to_date(rec.get("last_food_log_date"))
+    window_start = _to_date(rec.get("experiment_window_start"))
+    out = set()
+    for d in food_dates or ():
+        dd = _to_date(d)
+        if dd is None:
+            continue
+        if last is not None and dd <= last:
+            continue
+        if last is None and window_start is not None and dd < window_start:
+            continue
+        out.add(dd.isoformat())
+    return sorted(out)
+
+
+def reconcile_presence_with_food_registry(record, food_dates, today):
+    """The record as served, given the registry's food-log days (#5955).
+
+    ``food_dates`` None means the registry could not be read: the record's lull is unverified, so
+    a loud class fails closed to ``present`` (a lull is a claim that needs the registry behind it;
+    "present" makes no claim and the front end shows nothing). When the registry holds a food log
+    inside the stated gap the record is stale: it fails closed to ``present`` with the food marks
+    re-derived from the newest log (``last_food_log_date``, the lag-adjusted ``gap_days`` against
+    ``today``, the primary channel's detail). A record the registry agrees with is returned as-is.
+    Never mutates the input."""
+    rec = dict(record or {})
+    if not rec:
+        return rec
+    if food_dates is None:
+        if rec.get("presence_class") in LOUD_CLASSES:
+            rec.update(presence_class=PRESENT, severity=SEVERITY_NONE, registry_unverified=True)
+        return rec
+    inside = food_logs_inside_stated_gap(rec, food_dates)
+    if not inside:
+        return rec
+    newest = inside[-1]
+    gap = _effective_gap(newest, today)
+    food_label = MANUAL_CHANNELS.get(PRIMARY_CHANNEL)
+    quiet = [c for c in (rec.get("channels_quiet") or []) if c != food_label]
+    last_manual = rec.get("last_manual_log_date")
+    if not last_manual or (_to_date(last_manual) or date.min) < _to_date(newest):
+        last_manual = newest
+    detail = dict(rec.get("channel_detail") or {})
+    detail[PRIMARY_CHANNEL] = dict(
+        detail.get(PRIMARY_CHANNEL) or {"label": food_label},
+        last_log_date=newest,
+        gap_days=gap,
+        dropout_streak_days=gap,
+    )
+    rec.update(
+        presence_class=PRESENT,
+        severity=SEVERITY_NONE,
+        gap_days=gap,
+        last_food_log_date=newest,
+        last_manual_log_date=last_manual,
+        channels_quiet=quiet,
+        channels_quiet_count=len(quiet),
+        planned_pause=False,
+        planned_pause_reason="",
+        returned=False,
+        resumed_after_days=None,
+        channel_detail=detail,
+        registry_reconciled=True,
+    )
+    return rec
 
 
 # ── sub-computations ─────────────────────────────────────────────────────────

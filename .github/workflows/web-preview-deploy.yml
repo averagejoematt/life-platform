@@ -2,18 +2,15 @@
 #
 # One workflow, two targets, one owner per path:
 #   preview  s3://matthew-life-platform/site/next/v9/  (WEB_BASE=/next/v9/, noindex; robots.txt
-#            disallows /next/). Runs on every push to main touching the build, as since #5530.
+#            disallows /next/). Only by dispatch since the cut-over; EMPTY outside a rehearsal (#6083).
 #   root     s3://matthew-life-platform/site/           (WEB_BASE=/, sitemap on, self-canonical).
 #            ONLY when www/owned_paths.json carries `live_at_root: true` — the committed cut-over
-#            switch. deploy/www_deploy_target.py resolves the target: a push deploys root once the
-#            switch is on; a `workflow_dispatch` with target=root is REFUSED while it is off, so a
-#            dispatch cannot launch ahead of the repo. Flipping `/` is therefore ONE merge
-#            (scripts/www_cutover_switch.py --live, then a PR); the owner's go is that merge.
+#            switch (deploy/www_deploy_target.py resolves it; a dispatch can't launch ahead of the repo).
 #
 # What makes a root deploy safe (#5534): the site/ deploy excludes every path this build writes
 # (www/owned_paths.json via deploy/www_owned_paths.py, in sync_site_to_s3.sh AND rollback_site.sh),
 # and this workflow's own rollback restores the v9 paths from the previous green v9 build
-# (s3://…/site/_v9_previous/, S3 → S3, v9 keys only) — never from site/. Neither path can
+# (s3://…/www-previous/<LATEST>/, S3 → S3, v9 keys only) — never from site/. Neither path can
 # re-publish the v8 front page over the launch. After a root sync the smoke + visual sweeps judge the
 # live site (qa/qa_manifest.py describes `/` as the v9 page set once the switch is on); a green run
 # records the build as the new previous; a red one rolls the v9 paths back, scope-checked the way
@@ -26,6 +23,9 @@
 # nothing is deployed and the run is red; a fixture build is never published here. The shell lives
 # in tested entrypoints (deploy/www_deploy_target.py, deploy/www_build_target.sh,
 # deploy/www_preview_sync.sh, deploy/www_root_rollback.sh), not here (#4885).
+# Site API readiness (run 43124939822): the snapshot and smoke read the LIVE Site API, which CI deploys,
+# not this workflow. Not ready → `deferred` (nothing synced, nothing to roll back); web-deploy-resume.yml
+# re-dispatches once the API lands. The logic is deploy/www_api_readiness.py.
 
 name: v9 deploy (preview · root)
 
@@ -37,6 +37,8 @@ on:
       - 'scripts/publish_snapshot.py'
       - 'deploy/www_preview_sync.sh'
       - '.github/workflows/web-preview-deploy.yml'
+  schedule:  # daily rebuild from the live API (2026-11-14): 15:30 UTC, after overnight ingestion; targets like a push
+    - cron: "30 15 * * *"
   workflow_dispatch:
     inputs:
       target:
@@ -45,6 +47,12 @@ on:
         default: preview
         type: choice
         options: [preview, root]
+      api_readiness:
+        description: 'enforce (default) · skip = break-glass: build against whatever Site API is live (deploy/www_api_readiness.py)'
+        required: false
+        default: enforce
+        type: choice
+        options: [enforce, skip]
 
 permissions:
   contents: read
@@ -60,10 +68,53 @@ env:
   SNS_TOPIC_ARN: arn:aws:sns:us-west-2:205930651321:life-platform-alerts-digest
 
 jobs:
+  # ── the Site API this build reads must already carry this commit's site-API code ─────────────────
+  api-readiness:
+    name: Site API readiness (the live bundle contains the commit it owes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      ready: ${{ steps.ready.outputs.ready }}
+      reason: ${{ steps.ready.outputs.reason }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # the owed commit is git history; the script refuses a shallow clone
+      - uses: ./.github/actions/setup-ci
+        with:
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-readonly-role   # lambda:GetFunction (read-only)
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Compare the live Site API bundle's commit with the commit it owes
+        id: ready
+        env:
+          WWW_API_READINESS: ${{ github.event.inputs.api_readiness }}
+        run: python3 deploy/www_api_readiness.py check
+
+  # ── not ready: defer (a clear, non-rollback status); web-deploy-resume.yml re-dispatches later ──
+  deferred:
+    name: "Deferred: the Site API is not serving this commit's code yet"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: api-readiness
+    if: "!cancelled() && needs.api-readiness.result == 'success' && needs.api-readiness.outputs.ready != 'true'"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-ci
+        with:
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-readonly-role   # sns:Publish on the digest topic
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Record the deferral (step summary + one SNS line)
+        env:
+          READINESS_REASON: ${{ needs.api-readiness.outputs.reason }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python3 deploy/www_api_readiness.py notify-deferred
+
   deploy:
     name: Live snapshot → build → sync to the resolved target
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: api-readiness
+    if: "!cancelled() && needs.api-readiness.result == 'success' && needs.api-readiness.outputs.ready == 'true'"
     environment: ungated-deploy
     outputs:
       target: ${{ steps.target.outputs.target }}
@@ -97,6 +148,8 @@ jobs:
       # build's routes checked against the kept site/ pages (deploy/www_owned_paths.py --check-dist).
       - name: Build and scan for the target (scripts/check_www_build.py --scan-only; root adds the live collision check)
         run: |
+          PINS=$(python3 scripts/ci_pins.py pillow)  # the share cards www_build_target.sh draws (scripts/v9_og_images.py)
+          pip install $PINS
           bash deploy/www_build_target.sh "${{ steps.target.outputs.target }}"  # runs scripts/check_www_build.py --scan-only [+ www_owned_paths.py --check-dist]
 
       - name: Sync to the target prefix and invalidate it (root waits for the invalidation)
@@ -118,7 +171,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: deploy
-    if: needs.deploy.outputs.target == 'root'
+    if: "!cancelled() && needs.deploy.result == 'success' && needs.deploy.outputs.target == 'root'"
     outputs:
       site_reachable: ${{ steps.smoke.outputs.site_reachable }}
       surfaces: ${{ steps.smoke.outputs.surfaces }}
@@ -136,7 +189,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 50
     needs: deploy
-    if: needs.deploy.outputs.target == 'root'
+    if: "!cancelled() && needs.deploy.result == 'success' && needs.deploy.outputs.target == 'root'"
     outputs:
       site_reachable: ${{ steps.verdict.outputs.site_reachable }}
       surfaces: ${{ steps.verdict.outputs.surfaces }}
@@ -173,6 +226,28 @@ jobs:
           path: qa-screenshots/
           retention-days: 14
 
+  # ── both targets: every public copy (root, preview, legacy, archive) against the live publication policy (#6083) ──
+  public-copies:
+    name: Public copies guard (no orphan, no stale copy, the policy on every copy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: deploy
+    if: "!cancelled() && needs.deploy.result == 'success'"
+    outputs:
+      summary: ${{ steps.copies.outputs.summary }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-ci
+        with:
+          aws-role: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-readonly-role   # s3:ListBucket only; objects are read anonymously
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Check every public copy of the site (read-only; a violation is reported, never repaired here)
+        id: copies
+        run: |
+          PINS=$(python3 scripts/ci_pins.py boto3)  # qa/age_inversion_lib.py reaches web.site_api_biomarkers, which imports boto3
+          pip install $PINS
+          python3 scripts/check_public_copies.py --check --github-output
+
   # ── root only, green: this build becomes the previous build the next red rolls back to ──────────
   record-previous:
     name: Record this green root build as the previous build
@@ -191,20 +266,20 @@ jobs:
         with:
           name: v9-root-${{ github.sha }}
           path: www/dist
-      - name: Record the build at site/_v9_previous/ (no delete)
+      - name: Record the build at www-previous/<sha>/ (outside site/, never served)
         run: bash deploy/www_preview_sync.sh --target root --record-previous
 
   # ── root only, red: roll the v9 paths back to the previous v9 build — never to site/ ──────────────
   rollback-v9-on-failure:
-    name: Auto-rollback the v9 paths (smoke or visual-QA failure)
+    name: Auto-rollback the v9 paths (smoke or visual-QA failure; a copies-guard red alone is declined)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [deploy, smoke, visual-qa]
+    needs: [deploy, smoke, visual-qa, public-copies]
     if: >-
       always() &&
       needs.deploy.result == 'success' &&
       needs.deploy.outputs.target == 'root' &&
-      (needs.smoke.result == 'failure' || needs.visual-qa.result == 'failure')
+      (needs.smoke.result == 'failure' || needs.visual-qa.result == 'failure' || needs.public-copies.result == 'failure')
     environment: ungated-deploy
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -223,6 +298,7 @@ jobs:
           SMOKE_REACHABLE: ${{ needs.smoke.outputs.site_reachable }}
           SMOKE_SURFACES: ${{ needs.smoke.outputs.surfaces }}
           SMOKE_SUMMARY: ${{ needs.smoke.outputs.summary }}
-          GATE: smoke=${{ needs.smoke.result }} visual-qa=${{ needs.visual-qa.result }}
+          COPIES_SUMMARY: ${{ needs.public-copies.outputs.summary }}
+          GATE: smoke=${{ needs.smoke.result }} visual-qa=${{ needs.visual-qa.result }} public-copies=${{ needs.public-copies.result }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: bash deploy/www_root_rollback.sh

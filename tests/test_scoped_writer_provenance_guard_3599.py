@@ -533,4 +533,79 @@ def test_the_seed_date_is_not_in_the_future():
     ), "a line dated off the seal must carry its own reason"
 
 
+# ── #5931: a tag_record caller never puts a non-string under the provenance `phase` key ──
+# The `stamped` class above trusts `tag_record` to own `phase`. It did not, when a writer
+# had already put a DOMAIN value there: state_of_matthew stored its #1086 day/week/stage map
+# under `phase`, the old tagger preserved any pre-set key, and `singleton_visible` rejected
+# every cycle row, so /api/state_of_matthew served unavailable all cycle. tag_record now
+# overwrites a non-string pre-set (tests/test_tag_record_phase_shape_5931.py holds the runtime
+# and live-shape half); this sweep keeps the domain value from being written there at all.
+
+
+def _is_phase_key(node) -> bool:
+    return isinstance(node, ast.Constant) and node.value == "phase"
+
+
+def _is_str_literal(node) -> bool:
+    return isinstance(node, ast.Constant) and isinstance(node.value, str)
+
+
+def non_string_phase_lines(src: str) -> list:
+    """Lines where a `"phase"` dict key or `x["phase"] =` target gets a non-string-literal value."""
+    hits = []
+    for node in ast.walk(ast.parse(src)):
+        if isinstance(node, ast.Dict):
+            hits += [v.lineno for k, v in zip(node.keys, node.values) if k is not None and _is_phase_key(k) and not _is_str_literal(v)]
+        elif isinstance(node, ast.Assign) and not _is_str_literal(node.value):
+            hits += [node.lineno for t in node.targets if isinstance(t, ast.Subscript) and _is_phase_key(t.slice)]
+    return hits
+
+
+def calls_tag_record(src: str) -> bool:
+    for node in ast.walk(ast.parse(src)):
+        if isinstance(node, ast.Call):
+            fn = node.func
+            if (fn.id if isinstance(fn, ast.Name) else getattr(fn, "attr", None)) == "tag_record":
+                return True
+    return False
+
+
+def tag_record_callers() -> list:
+    out = []
+    for path in _producer_files():
+        if path.name == "compute_metadata.py":
+            continue  # the tagger itself writes `record["phase"] = phase` by design
+        try:
+            src = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        if "tag_record" in src and calls_tag_record(src):
+            out.append(path)
+    return out
+
+
+def test_no_tag_record_caller_puts_a_non_string_under_phase():
+    callers = tag_record_callers()
+    names = {p.name for p in callers}
+    # Bound the population so an empty sweep cannot pass vacuously (16 modules when written).
+    assert "state_of_matthew_lambda.py" in names and len(callers) >= 10, sorted(names)
+    offenders = [f"{p.relative_to(ROOT).as_posix()}:{ln}" for p in callers for ln in non_string_phase_lines(p.read_text(encoding="utf-8"))]
+    assert not offenders, (
+        "#5931: a tag_record caller sets `phase` to a non-string value. `phase` is the provenance attribute "
+        "singleton_visible / with_phase_filter compare against; rename the domain field (e.g. `phase_context`): "
+        f"{offenders}"
+    )
+
+
+def test_the_5931_sweep_flags_the_pre_fix_state_of_matthew_source():
+    """Must-fail control: put the #1086 map back under `phase` and the sweep sees both writes."""
+    src = (ROOT / "lambdas" / "compute" / "state_of_matthew_lambda.py").read_text(encoding="utf-8")
+    assert '"phase_context":' in src
+    reverted = src.replace('"phase_context":', '"phase":')
+    assert calls_tag_record(reverted)
+    assert len(non_string_phase_lines(reverted)) >= 2  # assemble_state + build_summary_item
+    # a string literal is NOT flagged — the rule is "non-string", not "any phase key"
+    assert non_string_phase_lines('x = {"phase": "experiment"}\ny = {}\ny["phase"] = "pilot"\n') == []
+
+
 # premerge-gate: 3599 box 2: the SOURCE-tier sibling of the guard above — an AST sweep of lambdas/ mcp/ deploy/ scripts/ for every put_item writer landing a row on an EXPERIMENT_SCOPED `USER#matthew#SOURCE#*` partition with no write-time stamp. Pre-merge for the same reason as its #2119 sibling: the defect arrives in the diff of the PR that adds the writer, and post-merge is after the unstamped rows exist (#3513 m

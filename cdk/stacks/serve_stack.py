@@ -333,10 +333,22 @@ class ServeStack(Stack):
         )
         _site_api_content_filter_fallback.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
+        # ── #5821: latency is two tiers — a digest blip and an urgent sustained hold ──
+        # `site-api-p95-latency-high` (one 5-minute period) is the digest-only early signal:
+        # ADR-052 puts latency on the digest, and on a low-traffic Lambda one period's p95 is
+        # mostly a few cold loads (16 of 16 episodes in the week to 2026-11-11 cleared within
+        # one period, each one an urgent email via #3499). Owner ruling 2026-11-11: email only
+        # when the slowness is SUSTAINED for 15 minutes — `site-api-p95-latency-sustained`,
+        # the same metric and threshold held for 3 of 3 periods, carries the reader-audience
+        # tag (scripts/platform_model_alarms.py) and so the urgent route.
         _site_api_latency_alarm = cloudwatch.Alarm(
             self,
             "SiteApiLatencyHigh",
             alarm_name="site-api-p95-latency-high",
+            alarm_description=(
+                "Digest-only early signal (#5821): site-api p95 Duration >= 5 s in one 5-minute period. "
+                "Usually a few cold loads; the urgent tier is site-api-p95-latency-sustained (15 min)."
+            ),
             metric=site_api_duration_p95,
             threshold=5000,
             evaluation_periods=1,
@@ -345,10 +357,36 @@ class ServeStack(Stack):
         )
         _site_api_latency_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
+        _site_api_latency_sustained_alarm = cloudwatch.Alarm(
+            self,
+            "SiteApiLatencySustained",
+            alarm_name="site-api-p95-latency-sustained",
+            alarm_description=(
+                "Readers are waiting (#5821): site-api p95 Duration >= 5 s in 3 of 3 consecutive 5-minute "
+                "periods (15 minutes sustained). Digest + urgent email (reader-audience facet). "
+                "Check recent site-api deploys and /api/edition upstream latency first."
+            ),
+            metric=site_api_duration_p95,
+            threshold=5000,
+            evaluation_periods=3,
+            datapoints_to_alarm=3,
+            comparison_operator=GTE,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+        _site_api_latency_sustained_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+
+        # #5821: digest-only by owner ruling 2026-11-11 (READER_AUDIENCE_DIGEST_ONLY) — the
+        # reader-audience escalation tag stays, the urgent email does not. Threshold unchanged
+        # here; retuning it to mean abuse is the issue's separate fix 4.
         _site_api_spike_alarm = cloudwatch.Alarm(
             self,
             "SiteApiInvocationSpike",
             alarm_name="site-api-invocation-spike",
+            alarm_description=(
+                "Traffic counter (#5821): site-api Invocations >= 200 in one 5-minute period. Digest only; "
+                "escalates on first red via the reader-audience tag. A fire outside a CI/QA window is the "
+                "no-WAF revisit trigger in docs/PROPORTIONALITY.md."
+            ),
             metric=site_api_invocations,
             threshold=200,
             evaluation_periods=1,
@@ -425,8 +463,8 @@ class ServeStack(Stack):
             ("site-api-ai-errors", site_api_ai_errors),
             ("site-api-ai-throttles", _site_api_ai_throttles),
             ("site-api-content-filter-fallback", _site_api_content_filter_fallback),
-            ("site-api-invocation-spike", _site_api_spike_alarm),
-            ("site-api-p95-latency-high", _site_api_latency_alarm),
+            ("site-api-invocation-spike", _site_api_spike_alarm),  # #5821: digest-only member — the seam declines it
+            ("site-api-p95-latency-sustained", _site_api_latency_sustained_alarm),
             ("site-api-throttles", _site_api_throttles),
         ):
             route_reader_audience(_ra_alarm, _ra_name, local_alerts_topic)

@@ -467,7 +467,7 @@ Work through by page. Each decision maps to one page/component.
 
 ### 9i. Connect genomics to glucose
 - **Effort:** Low
-- [ ] FADS2/MTHFR variants affecting individual glucose metabolism
+- [ ] Genetic variants affecting individual glucose metabolism
 
 ### 9j. Dynamic pull-quotes
 - **Effort:** Med-High

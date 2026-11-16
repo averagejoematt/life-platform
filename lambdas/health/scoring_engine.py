@@ -158,7 +158,7 @@ def score_nutrition(data: dict[str, Any], profile: dict[str, Any]) -> ScoreTuple
     parts, weights = [], []
     if cal is not None and cal_target:
         if band:
-            # #5099: the habit is a FLOOR and a CEILING (the charter band, centred on the target): inside it is a hit; an
+            # #5099: the habit is a FLOOR and a CEILING (the charter band, the any-day to the lifting-day floor since #5794): inside it is a hit; an
             # under-floor day is a MISS, never a success, and the score falls from the band edge, not from the target
             details["cal_band"] = list(band)
             details["cal_band_hit"] = band[0] <= cal <= band[1]

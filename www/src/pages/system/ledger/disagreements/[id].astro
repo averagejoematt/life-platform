@@ -1,6 +1,7 @@
 ---
 import Base from "../../../../layouts/Base.astro";
 import Connected from "../../../../components/Connected.astro";
+import DisagreementRoomEntry from "../../../../components/DisagreementRoomEntry.astro"; // the Coaching Room (CR3): renders nothing unless WEB_ROOM=1
 import Provenance from "../../../../components/Provenance.astro";
 import Quote from "../../../../components/Quote.astro";
 import { dayInWords } from "../../../../lib/format.js";
@@ -29,5 +30,5 @@ const b = all.get("coach", d.coach_b);
       </div>
       <Connected type="disagreement" id={d.id} />
     </div>
-  </section>
+  </section>{/* the Coaching Room entry (CR3) sits flush against the closing tag: with WEB_ROOM off the page's bytes are unchanged */}<DisagreementRoomEntry d={d} />
 </Base>

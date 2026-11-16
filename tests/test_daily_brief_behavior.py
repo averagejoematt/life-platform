@@ -54,6 +54,7 @@ import sys
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 from pacific_clock import freeze_pacific  # #2817: the Pacific clock a converted module actually reads
@@ -2629,3 +2630,142 @@ def _food_delivery_unpaused_5108(monkeypatch):
     from ingestion.source_registry import SOURCE_REGISTRY
 
     monkeypatch.setitem(SOURCE_REGISTRY, "food_delivery", {**SOURCE_REGISTRY["food_delivery"], "paused": False})
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #5821 — the owner's folded emails: coach note, protein note, steps note, habits to settle
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Owner rulings 2026-11-15: the Morning Brief, the Evening nudge and the weekly Nutrition Review arrive as their own
+# emails; these four are sections of the brief. A SATURDAY at the brief's own minute (10:00 PT) — the one morning all
+# four can render.
+_SAT_PT = datetime(2026, 8, 8, 10, 0, 0, tzinfo=ZoneInfo("America/Los_Angeles"))
+
+
+class TestFoldedEmailSections5821:
+    @pytest.fixture(autouse=True)
+    def _bundled_charter(self, monkeypatch):
+        """The bundled public charter only — no owner twin from env, no live S3 probe."""
+        from training import training_charter
+
+        monkeypatch.delenv(training_charter.PRIVATE_ENV_VAR, raising=False)
+        monkeypatch.setattr(training_charter, "_from_s3", lambda key: None)
+        training_charter.reset_cache()
+        yield
+        training_charter.reset_cache()
+
+    @staticmethod
+    def _seed_all_four(table):
+        from training import training_charter
+
+        below = float(training_charter.charter_value("nutrition.protein.feeding_threshold_g")) - 5
+        rows = [
+            # protein: one timed feeding below the threshold before the 10:00 cut-off -> behind
+            day_row("macrofactor", "2026-08-08", total_protein_g=Decimal(str(below)), food_log=[{"time": "08:15", "protein_g": below}]),
+            # coach note: folded Friday 14:10 PT (inside the 24 h before this brief) — plus today's DRY-RUN-shaped row
+            # with no text, which may not render
+            {
+                "pk": "COACH#nudge_ledger",
+                "sk": "DAY#2026-08-07",
+                "status": "folded_into_brief",
+                "sent_at": "2026-08-07T21:10:00Z",
+                "coach_name": "Marcus Webb",
+                "brief_text": "Yesterday's food day isn't in the record yet.",
+            },
+            {"pk": "COACH#nudge_ledger", "sk": "DAY#2026-08-08", "status": "folded_into_brief", "sent_at": "2026-08-08T16:10:00Z"},
+            # steps note: folded Friday evening
+            {"pk": "COACH#steps_nudge", "sk": "STEPS_NUDGE#2026-08-07", "status": "folded_into_brief", "text": "A 50-min walk closes it."},
+            # habits: one skipped daily habit on a closed day of the window
+            day_row("habitify", "2026-08-04", habit_statuses={"Floss": {"status": "skipped", "periodicity": "daily"}}),
+        ]
+        for r in rows:
+            table.store[(r["pk"], r["sk"])] = r
+
+    def test_each_section_renders_from_its_fixture(self, table):
+        self._seed_all_four(table)
+        logs = []
+        secs = {s["key"]: s for s in brief.brief_lines.folded_sections(table, _SAT_PT, _ListLogger(logs), "matthew")}
+        assert set(secs) == {"coach_note", "protein", "steps_note", "habits_to_settle"}, (secs, logs)
+        assert secs["coach_note"]["lines"] == ["Marcus Webb: Yesterday's food day isn't in the record yet."]
+        assert secs["protein"]["title"] == "Protein this morning" and "by 10:00" in secs["protein"]["lines"][0]
+        assert secs["steps_note"]["lines"] == ["A 50-min walk closes it."]
+        assert "Tue 08-04: Floss" in secs["habits_to_settle"]["lines"]
+        # Through the REAL renderer (the handler tests stub it): every section, escaped, inside the S:folded markers.
+        from content import html_builder as real_html_builder
+
+        kw = dict(
+            data={"date": "2026-08-07", "hrv": {"hrv_7d": None, "hrv_30d": None}},
+            profile={"calorie_target": 1500, "journey_start_date": "2024-01-01", "habit_registry": {}},
+            day_grade_score=None,
+            grade="C",
+            component_scores={},
+            component_details={},
+            readiness_score=None,
+            readiness_colour="gray",
+            tldr_guidance=None,
+            bod_insight=None,
+            training_nutrition=None,
+            journal_coach_text=None,
+            mvp_streak=0,
+            full_streak=0,
+        )
+        assert "S:folded" not in real_html_builder.build_html(**kw)
+        secs["habits_to_settle"]["lines"].append("<b>x</b>")
+        html = real_html_builder.build_html(folded_sections=list(secs.values()), **kw)
+        start, end = html.index("<!-- S:folded -->"), html.index("<!-- /S:folded -->")
+        for needle in ("A note from your coach", "Protein this morning", "Steps, last evening", "Habits to settle", "&lt;b&gt;x&lt;/b&gt;"):
+            assert start < html.index(needle) < end, needle
+
+    def test_no_data_means_no_sections_not_a_crash(self, table):
+        assert brief.brief_lines.folded_sections(table, _SAT_PT, _ListLogger([]), "matthew") == []
+        from content import html_builder as real_html_builder
+
+        assert real_html_builder._brief_folded([]) == ""
+
+    def test_each_stored_note_shows_once_and_the_habits_only_on_saturday(self, table):
+        """The next morning, Friday's coach and steps notes are no longer shown (no repeat), nor are the habits."""
+        self._seed_all_four(table)
+        sunday = _SAT_PT + timedelta(days=1)
+        keys = {s["key"] for s in brief.brief_lines.folded_sections(table, sunday, _ListLogger([]), "matthew")}
+        assert keys.isdisjoint({"coach_note", "steps_note", "habits_to_settle"}), keys
+        # A note folded Friday 08:10 PT was Friday's brief's (it ran at 10:00); Saturday's must not repeat it.
+        table.store[("COACH#nudge_ledger", "DAY#2026-08-07")]["sent_at"] = "2026-08-07T15:10:00Z"
+        keys = {s["key"] for s in brief.brief_lines.folded_sections(table, _SAT_PT, _ListLogger([]), "matthew")}
+        assert "coach_note" not in keys
+
+    def test_the_brief_still_sends_when_a_section_is_missing_or_crashes(self, handler_env, monkeypatch):
+        """Must-fail control for fail-soft: one section has data, one has none, one raises. The brief sends exactly
+        once and carries only the section with data; removing the try/except in `folded_sections` fails this test."""
+
+        def _ok(table, now_pt, user):
+            return {"key": "coach_note", "title": "A note from your coach", "lines": ["Coach: x"]}
+
+        def _absent(table, now_pt, user):
+            return None
+
+        def _boom(table, now_pt, user):
+            raise RuntimeError("ddb down")
+
+        monkeypatch.setattr(brief.brief_lines, "FOLDED_SECTIONS", (_absent, _boom, _ok))
+        r = computed_row()
+        handler_env["table"].store[(r["pk"], r["sk"])] = r
+        brief.lambda_handler({}, None)
+        assert len(handler_env["ses"].sent) == 1
+        _, kwargs = handler_env["html"].calls[0]
+        assert [s["key"] for s in kwargs["folded_sections"]] == ["coach_note"]
+
+    def test_a_demo_brief_carries_no_folded_section(self, handler_env, monkeypatch):
+        monkeypatch.setattr(brief.brief_lines, "FOLDED_SECTIONS", (lambda t, n, u: {"key": "k", "title": "T", "lines": ["owner"]},))
+        r = computed_row()
+        handler_env["table"].store[(r["pk"], r["sk"])] = r
+        brief.lambda_handler({"demo_mode": True}, None)
+        _, kwargs = handler_env["html"].calls[0]
+        assert kwargs["folded_sections"] is None
+
+
+class _ListLogger:
+    def __init__(self, sink):
+        self.sink = sink
+
+    def warning(self, msg, *args):
+        self.sink.append(msg)

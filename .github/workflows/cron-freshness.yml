@@ -127,9 +127,9 @@ jobs:
       - name: Scheduled-workflow cadence watch
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # Unpiped on purpose: a pipe would hand the step tail's exit status and the
-        # gate could not fail (the #3103 class, and CONVENTIONS.md §4's piped-step trap).
-        run: python3 scripts/check_cron_freshness.py
+        # Unpiped on purpose: a piped step hands back the tail's status (#3103, CONVENTIONS.md §4).
+        # --file-tenure (#5935): also file/refresh/close ONE tracker per workflow red on 3+ consecutive scheduled runs.
+        run: python3 scripts/check_cron_freshness.py --file-tenure
 
       - name: File or resolve the advisory issue
         if: always()
@@ -146,4 +146,4 @@ jobs:
             .github/workflows/. This is an ABSENCE, not a failure: the #1447 advisory
             filer is armed on a run's result and has nothing to be armed on, so the
             affected surface is unwatched while its tracker issue reads as healthy.
-            Run `python3 scripts/check_cron_freshness.py` for the per-workflow decode.
+            Or a #5935 tenure-tracker write failed. Run `python3 scripts/check_cron_freshness.py --tenure` for the decode.

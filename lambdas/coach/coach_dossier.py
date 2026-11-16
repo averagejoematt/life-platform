@@ -80,7 +80,7 @@ CORRECTION_ACTIONS = ("retract", "correct")
 # sentence built around "homozygous"/"allele" is a genotype claim even without an
 # rs-id. A false positive only withholds a dossier line, never mutates memory.
 GENOTYPE_PATTERNS = (
-    re.compile(r"\brs\d{3,}\b", re.IGNORECASE),  # dbSNP ids — rs429358 etc.
+    re.compile(r"\brs\d{3,}\b", re.IGNORECASE),  # dbSNP ids — rs<digits>
     re.compile(r"\b(?:APOE|APO-?E4?|MTHFR|COMT|FTO|CYP\d\w*)\b", re.IGNORECASE),
     re.compile(r"\b[eEε]\s?[234]\s?/\s?[eEε]\s?[234]\b"),  # allele pairs — e3/e4
     re.compile(r"ε\s?[234]\b"),  # bare epsilon allele
@@ -259,14 +259,17 @@ def learning_entry(item: dict, reason_translator: Optional[Callable] = None):
 
 
 def relationship_entry(item: dict):
-    """Public projection of RELATIONSHIP#state (#536 deterministic rapport writer)."""
+    """Public projection of RELATIONSHIP#state (#536 deterministic rapport writer).
+
+    Owner ruling 2026-11-15 (#5611 F4): the row's free-text `context_summary` is not part of the
+    public projection — it is never read here, so no stamp or filter verdict can publish it. The
+    structured arc (phase, rapport, counts, tenure, dates) stays public. Owner-side readers
+    (coach_history_summarizer, coach_observatory_renderer) read the row directly, not this.
+    """
     item = item or {}
     date = _date_of(item.get("updated_at"), item.get("last_interaction_date"), item.get("first_interaction_date"))
     if not date:
         return None, SKIP
-    summary = str(item.get("context_summary") or "").strip()
-    if not dossier_safe(summary):
-        return None, WITHHELD
     try:
         rapport = round(float(item.get("rapport_level")), 3) if item.get("rapport_level") is not None else None
     except (TypeError, ValueError):
@@ -284,7 +287,6 @@ def relationship_entry(item: dict):
         "tenure_days": int(item.get("tenure_days") or 0),
         "first_interaction_date": _date_of(item.get("first_interaction_date")),
         "last_interaction_date": _date_of(item.get("last_interaction_date")),
-        "context_summary": summary or None,
     }
     return entry, OK
 

@@ -146,6 +146,44 @@ def _publishable(item: dict) -> bool:
     return singleton_visible(item)
 
 
+MANIFEST_KEY = "generated/journal/posts.json"
+
+
+def _merge_manifest(staged_json: str, post_key: str, failures: list | None = None) -> str | None:
+    """The reading list to write on publish: the LIVE manifest with this one post's entry added or replaced.
+
+    The staged manifest is a draft-time snapshot of every row. Written whole, it put two held weeks' titles and excerpts
+    on the public list, dropped any week published since the draft, and rewrote an older post's excerpt (Week 10,
+    2026-11-14). The live manifest stays the record for every other post; the snapshot contributes only the entry
+    whose URL is this post's. Returns None (and records why) when that can't be done safely — the list is then left
+    as it was, never rebuilt from the snapshot."""
+
+    def _refuse(why: str) -> str | None:
+        logger.warning("posts.json not written: %s", why)
+        if failures is not None:
+            failures.append(f"posts.json not written: {why}")
+        return None
+
+    parts = (post_key or "").split("/")
+    if len(parts) < 3 or parts[0] != "generated":
+        return _refuse(f"no journal post key to identify this post ({post_key!r})")
+    post_url = "/" + "/".join(parts[1:-1]) + "/"
+    try:
+        staged = json.loads(staged_json) if isinstance(staged_json, str) else staged_json
+        entry = next(p for p in staged.get("posts") or [] if p.get("url") == post_url)
+    except (ValueError, StopIteration, AttributeError):
+        return _refuse(f"the staged manifest has no entry for {post_url}")
+    try:
+        live = json.loads(s3.get_object(Bucket=S3_BUCKET, Key=MANIFEST_KEY)["Body"].read()).get("posts") or []
+    except Exception as exc:
+        if (getattr(exc, "response", None) or {}).get("Error", {}).get("Code") not in ("NoSuchKey", "404"):
+            return _refuse(f"the live manifest could not be read ({exc})")
+        live = []  # the first post ever published
+    posts = [entry] + [p for p in live if p.get("url") != post_url]
+    posts.sort(key=lambda p: (str(p.get("date", "")), int(p.get("sequence") or 0)), reverse=True)
+    return json.dumps({"posts": posts, "updated_at": datetime.now(timezone.utc).isoformat()}, indent=2)
+
+
 def _publish_to_s3(item: dict, failures: list | None = None) -> list[str]:
     """Write pre-built HTML artifacts to S3. Returns list of invalidated CF paths.
 
@@ -177,15 +215,17 @@ def _publish_to_s3(item: dict, failures: list | None = None) -> list[str]:
         invalidation_paths.append(f"/{week_dir}/*")
 
     if journal_posts_json:
-        s3.put_object(
-            Bucket=S3_BUCKET,
-            Key="generated/journal/posts.json",
-            Body=public_body(journal_posts_json.encode("utf-8"), "application/json"),
-            ContentType="application/json",
-            CacheControl="max-age=300",
-        )
-        logger.info("S3: wrote generated/journal/posts.json")
-        invalidation_paths.append("/journal/posts.json")
+        merged = _merge_manifest(journal_posts_json, journal_post_key, failures)
+        if merged is not None:
+            s3.put_object(
+                Bucket=S3_BUCKET,
+                Key=MANIFEST_KEY,
+                Body=public_body(merged.encode("utf-8"), "application/json"),
+                ContentType="application/json",
+                CacheControl="max-age=300",
+            )
+            logger.info("S3: wrote %s", MANIFEST_KEY)
+            invalidation_paths.append("/journal/posts.json")
 
     # #405: the per-chronicle share kit → its stable generated location (served via
     # the already-routed /moments/* behavior). Built at draft time; written on publish
@@ -511,14 +551,12 @@ def publish_side_effects(item: dict, date_str: str, *, decline: dict | None = No
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# AUTO-PUBLISH SWEEP (SS-01) — the self-sustaining fail-safe: a chronicle draft must
-# never stay dark just because the approve link wasn't clicked. A daily schedule
-# sweeps drafts older than the review window and publishes them via the SAME path the
-# approve click uses (privacy/vice guards already ran at draft time). "Editor review
-# window + a fail-safe" — how a real team keeps the weekly running.
-# #4694: the fail-safe publishes only what passes the deterministic audit
-# (content/autopublish_audit.py). A draft nobody approved and the audit did not pass
-# stays a draft, and the sweep says so loudly (HELD_TOKEN → an alarm) every day it waits.
+# STALE-DRAFT SWEEP (SS-01) — a reminder, never a publisher (owner ruling 2026-11-13).
+# Until 2026-11-13 a daily schedule published any draft older than the review window that passed the deterministic
+# audit (#4694), so a week could reach subscribers that nobody approved. The owner ruled that elapsed time is never
+# consent: the sweep now publishes NOTHING. Every draft still unapproved past the window is held loudly (HELD_TOKEN →
+# the `chronicle-autopublish-held` alarm) every day it waits, with the audit's verdict, so the page says what an
+# approval would still need. Publication takes the owner's approve click AND a passing audit (`approval_refusal`).
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -569,45 +607,38 @@ def _audit_refusal(item: dict) -> list[str]:
         return [f"the audit could not run: {exc}"]
 
 
+def approval_refusal(item: dict) -> list[str]:
+    """Owner ruling 2026-11-13: an approval publishes only a draft that ALSO passes the editorial, provenance and privacy
+    audit (content/autopublish_audit) — the desk's open findings, the reader door, the dated weekdays, private activity.
+    The craft hold is the one item an approval answers: it exists to wait for the owner's eye (#4545). Fail-closed like
+    the sweep: an audit that cannot run refuses."""
+    return [b for b in _audit_refusal(item) if not b.startswith("craft hold")]
+
+
 def _sweep_stale_drafts(hours: float, max_days: float = 10.0, dry_run: bool = False) -> list[dict]:
-    """Publish every stale draft that passes the deterministic audit (#4694) via the approve path; HOLD the rest
-    loudly. Returns what was (would be) published — a held week is not in it."""
-    drafts = _find_stale_drafts(hours, max_days)
-    published = []
-    for item in drafts:
+    """HOLD every draft unapproved past the review window, loudly; publish nothing (owner ruling 2026-11-13).
+
+    Returns the held weeks. ``dry_run`` is kept for the scheduled event's shape; the sweep writes nothing either way."""
+    held = []
+    for item in _find_stale_drafts(hours, max_days):
         date_str = item.get("date") or str(item.get("sk", "")).replace("DATE#", "")
         wk = item.get("week_number", "?")
         blocking = _audit_refusal(item)
-        if blocking:
-            # #4694: a draft nobody approved and the audit did not pass stays a draft. Loud: the token below pages
-            # through the `chronicle-autopublish-held` alarm, every day the week sits unapproved inside the window,
-            # and this line names the week. The preview email's approve link still publishes it.
-            logger.error(
-                "%s Week %s (%s) held: unapproved for %sh and the audit found %d blocking item(s); approve it from the "
-                "preview email to publish. %s",
-                HELD_TOKEN,
-                wk,
-                date_str,
-                hours,
-                len(blocking),
-                blocking,
-            )
-            continue
-        if dry_run:
-            published.append({"date": date_str, "week": wk, "dry_run": True})
-            continue
-        try:
-            # #4593: the ONE side-effect owner; delivery + the Panel fire once for the batch below.
-            publish_side_effects(item, date_str, defer=DEFERRABLE)
-            published.append({"date": date_str, "week": wk})
-            logger.info("sweep: auto-published Week %s (%s) — no approval within %sh", wk, date_str, hours)
-        except Exception as exc:
-            logger.warning("sweep: auto-publish failed for %s: %s", date_str, exc)
-    if published and not dry_run:
-        _invoke_email_sender()  # one subscriber-delivery trigger for the batch
-        _invoke_coach_panel_podcast()  # #734: a published week earns a Panel episode
-    logger.info("chronicle auto-publish sweep: %d draft(s) handled (hours=%s, dry_run=%s)", len(published), hours, dry_run)
-    return published
+        # The token raises the `chronicle-autopublish-held` alarm (the daily digest) every day the week sits unapproved
+        # inside the window, and the line names the week and what the audit still finds (an approval needs those too).
+        logger.error(
+            "%s Week %s (%s) held: unapproved for %sh, and elapsed time never publishes a chronicle (owner ruling "
+            "2026-11-13); approve it from the preview email. The audit found %d blocking item(s). %s",
+            HELD_TOKEN,
+            wk,
+            date_str,
+            hours,
+            len(blocking),
+            blocking,
+        )
+        held.append({"date": date_str, "week": wk, "blocking": len(blocking)})
+    logger.info("chronicle stale-draft sweep: %d draft(s) held, none published (hours=%s, dry_run=%s)", len(held), hours, dry_run)
+    return held
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -616,14 +647,14 @@ def _sweep_stale_drafts(hours: float, max_days: float = 10.0, dry_run: bool = Fa
 
 
 def lambda_handler(event: dict, context) -> dict:
-    """Approve/request-changes (Function-URL GET) — or a scheduled auto-publish sweep."""
+    """Approve/request-changes (Function-URL GET) — or the scheduled stale-draft sweep (it holds, never publishes)."""
     logger.info("chronicle-approve: invoked")
     # SS-01 — scheduled sweep (EventBridge sends {"sweep": true} or source=aws.events).
     if isinstance(event, dict) and (event.get("sweep") or event.get("source") == "aws.events"):
         hours = float(os.environ.get("CHRONICLE_AUTOPUBLISH_HOURS", "48"))
         max_days = float(os.environ.get("CHRONICLE_AUTOPUBLISH_MAX_DAYS", "10"))
-        published = _sweep_stale_drafts(hours, max_days, dry_run=bool(event.get("dry_run")))
-        return {"statusCode": 200, "swept": published}
+        held = _sweep_stale_drafts(hours, max_days, dry_run=bool(event.get("dry_run")))
+        return {"statusCode": 200, "swept": [], "held": held}
     try:
         return _handle(event)
     except Exception as exc:
@@ -723,6 +754,24 @@ def _handle(event: dict) -> dict:
 
     # ── Perform action ───────────────────────────────────────────────────────
     if action == "approve":
+        refusal = approval_refusal(item)
+        if refusal:
+            # Owner ruling 2026-11-13: approval AND a passing audit. Nothing is published; the row stays a draft.
+            import html as _html
+
+            logger.warning(
+                "chronicle-approve: approval of Week %s (%s) refused — the audit found %d item(s)", week_num, date_str, len(refusal)
+            )
+            items = "".join(f"<li>{_html.escape(str(r))}</li>" for r in refusal)
+            return _html_response(
+                409,
+                "Not Published",
+                '<div class="icon">🔒</div>'
+                "<h1>Not published: the audit is not clear</h1>"
+                f"<p>Week {week_num} needs your approval <em>and</em> a clean editorial, provenance and privacy audit. "
+                f"The audit still finds {len(refusal)} item(s). Nothing was published; the draft is unchanged.</p>"
+                f"<ul>{items}</ul>",
+            )
         logger.info("chronicle-approve: APPROVING Week %s (%s)", week_num, date_str)
 
         publish_side_effects(item, date_str)  # #4593: every side effect, none declined

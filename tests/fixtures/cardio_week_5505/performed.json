@@ -1,0 +1,67 @@
+{
+  "source": "DynamoDB life-platform hevy cardio sessions (exercise_history.load_history_indexes()[1], annotated by cardio_cues.with_served_kinds), read-only 2026-11-08; only the fields the week count reads",
+  "weeks": {
+    "2026-10-26": [
+      {
+        "date": "2026-10-26",
+        "machine": "treadmill",
+        "note": "3.3 / 1.5 incline"
+      },
+      {
+        "date": "2026-10-28",
+        "machine": "treadmill",
+        "note": "3.5 incline / 3.2 speed",
+        "served_swap_kind": "hills"
+      },
+      {
+        "date": "2026-10-29",
+        "machine": "treadmill",
+        "note": "3.5 incline / 3.2 speed",
+        "served_swap_kind": "hills"
+      },
+      {
+        "date": "2026-10-30",
+        "machine": "cycling",
+        "note": "",
+        "served_swap_kind": "hills"
+      },
+      {
+        "date": "2026-11-01",
+        "machine": "cycling",
+        "note": "",
+        "served_kind": "hills"
+      }
+    ],
+    "2026-11-02": [
+      {
+        "date": "2026-11-02",
+        "machine": "treadmill",
+        "note": ""
+      },
+      {
+        "date": "2026-11-03",
+        "machine": "treadmill",
+        "note": "",
+        "served_swap_kind": "tempo"
+      },
+      {
+        "date": "2026-11-05",
+        "machine": "treadmill",
+        "note": "3.1 mph / 5 incline",
+        "served_swap_kind": "tempo"
+      },
+      {
+        "date": "2026-11-06",
+        "machine": "cycling",
+        "note": "",
+        "served_kind": "tempo"
+      },
+      {
+        "date": "2026-11-08",
+        "machine": "cycling",
+        "note": "I did level 10 for 5 mins then level 15 for 5 mins repeated",
+        "served_kind": "intervals"
+      }
+    ]
+  }
+}

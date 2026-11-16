@@ -117,6 +117,20 @@ WATCH_POLICY: dict[str, dict[str, Any]] = {
         "that stops leaves the site's only daily semantic QA dark with an empty (or "
         "stale-open) tracker issue that reads as healthy.",
     },
+    "web-preview-deploy.yml": {
+        "watched": True,
+        "grace_hours": 30.0,
+        # #5921: the FILE was born 2026-10-31, the CRON on 2026-11-14 (#5912). Without this the newborn rule
+        # dates the first-run deadline from the file and reads `never-fired` hours after the cron was added.
+        "registered_at": "2026-11-14T07:48:00+00:00",
+        "basis": "declared 15:30Z daily (2026-11-14); no observed history yet, so the grace is one full "
+        "cadence plus six hours: a merely-late or deferred-then-resumed run never reports, a "
+        "wholly missed day does.",
+        "reason": "The daily v9 rebuild. The public pages are a build-time snapshot of the live API, "
+        "and before this cron a published chapter, a graded call or a new day reached readers "
+        "only when unrelated www code merged (the front page sat two days stale, leading with "
+        "Chapter 06 after Week 10 published). If it stops, the site goes quietly stale again.",
+    },
     "operating-calendar.yml": {
         "watched": True,
         "grace_hours": 14.0,
@@ -138,6 +152,17 @@ WATCH_POLICY: dict[str, dict[str, Any]] = {
         "the #3021 lease janitor) and the #2826 head-coverage check; it observes the pipeline "
         "from OUTSIDE. If it stops, a green merge that never deployed sits invisible for "
         "exactly as long as nobody looks.",
+    },
+    "web-deploy-resume.yml": {
+        "watched": True,
+        "grace_hours": 8.0,
+        "basis": "declared hourly (41 * * * *); no fire history yet (born 2026-11-12). Sized as "
+        "deploy-wedge-watch.yml's high-frequency cron, whose measured worst gap (2026-08-26) set 8h; "
+        "check_cron_freshness re-derives a live grace once history exists.",
+        "reason": "The backstop that resumes a v9 deploy DEFERRED behind the Site API (2026-11-12, run "
+        "43124939822) and the dead-man for a deferral nobody resumed (deploy/www_api_readiness.py). "
+        "Its workflow_run trigger covers the usual case; if the cron stops, a laptop or cdk API deploy "
+        "leaves the site deferred with no page.",
     },
     "config-drift.yml": {
         "watched": True,

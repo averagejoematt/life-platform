@@ -4,6 +4,7 @@
 import { getCollection } from "astro:content";
 
 import { buildIndex, COLLECTION_OF, connected } from "./edges.js";
+import { hasPage } from "./url.js";
 
 let _cache = null;
 
@@ -39,7 +40,9 @@ export async function loadAll() {
 /** The Connected rail for one object, resolved to the objects themselves. */
 export async function connectedTo(type, id, opts) {
   const all = await loadAll();
-  const { items, total, more } = connected(all.index, type, id, opts);
+  // A row is a link, so an object with no page (a held chapter, url.js::hasPage) is never a row.
+  const keep = (e) => hasPage(e.type, all.get(e.type, e.id));
+  const { items, total, more } = connected(all.index, type, id, { ...opts, keep });
   return {
     total,
     more,
@@ -109,3 +112,64 @@ export async function loadJourney() {
   return _journey;
 }
 
+let _ownWords = null;
+/** The owner's approved first-person lines as the platform serves them (owner ruling 2026-11-15): the exporter always
+ *  writes the file (absent when the route did not answer). A snapshot made before it existed reads as absent, so every
+ *  placement renders nothing — never a guess. Pages read it only through lib/own_words.js::ownWords. */
+export async function loadOwnWords() {
+  if (_ownWords) return _ownWords;
+  try {
+    _ownWords = JSON.parse(await readFile(join(SNAPSHOT_DIR, "own_words.json"), "utf8"));
+  } catch {
+    _ownWords = { state: "absent", quotes: [] };
+  }
+  return _ownWords;
+}
+
+let _calibration = null;
+/** The Coaching Room's data file (CR1, built dark): written by the producer ONLY on a WEB_ROOM=1 export and read only
+ *  by room pages, which exist only on a room build. Throws when absent — a room build over a flag-off snapshot is a
+ *  setup error, not an empty room (re-export with WEB_ROOM=1). */
+export async function loadCalibration() {
+  if (_calibration) return _calibration;
+  _calibration = JSON.parse(await readFile(join(SNAPSHOT_DIR, "calibration.json"), "utf8"));
+  return _calibration;
+}
+
+let _coachRoom = null;
+/** The Coaching Room's coach profiles (CR2, built dark): written ONLY on a WEB_ROOM=1 export, read only by room pieces,
+ *  which render nothing with the switch off. Throws when absent — re-export with WEB_ROOM=1. */
+export async function loadCoachRoom() {
+  if (_coachRoom) return _coachRoom;
+  _coachRoom = JSON.parse(await readFile(join(SNAPSHOT_DIR, "coach_room.json"), "utf8"));
+  return _coachRoom;
+}
+
+let _lab = null;
+/** The Laboratory's data file (L1, built dark): written by the producer ONLY on a WEB_LAB=1 export and read only by
+ *  Lab pages, which exist only on a Lab build. Throws when absent — a Lab build over a flag-off snapshot is a setup
+ *  error, not an empty Lab (re-export with WEB_LAB=1). */
+export async function loadLab() {
+  if (_lab) return _lab;
+  _lab = JSON.parse(await readFile(join(SNAPSHOT_DIR, "lab.json"), "utf8"));
+  return _lab;
+}
+
+let _asOf = null;
+/** The snapshot's as-of day (the manifest's `as_of`), read once per build: the "this month" of the room's ledger view
+ *  (CR3). Never the wall clock. Read only by room pages. */
+export async function snapshotAsOf() {
+  if (_asOf) return _asOf;
+  _asOf = JSON.parse(await readFile(join(SNAPSHOT_DIR, "manifest.json"), "utf8")).as_of || null;
+  return _asOf;
+}
+
+let _story = null;
+/** The Human Story's data file (HS1, built dark): written by the producer ONLY on a WEB_STORY=1 export and read only by
+ *  story pages and the self-gating entry, which exist only on a story build. Throws when absent — re-export with
+ *  WEB_STORY=1. */
+export async function loadStory() {
+  if (_story) return _story;
+  _story = JSON.parse(await readFile(join(SNAPSHOT_DIR, "story.json"), "utf8"));
+  return _story;
+}

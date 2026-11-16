@@ -46,6 +46,7 @@ v1.5.0 — 2026-07-27: #1843 diary_sessions — video-diary/solo-recording sessi
 """
 
 import logging
+import math
 import os
 import time
 from datetime import datetime, timedelta, timezone
@@ -540,7 +541,7 @@ def _deep_dec(obj):
     if isinstance(obj, bool):
         return obj
     if isinstance(obj, float):
-        return Decimal(str(round(obj, 4)))
+        return Decimal(str(round(obj, 4))) if math.isfinite(obj) else None  # #5524: NaN/Inf never reach the write
     if isinstance(obj, int):
         return Decimal(str(obj))
     return obj
@@ -719,9 +720,12 @@ def store_computed_metrics(
     )
 
 
-def store_day_grade(date_str, total_score, grade, component_scores, weights):
-    """Write day_grade record — preserves existing schema for MCP tool compatibility."""
+def store_day_grade(date_str, total_score, grade, component_scores, weights, public_inputs=None):
+    """Write day_grade record — preserves existing schema for MCP tool compatibility. ``public_inputs`` = (data,
+    profile): the PUBLIC variant (health.day_grade_public, owner ruling 2026-11-05) is stored beside method 1."""
     try:
+        from health import day_grade_public
+
         item = {
             "pk": USER_PREFIX + "day_grade",
             "sk": "DATE#" + date_str,
@@ -735,6 +739,7 @@ def store_day_grade(date_str, total_score, grade, component_scores, weights):
         for comp, score in component_scores.items():
             if score is not None:
                 item["component_" + comp] = Decimal(str(score))
+        item.update(day_grade_public.stored_fields(public_inputs))  # {} when there are no inputs or the compute failed
         # ADR-058 (#1814): every write carries `phase` — an unstamped row passes the
         # default-deny read filter as CURRENT, so a row written between the reset's
         # tagger pass and genesis silently counted as an experiment day.
@@ -1239,10 +1244,7 @@ def lambda_handler(event, context):
 
     # ── Day grade ──
     day_grade_score, grade, component_scores, component_details = scoring_engine.compute_day_grade(data, profile)
-    logger.info(f"Day grade: {day_grade_score} ({grade})")
-    for comp, score in component_scores.items():
-        if score is not None:
-            logger.info(f"  {comp:<20} {score}")
+    logger.info("Day grade: %s (%s) %s", day_grade_score, grade, {c: s for c, s in component_scores.items() if s is not None})
 
     # ── Readiness ──
     # #543: load the personal percentile bands once (floor-guarded read; {} on miss → the
@@ -1294,6 +1296,7 @@ def lambda_handler(event, context):
             grade,
             component_scores,
             profile.get("day_grade_weights", {}),
+            public_inputs=(data, profile),  # owner ruling 2026-11-05: the public variant is computed beside method 1
         )
 
     store_habit_scores(

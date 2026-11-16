@@ -1,13 +1,13 @@
 """lambdas/coach/prediction_count_grader.py — the COUNT claim path (#4541).
 
-A count claim — "sleep duration will reach or exceed the 7.5-hour target on at least 5 of
-the first 7 nights" — names five things: a count (5), a window (7 days), a metric (sleep
-duration), a per-day comparator (>=) and a threshold (7.5 h). Its verdict is a COUNT: how
+A count claim — "sleep duration will reach or exceed 8 hours on at least 3 of the first 7
+nights" — names five things: a count (3), a window (7 days), a metric (sleep duration), a
+per-day comparator (>=) and a threshold (8 h). Its verdict is a COUNT: how
 many days in the window carried a reading that met the threshold, against the stated K.
 
 #4541: such a claim was emitted with a `directional` spec (metric + "up") and graded by the
-EWMA slope, so `pred_20260906_sleep_duration_will_consistently_reach_o` went CONFIRMED on a
-night count of 3 of 7. A slope says nothing about how many nights cleared a bar. This module
+EWMA slope, so a pre-registered count claim went CONFIRMED on a night count that fell short of
+its stated K. A slope says nothing about how many nights cleared a bar. This module
 runs BEFORE the type dispatch in `coach_prediction_evaluator._evaluate_all`, whatever the
 stored spec says, so a count-shaped sentence is never graded by slope, by the latest
 reading or by a trend sign.

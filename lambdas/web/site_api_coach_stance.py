@@ -26,10 +26,12 @@ from typing import Any
 from boto3.dynamodb.conditions import Key
 from coach import (
     audience_guard,  # #2972 — no owner-directed text on the public seams
+    coach_record,  # the season decided rows calibration-v2 assesses (owner 2026-11-09)
     plain_words,  # #4649 — a watch item a general reader cannot read is withheld
 )
 from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
+from web import site_api_calibration_v2  # owner ruling 2026-11-09: calibration-v2 is the verdict
 from web.site_api_coach_ledger import _CALIB_COACH_NAMES  # the huddle shows the same calibration the scoreboard does (#538)
 from web.site_api_coach_profile import _DISCLOSURE
 from web.site_api_common import (
@@ -518,12 +520,18 @@ def handle_coach_team(event, *, _g):
                 _summ, _, _lifetime_summ, _ = _score_coach_calibration(_bare, records=_cal_records.get(_bare, []))
                 _cal = {
                     "brier": _summ["brier"],
-                    "calibration": _summ["calibration"],
+                    "calibration": _summ["calibration"],  # calibration-v1 label: DEPRECATED, kept for API compatibility
                     "scored_n": _summ["n"],
                     # #1376: the huddle's confidence read shouldn't go dark on cycle
                     # 1 of a fresh season — carry the career figure alongside.
                     "lifetime_scored_n": _lifetime_summ["n"],
                     "lifetime_brier": _lifetime_summ["brier"],
+                    # Owner ruling 2026-11-09: the verdict is calibration-v2's three answers, over the same season
+                    # decided rows /api/calibration's assessment_v2.coaches serves for this coach.
+                    "assessment_v2": site_api_calibration_v2.coach_answers(
+                        coach_record.decided_rows(_cal_records.get(_bare, []), genesis=_g["EXPERIMENT_START"])
+                    ),
+                    "deprecated_fields": ["calibration"],
                 }
             huddle.append(
                 {

@@ -147,7 +147,7 @@ jobs:
 
       - name: Install Playwright + Chromium
         run: |
-          python -m pip install --upgrade pip
+          PINS=$(python3 scripts/ci_pins.py pip) && python -m pip install $PINS   # #5514: pinned pip, never a floating --upgrade
           PINS=$(python3 scripts/ci_pins.py playwright)   # version from requirements-dev.txt (CQ-01, #2609)
           python -m pip install $PINS
           python -m playwright install --with-deps chromium

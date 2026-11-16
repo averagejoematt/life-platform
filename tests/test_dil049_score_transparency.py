@@ -38,6 +38,7 @@ of the new code fails one of the two tests in its pair.
 
 import json
 
+from public_variant_fixtures import with_public  # noqa: E402 — 2026-11-05: public readers serve the public variant
 from web import site_api_character as ch_mod, site_api_common as common, site_api_vitals as vitals
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -162,7 +163,7 @@ def _sheet(date_str, *, relationships_not_instrumented):
     for p in ["sleep", "movement", "nutrition", "metabolic", "mind", "consistency"]:
         rec[f"pillar_{p}"] = _pillar(70.0)
     rec["pillar_relationships"] = _pillar(50.0, not_instrumented=relationships_not_instrumented)
-    return rec
+    return with_public(rec)
 
 
 def test_composite_discloses_when_a_pillar_is_excluded(monkeypatch):

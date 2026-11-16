@@ -1,0 +1,1116 @@
+{
+ "state": "ok",
+ "absent_text": null,
+ "source": [
+  "/api/coach/<id>",
+  "/api/coach_docket",
+  "/api/voice_fidelity"
+ ],
+ "fetched_at": "2026-10-31T18:00:00+00:00",
+ "coaches": {
+  "eli_marsh": {
+   "persona_id": "eli_marsh",
+   "absent": false,
+   "absent_reason": null,
+   "latest_read": {
+    "kind": "lead_daily",
+    "source": "/api/coach/eli_marsh · lead_daily",
+    "text": "Sample read for layout: the weight is moving at the pace the plan expects, and recovery is holding.",
+    "generated_at": "2026-10-31T18:00:54+00:00",
+    "data_through": "2026-10-30",
+    "date": "2026-10-31",
+    "cited": [
+     {
+      "metric": "day of the experiment",
+      "value": "56",
+      "as_of": "2026-10-31"
+     },
+     {
+      "metric": "recovery score",
+      "value": "71",
+      "as_of": "2026-10-30"
+     }
+    ],
+    "withheld_text": null
+   },
+   "stance": {
+    "source": "none",
+    "as_of": null,
+    "headline_read": "",
+    "how_my_read_changed": "",
+    "stage_label": "",
+    "stage_rationale": "",
+    "focused_on_now": [],
+    "set_aside_for_now": [],
+    "graduation_gate": "",
+    "summary_state": null,
+    "summary_as_of": null,
+    "summary_corrections": [],
+    "rung": null,
+    "ladder": [],
+    "withheld_text": null
+   },
+   "stance_history": [],
+   "asks": {
+    "commitment_counts": {
+     "held": 0,
+     "kept": 0,
+     "broken": 0,
+     "pending": 0,
+     "unresolved": 0,
+     "ungradeable": 0
+    },
+    "rows": [],
+    "degraded": false,
+    "disclosure": null
+   },
+   "docket_positions": [],
+   "docket": [],
+   "voice": {
+    "tone": "Calm, generalist, decisive (sample)",
+    "style": "Names the single priority for the phase and closes on the next concrete step (sample).",
+    "evidence_threshold": "",
+    "bold_claims": "",
+    "revision_style": "",
+    "uncertainty_style": ""
+   },
+   "fidelity": null,
+   "record_card": null,
+   "disclosure": "An AI character (sample disclosure for layout).",
+   "approved_words": {
+    "state": "ok",
+    "source": "/api/coach_room_words?coach=eli_marsh",
+    "approved_at": "2026-11-09",
+    "lead_window": {
+     "from": "2026-10-01",
+     "to": "2026-11-03",
+     "written": 28
+    },
+    "sealed_calls": [],
+    "lead_reads": [
+     {
+      "date": "2026-10-27",
+      "text": "Sample approved read for layout 1: the weight trend is on the plan's pace and recovery is steady.",
+      "generated_at": "2026-10-27T17:07:05+00:00",
+      "data_through": "2026-10-26",
+      "cited": [
+       {
+        "metric": "weight",
+        "value": "303.2",
+        "as_of": "2026-10-26"
+       },
+       {
+        "metric": "recovery score",
+        "value": "68",
+        "as_of": "2026-10-26"
+       }
+      ]
+     },
+     {
+      "date": "2026-10-24",
+      "text": "Sample approved read for layout 2: the weight trend is on the plan's pace and recovery is steady.",
+      "generated_at": "2026-10-24T17:07:05+00:00",
+      "data_through": "2026-10-23",
+      "cited": [
+       {
+        "metric": "weight",
+        "value": "304.0",
+        "as_of": "2026-10-23"
+       },
+       {
+        "metric": "recovery score",
+        "value": "68",
+        "as_of": "2026-10-23"
+       }
+      ],
+      "correction": {
+       "id": "ann-fixture-lead",
+       "annotated_at": "2026-11-11",
+       "read_written_at": "2026-10-24T17:07:05+00:00",
+       "note": "Correction added 11 November 2026. These words are shown exactly as written. Since then the record has changed: a synthetic fixture figure now reads 2, not 1. Synthetic layout text for the build tests.",
+       "corrections": [
+        {
+         "figure": "a synthetic fixture figure",
+         "unit": "",
+         "as_cited": "1",
+         "record_now": "2"
+        }
+       ],
+       "supersedes": null
+      }
+     },
+     {
+      "date": "2026-10-19",
+      "text": "Sample approved read for layout 3: the weight trend is on the plan's pace and recovery is steady.",
+      "generated_at": "2026-10-19T17:07:05+00:00",
+      "data_through": "2026-10-18",
+      "cited": [
+       {
+        "metric": "weight",
+        "value": "305.1",
+        "as_of": "2026-10-18"
+       },
+       {
+        "metric": "recovery score",
+        "value": "68",
+        "as_of": "2026-10-18"
+       }
+      ]
+     },
+     {
+      "date": "2026-10-12",
+      "text": "Sample approved read for layout 4: the weight trend is on the plan's pace and recovery is steady.",
+      "generated_at": "2026-10-12T17:07:05+00:00",
+      "data_through": "2026-10-11",
+      "cited": [
+       {
+        "metric": "weight",
+        "value": "306.8",
+        "as_of": "2026-10-11"
+       },
+       {
+        "metric": "recovery score",
+        "value": "68",
+        "as_of": "2026-10-11"
+       }
+      ]
+     }
+    ]
+   },
+   "public_briefs": {
+    "state": "absent",
+    "first_cycle": "2026-11-16",
+    "briefs": []
+   }
+  },
+  "sleep_coach": {
+   "persona_id": "sleep_coach",
+   "absent": false,
+   "absent_reason": null,
+   "latest_read": {
+    "kind": "output",
+    "source": "/api/coach/sleep_coach · recent_outputs",
+    "text": "",
+    "generated_at": "2026-10-29T17:02:35+00:00",
+    "data_through": "2026-10-28",
+    "date": "2026-10-29",
+    "cited": [],
+    "withheld_text": null
+   },
+   "stance": {
+    "source": "stance",
+    "as_of": "2026-10-31",
+    "headline_read": "Sample stance for layout: duration first, architecture later.",
+    "how_my_read_changed": "Sample: the bedtime window held for two weeks, so the read moved from timing to duration.",
+    "stage_label": "Get enough hours, regularly.",
+    "stage_rationale": "",
+    "focused_on_now": [
+     "time in bed most nights",
+     "a roughly consistent bedtime"
+    ],
+    "set_aside_for_now": [
+     "deep and REM percentages"
+    ],
+    "graduation_gate": "",
+    "summary_state": null,
+    "summary_as_of": null,
+    "summary_corrections": [],
+    "rung": {
+     "headline": "Get enough hours, regularly.",
+     "read_of_him": "At this stage the single biggest lever is total sleep and a consistent bedtime (sample).",
+     "cares_most": [
+      "time in bed most nights",
+      "a roughly consistent bedtime"
+     ],
+     "cares_less_right_now": [
+      "deep and REM percentages",
+      "perfect sleep scores"
+     ],
+     "plan": "Anchor a bedtime window and protect duration (sample)."
+    },
+    "ladder": [
+     "Get enough hours, regularly.",
+     "Make the timing tight.",
+     "Now we care about the stages.",
+     "Protect what works."
+    ],
+    "withheld_text": null
+   },
+   "stance_history": [
+    {
+     "as_of": "2026-10-31",
+     "headline_read": "Sample stance for layout: duration first, architecture later.",
+     "how_my_read_changed": "Sample: the bedtime window held for two weeks, so the read moved from timing to duration.",
+     "stage_label": "Get enough hours, regularly.",
+     "grade_corrections": [],
+     "withheld_text": null
+    },
+    {
+     "as_of": "2026-10-24",
+     "headline_read": "Sample: the deep-sleep call came in wrong; the read leans on timing now.",
+     "how_my_read_changed": "",
+     "stage_label": "Get enough hours, regularly.",
+     "grade_corrections": [
+      {
+       "original_status": "confirmed",
+       "corrected_status": "refuted",
+       "corrected_at": "2026-10-26T09:12:00+00:00",
+       "explanation": "Sample correction for layout: the call was graded again across its own window."
+      }
+     ],
+     "withheld_text": null
+    },
+    {
+     "as_of": "2026-10-17",
+     "headline_read": "",
+     "how_my_read_changed": "",
+     "stage_label": "",
+     "grade_corrections": [],
+     "withheld_text": null
+    },
+    {
+     "as_of": "2026-10-10",
+     "headline_read": "",
+     "how_my_read_changed": "",
+     "stage_label": "",
+     "grade_corrections": [],
+     "withheld_text": "Not quoted: the sleep sensor had sent no reading on the day this was written (sample)."
+    }
+   ],
+   "asks": {
+    "commitment_counts": {
+     "held": 4,
+     "kept": 1,
+     "broken": 1,
+     "pending": 1,
+     "unresolved": 1,
+     "ungradeable": 0
+    },
+    "rows": [
+     {
+      "date": "2026-10-29",
+      "due_date": "2026-11-05",
+      "status": "pending",
+      "outcome": null,
+      "outcome_date": null,
+      "text": "",
+      "outcome_notes": "",
+      "check": {
+       "metric": "sleep_duration_hours",
+       "direction": "up"
+      },
+      "withheld_text": null
+     },
+     {
+      "date": "2026-10-15",
+      "due_date": "2026-10-22",
+      "status": "kept",
+      "outcome": "kept",
+      "outcome_date": "2026-10-22",
+      "text": "Sample ask for layout: in bed by ten on five nights.",
+      "outcome_notes": "",
+      "check": {
+       "metric": "sleep_duration_hours",
+       "direction": "up"
+      },
+      "withheld_text": null
+     },
+     {
+      "date": "2026-10-08",
+      "due_date": "2026-10-15",
+      "status": "broken",
+      "outcome": "broken",
+      "outcome_date": "2026-10-15",
+      "text": "",
+      "outcome_notes": "",
+      "check": {
+       "metric": "sleep_duration_hours",
+       "direction": "up"
+      },
+      "withheld_text": null
+     },
+     {
+      "date": "2026-09-26",
+      "due_date": "2026-10-03",
+      "status": "unresolved",
+      "outcome": "unresolved",
+      "outcome_date": "2026-10-11",
+      "text": "",
+      "outcome_notes": "",
+      "check": null,
+      "withheld_text": null
+     }
+    ],
+    "degraded": false,
+    "disclosure": "Rendered verbatim from this coach's memory records (sample disclosure for layout)."
+   },
+   "docket_positions": [],
+   "docket": [
+    {
+     "coach_a": "nutrition_coach",
+     "coach_b": "sleep_coach",
+     "opened_date": "2026-10-02",
+     "resolution_date": "2026-10-16",
+     "resolved_date": "2026-10-16",
+     "topic": "",
+     "claims": {
+      "nutrition_coach": "",
+      "sleep_coach": ""
+     },
+     "criterion": {
+      "description": "",
+      "metric": "recovery_score_7day_avg",
+      "condition": "gte",
+      "threshold": 70.0
+     },
+     "sides": {
+      "nutrition_coach": false,
+      "sleep_coach": true
+     },
+     "stakes": {
+      "nutrition_coach": {
+       "brier": 0.25,
+       "brier_n": 6.0
+      },
+      "sleep_coach": {
+       "brier": 0.2507,
+       "brier_n": 20.0
+      }
+     },
+     "winner": "sleep_coach",
+     "outcome": "graded",
+     "actual_value": 74.4,
+     "concession": "",
+     "status": "resolved",
+     "id": "2026-10-02-nutrition-coach-sleep-coach",
+     "withheld": {},
+     "concession_withheld": null,
+     "loser": "nutrition_coach",
+     "holds": true
+    },
+    {
+     "topic": "",
+     "claims": {
+      "sleep_coach": "Sample claim for the fixture build, sleep side.",
+      "training_coach": "Sample claim for the fixture build, training side, said on 2026-10-27."
+     },
+     "criterion": {
+      "description": "",
+      "metric": "recovery_score",
+      "condition": "gte",
+      "threshold": 60.0
+     },
+     "sides": {
+      "sleep_coach": true,
+      "training_coach": false
+     },
+     "stakes": {
+      "sleep_coach": {
+       "brier": 0.2507,
+       "brier_n": 20.0
+      },
+      "training_coach": {
+       "brier": 0.24,
+       "brier_n": 12.0
+      }
+     },
+     "winner": null,
+     "outcome": null,
+     "actual_value": null,
+     "concession": "",
+     "withheld": {},
+     "concession_withheld": null,
+     "loser": null,
+     "holds": null,
+     "resolved_date": null,
+     "id": "2026-10-27-sleep-coach-training-coach",
+     "status": "open",
+     "coach_a": "sleep_coach",
+     "coach_b": "training_coach",
+     "opened_date": "2026-10-27",
+     "resolution_date": "2026-11-10"
+    },
+    {
+     "topic": "",
+     "claims": {
+      "sleep_coach": "Sample claim for the fixture build, sleep side, second entry.",
+      "training_coach": "Sample claim for the fixture build, training side, second entry."
+     },
+     "criterion": {
+      "description": "Sample criterion description for the fixture build.",
+      "metric": "resting_hr",
+      "condition": "lte",
+      "threshold": 58.0
+     },
+     "sides": {
+      "sleep_coach": false,
+      "training_coach": true
+     },
+     "stakes": {
+      "sleep_coach": {
+       "brier": 0.2507,
+       "brier_n": 18.0
+      },
+      "training_coach": {
+       "brier": 0.24,
+       "brier_n": 9.0
+      }
+     },
+     "winner": "training_coach",
+     "outcome": "graded",
+     "actual_value": 56.2,
+     "concession": "Sample concession text for the fixture build.",
+     "withheld": {},
+     "concession_withheld": null,
+     "loser": "sleep_coach",
+     "holds": true,
+     "resolved_date": "2026-10-13",
+     "id": "2026-10-06-sleep-coach-training-coach",
+     "status": "resolved",
+     "coach_a": "sleep_coach",
+     "coach_b": "training_coach",
+     "opened_date": "2026-10-06",
+     "resolution_date": "2026-10-13"
+    }
+   ],
+   "voice": {
+    "tone": "Warm but firm (sample)",
+    "style": "Thinks in architecture, efficiency and circadian alignment (sample).",
+    "evidence_threshold": "moderate: needs a week of consistent signal before calling a trend (sample)",
+    "bold_claims": "low: prefers hedged directional statements (sample)",
+    "revision_style": "Transparent and immediate (sample)",
+    "uncertainty_style": "Explicit confidence levels woven into the prose (sample)"
+   },
+   "fidelity": {
+    "n": 8.0,
+    "correct": 4.0,
+    "accuracy_pct": 50.0,
+    "distinguishability": "distinct"
+   },
+   "record_card": {
+    "headline": "3 of 4 checked calls right (sample)",
+    "right": 3,
+    "n": 4,
+    "through": "2026-10-31",
+    "skill_sentence": "Across 4 checked calls, too few to compare with a simple guess (sample).",
+    "records": null,
+    "caveat": "Self-assessment of this coach's own calls, not external validation."
+   },
+   "disclosure": "An AI character (sample disclosure for layout).",
+   "approved_words": {
+    "state": "ok",
+    "source": "/api/coach_room_words?coach=sleep_coach",
+    "approved_at": "2026-11-09",
+    "lead_reads": [],
+    "sealed_calls": [
+     {
+      "prediction_id": "20260906-genesis01",
+      "claim": "Sample sealed call for layout: weekly loss over the first four weeks will exceed two pounds a week.",
+      "logged_date": "2026-09-06",
+      "due_date": "2026-10-04",
+      "settled_date": "2026-10-04",
+      "metric": "weight_lbs",
+      "kind": "direction",
+      "status": "confirmed"
+     },
+     {
+      "prediction_id": "20260906-genesis02",
+      "claim": "Sample sealed call for layout: sleep duration will rise over the first fourteen days.",
+      "logged_date": "2026-09-06",
+      "due_date": "2026-09-20",
+      "settled_date": "2026-09-20",
+      "metric": "sleep_duration_hours",
+      "kind": "direction",
+      "status": "refuted"
+     }
+    ]
+   },
+   "public_briefs": {
+    "state": "ok",
+    "source": "/api/coach_brief?coach=sleep_coach",
+    "first_cycle": "2026-11-16",
+    "briefs": [
+     {
+      "cycle": "2026-11-16",
+      "cycle_end": "2026-11-22",
+      "data_through": "2026-11-15",
+      "generated_at": "2026-11-16T14:05:00+00:00",
+      "observations": [
+       {
+        "id": "o1",
+        "label": "sleep duration",
+        "unit": "h",
+        "last7": {
+         "start": "2026-11-09",
+         "end": "2026-11-15",
+         "mean": 7.1,
+         "n": 7
+        },
+        "prior7": {
+         "start": "2026-11-02",
+         "end": "2026-11-08",
+         "mean": 6.8,
+         "n": 7
+        },
+        "last28": {
+         "start": "2026-10-19",
+         "end": "2026-11-15",
+         "mean": 6.9,
+         "n": 27
+        },
+        "latest": {
+         "date": "2026-11-15",
+         "value": 7.4
+        }
+       },
+       {
+        "id": "o2",
+        "label": "HRV",
+        "unit": "ms",
+        "last7": {
+         "start": "2026-11-09",
+         "end": "2026-11-15",
+         "mean": 52,
+         "n": 7
+        },
+        "prior7": {
+         "start": "2026-11-02",
+         "end": "2026-11-08",
+         "mean": 49,
+         "n": 6
+        },
+        "last28": {
+         "start": "2026-10-19",
+         "end": "2026-11-15",
+         "mean": 50,
+         "n": 26
+        },
+        "latest": {
+         "date": "2026-11-15",
+         "value": 55
+        }
+       }
+      ],
+      "interpretations": [
+       {
+        "id": "i1",
+        "text": "Sample interpretation for layout: sleep is longer this week than last, and HRV has followed it up.",
+        "cites": [
+         "o1",
+         "o2"
+        ]
+       }
+      ],
+      "predictions": [
+       {
+        "id": "p1",
+        "claim": "Sleep duration will rise over the next 14 days.",
+        "kind": "direction",
+        "confidence": 0.6,
+        "rationale": "Sample rationale for layout: the last two weeks moved the same way.",
+        "status": "pending",
+        "outcome_date": null
+       }
+      ],
+      "evaluation_criteria": [
+       {
+        "prediction": "p1",
+        "type": "directional",
+        "metric": "sleep_duration_hours",
+        "target_date": null,
+        "window_start": "2026-11-16",
+        "window_end": "2026-11-29",
+        "rule_sentence": "Graded on the first and last readings between 2026-11-16 and 2026-11-29: confirmed if the change is in the called direction and larger than the window's own day-to-day noise; refuted if not; inconclusive without readings."
+       }
+      ],
+      "recommendations": [
+       {
+        "id": "r1",
+        "text": "Sample recommendation for layout: keep lights out by ten on at least five nights.",
+        "rationale": "Sample rationale for layout: the longer nights came on the earlier bedtimes."
+       }
+      ],
+      "owner_actions": [
+       {
+        "recommendation_id": "r1",
+        "state": "pending",
+        "metric": null,
+        "condition": null,
+        "threshold": null,
+        "window_start": null,
+        "window_end": null,
+        "days_with_data": null,
+        "days_meeting": null,
+        "days_in_window": null
+       }
+      ],
+      "revisions": []
+     }
+    ]
+   }
+  },
+  "nutrition_coach": {
+   "persona_id": "nutrition_coach",
+   "absent": false,
+   "absent_reason": null,
+   "latest_read": null,
+   "stance": {
+    "source": "stance",
+    "as_of": "2026-10-31",
+    "headline_read": "",
+    "how_my_read_changed": "",
+    "stage_label": "",
+    "stage_rationale": "",
+    "focused_on_now": [],
+    "set_aside_for_now": [],
+    "graduation_gate": "",
+    "summary_state": null,
+    "summary_as_of": null,
+    "summary_corrections": [],
+    "rung": null,
+    "ladder": [],
+    "withheld_text": null
+   },
+   "stance_history": [
+    {
+     "as_of": "2026-10-31",
+     "headline_read": "",
+     "how_my_read_changed": "",
+     "stage_label": "",
+     "grade_corrections": [],
+     "withheld_text": null
+    }
+   ],
+   "asks": {
+    "commitment_counts": {
+     "held": 2,
+     "kept": 1,
+     "broken": 0,
+     "pending": 0,
+     "unresolved": 1,
+     "ungradeable": 0
+    },
+    "rows": [
+     {
+      "date": "2026-10-20",
+      "due_date": "2026-10-27",
+      "status": "kept",
+      "outcome": "kept",
+      "outcome_date": "2026-10-27",
+      "text": "",
+      "outcome_notes": "",
+      "check": {
+       "metric": "total_protein_g",
+       "direction": "up"
+      },
+      "withheld_text": null
+     },
+     {
+      "date": "2026-10-06",
+      "due_date": "2026-10-13",
+      "status": "unresolved",
+      "outcome": "unresolved",
+      "outcome_date": "2026-10-21",
+      "text": "",
+      "outcome_notes": "",
+      "check": null,
+      "withheld_text": null
+     }
+    ],
+    "degraded": false,
+    "disclosure": null
+   },
+   "docket_positions": [],
+   "docket": [
+    {
+     "coach_a": "nutrition_coach",
+     "coach_b": "sleep_coach",
+     "opened_date": "2026-10-02",
+     "resolution_date": "2026-10-16",
+     "resolved_date": "2026-10-16",
+     "topic": "",
+     "claims": {
+      "nutrition_coach": "",
+      "sleep_coach": ""
+     },
+     "criterion": {
+      "description": "",
+      "metric": "recovery_score_7day_avg",
+      "condition": "gte",
+      "threshold": 70.0
+     },
+     "sides": {
+      "nutrition_coach": false,
+      "sleep_coach": true
+     },
+     "stakes": {
+      "nutrition_coach": {
+       "brier": 0.25,
+       "brier_n": 6.0
+      },
+      "sleep_coach": {
+       "brier": 0.2507,
+       "brier_n": 20.0
+      }
+     },
+     "winner": "sleep_coach",
+     "outcome": "graded",
+     "actual_value": 74.4,
+     "concession": "",
+     "status": "resolved",
+     "id": "2026-10-02-nutrition-coach-sleep-coach",
+     "withheld": {},
+     "concession_withheld": null,
+     "loser": "nutrition_coach",
+     "holds": true
+    },
+    {
+     "topic": "",
+     "claims": {
+      "glucose_coach": "",
+      "nutrition_coach": "Sample claim for the fixture build, nutrition side."
+     },
+     "criterion": {
+      "description": "",
+      "metric": "recovery_score",
+      "condition": "lt",
+      "threshold": 70.0
+     },
+     "sides": {
+      "glucose_coach": false,
+      "nutrition_coach": true
+     },
+     "stakes": {
+      "glucose_coach": {
+       "brier": 0.25,
+       "brier_n": 3.0
+      },
+      "nutrition_coach": {
+       "brier": 0.25,
+       "brier_n": 10.0
+      }
+     },
+     "winner": "nutrition_coach",
+     "outcome": "graded",
+     "actual_value": 59.0,
+     "concession": null,
+     "withheld": {
+      "glucose_coach": "Not quoted: this was said on September 23 and rests on his glucose sensor, which had sent no reading since August 27."
+     },
+     "concession_withheld": "Not quoted: this was said on September 23 and rests on his glucose sensor, which had sent no reading since August 27.",
+     "loser": "glucose_coach",
+     "holds": true,
+     "resolved_date": "2026-09-30",
+     "id": "2026-09-23-glucose-coach-nutrition-coach",
+     "status": "resolved",
+     "coach_a": "glucose_coach",
+     "coach_b": "nutrition_coach",
+     "opened_date": "2026-09-23",
+     "resolution_date": "2026-09-30"
+    }
+   ],
+   "voice": null,
+   "fidelity": {
+    "n": 8.0,
+    "correct": 5.0,
+    "accuracy_pct": 62.5,
+    "distinguishability": "distinct"
+   },
+   "record_card": null,
+   "disclosure": null,
+   "approved_words": {
+    "state": "ok",
+    "source": "/api/coach_room_words?coach=nutrition_coach",
+    "approved_at": "2026-11-09",
+    "sealed_calls": [],
+    "lead_reads": []
+   },
+   "public_briefs": {
+    "state": "ok",
+    "source": "/api/coach_brief?coach=nutrition_coach",
+    "first_cycle": "2026-11-16",
+    "briefs": []
+   }
+  },
+  "glucose_coach": {
+   "persona_id": "glucose_coach",
+   "absent": true,
+   "absent_reason": "no sensor since 2026-10-12",
+   "latest_read": null,
+   "stance": {
+    "source": "absent",
+    "as_of": null,
+    "headline_read": "",
+    "how_my_read_changed": "",
+    "stage_label": "",
+    "stage_rationale": "",
+    "focused_on_now": [],
+    "set_aside_for_now": [],
+    "graduation_gate": "",
+    "summary_state": null,
+    "summary_as_of": null,
+    "summary_corrections": [],
+    "rung": null,
+    "ladder": [],
+    "withheld_text": null
+   },
+   "stance_history": [],
+   "asks": {
+    "commitment_counts": null,
+    "rows": [],
+    "degraded": true,
+    "disclosure": null
+   },
+   "docket_positions": [],
+   "docket": [
+    {
+     "topic": "",
+     "claims": {
+      "glucose_coach": "",
+      "nutrition_coach": "Sample claim for the fixture build, nutrition side."
+     },
+     "criterion": {
+      "description": "",
+      "metric": "recovery_score",
+      "condition": "lt",
+      "threshold": 70.0
+     },
+     "sides": {
+      "glucose_coach": false,
+      "nutrition_coach": true
+     },
+     "stakes": {
+      "glucose_coach": {
+       "brier": 0.25,
+       "brier_n": 3.0
+      },
+      "nutrition_coach": {
+       "brier": 0.25,
+       "brier_n": 10.0
+      }
+     },
+     "winner": "nutrition_coach",
+     "outcome": "graded",
+     "actual_value": 59.0,
+     "concession": null,
+     "withheld": {
+      "glucose_coach": "Not quoted: this was said on September 23 and rests on his glucose sensor, which had sent no reading since August 27."
+     },
+     "concession_withheld": "Not quoted: this was said on September 23 and rests on his glucose sensor, which had sent no reading since August 27.",
+     "loser": "glucose_coach",
+     "holds": true,
+     "resolved_date": "2026-09-30",
+     "id": "2026-09-23-glucose-coach-nutrition-coach",
+     "status": "resolved",
+     "coach_a": "glucose_coach",
+     "coach_b": "nutrition_coach",
+     "opened_date": "2026-09-23",
+     "resolution_date": "2026-09-30"
+    }
+   ],
+   "voice": null,
+   "fidelity": null,
+   "record_card": null,
+   "disclosure": null,
+   "approved_words": {
+    "state": "absent",
+    "sealed_calls": [],
+    "lead_reads": []
+   },
+   "public_briefs": {
+    "state": "absent",
+    "first_cycle": "2026-11-16",
+    "briefs": []
+   }
+  }
+ },
+ "voice_fidelity": {
+  "n": 16.0,
+  "correct": 9.0,
+  "accuracy_pct": 56.2,
+  "chance_accuracy_pct": 14.3,
+  "candidate_pool_size": 7.0,
+  "verdict": "distinct",
+  "scope": "all cycles",
+  "run_month": "2026-10",
+  "updated_at": "2026-10-01T16:00:49+00:00",
+  "disclosure": "Self-measured (sample disclosure for layout): judges read a blinded sample of each coach's own output and guess which coach wrote it."
+ },
+ "docket_entries": [
+  {
+   "coach_a": "nutrition_coach",
+   "coach_b": "sleep_coach",
+   "opened_date": "2026-10-02",
+   "resolution_date": "2026-10-16",
+   "resolved_date": "2026-10-16",
+   "topic": "",
+   "claims": {
+    "nutrition_coach": "",
+    "sleep_coach": ""
+   },
+   "criterion": {
+    "description": "",
+    "metric": "recovery_score_7day_avg",
+    "condition": "gte",
+    "threshold": 70.0
+   },
+   "sides": {
+    "nutrition_coach": false,
+    "sleep_coach": true
+   },
+   "stakes": {
+    "nutrition_coach": {
+     "brier": 0.25,
+     "brier_n": 6.0
+    },
+    "sleep_coach": {
+     "brier": 0.2507,
+     "brier_n": 20.0
+    }
+   },
+   "winner": "sleep_coach",
+   "outcome": "graded",
+   "actual_value": 74.4,
+   "concession": "",
+   "status": "resolved",
+   "id": "2026-10-02-nutrition-coach-sleep-coach",
+   "withheld": {},
+   "concession_withheld": null,
+   "loser": "nutrition_coach",
+   "holds": true
+  },
+  {
+   "topic": "",
+   "claims": {
+    "glucose_coach": "",
+    "nutrition_coach": "Sample claim for the fixture build, nutrition side."
+   },
+   "criterion": {
+    "description": "",
+    "metric": "recovery_score",
+    "condition": "lt",
+    "threshold": 70.0
+   },
+   "sides": {
+    "glucose_coach": false,
+    "nutrition_coach": true
+   },
+   "stakes": {
+    "glucose_coach": {
+     "brier": 0.25,
+     "brier_n": 3.0
+    },
+    "nutrition_coach": {
+     "brier": 0.25,
+     "brier_n": 10.0
+    }
+   },
+   "winner": "nutrition_coach",
+   "outcome": "graded",
+   "actual_value": 59.0,
+   "concession": null,
+   "withheld": {
+    "glucose_coach": "Not quoted: this was said on September 23 and rests on his glucose sensor, which had sent no reading since August 27."
+   },
+   "concession_withheld": "Not quoted: this was said on September 23 and rests on his glucose sensor, which had sent no reading since August 27.",
+   "loser": "glucose_coach",
+   "holds": true,
+   "resolved_date": "2026-09-30",
+   "id": "2026-09-23-glucose-coach-nutrition-coach",
+   "status": "resolved",
+   "coach_a": "glucose_coach",
+   "coach_b": "nutrition_coach",
+   "opened_date": "2026-09-23",
+   "resolution_date": "2026-09-30"
+  },
+  {
+   "topic": "Sample topic for the fixture build, open entry.",
+   "claims": {
+    "sleep_coach": "Sample claim for the fixture build, sleep side.",
+    "training_coach": "Sample claim for the fixture build, training side, said on 2026-10-27."
+   },
+   "criterion": {
+    "description": "Sample criterion description for the fixture build, open entry.",
+    "metric": "recovery_score",
+    "condition": "gte",
+    "threshold": 60.0
+   },
+   "sides": {
+    "sleep_coach": true,
+    "training_coach": false
+   },
+   "stakes": {
+    "sleep_coach": {
+     "brier": 0.2507,
+     "brier_n": 20.0
+    },
+    "training_coach": {
+     "brier": 0.24,
+     "brier_n": 12.0
+    }
+   },
+   "winner": null,
+   "outcome": null,
+   "actual_value": null,
+   "concession": "",
+   "withheld": {},
+   "concession_withheld": null,
+   "loser": null,
+   "holds": null,
+   "resolved_date": null,
+   "id": "2026-10-27-sleep-coach-training-coach",
+   "status": "open",
+   "coach_a": "sleep_coach",
+   "coach_b": "training_coach",
+   "opened_date": "2026-10-27",
+   "resolution_date": "2026-11-10"
+  },
+  {
+   "topic": "Sample topic for the fixture build, second entry.",
+   "claims": {
+    "sleep_coach": "Sample claim for the fixture build, sleep side, second entry.",
+    "training_coach": "Sample claim for the fixture build, training side, second entry."
+   },
+   "criterion": {
+    "description": "Sample criterion description for the fixture build.",
+    "metric": "resting_hr",
+    "condition": "lte",
+    "threshold": 58.0
+   },
+   "sides": {
+    "sleep_coach": false,
+    "training_coach": true
+   },
+   "stakes": {
+    "sleep_coach": {
+     "brier": 0.2507,
+     "brier_n": 18.0
+    },
+    "training_coach": {
+     "brier": 0.24,
+     "brier_n": 9.0
+    }
+   },
+   "winner": "training_coach",
+   "outcome": "graded",
+   "actual_value": 56.2,
+   "concession": "Sample concession text for the fixture build.",
+   "withheld": {},
+   "concession_withheld": null,
+   "loser": "sleep_coach",
+   "holds": true,
+   "resolved_date": "2026-10-13",
+   "id": "2026-10-06-sleep-coach-training-coach",
+   "status": "resolved",
+   "coach_a": "sleep_coach",
+   "coach_b": "training_coach",
+   "opened_date": "2026-10-06",
+   "resolution_date": "2026-10-13"
+  }
+ ],
+ "docket_counts": {
+  "open": 1,
+  "resolved": 3
+ },
+ "docket_disclosure": "Standing disagreements between AI coaches, each with skin in the game: the stake is the coach's own Brier record, frozen when the docket opened. The resolution criterion and date are agreed at open and graded by deterministic code against real data — no AI writes the verdict, and lost disputes stay on the record next to the wins."
+}

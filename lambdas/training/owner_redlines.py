@@ -232,9 +232,9 @@ REDLINES: dict[str, dict[str, Any]] = {
             "Owner ruling 2026-10-23 (R1): stay at ~1,500 kcal; the charter is re-targeted there and the weekly engine does not push food up. "
             "The 2026-09-22 red team's model read differently and is kept as the dissent: at the 2024–25 activity base (16 h walking, 5 lifts) "
             "~2,000 kcal reproduced the campaign, and 1,500 was estimated to cost training carbohydrate and 3–6 lb more lean (from practice, not "
-            "a citation). The floors are therefore WARNINGS (`floor_role`): a day under `floor_any_day` / `floor_lifting_day` is reported "
-            "honestly and visibly, never vetoed and never clamped up; the 7-day-mean floor is reported, not enforced. `prescribed` is the "
-            "calorie band centred on the target (#5099); a titration record (health.titration) moves it, never silently."
+            "a citation). The floors are WARNINGS for logged days (`floor_role`): a logged day under `floor_any_day` / `floor_lifting_day` is reported "
+            "honestly and visibly, never vetoed; the SERVED target is clamped at the day's floor (owner ruling 2026-11-11, #5794); the 7-day-mean floor is reported, not enforced. `prescribed` is the "
+            "calorie band (#5099; the any-day to the lifting-day floor since owner ruling 2026-11-11, #5794); a titration step re-derives it as [max(base, any-day floor), max(base + the lifting uplift, lifting-day floor)] (owner ruling 2026-11-13, #5794), never silently."
         ),
     },
     "protein_floor_g": {
@@ -331,9 +331,12 @@ REDLINES: dict[str, dict[str, Any]] = {
         "retired": {"front_load_permitted_hr_wk": 16, "front_load_weeks": [3, 12], "target_hr_wk": 13, "hr_ceiling_bpm": 105},
         "ceiling_hr_wk_outside_front_load": 15,
         "maintenance_floor_hr_wk": 10,
-        # OD2: the average walking HR is capped at 120 with the talk test; 105 is the TARGET, no longer the cap
-        "hr_ceiling_bpm": 120,  # drift-ok: a heart-rate ceiling in bpm, not a budget ceiling (ADR-133 scanner false-positive)
-        "hr_target_bpm": 105,
+        # #5916 (owner ruling 2026-11-13): OD2's heart-rate cap and target are RETIRED. Easy walking is prescribed and judged by
+        # the talk test plus RPE (`standing_constraints.easy_effort_cue(easy_rpe_max)` is the line every surface prints); heart
+        # rate is recorded as a measurement and never graded against a fixed ceiling. The retired numbers are history
+        # (`redline_changelog.RETIRED_WALKING_HR_LINE`), not a field of this redline.
+        "intensity_by": "talk test + RPE (owner ruling 2026-11-13, #5916); heart rate is a recorded measurement, never graded against a fixed ceiling",
+        "easy_rpe_max": 4,
         "talk_test": True,
         "long_walk_slots_per_wk": 1,
         # OD7 (A): the vital sign is hours AND >= 3 standalone walks a week of >= 20 min outside a gym window (`training.recent_aerobic`)
@@ -351,8 +354,8 @@ REDLINES: dict[str, dict[str, Any]] = {
             "~8.5 hrs/wk, from day one. v3 (historian, 2026-09-22): the 2024–25 rate was BOUGHT with walking — 15 walks, 16–19 h/wk "
             "at 83–104 bpm for the first nine weeks — and halved to 2.0 at ~269 lb when walking fell from 18 to 7 h while lifting "
             "volume rose. v0.5 (OD2, owner 2026-09-30): 11–12 h total by block-2 week 6 with weight-bearing ≥ 8.5 h; 16 h is retired "
-            "and so is 'cycling ≤ 2 h'; HR average ≤ 120 with the talk test, 105 the target; one long-walk slot a week, weekday walks "
-            "≤ 75 min as a default. The floor is PERMANENT and is a vital sign, not a schedule: a week under 8.5 h (10 h in "
+            "and so is 'cycling ≤ 2 h'; one long-walk slot a week, weekday walks ≤ 75 min as a default. Owner ruling 2026-11-13 (#5916): "
+            "OD2's heart-rate cap and target are retired; easy walking is prescribed and judged by the talk test plus RPE, and heart rate is recorded as a measurement, never graded against a fixed ceiling. The floor is PERMANENT and is a vital sign, not a schedule: a week under 8.5 h (10 h in "
             "maintenance) fires the relapse-prodrome tripwire in every phase (11.4 → 4.4 walks/wk inside 8 weeks of the 2025 trough "
             "preceded the regain) — and since OD7 the vital sign also counts walks: ≥ 3 standalone walks a week of ≥ 20 min outside "
             "a gym window. Owner correction 2026-09-19: treadmill and cycling blocks logged inside Hevy count toward hours; Apple "
@@ -428,16 +431,19 @@ REDLINES: dict[str, dict[str, Any]] = {
         "detraining_discount_provenance": "owner ruling 2026-09-23 (#4107): 10 %, not the lane's conservative 15 %",
         "detraining_discount_pct_stated_2026_09_08": [10, 15],
         "entry_pct_of_band_best": [85, 90],
-        "trap_bar_until_lb": 275,
+        # #5694 (owner ruling 2026-11-08): the trap-bar-until-a-bodyweight hinge rule is RETIRED — he has pulled conventional
+        # since 2026-09-09. The weight it named lives once, in the charter (`gated_movements.conventional_deadlift.gate_lb`),
+        # read only as the Foundation -> Build phase boundary
+        "trap_bar_rule": "retired 2026-11-08 by owner ruling (#5694): the heavy lower day pulls the conventional deadlift, the volume lower day the RDL",
         "provenance": "owner",
         "stated": "2026-09-08",
         "note": (
             "'Prescribe strength loads against BODYWEIGHT-BAND-MATCHED history, not recent history… TWO axes: (1) "
             "matched bodyweight band tells you what his frame handled, (2) weeks since last consistent block tells you "
             "what his connective tissue is ready for NOW. Matching on weight alone will over-prescribe.' Observed "
-            "discount that was correct in practice: ~10-15% under last performed after a ~10 week layoff. Unchanged in v3, "
-            "plus: the hinge is the TRAP BAR until ≤ 275 lb — the 250–289 conventional pull in his record was set at 260-lb "
-            "geometry, so the conventional bar is gated by bodyweight, not by preference. Connective tissue at 316 lb lags "
+            "discount that was correct in practice: ~10-15% under last performed after a ~10 week layoff. Unchanged in v3. "
+            "(v3 also kept the hinge on the trap bar until a bodyweight gate; retired 2026-11-08, #5694 — see `trap_bar_rule`.) "
+            "Connective tissue at 316 lb lags "
             "muscle by 8–12 weeks (Kubo 2010): weekly axial tonnage and walking hours each +≤ 10 %/wk."
         ),
     },
@@ -620,9 +626,13 @@ REDLINES: dict[str, dict[str, Any]] = {
 # halt everything is one he will learn to ignore. `evaluated_by_engine: False` marks a
 # tripwire that plan_engine does not compute — it is REPORTED so the owner can see the
 # whole posture, and it says so wherever it appears (ADR-105: silence is not clearance).
-# The nutrition critics (`health.nutrition_critics`, #3754) read the intake floor and the
-# logging counts, but that is a different module: `evaluated_by_engine` is a plan_engine
-# claim and stays False there.
+# `evaluated_by_engine` is a plan_engine claim. #5802: `evaluated_by` names the module that
+# DOES read a tripwire the engine does not (`health.nutrition_critics`, `health.tripwire_readers`,
+# all report-only), and `merged_into` points a duplicate at the one evaluation that covers it.
+# Either one implies `evaluated_by_engine: False` unless the entry states otherwise (the stall row).
+# The merged overshoot arms: the owner picks the arm in the rate_overshoot decision ('step' or 'hold').
+# `unevaluated_tripwires()` is what is left: read by NO module — each one an owner ruling to
+# wire or delete (deletions are recorded in `training.redline_changelog`).
 TRIPWIRES: list[dict[str, Any]] = [
     # ── the v1 five — computed by plan_engine today (self_added_volume joined them in #4081) ──
     {
@@ -645,8 +655,9 @@ TRIPWIRES: list[dict[str, Any]] = [
             "Strength held flat through a 118 lb loss last time and the DEXA called retention excellent; a sustained drop is the earliest "
             "honest signal that the rate is outrunning recovery. v3: 5 % (was 7.5 %) on a rolling e1RM MEDIAN, and the action no longer "
             "adds calories by reflex — the wave-and-eat-more loop 'manufactures failures that raise calories for the wrong reason'. "
-            "`leverage_not_deterioration` is the companion: an absolute drop ≤ 5 % per 20 lb with allometric strength flat is leverage, "
-            "logged and not acted on. Since #4098 the engine computes the rolling 3-session e1RM median against the 6-session baseline "
+            "Leverage is not deterioration (folded from the deleted `leverage_not_deterioration` tripwire, owner ruling 2026-11-11, #5802): "
+            "an absolute drop ≤ 5 % per 20 lb of bodyweight with allometric strength (e1RM / BW^0.67) flat is a lighter man moving slightly "
+            "less — logged and not acted on; treating it as deterioration is how 2025's loads got held flat out of fear. Since #4098 the engine computes the rolling 3-session e1RM median against the 6-session baseline "
             "per template identity (`plan_engine.anchor_e1rm_trend`), trips on `threshold_pct` with `consecutive_sessions` of the last 3 "
             "below it, on the WORST core anchor, and holds the whole tripwire `not_yet_active` before `not_before_week` on the block "
             "calendar; the '2 of 4 anchors inside 14 days' and '> 10 % on one anchor for 3 sessions' clauses are not yet computed. "
@@ -704,6 +715,9 @@ TRIPWIRES: list[dict[str, Any]] = [
         "threshold_days": 14,
         "provenance": "owner-history",
         "action": "this is a diet-break / refeed decision, surfaced to him as a decision — never taken silently, never 'push harder'",
+        # #5802: ONE evaluation, two readers — nutrition_critics.decisions_offered computes it; plan_engine reads that result
+        "evaluated_by": "health.nutrition_critics",
+        "evaluated_by_engine": True,  # the engine's row READS it (an `evaluated_by` alone means plan_engine has no row)
         "note": (
             "The prior campaign ran flat-out with no planned landing and reversed. A stall that is NOT explained by "
             "adherence is the moment the blueprint says to schedule a break rather than push harder. An unaudited stall is "
@@ -717,11 +731,12 @@ TRIPWIRES: list[dict[str, Any]] = [
         "id": "loss_acceptable",
         "signal": "14-day trend vs the band's target",
         "threshold": "within ±15 % (±0.5 lb/wk)",
+        "tolerance_pct": 15,  # #5802: the number the reader uses — the ± around the served target
         "window_days": "rolling",
         "provenance": "owner",
         "derived_by": "owner (the 2026-09-21 ask: the rate is adaptive, not ideological)",
         "action": "nothing — do not slow on a calendar",
-        "evaluated_by_engine": False,
+        "evaluated_by": "health.tripwire_readers",  # #5802: report-only
         "note": "The base case the other rate rules are exceptions to. Named so 'on schedule' is a computed state, not the absence of a flag.",
     },
     {
@@ -732,7 +747,7 @@ TRIPWIRES: list[dict[str, Any]] = [
         "provenance": "owner",
         "derived_by": "owner + physician (red team 2026-09-22)",
         "action": "HOLD — the aggressive trajectory continues; ursodiol on",
-        "evaluated_by_engine": False,
+        "merged_into": "rate_overshoot",  # #5802: the hold arm of the overshoot decision
         "note": "Overshoot with every retention signal clean is the historical record repeating, not a failure; the gallstone cover is the price.",
     },
     {
@@ -742,7 +757,7 @@ TRIPWIRES: list[dict[str, Any]] = [
         "provenance": "population-derived",
         "derived_by": "population (Garthe 2011) via the nutritionist and S&C seats",
         "action": f"+{CALORIE_STEP_TEXT} kcal/day; target −0.5 lb/wk",
-        "evaluated_by_engine": False,
+        "merged_into": "rate_overshoot",  # #5802: the step arm of the overshoot decision
         "note": "The flagged arm of the overshoot rule; `rate_overshoot` below is its cap-based v2 ancestor kept for the nutrition critics' read.",
     },
     {
@@ -764,7 +779,7 @@ TRIPWIRES: list[dict[str, Any]] = [
         "provenance": "population-derived",
         "derived_by": "transformation coach + physician (v2), re-based on the v3 caps",
         "action": f"+{CALORIE_STEP_TEXT} kcal/day and ursodiol on — unless strength, DXA and recovery are ALL clean (`loss_excessive_clean`: hold); overshoot is a failure, not a win",
-        "evaluated_by_engine": False,
+        "evaluated_by": "health.nutrition_critics",  # #5802: decisions_offered
         "note": (
             "Cap-based: the cap is the schedule step's `cap` at his current weight (the charter band's ceiling above the landing, #5074; his taper caps from the landing down). "
             "`health.nutrition_critics` reads `threshold_weeks` and the overshoot rule's words and offers the one calorie step "
@@ -780,7 +795,7 @@ TRIPWIRES: list[dict[str, Any]] = [
         "provenance": "owner",
         "derived_by": "owner's rule: feet before fork",
         "action": f"walking +2 h FIRST; then −{CALORIE_STEP_TEXT} kcal (floor 1,800); never both inside 14 days",
-        "evaluated_by_engine": False,
+        "evaluated_by": "health.tripwire_readers",  # #5802: report-only
         "note": "The only rule that lowers intake, and it lowers the feet first.",
     },
     {
@@ -791,7 +806,7 @@ TRIPWIRES: list[dict[str, Any]] = [
         "provenance": "population-derived",
         "derived_by": "nutritionist (red team 2026-09-22)",
         "action": "adherence audit only; NO calorie change",
-        "evaluated_by_engine": False,
+        "evaluated_by": "health.tripwire_readers",  # #5802: report-only
         "note": "A rate that cannot be read is not a rate that is too slow.",
     },
     {
@@ -801,7 +816,7 @@ TRIPWIRES: list[dict[str, Any]] = [
         "provenance": "population-derived",
         "derived_by": "physician + nutritionist (v2), floors re-based to v3",
         "action": f"{_FLOOR_WARNING}: the step he may choose is +{CALORIE_STEP_TEXT} kcal/day as protein + fruit for 7 days",
-        "evaluated_by_engine": False,
+        "evaluated_by": "health.nutrition_critics",  # #5802: muscle_defense
         "note": "Read by `health.nutrition_critics` against `energy_floor_kcal.floor_any_day` / `floor_lifting_day`; the 1,078 kcal day in the record is a violation, not a good day.",
     },
     {
@@ -812,7 +827,7 @@ TRIPWIRES: list[dict[str, Any]] = [
         "provenance": "owner-history",
         "derived_by": "lived experience (red team 2026-09-22); firing today on his own record — 15 of 20 logged days",
         "action": f"{_FLOOR_WARNING}: the step he may choose is +{CALORIE_STEP_TEXT} kcal for 7 days, protein to 200 g",
-        "evaluated_by_engine": False,
+        "evaluated_by": "health.tripwire_readers",  # #5802: report-only
         "note": "The pre-ruling planned-minimum arm (1,700 at any weight) as distinct from the hard floor above, kept at its owner-history threshold as a warning; the charter's planned minimum is 1,400 since 1.21.0 (owner ruling 2026-10-23), so the ~1,500 target trips this arm by choice.",
     },
     {
@@ -825,7 +840,7 @@ TRIPWIRES: list[dict[str, Any]] = [
         "provenance": "owner-history",
         "derived_by": "lived experience (red team 2026-09-20 / 2026-09-22)",
         "action": "2 of 7 → a check-in, not a scolding (a message, read as an early mood signal); 4 of 14 → intake assumed at the floor and prescribed by default, walking audited",
-        "evaluated_by_engine": False,
+        "evaluated_by": "health.nutrition_critics",  # #5802: adherence
         "note": "Logging goes dark before the walks do. `health.nutrition_critics` reads `threshold_days` as the trailing no-log run; the <600 kcal dark-day rule is v3 and not yet read by it.",
     },
     {
@@ -835,18 +850,8 @@ TRIPWIRES: list[dict[str, Any]] = [
         "provenance": "population-derived",
         "derived_by": "lived experience (red team 2026-09-22; from practice, not a citation)",
         "action": f"the deficit shrinks by {CALORIE_STEP_TEXT} kcal — speed may not come from the fork when the feet are down",
-        "evaluated_by_engine": False,
+        "evaluated_by": "health.tripwire_readers",  # #5802: report-only
         "note": "The rule that stops 1,500 kcal from quietly substituting for 16 hours of walking, which is exactly how the current block is producing its rate.",
-    },
-    {
-        "id": "leverage_not_deterioration",
-        "signal": "absolute anchor load down ≤ 5 % per 20 lb of bodyweight WITH allometric strength (e1RM / BW^0.67) flat",
-        "threshold": "≤ 5 % per 20 lb, allometric flat",
-        "provenance": "population-derived",
-        "derived_by": "S&C coach (red team 2026-09-22; from practice)",
-        "action": "log it; no action",
-        "evaluated_by_engine": False,
-        "note": "The companion to `anchor_lift_strength_drop`: a lighter man moving slightly less is leverage, and treating it as deterioration is how 2025's loads got held flat out of fear.",
     },
     {
         "id": "lean_mass",
@@ -861,7 +866,7 @@ TRIPWIRES: list[dict[str, Any]] = [
         "provenance": "population-derived",
         "derived_by": "obesity-medicine physician (red team 2026-09-22)",
         "action": "slow one band; > 25 % of the loss, or appendicular lean −5 % from week 0 → maintenance until the next scan",
-        "evaluated_by_engine": False,
+        "evaluated_by": "health.tripwire_readers",  # #5802: report-only
         "note": "The instrument that answers his actual question (did I keep the muscle) and the one that earns the DXA-gated 3.5 / 3.0 steps. Week 0 = the 2026-03-30 scan by owner ruling 2026-09-22 (medical_cover.week0_reference); it earns nothing until the week-16 scan (OD6, #4503, owner 2026-09-30: the week-8 scan is a baseline plus the gross-failure and regional checks; between scans Body Scan 2 is the bioimpedance trend — training.bodyscan_lean).",
     },
     {
@@ -872,7 +877,7 @@ TRIPWIRES: list[dict[str, Any]] = [
         "provenance": "population-derived",
         "derived_by": "transformation coach (red team 2026-09-22)",
         "action": "the Minimum Viable Week",
-        "evaluated_by_engine": False,
+        "evaluated_by": "health.tripwire_readers",  # #5802: report-only
         "note": "Sleep is his one degraded channel now (7.25 h vs 8.4 in the 290s of 2024) and is why the walking ceiling is 15 h (the front-load window is retired, OD2).",
     },
     {
@@ -917,7 +922,7 @@ TRIPWIRES: list[dict[str, Any]] = [
         "provenance": "population-derived",
         "derived_by": "lived experience (red team 2026-09-22; from practice)",
         "action": "a call: logs go dark first, the scale second, the walk third",
-        "evaluated_by_engine": False,
+        "evaluated_by": "health.tripwire_readers",  # #5802: report-only
         "note": "Absorbs v2's `abstinence_violation_spiral` — the next morning's weigh-in is still the rule that breaks the spiral; the signal is now the missing weigh-in itself.",
     },
     {
@@ -927,20 +932,21 @@ TRIPWIRES: list[dict[str, Any]] = [
         "provenance": "population-derived",
         "derived_by": "obesity-medicine physician (red team 2026-09-22)",
         "action": "deficit to zero for 72 h; labs / ECG / ultrasound; resume on clearance. A slow line → −0.5 lb/wk and +250 kcal",
-        "evaluated_by_engine": False,
+        "evaluated_by": "health.tripwire_readers",  # #5802 owner veto 2026-11-11: report-only; the self-report lines read unknown
         "note": "The platform has a labs partition; the cadence and the thresholds are not wired to it. Postprandial RUQ pain → ultrasound within 48 h.",
     },
     {
         "id": "mood_declared",
         "signal": "PHQ-9 ≥ 10, item 9 > 0, a grief event, or he declares it himself",
         "threshold": "any",
+        "phq9_at_least": 10,  # #5802: the number the reader uses (the signal's PHQ-9 line)
         "provenance": "owner-history",
         "action": (
             "the Minimum Viable Week fires AUTOMATICALLY, not chosen — calories to the band's maintenance (not down), the walking floor "
             "halves (never zero), logging becomes ate / walked / weighed, daily weighing continues with no judgement for 14 days; one named "
             "human is contacted within 48 h BY THE PLAN, not by him; day 14 the plan asks whether the week extends; day 28 someone other than him decides"
         ),
-        "evaluated_by_engine": False,
+        "evaluated_by": "health.tripwire_readers",  # #5802 owner veto 2026-11-11: a shell — its input is the check-in lane's (#5819)
         "note": (
             "Both major reversals were bereavement/depression, not training. Two in fourteen years is the base rate, not the exception. "
             "v3 lowers the PHQ-9 line from 15 to 10 (physician). Written now because it cannot be written on the day; the named human is an owner act (§13)."
@@ -950,11 +956,12 @@ TRIPWIRES: list[dict[str, Any]] = [
         "id": "joy",
         "signal": "weekly yes/no: did you want to do any of it",
         "threshold": "three 'no' answers before 230 lb",
+        "threshold_rule": {"no_answers": 3, "above_lb": 230},  # #5802: the numbers the reader uses (the threshold text's)
         "threshold_days": 21,
         "provenance": "population-derived",
         "derived_by": "lived experience (red team 2026-09-22)",
         "action": "one week at maintenance — numbers-only tripwires miss this",
-        "evaluated_by_engine": False,
+        "evaluated_by": "health.tripwire_readers",  # #5802 owner veto 2026-11-11: a shell — its input is the check-in lane's (#5819)
         "note": "The one tripwire with no number behind it, on purpose.",
     },
     {
@@ -994,7 +1001,7 @@ TRIPWIRES: list[dict[str, Any]] = [
         "provenance": "population-derived",
         "derived_by": "S&C coach (red team 2026-09-22); the redline band is `lifting_sessions_per_wk.sets_per_muscle_wk` (v0.4: 8–12), this is its top",
         "action": "the plan does not grow next week — MRV is lower in a deficit and he can overshoot it without feeling it; above the band the next week's sets come down, never up",
-        "evaluated_by_engine": False,
+        "tripwire_class": "report_only",  # #5802: plan_engine reads it from the 28-day muscle volume
         "note": "The 28-day per-muscle sets are already computed; the per-session lines are the generator's own (v0.5 OD4, `training.green_block`).",
     },
     {
@@ -1004,6 +1011,12 @@ TRIPWIRES: list[dict[str, Any]] = [
         "threshold_days": 7,
         "provenance": "owner-history",
         "derived_by": "lived experience (red team 2026-09-22) on his own 2025 regain — walking gone within eight weeks of the trough",
+        # #5802 owner ruling 2026-11-11: KEEP, dormant — it reads a maintenance week, and none exists before the landing
+        "dormant_until": {
+            "since": "2026-11-11",
+            "until": "the maintenance phase (the landing, `landing()`)",
+            "ruling": "owner 2026-11-11 (#5802)",
+        },
         "action": "relapse declared; the band protocol begins regardless of weight",
         "evaluated_by_engine": False,
         "note": "Relapse detection is walking, not weight. This is the tripwire the 2024–25 campaign did not have.",
@@ -1011,14 +1024,32 @@ TRIPWIRES: list[dict[str, Any]] = [
 ]
 
 
+def _on_engine(t: dict[str, Any]) -> bool:
+    """plan_engine emits a row for it: `evaluated_by_engine` when stated, else True unless another module reads it or it is merged."""
+    return bool(t.get("evaluated_by_engine", not (t.get("evaluated_by") or t.get("merged_into"))))
+
+
 def engine_evaluated_tripwires() -> list[dict[str, Any]]:
-    """The tripwires plan_engine computes today (the v1 five + self_added_volume, #4081)."""
-    return [t for t in TRIPWIRES if t.get("evaluated_by_engine", True)]
+    """The tripwires plan_engine emits a row for (the v1 five + self_added_volume, #4081; volume_ceiling, #5802)."""
+    return [t for t in TRIPWIRES if _on_engine(t)]
+
+
+def evaluated_elsewhere() -> dict[str, str]:
+    """#5802: {tripwire id: the module that reads it, or `merged_into:<id>`} for every tripwire plan_engine does not compute."""
+    off_engine = [t for t in TRIPWIRES if not _on_engine(t)]
+    named = {t["id"]: t.get("evaluated_by") or (f"merged_into:{t['merged_into']}" if t.get("merged_into") else None) for t in off_engine}
+    return {k: v for k, v in named.items() if v}
+
+
+def dormant_tripwires() -> dict[str, dict[str, str]]:
+    """#5802: {id: its `dormant_until`} — kept by owner ruling, unread until a dated condition; never counted unevaluated."""
+    return {t["id"]: t["dormant_until"] for t in TRIPWIRES if t.get("dormant_until")}
 
 
 def unevaluated_tripwires() -> list[str]:
-    """Tripwires that are reported but not computed by plan_engine — named, never silent (ADR-105)."""
-    return [t["id"] for t in TRIPWIRES if not t.get("evaluated_by_engine", True)]
+    """Tripwires read by NO module and not owner-dormant (#5802) — not plan_engine, not `evaluated_by`, not merged. Named (ADR-105)."""
+    skip = {**evaluated_elsewhere(), **dormant_tripwires()}
+    return [t["id"] for t in TRIPWIRES if not _on_engine(t) and t["id"] not in skip]
 
 
 def landing() -> dict[str, Any]:
@@ -1046,6 +1077,8 @@ def summary() -> dict[str, Any]:
         "unresolved": [k for k, v in REDLINES.items() if v.get("owner_to_resolve")],
         "population_derived_thresholds": [t["id"] for t in TRIPWIRES if t.get("provenance") == "population-derived"],
         "unevaluated_tripwires": unevaluated_tripwires(),
+        "tripwires_evaluated_elsewhere": evaluated_elsewhere(),  # #5802
+        "tripwires_dormant": dormant_tripwires(),  # #5802: owner-kept, dated
         "changelog_v1_to_v2": CHANGELOG_V1_TO_V2,
         "changelog_v2_to_v3": CHANGELOG_V2_TO_V3,
     }

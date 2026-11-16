@@ -285,8 +285,11 @@ def _device(d: Any, hours_key: str, score_key: str) -> dict | None:
         "rem_hours": _num(d.get("rem_hours")),
         "light_hours": _num(d.get("light_hours")),
         "score": _num(d.get(score_key)),
+        # sprint III item 8: the vendor's own "this record is not final" flag, as served (True / False; None = not sent).
+        # True means the night was still recording when read — the Day page marks its figures provisional.
+        "provisional": d["vendor_incomplete"] if isinstance(d.get("vendor_incomplete"), bool) else None,
     }
-    return out if any(v is not None for k, v in out.items() if k != "night_of") else None
+    return out if any(v is not None for k, v in out.items() if k not in ("night_of", "provisional")) else None
 
 
 def night_of(row: dict | None) -> dict | None:
@@ -341,6 +344,8 @@ def engine_of(payload: Any, day: str) -> dict | None:
         "composite": _num(c.get("composite_score")),
         "delta": _num(c.get("composite_delta_1d")),
         "pillars": pillars,
+        # owner ruling 2026-11-05: the served method label (live vs recomputed under the public method), as served
+        "method": " ".join(filter(None, ((c.get("method") or {}).get(k) for k in ("label", "notice")))) or None,
     }
 
 
@@ -495,7 +500,9 @@ def check_layers(o: dict, where: str) -> None:
         _keys(n["by_device"], {"eightsleep", "whoop"}, f"{where}.night.by_device")
         for dev in n["by_device"].values():
             if dev is not None:
-                _keys(dev, {"night_of", "hours", "deep_hours", "rem_hours", "light_hours", "score"}, f"{where}.night.device")
+                _keys(dev, {"night_of", "hours", "deep_hours", "rem_hours", "light_hours", "score", "provisional"}, f"{where}.night.device")
+                if dev["provisional"] is not None and not isinstance(dev["provisional"], bool):
+                    raise SchemaError(f"{where}.night.device.provisional: true, false or null")
                 _nums(dev, ("hours", "deep_hours", "rem_hours", "light_hours", "score"), f"{where}.night.device")
     f = o["food"]
     if f is not None:
@@ -505,7 +512,9 @@ def check_layers(o: dict, where: str) -> None:
             raise SchemaError(f"{where}.food.logging_gap: a boolean")
     e = o["engine"]
     if e is not None:
-        _keys(e, {"level", "composite", "delta", "pillars"}, f"{where}.engine")
+        _keys(e, {"level", "composite", "delta", "pillars", "method"}, f"{where}.engine")
+        if e["method"] is not None and not (isinstance(e["method"], str) and e["method"]):
+            raise SchemaError(f"{where}.engine.method: a sentence or null")
         for p in e["pillars"]:
             _keys(p, {"name", "score", "not_instrumented"}, f"{where}.engine.pillar")
             if p["not_instrumented"] and p["score"] is not None:

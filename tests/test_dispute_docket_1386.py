@@ -511,13 +511,13 @@ class TestAC4PublicSurface:
 
         sac, t = api
         item = _open_docket_item()
-        item["claims"]["physical_coach"] = "the rs429358 variant explains the lipid response"
+        item["claims"]["physical_coach"] = "the rs0000000 variant explains the lipid response"
         t.put_item(Item=item)
         body = self._body(sac.handle_coach_docket({}))
         assert body["open"] == []
         assert body["counts"]["open"] == 0
         assert "withheld" not in body  # owner ruling 2026-11-06: not counted on the wire
-        assert "rs429358" not in json.dumps(body)
+        assert "rs0000000" not in json.dumps(body)
         # Invariance: the payload with the held entry is the payload with no entry at all (the only
         # difference between the two tables is the privately-held entry).
         t.delete_item(Key={"pk": item["pk"], "sk": item["sk"]})
@@ -541,14 +541,14 @@ class TestAC4PublicSurface:
                 "loser": "nutrition_coach",
                 "resolved_date": "2026-08-03",
                 "verdict": {"winner": "physical_coach", "loser": "nutrition_coach", "actual_value": 241.2},
-                "concession": "CONCESSION — the rs429358 variant explains the lipid response",
+                "concession": "CONCESSION — the rs0000000 variant explains the lipid response",
             }
         )
         t.put_item(Item=item)
         body = self._body(sac.handle_coach_docket({}))
         assert body["resolved"] == []
         assert "withheld" not in body  # owner ruling 2026-11-06: not counted on the wire
-        assert "rs429358" not in json.dumps(body)
+        assert "rs0000000" not in json.dumps(body)
 
     def test_lost_disputes_render_in_the_same_shape_as_wins(self, api, monkeypatch):
         sac, t = api

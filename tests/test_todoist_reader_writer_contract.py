@@ -191,6 +191,12 @@ NON_RECORD_KEYS = {
     "compute/hypothesis_engine_lambda.py": {
         "score": "hypothesis payload key",
     },
+    "health/character_public.py": {
+        # Owner ruling 2026-11-05: the public variant hands the engine a todoist-shaped {"overdue_count": n}
+        # rebuilt from method 1's task_follow_through component score; `raw_score` is the pillar field read off
+        # the character records beside it, not a todoist attribute.
+        "raw_score": "a character-sheet pillar field read beside the rebuilt todoist input",
+    },
     "operational/continuity_watch.py": {
         # #1400: AMBIENT_REASONS is keyed by SOURCE NAME ("todoist", "weather",
         # "whoop", ...) and its values are prose. The two flagged tokens are
@@ -236,6 +242,9 @@ READER_INVENTORY = {
     # read projecting ONLY `sk`. It reads no record fields — same shape as
     # pillar_absence and continuity_watch above.
     "common/input_manifest.py",
+    # Owner ruling 2026-11-05: builds (never reads off a record) the engine's todoist input for the public variant —
+    # `overdue_count`, the writer's own field name, rebuilt from method 1's stored component score.
+    "health/character_public.py",
 }
 
 

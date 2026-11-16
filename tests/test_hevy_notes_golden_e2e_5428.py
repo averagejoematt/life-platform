@@ -19,10 +19,17 @@ mode at the commit gate.
 
 from __future__ import annotations
 
+import pytest
 from training import hevy_note_lint, routine_title, session_block
 from training.cardio_note import apply_after_lines, compose
 from training.hevy_compiler import to_create_body
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set
+
+ROLLBACK = pytest.mark.usefixtures("exercise_library_rollback")
+"""#5861 (owner approval 2026-11-14): the marked tests pin the PRE-approval generator — the 09-25 / 10-18 golden renders are the
+pre-approval generator's (live: effort table, low-energy line, fitted lifts). They run on the library's rollback copy (status proposed:
+tests/conftest.py `exercise_library_rollback`), so they keep guarding the rollback path; the approved (live) behaviour is pinned by the
+#5861 tests."""
 
 
 def _with_cardio(ir: RoutineSpec) -> RoutineSpec:
@@ -48,6 +55,7 @@ def _compile(ir: RoutineSpec) -> dict:
     return to_create_body(ir, lambda k: "T-" + k, why_note=why)
 
 
+@ROLLBACK
 def test_freshly_rendered_routines_lint_clean():
     offenders = {}
     for name, ir in _renders().items():
@@ -60,7 +68,19 @@ def test_freshly_rendered_routines_lint_clean():
         # the linter read every kind and PREVIOUS (lane B writes it); nothing was skipped silently
         assert not [n for n in res.not_checked if n.startswith(("kinds", "L4 PREVIOUS"))], (name, res.not_checked)
         assert [e.kind for e in hevy_note_lint.from_wire(body, ir).exercises][-2:] == ["cardio", "mobility"]
-    assert offenders == {}, offenders
+    # #5428 re-grade #6 (2026-11-08): the offline 09-25 render reads NO history, so its barbell and machine compounds go out
+    # with no load on any row and the pick-load note asks him to find one — the 11-06 Romanian deadlift's class (4 of 4
+    # voices). That now fails L4 on exactly those lifts: the rule's positive control on the real generator path. With no
+    # basis for a start load the draft is not ready; the linter says so instead of shipping the open form.
+    no_load = "compound with no load on any working row asks him to 'find the load.' (§3.3)"
+    assert offenders == {
+        "09-25 v0.4 lower heavy": [
+            f"L4 [1] Squat (Barbell): a barbell {no_load}",
+            # #5694 (owner ruling 2026-11-08): Lower-heavy's hinge is the conventional deadlift, no longer the RDL
+            f"L4 [2] Deadlift (Barbell): a barbell {no_load}",
+            f"L4 [3] Leg Press (Machine): a machine {no_load}",
+        ]
+    }, offenders
 
 
 def _block_count(body: dict) -> int:
@@ -68,6 +88,7 @@ def _block_count(body: dict) -> int:
     return first.count(session_block.LOW_ENERGY_LINE)
 
 
+@ROLLBACK
 def test_exercise_1_carries_the_session_block_exactly_once_on_every_path():
     ir = _renders()["10-18 upper volume re-draft"]
     legacy = _compile(ir)  # a routine drafted before #5428 (no block on the IR): the restamp/cron WHY carries it

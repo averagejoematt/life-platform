@@ -132,7 +132,9 @@ signals           [ { class, summary, value?, confidence, block? } , ... ]   # �
                                                    # #3817: `block` (0-based) on block-scoped
                                                    # classes only (today: progression); absent =
                                                    # note-level. Merge key is (class, block) — §5b.
-pain_flag         false
+pain_flag         false                            # #5800: the net's `pain` class only (below)
+pain_net          false                            # #5800: the over-inclusive net (lexicon OR model) — never cleared
+pain_class        null                             # #5800: pain | discomfort | form_or_equipment | null
 sentiment         "positive" | "neutral" | "negative" | null
 degraded          false                            # true = LLM failed/capped, deterministic-only
 degraded_reason   null                             # #3699: "<code>: <ExcClass>: <msg>"; code ∈
@@ -140,7 +142,7 @@ degraded_reason   null                             # #3699: "<code>: <ExcClass>:
                                                    # ABSENT (not null) on records written before #3699 —
                                                    # consumers report those as `unrecorded`, never re-derived.
 extracted_by      "deterministic" | "haiku" | "hybrid"
-algo_version      "note-extractor@1.1.0"          # 1.1.0 = per-block merge + calibration + readiness join (#3817)
+algo_version      "note-extractor@1.2.0"          # 1.1.0 = per-block merge + calibration + readiness join (#3817); 1.2.0 = owner_request (#5573)
 extracted_at      <ts>
 ```
 
@@ -157,6 +159,13 @@ Each `{class, summary, value?, confidence}`:
 - `progression` — level/load/ROM/volume change. The arc anchor. *(cycling L10→L18→intervals; calf platform→full ROM)*
 - `form_technique` — technique state / cue that worked or didn't. *("balance harder", "form clicked")*
 - **`pain_discomfort`** — joint/tendon/bad-pain. **Safety: deterministic floor, sets `pain_flag`, elevated.**
+  *AMENDED 2026-11-11 (#5800):* the signal carries `severity: pain | discomfort`, and the record a `pain_class`
+  (`lambdas/training/training_notes_pain.py`, deterministic): `pain` = an un-negated pain word or a stated n/10 at or
+  above the `pain_flag_named_site` threshold (3/10); `discomfort` = a sensation (region + ache, burn/sore/tight, or the
+  model's read alone); `form_or_equipment` = a form or set-up note the model read as pain. Only `pain` sets
+  `pain_flag` — the tripwire, the deload recommendation, the steps-ramp / run-gate holds and elevation read it. The
+  other two are listed (`not_pain_notes`, the plan packet's `not_acted_on`) and acted on nowhere. The reader classes
+  stored rows from their own words, so records written before 1.3.0 need no rewrite.
 - `rpe_caveat` — qualifies a logged metric. **Overlay only, never overwrites raw** (Invariant 3).
 - `equipment_setup` — machine/tool/setup change. *("new machine", "no platform", "used straps")*
 - `limiter` — what capped the set. *("grip gave out before strength")*
@@ -260,6 +269,37 @@ makes every stored record a **forced** change under `certain_change_reason` — 
 goes through #3816's versioned write (prior archived at `ARCHIVE#…`, head stamped `supersedes`)
 and no improved record is mistakable for an original one.
 
+### §5d. Taxonomy amendment — `owner_request` (dated 2026-11-08, #5573)
+
+The second amendment since the lock. **New class — `owner_request`** — *the note ASKS the platform for
+something.* Every other class describes the session; this is the only one that expects a reply. Value:
+`{"subtype": "form_guidance" | "question" | "rule_request", "matched": [the phrases that decided it]}`.
+
+**Detection rule (deterministic, `training_notes.owner_request_of`), in precedence order:**
+
+* `rule_request` — "create / make / add / set up / write a rule", "need / want a rule".
+* `form_guidance` — an **ask** (`may need`, `I need`, `email(ed) me`, `send me`, `show me`, `can you`,
+  `please`, `would like`) **and** a guidance **medium** (`youtube`, `video`, `clip`, `tutorial`, `research`,
+  `guidance`, `email`, `link`) **and** a form **topic** (the `form_technique` words, or `how to`). All three:
+  *"watched a youtube video on form"* has a medium and a topic and asks for nothing.
+* `question` — a question mark after a word (`L9?` is a logging shrug, not a question), `not sure
+  how/if/whether…`, `should I/we`, `is this a good/better…`.
+
+**Measured** over every stored Hevy exercise note (633 noted exercise-sessions, 149 distinct texts,
+2021-04 → 2026-11-01, read 2026-11-08): exactly the three requests #5573 quotes fire, nothing else —
+Lateral Raise (Machine) 2026-11-01 → `form_guidance`, Triceps Rope Pushdown 2026-11-01 → `question`,
+Farmers Walk 2026-10-25 → `rule_request`. **Negative control:** *"felt off on rep 6"* is a form note
+(`form_technique` fires) and raises no request.
+
+The Haiku tail may add the class (its system line names it and the subtype); a model-only signal raises a
+request row only with a valid subtype at confidence ≥ 0.7 (`note_requests.LLM_MIN_CONFIDENCE`).
+`MAX_TOKENS` was re-derived for the extra element (640 → 768, `MAX_TOKENS_DERIVATION`).
+
+**What a detected request becomes** is `training/note_requests.py`, not this layer: a write-once request row
+(`training_constraints` / `REQUEST#…`, owner-only — `docs/SCHEMA.md`), one reply (a form cue sheet or a
+drafted story at raise time; a question is the coach chat's), and an `answered` / `declined` status with its
+channel and UTC instant. `ALGO_VERSION` moves `1.1.0` → `1.2.0`.
+
 ---
 
 ## 6. The extractor — deterministic-first, LLM tail, pain floor
@@ -275,7 +315,8 @@ else:
     try:    sig += haiku_extract(note, TAXONOMY)       # constrained JSON, max_tokens tight
     except: degraded = True                            # keep raw + deterministic sig; never drop (Invariant 4)
     cache.put(note_hash, ...)
-pain_flag = pain or any(s.class=="pain_discomfort" for s in sig)   # deterministic OR llm → flag
+pain_net  = pain or any(s.class=="pain_discomfort" for s in sig)   # deterministic OR llm → the net (kept)
+pain_flag = pain_class(note) == "pain"                             # #5800: only the pain class is a flag
 emit(record); if pain_flag: elevate(record)            # §7
 ```
 

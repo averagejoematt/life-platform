@@ -50,7 +50,7 @@ channel stays on the staging module. Full rule: `docs/CONVENTIONS.md` §1.
    (one bundle → every function) or `cd cdk && npx cdk deploy --all`.
 5. **CDK changes** (IAM, schedules, new Lambda) → `cd cdk && npx cdk deploy <StackName>`.
    The stack list lives in `cdk/app.py` / `docs/ARCHITECTURE.md` — don't trust a
-   hand-maintained table here. After a CDK deploy: `bash deploy/post_cdk_smoke.sh`.
+   hand-maintained table here. After a CDK deploy: `bash deploy/post_cdk_smoke.sh` (`deploy/cdk_deploy.sh` already ends with the #4034 sensor self-test, #5522).
 6. **Site content** → merge to `main`; a push touching `site/**` deploys automatically via
    `.github/workflows/site-deploy.yml` (#750). Attended fallback: `bash deploy/sync_site_to_s3.sh`
    (+ explicit fonts sync). Canonical rule: `docs/CONVENTIONS.md` §2.

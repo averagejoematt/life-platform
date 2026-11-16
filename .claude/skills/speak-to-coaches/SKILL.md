@@ -72,6 +72,24 @@ disagrees with and what it missed, then call `log_field_note_response` with `wee
 missed). This only works if that week's AI Lab Notes already exist — if `get_field_notes`
 comes back empty, say so and skip this step rather than inventing a response target.
 
+### 5b. Optional: what he did with the coaches' asks
+
+If Matthew wants to settle the coaches' recent asks, call `get_advice_link_queue` (read-only; `coach_id` from
+`$ARGUMENTS` if given). Unanswered asks come first; an ask he already answered carries `your_answer`. Take the asks
+in order, one at a time, and ask what he did with each. Record only the answer HE gives, with `log_advice_link`:
+
+- `ref_kind: "commitment"`, `ref_id`: the ask's `ask_id`, `coach_id`: the ask's `coach_id` (no `decision_sk` needed).
+- `state`: the one he names: `acted_on`, `declined`, `partially_followed` or `not_yet_decided`. Don't pick it for
+  him: if his answer is ambiguous, ask once which it is.
+- `evidence_text`: optional, his own words if he explains (verbatim, as in step 3). It stays private.
+- To change an answer, call again with the new state. To take one back, `withdraw: true` and no state. Both keep the
+  earlier answer in the private history, which the call returns.
+
+The public coach page shows only the newest answered state, the day and "self-reported" (`not_yet_decided`, a
+withdrawn answer and an unanswered ask all read "not recorded"), and never the note. If he skips an ask, record
+nothing: an unanswered ask is not `declined`. Never take a state from `grader_status` or from the
+`context_not_evidence` block (workouts, meals, habits): never put it in his mouth.
+
 ### 6. Close out
 
 Briefly summarize what got logged this session (which questions answered/skipped, any

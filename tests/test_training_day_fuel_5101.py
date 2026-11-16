@@ -1,9 +1,11 @@
 """tests/test_training_day_fuel_5101.py — training-day fuel through the ONE calorie resolver (#5101, epic #5091).
 
 Lifting, rest, travel and unknown days; the week; the lifting date resolves above the rest date; pre/post targets in
-the plan's block. Owner rulings 2026-10-23 (#5091 R1, #5212, and follow-up 2): the base is ~1,500, the floors are warnings
-(never a clamp), a lifting day is the base +150 and a rest day stays at the base — no payback below the target, so the
-week averages above the base by design — swept over 0..7 lifting days at the live charter. Pure: no clock, no AWS.
+the plan's block. Owner rulings 2026-10-23 (#5091 R1, #5212, and follow-up 2): the base is ~1,500, a lifting day is the
+base +150 and a rest day stays at the base — no payback below the target, so the week averages above the base by design.
+Owner ruling 2026-11-11 (#5794, option A) on top: the SERVED day is clamped at its floor (the lifting-day floor on a
+lifting day, the any-day floor on every other day), so at the live charter a lifting day serves 1,900 and a rest day
+1,600 — swept over 0..7 lifting days. Pure: no clock, no AWS.
 """
 
 from __future__ import annotations
@@ -28,17 +30,26 @@ def _res(day, dt, **kw):
     return ct.resolve(day, day_type=dt, **kw)
 
 
-def test_lifting_date_is_above_rest_date_and_rest_stays_at_the_base():
+def _served(base, day_type):
+    """The rule the resolver serves: the base (+ the uplift on a lifting day), clamped at the day's floor (#5794)."""
+    read = training_charter.charter_value
+    if day_type == "lifting":
+        return max(base + read("nutrition.training_day.lifting_uplift_kcal"), read("nutrition.calories.floor_lifting_day_kcal"))
+    return max(base, read("nutrition.calories.floor_any_day_kcal"))
+
+
+def test_lifting_date_is_above_rest_date_and_rest_serves_its_floor():
     lift = _res(WEEK[0], "lifting")
     rest = _res(WEEK[5], "rest")
     unk = ct.resolve(WEEK[0])
-    assert lift["kcal"] > unk["kcal"] == rest["kcal"] == unk["base_kcal"]
+    assert lift["kcal"] > unk["kcal"] == rest["kcal"] == 1600 and unk["base_kcal"] == rest["base_kcal"] == 1500
     assert unk["day_type"] == "unknown" and unk["uplift_kcal"] == 0 and rest["uplift_kcal"] == 0
     assert lift["uplift_kcal"] == training_charter.charter_value("nutrition.training_day.lifting_uplift_kcal") == 150
-    assert lift["kcal"] == lift["base_kcal"] + lift["uplift_kcal"] == 1650
+    # #5794: base + uplift = 1,650 sits under the 1,900 lifting-day floor, so the day is served at the floor
+    assert (lift["kcal"], lift["floor_clamp_kcal"], rest["floor_clamp_kcal"]) == (1900, 250, 100)
 
 
-def test_travel_holds_the_base_and_unknown_is_never_a_guessed_rest_day():
+def test_travel_holds_the_unknown_day_and_unknown_is_never_a_guessed_rest_day():
     base = ct.resolve(MON)["kcal"]
     assert _res(MON, "travel")["kcal"] == base
     assert _res(MON, "unknown")["kcal"] == base
@@ -49,23 +60,23 @@ def test_travel_holds_the_base_and_unknown_is_never_a_guessed_rest_day():
 
 def test_the_week_averages_above_the_base_by_design_no_rest_day_payback():
     """Owner ruling 2026-10-23 (#5091 follow-up 2): 'Rest days are not paid back below the target. The week averages
-    above 1,500 by design.' Five lifting days: (5 x 1,650 + 2 x 1,500) / 7 = 1,607."""
+    above 1,500 by design.' With the #5794 clamp, five lifting days: (5 x 1,900 + 2 x 1,600) / 7 = 1,814."""
     types = ["lifting" if d in PLANNED else "rest" for d in WEEK]
     days = [_res(d, t, week_day_types=types) for d, t in zip(WEEK, types)]
-    base = ct.resolve(MON)["kcal"]
-    assert [r["kcal"] for r in days] == [base + 150] * 5 + [base] * 2
-    assert round(sum(r["kcal"] for r in days) / 7) == 1607
+    base = ct.resolve(MON)["base_kcal"]
+    assert [r["kcal"] for r in days] == [1900] * 5 + [1600] * 2 == [_served(base, t) for t in types]
+    assert round(sum(r["kcal"] for r in days) / 7) == 1814
     assert all(r["balance_held"] for r in days) and all(r["kcal"] >= r["base_kcal"] for r in days)
     # the default (no week list) gives the same numbers: the rest day never depends on the week's count
-    assert _res(WEEK[5], "rest")["kcal"] == base
+    assert _res(WEEK[5], "rest")["kcal"] == _served(base, "rest")
 
 
 def test_travel_and_no_lifting_weeks_stay_at_the_base():
     # a count of 0 is a real count; travel and rest days are the base whatever the week holds
     for types in (["travel"] * 5 + ["rest", "rest"], ["lifting", "lifting", "travel", "rest", "rest", "travel", "travel"]):
         kcal = [_res(MON, t, week_day_types=types)["kcal"] for t in types]
-        base = ct.resolve(MON)["kcal"]
-        assert kcal == [base + 150 if t == "lifting" else base for t in types], kcal
+        base = ct.resolve(MON)["base_kcal"]
+        assert kcal == [_served(base, t) for t in types], kcal
 
 
 def test_split_holds_protein_and_fat_and_moves_carbohydrate():
@@ -75,9 +86,9 @@ def test_split_holds_protein_and_fat_and_moves_carbohydrate():
         total = 4 * r["split"]["protein_g"] + 9 * r["split"]["fat_g"] + 4 * r["split"]["carb_g"]
         assert abs(total - r["kcal"]) <= 9
     assert lift["split"]["carb_g"] > unk["split"]["carb_g"] == rest["split"]["carb_g"]
-    # the ruled numbers: 1,650 = 170 / 65 / 96 g, 1,500 = 170 / 65 / 59 g
-    assert {k: lift["split"][k] for k in ("protein_g", "fat_g", "carb_g")} == {"protein_g": 170, "fat_g": 65, "carb_g": 96}
-    assert {k: rest["split"][k] for k in ("protein_g", "fat_g", "carb_g")} == {"protein_g": 170, "fat_g": 65, "carb_g": 59}
+    # the served numbers (#5794 clamp): 1,900 = 170 / 65 / 159 g, 1,600 = 170 / 65 / 84 g — the clamp's kcal is carbohydrate
+    assert {k: lift["split"][k] for k in ("protein_g", "fat_g", "carb_g")} == {"protein_g": 170, "fat_g": 65, "carb_g": 159}
+    assert {k: rest["split"][k] for k in ("protein_g", "fat_g", "carb_g")} == {"protein_g": 170, "fat_g": 65, "carb_g": 84}
 
 
 def test_the_session_carbohydrate_fits_the_lifting_day_with_room_for_the_fibre_floor():
@@ -92,8 +103,9 @@ def test_the_session_carbohydrate_fits_the_lifting_day_with_room_for_the_fibre_f
     assert session + read("nutrition.floors.fibre.floor_g") <= lift["split"]["carb_g"], (session, lift["split"])
 
 
-def test_floors_warn_and_never_clamp():
-    """Owner ruling 2026-10-23 R1: the energy floors stay as WARNINGS — a day under its floor keeps its kcal and says so."""
+def test_floors_clamp_the_served_day_and_no_warning_is_stamped_5794():
+    """Owner ruling 2026-11-11 (#5794, option A; it replaces R1's warning): a day under its floor is SERVED at the floor,
+    the base and the lift are stated, and the retired `floor_warnings` entry is not stamped beside the clamp."""
     block = {"target_kcal": 1500, "prescribed_band_kcal": [1400, 1600], "floor_any_day_kcal": 1600, "floor_lifting_day_kcal": 1900}
     vals = {
         "nutrition.calories": block,
@@ -105,9 +117,15 @@ def test_floors_warn_and_never_clamp():
     }
     rest = ct.resolve(MON, charter_reader=vals.get, day_type="rest")
     lift = ct.resolve(MON, charter_reader=vals.get, day_type="lifting")
-    assert rest["kcal"] == 1500 and rest["balance_held"] is True and "under its 1600 kcal floor" in rest["floor_warnings"][0]
-    assert lift["kcal"] == 1650 and lift["balance_held"] is True and "under its 1900 kcal floor" in lift["provenance"]
-    assert ct.resolve(MON, charter_reader=vals.get)["kcal"] == 1500, "no clamp"
+    assert (rest["kcal"], rest["base_kcal"], rest["floor_clamp_kcal"], rest["balance_held"]) == (1600, 1500, 100, True)
+    assert (lift["kcal"], lift["base_kcal"], lift["uplift_kcal"], lift["floor_clamp_kcal"]) == (1900, 1500, 150, 250)
+    assert "clamped 1650 -> 1900 kcal at the lifting day floor" in lift["provenance"]
+    assert ct.resolve(MON, charter_reader=vals.get)["kcal"] == 1600, "an untyped day is clamped at the any-day floor"
+    stamped = [r["day_type"] for r in (rest, lift) if "floor_warnings" in r or "a warning, not a clamp" in r["provenance"]]
+    assert not stamped, f"the retired planned-day floor warning is still stamped on: {stamped}"
+    # control: floors under the day leave it untouched (the clamp only ever lifts)
+    low = {**vals, "nutrition.calories": {**block, "floor_any_day_kcal": 1000, "floor_lifting_day_kcal": 1000}}
+    assert [ct.resolve(MON, charter_reader=low.get, day_type=t)["kcal"] for t in ("rest", "lifting")] == [1500, 1650]
 
 
 def test_every_lifting_day_count_holds_the_macro_floors_at_the_ruled_charter_5207():
@@ -117,7 +135,7 @@ def test_every_lifting_day_count_holds_the_macro_floors_at_the_ruled_charter_520
     read = training_charter.charter_value
     floors = {"protein_g": read("nutrition.protein.range_g.low"), "fat_g": read("nutrition.floors.fat.floor_g")}
     floors["carb_g"] = read("nutrition.floors.carb.floor_g")
-    base = ct.resolve(MON)["kcal"]
+    base = ct.resolve(MON)["base_kcal"]
     assert base == read("nutrition.calories.target_kcal") == 1500
     offenders = []
     for n in range(8):
@@ -128,7 +146,7 @@ def test_every_lifting_day_count_holds_the_macro_floors_at_the_ruled_charter_520
             if short or r["kcal"] < base or not r["balance_held"]:
                 offenders.append((n, r["day_type"], r["kcal"], r["split"], short))
         mean = sum(r["kcal"] for r in days) / 7
-        if abs(mean - (base + 150 * n / 7)) > 0.5:
+        if abs(mean - sum(_served(base, t) for t in types) / 7) > 0.5:
             offenders.append((n, "week", round(mean, 1)))
     assert not offenders, offenders
 
@@ -163,7 +181,7 @@ def test_plan_block_carries_the_day_and_the_pre_post_targets():
     from training import disruption
 
     out = ct.plan_block(MON, None)
-    assert out["day_type"] == "unknown" and out["uplift_kcal"] == 0 and out["kcal"] == out["base_kcal"]
+    assert out["day_type"] == "unknown" and out["uplift_kcal"] == 0 and out["kcal"] == _served(out["base_kcal"], "unknown")
     # a non-lifting date served by the sequence does NOT get the uplift; the uplift is stated as conditional
     assert out["if_lifting_day"]["kcal"] > out["kcal"] == out["if_rest_day"]["kcal"]
     pp = out["if_lifting_day"]["pre_post_session"]

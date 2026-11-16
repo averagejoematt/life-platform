@@ -52,6 +52,11 @@ def _sheet(day, rel):
     for p in _PUBLIC_PILLARS:
         rec[f"pillar_{p}"] = _pillar(60.0)
     rec["pillar_relationships"] = rel
+    # Owner ruling 2026-11-05: public readers serve the record's public variant; here it carries the same pillars, so
+    # these tests keep exercising the held-pillar mask on top of it (tests/test_character_public_variant.py owns the
+    # variant's own arithmetic).
+    block = {k: copy.deepcopy(v) for k, v in rec.items() if k not in ("pk", "sk", "date")}
+    rec[character_privacy.PUBLIC_KEY] = dict(block, public_method_version=character_privacy.PUBLIC_METHOD_VERSION, origin="recomputed")
     return rec
 
 
@@ -118,7 +123,7 @@ def _receipt(journal: bool):
             {"pk": "USER#matthew#SOURCE#flourishing", "sks": ["DATE#2026-09-24"]},
         ]
     rel = {"inputs": {"raw_score": 35.5 if journal else 50.0, "data_coverage": 1.0 if journal else 0.0}, "outputs": {"level": 1.0}}
-    return {
+    body = {
         "date": "2026-09-24",
         "digest": "d",
         "input_rows": rows,
@@ -128,6 +133,9 @@ def _receipt(journal: bool):
             "pillars": {"sleep": {"inputs": {"raw_score": 60.0}, "outputs": {}}, "relationships": rel},
         },
     }
+    # Owner ruling 2026-11-05: the route serves the public variant's receipt, stored inside the item; these tests keep
+    # exercising its row/pillar filter (an unfiltered receipt of the same shape is the mutation control).
+    return dict(body, **{character_privacy.PUBLIC_KEY: copy.deepcopy(body)})
 
 
 def test_the_receipt_omits_private_rows_and_the_private_pillar():

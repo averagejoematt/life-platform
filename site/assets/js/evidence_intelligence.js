@@ -10,6 +10,7 @@ import { evidenceBar } from "/assets/js/evidence_bar.js";
 import { esc, tryJSON, has, fmt, ttl, fmtShort, todayPT, fig, figs, sec, empty, note, warmup } from "/assets/js/evidence_shared.js";
 import { dataFigure } from "/assets/js/evidence_datafigure.js";
 import { coachComparison } from "/assets/js/coach_comparison.js"; // #4585 — no coach count without what a simple guess scored
+import { answersHTML, methodLine, shortHTML, v2Coach, v2Stratum } from "/assets/js/calibration_v2_words.js"; // owner 2026-11-09: calibration-v2 is the verdict
 
 // #4780 — the "projected goal (80% range)" figure opts in to fmtShort's { yearIfNotCurrent }
 // spelling, so a next-year window reads "Jul 2, 2027–Sep 18, 2027", never as past dates. The
@@ -356,7 +357,18 @@ export async function renderCorrelations(d) {
 // a skeptic reaches the frozen artifact whichever door they came in. Honest-empty:
 // a freshly re-anchored cycle whose stamp hasn't published yet renders nothing.
 function _sealBlock(seal) {
-  if (!seal || !seal.sha256 || !seal.artifact_url) return "";
+  if (!seal || !seal.sha256) return "";
+  // Owner ruling 2026-11-11 (item 3): the file link and the verify command render ONLY when the API says the file
+  // served at the sealed address hashes to this digest (verifiable === true, decided from the served bytes by
+  // prereg_seal_state.assess). Anything else — false, or absent from an older API — publishes the digest and the
+  // reason, and offers no check a reader could not complete.
+  if (seal.verifiable !== true || !seal.artifact_url) {
+    return sec(
+      "The frozen pre-registration — sealed before Day 1",
+      `<p class="rd-line">${esc(seal.unverifiable_text || "The file served at the sealed address cannot be checked against this hash from this site.")}</p>` +
+        `<p class="rd-line label">SHA-256</p><pre class="rd-code">${esc(seal.sha256)}</pre>`,
+    );
+  }
   return sec(
     "The frozen pre-registration — sealed before Day 1",
     `<p class="rd-line">This experiment's predictions and hypotheses were locked and hash-sealed before any Day-1 data existed: ` +
@@ -364,9 +376,9 @@ function _sealBlock(seal) {
       `<p class="rd-line label">SHA-256</p><pre class="rd-code">${esc(seal.sha256)}</pre>` +
       (seal.verify
         ? `<div class="rd-verify"><pre class="rd-code rd-verify-cmd">${esc(seal.verify)}</pre>` +
-          `<button type="button" class="rd-copy-btn" data-copy="${esc(seal.verify)}">copy verify command</button></div>`
-        : "") +
-      `<p class="rd-archive">Anyone can run that command and compare the printed hash against the one above — the claims can't be quietly edited after they were made.</p>`,
+          `<button type="button" class="rd-copy-btn" data-copy="${esc(seal.verify)}">copy verify command</button></div>` +
+          `<p class="rd-archive">Anyone can run that command and compare the printed hash against the one above — the claims can't be quietly edited after they were made.</p>`
+        : ""),
   );
 }
 
@@ -402,10 +414,9 @@ if (typeof document !== "undefined") {
 // travelled badly. A stat that can span a reset now says which side it is on.
 // #3550: a pooled card must show the strata it was pooled from. The platform card
 // is scored against a STRATIFIED base rate (calibration_core.score_strata) so it can
-// never read skilled / well-calibrated while every stratum is unskilled — and this
-// line puts each stratum's own n, skill and gap beside the pooled figures so the
-// reader can see which stratum drove the verdict (the 2026-09-05 card hid a 27-point
-// coach over-confidence under 137 well-behaved interval forecasts).
+// never read skilled while every stratum is unskilled — and this line puts each
+// stratum's own n, skill and gap beside the pooled figures (the 2026-09-05 card hid a
+// 27-point coach over-confidence under 137 well-behaved interval forecasts).
 const _STRATUM_LABEL = { coaches: "coach calls", hypotheses: "hypothesis bets", interval_forecasts: "interval forecasts" };
 function _strataLine(s) {
   const strata = s && s.strata;
@@ -415,17 +426,13 @@ function _strataLine(s) {
     if (!(v && v.n > 0)) return `${esc(name)} n=0`;
     const skill = v.brier_skill != null ? `skill ${fmt(v.brier_skill, 2)}` : "skill undefined";
     const gap = v.reliability_gap != null ? ` · gap ${v.reliability_gap > 0 ? "+" : ""}${fmt(v.reliability_gap, 2)}` : "";
-    const verdict = v.calibration && v.calibration !== "insufficient_data" ? ` (${esc(ttl(String(v.calibration).replace(/_/g, " ")))})` : "";
-    return `${esc(name)} n=${esc(String(v.n))} · ${skill}${gap}${verdict}`;
+    // Owner ruling 2026-11-09: no calibration-v1 verdict word here — the strata's calibration-v2 answers sit in their own section.
+    return `${esc(name)} n=${esc(String(v.n))} · ${skill}${gap}`;
   });
-  const driver = s.worst_stratum_gap && s.worst_stratum_gap.stratum
-    ? ` Verdict driven by the worst stratum's gap: ${esc(_STRATUM_LABEL[s.worst_stratum_gap.stratum] || s.worst_stratum_gap.stratum)}.`
-    : "";
-  return `<p class="cs-fresh cs-strata">By stratum, each against its own base rate — ${parts.join(" · ")}.${driver}</p>`;
+  return `<p class="cs-fresh cs-strata">By stratum, each against its own base rate — ${parts.join(" · ")}.</p>`;
 }
 
 function _calStatFigs(s, scope) {
-  const cal = String(s.calibration || "").replace(/_/g, " ");
   const nLabel = scope ? `graded forecasts · ${scope}` : "graded forecasts";
   const skillLabel = s.skill_reference === "stratified" ? "skill vs stratified base-rate" : "skill vs base-rate";
   const skillMethod = s.skill_reference === "stratified" ? "calibration_score_strata" : "brier_skill_score";
@@ -442,12 +449,37 @@ function _calStatFigs(s, scope) {
         s.accuracy_ci95 ? `95% CI ${fmt(s.accuracy_ci95[0])}–${fmt(s.accuracy_ci95[1])}%` : null,
         "calibration_score_pairs",
       ),
-    // #1370 honest badge: calibrated (reliability) ≠ skilled (beats base rate). A
-    // skill ≤ 0 surface reads the dignified state with its n, never "Well Calibrated".
-    s.calibration === "not_yet_skillful"
-      ? fig("Not Yet Skillful", `n=${s.n}, skill ≤ base rate`, null, "brier_skill_score")
-      : s.calibration && s.calibration !== "insufficient_data" && fig(ttl(cal), "calibration", null, "calibration_verdict"),
+    // Owner ruling 2026-11-09: the pooled card carries no calibration verdict — calibration-v2 never pools strata,
+    // and the v1 badge that used to sit here is retired. The verdicts are the three answers below, per stratum.
   ]) + _strataLine(s);
+}
+
+// Owner ruling 2026-11-09: calibration-v2 — three separate answers per stratum, each in the server's words. The
+// strata are assessed separately and never pooled.
+const _V2_STRATA = [
+  ["coaches", "The coaches' calls"],
+  ["hypotheses", "Hypothesis bets"],
+  ["interval_forecasts", "Interval forecasts (the daily metric engine)"],
+  ["weekly_prescriptions", "Weekly training prescriptions"],
+];
+// Each coach's three answers in full — the interval and the Holm-corrected p ride in the words — behind a disclosure,
+// so the table above stays scannable on a phone.
+function _v2CoachDetails(d, coaches) {
+  const items = (coaches || [])
+    .map((c) => {
+      const a = v2Coach(d, c.coach_id);
+      return a && a.n > 0 ? `<div class="cv2-coach"><h4 class="cs-h">${esc(c.coach_name || c.coach_id)} · ${esc(String(a.n))} calls this season</h4>${answersHTML(a)}</div>` : "";
+    })
+    .join("");
+  return items ? `<details class="cv2-details"><summary>Each coach's three answers, in full</summary>${items}</details>` : "";
+}
+
+function _v2StrataBlock(d) {
+  const blocks = _V2_STRATA.map(([k, name]) => {
+    const a = v2Stratum(d, k);
+    return a && a.n > 0 ? `<div class="cv2-stratum"><h4 class="cs-h">${esc(name)} · ${esc(String(a.n))} resolved this season</h4>${answersHTML(a)}</div>` : "";
+  }).join("");
+  return blocks ? sec("Calibration — three separate questions, this season", methodLine(d) + blocks) : "";
 }
 
 // Predictions — the coaches' forward calls, scored against measured outcomes.
@@ -551,13 +583,9 @@ export function renderCalibration(d) {
       const cl = c.lifetime || {};
       const seasonN = c.n > 0 ? String(c.n) : "fresh slate";
       const careerN = cl.n != null ? String(cl.n) : "—";
-      // #5615: a coach whose every checked call carries one stated confidence has no calibration to label.
-      const oneBand = (c.reliability_bins || []).length === 1;
-      const calCell = oneBand
-        ? "one stated confidence — not measurable"
-        : c.calibration && c.calibration !== "insufficient_data"
-        ? esc(ttl(String(c.calibration).replace(/_/g, " ")))
-        : (cl.calibration && cl.calibration !== "insufficient_data" ? `career ${esc(ttl(String(cl.calibration).replace(/_/g, " ")))}` : "—");
+      // Owner ruling 2026-11-09: the cell is calibration-v2's three answers (estimable? · over/under at an observed
+      // level · vs the same-call guess), in the server's words — never the retired v1 label.
+      const calCell = shortHTML(v2Coach(d, c.coach_id));
       // #3450: the CI rides as a title tooltip in this dense per-coach table — the
       // platform-wide figure above carries the same interval inline, uncollapsed.
       const accTitle = c.accuracy_ci95 ? ` title="95% CI ${fmt(c.accuracy_ci95[0])}–${fmt(c.accuracy_ci95[1])}%"` : "";
@@ -566,11 +594,12 @@ export function renderCalibration(d) {
     .join("");
   const board = sec(
     "The scoreboard — by coach",
-    `<table class="rd-tbl"><thead><tr><th>coach</th><th>season</th><th>career</th><th>Brier</th><th>hit rate</th><th>calibration</th></tr></thead><tbody>${cRows}</tbody></table>` +
-      coachComparison(d && d.comparison, { cls: "correlative" }), // #4585: the scoreboard never appears alone
+    `<table class="rd-tbl"><thead><tr><th>coach</th><th>season</th><th>career</th><th>Brier</th><th>hit rate</th><th>calibration (this season): estimable? · over/under-confident? · vs the guess?</th></tr></thead><tbody>${cRows}</tbody></table>` +
+      coachComparison(d && d.comparison, { cls: "correlative" }) + // #4585: the scoreboard never appears alone
+      _v2CoachDetails(d, coaches),
   );
-  const hypLine = hyp && hyp.n > 0 ? note(`Hypothesis engine: ${hyp.n} resolved this season (career ${(hyp.lifetime && hyp.lifetime.n) || hyp.n}), Brier ${fmt(hyp.brier)}${hyp.calibration && hyp.calibration !== "insufficient_data" ? " (" + ttl(String(hyp.calibration).replace(/_/g, " ")) + ")" : ""}.`) : "";
-  return _sealBlock(d && d.prereg_seal) + pair + relTbl + board + hypLine + _judgeBlock() + note(d.disclosure || "Self-graded against the platform's own data — Brier 0 is perfect, 0.25 is the always-say-50% baseline, lower is better.") + _OPEN_ARTIFACT_LINE;
+  const hypLine = hyp && hyp.n > 0 ? note(`Hypothesis engine: ${hyp.n} resolved this season (career ${(hyp.lifetime && hyp.lifetime.n) || hyp.n}), Brier ${fmt(hyp.brier)}.`) : "";
+  return _sealBlock(d && d.prereg_seal) + pair + _v2StrataBlock(d) + relTbl + board + hypLine + _judgeBlock() + note(d.disclosure || "Self-graded against the platform's own data — Brier 0 is perfect, 0.25 is the always-say-50% baseline, lower is better.") + _OPEN_ARTIFACT_LINE;
 }
 
 // #1374 — calibrating the GRADER, not the forecasts. Everything above scores the

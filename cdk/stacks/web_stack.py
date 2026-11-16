@@ -62,6 +62,7 @@ from stacks.lambda_helpers import create_platform_lambda
 from stacks.secrets_helpers import site_api_origin_secret_value
 from stacks.web_alarms import add_web_alarms  # #2829: the us-east-1 alarm estate, extracted sibling
 from stacks.web_cloudfront_policies import build_api_policies  # #1221: /api cache + origin-request policies
+from stacks.web_edge_rate_rule import web_acl_properties  # #6114: the ONE edge rate rule (reader write POSTs)
 
 # ── #3568: reader-facing From address from the ONE registry (see email_stack.py). ──
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "lambdas"))
@@ -410,7 +411,7 @@ class WebStack(Stack):
         # concurrency headroom is limited (cf-auth Lambda@Edge functions already
         # consume reserved slots). Primary defence is CloudFront TTL caching
         # (300s-3600s per endpoint) which caps Lambda invocations regardless of
-        # traffic volume. Secondary: add WAF rate limiting after go-live.
+        # traffic volume. Secondary: the #6114 edge rate rule on reader write POSTs (below).
 
         # Function URL (AuthType NONE — CloudFront is the only public caller).
         # #815 hardened LambdaApiOrigin/AiLambdaOrigin (site-api / site-api-ai)
@@ -569,15 +570,21 @@ class WebStack(Stack):
         )
 
         # ══════════════════════════════════════════════════════════════
-        # WAF REMOVED (2026-06). `life-platform-amj-waf` was deleted (~−$8/mo;
-        # the WebACL no longer exists in us-east-1). Rate limiting is now done
-        # in-Lambda (DDB-backed, PG-10) on /api/ask, /api/board_ask, /api/subscribe,
-        # plus the cost-governor tier-2 pause — so the CloudFront WAF association
-        # is intentionally gone. Do NOT re-add a `web_acl_id` pointing at a
-        # non-existent WebACL: cdk deploy would fail associating a dead ARN.
-        # (Original SEC-02 WAF: SubscribeRateLimit/GlobalRateLimit/RateLimitAsk/
-        # RateLimitBoardAsk — superseded by the in-Lambda limiters.)
+        # Edge rate rule (#6114, owner ruling 2026-11-16). History: the SEC-02 WAF
+        # (`life-platform-amj-waf`) was deleted 2026-06 and rate limiting moved in-Lambda
+        # (DDB-backed); the in-Lambda limiters stay the real per-route control. This ACL
+        # is ONE rate-based rule on POSTs to the reader write doors only, default ALLOW —
+        # the spec, its scope and the measured limit live in stacks/web_edge_rate_rule.py.
+        # It is declared HERE, in the stack that owns the distribution, and associated by
+        # GetAtt below: never paste a WebACL ARN into `web_acl_id` (the 2026-06 failure
+        # mode — a dead ARN fails the distribution update).
         # ══════════════════════════════════════════════════════════════
+        reader_write_acl = cdk.CfnResource(
+            self,
+            "ReaderWriteEdgeAcl",
+            type="AWS::WAFv2::WebACL",
+            properties=web_acl_properties(),
+        )
 
         # ══════════════════════════════════════════════════════════════
         # averagejoematt.com — main website
@@ -609,7 +616,7 @@ class WebStack(Stack):
                     prefix="cf/",
                     include_cookies=False,
                 ),
-                # web_acl_id intentionally omitted — WAF removed (2026-06); see note above.
+                web_acl_id=reader_write_acl.get_att("Arn").to_string(),  # #6114: same-stack ACL, never a pasted ARN
                 viewer_certificate=cloudfront.CfnDistribution.ViewerCertificateProperty(
                     acm_certificate_arn=CERT_ARN_AMJ,
                     ssl_support_method="sni-only",

@@ -42,7 +42,10 @@ from common.pacific_time import (  # #1964/#1955/#3609 — the canonical frame, 
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from experiment.phase_filter import with_phase_filter
 
-from web import narrative_publication  # owner ruling 2026-11-03: the one narrative publication chokepoint
+from web import (
+    narrative_publication,  # owner ruling 2026-11-03: the one narrative publication chokepoint
+    prereg_seal_state,  # owner ruling 2026-11-11 item 3: a seal is offered for checking only when the served file matches
+)
 from web.bundle_counts import load_bundle_counts
 from web.platform_counts import DISCOVERED_COUNTS
 
@@ -233,22 +236,20 @@ CORS_HEADERS = {
 PLATFORM_STATS = {
     **DISCOVERED_COUNTS,
     **load_bundle_counts(),
-    "monthly_cost": "~$100",  # GROUND-TRUTH run-rate, pinned (#1232, re-grounded #2898).
-    # Source = Cost Explorer UnblendedCost, read 2026-08-23: June 2026 $79.80 and July 2026
-    # $98.35, both closed months. The LAST CLOSED MONTH is the honest trailing run-rate, so
-    # "~$100". The prior "~$80" was July's mid-month PROJECTION frozen as if it were an
-    # outcome, and the month it described finished 23% above it.
-    # August is running hotter still (MTD $123.97 at day 23) under the ADR-133 dated raise
-    # window that auto-reverts 2026-09-01 — a live, moving number, which is exactly why it
-    # does not belong in a static literal: /method/receipts/ serves the governor's own
-    # month-to-date and projection, and that page is the authority for "right now".
-    # Deliberately NO ceiling figure in this comment. The previous one asserted a base and
-    # a surge ceiling, both of which had moved by the time anyone re-read it — the ceiling
-    # family has exactly one source (cost_governor_lambda.MONTHLY_CEILING / SURGE_CEILING_USD)
-    # and everything else derives from it (#2898).
-    # This is a hand-maintained judgment field (never rewritten by sync_doc_metadata);
-    # tests/test_platform_stats_cost.py is the offline drift guard.
-    "review_count": 20,  # 2026-10-31 full review (the 20th)
+    "monthly_cost": "~$220",  # NOT SERVED — the stack manifest's pinned copy only (#5952).
+    # /api/platform_stats no longer serves this literal: site_api_rollups._monthly_cost_fields
+    # overrides it on every response with the LAST CLOSED MONTH read from the cost governor's
+    # own month-to-date series (site_api_budget.last_closed_month_cost), and serves "" — never
+    # this — when that read fails. The rule was always "the last closed month is the honest
+    # trailing run-rate"; this literal, pinned to July 2026 ($98.35), broke it for three months
+    # (Cost Explorer UnblendedCost: 2026-08 $180.58, 2026-09 $137.15, 2026-10 $218.99).
+    # This copy is re-grounded by hand: scripts/v4_build_stack_manifest.py copies it into
+    # site/data/stack.json (cost_of_ownership.aws.monthly_usd_typical) and
+    # tests/test_stack_manifest_drift.py pins the two equal. "~$220" is October 2026, the last
+    # closed month on 2026-11-14; change it and regenerate site/data/stack.json in one commit.
+    # Deliberately NO ceiling figure in this comment — the ceiling family has exactly one source
+    # (cost_governor_lambda.MONTHLY_CEILING / SURGE_CEILING_USD) (#2898).
+    "review_count": 22,  # 2026-11-14 full review (the 22nd; docs/reviews/fullreview_grades_2026-11-14.json, PARTIALLY_CALIBRATED)
     # #3690: was "A" while the newest full review graded ZERO lenses at A — the
     # 2026-09-05 baseline is B+ 9 · B 3 · B- 3 · C+ 2 across 17 lenses, modal B+,
     # worst C+. This is the platform's most-quoted credibility number, on the page a
@@ -264,10 +265,19 @@ PLATFORM_STATS = {
     # 2026-10-31 baseline: A- 3 · B+ 10 · B 2 · B- 2 across 17 lenses, modal B+ (the run's
     # calibration block reads UNCALIBRATED on the withheld-issue control — that governs the
     # review CLOCK, not whether these 17 grades were awarded; docs/reviews/FULLREVIEW_2026-10-31.md).
-    "review_grade": "B+",
-    "review_grade_distribution": "A- 3 · B+ 10 · B 2 · B- 2 (17 lenses, 2026-10-31)",
-    "active_secrets": 30,  # #3690: was 21; 28 -> 29 with life-platform/ip-hash-salt (#3620); 29 -> 30 with life-platform/progress-photos-signing (#3760). model/platform_model.json cost_surface.secrets
-    "site_pages": 100,  # #3690: was 77; qa/qa_manifest.py is the single page registry. 93 -> 95 with /start/ and /coaches/ (#4588); 95 -> 99 with the v9 /system/ pages (#5534 cut-over); 100 with /data/journey/ (#5579); 101 with the sampled day page (#5585); 100 with /story/theme-river/ unpublished (journal-derived, owner rulings 2026-11-03/05)
+    "review_grade": "C+",
+    "review_grade_distribution": "A- 1 · B+ 2 · B 2 · B- 4 · C+ 4 · C 4 (17 lenses, 2026-11-14)",
+    # Owner ruling 2026-11-14: the letter must never read as a passed review. The newest review's own calibration result
+    # is served BESIDE it — what its controls showed about the reviewers, in a reader's words. Re-derived and checked by
+    # tests/test_platform_stats_honesty_3690.py from the review's `calibration` block (verdict, planted, withheld/found),
+    # so a later review cannot leave this sentence describing an older run.
+    "review_grade_calibration": (
+        "Partially calibrated — not a passed review (2026-11-14). The review's checkers rejected all 17 of 17 planted "
+        "false findings, but its graders found 0 of 4 known issues that were withheld from them, so the grades describe "
+        "what was looked at and are not evidence that nothing was missed."
+    ),
+    "active_secrets": 31,  # #3690: was 21; 28 -> 29 with life-platform/ip-hash-salt (#3620); 29 -> 30 with life-platform/progress-photos-signing (#3760); 30 -> 31 with life-platform/hae-webhook (#5513). model/platform_model.json cost_surface.secrets
+    "site_pages": 108,  # #3690: was 77; qa/qa_manifest.py is the single page registry. 93 -> 95 with /start/ and /coaches/ (#4588); 95 -> 99 with the v9 /system/ pages (#5534 cut-over); 100 with /data/journey/ (#5579); 101 with the sampled day page (#5585); 100 with /story/theme-river/ unpublished (journal-derived, owner rulings 2026-11-03/05); 102 with /data/lab/ + /data/lab/protocols/ (Laboratory L1 live, owner GO 2026-11-09); 103 with /story/so-far/ (Human Story HS1 live, owner GO 2026-11-09); 105 with /system/calibration/ + /system/ledger/refuted/ (Coaching Room CR1 live, owner GO 2026-11-10); 106 with /data/lab/findings/ (findings over time, 2026-11-11); 107 with /privacy/policy/ (the maintained policy served again, #5920); 108 with /story/moments/ (sprint III, 2026-11-14)
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,
@@ -1114,6 +1124,23 @@ def _prereg_stamp_key(genesis: str) -> str:
     return f"generated/experiments/prereg/genesis-{genesis}.sha256.json"
 
 
+def _prereg_artifact_key(genesis: str) -> str:
+    """S3 key of the sealed pre-registration file itself — mirrors deploy/genesis_prereg_stamp.py's artifact_key()
+    under the same duplication rule as `_prereg_stamp_key` (parity pinned by tests/test_prereg_seal_withdrawn.py)."""
+    return f"generated/experiments/prereg/genesis-{genesis}.json"
+
+
+def _load_s3_bytes(key: str, cache_name: str) -> bytes | None:
+    """The raw bytes of one S3 object (a hash needs the bytes, not a parse); None when it cannot be read."""
+    try:
+        S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+        s3 = boto3.client("s3", region_name=S3_REGION)
+        return s3.get_object(Bucket=S3_BUCKET, Key=key)["Body"].read()
+    except Exception as e:
+        logger.warning(f"[{cache_name}] Failed to load {key}: {e}")
+        return None
+
+
 def _prereg_amendment_key(genesis: str) -> str:
     """S3 key of the genesis pre-registration's AMENDMENT ledger (#3599).
 
@@ -1160,14 +1187,24 @@ def prereg_seal_meta() -> dict | None:
     if not stamp or not stamp.get("sha256") or stamp.get("genesis") != EXPERIMENT_START:
         _prereg_seal_cache = None
         return None
+    # Owner ruling 2026-11-11 (item 3): the verify command and the file link are offered ONLY while the file served
+    # at the sealed address hashes to the stamp's digest — decided from the served bytes (prereg_seal_state.assess),
+    # never from a flag. Otherwise the digest stays published with the reason it cannot be checked here.
+    verifiable, why_not = prereg_seal_state.assess(
+        stamp.get("genesis"), stamp.get("sha256"), _load_s3_bytes(_prereg_artifact_key(EXPERIMENT_START), "prereg_seal")
+    )
     _prereg_seal_cache = {
         "genesis": stamp.get("genesis"),
         "sha256": stamp.get("sha256"),
-        "artifact_url": stamp.get("public_artifact_url"),
         "stamp_url": stamp.get("public_stamp_url"),
-        "verify": stamp.get("verify"),
         "stamped_at": stamp.get("stamped_at"),
+        "verifiable": verifiable,
     }
+    if verifiable:
+        _prereg_seal_cache["artifact_url"] = stamp.get("public_artifact_url")
+        _prereg_seal_cache["verify"] = stamp.get("verify")
+    else:
+        _prereg_seal_cache["unverifiable_text"] = why_not
     amendments = prereg_amendments(EXPERIMENT_START)
     if amendments:
         _prereg_seal_cache["amendments"] = amendments

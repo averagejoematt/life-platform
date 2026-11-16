@@ -5,6 +5,11 @@ steps nudge (#5056) — its own ledger row (`COACH#protein_nudge` / `PROTEIN_NUD
 spends the coach's one-a-day slot. No new EventBridge rule: the hourly cron covers the charter's breakfast window
 (`nutrition.protein.breakfast_nudge`) in both PDT and PST. Owner-only email; deterministic, no model.
 
+#5821 (owner ruling 2026-11-15): the note no longer arrives as its own "Protein this morning" email. The Morning Brief
+(10:00 PT) carries it as a section through `brief_line` below — read-only, computed by the brief itself, because the
+brief runs BEFORE this pass's first in-window tick (10:10 PT). The pass keeps evaluating, stamping and claiming the day;
+coach_nudge_lambda hands it a no-op deliverer and `delivered_status=emails.brief_lines.FOLDED`, so the ledger row says what happened.
+
 DEAD-MAN: every in-window tick (sent or not) overwrites `COACH#protein_nudge` / `EVAL#<date>` with its verdict;
 `nudge_ledger_qa.check_protein_nudge_liveness` reds when a recent day has no eval row (the pass never ran).
 """
@@ -100,8 +105,29 @@ def _stamp_eval(table, date: str, verdict: dict, now_utc: datetime) -> None:
         logger.warning("[protein-nudge] eval stamp failed: %s", e)
 
 
-def run(table, send: Callable[[str], None], now_utc: datetime, budget_tier: int, *, user: str = "matthew", dry_run: bool = False) -> dict:
-    """One breakfast-nudge pass. `send(text)` delivers the owner email. Never raises into the coach nudge's tick."""
+def brief_line(table, now_pt: datetime, user: str = "matthew") -> str | None:
+    """#5821: the Morning Brief's protein section — the same verdict and copy the note would carry, or None.
+
+    READ-ONLY (no claim, no stamp: a dry-run brief writes nothing). Deterministic and model-free, so it renders at
+    every budget tier (`budget_tier=0`): the tier-2 silence was the anti-nag rule for a standalone email, and the brief
+    is protected longest (ADR-125). `already_sent=False` — the brief does not share the pass's one-a-day slot."""
+    date = now_pt.date().isoformat()
+    verdict = protein_engine.nudge_decide(date=date, now_pt=now_pt, row=_read_row(table, date, user), already_sent=False, budget_tier=0)
+    return verdict.get("text") if verdict.get("send") else None
+
+
+def run(
+    table,
+    send: Callable[[str], None],
+    now_utc: datetime,
+    budget_tier: int,
+    *,
+    user: str = "matthew",
+    dry_run: bool = False,
+    delivered_status: str = "sent",
+) -> dict:
+    """One breakfast-nudge pass. `send(text)` delivers the note (#5821: a no-op since the brief carries it, settled
+    `delivered_status`). Never raises into the coach nudge's tick."""
     now_pt = now_utc.astimezone(PACIFIC)
     date = now_pt.date().isoformat()
     if not protein_engine.in_window(now_pt):
@@ -125,5 +151,5 @@ def run(table, send: Callable[[str], None], now_utc: datetime, budget_tier: int,
         logger.error("[protein-nudge] send failed: %s", e)
         _settle(table, date, "failed", error=str(e))
         return {"send": False, "reason": "send_failed"}
-    _settle(table, date, "dry_run" if dry_run else "sent", text=verdict["text"])
+    _settle(table, date, "dry_run" if dry_run else delivered_status, text=verdict["text"])
     return {"send": True, "reason": verdict["reason"], "key": verdict["key"]}

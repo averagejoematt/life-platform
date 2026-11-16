@@ -24,6 +24,11 @@ import sys
 
 import pytest
 
+ROLLBACK = pytest.mark.usefixtures("exercise_library_rollback")
+"""#5861 (owner approval 2026-11-14): the marked tests pin the PRE-approval generator — the redrafted 10-18 upper is the pre-approval
+generator's (live fits different lifts). They run on the library's rollback copy (status proposed: tests/conftest.py
+`exercise_library_rollback`), so they keep guarding the rollback path; the approved (live) behaviour is pinned by the #5861 tests."""
+
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "lambdas"))
@@ -64,6 +69,7 @@ def _lift_blocks(ir):
 
 
 # ── 1. real generator renders ──────────────────────────────────────────────────────────────────────────────────────
+@ROLLBACK
 def test_every_lift_note_of_the_redrafted_10_18_upper_meets_the_standard():
     from test_warmup_sets_5049 import _redraft
 
@@ -164,14 +170,15 @@ def test_the_10_26_upper_volume_renders_to_the_a_grade_corpus():
     notes = {b.movement_key: b.notes for b in blocks}
     assert notes == {
         "incline_db_press": "RPE 8–9\nBand pull-aparts first. Breathe out on the press.",
-        "one_arm_db_row": "RPE 8–9\nVolume day: chase 12.\nBreathe out on the pull.",
+        # #5817 (owner ruling 2026-11-11, D8): the one-arm DB row is an anchor with a cue sheet — its one still-visible
+        # cue rides ahead of the family breathing cue, which stays
+        "one_arm_db_row": "RPE 8–9\nVolume day: chase 12.\nElbow to hip. Breathe out on the pull.",
         "lat_pulldown": "RPE 8–9\nNow aiming 10–12: 8s were RPE 8 three times.",
-        # #5428 re-grade #2 (2026-10-31): a stale PREVIOUS still shows in Hevy's PREVIOUS column, so a row more than one
-        # step under it says why; the feeler W row is at the start load and its line is the result rule (re-grade #4)
-        "chest_fly_machine": "RPE 8–9, last set RPE 9–10\nLighter: first time in 4 years.\nW at RPE 5 or less → one step, no more.",
-        "lying_db_tricep_extension": (
-            "RPE 8–9, last set RPE 9–10\nLighter: first time in 13 months.\nW at RPE 5 or less → one step, no more.\nElbows still."
-        ),
+        # owner ruling 2026-11-10 (charter 1.41.0): a first session back after a long layoff reads the layoff band and the
+        # one layoff line, behind a W row lighter than the work — was `RPE 8–9, last set RPE 9–10` / `Lighter: first time
+        # in ‹gap›.` / `W at RPE 5 or less → one step, no more.` over a feeler AT the work (re-grades #2 and #4)
+        "chest_fly_machine": "RPE 6–7\nSame load all sets: first time in 4 years.",
+        "lying_db_tricep_extension": "RPE 6–7\nSame load all sets: first time in 13 months.\nElbows still.",
     }
     assert all(not note_problems(n) for n in notes.values())
     # Hevy's PREVIOUS, for the note linter: the last performed top load per movement (lb), with its date
@@ -180,14 +187,22 @@ def test_the_10_26_upper_volume_renders_to_the_a_grade_corpus():
 
 
 def test_a_stale_anchor_is_the_pick_load_form_with_a_feeler_row():
-    """The 10-26 chest fly (a 2022 anchor): a W row of 8 at the engine's start load, and the pick line's result rule."""
+    """The 10-26 chest fly with NO session on file: a W row of 8 at the engine's start load, and the pick line's result
+    rule. Owner ruling 2026-11-10: with its 2022 anchor on file the same lift is a first session back after a long layoff,
+    so its W row is half the work instead (was the feeler at the start load)."""
     blocks, floors = _upper_volume()
-    lift_note.compose_blocks(blocks, CATALOG, load_floors=floors, history_index=HISTORY, target_date=TARGET)
+    never = {k: v for k, v in HISTORY.items() if k != "T-FLY"}
+    lift_note.compose_blocks(blocks, CATALOG, load_floors=floors, history_index=never, target_date=TARGET)
     fly = next(b for b in blocks if b.movement_key == "chest_fly_machine")
     # re-grade #4: the feeler W row is AT the start load — it is the test of that load, and its line says what the answer does
     assert (fly.sets[0].type, fly.sets[0].weight_kg, fly.sets[0].reps) == ("warmup", fly.sets[1].weight_kg, 8)
     assert [s.weight_kg for s in fly.sets[1:]] == [60 * LB, 60 * LB]  # the engine's start load stays on the working rows
-    assert "80% of your band anchor" not in fly.notes and "Last:" not in fly.notes
+    assert "80% of your band anchor" not in fly.notes and "Last:" not in fly.notes and lift_note.PICK_LOAD_LINE in fly.notes
+    blocks, floors = _upper_volume()
+    lift_note.compose_blocks(blocks, CATALOG, load_floors=floors, history_index=HISTORY, target_date=TARGET)
+    fly = next(b for b in blocks if b.movement_key == "chest_fly_machine")
+    assert (fly.sets[0].type, fly.sets[0].weight_kg, fly.sets[0].reps) == ("warmup", 30 * LB, 8)
+    assert [s.weight_kg for s in fly.sets[1:]] == [60 * LB, 60 * LB] and lift_note.PICK_LOAD_LINE not in fly.notes
 
 
 def test_mutation_control_a_recent_anchor_is_not_the_pick_form():
@@ -203,7 +218,7 @@ def test_a_row_more_than_one_step_from_previous_carries_a_reason_and_one_within_
     blocks, floors = _upper_volume()
     near = dict(HISTORY, **{"T-ROW": [_sess("2026-10-21", 95, 10, 8)]})  # 90 vs 95: one 5-lb step -> no reason
     lift_note.compose_blocks(blocks, CATALOG, load_floors=floors, history_index=near, target_date=TARGET)
-    assert next(b for b in blocks if b.movement_key == "one_arm_db_row").notes == "RPE 8–9\nBreathe out on the pull."
+    assert next(b for b in blocks if b.movement_key == "one_arm_db_row").notes == "RPE 8–9\nElbow to hip. Breathe out on the pull."
     blocks, floors = _upper_volume()
     heavier = dict(HISTORY, **{"T-ROW": [_sess("2026-10-21", 75, 12, 7)]})  # 90 vs 75: three steps up
     lift_note.compose_blocks(blocks, CATALOG, load_floors=floors, history_index=heavier, target_date=TARGET)
@@ -218,12 +233,12 @@ def test_the_same_load_as_a_previous_that_ran_to_rpe_10_carries_the_one_more_rep
     grind = dict(HISTORY, **{"T-ROW": [_sess("2026-10-21", 90, 12, 10)]})  # 90 vs 90 at RPE 10
     lift_note.compose_blocks(blocks, CATALOG, load_floors=floors, history_index=grind, target_date=TARGET)
     row = next(b for b in blocks if b.movement_key == "one_arm_db_row")
-    assert row.notes == "RPE 8–9\nSame load: aim to leave one more rep.\nBreathe out on the pull."
+    assert row.notes == "RPE 8–9\nSame load: aim to leave one more rep.\nElbow to hip. Breathe out on the pull."  # #5817 sheet cue
     assert lift_note.hevy_note_grammar.REASON_RE.match(row.notes.split("\n")[1])  # the linter reads it as a reason
     for prev in (_sess("2026-10-21", 90, 12, 9), _sess("2026-10-21", 95, 12, 10), _sess("2026-10-21", 90, 12)):
         blocks, floors = _upper_volume()
         lift_note.compose_blocks(blocks, CATALOG, load_floors=floors, history_index=dict(HISTORY, **{"T-ROW": [prev]}), target_date=TARGET)
-        assert next(b for b in blocks if b.movement_key == "one_arm_db_row").notes == "RPE 8–9\nBreathe out on the pull."
+        assert next(b for b in blocks if b.movement_key == "one_arm_db_row").notes == "RPE 8–9\nElbow to hip. Breathe out on the pull."
 
 
 def test_one_cue_per_family_and_no_press_cue_on_a_squat_day():
@@ -247,7 +262,8 @@ def test_one_cue_per_family_and_no_press_cue_on_a_squat_day():
     }
     hist = {"S1": [_sess("2026-10-16", 245, 5, 8)], "S2": [_sess("2026-10-16", 135, 8, 8)]}
     lift_note.compose_blocks(blocks, cat, load_floors={}, history_index=hist, target_date="2026-10-23")
-    assert blocks[0].notes == "RPE 8–9\nAnkles + hips first. Brace each rep, breathe between reps."
+    # #5817: the barbell squat's one sheet cue between the prep clause and the family cue (exercise 1: 3 phone lines)
+    assert blocks[0].notes == "RPE 8–9\nAnkles + hips first. Knees track the toes. Brace each rep, breathe between reps."
     assert blocks[1].notes == "RPE 8–9"  # the second squat-family lift: no second cue
     assert "press" not in blocks[0].notes.lower()
     assert movement_cues.family_of("leg_press", {"anchor_family": "squat"}) == "leg_press"  # a leg press is not a squat cue

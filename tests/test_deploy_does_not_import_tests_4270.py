@@ -57,6 +57,7 @@ SHIMS = {
     "tests/premerge_derivation.py",
     "tests/golden_surface_eval.py",
     "tests/eval_credential_stub.py",
+    "tests/age_inversion_lib.py",  # #6083: the attack moved to qa/ so scripts/check_public_copies.py can run it on the archive
     "tests/mypy_clean_set.py",  # also the CLI path .claude/settings.json's permission entry names (owner edit)
 }
 

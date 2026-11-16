@@ -674,8 +674,10 @@ def test_strava_fetch_day_assigns_each_activity_to_one_local_date(monkeypatch):
 #
 # _activities_missing_from_store(api, stored) returns the API activities with no
 # stored counterpart. It is the one check that compares against Strava itself, so
-# it must (a) flag a genuinely-dropped activity and (b) NOT false-positive on a
-# deduped GPS-drop twin (collapsed by the ingestion _dedup into its sibling).
+# it must flag a genuinely-dropped activity. #5696: the ingest no longer collapses a
+# near-simultaneous twin (every vendor activity is stored; the read seam resolves
+# copies), so a twin the store lacks IS a gap — only a legacy stored row with no
+# strava_id can still stand in for an API activity by start time.
 
 
 # API shape (raw Strava): uses "id" + "start_date".
@@ -701,12 +703,19 @@ def test_reconcile_clean_when_all_present_by_id():
     assert strava._activities_missing_from_store(api, stored) == []
 
 
-def test_reconcile_does_not_flag_deduped_gps_drop_twin():
-    # The real 3mi walk (id 111) is stored; the 0-mi GPS-drop twin (id 999) is 17s
-    # later and was intentionally collapsed by _dedup. It must NOT read as missing.
+def test_reconcile_flags_a_twin_its_stored_sibling_used_to_hide():
+    # #5696: the real 3mi walk (id 111) is stored; the 0-mi twin (id 999) 17s later is
+    # not. Before #5696 the ingest dropped it on purpose and this diff matched it to 111
+    # by start time; now the ingest stores every activity, so an unstored twin is a gap.
     api = [_api(111, "2026-06-17T00:05:43Z"), _api(999, "2026-06-17T00:06:00Z")]
     stored = [_stored(111, "2026-06-17T00:05:43Z")]
-    assert strava._activities_missing_from_store(api, stored) == []
+    assert [str(a["id"]) for a in strava._activities_missing_from_store(api, stored)] == ["999"]
+
+
+def test_reconcile_matches_a_legacy_stored_row_without_an_id_by_start_time():
+    api = [_api(111, "2026-06-17T00:05:43Z")]
+    legacy = [{"start_date": "2026-06-17T00:06:00Z"}]  # a pre-strava_id row: time is the only key
+    assert strava._activities_missing_from_store(api, legacy) == []
 
 
 # ══════════════════════════════════════════════════════════════════════════

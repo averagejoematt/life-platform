@@ -331,7 +331,9 @@ def test_the_09_09_control_keeps_its_four_signals_and_gains_no_calibration():
     rec = extract_signals(CONTROL_0909, llm_fn=live_llm, date="2026-09-09")
     assert _classes(rec["signals"]) == {"progression", "environment", "pain_discomfort", "rpe_caveat"}
     assert len(rec["signals"]) == 4
-    assert rec["pain_flag"] is True
+    # #5800: the model put it in the net; "saddle sore" is discomfort — kept, listed, never a pain_flag
+    assert rec["pain_net"] is True and rec["pain_class"] == "discomfort" and rec["pain_flag"] is False
+    assert _by_class(rec["signals"], "pain_discomfort")["severity"] == "discomfort"
     prog = _by_class(rec["signals"], "progression")
     assert prog["value"]["level"] == 8 and prog["value"]["character"] == "flat" and prog["block"] == 0
     # The model's rpe_caveat survives: no discordance fired, so nothing took the class.

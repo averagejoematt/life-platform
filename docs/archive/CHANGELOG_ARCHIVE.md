@@ -11,9 +11,9 @@
 - Seeded 5 One Medical / LabCorp blood draws to `USER#matthew#SOURCE#labs`
 - 2019-05-01: 35 biomarkers, 0 out of range
 - 2020-10-20: 35 biomarkers, 0 out of range
-- 2021-10-20: 34 biomarkers, 2 out of range (total cholesterol 212↑, LDL 126↑)
-- 2022-06-01: 33 biomarkers, 2 out of range (total cholesterol 201↑, LDL 135↑)
-- 2024-06-01: 45 biomarkers + WBC differential, 2 out of range (total cholesterol 206↑, LDL 124↑)
+- 2021-10-20: 34 biomarkers, 2 out of range (lipid values removed 2026-11-11)
+- 2022-06-01: 33 biomarkers, 2 out of range (lipid values removed 2026-11-11)
+- 2024-06-01: 45 biomarkers + WBC differential, 2 out of range (lipid values removed 2026-11-11)
 - All use identical biomarker key names as Function Health draws for seamless cross-provider trending
 - Labs partition now: 8 items total (5 GP + 2 Function Health + 1 metadata)
 - Full labs timeline: 7 blood draws spanning 6 years (2019–2025)
@@ -32,7 +32,7 @@
 - Parsed 49-page comprehensive SNP interpretation report (consumer genomics, dated 2020-06-19)
 - Risk distribution: 35 unfavorable, 17 mixed, 47 neutral, 11 favorable
 - 14 categories: metabolism (20), longevity (20), nutrient_metabolism (19), lipids (10), immune (9), taste (7), exercise (6), sleep (6), miscellaneous (5), statin_response (3), antioxidant (2), cardiovascular (1), caffeine (1), cancer_risk (1)
-- Key actionable themes: 6 FTO obesity variants, triple vitamin D deficiency risk, MTHFR compound heterozygous, FADS2 poor ALA→EPA conversion, SLCO1B1 statin sensitivity, ABCG8 elevated LDL, CYP1A2 fast caffeine metabolizer
+- Key actionable themes: [genetic detail removed 2026-11-11: genotype data is owner-only]
 - Stores ONLY clinical interpretations — no raw genome data (privacy by design)
 
 ---

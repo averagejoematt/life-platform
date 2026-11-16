@@ -190,7 +190,7 @@ def test_series_projects_the_gap_columns_only_for_a_behavioral_source():
     series.handle_series(_event(metric="hrv"), query=query, today=TODAY)
     series.handle_series(_event(metric="total_protein_g"), query=query, today=TODAY)
     assert seen["whoop"] == ("date", "hrv")
-    assert set(seen["macrofactor"]) == {"date", "total_protein_g", "entries_count", "food_log", "_format"}
+    assert set(seen["macrofactor"]) == {"date", "total_protein_g", "entries_count", "food_log", "_format", "partial_at_export"}  # #5954
 
 
 def test_steps_resolve_per_day_through_metric_truth_and_name_the_source_that_answered():
@@ -294,6 +294,11 @@ ITEM_KEYS = {
     "simple_guess",
     "quality_flags",
     "corrections",
+    # owner 2026-11-09 (web.verification_fields): additive — null on every captured row (no record, no stamp read as one)
+    "evaluator_version",
+    "algo_version",
+    "verification",
+    "owner_note",  # owner ruling 2026-11-15 (#6079): the dated note beside an owner-ruled call's words, else null
 }
 GRADING_KEYS = {"how", "actual_text", "tolerance_text", "outcome_notes"}
 KINDS = {"number", "direction", "yes_no", "sealed", "observation"}
@@ -362,6 +367,7 @@ def test_every_item_is_pinned_to_the_shape_on_every_real_row():
         assert item["kind"] in KINDS and item["status"] in ledger.BUCKETS
         assert isinstance(item["sealed"], bool) and isinstance(item["retired"], bool)
         assert item["quality_flags"] == [] and item["corrections"] == []  # rows captured before the grader stamped them (#5533)
+        assert item["verification"] is None, "no verification record → null, never inferred"
         assert item["simple_guess"]["state"] in ("scored", "unscorable", "not_yet_scored")
         assert item["logged_date"] and len(item["logged_date"]) == 10  # a docket row's is the day its id says the bet opened
         if item["status"] in ("confirmed", "refuted"):
@@ -522,7 +528,7 @@ def test_a_skipped_week_carries_its_reason_and_a_held_week_exposes_no_title_exce
     assert eight["title"] is None and eight["url"] is None and eight["date"] is None and eight["reason"] is None
     assert not {"excerpt", "body", "content_markdown", "content_html", "stats_line"} & set(eight)
     # the fixture row carries the draft's title on purpose: the route must never serve it
-    assert "The Weight of 299" in json.dumps(_chronicle_rows()) and "The Weight of 299" not in json.dumps(body)
+    assert "Held draft title (redacted)" in json.dumps(_chronicle_rows()) and "Held draft title (redacted)" not in json.dumps(body)
     assert "title" not in chapters.ROW_PROJECTION and "content" not in " ".join(chapters.ROW_PROJECTION)
 
 
@@ -564,6 +570,48 @@ def test_a_week_published_in_the_store_but_not_yet_in_the_manifest_reads_as_the_
     rows[-1] = {**rows[-1], "status": "published"}
     body = _chapters(rows=rows)
     assert body["weeks"][7]["status"] == "published" and body["weeks"][7]["date"] == "2026-10-27" and body["weeks"][7]["title"] is None
+
+
+def test_a_published_week_serves_its_approval_moment_and_covered_days_and_no_other_week_gains_a_field():
+    """2026-11-14: `date` is the chronicle's data date. The publication is the row's `approved_at`; the covered days are
+    the post's "Day A to Day B" stats line through genesis. Held/skipped/pending weeks serve exactly what they did."""
+    body = _chapters(today="2026-11-03")
+    weeks = {w["week"]: w for w in body["weeks"]}
+    assert weeks[2]["published_at"] == "2026-09-18T18:00:44.273958+00:00" and weeks[2]["date"] == "2026-09-15"
+    assert (weeks[2]["covers_start"], weeks[2]["covers_end"]) == ("2026-09-09", "2026-09-15")  # Day 4 to Day 10
+    assert (weeks[1]["covers_start"], weeks[1]["covers_end"]) == ("2026-09-06", "2026-09-08")  # Day 1 to Day 3
+    assert weeks[6]["published_at"] == "2026-10-18T04:29:30.949081+00:00"
+    assert weeks[6]["covers_start"] is None and weeks[6]["covers_end"] is None  # "Weight: … | …" names no span
+    base = {"week", "start", "end", "status", "date", "title", "url", "label", "drafted_at", "reason"}
+    for n in (7, 8, 9):  # skipped, held, pending
+        assert set(weeks[n]) == base, n
+    assert all(set(weeks[n]) == base | {"published_at", "covers_start", "covers_end"} for n in range(1, 7))
+    # a held row's approval-shaped attribute is never served
+    rows = _chronicle_rows()
+    rows[-1] = {**rows[-1], "approved_at": "2026-10-29T00:00:00Z"}
+    assert "2026-10-29T00:00:00Z" not in json.dumps(_chapters(rows=rows))
+
+
+def test_published_at_is_the_published_rows_even_when_a_newer_revision_row_exists_and_null_when_unknown():
+    rows = _chronicle_rows()
+    rows.append({"date": "2026-10-13", "week_number": "6", "status": "changes_requested", "generated_at": "2026-10-30T00:00:00Z"})
+    assert _chapters(rows=rows)["weeks"][5]["published_at"] == "2026-10-18T04:29:30.949081+00:00"
+    rows = [{k: v for k, v in r.items() if k != "approved_at"} for r in _chronicle_rows()]
+    assert all(w["published_at"] is None for w in _chapters(rows=rows)["weeks"][:6])
+    store_only = _chronicle_rows()
+    store_only[-1] = {**store_only[-1], "status": "published", "approved_at": "2026-10-30T18:00:00Z"}
+    eight = _chapters(rows=store_only)["weeks"][7]
+    assert eight["published_at"] == "2026-10-30T18:00:00Z" and eight["covers_start"] is None and eight["title"] is None
+
+
+def test_covered_days_reads_only_a_day_span_through_genesis():
+    assert chapters.covered_days("Day 60 to Day 66 · 292.6 lbs (-5.2 this week) · 5 training sessions", GENESIS) == (
+        "2026-11-04",
+        "2026-11-10",
+    )
+    for line in ("Weight: 305.4 lbs | Week Grade: avg 70", "Prologue | Before Day 1 | Seattle, WA", None, "", "Day 9 to Day 3 · x"):
+        assert chapters.covered_days(line, GENESIS) == (None, None), line
+    assert "approved_at" in chapters.ROW_PROJECTION
 
 
 def test_row_week_reads_week_number_as_the_wire_writes_it_and_falls_back_to_the_date_bin():

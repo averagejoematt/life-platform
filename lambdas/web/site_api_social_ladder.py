@@ -319,7 +319,9 @@ def _handle_cohort_submit(event: dict, *, _g) -> dict:
     # Rate limit: 1 submission per IP per week — DDB-backed (the SAME limiter the
     # challenge check-in uses), survives warm-container distribution. Applied
     # unconditionally via the module chokepoint (#2237).
-    allowed, _rem, _retry = _rate_check(f"cohort_submit:{week}", ip_hash, limit=1, window_seconds=COHORT_SUBMIT_WINDOW)
+    allowed, _rem, _retry = _rate_check(
+        f"cohort_submit:{week}", ip_hash, limit=1, window_seconds=COHORT_SUBMIT_WINDOW, fail_open=False
+    )  # #6088: stores a reader number
     if not allowed:
         return _rate_limited("cohort_submit", "You've already added your number this week.", retry_after=COHORT_SUBMIT_WINDOW)
 

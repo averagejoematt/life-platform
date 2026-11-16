@@ -13,13 +13,14 @@ the catalog default came with a stale anchor and a 54 % re-entry ramp on top of 
 THE RULE (one order, per slot = session role x anchor pattern)
 
   1. the variant performed in the most recent CREDITED session of the SAME role in this block
-     (the slot he filled last time — the lower-heavy RDL stays the lower-heavy hinge); two members
+     (the slot he filled last time — the upper-volume row stays the upper-volume row); two members
      of one pattern on one day -> the one performed first (anchors lead the session);
   2. else the variant most recently performed in the block for the same PATTERN in any role (the
      09-29 upper-heavy row: upper-heavy had not run yet in block 1, upper-volume rowed the DB row
      on 09-25). At a moderate exposure whose pattern names `moderate_catalog_keys` (the owner's
-     RDL-as-moderate-hinge rule, #4147) only those keys count here — a heavy trap-bar pull must
-     not take the moderate hinge slot;
+     RDL-as-moderate-hinge rule, #4147) only those keys count here — a heavy pull must not take a
+     moderate hinge slot. (Since #5694 both lower roles PIN their hinge — `anchor_keys` — so only
+     the pinned members are ever candidates there);
   3. else the catalog order, unchanged — a slot with no in-block performance resolves exactly as
      before.
 

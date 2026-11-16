@@ -21,7 +21,7 @@ from aws_cdk import (
 # sys.path idiom ingestion_stack.py uses for source_registry. commitment_grading is
 # boto3-free by construction precisely so this import is cheap and safe at synth time.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "lambdas"))
-from coach import commitment_grading  # noqa: E402
+from coach import commitment_grading, prereg_overdue  # noqa: E402
 
 _GTE = cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD
 _LT = cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD
@@ -177,3 +177,40 @@ def add_commitment_alarms(scope, digest) -> None:
         treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
     )
     ungraded.add_alarm_action(cw_actions.SnsAction(digest))
+
+
+def add_prereg_overdue_alarm(scope, digest) -> None:
+    """#5518: the pre-registration dead-man — a sealed bet still open past its due date.
+
+    In cycle 17 four of the eighteen sealed rows sat ungraded for weeks past due (two genesis hypotheses stamped
+    ``pilot`` by the wall clock and filtered out of the engine's load; two sealed bets on a retired seat the
+    evaluator never queried) and no alarm said so: a review found them on day 56. The evaluator now counts, every
+    run and phase-blind, the pre-registered rows still open past their grader's own horizon plus a cadence grace
+    (``coach/prereg_overdue.py`` — the reasoning, the horizons and the graces live there) and emits the count as
+    ``PreRegisteredOverdue``. ALARM at >= 1 for ``ALARM_PERIODS`` (2) consecutive daily periods: a row past the
+    horizon is one its grader cannot see, so one is enough.
+
+    treat_missing_data=BREACHING: the scan emits nothing when a read fails, so a failed scan and a dead evaluator are
+    silence, and silence is heard (the commitments-ungraded posture). Two periods, not one, because the current UTC
+    day has no datapoint until the 18:00 UTC run (grading-stalled's guard). Digest-routed: an overdue sealed bet is
+    a next-morning problem. Name, namespace, metric and window come from the emitting module.
+    """
+    overdue = cloudwatch.Alarm(
+        scope,
+        "PreRegisteredOverdue",
+        # A LITERAL, for the same reason as commitments-ungraded (deploy/alarm_discovery.py resolves names by static
+        # AST); tests/test_prereg_overdue_5518.py holds it equal to prereg_overdue.ALARM_NAME.
+        alarm_name="prereg-overdue",
+        metric=cloudwatch.Metric(
+            namespace=prereg_overdue.NAMESPACE,
+            metric_name=prereg_overdue.METRIC,
+            period=Duration.seconds(prereg_overdue.PERIOD_SECONDS),
+            statistic="Maximum",
+        ),
+        evaluation_periods=prereg_overdue.ALARM_PERIODS,
+        datapoints_to_alarm=prereg_overdue.ALARM_PERIODS,
+        threshold=1,
+        comparison_operator=_GTE,
+        treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
+    )
+    overdue.add_alarm_action(cw_actions.SnsAction(digest))

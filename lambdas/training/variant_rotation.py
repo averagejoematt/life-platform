@@ -60,6 +60,9 @@ import logging
 from decimal import Decimal
 from typing import Any
 
+from training import kb_entry
+from training.week_floors import WEEKLY_FAMILY_FLOORS, family_members
+
 logger = logging.getLogger(__name__)
 
 ISSUE = "#5075"
@@ -72,6 +75,7 @@ LOADED_HEVY_TYPES = (None, "weight_reps")
 
 PINNED_SLOTS: dict[str, str] = {
     "shoulders_arms.farmers_walk": "owner ruling B3, 2026-10-24 (#5318): the farmer's carry replaced the shrug — never rotated",
+    "lower_volume.kettlebell_swing": "owner ruling 2026-11-11 (#5774): the KB swing, entered via 2 KB-deadlift exposures (`kb_entry`)",
 }
 """Accessory slots the owner pinned: they serve their template movement in every phase and are never written to the ledger."""
 
@@ -137,8 +141,10 @@ CHARTER_FAMILY_DISPOSITION: dict[str, str] = {
     "rows": "anchor — the row pattern, fixed per block (in-block variant rule, #4409)",
     "vertical_pull": "anchor — the vertical-pull pattern, fixed per block",
     "hinge": "anchor — the hinge pattern, fixed per block (the RDL as the moderate hinge; the conventional pull stays gated)",
-    "single_leg_progression": "slot — lower_heavy.leg_press rotates through the Bulgarian split squat (the logged step of the progression)",
-    "carries": "pinned — the farmer's carry (ruling B3); the suitcase carry is not in his logged history",
+    "single_leg_progression": (
+        "slot — lower_heavy.leg_press; under the weekly floor (#5759, `week_floors`) it serves its pool's single-leg member every phase"
+    ),
+    "carries": "pinned — the farmer's carry (ruling B3), the week's carry under the weekly floor (#5759, `week_floors`)",
     "delts": "slot — every lateral-raise, face-pull and reverse-pec-deck slot",
     "core": "slot — lower_volume.machine_crunch; the Pallof press is refused by the volume rule (the catalog files it under shoulders)",
 }
@@ -292,6 +298,16 @@ def pick(pool: list[str], step: int, offset: int) -> str:
     return pool[(step + offset % (n - 1)) % n]
 
 
+def floor_pick(members: list[str], step: int, previous: str | None) -> str:
+    """#5759: a floored slot's member at rotation step `step` — `members[step % n]`, moved on by one when that is the member
+    it served the phase before (`previous`, the ledger's when it holds one), so a family with two or more members changes
+    at every phase boundary even when the ledger's history started on the other member."""
+    v = members[max(step, 0) % len(members)]
+    if len(members) > 1 and v == previous:
+        v = members[(members.index(v) + 1) % len(members)]
+    return v
+
+
 def resolve_slot(
     slot: str, variants: dict[str, str] | None, catalog_movements: dict[str, Any] | None, skill_ceiling: int, taken: set[str]
 ) -> tuple[str | None, str | None]:
@@ -311,6 +327,27 @@ def _title(key: str | None, catalog: dict[str, Any]) -> str:
 
 
 # ── the ledger ───────────────────────────────────────────────────────────────
+LIVE_PHASE_PREFIX = "live_"
+"""A live draft's ledger attribute is `live_phase_N` (`record`); `ledger_view` lays it over `phase_N` for the
+live reader only. Every proposed-path reader matches `phase_` at the start of the key and never sees it."""
+
+
+def ledger_view(rows: list[dict[str, Any]], lib: Any = ...) -> list[dict[str, Any]]:
+    """The rotation ledger as THIS mode reads it (#5861 fix round 12, rollback safety). Shadow: `rows` itself — a live draft's
+    picks sit in `live_phase_N` attributes no proposed reader matches, so reverting the status serves what it would have served
+    had the library never been approved. Live: a copy with each `live_phase_N` laid over `phase_N` (the shadow history before
+    approval is kept for every phase the live engine has not decided)."""
+    from training import selection_engine as se
+
+    if se.mode(se.load_library_failsoft() if lib is ... else lib) != se.MODE_LIVE:
+        return rows
+    out = []
+    for r in rows:
+        over = {k[len(LIVE_PHASE_PREFIX) :]: v for k, v in r.items() if k.startswith(LIVE_PHASE_PREFIX + "phase_")}
+        out.append({k: v for k, v in r.items() if not k.startswith(LIVE_PHASE_PREFIX)} | over)
+    return out
+
+
 def ledger_sk(block: int, slot_id: str) -> str:
     return f"{LEDGER_SK_PREFIX}B{int(block):03d}#{slot_id}"
 
@@ -369,8 +406,12 @@ def record(rotation: dict[str, Any] | None, table: Any, recorded_at: str) -> int
     """Write every pending phase of a drafted session's rotation (`plan(...)["ledger_writes"]`), each `if_not_exists`
     so the first draft of a phase wins. Numbers go in as Decimal. Returns the number of rows written. Raises."""
     n = 0
-    for w in (rotation or {}).get("ledger_writes") or []:
-        phase_attr = f"phase_{int(w['phase'])}"
+    # #5861 fix round 12 (rollback safety): a LIVE draft's picks (`live_ledger_writes`) are kept apart — the proposed path reads
+    # `phase_N` only, so going back to `proposed` serves exactly what it would have served had the library never been approved
+    writes = [(w, "") for w in (rotation or {}).get("ledger_writes") or []]
+    writes += [(w, LIVE_PHASE_PREFIX) for w in (rotation or {}).get("live_ledger_writes") or []]
+    for w, prefix in writes:
+        phase_attr = f"{prefix}phase_{int(w['phase'])}"
         table.update_item(
             Key={"pk": LEDGER_PK, "sk": ledger_sk(int(w["block"]), w["slot_id"])},
             UpdateExpression="SET #p = if_not_exists(#p, :p), #b = :b, #s = :s, #r = :r, #i = :i, #iss = :iss",
@@ -399,7 +440,7 @@ def record(rotation: dict[str, Any] | None, table: Any, recorded_at: str) -> int
 
 def record_failsoft(rotation: dict[str, Any] | None, table: Any, recorded_at: str) -> int | None:
     """`record`, or None when the write failed — logged; the draft already landed and the next draft re-offers the write."""
-    if not (rotation or {}).get("ledger_writes"):
+    if not ((rotation or {}).get("ledger_writes") or (rotation or {}).get("live_ledger_writes")):
         return 0
     try:
         return record(rotation, table, recorded_at)
@@ -410,18 +451,35 @@ def record_failsoft(rotation: dict[str, Any] | None, table: Any, recorded_at: st
 
 # ── the plan: which variant each slot serves ─────────────────────────────────
 def _slot_plan(
-    slot: dict[str, Any], pos: dict[str, Any], catalog: dict[str, Any], rows: list[dict[str, Any]] | None, ceiling: int, missing: list[str]
+    slot: dict[str, Any],
+    pos: dict[str, Any],
+    catalog: dict[str, Any],
+    rows: list[dict[str, Any]] | None,
+    ceiling: int,
+    missing: list[str],
+    kb_exposures: int | None = None,
 ) -> dict[str, Any]:
     seeded = seed_pool(slot["incumbent"], catalog, skill_ceiling=ceiling, missing=missing)
     pool, step, block, phase = seeded["pool"], pos["step"], pos["block"], pos["phase"]
     base = {**slot, **seeded, "phase": phase, "weeks": pos["phase_weeks"], "block": block}
     if slot["pinned"]:
-        return {**base, "variant": slot["incumbent"], "previous": slot["incumbent"], "source": "pinned", "note": None}
-    computed = pick(pool, step, slot["offset"])
+        served = kb_entry.served(kb_exposures) if slot["slot_id"] == kb_entry.SLOT_ID else slot["incumbent"]  # #5774
+        note = kb_entry.note(kb_exposures) if slot["slot_id"] == kb_entry.SLOT_ID else None
+        return {**base, "variant": served, "previous": served, "source": "pinned", "note": note}
+    floor = seeded["charter_family"] if seeded["charter_family"] in WEEKLY_FAMILY_FLOORS else None
+    # #5759: a floored slot serves only its family's members, every phase after block 1's first (which serves the template
+    # as written — the committed session, the s == 0 rule)
+    members = [k for k in pool if k in family_members(floor)] if floor and step > 0 else []
+    if members:
+        pool = members
+        base.update(pool=members, floor=floor)
     prev_block, prev_phase = (block, phase - 1) if phase > 1 else (block - 1, pos["phases_per_block"])
     previous = (_ledger_variant(rows, prev_block, slot["slot_id"], prev_phase) if prev_block >= 1 else None) or (
-        pick(pool, step - 1, slot["offset"]) if step > 0 else slot["incumbent"]
+        (floor_pick(members, step - 1, None) if members and step > 1 else pick(seeded["pool"], step - 1, slot["offset"]))
+        if step > 0
+        else slot["incumbent"]
     )
+    computed = floor_pick(members, step, previous) if members else pick(pool, step, slot["offset"])
     held = _ledger_variant(rows, block, slot["slot_id"], phase)
     if held and held in pool:
         return {**base, "variant": held, "previous": previous, "source": "ledger", "note": None}
@@ -434,13 +492,53 @@ def _line(s: dict[str, Any], pos: dict[str, Any], catalog: dict[str, Any]) -> st
         f"week {s['weeks'][0]} of block {s['block']} (serves weeks {s['weeks'][0]}–{s['weeks'][1]}; this is week {pos['week_in_block']})"
     )
     if s["source"] == "pinned":
-        return f"pinned: {_title(s['variant'], catalog)} — {s['pinned']}"
+        return f"pinned: {_title(s['variant'], catalog)} — {s.get('note') or s['pinned']}"
     if pos["step"] == 0:
         return f"template: {_title(s['variant'], catalog)}, {where} — the first phase serves the template as written [{s['slot_id']}]"
     if s["variant"] == s["previous"]:
         why = "no other member of the vetted pool" if len(s["pool"]) < 2 else "the pool cycled back"
+        why = (
+            f"the pool's only {s['floor']} member, served every week by the weekly floor" if s.get("floor") and len(s["pool"]) < 2 else why
+        )
         return f"held: {_title(s['variant'], catalog)}, {where} — {why} [{s['slot_id']}, {s['source']}]"
     return f"rotated: {_title(s['previous'], catalog)} → {_title(s['variant'], catalog)}, {where} [{s['slot_id']}, {s['source']}]"
+
+
+def week_check(
+    every: list[dict[str, Any]],
+    catalog: dict[str, Any],
+    missing: list[str],
+    variants_by_role: dict[str, dict[str, str]] | None = None,
+    on: str | None = None,
+    template_phase: bool = False,
+) -> dict[str, Any]:
+    """#5759: the week-level selection check (`week_floors.check_week`) over what this rotation serves — every slot's
+    planned variant, or `variants_by_role` (a REFUSED rotation passes `{}`, so the template is checked). A pinned movement
+    on the charter's not_available list is not served; its reason joins the seeded pools' refusals."""
+    from training import week_floors
+
+    served, refusals = [], [dict(e) for p in every for e in p.get("excluded") or []]
+    for p in every:
+        v = p["variant"] if variants_by_role is None else (variants_by_role.get(p["role"]) or {}).get(p["incumbent"], p["incumbent"])
+        hit = _unavailable(v, catalog.get(v) or {}, missing) if p["source"] == "pinned" else None
+        if hit:
+            refusals.append({"key": v, "reason": f"on the charter's equipment.not_available list ({hit!r})"})
+        else:
+            served.append({"key": v, "slot_id": p["slot_id"], "role": p["role"]})
+    if template_phase:  # block 1's first phase: the floor does not move the committed session
+        why = "block 1's first phase serves the template as written (#5075 step 0: the committed session)"
+        refusals += [{"key": k, "reason": why} for fam in week_floors.WEEKLY_FAMILY_FLOORS for k in week_floors.family_members(fam)]
+    return week_floors.check_week(served, refusals, catalog, on=on)
+
+
+def _draft_day(day_entry: dict[str, Any] | None) -> str | None:
+    return (day_entry or {}).get("date") or (day_entry or {}).get("target_date")
+
+
+def _week_lines(week: dict[str, Any]) -> list[str]:
+    from training import week_floors
+
+    return week_floors.lines(week)
 
 
 def plan(
@@ -452,6 +550,7 @@ def plan(
     ledger_state: str = "not_read",
     skill_ceiling: int = 2,
     missing: list[str] | None = None,
+    kb_exposures: int | None = None,
 ) -> dict[str, Any]:
     """The rotation for one served session (`role`, default the entry's) or, with `role="*"`, every slot of the week.
 
@@ -481,20 +580,24 @@ def plan(
         return {**base, "position": None, "rationale": ["rotation: the program week is unknown — the template's accessories serve"]}
     base.update(position=pos, cadence={"anchors_fixed_weeks": block_weeks(), "accessory_slots_rotate_every_weeks": rotate_every_weeks()})
     missing = not_available() if missing is None else missing
-    every = [_slot_plan(s, pos, catalog_movements, rows, skill_ceiling, missing) for s in slots()]
+    every = [_slot_plan(s, pos, catalog_movements, rows, skill_ceiling, missing, kb_exposures) for s in slots()]
     by_role: dict[str, dict[str, str]] = {}
     for p in every:
         by_role.setdefault(p["role"], {})[p["incumbent"]] = p["variant"]
     check = volume_check(catalog_movements, by_role, skill_ceiling)
     planned = [p for p in every if role == "*" or p["role"] == role]
     if not check["unchanged"]:
+        week = week_check(every, catalog_movements, missing, variants_by_role={}, on=_draft_day(day_entry), template_phase=pos["step"] == 0)
         return {
             **base,
             "volume_check": check,
             "slots": planned,
+            "family_floors": week["family_floors"],
+            "kettlebell_weekly": week["kettlebell"],
             "rationale": [
                 f"rotation REFUSED — it would move the week's counts ({', '.join(check['moved'])}); the template's accessories serve"
-            ],
+            ]
+            + _week_lines(week),
         }
     target = (day_entry or {}).get("date") or (day_entry or {}).get("target_date")
     writes = [
@@ -509,7 +612,11 @@ def plan(
         volume_check=check,
         slots=[{k: v for k, v in p.items() if k != "write"} for p in planned],
         ledger_writes=writes,
-        rationale=[_line(p, pos, catalog_movements) for p in planned],
+        family_floors=(week := week_check(every, catalog_movements, missing, on=_draft_day(day_entry), template_phase=pos["step"] == 0))[
+            "family_floors"
+        ],
+        kettlebell_weekly=week["kettlebell"],
+        rationale=[_line(p, pos, catalog_movements) for p in planned] + _week_lines(week),
     )
     return base
 
@@ -551,14 +658,45 @@ def for_session(
     rows: list[dict[str, Any]] | None = None,
     read: bool = True,
     skill_ceiling: int = 2,
+    block_workouts: list[dict[str, Any]] | None = None,
+    select: bool = False,
 ) -> dict[str, Any]:
     """`plan` for the served session, with the ledger read here (fail-soft) unless `rows` is injected or `read` is False
-    (the plan view: no hidden DDB read — `ledger: not_read`, the rotation computed)."""
+    (the plan view: no hidden DDB read — `ledger: not_read`, the rotation computed). `block_workouts`: the Hevy record the
+    kettlebell slot's entry exposures are counted from (#5774, `kb_entry`), else the entry's own `kb_entry_exposures`;
+    neither = not read, and the entry (the KB deadlift) serves. `select` (a draft) runs the #5773 selection engine over
+    it: SHADOW beside these pools while the exercise library is proposed, LIVE once approved — and, with the ledger read
+    here, the block design review's approval record too (#5776): live drafting then serves only owner-approved picks."""
     pos = position(day_entry)
     state = "injected" if rows is not None else "not_read"
+    approvals = None  # #5776: read beside the ledger, so an injected ledger (a test, a generator input) reads neither
     if rows is None and read and pos is not None:
         rows, state = load_rows_failsoft(pos["block"])
-    return plan(day_entry, catalog_movements, rows=rows, ledger_state=state, skill_ceiling=skill_ceiling)
+        if select:
+            from training import block_design_review
+
+            approvals = block_design_review.load_failsoft(pos["block"])
+    if select and rows:  # #5861 fix round 12: live reads its own phase rows over the shadow ones; in shadow `rows` itself
+        rows = ledger_view(rows)
+    day = (day_entry or {}).get("date") or (day_entry or {}).get("target_date")
+    # the planned session carries its own measured count (`program_structure.planned_session`); a generator passes the record
+    n = kb_entry.exposures(block_workouts, day) if block_workouts is not None else (day_entry or {}).get("kb_entry_exposures")
+    out = plan(day_entry, catalog_movements, rows=rows, ledger_state=state, skill_ceiling=skill_ceiling, kb_exposures=n)
+    if not select:
+        return out
+    from training import selection_engine
+
+    # #5861 L3: the Hevy record rides to the engine, which reads it ONLY when the library is approved (live policy: each
+    # movement's trend and discomfort, the fatigue model's swaps); in shadow it is ignored and the output is unchanged
+    return selection_engine.apply(
+        out,
+        catalog_movements,
+        rows=rows,
+        skill_ceiling=skill_ceiling,
+        target_date=_draft_day(day_entry),
+        approvals=approvals,
+        block_workouts=block_workouts,
+    )
 
 
 def week_volume(catalog_movements: dict[str, Any], variants_by_role: dict[str, dict[str, str]], skill_ceiling: int = 2) -> dict[str, Any]:

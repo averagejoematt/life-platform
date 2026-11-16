@@ -39,6 +39,7 @@ from training import (  # noqa: E402
     standing_constraints as sc,
     training_charter as tc,
 )
+from training.cardio_note import without_capture as _wc  # noqa: E402  #5796: line 1 follows the RPE prompt
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set  # noqa: E402
 
 CYCLING_TID = "D8F7F851"
@@ -92,11 +93,11 @@ def test_every_block_carries_a_dose_and_an_rpe_or_talk_test_target():
                 facts=_bike_facts(),
                 treadmill_sessions=tread,
             )
-            line1 = note.split("\n")[0]
+            line1 = _wc(note).split("\n")[0]
             m = cn.LINE1_RE.match(line1)
             walk = machine == cm.TREADMILL
             dosed = m and ((m.group("level") and not walk and "mph" not in note) or (walk and m.group("incline") and m.group("walk_mph")))
-            if not (dosed and re.search(r"\bRPE \d", line1) and audit["kind"] == kind and len(note.split("\n")) <= 3):
+            if not (dosed and re.search(r"\bRPE \d", line1) and audit["kind"] == kind and len(_wc(note).split("\n")) <= 3):
                 offenders.append(f"{kind}/{machine}: {line1!r}")
     assert not offenders, "\n".join(offenders)
 
@@ -104,7 +105,7 @@ def test_every_block_carries_a_dose_and_an_rpe_or_talk_test_target():
 def test_the_bike_carries_level_and_rpe_and_keeps_its_speed_in_the_audit():
     note, audit = cn.compose(movement_key="cycling", minutes=30, target_date="2026-10-20", kind="easy", facts=_bike_facts())
     lo, hi = tc.charter_value("cardio_menu.blocks.easy.rpe")
-    assert note == f"Recumbent · L11 · RPE {lo}–{hi} (full sentences)"
+    assert _wc(note) == f"Recumbent · L11 · RPE {lo}–{hi} (full sentences)"
     assert audit["mph"] == 13.4  # his speed at the level: on the record, never on the wire (#5428)
 
 
@@ -120,7 +121,7 @@ def test_the_numbers_are_read_from_the_charter_not_restated(monkeypatch):
 
     monkeypatch.setattr(tc, "charter_value", moved)
     note = cn.compose(movement_key="cycling", minutes=30, target_date="2026-10-20", kind="easy", facts=_bike_facts())[0]
-    assert "RPE 3–4" in note.split("\n")[0]
+    assert "RPE 3–4" in _wc(note).split("\n")[0]
 
 
 # ── the default and the incline walk's starting dose (his treadmill history) ───────────
@@ -158,10 +159,10 @@ def test_a_raise_verdict_moves_the_bike_one_level_and_writes_why():
     note, audit = cn.compose(
         movement_key="cycling", minutes=30, target_date="2026-10-20", kind="easy", facts=_bike_facts(), verdict=verdict
     )
-    assert note.split("\n")[0].startswith("Recumbent · L12 · RPE ")
+    assert _wc(note).split("\n")[0].startswith("Recumbent · L12 · RPE ")
     # #5428: the reason is the audit's (the chat tells the story), never a tail on the wire
     assert audit["dose_reason"] == f"+1 level: {verdict['basis']} — same RPE, one level up"
-    assert "\n" not in note
+    assert "\n" not in _wc(note)
     assert audit["level"] == 12 and audit["hold_level"] == 11
 
 
@@ -328,7 +329,7 @@ def test_the_draft_path_appends_the_menus_block_with_its_dose_and_movement_minut
     assert [s.duration_seconds for s in cardio.sets] == [minutes * 60]
     # #5428: the speed and grade are settings, so they are prescribed — `today`, because his own logged walks (his
     # usual, 0.5-1.5 % at 3.0 mph) differ from the menu's band; no minutes on line 1 (the set row shows them)
-    assert cardio.notes.split("\n")[0].startswith("Treadmill · today 2.8 mph, 8% · RPE ")
+    assert _wc(cardio.notes).split("\n")[0].startswith("Treadmill · today 2.8 mph, 8% · RPE ")
     assert out["cardio_block"]["pick"]["menu"]["kind"] == "incline_treadmill_walk"
     plan = ideal.inputs_snapshot["cardio_plan"]
     assert plan["movement_minutes"] == minutes == out["cardio_block"]["movement_minutes"]

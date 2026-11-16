@@ -42,6 +42,7 @@ import re
 from typing import Any
 
 from training.cardio_note import LINE1_RE
+from training.hevy_note_grammar import CARDIO_RPE_CAPTURE_LINE
 from training.hevy_note_types import PINNED_ROUTINE_NOTE_FIELD
 from training.warmup_sets import is_warmup
 
@@ -164,8 +165,8 @@ RENDER_TABLE: tuple[dict[str, str], ...] = (
     },
     {
         "field": "superset_id",
-        "issue": "-",
-        "producer": "the block's superset",
+        "issue": "#5799",
+        "producer": "session_shape.pair_supersets",
         "home": NATIVE,
         "wire": "routine.exercises[].superset_id",
         "shows": "the exercises grouped as a superset",
@@ -206,7 +207,10 @@ _MINIMUM_LINE_RE = re.compile(r"^(?:Minimum|Travel) · ", re.M)
 # #5083/#5428: a rotated accessory's reason line (`lift_note.rotation_line`)
 _ROTATION_RE = re.compile(r"^New: replaces ", re.M)
 # #5428: the standard's reason grammar (`lift_note.reason_line`, the chat path's step line) — line 2, after the effort line
-_STANDARD_REASON_RE = re.compile(r"^(?:Heavier|Lighter|Volume day|Now aiming \d+–\d+|No jumps(?: today)?|Step due): ", re.M)
+# (re-grade #6, 2026-11-08: the capped exposure's line is `Same load all sets: …`; the retired `No jumps` still reads)
+_STANDARD_REASON_RE = re.compile(
+    r"^(?:Heavier|Lighter|Volume day|Now aiming \d+–\d+|Same load all sets|No jumps(?: today)?|Step due): ", re.M
+)
 _EFFORT_LINE_RE = re.compile(r"^RPE \d")
 
 
@@ -307,6 +311,10 @@ def _note_hits(i: int, own: str, base: int) -> dict[str, list[dict[str, Any]]]:
     where = f"exercise {i + 1} note"
     out: dict[str, list[dict[str, Any]]] = {}
     first = own.split("\n", 1)[0]
+    if first.strip() == CARDIO_RPE_CAPTURE_LINE and "\n" in own:  # #5796: line 1 follows the RPE capture prompt
+        base += len(first) + 1
+        own = own.split("\n", 1)[1]
+        first = own.split("\n", 1)[0]
     m = LINE1_RE.match(first)
     if m:
         if m.group("level"):

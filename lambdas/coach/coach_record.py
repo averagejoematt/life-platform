@@ -103,6 +103,7 @@ _PROJECTION_NAMES = {
     # rows the record counts — its frozen verdict, which of the four records a call is, and
     # the stated confidence the engine's skill score uses. Never a second query.
     "#bl": "baseline",
+    "#blc": "baseline_corrections",  # owner ruling 2026-11-09 (A): the overlay coach_baseline.effective reads
     "#ev": "evaluation",
     "#pr": "pre_registered",
     "#src": "source",

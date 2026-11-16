@@ -29,6 +29,7 @@ sys.path.insert(0, str(REPO / "lambdas"))
 sys.path.insert(0, str(REPO))
 
 from training import cardio_menu as cm, cardio_note as cn, cardio_progression as cp  # noqa: E402
+from training.cardio_note import without_capture as _wc  # noqa: E402  #5796: line 1 follows the RPE prompt
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set  # noqa: E402
 
 from tests.test_cardio_served_kind_5076 import (  # noqa: E402 — #5279's live-shaped harness, one home
@@ -191,7 +192,7 @@ def test_the_nightly_draft_doses_from_the_prescribed_level(monkeypatch):
     block, audit = _cardio(ideal)
     assert block.movement_key == "cycling", block.notes
     assert audit["hold_level"] == 12 and audit["level_basis"] == PRESCRIBED_BASIS
-    assert f" L{audit['level']} " in block.notes.split("\n")[0]  # #5428 line 1: "Recumbent · L12 · RPE …"
+    assert f" L{audit['level']} " in _wc(block.notes).split("\n")[0]  # #5428 line 1: "Recumbent · L12 · RPE …"
 
 
 def test_the_live_tempo_ride_is_read_at_its_base(monkeypatch):

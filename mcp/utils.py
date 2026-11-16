@@ -155,6 +155,7 @@ _ERROR_CODE_SPECS: dict[str, tuple[str, str]] = {
     "REDTEAM_BINDING": (KIND_POLICY, "Commit refused: the routine is not the one stage 2 red-teamed, unchanged since (#4066)."),
     "SUBTRACT_ONLY_VIOLATION": (KIND_POLICY, "Commit refused: a set under its floor or a conditional up-branch (#3927/#3971)."),
     "CRITIC_VETO": (KIND_POLICY, "Commit refused: a stage-2 critic's veto stands (#3752)."),
+    "WEEK_COMMITMENT": (KIND_POLICY, "Commit refused: the program week misses a concession-ledger weekly commitment (#5774)."),
     "HEVY_ROUTINE_DELETED": (KIND_POLICY, "Commit refused: the routine's Hevy copy was deleted in the app (#4066)."),
     "HEVY_CONFLICT": (KIND_POLICY, "Write refused: Hevy's copy was edited in the app since the platform last saw it."),
     # #4190: a WRITE tool's arguments carried the calling client's own tool-call XML
@@ -318,6 +319,10 @@ _DEFAULT_SUGGESTIONS: dict[str, list[str]] = {
     "CRITIC_VETO": [
         "Address the vetoing critic's finding (the error names the critic and its reason) in a new draft (manage_hevy_routine draft), then run plan_next_session with that routine_id (stage 2) and commit what it verdicts.",
         "Or overrule THAT critic in the owner's own words: plan_next_session with veto_override={critic, owner_words} on this routine_id — the words are stored verbatim on the verdict.",
+    ],
+    "WEEK_COMMITMENT": [
+        "Draft so the program week serves the commitment the error names (the engine's session, or a draft_custom day that carries it), then commit that routine_id.",
+        "The week is read from what is served — the routines committed this program week, this draft, and the plan for the rest — so a departure counts toward and against it.",
     ],
     "HEVY_ROUTINE_DELETED": [
         "Draft a new routine (manage_hevy_routine draft), red-team it (plan_next_session with routine_id), then commit that new routine_id.",

@@ -172,30 +172,38 @@ def wired(monkeypatch):
 
 
 class TestFloatsToDecimal:
+    """#5524: HAE now routes through the canonical `common.numeric.floats_to_decimal` with
+    `precision=HAE_DECIMAL_PLACES`; these pin that the private copy's behaviour survived."""
+
+    def test_the_walker_is_the_canonical_one_not_a_copy(self):
+        from common import numeric
+
+        assert hae.floats_to_decimal is numeric.floats_to_decimal
+
     def test_nan_and_inf_become_none_not_decimal_nan(self):
         """DynamoDB rejects Decimal('NaN'); a sensor NaN must become an absent
         value, never a stored one."""
-        assert hae.floats_to_decimal(float("nan")) is None
-        assert hae.floats_to_decimal(float("inf")) is None
-        assert hae.floats_to_decimal(float("-inf")) is None
+        assert hae.floats_to_decimal(float("nan"), precision=hae.HAE_DECIMAL_PLACES) is None
+        assert hae.floats_to_decimal(float("inf"), precision=hae.HAE_DECIMAL_PLACES) is None
+        assert hae.floats_to_decimal(float("-inf"), precision=hae.HAE_DECIMAL_PLACES) is None
 
     def test_float_becomes_decimal_rounded_to_four_places(self):
-        out = hae.floats_to_decimal(1.23456789)
+        out = hae.floats_to_decimal(1.23456789, precision=hae.HAE_DECIMAL_PLACES)
         assert isinstance(out, Decimal)
         assert out == Decimal("1.2346")
 
     def test_decimal_is_exact_not_binary_float_repr(self):
         """Decimal(str(...)) not Decimal(float) — the latter stores 0.1 as
         0.1000000000000000055511151231257827."""
-        assert hae.floats_to_decimal(0.1) == Decimal("0.1")
+        assert hae.floats_to_decimal(0.1, precision=hae.HAE_DECIMAL_PLACES) == Decimal("0.1")
 
     def test_ints_bools_and_strings_pass_through_untouched(self):
-        assert hae.floats_to_decimal(7) == 7
-        assert hae.floats_to_decimal("dexcom_stelo") == "dexcom_stelo"
-        assert hae.floats_to_decimal(None) is None
+        assert hae.floats_to_decimal(7, precision=hae.HAE_DECIMAL_PLACES) == 7
+        assert hae.floats_to_decimal("dexcom_stelo", precision=hae.HAE_DECIMAL_PLACES) == "dexcom_stelo"
+        assert hae.floats_to_decimal(None, precision=hae.HAE_DECIMAL_PLACES) is None
 
     def test_nested_dicts_and_lists_are_converted_recursively(self):
-        out = hae.floats_to_decimal({"a": [1.5, {"b": 2.25}], "c": float("nan")})
+        out = hae.floats_to_decimal({"a": [1.5, {"b": 2.25}], "c": float("nan")}, precision=hae.HAE_DECIMAL_PLACES)
         assert out == {"a": [Decimal("1.5"), {"b": Decimal("2.25")}], "c": None}
 
 
@@ -1166,6 +1174,156 @@ class TestHandlerAuth:
         encoded = base64.b64encode(json.dumps(payload).encode()).decode()
         resp = hae.lambda_handler(_event(None, is_b64=True, raw_body=encoded), _Ctx())
         assert resp["statusCode"] == 200
+
+
+# ── #5513 (c): which secret the expected token comes from ─────────────────────
+# The REAL `get_api_key` (not the handler_env stub), driven through a fake Secrets Manager.
+# Order under test: dedicated life-platform/hae-webhook first; the ingestion-keys bundle when
+# the dedicated one is absent, unreadable (grant not deployed) or lacks the field; and when
+# both are gone, the handler's existing auth-error path. The value is never logged.
+
+_DEDICATED = "life-platform/hae-webhook"
+_BUNDLE = "life-platform/ingestion-keys"
+_BUNDLE_BEARER = "bundle-bearer-value"  # not a real credential
+
+
+class ClientError(Exception):
+    """botocore's shape: the code lives in `.response["Error"]["Code"]`. An UNMODELLED code
+    (AccessDeniedException on Secrets Manager) is raised as this generic class name."""
+
+    def __init__(self, code):
+        super().__init__(f"An error occurred ({code})")
+        self.response = {"Error": {"Code": code}}
+
+
+class ResourceNotFoundException(ClientError):
+    """A MODELLED code: botocore names the raised class after it (verified with `from_code`)."""
+
+    def __init__(self):
+        super().__init__("ResourceNotFoundException")
+
+
+class _FakeSecrets:
+    def __init__(self, store):
+        self.store = store  # secret id -> SecretString, or an exception to raise
+        self.reads = []
+
+    def get_secret_value(self, SecretId):
+        self.reads.append(SecretId)
+        value = self.store.get(SecretId, ResourceNotFoundException())
+        if isinstance(value, Exception):
+            raise value
+        return {"SecretString": value}
+
+
+class _Lines:
+    def __init__(self):
+        self.lines = []
+
+    def _rec(self, msg, *args, **_kw):
+        self.lines.append(msg % args if args else msg)
+
+    info = warning = error = debug = _rec
+
+
+@pytest.fixture
+def token_source(monkeypatch):
+    """Point the real lookup at a fake store; reset the value cache and the retry window."""
+    from common import secret_cache
+
+    auth = sys.modules[hae.get_api_key.__module__]
+    lines = _Lines()
+    monkeypatch.setattr(auth, "logger", lines)
+    monkeypatch.setattr(auth, "_dedicated_retry_at", 0.0)
+    secret_cache.invalidate()
+
+    def _arm(store):
+        fake = _FakeSecrets(store)
+        monkeypatch.setattr(auth, "secrets_client", fake)
+        return auth, fake, lines
+
+    yield _arm
+    secret_cache.invalidate()
+
+
+class TestBearerTokenSource:
+    def test_the_dedicated_secret_wins_and_the_bundle_is_never_read(self, token_source):
+        auth, fake, lines = token_source(
+            {
+                _DEDICATED: json.dumps({"health_auto_export_api_key": _VALID_BEARER}),
+                _BUNDLE: json.dumps({"health_auto_export_api_key": _BUNDLE_BEARER}),
+            }
+        )
+        assert auth.get_api_key() == _VALID_BEARER
+        assert fake.reads == [_DEDICATED]
+        assert any("source=dedicated" in line for line in lines.lines)
+
+    def test_an_absent_dedicated_secret_falls_back_to_the_bundle(self, token_source):
+        auth, fake, lines = token_source({_BUNDLE: json.dumps({"health_auto_export_api_key": _BUNDLE_BEARER})})
+        assert auth.get_api_key() == _BUNDLE_BEARER
+        assert fake.reads == [_DEDICATED, _BUNDLE]
+        assert any("hae_auth_key_fallback" in line and "ResourceNotFoundException" in line for line in lines.lines)
+        assert any("source=bundle" in line for line in lines.lines)
+
+    def test_an_ungranted_dedicated_secret_falls_back_too(self, token_source):
+        """Code ships on merge; the CDK grant waits for the owner's deploy — AccessDenied must not 500."""
+        auth, fake, lines = token_source(
+            {_DEDICATED: ClientError("AccessDeniedException"), _BUNDLE: json.dumps({"health_auto_export_api_key": _BUNDLE_BEARER})}
+        )
+        assert auth.get_api_key() == _BUNDLE_BEARER
+        assert any("reason=ClientError" in line for line in lines.lines)
+
+    def test_a_dedicated_secret_without_the_field_falls_back(self, token_source):
+        auth, fake, lines = token_source(
+            {_DEDICATED: json.dumps({"wrong_field": "x"}), _BUNDLE: json.dumps({"health_auto_export_api_key": _BUNDLE_BEARER})}
+        )
+        assert auth.get_api_key() == _BUNDLE_BEARER
+        assert any("reason=key_missing" in line for line in lines.lines)
+
+    def test_a_failed_dedicated_read_is_not_retried_inside_the_window(self, token_source, monkeypatch):
+        auth, fake, _ = token_source({_BUNDLE: json.dumps({"health_auto_export_api_key": _BUNDLE_BEARER})})
+        clock = [1_000_000.0]
+        monkeypatch.setattr(auth.time, "time", lambda: clock[0])
+        auth.get_api_key()
+        auth.get_api_key()
+        assert fake.reads.count(_DEDICATED) == 1, "a missing secret must not cost a read per request"
+        clock[0] += auth._DEDICATED_RETRY_SECONDS
+        fake.store[_DEDICATED] = json.dumps({"health_auto_export_api_key": _VALID_BEARER})
+        assert auth.get_api_key() == _VALID_BEARER, "once the window passes, a newly created secret is picked up"
+
+    def test_no_line_ever_carries_a_token_value(self, token_source):
+        auth, _, lines = token_source(
+            {_DEDICATED: json.dumps({"wrong_field": _VALID_BEARER}), _BUNDLE: json.dumps({"health_auto_export_api_key": _BUNDLE_BEARER})}
+        )
+        auth.get_api_key()
+        assert lines.lines and not any(_VALID_BEARER in line or _BUNDLE_BEARER in line for line in lines.lines)
+
+    def test_the_logged_reason_is_the_class_name_never_the_response(self, token_source):
+        """#5513 / CodeQL py/clear-text-logging-sensitive-data: the reason never reads the error's
+        response or message, and no line names a secret id — fixed labels only."""
+        planted = "PLANTED-VALUE-IN-RESPONSE"
+        auth, _, lines = token_source(
+            {_DEDICATED: ClientError(planted), _BUNDLE: json.dumps({"health_auto_export_api_key": _BUNDLE_BEARER})}
+        )
+        assert auth.get_api_key() == _BUNDLE_BEARER
+        assert any("reason=ClientError" in line for line in lines.lines)
+        assert not any(planted in line for line in lines.lines)
+        assert not any(_DEDICATED in line or _BUNDLE in line for line in lines.lines)
+
+    def test_the_handler_admits_the_dedicated_token(self, wired, token_source):
+        token_source({_DEDICATED: json.dumps({"health_auto_export_api_key": _VALID_BEARER})})
+        resp = hae.lambda_handler(_event({"data": {"metrics": [], "workouts": []}}), _Ctx())
+        assert resp["statusCode"] == 200
+
+    def test_the_handler_admits_the_bundle_token_during_the_cutover(self, wired, token_source):
+        token_source({_BUNDLE: json.dumps({"health_auto_export_api_key": _BUNDLE_BEARER})})
+        resp = hae.lambda_handler(_event({"data": {"metrics": [], "workouts": []}}, bearer=_BUNDLE_BEARER), _Ctx())
+        assert resp["statusCode"] == 200
+
+    def test_both_secrets_absent_is_the_existing_auth_error_and_never_admits(self, wired, token_source):
+        token_source({})
+        resp = hae.lambda_handler(_event({"data": {"metrics": []}}), _Ctx())
+        assert resp["statusCode"] == 500
 
 
 class TestHandlerRouting:

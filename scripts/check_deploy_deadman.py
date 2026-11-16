@@ -342,14 +342,18 @@ def _git_last(paths: list[str], excludes: tuple[str, ...] = ()) -> tuple[str | N
     return (out[0], datetime.fromtimestamp(int(out[1]), tz=timezone.utc)) if len(out) == 2 else (None, None)
 
 
-def collect_owed_commits(lambda_map_path: str = "ci/lambda_map.json") -> dict:
+def collect_owed_commits(lambda_map_path: str = "ci/lambda_map.json", only: set | None = None) -> dict:
     """function -> (owed sha, owed datetime, reason), from git history of the checked-out main.
     The owed commit is the newest one that should have redeployed the function: its own
     handler, or any shared module / bundled config path (an unmapped lambdas/ file ships in
-    every bundle), whichever is newer."""
+    every bundle), whichever is newer. `only` narrows the answer to those function names (the
+    v9 deploy's Site API readiness gate, deploy/www_api_readiness.py, asks for one) — the
+    derivation itself is unchanged, so the gate and this dead-man agree on what is owed."""
     with open(lambda_map_path) as f:
         mapped = {src: row for src, row in json.load(f)["lambdas"].items()}
     live_map = {src: row["function"] for src, row in mapped.items() if not row.get("native_deps") and not row.get("not_deployed")}
+    if only is not None:
+        live_map = {src: fn for src, fn in live_map.items() if fn in only}
     bundled = subprocess.run(
         [sys.executable, "deploy/build_bundle.py", "--print-bundled-config-paths"], capture_output=True, text=True, timeout=120, check=True
     ).stdout.split()

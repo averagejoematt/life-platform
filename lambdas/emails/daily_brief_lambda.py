@@ -989,7 +989,7 @@ def fetch_anomaly_record(date_str):
 # AST-level check confirmed zero logic divergence. One implementation, one
 # place for the next scoring change.
 # ==============================================================================
-from health import habit_streaks, hr_regime  # noqa: E402 — #2221: the ADR-104 streak scan; #4999: the HR regime markers
+from health import character_privacy, day_grade_public, habit_streaks, hr_regime  # noqa: E402 — #2221; #4999; 2026-11-05 public variants
 from health.scoring_engine import (  # noqa: E402,F401
     COMPONENT_SCORERS,
     compute_day_grade,
@@ -1010,7 +1010,7 @@ from health.scoring_engine import (  # noqa: E402,F401
 # ==============================================================================
 
 
-def store_day_grade(date_str, total_score, grade, component_scores, weights, algo_version):
+def store_day_grade(date_str, total_score, grade, component_scores, weights, algo_version, public_inputs=None):
     try:
         item = {
             "pk": USER_PREFIX + "day_grade",
@@ -1026,6 +1026,7 @@ def store_day_grade(date_str, total_score, grade, component_scores, weights, alg
         for comp, score in component_scores.items():
             if score is not None:
                 item["component_" + comp] = Decimal(str(score))
+        item.update(day_grade_public.stored_fields(public_inputs))  # {} without inputs: public readers then fail closed
         # ADR-058 (#1814): every write carries `phase` — an unstamped row passes the
         # default-deny read filter as CURRENT (pre-genesis rows counted as experiment days).
         from common.compute_metadata import tag_record
@@ -1149,7 +1150,13 @@ def _regrade_handler(dates, profile):
             data = gather_daily_data(profile, date_str)
             score, grade, comp_scores, comp_details = compute_day_grade(data, profile)
             store_day_grade(
-                date_str, score, grade, comp_scores, profile.get("day_grade_weights", {}), profile.get("day_grade_algorithm_version", "1.1")
+                date_str,
+                score,
+                grade,
+                comp_scores,
+                profile.get("day_grade_weights", {}),
+                profile.get("day_grade_algorithm_version", "1.1"),
+                public_inputs=(data, profile),
             )
             hyd = comp_scores.get("hydration", "—")
             logger.info(f"[REGRADE] {date_str}: {score} ({grade}) hydration={hyd}")
@@ -1829,6 +1836,7 @@ def lambda_handler(event, context):
                     component_scores,
                     profile.get("day_grade_weights", {}),
                     profile.get("day_grade_algorithm_version", "1.1"),
+                    public_inputs=(data, profile),
                 )
             except Exception as e:
                 logger.warning("store_day_grade failed: " + str(e))
@@ -2111,6 +2119,10 @@ def lambda_handler(event, context):
         logger.warning("intake-response line failed (non-fatal): " + str(_ir_err))
 
     _steps_line = brief_lines.steps_line(table, pacific_today(), logger)  # #5056: the day's steps floor/target, owner-only
+    # #4972: owner-only heart-rhythm section, window ending on the data day — the email alone; a demo brief omits it
+    _rhythm_lines = None if demo_mode else brief_lines.rhythm_lines(table, yesterday, logger)
+    # #5821: the owner's folded emails (protein note, nutrition review, habits to settle) — each fail-soft, owner-only
+    _folded = None if demo_mode else brief_lines.folded_sections(table, pacific_now(), logger, USER_ID)
 
     try:
         html = html_builder.build_html(
@@ -2149,6 +2161,8 @@ def lambda_handler(event, context):
             budget_headroom_line=_budget_headroom_line,
             intake_line=_intake_line,
             steps_line=_steps_line,
+            rhythm_lines=_rhythm_lines,
+            folded_sections=_folded,
             journal_coach_absent=_journal_coach_absent,  # #2944: explicit declared-absent label
         )
     except Exception as e:
@@ -2256,7 +2270,7 @@ def lambda_handler(event, context):
             character_sheet=character_sheet,
         )
         output_writers.write_clinical_json(data, profile, yesterday)
-        output_writers.write_buddy_json(data, profile, yesterday, character_sheet=character_sheet)
+        output_writers.write_buddy_json(data, profile, yesterday, character_sheet=character_privacy.public_sheet(character_sheet))
         # BS-02: hero stats for averagejoematt.com homepage (Jordan: delta, not absolute)
         output_writers.write_public_stats_json(data, profile, streak_data=streak_data)
 
@@ -2512,6 +2526,9 @@ def lambda_handler(event, context):
                     "start_weight_lbs": _start_wt,
                     "goal_weight_lbs": _goal_wt,
                     "current_weight_lbs": _curr_wt,
+                    # Review 2026-11-14 (growth-2): the reading's own date travels with it (the brief's window ends at
+                    # yesterday, so this is the latest AVAILABLE weigh-in, not today's) — the share cards print it.
+                    "weight_as_of": _weight_as_of,
                     "lost_lbs": _lost,
                     "remaining_lbs": _remain,
                     "progress_pct": _prog_pct,
@@ -2623,6 +2640,7 @@ def lambda_handler(event, context):
                     },
                     journey={
                         "current_weight_lbs": _curr_wt,
+                        "weight_as_of": _weight_as_of,
                         "lost_lbs": _lost,
                         "progress_pct": _prog_pct,
                     },

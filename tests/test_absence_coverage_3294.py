@@ -329,6 +329,10 @@ _DISPOSITIONS = {
     # category and asserts no "he did not do X"; the licensing check adjudicates
     # category-level absence claims, which a bare count is not.
     "lambdas/web/site_api_freshness.py": "count_only",
+    # Owner ruling 2026-11-05: re-judges the stored presence CLASS (the engine's mood/neglect input) over public
+    # channels for a record written before engagement_state carried its public projection. It never publishes the
+    # list or names a channel — the derived dict it returns carries only the class, the food gap and the pause flag.
+    "lambdas/health/character_public.py": "classify_only",
 }
 
 _WIRED_CALLS = {"sourced_quiet", "sourced_quiet_channels", "quiet_fields_for_brief"}

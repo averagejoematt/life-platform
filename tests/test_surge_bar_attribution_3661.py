@@ -406,8 +406,7 @@ def _handler_fakes(gov, monkeypatch, surge_param_value, uniques, baseline):
 
     monkeypatch.setattr(gov, "_ssm", _SSM())
     monkeypatch.setattr(gov, "OBSERVE_MODE", False)
-    monkeypatch.setattr(gov, "_recent_unique_visitors", lambda now: uniques)
-    monkeypatch.setattr(gov, "_weekly_uniques_baseline", lambda now: baseline)
+    monkeypatch.setattr(gov, "_surge_reading_and_baseline", lambda now: (uniques, baseline))
     monkeypatch.setattr(gov, "_surge_flips_30d", lambda now: 0)
     monkeypatch.setattr(gov, "_emit_surge_flip", lambda: None)
     monkeypatch.setattr(gov, "_emit_surge_flip_gauge", lambda n: None)

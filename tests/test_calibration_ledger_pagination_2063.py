@@ -198,9 +198,19 @@ class TestPaginationIsScopedAndBounded:
         monkeypatch.setattr(api, "table", fake)
         api.handle_calibration({})
 
-        coach_pages = {pk: n for pk, n in fake.pages_by_pk.items() if pk.startswith("COACH#")}
+        # Owner 2026-11-09 (CR1): each coach partition is also read under VERIFY# (paginated, small); the PREDICTION#
+        # sweep itself still takes exactly one query per coach.
+        coach_pages: dict = {}
+        verify_pages: dict = {}
+        for kw in fake.query_calls:
+            pk = kw["KeyConditionExpression"]._values[0]._values[1]
+            prefix = kw["KeyConditionExpression"]._values[1]._values[1]
+            if pk.startswith("COACH#"):
+                bucket = coach_pages if prefix == "PREDICTION#" else verify_pages
+                bucket[pk] = bucket.get(pk, 0) + 1
         assert len(coach_pages) == 8
         assert set(coach_pages.values()) == {1}, coach_pages
+        assert set(verify_pages) == set(coach_pages) and set(verify_pages.values()) == {1}, verify_pages
         assert fake.pages_by_pk["USER#matthew#SOURCE#calibration"] == 2
 
     def test_prediction_fetch_does_not_paginate(self, monkeypatch):

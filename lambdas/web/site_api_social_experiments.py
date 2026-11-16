@@ -554,7 +554,9 @@ def _handle_experiment_suggest(event: dict, *, _g) -> dict:
     ip_hash = salted_ip_hash(ip, logger)
     if ip_hash is None:
         return _error(503, "Service temporarily unavailable. Please try again shortly.")
-    allowed, _rem, _retry = _rate_check("experiment_suggest", ip_hash, limit=3, window_seconds=3600)
+    allowed, _rem, _retry = _rate_check(
+        "experiment_suggest", ip_hash, limit=3, window_seconds=3600, fail_open=False
+    )  # #6088: stores reader text
     if not allowed:
         return _rate_limited("experiment_suggest", "Too many suggestions. Please try again later.", retry_after=3600)
     # #2221: this door was the module's only capture surface that (a) parsed with

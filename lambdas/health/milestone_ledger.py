@@ -94,14 +94,17 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
-from decimal import Decimal
 from typing import Any, NamedTuple
 
 from common.macrofactor_fields import intake_window  # #5431: intake reads bounded at the Pacific today
+from common.numeric import floats_to_decimal  # #5524: the one float->Decimal walker (NaN/Inf guarded)
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from training import session_count  # #5387: its zone2_by_date reads THE Zone 2 computation
 
-from health import process_milestones  # #1628: the pure window functions (no I/O — this module remains the ONE writer)
+from health import (
+    character_privacy,  # owner ruling 2026-11-06: level milestones credit the public method, never a recalculation
+    process_milestones,  # #1628: the pure window functions (no I/O — this module remains the ONE writer)
+)
 
 # ── DDB coordinates ───────────────────────────────────────────────────────────
 MILESTONES_SOURCE = "milestones"
@@ -403,19 +406,6 @@ def evaluate(signals: dict, existing_ids: set[str], last_event_date: str | None,
 # ── DDB I/O ───────────────────────────────────────────────────────────────────
 
 
-def _dec(obj):
-    """Decimal-safe deep copy — boto3 rejects Python floats."""
-    if isinstance(obj, list):
-        return [_dec(v) for v in obj]
-    if isinstance(obj, dict):
-        return {k: _dec(v) for k, v in obj.items()}
-    if isinstance(obj, bool):
-        return obj
-    if isinstance(obj, float):
-        return Decimal(str(obj))
-    return obj
-
-
 def read_ledger(table, user_prefix: str) -> dict:
     """The whole partition, in one paginated pk-only query.
 
@@ -542,7 +532,7 @@ def _put_once(table, user_prefix: str, entry: dict, stamp: dict | None) -> bool:
     CROSS_PHASE — the restart wipe never tombstones it — so an occupied key
     always means a genuinely consumed rung.
     """
-    item = _dec(dict(entry))
+    item = floats_to_decimal(dict(entry))  # #5524: the canonical walker — NaN/Inf become None, never a write-time TypeError
     if stamp:
         item.update(stamp)
     try:
@@ -638,7 +628,7 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
     tier0_streak = int(_f(latest_habit.get("t0_perfect_streak")) or 0)
 
     chars_sorted = sorted(chars, key=lambda i: str(i.get("sk") or ""))
-    character_level = int(_f((chars_sorted[-1] if chars_sorted else {}).get("character_level")) or 1)
+    character_level = character_privacy.event_level(chars_sorted)  # owner ruling 2026-11-06: public, never by recalculation
 
     # Training days + strength volume: hevy workout sub-records (DATE#d#WORKOUT#id)
     # union strava activity days (the spiral_breaker convention).

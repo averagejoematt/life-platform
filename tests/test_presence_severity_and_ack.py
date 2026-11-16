@@ -61,7 +61,9 @@ def test_other_channels_count_any_record():
 
 def test_habitify_predicate_needs_total_completed_projected():
     assert "total_completed" in ec.channel_presence_fields("habitify")
-    assert ec.channel_presence_fields("macrofactor") == ()
+    assert ec.channel_presence_fields("hevy") == ()
+    # #5519: the food channel counts a row only when it holds diary entries, so it projects the count.
+    assert ec.channel_presence_fields("macrofactor") == ("entries_count",)
 
 
 class _StubTable:

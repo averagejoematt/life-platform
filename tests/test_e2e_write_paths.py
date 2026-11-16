@@ -552,36 +552,52 @@ def test_challenge_follow_roundtrip(wp):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# challenge_checkin — POST → daily_checkins mutation → readback via /api/challenges
+# challenge_checkin — #6087: POST → the READER partition, never the owner's row
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def test_challenge_checkin_roundtrip_idempotency_and_daily_limit(wp):
+def _open_checkin_door(monkeypatch):
+    from web import site_api_social_challenges as chal
+
+    monkeypatch.setattr(chal, "PUBLIC_CHECKIN_LIVE", True)
+
+
+def test_challenge_checkin_is_shut_by_default_and_writes_nothing(wp):
     wp.seed_live_challenge()
-    date = "2026-07-15"
+    status, _ = wp.call("/api/challenge_checkin", body={"challenge_id": LIVE_CHALLENGE_ID, "completed": True}, ip=IP_A)
+    assert status == 403 and wp.table.written_pks == []
 
-    status, body = wp.call("/api/challenge_checkin", body={"challenge_id": LIVE_CHALLENGE_ID, "completed": True, "date": date}, ip=IP_A)
-    assert status == 200
-    assert body["checked_in"] is True and body["total_checkins"] == 1
 
-    # Readback through the public GET: the active challenge now shows progress.
+def test_challenge_checkin_roundtrip_isolation_replay_and_daily_limit(wp, monkeypatch):
+    _open_checkin_door(monkeypatch)
+    wp.seed_live_challenge()
+    owner_key = ("USER#matthew#SOURCE#challenges", f"CHALLENGE#{LIVE_CHALLENGE_ID}")
+    owner_before = copy.deepcopy(wp.table.store[owner_key])
+
+    status, body = wp.call("/api/challenge_checkin", body={"challenge_id": LIVE_CHALLENGE_ID, "completed": True}, ip=IP_A)
+    assert (status, body["checked_in"], body["duplicate"]) == (200, True, False)
+    reader = [it for (pk, _sk), it in wp.table.store.items() if pk == f"CHALLENGE_CHECKINS#{LIVE_CHALLENGE_ID}"]
+    assert len(reader) == 1 and reader[0]["completed"] is True
+
+    # Readback through the public GET: the owner's progress is untouched by the reader's tap.
     status, data = wp.call("/api/challenges", method="GET")
-    assert status == 200
+    assert status == 200 and data["reader_checkins_open"] is True
     live = [c for c in data["challenges"] if c.get("origin") == "live" and c["challenge_id"] == LIVE_CHALLENGE_ID]
-    assert len(live) == 1
-    assert live[0]["progress"]["checkin_days"] == 1 and live[0]["progress"]["completed_days"] == 1
+    assert len(live) == 1 and live[0]["progress"]["checkin_days"] == 0
 
     # Same IP, same challenge, same day → the REAL 1/day DDB rate limit 429s.
-    status, _ = wp.call("/api/challenge_checkin", body={"challenge_id": LIVE_CHALLENGE_ID, "completed": True, "date": date}, ip=IP_A)
+    status, _ = wp.call("/api/challenge_checkin", body={"challenge_id": LIVE_CHALLENGE_ID, "completed": True}, ip=IP_A)
     assert status == 429
 
-    # A retry from another IP for the SAME date replaces rather than duplicates
-    # (per-date idempotency: completion_pct must not inflate).
-    status, body = wp.call("/api/challenge_checkin", body={"challenge_id": LIVE_CHALLENGE_ID, "completed": False, "date": date}, ip=IP_B)
-    assert (status, body["total_checkins"]) == (200, 1)
-    stored = wp.table.store[("USER#matthew#SOURCE#challenges", f"CHALLENGE#{LIVE_CHALLENGE_ID}")]
-    assert [c["date"] for c in stored["daily_checkins"]] == [date]
-    assert stored["daily_checkins"][0]["completed"] is False  # replaced with the newest value
+    # A past day is refused; another reader is its own item. The owner row never changed.
+    status, _ = wp.call(
+        "/api/challenge_checkin", body={"challenge_id": LIVE_CHALLENGE_ID, "completed": False, "date": "2026-07-14"}, ip=IP_B
+    )
+    assert status == 400
+    status, _ = wp.call("/api/challenge_checkin", body={"challenge_id": LIVE_CHALLENGE_ID, "completed": False}, ip=IP_B)
+    assert status == 200
+    assert wp.table.store[owner_key] == owner_before
+    assert not [pk for pk in wp.table.written_pks if pk.startswith("USER#")]
 
     # Unknown challenge → 404, nothing minted.
     status, _ = wp.call("/api/challenge_checkin", body={"challenge_id": "e2e-ghost", "completed": True}, ip=IP_C)
@@ -835,12 +851,12 @@ def test_subscribe_rate_limit_via_preseeded_counter(wp):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def test_writes_stay_inside_sanctioned_partitions(wp):
+def test_writes_stay_inside_sanctioned_partitions(wp, monkeypatch):
     """#1438 acceptance criterion 2, made structural: run every write path, then
     prove (a) each site-api pk it wrote is covered by the SEC-01 LeadingKeys
     allowlist parsed from the LIVE role policy (so these writes are exactly what
     the public role could do in prod — nothing more), and (b) no write escaped
-    into a real data partition (the only USER#… partitions touched are the three
+    into a real data partition (the only USER#… partitions touched are the two
     sanctioned interactive ones), and (c) S3 writes stay in the two moderated
     generated/ prefixes."""
     from fnmatch import fnmatch
@@ -852,6 +868,9 @@ def test_writes_stay_inside_sanctioned_partitions(wp):
     assert wp.call("/api/challenge_vote", body={"catalog_id": CATALOG_ID}, ip=IP_A)[0] == 200
     assert wp.call("/api/experiment_follow", body={"email": SUB_EMAIL, "library_id": LIB_ID}, ip=IP_A)[0] == 200
     assert wp.call("/api/challenge_follow", body={"email": SUB_EMAIL, "catalog_id": CATALOG_ID}, ip=IP_A)[0] == 200
+    from web import site_api_social_challenges as chal
+
+    monkeypatch.setattr(chal, "PUBLIC_CHECKIN_LIVE", True)  # #6087: sweep the door open — it ships shut
     assert wp.call("/api/challenge_checkin", body={"challenge_id": LIVE_CHALLENGE_ID, "completed": True}, ip=IP_A)[0] == 200
     assert wp.call("/api/experiment_suggest", body={"idea": "e2e-test sweep suggestion payload"}, ip=IP_A)[0] == 200
     assert wp.call("/api/predict_week", body={"week_id": wp.week_id, "metric": "weight", "choice": "flat"}, ip=IP_A)[0] == 200
@@ -872,10 +891,10 @@ def test_writes_stay_inside_sanctioned_partitions(wp):
     assert subscriber_pks <= {"USER#matthew#SOURCE#subscribers", "SUBSCRIBE#rate_limit"}
 
     # (b) No stray keys: the only USER#… partitions ANY write path touched are the
-    # three sanctioned interactive ones — reader/experiment data partitions
+    # two sanctioned interactive ones (+ the subscriber lambda's own) — reader/experiment data partitions
     # (whoop, nutrition, chronicle, …) are untouchable from this surface.
+    # #6087: USER#matthew#SOURCE#challenges left this set — a reader's check-in is CHALLENGE_CHECKINS#.
     sanctioned_user_partitions = {
-        "USER#matthew#SOURCE#challenges",
         "USER#matthew#SOURCE#experiment_suggestions",
         "USER#matthew#SOURCE#subscribers",
     }

@@ -1009,9 +1009,9 @@ def _clinical_table():
                 }
             ],
             "USER#matthew#SOURCE#genome": [
-                {"gene": "MTHFR", "genotype": "C677T", "risk_level": "unfavorable", "summary": "reduced activity"},
-                {"gene": "APOE", "genotype": "e3/e3", "risk_level": "neutral", "summary": "typical"},
-                {"gene": "ACTN3", "genotype": "RX", "risk_level": "mixed", "summary": "mixed fibre"},
+                {"gene": "GENEA", "genotype": "X;Y", "risk_level": "unfavorable", "summary": "synthetic reduced"},
+                {"gene": "GENEB", "genotype": "X;X", "risk_level": "neutral", "summary": "synthetic typical"},
+                {"gene": "GENEC", "genotype": "Y;Y", "risk_level": "mixed", "summary": "synthetic mixed"},
             ],
         }
     )
@@ -1225,8 +1225,8 @@ def test_write_clinical_json_glucose_summary_averages_each_metric_independently(
 def test_write_clinical_json_genome_flags_keep_only_risky_variants_unfavorable_first():
     s3 = _write_clinical()
     flags = s3.written(_CLINICAL_KEY)["genome_flags"]
-    assert [f["gene"] for f in flags] == ["MTHFR", "ACTN3"]
-    assert flags[0] == {"gene": "MTHFR", "variant": "C677T", "risk": "unfavorable", "note": "reduced activity"}
+    assert [f["gene"] for f in flags] == ["GENEA", "GENEC"]
+    assert flags[0] == {"gene": "GENEA", "variant": "X;Y", "risk": "unfavorable", "note": "synthetic reduced"}
     assert all(f["risk"] in ("unfavorable", "mixed") for f in flags)
 
 

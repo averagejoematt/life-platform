@@ -58,6 +58,7 @@ from health import (  # noqa: E402
     sick_day_checker,
 )
 from pacific_clock import freeze_pacific  # noqa: E402 — #2811: the PT clock the module actually calls
+from public_variant_fixtures import with_public  # noqa: E402 — 2026-11-05: the public variant
 
 PREFIX = "USER#matthew#SOURCE#"
 # A Wednesday. The whole fixture web below hardcodes dates around it; tests whose
@@ -841,7 +842,7 @@ def _sheet_row(date_str, level, **pillars):
     row = _row("character_sheet", "DATE#" + date_str, date=date_str, character_level=level, character_tier="Foundation")
     for name in csl.PILLAR_ORDER:
         row["pillar_" + name] = {"raw_score": Decimal(str(pillars.get(name, 45)))}
-    return row
+    return with_public(row)  # owner ruling 2026-11-05: stored sheets carry their public variant
 
 
 class TestHandlerShortCircuits:
@@ -1062,9 +1063,12 @@ class TestHandlerFullCompute:
         monkeypatch.setattr(csl, "assemble_data", lambda d: {"date": d, "whoop": {"pk": PREFIX + "whoop", "sk": "DATE#" + d}})
 
         def _compute(data, previous_state, histories, cfg):
-            captured["data"] = data
-            captured["previous_state"] = previous_state
-            captured["histories"] = histories
+            # The FIRST call is method 1's; the second is the public variant's (owner ruling 2026-11-05), which
+            # these tests do not inspect here (tests/test_character_public_variant.py owns it).
+            if "data" not in captured:
+                captured["data"] = data
+                captured["previous_state"] = previous_state
+                captured["histories"] = histories
             return _stub_record(data["date"])
 
         monkeypatch.setattr(character_engine, "compute_character_sheet", _compute)

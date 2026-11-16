@@ -199,7 +199,7 @@ def _facts_with_a_miss():
         "by_outcome": {"confirmed": 1, "refuted": 1},
         "decided_count": 2,
         "hit_rate_pct": 50.0,
-        "calibration": {"brier": 0.18, "calibration": "well-calibrated", "scored_n": 6},
+        "calibration": {"brier": 0.18, "scored_n": 6},
         "misses": [{"date": "2026-08-10", "subdomain": "recovery", "metric": "hrv_ms", "reason": "reversed"}],
         "hits": [{"date": "2026-08-01", "subdomain": "sleep_quality", "metric": "deep_sleep_pct", "reason": "held up"}],
         "stance_start": None,

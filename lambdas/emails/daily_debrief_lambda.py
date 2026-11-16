@@ -128,8 +128,12 @@ def gather_facts(date_str: str) -> dict:
         if val is not None:
             facts[key] = val
 
-    put("day_grade", cm.get("day_grade_letter"))
-    put("day_grade_score", _num(cm.get("day_grade_score")))
+    # Owner ruling 2026-11-06: the episode is public, so the grade is the day_grade record's PUBLIC variant (no journal
+    # component); none spoken when the record has none (health.day_grade_public, fail closed).
+    from health import day_grade_public
+
+    put("day_grade", day_grade_public.public_letter(_fetch("day_grade", date_str)))
+    put("day_grade_score", _num(day_grade_public.public_score(_fetch("day_grade", date_str))))
     put("readiness_score", _num(cm.get("readiness_score")))
     put("recovery_pct", _num(cm.get("recovery_pct")))
     put("hrv_ms", _num(cm.get("hrv_ms")))

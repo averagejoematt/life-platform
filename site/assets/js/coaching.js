@@ -534,12 +534,14 @@ function glossHTML(text) {
 }
 async function renderToday(mount) {
   if (!mount || preStart()) return; // #949 — the countdown owns the pre-start door
-  const [d, team, preds, docket] = await Promise.all([
-    tryOnce("/api/coaching-dashboard"),
-    tryOnce("/api/coach_team"),
-    tryOnce("/api/predictions"),
-    tryOnce("/api/coach_docket"),
-  ]);
+  // The read paints on the dashboard alone: it is the page's LCP element, and on a CDN miss
+  // /api/coach_team and /api/predictions take ~2 s at origin against the dashboard's ~0.8 s.
+  // All four requests still start together; the record line and the disagreement band
+  // fill their slots below when the slower three land.
+  const teamP = tryOnce("/api/coach_team");
+  const predsP = tryOnce("/api/predictions");
+  const docketP = tryOnce("/api/coach_docket");
+  const d = await tryOnce("/api/coaching-dashboard");
   if (!d) return; // the Read tab below states the failure; the first screen stays quiet
   const now = Date.now();
   const coaches = (d.coaches || []).filter((c) => String(c.position_summary || "").trim());
@@ -594,13 +596,13 @@ async function renderToday(mount) {
       h += `<p class="ct-ask"><span class="label">the ask</span> <span data-verbatim>${esc(ask.text)}</span>` +
         `<span class="ct-ask-meta label">${ask.coach_name ? ` · ${esc(ask.coach_name)}` : ""}${ask.due ? ` · due ${esc(calendarDay(ask.due) || ask.due)}` : ""}${lateWords(daysOverdue(ask, now)) ? ` · ${esc(lateWords(daysOverdue(ask, now)))}` : ""}</span></p>`;
     }
-    const rec = recordLine(preds && preds.overall);
-    if (rec) h += `<p class="ct-record label">The board's record since Day 1: ${esc(rec)}. <a href="/coaching/scorecard/">the scorecard →</a></p>` + coachComparison(preds && preds.comparison, { cls: "ct-record label" }); // #4585
+    h += `<div data-ct-record></div>`; // filled from /api/predictions below
     h += `</section>`;
   } else if (chosen) {
     // > 7 days: no read on the first screen. Say why, then the standing stances.
     h += `<section class="ct-read ct-old" aria-labelledby="ct-read-h"><h2 class="ct-kicker label" id="ct-read-h">today's read</h2>` +
       `<p class="ct-banner">${esc(sinceBanner(chosen.analysis_generated_at, now, weights, nutrition))} That is too old to put first, so no coach read leads this page today.</p>`;
+    const team = await teamP;
     const huddle = ((team && team.huddle) || []).filter((x) => x && x.read_of_him);
     if (huddle.length) {
       h += `<p class="ct-kicker label">where each coach has him — their standing stance, not a daily read</p><ul class="ct-stances">` +
@@ -621,8 +623,7 @@ async function renderToday(mount) {
 
   // 3) WHERE THEY DISAGREE — uncollapsed: it is the page's return trigger (the chair's
   // amendment to ruling 2(iv)); the docket carries resolution dates.
-  const dis = (team ? tensionsHTML(team, { titled: true }) : "") + docketHTML(docket);
-  if (dis) h += `<section class="ct-disagree" aria-labelledby="ct-dis-h"><h2 class="ct-h" id="ct-dis-h">Where they disagree</h2>${dis}</section>`;
+  h += `<div data-ct-disagree></div>`; // filled from /api/coach_team + /api/coach_docket below
 
   // 4) THE OTHER COACHES — one line each with its written stamp, collapsed.
   const others = coaches.filter((c) => c !== chosen);
@@ -634,7 +635,18 @@ async function renderToday(mount) {
       `</ul></details>`;
   }
   mount.innerHTML = h;
-  mount.hidden = !h;
+  mount.hidden = !mount.textContent.trim();
+
+  const [team, preds, docket] = await Promise.all([teamP, predsP, docketP]);
+  const recSlot = mount.querySelector("[data-ct-record]");
+  const rec = recordLine(preds && preds.overall);
+  if (recSlot && rec) recSlot.outerHTML = `<p class="ct-record label">The board's record since Day 1: ${esc(rec)}. <a href="/coaching/scorecard/">the scorecard →</a></p>` + coachComparison(preds && preds.comparison, { cls: "ct-record label" }); // #4585
+  else if (recSlot) recSlot.remove();
+  const disSlot = mount.querySelector("[data-ct-disagree]");
+  const dis = (team ? tensionsHTML(team, { titled: true }) : "") + docketHTML(docket);
+  if (disSlot && dis) disSlot.outerHTML = `<section class="ct-disagree" aria-labelledby="ct-dis-h"><h2 class="ct-h" id="ct-dis-h">Where they disagree</h2>${dis}</section>`;
+  else if (disSlot) disSlot.remove();
+  mount.hidden = !mount.textContent.trim();
   enhanceCoachNames(mount);
 }
 

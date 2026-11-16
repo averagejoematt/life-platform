@@ -40,6 +40,7 @@ Pure: no clock; the one read is the movement catalog behind `logging_conventions
 
 from __future__ import annotations
 
+import functools
 import re
 from typing import Any, Iterable
 
@@ -223,10 +224,17 @@ EXERCISE_TAXONOMY: list[tuple[list[str], str | None, dict[str, float], str]] = [
 ]
 
 
+@functools.lru_cache(maxsize=None)
+def _keyword_pattern(keyword: str) -> re.Pattern[str]:
+    """The compiled word-start pattern for one taxonomy keyword — compiled once per process, not once per test (#5813:
+    a plan call's stage 1 ran `_matches` ~310,000 times, re-escaping and re-looking-up the pattern each time)."""
+    return re.compile(r"(?<![a-z])" + re.escape(keyword))
+
+
 def _matches(keyword: str, name_lower: str) -> bool:
     """A keyword matches at the START of a word, never mid-word — "row" is in "Dumbbell Row"
     but not in "Narrow Grip Bench Press" or "Medicine Ball Throw"."""
-    return re.search(r"(?<![a-z])" + re.escape(keyword), name_lower) is not None
+    return _keyword_pattern(keyword).search(name_lower) is not None
 
 
 def attribute_exercise(name: str, template_id: str | None = None) -> dict[str, Any]:

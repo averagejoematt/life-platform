@@ -573,6 +573,8 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .rd-lede { color: var(--ink-muted); font-size: var(--fs-body-lg); max-width: var(--measure); }
 .rd-prose { margin-top: var(--sp-3); color: var(--ink); line-height: var(--lh-relaxed); max-width: var(--measure); }
 .rd-prose em { font-style: italic; } .rd-prose strong { color: var(--ink); font-weight: var(--weight-med); }
+/* #5525: an inline code path (a test filename, a sha) has no break opportunity — let it wrap at 390 px. */
+.rd-prose code { overflow-wrap: anywhere; }
 /* Tier ladder (the character explainer) — one row per tier, hairline-separated. */
 .rd-tierlist { list-style: none; margin: var(--sp-3) 0 0; max-width: var(--measure); }
 .rd-tierlist li { padding: var(--sp-3) 0; border-top: var(--border-hair); color: var(--ink-muted); line-height: var(--lh-relaxed); }
@@ -1148,3 +1150,13 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .wrong-ob-perma { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.06em;
   color: var(--ink-faint); text-decoration: none; }
 .wrong-ob-perma:hover { color: var(--ember); text-decoration: underline; }
+
+/* Owner ruling 2026-11-09: calibration-v2 — three separate answers per coach / stratum (calibration_v2_words.js). */
+.cv2-answers { margin: var(--sp-2) 0 0; }
+.cv2-row { margin: 0 0 var(--sp-2); }
+.cv2-answers dt { font-weight: 600; color: var(--ink); }
+.cv2-answers dd { margin: 2px 0 0; color: var(--ink-muted); }
+.cv2-stratum, .cv2-coach { margin-top: var(--sp-3); }
+.cv2-details { margin-top: var(--sp-3); }
+.cv2-details summary { cursor: pointer; color: var(--ink); }
+.cv2-short { display: inline-block; }

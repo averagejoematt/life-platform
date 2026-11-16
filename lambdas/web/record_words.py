@@ -29,6 +29,16 @@ GUESS_RULE_WORDS = "a simple guess that gives every call the same chance of comi
 BASELINE_RULE = "base_rate"
 
 
+def claimable_advantage(skill: Any) -> bool | None:
+    """Whether a page may say the coaches BEAT the simple guess, given the skill point estimate (owner 2026-11-09:
+    calibration v2 — "no favorable label where the evidence is weak"; a skill label only when its test excludes zero).
+    No significance test runs on this path, so a positive point estimate alone never claims an advantage: ``False``
+    for any reading, ``None`` when there is none. The served sentence then reads "do not beat ... yet"."""
+    if isinstance(skill, bool) or not isinstance(skill, (int, float)):
+        return None
+    return False
+
+
 def guess_sentence(beats: bool | None) -> str:
     """``True`` → beats; ``False`` → not yet; ``None`` (no skill reading) → too few."""
     if beats is None:

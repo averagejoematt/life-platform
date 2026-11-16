@@ -101,13 +101,14 @@ SHOW SHAPE (1,250-1,450 spoken words, about 9 minutes):
 8. Close — one line that leaves the next week open, then "I'm Elena Voss. This has been The Measured Life."
 
 SPOKEN-WORD RULES (the episode is held at render if it breaks these):
-- No body-weight figures with units — no "pounds", "lbs" or "kg" next to a number. Talk about the scale's
-  direction and its pace against the plan instead.
+- {SPOKEN_WEIGHT_RULE}
 - No family members, partner, grief or loss words.
 - No report-card tone ("you failed", "fell short", "disappointing", "no excuse").
 - No causal phrasing: never "caused", "led to", "resulted in", "thanks to", "because of the/his", "is why".
 - Write numbers the way people say them ("about seventy-eight percent" or "78 percent", "fifty-one milliseconds").
-- Speaker ids: "elena" for Elena; "coach" for the guest. Every line is one turn, 1-4 sentences."""
+- Speaker ids: "elena" for Elena; "coach" for the guest. Every line is one turn, 1-4 sentences.""".replace(
+    "{SPOKEN_WEIGHT_RULE}", body_numbers.SPOKEN_WEIGHT_RULE  # #5949: the ONE statement of the rule, shared with the Panel's judge
+)
 
 _TURN = {
     "type": "object",
@@ -276,6 +277,11 @@ def spoken_word_findings(turns: List[Dict[str, Any]], body_weights: Optional[Lis
             m = rx.search(line)
             if m:
                 findings.append(f"turn {i} ({t.get('speaker')}): {name}: {m.group(0)!r}")
+        for fig in body_numbers.spoken_weight_figures(line):  # #5949: bare, worded and earlier-year figures
+            findings.append(
+                f"turn {i} ({t.get('speaker')}): body-number: {fig!r} is a spoken body-weight figure — say the direction "
+                "and the pace per week, never the figure or the amount"
+            )
         for num in re.findall(r"\b\d{3}(?:\.\d+)?\b", line):
             if num in bw:
                 findings.append(
@@ -326,6 +332,10 @@ Hold EVERY factual statement in the text against the dossier. Report only real p
 Ordinary common knowledge is not invented detail: how a named device is worn or works, what a named metric means,
 what a plan term means. Do not report style. Do not report rounding that stays honest. Do not report a statement you checked and found
 correct — return ONLY claims that must change. If the installment is clean, return an empty list.
+In a dossier prediction entry `made` is the day the call was filed, `target` is the day the call was about and the
+day its evidence was read from, and `graded` is only when scoring ran - never the morning the call targeted. A sentence
+about the call's target morning is checked against `target`; with no `target` in the entry, do not infer one from `graded`.
+A wrong target day against `target` is still a finding.
 For each finding give the exact claim, the problem, and the corrected wording."""
 
 

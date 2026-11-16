@@ -24,18 +24,24 @@ routine repo already live:
                 refused, an unreadable fixed meal) is graded on the intended feedings and the food grade is `degraded`
                 with the menu's reason code, never silently.
   * the write   ONE owner-only row, `USER#<id>#SOURCE#training_constraints / PANEL#<week_end>` (docs/SCHEMA.md):
-                scores, letters, reasons, the controls' verdicts and the trend — never the plan itself.
+                scores, letters, reasons, the controls' verdicts, the trend and the week's `draft_custom` departures
+                with their reasons (#5761) — never the plan itself.
 
 THE SCHEDULE. `mcp.handler` dispatches `{"job": "panel_weekly_grade"}` to `lambda_entry`, so an EventBridge
 rule with that constant input on `life-platform-mcp-warmer` is the whole schedule — the same idiom as the nightly
 pre-draft. The rule `PanelWeeklyGrade` and its dead-man `panel-weekly-grade-missing` live in
 `cdk/stacks/mcp_stack.py`; the expression is the `life-platform-mcp-warmer#PanelWeeklyGrade` row of
 `config/schedules.json` — Monday 15:30Z (08:30 PDT / 07:30 PST Monday), so the default week is the Mon-Sun week
-just finished. `JOB` below is the one declaration the stack must match (tests/test_panel_grade_schedule_5072.py).
+just finished (`week_to_grade`: any requested day snaps to the Sunday of its Monday-Sunday week, #5761). `JOB` below is the one declaration the stack must match (tests/test_panel_grade_schedule_5072.py).
 The rule carries an implicit `AWS::Lambda::Permission`, so it lands by an owner-attended
 `bash deploy/cdk_deploy.sh LifePlatformMcp`; until that apply the job runs only on demand.
+A second, fail-soft leg rides the same run (#5575): the weekly phase evaluator (`mcp.phase_evaluator_leg.weekly_leg`)
+writes its owner-only `PHASE#EVAL#<monday>` row (and STATE / TRANSITION rows) for the same week; it never changes the
+grade's status or its datapoint, and its own dead-man is qa-smoke's `phase_eval_liveness`.
 Every run prints one EMF datapoint (`LifePlatform/HevyRoutine::PanelGradeOutcome{Job=panel_weekly_grade}`):
 1 for a graded or honestly-empty week, 0 for a failure — the series the dead-man reads (7 empty daily buckets).
+The planning-loop dead-man (#5761) is qa-smoke's `planning_loop_liveness` (`lambdas/operational/planning_loop_qa.py`):
+it reds a completed week with no `PANEL#<sunday>` grade or no tracker `WEEK#<monday>` row by the following Tuesday.
 BUDGET: the judge spends under `charter_judge` (budget_guard band 1) through `bedrock_client.invoke_with_retry`;
 at tier >= 1 the run still lands — code scores only, `degraded` with the pause named — and still emits the 1.
 """
@@ -199,13 +205,23 @@ def store(grade: dict[str, Any]) -> dict[str, Any]:
     return {"written": True, "sk": item["sk"]}
 
 
+def week_to_grade(week_end: str | None, today: str) -> tuple[str, str]:
+    """(Monday, Sunday) of the week to grade (#5761): the Monday-Sunday Pacific week holding `week_end` — any day of it
+    snaps to its Sunday, the tracker's `week_end` (`training.may_tracker.week_bounds`) — or, with none given, the newest
+    COMPLETED week before `today`. The default used to be "yesterday", which on the Monday schedule is the Sunday, but an
+    on-demand Sunday run keyed a Sunday-to-Saturday week (`PANEL#2026-10-24`) that never paired with its tracker row."""
+    from training import may_tracker as mt
+
+    return mt.week_bounds(week_end) if week_end else mt.week_bounds(mt.last_completed_monday(today))
+
+
 def run(week_end: str | None = None) -> dict[str, Any]:
-    """Grade the committed week ending `week_end` (default: yesterday, Pacific) and store it."""
-    from common.pacific_time import pacific_today, shift_day_key
+    """Grade the committed Monday-Sunday week holding `week_end` (default: the newest completed week, Pacific) and store
+    it under its Sunday."""
+    from common.pacific_time import pacific_today
     from training import panel_judge
 
-    end = week_end or shift_day_key(pacific_today(), -1)
-    start = shift_day_key(end, -(JOB["week_days"] - 1))
+    start, end = week_to_grade(week_end, pacific_today())
     routines = read_routines(start, end)
     grade = panel_judge.grade_committed_week(
         end,
@@ -240,6 +256,27 @@ def emf_line(status: str) -> str:
     )
 
 
+def _phase_leg(week_end: str | None) -> dict[str, Any]:
+    """#5575: the weekly phase evaluator rides this run (owner ruling 2026-11-08: an existing weekly job, no new
+    schedule or IAM). Fail-soft: an import or run failure is named on the summary, never raised into the grade."""
+    try:
+        from mcp.phase_evaluator_leg import weekly_leg
+    except Exception as e:  # noqa: BLE001 — named on the result; the qa-smoke dead-man sees the missing EVAL row
+        return {"outcome": "failed", "error": type(e).__name__}
+    return weekly_leg(week_end)
+
+
+def _exercise_gates_leg(week_end: str | None) -> dict[str, Any]:
+    """#5772: the exercise library's weekly gate evaluation rides this run too (the #5575 ruling: an existing weekly
+    job). Fail-soft exactly like `_phase_leg`: a failure is named on the summary, never the grade's status or datapoint."""
+    try:
+        from mcp.exercise_gates_leg import weekly_leg
+    except Exception as e:  # noqa: BLE001 — named on the result
+        return {"outcome": "failed", "error": type(e).__name__}
+    out = weekly_leg(week_end)
+    return {k: out.get(k) for k in ("outcome", "error", "sk", "counts", "newly_unlocked", "announce")}  # counts + ids only
+
+
 def lambda_entry(event: dict[str, Any]) -> dict[str, Any]:
     """The scheduled/on-demand entry. Never raises: a failure is logged by class and emits the datapoint at 0."""
     try:
@@ -249,6 +286,10 @@ def lambda_entry(event: dict[str, Any]) -> dict[str, Any]:
         result = {"job": JOB["name"], "status": "failed", "error": f"{type(e).__name__}: {e}"[:300]}
     print(emf_line(result.get("status") or "failed"))
     summary = {k: result.get(k) for k in ("week_end", "status", "overall", "target_met", "degraded", "degraded_reasons", "stored")}
+    dep = result.get("departures") or {}
+    summary["departures"] = {k: dep.get(k) for k in ("committed", "draft_custom")} if dep else None  # #5761: counts only in the log
+    summary["phase"] = _phase_leg((event or {}).get("week_end"))  # #5575: fail-soft, never the grade's status or datapoint
+    summary["exercise_gates"] = _exercise_gates_leg((event or {}).get("week_end"))  # #5772: fail-soft, counts + ids only
     food = result.get("food") or {}
     summary["food"] = {k: food.get(k) for k in ("overall", "target_met", "degraded_reasons", "basis", "menu")} if food else None
     logger.info("PANEL_WEEKLY_GRADE %s", json.dumps(summary, default=str)[:4000])

@@ -229,6 +229,36 @@ LEAF_PATTERNS: Dict[str, Tuple[Tuple[str, ...], Tuple[str, ...]]] = {
         ),
         ("a {n}-day ramp", "the ramp over the trailing {n} days"),
     ),
+    # #5574: the phase rules' own numbers (every gate VALUE in `phases` is a reference, so it has no leaf here).
+    "phases.advance.consecutive_evaluations": (
+        (
+            r"\bconsecutive_evaluations\"?\s*[:=]\s*{n}",
+            r"{n}\s+consecutive\s+(?:weekly\s+)?evaluations?",
+            r"{n}\s+weekly\s+evaluations?\s+in\s+a\s+row",
+        ),
+        ("{n} consecutive weekly evaluations", "held for {n} weekly evaluations in a row"),
+    ),
+    "phases.every_transition.consistency.min_sessions_per_wk": (
+        (r"\bmin_sessions_per_wk\"?\s*[:=]\s*{n}", r"(?:>=|≥|at\s+least)\s*{n}\s+performed\s+sessions?"),
+        ("at least {n} performed sessions", '"min_sessions_per_wk": {n}'),
+    ),
+    "phases.every_transition.consistency.weeks_meeting": (
+        (r"\bweeks_meeting\"?\s*[:=]\s*{n}", r"\b{n}\s+of\s+the\s+last\s+\w+\s+weeks\b"),
+        ("in {n} of the last four weeks",),
+    ),
+    "phases.every_transition.consistency.of_last_weeks": (
+        (r"\bof_last_weeks\"?\s*[:=]\s*{n}", r"\b\w+\s+of\s+the\s+last\s+{n}\s+weeks\b"),
+        ("in three of the last {n} weeks",),
+    ),
+    "phases.every_transition.no_pain_flag.pain_lookback_weeks": (
+        (r"\bpain_lookback_weeks\"?\s*[:=]\s*{n}", r"\bpain\s+flag[^\n]{0,30}?\blast\s+{n}\s+weeks\b"),
+        ("no pain flag in the last {n} weeks",),
+    ),
+    # #5505: the week's re-offer allowance for a missed hard block (read only by cardio_menu.reoffers_per_wk)
+    "cardio_menu.placement.missed_reoffers_per_wk": (
+        (r"\bmissed_reoffers_per_wk\"?\s*[:=]\s*{n}", r"\bre-?offered\s+(?:at\s+most\s+)?{times}"),
+        ('"missed_reoffers_per_wk": {n}', "re-offered at most {times} a week"),
+    ),
     "cardio_menu.conditioning_sessions_per_wk": (
         (r"\bconditioning_sessions_per_wk\"?\s*[:=]\s*{n}", r"{n}\s+(?:hard\s+)?conditioning\s+sessions?", r"\bconditioning\s+{times}"),
         ("{n} conditioning sessions", "conditioning {times} a week"),
@@ -447,6 +477,16 @@ LEAF_PATTERNS: Dict[str, Tuple[Tuple[str, ...], Tuple[str, ...]]] = {
 # #5175: the charter numeric leaves NO pattern here owns, each with its reason. A dotted PREFIX covers every leaf under
 # it. The coverage test below fails on a leaf that is neither patterned nor listed, and on a row that covers nothing.
 NOT_APPLICABLE: Dict[str, str] = {
+    "split.session_minutes.measured_min_sessions": "the measured sessions before the per-set time is re-derived (#5799, charter "
+    "1.47.0): read only by training.session_time.min_sessions (derive_set_seconds), pinned against the recorded derivation by "
+    "tests/test_session_time_supersets_5799.py; a bare session count no prose pattern can key",
+    "progression.set_raise_proposal.weeks_running": "the set-raise proposal's run length (#5796, charter 1.42.0, a platform "
+    "default): read only through training.self_added_volume.set_raise_weeks (no fallback; a missing key raises), pinned by "
+    "tests/test_prescription_reconciliation_5796.py",
+    "effort_ceilings.layoff_return_rpe": "the layoff-return band (owner ruling 2026-11-10, charter 1.41.0): read only through "
+    "training.effort_ceilings.layoff_return_band (lift_note, session_block, the note linter's L14), pinned by "
+    "tests/test_layoff_return_and_warmup_climb_5428.py; any `RPE lo–hi` copy on a code line is already a hit for the "
+    "effort_ceiling_rpe value-class pattern",
     "disruption.step_back_up.min_days": "the shortest mode that owes a step-back-up week (#5122): read only by "
     "training.disruption.owes_step_back_up; pinned (3, and the boundary either side) by tests/test_step_back_up_min_days_5122.py",
     "gated_movements.running.walking_weeks": "the run gate's walking condition: read only by training.run_onramp; held equal to "
@@ -462,6 +502,8 @@ NOT_APPLICABLE: Dict[str, str] = {
     "calibration.fitness_tests.early_days_credited": "the battery's due-week arithmetic: read only by training.fitness_tests "
     "(tests/test_fitness_tests_5078.py); no prose names it",
     "calibration.fitness_tests.grace_weeks": "as early_days_credited (training.fitness_tests; tests/test_fitness_tests_5078.py)",
+    "calibration.rpe": "the RPE calibration set's schedule and statistics (#5797): read only by training.rpe_calibration "
+    "(tests/test_rpe_calibration_5797.py); the note line names no number and no prose copies one",
     "calibration.fitness_tests.tests": "each test's protocol constants (durations, reps): the battery's own definition, read "
     "only by training.fitness_tests and printed from the charter by the protocol card (tests/test_fitness_tests_5078.py)",
     "phase_after_may.plan_prompt": "the post-deadline plan prompt's weeks (#5130): owner-only, read only by "

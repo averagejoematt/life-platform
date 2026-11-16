@@ -4,14 +4,15 @@ Split out of ``site_api_vitals.py`` (#1654 — god-module breakup). One seam: **
 measured chemistry**, and it is the module carrying the platform's hardest privacy
 absolutes:
 
-  * `/api/genome_risks` publishes AGGREGATES ONLY (counts + risk levels + the
-    disclosure saying why detail is absent). Named genes, rsids, per-variant
-    summaries and implications must NEVER reach the response — a Tier-2 owner-only
-    boundary, and any per-variant publication is a PRE-13 decision.
+  * `/api/genome_risks` publishes NO genetic finding at all (owner ruling
+    2026-11-11): no variant, no category, no count, no risk summary — only a
+    status and a disclosure. Aggregation does not make genetic findings safe;
+    the analysis stays in the owner-only DynamoDB genome partition, which this
+    handler does not even read. Any publication is a PRE-13 decision.
   * `/api/labs` runs every panel through ``_strip_genetic_biomarkers``
     (``_GENETIC_CATEGORY_RE`` / ``_GENETIC_TEXT_RE``) so a pharmacogenomic marker
     filed as an ordinary lab cannot leak through the labs door instead.
-  * `/api/phenoage` follows Option A: chronological age is NEVER returned.
+  * `/api/phenoage` is markers-only (owner ruling 2026-11-14): no profile read, no figure of his own.
 
 ``tests/test_public_genetic_privacy_absolute.py`` guards all three by reading this
 module's source; it scans the whole site_api_vitals family, so the guard follows
@@ -30,21 +31,15 @@ pre-split module).
 import json
 import os
 import re as _re  # genetic-biomarker strip regexes (labs)
-from datetime import timezone
-from typing import Any
 
 import boto3
-from boto3.dynamodb.conditions import Key
 from health.sensor_absence import absence_verdict, is_stale
 
 from web.site_api_common import (
     PT,
     S3_REGION,
     USER_ID,
-    USER_PREFIX,
-    _decimal_to_float,
     _error,
-    _get_profile,
     _ok,
     _window_span,
     logger,
@@ -57,73 +52,32 @@ from web.site_api_common import (
 # ════════════════════════════════════════════════════════════════════════
 
 
+GENOME_PUBLIC_DISCLOSURE = (
+    "Genome analysis is owner-only. No genetic findings are published here: no variants, genes, "
+    "categories, counts or risk summaries, because even aggregated genetic results are personal."
+)
+
+
 def genome_risks(*, _g) -> dict:
     """
     GET /api/genome_risks
-    Returns genome risk AGGREGATES grouped by category. Cache: 86400s (24h).
+    Returns a status only. Cache: 86400s (24h).
 
-    PRIVACY ABSOLUTE — no genetic IDENTIFIER may reach this public payload.
-    The docstring here used to say "no raw genotypes exposed", which was true
-    and beside the point: this endpoint served 111 dbSNP `rsid` values and 93
-    `gene` names, each paired with the owner's personal risk classification, to
-    any unauthenticated caller. An rsID IS the identifier — it is what
-    `_GENETIC_TEXT_RE` (line ~2450 of this same file) exists to keep out of the
-    public labs payload, what `docs/DATA_GOVERNANCE.md` classes Tier 2
-    owner-only, and what #920/#945 purged from three other surfaces. This
-    handler was simply never brought under the rule (guard-the-instance, not
-    the set), and PRE-13 — the review that would decide whether ANY of this may
-    be published — is still deferred. Until that decision is Matthew's to make
-    explicitly, the public shape is aggregate-only:
+    PRIVACY ABSOLUTE (owner ruling 2026-11-11): individual variants, inferred
+    outcomes, genetic risk CATEGORIES and personalised genetic risk summaries are
+    private by default, and aggregation does not make them safe. History: the
+    per-variant payload (rsid, gene, readouts) was withdrawn 2026-08-02; the
+    per-category {n, risk_levels} aggregate that replaced it still revealed
+    single-variant results in 1-2 variant categories and named a drug-response
+    category, so on 2026-11-11 every genetic finding left this payload.
 
-      per category: how many variants, and the risk-level distribution.
-
-    That keeps the honest reader-facing fact ("the genome has been analysed and
-    here is the shape of it") without publishing which variants he carries.
-    Restoring per-variant detail is a PRE-13 decision, not a code change.
+    The route stays (rather than 404) so the pages and the nightly archive that
+    list it keep resolving; it answers with a status and a disclosure and
+    deliberately does NOT read the genome partition, so no future edit here can
+    leak a field from a row it never loaded. Restoring any genetic content is a
+    PRE-13 decision for the owner, not a code change.
     """
-    table = _g["table"]
-
-    pk = f"{USER_PREFIX}genome"
-    resp = table.query(KeyConditionExpression=Key("pk").eq(pk))
-    items = _decimal_to_float(resp.get("Items", []))
-
-    if not items:
-        # No genome uploaded yet — shaped-empty 200 so the page shows "not yet published".
-        return _ok(
-            {"genome": {"total_snps": 0, "risk_summary": {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0}, "categories": {}}},
-            cache_seconds=3600,
-        )
-
-    categories: dict[str, dict[str, Any]] = {}
-    risk_summary = {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0}
-
-    for snp in items:
-        cat = snp.get("category", "other")
-        risk = snp.get("risk_level", "neutral")
-        risk_summary[risk] = risk_summary.get(risk, 0) + 1
-        # Aggregate ONLY — never the rsid, the gene, or the per-variant free
-        # text (summary/implications carried genotype calls). Counting a
-        # category is a fact about the analysis; naming a variant is a fact
-        # about the person.
-        bucket = categories.setdefault(cat, {"n": 0, "risk_levels": {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0}})
-        bucket["n"] += 1
-        bucket["risk_levels"][risk] = bucket["risk_levels"].get(risk, 0) + 1
-
-    return _ok(
-        {
-            "genome": {
-                "total_snps": len(items),
-                "risk_summary": risk_summary,
-                "categories": dict(sorted(categories.items())),
-                "disclosure": (
-                    "Per-variant detail (identifiers, genes, and their individual readouts) is deliberately "
-                    "not published: genome variants are owner-only under this platform's data-governance tiers. "
-                    "These are counts of what was analysed, not which variants he carries."
-                ),
-            }
-        },
-        cache_seconds=86400,
-    )
+    return _ok({"genome": {"status": "private", "disclosure": GENOME_PUBLIC_DISCLOSURE}}, cache_seconds=86400)
 
 
 def glucose(*, _g) -> dict:
@@ -328,11 +282,58 @@ def _compute_phenoage(vals: dict, age_years: float):
         return None
 
 
-def phenoage(*, _g) -> dict:
-    """GET /api/phenoage — transparent Levine Phenotypic Age. Option A privacy: returns the
-    phenotypic age + the 9 driver markers ONLY; never chronological age or the gap."""
-    datetime = _g["datetime"]
+#: The Levine formula is LINEAR in chronological age: one year of age moves the result by this many years
+#: (0.0804 / 0.090165). That slope is why a published phenotypic age — at ANY precision — is a published age:
+#: the nine markers are public, so `(published − markers-only part) / slope` is the age (owner ruling 2026-11-14).
+PHENOAGE_YEARS_PER_YEAR_OF_AGE = 0.0804 / 0.090165
 
+#: The ages the public reference line is stated at. A fixed grid, chosen once: it never moves with the reader, the
+#: date or the owner, so nothing about it carries information.
+PHENOAGE_REFERENCE_AGES = (30, 40, 50, 60)
+
+
+def phenoage_reference(vals: dict) -> dict | None:
+    """The MARKERS-ONLY reading of the nine markers: what the Levine formula returns for a person of each reference
+    age who had exactly these markers, and how far that sits from the reference age. A pure function of public lab
+    values — the owner's age, birth date and the clock are not inputs, so no output of this function can narrow them.
+    None when the formula cannot be evaluated (a marker outside its domain)."""
+    at = {}
+    for age in PHENOAGE_REFERENCE_AGES:
+        v = _compute_phenoage(vals, float(age))
+        if v is None:
+            return None
+        at[age] = v
+    offsets = {age: at[age] - age for age in PHENOAGE_REFERENCE_AGES}
+    return {
+        "basis": "markers_only",
+        # one point per reference person: "someone `at_years` old with these nine markers reads `reads_years`"
+        "points": [{"at_years": a, "reads_years": round(at[a], 1), "offset_years": round(offsets[a], 1)} for a in PHENOAGE_REFERENCE_AGES],
+        "offset_low": round(min(offsets.values()), 1),
+        "offset_high": round(max(offsets.values()), 1),
+        "slope": round(PHENOAGE_YEARS_PER_YEAR_OF_AGE, 3),
+    }
+
+
+PHENOAGE_WITHHELD = "derived_from_chronological_age"
+PHENOAGE_NOTE = (
+    "His own phenotypic age is not published: the formula is linear in chronological age and the nine markers are "
+    "public, so the number at any precision would give his age away. What is published is the markers-only reading: "
+    "what the same nine markers return for a person of each reference age."
+)
+
+
+def phenoage(*, _g) -> dict:
+    """GET /api/phenoage — the Levine Phenotypic Age formula applied to the nine public markers, MARKERS ONLY.
+
+    Owner ruling 2026-11-14 (supersedes Option A, 2026-06-23). Option A returned the rounded phenotypic age and
+    withheld the chronological age and the gap. That was not enough: the formula is public and linear in age
+    (``PHENOAGE_YEARS_PER_YEAR_OF_AGE``), the nine inputs are public, so the rounded figure pinned the age to a
+    window of about 1.1 years — and a five-year band or a younger/older flag would only widen the window, then
+    narrow it again with every new draw. So the public path does not compute with his age AT ALL: it reads no
+    profile, no birth date and no clock, and returns the nine drivers plus ``phenoage_reference`` (a pure function
+    of the public markers). ``phenoage`` is always null and ``withheld`` says why. The precise figure stays
+    private (``scripts/phenoage_private.py``, run by the owner). ``tests/test_age_inversion.py`` holds the
+    line: the response is byte-identical whatever the birth date and whatever the day."""
     try:
         S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
         s3 = boto3.client("s3", region_name=S3_REGION)
@@ -385,22 +386,11 @@ def phenoage(*, _g) -> dict:
             "WBC": raw["wbc"],
         }
         missing = [k for k, v in required.items() if v is None]
-        # Chronological age (compute-only; never returned). From profile DOB.
-        prof = _get_profile() or {}
-        dob = prof.get("date_of_birth")
-        age_years = None
-        if dob:
-            try:
-                d = datetime.strptime(str(dob)[:10], "%Y-%m-%d")
-                age_years = (datetime.now(timezone.utc).replace(tzinfo=None) - d).days / 365.25
-            except (ValueError, TypeError):
-                age_years = None
-
-        if missing or age_years is None:
+        if missing:
             return _ok(
                 {
                     "phenoage": None,
-                    "missing": missing or (["chronological age (profile)"] if age_years is None else []),
+                    "missing": missing,
                     "as_of": labs.get("latest_draw_date"),
                     "lymphocyte_derived": lymph_derived,
                 },
@@ -419,8 +409,8 @@ def phenoage(*, _g) -> dict:
             "alp_UL": raw["alp"],
             "wbc_1000": raw["wbc"],
         }
-        pheno = _compute_phenoage(vals, age_years)
-        if pheno is None:
+        reference = phenoage_reference(vals)
+        if reference is None:
             return _ok({"phenoage": None, "missing": ["computation failed"], "as_of": labs.get("latest_draw_date")}, cache_seconds=3600)
 
         # Per-marker driver direction (younger/older) vs healthy reference — transparent, but
@@ -458,10 +448,13 @@ def phenoage(*, _g) -> dict:
                 }
             )
 
-        # Round to the nearest year for display; chronological age and the gap are NOT returned.
+        # The owner's own figure is never computed here (see the docstring): `phenoage` stays null by construction.
         return _ok(
             {
-                "phenoage": round(pheno),
+                "phenoage": None,
+                "withheld": PHENOAGE_WITHHELD,
+                "note": PHENOAGE_NOTE,
+                "reference": reference,
                 "as_of": labs.get("latest_draw_date"),
                 "drivers": drivers,
                 "lymphocyte_derived": lymph_derived,

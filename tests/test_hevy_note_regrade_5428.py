@@ -39,6 +39,7 @@ from training import (
     lift_note,
     session_block,
 )
+from training.cardio_note import without_capture as _wc  # noqa: E402  #5796: line 1 follows the RPE prompt
 from training.exercise_history import STALE_AFTER_DAYS as HISTORY_STALE_AFTER_DAYS
 from training.rep_scheme import LB_IN_KG
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set, deserialize, serialize
@@ -68,7 +69,7 @@ GRADED_TREADMILL_HILL = (
 )
 SESSION = (  # the load rule as re-grade #3 (2026-10-31) left it: two lines, a unit on every step
     "Lower heavy · RPE 8–9 on big lifts\nLow energy → first 2 lifts + easy cardio.\n"
-    "Top reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.\nUnder 40 lb: one step. Stack: next plate at any load. Once per lift."
+    "Top reps at RPE 7 or less → +10 lb on later sets; 7.5–8.5 → +5 lb.\nDumbbells under 40 lb or a machine: next step only. One load change per lift."
 )
 TARGET = "2026-10-30"  # routine 81fe18c0's day; be80e308 / dde23e6b were 10-29
 
@@ -217,6 +218,19 @@ def test_a_rotated_lift_he_logged_weeks_ago_is_not_new_and_not_find_the_load():
     assert rec["lift_notes"]["face_pull"]["reason"] is None and rec["lift_notes"]["face_pull"]["pick_load"] is False
 
 
+def test_a_new_lift_never_says_it_replaces_an_exercise_the_same_session_still_serves():
+    """#6020: `New: replaces Bicep Curl (Dumbbell)` beside a Bicep Curl (Dumbbell) block in the same routine is a note that
+    contradicts its own session (the approval package's Cable Crunch / Side Bend). The line is dropped, the swap stays stored."""
+    hammer, curl = _accessory("hammer_curl_dumbbell", 22.5), _accessory("db_curl", 20)
+    rotations = {"hammer_curl_dumbbell": "Bicep Curl (Dumbbell)"}
+    rec = _compose([hammer, curl], {}, rotations, target="2026-10-29")
+    assert "replaces" not in hammer.notes, hammer.notes
+    assert rec["lift_notes"]["hammer_curl_dumbbell"]["rotation_of"] == "Bicep Curl (Dumbbell)"
+    alone = _accessory("hammer_curl_dumbbell", 22.5)  # control: the replaced lift is NOT served, so the line is still written
+    _compose([alone], {}, rotations, target="2026-10-29")
+    assert "New: replaces Bicep Curl (Dumbbell)." in alone.notes, alone.notes
+
+
 def test_MUTATION_the_28_day_line_brings_back_the_graded_wire(monkeypatch):
     """Control: put the old 28-day line back and the same inputs fall back into the pick-load form. Re-grade #2
     (2026-10-31) closed the second door too: `New: replaces …` needs NO PREVIOUS at all, so even at 28 days the hammer
@@ -231,7 +245,7 @@ def test_MUTATION_the_28_day_line_brings_back_the_graded_wire(monkeypatch):
     face2 = _accessory("face_pull", 65)
     monkeypatch.setattr(lift_note, "STALE_AFTER_DAYS", 180)
     _compose([face2], _history("face_pull", ("2026-10-21", 65, 15, 9.0)), {"face_pull": "Rear Delt Reverse Fly (Machine)"}, "2026-10-29")
-    assert "New: replaces" not in face2.notes and GRADED_FACE_PULL.split("\n")[0] == face2.notes
+    assert "New: replaces" not in face2.notes and _wc(GRADED_FACE_PULL).split("\n")[0] == face2.notes
 
 
 def test_a_stale_previous_far_off_is_lighter_not_new_and_a_lift_never_logged_keeps_new():
@@ -239,13 +253,16 @@ def test_a_stale_previous_far_off_is_lighter_not_new_and_a_lift_never_logged_kee
     leads (§3.3) and the band stays (owner ruling 2026-10-30: no blanket layoff cap). Re-grade #2 (2026-10-31): Hevy
     still shows that PREVIOUS beside the 30-lb row, so the reason slot carries `Lighter: first time in 23 months.`, not
     `New: replaces …` — New is only for a lift with NO PREVIOUS (the 40f2c0b5 machine lateral raise read "New" over 65 lb
-    × 10 from 2024 and dropped to 35 lb with no why)."""
+    × 10 from 2024 and dropped to 35 lb with no why). Owner ruling 2026-11-10 (charter 1.41.0) supersedes the band and the
+    feeler here: a first session back after more than 90 days reads the layoff band and the one layoff line, behind a W
+    row at half the work (was `RPE 8–9, last set RPE 9–10` / `Lighter: first time in 23 months.` / the feeler AT 30 lb)."""
     leg = _accessory("lying_leg_curl_machine", 30)
     _compose(
         [leg], _history("lying_leg_curl_machine", ("2024-11-29", 40, 8, None)), {"lying_leg_curl_machine": "Seated Leg Curl (Machine)"}
     )
-    assert leg.notes == "RPE 8–9, last set RPE 9–10\nLighter: first time in 23 months.\nW at RPE 5 or less → one step, no more."
-    assert leg.sets[0].type == "warmup" and leg.sets[0].reps == g.PICK_LOAD_W_REPS and leg.notes != GRADED_LEG_CURL
+    assert leg.notes == "RPE 6–7\nSame load all sets: first time in 23 months."
+    assert (leg.sets[0].type, leg.sets[0].weight_kg, leg.sets[0].reps) == ("warmup", _kg(15), 8) and leg.notes != GRADED_LEG_CURL
+    assert "New: replaces" not in leg.notes
     # never logged: New stands, with the feeler line over the engine's start load
     fresh = _accessory("lying_leg_curl_machine", 30)
     _compose([fresh], {}, {"lying_leg_curl_machine": "Seated Leg Curl (Machine)"})
@@ -286,7 +303,7 @@ def test_the_graded_hill_fails_lint_on_levels_and_talk_words_and_the_composed_hi
     ]
     facts = {"last_level": 11}
     note, audit = cardio_note.compose(movement_key="cycling", minutes=30, target_date=TARGET, kind="hills", facts=facts)
-    assert note == (
+    assert _wc(note) == (
         "Recumbent · L11 → L13 · RPE 6–7 (short phrases)\n"
         "⌚ ride clock: L11 to min 10 · up a level every 2 min to min 14 · down the same to min 18 · L11 to the end"
     ), note
@@ -324,7 +341,7 @@ def test_a_treadmill_hill_reads_the_walk_clock_and_a_bike_the_ride_clock(monkeyp
     monkeypatch.setenv(lint.MODE_ENV, "off")
     sessions = [{"date": "2026-10-20", "note": "2.8 / 6"}]
     note, _ = cardio_note.compose(movement_key="treadmill", minutes=30, target_date=TARGET, kind="hills", treadmill_sessions=sessions)
-    line1, clock = note.split("\n")
+    line1, clock = _wc(note).split("\n")
     assert line1.endswith("6% → 10% · RPE 6–7 (short phrases)") and clock.startswith("⌚ walk clock: 6% to min 6"), note
     assert cardio_note.clock_of(note, 30) is not None  # the adherence reader reads the walk clock back
     assert _lint(_cardio_ir(note, "treadmill")).ok, _lint(_cardio_ir(note, "treadmill")).lines()
@@ -366,13 +383,18 @@ def test_a_layoff_cap_with_no_days_since_value_reads_its_gap_off_previous(monkey
     monkeypatch.setenv(lint.MODE_ENV, "off")
     ir = _calf_ir("standing_calf_raise_machine", "2025-05-14", STANDING_CALF_COMPOSED)
     recs = _cap(ir, None)
+    # re-grade #6 (2026-11-08): the one layoff line (no set count — the rows show it), and NO W step line beside it — the
+    # 11-06 wire read `No jumps: 3 sets today, 18 months off.` then `W at RPE 5 or less → one step, no more.` (4 of 4 voices)
     assert recs[0]["applied"] and recs[0]["clauses"] == [
-        {"movement_key": "standing_calf_raise_machine", "clause": "No jumps: 3 sets today, 18 months off.", "effort_capped": True}
+        {"movement_key": "standing_calf_raise_machine", "clause": "Same load all sets: first time in 18 months.", "effort_capped": True}
     ]
-    assert ir.exercises[1].notes == (
-        "RPE 7\nNo jumps: 3 sets today, 18 months off.\nW at RPE 5 or less → one step, no more.\nFull stretch at the bottom; knees soft."
-    )
-    assert ir.exercises[1].notes != GRADED_STANDING_CALF and _lint(ir).ok, _lint(ir).lines()
+    # owner ruling 2026-11-10 (charter 1.41.0): a FIRST session back reads the layoff band, not the cap's RPE 7 (was `RPE 7`)
+    assert ir.exercises[1].notes == "RPE 6–7\nSame load all sets: first time in 18 months.\nFull stretch at the bottom; knees soft."
+    assert ir.exercises[1].notes != GRADED_STANDING_CALF
+    # lint L14: the fixture's no-load feeler is not a W row lighter than the work; the composer puts one at half of it
+    assert any(ln.startswith("L14") for ln in _lint(ir).lines()), _lint(ir).lines()
+    ir.exercises[1].sets[0].weight_kg = _kg(60)
+    assert _lint(ir).ok, _lint(ir).lines()
 
 
 def test_MUTATION_no_layoff_clause_is_ever_bare():
@@ -384,9 +406,11 @@ def test_MUTATION_no_layoff_clause_is_ever_bare():
     assert session_block.change_reason(v, 40) == "first time in 6 weeks"
     assert session_block.change_reason({**v, "value": 3}) == session_block.BREAK_WORDS  # exposure 2 after a break
     assert session_block.layoff_gap(v, "2025-05-14", TARGET) == 534 and session_block.layoff_gap(v, None, TARGET) is None
-    assert session_block.capped_clause(3, None) == "No jumps: 3 sets today, new to the log."
-    for clause in ("No jumps: 3 sets today, 18 months off.", "No jumps: 1 set today, new to the log."):
-        assert g.phone_lines(clause) == 1 and g.REASON_RE.match(clause) and g.SET_COUNT_RE.search(clause), clause
+    # re-grade #6: the gap unknown reads `back after a break`, and the line carries no set count (the rows show it)
+    assert session_block.capped_clause(3, None) == "Same load all sets: back after a break."
+    for clause in ("Same load all sets: first time in 18 months.", "Same load all sets: back after a break."):
+        assert g.phone_lines(clause) <= 2 and g.REASON_RE.match(clause) and g.LAYOFF_RE.match(clause), clause
+        assert not g.SET_COUNT_RE.search(clause), clause
     # an uncapped layoff (a 40-day gap) keeps the plain clause, reason and all
     ir = _calf_ir("standing_calf_raise_machine", "2026-09-20", STANDING_CALF_COMPOSED)
     recs = _cap(ir, None)
@@ -395,40 +419,48 @@ def test_MUTATION_no_layoff_clause_is_ever_bare():
 
 def test_a_layoff_set_cap_over_90_days_takes_the_capped_exposures_effort(monkeypatch):
     """Dde23e6b's seated calf raise: PREVIOUS 90 lb × 15 @ RPE 9 on 2026-06-20 (133 days), capped 4 → 3 by the joints
-    critic. The graded wire kept `last set RPE 9–10` under the +10 lb rule; now `RPE 7` and the `No jumps` reason."""
+    critic. The graded wire kept `last set RPE 9–10` under the +10 lb rule; now `RPE 7` and the layoff line."""
     monkeypatch.setenv(lint.MODE_ENV, "off")
     calf = _accessory("seated_calf_raise", 90, n=4)
     _compose(
         [calf], _history("seated_calf_raise", ("2026-06-20", 90, 15, 9.0)), {"seated_calf_raise": "Calf Press (Machine)"}, "2026-10-31"
     )
-    assert calf.notes == "RPE 8–9, last set RPE 9–10\nFull stretch at the bottom; knees soft."  # 133 days: fresh, not New
+    # owner ruling 2026-11-10 (charter 1.41.0): 133 days is past the OD1 line, so the composer already eases it — the
+    # layoff band, the one layoff line and a W row at half the work (was `RPE 8–9, last set RPE 9–10` and no W row)
+    assert calf.notes == "RPE 6–7\nSame load all sets: first time in 19 weeks.\nFull stretch at the bottom; knees soft."  # not New
+    assert [(s.type, s.weight_kg) for s in calf.sets if s.type == "warmup"] == [("warmup", _kg(45))]
     ir = _calf_ir("seated_calf_raise", "2026-06-20", calf.notes)
     ir.exercises[1] = calf
     _cap(ir, 133, to=3)
-    assert calf.notes == "RPE 7\nNo jumps: 3 sets today, 19 weeks off.\nFull stretch at the bottom; knees soft.", calf.notes
+    # the critic's cap keeps the easier band (was `RPE 7`)
+    assert calf.notes == "RPE 6–7\nSame load all sets: first time in 19 weeks.\nFull stretch at the bottom; knees soft.", calf.notes
     assert calf.notes != GRADED_SEATED_CALF and _lint(ir).ok, _lint(ir).lines()
 
 
 def test_MUTATION_a_cap_inside_90_days_keeps_the_band_as_the_a_grade_corpus_does():
     """Control: the A-grade incline press, `2 sets today: first incline in 5 weeks.` under RPE 8–9 — a 35-day cap is not
-    OD1's capped exposure, so line 1 and the plain clause stand. And a ramp-capped lift's `No jumps` line merges."""
+    OD1's capped exposure, so line 1 and the plain clause stand. And a ramp-capped lift's layoff line stands as it is
+    (re-grade #6: the critic's cap and the composer's line are one line, with no set count)."""
     ir = _calf_ir("standing_calf_raise_machine", "2026-09-25", "RPE 8–9, last set RPE 9–10\nFull stretch at the bottom; knees soft.")
     _cap(ir, 35)
     assert (
         ir.exercises[1].notes == "RPE 8–9, last set RPE 9–10\n3 sets today: first time in 5 weeks.\nFull stretch at the bottom; knees soft."
     )
-    capped = "RPE 7\nNo jumps today: session 2 back after a break.\nFull stretch at the bottom; knees soft."
+    capped = "RPE 7\nSame load all sets: 2nd session back after 19 months off.\nFull stretch at the bottom; knees soft."
     ir = _calf_ir("standing_calf_raise_machine", "2026-10-27", capped)
     _cap(ir, 3)
-    assert ir.exercises[1].notes == "RPE 7\nNo jumps: 3 sets today, session 2 back.\nFull stretch at the bottom; knees soft."
-    assert session_block.add_capped_reason(ir.exercises[1].notes, "No jumps: 3 sets today, session 2 back.", 7) == ir.exercises[1].notes
+    assert ir.exercises[1].notes == capped
+    assert session_block.add_capped_reason(capped, "Same load all sets: 2nd session back after 19 months off.", 7) == capped
 
 
 def test_a_ramp_capped_first_exposure_names_its_gap():
-    """81fe18c0's split squat (PREVIOUS 2025-04-08): the ramp's exposure cap, exposure 1 — the gap, not 'session 1'."""
+    """81fe18c0's split squat (PREVIOUS 2025-04-08): the ramp's exposure cap, exposure 1 — the gap, not 'session 1'.
+    Re-grade #6 (2026-11-08): one grammar; a later exposure names its ordinal WITH the gap (the 11-06 split squat read
+    `No jumps today: session 2 back after a break.` though the ramp knew the gap: 570 days)."""
     caps = {"exposure": 1, "rpe_max": 7, "reps_max": 8, "gap_days": 540}
-    assert lift_note.no_jumps_line(caps) == "No jumps: first time in 18 months."
-    assert lift_note.no_jumps_line({**caps, "exposure": 2}) == "No jumps today: session 2 back after a break."
+    assert lift_note.no_jumps_line(caps) == "Same load all sets: first time in 18 months."
+    assert lift_note.no_jumps_line({**caps, "exposure": 2, "gap_days": 570}) == "Same load all sets: 2nd session back after 19 months off."
+    assert lift_note.no_jumps_line({**caps, "exposure": 3, "gap_days": None}) == "Same load all sets: back after a break."
     assert g.gap_text(10) == "10 days" and g.gap_text(35) == "5 weeks" and g.gap_text(133) == "19 weeks" and g.gap_text(800) == "2 years"
 
 
@@ -442,7 +474,10 @@ def test_the_squat_prep_cue_stays_beside_a_reason_line_when_it_fits():
     squat = ExerciseBlock(movement_key="squat_barbell", sets=[_n(215, 8, 12) for _ in range(3)], rationale_tag="anchor:squat:volume")
     history = {**_history("deadlift_trap_bar", ("2026-10-19", 235, 8, 8.5)), **_history("squat_barbell", ("2026-10-23", 265, 4, 9.0))}
     _compose([hinge, squat], history, target="2026-10-29")
-    assert squat.notes == "RPE 8–9\nVolume day: chase 12.\nAnkles + hips first. Brace each rep, breathe between reps.", squat.notes
+    # #5817 (owner ruling 2026-11-11, D8): the barbell squat's one sheet cue rides with them and still fits 4 lines
+    assert (
+        squat.notes == "RPE 8–9\nVolume day: chase 12.\nAnkles + hips first. Knees track the toes. Brace each rep, breathe between reps."
+    ), squat.notes
     assert g.phone_lines(squat.notes) == g.LIFT_MAX_LINES
 
 

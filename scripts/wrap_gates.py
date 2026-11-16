@@ -175,6 +175,12 @@ GATHER = [
     # #5143: the live alarm NAME set vs the model's alarms plane (both regions, read-only; fail-open UNVERIFIED offline).
     Gate("alarm-census", "e10", ["python3", "scripts/check_alarm_census.py"]),
     Gate("ci-warnings", "e11", ["python3", "scripts/check_ci_warnings.py"], marker="CI warnings"),
+    # #5524: the pk-family census's cadence. It used to refresh only at a reset, and no reset will
+    # come. No scan at all while the artifact is under 28 days old; past that, a read-only scan,
+    # and the refresh is KEPT only if every test that reads the artifact still passes (else the old
+    # bytes are restored and this reds, naming the new families). tests/test_schema_families_census.py
+    # reds at 35 days. A kept refresh is staged by (f). Offline/no-creds = UNVERIFIED, exit 0.
+    Gate("pk-census", "e", ["python3", "deploy/write_pk_family_census.py", "--refresh-if-older-than-days", "28"]),
     # #4262: backlog-hygiene (e7), unlinked-closures and merge-text-closures are NOT here any
     # more — they run nightly in `.github/workflows/wrap-nightly.yml` (see NIGHTLY, below),
     # and a11y-shrink-deadman left for the CI suite it was already part of (see NIGHTLY's note).

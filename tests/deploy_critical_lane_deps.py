@@ -18,12 +18,14 @@ lane venv during collection.
 # pyyaml added #3684: tests/test_wait_pr_green_cancel_diagnosis_3678.py imports yaml at
 # module scope and carries the deploy_critical marker, so the lane collects it. Without
 # the install the whole lane died on ModuleNotFoundError and reded main.
-LANE_THIRD_PARTY_DEPS = ("pytest", "boto3", "botocore", "hypothesis", "pyyaml")
+# pytest-timeout added #5514: the per-test ceiling in pytest.ini (a hung test fails named, not at timeout-minutes).
+LANE_THIRD_PARTY_DEPS = ("pytest", "pytest-timeout", "boto3", "botocore", "hypothesis", "pyyaml")
 
 # Distribution → importable top-level module names it (or its hard deps) ships.
 # Only names tests/ may import at MODULE SCOPE without crashing lane collection.
 DEP_IMPORT_NAMES = {
     "pytest": {"pytest", "_pytest", "py", "pluggy", "iniconfig", "packaging"},
+    "pytest-timeout": {"pytest_timeout"},
     "boto3": {"boto3", "s3transfer"},
     "botocore": {"botocore", "dateutil", "jmespath", "urllib3"},
     "hypothesis": {"hypothesis", "attr", "attrs", "sortedcontainers"},

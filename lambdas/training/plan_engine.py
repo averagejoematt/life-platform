@@ -101,6 +101,7 @@ from training import (
     training_charter,
     training_context_registry,
 )
+from training.tripwire_rows import stall_input, volume_ceiling_read  # noqa: F401 — #5802 (stall_input re-exported for the MCP caller)
 
 # The v1 critics stub the block carries until #3752 wires the adversarial stage (extracted
 # from constraint_block so the #5068 charter stamp did not grow the function).
@@ -150,8 +151,7 @@ ENGINE_INPUTS = (
     "pain_evidence_scope",
     "pain_layer_status",
     "pain_dismissals",
-    "weight_stall_days",
-    "adherence_on_plan",
+    "weight_stall_evaluation",  # #5802: nutrition_critics' ONE evaluation of weight_stall_with_adherence, read here
     "hevy_workouts_rotation_window",
     "hevy_workouts_prescription_window",
     "block_workouts",
@@ -167,7 +167,8 @@ _TRIPWIRE_INPUT = {
     "protein_floor_missed": "protein_days_missed_7d",
     "readiness_floor": "readiness_low_streak_days",
     "anchor_lift_strength_drop": "anchor_lift_drop_pct",
-    "weight_stall_with_adherence": "weight_stall_days",
+    "weight_stall_with_adherence": "weight_stall_evaluation",
+    "volume_ceiling": "muscle_volume",
     "pain_flag_named_site": "pain_evidence_scope",
     "self_added_volume": "hevy_workouts_prescription_window",
     "walking_collapse": "recent_aerobic",
@@ -345,6 +346,15 @@ def _pain_read_failed(scope: dict[str, Any] | None, layer_status: str | None, in
     return layer_status in (None, "dark", "unknown") and (input_states.get("pain_layer_status") or {}).get("state") == READ_FAILED
 
 
+def floor_days_state(days_missed_7d: int | None) -> str:
+    """THE `protein_floor_missed` evaluation (tripped | clear | unknown) against its own `threshold_days`; the fuel loop
+    (#5792, `mcp.fuel_loop`) reads the fat and fibre floors' day counts through it too, so there is one comparison."""
+    if days_missed_7d is None:
+        return "unknown"
+    t = next(x for x in owner_redlines.engine_evaluated_tripwires() if x["id"] == "protein_floor_missed")
+    return "tripped" if int(days_missed_7d) >= int(t["threshold_days"]) else "clear"
+
+
 # _tripwire_states — two rules kept as a comment (the #4880 function-length ratchet charges a docstring, #5001):
 #
 # #4051 closes the hole under the `unknown` and `dismissed_by_owner` rules of the docstring: a `clear` (or `unknown`) pain row is only
@@ -374,8 +384,6 @@ def _tripwire_states(
     anchor_lift_drop_sessions: int | None,
     pain_flag_sites: list[str] | None,
     pain_layer_status: str | None,
-    weight_stall_days: int | None,
-    adherence_on_plan: bool | None,
     pain_flag_instances: list[dict[str, Any]] | None = None,
     pain_dismissals: list[dict[str, Any]] | None = None,
     pain_evidence_scope: dict[str, Any] | None = None,
@@ -387,6 +395,8 @@ def _tripwire_states(
     loss_rate: dict[str, Any] | None = None,
     weight_lb: float | None = None,
     guidance_cap_lb_wk: float | None = None,
+    weight_stall_evaluation: dict[str, Any] | None = None,
+    muscle_volume: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Evaluate each owner tripwire against the inputs, or say why it could not be read.
 
@@ -441,12 +451,12 @@ def _tripwire_states(
         label = st.get("state")
         return _row(tid, "unknown", None, f"{label}: {why}" if (label and why and label != NOT_SUPPLIED) else fallback)
 
-    t = by_id["protein_floor_missed"]
     if protein_days_missed_7d is None:
         out.append(_missing("protein_floor_missed", "no intake rollup for the trailing 7d"))
     else:
-        tripped = protein_days_missed_7d >= t["threshold_days"]
-        out.append(_row("protein_floor_missed", "tripped" if tripped else "clear", f"{protein_days_missed_7d} of 7 days below floor"))
+        out.append(
+            _row("protein_floor_missed", floor_days_state(protein_days_missed_7d), f"{protein_days_missed_7d} of 7 days below floor")
+        )
 
     t = by_id["readiness_floor"]
     if readiness_low_streak_days is None:
@@ -614,16 +624,17 @@ def _tripwire_states(
             row["evidence"] = pain_evidence_scope
         out.append(row)
 
-    t = by_id["weight_stall_with_adherence"]
-    if weight_stall_days is None or adherence_on_plan is None:
-        out.append(_missing("weight_stall_with_adherence", "needs both a weight trend and an adherence read"))
+    # #5802: weight_stall_with_adherence is nutrition_critics' ONE evaluation (`health.tripwire_readers.stall_from_block`
+    # maps its decisions_offered record) — the engine computes no stall of its own, it reads that one.
+    ws = weight_stall_evaluation
+    if ws is None:
+        out.append(_missing("weight_stall_with_adherence", "the nutrition critics' stall evaluation was not supplied"))
     else:
-        tripped = weight_stall_days >= t["threshold_days"] and adherence_on_plan
-        out.append(
-            _row(
-                "weight_stall_with_adherence", "tripped" if tripped else "clear", f"{weight_stall_days}d stall, on-plan={adherence_on_plan}"
-            )
-        )
+        out.append(_row("weight_stall_with_adherence", ws["state"], ws.get("observed"), ws.get("detail") or ""))
+    out[-1]["evaluated_by"] = "health.nutrition_critics"
+    # #5802: volume_ceiling, REPORT-ONLY — a row and a report, never a change; the plan's growth rule stays the generator's
+    vc = volume_ceiling_read(muscle_volume) if muscle_volume else None
+    out.append({**(_row("volume_ceiling", *vc) if vc else _missing("volume_ceiling", "no muscle volume supplied")), "report_only": True})
 
     # #4081 — self_added_volume: training above the prescription two weeks running, from the
     # per-movement programmed/performed set counts `health.adherence_calc` stored on each Hevy
@@ -733,11 +744,19 @@ def _scheduled_session(
 def _effort_blocks(
     date: str, rows: Any, catalog_movements: Any, states: dict[str, dict[str, Any]], dis_records: Any, block_workouts: Any = None
 ) -> dict[str, Any]:
-    """`progression` (#5052) + `ceiling_change_proposal` (#5058) + `training_day_fuel` (#5101, typed by the #5191 calendar)."""
+    """`progression` (#5052) + `ceiling_change_proposal` (#5058) + `set_raise_proposal` (#5796) + `training_day_fuel` (#5101,
+    typed by the #5191 calendar). Both proposals are owner-approved; neither changes a prescription."""
     st = (states.get("hevy_workouts_prescription_window") or {}).get("state")
-    proposal = ceiling_proposal.for_plan(date, rows, None if st == READ_FAILED else st, catalog_movements)
+    read = None if st == READ_FAILED else st
+    proposal = ceiling_proposal.for_plan(date, rows, read, catalog_movements)
+    raises = self_added_volume.set_raise_for_plan(date, rows, read, catalog_movements)
     fuel = training_calendar.plan_fuel(date, disruption.state(dis_records, date) if dis_records is not None else None, block_workouts)
-    return {"progression": load_progression.rule_summary(), "ceiling_change_proposal": proposal, "training_day_fuel": fuel}
+    return {
+        "progression": load_progression.rule_summary(),
+        "ceiling_change_proposal": proposal,
+        "set_raise_proposal": raises,
+        "training_day_fuel": fuel,
+    }
 
 
 def _steps_ramp_block(
@@ -899,8 +918,7 @@ def constraint_block(
     pain_flag_instances: list[dict[str, Any]] | None = None,
     pain_dismissals: list[dict[str, Any]] | None = None,
     pain_evidence_scope: dict[str, Any] | None = None,
-    weight_stall_days: int | None = None,
-    adherence_on_plan: bool | None = None,
+    weight_stall_evaluation: dict[str, Any] | None = None,  # #5802: `health.tripwire_readers.stall_from_block` over the critics block
     hevy_workouts_rotation_window: list[dict[str, Any]] | None = None,
     rotation_window_start: str | None = None,
     hevy_workouts_prescription_window: list[dict[str, Any]] | None = None,
@@ -946,8 +964,7 @@ def constraint_block(
             "pain_evidence_scope": pain_evidence_scope,
             "pain_layer_status": pain_layer_status,
             "pain_dismissals": pain_dismissals,
-            "weight_stall_days": weight_stall_days,
-            "adherence_on_plan": adherence_on_plan,
+            "weight_stall_evaluation": weight_stall_evaluation,
             "hevy_workouts_rotation_window": hevy_workouts_rotation_window,
             "hevy_workouts_prescription_window": hevy_workouts_prescription_window,
             "block_workouts": block_workouts,
@@ -976,8 +993,8 @@ def constraint_block(
         anchor_lift_drop_sessions=anchor_lift_drop_sessions,
         pain_flag_sites=pain_flag_sites,
         pain_layer_status=pain_layer_status,
-        weight_stall_days=weight_stall_days,
-        adherence_on_plan=adherence_on_plan,
+        weight_stall_evaluation=weight_stall_evaluation,
+        muscle_volume=muscle_volume,
         pain_flag_instances=pain_flag_instances,
         pain_dismissals=pain_dismissals,
         pain_evidence_scope=pain_evidence_scope,
@@ -1058,6 +1075,7 @@ def constraint_block(
         "shared_quantities": {"loss_rate_lb_wk": loss_rate},
         # #3753 v3: tripwires the engine does not yet compute are NAMED here, never silent (ADR-105).
         "unevaluated_tripwires": owner_redlines.unevaluated_tripwires(),
+        "tripwires_evaluated_elsewhere": owner_redlines.evaluated_elsewhere(),  # #5802: id -> the module that reads it
         "recovery_tier": recovery_tier,
         "acwr_flag": acwr_flag,
         "muscle_volume": muscle_volume or {},
@@ -1103,7 +1121,7 @@ def constraint_block(
                 ),
                 (
                     f"{len(owner_redlines.unevaluated_tripwires())} v{owner_redlines.REDLINES_VERSION} tripwire(s) are reported but NOT evaluated by this "
-                    f"engine: {', '.join(owner_redlines.unevaluated_tripwires())} (#3753)"
+                    f"engine or any other module: {', '.join(owner_redlines.unevaluated_tripwires())} (#3753, #5802)"
                     if owner_redlines.unevaluated_tripwires()
                     else None
                 ),

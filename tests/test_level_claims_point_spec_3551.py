@@ -38,7 +38,7 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas", "coach"))
 import coach_prediction_evaluator as ev  # noqa: E402
 import coach_state_updater as su  # noqa: E402
 import pytest  # noqa: E402
-from coach import prediction_emission as pe, prediction_windows as pw  # noqa: E402
+from coach import prediction_emission as pe, prediction_point_grader as ppg, prediction_windows as pw  # noqa: E402
 from experiment import measurable_metrics as mm  # noqa: E402
 from fakes import FakeDdbTable, raise_hook  # noqa: E402
 
@@ -221,8 +221,6 @@ class TestPointEmissionContract:
         src = inspect.getsource(ev._evaluate_all)
         assert 'in ("directional", "point")' in src and "_evaluate_point" in src
         # The evaluator's name is the grader module's function with the evaluator's own data path injected.
-        from coach import prediction_point_grader as ppg
-
         assert "return evaluate_point(" in inspect.getsource(ev._evaluate_point) and ev.evaluate_point is ppg.evaluate_point
         assert ev.POINT_LOOKBACK_DAYS == ppg.POINT_LOOKBACK_DAYS
 
@@ -268,8 +266,11 @@ class TestPointTolerance:
 
 def _cache(values, start_day=1):
     recs = [{"date": f"2026-08-{start_day + i:02d}", "recovery_score": v} for i, v in enumerate(values)]
-    # #3553: the slot is DERIVED (it now carries the end date), never hand-typed.
-    return {ev.source_cache_key(ev.METRIC_SOURCES["recovery_score"], "2026-08-30", ev.POINT_LOOKBACK_DAYS): recs}
+    # #3553: the slot is DERIVED (it now carries the end date), never hand-typed. Owner 2026-11-09: the read
+    # ends on the call's own target day (ppg.read_anchor), so the cache is warmed for every target day used here.
+    days = ["2026-07-30"] + [f"2026-08-{d:02d}" for d in range(1, 31)]
+    src = ev.METRIC_SOURCES["recovery_score"]
+    return {ev.source_cache_key(src, ppg.read_anchor(d, "2026-08-30"), ev.POINT_LOOKBACK_DAYS): recs for d in days}
 
 
 def _spec(target, tol, target_date):

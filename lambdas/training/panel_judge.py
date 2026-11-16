@@ -30,6 +30,15 @@ regression gate under `charter_judge_gate` (band 3 with the other operator-truth
 the hard stop). A paused or failed judge leaves the CODE scores standing and marks the grade `degraded`
 with the reason — never a fabricated score. Every call goes through `bedrock_client`, so a laptop run is
 held by the dev-session cap (`ai.dev_session_cap`) as well.
+
+THE WEEK KEY (#5761). A `PANEL#<week_end>` row is keyed to the SUNDAY of its Monday-Sunday Pacific week — the same
+`week_end` `training.may_tracker.week_bounds` gives the tracker's `WEEK#<monday>` row — so the block retro's planning
+loop (`block_retro._loop_evidence`) pairs the two. `panel_item` refuses any other key; `mcp.panel_weekly_grade.run`
+snaps the requested day to its week first.
+
+THE DEPARTURES (#5761). Each graded week names how many of its committed routines were `draft_custom` departures from
+the engine's `draft`, and each one's stated `departure_reason` (#5055) — on the GRADE and its row, never in the judge's
+body: the judge is blinded to who wrote the plan, and a departure is exactly that.
 """
 
 from __future__ import annotations
@@ -49,6 +58,7 @@ PLANNER_ROUTE = "plan_critics"  # the tier the plan's own red team runs on — t
 WEEKLY_CALLS_PER_RUN = 1 + len(panel_rubric.CONTROL_MUTATIONS) + 1 + len(food_panel.CONTROL_MUTATIONS)
 MAX_TOKENS = 2000
 PANEL_SK_PREFIX = "PANEL#"
+DEPARTURE_ACTION = "draft_custom"  # the routine `source_action` that departs from the engine's `draft` (#5055)
 
 INSTRUCTIONS = (
     "PANEL RUBRIC JUDGE\n\n"
@@ -298,6 +308,22 @@ def trend(current: dict[str, Any], history: list[dict[str, Any]]) -> dict[str, A
     }
 
 
+def departures(routines: list[dict[str, Any]]) -> dict[str, Any]:
+    """#5761: the week's committed routines that were `draft_custom` departures, each with its stated reason (the IR's
+    `inputs_snapshot.departure_reason`, #5055; an empty one is said, never dropped)."""
+    custom = sorted(
+        (r for r in routines or [] if r.get("source_action") == DEPARTURE_ACTION), key=lambda r: str(r.get("target_date") or "")
+    )
+    reasons = [
+        {
+            "target_date": str(r.get("target_date") or "")[:10],
+            "reason": str((r.get("inputs_snapshot") or {}).get("departure_reason") or "").strip() or "no departure_reason recorded",
+        }
+        for r in custom
+    ]
+    return {"committed": len(routines or []), "draft_custom": len(custom), "reasons": reasons}
+
+
 def grade_committed_week(
     week_end: str,
     *,
@@ -318,7 +344,13 @@ def grade_committed_week(
     if rubric is None:
         return {"week_end": week_end, "status": "no_rubric", "degraded": True, "degraded_reasons": ["config/panel_rubric.json unreadable"]}
     if not routines:
-        return {"week_end": week_end, "status": "no_plan", "degraded": True, "degraded_reasons": ["no committed routine in the week"]}
+        return {
+            "week_end": week_end,
+            "status": "no_plan",
+            "degraded": True,
+            "degraded_reasons": ["no committed routine in the week"],
+            "departures": departures([]),
+        }
     case = {
         "case_id": f"week::{week_end}",
         "week_start": week_start,
@@ -345,6 +377,7 @@ def grade_committed_week(
         week_start=week_start,
         status="graded",
         routines_graded=len(routines),
+        departures=departures(routines),  # #5761: on the grade, never in the blinded judge body
         controls=controls,
         degraded=bool(real["degraded_reasons"]) or real["degraded"],
     )
@@ -354,7 +387,12 @@ def grade_committed_week(
 
 def panel_item(grade: dict[str, Any], user_pk: str) -> dict[str, Any]:
     """The owner-only DDB row for one weekly grade (`<user_pk>#SOURCE#training_constraints / PANEL#<week_end>`).
-    Scores, letters and reasons only — the plan itself is not copied (it stays on its ROUTINE# rows)."""
+    Scores, letters and reasons only — the plan itself is not copied (it stays on its ROUTINE# rows). Refuses a
+    `week_end` that is not the Sunday of its Monday-Sunday week (#5761): the key must pair with the tracker's week."""
+    from training.may_tracker import week_bounds
+
+    if week_bounds(grade["week_end"])[1] != grade["week_end"]:
+        raise ValueError(f"PANEL# week_end {grade['week_end']!r} is not the Sunday of its Monday-Sunday week")
     return {
         "pk": f"{user_pk}#SOURCE#training_constraints",
         "sk": f"{PANEL_SK_PREFIX}{grade['week_end']}",
@@ -377,4 +415,5 @@ def panel_item(grade: dict[str, Any], user_pk: str) -> dict[str, Any]:
         "rubric_version": grade.get("rubric_version"),
         "charter_version": charter_ai.training_charter.charter_version(),
         "food": food_panel.row_summary(grade.get("food")),
+        "departures": grade.get("departures"),
     }

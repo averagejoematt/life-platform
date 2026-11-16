@@ -27,6 +27,8 @@ import os
 import sys
 from unittest.mock import patch
 
+import pytest
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
@@ -56,6 +58,13 @@ def _state(**over):
     }
     state.update(over)
     return state
+
+
+@pytest.fixture(autouse=True)
+def _no_phase_state_row():
+    """#5576: the title phase reads the evaluator's PHASE#STATE row first; these tests drive the file fallback, offline."""
+    with patch.object(rt, "read_phase_state_row", return_value=None):
+        yield
 
 
 def _context(state, performed, index):

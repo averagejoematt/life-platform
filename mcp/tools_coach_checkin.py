@@ -38,6 +38,57 @@ from mcp.config import S3_BUCKET, USER_PREFIX, logger, s3_client, table as _tabl
 from mcp.core import decimal_to_float as _d2f
 from mcp.tools_coach_intelligence import COACH_IDS, COACH_NAMES
 
+# The log_coach_checkin input table, beside its tool (moved out of mcp/registry.py by #6087 to pay
+# for log_challenge_checkin's entry under the #1665 size ceiling).
+LOG_COACH_CHECKIN_INPUT = {
+    "type": "object",
+    "properties": {
+        "checkin_id": {
+            "type": "string",
+            "description": "The question's checkin_id from get_coach_checkin_queue (starts with 'CHECKIN#').",
+        },
+        "coach_id": {"type": "string", "description": "Optional: the asking coach's id — speeds up the lookup."},
+        "answer": {"type": "string", "description": "Matthew's answer, verbatim. Omit when skip=true."},
+        "skip": {"type": "boolean", "description": "true = Matthew declines this question (zero penalty)."},
+        "tags": {"type": "array", "items": {"type": "string"}, "description": "Optional topic tags (max 5)."},
+    },
+    "required": ["checkin_id"],
+}
+
+# log_coach_calibration's input table, beside its tool (the same #6087 move).
+LOG_COACH_CALIBRATION_INPUT = {
+    "type": "object",
+    "properties": {
+        "checkin_id": {
+            "type": "string",
+            "description": "The ANSWERED check-in this calibration derives from (starts with 'CHECKIN#').",
+        },
+        "coach_id": {"type": "string", "description": "Optional: the asking coach's id — speeds up the lookup."},
+        "subdomain": {
+            "type": "string",
+            "description": "The subdomain being re-graded (reuse existing CONFIDENCE# vocabulary where it fits).",
+        },
+        "direction": {
+            "type": "string",
+            "enum": ["up", "down", "hold"],
+            "description": "up = the answer clarified/confirmed the coach's read; down = it revealed a blind spot; hold = record the learning without a confidence move.",
+        },
+        "takeaway": {
+            "type": "string",
+            "description": "What the coach learned, tightly paraphrasing the answer — no invented context (max 600 chars).",
+        },
+        "answer_excerpt": {
+            "type": "string",
+            "description": "Optional: the exact phrase of Matthew's answer this rests on — must appear verbatim in the stored answer.",
+        },
+        "weight": {
+            "type": "number",
+            "description": "Optional confidence-move weight 0.1-1.0 (default 0.5; 1.0 = as strong as one graded prediction, the hard cap).",
+        },
+    },
+    "required": ["checkin_id", "subdomain", "direction", "takeaway"],
+}
+
 try:
     # Shared, bundled modules (#781) — staged at zip root in the Lambda.
     from coach import coach_calibration as ccal, coach_checkin as cc, persona_registry

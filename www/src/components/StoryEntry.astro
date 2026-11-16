@@ -1,0 +1,71 @@
+---
+// "The story so far" — the Human Story's entry on /story/ (HS1, built dark). SELF-GATING: with WEB_STORY off
+// (src/lib/story_dark.js) this component renders nothing and reads nothing — not even the story's data file — so
+// /story/ is byte-identical to a build without it. No <style>, no <script>: it adds no asset to the build either way.
+// Simple on arrival: where the experiment is, where to start, the latest installment; the week-by-week timeline (/story/so-far/)
+// is one link away. Only approved, published installments (scripts/publish_snapshot_story.py); no audio.
+import { soFar } from "../lib/story.js";
+import { STORY_MARKER, storyEnabled, storyPrivate } from "../lib/story_dark.js";
+import { latestEdition, loadAll, loadStory } from "../lib/snapshot.js";
+import { chapterPublished } from "../lib/format.js";
+import { href, pathOf } from "../lib/url.js";
+
+const on = storyEnabled();
+const so = on ? soFar(await loadStory(), await latestEdition()) : null;
+const story = { [STORY_MARKER]: "entry" };
+// 2026-11-14: the story index dates an installment by its DATA date ("The latest · 10 November 2026" for a chapter
+// approved on 13 November). The line now reads the chapter object's own publication words (format.js
+// chapterPublished: "Published 13 November 2026", or "Data through …" when no approval time is served).
+const all = on && so ? await loadAll() : null;
+const when = (r: any) => {
+  const c = all && r ? all.get("chapter", r.id) : null;
+  return (c && chapterPublished(c)) || (r ? r.dateWords : "");
+};
+---
+
+{
+  on && (
+    <section class="section hair" {...story}>
+      <div class="wrap" style="display:flex;flex-direction:column;gap:14px;max-width:900px">
+        <p class="label">The story so far{storyPrivate() ? " · private build, not published" : ""}</p>
+        {so ? (
+          <>
+            {so.sentence && <h2 style="font-size:30px;line-height:1.15">{so.sentence}</h2>}
+            <p class="dek" style="max-width:70ch">
+              {so.weeksWords} so far, each with its days and, where one was approved, its installment.
+            </p>
+            {(so.first || so.latest) && (
+              <nav class="rows" aria-label="Where to start">
+                {so.first && (
+                  <a href={href(pathOf("chapter", so.first.id))}>
+                    <span style="display:flex;flex-direction:column;gap:3px;min-width:0">
+                      <span class="label">Start at the beginning · {so.first.weekLabel}</span>
+                      <b style="font-size:18px;letter-spacing:-.02em;line-height:1.15">{so.first.title}</b>
+                    </span>
+                    <span class="mono muted" style="font-size:12px">{when(so.first)}</span>
+                  </a>
+                )}
+                {so.latest && (
+                  <a href={href(pathOf("chapter", so.latest.id))}>
+                    <span style="display:flex;flex-direction:column;gap:3px;min-width:0">
+                      <span class="label">The latest · {so.latest.weekLabel}</span>
+                      <b style="font-size:18px;letter-spacing:-.02em;line-height:1.15">{so.latest.title}</b>
+                    </span>
+                    <span class="mono muted" style="font-size:12px">{when(so.latest)}</span>
+                  </a>
+                )}
+              </nav>
+            )}
+            <div class="row" style="gap:10px;flex-wrap:wrap">
+              <a class="btn sm" href={href("/story/so-far/")}>The story so far, week by week</a>
+            </div>
+          </>
+        ) : (
+          <div class="empty">
+            <span>The week list was not served for this snapshot.</span>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}

@@ -242,6 +242,14 @@ def _hevy_family(name: str) -> Optional[str]:
     return None
 
 
+def hevy_block_family(name: str) -> Optional[str]:
+    """The family a Hevy exercise name places its block in (the `<workout id>#<family>` member id), or
+    None for an exercise that is no timed block (a lift). Public for readers that must tie a Hevy
+    block's own fields to the identity holding it — #5695's vacation fund counts a treadmill block's
+    distance once."""
+    return _hevy_family(name)
+
+
 def whoop_family(name: str) -> str:
     """The family of a Whoop sport name, or `other:<name>` when no token names one."""
     nl = (name or "").strip().lower()

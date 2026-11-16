@@ -376,6 +376,25 @@ def _cycle_record(cid: str):
     return coach_record.for_coach(table, cid, genesis=str(EXPERIMENT_START_DATE))
 
 
+def _calibration_block(pred_recs: list) -> dict:
+    """The track record's calibration block from the coach's PREDICTION# rows (pure). Owner ruling 2026-11-09: the
+    verdict is calibration-v2's three answers over this cycle's decided rows (the assessment /api/calibration serves
+    as ``assessment_v2.coaches[<coach>]``); the v1 ``calibration`` word stays only as a deprecated field."""
+    from common.constants import EXPERIMENT_START_DATE
+    from web import site_api_calibration_v2
+
+    _summary = calibration_core.score_pairs(calibration_core.pairs_from_prediction_records(pred_recs))
+    return {
+        "brier": _summary["brier"],
+        "brier_skill": _summary["brier_skill"],
+        "calibration": _summary["calibration"],  # calibration-v1 label: DEPRECATED (owner 2026-11-09)
+        "reliability_bins": _summary["reliability_bins"],
+        "scored_n": _summary["n"],
+        "deprecated_fields": ["calibration"],
+        "assessment_v2": site_api_calibration_v2.coach_answers(coach_record.decided_rows(pred_recs, genesis=str(EXPERIMENT_START_DATE))),
+    }
+
+
 def tool_get_coach_track_record(args):
     """Hit-rate track record for a coach over a time window.
 
@@ -500,15 +519,7 @@ def tool_get_coach_track_record(args):
                 }
             )
         )
-        pred_recs = [decimal_to_float(i) for i in pred_resp.get("Items", [])]
-        _summary = calibration_core.score_pairs(calibration_core.pairs_from_prediction_records(pred_recs))
-        calibration = {
-            "brier": _summary["brier"],
-            "brier_skill": _summary["brier_skill"],
-            "calibration": _summary["calibration"],
-            "reliability_bins": _summary["reliability_bins"],
-            "scored_n": _summary["n"],
-        }
+        calibration = _calibration_block([decimal_to_float(i) for i in pred_resp.get("Items", [])])
     except Exception as _cal_ex:
         logger.warning("track_record calibration for %s failed: %s", cid, _cal_ex)
 

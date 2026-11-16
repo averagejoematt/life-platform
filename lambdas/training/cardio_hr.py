@@ -69,7 +69,7 @@ from common.strava_read_seam import START_WINDOW_MIN
 
 from training import walking_volume
 
-CARDIO_HR_VERSION = "cardio-hr@1.1.0"
+CARDIO_HR_VERSION = "cardio-hr@1.2.0"
 
 HR_COVERAGE_MIN = 0.5
 COVERAGE_PROVENANCE = {
@@ -79,6 +79,16 @@ COVERAGE_PROVENANCE = {
         "re-derive from the measured drift between the inferred tail window and the wearable interval"
     ),
 }
+FINAL_WINDOW_FROM_S = 600
+"""The fixed-workload treadmill test's window (#5798): heart rate over minutes 10-20 of a 20-minute block. A test
+fixes these in the charter (`calibration.fitness_tests.tests.treadmill_20min_fixed`: window_from_s / duration_s);
+`tests/test_fixed_workload_test_5798.py` pins them equal."""
+FINAL_WINDOW_BLOCK_S = 1200
+FINAL_WINDOW_TOLERANCE = 0.1
+DEDICATED_SPAN_MAX = 1.25
+"""A heart-rate activity that runs longer than this multiple of the block is a whole-session average (a gym
+session with the treadmill at its tail), not the test's own minutes: the final-window mean is then refused."""
+
 ZONES = tuple(f"zone{i}_seconds" for i in range(1, 6))
 _NO_SERIES = "no per-second HR series on the wire — the activity summary's hr_recovery describes the activity's end, not the block's"
 
@@ -202,6 +212,45 @@ def join_block(b0: datetime, b1: datetime, activities: Iterable[Mapping[str, Any
     }
 
 
+def final_window(b0: datetime, b1: datetime, activities: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    """Mean heart rate over the block's last `b1 - b0 - FINAL_WINDOW_FROM_S` seconds (minutes 10-20 of a 20-minute test), #5798.
+
+    A MEASUREMENT, never an effort gate. The wire carries only per-activity summaries, so the mean is the overlapping
+    activity's average and is trustworthy as 'minutes 10-20' only when that activity IS the test: it must cover at
+    least `HR_COVERAGE_MIN` of the window and run no longer than `DEDICATED_SPAN_MAX` x the block. Anything else is
+    `unknown` with the reason, never a number."""
+    activities = list(activities or [])
+    w0 = b0 + timedelta(seconds=FINAL_WINDOW_FROM_S)
+    j = join_block(w0, b1, activities)
+    out: dict[str, Any] = {
+        "window": {"start_utc": w0.isoformat(), "end_utc": b1.isoformat()},
+        "hr_coverage": j["hr_coverage"],
+        "coverage_min": HR_COVERAGE_MIN,
+        "state": "unknown",
+        "mean_hr": None,
+        "hr_source": None,
+        "basis": "the overlapping activity's average heart rate (no per-second series on the wire); window placed by tail inference",
+        "reason": j.get("reason"),
+    }
+    if j["state"] != "joined":
+        return out
+    block_s = (b1 - b0).total_seconds()
+    spans = {
+        (a.get("start_date"), a.get("whoop_workout_id")): (e - s).total_seconds()
+        for a, s, e in _hr_activities(activities)
+        if activity_overlap.overlap_seconds(w0, b1, [(s, e)]) > 0
+    }
+    longest = max(spans.values()) if spans else 0.0
+    if longest > block_s * DEDICATED_SPAN_MAX:
+        out["reason"] = (
+            f"the heart-rate activity runs {int(longest)} s against a {int(block_s)} s test: a whole-session average, "
+            "not minutes 10-20 (start a watch workout for the test)"
+        )
+        return out
+    out.update(state="joined", mean_hr=j["avg_hr"], hr_source=j["hr_source"], reason=j["reason"])
+    return out
+
+
 def whoop_activity(row: Mapping[str, Any]) -> Optional[dict[str, Any]]:
     """A WHOOP workout row (`USER#…#SOURCE#whoop`, `DATE#…#WORKOUT#…`) in the activity shape, or None."""
     s, e = parse_iso_utc(row.get("start_time")), parse_iso_utc(row.get("end_time"))
@@ -279,6 +328,8 @@ def join_workout(
             row.update(hr_source=None, avg_hr=None, max_hr=None, zone_seconds=None)
         else:
             row.update(join_block(w["start"], w["end"], acts))
+            if modality == "walking" and abs(row["duration_s"] - FINAL_WINDOW_BLOCK_S) <= FINAL_WINDOW_BLOCK_S * FINAL_WINDOW_TOLERANCE:
+                row["final_window"] = final_window(w["start"], w["end"], acts)
         blocks.append(row)
     return {"version": CARDIO_HR_VERSION, "blocks": blocks, "threshold": {"hr_coverage_min": HR_COVERAGE_MIN, **COVERAGE_PROVENANCE}}
 

@@ -27,6 +27,7 @@ sys.path.insert(0, str(REPO / "lambdas"))
 sys.path.insert(0, str(REPO))
 
 from training import cardio_note as cn, routine_generator as rg, standing_constraints as sc  # noqa: E402
+from training.cardio_note import without_capture as _wc  # noqa: E402  #5796: line 1 follows the RPE prompt
 from training.routine_ir import ExerciseBlock, RoutineSpec, Set  # noqa: E402
 
 FIX = json.loads((REPO / "tests" / "fixtures" / "cardio_note_2026_10_18_5048.json").read_text(encoding="utf-8"))
@@ -49,6 +50,7 @@ GRAMMAR = re.compile(
 def reader_offences(note: str) -> list[str]:
     """What a reader test refuses on a cardio note: > 4 lines, a first line off the grammar, "Last:" on
     line 1, a sentence starting with "Not", "Optional" on the block (it is the gate's line)."""
+    note = _wc(note)  # #5796: the RPE capture prompt is an input field, not a line he reads
     lines = note.split("\n")
     out = []
     if len(lines) > 4:
@@ -99,8 +101,8 @@ def test_the_rewritten_2026_10_18_note_is_one_line_with_the_prescription_first()
     spec = _redraft()
     note = spec.exercises[0].notes
     assert reader_offences(note) == [], note
-    assert note == "Recumbent · L11 · RPE 4–5 (full sentences)"
-    assert cn.LINE1_RE.match(note)
+    assert _wc(note) == "Recumbent · L11 · RPE 4–5 (full sentences)"
+    assert cn.LINE1_RE.match(_wc(note))
     assert "No push" not in note and "mph" not in note and " min" not in note
     assert not re.search(r"\d+\s*bpm|\bHR\b", note)
     audit = spec.inputs_snapshot["cardio_notes"][0]
@@ -149,7 +151,7 @@ def test_MUTATION_CONTROL_the_day_before_the_ruling_the_no_push_gate_still_holds
 def _flat(**kw):
     base = dict(movement_key="cycling", minutes=20, target_date="2026-09-30", facts={"last_level": 11}, aerobic_block=READ_WEEK)
     base.update(kw)
-    return cn.compose(**base)[0]
+    return _wc(cn.compose(**base)[0])
 
 
 def test_the_note_is_the_same_whatever_the_recovery_band_and_the_audit_keeps_the_band():
@@ -169,11 +171,14 @@ def test_no_hr_reaches_the_wire_with_or_without_a_constraint():
 
 def test_every_number_the_note_acts_on_is_labelled_and_the_label_stays_off_the_wire():
     """ADR-105: the interval steps, the hill climb and the tempo check-ins are platform-chosen; the audit says so, the
-    note does not (#5428: engine words never reach Hevy)."""
-    assert set(cn.LABELS.values()) == {"platform-chosen"}
+    note does not (#5428: engine words never reach Hevy). The interval's hard step is owner-ruled since 2026-11-08
+    (#5428 re-grade #6: steady + 2), and its label says so."""
+    assert set(cn.LABELS.values()) == {"platform-chosen", "owner-ruled 2026-11-08 (#5428)"}
+    assert cn.LABELS["interval_level_step"] == "owner-ruled 2026-11-08 (#5428)" and cn.INTERVAL_LEVEL_STEP == 2
     for kind in ("easy", "tempo", "intervals", "hills"):
         note, audit = cn.compose(movement_key="cycling", minutes=30, target_date="2026-10-28", kind=kind, facts={"last_level": 11})
-        assert "platform-chosen" not in note and audit["labels"]["interval_level_step"] == "platform-chosen"
+        assert "platform-chosen" not in note and "owner-ruled" not in note
+        assert audit["labels"]["interval_level_step"] == "owner-ruled 2026-11-08 (#5428)"
 
 
 # ── box 3: the default is easy; the harder kinds are the menu's placement (#5076) ─────────

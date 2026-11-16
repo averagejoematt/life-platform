@@ -23,6 +23,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import sealed_prereg
 
 _REPO = Path(__file__).resolve().parent.parent
 for _p in (str(_REPO / "lambdas"), str(_REPO / "deploy")):
@@ -64,9 +65,10 @@ def test_plan_block_derives_the_step_floor_from_the_plan_root():
 def test_the_seeder_and_the_gate_share_one_derivation():
     """The sealed cycle-17 block is the FIRST FOUR keys of this derivation, byte for byte —
     the seeder now delegates here, so a freeze and the gate cannot disagree."""
+    sealed_path = sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     import seed_genesis_preregistration as seeder
 
-    sealed = json.loads((_REPO / "deploy" / "generated" / "genesis_preregistration.json").read_text(encoding="utf-8")).get("plan_facts")
+    sealed = json.loads(sealed_path.read_text(encoding="utf-8")).get("plan_facts")
     if sealed:
         for k, v in sealed.items():
             assert PLAN[k] == v, f"plan_facts.{k}: sealed {v!r} != derived {PLAN[k]!r}"

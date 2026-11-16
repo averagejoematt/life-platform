@@ -34,6 +34,9 @@ _RECORD = {
     "sk": "WEEK#2026-W26",
     "start_date": "2026-06-22",
     "end_date": "2026-06-28",
+    # 2026-11-11: day_grade / habit_pct pairs are served only from a record stamped with their public methods
+    # (common.activity_publication.PUBLIC_METRIC_METHODS); this replay is about p-values, so it is stamped.
+    "metric_methods": {"day_grade": "day-grade-public-v1", "habit_pct": "habit-pct-public-v1"},
     "correlations": {
         "Habit Completion % ↔ Day Grade": {
             "metric_a": "habit_pct",

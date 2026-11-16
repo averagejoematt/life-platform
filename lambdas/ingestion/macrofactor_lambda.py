@@ -30,6 +30,7 @@ import json
 import logging
 import math
 import os
+import re
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
@@ -649,8 +650,19 @@ SUMMARY_TOTAL_PREFIX = "summary_total_"
 #: Columns this parser does not know yet — stored verbatim, never dropped (capture-all).
 SUMMARY_UNMAPPED_FIELD = "summary_unmapped_columns"
 SUMMARY_INGESTED_FIELD = "summary_ingested_at"
+#: #5519: when the export that wrote this day's summary fields was CREATED (Pacific wall time, from
+#: the export's filename), and whether the day was over by then (`COVERAGE_*`).
+SUMMARY_EXPORT_CREATED_FIELD = "summary_export_created_at"
+SUMMARY_COVERAGE_FIELD = "summary_coverage"
+#: #5519: a day AFTER the export's creation day holds the vendor's projection (a scheduled food, a
+#: projected expenditure), never intake. Each such column lands as `summary_projected_<field>`,
+#: merged only onto a day that already has a row — never `total_*`, never a new row.
+SUMMARY_PROJECTED_PREFIX = "summary_projected_"
 #: Every field the summary owns on a DATE# row. A diary re-write carries these forward.
-SUMMARY_OWNED_FIELDS = frozenset(set(SUMMARY_SCALAR_COLUMNS.values()) | {"tdee_kcal", SUMMARY_UNMAPPED_FIELD, SUMMARY_INGESTED_FIELD})
+SUMMARY_OWNED_FIELDS = frozenset(
+    set(SUMMARY_SCALAR_COLUMNS.values())
+    | {"tdee_kcal", SUMMARY_UNMAPPED_FIELD, SUMMARY_INGESTED_FIELD, SUMMARY_EXPORT_CREATED_FIELD, SUMMARY_COVERAGE_FIELD}
+)
 _SUMMARY_KNOWN_COLUMNS = frozenset({"Date"} | set(SUMMARY_SCALAR_COLUMNS) | set(NUTRIENT_COLUMNS))
 #: Columns that make a Date-keyed file without a Food Name a (partial) daily summary (#5097).
 _PARTIAL_SUMMARY_COLUMNS = frozenset(_SUMMARY_KNOWN_COLUMNS - {"Date"})
@@ -659,7 +671,7 @@ _TOMBSTONE_FIELDS = ("tombstone", "tombstoned_at", "tombstoned_reason")
 
 def is_summary_owned(field):
     """True for a field the daily-summary export owns on a shared DATE# row."""
-    return field in SUMMARY_OWNED_FIELDS or field.startswith(SUMMARY_TOTAL_PREFIX)
+    return field in SUMMARY_OWNED_FIELDS or field.startswith(SUMMARY_TOTAL_PREFIX) or field.startswith(SUMMARY_PROJECTED_PREFIX)
 
 
 def _summary_date(raw):
@@ -677,7 +689,110 @@ def _is_future(date_str, today):
     return date_str > today
 
 
-def build_summary_day_items(rows, today=None):
+# ── #5519: an export speaks for the days up to its own creation, not up to the ingest ──────────
+# The #5431 guard compared each row with the Pacific date of the INGEST. A summary export created
+# 2026-10-26 21:12 (MacroFactor-20261026211247.csv) was uploaded on 10-30 PT and its 10-27..10-30
+# rows — the app's pre-filled scheduled 'Morning Smoothies', 80 kcal / 15 g each — were written as
+# measured intake (DATE#2026-10-28/29/30 owned as `daily_summary` stubs; 10-27's diary row took the
+# 80 kcal as its `summary_total_*`). MacroFactor names every export `MacroFactor-YYYYMMDDHHMMSS`,
+# the creation time on the phone's (Pacific) clock — every archived diary's stamp sits minutes
+# before its own upload on that clock. So the export's creation day is read from the filename:
+#   * a day BEFORE it was over when exported — `summary_coverage: complete`;
+#   * the creation day itself was still being logged — `partial_at_export` (diary: the
+#     `partial_at_export` flag), still stored, marked so a reader can tell;
+#   * a day AFTER it (and up to today) is the vendor's projection — kept, under
+#     `summary_projected_*` on an existing row only, never as intake and never as a new row;
+#   * a day after today stays the #5431 skip.
+# No stamp in the name: the creation day is the ingest day (the #5431 behaviour, unchanged).
+EXPORT_CREATED_FIELD = "export_created_at"  # the diary's own provenance stamp
+PARTIAL_AT_EXPORT_FIELD = "partial_at_export"  # the diary row of the export's creation day
+COVERAGE_COMPLETE = "complete"
+COVERAGE_PARTIAL = "partial_at_export"
+_EXPORT_STAMP = re.compile(r"(?<!\d)(\d{14})(?!\d)")
+
+
+def export_created_from_key(source_key):
+    """The export's creation time from its filename (`MacroFactor-20261026211247.csv` ->
+    '2026-10-26T21:12:47', Pacific wall time), or None when the name carries no valid stamp."""
+    m = _EXPORT_STAMP.search(os.path.basename(str(source_key or "")))
+    if not m:
+        return None
+    try:
+        return datetime.strptime(m.group(1), "%Y%m%d%H%M%S").strftime("%Y-%m-%dT%H:%M:%S")
+    except ValueError:
+        return None
+
+
+def export_day(export_created_at, today):
+    """The last day the export can speak for: its creation day, never after `today`."""
+    stamp = str(export_created_at or "")[:10]
+    return min(stamp, today) if normalize_date(stamp) == stamp and stamp else today
+
+
+def _summary_vendor_fields(row, nutrients):
+    """Every vendor value a summary row carries, under its stored field name (#5097 capture-all):
+    `total_X` + `summary_total_X` per nutrient, the scalar columns (a 0 is "not set"), the
+    `tdee_kcal` alias, and unknown columns verbatim."""
+    out = {}
+    for f, v in nutrients.items():
+        out[f"total_{f}"] = round(v, 2)
+        out[f"{SUMMARY_TOTAL_PREFIX}{f}"] = round(v, 2)
+    for col, f in SUMMARY_SCALAR_COLUMNS.items():
+        v = safe_float(row.get(col))
+        if v is not None and v > 0:  # a 0 weight/target/expenditure is "not set", never a reading
+            out[f] = round(v, 2)
+    if "expenditure_kcal" in out:
+        # (#484) Canonical name: readers (daily_insight, ai_context) and the
+        # correlation engine key off `tdee_kcal`. Write it here so the deficit
+        # chain converges forward without a per-reader backfill.
+        out["tdee_kcal"] = out["expenditure_kcal"]
+    unmapped = {k: str(v).strip() for k, v in row.items() if k and k not in _SUMMARY_KNOWN_COLUMNS and str(v or "").strip()}
+    if unmapped:
+        out[SUMMARY_UNMAPPED_FIELD] = unmapped
+    return out
+
+
+def projection_item(date_str, vendor_fields, export_created_at, ingested_at):
+    """#5519: the item for a day after the export's creation day — every vendor value renamed
+    under `summary_projected_*` (the `total_X` duplicate dropped: `summary_projected_total_X`
+    carries it). No `entries_count`, so the writer merges it onto an EXISTING row only
+    (`partial_summary_requests`). None when the row carries no vendor value at all."""
+    proj = {}
+    for k, v in vendor_fields.items():
+        if k.startswith("total_"):
+            continue
+        name = k[len("summary_") :] if k.startswith("summary_") else k
+        proj[f"{SUMMARY_PROJECTED_PREFIX}{name}"] = v
+    if not proj:
+        return None
+    proj[f"{SUMMARY_PROJECTED_PREFIX}export_created_at"] = export_created_at
+    proj[f"{SUMMARY_PROJECTED_PREFIX}ingested_at"] = ingested_at
+    return {"pk": PK, "sk": f"DATE#{date_str}", "date": date_str, "source": "macrofactor", **proj}
+
+
+def is_projection_item(item):
+    """True for a `projection_item` — merged onto an existing day, never a day record."""
+    return "entries_count" not in item and any(str(k).startswith(SUMMARY_PROJECTED_PREFIX) for k in item)
+
+
+def _coverage_fields(date_str, last_day, export_created_at):
+    out = {SUMMARY_COVERAGE_FIELD: COVERAGE_PARTIAL if date_str == last_day else COVERAGE_COMPLETE}
+    if export_created_at:
+        out[SUMMARY_EXPORT_CREATED_FIELD] = export_created_at
+    return out
+
+
+def mark_diary_export_day(rows, today, export_created_at):
+    """#5519 for the diary: `(rows, last_day, dropped)` — rows dated after the export's creation day
+    are removed before any parsing (the export cannot have observed them; the raw archive keeps
+    them), so the #4638 range ends where the export's knowledge does. `last_day` is the creation
+    day, whose item the handler marks `partial_at_export`."""
+    last_day = export_day(export_created_at, today)
+    kept = [r for r in rows if not ((normalize_date(r.get("Date")) or "") > last_day)]
+    return kept, last_day, len(rows) - len(kept)
+
+
+def build_summary_day_items(rows, today=None, export_created_at=None):
     """Parse MacroFactor daily-summary CSV → one logical DDB item per day.
 
     Every column lands under its own field (#5097 capture-all): the nutrient columns as
@@ -693,11 +808,16 @@ def build_summary_day_items(rows, today=None):
 
     #5431: a row dated after `today` (default: the Pacific date of this run) is never written,
     whatever it carries — a future day must not hold intake. Counted in the log line, no values.
+
+    #5519: a row dated after the EXPORT's creation day (`export_created_at`, from the filename)
+    and up to today becomes a `projection_item`, never intake; the creation day itself is marked
+    `summary_coverage: partial_at_export`, every earlier day `complete`.
     """
     today = today or pacific_today()
+    last_day = export_day(export_created_at, today)
     ingested_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     day_items = {}
-    skipped = expenditure_only = future = 0
+    skipped = expenditure_only = future = projected = 0
     for row in rows:
         date_str = _summary_date(row.get("Date"))
         if date_str is None:
@@ -708,6 +828,12 @@ def build_summary_day_items(rows, today=None):
             continue
         nutrients = {f: safe_float(row.get(col)) for col, f in NUTRIENT_COLUMNS.items() if col in row}
         nutrients = {f: v for f, v in nutrients.items() if v is not None}
+        if date_str > last_day:
+            proj = projection_item(date_str, _summary_vendor_fields(row, nutrients), export_created_at, ingested_at)
+            if proj:
+                day_items[date_str] = proj
+                projected += 1
+            continue
         # Skip rows with no nutrition data (MacroFactor sometimes exports empty future days)
         if all(not nutrients.get(f) for f in ("calories_kcal", "protein_g", "fat_g", "carbs_g")):
             skipped += 1
@@ -728,26 +854,15 @@ def build_summary_day_items(rows, today=None):
             "entries_count": 0,
             "food_log": [],
         }
-        for f, v in nutrients.items():
-            item[f"total_{f}"] = round(v, 2)
-            item[f"{SUMMARY_TOTAL_PREFIX}{f}"] = round(v, 2)
-        for col, f in SUMMARY_SCALAR_COLUMNS.items():
-            v = safe_float(row.get(col))
-            if v is not None and v > 0:  # a 0 weight/target/expenditure is "not set", never a reading
-                item[f] = round(v, 2)
-        if "expenditure_kcal" in item:
-            # (#484) Canonical name: readers (daily_insight, ai_context) and the
-            # correlation engine key off `tdee_kcal`. Write it here so the deficit
-            # chain converges forward without a per-reader backfill.
-            item["tdee_kcal"] = item["expenditure_kcal"]
-        unmapped = {k: str(v).strip() for k, v in row.items() if k and k not in _SUMMARY_KNOWN_COLUMNS and str(v or "").strip()}
-        if unmapped:
-            item[SUMMARY_UNMAPPED_FIELD] = unmapped
+        item.update(_summary_vendor_fields(row, nutrients))
+        item.update(_coverage_fields(date_str, last_day, export_created_at))
         day_items[date_str] = item
     print(
         f"Summary parser: {len(day_items)} days, skipped {skipped} blank/invalid rows "
         f"({expenditure_only} carried an expenditure but no logged food — not written); "
-        f"[#5431] skipped {future} row(s) dated after {today} (future days are never written)"
+        f"[#5431] skipped {future} row(s) dated after {today} (future days are never written); "
+        f"[#5519] export created {export_created_at or 'unknown (no stamp in the filename)'}: "
+        f"{projected} row(s) after {last_day} kept as projections, never intake"
     )
     return day_items
 
@@ -806,7 +921,7 @@ def write_summary_day(tbl, item):
     return "merged"
 
 
-def build_partial_summary_items(rows, today=None):
+def build_partial_summary_items(rows, today=None, export_created_at=None):
     """Parse a PER-METRIC MacroFactor summary CSV -> one partial item per day (#5097).
 
     The granular export can write one file per ticked metric (Calories & Macros, Weight
@@ -827,11 +942,15 @@ def build_partial_summary_items(rows, today=None):
 
     #5431: a row dated after `today` (default: the Pacific date of this run) is never written —
     not even its scalar columns. Counted in the log line, no values.
+
+    #5519: a row after the export's creation day becomes a `projection_item`; the rows it
+    does write carry `summary_coverage` like the full summary's.
     """
     today = today or pacific_today()
+    last_day = export_day(export_created_at, today)
     ingested_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     day_items = {}
-    skipped = future = 0
+    skipped = future = projected = 0
     for row in rows:
         date_str = _summary_date(row.get("Date"))
         if date_str is None:
@@ -844,28 +963,29 @@ def build_partial_summary_items(rows, today=None):
         nutrients = {f: v for f, v in nutrients.items() if v is not None}
         if nutrients and all(not v for v in nutrients.values()):
             nutrients = {}  # no logged food that day — never write zeros for it
-        item = {"pk": PK, "sk": f"DATE#{date_str}", "date": date_str, "source": "macrofactor", SUMMARY_INGESTED_FIELD: ingested_at}
-        for f, v in nutrients.items():
-            item[f"total_{f}"] = round(v, 2)
-            item[f"{SUMMARY_TOTAL_PREFIX}{f}"] = round(v, 2)
-        if nutrients:
-            item.update({"entries_count": 0, "food_log": [], "_format": "daily_summary", "schema_version": 2, "ingested_at": ingested_at})
-        for col, f in SUMMARY_SCALAR_COLUMNS.items():
-            v = safe_float(row.get(col))
-            if v is not None and v > 0:
-                item[f] = round(v, 2)
-        if "expenditure_kcal" in item:
-            item["tdee_kcal"] = item["expenditure_kcal"]
-        unmapped = {k: str(v).strip() for k, v in row.items() if k and k not in _SUMMARY_KNOWN_COLUMNS and str(v or "").strip()}
-        if unmapped:
-            item[SUMMARY_UNMAPPED_FIELD] = unmapped
-        if not any(k not in ("pk", "sk", "date", "source", SUMMARY_INGESTED_FIELD) for k in item):
+        vendor = _summary_vendor_fields(row, nutrients)
+        if date_str > last_day:
+            proj = projection_item(date_str, vendor, export_created_at, ingested_at)
+            if proj:
+                day_items[date_str] = proj
+                projected += 1
+            else:
+                skipped += 1
+            continue
+        if not vendor:
             skipped += 1  # the file carries nothing usable for this day
             continue
+        item = {"pk": PK, "sk": f"DATE#{date_str}", "date": date_str, "source": "macrofactor", SUMMARY_INGESTED_FIELD: ingested_at}
+        item.update(vendor)
+        if nutrients:
+            item.update({"entries_count": 0, "food_log": [], "_format": "daily_summary", "schema_version": 2, "ingested_at": ingested_at})
+            item.update(_coverage_fields(date_str, last_day, export_created_at))  # coverage describes the intake totals
         day_items[date_str] = item
     print(
         f"Partial-summary parser: {len(day_items)} days, skipped {skipped} blank/invalid rows; "
-        f"[#5431] skipped {future} row(s) dated after {today} (future days are never written)"
+        f"[#5431] skipped {future} row(s) dated after {today} (future days are never written); "
+        f"[#5519] export created {export_created_at or 'unknown (no stamp in the filename)'}: "
+        f"{projected} row(s) after {last_day} kept as projections, never intake"
     )
     return day_items
 
@@ -967,11 +1087,21 @@ def lambda_handler(event, context):
 
     csv_type = detect_csv_type(rows[0].keys())
     print(f"Detected CSV type: {csv_type}")
+    # #5519: the export speaks for the days up to its own creation — read from its filename.
+    export_created_at = export_created_from_key(source_key)
 
     days_emptied = 0
     if csv_type == "nutrition":
         archive_raw(bucket, source_key, content_bytes)
+        rows, diary_last_day, after_export = mark_diary_export_day(rows, pacific_today(), export_created_at)
+        if after_export:
+            print(f"[#5519] {after_export} diary row(s) dated after {diary_last_day} (the export's creation day) — not written as intake")
         day_items = build_day_items(rows)
+        for _d, _item in day_items.items():
+            if export_created_at:
+                _item[EXPORT_CREATED_FIELD] = export_created_at
+            if _d == diary_last_day:
+                _item[PARTIAL_AT_EXPORT_FIELD] = True  # still being logged when exported
         # #4638: the file's date range is authoritative — a stored day inside it with no
         # rows was emptied in the app. A failed read must not cost the import itself, so
         # it is logged loudly and the import proceeds without the empty records.
@@ -996,10 +1126,10 @@ def lambda_handler(event, context):
         day_items = build_workout_day_items(rows)
     elif csv_type == "daily_summary":
         archive_raw(bucket, source_key, content_bytes, subfolder="daily_summary")
-        day_items = build_summary_day_items(rows)
+        day_items = build_summary_day_items(rows, export_created_at=export_created_at)
     elif csv_type == "summary_partial":
         archive_raw(bucket, source_key, content_bytes, subfolder="daily_summary")
-        day_items = build_partial_summary_items(rows)
+        day_items = build_partial_summary_items(rows, export_created_at=export_created_at)
     else:
         # #469 (B-5): NEVER a silent 200. By the time this Lambda runs, dropbox_poll
         # has already hash-marked the file processed and moved it — a silent skip
@@ -1039,6 +1169,7 @@ def lambda_handler(event, context):
 
     written = 0
     absent_days = 0
+    projections_merged = 0
     for date_str_key, item in day_items.items():
         source_label = item.get("source", csv_type)
         if _pfd and "phase" not in item:
@@ -1046,7 +1177,8 @@ def lambda_handler(event, context):
         _mf_item = floats_to_decimal(item)
         # ── DATA-2: Validate before write ── (a scalar-only partial has no entries_count: it is
         # a merge onto an existing day, not a record, and the schema's day-record rules don't apply)
-        if _use_validator and not (csv_type == "summary_partial" and "entries_count" not in _mf_item):
+        # #5519: a projection is a merge of `summary_projected_*` onto an existing day, likewise.
+        if _use_validator and not (csv_type in ("summary_partial", "daily_summary") and "entries_count" not in _mf_item):
             _vr = _validate_item(source_label, _mf_item, date_str_key)
             if _vr.should_skip_ddb:
                 print(f"[DATA-2] CRITICAL: Skipping {source_label} DDB write for {date_str_key}: {_vr.errors}")
@@ -1055,15 +1187,21 @@ def lambda_handler(event, context):
             if _vr.warnings:
                 print(f"[DATA-2] Validation warnings for {source_label}/{date_str_key}: {_vr.warnings}")
         # #5097: a summary MERGES onto the day (OWN a food-less day, else MERGE onto the diary's).
-        if csv_type == "daily_summary":
+        if csv_type == "daily_summary" and not is_projection_item(_mf_item):
             print(f"[#5097] {date_str_key}: summary {write_summary_day(table, _mf_item)}")
         # ── REL-3: safe_put_item handles 400KB limit, CW metrics, and truncation ──
-        elif csv_type == "summary_partial":
+        elif csv_type in ("summary_partial", "daily_summary"):  # #5519: a projection rides the scalar-only merge
             outcome = write_partial_summary_day(table, _mf_item)
-            print(f"[#5097] {date_str_key}: partial summary {outcome}")
-            if outcome == "absent":
-                absent_days += 1
-                continue
+            if is_projection_item(_mf_item):
+                # #5519: a projection lands only on a day that already has a row; 'absent' is the design.
+                print(f"[#5519] {date_str_key}: projection {'merged' if outcome != 'absent' else 'not written (no stored day)'}")
+                projections_merged += outcome != "absent"
+                continue  # a projection is never a day written
+            else:
+                print(f"[#5097] {date_str_key}: partial summary {outcome}")
+                if outcome == "absent":
+                    absent_days += 1
+                    continue
         elif _use_safe_put:
             _safe_put(table, _mf_item, source=source_label, date_str=date_str_key)
         else:
@@ -1086,6 +1224,7 @@ def lambda_handler(event, context):
                 "days_written": written,
                 "days_emptied": days_emptied,
                 "days_absent": absent_days,
+                "projections_merged": projections_merged,
             }
         ),
     }

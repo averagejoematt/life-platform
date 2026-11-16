@@ -63,14 +63,20 @@ DEC_B = "DECISION#2026-10-31T08:00:00.000Z"
 PRED = "pred_20261029_protein_first_meal_lifts_hrv"
 OUTPUT = "2026-10-30#daily_brief_sleep"
 ACTION = "2026-10-30-sleep"
+ASK = "commit_20261030_lights_out_by_22_30_on_weeknights"
 
 # The three modules allowed to name the family at all, and the one allowed to construct a row.
 REGISTRY_MODULE = "lambdas/coach/advice_links.py"
 WRITER_MODULE = "mcp/tools_advice_links.py"
 READER_MODULE = "mcp/tools_decisions.py"
+#: The ONE reader of the ask-response family (owner 2026-11-12): the public projection and the owner's current answers.
+ASK_READER_MODULE = "lambdas/coach/ask_outcomes.py"
 #: mcp/idempotency.py names the sk shape in the tool's replay-semantics declaration (a string, no access).
-ALLOWED_TO_NAME = frozenset({REGISTRY_MODULE, WRITER_MODULE, READER_MODULE, "mcp/idempotency.py"})
-WRITER_FUNCTIONS = frozenset({(WRITER_MODULE, "tool_log_advice_link")})
+ALLOWED_TO_NAME = frozenset({REGISTRY_MODULE, WRITER_MODULE, READER_MODULE, ASK_READER_MODULE, "mcp/idempotency.py"})
+#: Each record constructor and the one function allowed to call it.
+WRITER_FUNCTIONS = frozenset(
+    {(WRITER_MODULE, "tool_log_advice_link", "build_link_record"), (WRITER_MODULE, "_log_ask_response", "build_ask_response")}
+)
 
 
 # ── the fake table: a query hook that evaluates the real boto3 Key condition ──────────────
@@ -108,6 +114,14 @@ def _table(*extra):
         {"pk": "COACH#nutrition_coach", "sk": f"PREDICTION#{PRED}", "prediction_id": PRED, "coach_id": "nutrition_coach"},
         {"pk": "COACH#sleep_coach", "sk": f"OUTPUT#{OUTPUT}", "text": "Lights out by 22:30."},
         {"pk": "USER#matthew", "sk": f"SOURCE#coach_actions#{ACTION}", "action_id": ACTION, "coach_id": "sleep"},
+        {
+            "pk": "COACH#sleep_coach",
+            "sk": f"COMMITMENT#{ASK}",
+            "commitment_id": ASK,
+            "coach_id": "sleep_coach",
+            "commitment_natural": "Lights out by 22:30 on weeknights.",
+            "status": "kept",
+        },
         *extra,
     ]
     return FakeDdbTable(rows=rows, query_hook=_query_hook)
@@ -236,10 +250,13 @@ def test_the_sk_is_deterministic_and_scoped_to_its_decision():
 
 def test_the_tool_schema_enums_equal_the_registry_both_ways():
     props = tal.LOG_ADVICE_LINK_INPUT["properties"]
-    assert props["state"]["enum"] == list(al.STATES)
+    assert props["state"]["enum"] == list(al.TOOL_STATES)
+    assert set(al.TOOL_STATES) == set(al.STATES) | set(al.ASK_RESPONSE_STATES)
     assert set(props["ref_kind"]["enum"]) == set(al.REF_KINDS)
     assert "enum" not in props["coach_id"], "coach ids derive from the persona registry at write — never a copy here"
-    assert set(tal.LOG_ADVICE_LINK_INPUT["required"]) == {"decision_sk", "coach_id", "ref_kind", "ref_id", "state"}
+    # decision_sk and state are required in code for a decision link; an ask needs neither (withdraw takes no state)
+    assert set(tal.LOG_ADVICE_LINK_INPUT["required"]) == {"coach_id", "ref_kind", "ref_id"}
+    assert props["withdraw"]["type"] == "boolean"
 
 
 def test_coach_ids_derive_from_the_persona_registry():
@@ -313,7 +330,7 @@ def _tracked_py() -> list[str]:
 
 
 def _names_the_family(src: str, tree: ast.AST) -> bool:
-    if "ADVICELINK" in src:
+    if "ADVICELINK" in src or "ASKRESPONSE" in src:
         return True
     for node in ast.walk(tree):
         if (
@@ -332,6 +349,9 @@ def _names_the_family(src: str, tree: ast.AST) -> bool:
 #: different vocabulary (remediation/signal_identity.py's alarm observations use `acted_on` as a dict
 #: key) and is deliberately not flagged.
 _ASSERTING = set(al.EVIDENCE_REQUIRED_STATES)
+#: A single assignment of any answer Matthew gives (not_yet_decided is his answer too, owner 2026-11-12) is flagged;
+#: the collection rule stays on the three asserting states so a three-state copy is still caught.
+_ASSIGNED = _ASSERTING | {al.NOT_YET_DECIDED}
 _STATE_NAMES = {"state", "advice_state"}
 #: The registry, and the writer's literal inputSchema enum (held equal to the registry above).
 _MAY_SPELL = {REGISTRY_MODULE, WRITER_MODULE}
@@ -346,11 +366,11 @@ def _assigns_an_asserting_state(tree: ast.AST) -> list[int]:
     for node in ast.walk(tree):
         if isinstance(node, ast.Dict):
             for k, v in zip(node.keys, node.values):
-                if k is not None and _lit(k) in _STATE_NAMES and _lit(v) in _ASSERTING:
+                if k is not None and _lit(k) in _STATE_NAMES and _lit(v) in _ASSIGNED:
                     hits.append(node.lineno)
-        elif isinstance(node, ast.keyword) and node.arg in _STATE_NAMES and _lit(node.value) in _ASSERTING:
+        elif isinstance(node, ast.keyword) and node.arg in _STATE_NAMES and _lit(node.value) in _ASSIGNED:
             hits.append(node.value.lineno)
-        elif isinstance(node, (ast.Assign, ast.AnnAssign)) and _lit(node.value) in _ASSERTING:
+        elif isinstance(node, (ast.Assign, ast.AnnAssign)) and _lit(node.value) in _ASSIGNED:
             targets = node.targets if isinstance(node, ast.Assign) else [node.target]
             for t in targets:
                 name = (
@@ -379,10 +399,9 @@ def test_only_the_owner_tool_writes_and_only_the_allowed_modules_name_the_family
         for fn in (n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))):
             for call in (c for c in ast.walk(fn) if isinstance(c, ast.Call)):
                 f = call.func
-                if (isinstance(f, ast.Attribute) and f.attr == "build_link_record") or (
-                    isinstance(f, ast.Name) and f.id == "build_link_record"
-                ):
-                    constructing.add((rel, fn.name))
+                name = f.attr if isinstance(f, ast.Attribute) else getattr(f, "id", None)
+                if name in ("build_link_record", "build_ask_response"):
+                    constructing.add((rel, fn.name, name))
     assert naming <= ALLOWED_TO_NAME, f"modules naming the ADVICELINK# family outside the allowlist: {sorted(naming - ALLOWED_TO_NAME)}"
     assert naming == ALLOWED_TO_NAME, f"an allowed module stopped naming the family (vacuous guard?): {sorted(ALLOWED_TO_NAME - naming)}"
     assert (
@@ -414,7 +433,7 @@ def test_no_backfill_or_migration_of_advice_states_exists():
             continue
         if _names_the_family(src, tree):  # the ADVICELINK key family, or an import of the registry
             touching.add(p)
-    assert touching == {REGISTRY_MODULE}, f"an ops/compute module touches the advice-link family: {sorted(touching)}"
+    assert touching == {REGISTRY_MODULE, ASK_READER_MODULE}, f"an ops/compute module touches the advice-link family: {sorted(touching)}"
 
 
 _DECISIONS_PK_RE = re.compile(r"SOURCE#decisions|\}decisions\"|_decisions_pk\(")
@@ -448,8 +467,58 @@ def test_the_state_sweep_can_fail():
         'rec["state"] = "partially_followed"',
         "self.advice_state = 'acted_on'",
         'STATES = ("acted_on", "declined", "partially_followed")',
+        'row = {"state": "not_yet_decided"}',
     ]
     missed = [src for src in caught if not _assigns_an_asserting_state(ast.parse(src))]
     assert missed == []
     for clean in ('ob = {"acted_on": True}', 'x.get("acted_on")', 'state = "unknown"'):
         assert _assigns_an_asserting_state(ast.parse(clean)) == [], clean
+
+
+#: The read-only ask queue (`get_advice_link_queue`) sits beside the owner tool: it must never write, never name the
+#: family and never call the writer, so the one-writer guard above still has exactly one writer to name.
+QUEUE_MODULE = "mcp/tools_advice_queue.py"
+_DDB_WRITES = {"put_item", "update_item", "delete_item", "batch_writer", "batch_write_item", "transact_write_items"}
+
+
+def test_the_advice_queue_is_read_only_and_outside_the_family():
+    src = (ROOT / QUEUE_MODULE).read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    assert QUEUE_MODULE not in ALLOWED_TO_NAME and not _names_the_family(src, tree)
+    calls = {
+        c.func.attr if isinstance(c.func, ast.Attribute) else getattr(c.func, "id", None) for c in ast.walk(tree) if isinstance(c, ast.Call)
+    }
+    assert not calls & (_DDB_WRITES | {"build_link_record", "tool_log_advice_link"}), calls
+    assert not _assigns_an_asserting_state(tree)
+
+
+# ── a coach ASK (COMMITMENT#) is answered by an ask response, never a decision link (owner 2026-11-12) ─
+# The ask-response behaviour itself (states, revisions, withdrawal, the public projection) is tests/test_ask_responses.py.
+
+
+def test_an_ask_cannot_be_a_decision_link():
+    with pytest.raises(al.AdviceLinkError, match="ask response"):
+        al.build_link_record(
+            user_id="matthew",
+            decision_sk=DEC_A,
+            coach_id="sleep_coach",
+            ref_kind="commitment",
+            ref_id=ASK,
+            state="acted_on",
+            evidence={"text": "I did it"},
+            recorded_at="2026-10-31T00:00:00.000Z",
+        )
+    stray = {"pk": PK, "sk": al.link_sk(DEC_A, "commitment", "sleep_coach", ASK), "ref_kind": "commitment", "state": "acted_on"}
+    assert al.effective_state({**stray, "recorded_by": "owner", "evidence": {"text": "I did it"}}) == "unknown"
+
+
+def test_the_queue_points_at_the_ask_kind_the_registry_accepts():
+    """get_advice_link_queue's instructions name the ask kind; it must be a real REF_KINDS key answered by an ask response."""
+    from mcp import tools_advice_queue as taq
+
+    assert "log_advice_link" in taq.HOW_TO_RECORD and "ref_kind='commitment'" in taq.HOW_TO_RECORD
+    assert "commitment" in al.REF_KINDS and al.answered_by_ask_response("commitment")
+    assert not any(al.answered_by_ask_response(k) for k in ("prediction", "coach_output", "coach_action"))
+    for state in al.ASK_RESPONSE_STATES:
+        assert state in taq.HOW_TO_RECORD, state
+    assert "withdraw=true" in taq.HOW_TO_RECORD and "never 'declined'" in taq.HOW_TO_RECORD

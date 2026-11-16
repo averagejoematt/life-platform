@@ -48,6 +48,11 @@ from unittest.mock import patch
 
 import pytest
 
+ROLLBACK = pytest.mark.usefixtures("exercise_library_rollback")
+"""#5861 (owner approval 2026-11-14): the marked tests pin the PRE-approval generator — its v0.3 nearest-band load for the heavy
+row (since #6014 the pinned one-arm dumbbell row; live, `live_load` loads it). They run on the library's rollback copy (status proposed: tests/conftest.py
+`exercise_library_rollback`), so they keep guarding the rollback path; the approved (live) behaviour is pinned by the #5861 tests."""
+
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "lambdas"))
@@ -62,15 +67,16 @@ CATALOG = json.loads((REPO / "config" / "movement_catalog.json").read_text())
 MOVEMENTS = CATALOG["movements"]
 LB = 0.45359237
 TID = {
-    k: MOVEMENTS[k]["hevy_template_id_hint"] for k in ("squat_barbell", "leg_press", "db_bench_press_flat", "machine_row", "lat_pulldown")
+    k: MOVEMENTS[k]["hevy_template_id_hint"]
+    for k in ("squat_barbell", "leg_press", "db_bench_press_flat", "one_arm_db_row", "lat_pulldown")
 }
 # #4080: heavy anchors the load path can load (both carry a template id). #4147: under v0.4 the
 # squat is heavy on lower-heavy and the row on upper-heavy.
-HEAVY = ("squat_barbell", "machine_row")
+HEAVY = ("squat_barbell", "one_arm_db_row")  # #6014: the heavy-upper row is pinned to the one-arm dumbbell row
 UPPER_DAY = "2026-09-27"  # three sessions done (lower-heavy, upper-volume, lower-volume) -> upper-heavy, week 1
 
 # The live 2026-09-23 shape (#4107's table): leg press 0 in band / 5 elsewhere, DB bench's
-# nearest band one session at 300–309 with more sessions further down, machine row one
+# nearest band one session at 300–309 with more sessions further down, dumbbell row one
 # session far below, lat pulldown in band three days before block 1.
 WEIGHTS = {
     "2022-08-31": 225.0,
@@ -114,14 +120,14 @@ HISTORY = {
         _s("2025-11-05", 320),
     ],
     TID["db_bench_press_flat"]: [_s("2024-09-15", 40, 10)] + [_s("2024-11-03", 60, 8)] * 25,
-    TID["machine_row"]: [_s("2025-05-18", 130, 10)],
+    TID["one_arm_db_row"]: [_s("2025-05-18", 60, 10)],  # #6014: the pinned heavy row (synthetic)
     TID["lat_pulldown"]: [_s("2026-09-20", 140, 10)],
 }
 NEAREST = {
     "squat_barbell": ("270-279", "2024-11-03", 265),
     "leg_press": ("260-269", "2025-11-05", 320),
     "db_bench_press_flat": ("300-309", "2024-09-15", 40),
-    "machine_row": ("190-199", "2025-05-18", 130),
+    "one_arm_db_row": ("190-199", "2025-05-18", 60),
 }
 
 
@@ -190,6 +196,7 @@ def test_the_heavy_squat_with_no_in_band_history_gets_a_week_1_load_from_the_nea
     assert "band" not in _block(ideal, "squat_barbell").notes
 
 
+@ROLLBACK
 def test_every_heavy_anchor_of_the_first_v04_week_is_loaded_from_its_nearest_band():
     for key in HEAVY:
         ideal = _ideal_for(key)
@@ -202,6 +209,7 @@ def test_every_heavy_anchor_of_the_first_v04_week_is_loaded_from_its_nearest_ban
         assert [s.weight_kg for s in _ws(_block(ideal, key))[1:]] == [rep_scheme.round_to_implement_kg(top * 0.9, equipment)] * 2  # #5428
 
 
+@ROLLBACK
 def test_mutation_control_without_the_fallback_the_heavy_anchors_come_out_unloaded():
     for key in HEAVY:
         with patch.object(load_ramp, "nearest_band_anchor", return_value=None):
@@ -323,7 +331,9 @@ def _gate(ideal, **kw):
 
 
 @pytest.mark.parametrize("which", ["lower_heavy", "upper_heavy"])
-def test_the_chat_gate_derives_the_generator_rows_and_commits_its_loads(which):
+def test_the_chat_gate_derives_the_generator_rows_and_commits_its_loads(which, request):
+    if which == "upper_heavy":  # ROLLBACK (#5861): the heavy machine row is the pre-approval generator's; live swaps it
+        request.getfixturevalue("exercise_library_rollback")
     ideal = _generate()[0] if which == "lower_heavy" else _generate_upper()[0]
     gate = _gate(ideal)
     assert gate["verdict"] == "clean", gate["audit"]
@@ -331,8 +341,8 @@ def test_the_chat_gate_derives_the_generator_rows_and_commits_its_loads(which):
     assert gate["load_floors"]["load_rule"]["week"] == 1
     gen = ideal.inputs_snapshot["load_floors"]["movements"]
     keys = {
-        "lower_heavy": ("squat_barbell", "romanian_deadlift_barbell"),
-        "upper_heavy": ("barbell_bench_press", "machine_row", "lat_pulldown"),
+        "lower_heavy": ("squat_barbell", "deadlift_barbell"),  # #5694 (owner ruling 2026-11-08): the conventional pull
+        "upper_heavy": ("barbell_bench_press", "one_arm_db_row", "lat_pulldown"),
     }
     for key in keys[which]:
         for f in ("floor_kg", "anchor_band", "anchor_date", "fallback"):
@@ -413,9 +423,11 @@ def test_derivation_guard_only_v03_floor_calls_the_ramp_and_the_fallback():
 
 # ── 5. the planner ──────────────────────────────────────────────────────────
 @pytest.mark.parametrize("key", HEAVY)
-def test_plan_next_session_loads_the_heavy_anchor_from_the_nearest_band(key):
+def test_plan_next_session_loads_the_heavy_anchor_from_the_nearest_band(key, request):
     """#4147: the squat through lower-heavy on 09-24 (nothing completed), the row through
     upper-heavy on 09-27 (three completed) — the planner and the draft carry the same load."""
+    if key == "one_arm_db_row":  # ROLLBACK (#5861): the v0.3 nearest-band load is the pre-approval generator's (live: live_load)
+        request.getfixturevalue("exercise_library_rollback")
     from mcp import handler as h
     from tests.test_program_session_4064_4147 import _stage1_patches
 

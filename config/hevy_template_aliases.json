@@ -21,14 +21,25 @@
     "An unconfirmed pairing (two different template ids that MIGHT be the same",
     "movement) is a CANDIDATE, surfaced by",
     "`lambdas/health/adherence_calc.py::find_alias_candidates()` for a human to",
-    "confirm, never written here automatically and never silently merged into a score."
+    "confirm, never written here automatically and never silently merged into a score.",
+    "",
+    "SPLIT (owner ruling 2026-11-11, #5773): `split` records a pair that WAS confirmed here and has been ruled two",
+    "different movements. Its ids are never folded, and `find_alias_candidates(known_split=...)` never re-proposes",
+    "the pair. B5EFBF9C (Overhead Triceps Extension (Cable)) is no longer an alias of 21310F5F (Triceps Extension",
+    "(Cable)): the exercise library tiers them differently (overhead A, neutral-arm C), so from this ruling on their",
+    "load history, strength series and adherence are separate, and the movement catalog carries",
+    "`overhead_triceps_extension_cable` under its own id."
   ],
-  "_version": 1,
-  "aliases": {
-    "B5EFBF9C": "tmpl:21310F5F"
-  },
+  "_version": 2,
+  "aliases": {},
   "titles": {
     "21310F5F": "Triceps Extension (Cable)",
     "B5EFBF9C": "Overhead Triceps Extension (Cable)"
+  },
+  "split": {
+    "B5EFBF9C": {
+      "was_alias_of": "tmpl:21310F5F",
+      "ruling": "owner ruling 2026-11-11 (#5773): the overhead cable triceps extension is its own movement, split from the neutral-arm cable extension"
+    }
   }
 }

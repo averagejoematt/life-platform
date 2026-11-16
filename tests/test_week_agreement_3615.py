@@ -158,6 +158,11 @@ def _payloads(**overrides):
                 "weights": [{"date": "2026-09-06", "lbs": 327.3}, {"date": "2026-09-20", "lbs": 316.9}],
             },
         },
+        # review 2026-11-14 (growth-2): the stats file behind the share cards — its journey weight carries its weigh-in date
+        "/public_stats.json": {
+            "_meta": {"generated_at": "2026-09-20T18:01:00+00:00", "refreshed_at": "2026-09-21T02:00:00+00:00"},
+            "journey": {"start_weight_lbs": 327.34, "goal_weight_lbs": 185.0, "current_weight_lbs": 316.9, "weight_as_of": "2026-09-20"},
+        },
         "/api/pulse": {"_meta": {"generated_at": "2026-09-21T02:00:00+00:00"}, "pulse": {"day_number": 15, "date": "2026-09-20"}},
         "/api/fingerprint": {
             "_meta": {"generated_at": "2026-09-21T02:00:00+00:00"},
@@ -257,6 +262,21 @@ def test_a_half_pound_past_tolerance_is_a_FAIL():
     payloads["/api/snapshot"]["vitals"]["vitals"]["weight_lbs"] = 318.0
     check = _run(wq.check_week_agreement, payloads)
     assert check.passed is False and "api_snapshot" in check.message
+
+
+def test_the_stats_file_behind_the_share_cards_is_held_to_the_same_weigh_in():
+    """Review 2026-11-14 (growth-2): the recap card read 36.7 lbs down from a stats file still on the day-before's
+    weigh-in while /api/journey served that morning's. The stats file is a registered surface now: a current weight
+    that disagrees with /api/journey's FOR THE SAME DATE reds, and one honestly dated to an earlier weigh-in does not."""
+    stale_but_same_date = _payloads()
+    stale_but_same_date["/public_stats.json"]["journey"]["current_weight_lbs"] = 319.0
+    check = _run(wq.check_week_agreement, stale_but_same_date)
+    assert check.passed is False and "public_stats" in check.message and "api_journey" in check.message
+    honestly_older = _payloads()
+    honestly_older["/public_stats.json"]["journey"].update(current_weight_lbs=319.0, weight_as_of="2026-09-19")
+    assert _run(wq.check_week_agreement, honestly_older).passed is True, "an older weigh-in under its own date is not a contradiction"
+    observations, _, _ = wq.observe(_budget(_payloads()), "https://site")
+    assert any(o.surface == "public_stats" and o.fact == reg.FACT_CURRENT_WEIGHT and o.as_of == "2026-09-20" for o in observations)
 
 
 def test_an_unreachable_surface_is_a_WARN_never_a_silent_pass():
@@ -394,7 +414,31 @@ def test_a_never_rendering_is_an_honest_duration():
     rows = wq._extract_status_components(
         {"groups": [{"components": [{"id": "x", "status": "blue", "last_sync_relative": "never", "comment": "c"}]}]}
     )
-    assert rows["x"]["duration_rendered"] is True and rows["x"]["duration_days"] is None
+    assert rows["x"][0]["duration_rendered"] is True and rows["x"][0]["duration_days"] is None
+
+
+# ── #5527: several components sharing one partition id are ALL judged ────────────
+_AH_SUBFEEDS = ("CGM Glucose", "Water Intake", "Blood Pressure", "Breathwork", "Stretching", "Mindful Minutes", "State of Mind", "Import")
+
+
+def test_every_component_of_a_shared_partition_id_is_extracted_5527():
+    """/api/status renders one component per apple_health sub-feed under ONE id. The old
+    dict-per-id shape kept the last and silently dropped seven of eight."""
+    comps = [{"id": "apple_health", "name": n, "status": "green", "last_sync_relative": "today"} for n in _AH_SUBFEEDS]
+    rows = wq._extract_status_components({"groups": [{"components": comps}]})
+    assert [r["label"] for r in rows["apple_health"]] == list(_AH_SUBFEEDS)
+
+
+def test_a_bad_narration_on_a_non_last_component_still_fails_5527():
+    """MUST-FAIL fixture: two components share the paused source's id; the FIRST narrates a
+    broken pipe, the LAST is honest. Keyed by id, the last overwrote the first and the gate
+    passed — the violation must now be found, and named by its component."""
+    payloads = _absence_payloads("PAUSED in the source registry — paused (ADR-074). Last record: 97d ago.")
+    honest = payloads["/api/status"]["groups"][0]["components"][0]
+    bad = dict(honest, name="Garmin sub-feed", comment="Pipeline may need attention — stopped 97d ago. Check auth/webhook.")
+    payloads["/api/status"]["groups"][0]["components"] = [bad, honest]
+    check = _run_absence(payloads)
+    assert check.passed is False and "Garmin sub-feed" in check.message, check.message
 
 
 def test_relative_durations_parse_the_way_the_panel_renders_them():

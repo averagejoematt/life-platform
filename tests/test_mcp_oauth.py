@@ -69,9 +69,17 @@ class _FakeTable:
         return {"Attributes": dict(item)} if ReturnValues == "ALL_NEW" else {}
 
 
+_REAL_TABLE = core.table
+
+
 def setup_function(_fn):
     core.table = _FakeTable()  # fresh store per test
     h._BEARER_TOKEN_CACHE.clear()
+
+
+def teardown_function(_fn):
+    # #5813: restore the module's table — a leaked query-less fake broke every later query_source reader on this worker
+    core.table = _REAL_TABLE
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -348,3 +356,71 @@ def test_approval_cookie_ttl_is_tuned_and_matches_issued_cookie():
         assert (
             h._APPROVAL_COOKIE_TTL_SECS - 60 <= remaining <= h._APPROVAL_COOKIE_TTL_SECS
         ), f"issued cookie exp ({remaining}s out) must reflect the tuned TTL ({h._APPROVAL_COOKIE_TTL_SECS}s)"
+
+
+# ── #5979 / #5932: hostile redirect URIs and mandatory PKCE ─────────────────────────────────────
+# The allowlist must agree with a BROWSER's reading of the URL, not only Python's: urllib reads
+# "https://evil.example\@claude.ai/cb" as host claude.ai, a browser treats "\" as "/" and goes to evil.example.
+HOSTILE_REDIRECTS = (
+    "https://evil.example\\@claude.ai/cb",  # backslash + userinfo: browser host evil.example
+    "https://evil.example\\.claude.ai/cb",  # backslash in the host
+    "http://evil.example\\@localhost/cb",  # the loopback variant
+    "https://user@claude.ai/cb",  # userinfo of any kind
+    "https://claude.ai%2eevil.example/cb",  # a percent-escape in the authority
+    "https://claude.ai\t.evil.example/cb",  # control / whitespace characters
+    "https://claude.ai /cb",
+    "https://claude.ai\x7f/cb",
+    "javascript://claude.ai/%0aalert(1)",  # not https
+)
+
+
+def _old_allowed(redirect_uri):
+    """The check before #5979 (the must-fail control): host from urllib, nothing else refused."""
+    parsed = urllib.parse.urlparse(redirect_uri)
+    host = (parsed.hostname or "").lower()
+    if host in h._LOOPBACK_HOSTS:
+        return True
+    return parsed.scheme == "https" and any(host == a or host.endswith("." + a) for a in h._DEFAULT_REDIRECT_HOSTS)
+
+
+def test_hostile_redirect_uris_are_refused_at_every_door():
+    _, challenge = _pkce_pair()
+    with patch("mcp.handler.get_api_key", return_value="secret"):
+        for uri in HOSTILE_REDIRECTS:
+            assert h._redirect_uri_allowed(uri) is False, uri
+            assert _authorize_get(uri, challenge)["statusCode"] == 400, uri
+            assert _authorize(uri, challenge)["statusCode"] == 400, uri
+
+
+def test_must_fail_control_the_old_check_admitted_the_parser_differential():
+    admitted = [u for u in HOSTILE_REDIRECTS[:3] if _old_allowed(u)]
+    assert admitted == list(HOSTILE_REDIRECTS[:3]), "the three backslash forms are the defect this pins"
+
+
+def test_legitimate_callbacks_still_pass():
+    for uri in (
+        "https://claude.ai/api/mcp/auth_callback",
+        "https://claude.ai/cb",
+        "http://127.0.0.1:33418/callback",
+        "http://localhost:6274/oauth/callback",
+    ):
+        assert h._redirect_uri_allowed(uri) is True, uri
+
+
+def test_pkce_is_mandatory_and_s256_only():
+    redirect = "https://claude.ai/cb"
+    verifier, challenge = _pkce_pair()
+    with patch("mcp.handler.get_api_key", return_value="secret"):
+        for ch, method in (("", "S256"), (verifier, "PLAIN"), (challenge, "PLAIN"), ("short", "S256")):
+            assert _authorize_get(redirect, ch, method)["statusCode"] == 400, (ch, method)
+            assert _authorize(redirect, ch, method)["statusCode"] == 400, (ch, method)
+    assert h._verify_pkce(verifier, verifier, "plain") is False, "plain is never accepted"
+
+
+def test_a_code_stored_without_a_challenge_is_refused_at_the_token():
+    """A code minted before this change (or by any path that skipped the challenge) never yields a bearer."""
+    redirect = "https://claude.ai/cb"
+    with patch("mcp.handler.get_api_key", return_value="secret"):
+        assert core.oauth_code_store("legacy-code", "", "S256", redirect)
+        resp = _token({"grant_type": "authorization_code", "code": "legacy-code", "code_verifier": "", "redirect_uri": redirect})
+        assert resp["statusCode"] == 400 and json.loads(resp["body"])["error"] == "invalid_grant"

@@ -12,7 +12,9 @@ site_api_common (identical binding semantics to the pre-split facade).
 from datetime import datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
+from common import restraint_publication as RP  # #5948: restraint habits are served nameless here
 from experiment.phase_filter import with_phase_filter  # ADR-058
+from health import character_privacy  # owner ruling 2026-11-05: the Mind pillar served is the public variant
 
 from web.site_api_common import (
     PT,
@@ -71,7 +73,7 @@ def mind_overview(*, _g) -> dict:
     cs_pk = f"{USER_PREFIX}character_sheet"
     for date_str in [today, yesterday]:
         resp = table.get_item(Key={"pk": cs_pk, "sk": f"DATE#{date_str}"})
-        record = _decimal_to_float(resp.get("Item"))
+        record = character_privacy.public_sheet(_decimal_to_float(resp.get("Item")))  # the public variant only (2026-11-05)
         if record:
             mp = record.get("pillar_mind", {})
             mind_pillar = {
@@ -79,6 +81,14 @@ def mind_overview(*, _g) -> dict:
                 "raw_score": float(mp.get("raw_score", 0)),
                 "tier": mp.get("tier", "Foundation"),
             }
+            if mp.get("not_instrumented"):  # owner ruling 2026-11-06: insufficient public data is a state, never a 0.0
+                mind_pillar = {
+                    "level": None,
+                    "raw_score": None,
+                    "tier": None,
+                    "state": "unavailable",
+                    "note": mp.get("not_instrumented_note"),
+                }
             break
 
     # ── 2. (retired) The State-of-Mind mood read (How We Feel check-ins) — private activity (owner
@@ -100,22 +110,15 @@ def mind_overview(*, _g) -> dict:
         )
     )
     hs_items = _decimal_to_float(hs_resp.get("Items", []))
+    # #5948: this page names no restraint habit, so the rows are nameless — a streak count and
+    # held/not, longest first (common.restraint_publication). The never-public categories are still
+    # screened out first: they are not counted here at all.
     vice_data = []
     if hs_items:
         latest_hs = hs_items[0]
         raw_vs = latest_hs.get("vice_streaks") or {}
         if isinstance(raw_vs, dict):
-            for name, streak_val in raw_vs.items():
-                if _is_blocked_vice(name):
-                    continue
-                vice_data.append(
-                    {
-                        "name": name,
-                        "current_streak": int(streak_val or 0),
-                        "holding": int(streak_val or 0) > 0,
-                    }
-                )
-        vice_data.sort(key=lambda v: -v["current_streak"])
+            vice_data = RP.nameless_streaks({name: val for name, val in raw_vs.items() if not _is_blocked_vice(name)})
 
     # ── 4. Social connection quality (interactions) ──
     int_pk = f"{USER_PREFIX}interactions"
@@ -206,17 +209,9 @@ def mind_overview(*, _g) -> dict:
     vice_timeline = []
     for hs_day in hs_30d_items:
         day_date = hs_day.get("date") or hs_day.get("sk", "").replace("DATE#", "")
-        raw_vs = hs_day.get("vice_streaks") or {}
-        day_entry = {"date": day_date, "held": int(hs_day.get("vices_held", 0)), "total": int(hs_day.get("vices_total", 0))}
-        # Include per-vice streaks (filtered)
-        if isinstance(raw_vs, dict):
-            streaks = {}
-            for name, val in raw_vs.items():
-                if _is_blocked_vice(name):
-                    continue
-                streaks[name] = int(val or 0)
-            day_entry["streaks"] = streaks
-        vice_timeline.append(day_entry)
+        # #5948: the day's counts only. The per-day ``streaks`` map this row used to carry was keyed
+        # by habit NAME (and no page read it); a restraint habit's label never rides the timeline.
+        vice_timeline.append({"date": day_date, "held": int(hs_day.get("vices_held", 0)), "total": int(hs_day.get("vices_total", 0))})
 
     # ── 9. (retired) The energy level read from the journal analysis — journal-derived, private
     #    (owner ruling 2026-11-03); not read.

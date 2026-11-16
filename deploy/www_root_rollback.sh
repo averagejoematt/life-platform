@@ -8,16 +8,22 @@
 # would hide the new one while the real defect stayed live); an absent verdict rolls back.
 #
 # The rollback itself is `deploy/www_preview_sync.sh --target root --restore-previous`: the last
-# green root build from s3://matthew-life-platform/site/_v9_previous/ copied back over the root,
+# green root build from s3://matthew-life-platform/www-previous/<LATEST>/ copied back over the root,
 # S3 → S3, no delete, v9-owned keys only — it structurally cannot re-publish the v8 front page or
 # touch a kept site/ page. On the first root deploy there is no previous build; the restore says so
 # and nothing is written (www/README.md names the owner's deliberate un-launch).
 #
+# A red public-copies guard ALONE (#6083: an orphan, a stale preview or archive, a policy breach on another copy) is
+# always DECLINED: a root revert removes no orphan, empties no preview, rebuilds no archive — and during a privacy fix
+# it would put the pre-fix build back at `/`. The run stays red and one SNS line names the guard's summary.
+#
 # Env (from the workflow): SITE_REACHABLE QA_SURFACES QA_SUMMARY (visual-qa) · SMOKE_REACHABLE
-# SMOKE_SURFACES SMOKE_SUMMARY (smoke) · SNS_TOPIC_ARN AWS_REGION RUN_URL GITHUB_SHA · GATE.
+# SMOKE_SURFACES SMOKE_SUMMARY (smoke) · COPIES_SUMMARY (public-copies) · SNS_TOPIC_ARN AWS_REGION RUN_URL GITHUB_SHA · GATE.
 # Writes declined=true|false (+ surfaces/verdict) to $GITHUB_OUTPUT when set. Always exits 0 once it
 # has decided — a second failure mode here would only give the rollback a new way not to happen.
 set -uo pipefail
+# #6116: under a test runner, real AWS is unreachable from this script (deploy/lib/prod_write_guard.sh)
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prod_write_guard.sh"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SHORT="${GITHUB_SHA:0:7}"
 RUN_URL="${RUN_URL:-}"
@@ -34,6 +40,22 @@ notify() {
 echo "v9 root rollback scope check (#3352 visual / #3395 smoke, applied to the v9 paths):"
 echo "  visual-qa: site_reachable='${SITE_REACHABLE:-<unset>}' surfaces='${QA_SURFACES:-<none>}'  ${QA_SUMMARY:-<no verdict recorded>}"
 echo "  smoke:     site_reachable='${SMOKE_REACHABLE:-<unset>}' surfaces='${SMOKE_SURFACES:-<none>}'  ${SMOKE_SUMMARY:-<no verdict recorded>}"
+echo "  copies:    ${COPIES_SUMMARY:-<no verdict recorded>}"
+
+case "${GATE:-}" in
+  *smoke=failure* | *visual-qa=failure*) ;;
+  *public-copies=failure*)
+    VERDICT="public-copies: ${COPIES_SUMMARY:-<no summary>}"
+    echo "⛔ v9 ROLLBACK DECLINED — only the public-copies guard failed; a root revert cannot repair another copy (#6083)"
+    echo "::warning title=v9 root rollback DECLINED (#6083)::${VERDICT}"
+    out "declined=true" "surfaces=public-copies" "verdict=${VERDICT}"
+    notify "Life Platform v9 PUBLIC COPY VIOLATION [$SHORT]" "v9 root deploy $SHORT: the root build is live and its sweeps passed, but another public copy of the site breaks the publication rules — NOTHING WAS REVERTED.
+${VERDICT}
+Remediate by hand: python3 scripts/check_public_copies.py --remediation (prints the commands; runs none).
+Run: ${RUN_URL}"
+    exit 0
+    ;;
+esac
 
 if [ "${SITE_REACHABLE:-}" = "false" ] || [ "${SMOKE_REACHABLE:-}" = "false" ]; then
   SURFACES=""
@@ -53,7 +75,7 @@ fi
 
 echo "⚠️  a post-deploy sweep failed on a v9-reachable surface — restoring the previous v9 build (never site/)"
 if bash "$HERE/www_preview_sync.sh" --target root --restore-previous; then
-  RESULT="restored the previous v9 build from s3://matthew-life-platform/site/_v9_previous/ (or reported that none exists yet)"
+  RESULT="restored the previous v9 build from s3://matthew-life-platform/www-previous/<LATEST>/ (or reported that none exists yet)"
 else
   RESULT="RESTORE FAILED (exit $?) — the root may be a mixed build; run: bash deploy/www_preview_sync.sh --target root --restore-previous"
 fi

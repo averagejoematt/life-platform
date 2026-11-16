@@ -86,6 +86,18 @@ def versioned_items(ir: RoutineSpec) -> list[dict]:
         # (workout.hevy_routine_id), not just nearest-date. Empty until commit.
         "hevy_routine_id": ir.hevy_routine_id or "",
     }
+    # #5797: the RPE calibration marks (which set, which top rep) ride the index row, so the history loader joins them to
+    # the performed workout by `hevy_routine_id` in ONE Query (`rpe_calibration.load_marks_failsoft`). Ints and strings only.
+    marks = ((getattr(ir, "inputs_snapshot", None) or {}).get("rpe_calibration") or {}).get("marks")
+    if marks:
+        # a deserialized IR carries floats (Decimal -> float), which boto3 refuses: the numbers are re-cast to int
+        index_item["rpe_calibration"] = [
+            {
+                **{k: str(m[k]) for k in ("movement_key", "template_id") if m.get(k) is not None},
+                **{k: int(m[k]) for k in ("exposure", "target_reps", "set") if m.get(k) is not None},
+            }
+            for m in marks
+        ]
     return [{**body, "pk": pk, "sk": _version_sk(ir.version)}, {**body, "pk": pk, "sk": "VERSION#current"}, index_item]
 
 
@@ -131,6 +143,37 @@ def stamp_charter_version(ir: RoutineSpec) -> RoutineSpec:
     return ir
 
 
+def stamp_library_version(ir: RoutineSpec) -> RoutineSpec:
+    """#5773: every drafted plan names the exercise-library version it was made under (`inputs_snapshot.library_version`),
+    as it names the charter's. Fail-soft — an unreadable library stamps None, which says so; it never blocks a draft."""
+    from training import selection_engine
+
+    try:
+        version = selection_engine.library_version()
+    except Exception as e:  # noqa: BLE001 — recording only
+        logger.warning(f"library_version stamp failed ({type(e).__name__}: {e}); stamped None")
+        version = None
+    ir.inputs_snapshot = {**(getattr(ir, "inputs_snapshot", None) or {}), "library_version": version}
+    return ir
+
+
+def stamp_progression_basis(ir: RoutineSpec) -> RoutineSpec:
+    """#5762: every drafted plan records, per movement, the progression basis it applied and whether it was a
+    `step_due` step (`inputs_snapshot.progression_basis`, `training.progression_record`). Fail-soft — a record that
+    cannot be built is named on the draft (`status: failed`), never a blocked draft; the block reader then derives it."""
+    from training import progression_record
+
+    try:
+        return progression_record.stamp(ir)
+    except Exception as e:  # noqa: BLE001 — recording only; the draft lands either way
+        logger.warning(f"progression_basis stamp failed ({type(e).__name__}: {e}); the draft lands without it")
+        ir.inputs_snapshot = {
+            **(getattr(ir, "inputs_snapshot", None) or {}),
+            "progression_basis": {"status": "failed", "error": str(e)[:200]},
+        }
+        return ir
+
+
 def draft_versioned(ir: RoutineSpec) -> RoutineSpec:
     """Persist a DRAFT idempotently (#3115) — the entry point every drafting path uses.
 
@@ -150,6 +193,8 @@ def draft_versioned(ir: RoutineSpec) -> RoutineSpec:
     new draft at it would resurrect an archived routine rather than create today's.
     """
     stamp_charter_version(ir)
+    stamp_library_version(ir)
+    stamp_progression_basis(ir)
     existing = get_current(ir.routine_id)
     if not existing:
         return _record_rotation(put_versioned(ir))
@@ -172,7 +217,7 @@ def _record_rotation(ir: RoutineSpec) -> RoutineSpec:
     from training import variant_rotation
 
     rotation = (getattr(ir, "inputs_snapshot", None) or {}).get("rotation")
-    if rotation and rotation.get("ledger_writes"):
+    if rotation and (rotation.get("ledger_writes") or rotation.get("live_ledger_writes")):  # #5861: a live draft's own list
         variant_rotation.record_failsoft(rotation, _table, datetime.now(timezone.utc).isoformat(timespec="seconds"))
     return ir
 
@@ -188,17 +233,24 @@ def list_by_date_range(start_date: str, end_date: str, limit: int = 100) -> list
         KeyConditionExpression=Key("pk").eq(INDEX_PK) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}#￿"),
         Limit=limit,
     )
-    routines: list[RoutineSpec] = []
-    seen: set[str] = set()
+    rids: list[str] = []
     for idx in resp.get("Items", []):
         rid = idx.get("routine_id")
-        if not rid or rid in seen:
-            continue
-        seen.add(rid)
-        ir = get_current(rid)
-        if ir:
-            routines.append(ir)
-    return routines
+        if rid and rid not in rids:
+            rids.append(rid)
+    return [ir for ir in _current_many(rids) if ir]
+
+
+def _current_many(rids: list[str]) -> list[RoutineSpec | None]:
+    """`[get_current(rid) for rid in rids]`, in that order, with the GetItems in flight together (#5813: a plan call's week
+    check read ~35 pointers one after another, ~0.8 s). The first raise in `rids` order is re-raised, as the loop would."""
+    if len(rids) < 2:
+        return [get_current(rid) for rid in rids]
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=min(len(rids), 8)) as pool:
+        futures = [pool.submit(get_current, rid) for rid in rids]
+    return [f.result() for f in futures]
 
 
 def _live_genesis() -> str | None:

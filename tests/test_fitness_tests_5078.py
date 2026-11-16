@@ -19,6 +19,12 @@ from unittest.mock import patch
 
 import pytest
 
+ROLLBACK = pytest.mark.usefixtures("exercise_library_rollback")
+"""#5861 (owner approval 2026-11-14): the marked tests pin the PRE-approval generator — the battery draft's shape and its catalog-hint
+resolver are the pre-approval generator's (live fits a title-only press, resolved at commit). They run on the library's rollback copy
+(status proposed: tests/conftest.py `exercise_library_rollback`), so they keep guarding the rollback path; the approved (live) behaviour
+is pinned by the #5861 tests."""
+
 os.environ.setdefault("S3_BUCKET", "test-bucket")
 os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
@@ -82,7 +88,7 @@ def test_the_charter_names_each_test_with_a_machine_a_unit_and_a_better_directio
     assert any("#5078" in e["by"] for e in c["change_log"])
     p = ft.protocol()
     spec = ft.tests_spec()
-    assert len(spec) == len(p["battery"]) == 4
+    assert len(spec) == len(p["battery"]) == 5
     for tid, row in spec.items():
         assert row["catalog_key"] in MOVEMENTS, f"{tid}: {row['catalog_key']} is not in the movement catalog"
         assert MOVEMENTS[row["catalog_key"]].get("hevy_template_id_hint"), f"{tid}: no Hevy template id"
@@ -208,7 +214,8 @@ def test_the_due_battery_prompts_once_through_the_calibration_sweep_and_a_stall_
     stalled = ft.calibration_row("2026-11-09", ft.due("2026-11-09", _pos(5, "2026-10-19"), []))
     assert stalled["state"] == "ok" and stalled["prompt"] is None and sweep(stalled) == []
     missed = ft.calibration_row("2026-11-10", ft.due("2026-11-10", _pos(8, "2026-11-09"), []))
-    assert missed["state"] == ft.MISSED and sweep(missed) == []  # its dead-man is the fitness-battery-missed alarm, not a second one
+    # #5760: a missed battery is the block's dead-man (`missed_2`, the fixed-text alert), never an AI-sweep prompt
+    assert missed["state"] == "missed_2" and missed["battery_state"] == ft.MISSED and sweep(missed) == []
     assert "40" not in json.dumps(ft.calibration_row("2026-10-27", ft.due("2026-10-27", _pos(6), ["2026-10-01"])))
 
 
@@ -250,7 +257,7 @@ def test_a_battery_round_trips_through_the_wire_and_a_second_write_merges():
     ft.write_record(t, merged)
     (row,) = ft.load_records(t)
     assert set(row["tests"]) == {"six_minute_walk", "dead_hang", "assisted_pull_up"}
-    assert row["tests"]["dead_hang"] == {"value": 41.5, "unit": "s", "protocol_version": "1", "source": "explicit"}
+    assert row["tests"]["dead_hang"] == {"value": 41.5, "unit": "s", "protocol_version": "2", "source": "explicit"}
     assert row["tests"]["assisted_pull_up"]["notes"] == "machine 2"
 
 
@@ -383,6 +390,7 @@ def _ideal(rs):
     return next(r for r in rs if r.variant == "ideal")
 
 
+@ROLLBACK
 def test_the_due_week_test_day_draft_carries_the_battery_on_its_minimum_session():
     from training import hevy_compiler, warmup_sets
 

@@ -25,6 +25,7 @@ from common import (
     stats_core,  # #1240: sanctioned stats implementation (ADR-105) — correlations
 )
 from common.metric_truth import steps_label  # #4630: the steps precedence label, from the registry facet
+from common.query_pages import query_pages  # #5656: whole-history reads follow every page
 from experiment import experiment_gates  # #1371: arming thresholds served to zero-states — same objects the engines enforce
 from experiment.phase_filter import with_phase_filter  # ADR-058 / #946 / #1197
 
@@ -194,7 +195,7 @@ def intelligence_summary(*, _g) -> dict:
         items = _decimal_to_float(resp.get("Items", []))
         if items:
             record = items[0]
-            corrs = _activity_publication.public_correlations(record.get("correlations", {}))
+            corrs = _activity_publication.public_correlations(record.get("correlations", {}), metric_methods=record.get("metric_methods"))
             summary["correlations"]["count"] = len(corrs) if isinstance(corrs, (dict, list)) else 0
             summary["correlations"]["last_week"] = record.get("sk", "").replace("WEEK#", "")
     except Exception as e:
@@ -270,18 +271,19 @@ def pillar_coupling(*, _g) -> dict:
     # wiped cycle, over a window labelled 2026-05-30 → 2026-07-28. Filtered, a fresh
     # cycle falls under _COUPLING_MIN_N and the endpoint returns honest_null with no
     # edges — which is what this module's own docstring calls the honest signal.
-    resp = table.query(
+    resp = query_pages(
+        table,
         **with_phase_filter(
             {
                 "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}character_sheet") & Key("sk").begins_with("DATE#"),
                 "ScanIndexForward": False,
                 "Limit": _COUPLING_WINDOW,
             }
-        )
+        ),
     )
     from health import character_privacy  # owner rulings 2026-11-03/04: private-source pillars are served held
 
-    recs = [character_privacy.public_sheet(r) for r in _decimal_to_float(resp.get("Items", []))]
+    recs = character_privacy.public_sheets(_decimal_to_float(resp.get("Items", [])))
     recs.sort(key=lambda r: str(r.get("sk", "")))  # chronological
     if len(recs) < _COUPLING_MIN_N:
         return _ok(
@@ -452,7 +454,7 @@ def correlations(event: dict = None, *, _g) -> dict:
     # Owner rulings 2026-11-03/05: a pair naming a private metric (State-of-Mind valence, the diary
     # session count, the journal-coded values count) is omitted, and the FDR correction re-run over the
     # public pairs only (common.activity_publication.public_correlations).
-    raw_corrs = _activity_publication.public_correlations(record.get("correlations", {}))
+    raw_corrs = _activity_publication.public_correlations(record.get("correlations", {}), metric_methods=record.get("metric_methods"))
     if isinstance(raw_corrs, list):
         # Legacy format: already a list
         pairs = raw_corrs

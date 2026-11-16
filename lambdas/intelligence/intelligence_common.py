@@ -325,7 +325,8 @@ _GOALS_CACHE_TTL = 300  # 5 minutes
 
 
 def load_goals_config() -> dict:
-    """Load user goals from S3. Cached in memory for Lambda warm instances."""
+    """Load the plan root for coach context: the public part (S3 twin) merged with the private part (S3
+    config/private/, owner ruling 2026-11-11) by ``common.user_goals``. Cached in memory for warm instances."""
     global _goals_cache, _goals_cache_ts
     import time
 
@@ -335,8 +336,12 @@ def load_goals_config() -> dict:
         return _goals_cache
 
     try:
-        resp = s3.get_object(Bucket=S3_BUCKET, Key="config/user_goals.json")
-        _goals_cache = json.loads(resp["Body"].read())
+        from common import user_goals  # noqa: PLC0415
+
+        public = user_goals.load_public(s3, S3_BUCKET, prefer_repo=False)
+        if public is None:
+            raise LookupError("public plan root unavailable")
+        _goals_cache = user_goals.merge(public, user_goals.load_private(s3, S3_BUCKET))
         _goals_cache_ts = now
         return _goals_cache
     except Exception as e:

@@ -1,0 +1,4 @@
+{
+ "_README": "Accepted evidence reviews of config/exercise_library.json (#5778). Appended ONLY by scripts/library_evidence_review.py on a PR branch the owner merges; deploy/build_exercise_library.py re-applies every record so a rebuild keeps them. Every citation here resolved live (Crossref DOI / PubMed PMID) with a matching title, first author and year on its review date. Never hand-edit; never a load, bodyweight or note.",
+ "reviews": []
+}

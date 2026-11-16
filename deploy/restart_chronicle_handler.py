@@ -155,7 +155,9 @@ def unregister_journal_permalink_redirects(apply: bool) -> list[str]:
 CHRONICLE_PREFIXES = [
     ("blog/", "blog/archive/", "blog/index.html"),
     ("dashboard/chronicle/posts/", "dashboard/chronicle/archive/", "dashboard/chronicle/index.html"),
-    ("site/chronicle/", "site/chronicle/archive/", "site/chronicle/index.html"),
+    # site/chronicle/ left this list in #6115 (2026-11-16): the location was audited page by page, emptied (each page
+    # 301'd to its successor or quarantined privately) and RETIRED in scripts/check_public_copies.py — a restart that
+    # archived into it, or rewrote its index placeholder, would re-publish a retired public location (rule B).
     # NB the v4 article pages (generated/journal/posts/week-NN/index.html, served at
     # /journal/posts/week-NN/) were a member of this list until #3512 and now have
     # their OWN step — see step [1b] in main(). Two reasons they could not stay here:
@@ -717,4 +719,7 @@ def main():
 
 
 if __name__ == "__main__":
+    from lib.prod_write_guard import install_prod_write_guard  # #6116: under a test runner, no real AWS write
+
+    install_prod_write_guard()
     main()

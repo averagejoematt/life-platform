@@ -332,14 +332,14 @@ def _approve_mod(monkeypatch):
     return m
 
 
-def test_the_autopublish_sweep_indexes_the_week_it_publishes(monkeypatch):
+def test_a_published_week_is_indexed(monkeypatch):
+    """The one publish owner indexes the week (the approve click and the Story Desk promote both run it; the stale-draft
+    sweep no longer publishes, owner ruling 2026-11-13)."""
     from unittest import mock
 
     mod = _approve_mod(monkeypatch)
     draft = {"sk": f"DATE#{WEEK_2}", "date": WEEK_2, "status": "draft", "week_number": 1}
     with (
-        mock.patch.object(mod, "_find_stale_drafts", return_value=[draft]),
-        mock.patch.object(mod, "_audit_refusal", return_value=[]),  # #4694: an audited draft — this pins indexing, not the gate
         mock.patch.object(mod, "_publish_to_s3", return_value=[]),
         mock.patch.object(mod, "_invalidate_cloudfront"),
         mock.patch.object(mod, "_commit_recap"),
@@ -347,9 +347,10 @@ def test_the_autopublish_sweep_indexes_the_week_it_publishes(monkeypatch):
         mock.patch.object(mod, "_invoke_elena_state_updater"),
         mock.patch.object(mod, "_invoke_email_sender"),
         mock.patch.object(mod, "_invoke_coach_panel_podcast"),
+        mock.patch.object(mod, "_commit_ledger"),
         mock.patch.object(mod, "_index_for_recall") as indexed,
     ):
-        mod._sweep_stale_drafts(48)
+        mod.publish_side_effects(draft, WEEK_2)
     indexed.assert_called_once_with(WEEK_2)
 
 
@@ -363,8 +364,6 @@ def test_indexing_runs_after_the_record_is_marked_published(monkeypatch):
     order = []
     draft = {"sk": f"DATE#{WEEK_2}", "date": WEEK_2, "status": "draft", "week_number": 1}
     with (
-        mock.patch.object(mod, "_find_stale_drafts", return_value=[draft]),
-        mock.patch.object(mod, "_audit_refusal", return_value=[]),  # #4694: an audited draft — this pins indexing, not the gate
         mock.patch.object(mod, "_publish_to_s3", return_value=[]),
         mock.patch.object(mod, "_invalidate_cloudfront"),
         mock.patch.object(mod, "_commit_recap"),
@@ -372,9 +371,10 @@ def test_indexing_runs_after_the_record_is_marked_published(monkeypatch):
         mock.patch.object(mod, "_invoke_email_sender"),
         mock.patch.object(mod, "_invoke_coach_panel_podcast"),
         mock.patch.object(mod, "_mark_published", side_effect=lambda d: order.append("mark")),
+        mock.patch.object(mod, "_commit_ledger"),
         mock.patch.object(mod, "_index_for_recall", side_effect=lambda d: order.append("index")),
     ):
-        mod._sweep_stale_drafts(48)
+        mod.publish_side_effects(draft, WEEK_2)
     assert order == ["mark", "index"]
 
 

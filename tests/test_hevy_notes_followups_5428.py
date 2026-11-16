@@ -28,6 +28,14 @@ import sys
 from contextlib import ExitStack
 from unittest.mock import patch
 
+import pytest
+
+ROLLBACK = pytest.mark.usefixtures("exercise_library_rollback")
+"""#5861 (owner approval 2026-11-14): the marked tests pin the PRE-approval generator — the 10-26 rotation notes and lint offenders are the
+shadow rotation's (live selection replaces the pools and swaps the unconfirmed machine row). They run on the library's rollback copy
+(status proposed: tests/conftest.py `exercise_library_rollback`), so they keep guarding the rollback path; the approved (live) behaviour
+is pinned by the #5861 tests."""
+
 os.environ.setdefault("TABLE_NAME", "life-platform")
 os.environ.setdefault("USER_ID", "matthew")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
@@ -84,6 +92,15 @@ def test_the_banned_scan_fails_the_archived_originals():
     assert all(banned_hits([o]) for o in originals), [o for o in originals if not banned_hits([o])]
 
 
+@pytest.fixture(autouse=True)
+def _charter_not_available_as_of_10_26():
+    """These tests replay the generator at its 2026-10-26 position, when the charter's equipment.not_available list was
+    empty. The owner's 2026-11-11 equipment ruling (#5771, charter 1.45.0) later marked preacher_curl_machine unavailable;
+    the replay keeps that date's list so it pins the rotation as it was served, not today's pool."""
+    with patch("training.variant_rotation.not_available", return_value=[]):
+        yield
+
+
 # ── 1. the rotation, through the real generator at the 10-26 position ─────────────────────────────────────────────
 def _generate_10_26(rows=None):
     """The real generator on 2026-10-26 with 26 performed program sessions: block 1, week 5, UPPER-VOLUME — the session
@@ -101,6 +118,7 @@ ROTATED_10_26 = {
 }
 
 
+@ROLLBACK
 def test_each_rotated_accessory_names_the_exercise_it_replaces():
     ideal = _generate_10_26()
     cal = ideal.inputs_snapshot["calendar"]
@@ -119,6 +137,7 @@ def test_each_rotated_accessory_names_the_exercise_it_replaces():
     assert rec["reason"] == "rotation" and rec["reason_line"] == "New: replaces Cable Fly Crossovers."
 
 
+@ROLLBACK
 def test_before_and_after_the_10_26_chest_fly():
     """The published 10-26 Chest Fly (Machine) note (bodyweights scrubbed) against today's render of the same slot."""
     before = (
@@ -132,6 +151,7 @@ def test_before_and_after_the_10_26_chest_fly():
     assert banned_hits([before]) and not banned_hits([fly.notes])
 
 
+@ROLLBACK
 def test_no_rotation_line_when_the_slot_did_not_rotate():
     """Mutation controls: block 1's first phase serves the template (step 0), a REFUSED rotation serves the template,
     and a held variant (the ledger holds what the previous phase served) is no swap — none of them writes the line."""
@@ -149,6 +169,7 @@ def test_no_rotation_line_when_the_slot_did_not_rotate():
     assert vr.swaps(pinned, CATALOG["movements"]) == {}
 
 
+@ROLLBACK
 def test_the_rotation_note_lands_in_the_render_check_and_is_missing_when_the_wire_drops_it():
     """#5083 box 3: the rotation has no Hevy field, so it rides the note (the documented fallback) — `render_check`
     finds it there, and an IR that records the swap but a wire that lost it reads `missing`, never `absent`."""
@@ -365,8 +386,8 @@ def test_mutation_control_without_the_stage_2_restamp_the_after_line_is_absent()
 
 def test_the_restamp_runs_after_the_critics_change_the_rows():
     """Order matters: a swap or drop moves what follows the cardio, so the restamp sits AFTER `apply_changes`."""
-    src = (REPO / "mcp" / "tools_plan.py").read_text(encoding="utf-8")
-    fn = next(n for n in ast.walk(ast.parse(src)) if isinstance(n, ast.FunctionDef) and n.name == "_run_stage_2")
+    src = (REPO / "mcp" / "plan_stage2_run.py").read_text(encoding="utf-8")  # #5781: stage 2's body moved here
+    fn = next(n for n in ast.walk(ast.parse(src)) if isinstance(n, ast.FunctionDef) and n.name == "record")
     calls = [(c.lineno, ast.unparse(c.func)) for c in ast.walk(fn) if isinstance(c, ast.Call)]
     apply_line = min(ln for ln, f in calls if f == "critics.apply_changes")
     assert any(f == "apply_after_lines" and ln > apply_line for ln, f in calls)
@@ -448,6 +469,7 @@ def _lint(ir: RoutineSpec) -> list[str]:
     return hevy_note_lint.lint_wire(to_create_body(ir, lambda k: "T-" + k, why_note=why), ir).to_dict()["problems"]
 
 
+@ROLLBACK
 def test_every_path_lints_clean_and_the_lint_fires_on_the_old_copy():
     step = [{"movement_key": "lat_pulldown", "sets": [{"weight_lbs": 160, "rep_range_start": 8, "rep_range_end": 12, "count": 2}]}]
     paths = {
@@ -460,7 +482,14 @@ def test_every_path_lints_clean_and_the_lint_fires_on_the_old_copy():
         paths[f"disruption, {pool}"] = disruption.to_routine(
             rx, target_date="2026-12-22", variant="ideal", mode={"template": "travel"}, catalog=CATALOG
         )
-    assert {k: v for k, v in ((k, _lint(ir)) for k, ir in paths.items()) if v} == {}
+    # #5428 re-grade #6 (2026-11-08): the offline 10-26 render has no history for its machine row, so its rows carry no
+    # load and the note asks him to find one — the 11-06 Romanian deadlift's class, which now fails (the real path's
+    # positive control); every other line of every path is clean
+    assert {k: v for k, v in ((k, _lint(ir)) for k, ir in paths.items()) if v} == {
+        "generator, 10-26 rotated": [
+            "L4 [2] Seated Row (Machine): a machine compound with no load on any working row asks him to 'find the load.' (§3.3)"
+        ]
+    }
     # mutation control: the engine's own rotation line (its slot id and week arithmetic) on the wire reds the lint
     ir = _generate_10_26()
     fly = next(b for b in ir.exercises if b.movement_key == "chest_fly_machine")

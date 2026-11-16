@@ -65,6 +65,9 @@ from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive ==
 #: no longer means, so the string is asserted absent from the tree by
 #: ``tests/test_tdee_worked_set_3931_behavior.py``.
 METHOD = "mifflin_bmr_plus_worked_set_exercise"
+#: The same estimate with the age input fixed at ``PUBLIC_REFERENCE_AGE_YEARS`` — the only form a public surface serves.
+#: A different label because it is a different number (ADR-152 rule 2: the label changes with the number).
+METHOD_PUBLIC = "mifflin_bmr_at_reference_age_plus_worked_set_exercise"
 
 #: The retired label. Published NOWHERE — it exists so the sweep test and any future
 #: archaeologist can name what changed without grepping git history.
@@ -90,6 +93,17 @@ IN_TO_CM = 2.54
 #: Used only when the profile carries no parseable date_of_birth. Always surfaced as
 #: ``age_basis`` so it can never be mistaken for a measured input (ADR-104).
 ASSUMED_AGE_YEARS = 35
+
+#: THE PUBLIC ESTIMATE IS COMPUTED AT A REFERENCE AGE, NEVER AT HIS (owner ruling 2026-11-14).
+#: Mifflin-St Jeor carries -5 kcal per year of age. His weight and height are public and his exercise log largely is,
+#: so a TDEE computed at his real age and served to the kcal is his age: to (1 + 2U) / 5 years where U is a reader's
+#: error on the exercise term, and to 0.2 years on any week with no exercise logged (qa/age_inversion_lib.py).
+#: Every path whose output can reach a public surface — the site API, and the coach facts that feed published prose —
+#: calls ``energy_budget(..., public=True)``: the age input is this constant, the basis and the method label say so,
+#: and the birth date is never read. The estimate moves by 5 kcal per year of difference — far inside its own error.
+#: The value is the pre-existing assumed age: it was chosen before this ruling and carries no information about him.
+PUBLIC_REFERENCE_AGE_YEARS = ASSUMED_AGE_YEARS
+PUBLIC_AGE_BASIS = "reference_age_not_his_age"
 
 #: Duration proxy for LIFTING-CLASS time that reports no mechanical work — ~6 kcal/kg/hour,
 #: ~6 METs. Applied to time the body was actually MOVING: a minute sitting on a bench
@@ -806,8 +820,13 @@ def energy_budget(
     deficit_kcal: float = DEFAULT_DEFICIT_KCAL,
     trend_check: Optional[dict] = None,
     lifting: Optional[dict] = None,
+    public: bool = False,
 ) -> Optional[dict]:
     """THE calorie-target payload (ADR-152). ``None`` when weight or height is absent.
+
+    ``public=True`` is the form every public-reaching caller uses (owner ruling 2026-11-14): the age input is
+    ``PUBLIC_REFERENCE_AGE_YEARS`` whatever ``age_years`` says, and the basis and method label say so — an estimate
+    computed at his real age is his age (see the constant). Owner-only callers (the MCP tools) keep his real age.
 
     ``None`` rather than a guess is deliberate: Mifflin-St Jeor is 6.25 kcal per cm of
     height, so assuming a height publishes a BMR, a TDEE and a number he would eat to,
@@ -820,7 +839,10 @@ def energy_budget(
 
     weight_kg = wl * LB_TO_KG
     height_cm = hi * IN_TO_CM
-    age = float(age_years) if age_years is not None else float(ASSUMED_AGE_YEARS)
+    if public:
+        age, age_basis, method = float(PUBLIC_REFERENCE_AGE_YEARS), PUBLIC_AGE_BASIS, METHOD_PUBLIC
+    else:
+        age, method = (float(age_years) if age_years is not None else float(ASSUMED_AGE_YEARS)), METHOD
     bmr = mifflin_bmr(weight_kg, height_cm, age, sex)
 
     days = max(1, int(window_days))
@@ -836,14 +858,14 @@ def energy_budget(
     # `target` is None and `target_basis` carries the refusal with both figures in it.
     check: dict = trend_check or {}
     refused = bool(check) and not check.get("publish", True)
-    target_basis = check.get("basis") if check else f"{METHOD}_minus_deficit"
+    target_basis = check.get("basis") if check else f"{method}_minus_deficit"
 
     return {
         # TDEE means MAINTENANCE. The deficit lives only in `target`.
         "tdee": int(tdee),
         "deficit": int(deficit),
         "target": None if refused else int(target),
-        "method": METHOD,
+        "method": method,
         "target_basis": target_basis,
         "target_published": not refused,
         "trend_check": trend_check,

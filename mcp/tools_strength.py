@@ -72,7 +72,10 @@ def template_alias_map() -> tuple[dict[str, str], dict]:
     try:
         from health.adherence_calc import canonical_template_ids
 
-        amap = canonical_template_ids()
+        from mcp import plan_call_scope
+
+        # #5813: three S3 config reads, once per plan_next_session call (each drafted lift's history asks); plain elsewhere
+        amap = plan_call_scope.memoized_copy(plan_call_scope.ALIAS_MAP, "aliases", canonical_template_ids)
         return amap, {"status": "read", "source": "config/hevy_template_aliases.json", "aliases": len(amap)}
     except Exception as e:  # noqa: BLE001 — identity degrades to raw template ids, and says so
         logger.warning("template alias registry unreadable (#4069): %s", e)

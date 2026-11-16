@@ -48,6 +48,21 @@ SOURCE = "journal_quotes"
 SK_PREFIX = "QUOTE#"
 MAX_QUOTES_PER_DAY = 2  # the "0–2 lines per close" nomination cap, enforced at mark time
 MAX_QUOTE_CHARS = 500
+
+# Owner-ruled day caps (owner ruling 2026-11-15). The 0–2 cap bounds what a close may NOMINATE; it is not a limit on
+# what he may approve. A date here carries his written, per-line approval of more lines than the cap — the date and
+# the number of lines the ruling names, nothing else. Every other gate still runs on each line: approved=true, the
+# taboo list, verbatim grounding. A new row is a new ruling (tests/test_journal_quotes_1568.py pins the set).
+OWNER_RULED_DAY_CAPS = {
+    "2026-11-08": 4,
+}
+
+
+def day_cap(date_str):
+    """How many lines may be marked for one entry date: the nomination cap, or the owner's ruling for that date."""
+    return max(MAX_QUOTES_PER_DAY, OWNER_RULED_DAY_CAPS.get(str(date_str or ""), 0))
+
+
 PUBLIC_LABEL = "from the journal, in his words"
 
 # #1806: the only 3 legitimate channel values (matches the video_diary/solo_recording

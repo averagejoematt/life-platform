@@ -24,7 +24,6 @@ WHAT THIS PINS
 
 from __future__ import annotations
 
-import json
 import math
 import os
 import sys
@@ -45,6 +44,7 @@ for _p in (REPO / "lambdas", REPO / "lambdas" / "compute"):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
+import sealed_prereg  # noqa: E402
 from experiment import (
     experiment_gates as gates,  # noqa: E402
     prereg_effect,  # noqa: E402
@@ -55,7 +55,9 @@ with mock.patch("boto3.resource"), mock.patch("boto3.client"):
 
 # The sealed, hash-stamped cycle-17 artifact (byte-identical to the live
 # /experiments/prereg/genesis-2026-09-06.json) — read, never written.
-_SEALED = json.loads((REPO / "deploy" / "generated" / "genesis_preregistration.json").read_text())
+# The sealed file is private since 2026-11-11 (owner ruling item 3): the private original when present (tests/sealed_prereg.py), else
+# the old path, which no longer exists, so a test that reads it skips (sealed_prereg.require_sealed_path()).
+_SEALED = sealed_prereg.load_sealed()
 
 # ── the deterministic fixture ────────────────────────────────────────────────
 # Recovery alternates 50/60 for seven days (2026-10-01..07): the six successive differences
@@ -204,6 +206,7 @@ def test_the_sealed_genesis_literals_do_not_meet_the_bar():
     """The sealed cycle-17 artifact's 0.1 and 3 are recorded as what they are — the
     predicate says so rather than the artifact being re-sealed (docs/DECISIONS.md ADR-105,
     2026-10-11 note)."""
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     for hyp in _SEALED["hypotheses"]:
         assert not gates.min_effect_meets_rigor_bar(hyp["test_spec"])[0], hyp["hypothesis_id"]
 

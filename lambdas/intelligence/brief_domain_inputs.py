@@ -26,11 +26,14 @@ read, or holds no visible record, is ``None`` — rendered as "not computed" —
 """
 
 from datetime import date, timedelta
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from boto3.dynamodb.conditions import Key
 from common import constants as _constants
+from common.activity_overlap import HEVY_DEVICE
+from common.strava_read_seam import STRAVA_SOURCE, strava_read_seam
 from experiment.phase_filter import singleton_visible, with_phase_filter
+from training import workout_identity
 
 #: The Hevy window. Mirrors ``coach_domain_facts._physical_pack`` (14 days), so the seat's
 #: chat and its daily read see the same sessions — the window ends at the brief's subject day.
@@ -44,8 +47,10 @@ _M_PER_MILE = 1609.34
 
 #: A Strava activity whose device is Hevy is the SAME session Hevy already logged (Hevy
 #: pushes every workout to Strava as WeightTraining — live rows 2026-09-25/26). Listing it
-#: twice would double the strength count the coach narrates.
-_HEVY_MIRROR_DEVICE = "hevy"
+#: twice would double the strength count the coach narrates. Dropped even when the Hevy
+#: window could not be read (``workout_identity.strava_without_echoes`` keeps a push it
+#: cannot match to a session in hand, and a lift's heart-rate member is not cardio).
+_HEVY_MIRROR_DEVICE = HEVY_DEVICE
 
 
 def gather(
@@ -211,29 +216,99 @@ def withings_block(data: Dict[str, Any]) -> Dict[str, Any]:
     return {"weight_lbs": round(weight, 1), "weight_lbs_date": row_date}
 
 
-def _strava_activities(day_rows: list) -> List[Dict[str, Any]]:
+def _activity_entry(a: Dict[str, Any], day: Dict[str, Any]) -> Dict[str, Any]:
+    secs = _num(a.get("moving_time_seconds")) or _num(a.get("elapsed_time_seconds"))
+    metres = _num(a.get("distance_meters"))
+    return {
+        "date": str(a.get("start_date_local") or "")[:10] or _row_date(day),
+        "type": a.get("sport_type") or a.get("type") or "unknown",
+        "duration_min": round(secs / 60, 1) if secs else None,
+        "distance_miles": round(metres / _M_PER_MILE, 2) if metres else None,
+        "avg_hr": _num(a.get("average_heartrate")),
+    }
+
+
+def _hevy_session_id(row: Dict[str, Any]) -> Optional[str]:
+    """The Hevy workout id ``workout_identity`` keys a session's members on (``<id>#<family>``)."""
+    members = workout_identity.hevy_members([row])
+    return members[0]["id"].rsplit("#", 1)[0] if members else None
+
+
+def _held_by_hevy(day_rows: list, hevy_rows: list) -> Dict[str, str]:
+    """#5697: ``{strava_id: Hevy workout id}`` for each Strava activity the workout-identity
+    resolver places in one identity with a Hevy block — the watch's ride or treadmill walk
+    recorded INSIDE a logged session (the owner's protocol since 2026-10-26). One rule: the
+    resolver reads Strava through ``strava_read_seam`` and the Hevy-echo drop, and joins by the
+    time-overlap rule ``training.session_count`` / ``walking_volume`` already count with."""
+    if not hevy_rows or not day_rows:
+        return {}
+    held: Dict[str, str] = {}
+    for ident in workout_identity.resolve_workout_identities(strava=day_rows, hevy=hevy_rows):
+        hevy_ids = ident["members"].get("hevy") or []
+        for sid in ident["members"].get(STRAVA_SOURCE) or []:
+            if hevy_ids and sid:
+                held[sid] = hevy_ids[0].rsplit("#", 1)[0]
+    return held
+
+
+def _strava_activities(day_rows: list, hevy_rows: Optional[list] = None) -> Tuple[List[Dict[str, Any]], Dict[str, List[Dict[str, Any]]]]:
     """Flatten Strava DAY rows (one row a day, an ``activities`` list inside) to dated
-    activities, newest first, Hevy mirrors dropped."""
-    out = []
-    for day in day_rows:
-        if not isinstance(day, dict):
-            continue
+    activities, newest first, read through ``strava_read_seam`` (#5697 — the one multi-device
+    de-duplication rule), Hevy mirrors dropped.
+
+    Returns ``(activities, blocks)``: an activity recorded inside a logged Hevy session (the
+    watch's gym ride / treadmill walk) is NOT extra cardio — it is that session's block, so it
+    goes to ``blocks[<Hevy workout id>]`` instead of the list."""
+    days = [d for d in day_rows if isinstance(d, dict)]
+    hevy = [r for r in hevy_rows or [] if isinstance(r, dict)]
+    held = _held_by_hevy(days, hevy)
+    out: List[Dict[str, Any]] = []
+    blocks: Dict[str, List[Dict[str, Any]]] = {}
+    for day in strava_read_seam(STRAVA_SOURCE, days) or []:
         for a in day.get("activities") or []:
             if not isinstance(a, dict) or str(a.get("device_name") or "").strip().lower() == _HEVY_MIRROR_DEVICE:
                 continue
-            secs = _num(a.get("moving_time_seconds")) or _num(a.get("elapsed_time_seconds"))
-            metres = _num(a.get("distance_meters"))
-            out.append(
-                {
-                    "date": str(a.get("start_date_local") or "")[:10] or _row_date(day),
-                    "type": a.get("sport_type") or a.get("type") or "unknown",
-                    "duration_min": round(secs / 60, 1) if secs else None,
-                    "distance_miles": round(metres / _M_PER_MILE, 2) if metres else None,
-                    "avg_hr": _num(a.get("average_heartrate")),
-                }
-            )
+            wid = held.get(str(a.get("strava_id") or ""))
+            (blocks.setdefault(wid, []) if wid else out).append(_activity_entry(a, day))
     out.sort(key=lambda a: str(a["date"]), reverse=True)
-    return out
+    return out, blocks
+
+
+def _session_entry(r: Dict[str, Any]) -> Dict[str, Any]:
+    vol_kg = _num(r.get("total_volume_kg"))
+    secs = _num(r.get("duration_sec"))
+    return {
+        "date": _row_date(r),
+        "title": r.get("title") or "Strength session",
+        "duration_min": round(secs / 60) if secs else None,
+        "exercise_count": int(_num(r.get("exercise_count")) or 0),
+        "set_count": int(_num(r.get("set_count")) or 0),
+        "volume_lb": round(vol_kg / _KG_PER_LB) if vol_kg else None,
+    }
+
+
+def _sessions_with_blocks(hevy: list, strava_rows: list) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """(the newest ``MAX_SESSIONS`` Hevy sessions, the Strava activities outside them).
+
+    #5697: a wearable's recording of a block inside a logged session (the watch's gym ride or
+    treadmill walk; a WHOOP piece of the lift the seam did not fold) rides on that session as
+    ``wearable_blocks`` — listed ONCE, beside the session that holds it, never again as extra
+    cardio. A block whose session is older than the shown ``MAX_SESSIONS`` stays in the
+    activity list, labelled ``in_strength_session`` with that session's date — still one
+    entry, and never read as cardio outside the logged lifts."""
+    activities, blocks = _strava_activities(strava_rows, hevy)
+    sessions: List[Dict[str, Any]] = []
+    for r in hevy:
+        held = blocks.pop(_hevy_session_id(r) or "", None)
+        if len(sessions) >= MAX_SESSIONS:
+            activities.extend({**b, "in_strength_session": _row_date(r)} for b in held or [])
+            continue
+        entry = _session_entry(r)
+        if held:
+            entry["wearable_blocks"] = held
+        sessions.append(entry)
+    activities.sort(key=lambda a: str(a["date"]), reverse=True)
+    return sessions, activities
 
 
 def training_block(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -241,21 +316,7 @@ def training_block(data: Dict[str, Any]) -> Dict[str, Any]:
     own date, and a day with no logged session stated as ABSENCE (ADR-104), not zero."""
     as_of = str(data.get("date") or "")[:10]
     hevy = sorted((r for r in data.get("hevy_recent") or [] if isinstance(r, dict)), key=lambda r: str(r.get("sk", "")), reverse=True)
-    sessions = []
-    for r in hevy[:MAX_SESSIONS]:
-        vol_kg = _num(r.get("total_volume_kg"))
-        secs = _num(r.get("duration_sec"))
-        sessions.append(
-            {
-                "date": _row_date(r),
-                "title": r.get("title") or "Strength session",
-                "duration_min": round(secs / 60) if secs else None,
-                "exercise_count": int(_num(r.get("exercise_count")) or 0),
-                "set_count": int(_num(r.get("set_count")) or 0),
-                "volume_lb": round(vol_kg / _KG_PER_LB) if vol_kg else None,
-            }
-        )
-    activities = _strava_activities(data.get("strava_7d") or [])
+    sessions, activities = _sessions_with_blocks(hevy, data.get("strava_7d") or [])
     last = sessions[0]["date"] if sessions else None
     if not sessions:
         note = f"No Hevy strength session logged in the {HEVY_WINDOW_DAYS} days through {as_of} — absence of logs, not proof of rest days."
@@ -263,7 +324,7 @@ def training_block(data: Dict[str, Any]) -> Dict[str, Any]:
         note = f"No strength session logged on {as_of}; the most recent logged session is {last}. A day without a log is absence, not zero training."
     else:
         note = f"Strength session logged on {as_of}."
-    if not activities:
+    if not any("in_strength_session" not in a for a in activities):
         note += " No Strava activity outside the logged lifts in the last 7 days — absence of data, not zero activity."
     return {
         "strength_sessions_14d": sessions,

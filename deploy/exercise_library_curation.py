@@ -1,0 +1,1915 @@
+# module-size-exception: a hand-authored DATA table (equipment vocabulary, verified citations, gate definitions, per-template
+# curation, expansion candidates) — one row per item, no logic to split out; the builder holds the rules.
+"""exercise_library_curation.py — the hand-authored half of `config/exercise_library.json` (#5769).
+
+`deploy/build_exercise_library.py` derives every history movement's attributes by rule from the
+movement catalog and the Hevy history; THIS module carries what a rule cannot know, and every row
+here wins over the derivation:
+
+  * EQUIPMENT_VOCABULARY — the controlled equipment ids (the gym audit matches against these).
+  * CITATIONS — ONLY references verified to exist on 2026-11-11: each DOI resolved through Crossref
+    (title, authors, year, journal) and its PMID through PubMed E-utilities, and the finding the row
+    leans on was read in the PubMed abstract. Nothing here is from memory alone. A row with evidence above
+    `none_reviewed` must cite one of these; anything else is `none_reviewed`, `last_reviewed: "unreviewed"`.
+  * GATES — the gate definitions (shape: `exercise_library.LIBRARY_GATE_KINDS`). No bodyweight number: a
+    bodyweight threshold is a ref into the owner-private overlay, or a pointer at the charter gate
+    that already owns it. Thresholds that ARE written here are relative / performance standards
+    (a fraction of bodyweight, a hold time) and say they are platform-proposed, pending the owner.
+  * CURATED — per-template attribute overrides for the movements that matter now.
+  * EXPANSION — candidates he has not done (a candidate whose template IS in his history is merged
+    into that history entry instead, and the builder records which).
+
+Evidence rules (stated once, #5857): the TIER is a quality band S-D the rubric derives from the attributes
+(`training.quality_rubric`, docs/coaching/EXERCISE_LIBRARY.md "Quality tiers"); evidence is its own field.
+`evidence_confidence`: rct_direct = a randomized trial measured hypertrophy of THIS target with THIS movement
+(or its defining variable, e.g. arm position); rct_characteristic = a trial supports it through the movement's
+defining characteristic (training length, joint angle); consensus = a named evidence-based reviewer's
+peer-reviewed position; none_reviewed = not reviewed. Only an rct_direct row may move ONE band off its rubric
+tier (`adjust`): +1 when the trial found it grew the target more than a compared movement, -1 when less.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+REVIEWED_ON = "2026-11-11"
+
+EQUIPMENT_VOCABULARY: dict[str, str] = {
+    "bodyweight": "no equipment",
+    "barbell": "Olympic barbell + plates",
+    "ez_bar": "EZ curl bar",
+    "trap_bar": "trap / hex bar",
+    "dumbbell": "dumbbells",
+    "kettlebell": "kettlebells",
+    "weight_plate": "a loose plate held or loaded",
+    "squat_rack": "squat rack / power rack with safeties",
+    "bench_flat": "flat bench",
+    "bench_adjustable": "adjustable (incline) bench",
+    "bench_decline": "decline bench",
+    "preacher_bench": "preacher bench (free-weight)",
+    "smith_machine": "Smith machine",
+    "landmine": "landmine attachment / barbell corner",
+    "olympic_platform": "lifting platform + bumper plates",
+    "cable_stack": "cable stack / functional trainer",
+    "lat_pulldown_station": "lat pulldown station",
+    "seated_cable_row_station": "seated cable row station",
+    "pullup_bar": "pull-up bar",
+    "dip_station": "dip station / parallel bars",
+    "assisted_pullup_dip_machine": "assisted pull-up / dip machine",
+    "captains_chair": "captain's chair / vertical knee-raise station",
+    "back_extension_45": "45-degree back extension / hyperextension bench",
+    "glute_ham_developer": "glute-ham developer",
+    "leg_press_machine": "leg press (sled or horizontal)",
+    "hack_squat_machine": "hack squat machine",
+    "pendulum_squat_machine": "pendulum squat machine",
+    "belt_squat_machine": "belt squat machine",
+    "leg_extension_machine": "leg extension machine",
+    "leg_curl_seated": "seated leg curl machine",
+    "leg_curl_lying": "lying (prone) leg curl machine",
+    "calf_raise_standing_machine": "standing calf raise machine",
+    "calf_raise_seated_machine": "seated calf raise machine",
+    "hip_thrust_machine": "hip thrust / glute bridge machine",
+    "glute_kickback_machine": "glute kickback machine",
+    "hip_abduction_machine": "hip abduction machine",
+    "hip_adduction_machine": "hip adduction machine",
+    "chest_press_machine": "seated chest press machine",
+    "incline_press_machine": "incline chest press machine",
+    "decline_press_machine": "decline chest press machine",
+    "pec_deck": "pec deck / chest fly machine",
+    "shoulder_press_machine": "shoulder press machine",
+    "lateral_raise_machine": "lateral raise machine",
+    "rear_delt_machine": "rear delt / reverse fly machine",
+    "t_bar_row_machine": "chest-supported T-bar row",
+    "seated_row_machine": "seated row machine (plate or selectorized)",
+    "pullover_machine": "pullover machine",
+    "biceps_curl_machine": "biceps curl machine",
+    "preacher_machine": "preacher curl machine",
+    "triceps_machine": "triceps extension / dip machine",
+    "ab_crunch_machine": "ab crunch machine",
+    "torso_rotation_machine": "torso rotation machine",
+    "back_extension_machine": "seated back extension machine",
+    "machine_unspecified": "a machine the history cannot name (review)",
+    "sled": "push / drag sled + turf",
+    "plyo_box": "plyo box / step",
+    "resistance_band": "resistance bands",
+    "ab_wheel": "ab wheel",
+    "medicine_ball": "medicine ball",
+    "suspension_trainer": "suspension trainer (TRX / rings)",
+    "jump_rope": "jump rope",
+    "battle_rope": "battle rope",
+    "treadmill": "treadmill",
+    "stationary_bike": "stationary / spin bike",
+    "air_bike": "air bike",
+    "rower": "rowing machine",
+    "elliptical": "elliptical",
+    "stair_climber": "stair climber",
+    "foam_roller": "foam roller / mobility kit",
+    "other_unspecified": "kit the history cannot name (review)",
+    # #5861 lane L2 (deploy/exercise_library_additions.py): equipment its new movements name
+    "recumbent_bike": "recumbent (back-supported) exercise bike",
+    "ski_erg": "ski ergometer",
+    "swimming_pool": "swimming pool (not part of home_gym)",
+    "ruck_vest": "weighted vest or loaded rucksack",
+    "stability_ball": "stability / physio ball",
+    "wrist_roller": "wrist roller",
+    "hand_gripper": "hand gripper",
+}
+
+_C = "Crossref + PubMed, " + REVIEWED_ON
+
+CITATIONS: dict[str, dict] = {
+    "maeo2023_overhead_triceps": {
+        "title": "Triceps brachii hypertrophy is substantially greater after elbow extension training performed in the overhead "
+        "versus neutral arm position",
+        "authors": "Maeo S, Wu Y, Huang M, Sakurai H, Kusagawa Y, Sugiyama T, Kanehisa H, Isaka T",
+        "year": 2023,
+        "journal": "European Journal of Sport Science 23:1240-1250",
+        "doi": "10.1080/17461391.2022.2100279",
+        "pmid": "35819335",
+        "design": "within-subject RCT, cable elbow extension, 12 wk, MRI muscle volume",
+        "finding": "overhead arm position grew the long head ~1.5x and the whole triceps ~1.4x more than the neutral position",
+        "verified_on": _C,
+    },
+    "maeo2021_seated_leg_curl": {
+        "title": "Greater Hamstrings Muscle Hypertrophy but Similar Damage Protection after Training at Long versus Short Muscle Lengths",
+        "authors": "Maeo S, Huang M, Wu Y, Sakurai H, Kusagawa Y, Sugiyama T, Kanehisa H, Isaka T",
+        "year": 2021,
+        "journal": "Medicine & Science in Sports & Exercise 53:825-837",
+        "doi": "10.1249/MSS.0000000000002523",
+        "pmid": "33009197",
+        "design": "within-subject RCT, seated vs prone leg curl, 12 wk, MRI muscle volume",
+        "finding": "seated (hip-flexed) leg curl grew the whole hamstrings more than prone (+14% vs +9%); both grew",
+        "verified_on": _C,
+    },
+    "kinoshita2023_standing_calf": {
+        "title": "Triceps surae muscle hypertrophy is greater after standing versus seated calf-raise training",
+        "authors": "Kinoshita M, Maeo S, Kobayashi Y, Eihara Y, Ono M, Sato M, Sugiyama T, Kanehisa H, Isaka T",
+        "year": 2023,
+        "journal": "Frontiers in Physiology 14:1272106",
+        "doi": "10.3389/fphys.2023.1272106",
+        "pmid": "38156065",
+        "design": "within-subject RCT, standing vs seated calf raise, 12 wk, MRI muscle volume",
+        "finding": "standing grew the gastrocnemius far more than seated (seated gastrocnemius did not grow significantly); "
+        "soleus grew similarly in both",
+        "verified_on": _C,
+    },
+    "kassiano2023_calf_long_length": {
+        "title": "Greater Gastrocnemius Muscle Hypertrophy After Partial Range of Motion Training Performed at Long Muscle Lengths",
+        "authors": "Kassiano W, Costa B, Kunevaliki G, Soares D, Zacarias G, Manske I, Takaki Y, Ruggiero MF, Stavinski N, "
+        "Francsuel J, Tricoli I, Carneiro MAS, Cyrino ES",
+        "year": 2023,
+        "journal": "Journal of Strength & Conditioning Research 37:1746-1753",
+        "doi": "10.1519/JSC.0000000000004460",
+        "pmid": "37015016",
+        "design": "RCT, calf raise on a leg-press machine, full vs initial (stretched) vs final partial ROM",
+        "finding": "the stretched-position partial grew the medial gastrocnemius more than full or shortened-position ROM",
+        "verified_on": _C,
+    },
+    "kubo2019_squat_depth": {
+        "title": "Effects of squat training with different depths on lower limb muscle volumes",
+        "authors": "Kubo K, Ikebukuro T, Yata H",
+        "year": 2019,
+        "journal": "European Journal of Applied Physiology 119:1933-1942",
+        "doi": "10.1007/s00421-019-04181-y",
+        "pmid": "31230110",
+        "design": "RCT, full vs half squat, 10 wk, MRI muscle volume",
+        "finding": "knee extensors grew similarly; adductors and gluteus maximus grew more with the full squat; "
+        "rectus femoris and hamstrings did not grow in either",
+        "verified_on": _C,
+    },
+    "plotkin2023_hip_thrust_vs_squat": {
+        "title": "Hip thrust and back squat training elicit similar gluteus muscle hypertrophy and transfer similarly to the deadlift",
+        "authors": "Plotkin DL, Rodas MA, Vigotsky AD, McIntosh MC, Breeze E, Ubrik R, Robitzsch C, Agyin-Birikorang A, "
+        "Mattingly ML, Michel JM, Kontos NJ, Lennon S, Fruge AD, Wilburn CM, Weimar WH, Bashir A, Beyers RJ, Henselmans M, "
+        "Contreras BM, Roberts MD",
+        "year": 2023,
+        "journal": "Frontiers in Physiology 14:1279170",
+        "doi": "10.3389/fphys.2023.1279170",
+        "pmid": "37877099",
+        "design": "RCT, hip thrust vs back squat, 9 wk, MRI",
+        "finding": "similar gluteal hypertrophy; greater thigh (quadriceps/adductor) hypertrophy with the squat",
+        "verified_on": _C,
+    },
+    "ema2013_knee_extension": {
+        "title": "Inhomogeneous architectural changes of the quadriceps femoris induced by resistance training",
+        "authors": "Ema R, Wakahara T, Miyamoto N, Kanehisa H, Kawakami Y",
+        "year": 2013,
+        "journal": "European Journal of Applied Physiology 113:2691-2703",
+        "doi": "10.1007/s00421-013-2700-1",
+        "pmid": "23949789",
+        "design": "12-wk knee-extension training, MRI + ultrasound per quadriceps muscle",
+        "finding": "knee-extension training grew the rectus femoris relatively more than the vasti",
+        "verified_on": _C,
+    },
+    "pedrosa2022_long_length_partials": {
+        "title": "Partial range of motion training elicits favorable improvements in muscular adaptations when carried out at long "
+        "muscle lengths",
+        "authors": "Pedrosa GF, Lima FV, Schoenfeld BJ, Lacerda LT, Simoes MG, Pereira MR, Diniz RC, Chagas MH",
+        "year": 2022,
+        "journal": "European Journal of Sport Science 22:1250-1260",
+        "doi": "10.1080/17461391.2021.1927199",
+        "pmid": "33977835",
+        "design": "RCT, knee extension, initial (stretched) vs final vs full vs varied ROM",
+        "finding": "partial ROM in the initial (lengthened) phase of the knee extension gave the greatest regional quadriceps growth",
+        "verified_on": _C,
+    },
+    "sato2021_elbow_angle": {
+        "title": "Elbow Joint Angles in Elbow Flexor Unilateral Resistance Exercise Training Determine Its Effects on Muscle "
+        "Strength and Thickness of Trained and Non-trained Arms",
+        "authors": "Sato S, Yoshida R, Kiyono R, Yahata K, Yasaka K, Nunes JP, Nosaka K, et al. (8 authors)",
+        "year": 2021,
+        "journal": "Frontiers in Physiology 12:734509",
+        "doi": "10.3389/fphys.2021.734509",
+        "pmid": "34616309",
+        "design": "RCT, preacher-style curl in the extended (0-50 deg) vs flexed (80-130 deg) elbow range, 5 wk, untrained",
+        "finding": "the extended (lengthened) range grew elbow-flexor thickness more (8.9% vs 3.4%)",
+        "verified_on": _C,
+    },
+    "bourne2017_hip_extension_nordic": {
+        "title": "Impact of the Nordic hamstring and hip extension exercises on hamstring architecture and morphology: "
+        "implications for injury prevention",
+        "authors": "Bourne MN, Duhig SJ, Timmins RG, Williams MD, Opar DA, Al Najjar A, Kerr GK, Shield AJ",
+        "year": 2017,
+        "journal": "British Journal of Sports Medicine 51:469-477",
+        "doi": "10.1136/bjsports-2016-096130",
+        "pmid": "27660368",
+        "design": "RCT, Nordic vs hip extension (back-extension style) training, 10 wk, MRI",
+        "finding": "hip extension grew the biceps femoris long head more than the Nordic; both grew the semitendinosus",
+        "verified_on": _C,
+    },
+    "stasinaki2018_triceps_length": {
+        "title": "Triceps Brachii Muscle Strength and Architectural Adaptations with Resistance Training Exercises at Short or "
+        "Long Fascicle Length",
+        "authors": "Stasinaki AN, Zaras N, Methenitis S, Tsitkanou S, Krase A, Kavvoura A, Terzis G",
+        "year": 2018,
+        "journal": "Journal of Functional Morphology and Kinesiology 3:28",
+        "doi": "10.3390/jfmk3020028",
+        "pmid": None,
+        "design": "triceps training at long vs short fascicle length (overhead vs other arm positions)",
+        "finding": "registered as existing (DOI resolved via Crossref; not indexed in PubMed); its findings were NOT reviewed, so it backs no tier",
+        "verified_on": "Crossref, " + REVIEWED_ON,
+    },
+    "haugen2023_free_vs_machine": {
+        "title": "Effect of free-weight vs. machine-based strength training on maximal strength, hypertrophy and jump performance "
+        "- a systematic review and meta-analysis",
+        "authors": "Haugen ME, Varvik FT, Larsen S, Haugen AS, van den Tillaar R, Bjornsen T",
+        "year": 2023,
+        "journal": "BMC Sports Science, Medicine and Rehabilitation 15:103",
+        "doi": "10.1186/s13102-023-00713-4",
+        "pmid": "37582807",
+        "design": "systematic review + meta-analysis, 13 studies",
+        "finding": "no difference in hypertrophy between free-weight and machine training (context, not a per-movement tier)",
+        "verified_on": _C,
+    },
+    "schoenfeld2017_volume": {
+        "title": "Dose-response relationship between weekly resistance training volume and increases in muscle mass: "
+        "A systematic review and meta-analysis",
+        "authors": "Schoenfeld BJ, Ogborn D, Krieger JW",
+        "year": 2017,
+        "journal": "Journal of Sports Sciences 35:1073-1082",
+        "doi": "10.1080/02640414.2016.1210197",
+        "pmid": "27433992",
+        "design": "meta-analysis",
+        "finding": "weekly set volume is dose-dependent for hypertrophy (context, not a per-movement tier)",
+        "verified_on": _C,
+    },
+    "wolf2023_partial_rom": {
+        "title": "Partial Vs Full Range of Motion Resistance Training: A Systematic Review and Meta-Analysis",
+        "authors": "Wolf M, Androulakis-Korakakis P, Fisher J, Schoenfeld B, Steele J",
+        "year": 2023,
+        "journal": "International Journal of Strength and Conditioning 3(1)",
+        "doi": "10.47206/ijsc.v3i1.182",
+        "pmid": None,
+        "design": "systematic review + meta-analysis",
+        "finding": "registered as existing (DOI resolved via Crossref; not indexed in PubMed); its findings were NOT reviewed, so it backs no tier",
+        "verified_on": "Crossref, " + REVIEWED_ON,
+    },
+    "lake2012_kettlebell_swing": {
+        "title": "Kettlebell Swing Training Improves Maximal and Explosive Strength",
+        "authors": "Lake JP, Lauder MA",
+        "year": 2012,
+        "journal": "Journal of Strength and Conditioning Research 26:2228-2233",
+        "doi": "10.1519/JSC.0b013e31825c2c9b",
+        "pmid": "22580981",
+        "design": "RCT, 6 wk kettlebell swing vs jump squat",
+        "finding": "swing training raised maximal and explosive strength comparably to jump squats (a strength/power outcome — "
+        "NOT a hypertrophy tier)",
+        "verified_on": _C,
+    },
+}
+
+# ── gates ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+_PROPOSED = "platform-proposed 2026-11-11 (#5769), pending owner ruling"
+# Owner ruling 2026-11-11 (#5772): the progression standards (every chain_prerequisite and performance_threshold gate)
+# are APPROVED as proposed. The bodyweight thresholds stay owner-to-set; the other gates keep `_PROPOSED`.
+_APPROVED_STANDARD = "owner-approved 2026-11-11 (progression standards approved as proposed, ruling on #5772)"
+_HANGING_SPLIT = (
+    "owner-approved standard of 2026-11-11 (dead hang >= 30 s, hanging knee raise 3 x 10, two sessions), split into ordered "
+    "steps 2026-11-14 (#5861 fix round 13)"
+)
+_HANGING_ENTRY = (
+    "platform-proposed 2026-11-14 (#5861 fix round 13) from the readiness criteria the owner accepted 2026-11-13; the entry "
+    "movement is pending his ruling"
+)
+
+
+_BW_COMMON = "each in two separate sessions at least 48 hours apart, with no pain flag on the movement or its joint in the last 14 days"
+# The movement-specific readiness standards the owner accepted as the criteria (2026-11-13). Practitioner heuristics, no
+# citation. They are STATED here and not yet evaluated: the gate stays a locked threshold until they are built as measured
+# chains (a follow-up after the shadow week) and then demonstrated. `demonstrate` is logged in Hevy; `confirm` is his word.
+READINESS_STANDARDS: dict[str, dict[str, list[str]]] = {
+    "bw_pull": {
+        "demonstrate": [
+            "assisted pull-up 3 x 6 at the machine's lightest usable assistance, RPE <= 8",
+            "3 x 3 negatives, each lowered for 4 to 5 seconds to a dead hang",
+        ],
+        "confirm": ["shoulders set before the elbows bend, chin over the bar, no kip, a full hang between reps"],
+    },
+    "bw_dip": {
+        "demonstrate": [
+            "assisted dip 3 x 8 at the machine's lightest usable assistance, RPE <= 8",
+            "straight-arm support hold on the bars 3 x 20 s",
+        ],
+        "confirm": ["forearms vertical, a slight forward lean, descent to upper arm parallel and no deeper"],
+    },
+    "bw_pushup": {
+        "demonstrate": [
+            "incline push-up 3 x 12 at RPE <= 8 at each lower step, down to a knee-height step",
+            "plank 3 x 30 s with the ribs down and no sag",
+        ],
+        "confirm": ["a rigid line from head to heel on every rep"],
+    },
+    "bw_nordic": {
+        "demonstrate": [
+            "a seated or lying leg curl that progressed over its last three exposures",
+            "45-degree back extension 3 x 12",
+            "assisted Nordic lowering 3 x 4, each over 3 seconds or longer",
+        ],
+        "confirm": ["no hamstring cramp on the lowering, the knees padded"],
+    },
+    "bw_hanging": {
+        "demonstrate": [
+            "dead hang 3 x 20 s, then 3 x 30 s, with active shoulders",
+            "supported (captain's chair) knee raise 3 x 10 without a swing",
+        ],
+        "confirm": ["the pelvis tilts at the top of the raise; no swing"],
+    },
+    "bw_advanced": {
+        "demonstrate": [
+            "pistol squat: box pistol to a knee-height box 3 x 5 per leg at RPE <= 8",
+            "handstand push-up: pike push-up with the feet on a bench 3 x 8 at RPE <= 8, and a wall handstand hold 3 x 20 s",
+        ],
+        "confirm": ["heel down with the knee tracking the toes (pistol)", "a full overhead reach without a back arch (handstand)"],
+    },
+}
+
+
+def _bw(gid_key: str, what: str) -> dict:
+    """A bodyweight gate. Owner ruling 19 (2026-11-13): no bodyweight cut-off is ever derived, so the private threshold stays
+    unset and UNSET IS LOCKED (`threshold_unset`; `exercise_gates.bodyweight_verdict` reads it so, and the private check
+    counts it valid). What he would have to show is the accepted readiness standard, stated on the gate."""
+    return {
+        "kind": "bodyweight_threshold",
+        "locks": True,
+        "measured_input": "7-day mean bodyweight (Withings), the same reading the charter's bodyweight gates use",
+        "threshold": {"ref": f"overlay:gate_thresholds.{gid_key}", "comparison": "at_or_under"},
+        "threshold_unset": "locked",  # said on the gate: no threshold is a LOCKED gate, and a valid one
+        "unlock_condition": f"LOCKED for {what}: the private threshold is unset, and by owner ruling (2026-11-13) no bodyweight "
+        "cut-off is derived, so it stays unset. What opens this is the readiness standard below, shown in logged sessions, once "
+        "that standard is built as a measured chain — a follow-up; until then nothing opens it.",
+        "readiness_standard": {
+            "status": "accepted by the owner 2026-11-13 as the criteria; practitioner heuristics; stated here, not yet evaluated",
+            "demonstrate": list(READINESS_STANDARDS[gid_key]["demonstrate"]),
+            "how": _BW_COMMON,
+            "confirm": list(READINESS_STANDARDS[gid_key]["confirm"]),
+        },
+        "chain_prerequisites": [],
+        "unknown_input": "locked",
+        "provenance": _PROPOSED + "; owner rulings 2026-11-13 (19, and the readiness standards accepted as criteria): no threshold is set",
+    }
+
+
+STD_3X = {"prerequisite_sessions_min": 3, "span_weeks_min": 2, "rpe_max": 7, "flag_free_days": 28}
+
+
+def _chain(prereqs: list[str], standard: str, provenance: str = _APPROVED_STANDARD, params: dict | None = None) -> dict:
+    """`standard` is the readable rule; `params` its machine-readable form (non-identifying performance numbers),
+    which the overlay writer copies into the private gate table the evaluator (#5772) reads."""
+    return {
+        "standard": dict(params or STD_3X),
+        "kind": "chain_prerequisite",
+        "locks": True,
+        "measured_input": "logged Hevy sessions of the prerequisite movement(s), with RPE and the private overlay's pain flags",
+        "unlock_condition": standard,
+        "chain_prerequisites": prereqs,  # "tid:<id>" or "key:<library key>", resolved by the builder
+        "unknown_input": "locked",
+        "provenance": provenance,
+    }
+
+
+_STD_3x = "the prerequisite logged in at least 3 sessions across at least 2 weeks at RPE <= 7, with no pain flag on it in the last 28 days"
+
+GATES: dict[str, dict] = {
+    # global
+    "pain_flag_exclusion": {
+        "kind": "pain_flag_exclusion",
+        "locks": True,
+        "applies_to": "all",
+        "measured_input": "pain flags on this movement in the private overlay's note signals (training_notes pain lexicon, word-bounded)",
+        "unlock_condition": "no pain flag on this movement in the last 28 days; after a flag, one pain-free trial set at RPE <= 6 reopens it",
+        "chain_prerequisites": [],
+        "unknown_input": "locked",
+        "provenance": _PROPOSED,
+    },
+    "equipment_available": {
+        "kind": "equipment_available",
+        "locks": True,
+        "applies_to": "all",
+        "measured_input": "gym_inventory.items[<equipment id>].home_gym.state for every id in the movement's `equipment`",
+        "unlock_condition": "every equipment id is `available` at home_gym; `unavailable` or `unknown` locks it and the movement's "
+        "ranked `fallbacks` are tried in order. Contention (an item was busy) never locks anything.",
+        "chain_prerequisites": [],
+        "unknown_input": "locked",
+        "provenance": "owner ruling 2026-11-11: movements logged in the last 5 years are available at home_gym by default; "
+        "a 'gym doesn't have X' note marks X unavailable (owner-confirmable)",
+    },
+    "clinical_cue_breathing": {
+        "kind": "clinical_cue",
+        "locks": False,
+        "measured_input": "none — a cue rides the movement; it is never evaluated against a number",
+        "unlock_condition": "not a lock: cue 'breathe through every rep, no breath-hold / no Valsalva bracing'. Never caps load or intensity.",
+        "chain_prerequisites": [],
+        "unknown_input": "locked",
+        "cue": "Breathe through every rep — exhale on the effort, no breath-hold.",
+        "clinical_reference": "owner-private (reference only, never an intensity gate)",
+        "provenance": "owner direction 2026-11-11: clinical context is cues only",
+    },
+    # bodyweight thresholds (values private)
+    "bw_pull": _bw("bw_pull", "bodyweight pull-ups / chin-ups"),
+    "bw_dip": _bw("bw_dip", "bodyweight dips"),
+    "bw_pushup": _bw("bw_pushup", "floor push-up volume"),
+    "bw_nordic": _bw("bw_nordic", "the Nordic hamstring curl"),
+    "bw_hanging": _bw("bw_hanging", "hanging knee / leg raises"),
+    "bw_advanced": _bw("bw_advanced", "advanced bodyweight skills (pistol, handstand, lever, flag)"),
+    "bw_power_clean": {
+        "kind": "bodyweight_threshold",
+        "locks": True,
+        "measured_input": "7-day mean bodyweight (Withings)",
+        "threshold": {"charter_ref": "gated_movements.power_clean.revisit_at_lb", "comparison": "at_or_under"},
+        "unlock_condition": "the charter's power-clean revisit weight (the charter owns the number), AND the hang power clean chain",
+        "chain_prerequisites": [],
+        "unknown_input": "locked",
+        "provenance": "training charter gated_movements.power_clean (owner rulings 2026-10-18)",
+    },
+    # bodyweight on-ramps (relative / performance, non-identifying). Fix round 13: `perf_assisted_pull` (carried by no movement;
+    # its 3 x 6 / 25 % standard is `chain_pull_negative`'s own) was removed — a gate nothing carries gates nothing.
+    # Fix round 13: the 5 s lowering left the machine standard — Hevy's Negative Pull Up template records reps and added
+    # weight, never time, so `eccentric_seconds_min` could not be met by any logged set. The tempo is now a stated,
+    # owner-confirmed item; the measured part is the sets, reps and sessions.
+    "chain_pull": _chain(
+        ["key:pull_up_negative"],
+        "3 x 3 negatives in two sessions, each lowered for 5 s or longer (the tempo is owner-confirmed: Hevy records reps, not "
+        "time, on this template), and the assisted-pull standard met (the negative's own step)",
+        provenance=_APPROVED_STANDARD + "; 2026-11-14 (#5861 fix round 13): the tempo is an owner-confirmed item, not a measured one",
+        params={"sets": 3, "reps_min": 3, "sessions_min": 2},
+    ),
+    "chain_pull_negative": _chain(
+        ["tid:2C37EC5E"],
+        "assisted pull-up logged at 3 x 6 with assistance <= 25% of bodyweight in two sessions",
+        params={"sets": 3, "reps_min": 6, "assistance_fraction_max": 0.25, "sessions_min": 2},
+    ),
+    "chain_dip": _chain(
+        ["tid:4B4BF8C2"],
+        "assisted dip logged at 3 x 8 with assistance <= 25% of bodyweight in two sessions, no shoulder pain flag",
+        params={"sets": 3, "reps_min": 8, "assistance_fraction_max": 0.25, "sessions_min": 2, "flag_free_days": 28},
+    ),
+    "chain_pushup": _chain(
+        ["tid:39C99849"],
+        "incline push-ups 3 x 12 at the lowest incline that holds a rigid plank, two sessions",
+        params={"sets": 3, "reps_min": 12, "sessions_min": 2},
+    ),
+    "chain_nordic": _chain(
+        ["tid:4F5866F8", "tid:11A123F3"], "45-degree back extension and seated leg curl each logged " + _STD_3x + "; band-assisted first"
+    ),
+    # The hanging chain (fix round 13, owner ruling 2026-11-14): `chain_hanging` required the hanging knee raise AND gated it,
+    # so it could never open. Three ordered steps, each measured on the movement before it: an ungated entry (the assisted
+    # pull-up: a controlled hang with part of the bodyweight supported) -> dead hang -> hanging knee raise -> hanging leg raise.
+    # Every one stays LOCKED until demonstrated; `bw_hanging` still rides all three movements.
+    "chain_dead_hang": _chain(
+        ["tid:2C37EC5E"],
+        "assisted pull-up logged at 3 x 6 at RPE <= 8 in two sessions, at any assistance: a controlled hang from the bar with "
+        "part of the bodyweight supported, before the full hang (practitioner heuristic)",
+        provenance=_HANGING_ENTRY,
+        params={"sets": 3, "reps_min": 6, "rpe_max": 8, "sessions_min": 2},
+    ),
+    "chain_hanging_knee_raise": _chain(
+        ["tid:B9380898"],
+        "dead hang 3 x 30 s with active shoulders in two sessions",
+        provenance=_HANGING_SPLIT,
+        params={"hang_seconds_min": 30, "sets": 3, "sessions_min": 2},
+    ),
+    "chain_hanging_leg_raise": _chain(
+        ["tid:08590920"],
+        "hanging knee raise 3 x 10 without a swing in two sessions",
+        provenance=_HANGING_SPLIT,
+        params={"sets": 3, "reps_min": 10, "sessions_min": 2},
+    ),
+    # kettlebell chain
+    # Fix round 14 (H4; the owner's 2026-11-14 library rulings, item 4, and his approval of the readiness standards as written):
+    # the swing's entry was "kettlebell deadlift logged in 2 sessions" (owner ruling 2026-11-11, #5810) — a movement the engine
+    # no longer serves, so the gate waited on a lift nobody prescribes. It is now the readiness proposal's measurable standard on
+    # a lift served every week: the barbell deadlift (hinge strength and control), PLUS the owner's one-time technique
+    # confirmation (`owner_confirmation_skill`, carried by every swing template). The swing stays LOCKED until both are met;
+    # nothing unlocks from this change. Practitioner heuristic, no citation.
+    "chain_kb_swing": _chain(
+        ["tid:C6272009"],
+        "barbell deadlift logged at 3 x 5 or more at RPE <= 8 in at least 3 sessions across at least 2 weeks, with no pain flag on "
+        "it in the last 28 days (hinge strength and control), AND the swing technique owner-confirmed (owner_confirmation_skill)",
+        provenance="owner ruling 2026-11-14 (readiness standards approved as written; #5861 fix round 14) — replaces the "
+        "2-kettlebell-deadlift entry of 2026-11-11 (#5810)",
+        params={"sets": 3, "reps_min": 5, "rpe_max": 8, "prerequisite_sessions_min": 3, "span_weeks_min": 2, "flag_free_days": 28},
+    ),
+    "chain_kb_clean": _chain(["tid:F8A0FCCA"], "kettlebell swing " + _STD_3x),
+    "chain_kb_overhead": _chain(["tid:F99C211D"], "kettlebell clean " + _STD_3x + ", rack position owner-confirmed"),
+    # Olympic-bar chain
+    "chain_hang_high_pull": _chain(["key:tall_high_pull"], "tall high pull " + _STD_3x),
+    # fix round 13: measured on the real hang high pull (Barbell High Pulls), not on the jump the key `hang_high_pull` holds
+    "chain_hang_power_clean": _chain(["key:barbell_high_pulls"], "hang high pull (Barbell High Pulls) " + _STD_3x),
+    "chain_full_clean": _chain(["tid:BD4E7E53"], "hang power clean " + _STD_3x + ", technique owner-confirmed"),
+    "owner_confirmation_skill": {
+        "kind": "owner_confirmation",
+        "locks": True,
+        "measured_input": "an owner (or coached-session) technique confirmation recorded for this movement",
+        "unlock_condition": "the owner marks the technique confirmed for this movement",
+        "chain_prerequisites": [],
+        "unknown_input": "locked",
+        "provenance": _PROPOSED,
+    },
+    # charter-owned gates
+    "charter_plyometric": {
+        "kind": "charter_gate",
+        "locks": True,
+        "charter_ref": "program_structure.EXCLUDED_METHODS + gated_movements.lower_leg_prep",
+        "measured_input": "the charter's plyometric exclusion and its lower-leg-prep carve-out (training.movement_catalog.is_plyometric)",
+        "unlock_condition": "excluded at every weight except the charter's carve-out list, opened from its prep weight",
+        "chain_prerequisites": [],
+        "unknown_input": "locked",
+        "provenance": "training charter (owner rulings 2026-09-23, 2026-10-18)",
+    },
+    "charter_running": {
+        "kind": "charter_gate",
+        "locks": True,
+        "charter_ref": "gated_movements.running",
+        "measured_input": "the running gate: bodyweight, pain-free walking weeks, the run/walk on-ramp stage",
+        "unlock_condition": "the charter's running gate and on-ramp completion",
+        "chain_prerequisites": [],
+        "unknown_input": "locked",
+        "provenance": "training charter gated_movements.running (#5090)",
+    },
+}
+
+# ── home_gym availability seeds (owner ruling 2026-11-11). The location is never named. ──
+# Each seed names its EVIDENCE state (`training.library_integrity.AVAILABILITY_EVIDENCE`); the builder derives `state` from
+# it. A seed wins over the logs, so an owner confirmation, exclusion or deferral is never overwritten by an inference.
+_DEFERRED = {
+    "evidence": "unknown",
+    "source": "owner ruling 2026-11-13 (13): deferred — unconfirmed, never assumed or served until he confirms it",
+}
+SEEDED_AVAILABILITY: dict[str, dict] = {
+    "preacher_machine": {"evidence": "confirmed_unavailable", "source": "owner note 2026-11-08", "owner_confirmable": True},
+    "hip_abduction_machine": dict(_DEFERRED),
+    "hip_adduction_machine": dict(_DEFERRED),
+    "stair_climber": dict(_DEFERRED),
+    "belt_squat_machine": dict(_DEFERRED),
+    "pendulum_squat_machine": dict(_DEFERRED),
+    "incline_press_machine": dict(_DEFERRED),
+}
+
+# Owner ruling 2026-11-15 (A, #6014): equipment the owner CONFIRMED present at home_gym. An owner confirmation wins over the
+# logs, so each is `owner_confirmed` (served) whatever its log history says. The standing calf raise machine is NOT here
+# (ruling B: owner unsure — its state is left to the logs).
+_OWNER_CONFIRMED_1115 = {
+    "evidence": "owner_confirmed",
+    "source": "owner ruling 2026-11-15 (A): confirmed present at home_gym",
+}
+SEEDED_AVAILABILITY |= {
+    eid: dict(_OWNER_CONFIRMED_1115)
+    for eid in (
+        "seated_row_machine",  # seated row machine
+        "shoulder_press_machine",  # seated shoulder press machine
+        "hip_thrust_machine",  # hip thrust machine
+        "t_bar_row_machine",  # chest-supported T-bar row
+        "hack_squat_machine",  # hack squat machine
+        "back_extension_45",  # 45-degree back extension bench
+        "triceps_machine",  # triceps extension / push-away machine
+        "bench_decline",  # decline bench
+        "ab_wheel",  # ab wheel
+        "smith_machine",  # Smith machine
+        "captains_chair",  # captain's chair (supported knee raise station)
+        "pullover_machine",  # pullover machine
+    )
+}
+
+HOME_GYM_SINCE: dict[str, str] = {
+    "date": "2026-05-01",
+    "source": "owner ruling 2026-11-15 (C): he has trained at home_gym only since May 2026",
+}
+"""The first day a log can be evidence for home_gym (owner ruling 2026-11-15, C, #6014). The recent-inferred window starts at
+the LATER of its 12 months and this day, so a log from an earlier gym never makes a machine look present. Month only — no
+personal log date rides the repo."""
+
+# ── hand-curated attributes ─────────────────────────────────────────────────────────────────────────────────────────
+_L, _M, _H, _U = "low", "moderate", "high", "unknown"
+
+
+def js(spinal: str, shear: str, wrist: str, elbow: str, shoulder: str) -> dict:
+    return {"spinal_load": spinal, "shear": shear, "wrist": wrist, "elbow": elbow, "shoulder": shoulder}
+
+
+def hyp(
+    target: str,
+    confidence: str = "none_reviewed",
+    cites: list[str] | None = None,
+    note: str | None = None,
+    adjust: tuple[Any, ...] | None = None,
+) -> dict:
+    """One per-target hypertrophy row's EVIDENCE half (#5857). The quality tier is not written here: the builder derives
+    `rubric_score`, `rubric_tier` and `tier` from the movement's attributes (`training.quality_rubric`). `adjust` is
+    (bands +1/-1, citation id, why): a direct trial moving the row one band off its rubric tier."""
+    row: dict = {
+        "target": target,
+        "evidence_confidence": confidence,
+        "citations": list(cites or []),
+        "last_reviewed": REVIEWED_ON if confidence != "none_reviewed" else "unreviewed",
+    }
+    if adjust:
+        row["evidence_adjustment"] = {"bands": adjust[0], "citation": adjust[1], "why": adjust[2]}
+        if len(adjust) > 3:  # #5861 FIX7: an equivalence adjustment names its basis and the higher-tier comparator it matched
+            row["evidence_adjustment"] |= {"basis": adjust[3], "comparator": adjust[4]}
+    if note:
+        row["note"] = note
+    return row
+
+
+_MAEO23 = "maeo2023_overhead_triceps"
+_MAEO21 = "maeo2021_seated_leg_curl"
+_KINO23 = "kinoshita2023_standing_calf"
+_OVERHEAD_UP = (+1, _MAEO23, "overhead arm position grew the triceps more than the neutral position (Maeo 2023)")
+_SEATED_UP = (+1, _MAEO21, "seated grew the hamstrings more than prone (Maeo 2021)")
+_PRONE_DOWN = (-1, _MAEO21, "prone grew the hamstrings less than seated (Maeo 2021)")
+_STANDING_UP = (+1, _KINO23, "standing grew the gastrocnemius more than seated (Kinoshita 2023)")
+_HIP_THRUST_EQ = (
+    +1,
+    "plotkin2023_hip_thrust_vs_squat",
+    "the hip thrust grew the glutes as much as the back squat (Plotkin 2023): equivalence with a higher-tier comparator",
+    "equivalence",
+    "squat_barbell",
+)
+"""#5861 FIX7 (ruling 17 applied as written, rubric 3.5.0): the barbell hip thrust's glute row scores length like every muscle
+(shortened: B on points); its direct trial matched the back squat, whose glute row sits higher — the rubric's equivalence +1."""
+
+
+# Keyed by Hevy template id (upper). Each value overrides the derived attribute of the same name.
+CURATED: dict[str, dict] = {
+    # triceps
+    "B5EFBF9C": {
+        "title": "Overhead Triceps Extension (Cable)",
+        "target": {"primary": "triceps", "secondary": [], "region": "upper"},
+        "family": "hypertrophy",
+        "length_bias": "lengthened",
+        "resistance_profile": "cable",
+        "stability": "moderate",
+        "joint_stress": js(_L, _L, _L, _M, _M),
+        "skill_complexity": "low",
+        "equipment": ["cable_stack"],
+        "hypertrophy": [
+            hyp("triceps_long_head", "rct_direct", [_MAEO23], "this exact movement (cable, overhead arm)", _OVERHEAD_UP),
+            hyp("triceps_lateral_medial", "rct_direct", [_MAEO23], adjust=_OVERHEAD_UP),
+        ],
+        "curation_note": "missing from the #5075 upper_heavy triceps pool (owner, 2026-11-11); SPLIT from 21310F5F by owner ruling 2026-11-11 (#5773) — its own movement, no longer an alias",
+    },
+    "21310F5F": {
+        "target": {"primary": "triceps", "secondary": [], "region": "upper"},
+        "family": "hypertrophy",
+        "length_bias": "mid",
+        "resistance_profile": "cable",
+        "stability": "moderate",
+        "joint_stress": js(_L, _L, _L, _M, _L),
+        "skill_complexity": "low",
+        "equipment": ["cable_stack"],
+        "hypertrophy": [
+            hyp("triceps", note="neutral-arm extension grew less than overhead in Maeo 2023; evidence not assigned without review")
+        ],
+    },
+    "93A552C6": {
+        "family": "hypertrophy",
+        "length_bias": "shortened",
+        "resistance_profile": "cable",
+        "stability": "moderate",
+        "joint_stress": js(_L, _L, _L, _M, _L),
+        "skill_complexity": "low",
+        "equipment": ["cable_stack"],
+    },
+    "2AFFFFA8-BD9F-4F27-BB8C-159C2875C4B1": {
+        "target": {"primary": "triceps", "secondary": [], "region": "upper"},
+        "family": "hypertrophy",
+        "length_bias": "lengthened",
+        "resistance_profile": "free_weight",
+        "stability": "moderate",
+        "joint_stress": js(_L, _L, _L, _H, _M),
+        "skill_complexity": "low",
+        "equipment": ["dumbbell", "bench_flat"],
+        "hypertrophy": [hyp("triceps", note="owner asked 2026-11-08 to pressure-test its efficacy; not reviewed")],
+    },
+    # biceps
+    "4F942934": {
+        "title": "Preacher Curl (Barbell)",
+        "target": {"primary": "biceps", "secondary": ["forearms"], "region": "upper"},
+        "family": "hypertrophy",
+        "length_bias": "lengthened",
+        "resistance_profile": "free_weight",
+        "stability": "high",
+        "joint_stress": js(_L, _L, _H, _M, _L),
+        "skill_complexity": "low",
+        "equipment": ["ez_bar", "preacher_bench"],
+        "hypertrophy": [hyp("biceps", "rct_characteristic", ["sato2021_elbow_angle"], "preacher position loads the extended-elbow range")],
+        # owner ruling 2026-11-11 (#5773): UNLOCKED — the not_for_you_now (a discomfort-class note, never a pain-class
+        # one under #5806's rule) is removed; a real `pain` note still excludes it at selection time.
+    },
+    "1E9A6B8E": {
+        "family": "hypertrophy",
+        "length_bias": "lengthened",
+        "resistance_profile": "machine_selectorized",
+        "stability": "high",
+        "joint_stress": js(_L, _L, _L, _M, _L),
+        "skill_complexity": "low",
+        "equipment": ["preacher_machine"],
+        "hypertrophy": [hyp("biceps", "rct_characteristic", ["sato2021_elbow_angle"])],
+    },
+    "FAB6EB2F": {
+        "family": "hypertrophy",
+        "length_bias": "lengthened",
+        "resistance_profile": "free_weight",
+        "stability": "high",
+        "joint_stress": js(_L, _L, _L, _M, _L),
+        "skill_complexity": "low",
+        "equipment": ["dumbbell", "preacher_bench"],
+        "hypertrophy": [hyp("biceps", "rct_characteristic", ["sato2021_elbow_angle"])],
+    },
+    "8BAB2735": {
+        "family": "hypertrophy",
+        "length_bias": "lengthened",
+        "resistance_profile": "free_weight",
+        "stability": "high",
+        "joint_stress": js(_L, _L, _L, _L, _M),
+        "skill_complexity": "low",
+        "equipment": ["dumbbell", "bench_adjustable"],
+        "hypertrophy": [hyp("biceps", note="shoulder-extended position; no verified trial on this movement")],
+    },
+    "7E3BC8B6": {
+        "family": "hypertrophy",
+        "length_bias": "mid",
+        "resistance_profile": "free_weight",
+        "stability": "moderate",
+        "skill_complexity": "low",
+        "equipment": ["dumbbell"],
+    },
+    # legs
+    "11A123F3": {
+        "family": "hypertrophy",
+        "length_bias": "lengthened",
+        "resistance_profile": "machine_selectorized",
+        "stability": "high",
+        "joint_stress": js(_L, _L, _L, _L, _L),
+        "skill_complexity": "low",
+        "equipment": ["leg_curl_seated"],
+        "hypertrophy": [hyp("hamstrings", "rct_direct", [_MAEO21], "seated beat prone, MRI, 12 wk", _SEATED_UP)],
+    },
+    "B8127AD1": {
+        "family": "hypertrophy",
+        "length_bias": "mid",
+        "resistance_profile": "machine_selectorized",
+        "stability": "high",
+        "joint_stress": js(_L, _L, _L, _L, _L),
+        "skill_complexity": "low",
+        "equipment": ["leg_curl_lying"],
+        "hypertrophy": [hyp("hamstrings", "rct_direct", [_MAEO21], "grew, but less than the seated curl", _PRONE_DOWN)],
+    },
+    "75A4F6C4": {
+        "family": "hypertrophy",
+        "length_bias": "mid",
+        "resistance_profile": "machine_selectorized",
+        "stability": "high",
+        "joint_stress": js(_L, _L, _L, _L, _L),
+        "skill_complexity": "low",
+        "equipment": ["leg_extension_machine"],
+        "hypertrophy": [
+            hyp(
+                "quadriceps_rectus_femoris",
+                "rct_characteristic",
+                ["ema2013_knee_extension", "pedrosa2022_long_length_partials"],
+                "rectus femoris grew most with knee extension; the stretched-range partial grew most",
+            )
+        ],
+    },
+    "D04AC939": {
+        "family": "strength_anchor",
+        "length_bias": "lengthened",
+        "resistance_profile": "free_weight",
+        "stability": "low",
+        "joint_stress": js(_H, _M, _M, _L, _M),
+        "skill_complexity": "moderate",
+        "equipment": ["barbell", "squat_rack"],
+        "hypertrophy": [
+            hyp("quadriceps", "rct_direct", ["kubo2019_squat_depth", "plotkin2023_hip_thrust_vs_squat"]),
+            hyp("glutes", "rct_direct", ["kubo2019_squat_depth", "plotkin2023_hip_thrust_vs_squat"], "full depth beat half depth"),
+            hyp("adductors", "rct_direct", ["kubo2019_squat_depth"], "full depth"),
+        ],
+    },
+    "D57C2EC7": {
+        "family": "hypertrophy",
+        "length_bias": "shortened",
+        "resistance_profile": "free_weight",
+        "stability": "moderate",
+        "joint_stress": js(_L, _L, _L, _L, _L),
+        "skill_complexity": "moderate",
+        "equipment": ["barbell", "bench_flat"],
+        "hypertrophy": [
+            hyp(
+                "glutes",
+                "rct_direct",
+                ["plotkin2023_hip_thrust_vs_squat"],
+                "equal to the back squat for the glutes",
+                adjust=_HIP_THRUST_EQ,
+            )
+        ],
+    },
+    "68CE0B9B": {
+        "family": "hypertrophy",
+        "length_bias": "shortened",
+        "resistance_profile": "machine_plate_loaded",
+        "stability": "high",
+        "joint_stress": js(_L, _L, _L, _L, _L),
+        "skill_complexity": "low",
+        "equipment": ["hip_thrust_machine"],
+        "hypertrophy": [hyp("glutes", note="machine form of the hip thrust; the trial used a barbell")],
+    },
+    "4F5866F8": {
+        "title": "Back Extension (Hyperextension)",
+        "target": {"primary": "hamstrings", "secondary": ["glutes", "back"], "region": "lower"},
+        "family": "hypertrophy",
+        "length_bias": "lengthened",
+        "resistance_profile": "bodyweight",
+        "stability": "high",
+        "joint_stress": js(_M, _L, _L, _L, _L),
+        "skill_complexity": "low",
+        "equipment": ["back_extension_45"],
+        "hypertrophy": [
+            hyp(
+                "hamstrings_biceps_femoris_long_head",
+                "rct_characteristic",
+                ["bourne2017_hip_extension_nordic"],
+                "hip-extension training",
+            )
+        ],
+    },
+    "108D7A14": {
+        "family": "hypertrophy",
+        "length_bias": "lengthened",
+        "resistance_profile": "bodyweight",
+        "stability": "moderate",
+        "joint_stress": js(_L, _L, _L, _L, _L),
+        "skill_complexity": "high",
+        "equipment": ["bodyweight"],
+        "hypertrophy": [hyp("hamstrings_semitendinosus", "rct_direct", ["bourne2017_hip_extension_nordic"])],
+    },
+    "E05C2C38": {
+        "family": "hypertrophy",
+        "length_bias": "lengthened",
+        "resistance_profile": "machine_selectorized",
+        "stability": "high",
+        "joint_stress": js(_M, _L, _L, _L, _L),
+        "skill_complexity": "low",
+        "equipment": ["calf_raise_standing_machine"],
+        "hypertrophy": [hyp("gastrocnemius", "rct_direct", [_KINO23, "kassiano2023_calf_long_length"], adjust=_STANDING_UP)],
+    },
+    "E53CCBE5": {
+        "family": "hypertrophy",
+        "length_bias": "lengthened",
+        "resistance_profile": "free_weight",
+        "stability": "low",
+        "joint_stress": js(_M, _L, _L, _L, _M),
+        "skill_complexity": "moderate",
+        "equipment": ["barbell", "squat_rack"],
+        "hypertrophy": [hyp("gastrocnemius", "rct_direct", [_KINO23], "standing / knee-extended position", _STANDING_UP)],
+    },
+    "062AB91A": {
+        "family": "hypertrophy",
+        "length_bias": "shortened",
+        "resistance_profile": "machine_plate_loaded",
+        "stability": "high",
+        "joint_stress": js(_L, _L, _L, _L, _L),
+        "skill_complexity": "low",
+        "equipment": ["calf_raise_seated_machine"],
+        "hypertrophy": [
+            # #5861 FIX-DATA: soleus ONLY. The bent knee takes the gastrocnemius out (it did not grow significantly seated in
+            # Kinoshita 2023 — a standing raise trains it), so a seated raise is never credited to it.
+            hyp("soleus", "rct_direct", ["kinoshita2023_standing_calf"], "soleus grew similarly seated and standing"),
+        ],
+    },
+    "91237BDD": {
+        "family": "hypertrophy",
+        "length_bias": "lengthened",
+        "resistance_profile": "machine_plate_loaded",
+        "stability": "high",
+        "joint_stress": js(_L, _L, _L, _L, _L),
+        "skill_complexity": "low",
+        "equipment": ["leg_press_machine"],
+        "hypertrophy": [
+            hyp(
+                "gastrocnemius",
+                "rct_direct",
+                ["kassiano2023_calf_long_length"],
+                "the trial ran on a leg press; stretched-range partials",
+            )
+        ],
+    },
+    "C7973E0E": {
+        "family": "hypertrophy",
+        "length_bias": "mid",
+        "resistance_profile": "machine_plate_loaded",
+        "stability": "high",
+        "joint_stress": js(_L, _L, _L, _L, _L),
+        "skill_complexity": "low",
+        "equipment": ["leg_press_machine"],
+    },
+    "B5D3A742": {
+        "family": "hypertrophy",
+        "length_bias": "lengthened",
+        "resistance_profile": "free_weight",
+        "stability": "low",
+        "joint_stress": js(_M, _L, _L, _L, _L),
+        "skill_complexity": "moderate",
+        "equipment": ["dumbbell", "bench_flat"],
+    },
+    "C6272009": {
+        "family": "strength_anchor",
+        "length_bias": "mid",
+        "resistance_profile": "free_weight",
+        "stability": "low",
+        "joint_stress": js(_H, _M, _L, _L, _L),
+        "skill_complexity": "moderate",
+        "equipment": ["barbell"],
+    },
+    "B923B230": {
+        "family": "strength_anchor",
+        "length_bias": "mid",
+        "resistance_profile": "free_weight",
+        "stability": "low",
+        "joint_stress": js(_H, _L, _L, _L, _L),
+        "skill_complexity": "moderate",
+        "equipment": ["trap_bar"],
+    },
+    "2B4B7310": {
+        "family": "strength_anchor",
+        "length_bias": "lengthened",
+        "resistance_profile": "free_weight",
+        "stability": "low",
+        "joint_stress": js(_H, _H, _L, _L, _L),
+        "skill_complexity": "moderate",
+        "equipment": ["barbell"],
+    },
+    # chest / shoulders / back
+    "79D0BB3A": {
+        "family": "strength_anchor",
+        "length_bias": "mid",
+        "resistance_profile": "free_weight",
+        "stability": "moderate",
+        "joint_stress": js(_L, _L, _M, _M, _M),
+        "skill_complexity": "moderate",
+        "equipment": ["barbell", "bench_flat", "squat_rack"],
+    },
+    "07B38369": {
+        "family": "hypertrophy",
+        "length_bias": "lengthened",
+        "resistance_profile": "free_weight",
+        "stability": "moderate",
+        "joint_stress": js(_L, _L, _L, _M, _M),
+        "skill_complexity": "moderate",
+        "equipment": ["dumbbell", "bench_adjustable"],
+    },
+    "FAF31231": {
+        "family": "hypertrophy",
+        "length_bias": "mid",
+        "resistance_profile": "machine_plate_loaded",
+        "stability": "high",
+        "joint_stress": js(_L, _L, _L, _L, _L),
+        "skill_complexity": "low",
+        "equipment": ["decline_press_machine"],
+        "hypertrophy": [hyp("chest", note="machines ~= free weights for hypertrophy overall (Haugen 2023, context only)")],
+    },
+    "6A6C31A5": {
+        "family": "hypertrophy",
+        "length_bias": "lengthened",
+        "resistance_profile": "cable",
+        "stability": "high",
+        "joint_stress": js(_L, _L, _L, _L, _M),
+        "skill_complexity": "low",
+        "equipment": ["lat_pulldown_station"],
+    },
+    "F1E57334": {
+        "family": "hypertrophy",
+        "length_bias": "mid",
+        "resistance_profile": "free_weight",
+        "stability": "moderate",
+        "joint_stress": js(_M, _L, _L, _L, _L),
+        "skill_complexity": "low",
+        "equipment": ["dumbbell", "bench_flat"],
+    },
+    "BE640BA0": {
+        "family": "corrective",
+        "length_bias": "shortened",
+        "resistance_profile": "cable",
+        "stability": "moderate",
+        "joint_stress": js(_L, _L, _L, _L, _L),
+        "skill_complexity": "low",
+        "equipment": ["cable_stack"],
+    },
+    "878CD1D0": {
+        "title": "Shoulder Press (Dumbbell)",
+        "target": {"primary": "shoulders", "secondary": ["triceps"], "region": "upper"},
+        "family": "hypertrophy",
+        "length_bias": "mid",
+        "resistance_profile": "free_weight",
+        "stability": "moderate",
+        "joint_stress": js(_M, _L, _L, _M, _M),
+        "skill_complexity": "moderate",
+        "equipment": ["dumbbell", "bench_adjustable"],
+    },
+    "D8281C62": {
+        "title": "Rear Delt Reverse Fly (Machine)",
+        "target": {"primary": "shoulders", "secondary": ["back"], "region": "upper"},
+        "family": "hypertrophy",
+        "length_bias": "mid",
+        "resistance_profile": "machine_selectorized",
+        "stability": "high",
+        "joint_stress": js(_L, _L, _L, _L, _L),
+        "skill_complexity": "low",
+        "equipment": ["rear_delt_machine"],
+    },
+    # carries / conditioning / core
+    "F8A0FCCA": {
+        "family": "carry_conditioning",
+        "length_bias": "not_applicable",
+        "resistance_profile": "free_weight",
+        "stability": "low",
+        "joint_stress": js(_M, _M, _L, _L, _L),
+        "skill_complexity": "moderate",
+        "equipment": ["kettlebell"],
+        "other_evidence": [{"outcome": "maximal + explosive strength", "citations": ["lake2012_kettlebell_swing"]}],
+    },
+    "50C613D0": {
+        "family": "carry_conditioning",
+        "length_bias": "not_applicable",
+        "resistance_profile": "free_weight",
+        "stability": "low",
+        "joint_stress": js(_M, _L, _M, _L, _L),
+        "skill_complexity": "low",
+        "equipment": ["dumbbell"],
+    },
+    "056A1C53-C778-4ACE-BB18-6F72E81B6724": {
+        "family": "carry_conditioning",
+        "length_bias": "not_applicable",
+        "resistance_profile": "free_weight",
+        "stability": "low",
+        "joint_stress": js(_M, _L, _M, _L, _L),
+        "skill_complexity": "low",
+        "equipment": ["dumbbell"],
+        "curation_note": "logged with a dumbbell or a kettlebell; the kettlebell form is `kettlebell_suitcase_carry`",
+    },
+    "4EEA8956-E0F1-4327-9E7D-E4F4F9A0B1DF": {
+        "target": {"primary": "abs", "secondary": ["obliques"], "region": "core"},
+        "family": "core_anti_movement",
+        "length_bias": "not_applicable",
+        "resistance_profile": "cable",
+        "stability": "moderate",
+        "joint_stress": js(_L, _L, _L, _L, _L),
+        "skill_complexity": "low",
+        "equipment": ["cable_stack"],
+    },
+    "EE0911E8-C017-42DB-B271-633D99E13507": {
+        "target": {"primary": "abs", "secondary": ["obliques"], "region": "core"},
+        "family": "core_anti_movement",
+        "length_bias": "not_applicable",
+        "resistance_profile": "cable",
+        "stability": "moderate",
+        "joint_stress": js(_L, _L, _L, _L, _L),
+        "skill_complexity": "low",
+        "equipment": ["cable_stack"],
+    },
+    "C6C9B8A0": {"family": "core_anti_movement", "length_bias": "not_applicable", "equipment": ["bodyweight"]},
+    "D8F7F851": {"family": "carry_conditioning", "equipment": ["stationary_bike"]},
+    "243710DE": {"family": "carry_conditioning", "equipment": ["treadmill"]},
+    "33EDD7DB": {"family": "carry_conditioning", "equipment": ["bodyweight"]},
+    # Olympic-bar work in his history
+    "C628D768": {
+        "family": "skill_athletic",
+        "length_bias": "not_applicable",
+        "resistance_profile": "free_weight",
+        "stability": "low",
+        "joint_stress": js(_H, _M, _H, _M, _M),
+        "skill_complexity": "high",
+        "equipment": ["barbell", "olympic_platform"],
+        "gates": ["bw_power_clean", "chain_full_clean"],
+    },
+    "ABB00838": {
+        "family": "skill_athletic",
+        "length_bias": "not_applicable",
+        "resistance_profile": "free_weight",
+        "stability": "low",
+        "joint_stress": js(_H, _M, _H, _M, _M),
+        "skill_complexity": "high",
+        "equipment": ["barbell", "olympic_platform"],
+        "gates": ["bw_power_clean", "chain_full_clean", "owner_confirmation_skill"],
+    },
+    "9B13BA4B": {
+        "family": "skill_athletic",
+        "length_bias": "not_applicable",
+        "resistance_profile": "free_weight",
+        "stability": "low",
+        "joint_stress": js(_M, _L, _M, _L, _M),
+        "skill_complexity": "moderate",
+        "equipment": ["kettlebell"],
+        "gates": ["chain_kb_clean"],
+    },
+    "2C37EC5E": {"family": "hypertrophy", "skill_complexity": "low", "equipment": ["assisted_pullup_dip_machine"], "gates": []},
+    "4B4BF8C2": {"family": "hypertrophy", "skill_complexity": "low", "equipment": ["assisted_pullup_dip_machine"], "gates": []},
+    "D23C609B": {"family": "hypertrophy", "skill_complexity": "low", "equipment": ["assisted_pullup_dip_machine"], "gates": []},
+    # fix round 13: the dead hang's two other logged forms are the same full-bodyweight hang — they carry its gates, so a
+    # locked dead hang is never served under another name
+    "50C6F8E4-F219-4B4D-9D93-6F56208F2B78": {"gates": ["bw_hanging", "chain_dead_hang"]},
+    "1211F57C-AB54-4489-9DAF-514337DECEDE": {"gates": ["bw_hanging", "chain_dead_hang"]},
+    # fix round 13: the kettlebell swing's two other logged forms are the same ballistic hinge — they carry its chain step, so
+    # a locked swing is never served under another name (owner ruling: the swing is never auto-unlocked)
+    "2CFA90EB-D60C-4AE1-BAD9-FB242EC4BFB1": {"gates": ["chain_kb_swing", "owner_confirmation_skill"]},
+    "D8EECEDA-FF22-42BC-8023-44E4F05B9CF5": {"gates": ["chain_kb_swing", "owner_confirmation_skill"]},
+}
+
+# ── expansion candidates (#5769 owner spec) ─────────────────────────────────────────────────────────────────────────
+# `template_id` is a Hevy template (standard 8-hex, or a custom template already in his account) where one exists,
+# else None with a `template_note`. A candidate whose template is in his history merges into the history entry.
+
+
+def _x(key: str, title: str, tid: str | None, **attrs) -> dict:
+    out = {"key": key, "title": title, "template_id": tid}
+    out.update(attrs)
+    return out
+
+
+_KB = ["kettlebell"]
+EXPANSION: list[dict] = [
+    # kettlebell
+    _x(
+        "kettlebell_deadlift",
+        "Kettlebell Deadlift",
+        None,
+        template_note=(
+            "owner ruling 2026-11-14: it gets its OWN custom Hevy template (on the creation list). It no longer logs under Hevy's "
+            "Sumo Deadlift D20D7BBE — a barbell lift's template, so the two histories would have mixed (nothing was ever logged "
+            "there). Not selectable until the template id is recorded in deploy/exercise_library_templates.json"
+        ),
+        # #5772: the evaluator counts any logged exercise whose title carries both words (the custom template, once it
+        # exists) — training.exercise_gates.sessions_for.
+        template_match={"title_all": ["kettlebell", "deadlift"]},
+        target={"primary": "glutes", "secondary": ["hamstrings", "back"], "region": "lower"},
+        family="strength_anchor",
+        length_bias="mid",
+        resistance_profile="free_weight",
+        stability="moderate",
+        joint_stress=js(_M, _L, _L, _L, _L),
+        skill_complexity="low",
+        equipment=_KB,
+        curation_note="first link of the kettlebell chain (deadlift -> swing -> clean -> press/snatch)",
+    ),
+    _x(
+        "kettlebell_swing",
+        "Kettlebell Swing",
+        "F8A0FCCA",
+        family="carry_conditioning",
+        skill_complexity="moderate",
+        equipment=_KB,
+        gates=["chain_kb_swing", "owner_confirmation_skill"],  # fix round 14: the technique is his word (the platform cannot see form)
+    ),
+    _x(
+        "kettlebell_goblet_squat",
+        "Kettlebell Goblet Squat",
+        "A127DA73",
+        target={"primary": "quadriceps", "secondary": ["glutes", "adductors"], "region": "lower"},
+        family="hypertrophy",
+        length_bias="lengthened",
+        resistance_profile="free_weight",
+        stability="moderate",
+        joint_stress=js(_M, _L, _L, _L, _L),
+        skill_complexity="low",
+        equipment=_KB,
+    ),
+    _x(
+        "kettlebell_clean",
+        "Kettlebell Clean",
+        "F99C211D",
+        target={"primary": "glutes", "secondary": ["back", "shoulders"], "region": "full_body"},
+        family="skill_athletic",
+        length_bias="not_applicable",
+        resistance_profile="free_weight",
+        stability="low",
+        joint_stress=js(_M, _M, _M, _L, _M),
+        skill_complexity="moderate",
+        equipment=_KB,
+        gates=["chain_kb_clean"],
+    ),
+    _x(
+        "kettlebell_press",
+        "Kettlebell Shoulder Press",
+        "6433CD93",
+        target={"primary": "shoulders", "secondary": ["triceps"], "region": "upper"},
+        family="hypertrophy",
+        length_bias="mid",
+        resistance_profile="free_weight",
+        stability="low",
+        joint_stress=js(_M, _L, _M, _M, _M),
+        skill_complexity="moderate",
+        equipment=_KB,
+        gates=["chain_kb_overhead"],
+    ),
+    _x(
+        "kettlebell_snatch",
+        "Kettlebell Snatch",
+        "89304423",
+        target={"primary": "glutes", "secondary": ["shoulders", "back"], "region": "full_body"},
+        family="skill_athletic",
+        length_bias="not_applicable",
+        resistance_profile="free_weight",
+        stability="low",
+        joint_stress=js(_M, _M, _M, _M, _H),
+        skill_complexity="high",
+        equipment=_KB,
+        gates=["chain_kb_overhead", "owner_confirmation_skill"],
+    ),
+    _x(
+        "kettlebell_suitcase_carry",
+        "Suitcase Carry (Kettlebell)",
+        None,
+        template_note="log under his Suitcase Carry custom template 056A1C53-C778-4ACE-BB18-6F72E81B6724 (history) with the kettlebell noted",
+        target={"primary": "abs", "secondary": ["obliques", "forearms"], "region": "core"},
+        family="carry_conditioning",
+        length_bias="not_applicable",
+        resistance_profile="free_weight",
+        stability="low",
+        joint_stress=js(_M, _L, _M, _L, _L),
+        skill_complexity="low",
+        equipment=_KB,
+    ),
+    _x(
+        "kettlebell_turkish_get_up",
+        "Kettlebell Turkish Get Up",
+        "5F8903BF",
+        target={"primary": "shoulders", "secondary": ["abs", "glutes"], "region": "full_body"},
+        family="skill_athletic",
+        length_bias="not_applicable",
+        resistance_profile="free_weight",
+        stability="low",
+        joint_stress=js(_L, _L, _M, _L, _H),
+        skill_complexity="high",
+        equipment=_KB,
+        gates=["chain_kb_overhead", "owner_confirmation_skill"],
+    ),
+    # landmine
+    _x(
+        "landmine_press_single_arm",
+        "Single Arm Landmine Press (Barbell)",
+        "1837BA23",
+        target={"primary": "shoulders", "secondary": ["chest", "triceps"], "region": "upper"},
+        family="hypertrophy",
+        length_bias="mid",
+        resistance_profile="free_weight",
+        stability="moderate",
+        joint_stress=js(_L, _L, _L, _L, _L),
+        skill_complexity="low",
+        equipment=["barbell", "landmine"],
+    ),
+    _x(
+        "landmine_press",
+        "Landmine Press",
+        "C15174B2-39DF-418B-BCB3-C94563278BE7",
+        target={"primary": "shoulders", "secondary": ["chest", "triceps"], "region": "upper"},
+        family="hypertrophy",
+        length_bias="mid",
+        resistance_profile="free_weight",
+        stability="moderate",
+        joint_stress=js(_L, _L, _L, _L, _L),
+        skill_complexity="low",
+        equipment=["barbell", "landmine"],
+    ),
+    _x(
+        "landmine_row",
+        "Landmine Row",
+        "D7D7FCCE",
+        target={"primary": "back", "secondary": ["biceps"], "region": "upper"},
+        family="hypertrophy",
+        length_bias="mid",
+        resistance_profile="free_weight",
+        stability="moderate",
+        joint_stress=js(_M, _M, _L, _L, _L),
+        skill_complexity="low",
+        equipment=["barbell", "landmine"],
+    ),
+    _x(
+        "landmine_squat",
+        "Landmine Squat",
+        None,
+        template_note="no Hevy standard template for the squat alone; 983274DD is the squat-and-press complex — create a custom template",
+        target={"primary": "quadriceps", "secondary": ["glutes"], "region": "lower"},
+        family="hypertrophy",
+        length_bias="lengthened",
+        resistance_profile="free_weight",
+        stability="moderate",
+        joint_stress=js(_M, _L, _L, _L, _L),
+        skill_complexity="low",
+        equipment=["barbell", "landmine"],
+    ),
+    _x(
+        "landmine_squat_and_press",
+        "Landmine Squat and Press",
+        "983274DD",
+        target={"primary": "quadriceps", "secondary": ["shoulders", "glutes"], "region": "full_body"},
+        family="carry_conditioning",
+        length_bias="mid",
+        resistance_profile="free_weight",
+        stability="moderate",
+        joint_stress=js(_M, _L, _L, _L, _M),
+        skill_complexity="moderate",
+        equipment=["barbell", "landmine"],
+    ),
+    _x(
+        "landmine_rotation",
+        "Landmine 180",
+        "923874CA",
+        target={"primary": "abs", "secondary": ["obliques", "shoulders"], "region": "core"},
+        family="core_anti_movement",
+        length_bias="not_applicable",
+        resistance_profile="free_weight",
+        stability="low",
+        joint_stress=js(_M, _M, _L, _L, _M),
+        skill_complexity="moderate",
+        equipment=["barbell", "landmine"],
+    ),
+    _x(
+        "meadows_row",
+        "Meadows Rows (Barbell)",
+        "C732C341",
+        target={"primary": "back", "secondary": ["biceps", "shoulders"], "region": "upper"},
+        family="hypertrophy",
+        length_bias="lengthened",
+        resistance_profile="free_weight",
+        stability="moderate",
+        joint_stress=js(_M, _M, _L, _L, _L),
+        skill_complexity="moderate",
+        equipment=["barbell", "landmine"],
+    ),
+    # Olympic-bar skill chain
+    _x(
+        "tall_high_pull",
+        "Tall High Pull (Barbell)",
+        None,
+        template_note="no Hevy template; on the creation list (`barbell_high_pulls` in his account is the hang version)",
+        # fix round 13: a title rule, so the gate that names it as its prerequisite can measure it once the template exists
+        template_match={"title_all": ["tall", "high", "pull"]},
+        target={"primary": "back", "secondary": ["shoulders", "traps"], "region": "upper"},
+        family="skill_athletic",
+        length_bias="not_applicable",
+        resistance_profile="free_weight",
+        stability="moderate",
+        joint_stress=js(_L, _L, _M, _L, _M),
+        skill_complexity="moderate",
+        equipment=["barbell"],
+        gates=["owner_confirmation_skill"],
+        curation_note="first link of the Olympic-bar chain (tall high pull -> hang high pull -> hang power clean)",
+    ),
+    # Fix round 13: the hang high pull IS his "Barbell High Pulls" template, d5ca687b-…. Until now this candidate named
+    # d5ac3808-… — a near-identical custom id that is "180 Squat Jumps" in Hevy — so a barbell pull's attributes and the
+    # tall-high-pull gate were merged into a jump, and the hang-power-clean gate measured the jump's sessions. Both library
+    # keys and both template ids are kept exactly as they were (history and ids are never rewritten): `barbell_high_pulls`
+    # is the hang high pull; `hang_high_pull` stays, as a LEGACY KEY, on the jump it has always pointed at.
+    _x(
+        "barbell_high_pulls",
+        "Barbell High Pulls",
+        "d5ca687b-c387-4f5b-a5b5-ea7a4bf8e8d6",
+        target={"primary": "back", "secondary": ["glutes", "traps"], "region": "full_body"},
+        family="skill_athletic",
+        length_bias="not_applicable",
+        resistance_profile="free_weight",
+        stability="low",
+        joint_stress=js(_M, _M, _M, _L, _M),
+        skill_complexity="moderate",
+        equipment=["barbell"],
+        gates=["chain_hang_high_pull"],
+        curation_note="the hang high pull: second link of the Olympic-bar chain (tall high pull -> hang high pull -> hang power clean)",
+    ),
+    _x(
+        "hang_high_pull",
+        "180 Squat Jumps",
+        "d5ac3808-b3a8-4044-ba20-53ddb08702d5",
+        curation_note="LEGACY KEY: this template is '180 Squat Jumps' (a jump). The hang high pull is `barbell_high_pulls`",
+    ),
+    _x(
+        "hang_power_clean",
+        "Hang Clean",
+        "BD4E7E53",
+        template_note="Hevy's 'Hang Clean' template; log the hang POWER clean (catch above parallel) under it",
+        target={"primary": "glutes", "secondary": ["back", "quadriceps"], "region": "full_body"},
+        family="skill_athletic",
+        length_bias="not_applicable",
+        resistance_profile="free_weight",
+        stability="low",
+        joint_stress=js(_M, _M, _H, _M, _M),
+        skill_complexity="high",
+        equipment=["barbell", "olympic_platform"],
+        gates=["chain_hang_power_clean", "owner_confirmation_skill"],
+    ),
+    # machines
+    _x(
+        "hack_squat_machine",
+        "Hack Squat (Machine)",
+        "1E42FD5F",
+        target={"primary": "quadriceps", "secondary": ["glutes"], "region": "lower"},
+        family="hypertrophy",
+        length_bias="lengthened",
+        resistance_profile="machine_plate_loaded",
+        stability="high",
+        joint_stress=js(_M, _L, _L, _L, _L),
+        skill_complexity="low",
+        equipment=["hack_squat_machine"],
+    ),
+    _x(
+        "pendulum_squat",
+        "Pendulum Squat (Machine)",
+        "30E293E3",
+        target={"primary": "quadriceps", "secondary": ["glutes"], "region": "lower"},
+        family="hypertrophy",
+        length_bias="lengthened",
+        resistance_profile="machine_plate_loaded",
+        stability="high",
+        joint_stress=js(_L, _L, _L, _L, _L),
+        skill_complexity="low",
+        equipment=["pendulum_squat_machine"],
+    ),
+    _x(
+        "belt_squat",
+        "Belt Squat (Machine)",
+        "3D1CDC75",
+        target={"primary": "quadriceps", "secondary": ["glutes", "adductors"], "region": "lower"},
+        family="hypertrophy",
+        length_bias="lengthened",
+        resistance_profile="machine_plate_loaded",
+        stability="high",
+        joint_stress=js(_L, _L, _L, _L, _L),
+        skill_complexity="low",
+        equipment=["belt_squat_machine"],
+        curation_note="loads the legs with no spinal load — the low-spine alternative to the back squat",
+    ),
+    _x(
+        "chest_supported_t_bar_row",
+        "Chest Supported T Bar Row",
+        "6A8D3193",
+        target={"primary": "back", "secondary": ["biceps", "shoulders"], "region": "upper"},
+        family="hypertrophy",
+        length_bias="mid",
+        resistance_profile="machine_plate_loaded",
+        stability="high",
+        joint_stress=js(_L, _L, _L, _L, _L),
+        skill_complexity="low",
+        equipment=["t_bar_row_machine"],
+    ),
+    _x(
+        "incline_chest_press_machine",
+        "Incline Chest Press (Machine)",
+        "FBF92739",
+        target={"primary": "chest", "secondary": ["shoulders", "triceps"], "region": "upper"},
+        family="hypertrophy",
+        length_bias="mid",
+        resistance_profile="machine_selectorized",
+        stability="high",
+        joint_stress=js(_L, _L, _L, _L, _L),
+        skill_complexity="low",
+        equipment=["incline_press_machine"],
+    ),
+    _x(
+        "decline_chest_press_machine",
+        "Decline Bench Press (Machine)",
+        "FAF31231",
+        family="hypertrophy",
+        equipment=["decline_press_machine"],
+    ),
+    _x(
+        "pullover_machine",
+        "Pullover (Machine)",
+        "B123DD01",
+        target={"primary": "back", "secondary": ["chest"], "region": "upper"},
+        family="hypertrophy",
+        length_bias="lengthened",
+        resistance_profile="machine_selectorized",
+        stability="high",
+        joint_stress=js(_L, _L, _L, _L, _M),
+        skill_complexity="low",
+        equipment=["pullover_machine"],
+    ),
+    # sled
+    _x(
+        "sled_push",
+        "Sled Push",
+        "AC0A1BF3",
+        target={"primary": "quadriceps", "secondary": ["glutes", "calves"], "region": "lower"},
+        family="carry_conditioning",
+        length_bias="not_applicable",
+        resistance_profile="sled",
+        stability="moderate",
+        joint_stress=js(_L, _L, _M, _L, _L),
+        skill_complexity="low",
+        equipment=["sled"],
+        curation_note="concentric-only: little soreness, knee-friendly conditioning",
+    ),
+    _x(
+        "sled_drag",
+        "Sled Pull",
+        "7D1BD41D",
+        template_note="Hevy 'Sled Pull' — log a backward or forward drag under it",
+        target={"primary": "quadriceps", "secondary": ["hamstrings", "back"], "region": "lower"},
+        family="carry_conditioning",
+        length_bias="not_applicable",
+        resistance_profile="sled",
+        stability="moderate",
+        joint_stress=js(_L, _L, _M, _L, _L),
+        skill_complexity="low",
+        equipment=["sled"],
+    ),
+    # posterior chain / core
+    _x("back_extension_45", "Back Extension (Hyperextension)", "4F5866F8", equipment=["back_extension_45"]),
+    _x(
+        "back_extension_weighted",
+        "Back Extension (Weighted Hyperextension)",
+        "091737FA",
+        target={"primary": "hamstrings", "secondary": ["glutes", "back"], "region": "lower"},
+        family="hypertrophy",
+        length_bias="lengthened",
+        resistance_profile="free_weight",
+        stability="high",
+        joint_stress=js(_M, _L, _L, _L, _L),
+        skill_complexity="low",
+        equipment=["back_extension_45", "weight_plate"],
+        hypertrophy=[hyp("hamstrings_biceps_femoris_long_head", "rct_characteristic", ["bourne2017_hip_extension_nordic"])],
+        gates=["chain_nordic_free"],
+    ),
+    _x(
+        "cable_crunch",
+        "Cable Crunch",
+        "23A48484",
+        target={"primary": "abs", "secondary": [], "region": "core"},
+        family="hypertrophy",
+        length_bias="mid",
+        resistance_profile="cable",
+        stability="moderate",
+        joint_stress=js(_L, _L, _L, _L, _L),
+        skill_complexity="low",
+        equipment=["cable_stack"],
+    ),
+    _x(
+        "pallof_press",
+        "Cable Core Pallof Press",
+        "CC55119B",
+        target={"primary": "abs", "secondary": ["obliques"], "region": "core"},
+        family="core_anti_movement",
+        length_bias="not_applicable",
+        resistance_profile="cable",
+        stability="moderate",
+        joint_stress=js(_L, _L, _L, _L, _L),
+        skill_complexity="low",
+        equipment=["cable_stack"],
+        curation_note="Hevy's standard Pallof template; his history also holds two custom Pallof templates",
+    ),
+    _x(
+        "dead_bug",
+        "Dead Bug",
+        "D8911FC4",
+        target={"primary": "abs", "secondary": [], "region": "core"},
+        family="core_anti_movement",
+        length_bias="not_applicable",
+        resistance_profile="bodyweight",
+        stability="high",
+        joint_stress=js(_L, _L, _L, _L, _L),
+        skill_complexity="low",
+        equipment=["bodyweight"],
+    ),
+    # single-leg and stretch-position variants
+    _x(
+        "single_leg_press",
+        "Single Leg Press (Machine)",
+        "3FD83744",
+        target={"primary": "quadriceps", "secondary": ["glutes"], "region": "lower"},
+        family="hypertrophy",
+        length_bias="mid",
+        resistance_profile="machine_plate_loaded",
+        stability="high",
+        joint_stress=js(_L, _L, _L, _L, _L),
+        skill_complexity="low",
+        equipment=["leg_press_machine"],
+    ),
+    _x(
+        "single_leg_extension",
+        "Single Leg Extensions",
+        "629AE73D",
+        target={"primary": "quadriceps", "secondary": [], "region": "lower"},
+        family="hypertrophy",
+        length_bias="mid",
+        resistance_profile="machine_selectorized",
+        stability="high",
+        joint_stress=js(_L, _L, _L, _L, _L),
+        skill_complexity="low",
+        equipment=["leg_extension_machine"],
+        hypertrophy=[hyp("quadriceps_rectus_femoris", "rct_characteristic", ["ema2013_knee_extension"])],
+    ),
+    _x(
+        "single_leg_standing_calf_raise_machine",
+        "Single Leg Standing Calf Raise (Machine)",
+        "B05C2C29",
+        target={"primary": "calves", "secondary": [], "region": "lower"},
+        family="hypertrophy",
+        length_bias="lengthened",
+        resistance_profile="machine_selectorized",
+        stability="moderate",
+        joint_stress=js(_M, _L, _L, _L, _L),
+        skill_complexity="low",
+        equipment=["calf_raise_standing_machine"],
+        hypertrophy=[hyp("gastrocnemius", "rct_direct", [_KINO23, "kassiano2023_calf_long_length"], adjust=_STANDING_UP)],
+    ),
+    _x(
+        "single_leg_rdl_dumbbell",
+        "Single Leg Romanian Deadlift (Dumbbell)",
+        "937292AB",
+        target={"primary": "hamstrings", "secondary": ["glutes"], "region": "lower"},
+        family="hypertrophy",
+        length_bias="lengthened",
+        resistance_profile="free_weight",
+        stability="low",
+        joint_stress=js(_M, _M, _L, _L, _L),
+        skill_complexity="moderate",
+        equipment=["dumbbell"],
+    ),
+    _x(
+        "split_squat_dumbbell",
+        "Split Squat (Dumbbell)",
+        "20C1A3CB",
+        target={"primary": "quadriceps", "secondary": ["glutes"], "region": "lower"},
+        family="hypertrophy",
+        length_bias="lengthened",
+        resistance_profile="free_weight",
+        stability="low",
+        joint_stress=js(_M, _L, _L, _L, _L),
+        skill_complexity="low",
+        equipment=["dumbbell"],
+    ),
+    _x(
+        "preacher_curl_dumbbell",
+        "Preacher Curl (Dumbbell)",
+        "FAB6EB2F",
+    ),
+    _x(
+        "behind_the_back_curl_cable",
+        "Behind the Back Curl (Cable)",
+        "2DBCA395",
+        target={"primary": "biceps", "secondary": [], "region": "upper"},
+        family="hypertrophy",
+        length_bias="lengthened",
+        resistance_profile="cable",
+        stability="moderate",
+        joint_stress=js(_L, _L, _L, _L, _M),
+        skill_complexity="low",
+        equipment=["cable_stack"],
+    ),
+    _x(
+        "overhead_curl_cable",
+        "Overhead Curl (Cable)",
+        "582ADA23",
+        target={"primary": "biceps", "secondary": [], "region": "upper"},
+        family="hypertrophy",
+        length_bias="shortened",
+        resistance_profile="cable",
+        stability="moderate",
+        joint_stress=js(_L, _L, _L, _L, _M),
+        skill_complexity="low",
+        equipment=["cable_stack"],
+    ),
+    _x(
+        "low_cable_fly",
+        "Low Cable Fly Crossovers",
+        "293483AD",
+        target={"primary": "chest", "secondary": ["shoulders"], "region": "upper"},
+        family="hypertrophy",
+        length_bias="lengthened",
+        resistance_profile="cable",
+        stability="moderate",
+        joint_stress=js(_L, _L, _L, _L, _M),
+        skill_complexity="low",
+        equipment=["cable_stack"],
+    ),
+    _x(
+        "lateral_raise_cable_single_arm",
+        "Single Arm Lateral Raise (Cable)",
+        "DE68C825",
+        target={"primary": "shoulders", "secondary": [], "region": "upper"},
+        family="hypertrophy",
+        length_bias="lengthened",
+        resistance_profile="cable",
+        stability="moderate",
+        joint_stress=js(_L, _L, _L, _L, _L),
+        skill_complexity="low",
+        equipment=["cable_stack"],
+    ),
+    _x(
+        "seated_leg_curl",
+        "Seated Leg Curl (Machine)",
+        "11A123F3",
+    ),
+    # bodyweight chains (on-ramps + gated lifts)
+    _x(
+        "pull_up_negative",
+        "Negative Pull Up",
+        "F60BDDF8",
+        target={"primary": "back", "secondary": ["biceps"], "region": "upper"},
+        family="hypertrophy",
+        length_bias="lengthened",
+        resistance_profile="bodyweight",
+        stability="moderate",
+        joint_stress=js(_L, _L, _L, _M, _M),
+        skill_complexity="moderate",
+        equipment=["pullup_bar", "plyo_box"],
+        gates=["bw_pull", "chain_pull_negative"],
+    ),
+    # #5861 FIX4 (fourth red team): the band rung — Hevy's BUILT-IN "Pull Up (Band)" (56808FD2, is_custom false in the template
+    # index). A garage with a bar and a band served the dumbbell pull-over (not a vertical pull) because no band rung existed.
+    _x(
+        "pull_up_band",
+        "Pull Up (Band)",
+        "56808FD2",
+        target={"primary": "back", "secondary": ["biceps"], "region": "upper"},
+        family="hypertrophy",
+        length_bias="lengthened",
+        resistance_profile="bodyweight",
+        stability="moderate",
+        joint_stress=js(_L, _L, _L, _M, _M),
+        skill_complexity="moderate",
+        equipment=["pullup_bar", "resistance_band"],
+        # #5861 fix round 11 (owner ruling #3 of fix round 8: the band pull-up gate stays LOCKED): the same locked gates as the
+        # pull-up negative — a band changes the bottom of the rep, not the top, so it opens on the same standard, never ungated.
+        gates=["bw_pull", "chain_pull_negative"],
+    ),
+    _x(
+        "pull_up",
+        "Pull Up",
+        "1B2B1E7C",
+        target={"primary": "back", "secondary": ["biceps"], "region": "upper"},
+        family="hypertrophy",
+        length_bias="lengthened",
+        resistance_profile="bodyweight",
+        stability="moderate",
+        joint_stress=js(_L, _L, _L, _M, _M),
+        skill_complexity="moderate",
+        equipment=["pullup_bar"],
+        gates=["bw_pull", "chain_pull"],
+    ),
+    _x(
+        "chin_up",
+        "Chin Up",
+        "29083183",
+        target={"primary": "back", "secondary": ["biceps"], "region": "upper"},
+        family="hypertrophy",
+        length_bias="lengthened",
+        resistance_profile="bodyweight",
+        stability="moderate",
+        joint_stress=js(_L, _L, _M, _M, _M),
+        skill_complexity="moderate",
+        equipment=["pullup_bar"],
+        gates=["bw_pull", "chain_pull"],
+    ),
+    _x(
+        "triceps_dip",
+        "Triceps Dip",
+        "28BB4A95",
+        target={"primary": "triceps", "secondary": ["chest", "shoulders"], "region": "upper"},
+        family="hypertrophy",
+        length_bias="lengthened",
+        resistance_profile="bodyweight",
+        stability="moderate",
+        joint_stress=js(_L, _L, _M, _M, _H),
+        skill_complexity="moderate",
+        equipment=["dip_station"],
+        gates=["bw_dip", "chain_dip"],
+    ),
+    _x(
+        "incline_push_up",
+        "Incline Push Ups",
+        "39C99849",
+        target={"primary": "chest", "secondary": ["triceps", "shoulders"], "region": "upper"},
+        family="hypertrophy",
+        length_bias="mid",
+        resistance_profile="bodyweight",
+        stability="moderate",
+        joint_stress=js(_L, _L, _M, _L, _L),
+        skill_complexity="low",
+        equipment=["bench_flat"],
+        curation_note="the on-ramp to floor push-ups (bench or Smith bar height sets the load)",
+    ),
+    _x(
+        "push_up",
+        "Push Up",
+        "392887AA",
+        target={"primary": "chest", "secondary": ["triceps", "shoulders"], "region": "upper"},
+        family="hypertrophy",
+        length_bias="mid",
+        resistance_profile="bodyweight",
+        stability="moderate",
+        joint_stress=js(_L, _L, _M, _L, _M),
+        skill_complexity="low",
+        equipment=["bodyweight"],
+        gates=["bw_pushup", "chain_pushup"],
+    ),
+    _x(
+        "nordic_hamstring_curl",
+        "Nordic Hamstrings Curls",
+        "108D7A14",
+        gates=["bw_nordic", "chain_nordic", "owner_confirmation_skill"],
+    ),
+    _x(
+        "dead_hang",
+        "Dead Hang",
+        "B9380898",
+        target={"primary": "forearms", "secondary": ["back", "shoulders"], "region": "upper"},
+        family="corrective",
+        length_bias="lengthened",
+        resistance_profile="bodyweight",
+        stability="moderate",
+        joint_stress=js(_L, _L, _M, _L, _M),
+        skill_complexity="low",
+        equipment=["pullup_bar"],
+        gates=["bw_hanging", "chain_dead_hang"],
+        curation_note="a bodyweight hang: gated on the hanging threshold and its own entry step; the hanging-raise chain's first link",
+    ),
+    _x(
+        "hanging_knee_raise",
+        "Hanging Knee Raise",
+        "08590920",
+        target={"primary": "abs", "secondary": ["forearms"], "region": "core"},
+        family="hypertrophy",
+        length_bias="mid",
+        resistance_profile="bodyweight",
+        stability="low",
+        joint_stress=js(_L, _L, _M, _L, _M),
+        skill_complexity="moderate",
+        equipment=["pullup_bar"],
+        gates=["bw_hanging"],
+    ),
+    _x(
+        "hanging_leg_raise",
+        "Hanging Leg Raise",
+        "F8356514",
+        target={"primary": "abs", "secondary": ["forearms"], "region": "core"},
+        family="hypertrophy",
+        length_bias="mid",
+        resistance_profile="bodyweight",
+        stability="low",
+        joint_stress=js(_L, _L, _M, _L, _M),
+        skill_complexity="moderate",
+        equipment=["pullup_bar"],
+        gates=["bw_hanging"],
+    ),
+    _x(
+        "captains_chair_knee_raise",
+        "Knee Raise Parallel Bars",
+        "98237BA2",
+        target={"primary": "abs", "secondary": [], "region": "core"},
+        family="hypertrophy",
+        length_bias="mid",
+        resistance_profile="bodyweight",
+        stability="high",
+        joint_stress=js(_L, _L, _L, _L, _M),
+        skill_complexity="low",
+        equipment=["captains_chair"],
+        curation_note="forearm-supported: the hanging-raise on-ramp that needs no grip",
+    ),
+]
+
+# the free-standing Nordic prerequisite gate for the weighted back extension (chain: the bodyweight version first)
+GATES["chain_nordic_free"] = _chain(
+    ["tid:4F5866F8"],
+    "bodyweight 45-degree back extension 3 x 12 pain-free in two sessions",
+    params={"sets": 3, "reps_min": 12, "sessions_min": 2, "flag_free_days": 28},
+)

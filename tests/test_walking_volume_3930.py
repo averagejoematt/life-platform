@@ -394,16 +394,20 @@ def _joints(draft: dict, block: dict | None, days_since: dict | None = None) -> 
 
 def test_recent_aerobic_shows_the_weekend_walks_flagged_and_joints_swaps_the_treadmill_to_cycling():
     """The incident, replayed on the wire rows: the plan for 09-28 sees Saturday's and Sunday's walks,
-    both over 75 min — and, since OD2 (#4503, cap 120 avg, 105 the target), UNDER the HR cap at ~116 bpm —
-    and the joints critic CHANGEs the lower draft's treadmill to cycling — same 60 min, HR avg ≤ 120. Mutation controls: drop `aerobic_flags` from
+    both over 75 min — their heart rate a MEASUREMENT with its basis and no grade (#5916, owner ruling 2026-11-13:
+    the OD2 cap and target are retired) —
+    and the joints critic CHANGEs the lower draft's treadmill to cycling — same 60 min. Mutation controls: drop `aerobic_flags` from
     `build_joints_packet`, or make `recent_aerobic.window` end at target − 2 — this reds."""
+    from training import recent_aerobic
+
     block = _ra_block()
     walks = [r for r in block["rows"] if r["modality"] == "walk"]
     assert [(r["date"], r["moving_min"], r["device"]) for r in walks] == [
         ("2026-09-26", 101.8, "Garmin epix (Gen2)"),
         ("2026-09-27", 164.8, "Garmin epix (Gen2)"),
     ]
-    assert all(r["flags"] == {"over_75_min": True, "avg_hr_over_ceiling": False} for r in walks)
+    assert all(r["flags"] == {"over_75_min": True} for r in walks)  # #5916: walk length is the only flag
+    assert all(r["avg_hr_basis"] == recent_aerobic.AVG_HR_BASIS_DEVICE and r["avg_hr_basis"].startswith("measured") for r in walks)
     assert [(r["avg_hr"], r["max_hr"]) for r in walks] == [(116.8, 171.0), (116.1, 176.0)]
     # the Hevy treadmill Strava cannot see is a row; the WHOOP walk over its minutes is not a second one (#4068)
     (tread,) = [r for r in block["rows"] if r["modality"] == "treadmill"]
@@ -416,13 +420,15 @@ def test_recent_aerobic_shows_the_weekend_walks_flagged_and_joints_swaps_the_tre
     draft = critics.draft_summary(ir)
     verdict = critics.deterministic_verdict(_joints(draft, block))
     assert verdict["verdict"] == "change" and verdict["field"] == "exercises[5].movement_key" and verdict["to"] == "cycling"
-    assert "POPULATION-DERIVED" in verdict["reason"] and "HR avg ≤ 120 bpm (target 105)" in verdict["reason"]
+    # #5990: the swap sentence reads the talk-test cue, never the retired walking heart-rate cap (#5916)
+    assert "POPULATION-DERIVED" in verdict["reason"] and recent_aerobic.EASY_EFFORT_CUE in verdict["reason"]
+    assert "HR avg" not in verdict["reason"] and "(target" not in verdict["reason"]
     (rec,) = critics.apply_changes(ir, [{**verdict, "critic": "joints_tendons"}])
     assert rec["applied"] is True
     assert ir.exercises[5].movement_key == "cycling" and ir.exercises[5].sets[0].duration_seconds == 3600
     # #5428: the swapped block's note is the cardio composer's — no HR target, no critic name, no issue number
     # #5428 lane C: line 1 is `<Machine> · <levels> · RPE …` (no minutes on line 1, cardio-note@4.0.0); the swap still lands on the bike.
-    assert ir.exercises[5].notes.startswith("Recumbent · ")
+    assert ir.exercises[5].notes.startswith("RPE _\nRecumbent · ")  # #5796: line 1 follows the RPE capture prompt
     assert "bpm" not in ir.exercises[5].notes and "#" not in ir.exercises[5].notes and "joints_tendons" not in ir.exercises[5].notes
     # re-evaluated, the revised draft carries nothing left to swap
     assert critics.deterministic_verdict(_joints(critics.draft_summary(ir), block))["verdict"] == "approve"
@@ -482,7 +488,17 @@ def test_the_cardio_pick_is_derived_from_the_rows_never_from_the_last_session():
     assert recent_aerobic.cardio_pick(None, "upper")["movement_key"] == "cycling"  # unread is never fresh
     # the redline numbers are read, not retyped
     assert f"none over {recent_aerobic.WALK_MAX_MIN} min" in owner_redlines.REDLINES["walking_floor_hr_wk"]["walks"]
-    assert recent_aerobic.HR_CEILING_BPM == owner_redlines.REDLINES["walking_floor_hr_wk"]["hr_ceiling_bpm"]
+    # #5916: the redline holds no heart-rate number; the two legacy names read the retired history record, and the
+    # line every surface prints is the talk test plus the redline's easy-effort RPE
+    from training import redline_changelog, standing_constraints
+
+    walking = owner_redlines.REDLINES["walking_floor_hr_wk"]
+    assert "hr_ceiling_bpm" not in walking and "hr_target_bpm" not in walking
+    assert (recent_aerobic.HR_CEILING_BPM, recent_aerobic.HR_TARGET_BPM) == (
+        redline_changelog.RETIRED_WALKING_HR_LINE["hr_ceiling_bpm"],
+        redline_changelog.RETIRED_WALKING_HR_LINE["hr_target_bpm"],
+    )
+    assert recent_aerobic.EASY_EFFORT_CUE == standing_constraints.easy_effort_cue(walking["easy_rpe_max"])
 
 
 def test_walking_collapse_and_overshoot_are_report_only_rows_on_the_block():
@@ -812,10 +828,12 @@ def test_the_0925_treadmill_replays_joined_on_the_live_fixture():
         "avg_hr": 116.9,
         "max_hr": 150.0,
         "hr_coverage": 0.858,
-        "over_ceiling": False,  # #4503 OD2: 116.9 is under the 120 avg cap (105 is the target, not the cap)
+        "avg_hr_basis": tread["avg_hr_basis"],  # #5916: a measurement with its basis…
+        "over_ceiling": None,  # …never graded (`coach.critics_aerobic` no longer reads it, #5990)
     }
+    assert last["avg_hr_basis"].startswith("measured") and "never graded" in last["avg_hr_basis"]
     packet = _joints(critics.draft_summary(_lower_volume_draft()), block)
-    assert packet["numbers"]["last_cardio_block_avg_hr"] == 116.9 and packet["numbers"]["last_cardio_block_over_hr_ceiling"] is False
+    assert packet["numbers"]["last_cardio_block_avg_hr"] == 116.9 and "last_cardio_block_over_hr_ceiling" not in packet["numbers"]  # #5990
     verdict = critics.deterministic_verdict(packet)
     assert "116.9 bpm avg" in verdict["reason"] and "coverage 0.858" in verdict["reason"]
 
@@ -925,7 +943,7 @@ def test_the_live_rides_join_through_the_store_and_the_0928_ride_needs_the_whoop
     t = _live_4412_table()
     j29 = store.derive(t, "matthew", _live_hevy("2026-09-29"))
     (b29,) = j29["blocks"]
-    assert j29["version"] == "cardio-hr@1.1.0"
+    assert j29["version"] == "cardio-hr@1.2.0"
     assert (b29["state"], b29["hr_coverage"], b29["avg_hr"], b29["max_hr"], b29["hr_source"]) == ("joined", 0.551, 109.0, 139, "WHOOP")
     assert [a["whoop_workout_id"] for a in b29["hr_activities"]] == ["d49d8bac-e0f4-4d80-9828-29840bc361cf"]
     assert b29["zone_seconds"] is None  # WHOOP's zone minutes read 0 at avg 109 — not used, never prorated

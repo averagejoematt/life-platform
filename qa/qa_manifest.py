@@ -100,17 +100,37 @@ _V9_TIER1 = {
 _V9_SAMPLED = {"/data/day/*/": ("/data/day/2026-10-16/", "Data · one day, sampled (v9, #5585)")}
 # #1429 named /privacy/ as a structural-sweep surface; the v9 page is static text, so it keeps a declared
 # marker (the h1 in www/src/pages/privacy/index.astro) and the smoke asserts it after the cut-over.
-_V9_STRUCTURAL = {"/privacy/": "Only deliberately published figures appear here."}
+_V9_STRUCTURAL = {
+    "/privacy/": "Only deliberately published figures appear here.",
+    # #5920: the maintained policy's twin — the current-edition line the page frames it with (the clauses are a visual check).
+    "/privacy/policy/": "data-policy-current",
+}
+# #5920: the policy checks the v8 /privacy/ row carried (#2574) — the permanence clauses and the live archive panel —
+# move with the policy to its v9 address. The panel reads the two archive documents, so they are this row's api_deps.
+_V9_EXTRA = {
+    "/privacy/policy/": {
+        "api_deps": ["/archive/continuity.json", "/archive/manifest.json"],
+        "visual_checks": [
+            {"selector": ".perm-clause", "min_count": 8, "desc": "the permanence clauses render"},
+            {"selector": "#perm-live .pl-grid dd", "not_empty": True, "desc": "the live archive panel resolved"},
+        ],
+    },
+}
 # The doors' declared intent (qa/comprehension_qa.py grades a newcomer's read against it; <=30 words each).
 _V9_INTENTS = {
+    # owner ruling 2026-11-15 (#6067): the weight is the catalyst; the purpose is the broader experiment
     "/": (
-        "The front page: who Matthew is, the six-dimensional portrait of how he is doing, the latest chapter, "
-        "and the doors into the story, the data and the system."
+        "The front page: an experiment in engineering a better life with AI coaches. The weight loss is measured; "
+        "the rest is open. The portrait, the latest chapter and three doors."
     ),
-    "/story/": "The narration: the latest weekly chapter and its episode, then every chapter in order.",
+    "/story/": (
+        "The narration: weekly chapters of an experiment in changing a life, not only a weight; "
+        "the latest chapter and its episode, then every chapter in order."
+    ),
+    # owner ruling 2026-11-16 (#6067): these measurements are one part of a broader experiment, not its verdict
     "/data/": (
-        "The data room: the published series behind the experiment, paired against each other, "
-        "with how each number is measured and what is missing."
+        "The data room: the measurable part of a four-part experiment — each published series with its latest "
+        "reading; open one to compare it with another and see what is missing."
     ),
     "/system/": (
         "How the platform works: the AI coaches' graded record beside a simple guess, the ledger of every prediction, "
@@ -131,6 +151,7 @@ _V9_NAMES = {
     "/system/sources/": "System · sources (v9)",
     "/system/everything-else/": "Everything else on the site (the footnote appendix, v9)",
     "/privacy/": "Privacy (v9)",
+    "/privacy/policy/": "Privacy · the full policy (v9, #5920)",
 }
 # The shell every v9 page shares (www/src/layouts/Base.astro): masthead, main, footer, tab bar.
 _V9_VISUAL = {
@@ -192,6 +213,10 @@ def _v9_rows(owned: dict | None = None, live: bool | None = None) -> list[dict]:
         if route in _V9_STRUCTURAL:  # #1429's named surface keeps its structural marker across the cut-over
             row["content_class"] = "static"
             row["structural"] = {"marker": _V9_STRUCTURAL[route]}
+        extra = _V9_EXTRA.get(route)
+        if extra:
+            row["api_deps"] = sorted(set(row["api_deps"]) | set(extra["api_deps"]))
+            row["visual"] = {**_V9_VISUAL, "checks": [*_V9_VISUAL["checks"], *extra["visual_checks"]]}
         rows.append(row)
     for pattern, (exemplar, name) in sorted(_V9_SAMPLED.items()):
         if pattern in owned.get("route_patterns", []) and exemplar in owned.get("routes", []):
@@ -1295,6 +1320,30 @@ def api_dep_endpoints():
 # All expectations below were MEASURED against live 2026-08-22 before this
 # sweep was allowed to gate (the 2026-07-17 lesson: never arm an unmeasured
 # widened gate).
+def _coach_brief_live():
+    """common.public_brief_policy.PUBLICATION_LIVE, read as text (the module imports the Lambda tree); unreadable = dark."""
+    try:
+        with open(os.path.join(_REPO, "lambdas", "common", "public_brief_policy.py"), encoding="utf-8") as fh:
+            src = fh.read()
+    except OSError:
+        return False
+    import re  # noqa: E402
+
+    return re.search(r"^PUBLICATION_LIVE = True\s*$", src, re.M) is not None
+
+
+def _cr2_words_live():
+    """common.narrative_allowlist.CR2_PUBLIC, read as text (the module imports the Lambda tree); unreadable = dark."""
+    try:
+        with open(os.path.join(_REPO, "lambdas", "common", "narrative_allowlist.py"), encoding="utf-8") as fh:
+            src = fh.read()
+    except OSError:
+        return False
+    import re  # noqa: E402
+
+    return re.search(r"^CR2_PUBLIC = True\s*$", src, re.M) is not None
+
+
 _API_SWEEP_OVERRIDES = {
     "/api/coach/": {
         "fetch": "/api/coach/eli_marsh",
@@ -1331,6 +1380,19 @@ _API_SWEEP_OVERRIDES = {
     "/api/social_context": {
         "expect": "400",
         "reason": "param-gated (?route= in {mind, training} required): the validator's structured 400 is " "the alive signal.",
+    },
+    "/api/coach_brief": {
+        "expect": "200" if _coach_brief_live() else "404",
+        "reason": "dark until common.public_brief_policy.PUBLICATION_LIVE (owner ruling 2026-11-09 E): every coach "
+        "answers 404 while the switch is off (measured live 2026-11-09, bare and ?coach=sleep_coach); the "
+        "expectation follows the committed switch, so the launch flips it with no edit here.",
+    },
+    "/api/coach_room_words": {
+        "fetch": "/api/coach_room_words?coach=eli_marsh",
+        "expect": "200" if _cr2_words_live() else "404",
+        "reason": "live since the CR2 release (owner GO 2026-11-11, second message; common.narrative_allowlist.CR2_PUBLIC): "
+        "the lead's approved reads; every coach answers 404 while the switch is off, and the expectation follows the "
+        "committed switch.",
     },
     "/api/verify_subscriber": {
         "expect": "400",

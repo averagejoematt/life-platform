@@ -79,6 +79,57 @@ def test_the_day_exporter_and_the_chapter_intervals_agree_on_every_day():
     assert week_of(46, "2026-10-21", spans) == 7
 
 
+def test_a_published_chapter_carries_its_served_approval_day_and_covered_days_and_nothing_else_does():
+    """2026-11-14: Week 10 was dated 10 November (its DATA date), covers Day 60 to Day 66 (4–10 November) and was
+    approved at 2026-11-14T00:24:35Z — 13 November in Pacific time. A held/skipped/pending week gets nulls even if a
+    payload carried values for it; an unserved published week keeps its date-based approval and nulls."""
+    from publish_snapshot_chapters import pacific_day
+
+    api = {
+        "genesis": "2026-09-06",
+        "weeks": [
+            {
+                "week": 10,
+                "start": "2026-11-08",
+                "end": "2026-11-14",
+                "status": "published",
+                "published_at": "2026-11-14T00:24:35.088197+00:00",
+                "covers_start": "2026-11-04",
+                "covers_end": "2026-11-10",
+            },
+            {"week": 2, "start": "2026-09-13", "end": "2026-09-19", "status": "published"},  # an older Lambda: not served
+            {
+                "week": 8,
+                "start": "2026-10-25",
+                "end": "2026-10-31",
+                "status": "held",
+                "published_at": "2026-10-29T00:00:00Z",
+                "covers_start": "2026-10-20",
+                "covers_end": "2026-10-26",
+            },
+        ],
+    }
+    approved = {"by": "owner", "at": "2026-11-10", "via": "chronicle-approve"}
+    chapters = [
+        {"id": "week-12", "week": 10, "date": "2026-11-10", "status": "published", "approved": dict(approved)},
+        {"id": "week-05", "week": 2, "date": "2026-09-15", "status": "published", "approved": {**approved, "at": "2026-09-15"}},
+        {"id": "program-week-08", "week": 8, "date": "2026-10-25", "status": "held", "approved": None},
+        {"id": "week-01", "week": 0, "date": "2026-08-31", "status": "published", "approved": {**approved, "at": "2026-08-31"}},
+    ]
+    apply_week_intervals(chapters, api, None)
+    by = {c["id"]: c for c in chapters}
+    w10 = by["week-12"]
+    assert (w10["published_at"], w10["covers_start"], w10["covers_end"]) == ("2026-11-13", "2026-11-04", "2026-11-10")
+    assert w10["approved"]["at"] == "2026-11-13" and (w10["week_start"], w10["week_end"]) == ("2026-11-08", "2026-11-14")
+    for cid, at in (("week-05", "2026-09-15"), ("week-01", "2026-08-31")):
+        assert (by[cid]["published_at"], by[cid]["covers_start"], by[cid]["covers_end"]) == (None, None, None), cid
+        assert by[cid]["approved"]["at"] == at, cid  # unknown approval: as before, never fabricated
+    held = by["program-week-08"]
+    assert (held["published_at"], held["covers_start"], held["covers_end"], held["approved"]) == (None, None, None, None)
+    assert pacific_day("2026-09-18T18:00:44.273958+00:00") == "2026-09-18" and pacific_day("2026-11-14T00:24:35Z") == "2026-11-13"
+    assert pacific_day("2026-11-13") == "2026-11-13" and pacific_day("nonsense") is None and pacific_day(None) is None
+
+
 def test_excerpt_drops_the_editors_note_and_the_markdown_markers():
     raw = (
         "*Editor's note, October 2026 — Margaret Calloway: this installment was rewritten after a review.*\n\n"
@@ -146,6 +197,31 @@ def _dist(tmp_path, journey_html, front_html="<a href='/data/'>x</a>"):
     (tmp_path / "data" / "journey" / "index.html").write_text(journey_html, encoding="utf-8")
     (tmp_path / "index.html").write_text(front_html, encoding="utf-8")
     return str(tmp_path)
+
+
+def test_spark_agreement_reds_when_one_series_is_two_pictures(tmp_path):
+    """Review 2026-11-14 (dataviz-2): the front page and the data room drew the same eight weekly means on two scales.
+    The build gate now compares them — same SVG, same latest reading — for every metric drawn on both."""
+    from check_www_build import spark_agreement
+
+    def page(svg, latest="288.5", metric="weight_lbs"):
+        return f'<a class="tile"><span class="spark" data-spark-of="{metric}" data-latest="{latest}"><svg viewBox="0 0 96 32">{svg}</svg></span></a>'
+
+    def dist(name, front, data):
+        root = tmp_path / name
+        (root / "data").mkdir(parents=True)
+        (root / "index.html").write_text(front, encoding="utf-8")
+        (root / "data" / "index.html").write_text(data, encoding="utf-8")
+        return str(root)
+
+    line = '<polyline points="5,4 17,9"/>'
+    assert (
+        spark_agreement(dist("same", page(line), page(line) + page("<rect/>", "58", "steps"))) == []
+    ), "a metric on one page only is not compared"
+    two = spark_agreement(dist("two", page(line), page('<rect height="26"/><rect height="4"/>')))
+    assert two and "weight_lbs" in two[0] and "one picture" in two[0]
+    stale = spark_agreement(dist("stale", page(line, "288.5"), page(line, "290.7")))
+    assert stale == ["weight_lbs: latest reading '290.7' on data/index.html but '288.5' on index.html"]
 
 
 def test_heart_coverage_holds_both_charts_and_the_front_page_budget(tmp_path):

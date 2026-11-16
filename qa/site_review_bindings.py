@@ -649,6 +649,66 @@ PAGE_BINDINGS.append(
         "endpoints": [{"url": "/api/pulse_history", "role": "primary", "metrics": []}],
     }
 )
+# The Laboratory (L1, LAB_LIVE — owner GO 2026-11-09): /data/lab/ binds through the evidence-topic derivation above;
+# its protocols page sits one level deeper, so it binds here. A static build from the publication snapshot.
+PAGE_BINDINGS.append(
+    {
+        "path": "/data/lab/protocols/",
+        "name": "Data · the Laboratory's protocols (v9)",
+        "door": "data",
+        "narrative_order": 108,
+        "story_intent": "the supplement protocols: dose, timing, why, paused, and the evidence for and against each",
+        "endpoints": [{"url": "/api/supplements", "role": "primary", "metrics": []}],
+    }
+)
+# Findings over time (2026-11-11): each correlation pair the weekly run listed more than once, week by week.
+PAGE_BINDINGS.append(
+    {
+        "path": "/data/lab/findings/",
+        "name": "Data · the Laboratory's findings over time (v9)",
+        "door": "data",
+        "narrative_order": 112,
+        "story_intent": "each correlation the weekly run listed in more than one week: how it held, with r and its interval each week",
+        "endpoints": [{"url": "/api/discoveries", "role": "primary", "metrics": []}],
+    }
+)
+# The Human Story (HS1, STORY_LIVE — owner GO 2026-11-09): the week-by-week timeline, a static build from the
+# publication snapshot's approved, published installments. Never /story/timeline/ (the kept v8 page, bound above).
+PAGE_BINDINGS.append(
+    {
+        "path": "/story/so-far/",
+        "name": "Story · the story so far, week by week (v9)",
+        "door": "story",
+        "narrative_order": 109,
+        "story_intent": "every program week with its days, and its installment where one was approved and published",
+        "endpoints": [{"url": "/api/chapters", "role": "primary", "metrics": []}],
+    }
+)
+# The Coaching Room's CR1 (room_public "cr1" — owner GO 2026-11-10): the coaches' verified record against a simple
+# prediction that nothing changes, and "wrong this month". Static builds from the publication snapshot's calibration.json.
+PAGE_BINDINGS.extend(
+    [
+        {
+            "path": "/system/calibration/",
+            "name": "System · the coaches, graded (CR1)",
+            "door": "method",
+            "narrative_order": 110,
+            "story_intent": "the coaches' verified record on the forecasts that could be checked, against a simple prediction that nothing changes, with every excluded call and the uncertainty",
+            "endpoints": [
+                {"url": "/api/calibration", "role": "primary", "metrics": []},
+                {"url": "/api/predictions", "role": "secondary", "metrics": []},
+            ],
+        },
+        {
+            "path": "/system/ledger/refuted/",
+            "name": "System · wrong this month (CR1)",
+            "door": "method",
+            "narrative_order": 111,
+            "story_intent": "the calls the coaches got wrong this month, as graded, with disputed and corrected grades set apart",
+            "endpoints": [{"url": "/api/ledger_export", "role": "primary", "metrics": []}],
+        },
+    ]
+)
 PAGE_BINDINGS.append(
     {
         "path": "/privacy/",
@@ -657,6 +717,34 @@ PAGE_BINDINGS.append(
         "narrative_order": 97,
         "story_intent": "the data-governance policy — what's collected, retained, and never made public",
         "endpoints": [],  # editorial
+    }
+)
+# Sprint III (2026-11-14): the moments that explain it — a stranger's way in, built from the publication snapshot
+# (journey, chapters, coaches, calibration, lab); each moment links its evidence.
+PAGE_BINDINGS.append(
+    {
+        "path": "/story/moments/",
+        "name": "Story · the moments that explain it (v9)",
+        "door": "story",
+        "narrative_order": 109.5,
+        "story_intent": "the few documented moments that best explain the experiment so far, numbered on The Line, each tied to its evidence",
+        "endpoints": [
+            {"url": "/api/journey", "role": "primary", "metrics": []},
+            {"url": "/api/chapters", "role": "primary", "metrics": []},
+        ],
+    }
+)
+# #5920: the maintained policy at its own address — the owner's text from the generated twin (www/src/privacy/policy.json).
+PAGE_BINDINGS.append(
+    {
+        "path": "/privacy/policy/",
+        "name": "Privacy · the full policy (v9)",
+        "door": "utility",
+        "narrative_order": 97.5,
+        "story_intent": "the full, current privacy policy: subscriber data, cookies and tracking, rights, the AI disclaimer, the permanence contract",
+        # editorial; the live archive panel reads /archive/manifest.json + /archive/continuity.json (published documents,
+        # not /api/* routes — qa/qa_manifest.py carries them as this row's api_deps, so the smoke's JSON-health sweep covers them)
+        "endpoints": [],
     }
 )
 PAGE_BINDINGS.append(

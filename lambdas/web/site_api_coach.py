@@ -253,9 +253,9 @@ def _recent_outputs(coach_id, limit=25):
     return _profile._recent_outputs(coach_id, limit, _g=globals())
 
 
-def _dossier_block(coach_id):
+def _dossier_block(coach_id, *, commitments_only=False):
     """Delegated to web.site_api_coach_profile._dossier_block."""
-    return _profile._dossier_block(coach_id, _g=globals())
+    return _profile._dossier_block(coach_id, _g=globals(), commitments_only=commitments_only)
 
 
 def _stance_latest(coach_id):

@@ -76,8 +76,11 @@ GET_EXERCISE_NOTES_DESCRIPTION = (
     "fitted to its resolved calorie target and day type, four feedings at the protein threshold, the macro floors — with "
     "each day's fit verdict and the cook days' grocery list (optional week_start, a Monday; default the coming week). "
     "action='fitness_test' (#5078, OWNER-ONLY): record fitness-battery results — results {test: value} "
-    "(six_minute_walk m, bike_20min_rpe6 m, dead_hang s, assisted_pull_up lb of assistance), optional notes and "
-    "date; action='fitness_tests' lists the batteries, each test's trend and whether the battery is due."
+    "(six_minute_walk m, treadmill_20min_fixed bpm over minutes 10-20 with the RPE in the note, bike_20min_rpe6 m, dead_hang s, assisted_pull_up lb of assistance), optional notes and "
+    "date; action='fitness_tests' lists the batteries, each test's trend and whether the battery is due. "
+    "action='note_requests' (#5573, OWNER-ONLY READ): what he ASKED for in a Hevy note (form guidance, a question, a "
+    "rule) — open requests, the overdue count, recent replies; action='answer_request' / 'decline_request' (request_id, "
+    "reply / reason) records the ONE reply given in chat."
 )
 
 # ── the inputSchema that lives beside its description (the #3692 ceiling) ────────────
@@ -106,6 +109,9 @@ GET_EXERCISE_NOTES_INPUT = {
                 "weekly_menu",
                 "fitness_test",
                 "fitness_tests",
+                "note_requests",
+                "answer_request",
+                "decline_request",
             ],
             "description": (
                 "read (default) = the note timeline. dismiss = record HIS dismissal of a pain flag on this "
@@ -116,7 +122,9 @@ GET_EXERCISE_NOTES_INPUT = {
                 "travel_kit = the travel food kit (#5104, read): day plan, grocery list, packing list, hotel/restaurant playbook. "
                 "weekly_menu = the week's menu built by code from his anchor foods (#5103, read): per-day fit, feedings, grocery list. "
                 "fitness_test = record fitness-battery results (#5078, OWNER-ONLY WRITE; `results`, optional `notes`, `date`). "
-                "fitness_tests = the batteries, trend and due state."
+                "fitness_tests = the batteries, trend and due state. "
+                "note_requests = his Hevy-note requests (#5573, read); answer_request / decline_request = record the one "
+                "reply or the reason (OWNER-ONLY WRITE; `request_id`, `reply` / `reason`)."
             ),
         },
         "exercise": {
@@ -173,12 +181,15 @@ GET_EXERCISE_NOTES_INPUT = {
         "results": {
             "type": "object",
             "description": (
-                "action='fitness_test': {test: value} — six_minute_walk (m), bike_20min_rpe6 (m), dead_hang (s), "
+                "action='fitness_test': {test: value} — six_minute_walk (m), treadmill_20min_fixed (bpm, minutes 10-20; RPE in the note), bike_20min_rpe6 (m), dead_hang (s), "
                 "assisted_pull_up (lb of assistance; lower is better). Any subset; a second call on the same date merges."
             ),
         },
         "notes": {"type": "object", "description": "action='fitness_test': {test: note} — e.g. which bike, the grip."},
         "date": {"type": "string", "description": "action='fitness_test': YYYY-MM-DD of the battery. Defaults to today (Pacific)."},
+        "request_id": {"type": "string", "description": "action='answer_request'/'decline_request': the id note_requests lists."},
+        "reply": {"type": "string", "description": "action='answer_request': the reply given in this conversation, as told to him."},
+        "reason": {"type": "string", "description": "action='decline_request': why the request is not being answered."},
     },
     "required": [],
 }
@@ -239,6 +250,23 @@ GET_TRAINING_DESCRIPTION = (
     "'am I in a deload?', 'periodization', 'what should I do today?', 'training recommendation', 'ready to train?', 'VO2 max trend', 'cardio recovery'."
 )
 
+# #5575: get_training's input table, moved out of mcp/registry.py (the #1665 ceiling) beside its description.
+GET_TRAINING_INPUT = {
+    "type": "object",
+    "properties": {
+        "view": {
+            "type": "string",
+            "description": "load (default), periodization, recommendation, or cardio_fitness (the Apple Watch's VO2 max arc + cardio signals).",
+            "enum": ["load", "periodization", "recommendation", "cardio_fitness"],
+        },
+        "start_date": {"type": "string", "description": "[load/periodization] Start date YYYY-MM-DD."},
+        "end_date": {"type": "string", "description": "[load/periodization] End date YYYY-MM-DD (default: today)."},
+        "date": {"type": "string", "description": "[recommendation] Target date YYYY-MM-DD (default: today)."},
+        "weeks": {"type": "number", "description": "[periodization] Number of weeks to analyse (default: 12)."},
+    },
+    "required": [],
+}
+
 GET_DAILY_METRICS_DESCRIPTION = (
     "Unified daily activity metrics. "
     "'movement' (default) = NEAT analysis, movement score 0-100, step target tracking, sedentary day flags. "
@@ -269,8 +297,57 @@ PLAN_NEXT_SESSION_DESCRIPTION = (
     "OWNER OVERRIDE (#4076): if Matthew overrules one critic's veto, re-run stage 2 with "
     "veto_override={critic, owner_words} — his words verbatim; only that veto is lifted, every other "
     "critic's changes still apply, and the override is recorded on the routine and in the corrections ledger. "
-    "Never skip stage 2 to get past a veto."
+    "Never skip stage 2 to get past a veto. "
+    "DETAIL (#5803): detail='summary' returns a compact view (~15 KB against ~250-335 KB) — the session, every verdict, "
+    "the commit-binding status, tripwires and the lines to say — with `omitted` naming each key left out and how to "
+    "fetch it; detail='full' (the default) is the whole record."
 )
+
+# #5803: plan_next_session's input table, moved out of mcp/registry.py (the #1665 ceiling) beside its description.
+PLAN_NEXT_SESSION_INPUT = {
+    "type": "object",
+    "properties": {
+        "target_date": {"type": "string", "description": "Session date YYYY-MM-DD. Defaults to today (Pacific)."},
+        "routine_id": {
+            "type": "string",
+            "description": "Stage 2 (#3752): a drafted routine_id to red-team. Runs the four critics over disjoint evidence, applies their changes to the draft, stores the verdicts on it; a veto then blocks commit.",
+        },
+        "veto_override": {
+            "type": "object",
+            "description": (
+                "#4076, stage 2 only: Matthew overrules ONE vetoing critic. {critic: muscle_defense|joints_tendons|"
+                "rate_advocate|blueprint_historian, owner_words: his words VERBATIM, error_class?: corrections-ledger class}. "
+                "Only that critic's veto is marked overridden (recorded on the routine, in the Hevy notes and in the "
+                "corrections ledger); every other critic's changes still apply and any other veto still blocks."
+            ),
+            "properties": {
+                "critic": {"type": "string"},
+                "owner_words": {"type": "string"},
+                "error_class": {"type": "string"},
+            },
+        },
+        "dry_run": {
+            "type": "boolean",
+            "description": (
+                "#4076, stage 2 only: run the critics, the override and the changes exactly as a real run, but WRITE "
+                "NOTHING (no routine version or routine_index row, no coach thread row, no corrections-ledger row). "
+                "Every put it would make is returned under critics.would_write. Default false."
+            ),
+        },
+        "detail": {
+            "type": "string",
+            "enum": ["full", "summary"],
+            "description": (
+                "#5803: 'full' (default) is the whole result. 'summary' is the compact view a chat reads: the session, the "
+                "critics' verdicts (pass/veto + reasons), commit-binding status, tripwire states, the honesty and must_say "
+                "lines, week_commitments, calibration_due, training_phase, the steps walk, exercise_unlocks, the pre-draft "
+                "status and the deload recommendation, plus `omitted` naming every key left out and how to fetch it. Both "
+                "run the same tool: stage 2 still stores its FULL record, and commit binds to that, never to this view."
+            ),
+        },
+    },
+    "required": [],
+}
 
 GET_EXERCISE_HISTORY_DESCRIPTION = (
     "Every logged SET for one movement, across all time — the MEASURED record: date, load, reps, RPE, "
@@ -326,16 +403,19 @@ GET_NUTRITION_DESCRIPTION = (
 )
 
 GET_ZONE2_BREAKDOWN_DESCRIPTION = (
-    "Zone 2 training tracker and weekly breakdown. Classifies Strava activities into 5 HR zones "
-    "based on average heartrate as a percentage of max HR (from profile). Aggregates weekly Zone 2 "
+    "Zone 2 training tracker and weekly breakdown. Counts the minutes actually spent in each recording "
+    "device's OWN Zone 2 band (Whoop workout zones, Strava activity zones; each session counted once across "
+    "sources). Basis: the vendors' own zone formulas as stored — not a percent of the profile max HR, and not "
+    "thresholds measured or re-derived for him; a measurement of past sessions, never a heart-rate target. "
+    "Hevy bike/elliptical/treadmill blocks are reported as cardio minutes, never Zone 2. Aggregates weekly Zone 2 "
     "minutes and compares to the 150 min/week target (Attia, Huberman, WHO moderate-intensity guidelines). "
     "Shows full 5-zone training distribution, sport type breakdown for Zone 2, weekly trend analysis, "
     "and training polarization alerts (Zone 3 'no man's land' warning per Seiler). "
-    "Zone 2 (60-70% max HR) is the highest-evidence longevity training modality — builds mitochondrial "
+    "Zone 2 is the highest-evidence longevity training modality — builds mitochondrial "
     "density, fat oxidation capacity, and cardiovascular base. "
     "Use for: 'how much Zone 2 am I doing?', 'am I hitting my Zone 2 target?', "
     "'show my training zone distribution', 'weekly Zone 2 minutes', 'zone 2 trend', "
-    "'am I doing enough easy cardio?', 'training polarization check'. Requires Strava data with HR."
+    "'am I doing enough easy cardio?', 'training polarization check'. Requires Whoop or Strava sessions with HR zones."
 )
 
 SAVE_INSIGHT_DESCRIPTION = (

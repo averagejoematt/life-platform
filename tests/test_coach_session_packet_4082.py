@@ -157,6 +157,23 @@ def stub_readers(monkeypatch):
             input_status("measured"),
         ),
     )
+    # #5573: note_requests reads the REQUEST# rows through `mcp.tools_training_notes._note_request_rows`; one open question here.
+    from mcp import tools_training_notes as ttn
+
+    monkeypatch.setattr(
+        ttn,
+        "_note_request_rows",
+        lambda: [{"sk": "REQUEST#2026-09-20#w#T1#0", "date": "2026-09-20", "subtype": "question", "status": "open", "note_raw": "q?"}],
+    )
+
+    # #5576: the phase brief reads PHASE#STATE + the newest PHASE#EVAL through `phase_evaluator_leg.phase_brief_field`; one stored state.
+    from mcp import phase_evaluator_leg as pel
+
+    monkeypatch.setattr(
+        pel,
+        "phase_brief_field",
+        lambda table=None: ({"phase": "foundation", "phase_title": "Foundation", "next_phase": "build"}, input_status("measured")),
+    )
 
 
 # #5078: one battery as the store's reader returns it (decimals_to_float of the BATTERY# item).
@@ -542,7 +559,7 @@ def test_morning_note_is_measured_with_the_four_words_the_day_and_the_pt_instant
     assert v["written_at_pt"].endswith("PT") and "written_at" not in v
     expected = {k: val for k, val in mn.coach_fact(dict(MORNING_NOTE_ROW)).items() if k != "state"}
     assert v == expected, "the packet must carry coach_fact's shape verbatim"
-    assert out["packet_version"] == "coach-session-packet@1.11.0"
+    assert out["packet_version"] == "coach-session-packet@1.13.0"
 
 
 def test_morning_note_no_row_is_absent_and_a_failed_read_is_read_failed(stub_readers, monkeypatch):
@@ -625,25 +642,28 @@ def test_today_lists_the_flex_session_and_the_garmin_walk_as_separate_items(stub
     assert "walking_layer_for_day" in pkt.SOURCES["today"] and "dedup_strava" in pkt.SOURCES["today"]
 
 
-def test_today_flags_the_garmin_walk_over_the_hr_ceiling_read_from_the_redline(stub_readers, monkeypatch):
-    """Mutation: hard-code 105, or flag on max HR, or skip the walk because it was de-duplicated."""
-    from training import owner_redlines
+def test_today_lists_the_garmin_walk_heart_rate_as_a_measurement_never_a_flag(stub_readers, monkeypatch):
+    """#5916 (owner ruling 2026-11-13): the walking heart-rate cap is retired. The 116.8-bpm walk is LISTED with its
+    basis and graded against nothing — it was the one flag at the retired 105 cap (#4311) and none at OD2's 120.
+    Mutation: bring back `hr_ceiling_flags` / `over_by_bpm`, hand-type the intensity line, or drop the walk's average."""
+    from training import owner_redlines, recent_aerobic, redline_changelog
 
-    ceiling = owner_redlines.REDLINES["walking_floor_hr_wk"]["hr_ceiling_bpm"]
     value, _ = _today("2026-09-27")
-    assert value["walking_floor_hr_wk"]["hr_ceiling_bpm"] == ceiling
-    # #4503 OD2: the cap is 120 avg, so the 116.8-bpm walk is compliant now; at the retired 105 cap it is the one flag
-    assert ceiling == 120 and value["hr_ceiling_flags"] == []
-    monkeypatch.setitem(owner_redlines.REDLINES["walking_floor_hr_wk"], "hr_ceiling_bpm", 105)
-    value, _ = _today("2026-09-27")
-    assert [(f["id"], f["avg_hr"], f["hr_ceiling_bpm"], f["over_by_bpm"], f["deduplicated"]) for f in value["hr_ceiling_flags"]] == [
-        ("strava:20343117320", 116.8, 105, 11.8, False)
+    assert "hr_ceiling_flags" not in value and "hr_ceiling_bpm" not in value["walking_floor_hr_wk"]
+    assert [(m["id"], m["avg_hr"], m["basis"], m["deduplicated"]) for m in value["walk_hr_measured"]] == [
+        ("strava:20343117320", 116.8, recent_aerobic.AVG_HR_BASIS_DEVICE, False)
     ]
+    assert all("over_by_bpm" not in m and m["basis"].startswith("measured") for m in value["walk_hr_measured"])
+    # the walking line is the talk test plus the redline's easy-effort RPE, read — never retyped
+    assert value["walking_floor_hr_wk"]["intensity"] == recent_aerobic.EASY_EFFORT_CUE
+    monkeypatch.setattr(recent_aerobic, "EASY_EFFORT_CUE", "the cue the redline carries")
+    assert _today("2026-09-27")[0]["walking_floor_hr_wk"]["intensity"] == "the cue the redline carries"
+    # no heart-rate number is a literal in the module: not the retired cap or target, not the redline's RPE
+    retired = redline_changelog.RETIRED_WALKING_HR_LINE
+    numbers = {retired["hr_ceiling_bpm"], retired["hr_target_bpm"]}
     src = (ROOT / "mcp" / "coach_packet_today.py").read_text()
-    assert not any(isinstance(n, ast.Constant) and n.value == ceiling for n in ast.walk(ast.parse(src))), "the ceiling is a literal"
-    monkeypatch.setitem(owner_redlines.REDLINES["walking_floor_hr_wk"], "hr_ceiling_bpm", 200)
-    value, _ = _today("2026-09-27")
-    assert value["hr_ceiling_flags"] == [] and value["walking_floor_hr_wk"]["hr_ceiling_bpm"] == 200
+    assert not any(isinstance(n, ast.Constant) and n.value in numbers for n in ast.walk(ast.parse(src))), "a heart-rate cap is a literal"
+    assert "hr_ceiling_bpm" not in owner_redlines.REDLINES["walking_floor_hr_wk"]
 
 
 def test_today_keeps_the_six_whoop_in_hevy_walks_de_duplicated(stub_readers, monkeypatch):

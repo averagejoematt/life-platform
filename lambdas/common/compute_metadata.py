@@ -24,11 +24,14 @@ Usage:
 
 from __future__ import annotations
 
+import logging
 import os
 import uuid
 from datetime import datetime, timezone
 
 import boto3
+
+logger = logging.getLogger(__name__)
 
 # Per-invocation run_id, set lazily on first call.
 _RUN_ID: str | None = None
@@ -56,7 +59,9 @@ def tag_record(record: dict, source_id: str = "unknown", phase: str | None = Non
     default-deny phase filter (with_phase_filter) hides pre-genesis records
     on the read path. Phase resolution order:
       1. Explicit `phase=` argument from caller (wins always).
-      2. record["phase"] already set (preserved — no override).
+      2. record["phase"] already set AS A STRING (preserved — no override). A
+         non-string pre-set value is a domain field squatting on the provenance
+         key; it is overwritten by step 3/4 with a warning (#5931).
       3. Auto-infer from record["sk"] if it matches DATE#YYYY-MM-DD:
          date < EXPERIMENT_START_DATE → "pilot", else "experiment".
       4. Otherwise from the WRITE'S OWN DATE (`as_of`, default: the Pacific calendar
@@ -77,6 +82,21 @@ def tag_record(record: dict, source_id: str = "unknown", phase: str | None = Non
     if phase is not None:
         record["phase"] = phase
     elif "phase" not in record:
+        record["phase"] = _infer_phase_from_record(record, as_of=as_of)
+    elif not isinstance(record["phase"], str):
+        # #5931: `phase` is the PROVENANCE attribute — the string the ADR-058 read path
+        # (with_phase_filter / singleton_visible) compares against. A writer that put a
+        # domain value under the same key (state_of_matthew stored its day/week map
+        # there) made every row invisible for a whole cycle. Overwrite, never raise:
+        # raising would drop the write and leave the reader exactly as dark as the bug
+        # did, and this function's rule is that provenance never breaks a write. The
+        # clobbered domain value is the writer's defect, caught by
+        # tests/test_tag_record_phase_shape_5931.py; the warning names it in the logs.
+        logger.warning(
+            "[compute_metadata] #5931 %s pre-set a non-string `phase` (%s) — overwritten with the provenance phase",
+            source_id,
+            type(record["phase"]).__name__,
+        )
         record["phase"] = _infer_phase_from_record(record, as_of=as_of)
     try:
         from common.input_manifest import stamp_output

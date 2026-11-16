@@ -19,9 +19,55 @@ the evaluator routes only specs that carry ``branches``. Pure apart from the inj
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 
 from experiment.measurable_metrics import METRIC_SOURCES, base_metric
+
+# The two clause shapes that make a sentence conditional (shared with coach.filing_rules, which splits branches on them).
+LEAD_CONDITION_RE = re.compile(r"^\s*(?:even\s+)?(?:if|when|whenever|once|assuming|provided(?:\s+that)?|unless|as\s+long\s+as)\b\s*", re.I)
+NEGATED_BRANCH_RE = re.compile(r"^\s*(?:and\s+|but\s+)?(?:if\s+not|otherwise|if\s+it\s+does\s*n[o']t|if\s+that\s+fails)\b[\s,]*", re.I)
+
+# ── #5611 (owner ruling 2026-11-02, decision E): an opinion is never graded as a prediction without frozen,
+# measurable criteria. THE MISFILED-CONDITIONAL CLASS: before the #5607 filing rules, a conditional claim ("If October
+# 5-6 protein stayed above X, carb reduction alone is the more likely driver ...") was stored as an ordinary
+# directional/point/machine spec on whichever metric the extractor found — usually the CONDITION's metric — so the
+# grader graded the antecedent as if it were the outcome and never tested the condition at all. A row filed under the
+# rules carries `filing_rules_version` (its condition is a frozen `branches` spec, or it was filed as an observation);
+# a sealed pre-registration's criteria were frozen at sealing. Any OTHER row whose claim is conditional-shaped and
+# whose spec is not a conditional is refused a first grade: not graded, not expired, no confidence move — it waits for
+# an owner ruling through the ledgered correction path (`grade_corrections.apply_correction`), exactly as a held row
+# does. Nothing is re-specified (the #5607 (d) rule): the stored spec is read, never rewritten.
+MISFILED_CONDITIONAL_REASON = (
+    "a conditional claim filed before the #5607 filing rules with no frozen, checkable condition: grading its stored "
+    "spec would grade an opinion as a prediction (#5611)"
+)
+FIRST_GRADE_STATUSES = ("pending", "confirming")
+
+
+def misfiled_conditional(pred: dict) -> bool:
+    """True when a row must not get a first grade: conditional-shaped claim, no filing record, not sealed, not a conditional spec."""
+    if not isinstance(pred, dict) or pred.get("filing_rules_version") or pred.get("pre_registered"):
+        return False
+    spec = pred.get("evaluation") or {}
+    if spec.get("type") == "conditional" or spec.get("branches"):
+        return False
+    claim = " ".join(str(pred.get("claim_natural") or "").split())
+    segments = [s for s in re.split(r";|\.\s+", claim) if s.strip()]
+    return bool(LEAD_CONDITION_RE.match(claim) or any(NEGATED_BRANCH_RE.match(s) for s in segments[1:]))
+
+
+def skip_misfiled(pred: dict, logger, stats: dict | None = None) -> bool:
+    """The evaluator's admission step, beside `evaluation_hold.skip_held`: True (after one log line, and
+    ``stats["refused_misfiled_conditional"] += 1``) when an OPEN row is a misfiled conditional. A row already graded
+    (a #2221 second look) is not this step's business — re-grading a decided row is the owner's correction path."""
+    if str(pred.get("status") or "") not in FIRST_GRADE_STATUSES or not misfiled_conditional(pred):
+        return False
+    pid = pred.get("prediction_id") or str(pred.get("sk", "")).replace("PREDICTION#", "", 1)
+    logger.info("[#5611] REFUSED a first grade — %s / %s: %s", pred.get("pk", "?"), pid, MISFILED_CONDITIONAL_REASON)
+    if stats is not None:
+        stats["refused_misfiled_conditional"] = stats.get("refused_misfiled_conditional", 0) + 1
+    return True
 
 
 def _cmp(value, op, threshold):

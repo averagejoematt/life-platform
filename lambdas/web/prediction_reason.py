@@ -23,6 +23,10 @@ THE RULE
     back with no verdict (inconclusive/expired), None while nothing has come back
     (pending, observational). Named apart from the row's existing ``gradeable`` (#3046:
     "has a deterministic grading path at all"), which answers a different question.
+  * A call an OWNER RULING took out of the record (#6102): its latest ``corrections[]`` entry has
+    ``basis == "ruling"`` and it now carries no verdict. Its reason is not "not enough data" — the
+    readings were there and it was graded; the ruling says why it could not be checked. The
+    reason points at the correction, whose explanation the same payload carries.
 
 Pure: no I/O, no clock. The one judgement it borrows from the grader is flatness — the
 directional noise band lives in ``coach_prediction_evaluator`` (``DIRECTIONAL_NOISE_THRESHOLD``),
@@ -56,6 +60,7 @@ METRIC_WORDS = {
     "blood_glucose_avg": "average blood glucose",
     "blood_glucose_std_dev": "blood-glucose swings",
     "body_fat_pct": "body-fat percentage",
+    "total_volume_kg": "per-session lifting volume",
 }
 
 #: The unit each METRIC_WORDS measure is read in, for a number printed beside its words (a bet's
@@ -76,6 +81,7 @@ METRIC_UNITS = {
     "blood_glucose_avg": " mg/dL",
     "blood_glucose_std_dev": " mg/dL",
     "body_fat_pct": "%",
+    "total_volume_kg": " kg",
 }
 
 
@@ -122,6 +128,19 @@ def measure_unit(name: Any) -> str | None:
 _SUFFIX_WORDS = {"_7day_avg": "7-day average", "_14day_avg": "14-day average", "_30day_avg": "30-day average"}
 _DIRECTIONS = {"up": "up", "down": "down"}
 _NO_VERDICT = ("inconclusive", "expired")
+#: #6102 — what a ruled, no-verdict call says in place of a data sentence (the correction beside it says why).
+#: THE WORDS MATTER: the publication gate empties any served string that shares a six-word run with a withheld row's
+#: stored text (``narrative_publication.is_tainted``), and a ruled row's stored notes open "Could not be checked as
+#: filed: …". The first wording here reused that phrase, so the gate emptied it on every ruled call (live, 2026-11-16).
+#: ``tests/test_coaches_api.py`` taints the rulings' stored sentences and holds this one clear of them.
+RULED_REASON = "a ruling took this call out of the accuracy count — the correction on this call says why"
+
+
+def ruled_out(record: dict) -> bool:
+    """True when the row's LATEST correction is an owner ruling (``grade_corrections`` ``basis == "ruling"``)."""
+    entries = record.get("corrections")
+    last = entries[-1] if isinstance(entries, list) and entries else None
+    return isinstance(last, dict) and str(last.get("basis") or "") == "ruling"
 
 
 def metric_words(metric: Any) -> str | None:
@@ -234,6 +253,8 @@ def reason_words(record: dict) -> tuple[str | None, bool | None]:
         q, n, bound, k = counted.group("q"), counted.group("n"), counted.group("bound"), counted.group("k")
         return f"{_cap(words)} came in {bar} on {q} of {n} days — the call needed {bound} {k}", flag
 
+    if status in _NO_VERDICT and ruled_out(record):
+        return RULED_REASON, flag  # #6102: never "not enough data" for a call a ruling took out of the record
     if status == "expired" and kind == "qualitative":
         return "retired ungraded — a call like this has no measurable test", flag
     if status in _NO_VERDICT and actual is None and words and kind in ("directional", "point"):

@@ -51,6 +51,11 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 #     (operational_stack, REL-4) — internal STORE/SERVE round-trip health (DDB,
 #     S3, the MCP Function URL used by Claude Desktop/claude.ai, never a public
 #     reader path); stays on the 72h bar.
+#   * `site-api-p95-latency-high` (serve_stack) — UNTAGGED by #5821 (owner ruling
+#     2026-11-11). A single 5-minute p95 >= 5 s on a low-traffic Lambda is mostly a few
+#     cold loads (16 of 16 episodes in the week to 2026-11-11 cleared within one period);
+#     ADR-052 puts latency on the digest. It stays as the digest-only early signal, and
+#     the reader-facing claim moved to `site-api-p95-latency-sustained` (3 of 3 periods).
 #
 # Unlisted alarms default to no `audience` facet at all (absent, not
 # `"internal"`) — the same "unlisted = default by omission" convention the
@@ -80,9 +85,42 @@ READER_AUDIENCE_ALARMS: dict[str, str] = {
     "site-api-ai-throttles": "serve_stack — throttling a reader hits directly on the AI endpoints.",
     "site-api-content-filter-fallback": "serve_stack — the reader-facing AI content-filter fallback path.",
     "site-api-invocation-spike": "serve_stack — an invocation spike on the reader-facing API (capacity/DoS blast radius reaches readers).",
-    "site-api-p95-latency-high": "serve_stack — p95 latency a reader directly experiences loading the site.",
+    "site-api-p95-latency-sustained": (
+        "serve_stack — p95 latency a reader directly experiences loading the site, held for 15 minutes "
+        "(3 of 3 five-minute periods, #5821); the single-period `site-api-p95-latency-high` is its digest-only "
+        "early signal and carries no audience tag."
+    ),
     "site-api-throttles": "serve_stack — throttling a reader hits directly on the public API.",
 }
+
+# ── #5821: the facet split into an ESCALATION tag and a ROUTING tag ───────────
+#
+# Until #5821 membership of READER_AUDIENCE_ALARMS meant two things at once: the first-red
+# escalation bar (#3423 — the /wrap citation gate and remediation/agent.py's
+# aged_alarm_escalations) AND a second SNS action on the urgent topic (#3499,
+# cdk/stacks/reader_audience.py). docs/PROPORTIONALITY.md's #3499 row named the trigger for
+# splitting them: "if `site-api-invocation-spike` sends more urgent mail in any 30-day window
+# than the other ten members combined … split the facet into an escalation tag and a routing
+# tag". It fired: 51 urgent emails in the 7 days to 2026-11-11 against 16 for every other
+# member combined (describe-alarm-history), and the remediation dispatcher logged every one of
+# them as "non-urgent alarm … daily sweep will handle" — the email was a duplicate of a digest
+# line. Owner ruling 2026-11-11 (#5821): the spike alarm keeps its escalation tag and its
+# digest action, and loses the urgent route.
+#
+# A name listed here MUST also be in READER_AUDIENCE_ALARMS (it keeps the escalation tag);
+# being listed here only withholds the urgent SNS action. The value is the routing ruling.
+READER_AUDIENCE_DIGEST_ONLY: dict[str, str] = {
+    "site-api-invocation-spike": (
+        "#5821 (owner ruling 2026-11-11) — a traffic counter, not a broken door: 200/5 min is about "
+        "the p95 of ordinary 5-minute traffic, so it flapped 51 times in 7 days and every email "
+        "duplicated a digest line. Escalation on first red is kept; the urgent email is not."
+    ),
+}
+
+
+def urgent_routed_reader_alarms() -> frozenset[str]:
+    """The facet members that ALSO publish to the urgent topic (#3499 minus #5821's split)."""
+    return frozenset(READER_AUDIENCE_ALARMS) - frozenset(READER_AUDIENCE_DIGEST_ONLY)
 
 
 def _resolve_str(node: ast.AST, consts: dict[str, str]) -> str | None:
@@ -463,11 +501,21 @@ def extract_alarms() -> dict[str, dict]:
         for name in inventory.get(stack, []):
             here.setdefault(name, {"stack": stack, "kind": "metric", "routing": "unresolved", "via": "alarm_discovery-only (untraced)"})
         alarms.update(here)
+    _attach_reader_audience(alarms)
+    return alarms
+
+
+def _attach_reader_audience(alarms: dict[str, dict]) -> None:
+    """#3423/#3499/#5821: overlay the curated reader-audience facet onto the traced alarms (mutates)."""
     # #3423: attach the curated reader-audience facet — a name the registry holds
     # that no CDK-derived alarm matches is a typo/rename and must not be dropped
     # silently (tests/test_reader_audience_alarms.py pins the same invariant against
     # the real inventory; this assertion catches it at generation time too, the same
     # "stated, never guessed" posture as the rest of this module).
+    stray = sorted(set(READER_AUDIENCE_DIGEST_ONLY) - set(READER_AUDIENCE_ALARMS))
+    assert (
+        not stray
+    ), f"READER_AUDIENCE_DIGEST_ONLY names {stray}, which carry no READER_AUDIENCE_ALARMS tag — the split only withholds a route"
     for name, ruling in READER_AUDIENCE_ALARMS.items():
         assert name in alarms, f"READER_AUDIENCE_ALARMS names {name!r}, which is not a CDK-declared alarm — typo or rename?"
         alarms[name]["audience"] = "reader"
@@ -484,6 +532,10 @@ def extract_alarms() -> dict[str, dict]:
         # this whole plane exists to prevent. Held against the REAL synthesized template
         # by tests/test_reader_audience_urgent_routing_3499.py, so this can never become a
         # claim the CDK does not honour.
+        # #5821: an escalate-only member (READER_AUDIENCE_DIGEST_ONLY) keeps the tag but not
+        # the urgent route, so its declared routing stands and the ruling is carried along.
+        if name in READER_AUDIENCE_DIGEST_ONLY:
+            alarms[name]["audience_routing_ruling"] = READER_AUDIENCE_DIGEST_ONLY[name]
+            continue
         prior = set() if alarms[name]["routing"] == "unresolved" else set(alarms[name]["routing"].split("+"))
         alarms[name]["routing"] = _join_routing(prior | {"urgent"})
-    return alarms

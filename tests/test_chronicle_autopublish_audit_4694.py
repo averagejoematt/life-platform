@@ -10,9 +10,11 @@ What is abridged: the two dek ``fact:`` explanations are shortened, and the live
 ``fact: 'graded_this_week_count' ... not reportable. → N/A`` non-finding — is carried in abridged form. It is a
 non-finding the audit ignores (#4749), so the live row has 3 blocking episode findings, not 4.
 
-The rule held here: an unapproved draft whose audit has a blocking item stays a draft and the sweep logs
-``HELD_TOKEN`` naming the week (the ``chronicle-autopublish-held`` alarm keys on it); an audited draft publishes as
-before; the approve click is untouched; and the Panel refuses a desk episode the desk left with a blocking finding.
+The rule held here (owner ruling 2026-11-13: elapsed time is never consent): the sweep publishes NOTHING — every
+unapproved draft in the window stays a draft and the sweep logs ``HELD_TOKEN`` naming the week and the audit's verdict
+(the ``chronicle-autopublish-held`` alarm keys on it), an audited draft included; the approve click publishes only a
+draft the audit passes, the craft hold being the one item an approval answers; and the Panel refuses a desk episode the
+desk left with a blocking finding.
 """
 
 from __future__ import annotations
@@ -132,7 +134,7 @@ def held(approve, monkeypatch):
 
 def test_the_week5_specimen_is_held_not_published_and_the_hold_names_the_week(approve, held):
     out, put, markp, sender, podcast = _run_sweep(approve, [_draft(WEEK5_DESK_FINDINGS)])
-    assert out == []
+    assert out == [{"date": "2026-10-06", "week": 5, "blocking": 6}]
     put.assert_not_called()
     markp.assert_not_called()
     sender.assert_not_called()
@@ -143,48 +145,48 @@ def test_the_week5_specimen_is_held_not_published_and_the_hold_names_the_week(ap
     assert "23 consecutive training days" in held[0] and "body-number" in held[0]
 
 
-def test_an_audited_draft_still_publishes_itself(approve, held):
-    """Mutation control: the same week, with only the desk's style notes left, is the 'forgot to click' case SS-01
-    exists for — and it goes out exactly as before."""
+def test_an_audited_draft_is_held_too_elapsed_time_is_not_consent(approve, held):
+    """Owner ruling 2026-11-13. The same week with only the desk's style notes left passed the audit and, until that
+    ruling, published itself at 48 h. Now it is held like any other unapproved week: the page fires, nothing ships."""
     style_only = {"post": [f for f in WEEK5_DESK_FINDINGS["post"] if f.startswith(("craft:", "repeat:"))], "episode": []}
     out, put, markp, sender, podcast = _run_sweep(approve, [_draft(style_only)])
-    assert out == [{"date": "2026-10-06", "week": 5}]
-    markp.assert_called_once_with("2026-10-06")
-    sender.assert_called_once()
-    podcast.assert_called_once()
-    assert held == []
+    assert out == [{"date": "2026-10-06", "week": 5, "blocking": 0}]
+    put.assert_not_called()
+    markp.assert_not_called()
+    sender.assert_not_called()
+    podcast.assert_not_called()
+    assert len(held) == 1 and "Week 5 (2026-10-06)" in held[0] and "found 0 blocking item(s)" in held[0]
 
 
 def test_a_draft_with_no_audit_on_record_is_held(approve, held):
     """The legacy writer (or a pre-desk row) leaves no desk record: no audit ran, so the sweep may not publish it."""
     out, put, markp, *_ = _run_sweep(approve, [_draft(None)])
-    assert out == [] and not markp.called
+    assert not markp.called and not put.called
     assert "no audit on record" in held[0]
 
 
 def test_an_audit_that_cannot_run_holds_the_week(approve, held):
     with mock.patch.object(autopublish_audit, "blocking_items", side_effect=RuntimeError("boom")):
         out, put, markp, *_ = _run_sweep(approve, [_draft({"post": [], "episode": []})])
-    assert out == [] and not markp.called
+    assert not markp.called and not put.called
     assert "the audit could not run: boom" in held[0]
 
 
-def test_a_held_week_does_not_stop_an_audited_one_in_the_same_sweep(approve):
+def test_every_week_in_the_window_is_held_and_named(approve, held):
     clean = _draft({"post": [], "episode": []}, sk="DATE#2026-09-29", date="2026-09-29", week_number=4)
     out, put, markp, sender, podcast = _run_sweep(approve, [_draft(WEEK5_DESK_FINDINGS), clean])
-    assert out == [{"date": "2026-09-29", "week": 4}]
-    markp.assert_called_once_with("2026-09-29")
+    assert [r["week"] for r in out] == [5, 4]
+    assert not markp.called and not sender.called and not podcast.called
+    assert len(held) == 2 and "Week 4 (2026-09-29)" in held[1]
 
 
 def test_the_dry_run_reports_a_hold_too(approve, held):
     with mock.patch.object(approve, "_find_stale_drafts", return_value=[_draft(WEEK5_DESK_FINDINGS)]):
-        assert approve._sweep_stale_drafts(48, dry_run=True) == []
+        assert approve._sweep_stale_drafts(48, dry_run=True) == [{"date": "2026-10-06", "week": 5, "blocking": 6}]
     assert len(held) == 1
 
 
-def test_the_approve_click_is_still_the_owner_s_way_through(approve):
-    """An owner approval publishes the very draft the sweep refuses — the gate is on the UNAPPROVED path only."""
-    row = _draft(WEEK5_DESK_FINDINGS, approval_token="t" * 64)
+def _click(approve, row):
     with (
         mock.patch.object(approve, "_get_draft", return_value=row),
         mock.patch.object(approve, "_publish_to_s3", return_value=[]) as pub,
@@ -193,16 +195,58 @@ def test_the_approve_click_is_still_the_owner_s_way_through(approve):
         mock.patch.object(approve, "_commit_ledger"),
         mock.patch.object(approve, "_mark_published") as markp,
         mock.patch.object(approve, "_index_for_recall"),
-        mock.patch.object(approve, "_invoke_email_sender"),
+        mock.patch.object(approve, "_invoke_email_sender") as sender,
         mock.patch.object(approve, "_invoke_elena_state_updater"),
         mock.patch.object(approve, "_invoke_coach_panel_podcast"),
     ):
         resp = approve._handle(
-            {"queryStringParameters": {"date": "2026-10-06", "token": "t" * 64, "action": "approve", "rev": revision_id(row)}}
+            {"queryStringParameters": {"date": row["date"], "token": "t" * 64, "action": "approve", "rev": revision_id(row)}}
         )
+    return resp, pub, markp, sender
+
+
+def test_an_approval_does_not_publish_a_draft_the_audit_refuses(approve):
+    """Owner ruling 2026-11-13: approval AND a passing audit. The Week 5 specimen, approved, publishes nothing and the
+    page names what is open (an approval no longer overrides a contradicted streak or an unheld quote)."""
+    row = _draft(WEEK5_DESK_FINDINGS, approval_token="t" * 64)
+    resp, pub, markp, sender = _click(approve, row)
+    assert resp["statusCode"] == 409
+    assert "23 consecutive training days" in resp["body"] and "Nothing was published" in resp["body"]
+    pub.assert_not_called()
+    markp.assert_not_called()
+    sender.assert_not_called()
+
+
+def test_an_approval_publishes_an_audited_draft_and_answers_the_craft_hold(approve):
+    """The craft hold waits for the owner's eye (#4545); his approval is that eye. A draft whose only open items are
+    the craft hold's publishes on the click — the control that the refusal above is the audit, not the click."""
+    row = _draft(
+        {"post": ["craft: 2 'not X — it's Y' constructions (max 1)"], "episode": []},
+        approval_token="t" * 64,
+        publish_hold="craft_hold",
+        desk_craft_json=json.dumps(["the dek is 47 words"]),
+    )
+    assert autopublish_audit.blocking_items(row), "the craft hold blocks the unapproved path"
+    resp, pub, markp, sender = _click(approve, row)
     assert resp["statusCode"] == 200
     pub.assert_called_once_with(row, failures=[])
     markp.assert_called_once_with("2026-10-06")
+
+
+def test_an_approval_does_not_publish_a_draft_that_names_private_activity(approve):
+    row = _draft({"post": [], "episode": []}, approval_token="t" * 64)
+    with mock.patch.object(autopublish_audit.prediction_publication, "words_name_private_activity", return_value=True):
+        resp, pub, markp, _ = _click(approve, row)
+    assert resp["statusCode"] == 409 and "private activity" in resp["body"]
+    pub.assert_not_called()
+
+
+def test_an_approval_refuses_when_the_audit_cannot_run(approve):
+    row = _draft({"post": [], "episode": []}, approval_token="t" * 64)
+    with mock.patch.object(autopublish_audit, "blocking_items", side_effect=RuntimeError("boom")):
+        resp, pub, markp, _ = _click(approve, row)
+    assert resp["statusCode"] == 409 and "the audit could not run: boom" in resp["body"]
+    pub.assert_not_called()
 
 
 # ── the audit itself ─────────────────────────────────────────────────────────
@@ -243,7 +287,7 @@ def test_a_wrong_dated_weekday_in_the_stored_text_blocks_the_sweep(approve, held
         "dated weekday: 'Thursday, October 3' — 2026-10-03 was a Saturday"
     ]
     out, put, markp, *_ = _run_sweep(approve, [wrong])
-    assert out == [] and not markp.called
+    assert not markp.called and not put.called
     assert len(held) == 1 and "2026-10-03 was a Saturday" in held[0]
 
 

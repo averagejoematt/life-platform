@@ -407,7 +407,7 @@
 | 9f | **Add cross-domain visualizations** — same meal with good vs bad sleep; with vs without post-meal walk; glucose × stress level | Data | Medium | Should-have |
 | 9g | **Add nocturnal glucose patterns** — dawn phenomenon, overnight stability, sleep architecture × nighttime glucose | Data | Medium | Should-have |
 | 9h | **Add inline definitions/tooltips** — TIR, SD, optimal vs standard range. Bridge vocabulary gap between accessible narrative and clinical data | UX | Low | Must-have |
-| 9i | **Connect genomics to glucose** — note on FADS2/MTHFR variants affecting individual glucose metabolism. Genomics × CGM = most scientifically sophisticated content on site | Content | Low | Should-have |
+| 9i | **Connect genomics to glucose** — note on genetic variants affecting individual glucose metabolism. Genomics × CGM = most scientifically sophisticated content on site | Content | Low | Should-have |
 | 9j | **Dynamic pull-quotes** — auto-surface most striking meal comparisons from accumulating data. Content engine | Feature | Med-High | Nice-to-have |
 | 9k | **Weave narrative through data** — continue fear→data→understanding→peace arc through data sections, not just bookends | Content | Medium | Must-have |
 | 9l | **Expand psychological thread** — 2-3 sentences on health anxiety and monitoring as resolution. Resonates deeply with metabolic-fear audience | Content | Low | Should-have |
@@ -450,7 +450,7 @@
 | 10a | **Add narrative intro** — the only observatory without one. Find the personal truth. "Every diet I've ever done worked until it didn't" energy | Content | Low | Must-have |
 | 10b | **Add Top Meals section** — most frequently logged meals with macro profile, glucose response grade, protein-per-calorie ranking. "People eat meals, not grams" | Feature | Medium | Must-have |
 | 10c | **Add protein distribution visualization** — per-meal breakdown showing leucine threshold met/missed at each meal slot, not just daily total | Data | Medium | Must-have |
-| 10d | **Add micronutrient section** — key gaps relative to genomics: choline (550mg+ PEMT target), vitamin D, omega-3, folate. SNPs → dietary data | Data/Content | Medium | Should-have |
+| 10d | **Add micronutrient section** — key gaps relative to genomics: choline, vitamin D, omega-3, folate. SNPs → dietary data | Data/Content | Medium | Should-have |
 | 10e | **Add TDEE adaptation tracking** — MacroFactor adaptive TDEE over time. Early warning for metabolic adaptation/stall | Data | Medium | Should-have |
 | 10f | **Fix pull-quote duplication** — Pull-Quote #2 identical to Glucose page. Each observatory needs unique findings | Content | Low | Must-have |
 | 10g | **Align to editorial design pattern** — same pass as Sleep and Glucose | Design | Med-High | Must-have |

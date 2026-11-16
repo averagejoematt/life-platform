@@ -1067,13 +1067,14 @@ _STORE_VENDOR_TIME_TOLERANCE_SECONDS = 1
 
 
 def _fetch_stored_workouts(table, start_date: str, end_date: str) -> list:
-    """The stored whoop workout sub-records across [start_date, end_date] (inclusive),
-    with the fields the store → vendor pass compares."""
+    """The stored whoop workout sub-records across [start_date, end_date] (inclusive), WHOLE.
+
+    #5669: no projection — an emptied day's tombstone keeps the row it replaces (`emptied_record`,
+    `whoop_empty_day`), so the read carries every vendor field, not only the compared ones."""
     pk = f"USER#{USER_ID}#SOURCE#whoop"
     out: list = []
     kwargs = {
         "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}￿"),
-        "ProjectionExpression": "sk, workout_id, sport_id, start_time, end_time, tombstone",
     }
     while True:
         resp = table.query(**kwargs)
@@ -1118,21 +1119,10 @@ def _workouts_store_vendor_diff(vendor_workouts: list, stored_workouts: list, co
 
 
 def _emit_store_vendor_metrics(absent_count: int, changed_count: int) -> None:
-    try:
-        _cw.put_metric_data(
-            Namespace="LifePlatform/IngestReconciliation",
-            MetricData=[
-                {
-                    "MetricName": name,
-                    "Dimensions": [{"Name": "Source", "Value": "whoop"}],
-                    "Value": float(value),
-                    "Unit": "Count",
-                }
-                for name, value in (("StoreOnlyActivityCount", absent_count), ("ChangedActivityCount", changed_count))
-            ],
-        )
-    except Exception as e:  # metric emission must never fail the run
-        logger.warning("store→vendor metric emit failed (non-fatal): %s", e)
+    """#5888: emits nothing. StoreOnlyActivityCount / ChangedActivityCount{Source=whoop} were unalarmed, undashboarded
+    series (+2 over the LifePlatform/IngestReconciliation budget); the counts live in the [RECONCILE] warning log
+    (non-zero cases) and the run's report body. Kept as a call site so a future alarm re-adds the put in one place."""
+    return None
 
 
 def _store_vendor_report(vendor_workouts: list, start, today) -> dict:

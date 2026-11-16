@@ -50,6 +50,7 @@ import emails.coach_nudge_lambda as shell  # noqa: E402
 from boto3.dynamodb.types import TypeSerializer  # noqa: E402
 from coach import coach_nudge_engine as eng  # noqa: E402
 from common.pacific_time import PACIFIC  # noqa: E402
+from emails.brief_lines import FOLDED  # noqa: E402 — #5821: a passing note is folded into the brief, not mailed
 from fakes import FakeDdbTable  # noqa: E402
 from operational import nudge_ledger_qa as dead_man  # noqa: E402
 
@@ -128,22 +129,22 @@ def test_the_float_that_killed_it_now_lands_as_a_decimal(monkeypatch):
 
     out = shell.lambda_handler({}, None)
 
-    assert out["nudge"] == "sent", out
+    assert out["nudge"] == "folded", out
     assert out["trigger"] == eng.TRIGGER_ACWR_BAND_CROSS
-    assert len(ses.sends) == 1
+    assert ses.sends == []  # #5821: the brief carries it
 
     records = _nudges(table)
-    assert len(records) == 1, "the whole point of #3569: a sent nudge has a record"
+    assert len(records) == 1, "the whole point of #3569: a delivered nudge has a record"
     record = records[0]
     assert record["pk"] == "COACH#training_coach"
-    assert record["status"] == "sent"
+    assert record["status"] == FOLDED
     # The float is preserved in value, converted in TYPE — this is the fix.
     assert record["trigger_payload"]["acwr"] == Decimal("1.42")
     assert isinstance(record["trigger_payload"]["acwr"], Decimal)
     assert not isinstance(record["trigger_payload"]["acwr"], float)
 
     ledger = _ledger(table)
-    assert ledger["status"] == "sent" and ledger["graded"] is False
+    assert ledger["status"] == FOLDED and ledger["graded"] is True  # a folded note is not outcome-graded (#5821)
     assert (ledger["nudge_pk"], ledger["nudge_sk"]) == (record["pk"], record["sk"])
 
 
@@ -163,7 +164,7 @@ def test_the_verdict_triggers_confidence_float_also_round_trips(monkeypatch):
     _wire(monkeypatch, table, now_utc=NOW_UTC, copy_text=CLEAN_COPY)
 
     out = shell.lambda_handler({}, None)
-    assert out["nudge"] == "sent", out
+    assert out["nudge"] == "folded", out
     assert out["trigger"] == eng.TRIGGER_VERDICT_TOMORROW
     record = _nudges(table)[0]
     assert record["trigger_payload"]["stated_confidence"] == Decimal("0.72")
@@ -206,7 +207,7 @@ def test_negative_control_is_not_vacuous_the_unmutated_run_passes(monkeypatch):
     for any reason at all would look like a proof."""
     table = _WireTable(rows=ACWR_ROWS)
     _wire(monkeypatch, table, now_utc=NOW_UTC, copy_text=CLEAN_COPY)
-    assert shell.lambda_handler({}, None)["nudge"] == "sent"
+    assert shell.lambda_handler({}, None)["nudge"] == "folded"
     assert len(_nudges(table)) == 1
 
 
@@ -216,24 +217,16 @@ def test_negative_control_is_not_vacuous_the_unmutated_run_passes(monkeypatch):
 
 
 def test_the_record_already_exists_when_ses_is_called(monkeypatch):
-    """The ordering assertion, stated where it can fail: at SES-call time the
-    NUDGE# record must already be in the store. On the pre-#3569 order this is
-    empty, so this test is the regression guard for the reorder itself."""
+    """#5821: there is no SES call any more — the note is folded into the Morning Brief. What survives of the
+    ordering guarantee: the record AND the ledger row the brief reads are both written, and no SES client is ever
+    created (restoring a send after `_finalize` fails here)."""
     table = _WireTable(rows=ACWR_ROWS)
-    _wire(monkeypatch, table, now_utc=NOW_UTC, copy_text=CLEAN_COPY)
-    seen = {}
-    original = shell._send_email
-
-    def _observing_send(coach_name, copy_text, dry_run=False):
-        seen["records_at_send_time"] = len(_nudges(table))
-        seen["ledger_at_send_time"] = dict(_ledger(table) or {})
-        return original(coach_name, copy_text, dry_run=dry_run)
-
-    monkeypatch.setattr(shell, "_send_email", _observing_send)
+    ses, _ = _wire(monkeypatch, table, now_utc=NOW_UTC, copy_text=CLEAN_COPY)
     shell.lambda_handler({}, None)
 
-    assert seen["records_at_send_time"] == 1
-    assert seen["ledger_at_send_time"]["status"] == "sent"
+    assert len(_nudges(table)) == 1
+    assert _ledger(table)["status"] == FOLDED and _ledger(table)["brief_text"] == CLEAN_COPY
+    assert ses.sends == [] and ses.boto3.clients == []
 
 
 def test_an_unwritable_record_is_never_delivered(monkeypatch):
@@ -257,25 +250,17 @@ def test_an_unwritable_record_is_never_delivered(monkeypatch):
 
 
 def test_a_failed_send_corrects_the_record_it_already_wrote(monkeypatch):
-    """The write-first order's one new obligation: a record saying `sent` must be
-    downgraded when SES then fails — same pk/sk, so it is corrected in place and
-    never orphaned as a phantom delivery."""
+    """#5821: with no send there is no SES failure to correct. The dry-run flag still works: a dry run writes the
+    record (status folded) but leaves NO copy on the ledger row, so it can never reach the Morning Brief."""
     table = _WireTable(rows=ACWR_ROWS)
-    _wire(monkeypatch, table, now_utc=NOW_UTC, copy_text=CLEAN_COPY)
+    ses, _ = _wire(monkeypatch, table, now_utc=NOW_UTC, copy_text=CLEAN_COPY)
 
-    def _boom(coach_name, copy_text, dry_run=False):
-        raise RuntimeError("MessageRejected")
-
-    monkeypatch.setattr(shell, "_send_email", _boom)
-
-    out = shell.lambda_handler({}, None)
-    assert out["reason"] == "ses_error" and out["statusCode"] == 500
+    out = shell.lambda_handler({"dry_run": True}, None)
+    assert out["nudge"] == "folded" and out["statusCode"] == 200
     records = _nudges(table)
-    assert len(records) == 1, "corrected in place — not a second, orphaned record"
-    assert records[0]["status"] == eng.STATUS_BLOCKED
-    assert "outcome" not in records[0]  # nothing was delivered, so nothing is pending
-    assert records[0]["gate_findings"] == ["ses_error:MessageRejected"]
-    assert _ledger(table)["status"] == eng.STATUS_BLOCKED
+    assert len(records) == 1 and records[0]["status"] == FOLDED
+    assert "brief_text" not in _ledger(table)
+    assert ses.sends == []
 
 
 def test_the_reservation_now_carries_a_timestamp(monkeypatch):
@@ -504,6 +489,15 @@ def test_dead_man_is_green_on_a_healthy_pair():
     check = _run(_LedgerTable([sent], records=[record]))
     assert check.passed is True, check.message
     assert "every one terminal with its NUDGE# record present" in check.message
+
+
+def test_dead_man_reds_when_a_folded_note_has_no_record():
+    """#5821: a note folded into the Morning Brief is held to the same check as a sent one — its ledger row must point
+    at a NUDGE# record that exists (dropping FOLDED from RECORD_STATUSES makes this pass silently)."""
+    folded = _row(1, FOLDED, nudge_pk="COACH#training_coach", nudge_sk=f"NUDGE#{_day(1)}#gone", graded=True)
+    check = _run(_LedgerTable([folded], records=[]))
+    assert check.passed is False
+    assert "missing" in check.message or "ZERO NUDGE#" in check.message
 
 
 def test_dead_man_does_not_red_a_reservation_that_is_still_young():

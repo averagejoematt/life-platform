@@ -340,6 +340,9 @@ MCP_RULINGS = {
     ("tools_coach_intelligence.py", "tool_get_predictions"): (MCP_SCOPED, 2, ("COACH#sleep_coach", "PREDICTION#")),
     ("tools_coach_intelligence.py", "tool_evaluate_prediction"): (MCP_SCOPED, 1, ("USER#matthew", "SOURCE#coach_thread#sleep#")),
     ("tools_decisions.py", "tool_get_decisions"): (MCP_SCOPED, 1, ("USER#matthew#SOURCE#decisions", "DECISION#")),
+    # get_advice_link_queue (2026-11-11): the current cycle's asks and decisions only — a wiped cycle's ask is not one to answer.
+    ("tools_advice_queue.py", "_asks"): (MCP_SCOPED, 1, ("COACH#sleep_coach", "COMMITMENT#")),
+    ("tools_advice_queue.py", "_decisions"): (MCP_SCOPED, 1, ("USER#matthew#SOURCE#decisions", "DECISION#")),
     ("tools_lifestyle.py", "tool_get_insights"): (MCP_SCOPED, 1, ("USER#matthew#SOURCE#insights", "INSIGHT#")),
     ("tools_lifestyle.py", "tool_list_experiments"): (MCP_SCOPED, 1, ("USER#matthew#SOURCE#experiments", "EXP#")),
     # platform_memory is split BY CATEGORY: durable categories are CROSS_PHASE and never

@@ -117,7 +117,9 @@ SECTION_GUIDE: dict[str, str] = {
         "the gate counts. A movement whose gate is not met must not appear in a plan; propose the "
         "stated substitute instead. A carve-out (an explicit list of permitted exceptions to an "
         "exclusion) is limited to exactly its list: everything not on the list stays excluded. "
-        "An entry marked available now is open and is prescribed by RPE or talk test."
+        "An entry marked available now is open and is prescribed by RPE or talk test. An entry whose "
+        "`status` is `open` was opened by an owner ruling: prescribe it, never substitute for it, and read "
+        "a weight it still carries only where another section references that weight."
     ),
     "governing_goal": (
         "governing_goal — the frame every other section serves: a time-bound, must-hit target "
@@ -161,6 +163,17 @@ SECTION_GUIDE: dict[str, str] = {
         "with its concession named; an average that hides one low seat does not meet it. When "
         "you grade, give every seat its own score, its named concession, and the single change "
         "that would raise it."
+    ),
+    "phases": (
+        "phases — the training phases in `order`, each with a `title` (the name on the Hevy "
+        "routine), an `intent`, its entry gates and what it `unlocks`. A gate's value is a "
+        "reference into this charter (`value_ref` / `gate_ref`), never a number of its own: read "
+        "the value at that path. An `owner_twin:` reference names an owner-only value you are not "
+        "given; treat that gate as unknown and never guess it. `every_transition` holds on every "
+        "change of phase. `advance` is the rule: gates are evaluated weekly, a met set is proposed "
+        "and takes effect at the next block start unless the owner vetoes, and the phase never "
+        "moves backwards. Missing data is unknown, never met. Which phase is current is not in "
+        "this section: quote the phase you are given, and never compute a phase change yourself."
     ),
     "phase_after_may": (
         "phase_after_may — what happens after the target date: the frame continues toward the "

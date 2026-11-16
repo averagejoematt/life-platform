@@ -121,6 +121,19 @@ def load_recent_history(
     return load_history_indexes(lookback_days=lookback_days, today=today)[0]
 
 
+# #5813: every item attribute `load_history_indexes` reads — keep in step with the loop body (a new `item.get` needs a name here).
+_HISTORY_INDEX_NAMES = {
+    "#sk": "sk",
+    "#d": "date",
+    "#ex": "exercises",
+    "#swid": "source_workout_id",
+    "#rid": "hevy_routine_id",
+    "#st": "start_time",
+    "#et": "end_time",
+}
+_HISTORY_INDEX_PROJECTION = ", ".join(_HISTORY_INDEX_NAMES)
+
+
 def load_history_indexes(
     lookback_days: int = DEFAULT_LOOKBACK_DAYS,
     today: date | None = None,
@@ -166,6 +179,10 @@ def load_history_indexes(
         kwargs: dict[str, Any] = with_phase_filter(
             {
                 "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").gte(f"DATE#{start}"),
+                # #5813: only the attributes read below. A Hevy row is ~half `adherence` + `cardio_hr`, which this index
+                # never reads; projecting them out halved this read live (2.5 s -> 1.3 s over the whole partition).
+                "ProjectionExpression": _HISTORY_INDEX_PROJECTION,
+                "ExpressionAttributeNames": dict(_HISTORY_INDEX_NAMES),
             },
             include_pilot=True,
         )
@@ -205,6 +222,12 @@ def load_history_indexes(
                             # #5076: the routine he performed, so the menu reads the kind it prescribed for an empty-note ride
                             **({"hevy_routine_id": str(item["hevy_routine_id"])} if item.get("hevy_routine_id") else {}),
                             "duration_sec": block_seconds,
+                            # #5796: the effort on the set row when Hevy carries one (read before his note)
+                            **(
+                                {"set_rpe": max(rpes)}
+                                if (rpes := [_to_float(s["rpe"]) for s in sets_raw if s.get("rpe") is not None])
+                                else {}
+                            ),
                             "distance_m": block_meters if block_meters > 0 else None,
                             "session_start": item.get("start_time"),
                             "session_end": item.get("end_time"),
@@ -236,6 +259,8 @@ def load_history_indexes(
                         "date": workout_date,
                         "sets": sets,
                         "top_weight_kg": top_weight,
+                        # #5797: the routine he performed, so a calibration mark joins to its set (`rpe_calibration.annotate`)
+                        **({"hevy_routine_id": str(item["hevy_routine_id"])} if item.get("hevy_routine_id") else {}),
                     }
                 )
         last_key = resp.get("LastEvaluatedKey")
@@ -246,7 +271,19 @@ def load_history_indexes(
         index[tid].sort(key=lambda s: s["date"], reverse=True)
     for tid in cardio:
         cardio[tid].sort(key=lambda s: s["date"], reverse=True)
+    _annotate_calibration(index, start)
     return index, cardio
+
+
+def _annotate_calibration(index: dict[str, list[dict[str, Any]]], start: str) -> None:
+    """#5797: stamp each performed RPE calibration set with its predicted-vs-actual pair, here in the ONE loader so the
+    generator, the planner and the chat gate read the same pairs. Only when a session carries a Hevy routine id (nothing
+    else can join); fail-soft (`rpe_calibration.load_marks_failsoft`)."""
+    if not any(s.get("hevy_routine_id") for sessions in index.values() for s in sessions):
+        return
+    from training import rpe_calibration
+
+    rpe_calibration.annotate(index, rpe_calibration.load_marks_failsoft(_table(), start))
 
 
 CARRY_INDEX_PREFIX = "carry:"

@@ -21,6 +21,7 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
 from fakes import FakeDdbTable  # noqa: E402
+from public_variant_fixtures import with_public  # noqa: E402 — 2026-11-05: public readers serve the public variant
 from web import site_api_vitals as vitals  # noqa: E402
 
 CS_PK = f"{vitals.USER_PREFIX}character_sheet"
@@ -42,7 +43,7 @@ def _cs_row(date, level, level_events=None, **pillar_raws):
         row["level_events"] = level_events
     for p, raw in pillar_raws.items():
         row[f"pillar_{p}"] = {"raw_score": raw, "level": 5}
-    return row
+    return with_public(row)
 
 
 def _setup(monkeypatch, rows):

@@ -61,7 +61,7 @@ from datetime import datetime, timezone
 import pytest
 from experiment import phase_taxonomy
 from ingestion.source_registry import SOURCE_REGISTRY
-from web import site_api_common as sac, site_api_lambda as router, site_api_social as social
+from web import site_api_common as sac, site_api_lambda as router, site_api_social as social, site_api_social_challenges as chal
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 0. Frozen clock
@@ -1628,63 +1628,86 @@ def _active_challenge_table(checkins=None, duration=7) -> FakeSocialTable:
     )
 
 
-def test_a_checkin_on_an_active_challenge_is_recorded_with_todays_date(monkeypatch):
+OWNER_ROW = ("USER#matthew#SOURCE#challenges", "CHALLENGE#cold-shower-finish")
+
+
+def _open_checkins(monkeypatch):
+    """#6087: the reader door ships SHUT (`chal.PUBLIC_CHECKIN_LIVE`); these tests drive it open."""
+    monkeypatch.setattr(chal, "PUBLIC_CHECKIN_LIVE", True)
+
+
+def _reader_rows(table) -> list:
+    return [v for (pk, _sk), v in table.store.items() if pk == "CHALLENGE_CHECKINS#cold-shower-finish"]
+
+
+def test_a_shut_checkin_door_answers_403_and_writes_nothing(monkeypatch):
+    table, _s3, _sec = wire(monkeypatch, table=_active_challenge_table())
+    resp = social._handle_challenge_checkin(post({"challenge_id": "cold-shower-finish", "completed": True}))
+    assert resp["statusCode"] == 403 and table.puts == [] and table.updates == []
+
+
+def test_a_checkin_on_an_active_challenge_is_recorded_in_the_reader_partition(monkeypatch):
+    """#6087: the reader's tap is its own item; the owner's row is only read."""
+    _open_checkins(monkeypatch)
     table, _s3, _sec = wire(monkeypatch, table=_active_challenge_table())
     body = ok_body(social._handle_challenge_checkin(post({"challenge_id": "cold-shower-finish", "completed": True})))
-    assert body["date"] == TODAY and body["total_checkins"] == 1
-    stored = table.store[("USER#matthew#SOURCE#challenges", "CHALLENGE#cold-shower-finish")]["daily_checkins"]
-    assert stored[0]["source"] == "website"
+    assert body["date"] == TODAY and body["duplicate"] is False
+    assert "daily_checkins" not in table.store[OWNER_ROW]
+    assert [r["date"] for r in _reader_rows(table)] == [TODAY]
 
 
-def test_a_checkin_replaces_the_same_days_earlier_entry_instead_of_appending(monkeypatch):
-    """A double-tap or a network retry must not inflate completion_pct — the
-    dedup is on `date`, and the last write wins."""
-    table, _s3, _sec = wire(monkeypatch, table=_active_challenge_table(checkins=[{"date": TODAY, "completed": False}]))
+def test_a_reader_checkin_never_replaces_the_owners_same_day_entry(monkeypatch):
+    """The #6087 specimen: the old door dropped the owner's entry for the date and wrote the reader's."""
+    _open_checkins(monkeypatch)
+    owner_entry = {"date": TODAY, "completed": True, "source": "owner_mcp"}
+    table, _s3, _sec = wire(monkeypatch, table=_active_challenge_table(checkins=[owner_entry]))
+    ok_body(social._handle_challenge_checkin(post({"challenge_id": "cold-shower-finish", "completed": False})))
+    assert table.store[OWNER_ROW]["daily_checkins"] == [owner_entry]
+
+
+def test_a_reader_checkin_response_echoes_no_owner_progress(monkeypatch):
+    _open_checkins(monkeypatch)
+    wire(monkeypatch, table=_active_challenge_table(checkins=[{"date": "2026-05-08"}, {"date": "2026-05-09"}], duration=10))
     body = ok_body(social._handle_challenge_checkin(post({"challenge_id": "cold-shower-finish", "completed": True})))
-    stored = table.store[("USER#matthew#SOURCE#challenges", "CHALLENGE#cold-shower-finish")]["daily_checkins"]
-    assert body["total_checkins"] == 1 and len(stored) == 1 and stored[0]["completed"] is True
-
-
-def test_checkin_completion_percent_is_checkins_over_duration(monkeypatch):
-    """Hand-derived: 2 prior check-ins plus today's = 3 of a 10-day challenge ->
-    round(3/10*100) = 30."""
-    wire(
-        monkeypatch,
-        table=_active_challenge_table(checkins=[{"date": "2026-05-08"}, {"date": "2026-05-09"}], duration=10),
-    )
-    body = ok_body(social._handle_challenge_checkin(post({"challenge_id": "cold-shower-finish", "completed": True})))
-    assert body["total_checkins"] == 3 and body["completion_pct"] == 30
+    assert not {"total_checkins", "completion_pct", "duration_days"} & set(body)
 
 
 def test_a_checkin_for_an_unknown_challenge_is_a_404(monkeypatch):
+    _open_checkins(monkeypatch)
     wire(monkeypatch)
     assert social._handle_challenge_checkin(post({"challenge_id": "nope", "completed": True}))["statusCode"] == 404
 
 
 def test_a_checkin_for_a_challenge_that_is_not_active_is_refused(monkeypatch):
+    _open_checkins(monkeypatch)
     table = FakeSocialTable([{"pk": "USER#matthew#SOURCE#challenges", "sk": "CHALLENGE#done", "name": "Done", "status": "completed"}])
     wire(monkeypatch, table=table)
     assert social._handle_challenge_checkin(post({"challenge_id": "done", "completed": True}))["statusCode"] == 400
 
 
 def test_a_checkin_missing_the_completed_flag_is_rejected(monkeypatch):
-    """`completed is None` — not falsiness — so an explicit `false` still counts."""
+    """`completed` must be a real boolean — an explicit `false` still counts."""
+    _open_checkins(monkeypatch)
     wire(monkeypatch, table=_active_challenge_table())
     assert social._handle_challenge_checkin(post({"challenge_id": "cold-shower-finish"}))["statusCode"] == 400
     assert social._handle_challenge_checkin(post({"challenge_id": "cold-shower-finish", "completed": False}))["statusCode"] == 200
 
 
 def test_a_second_checkin_for_the_same_challenge_from_one_ip_in_a_day_is_refused(monkeypatch):
+    _open_checkins(monkeypatch)
     wire(monkeypatch, table=_active_challenge_table())
     social._handle_challenge_checkin(post({"challenge_id": "cold-shower-finish", "completed": True}))
     resp = social._handle_challenge_checkin(post({"challenge_id": "cold-shower-finish", "completed": True}))
     assert resp["statusCode"] == 429
 
 
-def test_a_checkin_date_that_is_not_a_calendar_date_is_rejected(monkeypatch):
-    wire(monkeypatch, table=_active_challenge_table())
-    resp = social._handle_challenge_checkin(post({"challenge_id": "cold-shower-finish", "completed": True, "date": "not-a-date"}))
-    assert resp["statusCode"] == 400
+def test_a_checkin_date_that_is_not_today_is_rejected(monkeypatch):
+    _open_checkins(monkeypatch)
+    table, _s3, _sec = wire(monkeypatch, table=_active_challenge_table())
+    for day in ("not-a-date", "2026-05-09", "2026-05-11"):
+        resp = social._handle_challenge_checkin(post({"challenge_id": "cold-shower-finish", "completed": True, "date": day}))
+        assert resp["statusCode"] == 400, day
+    assert _reader_rows(table) == []
 
 
 # ── #2238: the check-in `note` — the module's only reader free text that reaches
@@ -1717,47 +1740,24 @@ def _published_challenges(monkeypatch) -> str:
     return json.dumps(ok_body(social.handle_challenges()))
 
 
-def test_a_checkin_note_containing_markup_is_html_stripped_before_storage(monkeypatch):
-    """Kills the write-door sanitise (`note = _sanitise_note(...)`). The two sibling
-    capture doors in this file have run this exact `re.sub` since they shipped."""
+def test_a_reader_checkin_note_is_never_stored(monkeypatch):
+    """#6087: the reader door stores no free text at all — markup, blocked vocabulary or plain prose."""
+    blocked = _pin_synthetic_vice(monkeypatch)
+    _open_checkins(monkeypatch)
     table, _s3, _sec = wire(monkeypatch, table=_active_challenge_table())
     resp = social._handle_challenge_checkin(
-        post({"challenge_id": "cold-shower-finish", "completed": True, "note": "<script>alert(1)</script>felt strong"})
+        post({"challenge_id": "cold-shower-finish", "completed": True, "note": f"<b>x</b> {blocked} 30 seconds cold"})
     )
     assert resp["statusCode"] == 200
-    stored = table.store[("USER#matthew#SOURCE#challenges", "CHALLENGE#cold-shower-finish")]["daily_checkins"]
-    assert "<script>" not in stored[0]["note"] and "felt strong" in stored[0]["note"]
-
-
-def test_a_checkin_note_carrying_blocked_vocabulary_is_refused_at_the_door(monkeypatch):
-    """Kills the write-door `if _is_blocked_vice(note): return _error(400, ...)` —
-    the `_handle_board_question`:1691 precedent, applied to the one free-text field
-    that was missing it."""
-    blocked = _pin_synthetic_vice(monkeypatch)
-    table, _s3, _sec = wire(monkeypatch, table=_active_challenge_table())
-    resp = social._handle_challenge_checkin(post({"challenge_id": "cold-shower-finish", "completed": True, "note": f"day 3 {blocked}"}))
-    assert resp["statusCode"] == 400
-    stored = table.store[("USER#matthew#SOURCE#challenges", "CHALLENGE#cold-shower-finish")].get("daily_checkins")
-    assert not stored, "a refused check-in must not have been written at all"
-
-
-def test_a_plain_text_checkin_note_still_round_trips(monkeypatch):
-    """The happy path the AC protects: an ordinary note is untouched by either screen."""
-    _pin_synthetic_vice(monkeypatch)
-    wire(monkeypatch, table=_active_challenge_table())
-    assert (
-        social._handle_challenge_checkin(post({"challenge_id": "cold-shower-finish", "completed": True, "note": "30 seconds cold"}))[
-            "statusCode"
-        ]
-        == 200
-    )
-    assert "30 seconds cold" in _published_challenges(monkeypatch)
+    assert all("note" not in r for r in _reader_rows(table)) and "daily_checkins" not in table.store[OWNER_ROW]
+    assert "30 seconds cold" not in _published_challenges(monkeypatch)
 
 
 def test_a_reader_supplied_checkin_note_is_not_published_raw_on_the_public_challenge_route(monkeypatch):
     """End-to-end, the shape the discovering agent drove: POST a note carrying both
     markup and blocked vocabulary, then read the public route."""
     blocked = _pin_synthetic_vice(monkeypatch)
+    _open_checkins(monkeypatch)
     wire(monkeypatch, table=_active_challenge_table())
     social._handle_challenge_checkin(
         post({"challenge_id": "cold-shower-finish", "completed": True, "note": f"<script>alert(1)</script>{blocked}"})
@@ -1871,6 +1871,7 @@ _FLAG_DRIVERS = {
     "_handle_submit_finding": lambda: post(GOOD_FINDING),
     "_handle_page_feedback": lambda: post({"page": "/data/", "made_sense": "yes"}),  # #4182
     "_handle_morning_note": lambda: post(_signed_morning_note_body()),  # #4189 — the owner's door; the driver carries today's token
+    "_handle_predict_week": lambda: post({"week_id": CURRENT_WEEK, "metric": "weight", "choice": "up"}),  # #6088 — now metered
     # #2239 — a GET, not a POST, but it goes through the same chokepoint and so
     # joins the derived sweep automatically. Driven with an address that is NOT on
     # the roster: the 404 branch is the one an enumerator actually uses.
@@ -1892,6 +1893,7 @@ def test_a_write_endpoint_still_limits_when_the_shared_rate_limiter_is_unavailab
 
     Against pre-#2237 code this reds on five of the seven doors with 40x200.
     """
+    _open_checkins(monkeypatch)  # #6087: the check-in door ships shut; the sweep measures it open
     monkeypatch.setattr(social, "_RATE_LIMITER_READY", False)
     wire(monkeypatch, table=_active_challenge_table(), s3=_cohort_and_challenge_s3())
     statuses = {ENDPOINTS[name](_FLAG_DRIVERS[name]())["statusCode"] for _ in range(40)}
@@ -1902,15 +1904,45 @@ def test_a_write_endpoint_still_limits_when_the_shared_rate_limiter_is_unavailab
 def test_the_same_write_endpoint_does_limit_while_the_shared_limiter_is_present(name, monkeypatch):
     """The control arm: with the shared limiter present every door refuses the
     excess too, so the test above measures the FALLBACK and not the limiter."""
+    _open_checkins(monkeypatch)  # #6087: the check-in door ships shut; the sweep measures it open
     wire(monkeypatch, table=_active_challenge_table(), s3=_cohort_and_challenge_s3())
     statuses = {ENDPOINTS[name](_FLAG_DRIVERS[name]())["statusCode"] for _ in range(40)}
     assert 429 in statuses
+
+
+#: #6088 — the doors that STORE reader content or a reader-moved counter; each fails CLOSED when
+#: the limiter errors. The AST set guard is tests/test_reader_write_fail_closed_6088.py; this is the wire half.
+_STORING_DOORS = (
+    "_handle_submit_finding",
+    "_handle_board_question",
+    "_handle_experiment_suggest",
+    "_handle_page_feedback",
+    "_handle_cohort_submit",
+    "_handle_predict_week",
+    "_handle_challenge_checkin",  # #6087 isolated it; #6088 makes its meter fail closed
+)
+
+
+def test_a_storing_door_refuses_and_writes_nothing_when_the_limiter_errors_6088(monkeypatch):
+    """A DynamoDB error inside the limiter (update_item raises) must refuse the request with no
+    stored row and no stored object. Before #6088 five of these six admitted it unmetered."""
+    _open_checkins(monkeypatch)  # #6087 ships the check-in door shut; drive it open so its meter is what is tested
+    admitted = {}
+    for name in _STORING_DOORS:
+        table = _active_challenge_table()
+        table.fail = {"update_item"}
+        _t, s3, _sec = wire(monkeypatch, table=table, s3=_cohort_and_challenge_s3())
+        resp = ENDPOINTS[name](_FLAG_DRIVERS[name]())
+        if resp["statusCode"] == 200 or table.puts or s3.puts:
+            admitted[name] = (resp["statusCode"], len(table.puts), len(s3.puts))
+    assert not admitted, f"doors that wrote through a limiter error: {admitted}"
 
 
 def test_the_degraded_limiter_refuses_rather_than_admits_once_its_store_is_full(monkeypatch):
     """The in-memory fallback is per-container, so it can only be a bound if it is
     itself bounded. At capacity it FAILS CLOSED — the distributed flood ends in
     429s, not in an unmetered write path plus an ever-growing dict."""
+    _open_checkins(monkeypatch)  # #6087: the check-in door ships shut; the sweep measures it open
     monkeypatch.setattr(social, "_RATE_LIMITER_READY", False)
     monkeypatch.setattr(social, "_FALLBACK_STORE_MAX_KEYS", 2)
     wire(monkeypatch, table=_active_challenge_table())
@@ -2006,7 +2038,10 @@ def test_a_follow_that_cannot_be_persisted_reports_failure(monkeypatch):
 
 
 def test_a_checkin_that_cannot_be_read_or_written_reports_a_database_error(monkeypatch):
-    wire(monkeypatch, table=_write_failing_table())
+    _open_checkins(monkeypatch)
+    failing = _active_challenge_table()
+    failing.fail = {"put_item"}  # #6087: the reader door's one write is a put into its own partition
+    wire(monkeypatch, table=failing)
     assert social._handle_challenge_checkin(post({"challenge_id": "cold-shower-finish", "completed": True}))["statusCode"] == 500
     table = _active_challenge_table()
     table.fail = {"get_item"}
@@ -2490,6 +2525,28 @@ def test_the_prediction_dedup_row_expires_after_the_eight_day_window(monkeypatch
     social._handle_predict_week(post({"week_id": CURRENT_WEEK, "metric": "weight", "choice": "up"}))
     row = next(r for r in table.puts if str(r["sk"]).startswith("PRED#"))
     assert row["ttl"] - row["voted_at"] == 8 * 86400
+
+
+def test_predict_week_is_rate_limited_per_network_6088(monkeypatch):
+    """#6088: the door had no meter — only the per-metric dedup row. Hand-derived: the limit is
+    PREDICT_WEEK_RATE_LIMIT per hour and the charge precedes validation, so limit+1 requests from one
+    network (each an invalid metric, so no dedup row is minted) end in a 429."""
+    table, _s3, _sec = wire(monkeypatch, s3=_predict_s3())
+    statuses = [
+        social._handle_predict_week(post({"week_id": CURRENT_WEEK, "metric": "nope", "choice": "up"}))["statusCode"]
+        for _ in range(social.PREDICT_WEEK_RATE_LIMIT + 1)
+    ]
+    assert statuses[:-1] == [404] * social.PREDICT_WEEK_RATE_LIMIT and statuses[-1] == 429
+    assert table.puts == []
+
+
+def test_predict_week_fails_closed_when_the_limiter_errors_6088(monkeypatch):
+    """It stores a counter, so a DynamoDB limiter error refuses the tap — no dedup row, no tally."""
+    table = FakeSocialTable(fail={"update_item"})
+    wire(monkeypatch, table=table, s3=_predict_s3())
+    resp = social._handle_predict_week(post({"week_id": CURRENT_WEEK, "metric": "weight", "choice": "up"}))
+    assert resp["statusCode"] == 429
+    assert table.puts == [] and all(str(u["Key"]["pk"]).startswith("RATE#") for u in table.updates)
 
 
 def test_a_prediction_for_a_closed_window_is_refused_with_a_conflict(monkeypatch):

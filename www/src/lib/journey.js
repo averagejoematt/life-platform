@@ -28,6 +28,15 @@ export function windowDays(days, range) {
  *   mobile?: boolean, width?: number, height?: number, unit?: string, decimals?: number, aria?: string
  * }} o
  */
+/** The month-tick step for an axis `spanMs` long drawn across `plotW` units at font size `fs`: the smallest
+ * calendar-regular step (1, 2, 3, 4, 6 or 12 months) whose narrowest gap — 28 days a month — clears a
+ * three-glyph label (IBM Plex Mono, 0.6 em a glyph) plus a one-em gutter. */
+export function monthStep(spanMs, plotW, fs) {
+  const perDay = plotW / Math.max(1, spanMs / 864e5);
+  const need = 3 * fs * 0.6 + fs;
+  return [1, 2, 3, 4, 6, 12].find((s) => 28 * s * perDay >= need) ?? 12;
+}
+
 export function journeyChart(o) {
   const J = o.journey;
   // On a phone the viewBox is the container's own width (the island passes it), so the 12.5-unit labels
@@ -91,14 +100,21 @@ export function journeyChart(o) {
     g += `<line x1="${pad.l}" y1="${Y(v).toFixed(1)}" x2="${W - pad.r}" y2="${Y(v).toFixed(1)}" stroke="#C9C9C3" stroke-width="1"/>`;
     g += txt(pad.l - 6, Y(v) + 4, String(Math.round(v)), "end");
   }
-  // month ticks
+  // month ticks — thinned by the width the axis actually has. A month label is three glyphs (1.8 em) and the
+  // narrowest month is 28 days, so the step is the smallest of 1·2·3·4·6·12 months whose shortest gap still clears
+  // a label plus a one-em gutter. On a phone the projection wedge runs the axis out a year, ~25 units a month,
+  // and at one-month steps 'Feb' sat on 'Mar' (render gate, live build, 12 November). Ticks are thinned, never
+  // shrunk: every label keeps its size, and the kept months fall on a regular calendar step.
+  const step = monthStep(x1 - x0, W - pad.l - pad.r, fs);
   const cur = new Date(x0);
   cur.setUTCDate(1);
   cur.setUTCMonth(cur.getUTCMonth() + 1);
   while (cur.getTime() <= x1) {
-    const iso = cur.toISOString().slice(0, 10);
-    g += txt(X(iso), H - 9, MONTHS[cur.getUTCMonth()], "middle");
-    boxes.push(boxOf(X(iso), H - 9, MONTHS[cur.getUTCMonth()], "middle"));
+    if (cur.getUTCMonth() % step === 0) {
+      const iso = cur.toISOString().slice(0, 10);
+      g += txt(X(iso), H - 9, MONTHS[cur.getUTCMonth()], "middle");
+      boxes.push(boxOf(X(iso), H - 9, MONTHS[cur.getUTCMonth()], "middle"));
+    }
     cur.setUTCMonth(cur.getUTCMonth() + 1);
   }
   if (distance && J) {

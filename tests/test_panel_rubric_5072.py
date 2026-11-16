@@ -347,5 +347,15 @@ def test_the_mcp_job_wires_readers_stores_one_row_and_never_raises(monkeypatch, 
     emf = [json.loads(ln) for ln in capsys.readouterr().out.splitlines() if ln.startswith('{"_aws"')]
     assert resp["statusCode"] == 200 and [e["PanelGradeOutcome"] for e in emf] == [1, 0], emf
     assert pwg._committed(type("IR", (), {"status": "draft", "hevy_routine_id": None})()) is False
-    handler_src = (_REPO / "mcp" / "handler.py").read_text(encoding="utf-8")
-    assert f'event.get("job") == "{pwg.JOB["event"]["job"]}"' in handler_src, "mcp.handler no longer dispatches the weekly grade"
+    # The handler routes the rule's constant input here — driven, not grepped (#5540 moved the dispatch
+    # behind mcp/invoke_gate.py: privileged jobs run only on the function the rule targets).
+    from types import SimpleNamespace
+
+    from mcp import handler
+
+    ctx = SimpleNamespace(
+        function_name=pwg.JOB["function"], invoked_function_arn=f"arn:aws:lambda:us-west-2:1:function:{pwg.JOB['function']}"
+    )
+    monkeypatch.setattr(pwg, "lambda_entry", lambda event: {"statusCode": 200, "routed": event})
+    routed = handler.lambda_handler(dict(pwg.JOB["event"]), ctx)
+    assert routed.get("routed") == pwg.JOB["event"], "mcp.handler no longer dispatches the weekly grade"

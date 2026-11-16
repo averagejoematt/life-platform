@@ -39,6 +39,9 @@ import pytest
 import yaml
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Empty AWS_* values are NOT "no credentials": the CLI falls back to ~/.aws. Every subprocess env here also points the
+# two credential files at nothing, so no path through a deploy script can reach a real bucket (INCIDENT_LOG 2026-11-16).
+_NO_AWS_FILES = {"AWS_CONFIG_FILE": os.devnull, "AWS_SHARED_CREDENTIALS_FILE": os.devnull, "AWS_EC2_METADATA_DISABLED": "true"}
 for p in (REPO, os.path.join(REPO, "qa"), os.path.join(REPO, "scripts")):
     if p not in sys.path:
         sys.path.insert(0, p)
@@ -207,6 +210,29 @@ def test_owned_paths_json_is_consistent_with_src_pages_and_the_switch_is_on():
                 continue
             route = "/" if rel == "index" else ("/" + rel[: -len("/index")] + "/" if rel.endswith("/index") else "/" + rel + "/")
             (patterns if "[" in route else static).add(re.sub(r"\[[^\]]+\]", "*", route))
+    if OWNED.get("room_public") in ("cr1", "cr2"):  # the Coaching Room's published CR1 pages: injected templates, read off room.js
+        room_js = open(os.path.join(REPO, "www", "src", "lib", "room.js"), encoding="utf-8").read()
+        static |= set(re.findall(r'path:\s*"(/[^"\[]+/)",\s*release:\s*"cr1"', room_js))
+    if OWNED.get("room_public") == "cr2":  # CR2's per-coach record: an injected [param] template -> a route pattern
+        room_js = open(os.path.join(REPO, "www", "src", "lib", "room.js"), encoding="utf-8").read()
+        patterns |= {re.sub(r"\[[^\]]+\]", "*", p) for p in re.findall(r'path:\s*"(/[^"]+/)",\s*release:\s*"cr2"', room_js)}
+    # The Lab and the Human Story once committed live (LAB_LIVE / STORY_LIVE, read through scripts/www_launch_switch.py):
+    # their pages are injected templates too, so their routes are read off the same lists postbuild adds them from.
+    sys.path.insert(0, os.path.join(REPO, "scripts"))
+    import www_launch_switch  # noqa: E402
+
+    for live, lib, const in (
+        (www_launch_switch.lab_live(), "lab.js", "LAB_ROUTES"),
+        (www_launch_switch.story_live(), "story_dark.js", "STORY_ROUTES"),
+    ):
+        if not live:
+            continue
+        js = open(os.path.join(REPO, "www", "src", "lib", lib), encoding="utf-8").read()
+        block = js[js.index(f"export const {const} = [") :]
+        block = block[: block.index("];")]
+        for pattern in re.findall(r'pattern:\s*"(/[^"]+)"', block):
+            route = pattern.rstrip("/") + "/"
+            (patterns if "[" in route else static).add(re.sub(r"\[[^\]]+\]", "*", route))
     assert set(OWNED["static_routes"]) == static
     assert set(OWNED["route_patterns"]) == patterns
     assert set(OWNED["static_routes"]) <= set(OWNED["routes"])
@@ -232,6 +258,8 @@ def test_every_owned_route_is_a_static_route_or_matches_a_pattern():
     [
         ("push", "", False, "preview"),
         ("push", "", True, "root"),
+        ("schedule", "", False, "preview"),  # the daily rebuild follows the switch exactly like a push
+        ("schedule", "", True, "root"),
         ("workflow_dispatch", "preview", False, "preview"),
         ("workflow_dispatch", "", True, "preview"),
         ("workflow_dispatch", "root", True, "root"),
@@ -281,7 +309,7 @@ def test_www_sync_script_guards_the_root_sync_and_never_deletes(tmp_path):
     assert 'aws s3 sync "s3://$BUCKET/$PREVIOUS_PREFIX' in restore and "$SITE_DIR" not in restore and "git checkout" not in restore
     # a lane can rehearse every mode without credentials
     env = {k: v for k, v in os.environ.items() if not k.startswith("AWS_")}
-    env.update({"AWS_ACCESS_KEY_ID": "", "AWS_SECRET_ACCESS_KEY": "", "AWS_PROFILE": ""})
+    env.update({"AWS_ACCESS_KEY_ID": "", "AWS_SECRET_ACCESS_KEY": "", "AWS_PROFILE": "", **_NO_AWS_FILES})
     r = subprocess.run(
         ["bash", os.path.join(REPO, "deploy", "www_preview_sync.sh"), "--target", "root", "--restore-previous", "--print"],
         capture_output=True,
@@ -459,10 +487,26 @@ def test_committed_sitemaps_and_robots():
 def test_workflow_has_one_target_input_and_root_only_sweeps_and_rollback():
     on = WORKFLOW.get("on") or WORKFLOW.get(True)
     inputs = on["workflow_dispatch"]["inputs"]
-    assert set(inputs) == {"target"} and inputs["target"]["options"] == ["preview", "root"] and inputs["target"]["default"] == "preview"
+    # + api_readiness (2026-11-12, run 43124939822): the dispatch-only break-glass for the Site API readiness gate.
+    assert set(inputs) == {"target", "api_readiness"} and inputs["api_readiness"]["default"] == "enforce"
+    assert inputs["target"]["options"] == ["preview", "root"] and inputs["target"]["default"] == "preview"
     assert set(on["push"]["paths"]) >= {"www/**", "deploy/www_preview_sync.sh"}
+    # the daily rebuild (2026-11-14): without it the pages only refreshed when unrelated code merged
+    assert [c["cron"] for c in on["schedule"]] == ["30 15 * * *"]
     jobs = WORKFLOW["jobs"]
-    assert set(jobs) == {"deploy", "smoke", "visual-qa", "record-previous", "rollback-v9-on-failure"}
+    # api-readiness + deferred: tests/test_www_api_readiness.py owns their wiring.
+    # public-copies (#6083): both targets; its red reaches the rollback job, whose scope check declines it.
+    assert set(jobs) == {
+        "api-readiness",
+        "deferred",
+        "deploy",
+        "smoke",
+        "visual-qa",
+        "public-copies",
+        "record-previous",
+        "rollback-v9-on-failure",
+    }
+    assert "needs.deploy.outputs.target" not in jobs["public-copies"]["if"] and "public-copies" in jobs["rollback-v9-on-failure"]["needs"]
     for name in ("smoke", "visual-qa", "record-previous", "rollback-v9-on-failure"):
         assert "needs.deploy.outputs.target == 'root'" in jobs[name]["if"], f"{name} must run for the root target only"
     assert "needs.smoke.result == 'failure' || needs.visual-qa.result == 'failure'" in jobs["rollback-v9-on-failure"]["if"]
@@ -501,4 +545,76 @@ def test_root_rollback_script_declines_on_an_unreachable_surface_and_restores_ot
     assert r.returncode == 0 and "DECLINED" in r.stdout and "declined=true" in out.read_text(), r.stdout + r.stderr
 
 
+def test_root_rollback_declines_a_public_copies_red_alone_and_never_restores(tmp_path):
+    """#6083: a violating OTHER copy (orphan, stale preview or archive) is not repaired by a root revert, and during a
+    privacy fix a revert would put the pre-fix build back. A copies-only red declines; a sweep red still rolls back.
+    AWS is a stub on PATH and every credential source is pointed at nothing: this test must never reach a real bucket
+    (an earlier draft fell back to a developer's ~/.aws profile and ran the real restore — 2026-11-16)."""
+    script = os.path.join(REPO, "deploy", "www_root_rollback.sh")
+    bindir, calls, out = tmp_path / "bin", tmp_path / "aws-calls", tmp_path / "out"
+    bindir.mkdir()
+    (bindir / "aws").write_text(f'#!/usr/bin/env bash\necho "$*" >> {calls}\nexit 1\n')
+    (bindir / "aws").chmod(0o755)
+    base = {k: v for k, v in os.environ.items() if not k.startswith("AWS_")}
+    base.update(
+        PATH=f"{bindir}{os.pathsep}{os.environ['PATH']}",
+        LP_TEST_AWS_IS_STUB=str(bindir / "aws"),  # #6116: declared, so the guard lets the restore reach the stub
+        AWS_CONFIG_FILE=os.devnull,
+        AWS_SHARED_CREDENTIALS_FILE=os.devnull,
+        AWS_EC2_METADATA_DISABLED="true",
+        GITHUB_OUTPUT=str(out),
+        GITHUB_SHA="abc1234567",
+        SNS_TOPIC_ARN="",
+        COPIES_SUMMARY="1 violation(s) across ['preview']",
+    )
+    env = dict(base, GATE="smoke=success visual-qa=success public-copies=failure")
+    r = subprocess.run(["bash", script], capture_output=True, text=True, env=env, cwd=REPO)
+    assert r.returncode == 0 and "DECLINED" in r.stdout and "restoring" not in r.stdout, r.stdout + r.stderr
+    assert "declined=true" in out.read_text() and "surfaces=public-copies" in out.read_text()
+    assert not calls.exists(), "a declined rollback made an AWS call"
+    # a sweep red beside it takes the existing path: the restore is attempted (against the stub, which refuses it)
+    out.write_text("")
+    env = dict(base, GATE="smoke=failure visual-qa=success public-copies=failure")
+    r = subprocess.run(["bash", script], capture_output=True, text=True, env=env, cwd=REPO, timeout=60)
+    assert "restoring the previous v9 build" in r.stdout and "declined=false" in out.read_text(), r.stdout + r.stderr
+    assert "www-previous/LATEST" in calls.read_text(), "the restore path was not the one taken"
+
+
 # premerge-gate: 5534: a structural sweep of deploy/sync_site_to_s3.sh, deploy/rollback_site.sh, .github/workflows/web-preview-deploy.yml and site/reference/ — a new sync step without the owned excludes, or a new superseded page without its copy, must red on the PR that adds it
+
+
+def test_the_previous_build_is_recorded_outside_the_served_prefix_one_build_per_prefix(tmp_path):
+    """Owner ruling 2026-11-14 (close current-surface exposures): the rollback source lived at site/_v9_previous/ —
+    served, so the whole previous site was public at /_v9_previous/, and (the deploy role cannot delete) every build's
+    stale pages accumulated there and a rollback re-published them. A green build is now recorded under its own prefix
+    OUTSIDE site/ (www-previous/<build>/), the LATEST pointer moves only after the copy, and the restore reads the pointer."""
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    (dist / "index.html").write_text("<!doctype html>")
+    env = {k: v for k, v in os.environ.items() if not k.startswith("AWS_")}
+    env.update({"AWS_ACCESS_KEY_ID": "", "AWS_SECRET_ACCESS_KEY": "", "AWS_PROFILE": "", "GITHUB_SHA": "abc123", **_NO_AWS_FILES})
+    r = subprocess.run(
+        [
+            "bash",
+            os.path.join(REPO, "deploy", "www_preview_sync.sh"),
+            "--target",
+            "root",
+            "--record-previous",
+            "--print",
+            "--dist",
+            str(dist),
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=REPO,
+    )
+    out = r.stdout
+    assert r.returncode == 0, out + r.stderr
+    assert "s3://matthew-life-platform/www-previous/abc123" in out and "www-previous/LATEST" in out, out
+    assert (
+        "site/_v9_previous" not in out and "s3://matthew-life-platform/site/" not in out
+    ), "the record never writes under the served prefix"
+    assert out.index("www-previous/abc123") < out.index("www-previous/LATEST"), "the pointer moves only after the copy"
+    restore = WWW_SYNC[WWW_SYNC.index('if [ "$MODE" = "restore" ]') : WWW_SYNC.index("# ── sync and record")]
+    assert "$PREVIOUS_ROOT/LATEST" in restore and 'PREVIOUS_PREFIX="$PREVIOUS_ROOT/$LATEST_ID"' in restore

@@ -86,7 +86,6 @@ PAIR_SEAM_RESIDUE: dict[str, str] = {
     "challenges::lambdas/intelligence/challenge_generator_lambda.py::read": SEED_DATE,
     "challenges::lambdas/intelligence/challenge_generator_lambda.py::write": SEED_DATE,
     "challenges::lambdas/web/site_api_social_challenges.py::read": SEED_DATE,
-    "challenges::lambdas/web/site_api_social_challenges.py::write": SEED_DATE,
     "chronicle::lambdas/content/site_writer.py::read": SEED_DATE,
     "chronicle::lambdas/emails/chronicle_approve_lambda.py::read": SEED_DATE,
     "chronicle::lambdas/emails/chronicle_approve_lambda.py::write": SEED_DATE,
@@ -122,7 +121,6 @@ PAIR_SEAM_RESIDUE: dict[str, str] = {
     "computed_metrics::mcp/tools_training.py::read": SEED_DATE,
     "day_grade::lambdas/compute/adaptive_mode_lambda.py::read": SEED_DATE,
     "day_grade::lambdas/compute/daily_metrics_compute_lambda.py::write": SEED_DATE,
-    "day_grade::lambdas/compute/failure_pattern_compute_lambda.py::read": SEED_DATE,
     "day_grade::lambdas/emails/daily_brief_lambda.py::write": SEED_DATE,
     "day_grade::lambdas/emails/monday_compass_lambda.py::read": SEED_DATE,
     "day_grade::lambdas/operational/coherence_sentinel_lambda.py::read": SEED_DATE,
@@ -177,7 +175,6 @@ PAIR_SEAM_RESIDUE: dict[str, str] = {
     "experiments::lambdas/emails/coach_nudge_lambda.py::read": SEED_DATE,
     "experiments::lambdas/intelligence/ai_expert_analyzer_lambda.py::read": SEED_DATE,
     "experiments::lambdas/web/site_api_discovery.py::read": SEED_DATE,
-    "experiments::lambdas/web/site_api_journey.py::read": SEED_DATE,
     "experiments::lambdas/web/site_api_protocols.py::read": SEED_DATE,
     "experiments::lambdas/web/site_api_rollups.py::read": SEED_DATE,
     "experiments::mcp/tools_lifestyle.py::write": SEED_DATE,
@@ -369,6 +366,26 @@ REASON_5387_HEVY = (
 )
 
 PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
+    "training_constraints::lambdas/training/note_requests.py::read": (
+        "2026-11-08",
+        "training_constraints is sk-family partitioned: training.note_requests reads ONLY sk begins_with REQUEST# (read_rows), and the only writers of that family are note_requests.raise_requests (write-once) and note_requests.resolve (the chat's answer, reached from mcp/tools_training_notes.py's answer_request/decline_request actions). variant_rotation writes ROTATION#, tools_training_notes writes DISMISSAL#/DELOAD#/MODE#disruption# families — none starts with REQUEST#, so no other writer's shape can reach this reader; the round trip is one module's own shape, pinned by tests/test_note_requests_5573.py (#5573).",
+    ),
+    "training_constraints::lambdas/training/variant_rotation.py::write": (
+        "2026-11-08",
+        "training_constraints is sk-family partitioned: training.note_requests reads ONLY sk begins_with REQUEST# (read_rows), and the only writers of that family are note_requests.raise_requests (write-once) and note_requests.resolve (the chat's answer, reached from mcp/tools_training_notes.py's answer_request/decline_request actions). variant_rotation writes ROTATION#, tools_training_notes writes DISMISSAL#/DELOAD#/MODE#disruption# families — none starts with REQUEST#, so no other writer's shape can reach this reader; the round trip is one module's own shape, pinned by tests/test_note_requests_5573.py (#5573).",
+    ),
+    "training_constraints::mcp/tools_training_notes.py::write": (
+        "2026-11-08",
+        "training_constraints is sk-family partitioned: training.note_requests reads ONLY sk begins_with REQUEST# (read_rows), and the only writers of that family are note_requests.raise_requests (write-once) and note_requests.resolve (the chat's answer, reached from mcp/tools_training_notes.py's answer_request/decline_request actions). variant_rotation writes ROTATION#, tools_training_notes writes DISMISSAL#/DELOAD#/MODE#disruption# families — none starts with REQUEST#, so no other writer's shape can reach this reader; the round trip is one module's own shape, pinned by tests/test_note_requests_5573.py (#5573).",
+    ),
+    "day_grade::lambdas/content/recap_data.py::read": (
+        "2026-11-05",
+        "Owner ruling 2026-11-05: the recap card's grade is the day_grade record's PUBLIC variant, read ONLY through "
+        "health.day_grade_public.public_grade/public_letter — the same module whose stored_fields() both writers "
+        "(daily_metrics_compute_lambda.store_day_grade and the daily brief's fallback store_day_grade) store under "
+        "`public`. Reader and writers share the one shape by construction (tests/test_character_public_variant.py pins "
+        "the round trip); a record without the variant reads as no grade, never as method 1.",
+    ),
     "adaptive_mode::lambdas/compute/adaptive_mode_lambda.py::write": (
         "2026-11-03",
         "Owner ruling 2026-11-03 retired the one enrolled PUBLIC reader (/api/ask grounding): the engagement score weights the "
@@ -531,6 +548,13 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
     "apple_health::lambdas/web/site_api_freshness.py::read": (
         "2026-10-18",
         "reads resting_heart_rate_apple + date only; a writer rename degrades to an explicit 'unavailable', never a wrong value",
+    ),
+    # get_advice_link_queue (2026-11-11): owner-facing CONTEXT only, never evidence. Reads `date`, `title`, `duration_sec`,
+    # `set_count`, `total_volume_kg` off per-workout rows (sk carries `#WORKOUT#`); every field is read with a default, so a
+    # writer rename shows a zero or a blank in a labelled context row and never reaches a stored record or a public surface.
+    "hevy::mcp/tools_advice_queue.py::read": (
+        "2026-11-11",
+        "context-only owner read of five per-workout fields, each defaulted; a writer drift degrades a context row, nothing is stored or published",
     ),
     "hevy::mcp/tools_nutrition.py::read": (
         "2026-09-20",

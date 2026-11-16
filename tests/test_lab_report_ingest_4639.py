@@ -456,8 +456,12 @@ def test_coaching_sees_the_draw_that_spelled_it_crp_hs():
 
 
 def test_mcp_genome_xref_holds_every_spelling():
-    import re
+    """The biomarker -> gene map is private since 2026-11-11 (item 5), so the spelling parity is held by the loader:
+    every lab_units alias pair is mirrored, and a map keyed by either spelling answers for both."""
+    from mcp import labs_helpers
 
-    src = open(os.path.join(REPO, "mcp", "labs_helpers.py"), encoding="utf-8").read()
+    assert labs_helpers._XREF_SPELLINGS == dict(lab_units.MARKER_ALIASES)
     for alias, canon in lab_units.MARKER_ALIASES.items():
-        assert re.search(rf'"{alias}":', src) and re.search(rf'"{canon}":', src)
+        for key in (alias, canon):
+            got = labs_helpers._valid_xref({key: ["GENEA"]})
+            assert got[alias] == got[canon] == ["GENEA"]

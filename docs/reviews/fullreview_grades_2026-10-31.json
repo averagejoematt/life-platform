@@ -967,7 +967,7 @@
     {
      "clause_id": "cpo.A.2",
      "verdict": "FAILED",
-     "reason": "Chronicle: live posts.json ends at Week 6 (2026-10-13), 18 days old at Day 56. DDB has no DATE#2026-10-20 row, so Week 7 never existed. DATE#2026-10-27 'The Weight of 299' (Week 8) has been status=draft since 2026-10-28T15:03Z. /story/ and /start/ say only 'The next draft is due Wednesday, November 4' and never mention the held Week 8 draft or the skipped Week 7. Podcast: the page honestly says 'No episode yet for weeks 5 and 6'; newest is EP4, 2026-10-01. Predict-the-week is alive (/api/predict_week week_id 2026-W44, active true) with 0 votes. Ask-the-board tab is present on /coaching/ but its POST path was not exercised. Only Day 56 sampled."
+     "reason": "Chronicle: live posts.json ends at Week 6 (2026-10-13), 18 days old at Day 56. DDB has no DATE#2026-10-20 row, so Week 7 never existed. DATE#2026-10-27 'Held draft title (redacted)' (Week 8) has been status=draft since 2026-10-28T15:03Z. /story/ and /start/ say only 'The next draft is due Wednesday, November 4' and never mention the held Week 8 draft or the skipped Week 7. Podcast: the page honestly says 'No episode yet for weeks 5 and 6'; newest is EP4, 2026-10-01. Predict-the-week is alive (/api/predict_week week_id 2026-W44, active true) with 0 votes. Ask-the-board tab is present on /coaching/ but its POST path was not exercised. Only Day 56 sampled."
     },
     {
      "clause_id": "cpo.A.3",
@@ -2430,7 +2430,7 @@
     {
      "id": "reader-2",
      "summary": "The story surface has an unexplained chapter gap: the day strip says WEEK 8 / Day 56, but the newest chapter is Week 6 (Oct 13, '18 days ago'); there is no Week 7 chronicle row at all (Oct 20), and Week 8 is the held draft. A cold reader sees the chapter list jump from 'Week 6' to a banner for Week 8 with 'Next write-up: Wednesday, November 4', and the home 'latest chapter' is 18 days old.",
-     "evidence": "curl https://averagejoematt.com/journal/posts.json -> updated_at 2026-10-25, posts [(2026-10-13,'Week 6'),(2026-10-06,'Week 5'),...]. DDB USER#matthew#SOURCE#chronicle sk>DATE#2026-10: only DATE#2026-10-06 (published, wk5), DATE#2026-10-13 (published, wk6), DATE#2026-10-27 (draft, wk8 'The Weight of 299'); no DATE#2026-10-20 / week_number 7 row although STORYQ#W007 exists. Live /story/chronicle/: 'DAY 56 · WEEK 8 ... WEEK 6 · TUESDAY, OCTOBER 13 · 18 DAYS AGO'. Week 8 hold itself is owner-gated (#4531) and not scored; the missing Week 7 cause was not determined here.",
+     "evidence": "curl https://averagejoematt.com/journal/posts.json -> updated_at 2026-10-25, posts [(2026-10-13,'Week 6'),(2026-10-06,'Week 5'),...]. DDB USER#matthew#SOURCE#chronicle sk>DATE#2026-10: only DATE#2026-10-06 (published, wk5), DATE#2026-10-13 (published, wk6), DATE#2026-10-27 (draft, wk8 'Held draft title (redacted)'); no DATE#2026-10-20 / week_number 7 row although STORYQ#W007 exists. Live /story/chronicle/: 'DAY 56 · WEEK 8 ... WEEK 6 · TUESDAY, OCTOBER 13 · 18 DAYS AGO'. Week 8 hold itself is owner-gated (#4531) and not scored; the missing Week 7 cause was not determined here.",
      "sev": "P2",
      "effort": "M",
      "ab_class": "B",

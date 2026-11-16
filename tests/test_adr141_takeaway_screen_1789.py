@@ -108,7 +108,7 @@ def test_clean_takeaway_is_truncated_to_the_prompt_budget_not_dropped():
         "my sister moving in reset his whole evening",  # family specifics
         "the funeral week is what broke the routine",  # private events
         "at 47 years old the recovery curve flattened",  # chronological age (PhenoAge Option A)
-        "his APOE e3/e4 genotype is driving the sleep read",  # genotype strings (PRE-13)
+        "a synthetic APOE e2/e2 genotype string in a takeaway",  # genotype strings (PRE-13)
         "he asked me to follow up at matt@example.com",  # PII (broadcast_sensitivity_gate)
         "call him on 415-555-1212 before the next block",  # PII (phone)
     ],

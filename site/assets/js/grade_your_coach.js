@@ -1,8 +1,9 @@
 // grade_your_coach.js — the /method/grade-your-coach/ controller (#1396).
 //
 // Paste a prediction ledger, get the same scorecard this platform's own AI
-// coaches get: Brier, reliability curve, skill vs. the base rate, and a verdict
-// that refuses to flatter.
+// coaches get: Brier, reliability curve, skill vs. the base rate, and the
+// calibration-v2 answers (owner ruling 2026-11-09) — three separate questions,
+// none of which praises a forecaster for passing a test.
 //
 // EVERYTHING here runs in the reader's browser. There is no endpoint, no upload,
 // no telemetry — the pasted text never leaves the page. That is a promise the
@@ -14,30 +15,22 @@
 // of oss/calibration-core/js/calibration-core.js, held to the same test vectors
 // as the deployed Python grader (tests/js/calibration_core.test.mjs). The
 // numbers on this page are not "like" the platform's; they are the platform's.
+//
+// The calibration VERDICT is calibration-v2 (calibration-v2-core.js, a port of
+// lambdas/experiment/calibration_v2.py held to it by shared vectors —
+// tests/js/calibration_v2_core.test.mjs). The scorer's older single label is
+// never read here.
 import { parseLedgerText, scorePairs } from "/assets/js/calibration-core.js";
+import { assess } from "/assets/js/calibration-v2-core.js";
 
 const DEMO_URL = "/data/calibration_demo.json";
 
-const VERDICT_COPY = {
-  "over-confident": "Stated confidence runs ahead of what actually happened. The classic advice-engine failure: it sounds certain more often than it is right.",
-  "under-confident": "Stated confidence runs behind reality — this forecaster is better than it says it is, and is hedging.",
-  "well-calibrated": "Stated confidence tracks observed rates, and the forecasts beat the base rate. Both halves are required for this verdict.",
-  not_yet_skillful:
-    "The stated confidences line up reasonably, but the forecasts do not beat simply guessing the base rate every time. Reliability without skill is not calibration — so this reads as not yet skillful, with its n and skill shown beside it.",
-  not_measurable:
-    "Every resolved forecast was stated at the same confidence, so there is nothing to compare stated confidence against — calibration cannot be read, and no verdict is given.",
-  insufficient_data: "Fewer than 5 resolved forecasts. There is not enough here to claim anything about calibration, so nothing is claimed.",
-};
-
-const LABEL_COPY = {
-  under_review:
-    "A positive label is held for review: nearly every call was stated at one confidence, so the skill behind it rests on a handful of calls. The score, sample size and skill are shown beside it.",
-  nascent: "fewer than 3 resolved calls",
-  not_yet_skillful: "skill at or below the base rate",
-  developing: "resolved, but the Brier score is above 0.20",
-  reliable: "Brier at or below 0.20",
-  authoritative: "Brier at or below 0.15 across 12+ resolved calls",
-};
+const QUESTIONS = [
+  ["estimability", "Can calibration be estimated across confidence levels?"],
+  ["confidence_direction", "Over- or under-confident at an observed confidence level?"],
+  ["skill", "Better than the same-call guess that nothing changes?"],
+];
+const SKILL_WORDS = "No baseline: a pasted ledger carries no same-call guess to compare against, so this question is not answered here.";
 
 function esc(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -138,12 +131,18 @@ function renderScorecard(s, parsed) {
     ) +
     `</div>`;
 
-  const verdictKey = s.calibration;
+  // calibration-v2: three separate questions, each answered in the method's own words (interval and Holm-corrected p
+  // included). Not detecting a problem is never presented as proof of good calibration.
+  const v2 = assess(parsed.pairs);
   const verdict =
-    `<div class="gyc-verdict" data-verdict="${esc(verdictKey)}">` +
-    `<p class="gyc-verdict-h">${esc(String(verdictKey).replace(/[-_]/g, " "))}</p>` +
-    `<p class="gyc-verdict-b">${esc(VERDICT_COPY[verdictKey] || "")}</p>` +
-    `<p class="gyc-label label">credibility: ${esc(String(s.label).replace(/_/g, " "))} (${s.score}/100) — ${esc(LABEL_COPY[s.label] || "")}</p>` +
+    `<div class="gyc-verdict" data-verdict="${esc(v2.confidence_direction.result)}">` +
+    `<dl class="gyc-v2">` +
+    QUESTIONS.map(([key, ask]) => {
+      const words = key === "skill" ? SKILL_WORDS : v2[key].wording;
+      return `<div class="gyc-v2-row"><dt class="gyc-v2-q">${esc(ask)}</dt><dd class="gyc-verdict-b">${esc(words)}</dd></div>`;
+    }).join("") +
+    `</dl>` +
+    `<p class="gyc-label label">${esc(v2.method_version)} · three separate tests, each with its own interval · the platform's own coaches are graded the same way</p>` +
     `</div>`;
 
   const curve = s.reliability_bins.length

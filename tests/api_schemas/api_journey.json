@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T06:47:34.497546+00:00",
+  "captured_at": "2026-11-13T18:14:41.730906+00:00",
   "fetch_path": "/api/journey",
   "is_prefix_sample": false,
   "path": "/api/journey",
@@ -31,7 +31,7 @@
             "type": "integer"
           },
           "days_to_goal": {
-            "type": "null"
+            "type": "integer"
           },
           "goal_weight_lbs": {
             "type": "number"
@@ -52,13 +52,13 @@
             "type": "number"
           },
           "projected_goal_date": {
-            "type": "null"
+            "type": "string"
           },
           "projected_goal_date_earliest": {
-            "type": "null"
+            "type": "string"
           },
           "projected_goal_date_latest": {
-            "type": "null"
+            "type": "string"
           },
           "projection_confidence": {
             "type": "number"
@@ -79,10 +79,10 @@
             "type": "integer"
           },
           "weekly_rate_ci_high": {
-            "type": "null"
+            "type": "number"
           },
           "weekly_rate_ci_low": {
-            "type": "null"
+            "type": "number"
           },
           "weekly_rate_lbs": {
             "type": "number"

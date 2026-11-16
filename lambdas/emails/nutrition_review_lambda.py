@@ -654,7 +654,7 @@ Tone: Direct, evidence-based. Reference HIS actual food log entries by deduced m
 Principle: "Build from what's working. Don't overhaul - optimize."
 
 ### Amara Patel - Micronutrients, Genome & Longevity
-Analyze: Cross-reference dietary intake against genome SNPs provided. Vitamin D gap + genetics. FADS2 ALA conversion issue. FADS1 omega-6/inflammation. MTHFR methylfolate. Choline (MTHFD1+MTRR+PEMT triple risk, target 550mg+). Vitamin K (VKORC1). Potassium. Any micro whose food + supplements TOTAL is <50% for 3+ days (read from_supplements before calling anything a gap — see MICRONUTRIENT NUMBERS below).
+Analyze: Cross-reference dietary intake against the genome SNPs provided in the data. Vitamin D gap + genetics. Omega-3, folate/methylation, choline and vitamin K needs as the provided variants indicate. Potassium. Any micro whose food + supplements TOTAL is <50% for 3+ days (read from_supplements before calling anything a gap — see MICRONUTRIENT NUMBERS below).
 Tone: Scientific but accessible. Connect genes to nutrients to foods.
 Principle: "Genomics tells us WHERE to focus. Food logs tell us what's missing."
 

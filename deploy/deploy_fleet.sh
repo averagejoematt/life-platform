@@ -17,6 +17,8 @@
 #
 # Usage:  bash deploy/deploy_fleet.sh [--dry-run]
 set -euo pipefail
+# #6116: under a test runner, real AWS is unreachable from this script (deploy/lib/prod_write_guard.sh)
+source "$(dirname "${BASH_SOURCE[0]}")/lib/prod_write_guard.sh"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -148,3 +150,9 @@ if [ "$POSTFLIGHT_RC" -ne 0 ]; then
   exit 1
 fi
 [ "$FAILED" -eq 0 ] || exit 1
+
+# A site deploy (v9 or site/**) that DEFERRED while the Site API lagged its commit resumes now (deploy/www_api_readiness.py).
+# In CI, web-deploy-resume.yml runs on this workflow's completion instead (the deploy job holds no actions: write).
+if [ "$DRY_RUN" != "--dry-run" ] && [ -z "${GITHUB_ACTIONS:-}" ]; then
+  python3 "$ROOT/deploy/www_api_readiness.py" resume || echo "⚠️  site-deploy resume check did not complete — web-deploy-resume.yml retries hourly"
+fi

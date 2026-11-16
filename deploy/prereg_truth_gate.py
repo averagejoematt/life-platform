@@ -122,8 +122,9 @@ Issue #3599 says "today's cycle-16 artifact fails on two counts". That artifact 
 gone; cycle 17 (genesis 2026-09-06) has been live since. Re-measured against the
 cycle-17 seal on 2026-09-18 the verdict is SEVEN blocking findings — every one of the
 four kinds above, so each clause has a live specimen rather than only a synthetic one.
-The sealed bytes are committed at `tests/fixtures/prereg_cycle17_2026-09-06.json` and
-the counts are asserted there.
+The counts are asserted in tests/test_prereg_truth_gate_3599.py against the sealed bytes, which are private since
+2026-11-11 (they carry withdrawn calls): those tests run only where the private original is supplied
+(tests/sealed_prereg.py) and skip elsewhere.
 """
 
 from __future__ import annotations

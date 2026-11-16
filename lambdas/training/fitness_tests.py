@@ -4,7 +4,9 @@ WHY THIS EXISTS
   Before #5078 the calibration loop measured the scale only: nothing stored or read a fitness test, so
   "is he fitter" was inferred. The owner's direction (2026-10-18, the elite-panel review) is a battery
   on a fixed cadence: a 6-minute walk for distance, a 20-minute bike at RPE 6 for distance, a dead
-  hang for time and the assistance an assisted pull-up needs. The tests feed the May tracker (#5073)
+  hang for time and the assistance an assisted pull-up needs. #5798 adds the fixed-WORKLOAD cardio test: the
+  treadmill, 20 minutes at one fixed speed and incline, mean heart rate over minutes 10-20 with the RPE beside it
+  (a measurement, never an effort gate; compared only within one heart-rate regime and one setting). The tests feed the May tracker (#5073)
   and the coach packet.
 
 EVERY RULE IS CHARTER DATA (`calibration.fitness_tests`, read through `charter_value`): the cadence
@@ -33,12 +35,14 @@ THREE PURE PIECES (the DDB read and write take an injected table; the MCP side i
   3. THE TEST DAY — on the due week the charter's `test_day.role` (the lightest day, never a lower
      day) carries the battery: the generator's ideal session cut to the minimum shape (anchors only,
      `split.minimum_session.sets_per_movement` working sets) with the tests placed in `order`.
-     A battery already on file for the due week leaves the usual session alone.
+     A battery already on file for the due week leaves the usual session alone. A due week that passed with no battery
+     (overdue / missed) is carried by the NEXT test-day session, whatever its week, until one is logged (#5760).
 """
 
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Iterable, Mapping, Optional
 
 from common.pacific_time import pacific_weekday, parse_day_key, shift_day_key
@@ -55,6 +59,8 @@ STORE = f"{PK} / {SK_PREFIX}<YYYY-MM-DD> — CROSS_PHASE (ADR-077), Tier owner-o
 UPCOMING, DUE, OVERDUE, MISSED, UNKNOWN = "upcoming", "due", "overdue", "missed", "unknown"
 MEASURED, ABSENT, READ_FAILED = "measured", "absent", "read_failed"
 EXPLICIT, HEVY = "explicit", "hevy"
+INVALID = "invalid"
+"""A fixed-workload test whose heart rate could not be joined (#5798): stored as an attempt with a reason, never as a value."""
 
 BATTERY_TITLE = "FITNESS TESTS"
 """The title prefix of the drafted test-day routine — and the marker that makes a Hevy workout a battery."""
@@ -152,6 +158,11 @@ def build_battery_record(
         note = str((notes or {}).get(tid) or "").strip()
         if note:
             row["notes"] = note[:500]
+        if spec[tid].get("hevy_field") == "final_window_hr":  # the fixed workload: its setting and RPE ride beside the heart rate (#5798)
+            from training import cardio_menu
+
+            row["setting"] = setting_label(spec[tid])
+            row["rpe"] = cardio_menu.logged_rpe(note)
         tests[tid] = row
     return {
         "sk": sk,
@@ -216,20 +227,53 @@ def _hevy_value(row: Mapping[str, Any], sets: list[Mapping[str, Any]]) -> Option
     return None
 
 
-def _exercise_test(ex: Mapping[str, Any], ids: Mapping[str, tuple[set[str], str]]) -> Optional[str]:
+def _exercise_tests(ex: Mapping[str, Any], ids: Mapping[str, tuple[set[str], str]]) -> list[str]:
+    """Every test the exercise's machine can carry. Two tests share the treadmill (the 6-minute walk and the fixed
+    20-minute test, #5798); each one's own duration and field decide whether the sets are its result."""
     tid_ = str(ex.get("template_id") or "")  # the stored shape (hevy_common._normalize_exercise); the wire's key stays in the compiler
     name = str(ex.get("name") or ex.get("title") or "").strip().lower()
-    for test_id, (tids, title) in ids.items():
-        if (tid_ and tid_ in tids) or (title and name == title):
-            return test_id
-    return None
+    return [t for t, (tids, title) in ids.items() if (tid_ and tid_ in tids) or (title and name == title)]
+
+
+def _fixed_workload_row(spec: Mapping[str, Any], workout: Mapping[str, Any], index: int, ex: Mapping[str, Any]) -> Optional[dict[str, Any]]:
+    """The fixed-workload test from one Hevy treadmill block (#5798): mean heart rate over the charter's window, from the
+    stored cardio-HR join (`cardio_hr.final_window`), with the RPE from the block's note. None when the block is not a
+    ~20-minute block; `state: invalid` (no value) when the heart-rate join did not hold."""
+    from training import cardio_hr, cardio_menu
+
+    want = _f(spec.get("duration_s")) or 0.0
+    total = sum(_dur(s) or 0.0 for s in _working(ex.get("sets") or []))
+    if not want or abs(total - want) > want * DURATION_TOLERANCE:
+        return None
+    block = cardio_hr.block_for(workout, index) or {}
+    fw = block.get("final_window") if isinstance(block.get("final_window"), Mapping) else None
+    base: dict[str, Any] = {
+        "unit": spec.get("unit"),
+        "protocol_version": None,
+        "source": HEVY,
+        "setting": setting_label(spec),
+        "rpe": cardio_menu.logged_rpe(str(ex.get("notes") or "")),
+    }
+    mean = _f((fw or {}).get("mean_hr"))
+    if fw and fw.get("state") == "joined" and mean is not None:
+        return {**base, "value": mean, "hr_coverage": fw.get("hr_coverage"), "hr_source": fw.get("hr_source"), "hr_basis": fw.get("basis")}
+    why = str((fw or {}).get("reason") or block.get("reason") or "no heart-rate join on this block")
+    return {**base, "value": None, "state": INVALID, "reason": why, "hr_coverage": (fw or {}).get("hr_coverage")}
+
+
+def setting_label(spec: Mapping[str, Any]) -> Optional[str]:
+    """The fixed workload as one comparable string ('3.2 mph / 3.5 %'): results are compared only at the same setting."""
+    st = spec.get("setting")
+    if not isinstance(st, Mapping) or st.get("speed_mph") is None:
+        return None
+    return f"{st['speed_mph']} mph / {st.get('incline_pct')} %"
 
 
 def from_hevy(
     items: Iterable[Mapping[str, Any]], movements: Mapping[str, Any], proto: Optional[Mapping[str, Any]] = None
 ) -> dict[str, dict[str, Any]]:
     """{date: {test id: row}} read from Hevy per-workout rows (the stored shape: `exercises[].sets[]` with
-    `distance_m`, `duration_sec`, `weight_kg`, `reps`). A workout is a battery when its title carries
+    `distance_m`, `duration_sec`, `weight_kg`, `reps`; the fixed-workload test also reads the row's `cardio_hr`). A workout is a battery when its title carries
     `BATTERY_TITLE` or it logs at least `HEVY_MIN_TESTS` tests; anything else is ordinary training."""
     p = protocol() if proto is None else proto
     spec, ids = tests_spec(p), template_ids(movements, p)
@@ -239,13 +283,16 @@ def from_hevy(
         if date is None:
             continue
         found: dict[str, Any] = {}
-        for ex in it.get("exercises") or []:
-            test_id = _exercise_test(ex, ids)
-            if test_id is None:
-                continue
-            v = _hevy_value(spec[test_id], _working(ex.get("sets") or []))
-            if v is not None and (test_id not in found or _better(spec[test_id], v, found[test_id]["value"])):
-                found[test_id] = {"value": v, "unit": spec[test_id].get("unit"), "protocol_version": None, "source": HEVY}
+        for i, ex in enumerate(it.get("exercises") or []):
+            for test_id in _exercise_tests(ex, ids):
+                if spec[test_id].get("hevy_field") == "final_window_hr":
+                    row = _fixed_workload_row(spec[test_id], it, i, ex)
+                    if row is not None and (test_id not in found or (found[test_id].get("value") is None and row.get("value") is not None)):
+                        found[test_id] = row
+                    continue
+                v = _hevy_value(spec[test_id], _working(ex.get("sets") or []))
+                if v is not None and (test_id not in found or _better(spec[test_id], v, found[test_id]["value"])):
+                    found[test_id] = {"value": v, "unit": spec[test_id].get("unit"), "protocol_version": None, "source": HEVY}
         titled = BATTERY_TITLE.lower() in str(it.get("workout_name") or it.get("title") or "").lower()
         if found and (titled or len(found) >= HEVY_MIN_TESTS):
             out.setdefault(date, {}).update(found)
@@ -272,25 +319,62 @@ def batteries(records: Iterable[Mapping[str, Any]] | None, hevy: Mapping[str, Ma
 
 
 # ── trend ────────────────────────────────────────────────────────────────────────────────
+def _series_key(row: Mapping[str, Any], date: str, test: Mapping[str, Any]) -> tuple[Optional[str], Optional[str]]:
+    """What a result may be compared with (#5798): for a regime-bound test, only results in the same heart-rate regime
+    (the newest `health.hr_regime` marker on or before the test date) at the same fixed setting."""
+    if not test.get("regime_bound"):
+        return (None, None)
+    from health import hr_regime
+
+    marker = hr_regime.latest_marker(date)
+    return (str(marker["date"]) if marker else None, row.get("setting"))
+
+
 def trend(batts: list[Mapping[str, Any]], proto: Optional[Mapping[str, Any]] = None, as_of: Optional[str] = None) -> dict[str, Any]:
-    """Per test: latest, previous, delta and whether it moved the better way. A test never logged is `absent`."""
+    """Per test: latest, previous, delta and whether it moved the better way. A test never logged is `absent`.
+
+    A regime-bound test (the fixed-workload treadmill, #5798) compares only within one heart-rate regime and one
+    fixed setting: the first result after a marker (or at a new setting) is `first`, never a delta against an earlier
+    regime. An `invalid` attempt (no heart-rate join) has no value; when it is the newest attempt the cell says so."""
     spec = tests_spec(proto)
     rows = [b for b in batts if as_of is None or str(b.get("date")) <= as_of]
     out: dict[str, Any] = {}
     for tid, row in spec.items():
-        hist = [(b["date"], b["tests"][tid]) for b in rows if tid in (b.get("tests") or {})]
+        attempts = [(b["date"], b["tests"][tid]) for b in rows if tid in (b.get("tests") or {})]
+        hist = [(d, r) for d, r in attempts if r.get("state") != INVALID and r.get("value") is not None]
         base = {"label": row.get("label"), "unit": row.get("unit"), "better": row.get("better")}
+        if not attempts:
+            out[tid] = {"state": ABSENT, **base, "detail": "never logged"}
+            continue
+        if attempts[-1][1].get("state") == INVALID:
+            d, r = attempts[-1]
+            out[tid] = {
+                "state": INVALID,
+                **base,
+                "latest_attempt": {"date": d, "weekday": pacific_weekday(d), "source": r.get("source"), "reason": r.get("reason")},
+                "detail": "the newest attempt has no usable heart-rate join — stored invalid, never as a value",
+            }
+            continue
         if not hist:
             out[tid] = {"state": ABSENT, **base, "detail": "never logged"}
             continue
-        (ld, lr), prev = hist[-1], (hist[-2] if len(hist) > 1 else None)
+        ld, lr = hist[-1]
+        key = _series_key(lr, ld, row)
+        same = [(d, r) for d, r in hist if _series_key(r, d, row) == key]
+        prev = same[-2] if len(same) > 1 else None
         cell: dict[str, Any] = {
             "state": MEASURED,
             **base,
             "latest": {"date": ld, "weekday": pacific_weekday(ld), "value": lr.get("value"), "source": lr.get("source")},
         }
+        if row.get("regime_bound"):
+            cell["latest"]["rpe"] = lr.get("rpe")
+            cell["latest"]["setting"] = lr.get("setting")
+            cell["compared_within"] = {"hr_regime_marker": key[0], "setting": key[1]}
         if prev is None:
             cell.update(previous=None, delta=None, direction="first")
+            if row.get("regime_bound") and len(hist) > 1:
+                cell["detail"] = "first result in this heart-rate regime at this setting — earlier results are not compared"
         else:
             pv, lv = float(prev[1]["value"]), float(lr["value"])
             delta = round(lv - pv, 1)
@@ -300,6 +384,8 @@ def trend(batts: list[Mapping[str, Any]], proto: Optional[Mapping[str, Any]] = N
                 delta=delta,
                 direction=direction,
             )
+            if row.get("regime_bound"):
+                cell["previous"]["rpe"] = prev[1].get("rpe")
         out[tid] = cell
     return out
 
@@ -463,10 +549,11 @@ CALIBRATION_KIND = "fitness_battery"
 """The battery's row in `training.calibration_cadence`'s block — the ONE prompt path to the owner (the Telegram
 event sweep's `detect_calibration`, keyed `CALIB_PROMPT#fitness_battery#<due week opening>`, once per due week)."""
 
-_CALIBRATION_STATE = {UPCOMING: "ok", DUE: "due", OVERDUE: "overdue", MISSED: MISSED, UNKNOWN: UNKNOWN}
-"""This module's states in the calibration block's vocabulary. `missed` stays `missed` (NOT the block's `missed_2`):
-the battery's dead-man is its own alarm (`fitness-battery-missed`), so the calibration sweep prompts a due or
-overdue battery and never raises a second dead-man for it."""
+_CALIBRATION_STATE = {UPCOMING: "ok", DUE: "due", OVERDUE: "overdue", MISSED: "missed_2", UNKNOWN: UNKNOWN}
+"""This module's states in the calibration block's vocabulary. `missed` is the block's `missed_2` (#5760): the block-1
+battery lapsed with only the `fitness-battery-missed` digest alarm to say so, so a missed battery now rides the same
+dead-man path as the tape — one fixed-text Telegram alert per due week (`coach.calibration_deadman_alert`, keyed
+`CALIB_DEADMAN#fitness_battery#<due week opening>`) naming the battery and the day it lapsed. The digest alarm stays."""
 
 
 def calibration_row(today: str, cadence: Mapping[str, Any], proto: Optional[Mapping[str, Any]] = None) -> dict[str, Any]:
@@ -492,13 +579,19 @@ def calibration_row(today: str, cadence: Mapping[str, Any], proto: Optional[Mapp
         "issue": ISSUE,
         "prompt": None,
     }
-    if state in (DUE, OVERDUE) and fact:
+    if state in (DUE, OVERDUE, MISSED) and fact:
         labels = ", ".join(str(t.get("label")) for t in tests_spec(p).values())
         row["prompt"] = (
             f"Fitness tests are {state} (program week {cadence.get('due_program_week')} closes the block, opened {cadence.get('due_on')}): "
-            f"{labels}. The test-day draft carries them; log each result with your coach. Last battery {cadence.get('latest') or 'never'}."
+            f"{labels}. The next test-day draft carries them; log each result with your coach. Last battery {cadence.get('latest') or 'never'}."
         )
         row["prompt_key"] = cc.prompt_key(CALIBRATION_KIND, str(row["cycle_start"]))
+    if state == MISSED and fact:  # #5760: the dead-man's fixed text names the item and the day it lapsed
+        row["lapsed_on"] = cadence.get("due_on")
+        row["alert"] = (
+            f"The fitness battery lapsed on {cadence.get('due_on')}: the week that closed the block passed, then its grace week, "
+            f"with no battery logged (last {cadence.get('latest') or 'never'}). The next test-day draft carries it; log each result with your coach."
+        )
     return row
 
 
@@ -541,7 +634,9 @@ def never_on_roles(proto: Optional[Mapping[str, Any]] = None) -> set[str]:
 
 
 def is_test_day(day_entry: Mapping[str, Any], proto: Optional[Mapping[str, Any]] = None) -> bool:
-    """True when the served session is the test-day role in a due program week (before any record read)."""
+    """True when the served session is the test-day role in a week that can carry a battery (before any record read):
+    the week that closes a block (block_model's week_in_block == n), or any later week — an earlier block's battery may
+    still be uncovered, and an overdue battery goes on the NEXT test day, not the next block's end (#5760)."""
     p = protocol() if proto is None else proto
     role, week = day_entry.get("session_role"), day_entry.get("week")
     try:
@@ -550,7 +645,27 @@ def is_test_day(day_entry: Mapping[str, Any], proto: Optional[Mapping[str, Any]]
         return False
     if not role or role != test_day_role(p) or role in never_on_roles(p):
         return False
-    return isinstance(week, int) and week >= 1 and week % n == 0  # the week that closes a block (block_model's week_in_block == n)
+    return isinstance(week, int) and not isinstance(week, bool) and (week % n == 0 or week > n)
+
+
+def _closes_block(day_entry: Mapping[str, Any], proto: Mapping[str, Any]) -> bool:
+    week = day_entry.get("week")
+    return isinstance(week, int) and week >= 1 and week % block_weeks(proto) == 0
+
+
+def _overdue_info(day_entry: Mapping[str, Any], block_workouts: Any, dates: list[str], target: str, proto: Mapping[str, Any]) -> dict:
+    """#5760: off a block's closing week, the cadence of the battery from the session ledger's own week openings — the same
+    `due()` the prompt and the dead-man read. Overdue or missed with a FACT due day = an earlier block's battery is still
+    uncovered, so this test day carries it; anything else (upcoming, unknown, an unplaced week) leaves the session alone."""
+    from training import session_sequence
+
+    completed = session_sequence.completed_positions(block_workouts or [], target) if target else []
+    return due(target, position_from(day_entry, completed), dates, proto)
+
+
+# A test block's rationale tag prefix: every block that must keep its protocol note (cardio_cues skips it).
+FITNESS_TEST_TAG_PREFIX = "fitness_test:"
+_SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9])")
 
 
 def test_note(row: Mapping[str, Any]) -> str:
@@ -560,7 +675,10 @@ def test_note(row: Mapping[str, Any]) -> str:
 
     head = fitness_test_line(str(row.get("label")))
     proto = str(row.get("protocol") or "").strip()
-    return f"{head}\n{proto}" if proto else head
+    # one protocol sentence per line (#5428, 2026-11-08): the charter's words unchanged, but no line over the phone's
+    # three-line limit — the pull-up protocol as one 166-char line was an L7 on every test-day predraft
+    sentences = [x for x in _SENTENCE_BREAK.split(proto) if x]
+    return "\n".join([head, *sentences])
 
 
 def _test_block(test_id: str, row: Mapping[str, Any], movements: Mapping[str, Any]) -> Any:
@@ -581,7 +699,7 @@ def _test_block(test_id: str, row: Mapping[str, Any], movements: Mapping[str, An
         notes=test_note(row),
         joint_friendly_score=int(m.get("joint_friendly_score", 3)),
         skill_tier=int(m.get("skill_tier", 1)),
-        rationale_tag=f"fitness_test:{test_id}",
+        rationale_tag=f"{FITNESS_TEST_TAG_PREFIX}{test_id}",
     )
 
 
@@ -626,8 +744,25 @@ def _minimum_blocks(blocks: list[Any], per_movement: int, max_movements: int) ->
 def session_note(due_info: Mapping[str, Any], proto: Optional[Mapping[str, Any]] = None) -> str:
     """The routine's session note (Hevy cuts at ~150 chars) — what the day is and why."""
     p = protocol() if proto is None else proto
-    note = f"Fitness tests today, then a short lift. Why: the battery is due this week (every {every_weeks(p)} wk, block end). Log each result."
-    return note[:_NOTE_CHARS]
+    if due_info.get("state") in (OVERDUE, MISSED):  # #5760: an earlier block's battery, carried by the next test day
+        why = f"the battery due {due_info.get('due_on')} (block end) was not logged"
+    else:
+        why = f"the battery is due this week (every {every_weeks(p)} wk, block end)"
+    return f"Fitness tests today, then a short lift. Why: {why}. Log each result."[:_NOTE_CHARS]
+
+
+# The usual-session rationale lines that stay true on the battery day: the grid, the calendar position, the ramp that loads
+# the kept anchors, the floors, the warm-up pass and the day's fatigue read. Anything else names the session replaced.
+_SESSION_INDEPENDENT_RATIONALE = (
+    "week grid source=",
+    "archetype=",
+    "session sequence:",
+    "loads:",
+    "load floors",
+    "warm-ups:",
+    "fatigue (",
+    "z2 7d",
+)
 
 
 def apply_battery(ideal: Any, movements: Mapping[str, Any], due_info: Mapping[str, Any], proto: Optional[Mapping[str, Any]] = None) -> Any:
@@ -649,6 +784,12 @@ def apply_battery(ideal: Any, movements: Mapping[str, Any], due_info: Mapping[st
                 unresolved.append(f"{step}: catalog key {spec[step].get('catalog_key')!r} not in the movement catalog")
                 continue
             blocks.append(_test_block(step, spec[step], movements))
+    # #6020: the rationale the usual session wrote describes movements and a set count this routine no longer serves
+    # ("14 sets over 6 movements (~49 min)", the swaps and rotations of accessories that were cut). Only the lines that hold
+    # for any session stay; the rest move to the snapshot, so nothing is lost and none reads as what was written.
+    old_rationale = [str(x) for x in (ideal.rationale or [])]
+    kept_rationale = [x for x in old_rationale if x.startswith(_SESSION_INDEPENDENT_RATIONALE)]
+    replaced_rationale = [x for x in old_rationale if x not in kept_rationale]
     ideal.exercises = blocks
     ideal.title = f"{BATTERY_TITLE} — {ideal.title}"
     ideal.notes = session_note(due_info, p)
@@ -664,13 +805,20 @@ def apply_battery(ideal: Any, movements: Mapping[str, Any], due_info: Mapping[st
             "unresolved": unresolved,
             "charter_version": charter_version(),
             "issue": ISSUE,
+            "replaced_rationale": replaced_rationale,
         },
     }
     ideal.rationale = [
         f"fitness battery ({ISSUE}): program week {due_info.get('due_program_week')} closes the block, so the test-day role carries "
-        "the tests on its minimum session (anchors only) — the lightest day, never a lower day",
+        "the tests on its minimum session (anchors only) — the lightest day, never a lower day"
+        + (
+            f"; it was not logged by {due_info.get('due_on')}, so this next test day carries it (#5760)"
+            if due_info.get("state") in (OVERDUE, MISSED)
+            else ""
+        ),
         *[f"UNRESOLVED — {u}" for u in unresolved],
-        *list(ideal.rationale or []),
+        *kept_rationale,
+        f"{n_sets} sets over {len(blocks)} movements (the tests plus the minimum session)",
     ]
     return ideal
 
@@ -699,6 +847,18 @@ def place_battery(
         )
         return routines
     dates = [b["date"] for b in batteries(records, from_hevy(block_workouts or [], movements, p))]
+    if not _closes_block(day_entry, p):
+        info = _overdue_info(day_entry, block_workouts, dates, str(getattr(ideal, "target_date", "") or ""), p)
+        if info.get("state") not in (OVERDUE, MISSED) or info.get("due_on_is_estimate") is not False:
+            return routines
+        try:
+            minimum_shape()
+        except ValueError:
+            msg = f"fitness battery ({ISSUE}): overdue, but UNRESOLVED split.minimum_session in the charter — the usual session"
+            ideal.rationale = [msg, *list(ideal.rationale or [])]
+            return routines
+        apply_battery(ideal, movements, info, p)
+        return routines
     opened = _day((day_entry.get("week_basis") or {}).get("week_opened_on"))
     latest = dates[-1] if dates else None
     if opened is None:

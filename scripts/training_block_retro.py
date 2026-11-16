@@ -6,7 +6,9 @@ model is called once and the AWS write is a separate, deliberate act:
 
   grade   READ-ONLY. Reads the owner-only rows the retro is graded from — the May tracker's WEEK# rows, the
           weekly PANEL# grades, the owner's DELOAD# and MODE#disruption records, the last RETRO# row and the
-          #5089 charter predictions (`diary_claims` PREDICTION# rows, source `charter_build`) — plus the
+          #5089 charter predictions (`diary_claims` PREDICTION# rows, source `charter_build`) and the engine's
+          progression record over the block (#5762: the committed routines' `inputs_snapshot.progression_basis`
+          paired with the Hevy sets logged on each one's day, `progression_record.block_progression`) — plus the
           `--supplied` JSON the skill builds from MCP tools, then runs the retro (the panel re-grade on route
           `charter.retro` unless `--no-panel`) and writes the retro JSON + the doc-tab markdown to `--out`.
   store   THE WRITE (dry-run unless `--apply`). Puts `USER#matthew#SOURCE#training_constraints / RETRO#<block_end>`
@@ -17,6 +19,12 @@ model is called once and the AWS write is a separate, deliberate act:
           {row_id: letter} the skill reads from the owner's PRIVATE review doc and keeps OUTSIDE the repo (the
           repo is PUBLIC). The first retro reads it as its prior. Refuses a missing row, an unknown row, an
           off-scale letter, or a baseline row that is already stored.
+
+  volume-response  READ-ONLY, ADVISORY (#5801). The block's weekly working sets per muscle (`muscle_volume.
+          working_sets_by_muscle`, the reader behind `get_muscle_volume`) beside each lift's e1RM trend
+          (`plan_engine.anchor_e1rm_trend`) and the #5762 progression record, with a proposed next-block weekly set
+          count per muscle (`training.volume_response`). A proposal for the block design review (#5776), never applied;
+          it writes only `volume_response.json` / `.md` to `--out` — an OWNER-ONLY scratch dir, never a repo file.
 
 Every read uses a 60 s read timeout. A failed read stops the run and names the partition — a broken read is
 never an empty block.
@@ -87,11 +95,29 @@ def read_inputs(table: Any, block_end: str) -> dict[str, Any]:
     }
 
 
+def read_progression(block_end: str) -> dict[str, Any]:
+    """#5762: the engine's own progression record over the block — the routines committed in its window (the
+    `routine_index` partition) and the weighted Hevy sets logged since its start. Raises on a failed read."""
+    from datetime import date
+
+    from health.adherence_calc import _load_catalog
+    from training import exercise_history, progression_record, routine_repo
+
+    window = block_retro.block_window(block_end)
+    today = date.today()
+    lookback = max((today - date.fromisoformat(window["start"])).days + 1, 1)
+    routines = routine_repo.list_by_date_range(window["start"], window["end"], limit=1000)
+    history = exercise_history.load_history_indexes(lookback_days=lookback, today=today)[0]
+    rec = progression_record.block_progression(routines, history, start=window["start"], end=window["end"], catalog=_load_catalog())
+    return _plain(rec)
+
+
 def cmd_grade(args: argparse.Namespace) -> int:
     supplied = json.load(open(args.supplied, encoding="utf-8")) if args.supplied else {}
     overrides = json.load(open(args.overrides, encoding="utf-8")) if args.overrides else {}
     inputs = read_inputs(_table(), args.block_end)
-    retro = block_retro.run(args.block_end, supplied=supplied, with_panel=not args.no_panel, **inputs)
+    progression = read_progression(args.block_end)
+    retro = block_retro.run(args.block_end, supplied=supplied, progression=progression, with_panel=not args.no_panel, **inputs)
     if retro.get("status") != "graded":
         print(json.dumps(retro, indent=2))
         return 1
@@ -124,6 +150,56 @@ def prediction_update(p: dict[str, Any], graded_at: str) -> dict[str, Any]:
             ":g": {"verdict": p["verdict"], "evidence": json.dumps(p["evidence"], sort_keys=True, default=str), "graded_at": graded_at},
         },
     }
+
+
+def read_hevy(block_end: str, lookback_days: int = 120) -> tuple[Any, list[dict[str, Any]]]:
+    """The block's Hevy rows plus `lookback_days` of history before it (the e1RM trend needs 9 sessions). Read-only:
+    the same cross-phase read `get_muscle_volume` uses. Returns (block window, raw items)."""
+    from datetime import date, timedelta
+
+    for k, v in (("S3_BUCKET", "matthew-life-platform"), ("USER_ID", "matthew"), ("AWS_DEFAULT_REGION", REGION)):
+        os.environ.setdefault(k, v)
+    sys.path.insert(0, _ROOT)
+    from mcp.tools_strength import _read_hevy_all_phases
+
+    window = block_retro.block_window(block_end)
+    start = (date.fromisoformat(window["start"]) - timedelta(days=lookback_days)).isoformat()
+    return window, _read_hevy_all_phases(start, window["end"])[0]
+
+
+def cmd_volume_response(args: argparse.Namespace) -> int:
+    from training import muscle_volume, volume_response
+
+    sys.path.insert(0, _ROOT)  # `mcp` lives at the repo root; read_hevy adds it too late for this import
+    from mcp.strength_helpers import extract_hevy_sessions
+
+    if os.path.abspath(args.out).startswith(_ROOT + os.sep):
+        print("refusing: --out is inside the repo; loads and e1RMs are private. Use a scratch directory outside it.")
+        return 1
+    window, items = read_hevy(args.block_end)
+    workouts = muscle_volume.normalize_hevy_items(items)
+    counted = muscle_volume.working_sets_by_muscle(workouts, window["start"], window["end"])
+    weeks = muscle_volume.window_weeks(window["start"], window["end"])
+    lifts = [
+        {
+            "name": e["name"],
+            "template_id": e["template_id"],
+            "sessions": extract_hevy_sessions(items, e["name"], template_id=e["template_id"] or ""),
+        }
+        for e in counted["exercise_sets"]
+    ]
+    report = volume_response.build_report(
+        args.block_end, weeks=weeks, muscle_totals=counted["muscles"], lifts=lifts, progression=read_progression(args.block_end)
+    )
+    os.makedirs(args.out, exist_ok=True)
+    with open(os.path.join(args.out, "volume_response.json"), "w", encoding="utf-8") as f:
+        json.dump(report, f, indent=2, sort_keys=True, default=str)
+    md = volume_response.render_markdown(report)
+    with open(os.path.join(args.out, "volume_response.md"), "w", encoding="utf-8") as f:
+        f.write(md)
+    print(md)
+    print(f"wrote {args.out}/volume_response.json and .md (owner-only; advisory, nothing applied or stored)")
+    return 0
 
 
 def cmd_store(args: argparse.Namespace) -> int:
@@ -200,8 +276,13 @@ def main(argv: list[str] | None = None) -> int:
     b = sub.add_parser("baseline", help="write the one-time owner-only baseline row (dry-run unless --apply)")
     b.add_argument("--letters", required=True, help="JSON {row_id: letter} from the PRIVATE review doc, kept outside the repo")
     b.add_argument("--apply", action="store_true", help="write to DynamoDB (default: dry-run)")
+    v = sub.add_parser(
+        "volume-response", help="read-only, advisory: per-muscle sets beside e1RM response, with a next-block proposal (#5801)"
+    )
+    v.add_argument("--block-end", required=True, help="the block's last day (a Sunday, YYYY-MM-DD)")
+    v.add_argument("--out", required=True, help="an OWNER-ONLY scratch directory (never inside the repo)")
     args = ap.parse_args(argv)
-    return {"grade": cmd_grade, "store": cmd_store, "baseline": cmd_baseline}[args.cmd](args)
+    return {"grade": cmd_grade, "store": cmd_store, "baseline": cmd_baseline, "volume-response": cmd_volume_response}[args.cmd](args)
 
 
 if __name__ == "__main__":

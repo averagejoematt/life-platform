@@ -193,7 +193,11 @@ def test_three_real_planning_conversations_before_and_the_synthesized_fallback()
     assert not problems, problems
     for fx in fixtures:  # the redaction: tool names and the action/routine flag only
         for c in fx["tool_calls"]:
-            assert set(c) <= {"at", "tool", "args"} and set(c.get("args", {})) <= {"action", "routine_id"}, c
+            assert set(c) <= {"at", "tool", "args", "lift_history"} and set(c.get("args", {})) <= {"action", "routine_id"}, c
+            # #5501: the packet's own logged state word, never content
+            assert c.get("lift_history") in (None, "measured", "absent", "read_failed") and (
+                "lift_history" not in c or c["tool"] == "get_coach_session_packet"
+            ), c
 
 
 _ALLOWED_FIXTURE_KEYS = {
@@ -231,18 +235,24 @@ def test_real_after_conversations_reach_the_packet_context_but_not_exercise_hist
         "after-2026-10-29T0408Z": ([("plan_before_preflight", ["exercise_history"])], ["exercise_notes"] + packet, True),
         "after-2026-10-30T2059Z": ([("plan_before_preflight", ["exercise_history", "exercise_notes"])], packet, True),
         "after-2026-10-31T0433Z": ([("plan_before_preflight", ["exercise_history", "exercise_notes"])], packet, True),
+        # #5501 live proof: the first real planning conversation after the packet carried lift_history — no violation.
+        "after-2026-11-01T1629Z": ([], all5, True),
     }
     assert got == expected
     joined = {r["conversation"]: r["continued_by"] for r in rows if r["continued_by"]}
     assert joined == {"after-2026-10-29T0408Z": ["after-2026-10-29T2243Z"], "after-2026-10-30T2059Z": ["after-2026-10-30T2213Z"]}
     s = ev.summarize(rows)
     assert (s["before"]["packet_first"], s["before"]["may_frame_on_payload"]) == (1, 0)
-    assert (s["after"]["packet_first"], s["after"]["may_frame_on_payload"], s["after"]["conversations"]) == (4, 4, 4)
+    assert (s["after"]["packet_first"], s["after"]["may_frame_on_payload"], s["after"]["conversations"]) == (5, 5, 5)
     for fx in after:  # the redaction: tool names, timestamps and the action/routine flag only — PUBLIC repo
         assert set(fx) <= _ALLOWED_FIXTURE_KEYS, set(fx) - _ALLOWED_FIXTURE_KEYS
         assert fx["phase"] == "after" and fx["window_utc"][0] >= ev.CONTRACT_DEPLOYED_UTC
         for c in fx["tool_calls"]:
-            assert set(c) <= {"at", "tool", "args"} and set(c.get("args", {})) <= {"action", "routine_id"}, c
+            assert set(c) <= {"at", "tool", "args", "lift_history"} and set(c.get("args", {})) <= {"action", "routine_id"}, c
+            # #5501: the packet's own logged state word, never content
+            assert c.get("lift_history") in (None, "measured", "absent", "read_failed") and (
+                "lift_history" not in c or c["tool"] == "get_coach_session_packet"
+            ), c
             assert c.get("args", {}).get("routine_id") in (None, "<present>"), c
 
 

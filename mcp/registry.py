@@ -10,6 +10,7 @@ from mcp.config import RAW_DAY_LIMIT, SOURCES
 from mcp.tool_annotations import annotate_tools  # #4286: readOnlyHint/destructiveHint/idempotentHint
 from mcp.tool_output_schemas import attach_output_schemas  # #4286 box 2: outputSchema, the ten most-called tools
 from mcp.tools_advice_links import LOG_ADVICE_LINK_DESCRIPTION, LOG_ADVICE_LINK_INPUT, tool_log_advice_link  # #5612
+from mcp.tools_advice_queue import ADVICE_QUEUE_DESCRIPTION, ADVICE_QUEUE_INPUT, tool_get_advice_link_queue  # read-only ask queue
 
 # BENCH-1: cut-benchmarking & regain firewall (PRIVATE, view-dispatched).
 from mcp.tools_benchmark import GET_BENCHMARK_DESCRIPTION, tool_get_benchmark
@@ -17,9 +18,16 @@ from mcp.tools_benchmark import GET_BENCHMARK_DESCRIPTION, tool_get_benchmark
 # #1478: one-call session opener aggregating six pending-capture surfaces.
 from mcp.tools_capture import tool_get_capture_queues
 from mcp.tools_cgm import tool_get_cgm
+from mcp.tools_challenges import CHALLENGE_CHECKIN_DESCRIPTION, CHALLENGE_CHECKIN_INPUT, tool_log_challenge_checkin  # #6087
 
 # #915: ad-hoc coach check-in loop — coaches ask, Matthew answers verbatim.
-from mcp.tools_coach_checkin import tool_get_coach_checkin_queue, tool_log_coach_calibration, tool_log_coach_checkin
+from mcp.tools_coach_checkin import (
+    LOG_COACH_CALIBRATION_INPUT,
+    LOG_COACH_CHECKIN_INPUT,
+    tool_get_coach_checkin_queue,
+    tool_log_coach_calibration,
+    tool_log_coach_checkin,
+)
 
 # #1690 (epic #1687 S3): correct a weekly-review-pack item by number from chat.
 from mcp.tools_coach_corrections import tool_log_coach_correction
@@ -42,7 +50,7 @@ from mcp.tools_data import (
     tool_get_sources,
     tool_search_activities,
 )
-from mcp.tools_decisions import tool_get_decisions, tool_log_decision, tool_update_decision_outcome
+from mcp.tools_decisions import GET_DECISIONS_INPUT, tool_get_decisions, tool_log_decision, tool_update_decision_outcome
 
 # #3692: the model-facing selection prose lives in a cohesive sibling so this file
 # stays the wiring table it says it is. Two descriptions stayed inline below — see
@@ -103,6 +111,7 @@ from mcp.tools_descriptions import (
     GET_SOURCES_DESCRIPTION,
     GET_TODOIST_SNAPSHOT_DESCRIPTION,
     GET_TRAINING_DESCRIPTION,
+    GET_TRAINING_INPUT,
     GET_WEIGHT_LOSS_PROGRESS_DESCRIPTION,
     GET_WORKOUT_DETAIL_DESCRIPTION,
     GET_WORKOUTS_DESCRIPTION,
@@ -125,6 +134,7 @@ from mcp.tools_descriptions import (
     MANAGE_SICK_DAYS_DESCRIPTION,
     MARK_JOURNAL_QUOTE_DESCRIPTION,
     PLAN_NEXT_SESSION_DESCRIPTION,
+    PLAN_NEXT_SESSION_INPUT,
     READ_PLATFORM_MEMORY_DESCRIPTION,
     SAVE_INSIGHT_DESCRIPTION,
     SEARCH_ACTIVITIES_DESCRIPTION,
@@ -201,6 +211,7 @@ from mcp.tools_surfaces import (  # #4584: the two input schemas moved beside th
 from mcp.tools_todoist import PRIORITY_DESCRIPTION, close_todoist_task, create_todoist_task, tool_get_todoist_snapshot, update_todoist_task
 from mcp.tools_training import tool_get_acwr_status, tool_get_training
 from mcp.tools_training_notes import tool_get_exercise_notes
+from mcp.tools_training_phase import MANAGE_TRAINING_PHASE_DESCRIPTION, MANAGE_TRAINING_PHASE_INPUT, tool_manage_training_phase  # #5575
 
 # Vacation fund tracker ($1/workout-mile since experiment start).
 
@@ -348,6 +359,14 @@ TOOLS = {
         "fn": tool_get_may_tracker,
         "schema": {"name": "get_may_tracker", "description": GET_MAY_TRACKER_DESCRIPTION, "inputSchema": GET_MAY_TRACKER_INPUT},
     },
+    "manage_training_phase": {  # #5575: the computed phase — status, the owner's veto and override
+        "fn": tool_manage_training_phase,
+        "schema": {
+            "name": "manage_training_phase",
+            "description": MANAGE_TRAINING_PHASE_DESCRIPTION,
+            "inputSchema": MANAGE_TRAINING_PHASE_INPUT,
+        },
+    },
     "get_predictions": {
         "fn": tool_get_predictions,
         "schema": {
@@ -463,21 +482,7 @@ TOOLS = {
         "schema": {
             "name": "get_training",
             "description": GET_TRAINING_DESCRIPTION,
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "view": {
-                        "type": "string",
-                        "description": "load (default), periodization, recommendation, or cardio_fitness (the Apple Watch's VO2 max arc + cardio signals).",
-                        "enum": ["load", "periodization", "recommendation", "cardio_fitness"],
-                    },
-                    "start_date": {"type": "string", "description": "[load/periodization] Start date YYYY-MM-DD."},
-                    "end_date": {"type": "string", "description": "[load/periodization] End date YYYY-MM-DD (default: today)."},
-                    "date": {"type": "string", "description": "[recommendation] Target date YYYY-MM-DD (default: today)."},
-                    "weeks": {"type": "number", "description": "[periodization] Number of weeks to analyse (default: 12)."},
-                },
-                "required": [],
-            },
+            "inputSchema": GET_TRAINING_INPUT,  # #5575: moved beside its description (pays for manage_training_phase)
         },
     },
     "get_daily_metrics": {
@@ -553,39 +558,7 @@ TOOLS = {
         "schema": {
             "name": "plan_next_session",
             "description": PLAN_NEXT_SESSION_DESCRIPTION,
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "target_date": {"type": "string", "description": "Session date YYYY-MM-DD. Defaults to today (Pacific)."},
-                    "routine_id": {
-                        "type": "string",
-                        "description": "Stage 2 (#3752): a drafted routine_id to red-team. Runs the four critics over disjoint evidence, applies their changes to the draft, stores the verdicts on it; a veto then blocks commit.",
-                    },
-                    "veto_override": {
-                        "type": "object",
-                        "description": (
-                            "#4076, stage 2 only: Matthew overrules ONE vetoing critic. {critic: muscle_defense|joints_tendons|"
-                            "rate_advocate|blueprint_historian, owner_words: his words VERBATIM, error_class?: corrections-ledger class}. "
-                            "Only that critic's veto is marked overridden (recorded on the routine, in the Hevy notes and in the "
-                            "corrections ledger); every other critic's changes still apply and any other veto still blocks."
-                        ),
-                        "properties": {
-                            "critic": {"type": "string"},
-                            "owner_words": {"type": "string"},
-                            "error_class": {"type": "string"},
-                        },
-                    },
-                    "dry_run": {
-                        "type": "boolean",
-                        "description": (
-                            "#4076, stage 2 only: run the critics, the override and the changes exactly as a real run, but WRITE "
-                            "NOTHING (no routine version or routine_index row, no coach thread row, no corrections-ledger row). "
-                            "Every put it would make is returned under critics.would_write. Default false."
-                        ),
-                    },
-                },
-                "required": [],
-            },
+            "inputSchema": PLAN_NEXT_SESSION_INPUT,
         },
     },
     "get_coach_session_packet": {
@@ -1517,15 +1490,7 @@ TOOLS = {
         "schema": {
             "name": "get_decisions",
             "description": GET_DECISIONS_DESCRIPTION,
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "days": {"type": "integer", "description": "Look back N days (default 30)."},
-                    "pillar": {"type": "string", "description": "Filter by pillar (e.g. 'sleep', 'nutrition')."},
-                    "outcome_only": {"type": "boolean", "description": "If true, only return decisions with recorded outcomes."},
-                },
-                "required": [],
-            },
+            "inputSchema": GET_DECISIONS_INPUT,
         },
     },
     "update_decision_outcome": {
@@ -1552,6 +1517,10 @@ TOOLS = {
     "log_advice_link": {  # #5612 (ruling F): owner-asserted decision <-> coach recommendation link
         "fn": tool_log_advice_link,
         "schema": {"name": "log_advice_link", "description": LOG_ADVICE_LINK_DESCRIPTION, "inputSchema": LOG_ADVICE_LINK_INPUT},
+    },
+    "get_advice_link_queue": {  # read-only: the coaches' recent asks beside what Matthew recorded; writes nothing
+        "fn": tool_get_advice_link_queue,
+        "schema": {"name": "get_advice_link_queue", "description": ADVICE_QUEUE_DESCRIPTION, "inputSchema": ADVICE_QUEUE_INPUT},
     },
     # ── IC-18: Cross-Domain Hypothesis Engine ───────────────────────────────────────────
     # ── BS-12: Deficit Sustainability Tracker ──
@@ -2048,20 +2017,7 @@ TOOLS = {
         "schema": {
             "name": "log_coach_checkin",
             "description": LOG_COACH_CHECKIN_DESCRIPTION,
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "checkin_id": {
-                        "type": "string",
-                        "description": "The question's checkin_id from get_coach_checkin_queue (starts with 'CHECKIN#').",
-                    },
-                    "coach_id": {"type": "string", "description": "Optional: the asking coach's id — speeds up the lookup."},
-                    "answer": {"type": "string", "description": "Matthew's answer, verbatim. Omit when skip=true."},
-                    "skip": {"type": "boolean", "description": "true = Matthew declines this question (zero penalty)."},
-                    "tags": {"type": "array", "items": {"type": "string"}, "description": "Optional topic tags (max 5)."},
-                },
-                "required": ["checkin_id"],
-            },
+            "inputSchema": LOG_COACH_CHECKIN_INPUT,  # #6087: moved beside its tool (pays log_challenge_checkin's lines)
         },
     },
     # #1481: conversational self-calibration — the asking coach re-grades itself from the answer.
@@ -2070,38 +2026,7 @@ TOOLS = {
         "schema": {
             "name": "log_coach_calibration",
             "description": LOG_COACH_CALIBRATION_DESCRIPTION,
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "checkin_id": {
-                        "type": "string",
-                        "description": "The ANSWERED check-in this calibration derives from (starts with 'CHECKIN#').",
-                    },
-                    "coach_id": {"type": "string", "description": "Optional: the asking coach's id — speeds up the lookup."},
-                    "subdomain": {
-                        "type": "string",
-                        "description": "The subdomain being re-graded (reuse existing CONFIDENCE# vocabulary where it fits).",
-                    },
-                    "direction": {
-                        "type": "string",
-                        "enum": ["up", "down", "hold"],
-                        "description": "up = the answer clarified/confirmed the coach's read; down = it revealed a blind spot; hold = record the learning without a confidence move.",
-                    },
-                    "takeaway": {
-                        "type": "string",
-                        "description": "What the coach learned, tightly paraphrasing the answer — no invented context (max 600 chars).",
-                    },
-                    "answer_excerpt": {
-                        "type": "string",
-                        "description": "Optional: the exact phrase of Matthew's answer this rests on — must appear verbatim in the stored answer.",
-                    },
-                    "weight": {
-                        "type": "number",
-                        "description": "Optional confidence-move weight 0.1-1.0 (default 0.5; 1.0 = as strong as one graded prediction, the hard cap).",
-                    },
-                },
-                "required": ["checkin_id", "subdomain", "direction", "takeaway"],
-            },
+            "inputSchema": LOG_COACH_CALIBRATION_INPUT,  # #6087: beside its tool
         },
     },
     # #1478: one-call session opener aggregating six pending-capture surfaces.
@@ -2127,6 +2052,10 @@ TOOLS = {
     },
     # #4078: chat's "queued pending approval" made real — enqueue / list / approve / discard.
     # #4584: his own words from chat, stored verbatim; a clean note is public (owner decision 2026-10-04).
+    "log_challenge_checkin": {  # #6087: the owner's own challenge check-in — the public door can no longer write his row
+        "fn": tool_log_challenge_checkin,
+        "schema": {"name": "log_challenge_checkin", "description": CHALLENGE_CHECKIN_DESCRIPTION, "inputSchema": CHALLENGE_CHECKIN_INPUT},
+    },
     "log_owner_note": {
         "fn": tool_log_owner_note,
         "schema": {"name": "log_owner_note", "description": LOG_OWNER_NOTE_DESCRIPTION, "inputSchema": LOG_OWNER_NOTE_INPUT},

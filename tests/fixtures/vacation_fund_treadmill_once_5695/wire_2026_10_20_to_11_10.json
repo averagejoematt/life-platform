@@ -1,0 +1,4571 @@
+{
+ "_provenance": "Live DynamoDB life-platform (us-west-2), read-only query 2026-11-10 for #5695: strava and hevy DATE#2026-10-20..2026-11-10 (macrofactor_workouts held no rows). Only the fields vacation_fund / workout_identity / strava_read_seam / logging_conventions read are kept; activity names, notes, location, polyline, gear and timezone are stripped.",
+ "hevy": [
+  {
+   "date": "2026-10-21",
+   "duration_sec": 9119,
+   "end_time": "2026-10-22T02:10:07+00:00",
+   "exercises": [
+    {
+     "name": "Bench Press (Barbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "warmup",
+       "weight_kg": 43.091326396385774
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "warmup",
+       "weight_kg": 61.235042773811365
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 3,
+       "type": "warmup",
+       "weight_kg": 83.91468824559335
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 92.98654643430615
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 4,
+       "type": "normal",
+       "weight_kg": 102.05840462301894
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 4,
+       "type": "normal",
+       "weight_kg": 102.05840462301894
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 83.91468824559335
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 70.30690096252415
+      }
+     ],
+     "template_id": "79D0BB3A"
+    },
+    {
+     "name": "Dumbbell Row",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "warmup",
+       "weight_kg": 20.41168092460379
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 45.35929094356398
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 45.35929094356398
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 45.35929094356398
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 49.895220037920375
+      }
+     ],
+     "template_id": "F1E57334"
+    },
+    {
+     "name": "Shoulder Press (Dumbbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 6,
+       "type": "normal",
+       "weight_kg": 36.28743275485118
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 6,
+       "type": "normal",
+       "weight_kg": 36.28743275485118
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 36.28743275485118
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 6,
+       "type": "normal",
+       "weight_kg": 36.28743275485118
+      }
+     ],
+     "template_id": "878CD1D0"
+    },
+    {
+     "name": "Triceps Pushdown",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 43.091326396385774
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 43.091326396385774
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 43.091326396385774
+      }
+     ],
+     "template_id": "93A552C6"
+    },
+    {
+     "name": "Lat Pulldown (Cable)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 72.57486550970236
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 72.57486550970236
+      }
+     ],
+     "template_id": "6A6C31A5"
+    },
+    {
+     "name": "Face Pull",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 26.081592292549285
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 29.483539113316585
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 29.483539113316585
+      }
+     ],
+     "template_id": "BE640BA0"
+    },
+    {
+     "name": "Bicep Curl (Dumbbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 14.741769556658292
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 14.741769556658292
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 14.741769556658292
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 14.741769556658292
+      }
+     ],
+     "template_id": "37FCC2BB"
+    },
+    {
+     "name": "Cycling",
+     "sets": [
+      {
+       "distance_m": 15257,
+       "duration_sec": 2400,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "D8F7F851"
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": 600,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "527DA061"
+    }
+   ],
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-10-21#WORKOUT#e982a3d5-0cf9-4c1c-8ac6-c1848f8bf124",
+   "start_time": "2026-10-21T23:38:08+00:00"
+  },
+  {
+   "date": "2026-10-23",
+   "duration_sec": 8735,
+   "end_time": "2026-10-24T01:30:02+00:00",
+   "exercises": [
+    {
+     "name": "Squat (Barbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "warmup",
+       "weight_kg": 45.35929094356398
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "warmup",
+       "weight_kg": 61.235042773811365
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 3,
+       "type": "warmup",
+       "weight_kg": 83.91468824559335
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 92.98654643430615
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 102.05840462301894
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 111.13026281173174
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 4,
+       "type": "normal",
+       "weight_kg": 120.20212100044454
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 102.05840462301894
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 83.91468824559335
+      }
+     ],
+     "template_id": "D04AC939"
+    },
+    {
+     "name": "Deadlift (Barbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "warmup",
+       "weight_kg": 70.30690096252415
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 6,
+       "type": "normal",
+       "weight_kg": 102.05840462301894
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 6,
+       "type": "normal",
+       "weight_kg": 102.05840462301894
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 6,
+       "type": "normal",
+       "weight_kg": 102.05840462301894
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 6,
+       "type": "normal",
+       "weight_kg": 102.05840462301894
+      }
+     ],
+     "template_id": "C6272009"
+    },
+    {
+     "name": "Leg Press (Machine)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 163.29344739683032
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 163.29344739683032
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 163.29344739683032
+      }
+     ],
+     "template_id": "C7973E0E"
+    },
+    {
+     "name": "Calf Press (Machine)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 21,
+       "type": "normal",
+       "weight_kg": 185.9730928686123
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 21,
+       "type": "normal",
+       "weight_kg": 185.9730928686123
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 21,
+       "type": "normal",
+       "weight_kg": 185.9730928686123
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 21,
+       "type": "normal",
+       "weight_kg": 185.9730928686123
+      }
+     ],
+     "template_id": "91237BDD"
+    },
+    {
+     "name": "Seated Leg Curl (Machine)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 49.895220037920375
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 49.895220037920375
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 49.895220037920375
+      }
+     ],
+     "template_id": "11A123F3"
+    },
+    {
+     "name": "Cycling",
+     "sets": [
+      {
+       "distance_m": 17139,
+       "duration_sec": 2700,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "D8F7F851"
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": 900,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "527DA061"
+    }
+   ],
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-10-23#WORKOUT#8f4a487e-4195-4d81-8c96-01c8fea7732a",
+   "start_time": "2026-10-23T23:04:27+00:00"
+  },
+  {
+   "date": "2026-10-25",
+   "duration_sec": 9776,
+   "end_time": "2026-10-25T19:24:54+00:00",
+   "exercises": [
+    {
+     "name": "Shoulder Press (Dumbbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "warmup",
+       "weight_kg": 6.8038936415345965
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 29.483539113316585
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 34.01946820767298
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 34.01946820767298
+      }
+     ],
+     "template_id": "878CD1D0"
+    },
+    {
+     "name": "Lateral Raise (Dumbbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 6.8038936415345965
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 6.8038936415345965
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 6.8038936415345965
+      }
+     ],
+     "template_id": "422B08F1"
+    },
+    {
+     "name": "Seated Incline Curl (Dumbbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 9.071858188712795
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 11.339822735890994
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 13.607787283069193
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 13.607787283069193
+      }
+     ],
+     "template_id": "8BAB2735"
+    },
+    {
+     "name": "Rear Delt Reverse Fly (Machine)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 27.215574566138386
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 27.215574566138386
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 27.215574566138386
+      }
+     ],
+     "template_id": "D8281C62"
+    },
+    {
+     "name": "Triceps Rope Pushdown",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 22.67964547178199
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 22.67964547178199
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 22.67964547178199
+      }
+     ],
+     "template_id": "94B7239B"
+    },
+    {
+     "name": "Overhead Triceps Extension (Cable)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 13.607787283069193
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 15.87575183024739
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 15.87575183024739
+      }
+     ],
+     "template_id": "B5EFBF9C"
+    },
+    {
+     "name": "21s",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 21,
+       "type": "normal",
+       "weight_kg": 22.67964547178199
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 21,
+       "type": "normal",
+       "weight_kg": 22.67964547178199
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 21,
+       "type": "normal",
+       "weight_kg": 22.67964547178199
+      }
+     ],
+     "template_id": "6cb744a3-2830-4fd4-a208-d6fecd2f730c"
+    },
+    {
+     "name": "Farmers Walk",
+     "sets": [
+      {
+       "distance_m": 50,
+       "duration_sec": null,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": 54.43114913227677
+      },
+      {
+       "distance_m": 60,
+       "duration_sec": null,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": 54.43114913227677
+      },
+      {
+       "distance_m": 60,
+       "duration_sec": null,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": 54.43114913227677
+      }
+     ],
+     "template_id": "50C613D0"
+    },
+    {
+     "name": "Cycling",
+     "sets": [
+      {
+       "distance_m": 22209,
+       "duration_sec": 3600,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "D8F7F851"
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": 1200,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "527DA061"
+    }
+   ],
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-10-25#WORKOUT#15a2ac5c-eb99-4325-995f-f3d9dccb5626",
+   "start_time": "2026-10-25T16:41:58+00:00"
+  },
+  {
+   "date": "2026-10-26",
+   "duration_sec": 8021,
+   "end_time": "2026-10-27T01:35:26+00:00",
+   "exercises": [
+    {
+     "name": "Incline Bench Press (Dumbbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 6,
+       "type": "warmup",
+       "weight_kg": 12.473805009480094
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 36.28743275485118
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 38.55539730202938
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 38.55539730202938
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 38.55539730202938
+      }
+     ],
+     "template_id": "07B38369"
+    },
+    {
+     "name": "Dumbbell Row",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 40.82336184920758
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 40.82336184920758
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 40.82336184920758
+      }
+     ],
+     "template_id": "F1E57334"
+    },
+    {
+     "name": "DB Rear Delt Rows",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 15.87575183024739
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 15.87575183024739
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 15.87575183024739
+      }
+     ],
+     "template_id": "6e1f6811-3457-40da-ab93-92de19b84707"
+    },
+    {
+     "name": "Overhead Triceps Extension (Cable)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 15.87575183024739
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 15.87575183024739
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 15.87575183024739
+      }
+     ],
+     "template_id": "B5EFBF9C"
+    },
+    {
+     "name": "Lat Pulldown (Cable)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 72.57486550970236
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 72.57486550970236
+      }
+     ],
+     "template_id": "6A6C31A5"
+    },
+    {
+     "name": "Preacher Curl (Barbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 22.67964547178199
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 22.67964547178199
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 7,
+       "type": "normal",
+       "weight_kg": 22.67964547178199
+      }
+     ],
+     "template_id": "4F942934"
+    },
+    {
+     "name": "Chest Fly (Machine)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 49.895220037920375
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 49.895220037920375
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 49.895220037920375
+      }
+     ],
+     "template_id": "78683336"
+    },
+    {
+     "name": "Treadmill",
+     "sets": [
+      {
+       "distance_m": 3943,
+       "duration_sec": 2700,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "243710DE"
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": 720,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "527DA061"
+    }
+   ],
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-10-26#WORKOUT#a8fe84fa-89a2-4ed7-b70c-4048bd287ab5",
+   "start_time": "2026-10-26T23:21:45+00:00"
+  },
+  {
+   "date": "2026-10-28",
+   "duration_sec": 5633,
+   "end_time": "2026-10-29T02:20:56+00:00",
+   "exercises": [
+    {
+     "name": "Deadlift (Trap bar)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "warmup",
+       "weight_kg": 61.235042773811365
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "warmup",
+       "weight_kg": 70.30690096252415
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 3,
+       "type": "warmup",
+       "weight_kg": 92.98654643430615
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 111.13026281173174
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 111.13026281173174
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 111.13026281173174
+      }
+     ],
+     "template_id": "B923B230"
+    },
+    {
+     "name": "Squat (Barbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "warmup",
+       "weight_kg": 61.235042773811365
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 97.52247552866254
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 97.52247552866254
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 97.52247552866254
+      }
+     ],
+     "template_id": "D04AC939"
+    },
+    {
+     "name": "Leg Press (Machine)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 163.29344739683032
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 163.29344739683032
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 163.29344739683032
+      }
+     ],
+     "template_id": "C7973E0E"
+    },
+    {
+     "name": "Calf Press (Machine)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 21,
+       "type": "warmup",
+       "weight_kg": 163.29344739683032
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 21,
+       "type": "normal",
+       "weight_kg": 163.29344739683032
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 21,
+       "type": "normal",
+       "weight_kg": 163.29344739683032
+      }
+     ],
+     "template_id": "91237BDD"
+    },
+    {
+     "name": "Side Bend (Dumbbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 21.545663198192887
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 21.545663198192887
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 21.545663198192887
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 21.545663198192887
+      }
+     ],
+     "template_id": "026FD047"
+    },
+    {
+     "name": "Treadmill",
+     "sets": [
+      {
+       "distance_m": 2527,
+       "duration_sec": 1800,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "243710DE"
+    }
+   ],
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-10-28#WORKOUT#0adcac0c-b587-47ea-9b0f-a2be28fe23c6",
+   "start_time": "2026-10-29T00:47:03+00:00"
+  },
+  {
+   "date": "2026-10-29",
+   "duration_sec": 8579,
+   "end_time": "2026-10-30T01:37:40+00:00",
+   "exercises": [
+    {
+     "name": "Bench Press (Barbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "warmup",
+       "weight_kg": 52.16318458509857
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "warmup",
+       "weight_kg": 72.57486550970236
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 3,
+       "type": "warmup",
+       "weight_kg": 88.45061733994974
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 4,
+       "type": "normal",
+       "weight_kg": 102.05840462301894
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 4,
+       "type": "normal",
+       "weight_kg": 102.05840462301894
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 92.98654643430615
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 92.98654643430615
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 61.235042773811365
+      }
+     ],
+     "template_id": "79D0BB3A"
+    },
+    {
+     "name": "Dumbbell Row",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "warmup",
+       "weight_kg": 21.545663198192887
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 45.35929094356398
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 49.895220037920375
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 6,
+       "type": "normal",
+       "weight_kg": 49.895220037920375
+      }
+     ],
+     "template_id": "F1E57334"
+    },
+    {
+     "name": "Lat Pulldown (Cable)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 72.57486550970236
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 6,
+       "type": "normal",
+       "weight_kg": 81.64672369841516
+      }
+     ],
+     "template_id": "6A6C31A5"
+    },
+    {
+     "name": "Triceps Extension (Cable)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "warmup",
+       "weight_kg": 4.535929094356398
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 15.87575183024739
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 15.87575183024739
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 19.27769865101469
+      }
+     ],
+     "template_id": "21310F5F"
+    },
+    {
+     "name": "Face Pull",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 29.483539113316585
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 29.483539113316585
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 29.483539113316585
+      }
+     ],
+     "template_id": "BE640BA0"
+    },
+    {
+     "name": "Lateral Raise (Dumbbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 6.8038936415345965
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 6.8038936415345965
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 6.8038936415345965
+      }
+     ],
+     "template_id": "422B08F1"
+    },
+    {
+     "name": "Hammer Curl (Dumbbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 14.741769556658292
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 14.741769556658292
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 14.741769556658292
+      }
+     ],
+     "template_id": "7E3BC8B6"
+    },
+    {
+     "name": "Treadmill",
+     "sets": [
+      {
+       "distance_m": 3782,
+       "duration_sec": 2700,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "243710DE"
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": 600,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "527DA061"
+    }
+   ],
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-10-29#WORKOUT#b03e0ea6-bf4d-43d9-a1eb-b624d47a51f6",
+   "start_time": "2026-10-29T23:14:41+00:00"
+  },
+  {
+   "date": "2026-10-30",
+   "duration_sec": 9436,
+   "end_time": "2026-10-31T01:43:58+00:00",
+   "exercises": [
+    {
+     "name": "Squat (Barbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "warmup",
+       "weight_kg": 61.235042773811365
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "warmup",
+       "weight_kg": 83.91468824559335
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 3,
+       "type": "warmup",
+       "weight_kg": 92.98654643430615
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 4,
+       "type": "normal",
+       "weight_kg": 111.13026281173174
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 3,
+       "type": "normal",
+       "weight_kg": 120.20212100044454
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 3,
+       "type": "normal",
+       "weight_kg": 129.27397918915733
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 102.05840462301894
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 102.05840462301894
+      }
+     ],
+     "template_id": "D04AC939"
+    },
+    {
+     "name": "Deadlift (Barbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "warmup",
+       "weight_kg": 70.30690096252415
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 6,
+       "type": "normal",
+       "weight_kg": 102.05840462301894
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 6,
+       "type": "normal",
+       "weight_kg": 102.05840462301894
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 6,
+       "type": "normal",
+       "weight_kg": 102.05840462301894
+      }
+     ],
+     "template_id": "C6272009"
+    },
+    {
+     "name": "Bulgarian Split Squat (Dumbbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 10.205840462301895
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 10.205840462301895
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 10.205840462301895
+      }
+     ],
+     "template_id": "B5D3A742"
+    },
+    {
+     "name": "Lying Leg Curl (Machine)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 43.091326396385774
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 56.69911367945497
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 9,
+       "type": "normal",
+       "weight_kg": 56.69911367945497
+      }
+     ],
+     "template_id": "B8127AD1"
+    },
+    {
+     "name": "Seated Calf Raise",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 40.82336184920758
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 40.82336184920758
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 40.82336184920758
+      }
+     ],
+     "template_id": "062AB91A"
+    },
+    {
+     "name": "Cycling",
+     "sets": [
+      {
+       "distance_m": 15289,
+       "duration_sec": 3600,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "D8F7F851"
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": 600,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "527DA061"
+    }
+   ],
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-10-30#WORKOUT#db8adbcf-d628-4ceb-a3f7-c8b4cb611b0a",
+   "start_time": "2026-10-30T23:06:42+00:00"
+  },
+  {
+   "date": "2026-11-01",
+   "duration_sec": 9661,
+   "end_time": "2026-11-01T21:27:50+00:00",
+   "exercises": [
+    {
+     "name": "Shoulder Press (Dumbbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "warmup",
+       "weight_kg": 20.41168092460379
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 34.01946820767298
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 6,
+       "type": "normal",
+       "weight_kg": 36.28743275485118
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 6,
+       "type": "normal",
+       "weight_kg": 38.55539730202938
+      }
+     ],
+     "template_id": "878CD1D0"
+    },
+    {
+     "name": "Lateral Raise (Machine)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "warmup",
+       "weight_kg": 6.8038936415345965
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "warmup",
+       "weight_kg": 6.8038936415345965
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 9.071858188712795
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 9.071858188712795
+      }
+     ],
+     "template_id": "D5D0354D"
+    },
+    {
+     "name": "Rear Delt Reverse Fly (Machine)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 6,
+       "type": "warmup",
+       "weight_kg": 49.895220037920375
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 38.55539730202938
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 38.55539730202938
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 38.55539730202938
+      }
+     ],
+     "template_id": "D8281C62"
+    },
+    {
+     "name": "Seated Incline Curl (Dumbbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 13.607787283069193
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 11.339822735890994
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 11.339822735890994
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 11.339822735890994
+      }
+     ],
+     "template_id": "8BAB2735"
+    },
+    {
+     "name": "Triceps Rope Pushdown",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 19.27769865101469
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 22.67964547178199
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 22.67964547178199
+      }
+     ],
+     "template_id": "94B7239B"
+    },
+    {
+     "name": "Farmers Walk",
+     "sets": [
+      {
+       "distance_m": 50,
+       "duration_sec": null,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": 29.483539113316585
+      },
+      {
+       "distance_m": 50,
+       "duration_sec": null,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": 29.483539113316585
+      },
+      {
+       "distance_m": 50,
+       "duration_sec": null,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": 29.483539113316585
+      }
+     ],
+     "template_id": "50C613D0"
+    },
+    {
+     "name": "Cycling",
+     "sets": [
+      {
+       "distance_m": 17703,
+       "duration_sec": 3600,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "D8F7F851"
+    },
+    {
+     "name": "Dead Hang",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": 6,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "B9380898"
+    },
+    {
+     "name": "Pull Up (Assisted)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 58.96707822663317
+      }
+     ],
+     "template_id": "2C37EC5E"
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": 900,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "527DA061"
+    }
+   ],
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-11-01#WORKOUT#4b137083-8c34-49b3-8609-bbef1a39f689",
+   "start_time": "2026-11-01T18:46:49+00:00"
+  },
+  {
+   "date": "2026-11-02",
+   "duration_sec": 7713,
+   "end_time": "2026-11-03T02:22:14+00:00",
+   "exercises": [
+    {
+     "name": "Incline Bench Press (Dumbbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "warmup",
+       "weight_kg": 21.545663198192887
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 38.55539730202938
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 38.55539730202938
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 38.55539730202938
+      }
+     ],
+     "template_id": "07B38369"
+    },
+    {
+     "name": "Dumbbell Row",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 43.091326396385774
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 43.091326396385774
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 43.091326396385774
+      }
+     ],
+     "template_id": "F1E57334"
+    },
+    {
+     "name": "Lat Pulldown (Cable)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 72.57486550970236
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 72.57486550970236
+      }
+     ],
+     "template_id": "6A6C31A5"
+    },
+    {
+     "name": "DB Rear Delt Rows",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 15.87575183024739
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 15.87575183024739
+      }
+     ],
+     "template_id": "6e1f6811-3457-40da-ab93-92de19b84707"
+    },
+    {
+     "name": "Chest Fly (Machine)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "warmup",
+       "weight_kg": 45.35929094356398
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 49.895220037920375
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 49.895220037920375
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 49.895220037920375
+      }
+     ],
+     "template_id": "78683336"
+    },
+    {
+     "name": "Bicep Curl (Machine)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 27.215574566138386
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 27.215574566138386
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 27.215574566138386
+      }
+     ],
+     "template_id": "AF328E3D"
+    },
+    {
+     "name": "Overhead Triceps Extension (Cable)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 9.071858188712795
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 11.339822735890994
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 11.339822735890994
+      }
+     ],
+     "template_id": "B5EFBF9C"
+    },
+    {
+     "name": "Treadmill",
+     "sets": [
+      {
+       "distance_m": 3766,
+       "duration_sec": 2700,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "243710DE"
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": 720,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "527DA061"
+    }
+   ],
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-11-02#WORKOUT#19758169-e42c-4c2d-b754-d6560fb21968",
+   "start_time": "2026-11-03T00:13:41+00:00"
+  },
+  {
+   "date": "2026-11-03",
+   "duration_sec": 8373,
+   "end_time": "2026-11-04T03:03:33+00:00",
+   "exercises": [
+    {
+     "name": "Deadlift (Trap bar)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "warmup",
+       "weight_kg": 61.235042773811365
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "warmup",
+       "weight_kg": 83.91468824559335
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 3,
+       "type": "warmup",
+       "weight_kg": 95.25451098148434
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 115.66619190608813
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 115.66619190608813
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 115.66619190608813
+      }
+     ],
+     "template_id": "B923B230"
+    },
+    {
+     "name": "Squat (Barbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "warmup",
+       "weight_kg": 70.30690096252415
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 102.05840462301894
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 102.05840462301894
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 102.05840462301894
+      }
+     ],
+     "template_id": "D04AC939"
+    },
+    {
+     "name": "Seated Calf Raise",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "warmup",
+       "weight_kg": 31.75150366049478
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 54.43114913227677
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 40.82336184920758
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 40.82336184920758
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 40.82336184920758
+      }
+     ],
+     "template_id": "062AB91A"
+    },
+    {
+     "name": "Side Bend (Dumbbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 29.483539113316585
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 29.483539113316585
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 29.483539113316585
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 29.483539113316585
+      }
+     ],
+     "template_id": "026FD047"
+    },
+    {
+     "name": "Treadmill",
+     "sets": [
+      {
+       "distance_m": 5311,
+       "duration_sec": 3600,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "243710DE"
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": 720,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "527DA061"
+    }
+   ],
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-11-03#WORKOUT#25234dfd-e5e4-4075-b00b-3b32a863c269",
+   "start_time": "2026-11-04T00:44:00+00:00"
+  },
+  {
+   "date": "2026-11-05",
+   "duration_sec": 9376,
+   "end_time": "2026-11-06T02:59:16+00:00",
+   "exercises": [
+    {
+     "name": "Bench Press (Barbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "warmup",
+       "weight_kg": 52.16318458509857
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "warmup",
+       "weight_kg": 70.30690096252415
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 3,
+       "type": "warmup",
+       "weight_kg": 83.91468824559335
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 4,
+       "type": "normal",
+       "weight_kg": 102.05840462301894
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 4,
+       "type": "normal",
+       "weight_kg": 102.05840462301894
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 3,
+       "type": "normal",
+       "weight_kg": 106.59433371737533
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 92.98654643430615
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 70.30690096252415
+      }
+     ],
+     "template_id": "79D0BB3A"
+    },
+    {
+     "name": "Dumbbell Row",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "warmup",
+       "weight_kg": 21.545663198192887
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 49.895220037920375
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 49.895220037920375
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 49.895220037920375
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 49.895220037920375
+      }
+     ],
+     "template_id": "F1E57334"
+    },
+    {
+     "name": "Lat Pulldown (Cable)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 6,
+       "type": "normal",
+       "weight_kg": 77.11079460405875
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 6,
+       "type": "normal",
+       "weight_kg": 77.11079460405875
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 6,
+       "type": "normal",
+       "weight_kg": 77.11079460405875
+      }
+     ],
+     "template_id": "6A6C31A5"
+    },
+    {
+     "name": "Lateral Raise (Machine)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 9.071858188712795
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 9.071858188712795
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 9.071858188712795
+      }
+     ],
+     "template_id": "D5D0354D"
+    },
+    {
+     "name": "Decline Bench Press (Machine)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 31.75150366049478
+      }
+     ],
+     "template_id": "FAF31231"
+    },
+    {
+     "name": "Triceps Extension (Cable)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 19.27769865101469
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 19.27769865101469
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 19.27769865101469
+      }
+     ],
+     "template_id": "21310F5F"
+    },
+    {
+     "name": "Face Pull",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 29.483539113316585
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 32.88548593408388
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 32.88548593408388
+      }
+     ],
+     "template_id": "BE640BA0"
+    },
+    {
+     "name": "Hammer Curl (Dumbbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 15.87575183024739
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 15.87575183024739
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 15.87575183024739
+      }
+     ],
+     "template_id": "7E3BC8B6"
+    },
+    {
+     "name": "Treadmill",
+     "sets": [
+      {
+       "distance_m": 3943,
+       "duration_sec": 2700,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "243710DE"
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": 720,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "527DA061"
+    }
+   ],
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-11-05#WORKOUT#0034c103-9126-4d43-a93b-eae99c816e8d",
+   "start_time": "2026-11-06T00:23:00+00:00"
+  },
+  {
+   "date": "2026-11-06",
+   "duration_sec": 10099,
+   "end_time": "2026-11-07T02:23:33+00:00",
+   "exercises": [
+    {
+     "name": "Squat (Barbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "warmup",
+       "weight_kg": 61.235042773811365
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "warmup",
+       "weight_kg": 83.91468824559335
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 3,
+       "type": "warmup",
+       "weight_kg": 106.59433371737533
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 3,
+       "type": "normal",
+       "weight_kg": 115.66619190608813
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 3,
+       "type": "normal",
+       "weight_kg": 124.73805009480093
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 3,
+       "type": "normal",
+       "weight_kg": 124.73805009480093
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 106.59433371737533
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "normal",
+       "weight_kg": 92.98654643430615
+      }
+     ],
+     "template_id": "D04AC939"
+    },
+    {
+     "name": "Romanian Deadlift (Barbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "warmup",
+       "weight_kg": 61.235042773811365
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 83.91468824559335
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 83.91468824559335
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 83.91468824559335
+      }
+     ],
+     "template_id": "2B4B7310"
+    },
+    {
+     "name": "Bulgarian Split Squat (Dumbbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 10.205840462301895
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 10.205840462301895
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 10.205840462301895
+      }
+     ],
+     "template_id": "B5D3A742"
+    },
+    {
+     "name": "Standing Calf Raise (Barbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 70.30690096252415
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 79.37875915123695
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 15,
+       "type": "normal",
+       "weight_kg": 88.45061733994974
+      }
+     ],
+     "template_id": "E53CCBE5"
+    },
+    {
+     "name": "Lying Leg Curl (Machine)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 29.483539113316585
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 29.483539113316585
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 56.69911367945497
+      }
+     ],
+     "template_id": "B8127AD1"
+    },
+    {
+     "name": "Cycling",
+     "sets": [
+      {
+       "distance_m": 18186,
+       "duration_sec": 3600,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "D8F7F851"
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": 1080,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "527DA061"
+    }
+   ],
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-11-06#WORKOUT#d8d0ca72-4d35-47f3-84aa-6a25ff51c590",
+   "start_time": "2026-11-06T23:35:14+00:00"
+  },
+  {
+   "date": "2026-11-08",
+   "duration_sec": 9302,
+   "end_time": "2026-11-08T19:37:53+00:00",
+   "exercises": [
+    {
+     "name": "Shoulder Press (Dumbbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "warmup",
+       "weight_kg": 21.545663198192887
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 38.55539730202938
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 38.55539730202938
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 38.55539730202938
+      }
+     ],
+     "template_id": "878CD1D0"
+    },
+    {
+     "name": "Lateral Raise (Dumbbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 7.937875915123695
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 7.937875915123695
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 7.937875915123695
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 7.937875915123695
+      }
+     ],
+     "template_id": "422B08F1"
+    },
+    {
+     "name": "DB Rear Delt Rows",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 17.00973410383649
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 17.00973410383649
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 17.00973410383649
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 17.00973410383649
+      }
+     ],
+     "template_id": "6e1f6811-3457-40da-ab93-92de19b84707"
+    },
+    {
+     "name": "Preacher Curl (Barbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 13.607787283069193
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 13.607787283069193
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 13.607787283069193
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 13.607787283069193
+      }
+     ],
+     "template_id": "4F942934"
+    },
+    {
+     "name": "Lying Db Tricep Extension",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 11.339822735890994
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 11.339822735890994
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 11.339822735890994
+      }
+     ],
+     "template_id": "2affffa8-bd9f-4f27-bb8c-159c2875c4b1"
+    },
+    {
+     "name": "Farmers Walk",
+     "sets": [
+      {
+       "distance_m": 20,
+       "duration_sec": null,
+       "reps": null,
+       "type": "warmup",
+       "weight_kg": 29.483539113316585
+      },
+      {
+       "distance_m": 80,
+       "duration_sec": null,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": 29.483539113316585
+      },
+      {
+       "distance_m": 60,
+       "duration_sec": null,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": 29.483539113316585
+      },
+      {
+       "distance_m": 60,
+       "duration_sec": null,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": 29.483539113316585
+      }
+     ],
+     "template_id": "50C613D0"
+    },
+    {
+     "name": "Cycling",
+     "sets": [
+      {
+       "distance_m": 20117,
+       "duration_sec": 3600,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "D8F7F851"
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": 900,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "527DA061"
+    }
+   ],
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-11-08#WORKOUT#c488ddc7-8275-40a4-ac0d-712405bf188f",
+   "start_time": "2026-11-08T17:02:51+00:00"
+  },
+  {
+   "date": "2026-11-09",
+   "duration_sec": 8458,
+   "end_time": "2026-11-10T00:02:36+00:00",
+   "exercises": [
+    {
+     "name": "Incline Bench Press (Dumbbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "warmup",
+       "weight_kg": 21.545663198192887
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 38.55539730202938
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 38.55539730202938
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 38.55539730202938
+      }
+     ],
+     "template_id": "07B38369"
+    },
+    {
+     "name": "Dumbbell Row",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 43.091326396385774
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 43.091326396385774
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 43.091326396385774
+      }
+     ],
+     "template_id": "F1E57334"
+    },
+    {
+     "name": "Lat Pulldown (Cable)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 72.57486550970236
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 68.03893641534596
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 68.03893641534596
+      }
+     ],
+     "template_id": "6A6C31A5"
+    },
+    {
+     "name": "Chest Fly (Machine)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "warmup",
+       "weight_kg": 49.895220037920375
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 54.43114913227677
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 65.77097186816776
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 65.77097186816776
+      }
+     ],
+     "template_id": "78683336"
+    },
+    {
+     "name": "Chest Supported Reverse Fly (Dumbbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "warmup",
+       "weight_kg": 4.535929094356398
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 6.8038936415345965
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 6.8038936415345965
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 6.8038936415345965
+      }
+     ],
+     "template_id": "B582299E"
+    },
+    {
+     "name": "Triceps Kickback (Dumbbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 11.339822735890994
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 11.339822735890994
+      }
+     ],
+     "template_id": "6127A3AD"
+    },
+    {
+     "name": "Spider Curl",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 9.071858188712795
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 9.071858188712795
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 9.071858188712795
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 9.071858188712795
+      }
+     ],
+     "template_id": "610e3cbe-3eca-4651-9a9f-85761c9afe7c"
+    },
+    {
+     "name": "Treadmill",
+     "sets": [
+      {
+       "distance_m": 3862,
+       "duration_sec": 2700,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "243710DE"
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": 720,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "527DA061"
+    }
+   ],
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-11-09#WORKOUT#3dd294a4-5d73-4543-8b48-3eb0d4bf873e",
+   "start_time": "2026-11-09T21:41:38+00:00"
+  },
+  {
+   "date": "2026-11-10",
+   "duration_sec": 7301,
+   "end_time": "2026-11-11T03:01:30+00:00",
+   "exercises": [
+    {
+     "name": "Romanian Deadlift (Barbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "warmup",
+       "weight_kg": 43.091326396385774
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "warmup",
+       "weight_kg": 61.235042773811365
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 3,
+       "type": "warmup",
+       "weight_kg": 83.91468824559335
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 102.05840462301894
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 102.05840462301894
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 102.05840462301894
+      }
+     ],
+     "template_id": "2B4B7310"
+    },
+    {
+     "name": "Clean",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 1,
+       "type": "normal",
+       "weight_kg": 61.235042773811365
+      }
+     ],
+     "template_id": "ABB00838"
+    },
+    {
+     "name": "Squat (Barbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 5,
+       "type": "warmup",
+       "weight_kg": 70.30690096252415
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 92.98654643430615
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 92.98654643430615
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 8,
+       "type": "normal",
+       "weight_kg": 92.98654643430615
+      }
+     ],
+     "template_id": "D04AC939"
+    },
+    {
+     "name": "Standing Calf Raise (Barbell)",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 92.98654643430615
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 92.98654643430615
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 92.98654643430615
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 12,
+       "type": "normal",
+       "weight_kg": 92.98654643430615
+      }
+     ],
+     "template_id": "E53CCBE5"
+    },
+    {
+     "name": "Torso Rotation",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "warmup",
+       "weight_kg": 58.96707822663317
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 68.03893641534596
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 68.03893641534596
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 68.03893641534596
+      },
+      {
+       "distance_m": null,
+       "duration_sec": null,
+       "reps": 10,
+       "type": "normal",
+       "weight_kg": 68.03893641534596
+      }
+     ],
+     "template_id": "FBB62888"
+    },
+    {
+     "name": "Cycling",
+     "sets": [
+      {
+       "distance_m": 12151,
+       "duration_sec": 2400,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "D8F7F851"
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "distance_m": null,
+       "duration_sec": 720,
+       "reps": null,
+       "type": "normal",
+       "weight_kg": null
+      }
+     ],
+     "template_id": "527DA061"
+    }
+   ],
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-11-10#WORKOUT#2b2d6415-f364-4e6c-bf08-85d89afb19ed",
+   "start_time": "2026-11-11T00:59:49+00:00"
+  }
+ ],
+ "strava": [
+  {
+   "activities": [],
+   "date": "2026-10-20",
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-10-20",
+   "total_distance_miles": 0
+  },
+  {
+   "activities": [
+    {
+     "average_heartrate": 119.2,
+     "device_name": "Hevy",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 9113,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 153,
+     "moving_time_seconds": 9105,
+     "sport_type": "WeightTraining",
+     "start_date": "2026-10-21T23:38:08Z",
+     "start_date_local": "2026-10-21T16:38:08Z",
+     "strava_id": "20682793060",
+     "total_elevation_gain_feet": null,
+     "type": "WeightTraining",
+     "zone1_seconds": 5690,
+     "zone2_seconds": 3415,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    },
+    {
+     "average_heartrate": 128.1,
+     "device_name": "WHOOP",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 2403,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 143,
+     "moving_time_seconds": 2403,
+     "sport_type": "Ride",
+     "start_date": "2026-10-22T01:16:50Z",
+     "start_date_local": "2026-10-21T18:16:50Z",
+     "strava_id": "20682727582",
+     "total_elevation_gain_feet": null,
+     "type": "Ride",
+     "zone1_seconds": 0,
+     "zone2_seconds": 2403,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    }
+   ],
+   "date": "2026-10-21",
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-10-21",
+   "total_distance_miles": 0
+  },
+  {
+   "activities": [
+    {
+     "average_heartrate": 117.5,
+     "device_name": "WHOOP",
+     "distance_meters": 8401.6,
+     "distance_miles": 5.22,
+     "elapsed_time_seconds": 6120,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 164,
+     "moving_time_seconds": 6009,
+     "sport_type": "Walk",
+     "start_date": "2026-10-22T23:54:09Z",
+     "start_date_local": "2026-10-22T16:54:09Z",
+     "strava_id": "20695623565",
+     "total_elevation_gain_feet": 305.4,
+     "type": "Walk",
+     "zone1_seconds": 5413,
+     "zone2_seconds": 536,
+     "zone3_seconds": 60,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    }
+   ],
+   "date": "2026-10-22",
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-10-22",
+   "total_distance_miles": 5.22
+  },
+  {
+   "activities": [
+    {
+     "average_heartrate": 107.2,
+     "device_name": "Hevy",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 8731,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 149,
+     "moving_time_seconds": 8722,
+     "sport_type": "WeightTraining",
+     "start_date": "2026-10-23T23:04:27Z",
+     "start_date_local": "2026-10-23T16:04:27Z",
+     "strava_id": "20706903794",
+     "total_elevation_gain_feet": null,
+     "type": "WeightTraining",
+     "zone1_seconds": 7797,
+     "zone2_seconds": 925,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    },
+    {
+     "average_heartrate": 108.1,
+     "device_name": "WHOOP",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 2279,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 157,
+     "moving_time_seconds": 2279,
+     "sport_type": "WeightTraining",
+     "start_date": "2026-10-23T23:12:00Z",
+     "start_date_local": "2026-10-23T16:12:00Z",
+     "strava_id": "20706297721",
+     "total_elevation_gain_feet": null,
+     "type": "WeightTraining",
+     "zone1_seconds": 1926,
+     "zone2_seconds": 353,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    },
+    {
+     "average_heartrate": 116.5,
+     "device_name": "WHOOP",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 2704,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 127,
+     "moving_time_seconds": 2704,
+     "sport_type": "Ride",
+     "start_date": "2026-10-24T00:22:13Z",
+     "start_date_local": "2026-10-23T17:22:13Z",
+     "strava_id": "20706791402",
+     "total_elevation_gain_feet": null,
+     "type": "Ride",
+     "zone1_seconds": 1054,
+     "zone2_seconds": 1650,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    }
+   ],
+   "date": "2026-10-23",
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-10-23",
+   "total_distance_miles": 0
+  },
+  {
+   "activities": [
+    {
+     "average_heartrate": 109.5,
+     "device_name": "Apple Watch Ultra 4",
+     "distance_meters": 17510.1,
+     "distance_miles": 10.88,
+     "elapsed_time_seconds": 17917,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 157,
+     "moving_time_seconds": 12970,
+     "sport_type": "Walk",
+     "start_date": "2026-10-24T16:26:04Z",
+     "start_date_local": "2026-10-24T09:26:04Z",
+     "strava_id": "20718558173",
+     "total_elevation_gain_feet": 902.2,
+     "type": "Walk",
+     "zone1_seconds": 11663,
+     "zone2_seconds": 1307,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    }
+   ],
+   "date": "2026-10-24",
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-10-24",
+   "total_distance_miles": 10.88
+  },
+  {
+   "activities": [
+    {
+     "average_heartrate": 101.7,
+     "device_name": "Hevy",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 9778,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 129,
+     "moving_time_seconds": 9769,
+     "sport_type": "WeightTraining",
+     "start_date": "2026-10-25T16:41:58Z",
+     "start_date_local": "2026-10-25T09:41:58Z",
+     "strava_id": "20730246841",
+     "total_elevation_gain_feet": null,
+     "type": "WeightTraining",
+     "zone1_seconds": 9660,
+     "zone2_seconds": 109,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    },
+    {
+     "average_heartrate": 101.4,
+     "device_name": "WHOOP",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 1019,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 124,
+     "moving_time_seconds": 1019,
+     "sport_type": "WeightTraining",
+     "start_date": "2026-10-25T16:59:00Z",
+     "start_date_local": "2026-10-25T09:59:00Z",
+     "strava_id": "20729313880",
+     "total_elevation_gain_feet": null,
+     "type": "WeightTraining",
+     "zone1_seconds": 1019,
+     "zone2_seconds": 0,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    },
+    {
+     "average_heartrate": 110.3,
+     "device_name": "WHOOP",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 3604,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 127,
+     "moving_time_seconds": 3604,
+     "sport_type": "Ride",
+     "start_date": "2026-10-25T18:01:17Z",
+     "start_date_local": "2026-10-25T11:01:17Z",
+     "strava_id": "20730069804",
+     "total_elevation_gain_feet": null,
+     "type": "Ride",
+     "zone1_seconds": 3131,
+     "zone2_seconds": 473,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    },
+    {
+     "average_heartrate": 78.4,
+     "device_name": "WHOOP",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 1394,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 128,
+     "moving_time_seconds": 1394,
+     "sport_type": "WeightTraining",
+     "start_date": "2026-10-25T19:02:57Z",
+     "start_date_local": "2026-10-25T12:02:57Z",
+     "strava_id": "20730346368",
+     "total_elevation_gain_feet": null,
+     "type": "WeightTraining",
+     "zone1_seconds": 1383,
+     "zone2_seconds": 11,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    }
+   ],
+   "date": "2026-10-25",
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-10-25",
+   "total_distance_miles": 0
+  },
+  {
+   "activities": [
+    {
+     "average_heartrate": 120.5,
+     "device_name": "Hevy",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 8018,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 161,
+     "moving_time_seconds": 7986,
+     "sport_type": "WeightTraining",
+     "start_date": "2026-10-26T23:21:45Z",
+     "start_date_local": "2026-10-26T16:21:45Z",
+     "strava_id": "20745245769",
+     "total_elevation_gain_feet": null,
+     "type": "WeightTraining",
+     "zone1_seconds": 5938,
+     "zone2_seconds": 1975,
+     "zone3_seconds": 73,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    },
+    {
+     "average_heartrate": 119.9,
+     "device_name": "Apple Watch Ultra 4",
+     "distance_meters": 3952.9,
+     "distance_miles": 2.46,
+     "elapsed_time_seconds": 2712,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 127,
+     "moving_time_seconds": 2712,
+     "sport_type": "Walk",
+     "start_date": "2026-10-27T00:35:34Z",
+     "start_date_local": "2026-10-26T17:35:34Z",
+     "strava_id": "20745144975",
+     "total_elevation_gain_feet": null,
+     "type": "Walk",
+     "zone1_seconds": 2712,
+     "zone2_seconds": 0,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    }
+   ],
+   "date": "2026-10-26",
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-10-26",
+   "total_distance_miles": 2.46
+  },
+  {
+   "activities": [
+    {
+     "average_heartrate": 111.1,
+     "device_name": "Apple Watch Ultra 4",
+     "distance_meters": 8694.9,
+     "distance_miles": 5.4,
+     "elapsed_time_seconds": 6473,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 167,
+     "moving_time_seconds": 6473,
+     "sport_type": "Walk",
+     "start_date": "2026-10-27T23:30:31Z",
+     "start_date_local": "2026-10-27T16:30:31Z",
+     "strava_id": "20759621874",
+     "total_elevation_gain_feet": 390.4,
+     "type": "Walk",
+     "zone1_seconds": 5822,
+     "zone2_seconds": 570,
+     "zone3_seconds": 81,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    }
+   ],
+   "date": "2026-10-27",
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-10-27",
+   "total_distance_miles": 5.4
+  },
+  {
+   "activities": [
+    {
+     "average_heartrate": null,
+     "device_name": "Hevy",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 5633,
+     "has_heartrate": false,
+     "kilojoules": null,
+     "max_heartrate": null,
+     "moving_time_seconds": 5633,
+     "sport_type": "WeightTraining",
+     "start_date": "2026-10-29T00:47:03Z",
+     "start_date_local": "2026-10-28T17:47:03Z",
+     "strava_id": "20773317048",
+     "total_elevation_gain_feet": null,
+     "type": "WeightTraining"
+    },
+    {
+     "average_heartrate": 126.3,
+     "device_name": "Apple Watch Ultra 4",
+     "distance_meters": 2538,
+     "distance_miles": 1.58,
+     "elapsed_time_seconds": 1804,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 136,
+     "moving_time_seconds": 1804,
+     "sport_type": "Walk",
+     "start_date": "2026-10-29T01:50:23Z",
+     "start_date_local": "2026-10-28T18:50:23Z",
+     "strava_id": "20773314257",
+     "total_elevation_gain_feet": null,
+     "type": "Walk",
+     "zone1_seconds": 1217,
+     "zone2_seconds": 587,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    }
+   ],
+   "date": "2026-10-28",
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-10-28",
+   "total_distance_miles": 1.58
+  },
+  {
+   "activities": [
+    {
+     "average_heartrate": 112,
+     "device_name": "Hevy",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 8575,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 153,
+     "moving_time_seconds": 8532,
+     "sport_type": "WeightTraining",
+     "start_date": "2026-10-29T23:14:41Z",
+     "start_date_local": "2026-10-29T16:14:41Z",
+     "strava_id": "20786026725",
+     "total_elevation_gain_feet": null,
+     "type": "WeightTraining",
+     "zone1_seconds": 7582,
+     "zone2_seconds": 950,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    },
+    {
+     "average_heartrate": 124.3,
+     "device_name": "Apple Watch Ultra 4",
+     "distance_meters": 3788.9,
+     "distance_miles": 2.35,
+     "elapsed_time_seconds": 2708,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 132,
+     "moving_time_seconds": 2708,
+     "sport_type": "Walk",
+     "start_date": "2026-10-30T00:39:41Z",
+     "start_date_local": "2026-10-29T17:39:41Z",
+     "strava_id": "20786490926",
+     "total_elevation_gain_feet": null,
+     "type": "Walk",
+     "zone1_seconds": 2391,
+     "zone2_seconds": 317,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    }
+   ],
+   "date": "2026-10-29",
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-10-29",
+   "total_distance_miles": 2.35
+  },
+  {
+   "activities": [
+    {
+     "average_heartrate": 112.2,
+     "device_name": "Hevy",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 9436,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 151,
+     "moving_time_seconds": 9427,
+     "sport_type": "WeightTraining",
+     "start_date": "2026-10-30T23:06:42Z",
+     "start_date_local": "2026-10-30T16:06:42Z",
+     "strava_id": "20797976560",
+     "total_elevation_gain_feet": null,
+     "type": "WeightTraining",
+     "zone1_seconds": 8226,
+     "zone2_seconds": 1201,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    },
+    {
+     "average_heartrate": 117.7,
+     "device_name": "Apple Watch Ultra 4",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 3664,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 131,
+     "moving_time_seconds": 3664,
+     "sport_type": "Ride",
+     "start_date": "2026-10-31T00:25:51Z",
+     "start_date_local": "2026-10-30T17:25:51Z",
+     "strava_id": "20798915864",
+     "total_elevation_gain_feet": null,
+     "type": "Ride",
+     "zone1_seconds": 970,
+     "zone2_seconds": 2694,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    }
+   ],
+   "date": "2026-10-30",
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-10-30",
+   "total_distance_miles": 0
+  },
+  {
+   "activities": [
+    {
+     "average_heartrate": 110.2,
+     "device_name": "Apple Watch Ultra 4",
+     "distance_meters": 18288.1,
+     "distance_miles": 11.36,
+     "elapsed_time_seconds": 16200,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 156,
+     "moving_time_seconds": 13138,
+     "sport_type": "Walk",
+     "start_date": "2026-10-31T17:05:20Z",
+     "start_date_local": "2026-10-31T10:05:20Z",
+     "strava_id": "20809519294",
+     "total_elevation_gain_feet": 971.8,
+     "type": "Walk",
+     "zone1_seconds": 11734,
+     "zone2_seconds": 1404,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    }
+   ],
+   "date": "2026-10-31",
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-10-31",
+   "total_distance_miles": 11.36
+  },
+  {
+   "activities": [
+    {
+     "average_heartrate": 100.2,
+     "device_name": "Hevy",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 9658,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 144,
+     "moving_time_seconds": 9656,
+     "sport_type": "WeightTraining",
+     "start_date": "2026-11-01T18:46:49Z",
+     "start_date_local": "2026-11-01T10:46:49Z",
+     "strava_id": "20822719660",
+     "total_elevation_gain_feet": null,
+     "type": "WeightTraining",
+     "zone1_seconds": 9563,
+     "zone2_seconds": 93,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    },
+    {
+     "average_heartrate": 112.7,
+     "device_name": "Apple Watch Ultra 4",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 3606,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 122,
+     "moving_time_seconds": 3606,
+     "sport_type": "Ride",
+     "start_date": "2026-11-01T20:06:02Z",
+     "start_date_local": "2026-11-01T12:06:02Z",
+     "strava_id": "20822563002",
+     "total_elevation_gain_feet": null,
+     "type": "Ride",
+     "zone1_seconds": 2671,
+     "zone2_seconds": 935,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    }
+   ],
+   "date": "2026-11-01",
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-11-01",
+   "total_distance_miles": 0
+  },
+  {
+   "activities": [
+    {
+     "average_heartrate": 123.6,
+     "device_name": "Hevy",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 7711,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 163,
+     "moving_time_seconds": 7651,
+     "sport_type": "WeightTraining",
+     "start_date": "2026-11-03T00:13:41Z",
+     "start_date_local": "2026-11-02T16:13:41Z",
+     "strava_id": "20837308464",
+     "total_elevation_gain_feet": null,
+     "type": "WeightTraining",
+     "zone1_seconds": 3771,
+     "zone2_seconds": 3846,
+     "zone3_seconds": 34,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    },
+    {
+     "average_heartrate": 131,
+     "device_name": "Apple Watch Ultra 4",
+     "distance_meters": 3771.6,
+     "distance_miles": 2.34,
+     "elapsed_time_seconds": 2708,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 149,
+     "moving_time_seconds": 2708,
+     "sport_type": "Walk",
+     "start_date": "2026-11-03T01:22:47Z",
+     "start_date_local": "2026-11-02T17:22:47Z",
+     "strava_id": "20837224609",
+     "total_elevation_gain_feet": null,
+     "type": "Walk",
+     "zone1_seconds": 332,
+     "zone2_seconds": 2376,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    }
+   ],
+   "date": "2026-11-02",
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-11-02",
+   "total_distance_miles": 2.34
+  },
+  {
+   "activities": [
+    {
+     "average_heartrate": 115.9,
+     "device_name": "Hevy",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 8372,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 155,
+     "moving_time_seconds": 8351,
+     "sport_type": "WeightTraining",
+     "start_date": "2026-11-04T00:44:00Z",
+     "start_date_local": "2026-11-03T16:44:00Z",
+     "strava_id": "20851549241",
+     "total_elevation_gain_feet": null,
+     "type": "WeightTraining",
+     "zone1_seconds": 6863,
+     "zone2_seconds": 1488,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    },
+    {
+     "average_heartrate": 123.5,
+     "device_name": "Apple Watch Ultra 4",
+     "distance_meters": 5353.1,
+     "distance_miles": 3.33,
+     "elapsed_time_seconds": 3610,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 132,
+     "moving_time_seconds": 3610,
+     "sport_type": "Walk",
+     "start_date": "2026-11-04T01:49:46Z",
+     "start_date_local": "2026-11-03T17:49:46Z",
+     "strava_id": "20851945182",
+     "total_elevation_gain_feet": null,
+     "type": "Walk",
+     "zone1_seconds": 3199,
+     "zone2_seconds": 411,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    }
+   ],
+   "date": "2026-11-03",
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-11-03",
+   "total_distance_miles": 3.33
+  },
+  {
+   "activities": [
+    {
+     "average_heartrate": 106.2,
+     "device_name": "Apple Watch Ultra 4",
+     "distance_meters": 8775.8,
+     "distance_miles": 5.45,
+     "elapsed_time_seconds": 6590,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 165,
+     "moving_time_seconds": 6561,
+     "sport_type": "Walk",
+     "start_date": "2026-11-05T00:15:06Z",
+     "start_date_local": "2026-11-04T16:15:06Z",
+     "strava_id": "20865362808",
+     "total_elevation_gain_feet": 403.5,
+     "type": "Walk",
+     "zone1_seconds": 5938,
+     "zone2_seconds": 533,
+     "zone3_seconds": 90,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    }
+   ],
+   "date": "2026-11-04",
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-11-04",
+   "total_distance_miles": 5.45
+  },
+  {
+   "activities": [
+    {
+     "average_heartrate": 108.1,
+     "device_name": "Hevy",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 9377,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 147,
+     "moving_time_seconds": 9366,
+     "sport_type": "WeightTraining",
+     "start_date": "2026-11-06T00:23:00Z",
+     "start_date_local": "2026-11-05T16:23:00Z",
+     "strava_id": "20877966773",
+     "total_elevation_gain_feet": null,
+     "type": "WeightTraining",
+     "zone1_seconds": 6320,
+     "zone2_seconds": 3046,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    },
+    {
+     "average_heartrate": 129.6,
+     "device_name": "Apple Watch Ultra 4",
+     "distance_meters": 3948.2,
+     "distance_miles": 2.45,
+     "elapsed_time_seconds": 2812,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 138,
+     "moving_time_seconds": 2812,
+     "sport_type": "Walk",
+     "start_date": "2026-11-06T01:56:38Z",
+     "start_date_local": "2026-11-05T17:56:38Z",
+     "strava_id": "20877893510",
+     "total_elevation_gain_feet": null,
+     "type": "Walk",
+     "zone1_seconds": 357,
+     "zone2_seconds": 2455,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    }
+   ],
+   "date": "2026-11-05",
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-11-05",
+   "total_distance_miles": 2.45
+  },
+  {
+   "activities": [
+    {
+     "average_heartrate": 112.5,
+     "device_name": "Hevy",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 10097,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 153,
+     "moving_time_seconds": 10083,
+     "sport_type": "WeightTraining",
+     "start_date": "2026-11-06T23:35:14Z",
+     "start_date_local": "2026-11-06T15:35:14Z",
+     "strava_id": "20889512302",
+     "total_elevation_gain_feet": null,
+     "type": "WeightTraining",
+     "zone1_seconds": 8254,
+     "zone2_seconds": 1829,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    },
+    {
+     "average_heartrate": 121.6,
+     "device_name": "Apple Watch Ultra 4",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 3602,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 140,
+     "moving_time_seconds": 3602,
+     "sport_type": "Ride",
+     "start_date": "2026-11-07T01:02:21Z",
+     "start_date_local": "2026-11-06T17:02:21Z",
+     "strava_id": "20889395398",
+     "total_elevation_gain_feet": null,
+     "type": "Ride",
+     "zone1_seconds": 591,
+     "zone2_seconds": 3011,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    }
+   ],
+   "date": "2026-11-06",
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-11-06",
+   "total_distance_miles": 0
+  },
+  {
+   "activities": [
+    {
+     "average_heartrate": 63,
+     "device_name": "Apple Watch Ultra 4",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 67,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 74,
+     "moving_time_seconds": 67,
+     "sport_type": "Yoga",
+     "start_date": "2026-11-07T16:31:41Z",
+     "start_date_local": "2026-11-07T08:31:41Z",
+     "strava_id": "20897694006",
+     "total_elevation_gain_feet": null,
+     "type": "Yoga",
+     "zone1_seconds": 67,
+     "zone2_seconds": 0,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    },
+    {
+     "average_heartrate": 108.8,
+     "device_name": "Apple Watch Ultra 4",
+     "distance_meters": 17850.7,
+     "distance_miles": 11.09,
+     "elapsed_time_seconds": 17375,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 164,
+     "moving_time_seconds": 13117,
+     "sport_type": "Walk",
+     "start_date": "2026-11-07T17:33:41Z",
+     "start_date_local": "2026-11-07T09:33:41Z",
+     "strava_id": "20901403500",
+     "total_elevation_gain_feet": 731.6,
+     "type": "Walk",
+     "zone1_seconds": 12348,
+     "zone2_seconds": 651,
+     "zone3_seconds": 118,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    }
+   ],
+   "date": "2026-11-07",
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-11-07",
+   "total_distance_miles": 11.09
+  },
+  {
+   "activities": [
+    {
+     "average_heartrate": null,
+     "device_name": "Hevy",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 9302,
+     "has_heartrate": false,
+     "kilojoules": null,
+     "max_heartrate": null,
+     "moving_time_seconds": 9302,
+     "sport_type": "WeightTraining",
+     "start_date": "2026-11-08T17:02:51Z",
+     "start_date_local": "2026-11-08T09:02:51Z",
+     "strava_id": "20913246294",
+     "total_elevation_gain_feet": null,
+     "type": "WeightTraining"
+    },
+    {
+     "average_heartrate": 116.4,
+     "device_name": "Apple Watch Ultra 4",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 3604,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 129,
+     "moving_time_seconds": 3604,
+     "sport_type": "Ride",
+     "start_date": "2026-11-08T18:39:08Z",
+     "start_date_local": "2026-11-08T10:39:08Z",
+     "strava_id": "20915208679",
+     "total_elevation_gain_feet": null,
+     "type": "Ride",
+     "zone1_seconds": 1529,
+     "zone2_seconds": 2075,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    }
+   ],
+   "date": "2026-11-08",
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-11-08",
+   "total_distance_miles": 0
+  },
+  {
+   "activities": [
+    {
+     "average_heartrate": 119,
+     "device_name": "Hevy",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 8456,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 157,
+     "moving_time_seconds": 8442,
+     "sport_type": "WeightTraining",
+     "start_date": "2026-11-09T21:41:38Z",
+     "start_date_local": "2026-11-09T13:41:38Z",
+     "strava_id": "20927006843",
+     "total_elevation_gain_feet": null,
+     "type": "WeightTraining",
+     "zone1_seconds": 5001,
+     "zone2_seconds": 3441,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    },
+    {
+     "average_heartrate": 133.5,
+     "device_name": "Apple Watch Ultra 4",
+     "distance_meters": 3877.9,
+     "distance_miles": 2.41,
+     "elapsed_time_seconds": 2699,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 141,
+     "moving_time_seconds": 2699,
+     "sport_type": "Walk",
+     "start_date": "2026-11-09T23:02:41Z",
+     "start_date_local": "2026-11-09T15:02:41Z",
+     "strava_id": "20927134348",
+     "total_elevation_gain_feet": null,
+     "type": "Walk",
+     "zone1_seconds": 325,
+     "zone2_seconds": 2374,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    }
+   ],
+   "date": "2026-11-09",
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-11-09",
+   "total_distance_miles": 2.41
+  },
+  {
+   "activities": [
+    {
+     "average_heartrate": 111.5,
+     "device_name": "Hevy",
+     "distance_meters": 0,
+     "distance_miles": null,
+     "elapsed_time_seconds": 7301,
+     "has_heartrate": true,
+     "kilojoules": null,
+     "max_heartrate": 154,
+     "moving_time_seconds": 7290,
+     "sport_type": "WeightTraining",
+     "start_date": "2026-11-11T00:59:49Z",
+     "start_date_local": "2026-11-10T16:59:49Z",
+     "strava_id": "20941629959",
+     "total_elevation_gain_feet": null,
+     "type": "WeightTraining",
+     "zone1_seconds": 6583,
+     "zone2_seconds": 707,
+     "zone3_seconds": 0,
+     "zone4_seconds": 0,
+     "zone5_seconds": 0
+    }
+   ],
+   "date": "2026-11-10",
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-11-10",
+   "total_distance_miles": 0
+  }
+ ]
+}

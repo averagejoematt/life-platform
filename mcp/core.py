@@ -3,6 +3,7 @@ Core data access: profile, caching, DynamoDB queries, serialisation.
 """
 
 import concurrent.futures
+import contextvars
 import json
 import time
 import uuid
@@ -370,7 +371,18 @@ def query_source(source, start_date, end_date, lean=False, include_pilot=None):
         end_date = min(end_date, pacific_today())
         if start_date > end_date:
             return []  # DynamoDB rejects a BETWEEN whose lower bound exceeds the upper
+    # #5813: inside one plan_next_session call the same (source, window) is read once and each caller gets its own copy;
+    # outside a plan call (every other tool, the crons) `memo_get` always misses and `memo_put` stores nothing. The key is
+    # the READ, not the call's spelling: the RESOLVED phase decision (an explicit bool and a derived one that resolve the
+    # same differ only in the tombstone drop, so `derived` is in the key), and never `lean` — a lean read is the same
+    # query with `_LEAN_STRIP` removed afterwards, so the memo holds the full rows and a lean caller strips its own copy.
+    from mcp import plan_call_scope
+
     include_pilot, derived = _resolve_include_pilot(source, include_pilot)
+    memo_key = (source, start_date, end_date, include_pilot, derived)
+    hit = plan_call_scope.memo_get(plan_call_scope.SOURCE_RANGE, memo_key)
+    if hit is not plan_call_scope.MISS:
+        return _lean(hit) if lean else hit
     pk = f"{USER_PREFIX}{source}"
     kwargs = _apply_phase_filter(
         {"KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}~")},
@@ -388,9 +400,13 @@ def query_source(source, start_date, end_date, lean=False, include_pilot=None):
     if derived:
         items = [i for i in items if not i.get("tombstone")]
     raw = strava_read_seam(source, decimal_to_float(items))  # #4419: every MCP history read of strava is deduped here
-    if lean:
-        return [{k: v for k, v in item.items() if k not in _LEAN_STRIP} for item in raw]
-    return raw
+    plan_call_scope.memo_put(plan_call_scope.SOURCE_RANGE, memo_key, raw)
+    return _lean(raw) if lean else raw
+
+
+def _lean(rows):
+    """`rows` without the `_LEAN_STRIP` fields — what a `lean=True` read returns."""
+    return [{k: v for k, v in item.items() if k not in _LEAN_STRIP} for item in rows]
 
 
 def parallel_query_sources(sources, start_date, end_date, lean=False, include_pilot=None):
@@ -402,7 +418,12 @@ def parallel_query_sources(sources, start_date, end_date, lean=False, include_pi
     """
     results = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(sources), 5)) as pool:
-        future_to_src = {pool.submit(query_source, src, start_date, end_date, lean, include_pilot): src for src in sources}
+        # #5813: each worker runs in a copy of the caller's context, so a plan call's per-call read memo (a ContextVar,
+        # which a bare pool thread does not inherit) covers the fan-out too; outside a plan call the copy holds no memo.
+        future_to_src = {
+            pool.submit(contextvars.copy_context().run, query_source, src, start_date, end_date, lean, include_pilot): src
+            for src in sources
+        }
         for future in concurrent.futures.as_completed(future_to_src):
             src = future_to_src[future]
             try:

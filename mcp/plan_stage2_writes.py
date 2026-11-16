@@ -93,16 +93,23 @@ def _write(kind: str, item: dict[str, Any], *, condition: str | None = None) -> 
     return row
 
 
-def dry_run_result(record: dict[str, Any], ir: Any, would: list[dict[str, Any]], today: str, notes_preview: str) -> dict[str, Any]:
-    """The stage-2 result of a dry run: the full critics record, `written: False`, and every put
-    the real run makes under `would_write` — routine version + pointer + index, the thread row,
-    and any ledger rows the override path recorded. Nothing here touches DynamoDB, S3 or Hevy."""
-    from coach import critics
+def version_puts(ir: Any) -> list[dict[str, Any]]:
+    """The three puts `routine_repo.put_versioned` makes for `ir` as it stands — version, pointer, index — unwritten."""
     from training import routine_repo
 
     kinds = ("routine_version", "routine_current", "routine_index")
     puts = [_write(k, it) for k, it in zip(kinds, routine_repo.versioned_items(ir))]
     puts[0]["condition"] = "attribute_not_exists(pk) AND attribute_not_exists(sk)"
+    return puts
+
+
+def dry_run_result(record: dict[str, Any], ir: Any, would: list[dict[str, Any]], today: str, notes_preview: str) -> dict[str, Any]:
+    """The stage-2 result of a dry run: the full critics record, `written: False`, and every put
+    the real run makes under `would_write` — routine version + pointer + index, the thread row,
+    and any ledger rows the override path recorded. Nothing here touches DynamoDB, S3 or Hevy."""
+    from coach import critics
+
+    puts = version_puts(ir)
     thread = write_thread(ir, today, put=False)
     if thread.get("item") is not None:
         puts.append(_write("coach_thread", thread["item"]))

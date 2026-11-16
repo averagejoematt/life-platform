@@ -32,10 +32,13 @@ import pathlib
 import re
 
 import pytest
+import sealed_prereg  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 GOALS = ROOT / "config" / "user_goals.json"
-SEALED = ROOT / "deploy" / "generated" / "genesis_preregistration.json"
+# The sealed file is private since 2026-11-11 (owner ruling item 3): the private original when present (tests/sealed_prereg.py), else
+# the old path, which no longer exists, so a test that reads it skips (sealed_prereg.require_sealed_path()).
+SEALED = sealed_prereg.sealed_path() or (ROOT / "deploy" / "generated" / "genesis_preregistration.json")
 
 # Surfaces that either feed a prompt or generate a public page. A plan figure
 # appearing here must be the current cycle's.
@@ -134,6 +137,7 @@ def test_sealed_prereg_agrees_with_the_plan_root():
     edit to the sealed file — and never a test that demands the LLM prose
     happen to mention a number (the #2959/#3003/#3199 phrase-match class).
     """
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     problems = _sealed_disagreements(SEALED.read_text(encoding="utf-8"), _canonical_protein_floor(), _canonical_kcal_target())
     assert not problems, "; ".join(problems)
 
@@ -141,6 +145,7 @@ def test_sealed_prereg_agrees_with_the_plan_root():
 def test_sealed_prereg_guard_actually_fails_on_a_contradiction():
     """Positive control: the same check, fed a sealed text that carries the dead
     190 g figure (#1898's exact defect) and a moved calorie threshold, must red."""
+    sealed_prereg.require_sealed_path()  # the sealed original is private since 2026-11-11
     floor, kcal = _canonical_protein_floor(), _canonical_kcal_target()
     sealed = json.loads(SEALED.read_text(encoding="utf-8"))
     sealed["coaches"] = {"planted": {"predictions": [{"claim_natural": "Hit the protein target (190g) every day."}]}}

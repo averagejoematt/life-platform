@@ -47,9 +47,9 @@ SEEDED_VIOLATIONS = [
     ("age_turns", "before he turns 44 I want the RHR under 60"),
     ("age_im", "he told me: I'm 43 and tired of restarting"),
     # genotype strings (PRE-13 / DATA_GOVERNANCE)
-    ("genotype_rsid", "the rs429358 variant explains the lipid response"),
+    ("genotype_rsid", "the rs0000000 variant explains the lipid response"),
     ("genotype_gene", "given his APOE status we keep saturated fat conservative"),
-    ("genotype_allele_pair", "as an e3/e4 carrier the target stays aggressive"),
+    ("genotype_allele_pair", "a synthetic e2/e2 allele pair sets the target"),
     ("genotype_vocab", "he is heterozygous for the relevant polymorphism"),
     # real-person third parties (privacy_guard banned-name sets)
     ("real_name_full", "as Peter Attia says, zone 2 is the base of the pyramid"),
@@ -292,6 +292,58 @@ def test_relationship_entry_carries_a_record_id():
     assert entry["record_id"] == "RELATIONSHIP#state"
 
 
+# #5611 F4 (owner ruling 2026-11-15): the RELATIONSHIP#state free text is not on the public
+# projection. A provenance stamp that would make the row eligible must not publish it — the
+# field is never read, so there is nothing for a stamp to unlock. Synthetic text only.
+_SYNTHETIC_REL_NOTE_5611 = "SYNTHETIC-5611 relationship note, placeholder only"
+
+
+def _eligible_stamp_5611():
+    from common import narrative_provenance as NP
+
+    stamp = NP.stamp(["strava"], producer="test_5611")
+    assert NP.is_publishable({NP.PROVENANCE_KEY: stamp}), "the control must use a stamp the chokepoint would publish"
+    return {NP.PROVENANCE_KEY: stamp}
+
+
+def test_relationship_entry_never_projects_context_summary_even_when_stamped_eligible_5611():
+    row = {
+        "sk": "RELATIONSHIP#state",
+        "journey_phase": "working_rapport",
+        "rapport_level": 0.4231,
+        "interaction_count": 9,
+        "tenure_days": 34,
+        "first_interaction_date": "2026-06-22",
+        "last_interaction_date": "2026-07-24",
+        "updated_at": "2026-07-25T04:00:00+00:00",
+        "context_summary": _SYNTHETIC_REL_NOTE_5611,
+    } | _eligible_stamp_5611()
+    entry, status = cd.relationship_entry(row)
+    assert status == cd.OK
+    assert "context_summary" not in entry
+    assert _SYNTHETIC_REL_NOTE_5611 not in json.dumps(entry)
+    # Owner kept the structured arc public, unchanged (rapport_level explicitly).
+    assert entry == {
+        "kind": "relationship",
+        "record_id": "RELATIONSHIP#state",
+        "date": "2026-07-25",
+        "journey_phase": "working_rapport",
+        "rapport_level": 0.423,
+        "interaction_count": 9,
+        "tenure_days": 34,
+        "first_interaction_date": "2026-06-22",
+        "last_interaction_date": "2026-07-24",
+    }
+
+
+def test_relationship_free_text_no_longer_gates_the_structured_arc_5611():
+    # The summary is not served, so its content cannot withhold the arc that IS served.
+    entry, status = cd.relationship_entry(
+        {"sk": "RELATIONSHIP#state", "updated_at": "2026-07-25T04:00:00+00:00", "context_summary": "reach me at someone@example.com"}
+    )
+    assert status == cd.OK and "context_summary" not in entry
+
+
 def test_docket_entry_takes_this_coachs_side_both_id_forms():
     row = {
         "sk": "OPEN#glucose|sleep#late-eating",
@@ -432,12 +484,13 @@ def _cond_parts(cond):
     return expr["values"][1], None
 
 
-def _seeded_table(corrections_rows=None, corrections_error=False, extra_commitments=None):
+def _seeded_table(corrections_rows=None, corrections_error=False, extra_commitments=None, relationship_extra=None):
     """`corrections_rows` overrides the default single commitment-retract ledger
     row (#1794/#1796 tests exercise other correction shapes); `corrections_error`
     makes the corrections-partition query raise, to pin the #1796 fail-closed path;
     `extra_commitments` appends rows (#1800's PII case) without disturbing the
-    counts every other test in this file asserts against the default seed."""
+    counts every other test in this file asserts against the default seed.
+    `relationship_extra` merges fields onto the RELATIONSHIP#state row (#5611 F4)."""
     coach_pk = "COACH#sleep_coach"
     if corrections_rows is None:
         corrections_rows = [_ledger_row("COMMITMENT#commit_20260720_stale", "retract")]
@@ -521,6 +574,7 @@ def _seeded_table(corrections_rows=None, corrections_error=False, extra_commitme
                     "updated_at": "2026-07-25T04:00:00+00:00",
                     "context_summary": "steady adherence, one commitment revisited",
                 }
+                | dict(relationship_extra or {})
             }
         return {}
 
@@ -545,6 +599,16 @@ def test_site_dossier_renders_verbatim_with_dates_and_evidence(monkeypatch):
     assert d["relationship"]["journey_phase"] == "working_rapport"
     assert d["docket_positions"][0]["my_claim"] == "meal timing is noise next to screens"
     assert d["docket_positions"][0]["date"] == "2026-07-20"
+
+
+def test_site_dossier_relationship_omits_context_summary_even_when_stamped_eligible_5611(monkeypatch):
+    d = _dossier_via_api(monkeypatch, relationship_extra={"context_summary": _SYNTHETIC_REL_NOTE_5611} | _eligible_stamp_5611())
+    rel = d["relationship"]
+    assert "context_summary" not in rel
+    assert _SYNTHETIC_REL_NOTE_5611 not in json.dumps(d)
+    assert (rel["journey_phase"], rel["rapport_level"], rel["interaction_count"], rel["tenure_days"]) == ("working_rapport", 0.41, 7, 30)
+    assert (rel["first_interaction_date"], rel["last_interaction_date"], rel["date"]) == ("2026-06-22", "2026-07-24", "2026-07-25")
+    assert (rel["record_id"], rel["kind"]) == ("RELATIONSHIP#state", "relationship")
 
 
 def test_site_dossier_withholds_seeded_violation_and_counts_it(monkeypatch):

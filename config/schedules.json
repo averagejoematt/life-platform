@@ -61,7 +61,7 @@
     "character-sheet-compute": {
       "function": "character-sheet-compute",
       "stack": "LifePlatformCompute",
-      "expression": "cron(30 9 * * ? *)",
+      "expression": "cron(50 9 * * ? *)",
       "facing": "internal",
       "purpose": "Character Sheet Compute Lambda — v1.1.0"
     },
@@ -99,6 +99,13 @@
       "expression": "cron(0 10 ? * SUN *)",
       "facing": "internal",
       "purpose": "Coach Intelligence: Weekly History Compressor"
+    },
+    "coach-history-summarizer#PublicBrief": {
+      "function": "coach-history-summarizer",
+      "stack": "LifePlatformCompute",
+      "expression": "cron(0 9 ? * MON *)",
+      "facing": "internal",
+      "purpose": "Owner ruling 2026-11-09 (third, E): the weekly public-safe coaching brief (coach.public_brief); dark until public_brief_policy.PUBLICATION_LIVE"
     },
     "coach-memoir": {
       "function": "coach-memoir",

@@ -15,6 +15,142 @@ export function dayInWords(iso, opts = {}) {
   return opts.weekday ? `${DAYS[dt.getUTCDay()]} ${core}` : core;
 }
 
+const ISO_DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const dayMs = (iso) => Date.parse(`${iso}T00:00:00Z`);
+
+/** Two days as one range in words: "4 to 10 November" (the year when {year:true}), "30 September to 6 October",
+ * "29 December 2026 to 4 January 2027"; {short:true} gives "4–10 Nov". null unless both are ISO days, in order. */
+export function rangeInWords(a, b, opts = {}) {
+  if (!ISO_DAY_RE.test(a || "") || !ISO_DAY_RE.test(b || "") || a > b) return null;
+  const [ya, ma] = a.split("-").map(Number);
+  const [yb, mb] = b.split("-").map(Number);
+  const da = Number(a.slice(8));
+  const db = Number(b.slice(8));
+  const month = (m) => (opts.short ? MONTHS[m - 1].slice(0, 3) : MONTHS[m - 1]);
+  const year = opts.year && !opts.short ? ` ${yb}` : "";
+  if (ya !== yb) return opts.short ? `${dayInWords(a, { short: true })} – ${dayInWords(b, { short: true })}` : `${dayInWords(a)} to ${dayInWords(b)}`;
+  if (a === b) return `${da} ${month(ma)}${year}`;
+  if (ma === mb) return opts.short ? `${da}–${db} ${month(mb)}` : `${da} to ${db} ${month(mb)}${year}`;
+  return opts.short ? `${da} ${month(ma)} – ${db} ${month(mb)}` : `${da} ${month(ma)} to ${db} ${month(mb)}${year}`;
+}
+
+/** A published chapter's covered days (`covers_start`..`covers_end`, its own "Day A to Day B" stats line) in words:
+ * "Days 60–66 · 4 to 10 November". The day numbers count from genesis, which is the chapter's own program-week start
+ * less 7·(week−1) (the exporter's explicit interval). null when the snapshot carries no covered days — the caller then
+ * shows the program week (`week_start`..`week_end`), never a span inferred from `date`. */
+export function chapterCovers(c, opts = {}) {
+  if (!c || !ISO_DAY_RE.test(c.covers_start || "") || !ISO_DAY_RE.test(c.covers_end || "")) return null;
+  const range = rangeInWords(c.covers_start, c.covers_end, opts);
+  if (!range) return null;
+  const genesis = ISO_DAY_RE.test(c.week_start || "") && Number.isInteger(c.week) && c.week >= 1 ? dayMs(c.week_start) - 7 * (c.week - 1) * 864e5 : null;
+  if (genesis == null) return range;
+  const n = (iso) => Math.round((dayMs(iso) - genesis) / 864e5) + 1;
+  const [a, b] = [n(c.covers_start), n(c.covers_end)];
+  if (a < 1) return range;
+  return `${a === b ? `Day ${a}` : `Days ${a}–${b}`} · ${range}`;
+}
+
+/** The days a chapter's week-scoped lists read: the covered days when served, else the program week. */
+export function chapterWindow(c) {
+  if (c && ISO_DAY_RE.test(c.covers_start || "") && ISO_DAY_RE.test(c.covers_end || "") && c.covers_start <= c.covers_end) return [c.covers_start, c.covers_end];
+  if (c && ISO_DAY_RE.test(c.week_start || "") && ISO_DAY_RE.test(c.week_end || "")) return [c.week_start, c.week_end];
+  return null;
+}
+
+/** When a published chapter was published, in words: "Published 13 November 2026" from the owner's approval day
+ * (`published_at`). When that is not served the chapter's `date` is a DATA date, so it is never called the publication:
+ * "Data through 10 November 2026" ({lower:true} for a mid-line form). null for an unpublished week. */
+export function chapterPublished(c, opts = {}) {
+  if (!c || c.status !== "published") return null;
+  const lead = (w) => (opts.lower ? w.toLowerCase() : w);
+  if (ISO_DAY_RE.test(c.published_at || "")) return `${lead("Published")} ${dayInWords(c.published_at)}`;
+  const through = c.data_through || c.date;
+  return ISO_DAY_RE.test(through || "") ? `${lead("Data through")} ${dayInWords(through)}` : null;
+}
+
+// ── One chapter, one name (#6081) ─────────────────────────────────────────────────────────────────────────────────
+// Every page that names a chapter — the front page, /story/, the chapter page, /story/so-far/, /story/moments/ and the
+// journey's chapter ticks — reads its number, its days and its publication from chapterMeta, the rule the chapter page
+// already kept: the number is the program `week` zero-padded (the prologue is "Prologue", `00` in a numeral slot); the
+// days are the covered days when served, else the program week said as "program week"; the publication is
+// `published_at` (chapterPublished), never the data date called "Published". A program-week range is printed only with
+// those two words in front of it.
+
+const SPELLED = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"];
+
+/** A chapter as every page names it: {week, number, name, prologue, window, windowShort, programWeek, published, weekNote, tick}.
+ * `number` "10" (`00` for the prologue, "—" without a week); `name` "Chapter 10" / "Prologue"; `window` "Days 60–66 · 4 to 10
+ * November" or "program week 11 to 17 October" (null for the prologue, which has neither); `published` "Published 13
+ * November 2026" (or "Data through …"); `weekNote` the one line saying "Week N" is the program week when the chapter
+ * covers other days; `tick` {date, n} for a numbered tick on a weight line — the window's last day. null for no chapter. */
+export function chapterMeta(c) {
+  if (!c) return null;
+  const week = Number.isInteger(c.week) ? c.week : null;
+  const prologue = week === 0;
+  const number = week == null ? "—" : String(week).padStart(2, "0");
+  const name = prologue ? "Prologue" : week == null ? String(c.week_label || "") : `Chapter ${number}`;
+  const isPub = c.status === "published";
+  const covers = isPub ? chapterCovers(c) : null;
+  const coversShort = isPub ? chapterCovers(c, { short: true }) : null;
+  const programWeek = rangeInWords(c.week_start, c.week_end);
+  const programShort = rangeInWords(c.week_start, c.week_end, { short: true });
+  const window = covers || (programWeek ? `program week ${programWeek}` : null);
+  const windowShort = coversShort || (programShort ? `program week ${programShort}` : null);
+  const differs = covers && programWeek && (c.covers_start !== c.week_start || c.covers_end !== c.week_end);
+  const weekNote = differs && week >= 1 ? `“Week ${week}” names the program week, ${programWeek}; this chapter covers ${covers.replace(/^Day/, "day").replace(" · ", ", ")}.` : null;
+  const win = chapterWindow(c);
+  const tick = isPub && week >= 1 && win ? { date: win[1], n: String(week) } : null;
+  return { week, number, name, prologue, window, windowShort, programWeek, published: chapterPublished(c), weekNote, tick };
+}
+
+/** How many chapters are published, said the same way on every page: "7 chapters and a prologue" ({spell:true}: "seven
+ * chapters and a prologue"; {capital:true} capitalises). `n` counts the numbered chapters only; the prologue is never one. */
+export function chapterCount(chapters, opts = {}) {
+  const pub = (chapters || []).filter((c) => c && c.status === "published");
+  const n = pub.filter((c) => Number.isInteger(c.week) && c.week >= 1).length;
+  const prologue = pub.some((c) => c.week === 0);
+  return { n, prologue, words: countWords(n, prologue, opts) };
+}
+
+/** The count phrase from its two parts (a page that counts its own rows says it the same way). */
+export function countWords(n, prologue, opts = {}) {
+  const num_ = opts.spell && SPELLED[n] ? SPELLED[n] : String(n);
+  const core = `${num_} ${n === 1 ? "chapter" : "chapters"}${prologue ? " and a prologue" : ""}`;
+  return opts.capital ? core[0].toUpperCase() + core.slice(1) : core;
+}
+
+/** The weeks between two published chapters, in the words /story/ shows for them (its status tags: skipped, held,
+ * pending): "Week 7 was skipped; weeks 8 and 9 are held." `chapters` is the whole chapter list; a week with no chapter
+ * object "has no chapter". null when there is no week between. Never a title, an excerpt or a reason. */
+export function gapWords(chapters, fromWeek, toWeek) {
+  if (!Number.isInteger(fromWeek) || !Number.isInteger(toWeek) || toWeek < fromWeek) return null;
+  const byWeek = new Map((chapters || []).filter((c) => c && Number.isInteger(c.week)).map((c) => [c.week, c.status]));
+  const groups = [];
+  for (let w = fromWeek; w <= toWeek; w++) {
+    const st = byWeek.get(w) || "none";
+    const last = groups[groups.length - 1];
+    if (last && last.st === st) last.weeks.push(w);
+    else groups.push({ st, weeks: [w] });
+  }
+  const said = groups.map(({ st, weeks }) => {
+    const one = weeks.length === 1;
+    const which = one ? `week ${weeks[0]}` : weeks.length === 2 ? `weeks ${weeks[0]} and ${weeks[1]}` : `weeks ${weeks[0]} to ${weeks[weeks.length - 1]}`;
+    const verb = st === "none" ? (one ? "has no chapter" : "have no chapter") : st === "skipped" ? (one ? "was skipped" : "were skipped") : `${one ? "is" : "are"} ${st}`;
+    return `${which} ${verb}`;
+  });
+  const text = said.join("; ");
+  return `${text[0].toUpperCase()}${text.slice(1)}.`;
+}
+
+/** The next chapter, from ONE source: the edition's draft date (`next.chapter.data.date`), numbered by the chapter
+ * object whose program week holds that day — the row /story/ lists as pending. {number, date} — number null when no
+ * unpublished week holds the day (the date is then said alone). null with no draft date. */
+export function nextChapter(chapters, draftDate) {
+  if (!ISO_DAY_RE.test(draftDate || "")) return null;
+  const c = (chapters || []).find((x) => x && x.status !== "published" && Number.isInteger(x.week) && x.week >= 1 && ISO_DAY_RE.test(x.week_start || "") && ISO_DAY_RE.test(x.week_end || "") && x.week_start <= draftDate && draftDate <= x.week_end);
+  return { number: c ? String(c.week).padStart(2, "0") : null, date: draftDate };
+}
+
 /** A number with a fixed number of decimals and en-GB grouping; null -> "—". */
 export function num(v, decimals = 0) {
   if (v == null || Number.isNaN(Number(v))) return "—";
@@ -119,4 +255,19 @@ export function glossList(text) {
 export function glossText(text) {
   const n = quoteGlosses(text).length;
   return n ? `${n === 1 ? "The date quoted is" : "The dates quoted are"} ${glossList(text)}.` : "";
+}
+
+/**
+ * A call whose words are withheld, in a compact mention (2026-11-14): its frozen test as the grader states it — already
+ * public on the call's own page — instead of repeating the ledger's one sentence ("The words of this call are not
+ * published.") five times down a day page. The ledger row itself still carries that sentence (owner ruling
+ * 2026-11-06). Null when the test is not served, so the caller falls back to the sentence. ISO dates become words.
+ */
+export function heldCallWords(p, max = 90) {
+  const how = p && p.grading && typeof p.grading.how === "string" ? p.grading.how.trim() : "";
+  if (!how) return null;
+  const t = how.replace(/\b1 days\b/, "1 day").replace(/\d{4}-\d{2}-\d{2}/g, (iso) => dayInWords(iso, { short: true }) || iso);
+  // An observation is never graded, so it has no test: its line reads as itself ("…: an observation, not graded").
+  const observation = p.status === "observation" || p.kind === "observation" || /observation, not graded/.test(t);
+  return observation ? clip(t, max) : `the test: ${clip(t, max)}`;
 }

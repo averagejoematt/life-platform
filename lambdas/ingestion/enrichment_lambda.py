@@ -90,6 +90,7 @@ from common.digest_utils import (
 
 # Phase 4.2 (2026-05-16): canonical impl in lambdas/numeric.py.
 from common.numeric import floats_to_decimal  # noqa: F401
+from common.strava_read_seam import STRAVA_SOURCE, strava_read_seam  # #5696: the percentile population is deduped
 
 
 def query_source(source, start_date, end_date):
@@ -368,7 +369,11 @@ def enrich_date_range(start_date: str, end_date: str, fill_only_before: str = ""
     # Load all Strava data (for percentile context) and target window
     logger.info("[enrichment] Loading all Strava data for percentile context...")
     all_strava = query_source("strava", ARCHIVE_START, end_date)
-    sorted_elevations, sorted_distances = build_percentile_lookup(all_strava)
+    # #5696: the percentile POPULATION is read through the seam — one session, one data point
+    # (a WHOOP copy of a watch walk carries distance 0.0 and would sit in the pool as a measured
+    # zero). The write-back below walks the VERBATIM rows: this lambda writes the partition, and a
+    # deduped row written back would delete the stored copies the seam resolves at read time.
+    sorted_elevations, sorted_distances = build_percentile_lookup(strava_read_seam(STRAVA_SOURCE, all_strava))
     logger.info(
         f"[enrichment] Percentile context: {len(sorted_elevations)} elevation datapoints, {len(sorted_distances)} distance datapoints"
     )

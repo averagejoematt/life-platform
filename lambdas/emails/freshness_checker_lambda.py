@@ -43,7 +43,7 @@ s3 = boto3.client("s3", region_name=REGION)
 # used to be hand-mirrored here + site_api_data + tools_labs and drifted —
 # withings/strava read as infrastructure, so a quiet logging stretch paged.
 # Per-source rationale (thresholds, pause reasons) lives in source_registry.py.
-from ingestion.source_registry import behavioral_source_keys, checker_sources, stale_hours_overrides
+from ingestion.source_registry import behavioral_source_keys, checker_sources, interior_gap_source_keys, stale_hours_overrides
 from ingestion.watch_presence import check_dead_men as check_watch_dead_men, not_ok as watch_dead_men_not_ok  # #4970
 from operational.output_artifact_registry import check_all as check_output_artifacts, not_ok as artifacts_not_ok
 from training.training_notes import training_notes_health  # #3768: a derived layer can be dark while its raw source is fresh
@@ -500,7 +500,9 @@ def count_infra_stale(stale_sources) -> int:
 # flags the missing middle. We only judge sources expected to produce a record
 # EVERY day; sparse sources (strava activities, withings weigh-ins, food_delivery)
 # have legitimate empty days and would false-positive, so they are excluded.
-DAILY_SOURCES = {"whoop", "apple_health", "eightsleep", "habitify"}
+# #5527: DERIVED from the registry (expected_days == 7, monitored, not behavioral) — the
+# hand-typed set it replaces had drifted, leaving todoist and weather unscanned.
+DAILY_SOURCES = interior_gap_source_keys()
 INTERIOR_GAP_WINDOW_DAYS = 14
 
 

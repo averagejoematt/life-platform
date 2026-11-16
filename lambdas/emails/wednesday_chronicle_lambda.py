@@ -1192,7 +1192,7 @@ def _handler_core(event: dict, context) -> dict:
             }
 
         _send_preview_email(title, week_num, date_str, approval_token, draft_email_html, share_kit_block, _fallback, _craft)
-        logger.info(f"FEAT-12: Draft Week {week_num} stored — awaiting approval")
+        _store.mark_awaiting_approval(week_num, _g=globals())  # #5520: the door names the waiting draft
 
     else:
         # ── Standard flow: publish immediately ───────────────────────────────

@@ -33,6 +33,10 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
 
 from common import prediction_publication as PP  # noqa: E402
+from web import public_call_id as PCI  # noqa: E402
+
+sys.path.insert(0, str(ROOT / "tests"))
+import call_publication_route_walk as CPW  # noqa: E402
 
 NOW = "2026-11-07T20:00:00+00:00"
 VARIANTS = ("none", "some", "many")
@@ -132,10 +136,19 @@ def test_the_walk_is_not_vacuous(walks):
     """The public record is served: legacy reviewed calls, a structured call filed after the registry, a public bet,
     the commitments tally the grader produced."""
     out = walks["none"]
-    ids = {i["prediction_id"] for i in _body(out, "/api/ledger_export")["items"]}
-    assert "pred_20261020_synthetic_public_sleep_0" in ids and "pred_20261106_synthetic_public_new_sleep" in ids
-    # Owner ruling 2026-11-06: a word the graded source explains does not take a call off the public record.
-    assert {"pred_20261106_synthetic_public_fatigue", "pred_20261106_synthetic_public_rpe"} <= ids
+    items = _body(out, "/api/ledger_export")["items"]
+    # Owner ruling 2026-11-14: a call's public identity is opaque (web.public_call_id) — every served call carries one,
+    # unique within its coach, and no stored key (a slug of the call's words) reaches any body or page.
+    ids = [(i["coach_id"], i["prediction_id"]) for i in items]
+    assert ids and all(PCI.PUBLIC_ID.match(pid) for _c, pid in ids), ids
+    assert len(set(ids)) == len(ids)
+    for v, walk in walks.items():
+        for key, body in walk["bodies"].items():
+            assert "synthetic_public" not in body and "synthetic_private" not in body, (v, key)
+        assert "synthetic_public" not in walk["pages"], v
+    # the public record is served: the fixed public calls (3 per coach), the structured ones filed after the registry
+    # and (owner ruling 2026-11-06) the two whose words a graded source explains
+    assert len(items) >= 3 * len(CPW.COACHES) + 3
     assert any("public-bet" in json.dumps(r) for r in _body(out, "/api/coach_docket")["resolved"])
     assert _body(out, "/api/predictions")["commitments"] is not None
 
@@ -147,6 +160,39 @@ def test_the_method_is_served_beside_every_count(walks):
         assert method["version"] == PP.METHOD_VERSION == 2 and method["effective"] == PP.EFFECTIVE == "2026-11-05", key
         assert [h["version"] for h in method["history"]] == [1, 2], key
         assert "journal" in method["note"] and "not counted" in method["note"], key
+
+
+def test_the_verification_fields_are_served_and_count_only_public_calls(walks):
+    """Owner 2026-11-09: the additive verification fields are on the wire (so the identity tests above cover them, not
+    vacuously): the public calls' pointers are counted, the private VERIFIED calls are not, and every count is the
+    same across the three variants (asserted for every body above)."""
+    out = walks["many"]
+    ledger = _body(out, "/api/ledger_export")
+    preds = _body(out, "/api/predictions")
+    calib = _body(out, "/api/calibration")
+    n = len(("sleep", "mind", "nutrition", "physical"))  # each public coach: one reproduced and one could-not-verify call
+    assert ledger["verification_summary"]["reproduced"] == n and ledger["verification_summary"]["could_not_verify"] == n
+    assert ledger["verification_summary"]["corrected"] == 0, "the private calls' 'corrected' pointers never count"
+    assert sum(ledger["verification_summary"].values()) == ledger["total"]
+    assert preds["verification_summary"] == ledger["verification_summary"]
+    verified = calib["platform"]["strata"]["coaches"]["verified"]
+    assert verified["n"] == n and verified["confirmed"] == n, verified
+    # CR1 (owner 2026-11-09): the headline, its exclusions and the archive — over the public calls only (the identity
+    # tests above hold every byte of it fixed across the variants; the ungated control below moves it).
+    vs = calib["verification_summary"]
+    assert vs["verified"] == verified, "the stratum's verified block is the headline's own object"
+    sides = 2  # the public bet's two graded docket sides: no verification record, so "could not be verified"
+    assert vs["eligible_total"] == 2 * n + sides == vs["verified"]["n"] + vs["excluded_total"]
+    assert {e["key"]: e["n"] for e in vs["excluded_by_category"]} == {"opinion": 1, "could_not_verify": n - 1 + sides}
+    assert sum(e["n"] for e in vs["excluded_by_category"]) == vs["excluded_total"]
+    assert len(vs["counted_calls"]) == verified["n"] and not [c for c in vs["counted_calls"] if "private" in c]
+    assert vs["archive"]["n"] == 2 * n + sides and vs["archive"]["confirmed"] == n + 1
+    assert vs["verified"]["baseline"]["n"] == vs["verified"]["n"], "the baseline is scored on exactly the same calls"
+    assert calib["platform"]["strata"]["hypotheses"]["verified"] is None
+    stratum = calib["platform"]["strata"]["coaches"]
+    assert stratum["n"] > 0 and stratum["accuracy_ci95"] is not None and stratum["accuracy_pct"] is not None
+    item = next(i for i in ledger["items"] if i.get("verification"))
+    assert set(item["verification"]) == {"outcome", "verified_at", "ruleset_version", "classification_validated"}
 
 
 # ── negative control ──────────────────────────────────────────────────────────────────────
@@ -168,6 +214,20 @@ def test_negative_control_the_ungated_policy_leaks(ungated):
     ):
         assert key in moved, (key, sorted(moved))
     some = ungated["some"]
-    assert any(t in body for body in some["bodies"].values() for t in PRIVATE_MARKS)
-    assert any(t in some["pages"] for t in PRIVATE_MARKS)
+    # ungated, the private calls reach the wire: the ledger serves more calls than the public-only variant (their ids are
+    # opaque since the owner's 2026-11-14 ruling, so the bodies no longer spell them — the count is what moves)
+    assert _body(some, "/api/ledger_export")["total"] > _body(ungated["none"], "/api/ledger_export")["total"]
+    # the private calls reach the pages: more prediction pages than the public-only variant (ids are opaque now, so the
+    # pages no longer spell them — owner ruling 2026-11-14 — and the count is what moves)
+    assert len(json.loads(some["pages"])["prediction"]) > len(json.loads(ungated["none"]["pages"])["prediction"])
     assert _body(some, "/api/predictions")["overall"]["total"] > _body(ungated["none"], "/api/predictions")["overall"]["total"]
+    # Owner 2026-11-09: ungated, the private verified calls move the new counts too — the identity above is not vacuous.
+    assert _body(some, "/api/ledger_export")["verification_summary"] != _body(ungated["none"], "/api/ledger_export")["verification_summary"]
+    s_ver = _body(some, "/api/calibration")["platform"]["strata"]["coaches"]["verified"]
+    assert s_ver != _body(ungated["none"], "/api/calibration")["platform"]["strata"]["coaches"]["verified"]
+    # CR1: ungated, the private calls enter the headline's N, its exclusions and its counted ids — so the identity
+    # of verification_summary across the gated variants is not vacuous.
+    s_vs = _body(some, "/api/calibration")["verification_summary"]
+    n_vs = _body(ungated["none"], "/api/calibration")["verification_summary"]
+    assert s_vs["eligible_total"] > n_vs["eligible_total"] and s_vs["verified"]["n"] > n_vs["verified"]["n"]
+    assert len(s_vs["counted_calls"]) > len(n_vs["counted_calls"])  # the private calls are counted (opaque ids since 2026-11-14)

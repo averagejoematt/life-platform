@@ -68,6 +68,15 @@ _SANCTIONED_REGISTRY_FILES = {
     # derive from the census and came OUT of the ledger, so the ratchet counted down
     # (charter standing rule 2), it did not grow sideways.
     "lambdas/common/input_manifest.py",
+    # #5980: the DLQ consumer's redrive allowlist — the functions the CDK stacks wire to
+    # `life-platform-ingestion-dlq`. The registry for that fact is the CDK declaration
+    # (`dlq=` on each `create_platform_lambda`), which the Lambda bundle does not stage, so
+    # the runtime needs the set spelled out once. It is not a free-standing copy:
+    # tests/test_dlq_recurring_failure_4731.py derives the same set from cdk/stacks by AST
+    # and holds the file EQUAL to it, so it cannot drift in either direction. This is a
+    # reviewer decision on the #5980 code PR; the alternative is a CDK-injected env var,
+    # which makes that PR a CDK deploy.
+    "lambdas/operational/redrive_targets.py",
 }
 
 _MIN_MEMBERS = 2  # a one-string literal is a reference, not an enumeration

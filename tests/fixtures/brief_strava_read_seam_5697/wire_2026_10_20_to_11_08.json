@@ -1,0 +1,2448 @@
+{
+ "_provenance": "Live DynamoDB life-platform (us-west-2), read-only query 2026-11-09 for #5697: strava DATE#2026-10-20..11-08, hevy DATE#2026-10-19..11-08. Only the fields brief_domain_inputs / workout_identity / strava_read_seam read are kept; names, notes, location, polyline, gear and timezone are stripped. Lifting sets keep only duration_sec (null).",
+ "strava": [
+  {
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-10-20",
+   "date": "2026-10-20",
+   "activities": []
+  },
+  {
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-10-21",
+   "date": "2026-10-21",
+   "activities": [
+    {
+     "strava_id": "20682793060",
+     "start_date": "2026-10-21T23:38:08Z",
+     "start_date_local": "2026-10-21T16:38:08Z",
+     "sport_type": "WeightTraining",
+     "type": "WeightTraining",
+     "device_name": "Hevy",
+     "moving_time_seconds": 9105,
+     "elapsed_time_seconds": 9113,
+     "distance_meters": 0,
+     "average_heartrate": 119.2,
+     "has_heartrate": true
+    },
+    {
+     "strava_id": "20682727582",
+     "start_date": "2026-10-22T01:16:50Z",
+     "start_date_local": "2026-10-21T18:16:50Z",
+     "sport_type": "Ride",
+     "type": "Ride",
+     "device_name": "WHOOP",
+     "moving_time_seconds": 2403,
+     "elapsed_time_seconds": 2403,
+     "distance_meters": 0,
+     "average_heartrate": 128.1,
+     "has_heartrate": true
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-10-22",
+   "date": "2026-10-22",
+   "activities": [
+    {
+     "strava_id": "20695623565",
+     "start_date": "2026-10-22T23:54:09Z",
+     "start_date_local": "2026-10-22T16:54:09Z",
+     "sport_type": "Walk",
+     "type": "Walk",
+     "device_name": "WHOOP",
+     "moving_time_seconds": 6009,
+     "elapsed_time_seconds": 6120,
+     "distance_meters": 8401.6,
+     "average_heartrate": 117.5,
+     "has_heartrate": true
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-10-23",
+   "date": "2026-10-23",
+   "activities": [
+    {
+     "strava_id": "20706903794",
+     "start_date": "2026-10-23T23:04:27Z",
+     "start_date_local": "2026-10-23T16:04:27Z",
+     "sport_type": "WeightTraining",
+     "type": "WeightTraining",
+     "device_name": "Hevy",
+     "moving_time_seconds": 8722,
+     "elapsed_time_seconds": 8731,
+     "distance_meters": 0,
+     "average_heartrate": 107.2,
+     "has_heartrate": true
+    },
+    {
+     "strava_id": "20706297721",
+     "start_date": "2026-10-23T23:12:00Z",
+     "start_date_local": "2026-10-23T16:12:00Z",
+     "sport_type": "WeightTraining",
+     "type": "WeightTraining",
+     "device_name": "WHOOP",
+     "moving_time_seconds": 2279,
+     "elapsed_time_seconds": 2279,
+     "distance_meters": 0,
+     "average_heartrate": 108.1,
+     "has_heartrate": true
+    },
+    {
+     "strava_id": "20706791402",
+     "start_date": "2026-10-24T00:22:13Z",
+     "start_date_local": "2026-10-23T17:22:13Z",
+     "sport_type": "Ride",
+     "type": "Ride",
+     "device_name": "WHOOP",
+     "moving_time_seconds": 2704,
+     "elapsed_time_seconds": 2704,
+     "distance_meters": 0,
+     "average_heartrate": 116.5,
+     "has_heartrate": true
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-10-24",
+   "date": "2026-10-24",
+   "activities": [
+    {
+     "strava_id": "20718558173",
+     "start_date": "2026-10-24T16:26:04Z",
+     "start_date_local": "2026-10-24T09:26:04Z",
+     "sport_type": "Walk",
+     "type": "Walk",
+     "device_name": "Apple Watch Ultra 4",
+     "moving_time_seconds": 12970,
+     "elapsed_time_seconds": 17917,
+     "distance_meters": 17510.1,
+     "average_heartrate": 109.5,
+     "has_heartrate": true
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-10-25",
+   "date": "2026-10-25",
+   "activities": [
+    {
+     "strava_id": "20730246841",
+     "start_date": "2026-10-25T16:41:58Z",
+     "start_date_local": "2026-10-25T09:41:58Z",
+     "sport_type": "WeightTraining",
+     "type": "WeightTraining",
+     "device_name": "Hevy",
+     "moving_time_seconds": 9769,
+     "elapsed_time_seconds": 9778,
+     "distance_meters": 0,
+     "average_heartrate": 101.7,
+     "has_heartrate": true
+    },
+    {
+     "strava_id": "20729313880",
+     "start_date": "2026-10-25T16:59:00Z",
+     "start_date_local": "2026-10-25T09:59:00Z",
+     "sport_type": "WeightTraining",
+     "type": "WeightTraining",
+     "device_name": "WHOOP",
+     "moving_time_seconds": 1019,
+     "elapsed_time_seconds": 1019,
+     "distance_meters": 0,
+     "average_heartrate": 101.4,
+     "has_heartrate": true
+    },
+    {
+     "strava_id": "20730069804",
+     "start_date": "2026-10-25T18:01:17Z",
+     "start_date_local": "2026-10-25T11:01:17Z",
+     "sport_type": "Ride",
+     "type": "Ride",
+     "device_name": "WHOOP",
+     "moving_time_seconds": 3604,
+     "elapsed_time_seconds": 3604,
+     "distance_meters": 0,
+     "average_heartrate": 110.3,
+     "has_heartrate": true
+    },
+    {
+     "strava_id": "20730346368",
+     "start_date": "2026-10-25T19:02:57Z",
+     "start_date_local": "2026-10-25T12:02:57Z",
+     "sport_type": "WeightTraining",
+     "type": "WeightTraining",
+     "device_name": "WHOOP",
+     "moving_time_seconds": 1394,
+     "elapsed_time_seconds": 1394,
+     "distance_meters": 0,
+     "average_heartrate": 78.4,
+     "has_heartrate": true
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-10-26",
+   "date": "2026-10-26",
+   "activities": [
+    {
+     "strava_id": "20745245769",
+     "start_date": "2026-10-26T23:21:45Z",
+     "start_date_local": "2026-10-26T16:21:45Z",
+     "sport_type": "WeightTraining",
+     "type": "WeightTraining",
+     "device_name": "Hevy",
+     "moving_time_seconds": 7986,
+     "elapsed_time_seconds": 8018,
+     "distance_meters": 0,
+     "average_heartrate": 120.5,
+     "has_heartrate": true
+    },
+    {
+     "strava_id": "20745144975",
+     "start_date": "2026-10-27T00:35:34Z",
+     "start_date_local": "2026-10-26T17:35:34Z",
+     "sport_type": "Walk",
+     "type": "Walk",
+     "device_name": "Apple Watch Ultra 4",
+     "moving_time_seconds": 2712,
+     "elapsed_time_seconds": 2712,
+     "distance_meters": 3952.9,
+     "average_heartrate": 119.9,
+     "has_heartrate": true
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-10-27",
+   "date": "2026-10-27",
+   "activities": [
+    {
+     "strava_id": "20759621874",
+     "start_date": "2026-10-27T23:30:31Z",
+     "start_date_local": "2026-10-27T16:30:31Z",
+     "sport_type": "Walk",
+     "type": "Walk",
+     "device_name": "Apple Watch Ultra 4",
+     "moving_time_seconds": 6473,
+     "elapsed_time_seconds": 6473,
+     "distance_meters": 8694.9,
+     "average_heartrate": 111.1,
+     "has_heartrate": true
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-10-28",
+   "date": "2026-10-28",
+   "activities": [
+    {
+     "strava_id": "20773317048",
+     "start_date": "2026-10-29T00:47:03Z",
+     "start_date_local": "2026-10-28T17:47:03Z",
+     "sport_type": "WeightTraining",
+     "type": "WeightTraining",
+     "device_name": "Hevy",
+     "moving_time_seconds": 5633,
+     "elapsed_time_seconds": 5633,
+     "distance_meters": 0,
+     "has_heartrate": false
+    },
+    {
+     "strava_id": "20773314257",
+     "start_date": "2026-10-29T01:50:23Z",
+     "start_date_local": "2026-10-28T18:50:23Z",
+     "sport_type": "Walk",
+     "type": "Walk",
+     "device_name": "Apple Watch Ultra 4",
+     "moving_time_seconds": 1804,
+     "elapsed_time_seconds": 1804,
+     "distance_meters": 2538,
+     "average_heartrate": 126.3,
+     "has_heartrate": true
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-10-29",
+   "date": "2026-10-29",
+   "activities": [
+    {
+     "strava_id": "20786026725",
+     "start_date": "2026-10-29T23:14:41Z",
+     "start_date_local": "2026-10-29T16:14:41Z",
+     "sport_type": "WeightTraining",
+     "type": "WeightTraining",
+     "device_name": "Hevy",
+     "moving_time_seconds": 8532,
+     "elapsed_time_seconds": 8575,
+     "distance_meters": 0,
+     "average_heartrate": 112,
+     "has_heartrate": true
+    },
+    {
+     "strava_id": "20786490926",
+     "start_date": "2026-10-30T00:39:41Z",
+     "start_date_local": "2026-10-29T17:39:41Z",
+     "sport_type": "Walk",
+     "type": "Walk",
+     "device_name": "Apple Watch Ultra 4",
+     "moving_time_seconds": 2708,
+     "elapsed_time_seconds": 2708,
+     "distance_meters": 3788.9,
+     "average_heartrate": 124.3,
+     "has_heartrate": true
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-10-30",
+   "date": "2026-10-30",
+   "activities": [
+    {
+     "strava_id": "20797976560",
+     "start_date": "2026-10-30T23:06:42Z",
+     "start_date_local": "2026-10-30T16:06:42Z",
+     "sport_type": "WeightTraining",
+     "type": "WeightTraining",
+     "device_name": "Hevy",
+     "moving_time_seconds": 9427,
+     "elapsed_time_seconds": 9436,
+     "distance_meters": 0,
+     "average_heartrate": 112.2,
+     "has_heartrate": true
+    },
+    {
+     "strava_id": "20798915864",
+     "start_date": "2026-10-31T00:25:51Z",
+     "start_date_local": "2026-10-30T17:25:51Z",
+     "sport_type": "Ride",
+     "type": "Ride",
+     "device_name": "Apple Watch Ultra 4",
+     "moving_time_seconds": 3664,
+     "elapsed_time_seconds": 3664,
+     "distance_meters": 0,
+     "average_heartrate": 117.7,
+     "has_heartrate": true
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-10-31",
+   "date": "2026-10-31",
+   "activities": [
+    {
+     "strava_id": "20809519294",
+     "start_date": "2026-10-31T17:05:20Z",
+     "start_date_local": "2026-10-31T10:05:20Z",
+     "sport_type": "Walk",
+     "type": "Walk",
+     "device_name": "Apple Watch Ultra 4",
+     "moving_time_seconds": 13138,
+     "elapsed_time_seconds": 16200,
+     "distance_meters": 18288.1,
+     "average_heartrate": 110.2,
+     "has_heartrate": true
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-11-01",
+   "date": "2026-11-01",
+   "activities": [
+    {
+     "strava_id": "20822719660",
+     "start_date": "2026-11-01T18:46:49Z",
+     "start_date_local": "2026-11-01T10:46:49Z",
+     "sport_type": "WeightTraining",
+     "type": "WeightTraining",
+     "device_name": "Hevy",
+     "moving_time_seconds": 9656,
+     "elapsed_time_seconds": 9658,
+     "distance_meters": 0,
+     "average_heartrate": 100.2,
+     "has_heartrate": true
+    },
+    {
+     "strava_id": "20822563002",
+     "start_date": "2026-11-01T20:06:02Z",
+     "start_date_local": "2026-11-01T12:06:02Z",
+     "sport_type": "Ride",
+     "type": "Ride",
+     "device_name": "Apple Watch Ultra 4",
+     "moving_time_seconds": 3606,
+     "elapsed_time_seconds": 3606,
+     "distance_meters": 0,
+     "average_heartrate": 112.7,
+     "has_heartrate": true
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-11-02",
+   "date": "2026-11-02",
+   "activities": [
+    {
+     "strava_id": "20837308464",
+     "start_date": "2026-11-03T00:13:41Z",
+     "start_date_local": "2026-11-02T16:13:41Z",
+     "sport_type": "WeightTraining",
+     "type": "WeightTraining",
+     "device_name": "Hevy",
+     "moving_time_seconds": 7651,
+     "elapsed_time_seconds": 7711,
+     "distance_meters": 0,
+     "average_heartrate": 123.6,
+     "has_heartrate": true
+    },
+    {
+     "strava_id": "20837224609",
+     "start_date": "2026-11-03T01:22:47Z",
+     "start_date_local": "2026-11-02T17:22:47Z",
+     "sport_type": "Walk",
+     "type": "Walk",
+     "device_name": "Apple Watch Ultra 4",
+     "moving_time_seconds": 2708,
+     "elapsed_time_seconds": 2708,
+     "distance_meters": 3771.6,
+     "average_heartrate": 131,
+     "has_heartrate": true
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-11-03",
+   "date": "2026-11-03",
+   "activities": [
+    {
+     "strava_id": "20851549241",
+     "start_date": "2026-11-04T00:44:00Z",
+     "start_date_local": "2026-11-03T16:44:00Z",
+     "sport_type": "WeightTraining",
+     "type": "WeightTraining",
+     "device_name": "Hevy",
+     "moving_time_seconds": 8351,
+     "elapsed_time_seconds": 8372,
+     "distance_meters": 0,
+     "average_heartrate": 115.9,
+     "has_heartrate": true
+    },
+    {
+     "strava_id": "20851945182",
+     "start_date": "2026-11-04T01:49:46Z",
+     "start_date_local": "2026-11-03T17:49:46Z",
+     "sport_type": "Walk",
+     "type": "Walk",
+     "device_name": "Apple Watch Ultra 4",
+     "moving_time_seconds": 3610,
+     "elapsed_time_seconds": 3610,
+     "distance_meters": 5353.1,
+     "average_heartrate": 123.5,
+     "has_heartrate": true
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-11-04",
+   "date": "2026-11-04",
+   "activities": [
+    {
+     "strava_id": "20865362808",
+     "start_date": "2026-11-05T00:15:06Z",
+     "start_date_local": "2026-11-04T16:15:06Z",
+     "sport_type": "Walk",
+     "type": "Walk",
+     "device_name": "Apple Watch Ultra 4",
+     "moving_time_seconds": 6561,
+     "elapsed_time_seconds": 6590,
+     "distance_meters": 8775.8,
+     "average_heartrate": 106.2,
+     "has_heartrate": true
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-11-05",
+   "date": "2026-11-05",
+   "activities": [
+    {
+     "strava_id": "20877966773",
+     "start_date": "2026-11-06T00:23:00Z",
+     "start_date_local": "2026-11-05T16:23:00Z",
+     "sport_type": "WeightTraining",
+     "type": "WeightTraining",
+     "device_name": "Hevy",
+     "moving_time_seconds": 9366,
+     "elapsed_time_seconds": 9377,
+     "distance_meters": 0,
+     "average_heartrate": 108.1,
+     "has_heartrate": true
+    },
+    {
+     "strava_id": "20877893510",
+     "start_date": "2026-11-06T01:56:38Z",
+     "start_date_local": "2026-11-05T17:56:38Z",
+     "sport_type": "Walk",
+     "type": "Walk",
+     "device_name": "Apple Watch Ultra 4",
+     "moving_time_seconds": 2812,
+     "elapsed_time_seconds": 2812,
+     "distance_meters": 3948.2,
+     "average_heartrate": 129.6,
+     "has_heartrate": true
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-11-06",
+   "date": "2026-11-06",
+   "activities": [
+    {
+     "strava_id": "20889512302",
+     "start_date": "2026-11-06T23:35:14Z",
+     "start_date_local": "2026-11-06T15:35:14Z",
+     "sport_type": "WeightTraining",
+     "type": "WeightTraining",
+     "device_name": "Hevy",
+     "moving_time_seconds": 10083,
+     "elapsed_time_seconds": 10097,
+     "distance_meters": 0,
+     "average_heartrate": 112.5,
+     "has_heartrate": true
+    },
+    {
+     "strava_id": "20889395398",
+     "start_date": "2026-11-07T01:02:21Z",
+     "start_date_local": "2026-11-06T17:02:21Z",
+     "sport_type": "Ride",
+     "type": "Ride",
+     "device_name": "Apple Watch Ultra 4",
+     "moving_time_seconds": 3602,
+     "elapsed_time_seconds": 3602,
+     "distance_meters": 0,
+     "average_heartrate": 121.6,
+     "has_heartrate": true
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-11-07",
+   "date": "2026-11-07",
+   "activities": [
+    {
+     "strava_id": "20897694006",
+     "start_date": "2026-11-07T16:31:41Z",
+     "start_date_local": "2026-11-07T08:31:41Z",
+     "sport_type": "Yoga",
+     "type": "Yoga",
+     "device_name": "Apple Watch Ultra 4",
+     "moving_time_seconds": 67,
+     "elapsed_time_seconds": 67,
+     "distance_meters": 0,
+     "average_heartrate": 63,
+     "has_heartrate": true
+    },
+    {
+     "strava_id": "20901403500",
+     "start_date": "2026-11-07T17:33:41Z",
+     "start_date_local": "2026-11-07T09:33:41Z",
+     "sport_type": "Walk",
+     "type": "Walk",
+     "device_name": "Apple Watch Ultra 4",
+     "moving_time_seconds": 13117,
+     "elapsed_time_seconds": 17375,
+     "distance_meters": 17850.7,
+     "average_heartrate": 108.8,
+     "has_heartrate": true
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#strava",
+   "sk": "DATE#2026-11-08",
+   "date": "2026-11-08",
+   "activities": [
+    {
+     "strava_id": "20913246294",
+     "start_date": "2026-11-08T17:02:51Z",
+     "start_date_local": "2026-11-08T09:02:51Z",
+     "sport_type": "WeightTraining",
+     "type": "WeightTraining",
+     "device_name": "Hevy",
+     "moving_time_seconds": 9302,
+     "elapsed_time_seconds": 9302,
+     "distance_meters": 0,
+     "has_heartrate": false
+    },
+    {
+     "strava_id": "20915208679",
+     "start_date": "2026-11-08T18:39:08Z",
+     "start_date_local": "2026-11-08T10:39:08Z",
+     "sport_type": "Ride",
+     "type": "Ride",
+     "device_name": "Apple Watch Ultra 4",
+     "moving_time_seconds": 3604,
+     "elapsed_time_seconds": 3604,
+     "distance_meters": 0,
+     "average_heartrate": 116.4,
+     "has_heartrate": true
+    }
+   ]
+  }
+ ],
+ "hevy": [
+  {
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-10-19#WORKOUT#a5318af7-424a-49e7-9daf-b03f3d1a8a8a",
+   "date": "2026-10-19",
+   "title": "Foundation - Lower - 8 - 35",
+   "start_time": "2026-10-19T12:18:52+00:00",
+   "end_time": "2026-10-19T14:29:08+00:00",
+   "duration_sec": 7816,
+   "total_volume_kg": 22616.14,
+   "exercise_count": 8,
+   "set_count": 24,
+   "exercises": [
+    {
+     "name": "Deadlift (Trap bar)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Squat (Barbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Leg Extension (Machine)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Leg Press (Machine)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Calf Press (Machine)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Seated Leg Curl (Machine)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Cycling",
+     "sets": [
+      {
+       "duration_sec": 2700
+      }
+     ]
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "duration_sec": 900
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-10-21#WORKOUT#e982a3d5-0cf9-4c1c-8ac6-c1848f8bf124",
+   "date": "2026-10-21",
+   "title": "Foundation - Upper - 10 - 36",
+   "start_time": "2026-10-21T23:38:08+00:00",
+   "end_time": "2026-10-22T02:10:07+00:00",
+   "duration_sec": 9119,
+   "total_volume_kg": 10581.19,
+   "exercise_count": 9,
+   "set_count": 31,
+   "exercises": [
+    {
+     "name": "Bench Press (Barbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Dumbbell Row",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Shoulder Press (Dumbbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Triceps Pushdown",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Lat Pulldown (Cable)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Face Pull",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Bicep Curl (Dumbbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Cycling",
+     "sets": [
+      {
+       "duration_sec": 2400
+      }
+     ]
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "duration_sec": 600
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-10-23#WORKOUT#8f4a487e-4195-4d81-8c96-01c8fea7732a",
+   "date": "2026-10-23",
+   "title": "Foundation - Lower - 9 - 37",
+   "start_time": "2026-10-23T23:04:27+00:00",
+   "end_time": "2026-10-24T01:30:02+00:00",
+   "duration_sec": 8735,
+   "total_volume_kg": 28544.6,
+   "exercise_count": 7,
+   "set_count": 26,
+   "exercises": [
+    {
+     "name": "Squat (Barbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Deadlift (Barbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Leg Press (Machine)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Calf Press (Machine)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Seated Leg Curl (Machine)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Cycling",
+     "sets": [
+      {
+       "duration_sec": 2700
+      }
+     ]
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "duration_sec": 900
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-10-25#WORKOUT#15a2ac5c-eb99-4325-995f-f3d9dccb5626",
+   "date": "2026-10-25",
+   "title": "Foundation - Upper - 11 - 38",
+   "start_time": "2026-10-25T16:41:58+00:00",
+   "end_time": "2026-10-25T19:24:54+00:00",
+   "duration_sec": 9776,
+   "total_volume_kg": 5713,
+   "exercise_count": 10,
+   "set_count": 28,
+   "exercises": [
+    {
+     "name": "Shoulder Press (Dumbbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Lateral Raise (Dumbbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Seated Incline Curl (Dumbbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Rear Delt Reverse Fly (Machine)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Triceps Rope Pushdown",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Overhead Triceps Extension (Cable)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "21s",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Farmers Walk",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Cycling",
+     "sets": [
+      {
+       "duration_sec": 3600
+      }
+     ]
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "duration_sec": 1200
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-10-26#WORKOUT#a8fe84fa-89a2-4ed7-b70c-4048bd287ab5",
+   "date": "2026-10-26",
+   "title": "Foundation - Upper - 12 - 39",
+   "start_time": "2026-10-26T23:21:45+00:00",
+   "end_time": "2026-10-27T01:35:26+00:00",
+   "duration_sec": 8021,
+   "total_volume_kg": 7105.53,
+   "exercise_count": 9,
+   "set_count": 24,
+   "exercises": [
+    {
+     "name": "Incline Bench Press (Dumbbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Dumbbell Row",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "DB Rear Delt Rows",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Overhead Triceps Extension (Cable)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Lat Pulldown (Cable)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Preacher Curl (Barbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Chest Fly (Machine)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Treadmill",
+     "sets": [
+      {
+       "duration_sec": 2700
+      }
+     ]
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "duration_sec": 720
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-10-28#WORKOUT#0adcac0c-b587-47ea-9b0f-a2be28fe23c6",
+   "date": "2026-10-28",
+   "title": "Foundation - Lower - 10 - 40",
+   "start_time": "2026-10-29T00:47:03+00:00",
+   "end_time": "2026-10-29T02:20:56+00:00",
+   "duration_sec": 5633,
+   "total_volume_kg": 23580.03,
+   "exercise_count": 6,
+   "set_count": 21,
+   "exercises": [
+    {
+     "name": "Deadlift (Trap bar)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Squat (Barbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Leg Press (Machine)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Calf Press (Machine)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Side Bend (Dumbbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Treadmill",
+     "sets": [
+      {
+       "duration_sec": 1800
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-10-29#WORKOUT#b03e0ea6-bf4d-43d9-a1eb-b624d47a51f6",
+   "date": "2026-10-29",
+   "title": "Foundation - Upper - 13 - 41",
+   "start_time": "2026-10-29T23:14:41+00:00",
+   "end_time": "2026-10-30T01:37:40+00:00",
+   "duration_sec": 8579,
+   "total_volume_kg": 7932.21,
+   "exercise_count": 9,
+   "set_count": 29,
+   "exercises": [
+    {
+     "name": "Bench Press (Barbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Dumbbell Row",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Lat Pulldown (Cable)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Triceps Extension (Cable)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Face Pull",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Lateral Raise (Dumbbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Hammer Curl (Dumbbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Treadmill",
+     "sets": [
+      {
+       "duration_sec": 2700
+      }
+     ]
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "duration_sec": 600
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-10-30#WORKOUT#db8adbcf-d628-4ceb-a3f7-c8b4cb611b0a",
+   "date": "2026-10-30",
+   "title": "Foundation - Lower - 11 - 42",
+   "start_time": "2026-10-30T23:06:42+00:00",
+   "end_time": "2026-10-31T01:43:58+00:00",
+   "duration_sec": 9436,
+   "total_volume_kg": 8949.39,
+   "exercise_count": 7,
+   "set_count": 23,
+   "exercises": [
+    {
+     "name": "Squat (Barbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Deadlift (Barbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Bulgarian Split Squat (Dumbbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Lying Leg Curl (Machine)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Seated Calf Raise",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Cycling",
+     "sets": [
+      {
+       "duration_sec": 3600
+      }
+     ]
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "duration_sec": 600
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-11-01#WORKOUT#4b137083-8c34-49b3-8609-bbef1a39f689",
+   "date": "2026-11-01",
+   "title": "Foundation - Upper - 14 - 43",
+   "start_time": "2026-11-01T18:46:49+00:00",
+   "end_time": "2026-11-01T21:27:50+00:00",
+   "duration_sec": 9661,
+   "total_volume_kg": 4449.75,
+   "exercise_count": 10,
+   "set_count": 26,
+   "exercises": [
+    {
+     "name": "Shoulder Press (Dumbbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Lateral Raise (Machine)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Rear Delt Reverse Fly (Machine)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Seated Incline Curl (Dumbbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Triceps Rope Pushdown",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Farmers Walk",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Cycling",
+     "sets": [
+      {
+       "duration_sec": 3600
+      }
+     ]
+    },
+    {
+     "name": "Dead Hang",
+     "sets": [
+      {
+       "duration_sec": 6
+      }
+     ]
+    },
+    {
+     "name": "Pull Up (Assisted)",
+     "sets": [
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "duration_sec": 900
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-11-02#WORKOUT#19758169-e42c-4c2d-b754-d6560fb21968",
+   "date": "2026-11-02",
+   "title": "Foundation - Upper - 15 - 44",
+   "start_time": "2026-11-03T00:13:41+00:00",
+   "end_time": "2026-11-03T02:22:14+00:00",
+   "duration_sec": 7713,
+   "total_volume_kg": 7645.31,
+   "exercise_count": 9,
+   "set_count": 23,
+   "exercises": [
+    {
+     "name": "Incline Bench Press (Dumbbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Dumbbell Row",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Lat Pulldown (Cable)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "DB Rear Delt Rows",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Chest Fly (Machine)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Bicep Curl (Machine)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Overhead Triceps Extension (Cable)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Treadmill",
+     "sets": [
+      {
+       "duration_sec": 2700
+      }
+     ]
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "duration_sec": 720
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-11-03#WORKOUT#25234dfd-e5e4-4075-b00b-3b32a863c269",
+   "date": "2026-11-03",
+   "title": "Foundation - Lower - 12 - 45",
+   "start_time": "2026-11-04T00:44:00+00:00",
+   "end_time": "2026-11-04T03:03:33+00:00",
+   "duration_sec": 8373,
+   "total_volume_kg": 10137.8,
+   "exercise_count": 6,
+   "set_count": 21,
+   "exercises": [
+    {
+     "name": "Deadlift (Trap bar)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Squat (Barbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Seated Calf Raise",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Side Bend (Dumbbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Treadmill",
+     "sets": [
+      {
+       "duration_sec": 3600
+      }
+     ]
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "duration_sec": 720
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-11-05#WORKOUT#0034c103-9126-4d43-a93b-eae99c816e8d",
+   "date": "2026-11-05",
+   "title": "Foundation - Upper - 16 - 46",
+   "start_time": "2026-11-06T00:23:00+00:00",
+   "end_time": "2026-11-06T02:59:16+00:00",
+   "duration_sec": 9376,
+   "total_volume_kg": 9190.93,
+   "exercise_count": 10,
+   "set_count": 31,
+   "exercises": [
+    {
+     "name": "Bench Press (Barbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Dumbbell Row",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Lat Pulldown (Cable)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Lateral Raise (Machine)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Decline Bench Press (Machine)",
+     "sets": [
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Triceps Extension (Cable)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Face Pull",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Hammer Curl (Dumbbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Treadmill",
+     "sets": [
+      {
+       "duration_sec": 2700
+      }
+     ]
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "duration_sec": 720
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-11-06#WORKOUT#d8d0ca72-4d35-47f3-84aa-6a25ff51c590",
+   "date": "2026-11-06",
+   "title": "Foundation - Lower - 13 - 47",
+   "start_time": "2026-11-06T23:35:14+00:00",
+   "end_time": "2026-11-07T02:23:33+00:00",
+   "duration_sec": 10099,
+   "total_volume_kg": 11031.38,
+   "exercise_count": 7,
+   "set_count": 23,
+   "exercises": [
+    {
+     "name": "Squat (Barbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Romanian Deadlift (Barbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Bulgarian Split Squat (Dumbbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Standing Calf Raise (Barbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Lying Leg Curl (Machine)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Cycling",
+     "sets": [
+      {
+       "duration_sec": 3600
+      }
+     ]
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "duration_sec": 1080
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#hevy",
+   "sk": "DATE#2026-11-08#WORKOUT#c488ddc7-8275-40a4-ac0d-712405bf188f",
+   "date": "2026-11-08",
+   "title": "Foundation - Upper - 17 - 48",
+   "start_time": "2026-11-08T17:02:51+00:00",
+   "end_time": "2026-11-08T19:37:53+00:00",
+   "duration_sec": 9302,
+   "total_volume_kg": 3220.51,
+   "exercise_count": 8,
+   "set_count": 25,
+   "exercises": [
+    {
+     "name": "Shoulder Press (Dumbbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Lateral Raise (Dumbbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "DB Rear Delt Rows",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Preacher Curl (Barbell)",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Lying Db Tricep Extension",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Farmers Walk",
+     "sets": [
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      },
+      {
+       "duration_sec": null
+      }
+     ]
+    },
+    {
+     "name": "Cycling",
+     "sets": [
+      {
+       "duration_sec": 3600
+      }
+     ]
+    },
+    {
+     "name": "Stretching",
+     "sets": [
+      {
+       "duration_sec": 900
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

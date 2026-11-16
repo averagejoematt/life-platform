@@ -9,7 +9,9 @@ hands them in — it computes nothing of its own:
              `read_failed`, never "no cap"; nothing from the record is logged or returned);
   waist      the measurements partition;
   steps      `training.steps_resolver.steps_range` (measured candidates only — the Strava-walk
-             derived estimate is not a step count);
+             derived estimate is not a step count); #5758: each day below the floor carries the walk the plan
+             offered (the drafted routines' stored `steps_walk`, `routine_repo.list_by_date_range`) and the walking
+             minutes performed (the same Strava + Hevy rows through `step_gap_walk.performed_minutes`);
   fitness    `mcp.tools_fitness_tests.read_view` (#5078): the battery record, Hevy and the cadence state;
   Hevy       ONE read (`tools_strength._read_hevy_all_phases`) serves the week's working sets
              (`muscle_volume.working_sets_by_muscle`) and the four core anchors' e1RM series
@@ -156,9 +158,9 @@ def _day(r: Any) -> str:
 
 
 def pain_instances(hevy: Optional[list]) -> Optional[list]:
-    """The pain-flag instances in `tools_plan._pain_instances`' shape, one per exercise whose Hevy note the pain net
-    (`training_notes.pain_lexicon_hit`, the layer's deterministic pass) flags; None = Hevy unread."""
-    from training.training_notes import pain_lexicon_hit
+    """The pain-flag instances in `tools_plan._pain_instances`' shape, one per exercise whose Hevy note reads as the
+    `pain` class (`training_notes_pain.pain_class`, #5800 — the net's discomfort and form notes hold nothing); None = Hevy unread."""
+    from training.training_notes_pain import PAIN, pain_class
 
     if hevy is None:
         return None
@@ -166,7 +168,7 @@ def pain_instances(hevy: Optional[list]) -> Optional[list]:
     for r in hevy:
         for e in r.get("exercises") or []:
             note = str(e.get("notes") or e.get("note") or "")
-            if pain_lexicon_hit(note):
+            if pain_class(note) == PAIN:
                 name = str(e.get("name") or e.get("title") or "exercise")
                 inst = by.setdefault(name, {"movement": name, "exercise": name, "note_dates": [], "notes": []})
                 inst["note_dates"].append(_day(r))
@@ -251,6 +253,23 @@ def _plan_dismissals() -> list:
     return _pain_dismissals()
 
 
+def _walk_offers(start: str, end: str) -> Optional[dict[str, dict[str, Any]]]:
+    from training import step_gap_walk
+    from training.routine_repo import list_by_date_range
+
+    return step_gap_walk.offers_by_date(list_by_date_range(start, end, limit=500))
+
+
+def _walks(days: list, strava: Optional[list], hevy: Optional[list]) -> dict[str, Any]:
+    """#5758: the walk the plan offered each day (the drafted routines' stored `steps_walk`; None = unread) and the walking
+    minutes he performed (`step_gap_walk.performed_minutes`, the walking layer's one definition; None = unknown)."""
+    from training import step_gap_walk
+
+    dates = sorted(str(d.get("date")) for d in days if d.get("date"))
+    offers = _read(_walk_offers, dates[0], dates[-1])[0] if dates else {}
+    return {"offers": offers, "performed": {d: step_gap_walk.performed_minutes(d, strava, hevy) for d in dates}}
+
+
 def compute_weeks(last_monday: str, weeks: int = 4) -> list[dict[str, Any]]:
     """`weeks` completed tracker rows ending with the week of `last_monday`, oldest first; each row's
     triggers read the row before it (the first reads none)."""
@@ -284,6 +303,7 @@ def compute_weeks(last_monday: str, weeks: int = 4) -> list[dict[str, Any]]:
     guidance = _guidance() if not w_err else None
     fitness, f_err = _read(_fitness_view, last_sunday, None if h_err else all_items)
     days = (srange or {}).get("days") or []
+    walks = _walks(days, None if st_err else (strava or []), None if h_err else all_items)  # #5758: offered vs performed
 
     rows: list[dict[str, Any]] = []
     prior: Optional[dict[str, Any]] = None
@@ -296,7 +316,7 @@ def compute_weeks(last_monday: str, weeks: int = 4) -> list[dict[str, Any]]:
             mon,
             weight=mt.weight_section(sun, week_rate, rate_4wk, None if w_err else _latest_weight(wrows or [], sun), guidance, w_err),
             waist=mt.waist_section(mrows, sun, m_err),
-            steps=mt.steps_section([d for d in days if mon <= d["date"] <= sun], s_err),
+            steps=mt.steps_section([d for d in days if mon <= d["date"] <= sun], s_err, walks),
             anchors=mt.anchors_section(series, sun, a_err),
             volume=mt.volume_section(None if h_err else working_sets_by_muscle(workouts, mon, sun), h_err),
             fitness=mt.fitness_section(_fitness_as_of(fitness, sun, last_sunday), sun, f_err),

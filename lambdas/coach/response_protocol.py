@@ -16,14 +16,13 @@ THE CONTRACT.
 THE READ. ``view`` is the protocol as the coach context carries it (``training.coach_context.assemble``'s
 ``response_protocol``, owner channel only, and the mind coach's own Telegram thread): the owner, the signals,
 the protocol text and its source. PURE over what it is handed; ``load`` is the one I/O (the repo file when
-present, else the S3 twin ``config/user_goals.json`` — config/ is not in the Lambda bundle), fail-soft to None.
+present, else the S3 twin ``config/user_goals.json`` — config/ is not in the Lambda bundle) merged with the private part
+(``common.user_goals``, owner ruling 2026-11-11), fail-soft to None.
 """
 
 from __future__ import annotations
 
-import json
 import logging
-import os
 import re
 from typing import Any, Mapping, Optional
 
@@ -111,21 +110,15 @@ def view(goals: Optional[Mapping[str, Any]], names: Mapping[str, str]) -> Option
 
 
 def load(s3_client: Any = None, bucket: Optional[str] = None) -> Optional[dict[str, Any]]:
-    """The plan root (the repo file when present, else the S3 twin), or None on any failure (fail-soft)."""
+    """The plan root for coach context — the public part merged with the private part (``common.user_goals``; the
+    failure_mode prose is private since the owner's 2026-11-11 ruling) — or None on any failure (fail-soft)."""
     try:
-        from common.repo_config import config_path  # noqa: PLC0415
+        from common import user_goals  # noqa: PLC0415
 
-        with open(config_path("user_goals.json"), encoding="utf-8") as fh:
-            return json.load(fh)
-    except Exception:  # noqa: BLE001 — in Lambda config/ is not bundled: the S3 twin is the source
-        pass
-    try:
-        if s3_client is None:
-            import boto3  # noqa: PLC0415
-
-            s3_client = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-west-2"))
-        body = s3_client.get_object(Bucket=bucket or os.environ.get("S3_BUCKET", "matthew-life-platform"), Key="config/user_goals.json")
-        return json.loads(body["Body"].read())
+        goals = user_goals.load_goals(s3_client, bucket)
+        if goals is None:
+            logger.warning("[response_protocol] plan root unavailable (protocol omitted)")
+        return goals
     except Exception as e:  # noqa: BLE001 — a coach context is never load-bearing on this read
         logger.warning("[response_protocol] plan root unavailable (protocol omitted): %s", type(e).__name__)
         return None

@@ -414,6 +414,7 @@ SOURCE_CLASS: dict[str, str] = {
     "anomalies": EXPERIMENT_SCOPED,
     "weekly_correlations": EXPERIMENT_SCOPED,
     "scenarios": EXPERIMENT_SCOPED,  # #550: nightly what-followed distributions — recomputed daily
+    "public_corrections": CROSS_PHASE,  # owner rulings 2026-11-05/06: the public correction ledger of the scoring methods
     "what_changed": EXPERIMENT_SCOPED,  # SS-08 monthly delta + first-seen ledger; resets with cycle
     "centenarian_progress": EXPERIMENT_SCOPED,
     "nutrition_review": EXPERIMENT_SCOPED,
@@ -697,6 +698,13 @@ _PK_RULES: list = [
     # routine_index entry in SOURCE_CLASS): pre-genesis drafts are history a genesis-reading
     # consumer excludes by `target_date`, never a partition the reset tombstones.
     (lambda pk, sk: pk.startswith("USER#matthew#ROUTINE#"), SYSTEM_STATE),
+    # #5524: the MCP write-tool idempotency ledger (`mcp/idempotency.py` LEDGER_PK, since
+    # 1316cec12, #3114/#3115) — claim/payload/release rows keyed by `<scope>#<content key>`,
+    # each with a 180-day TTL. Dedup bookkeeping about tool CALLS, not run intelligence: a
+    # replay suppressed in cycle N would still be a replay in cycle N+1, so the reset neither
+    # tags nor wipes it. Unclassified for ten weeks because pk_census folded every per-user
+    # partition into one `USER` family whose representative was a ROUTINE# pk.
+    (lambda pk, sk: pk == "USER#matthew#MCP_IDEMPOTENCY", SYSTEM_STATE),
     (lambda pk, sk: pk == "USER#system", SYSTEM_STATE),
     # Presentation/cache/infra.
     (lambda pk, sk: pk == "PULSE", SYSTEM_STATE),
@@ -730,10 +738,20 @@ _PK_RULES: list = [
     # submits — blocking every future reset until the fix lands (the bug this rule
     # closes, filed adversarially before any live COHORT# row existed).
     (lambda pk, sk: pk.startswith("COHORT#"), SYSTEM_STATE),
+    # #6088: readers' own calls beside a coach's open call (READERCALL#<call id> / TAP#<ip_hash>, TALLY#<choice>).
+    # Audience data about the READER population, like VOTES#/COHORT# above — never Matthew's evidence and never a
+    # coach's record (the owner's hard line, 2026-11-16). SYSTEM_STATE: the phase machinery ignores it (no tag, no
+    # wipe, no filter); the TAP# markers carry their own TTL, and a tally names one call id, which a reset never reuses.
+    (lambda pk, sk: pk.startswith("READERCALL#"), SYSTEM_STATE),
     # Challenge-follow interest records (site_api_social.handle_challenge_follow) —
     # reader emails awaiting a "challenge started" notification. Audience state like
     # SUBSCRIBE#/VOTES#: kept across resets, ignored by the phase machinery.
     (lambda pk, sk: pk.startswith("CHALLENGE_FOLLOWS"), SYSTEM_STATE),
+    # #6087: reader challenge check-ins (CHALLENGE_CHECKINS#<id> / READER#<ip_hash>#DATE#<d>,
+    # common/challenge_checkins.py) — a READER's "doing this too", kept apart from Matthew's own
+    # challenge row. Audience state like COHORT#/VOTES#: never his run intelligence, 180-day TTL,
+    # ignored by the phase machinery (no tag, no wipe, no filter).
+    (lambda pk, sk: pk.startswith("CHALLENGE_CHECKINS#"), SYSTEM_STATE),
     # ── #930/#951: the ops pk families, classified deliberately (all were previously
     # unclassified — classify() raised). None are traversed by the restart tooling
     # (the tagger scans USER#…#SOURCE# only); these rules make the registry total.

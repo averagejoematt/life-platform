@@ -17,7 +17,9 @@ What varies, all SYNTHETIC (no real id, date, count or wording):
     the journal, graded on a public metric), and calls filed after the registry — an observation (free-text subject),
     a gradeable call whose words name the journal, a gradeable call on a metric no registry resolves;
   * the rows that NAME a private call: its LEARNING# (one names a call filed after the registry, so the reference
-    rule's read is exercised), a grade CORRECTION#, the calibration ledger's prediction_void;
+    rule's read is exercised), a grade CORRECTION#, the calibration ledger's prediction_void, and (owner 2026-11-09)
+    its VERIFY# audit row — every graded private call carries a ``latest_verification`` pointer, so the verification
+    fields (per-item ``verification``, ``verification_summary``, the calibration ``verified`` blocks) are walked;
   * a private ASK (COMMITMENT#), legacy and new, and the commitments TALLY — PRODUCED here by the real producer
     (``coach.commitment_grading.write_tally``) from the varied corpus, so the producer half is under test too;
   * a private BET: a resolved docket entry, its two sides' docket PREDICTION# rows and its docket LEARNING#.
@@ -172,6 +174,47 @@ def _correction(cid, pid, day):
     }
 
 
+VERIFIED_AT = "2026-11-07T12:00:00Z"
+
+
+def _pointer(pid, outcome):
+    """Owner 2026-11-09: the call's ``latest_verification`` pointer (coach.verification_record) — the read side of the
+    new verification fields, so a private VERIFIED call is in every variant that varies."""
+    return {
+        "latest_verification": {
+            "sk": f"VERIFY#{pid}#{VERIFIED_AT}",
+            "outcome": outcome,
+            "verified_at": VERIFIED_AT,
+            "ruleset_version": "1.1",
+            "classification_validated": False,
+        }
+    }
+
+
+def _verify_row(cid, pid, outcome, status, value="keep"):
+    """The append-only VERIFY# audit row that names the call (it follows the call's publication class). Owner
+    2026-11-09 (CR1): it carries the approved classification the verified headline counts by — a private call's
+    record says "keep" too, so the ungated control's private calls enter the headline and move it."""
+    return {
+        "classification": {"value": value, "approved": True, "ruling_ref": "SYNTHETIC-RULING"},
+        "pk": _pk(cid),
+        "sk": f"VERIFY#{pid}#{VERIFIED_AT}",
+        "record_type": "verification",
+        "prediction_id": pid,
+        "prediction_sk": f"PREDICTION#{pid}",
+        "coach_id": f"{cid}_coach",
+        "original_status": status,
+        "current_status": status,
+        "rerun_status": status,
+        "ruleset_version": "1.1",
+        "verified_at": VERIFIED_AT,
+        "outcome": outcome,
+        "classification_validated": False,
+        "phase": "experiment",
+        "cycle": Decimal("17"),
+    }
+
+
 def _ask(cid, sk_id, at, text, status, metric=None):
     return {
         "pk": _pk(cid),
@@ -288,11 +331,23 @@ def public_rows() -> list:
         for j, (status, metric) in enumerate((("confirmed", "recovery_score"), ("refuted", "hrv"), ("pending", "steps"))):
             pid = f"pred_20261020_synthetic_public_{cid}_{j}"
             od = "2026-10-27" if status != "pending" else None
+            outcome = ("reproduced", "could_not_verify")[j % 2]
             rows.append(
-                _call(cid, pid, LEGACY_AT, f"Synthetic public call {i}-{j}: {metric} will rise this week.", status, metric, outcome_date=od)
+                _call(
+                    cid,
+                    pid,
+                    LEGACY_AT,
+                    f"Synthetic public call {i}-{j}: {metric} will rise this week.",
+                    status,
+                    metric,
+                    outcome_date=od,
+                    extra=_pointer(pid, outcome) if od else None,
+                )
             )
             if od:
                 rows.append(_learning(cid, pid, "2026-10-27", status, metric))
+                # one public call is classified an opinion, so the exclusions carry two categories (CR1)
+                rows.append(_verify_row(cid, pid, outcome, status, "noc_interpretation" if (cid, j) == ("mind", 1) else "keep"))
         rows.append(_call(cid, f"pred_20261020_synthetic_obs_{cid}", LEGACY_AT, f"Synthetic public observation {i}.", "observation", None))
         new_pid = f"pred_20261106_synthetic_public_new_{cid}"
         rows.append(
@@ -369,9 +424,11 @@ def private_rows(n: int) -> list:
                     "refuted",
                     "total_protein_g",
                     outcome_date="2026-10-27",
+                    extra=_pointer(legacy, "reproduced"),
                 )
             )
             rows.append(_learning(cid, legacy, "2026-10-27", "refuted", "total_protein_g"))
+            rows.append(_verify_row(cid, legacy, "reproduced", "refuted"))
             rows.append(_correction(cid, legacy, "2026-10-28"))
             rows.append(_void(cid, legacy))
             obs = f"pred_20261106_synthetic_private_obs_{cid}_{k}"
@@ -389,9 +446,11 @@ def private_rows(n: int) -> list:
                     "recovery_score",
                     filing=GRADEABLE,
                     outcome_date=NEW_DAY,
+                    extra=_pointer(words, "corrected"),
                 )
             )
             rows.append(_learning(cid, words, NEW_DAY, "confirmed", "recovery_score"))  # names a call filed after the registry
+            rows.append(_verify_row(cid, words, "corrected", "confirmed"))
             cog = f"pred_20261106_synthetic_private_cognition_{cid}_{k}"
             rows.append(
                 _call(cid, cog, NEW_AT, f"{PRIVATE_TOKEN} {k}: HRV rises as his cognition sharpens.", "pending", "hrv", filing=GRADEABLE)
@@ -529,11 +588,16 @@ def _serve(L, path: str, qs: dict):
         "headers": {},
         "queryStringParameters": dict(qs),
     }
+    from web import public_call_id
+
     narrative_publication.begin_request()
     resp = L._dispatch_route(event, path, "GET")
     if resp is None and callable(L.ROUTES.get(path)):
         resp = L.ROUTES[path]()
-    return guard_api_response(narrative_publication.annotate(resp)) if isinstance(resp, dict) else resp
+    if not isinstance(resp, dict):
+        return resp
+    resp = public_call_id.publicize_response(resp)  # lambda_handler's step before the guards (owner ruling 2026-11-14)
+    return guard_api_response(narrative_publication.annotate(resp))
 
 
 def _parsed(resp):

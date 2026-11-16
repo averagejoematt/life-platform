@@ -29,6 +29,11 @@ import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync,
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { ROOM_ENV, ROOM_PUBLIC_VALUES, roomPrivate, roomScope, scopeRoutes } from "../src/lib/room.js";
+import { LAB_ROUTES, labEnabled, labPrivate } from "../src/lib/lab.js";
+import { STORY_ROUTES, storyEnabled, storyPrivate } from "../src/lib/story_dark.js";
+import { readerCallEnabled } from "../src/lib/readercall.js";
+
 const WWW = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = join(WWW, "dist");
 const PAGES = join(WWW, "src", "pages");
@@ -40,6 +45,19 @@ const REACH_SINKS = ["/system/everything-else/"];
 const ASSET_PREFIX_ROOTS = ["_astro", "assets"];
 
 const rawBase = process.env.WEB_BASE || "/";
+// A PRIVATE Coaching Room build (WEB_ROOM=1 or WEB_ROOM=cr1, src/lib/room.js) is local: it must never rewrite the two
+// committed artifacts the deploy reads, so they are left exactly as committed and the build says so. A PUBLISHED CR1
+// build (the committed `room_public: "cr1"`, no WEB_ROOM) is an ordinary build: its pages are owned and counted.
+// A Laboratory build (WEB_LAB=1, src/lib/lab.js, L1) is private in the same way and held to the same rule.
+// A Human Story build (WEB_STORY=1, src/lib/story_dark.js, HS1) is private and local in exactly the same way.
+// Only a PRIVATE build (the env switch while the go-live constant is false) is held back; once LAB_LIVE / STORY_LIVE is
+// committed true the Lab / the story is ordinary build output and is owned, mapped and deployed like every page.
+const lab = labPrivate();
+const story = storyPrivate();
+const privateRoom = roomScope() !== "off" && roomPrivate();
+// #6088: a WEB_READERCALL=1 build (the reader-call control, built dark) is private and local in exactly the same way.
+const readercall = readerCallEnabled();
+const room = privateRoom || lab || story || readercall;
 const base = "/" + rawBase.replace(/^\/+|\/+$/g, "");
 
 function walk(dir, out = []) {
@@ -97,6 +115,31 @@ for (const abs of walk(PAGES)) {
   else staticRoutes.add(route);
 }
 
+// A LIVE injected route (src/lib/lab.js, src/lib/story_dark.js) is not under src/pages/, so it is added here: a static
+// one to static_routes (qa/qa_manifest.py derives its sweep rows from them), a [param] one to route_patterns.
+for (const [on, list] of [
+  [labEnabled() && !lab, LAB_ROUTES],
+  [storyEnabled() && !story, STORY_ROUTES],
+]) {
+  if (!on) continue;
+  for (const r of list) {
+    const route = r.pattern.replace(/\/?$/, "/");
+    if (route.includes("[")) routePatterns.add(route.replace(/\[[^\]]+\]/g, "*"));
+    else staticRoutes.add(route);
+  }
+}
+
+// A PUBLISHED room build (the committed `room_public: "cr1"` or "cr2"): the room's pages live outside src/pages/ and are
+// injected (src/lib/room.js), so they are added here — a static one to static_routes, a [param] one (CR2's per-coach
+// record) to route_patterns. Never on a private build (which does not write this file) and never while the switch is
+// off (no route is injected).
+if (!privateRoom && ["cr1", "cr2"].includes(roomScope())) {
+  for (const r of scopeRoutes(roomScope())) {
+    if (r.path.includes("[")) routePatterns.add(r.path.replace(/\[[^\]]+\]/g, "*"));
+    else staticRoutes.add(r.path);
+  }
+}
+
 let previous = {};
 if (existsSync(OWNED_OUT)) {
   try {
@@ -111,17 +154,21 @@ const owned = {
     "Every path the v9 build (www/) writes for the production base `/`, emitted by www/scripts/postbuild.mjs on every build and " +
     "drift-checked by scripts/check_www_build.py. deploy/sync_site_to_s3.sh and deploy/rollback_site.sh exclude exactly these " +
     "through deploy/www_owned_paths.py — one owner per path (#5534). `live_at_root` is the cut-over switch, not build output: " +
-    "false = the build is served at /next/v9/ only; true = the build owns `/` and every `www/**` merge deploys there.",
+    "false = the build is served at /next/v9/ only; true = the build owns `/` and every `www/**` merge deploys there. " +
+    "`room_public` is the Coaching Room's committed publication switch, not build output: \"off\" = no room page is built; " +
+    "\"cr1\" = every build publishes CR1 (/system/calibration/, /system/ledger/refuted/, the /system/ entry); \"cr2\" = CR1 + CR2 " +
+    "(/system/coaches/<id>/record/ and the entry on each coach page); never CR3.",
   base: "/",
   files: [...files].sort(),
   flipped_on: previous.flipped_on ?? null,
   live_at_root: previous.live_at_root === true,
   prefixes: [...prefixes].sort(),
+  room_public: ROOM_PUBLIC_VALUES.includes(previous.room_public) ? previous.room_public : "off",
   route_patterns: [...routePatterns].sort(),
   routes: [...routes].sort(),
   static_routes: [...staticRoutes].sort(),
 };
-writeFileSync(OWNED_OUT, JSON.stringify(owned, null, 2) + "\n");
+if (!room) writeFileSync(OWNED_OUT, JSON.stringify(owned, null, 2) + "\n");
 
 // ── 3b. reach ─────────────────────────────────────────────────────────────────────────────
 function pagePath(route) {
@@ -185,9 +232,15 @@ const reach = {
   transitive,
   transitive_count: transitive.length,
 };
-writeFileSync(REACH_OUT, JSON.stringify(reach, null, 2) + "\n");
+if (!room) writeFileSync(REACH_OUT, JSON.stringify(reach, null, 2) + "\n");
 
-console.log(
-  `postbuild: ${routes.size} routes, ${files.size} files, ${prefixes.size} asset prefixes → owned_paths.json; ` +
-    `reach depth1=${depth1.length} transitive=${transitive.length} → reach.json`
-);
+if (room) {
+  console.log(
+    `postbuild: ${lab ? "WEB_LAB=1 — a private Laboratory build" : story ? "WEB_STORY=1 — a private Human Story build" : readercall ? "WEB_READERCALL=1 — a private reader-call build" : `WEB_ROOM=${process.env[ROOM_ENV]} — a private Coaching Room build`} (${routes.size} routes); owned_paths.json and reach.json left as committed. Never deploy this dist.`
+  );
+} else {
+  console.log(
+    `postbuild: ${routes.size} routes, ${files.size} files, ${prefixes.size} asset prefixes → owned_paths.json; ` +
+      `reach depth1=${depth1.length} transitive=${transitive.length} → reach.json`
+  );
+}

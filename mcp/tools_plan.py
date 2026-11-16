@@ -41,16 +41,11 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, timezone
 from typing import Any, Optional
 
 from common.pacific_time import pacific_today
-from training.commit_binding import binding_for  # #4066
 
-from mcp import (
-    plan_call_scope,  # #5313: one read per plan call, the call clock, stage 2's write deadline
-    plan_stage2_writes,  # #4076: stage 2's writes and its dry run
-)
+from mcp import plan_call_scope, plan_summary  # #5313 one read per plan call + the write deadline; #5803 the summary view
 from mcp.core import LAYER_UNKNOWN
 from mcp.plan_draft_evidence import ANCHOR_HISTORY_LOOKBACK_DAYS, BLOCK_LOOKBACK_DAYS, PAIN_LOOKBACK_DAYS  # noqa: F401 (#4161)
 from mcp.plan_helpers import (  # noqa: F401 (#4149)
@@ -63,6 +58,7 @@ from mcp.plan_helpers import (  # noqa: F401 (#4149)
     _union_evidence_rows,
     attach_coach_context,  # #5071
     attach_morning_note,  # #4189
+    calibration_due_field,  # #5760
     critics_with_charter,  # #5071
 )
 from mcp.plan_hevy_windows import _block_workouts, _prescription_window, _rotation_window  # noqa: F401  (#4110 size fix)
@@ -120,6 +116,27 @@ def _guidance_freshness() -> dict[str, Any]:
     return guidance_freshness.read_freshness(table, pacific_today())
 
 
+def _training_phase_field() -> dict[str, Any]:
+    """#5576: the weekly evaluator's phase brief (`phase_evaluator_leg.phase_brief_field`, the coach packet's same read) —
+    current phase + since, next phase, and the closest unmet gate with its measured value. Never raises: a failed read
+    is `read_failed` with its class, a not-yet-seeded state is `absent`. Owner-only (MCP)."""
+    from mcp.phase_evaluator_leg import phase_brief_field
+
+    value, status = phase_brief_field()
+    return {**status, "value": value}
+
+
+def _training_fields(*, stage_1: bool, dry_run: bool) -> dict[str, Any]:
+    """#5576 `training_phase` + #5772 `exercise_unlocks` — a newly unlocked movement is announced ONCE: stage 1 claims
+    the record (`exercise_gates_leg.unlock_announcements_field`), stage 2 and a dry run read without claiming."""
+    from mcp.exercise_gates_leg import unlock_announcements_field
+
+    return {
+        "training_phase": _training_phase_field(),
+        "exercise_unlocks": unlock_announcements_field(claim_rows=stage_1 and not dry_run),
+    }
+
+
 def _read(name: str, fn, *a, **kw) -> tuple[Any, dict[str, Any]]:
     """(value, input status) — `_safe`, but the failure is KEPT (#4072).
 
@@ -131,7 +148,8 @@ def _read(name: str, fn, *a, **kw) -> tuple[Any, dict[str, Any]]:
     from training.plan_engine import ABSENT, MEASURED, READ_FAILED, error_label, input_status
 
     try:
-        value = fn(*a, **kw)
+        with plan_call_scope.reading(name):  # #5813: timed per reader on `timing_ms.stage_1`
+            value = fn(*a, **kw)
     except Exception as e:  # noqa: BLE001 — reported in the block, never swallowed (#4072)
         logger.warning("plan_next_session input %s read failed: %s", name, e)
         return None, input_status(READ_FAILED, error=error_label(e))
@@ -434,6 +452,7 @@ def _gather_performed_evidence(target_date: str, layer_status: str) -> dict[str,
         r["pain_flag_any"] = bool(f.get("pain_flag_any"))
         r["pain_dates"] = f.get("pain_dates") or []
         r["pain_notes"] = f.get("pain_notes") or []  # #4174: the words tie a note to its site
+        r["not_pain_notes"] = f.get("not_pain_notes") or []  # #5800: discomfort / form-or-equipment — listed only
         r["sessions_with_notes"] = f.get("sessions_with_notes")
     scope = {
         # `read` is the only value `plan_engine._evidence_scope_read` accepts, and it also
@@ -446,6 +465,8 @@ def _gather_performed_evidence(target_date: str, layer_status: str) -> dict[str,
         "phases_read": phases,
         "movements_considered": len(considered),
         "movements_flagged": sum(1 for r in considered if r.get("pain_flag_any")),
+        # #5800: the net's discomfort and form/equipment notes — shown to the coaches here, acted on nowhere
+        "not_acted_on": [{"movement": r["label"], **n} for r in considered for n in r.get("not_pain_notes") or []],
         "note_layer_status": layer_status,
         "reason": (
             f"{len(considered)} movement(s) performed in {start}..{target_date} were checked against the derived note layer"
@@ -615,6 +636,7 @@ _STAGE_2_HOW_TO_USE = (
 )
 
 
+@plan_summary.detail_mode  # #5803: detail='summary' — the compact view, projected from the full result after it is built
 @plan_call_scope.plan_call  # #5313
 def tool_plan_next_session(args):
     """Stage 1: the deterministic constraint block (#3751). Stage 2, with `routine_id`: the
@@ -623,7 +645,7 @@ def tool_plan_next_session(args):
     target_date = args.get("target_date") or pacific_today()
     routine_id = args.get("routine_id")
 
-    from training import accessory_strength_trend, plan_engine
+    from training import accessory_strength_trend, plan_engine, step_gap_walk, week_commitments
 
     # #4076: the owner override is parsed BEFORE anything runs — a malformed one is an error,
     # never a stage-2 run that silently ignored it and left the veto standing unexplained.
@@ -720,12 +742,11 @@ def tool_plan_next_session(args):
     layer_status = LAYER_UNKNOWN
     status["pain_layer_status"] = st(plan_engine.MEASURED)
     try:
-        from training.training_notes import training_notes_health
-
         from mcp.config import table
         from mcp.core import derived_layer_status
+        from mcp.plan_call_scope import notes_health  # #5813: the one health sweep per call
 
-        layer_status = derived_layer_status(training_notes_health(table))[0]
+        layer_status = derived_layer_status(notes_health(table))[0]
     except Exception as e:  # noqa: BLE001
         status["pain_layer_status"] = st(READ_FAILED, error=plan_engine.error_label(e))
 
@@ -757,8 +778,6 @@ def tool_plan_next_session(args):
         status["anchor_lift_drop_pct"] = st(ABSENT, "no drafted lift has enough history for a band-matched comparison")
     else:
         status["anchor_lift_drop_pct"] = st(plan_engine.MEASURED)
-    for name in ("weight_stall_days", "adherence_on_plan"):
-        status[name] = st(NOT_READ, "no reader is wired for this input yet — the weight_stall_with_adherence tripwire cannot evaluate")
 
     # #4051: the evidence set stage 1 never had — every movement PERFORMED in the trailing
     # window, with the note layer's flags for each. Gathered on EVERY call (a draft's
@@ -816,6 +835,11 @@ def tool_plan_next_session(args):
     if block_workouts == [] and status["block_workouts"]["state"] != READ_FAILED:
         status["block_workouts"] = st(ABSENT, "no Hevy session since the program's block start")
 
+    # #3754 boxes 3+4: the nutrition critics ride beside the constraint block on the daily surface the owner reads — the same
+    # block get_deficit_sustainability carries, built by the same resolver (owner-only MCP, never a site or email surface).
+    # #5802: built BEFORE the block, because weight_stall_with_adherence is ITS evaluation, read by the engine (one, not two).
+    nutrition = _safe(_nutrition_critics_block, deficit_raw) or {"error": "nutrition critics could not be built", "verdicts": []}
+    stall, status["weight_stall_evaluation"] = plan_engine.stall_input(nutrition)
     attach_fatigue_inputs(
         evidence,
         readiness_low_streak_days=readiness_streak,
@@ -861,6 +885,7 @@ def tool_plan_next_session(args):
         pain_dismissals=dismissals,
         # #4051: what was examined, so `clear` is only reachable from a set that was read.
         pain_evidence_scope=pain_scope,
+        weight_stall_evaluation=stall,  # #5802
         # with a draft in hand the per-movement note reads report the layer's status themselves
         pain_layer_status=((evidence or {}).get("pain_layer_status") or layer_status),
         hevy_workouts_rotation_window=rotation_rows,
@@ -878,10 +903,12 @@ def tool_plan_next_session(args):
         input_status=status,
     )
     _merge_walking_volume(block, walk_layer)
+    step_gap_walk.attach(block, steps_window, prescription_rows)  # #5758: the walk that closes the day's projected step gap
     _attach_below_mev(block, volume)  # #5053
     _attach_collapse_actuator(block)  # #4503 OD7: the named-human actuator mark, read only on a tripped collapse
     attach_morning_note(block, target_date, recovery_tier)  # #4189: his four words beside the recovery tier
     _attach_session_loads(block, target_date, catalog_movements)
+    week_commitments.attach(block, ir, target_date, catalog_movements)  # #5774: the ledger's weekly commitments, hard at stage 1
     # #4112: the accessory half of the two-tier trend split — tracked/reported, never a
     # change/veto flag. Reads the SAME per-exercise rows `_worst_anchor` already built above.
     accessory_strength_trend.attach(block, evidence)
@@ -907,16 +934,11 @@ def tool_plan_next_session(args):
             "Consult a qualified healthcare provider before making health decisions based on this data."
         ),
     }
-    # #3754 boxes 3+4: the nutrition critics ride beside the constraint block on the daily
-    # surface the owner reads — the same block get_deficit_sustainability carries, built by
-    # the same resolver, so the two surfaces cannot disagree. Owner-only (MCP), never a site
-    # or email surface.
-    out["nutrition_critics"] = _safe(_nutrition_critics_block, deficit_raw) or {
-        "error": "nutrition critics could not be built",
-        "verdicts": [],
-    }
+    out["nutrition_critics"] = nutrition  # #3754: built above (#5802), the same block get_deficit_sustainability carries
     # #4503 OD6: between DXA scans, Body Scan 2 is the lean/regional trend — labelled bioimpedance, never the DXA anchor
     out["between_dxa_lean"] = _safe(_between_dxa_lean, target_date, dxa, status["dxa_scans"]["state"]) or {"state": "read_failed"}
+    out.update(_training_fields(stage_1=ir is None, dry_run=bool(args.get("dry_run"))))  # #5576 training_phase + #5772 exercise_unlocks
+    out["calibration_due"] = calibration_due_field(target_date)  # #5760: tape / photos / battery due, named until logged
     attach_coach_context(out, target_date, constraint_block=block, packet_reason=PACKET_NOT_REREAD)  # #5071/#5200
     if ir is None:  # #4084: the overnight pre-draft comes FIRST — the evening chat reviews it instead of rebuilding
         from mcp.nightly_predraft import attach_to_stage_1
@@ -998,155 +1020,24 @@ def _run_stage_2(
     overrides: list[dict[str, Any]] | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
-    """The red team. `dry_run` (#4076) runs every step — critics, the owner override, the changes — and
-    WRITES NOTHING: no version, no index row, no thread row, no ledger row; each is returned under
-    `would_write` (`mcp.plan_stage2_writes`)."""
-    from coach import critic_overrides, critics
-    from training import session_block
-    from training.cardio_note import apply_after_lines
-    from training.routine_repo import put_versioned
+    """The red team — `mcp.plan_stage2_run.run` (#5781: the deterministic verdicts are STORED before the model step,
+    each phase timed on `timing_ms`). `dry_run` (#4076) runs every step and writes nothing (`would_write`)."""
+    from mcp import plan_stage2_run
 
-    from mcp.hevy_prescription_gate import critic_set_floors
-    from mcp.tools_hevy_routine import _validate_ir_for_hevy
-
-    by_idx = {e["idx"]: e for e in evidence["exercises"]}
-
-    def build(draft: dict[str, Any]) -> dict[str, dict[str, Any]]:
-        return {
-            "muscle_defense": critics.build_muscle_defense_packet(
-                draft,
-                anchor_trends={i: e for i, e in by_idx.items() if e.get("drop_pct") is not None},
-                program_week=block.get("program_week"),
-                protein_days_missed_7d=protein_missed,
-                protein_days_measured_7d=protein_measured,
-            ),
-            "joints_tendons": critics.build_joints_packet(
-                draft,
-                pain_by_idx={i: e for i, e in by_idx.items() if "pain_flag_any" in e},
-                days_since_by_idx={i: e.get("days_since") for i, e in by_idx.items()},
-                loaded_lifting_streak=evidence.get("loaded_lifting_streak"),
-                pain_layer_status=evidence.get("pain_layer_status"),
-                dismissals=dismissals,  # #4036 — the owner's own override of a flag instance
-                stale_by_idx={i: e["stale"] for i, e in by_idx.items() if e.get("stale")},  # #4161: the cap scales with the gap
-                fatigue=evidence.get("fatigue"),  # #4161: performance / readiness, not a loaded-day count
-                recent_aerobic=block.get("recent_aerobic"),  # #4387: what his legs did in the last 48-72 h
-            ),
-            "rate_advocate": critics.build_rate_advocate_packet(
-                draft,
-                tripwires=block.get("tripwires"),
-                walking=block.get("walking"),
-                rate_target=block.get("rate_target"),
-                # #4068: THE loss rate (mcp.shared_quantities via get_benchmark's `loss_rate`
-                # block) — the number the deficit critic reads, provisional flag included.
-                # #5001: the constraint block's `shared_quantities.loss_rate_lb_wk` first — the SAME quantity its
-                # rate_ceiling row was evaluated over, so the advocate's rate and its tripwire can never disagree.
-                current_rate_lb_wk=_loss_rate_of(reference, _block_rate(block))[0],
-                rate_provisional=_loss_rate_of(reference, _block_rate(block))[1],
-                lifting_sessions_7d=evidence.get("lifting_sessions_7d"),
-            ),
-            "blueprint_historian": critics.build_historian_packet(
-                draft, reference=reference, weeks_in_block=evidence.get("weeks_in_block")
-            ),
-        }
-
-    # LIVE FINDING 2026-09-20 (routine 73bc228c v5 -> v6): a re-run on an already-critiqued
-    # routine compounded the joints critic's cut (22 -> 18 -> 14) because every `session.total_sets`
-    # change is relative to the draft the critic sees. Stage 2 must be a re-EVALUATION of the
-    # coach's draft, never a second cut on its own output: restore the pre-critics exercise list
-    # first, and keep that snapshot on the record so the next run can do the same.
-    prior = (getattr(ir, "inputs_snapshot", None) or {}).get("critics") or {}
-    if prior.get("draft_exercises"):
-        from training.routine_ir import _exercise_from_raw
-
-        ir.exercises = [_exercise_from_raw(dict(e)) for e in prior["draft_exercises"]]
-    from dataclasses import asdict
-
-    draft_exercises = [asdict(e) for e in ir.exercises]
-    draft = critics.draft_summary(ir)
-    packets = critics_with_charter(build(draft), target_date, block)  # #5071: the critics read the one context
-    allowed, paused = _model_allowed()
-    invoke = None
-    if allowed:
-        from ai.bedrock_client import invoke as _invoke
-
-        invoke = _invoke
-    # #5313: the four model calls run concurrently, their wait bounded by the time left before the write deadline
-    wait = plan_call_scope.model_budget_secs()
-    verdicts = critics.run_critics(packets, draft, invoke=invoke, model_allowed=allowed, model_paused_reason=paused, model_timeout_s=wait)
-    ran_at = datetime.now(timezone.utc).isoformat()
-    would: list[dict[str, Any]] = []  # #4076 dry run: the ledger rows the override WOULD write
-    # #4076: the owner's override marks ONLY the named critic's veto; it runs before the
-    # changes so the record is complete, and it moves no change — `apply_changes` below sees
-    # every other critic's verdict exactly as the critics returned it.
-    override_records = critic_overrides.apply_overrides(
-        verdicts,
-        overrides or [],
-        at=ran_at,
-        routine_id=getattr(ir, "routine_id", None),
-        target_date=target_date,
-        record_correction=plan_stage2_writes.dry_ledger(would) if dry_run else _record_override_correction,
+    return plan_stage2_run.run(
+        ir,
+        block,
+        reference,
+        evidence,
+        protein_missed,
+        protein_measured,
+        target_date,
+        dismissals,
+        overrides,
+        dry_run,
+        write_thread=_write_thread,  # resolved HERE, where the tests patch it
+        record_correction=_record_override_correction,
     )
-    changes = critics.apply_changes(ir, verdicts, set_floors=critic_set_floors(ir))  # #4149: held to the commit gate's floor
-    apply_after_lines(ir.exercises)  # #5428: a swap or drop moves what follows the cardio — re-stamp `After:` on the final order
-    session_block.sync_low_energy(ir)  # #5428 re-grade #2: and can change whether the session has easy cardio to fall back on
-    overridden = {v["critic"] for v in verdicts if critics.is_overridden(v)}
-    rc = critics.recheck(ir, build, overridden=overridden)
-    precheck = _validate_ir_for_hevy(ir)
-    rc["hevy_precheck_errors"] = precheck["errors"]
-    rc["passed"] = bool(rc["passed"] and not precheck["errors"])
-    record = {
-        "engine": critics.CRITICS_VERSION,
-        "ran_at": ran_at,
-        "target_date": target_date,
-        "model_ran": allowed,
-        "model_paused_reason": paused,
-        "verdicts": verdicts,
-        "changes": changes,
-        "recheck": rc,
-        "veto": bool(critics.standing_vetoes(verdicts)),
-        # #4076: every override asked for on this run, applied or not, with his words verbatim.
-        "owner_overrides": override_records,
-        "packet_numbers": {cid: p["numbers"] for cid, p in packets.items()},
-        # #4387: the per-activity rows the joints critic argued from, on the stored record (the live-proof read)
-        "recent_aerobic": {k: (block.get("recent_aerobic") or {}).get(k) for k in ("window", "rows", "totals", "cardio_pick")},
-        # the coach's draft as critiqued, so a re-run re-evaluates THIS, not its own output
-        "draft_exercises": draft_exercises,
-    }
-    # #5313: past the deadline, store NOTHING and say so — never race the MCP cap. A dry run (#4076) stores nothing anyway.
-    late = None if dry_run else plan_call_scope.past_write_deadline()
-    if late:
-        return {**record, "routine_id": ir.routine_id, "written": False, "verdict_state": "not_written", "next": late}
-    ir.inputs_snapshot = {**(getattr(ir, "inputs_snapshot", None) or {}), "critics": record}
-    # #5428: the verdicts are STORED (`record` above, on inputs_snapshot) and never ride a Hevy note; an applied
-    # change already wrote its one plain clause on the exercise it changed. This strips a legacy RED TEAM block.
-    _place_block_on_first_exercise(ir)
-    ir.parent_version = ir.version
-    ir.version = int(ir.version) + 1
-    # #4066: bind the verdict to THIS routine and THIS content, stamped after every change and
-    # the notes block are applied (`record` IS inputs_snapshot["critics"]) — commit refuses any
-    # other routine_id or any later edit.
-    record["binding"] = binding_for(ir)
-    if dry_run:
-        return plan_stage2_writes.dry_run_result(record, ir, would, pacific_today(), critics.notes_block(ir))
-    put_versioned(ir)
-    out = dict(record)
-    out["routine_id"] = ir.routine_id
-    out["routine_version"], out["written"], out["verdict_state"] = ir.version, True, "landed"
-    out["thread"] = _write_thread(ir, pacific_today())
-    out["notes_preview"] = critics.notes_block(ir)
-    if record["veto"]:
-        out["next"] = (
-            "VETO — redraft (manage_hevy_routine draft), then run stage 2 again; commit will refuse until no veto "
-            "stands. If Matthew overrules one critic, re-run with veto_override={critic, owner_words} (#4076)."
-        )
-    elif overridden:
-        out["next"] = (
-            f"no standing veto — {', '.join(sorted(overridden))} OVERRIDDEN by the owner (his words are on the record); "
-            "every other critic's changes are applied. manage_hevy_routine dry_run shows the revised body, then commit."
-        )
-    else:
-        out["next"] = "no veto — manage_hevy_routine dry_run shows the revised body, then commit."
-    return out
 
 
 _BLOCK_MARK = "RED TEAM ("

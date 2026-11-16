@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-31T06:47:34.497546+00:00",
+  "captured_at": "2026-11-13T18:14:41.730906+00:00",
   "fetch_path": "/api/hypotheses",
   "is_prefix_sample": false,
   "path": "/api/hypotheses",
@@ -34,6 +34,9 @@
       "hypotheses": {
         "items": {
           "keys": {
+            "actionable_if_confirmed": {
+              "type": "string"
+            },
             "check_count": {
               "type": "number"
             },
@@ -46,14 +49,17 @@
             "confidence": {
               "type": "string"
             },
+            "confirmation_criteria": {
+              "type": "string"
+            },
             "created_at": {
               "type": "string"
             },
             "days_observed": {
-              "type": "number"
+              "type": "null"
             },
             "deterministic_verdict": {
-              "type": "string"
+              "type": "null"
             },
             "domains": {
               "items": {
@@ -75,16 +81,22 @@
               "type": "string"
             },
             "last_checked": {
-              "type": "string"
+              "type": "null"
             },
             "last_evidence": {
-              "type": "string"
+              "type": "null"
+            },
+            "min_days_per_arm": {
+              "type": "number"
+            },
+            "monitoring_window_days": {
+              "type": "number"
             },
             "n_comparison": {
-              "type": "number"
+              "type": "null"
             },
             "n_condition": {
-              "type": "number"
+              "type": "null"
             },
             "pre_registered_at": {
               "type": "string"
@@ -109,19 +121,127 @@
                 "lag_days": {
                   "type": "number"
                 },
+                "min_days_per_arm": {
+                  "type": "number"
+                },
                 "min_effect": {
                   "type": "number"
+                },
+                "min_effect_basis": {
+                  "keys": {
+                    "k": {
+                      "type": "number"
+                    },
+                    "metric": {
+                      "type": "string"
+                    },
+                    "n": {
+                      "type": "number"
+                    },
+                    "n_floor": {
+                      "type": "number"
+                    },
+                    "replaced": {
+                      "keys": {
+                        "kind": {
+                          "type": "string"
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "number"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "statistic": {
+                      "type": "string"
+                    },
+                    "unit": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "number"
+                    },
+                    "window_days": {
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
+                },
+                "min_effect_derivation": {
+                  "keys": {
+                    "metric": {
+                      "type": "string"
+                    },
+                    "n": {
+                      "type": "number"
+                    },
+                    "rule": {
+                      "type": "string"
+                    },
+                    "sd": {
+                      "type": "number"
+                    },
+                    "unit": {
+                      "type": "string"
+                    },
+                    "window_days": {
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
+                },
+                "min_effect_provenance": {
+                  "keys": {
+                    "kind": {
+                      "type": "string"
+                    },
+                    "source": {
+                      "keys": {
+                        "metric": {
+                          "type": "string"
+                        },
+                        "n": {
+                          "type": "number"
+                        },
+                        "rule": {
+                          "type": "string"
+                        },
+                        "sd": {
+                          "type": "number"
+                        },
+                        "unit": {
+                          "type": "string"
+                        },
+                        "window_days": {
+                          "type": "number"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "value": {
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
                 },
                 "outcome_metric": {
                   "type": "string"
                 }
               },
+              "optional": [
+                "condition_threshold",
+                "min_effect_basis",
+                "min_effect_derivation"
+              ],
               "type": "object"
             }
           },
           "type": "object"
         },
-        "length_sample": 3,
+        "length_sample": 8,
         "type": "array"
       }
     },

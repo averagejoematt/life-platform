@@ -29,3 +29,17 @@
 # (b) Removal path: delete this line when garth-layer is deleted and garmin.txt with it,
 #     or if the layer is ever re-attached (then rebuild with certifi >= 2026.10.19 first).
 GHSA-6q48-6c7w-9gw2  scope=lambdas/requirements/garmin.txt  # #5473 — retired garth-layer, owner-dismissed not_used 2026-10-28
+#
+# oauthlib device-code grant (CVE-2026-49272 / GHSA-3jp2-3mrg-2vxc), oauthlib 4.0.0 in
+# the RETIRED garth-layer:4 — fixed in 4.0.1. Scoped to garmin.txt only (#5724).
+# (a) Why safe: two independent reasons. The layer is attached to no Lambda since #4640,
+#     so nothing loads this oauthlib. And the flaw is in the OAuth2 PROVIDER side —
+#     DeviceCodeGrant.validate_token_request on a token endpoint — while garth is an
+#     OAuth CLIENT that never runs a token endpoint. Bumping the pin is not a fix: the
+#     manifest records the deployed layer's measured contents, so an edited pin is
+#     manifest drift (Dependabot #5664 redded tests/test_layer_build_manifest.py
+#     ::test_live_tree_has_no_manifest_drift for exactly that) and deploys nothing.
+# (b) Removal path / expiry: delete this line with the GHSA-6q48 line above when
+#     garth-layer and garmin.txt are deleted; or, if the layer is ever re-attached,
+#     rebuild it with oauthlib >= 4.0.1 first (lambdas/requirements/README.md).
+GHSA-3jp2-3mrg-2vxc  scope=lambdas/requirements/garmin.txt  # #5724 — retired garth-layer; provider-side flaw, garth is a client

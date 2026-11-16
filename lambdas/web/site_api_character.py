@@ -25,7 +25,7 @@ import re as _re
 from datetime import date as _date, timedelta
 
 from boto3.dynamodb.conditions import Key
-from experiment.phase_filter import with_phase_filter  # ADR-058
+from experiment.phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 from health import character_privacy  # owner ruling 2026-11-03: private-source components never named
 
 from web.site_api_common import (
@@ -219,13 +219,13 @@ def character(date: str | None = None, *, _g) -> dict:
             {  # ADR-058: hide pilot character sheets (unless time-travelling)
                 "KeyConditionExpression": _key_cond,
                 "ScanIndexForward": False,
-                "Limit": 2,
+                "Limit": 10,  # owner ruling 2026-11-05: room to skip a record with no public variant
             },
             include_pilot=bool(date),
         )
     )
     # Owner rulings 2026-11-03/04: a pillar computed only from private sources is served held (character_privacy).
-    _recs = [character_privacy.public_sheet(r) for r in _decimal_to_float(_resp.get("Items", []))]
+    _recs = character_privacy.public_sheets(_decimal_to_float(_resp.get("Items", [])))[:2]  # public variants only (fail closed)
     record = _recs[0] if _recs else None
     prior_record = _recs[1] if len(_recs) > 1 else None
 
@@ -368,6 +368,7 @@ def character(date: str | None = None, *, _g) -> dict:
                 "composite_pillar_total": _composite_pillar_total,
                 "composite_note": composite_note,
                 "time_travel": bool(date),
+                "method": _method_label(table, record, datetime.now(PT).date()),  # which method computed this value (2026-11-05/06)
                 # #590: the engine's designed cross-pillar couplings that are ACTIVE
                 # right now (rare gameplay thresholds — e.g. Sleep Drag). The home
                 # constellation lights these as directional overlay edges. Additive.
@@ -426,6 +427,43 @@ _CHAR_CONFIG_LEVELING_KEYS = (
     "neglect_decay",  # #913: atrophy knobs (n_grace_days/rate/floor/min_behavioral_share)
     "tier_streak_overrides",
 )
+
+
+def _correction_item(table):
+    """The stored public correction ledger (health.public_corrections), or None — absent, tombstoned or unreadable."""
+    from health import public_corrections
+
+    try:
+        got = table.get_item(Key={"pk": f"{USER_PREFIX}{public_corrections.SOURCE}", "sk": public_corrections.correction_sk()}).get("Item")
+        return _decimal_to_float(got) if singleton_visible(got) else None
+    except Exception as e:  # the ledger must not take the method contract down
+        logger.warning("character: correction ledger read failed: %s", e)
+        return None
+
+
+def _method_label(table, record, today) -> "dict | None":
+    """``character_privacy.public_method_label`` plus, on a live date, the correction notice while the recorded
+    correction is recent (owner ruling 2026-11-06 item 10) — a reader who saw the old level is told why it moved."""
+    label = character_privacy.public_method_label(record)
+    if label and not label.get("notice"):
+        item = _correction_item(table)
+        label["notice"] = character_privacy.correction_notice((item or {}).get("recalculated_on"), today)
+    return label
+
+
+def _public_method(table) -> dict:
+    """The versioned public method and its correction ledger (owner rulings 2026-11-05/06). The ledger holds only
+    public-method values and one list of reasons (health.public_corrections), so it cannot identify private activity;
+    ``correction`` is None until a correction is recorded."""
+    from health import public_corrections
+
+    item = _correction_item(table)
+    return {
+        "version": character_privacy.PUBLIC_METHOD_VERSION,
+        "effective_from": character_privacy.PUBLIC_METHOD_EFFECTIVE_FROM,
+        "history": [dict(m) for m in character_privacy.PUBLIC_METHOD_HISTORY],
+        "correction": public_corrections.served_ledger(item),
+    }
 
 
 def character_config(*, _g) -> dict:
@@ -511,20 +549,26 @@ def character_config(*, _g) -> dict:
             "tiers": tiers,
             "cross_pillar_effects": effects,
             "updated_at": (cfg.get("_meta") or {}).get("last_updated"),
+            "public_method": _public_method(table),
         },
         cache_seconds=3600,
     )
 
 
-def _public_receipt(receipt: dict) -> dict:
-    """The receipt as the public may read it (owner rulings 2026-11-03/04). A receipt names the input rows a day
-    was computed from — and a journal row's sort key IS its date, template and entry id. So an input row from a
+def _public_receipt(receipt: dict) -> "dict | None":
+    """The receipt as the public may read it. Owner ruling 2026-11-05: it is the PUBLIC variant's own receipt (its
+    transitions are the public method's, digested against the public config), stored inside the day's receipt item
+    under ``character_privacy.PUBLIC_KEY`` — None when the item has none (fail closed: the method-1 receipt is the
+    owner's and is never served). Owner rulings 2026-11-03/04 still apply on top: a receipt names the input rows a
+    day was computed from — and a journal row's sort key IS its date, template and entry id. So an input row from a
     source the publication policy does not classify public (``common.activity_publication``; unclassified fails
     closed) is OMITTED, and so is a pillar every input of which is private (``character_privacy``), from the
-    transitions as from the replay's mismatch list. Omit, never mark: no count of what was left out. The stored
-    receipt is unchanged and its digest still covers every row (the owner's replay verifies it)."""
+    transitions as from the replay's mismatch list. Omit, never mark: no count of what was left out."""
     from common import activity_publication
 
+    receipt = receipt.get(character_privacy.PUBLIC_KEY) if isinstance(receipt, dict) else None
+    if not isinstance(receipt, dict) or not isinstance(receipt.get("transitions"), dict):
+        return None
     out = dict(receipt)
     out["input_rows"] = [
         r
@@ -591,21 +635,26 @@ def character_receipt(date: str | None = None, verify: bool = False, *, _g) -> d
         )
 
     receipt = _public_receipt(_decimal_to_float({k: v for k, v in item.items() if k not in ("pk", "sk")}))
+    if receipt is None:  # owner ruling 2026-11-05: only the public variant's receipt is ever served (fail closed)
+        return _ok(
+            {"available": False, "date": date, "reason": "no receipt computed under the public method is recorded for this date"},
+            cache_seconds=cache_s,
+        )
     body = {"available": True, "receipt": receipt, "replay": None}
     if verify:
         try:
             import boto3 as _boto3
-            from health import character_engine as _ce, progression_receipts as _pr
+            from health import character_engine as _ce, character_public as _cpub, progression_receipts as _pr
 
             bucket = os.environ.get("S3_BUCKET", "matthew-life-platform")
             s3 = _boto3.client("s3", region_name=S3_REGION)
             cfg = json.loads(s3.get_object(Bucket=bucket, Key=f"config/{USER_ID}/character_sheet.json")["Body"].read())
             # #1412: verify against the SAME effective config the compute hashed
-            # into the receipt (personal-variance targets overlaid).
+            # into the receipt (personal-variance targets overlaid) — the public method's (2026-11-05).
             from health import personal_baselines as _pb
 
-            cfg = _pb.effective_character_config(cfg, table, USER_PREFIX)
-            replayed: dict = _pr.replay(item, cfg, engine=_ce)
+            cfg = _cpub.public_config(_pb.effective_character_config(cfg, table, USER_PREFIX))
+            replayed: dict = _pr.replay(item[character_privacy.PUBLIC_KEY], cfg, engine=_ce)
             if isinstance(replayed.get("mismatches"), list):  # a private pillar's fields are not named here either
                 replayed["mismatches"] = [
                     m for m in replayed["mismatches"] if character_privacy.pillar_is_publishable((m or {}).get("pillar"))
@@ -662,8 +711,10 @@ def character_stats(*, _g) -> dict:
         pd = record.get(f"pillar_{p}", {})
         pillars[p] = {
             "level": float(pd.get("level", 1)),
-            "raw_score": float(pd.get("raw_score", 0)),
+            # owner ruling 2026-11-06: an unavailable pillar (no measurement) serves no score, never a placeholder
+            "raw_score": None if pd.get("not_instrumented") else float(pd.get("raw_score", 0)),
             "tier": pd.get("tier", "Foundation"),
+            "not_instrumented": bool(pd.get("not_instrumented", False)),
         }
 
     # Pre-experiment: zeroed character

@@ -80,18 +80,19 @@ from __future__ import annotations
 
 from typing import Any
 
-from training import effort_ceilings, in_block_variant, program_conflicts, program_v03, program_v04, variant_rotation
+from training import effort_ceilings, in_block_variant, program_conflicts, program_v03, program_v04, recent_aerobic, variant_rotation
 from training.accessory_check import CARDIO_NAME_HINTS, accessory_rotation, classify_movement  # noqa: F401 — re-exported (#5069 split)
+from training.movement_resolver import resolve_movement as _resolve_movement  # noqa: F401 — #6014: moved out, same entrypoint
 from training.program_v03 import BLOCK_CALENDAR  # noqa: F401 — v0.3 history; `load_ramp.block_1_start()` reads it (#4107)
 from training.session_cues import CARRY_EXPOSURE, _default_sets, exposure_cue  # noqa: F401 — #5317/#5318, re-exported
 from training.session_shape import (  # noqa: F401 — #5069: a session's length and shape (ruling 5), re-exported from here
     SESSION_TIME_MODEL,
     enforce_session_shape,
+    fit_to_time,
     lifting_minutes_cap,
     routine_minutes,
     session_minutes_estimate,
     session_shape_problems,
-    trim_to_time,
 )
 from training.training_charter import charter_value, charter_version
 
@@ -211,23 +212,22 @@ ANCHORS: dict[str, dict[str, Any]] = {
         ),
     },
     "hinge": {
-        "pattern": "hip hinge — TRAP BAR until ≤ 275 lb; the conventional pull is gated by bodyweight",
+        "pattern": "hip hinge — the conventional deadlift is the heavy pull, the Romanian deadlift the volume hinge (#5694)",
         "frequency_per_week": _frequency("each_major_muscle_per_wk"),
-        # #4108: the catalog key is `deadlift_trap_bar` (Deadlift (Trap bar) ×14); §3 keeps the trap bar until <= 275 lb.
-        "catalog_keys": ["deadlift_trap_bar", "machine_hip_thrust", "leg_curl"],
-        # #4147 v0.4 (owner 2026-09-23): the RDL is allowed as the MODERATE hinge — it is what the committed first v0.4
-        # session (Lower-heavy, 2026-09-25) carries. A moderate hinge exposure tries these first, then `catalog_keys`.
+        # #5694 (owner ruling 2026-11-08): the conventional pull is open (pulled since 2026-09-09); the trap bar stays listed.
+        "catalog_keys": ["deadlift_barbell", "deadlift_trap_bar", "machine_hip_thrust", "leg_curl"],
+        # #4147 v0.4 (owner 2026-09-23): the RDL is allowed as a MODERATE hinge. A moderate hinge exposure tries these first,
+        # then `catalog_keys`. Both lower roles pin their hinge (`SESSION_TEMPLATES[...]["anchor_keys"]`, #5694).
         "moderate_catalog_keys": ["romanian_deadlift_barbell", "romanian_deadlift_dumbbell"],
         "hevy_title_hints": ["deadlift", "romanian deadlift", "rdl", "good morning", "back extension", "hip thrust", "trap bar"],
         "primary_muscles": ["hamstrings", "glutes"],
-        "conventional_pull_gate_lb": 275,
         "provenance": "owner",
-        "stated": "2026-09-21",
+        "stated": "2026-11-08",
         "note": (
-            "v0.3 anchor. `owner_redlines.REDLINES['load_anchoring']['trap_bar_until_lb']` is the one home for the 275 gate — the "
-            "250–289 conventional pull in his record was set at 260-lb geometry. `deadlift_trap_bar` (tier 3) resolves first because "
-            "the hinge anchor is EXEMPT from the skill_ceiling of 2 (owner ruling 2026-09-23, #4080 — "
-            "`program_conflicts.ANCHOR_SKILL_CEILING_RULING`); `machine_hip_thrust` / `leg_curl` stay listed as the fallbacks."
+            "v0.3 anchor; #5694 (owner ruling 2026-11-08): the conventional deadlift is the heavy pull, the Romanian deadlift the "
+            "volume hinge (8–10); the trap-bar gate is retired (the charter entry is open, its weight only a phase boundary). Tier-3 "
+            "bars resolve because the hinge is EXEMPT from skill_ceiling 2 (#4080, `program_conflicts.ANCHOR_SKILL_CEILING_RULING`); "
+            "`machine_hip_thrust` / `leg_curl` stay listed as the fallbacks a non-exempt ceiling reaches."
         ),
     },
     "bench": {
@@ -293,7 +293,7 @@ ACCESSORY_POOL: dict[str, list[str]] = {
     # #5069: face_pull (rear delts, 93 logged sessions) joins for the shoulders+arms day; #5318 (owner ruling B3, 2026-10-24):
     # the farmer's carry replaced the dumbbell shrug there (traps, grip and core)
     "upper": ["cable_chest_fly", "cable_tricep_pushdown", "db_curl", "reverse_pec_deck", "db_lateral_raise", "face_pull", "farmers_walk"],
-    "lower": ["leg_press", "leg_curl", "calf_raise_machine", "machine_crunch", "machine_hip_thrust"],
+    "lower": ["leg_press", "leg_curl", "calf_raise_machine", "machine_crunch", "machine_hip_thrust", "kettlebell_swing"],  # #5774
 }
 """The pools, one per archetype, the block's accessories are chosen FROM at block start (v0.4's machines/cables, plus the
 shoulders+arms day's face pull, #5069, and the farmer's carry that replaced its dumbbell shrug, #5318); not a rotation menu (the rotation is #5075's). `leg_press` is a squat-family member used here as a lower ACCESSORY — the committed first v0.4
@@ -328,7 +328,9 @@ DAY_SHAPE: dict[str, Any] = {
         f"ruling A4 2026-10-24: a shorter session is never padded), one cardio block <= {charter_value('split.session_minutes.cardio_block_max')} min and "
         f"stretching <= {charter_value('split.session_minutes.stretching_max')} min on top"
     ),
-    "pm": "easy walking EVERY day (HR avg ≤ 120 with the talk test, 105 the target; 2–3 walks, weekday none over 75 min, one long-walk slot a week; never intervals)",
+    # #5916 (owner ruling 2026-11-13): no heart-rate number here. The talk test plus the redline's easy-effort RPE
+    # (`recent_aerobic.EASY_EFFORT_CUE` <- `owner_redlines.walking_floor_hr_wk.easy_rpe_max`), read, never retyped.
+    "pm": f"easy walking EVERY day: {recent_aerobic.EASY_EFFORT_CUE} 2–3 walks, weekday none over 75 min, one long-walk slot a week; never intervals",
     "order": "the sessions are a SEQUENCE, not weekdays (#4110): a walk or rest day postpones the next session, never skips it (#4147, #5069)",
     "cardio_placement": "no walking in the 2 h before lifting; the lightest walking day follows the heavy session; cycling is the knee-sparing substitute (OD2 deleted the ≤ 2 h cap)",
     "provenance": "owner-history",
@@ -603,6 +605,13 @@ SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
         # #5162 (owner ruling 2026-10-23, "trade inside 75"): the press's 3 sets became 3 lateral-raise sets
         "anchors": [["bench", "heavy"], ["row", "heavy"], ["vertical_pull", "moderate"]],
         "anchor_sets": {"vertical_pull": 2},
+        # #6014 (coaching decision 2026-11-15, owner-vetoable): the heavy row is the free-weight one-arm dumbbell row, pinned. With
+        # the seated row machine confirmed (owner ruling 2026-11-15, A) the row family's own order would serve `machine_row` here,
+        # the week would carry no free-weight pull and stage 1 (`week_commitments` free_weight_compounds, owner ruling 2026-11-12)
+        # would block every commit. The dumbbell row alone, so an in-block machine row on the volume day never takes this slot
+        # (`in_block_variant.prefer` only reorders the pinned members); a pain or equipment swap still walks the whole family
+        # (`live_session._anchor_candidates`). The volume day keeps the family's order.
+        "anchor_keys": {"row": ["one_arm_db_row"]},
         # #5053: the rear-delt slot (delts 14–18/wk, charter `volume_priorities`) — the upper heavy day carries the pec deck
         # the traded delt slot leads the accessories: a time trim drops last-listed first, so it goes last
         "accessories": ["db_lateral_raise", "cable_tricep_pushdown", "db_curl", "reverse_pec_deck"],
@@ -611,7 +620,11 @@ SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
     },
     "lower_heavy": {
         "archetype": "lower",
-        "anchors": [["squat", "heavy"], ["hinge", "moderate"]],
+        # #5694 (owner ruling 2026-11-08): the conventional deadlift, the heavy pull; pinned so an in-block RDL / trap bar never takes
+        # the slot. Fallback: the hip thrust (the tier-1 floor's hinge) — never `leg_curl`, an accessory he curls on lower days that
+        # #4409 rule 1 would otherwise serve as the in-block hinge
+        "anchors": [["squat", "heavy"], ["hinge", "heavy"]],
+        "anchor_keys": {"hinge": ["deadlift_barbell", "machine_hip_thrust"]},
         "accessories": ["leg_press", "leg_curl", "calf_raise_machine"],
         "accessory_sets": {"calf_raise_machine": 4},  # #5053: calves at their MEV floor (8/wk) across the two lower days
     },
@@ -650,10 +663,17 @@ SESSION_TEMPLATES: dict[str, dict[str, Any]] = {
     "lower_volume": {
         "archetype": "lower",
         "anchors": [["hinge", "volume"], ["squat", "volume"]],
+        # #5694 (owner ruling 2026-11-08): the Romanian deadlift (barbell), 8–10, replaces the trap bar (the retired gate's hinge).
+        # No `leg_curl` fallback (see lower_heavy): his 10-13 / 10-19 lower-volume curls would become the in-block hinge
+        "anchor_keys": {"hinge": ["romanian_deadlift_barbell", "romanian_deadlift_dumbbell", "machine_hip_thrust"]},
+        "anchor_reps": {"hinge": [8, 10]},
         # #5053: core and calves reach their MEV floors (4 and 8 sets/wk) here; the second leg curl is the week's trade — the
-        # redline's 75-set week is full (`owner_redlines` total_hard_sets_wk) and hamstrings still sit at the 8-set floor
-        "accessories": ["calf_raise_machine", "machine_crunch"],
-        "accessory_sets": {"calf_raise_machine": 4, "machine_crunch": 4},
+        # redline's 75-set week is full (`owner_redlines` total_hard_sets_wk) and hamstrings still sit at the 8-set floor.
+        # #5774 (owner ruling 2026-11-11): the kettlebell slot — the KB swing, entered via 2 KB-deadlift exposures (`kb_entry`)
+        # — beside the RDL, set-neutral: 2 of the crunch's 4 sets (core stays at its MEV of 4 with the carry's 2 core sets).
+        # It sits before the crunch so a time trim drops the crunch first; reps 6-8 (the OD1 novel-again cap, reps <= 8)
+        "accessories": ["calf_raise_machine", "kettlebell_swing", "machine_crunch"],
+        "accessory_sets": {"calf_raise_machine": 4, "kettlebell_swing": 2, "machine_crunch": 2},
     },
 }
 """Per role: its archetype, the anchor exposures (pattern, intensity) and the block-fixed accessories, in the charter's order.
@@ -666,7 +686,7 @@ work. Every big redline muscle group sits inside its weekly band and each group'
 role for the block (`ROTATION_RULE`). `anchor_sets` overrides an exposure's set count for one pattern: vertical pull runs
 2 sets so back (row + pulldown, twice) sits at 10. `anchor_keys` pins a pattern's slot to named members (#5318, owner ruling
 B2: upper-volume's bench slot is the incline dumbbell press only; upper-heavy keeps the barbell bench, the strength anchor).
-`accessory_shapes` names a distance-dosed accessory (#5318, ruling B3: the shoulders+arms farmer's carry; #5372: distance-typed, `CARRY_EXPOSURE`). v0.4's four roles were unchanged (#4147) until #5162 moved the press
+`anchor_reps` narrows one pattern's reps (#5694: both lower hinges are pinned; the volume day's RDL runs 8–10). `accessory_shapes` names a distance-dosed accessory (#5318, ruling B3: the shoulders+arms farmer's carry; #5372: distance-typed, `CARRY_EXPOSURE`). v0.4's four roles were unchanged (#4147) until #5162 moved the press
 off the two upper days; v0.3's are `program_v03.SESSION_TEMPLATES`."""
 
 SESSION_DISTRIBUTION_PROVENANCE: dict[str, Any] = {
@@ -686,8 +706,8 @@ SESSION_DISTRIBUTION_PROVENANCE: dict[str, Any] = {
     "note": (
         "The owner fixed the SPLIT and its ORDER (the charter's `split.sequence`, ruling 5), the heavy scheme (top set + 2 back-offs "
         f"at −10 %), the volume reps (8–12), each major muscle {charter_value('split.frequency.each_major_muscle_per_wk')}x/wk and "
-        f"delts {charter_value('split.frequency.delts_per_wk')}x/wk, the trap bar until the charter's gate and the "
-        "RDL as the moderate hinge. `lower_heavy` is the session he committed on 2026-09-23 (routine b1b9960468f374e30dcdeca8630dd18f). "
+        f"delts {charter_value('split.frequency.delts_per_wk')}x/wk, and the hinges (owner ruling 2026-11-08, #5694: the "
+        "conventional deadlift on the heavy lower day, the Romanian deadlift on the volume lower day; the trap-bar rule is retired). `lower_heavy` is the session he committed on 2026-09-23 (routine b1b9960468f374e30dcdeca8630dd18f). "
         "Three v0.4 placements are the platform's, owner-ratified unchanged on 2026-09-25. The `shoulders_arms` day's movements "
         "(overhead press, lateral raise, face pull, curl, pushdown) are the platform's choice from his logged history under the "
         "contents ruling 5 names; its farmer's carry (in place of the dumbbell shrug) and the upper_volume role's incline dumbbell press "
@@ -816,50 +836,6 @@ def _deload_trim(exposures: list[dict[str, Any]], pct: int) -> dict[str, Any]:
     return {"sets_before": before, "sets_after": total, "pct": pct, "loads": "held"}
 
 
-def _resolve_movement(
-    keys: list[str],
-    catalog_movements: dict[str, Any] | None,
-    skill_ceiling: int,
-    taken: set[str],
-    *,
-    family: str | None = None,
-    allow_anchor_exemption: bool = True,
-):
-    """The first catalog key of a pattern the generator may prescribe, in the listed order.
-
-    `family` is the anchor pattern name ("squat", "hinge", "bench", "row", …) when this call
-    is resolving one anchor's `catalog_keys`; `None` for an accessory, which never qualifies
-    for the exemption below regardless of `allow_anchor_exemption`.
-
-    When `family` is one of `program_conflicts.ANCHOR_SKILL_CEILING_RULING["exempt_families"]`
-    AND `allow_anchor_exemption` is True, THIS resolution uses that ruling's
-    `effective_ceiling` instead of `skill_ceiling` (owner ruling 2026-09-23, #4080,
-    option B) — every other pattern and every accessory still uses `skill_ceiling` unchanged.
-    `allow_anchor_exemption=False` is how a deliberately-lower ceiling (the Minimum Viable
-    Session's skill_ceiling=1) opts OUT of the exemption rather than being silently raised.
-    """
-    if catalog_movements is None:
-        return None, "movement catalog not read — the pattern is prescribed, the movement is unresolved"
-    ruling = program_conflicts.ANCHOR_SKILL_CEILING_RULING
-    exempt = allow_anchor_exemption and family is not None and family in ruling["exempt_families"]
-    ceiling = max(int(skill_ceiling), int(ruling["effective_ceiling"])) if exempt else skill_ceiling
-    skipped: list[str] = []
-    for k in keys:
-        m = catalog_movements.get(k)
-        if m is None:
-            skipped.append(f"{k} (not in catalog)")
-            continue
-        tier = int(m.get("skill_tier", 99))
-        if tier > ceiling:
-            skipped.append(f"{k} (skill_tier {tier} > ceiling {ceiling}" + (", anchor-exempt" if exempt else "") + ")")
-            continue
-        if k in taken:
-            skipped.append(f"{k} (already in this session)")
-            continue
-        return k, ("skipped: " + ", ".join(skipped)) if skipped else None
-    return None, "no reachable member: " + ", ".join(skipped)
-
-
 def session_prescription_for_role(
     role: str,
     *,
@@ -870,12 +846,13 @@ def session_prescription_for_role(
     in_block: list[dict[str, Any]] | None = None,
     deload_sets_pct: int | None = None,
     accessory_variants: dict[str, str] | None = None,
+    **time_fit: Any,
 ) -> dict[str, Any]:
     """The session for one role, as data: exposures, sets (top / back_off / working), reps, and its lifting minutes.
 
     #5069 (owner ruling 5): the session fits the charter's lifting-minute cap — `trim_to_time` drops accessories, last-listed
     first, and records what it dropped (`time_trim`); anchors are never cut for time. `session_minutes` is the estimate after
-    every trim (`session_minutes_estimate`).
+    every trim (`session_minutes_estimate`). #5799: `fit_to_time(**time_fit)` pairs supersets first; drop sets only if picked.
 
     `in_block` (#4409): `in_block_variant.performed_in_block` — a slot keeps its in-block variant.
 
@@ -898,6 +875,7 @@ def session_prescription_for_role(
     exposures: list[dict[str, Any]] = []
     for pattern, intensity in tmpl["anchors"]:
         spec = EXPOSURES[intensity]
+        reps = list((tmpl.get("anchor_reps") or {}).get(pattern) or spec["reps"])  # #5694: a role may narrow one pattern's reps
         # #5318: a role may pin a pattern's slot to named members (upper_volume's bench slot is the incline DB press only)
         override = (tmpl.get("anchor_keys") or {}).get(pattern)
         keys = list(override or ANCHORS[pattern]["catalog_keys"])
@@ -917,13 +895,12 @@ def session_prescription_for_role(
         if key:
             taken.add(key)
         if intensity == "heavy":
-            sets = [{"kind": "top", "reps": list(spec["reps"]), "rpe": list(_EFFORT[spec["effort"]])}] + [
-                {"kind": "back_off", "reps": list(spec["reps"]), "pct_of_top": 100 + spec["back_off_pct"]}
-                for _ in range(spec["back_off_sets"])
+            sets = [{"kind": "top", "reps": list(reps), "rpe": list(_EFFORT[spec["effort"]])}] + [
+                {"kind": "back_off", "reps": list(reps), "pct_of_top": 100 + spec["back_off_pct"]} for _ in range(spec["back_off_sets"])
             ]
         else:
             n_sets = int((tmpl.get("anchor_sets") or {}).get(pattern, spec["sets"]))
-            sets = [{"kind": "working", "reps": list(spec["reps"])} for _ in range(n_sets)]
+            sets = [{"kind": "working", "reps": list(reps)} for _ in range(n_sets)]
         exposures.append(
             {
                 "kind": "anchor",
@@ -940,6 +917,7 @@ def session_prescription_for_role(
         # #5318: a carry slot is distance-dosed (`CARRY_EXPOSURE`, #5372), every other accessory is a rep range (`EXPOSURES['accessory']`)
         shape = (tmpl.get("accessory_shapes") or {}).get(k, "accessory")
         acc = CARRY_EXPOSURE if shape == "carry" else EXPOSURES["accessory"]
+        acc = {**acc, "reps": [6, 8]} if k == "kettlebell_swing" else acc  # #5774: the KB slot runs the OD1 novel-again cap, reps <= 8
         n_acc = int((tmpl.get("accessory_sets") or {}).get(k, acc["sets"]))  # #5053: a floor slot may run more than 2 sets
         # an accessory is named by its catalog key already; without the catalog it is still
         # prescribable by that key, it just has not been checked against the skill ceiling
@@ -958,11 +936,10 @@ def session_prescription_for_role(
                 "rest_seconds": acc["rest_seconds"],
             }
         )
-    time_trim = trim_to_time(exposures)  # #5069: the charter's lifting-minute cap, accessories first
+    fit = fit_to_time(exposures, **time_fit)  # #5069/#5799: supersets (measured_minutes), drop sets (short_on_time_variant), the trim
     in_block_variant.stamp_template_ids(exposures, catalog_movements, in_block)  # #4431: the one slot-template resolver
-    deload_info = None
-    if deload:
-        deload_info = _deload_trim(exposures, int(deload_sets_pct if deload_sets_pct is not None else _deload_cfg()["sets_pct"]))
+    pct = _deload_cfg()["sets_pct"] if deload and deload_sets_pct is None else deload_sets_pct
+    deload_info = _deload_trim(exposures, int(pct)) if deload else None
     for e in exposures:  # #5317: the cue is the sets' own, stamped after every trim — never a literal beside them
         e["cue"] = exposure_cue(e["intensity"], e["sets"])
     return {
@@ -975,7 +952,7 @@ def session_prescription_for_role(
         "exposures": exposures,
         "total_sets": sum(len(e["sets"]) for e in exposures),
         "session_minutes": session_minutes_estimate(exposures),
-        "time_trim": time_trim,
+        **fit,  # time_trim (#5069), supersets and short_on_time (#5799)
         "charter_version": CHARTER_VERSION,
         "hevy_folder": HEVY_FOLDERS[tmpl["archetype"]],
         "distribution": SESSION_DISTRIBUTION_PROVENANCE,
@@ -1012,6 +989,7 @@ def planned_session(
     if role in SESSION_TEMPLATES:
         ib = in_block_variant.performed_in_block(block_workouts, catalog_movements, day)  # #4409
         # #5075: the plan view computes the rotation (no hidden ledger read)
+        out["kb_entry_exposures"] = variant_rotation.kb_entry.exposures(block_workouts, day)  # #5774: measured, None = not read
         out["rotation"] = variant_rotation.for_session(out, catalog_movements or {}, read=False, skill_ceiling=skill_ceiling)
         applied = ((entry.get("deload_recommendation") or {}).get("applied_on")) or {}  # #5070: his recorded word's own cut
         out["prescription"] = session_prescription_for_role(

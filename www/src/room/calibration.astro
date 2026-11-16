@@ -1,0 +1,656 @@
+---
+// /system/calibration/ — the Coaching Room's instrument (CR1). This file lives outside src/pages/ and is injected as a
+// route only when the room's scope is on (src/lib/room.js, astro.config.mjs: WEB_ROOM=1 / WEB_ROOM=cr1 privately, or the
+// committed `room_public: "cr1"`). With the room off it is not in the build at all. Every figure is carried from the snapshot's calibration.json (/api/calibration + /api/predictions);
+// nothing is computed here (README requirement A). Four questions, simple on arrival, deep on demand: what the
+// coaches predicted, how often they were right, against a simple guess, how much uncertainty remains.
+// Owner ruling 2026-11-09: the page LEADS with the producer's verified sentence (the calls that could be checked under
+// the current rules, re-verified, against "nothing changes" on exactly those calls), then — prominently — why the record
+// changed (eligibility and verification rules were corrected, not the coaches improving), then the uncertainty, the
+// excluded calls by category, the method, the archived original grading and the sealed pre-registration.
+import Base from "../layouts/Base.astro";
+import { DISPUTED_NOTE, isDisputed } from "../lib/disputed.js";
+import {
+  KIND_WORDS,
+  v2Answers,
+  blendRow,
+  coachVerified,
+  archiveRecord,
+  excludedAccounting,
+  methodChangeText,
+  qualifyText,
+  calibrationChart,
+  concentrationText,
+  denominatorSteps,
+  intervalText,
+  v2MethodText,
+  v2Short,
+  v2Stratum,
+  pct,
+  recordHeadline,
+  signTestText,
+  verifiedLead,
+  whyChanged,
+  skillText,
+  strataRows,
+  subgroupBlock,
+  verdictWords,
+  versusGuess,
+  voidedRows,
+} from "../lib/calibration.js";
+import { dayInWords, domainWords, kOfN, num } from "../lib/format.js";
+import { ROOM_MARKER, roomCr2, roomEnabled, roomPublic } from "../lib/room.js";
+import CommentaryFeature from "../components/CommentaryFeature.astro"; // CR2: renders nothing unless CR2 is on
+import OwnWords from "../components/OwnWords.astro";
+import { ownWords } from "../lib/own_words.js";
+import { loadAll, loadCalibration, loadOwnWords } from "../lib/snapshot.js";
+import { href, pathOf } from "../lib/url.js";
+
+if (!roomEnabled()) throw new Error("src/room/calibration.astro rendered with the room off — the room route must not be injected");
+
+const file = await loadCalibration();
+const all = await loadAll();
+const ok = file.state === "ok";
+const cal = (file.calibration || {}) as any;
+const rec = (file.record || {}) as any;
+const head = recordHeadline(file);
+const strata = strataRows(file);
+const blend = blendRow(file);
+const voided = voidedRows(cal.voided);
+const seal = cal.prereg_seal || null;
+const comparison = cal.comparison || {};
+const kinds = ["direction", "number", "yes_no", "sealed"];
+const coaches = [...(cal.coaches || [])].sort((a: any, b: any) => (a.retired === b.retired ? b.n - a.n : a.retired ? 1 : -1));
+const chartCoaches = coaches.map((c: any) => ({ coach_name: c.coach_name, reliability_bins: c.reliability_bins || [] }));
+const disputed = all.byType.prediction.filter(isDisputed);
+const noindex = process.env.WEB_NOINDEX === "1";
+const pub = roomPublic(); // the published CR1 build: no private banner, indexed
+const whole = roomCr2(); // CR2's per-coach record pages exist only when CR2 is on (committed "cr2", or a private build)
+const lead = verifiedLead(cal);
+const why = whyChanged(cal);
+const archived = archiveRecord(cal);
+const signText = signTestText(lead);
+const METHOD_NOTE = "https://github.com/averagejoematt/life-platform/blob/main/docs/methods/CALIBRATION_V2.md";
+const methodPage = all.get("method", "calibration_score_pairs");
+const asOf = file.as_of ? dayInWords(file.as_of) : null;
+const qualify = qualifyText(head);
+const methodChange = methodChangeText(cal.method);
+const excluded = excludedAccounting(cal);
+// calibration-v2 (owner ruling 2026-11-09): the coaches' stratum's three answers, as served — never a v1 label.
+const stratumV2 = v2Stratum(cal, "coaches");
+const stratumAnswers = v2Answers(stratumV2);
+// Owner ruling 2026-11-10: the three denominators (eligible → left out → the verified sample) and the secondary,
+// exploratory split by kind of call — both as served (verification_summary), never derived here.
+const steps = denominatorSteps(cal);
+const sub = subgroupBlock(cal);
+const methodText = v2MethodText(cal);
+const funnel = [
+  ["calls in the public ledger this cycle", rec.total, "ink"],
+  ["observations — not graded, by design", rec.observational, "rule"],
+  ["still open", rec.pending, "rule"],
+  ["could not be checked — too few readings", rec.expired, "rule"],
+  ["inconclusive", rec.inconclusive, "rule"],
+  ["disputed — counted neither right nor wrong", rec.under_review, "rule"],
+  ["checked — the denominator", rec.decided, "ink"],
+].filter((r) => typeof r[1] === "number");
+const widest = Math.max(1, ...funnel.map((r) => r[1] as number));
+const room = { [ROOM_MARKER]: "calibration" };
+// A dated first-person reflection (owner ruling 2026-11-15): shown beside the measured record, only when the platform
+// serves the approved line exactly. It is how the coaching seemed to him on one day — never a count, and never evidence
+// that the coaching had no effect (whether advice changed what he did is not recorded in public).
+const reflection = ownWords(await loadOwnWords(), "coaches_changed");
+---
+
+<Base title="The coaches, graded" top="system" description={head ? head.sentence : "The coaches' record, graded by code."} status={asOf}>
+  <Fragment slot="head">{!noindex && !pub && <meta name="robots" content="noindex, nofollow" />}</Fragment>
+  {
+    !pub && (
+      <div {...room} data-room-private="" class="mono" style="background:var(--ink);color:var(--paper);font-size:12px;padding:6px var(--pad);text-align:center">
+        Coaching Room · private build · not published
+      </div>
+    )
+  }
+
+  {
+    !ok || !head ? (
+      <section class="section" {...room}>
+        <div class="wrap">
+          <h1>The coaches, graded</h1>
+          <div class="empty" style="margin-top:18px"><span>{file.absent_text || "The calibration figures were not served for this snapshot."}</span></div>
+        </div>
+      </section>
+    ) : (
+      <>
+        <section class="section" {...room} style="padding-bottom:28px">
+          <div class="wrap" style="display:flex;flex-direction:column;gap:18px;max-width:1100px">
+            <p class="label">System · the Coaching Room · cycle {cal.cycle} · through {asOf}</p>
+            {
+              lead ? (
+                <>
+                  <h1 style="font-size:clamp(26px,4.4vw,42px);line-height:1.15;max-width:32ch" data-headline="verified" data-lead>{lead.sentence}</h1>
+                  {steps && (
+                    <div style="max-width:72ch;display:flex;flex-direction:column;gap:8px" data-denominators>
+                      <p class="label">Which calls the {steps.counted} are</p>
+                      <ol style="margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:0 18px;border-top:1px solid var(--ink)">
+                        <li style="padding:10px 0;border-bottom:1px solid var(--rule)" data-step="eligible">
+                          <b class="mono" style="font-size:22px">{steps.eligible}</b>
+                          <span style="display:block;font-size:14px">eligible calls: graded right or wrong this cycle</span>
+                        </li>
+                        <li style="padding:10px 0;border-bottom:1px solid var(--rule)" data-step="excluded">
+                          <b class="mono" style="font-size:22px">− {steps.excluded}</b>
+                          <span style="display:block;font-size:14px">
+                            left out, each for one stated reason{steps.repeats ? `, ${steps.repeats} of them repeats of a forecast already counted` : ""} (<a href="#excluded">listed below</a>)
+                          </span>
+                        </li>
+                        <li style="padding:10px 0;border-bottom:1px solid var(--rule)" data-step="sample">
+                          <b class="mono" style="font-size:22px">= {steps.counted}</b>
+                          <span style="display:block;font-size:14px">distinct forecasts in the verified sample: each counted once</span>
+                        </li>
+                      </ol>
+                      <p class="muted" style="font-size:13px">Every figure in the sentence above is out of the {steps.counted}, not the {steps.eligible}.</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <h1 style="font-size:clamp(32px,6vw,56px);line-height:1.04" data-headline={head.mode}>{head.h1}</h1>
+                  <p class="serif" style="font-size:clamp(18px,2.4vw,22px);line-height:1.45;max-width:62ch">{head.dek}</p>
+                  <p class="muted" style="font-size:13px;max-width:70ch;border-left:3px solid var(--ink);padding-left:12px" data-verification>{head.caveat}</p>
+                </>
+              )
+            }
+            {
+              why && (
+                <div style="border:2px solid var(--ink);padding:16px 18px;max-width:72ch;display:flex;flex-direction:column;gap:8px" data-why-changed>
+                  <p class="label">Why this record differs from the one first published</p>
+                  <p style="font-size:16px;line-height:1.5">{why.text}</p>
+                  {why.archive && (
+                    <p class="muted" style="font-size:14px">
+                      As first graded: <b class="mono">{kOfN(why.archive.k, why.archive.n)}</b>{why.archive.pct ? ` · ${why.archive.pct}` : ""}. Kept, every grade with it, in <a href="#archive">the archive</a>.
+                      {Number.isInteger(rec.decided) && Number.isInteger(rec.confirmed) && ` The ledger as graded now, recorded corrections applied: ${kOfN(rec.confirmed, rec.decided)} — the count the other pages label "as graded now".`}
+                    </p>
+                  )}
+                </div>
+              )
+            }
+            <p class="muted" style="font-size:13px;max-width:70ch">
+              Graded by code, never by the coaches. A call under classification review keeps its verdict and is counted neither right nor wrong.
+            </p>
+            <CommentaryFeature />
+          </div>
+        </section>
+
+        <section class="hair" {...room} style="border-top:1px solid var(--ink)">
+          <div class="wrap" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:0;padding-top:0;padding-bottom:0">
+            <div style="padding:22px 18px 22px 0;border-bottom:1px solid var(--rule)">
+              <p class="label">What they predicted</p>
+              <p style="font-size:28px;font-weight:700;margin-top:8px" class="num">{rec.total ?? "—"} <small style="font-size:14px;font-weight:400">calls this cycle</small></p>
+              <p class="muted" style="font-size:13px;margin-top:6px">{lead && excluded && excluded.eligible !== null ? `${excluded.eligible} were graded right or wrong; ${lead.n} of those are forecasts that could be checked under the current rules.` : `${rec.decided} of them could be checked against a reading. ${rec.counted_text || ""}`}</p>
+            </div>
+            <div style="padding:22px 18px;border-bottom:1px solid var(--rule)">
+              <p class="label">How often they were right</p>
+              <p style="font-size:28px;font-weight:700;margin-top:8px" class="num">{kOfN(head.k, head.n)}</p>
+              <p class="muted" style="font-size:13px;margin-top:6px">{head.mode === "verified" ? "calls that pass the current checks only" : "as graded now — not re-verified"}{pct(rec.accuracy_pct) && head.mode !== "verified" ? ` · ${pct(rec.accuracy_pct)}` : ""}</p>
+            </div>
+            <div style="padding:22px 18px;border-bottom:1px solid var(--rule)">
+              <p class="label">Against a simple guess</p>
+              <p style="font-size:17px;font-weight:700;margin-top:8px;line-height:1.3">{lead && lead.baseline ? `A prediction that nothing changes: ${kOfN(lead.baseline.right, lead.baseline.n)}${lead.baseline.pct ? ` · ${lead.baseline.pct}` : ""}` : head.skill || "Not compared yet."}</p>
+              <p class="muted" style="font-size:13px;margin-top:6px">
+                {versusGuess(head.records, "direction") && `Direction calls: coaches ${versusGuess(head.records, "direction")!.coach}, a guess that nothing changes ${versusGuess(head.records, "direction")!.guess}, of ${versusGuess(head.records, "direction")!.of}${head.mode === "verified" ? "" : ", as graded now"}.`}
+              </p>
+            </div>
+            <div style="padding:22px 0 22px 18px;border-bottom:1px solid var(--rule)">
+              <p class="label">How much is still uncertain</p>
+              <p style="font-size:17px;font-weight:700;margin-top:8px;line-height:1.3">{(head.mode === "verified" ? intervalText(head.ci95) : intervalText(cal.platform?.strata?.coaches?.accuracy_ci95)) || "The interval on the coaches' record is not published yet."}</p>
+              <p class="muted" style="font-size:13px;margin-top:6px">Each coach's interval is below. {rec.pending ?? 0} calls are still open{rec.under_review ? `; ${rec.under_review} disputed` : ""}.</p>
+            </div>
+          </div>
+        </section>
+
+        {
+          reflection && (
+            <section class="section" {...room} style="padding-top:26px;padding-bottom:26px;border-top:1px solid var(--rule)" data-own-reflection>
+              <div class="wrap" style="max-width:900px">
+                <OwnWords
+                  id="coaches_changed"
+                  label="A dated reflection, in my words"
+                  note="How it seemed to me on that day — beside the record on this page, not instead of it. The record counts whether forecasts came true; whether the coaching changed what I did is not measured here, and this sentence does not measure it either."
+                />
+              </div>
+            </section>
+          )
+        }
+
+        {
+          lead && (
+            <section class="section" {...room} data-uncertainty>
+              <div class="wrap grid cols2" style="gap:48px;align-items:start">
+                <div style="display:flex;flex-direction:column;gap:12px">
+                  <h2 style="font-size:30px">How sure can we be</h2>
+                  <dl style="display:flex;flex-direction:column;gap:10px;margin:0;border-top:1px solid var(--ink)">
+                    <div style="display:flex;flex-direction:column;gap:2px;padding-top:10px;border-bottom:1px solid var(--rule);padding-bottom:10px">
+                      <dt style="font-size:14px;font-weight:700">The coaches</dt>
+                      <dd class="mono" style="font-size:13px;margin:0">{kOfN(lead.k, lead.n)}{lead.pct ? ` · ${lead.pct}` : ""}</dd>
+                      <dd class="mono muted" style="font-size:13px;margin:0">{lead.ci || "no interval served"}</dd>
+                    </div>
+                    {lead.baseline && (
+                      <div style="display:flex;flex-direction:column;gap:2px;border-bottom:1px solid var(--rule);padding-bottom:10px">
+                        <dt style="font-size:14px;font-weight:700">A prediction that nothing changes <span class="muted" style="font-weight:400">· the same calls</span></dt>
+                        <dd class="mono" style="font-size:13px;margin:0">{kOfN(lead.baseline.right, lead.baseline.n)}{lead.baseline.pct ? ` · ${lead.baseline.pct}` : ""}</dd>
+                        {lead.baseline.ci && <dd class="mono muted" style="font-size:13px;margin:0">{lead.baseline.ci}</dd>}
+                      </div>
+                    )}
+                  </dl>
+                  {signText && <p style="font-size:15px;line-height:1.5" data-sign-test>{signText}</p>}
+                  {lead.baseline && lead.baseline.unscorable > 0 && (
+                    <p class="muted" style="font-size:13px;line-height:1.5">{lead.baseline.unscorable} of the calls had no reading before them for the simple prediction to start from; they count as its misses.</p>
+                  )}
+                  <p class="muted" style="font-size:13px;line-height:1.5">
+                    The intervals are 95% Wilson intervals. Several calls share a measure and a window, so they are not independent: the intervals and the test are
+                    optimistic, not conservative.
+                  </p>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:10px" data-methodology>
+                  <h2 style="font-size:30px">How it is scored</h2>
+                  <p style="font-size:15px;line-height:1.5">
+                    A call counts only if it named a measure, a direction or a number, and a date to check it by; if its grade was re-run under the current rules
+                    and came out the same (or the same as a recorded correction); and if it is cleared for publication. The simple prediction is graded on exactly
+                    those calls, by the same grader, against the same tolerance.
+                  </p>
+                  <p style="font-size:14px">
+                    <a href={METHOD_NOTE}>The method note (calibration v2)</a>
+                    {methodPage && <> · <a href={href(pathOf("method", methodPage.id))}>{methodPage.name || methodPage.title}</a></>}
+                  </p>
+                </div>
+              </div>
+            </section>
+          )
+        }
+
+        {
+          lead && sub && (
+            <section class="section" {...room} style="border-top:1px solid var(--ink)" data-subgroups id="by-kind">
+              <div class="wrap" style="display:flex;flex-direction:column;gap:12px;max-width:900px">
+                <p class="label">A secondary, exploratory result</p>
+                <h2 style="font-size:30px">By kind of call</h2>
+                <p style="font-size:15px;line-height:1.5;max-width:70ch">
+                  The same {sub.n} forecasts, split by the kind of call, each tested the same way as the headline: {sub.test}.
+                </p>
+                {sub.caveat && <p style="font-size:15px;line-height:1.5;max-width:70ch;border-left:3px solid var(--ink);padding-left:12px" data-subgroup-caveat>{sub.caveat}</p>}
+                <div style="display:flex;flex-direction:column;border-top:1px solid var(--ink)">
+                  {sub.kinds.map((k) => (
+                    <div style="padding:12px 0;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:4px" data-subgroup={k.key}>
+                      <p style="font-size:15px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 16px">
+                        <b>{k.words}</b>
+                        <span class="mono" style="font-size:13px">{k.counted} counted{k.of !== null && k.coach !== null && k.rule !== null ? ` · coaches ${k.coach} · simple prediction ${k.rule} · of ${k.of}` : ""}</span>
+                      </p>
+                      <p style="font-size:14px;line-height:1.5" data-subgroup-sentence>{k.sentence}</p>
+                    </div>
+                  ))}
+                </div>
+                {sub.adjustment && <p class="muted" style="font-size:13px;line-height:1.5" data-subgroup-adjustment>{sub.adjustment}</p>}
+              </div>
+            </section>
+          )
+        }
+
+        {
+          stratumAnswers.length > 0 && (
+            <section class="section" {...room} style="border-top:1px solid var(--ink)" data-assessment>
+              <div class="wrap" style="display:flex;flex-direction:column;gap:10px;max-width:900px">
+                <h2 style="font-size:30px">The calibration verdicts</h2>
+                <p style="font-size:15px;line-height:1.5;max-width:70ch" data-assessment-scope>
+                  These three answers are over {Number.isInteger(stratumV2?.n) ? `all ${stratumV2.n}` : "all the"} graded calls this season, as graded{lead ? `: a wider set than the ${lead.n} verified forecasts above, not re-verified and not de-duplicated, so their counts differ from the figures above` : ""}.
+                </p>
+                <dl style="font-size:15px;max-width:70ch;margin:0;display:flex;flex-direction:column;gap:8px">
+                  {stratumAnswers.map((x) => (
+                    <div><dt style="font-weight:700">{x.ask}</dt><dd style="margin:0">{x.words}</dd></div>
+                  ))}
+                </dl>
+                {methodText && <p class="muted" style="font-size:13px">Three separate tests, each with its own interval ({methodText}). Not detecting a problem is not proof of good calibration.</p>}
+              </div>
+            </section>
+          )
+        }
+
+        {
+          lead && excluded && (
+            <section class="section" {...room} style="border-top:1px solid var(--ink)" data-excluded id="excluded">
+              <div class="wrap" style="display:flex;flex-direction:column;gap:12px;max-width:900px">
+                <h2 style="font-size:30px">Which calls were left out, and why</h2>
+                {excluded.eligible !== null && excluded.total !== null && (
+                  <p style="font-size:16px;line-height:1.5" data-reconcile>
+                    <b class="mono">{excluded.eligible}</b> calls were graded right or wrong. <b class="mono">{excluded.total}</b> are left out of the count above,
+                    each for one reason, leaving <b class="mono">{excluded.counted}</b>. Every one stays in the ledger with its grade.
+                  </p>
+                )}
+                <div class="rows">
+                  {excluded.rows.map((r) => (
+                    <div data-excluded-category={r.key}><span style="font-size:14px">{r.words}</span><b class="mono">{r.n}</b></div>
+                  ))}
+                  {excluded.total !== null && (<div><span style="font-size:14px"><b>All left out</b></span><b class="mono">{excluded.total}</b></div>)}
+                </div>
+                {excluded.note && <p class="muted" style="font-size:13px">{excluded.note}</p>}
+              </div>
+            </section>
+          )
+        }
+
+        <section class="section" {...room}>
+          <div class="wrap grid cols2" style="gap:48px;align-items:start">
+            <div>
+              <h2 style="font-size:30px">Which calls qualify to be scored</h2>
+              <p style="font-size:15px;line-height:1.5;margin-top:10px;max-width:60ch">
+                Most of what the coaches say is commentary, not a call that can be checked. Only a call with a measure and a date to check it against
+                enters the score; the rest are counted, not graded.
+              </p>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-top:16px">
+                {funnel.map(([label, n, tone]) => (
+                  <div style="display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) 3.5em;gap:10px;align-items:center;font-size:14px">
+                    <span>{label}</span>
+                    <span aria-hidden="true" style={`display:block;height:12px;width:${Math.max(1, Math.round(((n as number) / widest) * 100))}%;background:var(--${tone === "ink" ? "ink" : "rule2"})`} />
+                    <b class="mono" style="text-align:right">{n}</b>
+                  </div>
+                ))}
+              </div>
+              <p class="muted" style="font-size:13px;margin-top:12px">The counts are the platform's, as served; the bars only draw them.</p>
+              {qualify && <p style="font-size:15px;line-height:1.5;margin-top:16px;border-left:3px solid var(--ink);padding-left:12px" data-qualify>{qualify}</p>}
+              {
+                excluded && !lead && (
+                  <div style="margin-top:16px" data-excluded>
+                    <p class="label" style="margin-bottom:6px">Left out of the headline, and why</p>
+                    <div class="rows">
+                      {excluded.rows.map((r) => (
+                        <div data-excluded-category={r.key}><span style="font-size:14px">{r.words}</span><b class="mono">{r.n}</b></div>
+                      ))}
+                      {excluded.total !== null && (<div><span style="font-size:14px"><b>All left out</b></span><b class="mono">{excluded.total}</b></div>)}
+                    </div>
+                    {excluded.note && <p class="muted" style="font-size:13px;margin-top:8px">{excluded.note}</p>}
+                  </div>
+                )
+              }
+              {
+                methodChange && (
+                  <details style="margin-top:14px;font-size:14px" data-method>
+                    <summary style="cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center">{methodChange}</summary>
+                    <p class="muted" style="margin-top:6px;line-height:1.5">{cal.method.note}</p>
+                  </details>
+                )
+              }
+            </div>
+            <div>
+              <h2 style="font-size:30px">Against a guess that nothing changes</h2>
+              <p class="muted" style="font-size:14px;margin-top:10px">Each checked call is also scored by a rule that says the measure stays where it was. Kinds of call are never added together.{head.mode === "verified" ? " Re-verified calls only." : " On the grades as they stand now."}</p>
+              {sub ? (
+                <p style="font-size:15px;line-height:1.5;margin-top:12px">
+                  For the {sub.n} verified forecasts, the comparison split by kind of call, with its adjusted p-values, is <a href="#by-kind">above, as an exploratory result</a>.
+                </p>
+              ) : (
+              <div class="rows" style="margin-top:12px">
+                {kinds.map((k) => {
+                  const v = versusGuess(head.records, k);
+                  return v ? (
+                    <div>
+                      <span style="font-size:14px"><b>{KIND_WORDS[k]}</b> <span class="muted">· {verdictWords(v.verdict)}</span></span>
+                      <span class="mono">coaches {v.coach} · guess {v.guess} · of {v.of}</span>
+                    </div>
+                  ) : null;
+                })}
+              </div>
+              )}
+              {comparison.method && (
+                <details style="margin-top:12px;font-size:13px">
+                  <summary style="cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center">How the comparison is scored</summary>
+                  <p class="muted" style="margin-top:6px;line-height:1.5">{comparison.method}</p>
+                </details>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section class="section" {...room} style="border-top:1px solid var(--ink)">
+          <div class="wrap grid cols2" style="gap:48px;align-items:start">
+            <div style="display:flex;flex-direction:column;gap:14px">
+              <h2 style="font-size:30px">How sure they said they were</h2>
+              <p style="font-size:15px;line-height:1.55">
+                Calibration compares how confident a call said it was with how often such calls came true. When nearly every call is stated at one value there
+                is nothing to compare across, so no curve is drawn and no coach is called calibrated on that evidence.
+                {head.mode === "verified" ? "" : " Drawn from the grades as they stand now; none is yet published as re-verified."}
+              </p>
+              <div class="rows">
+                {coaches.map((c: any) => (
+                  <div>
+                    <span style="font-size:14px"><b>{c.coach_name}</b>{c.retired ? " · retired" : ""}</span>
+                    <span class="mono" style="font-size:12px;text-align:right">{concentrationText(c)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <figure class="figure chart" style="margin:0">
+              <div data-cal-chart data-payload={JSON.stringify(chartCoaches)} style="position:relative"><Fragment set:html={calibrationChart(chartCoaches)} /></div>
+              <figcaption class="muted" style="font-size:13px;margin-top:8px;line-height:1.5">
+                Across: the confidence a call was stated with, in bands one tenth wide (shaded where calls sit). Up: how often those calls came true. One dot per
+                coach per band, sized by the number of calls; inside a band the dots sit side by side, and where they sit inside it means nothing. The dashed
+                line is "came true exactly as often as stated". Point at a dot, tap it, or use the arrow keys.
+              </figcaption>
+            </figure>
+          </div>
+        </section>
+
+        <section class="section" {...room} style="border-top:1px solid var(--ink)">
+          <div class="wrap">
+            <h2 style="font-size:30px">Each coach</h2>
+            <p class="muted" style="font-size:14px;margin-top:8px;max-width:70ch">Every seat that made a checked call this cycle, retired seats included. A wide interval means the record could still move a long way. {head.mode === "verified" ? "Where a coach's re-verified record is served it leads; the ledger's record as graded now (corrections applied, not re-verified) sits beside it." : "Each record is the grades as they stand now; none is yet published as re-verified."}</p>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:0 28px;margin-top:16px;border-top:1px solid var(--ink)">
+              {coaches.map((c: any) => {
+                const obj = c.coach_ref ? all.get("coach", c.coach_ref) : null;
+                const dir = versusGuess(c.comparison?.records, "direction");
+                const numb = versusGuess(c.comparison?.records, "number");
+                const cv = coachVerified(c);
+                const answers = v2Answers(c.assessment_v2);
+                return (
+                  <article style="padding:16px 0;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:6px" data-coach={c.coach_id}>
+                    <p style="font-size:17px;font-weight:700">
+                      {obj ? <a href={href(pathOf("coach", obj.id))}>{c.coach_name}</a> : c.coach_name}
+                      <span class="muted" style="font-weight:400;font-size:13px"> · {obj ? domainWords(obj.domain) : ""}{c.retired ? (obj ? " · retired" : "retired") : ""}</span>
+                    </p>
+                    {cv ? (
+                      <>
+                        <p class="mono" style="font-size:14px" data-coach-verified>{kOfN(cv.k, cv.n)} that pass the current checks{cv.pct ? ` · ${cv.pct}` : ""}</p>
+                        <p class="mono muted" style="font-size:12px">{cv.ci || "no interval served"} · as graded now {kOfN(c.confirmed, c.n)}</p>
+                      </>
+                    ) : (
+                      <>
+                        <p class="mono" style="font-size:14px">{kOfN(c.confirmed, c.n)}{pct(c.accuracy_pct) ? ` · ${pct(c.accuracy_pct)}` : ""}</p>
+                        <p class="mono muted" style="font-size:12px">{intervalText(c.accuracy_ci95) || "no interval served"}</p>
+                      </>
+                    )}
+                    {answers.length > 0 ? (
+                      <dl style="font-size:13px;margin:0;display:flex;flex-direction:column;gap:4px" data-calibration-v2>
+                        {answers.map((x) => (
+                          <div><dt class="muted" style="font-size:12px">{x.ask}</dt><dd style="margin:0">{x.words}</dd></div>
+                        ))}
+                      </dl>
+                    ) : (
+                      <p style="font-size:13px">{c.comparison?.skill?.sentence || "No calibration assessment served."}</p>
+                    )}
+                    <dl style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:12px;margin:4px 0 0">
+                      {dir && (<><dt class="muted">direction v guess</dt><dd class="mono" style="margin:0">{dir.text}</dd></>)}
+                      {numb && (<><dt class="muted">number v guess</dt><dd class="mono" style="margin:0">{numb.text}</dd></>)}
+                      <dt class="muted">stated</dt><dd class="mono" style="margin:0">{concentrationText(c)}</dd>
+                      {c.under_review > 0 && (<><dt class="muted">disputed</dt><dd class="mono" style="margin:0">{c.under_review}, counted neither way</dd></>)}
+                    </dl>
+                    {obj && whole && <a href={href(`/system/coaches/${obj.id}/record/`)} style="font-size:13px;font-weight:700;margin-top:4px">{c.coach_name}'s full record →</a>}
+                  </article>
+                );
+              })}
+            </div>
+            {all.byType.coach.some((c: any) => c.tier === "lead") && <p class="muted" style="font-size:13px;margin-top:12px">The lead coach makes no calls of its own.</p>}
+          </div>
+        </section>
+
+        <section class="section" {...room} style="border-top:1px solid var(--ink)">
+          <div class="wrap">
+            <details data-strata>
+            <summary style="cursor:pointer;min-height:44px;display:flex;align-items:center;gap:10px"><b style="font-size:20px">The platform's own card, and why it is not the coaches' record</b></summary>
+            <p style="font-size:15px;margin-top:8px;max-width:72ch;line-height:1.5">
+              The platform scores four kinds of call. The coaches' calls are one stratum; the daily metric engine's interval forecasts are far more numerous and far
+              easier to get right, so a figure that blends them is not the coaches' record.
+            </p>
+            <div class="scroll" style="margin-top:14px" tabindex="0" role="region" aria-label="The strata of the platform card (scrolls sideways)">
+              <table style="min-width:640px">
+                <thead><tr><th>Stratum</th><th>Checked</th><th>Right</th><th>Share</th><th>95% interval</th><th>Brier skill</th><th>Calibration</th></tr></thead>
+                <tbody>
+                  {strata.map((s) => (
+                    <tr data-stratum={s.key}>
+                      <td style="font-weight:600">{s.name}</td>
+                      <td class="mono">{s.n ?? "—"}</td>
+                      <td class="mono">{s.n ? (s.right ?? "—") : "—"}</td>
+                      <td class="mono">{s.n ? (s.pct || "not published") : "none settled"}</td>
+                      <td class="mono">{s.n ? (s.ci ? s.ci.replace("95% interval ", "") : "not published") : "—"}</td>
+                      <td class="mono">{s.n ? skillText(s.skill).split(" — ")[0] : "—"}</td>
+                      <td>{s.n ? (v2Short(s.assessment) || "no assessment served") : "no resolved calls"}</td>
+                    </tr>
+                  ))}
+                  {blend && (
+                    <tr data-stratum="blend" style="background:var(--rule2)">
+                      <td style="font-weight:600">The blend of all four — the platform card, not the coaches' record</td>
+                      <td class="mono">{blend.n}</td>
+                      <td class="mono">{blend.right}</td>
+                      <td class="mono">{blend.pct || "—"}</td>
+                      <td class="mono">{blend.ci ? blend.ci.replace("95% interval ", "") : "—"}</td>
+                      <td class="mono">{skillText(blend.skill).split(" — ")[0]}</td>
+                      <td>not assessed — strata are never pooled</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <p class="muted" style="font-size:13px;margin-top:10px">Brier skill: above zero beats the stratum's own base rate; zero or below does not. Each stratum is scored against its own base rate.</p>
+            </details>
+          </div>
+        </section>
+
+        <section class="section" {...room} style="border-top:1px solid var(--ink)">
+          <div class="wrap grid cols2" style="gap:48px;align-items:start">
+            <div>
+              <h2 style="font-size:30px">Voided by a reset, never graded</h2>
+              <p style="font-size:15px;margin-top:8px;line-height:1.5">
+                When the experiment restarted, every still-open pre-registered call was voided rather than graded: {num(cal.voided?.n)} in all
+                ({num(cal.voided?.predictions)} calls and {num(cal.voided?.hypotheses)} hypothesis bets). They are counted here so the denominator above stays honest.
+              </p>
+              {voided.length > 0 && (
+                <details style="margin-top:8px;font-size:14px" data-voided>
+                  <summary style="cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center">Each reset ({voided.length})</summary>
+                  <div class="rows" style="margin-top:6px">
+                    {voided.map((v) => (
+                      <div><span style="font-size:14px">Reset of {v.words}</span><span class="mono">{num(v.n)}</span></div>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </div>
+            <div>
+              <h2 style="font-size:30px">Sealed before day one</h2>
+              {seal && seal.verifiable === true && seal.verify && seal.artifact_url ? (
+                <>
+                  <p style="font-size:15px;margin-top:8px;line-height:1.5">
+                    The pre-registration for the start on {dayInWords(seal.genesis)} was hashed and stamped before the first day was graded. Anyone can check that
+                    the file has not changed since: run the command and compare the hash.
+                  </p>
+                  <p class="mono" style="font-size:12px;margin-top:12px;word-break:break-all"><span class="muted">sha-256 </span>{seal.sha256}</p>
+                  <div data-verify style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+                    <label style="flex:1 1 240px;display:flex;flex-direction:column;gap:4px">
+                      <span class="label">Verify command</span>
+                      <input class="sel mono" type="text" readonly value={seal.verify} aria-label="The command that re-hashes the sealed file" style="font-size:12px;width:100%;min-height:44px" />
+                    </label>
+                    <button type="button" class="btn ghost sm" hidden style="align-self:flex-end;min-height:44px">Copy</button>
+                  </div>
+                  <p style="font-size:13px;margin-top:10px"><a href={seal.artifact_url}>The sealed file</a> · <a href={seal.stamp_url || seal.artifact_url}>its stamp</a>{seal.stamped_at ? ` · stamped ${dayInWords(seal.stamped_at)}` : ""}</p>
+                </>
+              ) : seal && seal.sha256 ? (
+                <>
+                  {/* Owner ruling 2026-11-11 (item 3): the served file does not match the seal, so no check is offered —
+                      the digest stays published with the reason, as served (prereg_seal_state). */}
+                  <p style="font-size:15px;margin-top:8px;line-height:1.5" data-seal-unverifiable>
+                    {seal.unverifiable_text || "The file served at the sealed address does not match this hash, so the seal cannot be checked against a file from this site."}
+                  </p>
+                  <p class="mono" style="font-size:12px;margin-top:12px;word-break:break-all"><span class="muted">sha-256 </span>{seal.sha256}</p>
+                  {seal.stamp_url && (
+                    <p style="font-size:13px;margin-top:10px"><a href={seal.stamp_url}>The stamp</a>{seal.stamped_at ? ` · stamped ${dayInWords(seal.stamped_at)}` : ""}</p>
+                  )}
+                </>
+              ) : (
+                <div class="empty" style="margin-top:12px"><span>No sealed pre-registration was served.</span></div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section class="section" {...room} style="border-top:1px solid var(--ink)">
+          <div class="wrap" style="max-width:1000px">
+            <details data-archive id="archive">
+              <summary style="cursor:pointer;min-height:44px;display:flex;align-items:center;gap:10px">
+                <b style="font-size:20px">The archive — the original grading, and the career record</b>
+              </summary>
+              <div style="display:flex;flex-direction:column;gap:16px;margin-top:14px">
+                {archived ? (
+                  <p style="font-size:15px" data-archived-original>
+                    The original grading, {archived.label}: <b class="mono">{kOfN(archived.k, archived.n)}</b>{archived.pct ? ` · ${archived.pct}` : ""}{archived.ci ? ` · ${archived.ci}` : ""}.
+                    It is kept as history; the record above replaces it as the coaches' score.
+                  </p>
+                ) : head.archive && (
+                  <p style="font-size:15px">As first graded, including grades not re-verified: <b class="mono">{kOfN(head.archive.k, head.archive.n)}</b>{head.archive.pct ? ` · ${head.archive.pct}` : ""}.</p>
+                )}
+                <p style="font-size:15px;line-height:1.5">
+                  The grader gained its quality checks (a logging gap, too little data, a stand-in measure) part-way through. A grade written before the checks existed
+                  is kept and counted, but it was never assessed by them and it has not been re-verified. Per coach, as served:
+                </p>
+                <div class="rows">
+                  {coaches.map((c: any) => (
+                    <div>
+                      <span style="font-size:14px"><b>{c.coach_name}</b></span>
+                      <span class="mono" style="font-size:12px;text-align:right">
+                        {c.quality ? `${c.quality.unassessed} of ${c.quality.n} graded before the checks · ${c.quality.clean} clean · ${c.quality.flagged} flagged` : "no quality record served"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p style="font-size:15px;line-height:1.5">
+                  The career record runs across earlier cycles of the experiment, before resets; it is history, not this cycle's score.
+                  {rec.lifetime && typeof rec.lifetime.decided === "number" ? ` All coaches: ${kOfN(rec.lifetime.confirmed, rec.lifetime.decided)}${pct(rec.lifetime.accuracy_pct) ? `, ${pct(rec.lifetime.accuracy_pct)}` : ""}.` : ""}
+                </p>
+                <div class="rows">
+                  {coaches.filter((c: any) => c.lifetime).map((c: any) => (
+                    <div>
+                      <span style="font-size:14px"><b>{c.coach_name}</b> <span class="muted">· career</span></span>
+                      <span class="mono" style="font-size:12px;text-align:right">{kOfN(c.lifetime.confirmed, c.lifetime.n)}{intervalText(c.lifetime.accuracy_ci95) ? ` · ${intervalText(c.lifetime.accuracy_ci95)}` : ""}</span>
+                    </div>
+                  ))}
+                </div>
+                {disputed.length > 0 && (
+                  <div>
+                    <p class="label" style="margin-bottom:6px">Disputed · {DISPUTED_NOTE}</p>
+                    <div class="rows">
+                      {disputed.map((p: any) => (
+                        <a href={href(pathOf("prediction", p.id))}>
+                          <span style="font-size:14px"><b>{p.coach_name}</b> <span class="muted">· {dayInWords(p.logged_date, { short: true })}{p.metric_key ? ` · ${p.metric_key.replace(/_/g, " ")}` : ""}</span></span>
+                          <span class="flag disputed">counted neither way</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </details>
+            <p style="margin-top:20px"><a class="btn ghost sm" href={href("/system/ledger/")}>Every call, in the ledger</a></p>
+          </div>
+        </section>
+      </>
+    )
+  }
+</Base>
+
+<script>
+  import "../islands/calibration.js";
+</script>

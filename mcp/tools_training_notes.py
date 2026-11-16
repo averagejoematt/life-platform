@@ -15,11 +15,15 @@ existed anywhere. See the block at the end of this file.
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from typing import Any
 
 from boto3.dynamodb.conditions import Key
-from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from common.numeric import decimals_to_float
+from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from training import note_requests as nr  # #5573: the owner's Hevy-note requests (the block at the end of this file)
 from training.training_notes import DEGRADE_UNRECORDED, dedupe_head_rows, head_sk_base
 from training.training_notes_keys import PREFLIGHT_LOOKBACK_DAYS  # #3972: the one number, not a restated 180
+from training.training_notes_pain import PAIN, record_pain_class  # #5800: only the `pain` class is a flag
 
 from mcp.config import table
 from mcp.core import LAYER_DARK, decimal_to_float, derived_layer_status
@@ -85,7 +89,7 @@ def _notes_timeline(rows: list) -> tuple[list, list, object]:
         # it corrected — it is found by the head's `migrated_from_sk`.
         ov = corrections.get(r.get("sk", "")) or corrections.get(str(r.get("migrated_from_sk") or ""))
         signals = (ov or {}).get("signals", r.get("signals", []))
-        pain = (ov or {}).get("pain_flag", r.get("pain_flag", False))
+        pain_class, pain = _pain_of(r, ov, signals)
         entry = {
             "date": r.get("date"),
             "workout_uid": r.get("workout_uid"),
@@ -95,6 +99,7 @@ def _notes_timeline(rows: list) -> tuple[list, list, object]:
             "note_raw": r.get("note_raw"),
             "signals": signals,
             "pain_flag": pain,
+            "pain_class": pain_class,  # #5800: pain | discomfort | form_or_equipment | None — only `pain` is a flag
             "sentiment": (ov or {}).get("sentiment", r.get("sentiment")),
             "degraded": r.get("degraded", False),
             # #3699: a degraded row says WHY on the row itself. A row with no reason field
@@ -114,6 +119,24 @@ def _notes_timeline(rows: list) -> tuple[list, list, object]:
             if s.get("class") == "progression" and s.get("value"):
                 latest_progression = s["value"]
     return timeline, pain_dates, latest_progression
+
+
+def _pain_of(r: dict, ov: dict | None, signals: list) -> tuple[str | None, bool]:
+    """`(pain_class, pain_flag)` for one head (#5800). The class is read from the note's own words and signals, so a
+    record written before #5800 (whose stored `pain_flag` is the whole net) is classed with no rewrite; an owner
+    correction that states `pain_flag` is his word and wins."""
+    cls = record_pain_class({**r, "signals": signals})
+    if ov and "pain_flag" in ov:
+        flag = bool(ov.get("pain_flag"))
+        return (ov.get("pain_class") or (PAIN if flag else (None if cls == PAIN else cls))), flag
+    return cls, cls == PAIN
+
+
+def _not_acted_on(timeline: list) -> list:
+    """`[{date, class}]` for the discomfort / form-or-equipment entries — listed, never a flag (#5800). No note text."""
+    return [
+        {"date": str(e.get("date") or "")[:10], "class": e["pain_class"]} for e in timeline or [] if e.get("pain_class") not in (None, PAIN)
+    ]
 
 
 def _pain_notes(timeline: list) -> list:
@@ -169,6 +192,7 @@ def pain_flags_for_templates(template_ids, start: str, layer_status: str, max_wo
             # #4174: each flagged note with its own words — the dismissal rule is per SITE, and
             # the note layer knows no anatomy, so the words are how a note is tied to a site.
             "pain_notes": _pain_notes(timeline),
+            "not_pain_notes": _not_acted_on(timeline),  # #5800: discomfort / form-or-equipment, listed and acted on nowhere
             "sessions_with_notes": len(timeline),
             "layer_status": layer_status,
         }
@@ -212,6 +236,14 @@ def tool_get_exercise_notes(args):
         from mcp import tools_fitness_tests as ftt
 
         return (ftt.action_log if action == "fitness_test" else ftt.action_list)(args)
+    if action in (
+        "note_requests",
+        "answer_request",
+        "decline_request",
+    ):  # #5573: his Hevy-note requests (the #5573 block at the end of this file)
+        return {"note_requests": _note_requests_list, "answer_request": _answer_note_request, "decline_request": _decline_note_request}[
+            action
+        ](args)
     if action != "read":
         return {
             "error": f"Unknown action '{action}'.",
@@ -226,6 +258,9 @@ def tool_get_exercise_notes(args):
                 "weekly_menu",
                 "fitness_test",
                 "fitness_tests",
+                "note_requests",
+                "answer_request",
+                "decline_request",
             ],
         }
     exercise = args.get("exercise") or args.get("template_id") or ""
@@ -256,9 +291,10 @@ def tool_get_exercise_notes(args):
     # into get_freshness_status"; it was hooked into the freshness TOOL and never into the
     # reader whose zeros it qualifies.
     try:
-        from training.training_notes import training_notes_health
+        from mcp import plan_call_scope
 
-        health = training_notes_health(table)
+        # #5813: once per plan_next_session call (stage 1 asks once per drafted exercise); a plain read elsewhere
+        health = plan_call_scope.notes_health(table)
     except Exception as e:  # noqa: BLE001
         health = {"checked": False, "error": f"{type(e).__name__}: {e}"}
     status, reason = derived_layer_status(health)
@@ -274,12 +310,15 @@ def tool_get_exercise_notes(args):
         "sessions_with_notes": None if dark else len(timeline),
         "pain_flag_any": None if dark else bool(pain_dates),  # PROMINENT — the pre-flight pain surface (§7)
         "pain_dates": pain_dates,
+        "not_pain_notes": _not_acted_on(timeline),  # #5800
         "latest_progression": latest_progression,
         "layer_status": status,
         "layer_health": health,
         "note": (
             "Derived note-signal layer (inferred, confidence-tagged); raw Hevy notes are sovereign. "
-            "pain_flag is over-inclusive by design — confirm or dismiss before loading that movement."
+            "pain_flag is the `pain` class of an over-inclusive net (#5800: an un-negated pain word or a stated n/10 at or above "
+            "the tripwire's 3/10) — confirm or dismiss before loading that movement. not_pain_notes are discomfort or "
+            "form/equipment notes: listed, never acted on."
         ),
     }
     if dark:
@@ -745,3 +784,89 @@ def _end_disruption(args):
         "step_back_up": disruption.policy().get("step_back_up"),
         "owes_step_back_up": disruption.owes_step_back_up(record),
     }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #5573 — the owner's Hevy-note requests: the coach packet's field, the capture queue's section, and the chat's answer
+# ══════════════════════════════════════════════════════════════════════════════
+# `training.note_requests` is the core (the REQUEST# row in `training_constraints`, the raise-time reply, the once-only
+# resolution). This block reads its rows for the two owner surfaces — `get_coach_session_packet.note_requests` (every
+# open request, the overdue count, the replies of the last 14 days) and `get_capture_queues.note_requests` — and
+# carries the chat's write as three more actions on this owner tool (`note_requests` / `answer_request` /
+# `decline_request`), so no tool and no MCP module is minted. Owner-only: nothing here is imported by the site API.
+
+
+def _note_request_rows() -> list[dict[str, Any]]:
+    return [decimals_to_float(r) for r in nr.read_rows(table)]
+
+
+def note_requests_view(today: str | None = None) -> dict[str, Any]:
+    return nr.view(_note_request_rows(), str(today or pacific_today())[:10])
+
+
+NOTE_REQUESTS_HOW_TO = (
+    "Each open request is Matthew asking, in a Hevy note, for something. Answer it ONCE in this conversation — a question "
+    "from the evidence (say when the evidence is mixed; ADR-104/105), a form request with general guidance that is not an "
+    "assessment of his form — then record it: get_exercise_notes action='answer_request' request_id=<id> reply=<what you "
+    "told him>, or action='decline_request' request_id=<id> reason=<why>. `answered_recent` replies were written by code "
+    "(a form cue sheet, a drafted story); deliver them as written and never file or apply a drafted story yourself."
+)
+
+
+def note_requests_packet_field(target_date: str) -> tuple[Any, dict[str, Any]]:
+    """The coach packet's `note_requests` field: measured when any request is open or recently answered, else absent."""
+    from training.plan_engine import ABSENT, MEASURED, input_status
+
+    value = note_requests_view(target_date)
+    value["how_to_answer"] = NOTE_REQUESTS_HOW_TO
+    if not value["open"] and not value["answered_recent"]:
+        return value, input_status(ABSENT, "no open or recently answered note request")
+    return value, input_status(MEASURED)
+
+
+def note_requests_capture_section() -> dict[str, Any]:
+    """`get_capture_queues`' compact view: the open requests (no reply text) and the counts."""
+    v = note_requests_view()
+    return {
+        "count": v["open_count"],
+        "overdue_count": v["overdue_count"],
+        "overdue_after_days": v["overdue_after_days"],
+        "items": [{k: o.get(k) for k in ("request_id", "date", "exercise", "subtype", "age_days", "overdue")} for o in v["open"][:10]],
+        "answered_recent_count": len(v["answered_recent"]),
+        "how_to_resolve": "get_coach_session_packet carries the full notes and replies; answer once, then get_exercise_notes "
+        "action='answer_request' | 'decline_request' request_id=<id>.",
+    }
+
+
+def _note_requests_list(args: dict[str, Any] | None = None) -> dict[str, Any]:
+    """action='note_requests' — open requests, overdue count, recent replies (OWNER-ONLY READ)."""
+    view = note_requests_view((args or {}).get("today"))
+    view["how_to_answer"] = NOTE_REQUESTS_HOW_TO
+    view["privacy"] = "owner-only: the rows carry his verbatim notes; never a reader surface"
+    return view
+
+
+def _note_request_resolve(args: dict[str, Any], status: str, text_key: str) -> dict[str, Any]:
+    rid = str(args.get("request_id") or "").strip()
+    if not rid:
+        return {"error": "refused: request_id is required (get_exercise_notes action='note_requests' lists them)", "wrote": False}
+    text = args.get(text_key) or args.get("words") or ""
+    try:
+        out = nr.resolve(table, rid, status=status, text=text, channel=nr.CHANNEL_CHAT)
+    except ValueError as e:
+        return {"error": f"refused: {e}", "wrote": False}
+    if out.get("row"):
+        out["row"] = decimals_to_float(out["row"])
+    if out.get("wrote"):
+        out["status"] = status
+    return out
+
+
+def _answer_note_request(args: dict[str, Any]) -> dict[str, Any]:
+    """action='answer_request' — record the reply given in this conversation (once; refused if already resolved)."""
+    return _note_request_resolve(args or {}, nr.STATUS_ANSWERED, "reply")
+
+
+def _decline_note_request(args: dict[str, Any]) -> dict[str, Any]:
+    """action='decline_request' — record why the request is not being answered (once; refused if already resolved)."""
+    return _note_request_resolve(args or {}, nr.STATUS_DECLINED, "reason")

@@ -68,7 +68,8 @@ def test_additive_hevy_meters_to_miles():
         out = vf.compute_vacation_fund(start_date="2026-06-01", end_date="2026-06-08")
     assert out["per_source"]["hevy"] == 3.0  # (1609.34 + 3218.68)/1609.34
     assert out["total_miles"] == 5.0
-    assert any("overlap" in w.lower() for w in out["warnings"])
+    # #5695: an untimed Hevy row joins no Strava activity, so nothing is counted once and MacroFactor is off.
+    assert not any("counted once" in w or "overlap" in w.lower() for w in out["warnings"])
 
 
 def test_additive_macrofactor_yards_to_miles():

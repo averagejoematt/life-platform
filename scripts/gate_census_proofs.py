@@ -1785,7 +1785,15 @@ GUARD_PROOFS.update(
                 "diff --stat` clean): OK, exit 0. The offline suite pins the identical shapes deterministically — "
                 "TestMustFailCases::test_an_entry_escalated_to_allow_fails_by_name and "
                 "::test_zero_execution_sites_fails — 21 tests total in tests/test_no_verify_set_guard_3642.py, "
-                "all passing."
+                "all passing. RE-PROVEN 2026-11-14 after the owner ruled routine hook bypassing out and the rule "
+                "inverted (the registered EXECUTION population is now ZERO; deploy/agent_commit.sh commits through "
+                "the hooks). M2' in the real tracked file: the live commit line changed back to "
+                '`git commit --no-verify -m "${MSG}" || refuse 1` — ARMED: exit 1, `EXECUTION site '
+                "deploy/agent_commit.sh:<line> runs a hook-skipping commit — none is registered since 2026-11-14`; "
+                "REVERTED from a byte copy: `OK — 19 site(s), all registered.`, exit 0. M1 (the settings escalation) "
+                "is unchanged and stays pinned offline by ::test_an_entry_escalated_to_allow_fails_by_name; the old "
+                "M2 shape (the line going away) is now the registered state, pinned by "
+                "::test_zero_execution_sites_is_the_registered_state; 22 tests."
             ),
             "scope": (
                 "A verdict on the CLASSIFIER (grep population + structural .claude/settings.json parse), not on "
@@ -1895,8 +1903,8 @@ GUARD_PROOFS.update(
                 "the evening before Day 1. It found that on the run that introduced it."
             ),
             "scope": (
-                "The predicate is pure and is proved here against the committed frozen artifact plus a committed "
-                "read-only capture of the live ledger (tests/fixtures/prereg_season_rows_2026-09-17.json). What "
+                "The predicate is pure and is proved here against the frozen artifact plus a read-only capture of "
+                "the live ledger (both private since 2026-11-11; the proof runs where tests/sealed_prereg.py finds them). What "
                 "that does NOT prove: that the credentialed callers actually reach it in anger — "
                 "restart_verify.py check 20 and genesis_prereg_stamp.py --apply are asserted only at the source "
                 "level here, and the seal-publish refusal has not been watched aborting a real publish (the next "
@@ -1961,8 +1969,8 @@ GUARD_PROOFS.update(
                 "— 7 blocking, every kind reached by one real artifact."
             ),
             "scope": (
-                "The predicate is pure and is proved here against the committed sealed bytes "
-                "(tests/fixtures/prereg_cycle17_2026-09-06.json, byte-identical to the published artifact). What that "
+                "The predicate is pure and is proved here against the sealed bytes (private since 2026-11-11, "
+                "supplied through tests/sealed_prereg.py, hash-checked against the published seal). What that "
                 "does NOT prove: that the seal chokepoint aborts a REAL attended seal — the write_stamp() refusal is "
                 "exercised behaviourally against a tmp_path stamp here, and the next genesis freeze is the first live "
                 "chance. The gate binds seals it MINTS only, so today's already-published cycle-17 seal passes "
@@ -2060,6 +2068,35 @@ STRUCTURAL_HAND_PROOFS.update(
                 "live sweeps after a root sync, CloudFront."
             ),
             "proved_on": "2026-11-01",
+        },
+        # Owner ruling 2026-11-14: no public output is a function of the owner's age. The Levine phenotypic age served by
+        # /api/phenoage was the age to ~1.1 years (formula public and linear in age, the nine markers public).
+        "structural::test_age_inversion.py": {
+            "gate_name": "test_age_inversion.py",
+            "command": "python3 -m pytest tests/test_age_inversion.py -q -p no:randomly   # baseline 16 passed (14 when proven; two TDEE tests added with the reference-age estimate)",
+            "mutation": (
+                "Three plants in the real tracked tree, ONE AT A TIME, each restored from a byte copy: M1 the public handler "
+                "(lambdas/web/site_api_biomarkers.py::phenoage) reads the profile's birth date again and serves "
+                "`round(_compute_phenoage(vals, age))` under `phenoage` (the pre-ruling shape); M2 a function reading "
+                '`profile.get("date_of_birth")` appended to lambdas/web/site_api_physical.py (a public module off the allow-list); '
+                "M3 scripts/publish_snapshot_journey.py::phenoage writes a `years` figure into journey.json's phenoage object."
+            ),
+            "observed": (
+                "2026-11-14, this lane. BASELINE 14 passed. M1: 4 failed (the handler reads no profile and no clock; the response is "
+                "the same bytes whatever the birth date; the snapshot refuses a figure of his own; no other public path reads the "
+                "birth date). M2: 1 failed (test_no_other_public_path_reads_the_birth_date). M3: 1 failed (the snapshot test). "
+                "REVERTED 14 passed each time. The instrument's own controls are in-test on synthetic ages: the old shape scores a "
+                "window under 1.3 y, a five-year band 5–6 y narrowing with a second draw, a younger/older flag a one-sided bound."
+            ),
+            "scope": (
+                "The handler through a fake S3 client and injected globals that raise on any access, the publication snapshot's "
+                "producer and contract, and an AST sweep of lambdas/web, lambdas/coach, lambdas/content and lambdas/emails for a "
+                "`date_of_birth` key read (allow-list EMPTY since the public Mifflin estimate moved to a reference age). Synthetic markers and ages only. NOT SEEN: the "
+                "live response (qa/age_inversion_lib.py --live is the anonymous live attack; deploy/pii_surface_guard.py reds "
+                "on a served phenotypic-age figure, offline over the committed shape snapshots and live over the payloads), any "
+                "age-derived output computed outside those four packages, and what readers captured before the ruling."
+            ),
+            "proved_on": "2026-11-14",
         },
         # #4880: the function-length ratchet (D3) — the module-size guard's shape, one level down.
         "structural::test_function_length_guard_4880.py": {
@@ -4454,4 +4491,423 @@ GUARD_PROOFS["guard::scripts/check_coach_verdict_agreement.py"] = {
         "invert the match — its findings are candidates for review, and a memoir is never certified (flagged_for_review)."
     ),
     "proved_on": "2026-11-03",
+}
+
+
+# Owner ruling 2026-11-09: calibration-v2 adopted; no reader surface shows a calibration-v1 label.
+STRUCTURAL_HAND_PROOFS["structural::test_calibration_v1_labels_retired.py"] = {
+    "gate_name": "test_calibration_v1_labels_retired.py",
+    "command": "python3 -m pytest tests/test_calibration_v1_labels_retired.py -q -p no:randomly   # baseline 7 passed",
+    "mutation": (
+        'Six plants in the real tree, ONE AT A TIME, each restored from a byte copy: M1 a `"Well Calibrated"` string appended '
+        "to site/assets/js/evidence_intelligence.js; M2 a read of `s.calibration` appended to grade_your_coach.js; M3 a read of "
+        "`c.calibration` appended to evidence_intelligence.js; M4 `score` dropped from site_api_calibration_v2.DEPRECATED_V1_FIELDS; "
+        "M5 calibration_v2's non-rejection wording replaced by `Well calibrated`; M6 a `not yet skillful` comment appended to "
+        "www/src/room/calibration.astro."
+    ),
+    "observed": (
+        "2026-11-09, this lane. BASELINE 7 passed. M1: 1 failed (test_no_v1_label_in_served_pages_or_scripts). M2: 1 failed "
+        "(test_grade_your_coach_never_reads_the_v1_fields). M3: 1 failed (test_the_legacy_calibration_page_reads_only_v2_for_its_verdict). "
+        "M4: 1 failed (test_the_api_keeps_v1_fields_only_as_deprecated). M5: 1 failed (test_v2_words_never_praise). M6: 1 failed "
+        "(test_no_v1_label_in_served_pages_or_scripts). REVERTED 7 passed each time."
+    ),
+    "scope": (
+        "Repo-side only: the committed site/ tree (HTML, JS, JSON; /legacy and /next archives excepted) and www/src sources, two "
+        "renderer sources read as text, the served method block, and calibration_v2 words over 300 synthetic ledgers. NOT SEEN: "
+        "HTML a page builds at runtime from a live payload (tests/js/calibration_v2_reader_surfaces.test.mjs renders that with a "
+        "sentinel) and the live pages themselves (the post-deploy curl is that proof)."
+    ),
+    "proved_on": "2026-11-09",
+}
+
+
+# Owner ruling 2026-11-09 (D): the CR2 historical-words allowlist — dark (switch off, no route in the scope), fail closed.
+STRUCTURAL_HAND_PROOFS["structural::test_narrative_allowlist_cr2.py"] = {
+    "gate_name": "test_narrative_allowlist_cr2.py",
+    "command": "python3 -m pytest tests/test_narrative_allowlist_cr2.py -q -p no:randomly   # baseline 23 passed",
+    "mutation": (
+        "Three plants in the real tree, ONE AT A TIME, each restored from a byte copy: M1 narrative_allowlist.record_for stops "
+        "refusing a row that carries its own provenance record; M2 narrative_publication.gate_item ignores the allowlist "
+        "(`approved = None`); M3 narrative_allowlist.active() drops the CR2 scope check (the switch alone would publish on "
+        "every live route)."
+    ),
+    "observed": (
+        "2026-11-09, this lane. BASELINE 23 passed. M1: 6 failed (the private / unrecorded / malformed / empty record cases "
+        "and the missing-record case). M2: 2 failed (the in-scope serve tests). M3: 4 failed (switch-on-outside-the-scope, "
+        "only-the-cr2-scope and the out-of-scope halves). REVERTED 23 passed each time (also observed identically at the 19-test stage)."
+    ),
+    "scope": (
+        "Repo-side: the allowlist module, the gate's read and wire halves, the frozen pre-registration artifact and the call "
+        "registry. NOT SEEN: the stored rows themselves (their words are private until CR2 ships; the record-level check that "
+        "pinned each hash is the owner's private provenance_v2_cr2 record) and the live API (the post-deploy sweep is that proof)."
+    ),
+    "proved_on": "2026-11-09",
+}
+
+# #5573 — Hevy notes that ask the platform for something: the owner_request class, the write-once REQUEST# row,
+# the once-only resolution and the owner-only surface. ONE structural entrant (the file carries a premerge-gate sweep
+# of lambdas/web/), proved by five plants in the real tree, one at a time, each restored from a byte copy.
+STRUCTURAL_HAND_PROOFS["structural::test_note_requests_5573.py"] = {
+    "gate_name": "test_note_requests_5573.py",
+    "command": "python3 -m pytest tests/test_note_requests_5573.py -q -p no:randomly   # baseline 23 passed",
+    "mutation": (
+        "M1 a planted lambdas/web/ module importing training.note_requests (a reader surface); M2 `owner_request` removed "
+        "from training_notes.TAXONOMY (merge_signals drops every request signal); M3 raise_requests' attribute_not_exists "
+        "condition replaced by None (a re-run rewrites the row); M4 resolve()'s `status = open` store condition removed (a "
+        "racing second answer lands); M5 the overdue test `age > OVERDUE_DAYS` made `>=`."
+    ),
+    "observed": (
+        "2026-11-08, this lane. BASELINE 23 passed. M1: 1 failed (test_no_reader_surface_reads_the_requests_and_the_requests_"
+        "read_no_private_source). M2: 14 failed (the taxonomy pin, the three live fixtures, every raise/resolve/view test). "
+        "M3: 1 failed (test_a_request_is_raised_once_and_never_rewritten). M4: 1 failed (test_the_store_refuses_a_racing_"
+        "second_answer). M5: 1 failed (test_view_counts_open_requests_past_seven_days_as_overdue). REVERTED 23 passed."
+    ),
+    "scope": (
+        "Repo-side only: the extractor over the field-projected live Hevy rows, a FakeTable that evaluates the two real "
+        "condition shapes, the MCP packet/capture/action seams, and the hevy_backfill on-ingest hook. NOT SEEN: a live "
+        "REQUEST# row (the first one, on the next owner request in a Hevy note, is the issue's live proof)."
+    ),
+    "proved_on": "2026-11-08",
+}
+
+
+# #5540: the MCP function's privileged (no-request) branches — the two constant-input jobs and the scheduled
+# cache warmer — run only on the warmer, and a scheduled event must name one of the MCP stack's schedules.
+GUARD_PROOFS["guard::mcp/invoke_gate.py"] = {
+    "gate_name": "mcp/invoke_gate.py",
+    "command": "python3 -m pytest tests/test_mcp_invoke_gate_5540.py -q -p no:cacheprovider   # baseline 9 passed",
+    "mutation": (
+        "Four plants, ONE AT A TIME (md5 a39ebf6acf761e31f4287dc88f0d3f68 before and after): M1 is_warmer returns True "
+        "for any function; M2 the scheduled-event `resources` check disarmed (`if False and kind == SCHEDULED ...`); M3 "
+        "the LifePlatformMcp- name-prefix check dropped (any stack's schedule accepted); M4 panel_weekly_grade dropped "
+        "from PRIVILEGED_JOBS. Plus the whole fix reverted (mcp/handler.py from origin/main) → 7 failed / 2 passed."
+    ),
+    "observed": (
+        "2026-11-08, branch issue-5540-mcp-auth-before-jobs: M1 → 1 failed / 8 passed "
+        "(test_no_privileged_payload_reaches_a_job_path_off_the_warmer); M2 → 1 failed / 8 passed "
+        "(test_scheduled_event_on_the_warmer_needs_a_known_schedule); M3 → 1 failed / 8 passed (same); M4 → 3 failed / "
+        "6 passed (the unauthenticated sweep, the live-payloads test, the handler job-set contract); RESTORED 9 passed."
+    ),
+    "scope": (
+        "In-process, through the real lambda_handler with a fake Lambda context. NOT a cryptographic boundary: a caller "
+        "holding lambda:InvokeFunction on the warmer can forge the envelope (IAM is the boundary). The job events carry "
+        "no `resources` yet, so they are gated on the function name only (the #5540 residual)."
+    ),
+    "proved_on": "2026-11-08",
+}
+
+
+# #5769 — the exercise library v0.1: schema, coverage, verified-citation tiers, the public-file privacy scan, gate
+# coverage, ranked fallbacks, home_gym availability, the fail-closed private join and the approval path. ONE structural
+# entrant (the file carries a premerge-gate sweep of lambdas/ + mcp/), proved by six plants in the real tree, one at a
+# time, each restored from a byte copy (config/exercise_library.json md5 3cbe7a71ddc0774fb7aee8d00e6eaf8c before/after).
+STRUCTURAL_HAND_PROOFS["structural::test_exercise_library_5769.py"] = {
+    "gate_name": "test_exercise_library_5769.py",
+    "command": "python3 -m pytest tests/test_exercise_library_5769.py -q -p no:cacheprovider   # baseline 48 passed",
+    "mutation": (
+        "M1 a planted lambdas/training/ module importing training.exercise_library (the drafting path reads the proposed "
+        "library); M2 a `top_weight_kg` number written into a movement's history block; M3 seated_leg_curl's tier-A row "
+        "stripped of its citations; M4 `bw_pull` removed from pull_up's gates; M5 pull_up's fallbacks emptied; M6 the seeded "
+        "preacher_machine state flipped to available."
+    ),
+    "observed": (
+        "2026-11-11, this lane. BASELINE 48 passed. M1: 1 failed (test_nothing_in_the_drafting_path_imports_the_library). "
+        "M2: 1 failed (test_no_private_numbers_in_the_committed_library). M3: 3 failed (schema valid, tier A/B cites a "
+        "DOI/PMID, approval refuses). M4: 4 failed (schema valid, every movement that needs a gate has one, named gate "
+        "chains, approval refuses). M5: 4 failed (schema valid, ranked fallback matches the rule, first fallback avoids "
+        "the primary's equipment, approval refuses). M6: 1 failed (test_availability_follows_the_owner_rule). "
+        "REVERTED 48 passed."
+    ),
+    "scope": (
+        "Repo-side only: the committed public library, the curation, the pure classifiers and a fixture overlay. NOT SEEN: "
+        "the live owner-private overlay (the driver runs scripts/check_library_gates_private.py against it) and any "
+        "selection-time read (#5771/#5773)."
+    ),
+    "proved_on": "2026-11-11",
+}
+
+# #5769 — the private-side gate completeness check (owner requirement 2026-11-11): every public gate resolves to a
+# complete private overlay row; ids and field names only in its output.
+GUARD_PROOFS["guard::scripts/check_library_gates_private.py"] = {
+    "gate_name": "scripts/check_library_gates_private.py",
+    "command": (
+        "python3 -m pytest tests/test_exercise_library_5769.py -q -p no:cacheprovider -k 'private_check or approval'   "
+        "# baseline 9 passed; plus the script against the lane's dry-run overlay (exit 1: 6 bodyweight values unset)"
+    ),
+    "mutation": (
+        "G1 private_gate_gaps never appends a finding (`if False and missing:`); G2 the script's run() returns 0 "
+        "regardless of findings. One at a time; lambdas/training/exercise_library.py restored from a byte copy, the "
+        "script from the index."
+    ),
+    "observed": (
+        "2026-11-11, this lane. G1: 7 failed / 2 passed (all five must-fail shapes, prints-no-values, approval refuses) and "
+        "the script exits 0 on the incomplete dry-run overlay. G2: 2 failed / 7 passed (prints-no-values, approval "
+        "refuses). RESTORED 9 passed; the script exits 1 again."
+    ),
+    "scope": (
+        "Against fixture overlays and the lane's dry-run overlay file. NOT SEEN: the S3 overlay (not written yet — the "
+        "driver runs --apply after review, then this check without --overlay)."
+    ),
+    "proved_on": "2026-11-11",
+}
+
+# #5772 — the exercise library's weekly gate evaluation. Both modules match the census's `*_gate` guard-name rule and
+# genuinely gate (they lock a movement), so each carries the mutations actually run on 2026-11-11 in this lane: one
+# plant at a time in the real file, restored from a byte copy, against tests/test_exercise_gates_5772.py.
+GUARD_PROOFS["guard::lambdas/training/exercise_gates.py"] = {
+    "gate_name": "lambdas/training/exercise_gates.py",
+    "command": "python3 -m pytest tests/test_exercise_gates_5772.py -q -x -p no:cacheprovider   # baseline 25 passed",
+    "mutation": (
+        "E1 `_unknown` returns UNLOCKED (an unknown input opens the gate); E2 the owner-unset branch returns UNLOCKED "
+        "(a null threshold opens it); E3 the chain step-open check disabled (`if False:`); E4 the clinical-cue branch keyed "
+        "on the `locks` flag instead of the kind; E5 `log_view` includes `value_seen` (a body number in the log line); "
+        "K1 the `template_match` title rule disabled; K2 `sessions_min` read as a minimum of 1 (one KB-deadlift session "
+        "opens the swing); K3 any #5800 note class (discomfort included) flags pain; C1 `confirmation_verdict` ignores the "
+        "overlay's technique_confirmations; C2 a confirmation also opens chain gates."
+    ),
+    "observed": (
+        "2026-11-11, this lane. E1: 1 failed (test_every_unknown_input_reads_locked_and_says_so). E2: 1 failed "
+        "(test_a_null_owner_threshold_locks_with_its_reason). E3: 1 failed (test_chain_order_a_later_step_alone_opens_nothing). "
+        "E4: 1 failed (test_a_clinical_cue_never_locks_even_with_every_input_unknown). E5: 1 failed "
+        "(test_the_leg_summary_and_log_carry_no_body_number). K1, K2: 1 failed each "
+        "(test_kb_swing_opens_on_two_kb_deadlift_sessions_and_not_one). K3: 1 failed "
+        "(test_only_a_pain_class_note_locks_a_movement). C1, C2: 1 failed each "
+        "(test_the_owners_clean_confirmation_meets_its_gate_and_nothing_else). RESTORED 25 passed."
+    ),
+    "scope": (
+        "The pure evaluator over a synthetic library and the committed library. NOT SEEN: a live weekly run (the first "
+        "EXGATE#EVAL row after deploy) and the owner-private overlay on S3 (not written yet)."
+    ),
+    "proved_on": "2026-11-11",
+}
+GUARD_PROOFS["guard::mcp/exercise_gates_leg.py"] = {
+    "gate_name": "mcp/exercise_gates_leg.py",
+    "command": "python3 -m pytest tests/test_exercise_gates_5772.py -q -x -p no:cacheprovider   # baseline 25 passed",
+    "mutation": "L1 `claim` returns True on ConditionalCheckFailedException (a lost claim still announces — twice).",
+    "observed": (
+        "2026-11-11, this lane. L1: 1 failed (test_announce_once_control_a_racing_second_claim_loses). RESTORED 25 passed. "
+        "The proposed-library hold and the first-run baseline are pinned by test_a_proposed_library_announces_nothing and "
+        "test_a_newly_unlocked_movement_is_announced_exactly_once."
+    ),
+    "scope": "Against an in-memory DynamoDB fake with conditional put/update. NOT SEEN: the live table and the Monday run.",
+    "proved_on": "2026-11-11",
+}
+
+# #5817 — the four anchor cue sheets (owner ruling 2026-11-11, #5779 D8): the still-visible / not-visible split, no sheet
+# reviewed by code (a premerge-gate sweep of lambdas/ and mcp/ for a `reviewed` write), and the anchors' one sheet cue on
+# the rendered Hevy note beside the family breathing cue, lint-clean. ONE structural entrant, proved by five plants in the
+# real tree, one at a time, each restored from a byte copy (md5 identical before and after).
+STRUCTURAL_HAND_PROOFS["structural::test_anchor_cue_sheets_5817.py"] = {
+    "gate_name": "test_anchor_cue_sheets_5817.py",
+    "command": "python3 -m pytest tests/test_anchor_cue_sheets_5817.py -q -p no:cacheprovider -p no:randomly   # baseline 14 passed",
+    "mutation": (
+        "M1 lift_note's sheet cue switched off (`sheet_cue = \"\"`); M2 a module-level `_ANCHOR_SHEETS[...]['reviewed'] = True` "
+        "planted at the foot of form_cue_sheets.py; M3 the squat sheet's not_visible emptied; M4 the family cue dropped from "
+        "the sheet cue line (`tries = [prefix + sheet, sheet, with_prep]`); M5 session_block._fit's sheet-cue drop disarmed "
+        "(`sheet = ()`)."
+    ),
+    "observed": (
+        "2026-11-11, this lane. BASELINE 14 passed. M1: 4 failed (the rendered anchor day, the anchor-after-its-family, the "
+        "non-anchor on/off comparison, the off-lint control). M2: 2 failed (test_no_sheet_is_reviewed_and_no_code_marks_one, "
+        "test_no_module_writes_a_sheets_reviewed_flag). M3: 1 failed (test_every_anchor_sheet_splits_still_visible_from_not_"
+        "visible). M4: 2 failed (the rendered anchor day, the tight-budget order). M5: 1 failed (the tight-budget order). "
+        "REVERTED 14 passed."
+    ),
+    "scope": (
+        "Repo-side only: the lift-note composer, the session block's overflow fitter and the wire linter over synthetic "
+        "routines and the real catalog keys. NOT SEEN: a live drafted routine carrying an anchor sheet cue (the next nightly "
+        "predraft with a bench, squat, deadlift or one-arm DB row is the issue's live proof)."
+    ),
+    "proved_on": "2026-11-11",
+}
+
+STRUCTURAL_HAND_PROOFS["structural::test_rate_policy_5861.py"] = {
+    "gate_name": "test_rate_policy_5861.py",
+    "command": "python3 -m pytest tests/test_rate_policy_5861.py -q -p no:warnings   # baseline 11 passed",
+    "mutation": (
+        "M1 the strength signal never slows (`slow = False`); M2 adherence never slows (state 'ok' when a reason exists); "
+        "M3 an observed rate below the band lifts the band one rung; M4 a `time.time()` stamp in the proposal; M5 the "
+        "strength threshold restated as `5.0` instead of read from owner_redlines; M6 a `# from health import rate_policy` "
+        "line appended to lambdas/health/calorie_target.py (the no-live-reader sweep)."
+    ),
+    "observed": (
+        "2026-11-12, this lane. BASELINE 11 passed. M1: 4 failed. M2: 1 failed. M3: 2 failed (the below-band control and the "
+        "full signal grid). M4: 1 failed (test_deterministic). M5: 1 failed (test_strength_threshold_is_the_tripwires_own). "
+        "M6: 1 failed (test_no_live_path_reads_the_proposal). REVERTED 11 passed."
+    ),
+    "scope": (
+        "Repo-side only, synthetic profiles: the pure proposal and the import sweep of lambdas/ + mcp/. NOT SEEN: any live "
+        "output — nothing reads the proposal until the owner rules to wire it at health.titration.band_for."
+    ),
+    "proved_on": "2026-11-12",
+}
+
+
+STRUCTURAL_HAND_PROOFS["structural::test_putmetricdata_namespace_condition_5545.py"] = {
+    "gate_name": "test_putmetricdata_namespace_condition_5545.py",
+    "command": "python3 -m pytest tests/test_putmetricdata_namespace_condition_5545.py -q -p no:warnings   # baseline 11 passed",
+    "mutation": (
+        "M1 `_put_metric_data_statement` drops its `cloudwatch:namespace` condition (rule 1); M2 a hand-spelled "
+        "`cloudwatch:PutMetricData` PolicyStatement in role_policies_operational.py (rule 2); M3 the whoop role loses "
+        "LifePlatform/IngestReconciliation its _reconcile emits (rule 3, coverage); M4 daily-brief gains LifePlatform/Budget "
+        "no code it reaches emits (rule 4, justification)."
+    ),
+    "observed": (
+        "2026-11-15, #5545 lane. BASELINE 11 passed. M1: 3 failed. M2: 1 failed. M3: 1 failed. M4: 1 failed. " "REVERTED 11 passed."
+    ),
+    "scope": (
+        "Repo-side only: the CDK role builders and the static import closure of each handler in the one bundle. NOT SEEN: "
+        "the deployed roles until the owner runs the six OWNER-REQUIRED stacks (tests/test_role_family_write_scope.py's "
+        "live leg reads them after deploy)."
+    ),
+    "proved_on": "2026-11-15",
+}
+
+STRUCTURAL_HAND_PROOFS["structural::test_core_alias_6090.py"] = {
+    "gate_name": "test_core_alias_6090.py",
+    "command": (
+        "CONTENT_FILTER_JSON=<the real channel object plus a private_identifiers list, in-process only> "
+        "python3 -m pytest tests/test_core_alias_6090.py -q -p no:warnings   # baseline 12 passed (armed); unarmed 11 passed 1 skipped"
+    ),
+    "mutation": (
+        "Two plants in the real tracked tree, ONE AT A TIME, each restored from a byte copy: M1 config/training_charter.json "
+        "restored to origin/main (the core id that spells a private habit, before the neutral alias); M2 "
+        "tests/test_core_habits_5124.py restored to origin/main (its fixtures carried the same id)."
+    ),
+    "observed": "2026-11-16, #6090 lane. BASELINE 12 passed (armed). M1: 1 failed, 11 passed. M2: 1 failed, 11 passed. REVERTED 12 passed.",
+    "scope": (
+        "Every git-tracked text file against the off-repo private_identifiers list of the content-filter channel. NOT SEEN: "
+        "a run with no channel source carrying the list (the test skips visibly), so CI is armed only once the owner adds "
+        "the list to the CONTENT_FILTER_JSON secret; git history (no rewrite, owner ruling 2026-11-16)."
+    ),
+    "proved_on": "2026-11-16",
+}
+
+# #6083 — the public-copies guard, as its v9 deploy step (both targets, after the sync).
+CI_PROOFS["ci::web-preview-deploy.yml::public-copies::2"] = {
+    "gate_name": "public-copies / Check every public copy of the site (read-only; a violation is reported, never repaired here)",
+    "command": (
+        "python3 scripts/check_public_copies.py --check   # exit 1 on any violation; fixtures: "
+        "python3 -m pytest tests/test_check_public_copies_6083.py -q   # baseline 17 passed"
+    ),
+    "mutation": (
+        "LIVE: the step's own command, read-only, against production as it stood (no plant — the estate carried real "
+        "violations). FIXTURES, five plants in the real tracked scripts/check_public_copies.py, ONE AT A TIME, each restored "
+        "from a byte copy (md5 d23e2f80… before and after; M4's re-run against ef8cfa17…, before black): M1 the orphan test `o['LastModified'] < marker - SYNC_WINDOW` → "
+        "`False`; M2 withheld_words' words test → `False`; M3 the stale-preview lag test → `False`; M4 derived_issues' "
+        "`if not found:` → `if False:` (re-run after the test was tightened to name the branch); M5 archive_admission's "
+        "refusal → `if False:`."
+    ),
+    "observed": (
+        "2026-11-16. LIVE `--check` exit 1: three rule-A orphans at the root (pages under the /story/*/ route family the "
+        "newest root build did not write). LIVE `--remediation` exit 1: the same three, the archive built before the newest "
+        "root build (rule B), and — with site/next/** excluded from admission — 642 archive members the registry now "
+        "refuses (rule A). FIXTURES: M1 3 failed / 14 passed; M2 1 failed / 16; M3 1 failed / 16; M4 1 failed / 16; M5 1 "
+        "failed / 16. RESTORED 17 passed, including the clean estate (no violation) and the red→green orphan mutation."
+    ),
+    "scope": (
+        "Every document a reader can fetch under site/ (the v9 root, the preview, the legacy pages, the retired "
+        "/_v9_previous/) and the downloaded /archive/latest.tar.gz (web/ and api/), against a fresh live snapshot: orphans "
+        "(rule A), stale copies (B), the build scan's publication members + the age-inversion attack + archived words the "
+        "live route withholds (C), sitemap/feed URLs (D), and undeclared locations. NOT SEEN: image content (share cards, "
+        "covers); a record dropped whole from a live route (only a record served WITHOUT words is compared); objects under "
+        "generated/ other than the archive (Lambda artefacts, classified not-a-copy in PUBLIC_RESOURCES)."
+    ),
+    "proved_on": "2026-11-16",
+}
+
+# #6083 — the guard module itself (its CI step is ci::web-preview-deploy.yml::public-copies::2 above; the same plants).
+GUARD_PROOFS["guard::scripts/check_public_copies.py"] = {
+    "gate_name": "scripts/check_public_copies.py",
+    "command": "python3 -m pytest tests/test_check_public_copies_6083.py -q -p no:warnings   # baseline 17 passed",
+    "mutation": (
+        "Five plants in the real tracked file, ONE AT A TIME, each restored from a byte copy (md5 identical before and "
+        "after): M1 the orphan test → False; M2 the withheld-words test → False; M3 the stale-preview lag test → False; "
+        "M4 derived_issues' `if not found:` → `if False:`; M5 archive_admission's refusal → `if False:`. Plus the two "
+        "inventory pins, both directions: `generated/covers/*` dropped from PUBLIC_RESOURCES, and a `/extra` origin added "
+        "to ORIGIN_PATHS — each 1 failed."
+    ),
+    "observed": (
+        "2026-11-16, this lane. M1 3 failed / 14 passed; M2-M5 1 failed / 16 passed each; the two pins 1 failed each. "
+        "RESTORED 17 passed. LIVE read-only `--check` against production: exit 1 on three real rule-A orphans."
+    ),
+    "scope": "See ci::web-preview-deploy.yml::public-copies::2. Fixtures are synthetic; the live run is read-only.",
+    "proved_on": "2026-11-16",
+}
+
+# #6116 — a test run cannot perform a real production write: the set of writing deploy scripts carries the guard, and
+# the incident command is refused before its first aws call.
+STRUCTURAL_HAND_PROOFS["structural::test_prod_write_guard_6116.py"] = {
+    "gate_name": "test_prod_write_guard_6116.py",
+    "command": "python3 -m pytest tests/test_prod_write_guard_6116.py -q -p no:cacheprovider   # baseline 9 passed",
+    "mutation": (
+        "Four plants in the real tracked tree, ONE AT A TIME, each restored from a byte copy: M1 the `source …/lib/"
+        "prod_write_guard.sh` line removed from deploy/www_preview_sync.sh; M2 `return 1` as the first line of "
+        "lp_pwg_test_context in deploy/lib/prod_write_guard.sh (the guard never arms); M3 the install_prod_write_guard "
+        "lines removed from deploy/restart_pipeline.py; M4 the `_patch_botocore(reason)` call removed from "
+        "deploy/lib/prod_write_guard.py. Plus the in-file must-fail control test_the_set_scan_is_not_blind (seven planted "
+        "unguarded writers named, five clean files not)."
+    ),
+    "observed": (
+        "2026-11-16, #6116 lane. BASELINE 9 passed. M1: 2 failed (the set test names www_preview_sync.sh; the incident "
+        "control sees the stub called), 7 passed. M2: 2 failed (incident control; the session shim test), 7 passed. M3: 1 "
+        "failed (the set test), 8 passed. M4: 1 failed (the Python twin test), 8 passed. REVERTED 9 passed."
+    ),
+    "scope": (
+        "Every git-tracked deploy/**/*.sh and deploy/**/*.py whose text performs an AWS write (shell: `aws <svc> <verb>` "
+        "with a non-read verb, an s3 cp/sync whose destination is not provably local, `cdk deploy`; Python: a boto3 write "
+        "method, an aws/cdk argv, an aws command-line string). NOT SEEN: deploy/archive/ (excluded by name); scripts/ and "
+        "qa/ writers (43, owner-run; covered only by the conftest session layer); an `aws` invoked by absolute path; a "
+        "write built from a computed verb string."
+    ),
+    "proved_on": "2026-11-16",
+}
+
+# #6116 — the two guard modules themselves (their set + incident controls are structural::test_prod_write_guard_6116.py).
+GUARD_PROOFS["guard::deploy/lib/prod_write_guard.sh"] = {
+    "gate_name": "deploy/lib/prod_write_guard.sh",
+    "command": (
+        "python3 -m pytest tests/test_prod_write_guard_6116.py -q -p no:cacheprovider   # baseline 9 passed; the incident "
+        "control runs the REAL deploy/www_preview_sync.sh --target root --restore-previous against a recording stub aws"
+    ),
+    "mutation": (
+        "In the real tracked file, restored from a byte copy (cmp identical): M2 `return 1` as the first line of "
+        "lp_pwg_test_context — the guard never arms under a test runner."
+    ),
+    "observed": (
+        "2026-11-16, #6116 lane. BASELINE 9 passed. M2 RED: 2 failed, 7 passed — the restore reached the stub in the "
+        "careless, markers-stripped and env -i environments (calls recorded, exit 0), and the session's `aws` shim passed "
+        "an `s3 rm` through to the stub. REVERTED 9 passed. During development the same control caught a refusal inside "
+        "`$(aws … || true)` being read as 'nothing to restore' (exit 0) — fixed by signalling the main shell."
+    ),
+    "scope": (
+        "Every `aws` and every mutating `cdk`/`npx cdk` call from a script that sources it, and from any child resolving "
+        "them by name through PATH (the deploy/lib/prod_write_guard_bin shims). Inert outside a test runner (proved by "
+        "test_outside_a_test_runner_the_guard_changes_nothing). NOT SEEN: an absolute-path aws; a host without `ps` (the "
+        "ancestry signal; the two env signals remain)."
+    ),
+    "proved_on": "2026-11-16",
+}
+
+GUARD_PROOFS["guard::deploy/lib/prod_write_guard.py"] = {
+    "gate_name": "deploy/lib/prod_write_guard.py",
+    "command": (
+        "python3 -m pytest tests/test_prod_write_guard_6116.py -q -p no:cacheprovider   # baseline 9 passed; the twin test "
+        "runs a subprocess that installs the guard and calls s3 PutObject (boto3 imported lazily, then at module level)"
+    ),
+    "mutation": (
+        "Two, ONE AT A TIME, each restored from a byte copy: M4 the `_guard_botocore(reason)` call removed from "
+        "install_prod_write_guard; M5 `return None` after the in-process check (the twin never arms)."
+    ),
+    "observed": (
+        "2026-11-16, #6116 lane. BASELINE 9 passed. M4 RED: 1 failed, 8 passed (the PutObject reached the network). M5 RED: "
+        "1 failed, 8 passed. REVERTED 9 passed."
+    ),
+    "scope": (
+        "Every non-read botocore operation in a Python deploy entry point whose __main__ block installs it (the set is "
+        "held by structural::test_prod_write_guard_6116.py), plus `aws`/`npx cdk deploy` via subprocess through the PATH "
+        "shims. NOT SEEN: the pytest process itself (deliberately inert there — conftest's hermetic credentials govern); a "
+        "botocore client class other than BaseClient."
+    ),
+    "proved_on": "2026-11-16",
 }

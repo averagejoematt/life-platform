@@ -290,6 +290,7 @@ class IngestionConfig:
         refresh_today: bool = False,
         refresh_trailing_days: int = 0,
         carry_forward_fn=None,
+        extra_dates_fn=None,
         enable_raw_archive: bool = True,
         record_gap_exhausted_absence: bool = False,
     ):
@@ -325,6 +326,14 @@ class IngestionConfig:
         # `carry_forward_fn(existing_item, new_item) -> new_item`, called by
         # _store_item with the currently-stored record. None = plain replace.
         self.carry_forward_fn = carry_forward_fn
+        # #5753: refresh_trailing_days reaches back only N days, so an entry the vendor gains
+        # for an OLDER day (a Strava manual walk typed in two weeks late) is never re-fetched —
+        # its day is already "present". A source that can discover such days supplies
+        # `extra_dates_fn(table, today: date) -> list[str]`, called in gap-fill mode after
+        # the presence check; each day it names joins this run's dates and goes through the
+        # same fetch → transform → _store_item path (carry_forward_fn included). Fail-soft:
+        # an exception is logged and the run carries on with the ordinary dates.
+        self.extra_dates_fn = extra_dates_fn
         # #1677: a source whose "raw" is already durable has nothing to archive. The
         # closed-platform paste fallback fetches NOTHING — its input is the owner's
         # pasted text, already stored verbatim as a PASTE# row in the same table — so an
@@ -432,6 +441,7 @@ def _find_missing_dates(table, config, logger):
     for i in range(1, getattr(config, "refresh_trailing_days", 0) + 1):
         existing.discard((today - timedelta(days=i)).strftime("%Y-%m-%d"))  # force trailing days to re-fetch
     missing = sorted(check_dates - existing)
+    missing = _merge_extra_dates(table, config, today, missing, logger)
 
     if missing:
         logger.info(f"[GAP-FILL] Found {len(missing)} missing dates: {missing}")
@@ -439,6 +449,25 @@ def _find_missing_dates(table, config, logger):
         logger.info(f"[GAP-FILL] No gaps in last {config.lookback_days} days")
 
     return missing
+
+
+def _merge_extra_dates(table, config, today, missing: list, logger) -> list:
+    """#5753: add the source's own discovered dates (``config.extra_dates_fn``) to ``missing``.
+
+    Fail-soft — a discovery failure must never cost the run its ordinary dates.
+    """
+    fn = getattr(config, "extra_dates_fn", None)
+    if fn is None:
+        return missing
+    try:
+        extra = {str(d) for d in (fn(table, today) or []) if d}
+    except Exception as e:
+        logger.warning(f"[GAP-FILL] extra_dates_fn failed (non-fatal): {e}")
+        return missing
+    added = sorted(extra - set(missing))
+    if added:
+        logger.info(f"[GAP-FILL] {len(added)} extra date(s) from the source's own discovery: {added}")
+    return sorted(set(missing) | extra)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

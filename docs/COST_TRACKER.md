@@ -349,6 +349,7 @@ Decisions where cost was a factor in the design:
 | Feature | Est. Monthly Cost | Status |
 |---------|-------------------|--------|
 | Additional Secrets Manager secrets | $0.40/each | OAuth sources stay separate; static API keys merge into `life-platform/ingestion-keys`. |
+| `life-platform/hae-webhook` (#5513 c) | $0.40/month | Security exception to the bundling rule above: the internet-facing webhook's token gets its own secret so its role stops reading four other services' keys. Billed from the owner's create-secret. |
 | Reader-traffic surge | up to +$15/mo (the $85→$100 float) | ADR-133 — engaged automatically, first activation 2026-07-19. |
 | Provisioned concurrency (rejected) | $10.80/month | ❌ Rejected — caching solved it. |
 

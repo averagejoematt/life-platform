@@ -38,6 +38,7 @@ LIFE_PLATFORM_BUCKET = "matthew-life-platform"
 ALERTS_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
 DIGEST_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"
 MCP_FUNCTION_NAME = "life-platform-mcp"
+MCP_RESERVED_CONCURRENCY = 10  # ADR-010 (#5541)
 WARMER_FUNCTION_NAME = "life-platform-mcp-warmer"
 
 
@@ -102,6 +103,15 @@ class McpStack(Stack):
             dlq=None,
             alerts_topic=None,
         )
+        # #5541 / ADR-010: the request-serving function's concurrency ceiling. ADR-010 chose a
+        # reserved-concurrency cap over WAF (WAF cannot front a Function URL) and said 10; the
+        # override was never live (get-function-concurrency empty, 2026-10-31). 10 caps nothing
+        # measured: ConcurrentExecutions daily Max over the 14 days to 2026-11-08 was 1-4, and the
+        # 100-execution account pool keeps 62 unreserved (72 before; account peak 13). The warmer is
+        # a separate function and is NOT capped. MCP_RESERVED_CONCURRENCY is pinned against
+        # ADR-010 by tests/test_mcp_auth_alarm_concurrency_5541.py; mcp-throttles below makes a
+        # binding cap visible instead of a silent 429 to a Claude session.
+        mcp.node.default_child.add_property_override("ReservedConcurrentExecutions", MCP_RESERVED_CONCURRENCY)
 
         # Existing EventBridge permission kept for legacy nightly-warmer rule.
         # The new dedicated warmer Lambda (below) is the primary warmer from v3.7.22.
@@ -182,6 +192,33 @@ class McpStack(Stack):
             treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
         )
         slo_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+
+        # #5541: the ADR-010 cap's own visibility (the #1328 lesson: a reserved-concurrency cap
+        # bound daily for a week with zero Throttles alarms anywhere). 5 throttles in 15 min: a
+        # lone collision stays quiet, a binding cap does not. Digest (ADR-050) — a throttled MCP
+        # call is a retry in a Claude session, not a reader-facing 429.
+        mcp_throttles = cloudwatch.Alarm(
+            self,
+            "McpThrottles",
+            alarm_name="mcp-throttles",
+            alarm_description=(
+                "#5541: life-platform-mcp throttled >= 5 times in 15 min — the ADR-010 reserved-concurrency cap "
+                "(MCP_RESERVED_CONCURRENCY in cdk/stacks/mcp_stack.py) is binding. Check ConcurrentExecutions "
+                "against the cap before raising it; a burst of AuthFailures alongside is abuse, not load."
+            ),
+            metric=cloudwatch.Metric(
+                namespace="AWS/Lambda",
+                metric_name="Throttles",
+                dimensions_map={"FunctionName": MCP_FUNCTION_NAME},
+                period=Duration.seconds(900),
+                statistic="Sum",
+            ),
+            evaluation_periods=1,
+            threshold=5,
+            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+        mcp_throttles.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
         # ── SLO-5: Warmer completeness alarm (R9 A+ hardening) ────────────────
         # Fires if the dedicated warmer Lambda errors on its daily run.

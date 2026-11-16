@@ -98,6 +98,12 @@ now, `achieved_hold`:
   * a set with NO logged RPE is read as at the ceiling: its hold is the achieved load, and the row
     says so (`hold.rpe_basis: "absent"`). `hold.rpe_basis` / `hold.e1rm_rpe_adjusted` record the
     basis on every row.
+  * #5797 (owner ruling 2026-11-11): his RPE is CALIBRATED once it has been measured. The mean
+    error of his calibration sets (actual - predicted reps in reserve, `training.rpe_calibration`)
+    is added to the RIR of every RPE-logged set — only once n reaches the charter's
+    `calibration.rpe.min_n` AND its interval excludes zero (`hold.rpe_basis:
+    "rpe_adjusted_calibrated"`, `hold.rpe_calibration` the n, mean and interval). A calibration set
+    itself (its RPE a prediction, its reps run to the first slow rep) is never a set to hold from.
   * #4503 OD1 (owner ruling 2026-09-30, `layoff_tiers`): the tier is the larger of the caller's days,
     the record's gap (`_lifting_gap_days`: the cron hands the generator a constant 2) and THIS
     movement's gap at this band — <= 28 d held (qualifying sets from the last 28 days), 29–90 d at
@@ -322,7 +328,8 @@ def slot_of(sets: list[Any] | None, intensity_or_tag: str | None) -> dict[str, A
 
 
 def rpe_adjusted_e1rm_kg(weight_kg: float, reps: int, rpe: float) -> float:
-    """Epley on (reps + RIR), RIR = 10 - RPE (floored at 0): the reps-in-reserve reading of RPE."""
+    """Epley on (reps + RIR), RIR = 10 - RPE (floored at 0): the reps-in-reserve reading of RPE. The hold passes a
+    CALIBRATED RPE (#5797: the logged RPE minus his measured RIR error, `_calibration_basis`) — the same RIR shift."""
     return float(weight_kg) * (1 + (int(reps) + max(0.0, 10.0 - float(rpe))) / 30.0)
 
 
@@ -385,16 +392,20 @@ def achieved_hold(
     band = band_key(float(current_weight_lb))
     tol = BODYWEIGHT_TOLERANCE_DAYS if tolerance_days is None else tolerance_days
     best: dict[str, Any] | None = None
-    for s in (history_index or {}).get(template_id) or []:
+    sessions = (history_index or {}).get(template_id) or []
+    calibration = _calibration_basis(sessions)
+    for s in sessions:
         d = str(s.get("date") or "")
         if (as_of and d >= as_of) or (d < since if since else anchor_discount(d, p)[1]["applies"]):
             continue
         lbs = nearest_bodyweight(d, weight_index, tol)
         if lbs is None or (band_key(lbs) != band and not any_band):
             continue
-        for st in s.get("sets") or []:
+        cal_index = (s.get("calibration") or {}).get("set_index")
+        for i, st in enumerate(s.get("sets") or []):
             w, r = float(st.get("weight_kg") or 0), int(st.get("reps") or 0)
-            if w <= 0 or r < min_reps:
+            # #5797: a calibration set's RPE is a PREDICTION and its reps run to the first slow rep — not a set to hold from
+            if w <= 0 or r < min_reps or i == cal_index:
                 continue
             rpe = st.get("rpe")
             if rpe is None:
@@ -404,9 +415,10 @@ def achieved_hold(
                 e1, basis = None, "absent"
                 held = w if r >= target else min(rep_ceiling_kg(rpe_adjusted_e1rm_kg(w, r, ceiling), target, ceiling), w)
             else:
-                e1 = rpe_adjusted_e1rm_kg(w, r, float(rpe))
+                # #5797: RIR + offset == RPE - offset; the offset is 0 until the calibration interval excludes zero
+                e1 = rpe_adjusted_e1rm_kg(w, r, float(rpe) - calibration["rir_offset"])
                 held = min(rep_ceiling_kg(e1, target, ceiling), w)
-                basis = "rpe_adjusted"
+                basis = "rpe_adjusted_calibrated" if calibration["adjusts"] else "rpe_adjusted"
             if best is None or (held, d) > (best["held_kg"], best["date"]):
                 best = {
                     "weight_kg": w,
@@ -420,8 +432,17 @@ def achieved_hold(
                     "e1rm_rpe_adjusted": round(e1, 3) if e1 is not None else None,
                     "target_reps": target,
                     "rpe_ceiling": ceiling,
+                    "rpe_calibration": calibration,
                 }
     return best
+
+
+def _calibration_basis(sessions: list[dict[str, Any]]) -> dict[str, Any]:
+    """#5797: this movement's RPE calibration (`rpe_calibration.hold_basis`) — its n, mean error and interval, and the
+    RIR offset the hold applies (0 until n reaches the charter's minimum AND the interval excludes zero)."""
+    from training import rpe_calibration
+
+    return rpe_calibration.hold_basis(sessions)
 
 
 def block_1_start() -> str:
@@ -798,6 +819,7 @@ def _apply_hold(
         "held_kg": hold["held_kg"] if hold else None,
         "rpe_basis": hold["rpe_basis"] if hold else None,
         "e1rm_rpe_adjusted": hold["e1rm_rpe_adjusted"] if hold else None,
+        "rpe_calibration": hold.get("rpe_calibration") if hold else None,  # #5797: n, mean error, interval, the offset applied
         "layoff": layoff,
         "tier": tier,
         "layoff_evidence": {

@@ -29,21 +29,31 @@ export function habitsKeystone(corrs) {
   const n = k.n_days;
   const ready = n >= 14;
   const dir = k.correlation_r >= 0 ? "moves up with" : "moves against";
-  const strength = Math.abs(k.correlation_r) >= 0.6 ? "strong" : Math.abs(k.correlation_r) >= 0.3 ? "moderate" : "faint";
+  // #5523: the tier is the API's (stats_core.correlation_tier: |r| ceiling, the 95% Fisher interval demotes) — no
+  // second rule here. An unserved tier reads as the weakest, never as a strength the page computed itself.
+  const tier = k.tier === "strong" || k.tier === "moderate" ? k.tier : "weak";
+  const strength = tier === "weak" ? "faint" : tier;
   const machine = `${ttl(k.group)} ${dir} the day grade · ${strength} direction · n=${fmt(n)} days — early signal, not proven${ready ? "" : " · coefficient withheld until 2 weeks"}`;
-  const serif = `Of everything tracked, ${ttl(k.group)} is the group most pulling the day up so far. On ~${fmt(n)} days that's a lead, not a law — the number to trust here is n, not a coefficient. ${ready ? "It now has the overlap to carry a real correlation, below." : "It earns a real coefficient once there are two weeks of overlap."}`;
+  // #5956 (2026-11-14): this sentence said "most pulling the day up" whatever the sign — so a group whose own card read
+  // "moves against the day grade" (r = −0.57) was called the one lifting it — and "pulling" claimed a cause. The words
+  // now follow the sign the card shows, and stay correlative: which group's adherence moves most with the grade.
+  const together = k.correlation_r >= 0
+    ? `on days it is held more, the day grade tends to be higher`
+    : `on days it is held more, the day grade tends to be lower`;
+  const serif = `Of everything tracked, ${ttl(k.group)} is the group whose adherence moves most closely with the day grade so far — ${together}. That is a correlation, not a cause. On ~${fmt(n)} days it is a lead, not a law — the number to trust here is n, not a coefficient. ${ready ? "It now has the overlap to carry a real correlation, below." : "It earns a real coefficient once there are two weeks of overlap."}`;
   // P2.1 — keystone calibration, honesty-gated. Below 2 weeks of overlap: direction only,
   // no Pearson, no chip (P0.1). At n>=14 the coefficient surfaces inside the sleep board's
   // own confidence-card DNA — n + overlap weeks + a confidence tier + a "likely noise" guard
   // when |r| is small even with the overlap — so the magnitude never reads louder than its n.
   let card = "";
   if (ready) {
-    const absr = Math.abs(k.correlation_r);
-    const confidence = absr >= 0.6 ? "suggestive · strong" : absr >= 0.3 ? "suggestive · moderate" : "weak — treat as noise";
-    const noise = absr < 0.3 ? `<span class="cb-noise">⚠ likely noise at this n — direction only</span>` : "";
-    const read = absr < 0.3
+    const weak = tier === "weak";
+    const confidence = weak ? "weak — treat as noise" : `suggestive · ${tier}`;
+    const noise = weak ? `<span class="cb-noise">⚠ likely noise at this n — direction only</span>` : "";
+    const ci = Array.isArray(k.ci95) && k.ci95.length === 2 ? ` <span class="cb-ci">(95% CI ${k.ci95[0].toFixed(2)} to ${k.ci95[1].toFixed(2)})</span>` : "";
+    const read = weak
       ? `<p class="cb-dir">${esc(dir)} the day grade — direction only, coefficient too weak to trust</p>`
-      : `<p class="cb-dir mono">r = ${(Math.round(k.correlation_r * 100) / 100).toFixed(2)}</p>` + correlationChip([{ label: k.group, r: k.correlation_r, n }], { outcome: "the day grade" });
+      : `<p class="cb-dir mono">r = ${(Math.round(k.correlation_r * 100) / 100).toFixed(2)}${ci}</p>` + correlationChip([{ label: k.group, r: k.correlation_r, n }], { outcome: "the day grade" });
     card = `<div class="cb-grid"><article class="cb-card"><header class="cb-head"><h3 class="cb-pair">${esc(ttl(k.group))} <span class="cb-arrow">→</span> the day grade</h3><span class="cb-tag">${esc(confidence)}</span></header><div class="cb-read">${read}${noise}</div><p class="cb-meta label">n=${fmt(n)} · ${fmt(Math.round((n / 7) * 10) / 10)} wk overlap · N=1, correlative</p></article></div>`;
   }
   return sec("The keystone — one early signal, not a law",
@@ -251,6 +261,12 @@ export async function renderHabits(d) {
   const reg = await tryJSON("/api/habit_registry");
   const habits = (reg && reg.habits) || [];
   const groups = (reg && reg.groups) || [];
+  // #5948: restraint habits outside the two nameable categories (alcohol, food delivery) are not in the
+  // registry list or in per_habit — the API serves them as counts only (`restraints_unnamed`: no name,
+  // id or slug), so this page counts them and has no name to print.
+  const _unBy = (reg && reg.restraints_unnamed && reg.restraints_unnamed.by_group) || {};
+  const _unN = Object.values(_unBy).reduce((s, n) => s + (Number(n) || 0), 0);
+  const _unAgg = d.restraints_unnamed || {};
   // P0.2 — consistency RATE is the north-star; the fragile single streak demotes (honest at 0).
   const _histAll = d.history || [];
   const _held = _histAll.filter((h) => (h.tier0_pct || 0) >= 80).length;
@@ -259,22 +275,25 @@ export async function renderHabits(d) {
   const head = figs([
     _rate != null && fig(_rate + "%", `consistency · held ${_held}/${_total} days`),
     fig(d.days_tracked ?? 0, "days tracked"),
-    habits.length ? fig(habits.length, "habits tracked") : "",
+    habits.length + _unN ? fig(habits.length + _unN, "habits tracked") : "",
     fig(d.current_streak ?? 0, "current streak"),
   ]) + `<p class="rd-meta label">Consistency rate — how often the non-negotiables get held — is the north-star. The single streak is fragile (one missed day zeroes it), so it's shown honestly but not led with.</p>`;
   const dow = a.length ? sec("Adherence by day of week", `<div class="hb-chart">${a.map((v, i) => `<div class="hb-col"><span class="hb-bar" style="height:${Math.max(4, (v / mx) * 100)}%"></span><span class="hb-day label">${dows[i] || ""}</span></div>`).join("")}</div>`) : "";
   let list = empty("Habit list loading from Habitify.");
-  if (habits.length) {
-    const order = groups.length ? groups : [...new Set(habits.map((h) => h.group || "Other"))];
+  if (habits.length || _unN) {
+    const order = groups.length ? groups : [...new Set(habits.map((h) => h.group || "Other").concat(Object.keys(_unBy)))];
     const _perBy = {}; for (const ph of d.per_habit || []) _perBy[ph.name] = ph;
     // #3548: h3, not h4 — this list sits directly under this section's own h2
     // (sec() below), so an h4 here skipped a level (heading-order, moderate).
-    const body = order.map((g) => { const hs = habits.filter((h) => (h.group || "Other") === g); if (!hs.length) return ""; return `<h3 class="hb-group label">${esc(g)} <span class="rd-unit">${hs.length}</span></h3><table class="rd-tbl"><tbody>${hs.map((h) => `<tr><td class="rd-name">${esc(h.name)}${habitTaxonomyChips(h.taxonomy)}${habitFrictionChip((_perBy[h.name] || {}).adherence_pct)}</td><td class="hb-dotcell">${habitDotStrip((_perBy[h.name] || {}).days)}</td><td class="num rd-range">${esc(h.frequency || "daily")}</td></tr>`).join("")}</tbody></table>`; }).join("");
+    const body = order.map((g) => { const hs = habits.filter((h) => (h.group || "Other") === g); const more = Number(_unBy[g]) || 0; if (!hs.length && !more) return ""; return `<h3 class="hb-group label">${esc(g)} <span class="rd-unit">${hs.length + more}</span></h3><table class="rd-tbl"><tbody>${hs.map((h) => `<tr><td class="rd-name">${esc(h.name)}${habitTaxonomyChips(h.taxonomy)}${habitFrictionChip((_perBy[h.name] || {}).adherence_pct)}</td><td class="hb-dotcell">${habitDotStrip((_perBy[h.name] || {}).days)}</td><td class="num rd-range">${esc(h.frequency || "daily")}</td></tr>`).join("")}${more ? `<tr><td class="rd-name" colspan="3">${more} more, counted and named privately</td></tr>` : ""}</tbody></table>`; }).join("");
+    const _unNote = _unN
+      ? ` ${_unN} restraint habit${_unN === 1 ? " is" : "s are"} counted here and not named — only the alcohol and takeout ones are listed${_unAgg.adherence_pct != null ? `; together ${_unN === 1 ? "it was" : "they were"} kept ${fmt(_unAgg.adherence_pct)}% of the days ${_unN === 1 ? "it was" : "they were"} due` : ""}.`
+      : "";
     const _dw = d.days_window || {};
     const _stripNote = _dw.n_days
       ? ` The dot strip is day-by-day over the cycle — up to 30 days, clamped to the cycle start (${_dw.n_days < 30 ? `${fmt(_dw.n_days)} day${_dw.n_days > 1 ? "s" : ""} so far — a short strip is the honest strip, never padded with pre-cycle days` : "the full 30-day window"}): ember dot = kept · ink dot = missed (never red) · outline = not scheduled · dash = no data captured.`
       : "";
-    list = sec(`Habits I'm tracking (${habits.length})`, body + `<p class="rd-meta label">Time-of-day and do/avoid/maintain are <em>auto-derived</em> from the habit's name (heuristic, not fact). The friction tag is the opposite — read straight from the real adherence rate: kept ~always is automatic, kept rarely is high-friction. Descriptive, not a grade.${_stripNote}</p>`);
+    list = sec(`Habits I'm tracking (${habits.length + _unN})`, body + `<p class="rd-meta label">Time-of-day and do/avoid/maintain are <em>auto-derived</em> from the habit's name (heuristic, not fact). The friction tag is the opposite — read straight from the real adherence rate: kept ~always is automatic, kept rarely is high-friction. Descriptive, not a grade.${_stripNote}${_unNote}</p>`);
   }
   // §2 — 90-day adherence heatmap (P0.3). GitHub-style calendar, ember-saturation = the day's
   // Tier-0 %, cut-start (Sep 6) ringed. Replaces the old green/amber/red 7-day grid (rainbow +
@@ -297,7 +316,9 @@ export async function renderHabits(d) {
     }).join("")}</div>` +
     `<p class="rd-meta label">Each grade is the group's real adherence RATE over the window — never a correlation. Higher = load-bearing; the low ones (the floor, like Recovery) read muted, not as failure. Tier-0 non-negotiables drive the heatmap above.</p>`) : "";
   const states = habitStateTaxonomy(d.per_habit, habits);
-  const effort = habitsEffortMap(d.group_90d_avgs || {}, habits);
+  // The effort map counts habits per group, so the unnamed ones are counted in their group (no name needed).
+  const _unStubs = Object.entries(_unBy).flatMap(([g, n]) => Array.from({ length: Number(n) || 0 }, () => ({ group: g })));
+  const effort = habitsEffortMap(d.group_90d_avgs || {}, habits.concat(_unStubs));
   const drivers = habitsDrivers(d.per_habit);
   const whymiss = habitsWhyMissed(d.per_habit);
   const gtrends = habitsGroupTrends(d.history, d.group_90d_avgs || {});

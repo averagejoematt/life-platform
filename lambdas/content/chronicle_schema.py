@@ -446,3 +446,33 @@ def real_publication_credit_findings(text) -> list:
                 }
             )
     return findings
+
+
+# Installments withdrawn from public access WITHOUT touching their stored row (owner ruling 2026-11-10). Every manifest
+# and page builder treats one exactly like an `unlisted` row for the reading list (URL slot kept; off the manifest and
+# the Prologue numbering), and never renders its page again. Keyed by the chronicle sort key.
+#   DATE#2026-09-05 — "The Plan, On the Record" (/journal/posts/week-03/): it quotes day-one sealed calls verbatim, two
+#                     of which the owner ruled private on 2026-11-09 (#5720).
+WITHDRAWN_SKS = frozenset({"DATE#2026-09-05"})
+
+
+def is_withdrawn(inst) -> bool:
+    """True when this installment has been withdrawn from public access (WITHDRAWN_SKS)."""
+    return str((inst or {}).get("sk", "")) in WITHDRAWN_SKS
+
+
+def is_unpublished(inst) -> bool:
+    """True unless the row's status is ``published`` — a draft, a ``changes_requested`` hold or a row with no status.
+
+    Fail closed: a held installment's title and excerpt reached the public reading list when a LATER week published,
+    because the manifest was rebuilt from every row in the phase (Week 10, 2026-11-14)."""
+    return str((inst or {}).get("status") or "").strip().lower() != "published"
+
+
+def off_the_list(inst, *, publishing: bool = False) -> bool:
+    """True when an installment stays out of the public reading list: unlisted on its row, withdrawn, or not yet
+    published. ``publishing`` exempts the one row being published right now from the status test only — its row still
+    reads ``draft`` when the manifest is built. The week-NN URL sequence is NOT filtered by this: it runs over every
+    visible row, so a held week keeps its slot and no published link moves."""
+    inst = inst or {}
+    return bool(inst.get("unlisted")) or is_withdrawn(inst) or (not publishing and is_unpublished(inst))

@@ -141,12 +141,8 @@ _DYNAMIC_REFERENCES: dict[str, str] = {
     "secret:lambdas.common.secret_cache.get_secret": "the shared cache indirection — every caller's id is its own literal",
     "secret:lambdas.common.secret_cache.get_secret_json": "same, JSON variant",
     "secret:lambdas.ingestion.eightsleep_lambda._cached_secret": "secret id is a parameter of the local cache wrapper",
-    # #2846: appeared the moment health-auto-export-webhook stopped being a raw
-    # `_lambda.Function` and became a create_platform_lambda call — this sweep's
-    # population IS the constructor's call sites (_sweep_fleet), so for as long as
-    # HAE was constructed by hand it was invisible to the grant lockstep. Same
-    # local-cache-wrapper shape as its eightsleep/notion siblings above.
-    "secret:lambdas.ingestion.health_auto_export_lambda._cached_secret": "secret id is a parameter of the local cache wrapper",
+    # (#5513 removed the HAE `_cached_secret` row that #2846 added: the webhook now reads both of its
+    # secret ids as module constants through common.secret_cache, so the lockstep checks them by name.)
     "secret:lambdas.ingestion.ingestion_framework.run_ingestion": "SIMP-2 reads the id from the source registry facet",
     "secret:lambdas.ingestion.notion_lambda._cached_secret": "secret id is a parameter of the local cache wrapper",
     # #3760: both surfaced when `progress-viewer` joined the fleet — this sweep's population
@@ -185,6 +181,18 @@ _CONFIG_WITHOUT_REPO_FILE: dict[str, str] = {
     "out of band into the private coaching home and never in this PUBLIC repo (the contact-path test greps the tree "
     "for the field shape). The tracked shape is `coach.named_human_contact`'s module docstring. Deliberately NOT a "
     "repo twin, and no example JSON under config/ either.",
+    "config/private/user_goals_private.json": "Owner ruling 2026-11-11 (item 2): the plan root's PRIVATE part (mental "
+    "health, eating, relapse, clinical and genetic fields). Owner-provisioned out of band; the tracked file holds only "
+    "the public-safe part and `common.user_goals` merges the two. Deliberately NOT a repo twin, so the config twin sync "
+    "can never write or delete it; absent, coach context degrades to the public plan.",
+    "config/private/genome_lab_xref.json": "Owner ruling 2026-11-11 (second message, item 5): the biomarker -> gene "
+    "cross-reference for the owner's labs is personal genetic information. Owner-provisioned out of band; "
+    "`mcp.labs_helpers` reads it and fails soft to no genome context. Deliberately NOT a repo twin.",
+    "config/coaching/exercise_library.private.json": "#5769/#5773: the exercise library's OWNER-PRIVATE N=1 overlay "
+    "(best sets per bodyweight band, coded note signals, bodyweight gate thresholds). Produced out of band by "
+    "`deploy/write_exercise_library_overlay.py --apply` under the #3043 owner-private prefix and never in this PUBLIC "
+    "repo; the selection engine reads it fail-closed (absent => N=1 fit unknown, never an error), and so does the #5772 weekly gate evaluation (absent => every overlay-fed gate locks as unknown). Deliberately NOT a "
+    "repo twin.",
 }
 
 #: The derived content-filter/privacy-guard consumer set → its watch surface.
@@ -490,6 +498,136 @@ def test_deploy_role_grants_artifact_tagging_for_fleet_bookkeeping():
     )
 
 
+def _fleet_lambda_resources(lambda_map: dict, acct: str) -> list:
+    """#5544: the deploy role's Lambda write scope, DERIVED from ci/lambda_map.json.
+
+    The set is exactly what `deploy/deploy_fleet.sh` and `deploy/rollback_fleet.sh` iterate:
+    every `.lambdas[].function` not flagged `not_deployed`, in its `region` (default
+    us-west-2), plus the two MCP functions. 108 exact ARNs do not fit the 10,240-character
+    inline-policy budget, so per region the names are folded by their first hyphen token:
+    a token shared by 2+ fleet functions becomes `<longest common hyphen prefix>-*`
+    (`coach-*`, `life-platform-*`), a token held by one function stays an exact name.
+    """
+    pairs = {(row["function"], row.get("region") or "us-west-2") for row in lambda_map["lambdas"].values() if not row.get("not_deployed")}
+    pairs |= {("life-platform-mcp", "us-west-2"), ("life-platform-mcp-warmer", "us-west-2")}
+    groups: dict = {}
+    for name, region in pairs:
+        groups.setdefault((region, name.split("-")[0]), []).append(name)
+    out = set()
+    for (region, _token), names in groups.items():
+        if len(names) == 1:
+            out.add(f"arn:aws:lambda:{region}:{acct}:function:{names[0]}")
+            continue
+        common = []
+        for segment in zip(*(n.split("-") for n in names)):
+            if len(set(segment)) != 1:
+                break
+            common.append(segment[0])
+        out.add(f"arn:aws:lambda:{region}:{acct}:function:{'-'.join(common)}-*")
+    return sorted(out)
+
+
+def test_deploy_role_lambda_and_s3_scope_is_the_fleet_and_the_deploy_prefixes():
+    """#5544 pin: the CI deploy role writes only the Lambda fleet and the deploy prefixes.
+
+    Until #5544 `LambdaDeploy` granted UpdateFunctionCode/UpdateFunctionConfiguration/
+    InvokeFunction plus four layer writes on `function:*` and `layer:*` in two regions, and
+    `S3DeployArtifacts` granted Get/PutObject on the whole bucket — `raw/` and `uploads/`
+    included. The enumeration behind the narrowing (every job that assumes this role, every
+    script they run, cross-checked against CloudTrail) is in infra/iam/README.md. Each
+    assertion below reds a specific re-broadening:
+
+      * the fleet statement is not the list derived from ci/lambda_map.json (drifts either way);
+      * any Lambda action on `function:*`, `layer:*` or a region/account wildcard;
+      * InvokeFunction or a layer write anywhere — no deploy-role job invokes or publishes;
+      * UpdateFunctionConfiguration on anything but the site-api (config_twin_sync's recycle);
+      * an S3 object action on the bucket root (`bucket/*`) or outside the five deploy prefixes;
+      * a policy the apply would reject for size (the inline budget is 10,240 non-blank chars).
+    """
+    with open(os.path.join(ge.IAM_DIR, "github-actions-deploy-role.permissions.json"), encoding="utf-8") as fh:
+        doc = json.load(fh)
+    with open(os.path.join(REPO, "ci", "lambda_map.json"), encoding="utf-8") as fh:
+        lambda_map = json.load(fh)
+
+    def _as_list(v):
+        return v if isinstance(v, list) else [v]
+
+    allows = [s for s in doc["Statement"] if s.get("Effect") == "Allow"]
+    stmts = {s["Sid"]: s for s in doc["Statement"]}
+    acct = "205930651321"
+    bucket = "arn:aws:s3:::matthew-life-platform"
+
+    # ── Lambda: the fleet, derived — never hand-listed ──
+    fleet = stmts["LambdaFleetDeploy"]
+    assert sorted(_as_list(fleet["Action"])) == ["lambda:GetFunction", "lambda:GetFunctionConfiguration", "lambda:UpdateFunctionCode"]
+    want = _fleet_lambda_resources(lambda_map, acct)
+    have = _as_list(fleet["Resource"])
+    assert have == want, (
+        "LambdaFleetDeploy.Resource is not the set derived from ci/lambda_map.json (#5544). Replace it with:\n"
+        + json.dumps(want, indent=2)
+        + "\n…then apply it (`bash deploy/setup_github_oidc.sh`) BEFORE the first deploy of a new name, or "
+        "deploy_fleet.sh fails that function with AccessDenied."
+    )
+    for name, region in {(r["function"], r.get("region") or "us-west-2") for r in lambda_map["lambdas"].values()}:
+        arn = f"arn:aws:lambda:{region}:{acct}:function:{name}"
+        assert any(fnmatch.fnmatchcase(arn, p) for p in have), f"fleet function {arn} is not deployable by CI"
+    # Lambda@Edge (CloudFront auth) is hand-deployed and must stay out of CI's reach.
+    with open(os.path.join(REPO, "cdk", "stacks", "constants.py"), encoding="utf-8") as fh:
+        tree = ast.parse(fh.read())
+    tiers = next(
+        ast.literal_eval(n.value)
+        for n in tree.body
+        if isinstance(n, (ast.Assign, ast.AnnAssign))
+        and any(getattr(t, "id", None) == "SECURITY_TIER_LOG_FUNCTIONS" for t in (n.targets if isinstance(n, ast.Assign) else [n.target]))
+    )
+    edge = {fn for fn, kind in tiers.items() if kind == "edge"}
+    edge |= {row["function"] for row in lambda_map["lambda_edge"]["functions"].values()}
+    assert edge, "the Lambda@Edge negative-control set went empty — the derivation broke"
+    reachable_edge = sorted(fn for fn in edge for p in have if fnmatch.fnmatchcase(f"arn:aws:lambda:us-east-1:{acct}:function:{fn}", p))
+    assert not reachable_edge, f"a fleet pattern reaches a hand-deployed Lambda@Edge function: {reachable_edge}"
+
+    lambda_grants = [(a, r) for s in allows for a in _as_list(s["Action"]) if a.startswith("lambda:") for r in _as_list(s["Resource"])]
+    broad = sorted(
+        (a, r)
+        for a, r in lambda_grants
+        if a != "lambda:ListFunctions" and (r == "*" or r.endswith(":function:*") or ":layer:" in r or r.startswith("arn:aws:lambda:*"))
+    )
+    assert not broad, f"a Lambda action is granted on a wildcard function/layer resource again (#5544): {broad}"
+    banned = sorted({a for a, _ in lambda_grants if a in ("lambda:*", "lambda:InvokeFunction") or "Layer" in a})
+    assert not banned, f"no deploy-role job invokes a function or writes a layer (#5544): {banned}"
+    ufc = sorted({r for a, r in lambda_grants if a == "lambda:UpdateFunctionConfiguration"})
+    assert ufc == [f"arn:aws:lambda:us-west-2:{acct}:function:life-platform-site-api"], ufc
+    twin_sync = open(os.path.join(REPO, "deploy", "config_twin_sync.py"), encoding="utf-8").read()
+    assert (
+        "update_function_configuration(" in twin_sync and '"life-platform-site-api"' in twin_sync
+    ), "config_twin_sync.py no longer recycles the site-api — drop LambdaSiteApiRecycle with it (#5544)"
+
+    # ── S3: the deploy prefixes only — never the bucket root, never raw/ or uploads/ ──
+    prefixes = {
+        f"{bucket}/deploys/*",
+        f"{bucket}/site/*",
+        f"{bucket}/config/*",
+        f"{bucket}/www-previous/*",
+        f"{bucket}/remediation-log/iam-additive-gate/*",
+    }
+    object_grants = sorted(
+        (a, r)
+        for s in allows
+        for a in _as_list(s["Action"])
+        if a.startswith("s3:") and ("Object" in a or a == "s3:*")
+        for r in _as_list(s["Resource"])
+    )
+    assert object_grants, "no S3 object grant found — the statement scan broke, not the policy"
+    outside = sorted((a, r) for a, r in object_grants if r not in prefixes)
+    assert not outside, f"an S3 object action is granted outside the deploy prefixes (#5544): {outside}"
+    for key in ("raw/matthew/whoop/2026/11/14.json", "uploads/macrofactor/x.csv", "generated/x.json", "x"):
+        hits = sorted({a for a, r in object_grants if fnmatch.fnmatchcase(f"{bucket}/{key}", r)})
+        assert not hits, f"s3://matthew-life-platform/{key} is reachable by {hits} again (#5544)"
+
+    size = len(json.dumps(doc, separators=(",", ":")))
+    assert size <= 10240, f"the deploy role's inline policy is {size} chars; IAM rejects > 10,240 — fold more names into patterns"
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # C. The dynamic-reference ratchet
 # ══════════════════════════════════════════════════════════════════════════════
@@ -711,6 +849,22 @@ _PENDING_PERMISSIONS_APPLY: dict[str, str] = {
     # zoned-schedule leg) was applied by the owner ~04:48Z with the same put-role-policy command;
     # post-apply `deploy/verify_oidc_iam.py --strict` reported CLEAN across all 17 targets.
     # Removed here per the same #2824 rule.
+    # 2026-11-15: the #5513 deploy-role entry (GetSecretValue removed; CDKBootstrapRoleAssume names the 12
+    # bootstrap roles) was applied ~06:10Z with `bash deploy/setup_github_oidc.sh`; its verifier showed the
+    # deploy role matching. Removed here per the same #2824 rule.
+    # 2026-11-15: the #5934 readonly-role entry (CloudWatchAlarmHistoryRead + QaSmokeCauseLogRead for
+    # wrap-nightly's alarm-citations leg) was applied ~06:00Z with the same put-role-policy command;
+    # get-role-policy read back both Sids. Removed here per the same #2824 rule.
+    # 2026-11-15: the #5821 remediation-role entry (OpsDigestLine) was applied by the owner ~06:20Z with
+    # `bash deploy/setup_remediation_role.sh`; its post-apply verifier no longer listed the role as drifted.
+    # Removed here per the same #2824 rule.
+    # 2026-11-15: the #5974 golden-eval-role entry (KMSDecryptViaDynamoDB, conditioned kms:ViaService
+    # dynamodb.us-west-2) was applied ~07:00Z with the put-role-policy command; get-role-policy read back
+    # the Sid. Removed here per the same #2824 rule.
+    # 2026-11-16: the #5544 deploy-role entry (LambdaDeploy narrowed to LambdaFleetDeploy + LambdaSiteApiRecycle;
+    # S3 object access narrowed to deploys/ site/ config/ www-previous/ and the iam-additive-gate ledger) was
+    # applied with `bash deploy/setup_github_oidc.sh` (owner-approved); post-apply
+    # `deploy/verify_oidc_iam.py --strict` reported CLEAN across all 17 targets. Removed here per the same #2824 rule.
 }
 
 

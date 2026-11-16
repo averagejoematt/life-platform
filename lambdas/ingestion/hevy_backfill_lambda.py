@@ -223,8 +223,25 @@ def _derive_training_notes(rec: dict) -> None:
             if it.get("pain_flag"):
                 tn.elevate_pain(_table, it)
         logger.info("training-notes derived %s: %d records, %d pain", rec.get("workout_uid"), res["records"], res["pain"])
+        _raise_note_requests(res.get("items", []), rec.get("workout_uid"))
     except Exception as e:  # noqa: BLE001
         logger.warning("training-notes derive failed (non-fatal) %s: %s", rec.get("workout_uid"), e)
+
+
+def _raise_note_requests(items: list, workout_uid) -> dict:
+    """#5573: a note that ASKS the platform for something (form guidance, a question, a rule) gets a request row,
+    and a reply where code can write one (`training.note_requests`). Guarded like the derive itself — a raise
+    failure never breaks ingestion; write-once, so a re-run over the same note writes nothing."""
+    try:
+        from training import note_requests
+
+        out = note_requests.raise_requests(_table, items)
+        if out["requests"]:
+            logger.info("note-requests %s: %s", workout_uid, out)  # counts + subtypes only, never the note text
+        return out
+    except Exception as e:  # noqa: BLE001
+        logger.warning("note-requests raise failed (non-fatal) %s: %s", workout_uid, type(e).__name__)
+        return {"error": type(e).__name__}
 
 
 def _attach_adherence(rec: dict, raw_workout: dict) -> None:
@@ -254,6 +271,22 @@ def _rejoin_cardio_hr() -> dict:
     except Exception as e:  # noqa: BLE001
         logger.warning("cardio-hr rejoin failed (non-fatal): %s: %s", type(e).__name__, e)
         return {"errors": 1}
+
+
+def _after_walk(written: list[dict]) -> dict:
+    """The post-walk steps, in order. None of them raises.
+
+    #475 / C-7: consume DELETE#WORKOUT# markers — this run's AND any unresolved backlog (self-healing). Runs after the
+    walk so a delete event and its workout record written in the same run still reconcile; a failure leaves the marker
+    unresolved for the next poll and never blocks the cursor (marker state is independent of the events window).
+    #4412: the wearable usually lands AFTER the Hevy session (WHOOP → Strava → hourly pull), so the cardio HR join is
+    re-derived every run over the last two Pacific days — written only when it changed.
+    #5795: a loaded session written for today/yesterday starts the nightly pre-draft (flag `PREDRAFT_ON_INGEST`, off)."""
+    from ingestion import predraft_trigger
+
+    out = {"tombstones": resolve_tombstones(), "cardio_hr_rejoin": _rejoin_cardio_hr()}
+    out["predraft_trigger"] = predraft_trigger.after_poll(written)
+    return out
 
 
 def _record_health(*, attempted: bool, succeeded: bool, exc) -> None:
@@ -387,12 +420,14 @@ def reextract_training_notes(days: int) -> dict:
     wrote = 0
     skipped = 0
     versioned = 0
+    raised = 0  # #5573: owner-request rows this sweep raised (write-once — a re-run raises 0)
     for item in resp.get("Items", []):
         exercises = item.get("exercises") or []
         if not any((e.get("notes") or "").strip() for e in exercises):
             continue
         try:
             res = tn.write_workout_notes(_table, item.get("date"), item.get("workout_uid", ""), exercises, llm_fn=llm_fn)
+            raised += int((_raise_note_requests(res.get("items", []), item.get("workout_uid")) or {}).get("raised") or 0)  # #5573
             workouts += 1
             records += res.get("records", 0)
             wrote += res.get("wrote", 0)
@@ -410,6 +445,7 @@ def reextract_training_notes(days: int) -> dict:
         "wrote": wrote,
         "skipped_unchanged": skipped,
         "versioned": versioned,
+        "note_requests_raised": raised,
         "window": f"{start}..{end}",
     }
     logger.info("training-notes re-extract: %s", out)
@@ -642,7 +678,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
     is_initial = since == INITIAL_SINCE
     logger.info("hevy backfill starting. since=%s initial=%s", since, is_initial)
 
-    ingested = 0
+    written: list[dict] = []  # #5795: the records this poll wrote — the pre-draft trigger reads them
     deleted = 0
     errors = 0
     blocking_errors = 0  # #4643: errors that hold the cursor (a quarantined event does not)
@@ -693,7 +729,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
                         cardio_hr_store.attach(_table, USER_ID, rec)  # #4412 cardio block ↔ wearable HR (guarded, pre-write)
                         write_normalized(rec)
                         _derive_training_notes(rec)  # on-ingest note-signal projection (guarded)
-                        ingested += 1
+                        written.append(rec)
                         logger.info(
                             "hevy backfill ingest %s date=%s phase=%s sets=%d volume=%.2fkg",
                             wid,
@@ -769,15 +805,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
         # paths engage — a swallowed fatal was how Hevy could die invisibly (#466).
         raise
 
-    # #475 / C-7: consume DELETE#WORKOUT# markers — this run's AND any unresolved
-    # backlog (self-healing). Runs after the walk so a delete event and its
-    # workout record written in the same run still reconcile. Never raises; a
-    # failure leaves the marker unresolved for the next poll and never blocks
-    # the cursor (marker state is independent of the events window).
-    tombstones = resolve_tombstones()
-    # #4412: the wearable usually lands AFTER the Hevy session (WHOOP → Strava → hourly pull), so
-    # the join is re-derived every run over the last two Pacific days — written only when it changed.
-    cardio_rejoin = _rejoin_cardio_hr()
+    post_walk = _after_walk(written)  # tombstones, the cardio HR re-join, the #5795 pre-draft trigger
     # #4643: a truncated walk is a FAILED run. It used to record success whenever no event
     # errored, so a backlog the cap could never clear — `since` frozen, every run walking the
     # same 30 newest pages — read as a healthy source forever. It is not a parse fault; the
@@ -794,7 +822,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
         "initial_run": is_initial,
         "since": since,
         "new_since": poll_started_at if blocking_errors == 0 and not truncated else since,
-        "ingested": ingested,
+        "ingested": len(written),
         "deleted": deleted,
         "errors": errors,
         "blocking_errors": blocking_errors,
@@ -802,8 +830,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
         "pages_walked": pages_walked,
         "total_pages": total_pages_observed,
         "truncated": truncated,
-        "tombstones": tombstones,
-        "cardio_hr_rejoin": cardio_rejoin,
+        **post_walk,
         "failed_ids": failed_ids[:10],
     }
     logger.info("hevy backfill complete: %s", json.dumps(summary, default=str))

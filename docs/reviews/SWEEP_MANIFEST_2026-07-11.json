@@ -347,19 +347,19 @@
   },
   {
    "id": "privacy-1",
-   "summary": "The public repo re-publishes the exact genotype #920 removed: tests/test_labs_privacy.py quotes \"Lpa Aspirin Genotype \u2014 Ile/Ile\" as 'the exact live finding' (docstring line 5 + fixture lines 59-60 labeled '# The exact live finding'), and PR #920's public body says outright it is Matthew's actual genotype; commit dd623142's message/diff carries it too. The hotfix that stripped the genotype from /api/labs immortalized the value on a fresh public surface.",
+   "summary": "The public repo re-publishes the exact genotype #920 removed: tests/test_labs_privacy.py quotes the named-gene genotype [value removed 2026-11-11] as 'the exact live finding' (docstring line 5 + fixture lines 59-60 labeled '# The exact live finding'), and PR #920's public body says outright it is Matthew's actual genotype; commit dd623142's message/diff carries it too. The hotfix that stripped the genotype from /api/labs immortalized the value on a fresh public surface.",
    "sev_guess": "high",
    "verdict": "CONFIRMED"
   },
   {
    "id": "privacy-2",
-   "summary": "Live public API still asserts a named-gene fact about Matthew's genome: /api/supplements and /config/supplement_registry.json (both 200) serve \"Genome includes MTHFR variants \u2014 check whether you need methylated forms\" + rationale \"MTHFR variants in genome suggest methylation support needed\" \u2014 the same named-gene-with-personal-carrier-status class #920 called critical, and it survived the #920 commit that edited this exact file (dd623142 touched site/config/supplement_registry.json but only remapped recommenders).",
+   "summary": "Live public API still asserts a named-gene fact about Matthew's genome: /api/supplements and /config/supplement_registry.json (both 200) serve a named-gene carrier statement [quote removed 2026-11-11] \u2014 the same named-gene-with-personal-carrier-status class #920 called critical, and it survived the #920 commit that edited this exact file (dd623142 touched site/config/supplement_registry.json but only remapped recommenders).",
    "sev_guess": "high",
    "verdict": "CONFIRMED"
   },
   {
    "id": "privacy-3",
-   "summary": "Public build beat names the specific gene involved in the (Matthew-gated) privacy audit: /story/build/beats.json (200, rendered on the build page) honest_miss says the site published \"specific gene variants including APOE status, and exact hormone and cancer-screening lab values\" \u2014 publicly confirming APOE data exists and was once served (an invitation to archive/Wayback digging), and violating the norm PR #943 itself established ('specifics deliberately NOT quoted here \u2014 public repo'). Adjacent risk: the public test file also contains an \"APOE Allele e3/e3\" fixture, so readers can plausibly (even if wrongly) read a real value off the pair.",
+   "summary": "Public build beat names the specific gene involved in the (Matthew-gated) privacy audit: /story/build/beats.json (200, rendered on the build page) honest_miss says the site published \"specific gene variants [gene removed 2026-11-11], and exact hormone and cancer-screening lab values\" \u2014 publicly confirming that gene's data exists and was once served (an invitation to archive/Wayback digging), and violating the norm PR #943 itself established ('specifics deliberately NOT quoted here \u2014 public repo'). Adjacent risk: the public test file also contains a named-gene allele-pair fixture [removed 2026-11-11], so readers can plausibly (even if wrongly) read a real value off the pair.",
    "sev_guess": "medium",
    "verdict": "CONFIRMED"
   },

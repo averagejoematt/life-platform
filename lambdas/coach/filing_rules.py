@@ -43,7 +43,7 @@ from datetime import datetime, timedelta
 from experiment.measurable_metrics import METRIC_SOURCES, infer_direction
 
 from coach import prediction_windows
-from coach.conditional_branches import antecedent_held
+from coach.conditional_branches import LEAD_CONDITION_RE, NEGATED_BRANCH_RE, antecedent_held
 from coach.prediction_emission import _metric_names, classify_claim_shape, infer_subdomain
 
 FILING_RULES_VERSION = "1"
@@ -68,9 +68,11 @@ REASONS = {
 }
 
 # ── clause structure ─────────────────────────────────────────────────────────────────────
-_LEAD_COND_RE = re.compile(r"^\s*(?:even\s+)?(?:if|when|whenever|once|assuming|provided(?:\s+that)?|unless|as\s+long\s+as)\b\s*", re.I)
+# The lead-condition and negated-branch shapes live in coach.conditional_branches (#5611): the grader refuses a
+# misfiled conditional with the SAME two patterns this module splits branches with, so the two cannot drift.
+_LEAD_COND_RE = LEAD_CONDITION_RE
 _TRAIL_COND_RE = re.compile(r"\s+(?:even\s+)?(?:if|once|when|whenever|unless|while|as\s+long\s+as|provided(?:\s+that)?)\s+", re.I)
-_NEGATED_BRANCH_RE = re.compile(r"^\s*(?:and\s+|but\s+)?(?:if\s+not|otherwise|if\s+it\s+does\s*n[o']t|if\s+that\s+fails)\b[\s,]*", re.I)
+_NEGATED_BRANCH_RE = NEGATED_BRANCH_RE
 _MODAL_RE = re.compile(r"\b(?:will|would|should|could|can|may|might|won't|wouldn't|then)\b", re.I)
 # Commentary appended after the outcome ("…, which would suggest …", "… due to …") is not the outcome.
 _COMMENTARY_RE = re.compile(
@@ -290,7 +292,8 @@ def _outcome_core(text):
 
 
 # ── metric naming ────────────────────────────────────────────────────────────────────────
-_GENERIC_TOKENS = {"total", "score", "hours", "duration", "blood", "body", "heart", "rate", "resting", "count", "step"}
+# "volume" alone never names Hevy's lifting volume: a "Zone 2 volume" or "walking volume" call is not graded on it.
+_GENERIC_TOKENS = {"total", "score", "hours", "duration", "blood", "body", "heart", "rate", "resting", "count", "step", "volume"}
 
 
 def _names_for(metric):

@@ -55,6 +55,10 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any, Callable, NamedTuple
 
+from common.challenge_checkins import owner_entries  # #6087: the owner's own check-ins only
+
+from health import character_privacy  # owner ruling 2026-11-06: level badges credit the public method, never a recalculation
+
 # ── The first-earn ledger's DDB coordinates ───────────────────────────────────
 ACHIEVEMENTS_SOURCE = "achievements"
 FIRST_EARN_SK_PREFIX = "BADGE#"
@@ -457,7 +461,7 @@ def _completed_challenge_stats(challenges: list[dict]) -> tuple[int, int]:
         if ch.get("status") != "completed":
             continue
         completed += 1
-        checkins = ch.get("daily_checkins") or []
+        checkins = owner_entries(ch.get("daily_checkins"))  # #6087: never a reader's tap
         if checkins and all(c.get("completed") for c in checkins):
             perfect += 1
     return completed, perfect
@@ -475,7 +479,7 @@ def signals_from(inputs: dict) -> dict:
 
     current_streak = _streak_of(habits[-1]) if habits else 0
     days_tracked = len(habits)
-    current_level = int(_f((chars[-1] if chars else {}).get("character_level"), 1) or 1)
+    current_level = character_privacy.event_level(chars)  # owner ruling 2026-11-06: a recalculated level earns no badge
     current_weight = _f((weights[-1] if weights else {}).get("weight_lbs"), 999.0)
     start_weight = inputs["start_weight_lbs"]
     lost_lbs = round(start_weight - current_weight, 1) if current_weight < start_weight else 0
@@ -534,7 +538,7 @@ def histories_from(inputs: dict) -> dict[str, list[tuple[str, Any]]]:
     dated_habits = [d for d in (_date_of(h) for h in inputs["habits"]) if d]
     out["days_tracked"] = [(d, i + 1) for i, d in enumerate(dated_habits)]
 
-    levels = [(_date_of(c), int(_f(c.get("character_level"), 1) or 1)) for c in inputs["chars"]]
+    levels = character_privacy.event_level_series(inputs["chars"])
     out["current_level"] = [(d, v) for d, v in levels if d]
 
     start_weight = inputs["start_weight_lbs"]

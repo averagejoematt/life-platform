@@ -70,8 +70,8 @@ Cross-source computations, pharmacokinetic models, correlation matrices.
 
 ### 2A. Caffeine at Bedtime Estimate
 - **Where:** New section in `tool_get_caffeine_sleep_correlation` (~L3344) OR daily brief
-- **Compute:** Sum caffeine from food_log entries with timestamps. Apply half-life decay (5.5h default, adjust to 3.5h for CYP1A2 rs762551 A/A fast metabolizer from genome data). Estimate residual mg at sleep_start time from Whoop.
-- **Data needed:** MacroFactor food_log (timestamps + caffeine), Whoop sleep_start, genome CYP1A2
+- **Compute:** Sum caffeine from food_log entries with timestamps. Apply half-life decay (5.5h default; any genome-based adjustment is owner-only [genetic detail removed 2026-11-11]). Estimate residual mg at sleep_start time from Whoop.
+- **Data needed:** MacroFactor food_log (timestamps + caffeine), Whoop sleep_start, genome (caffeine-metabolism variant)
 - **Effort:** 45 min
 
 ### 2B. Morning-to-Evening Energy Delta

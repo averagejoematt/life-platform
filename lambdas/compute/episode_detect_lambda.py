@@ -31,6 +31,7 @@ BENCH-1.2 — detection algorithm + handler + CDK wiring (next commit).
 """
 
 import logging
+import math
 import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -84,7 +85,7 @@ def _deep_dec(obj):
     if isinstance(obj, dict):
         return {str(k): _deep_dec(v) for k, v in obj.items()}
     if isinstance(obj, float):
-        return Decimal(str(round(obj, 4)))
+        return Decimal(str(round(obj, 4))) if math.isfinite(obj) else None  # #5524: NaN/Inf never reach the write
     if isinstance(obj, int):
         return Decimal(str(obj))
     return obj

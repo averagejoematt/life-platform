@@ -37,6 +37,7 @@ from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
+from public_variant_fixtures import with_public  # noqa: E402 — 2026-11-05: public readers serve the public variant
 from web import (  # noqa: E402
     site_api_character as char,
     site_api_common as common,
@@ -145,7 +146,7 @@ def test_a_real_sheet_is_untouched(monkeypatch):
                     "data_coverage": 1.0,
                     "coverage_hold": False,
                 }
-            return {"Items": [rec]}
+            return {"Items": [with_public(rec)]}
 
     for mod in (common, char, vitals):
         monkeypatch.setattr(mod, "EXPERIMENT_START", _iso(_today_pt() - timedelta(days=30)), raising=False)

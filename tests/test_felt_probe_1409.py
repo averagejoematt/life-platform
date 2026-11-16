@@ -27,6 +27,7 @@ os.environ.setdefault("EMAIL_SENDER", "test@example.com")
 
 from content import ritual_link  # noqa: E402
 from experiment import phase_taxonomy  # noqa: E402
+from public_variant_fixtures import with_public  # noqa: E402 — 2026-11-05: the public variant
 from web import site_api_data as data  # noqa: E402
 
 
@@ -102,7 +103,9 @@ def _sheet_row(date_str, sleep=None, movement=None, relationships=None):
     for name, v in (("sleep", sleep), ("movement", movement), ("relationships", relationships)):
         if v is not None:
             row[f"pillar_{name}"] = {"level_score": v}
-    return row
+    # Owner ruling 2026-11-05: public readers read the sheet's public variant (here: the same pillars).
+    row["character_level"] = 1
+    return with_public(row)
 
 
 def _calibration(monkeypatch, probes, sheets):

@@ -323,7 +323,14 @@ ecosystem bumps it — one copy, no hand-bump (the old "bump the `ci-cd.yml` lit
 hand" step let the pin sit months stale, the #2468 incident). Discover them all —
 `grep -E 'aws-cdk|constructs==' cdk/package.json cdk/requirements.txt
 requirements-dev.txt .github/workflows/ci-cd.yml`. Dependabot proposes both halves
-(`chore(deps-cdk)`); land lib and CLI bumps as deliberate PRs.
+(`chore(deps-cdk)`); land lib and CLI bumps as deliberate PRs. **No
+`cdk/package-lock.json`, on purpose (#5514):** `cdk/package.json` is a
+version-of-record only — no workflow runs `npm install`/`npm ci` in `cdk/`, they run
+`npm install -g "aws-cdk@${CDK_CLI_VERSION}"`, and the CLI ships with no
+dependencies (`npm view aws-cdk@<v> dependencies optionalDependencies
+bundleDependencies` → `{}`, checked 2026-11-10 on 2.1146.1). A lockfile would be read by
+no install path and pin nothing. Revisit if a workflow ever installs FROM `cdk/` or the
+CLI grows a dependency.
 
 **CI-parity test runs need FAKE creds, not absent ones.** CI's runner has no valid AWS
 credentials, but `env -u` alone lets boto3 fall back to the `[default]` profile and
@@ -734,6 +741,33 @@ the restored ref to push back) can be re-uploaded once new bytes exist but never
 ("LEFT LIVE") rather than silently leaving it live. This used to point at #2799, which
 CLOSED 2026-08-31 as the completed silent-failure-floor epic; a live rule pointing at a
 closed issue is a rule with no owner, and #3652 found it that way.
+
+**The v9 deploy waits for the Site API it reads (2026-11-12, run 43124939822).** The v9
+build exports its snapshot from, and its smoke judges, the LIVE Site API — whose code ships
+only through CI's fleet deploy or `deploy/deploy_site_api.sh`. A merge that changed both
+(#5827: a flag flip on an already-registered route) smoke-failed against the old API while
+CI sat behind an owner-required IAM diff; the rollback was correctly declined (`api:1`), the
+run stayed red. `web-preview-deploy.yml`'s `api-readiness` job now compares the live
+bundle's `build_info.json` commit with the commit the Site API owes (the stale-Lambda
+dead-man's own derivation) and, when behind, **defers** — nothing synced, nothing rolled
+back — instead of waiting. `web-deploy-resume.yml` (every CI/CD completion + hourly) and the
+laptop deploy scripts re-dispatch the deferred deploy once the API lands; a deferral older
+than 8 h reds the resume run. Break-glass: dispatch with `api_readiness=skip`. Logic and
+tests: `deploy/www_api_readiness.py`, `tests/test_www_api_readiness.py`.
+
+**The legacy `site/**` deploy carries the same gate (2026-11-12 follow-up).** `site-deploy.yml`
+(`/coaching/` and every kept shell) reads the same live Site API, so it runs the same
+`www_api_readiness.py check` in an `api-readiness` job; not ready → its own `deferred` job
+(nothing synced, so `rollback-site-on-failure` cannot fire — rollback still keys on a real
+smoke/visual red after a real deploy). `web-deploy-resume.yml` resumes **both** workflows
+(`TARGETS` in the module; one API read, one dispatch per deferred target) and the stale alarm
+times from the **first** deferral of a streak, so frequent `site/**` merges cannot keep
+resetting it. Break-glass: `gh workflow run site-deploy.yml --ref main -f api_readiness=skip`.
+`deploy/api_deploy_sequencing.json` is **kept as the secondary line**, not retired: it is
+still the PR-time advisory (`scripts/check_api_before_frontend.py`) and the smoke/visual 404
+downgrade for what the commit gate cannot see — an UNVERIFIED or break-glass run, and a cached
+edge 404 outliving the Lambda deploy. Entries should be rare and short-lived; the stale
+`/api/pairs` entry was re-armed with this change.
 
 ### 4c. Merge-day derived-artifact drift auto-reconciles on main (#1173)
 
@@ -1671,7 +1705,7 @@ commit — the step letters below stay the per-gate contract anchors):
 | `health-auto-export-webhook` gains a second ingress (an out-of-IaC API Gateway) or a wider-than-declared invoke grant | HAE webhook single-ingress parity (#1946) | `deploy/check_hae_webhook_ingress_drift.py --strict` + its daily blocking workflow |
 | A security-tier Lambda log group (canary, key-rotator, dlq-consumer, cf-auth, buddy-auth) retains for other than the `docs/DATA_GOVERNANCE.md` 90 days in ANY region — including a Lambda@Edge replica group a newly-served region just created at NEVER_EXPIRE (#3278: five regions sat that way, unpoliced) | Security log-retention declared-vs-live sweep (#3278): declared once in `cdk/stacks/constants.py`, derived by CDK for the regional functions, asserted weekly across every enabled region; the doc row is asserted against the same constant offline | `deploy/sentinel_log_retention.py`; `deploy/apply_log_retention.py --apply`; `tests/test_security_log_retention_3278.py` |
 | A producer Lambda silently stops running while its exemption (or the absence of any schedule) means nothing measures it — the heartbeat ledger accepted 51 such deaths | Producer census (#4034), drift-sentinel leg: every Lambda that can write a `deploy/emf_namespace_ledger.py` namespace graded on AWS/Lambda Invocations against its cadence | `deploy/sentinel_producer_census.py`; `tests/test_producer_census_4034.py` |
-| A deploy renames a metric, disables an alarm's actions or deletes a heartbeat alarm, and the ledger (which checks NAMES in source) stays green over a blind sensor | Post-deploy sensor self-tests (#4034): the set derived from the heartbeat COVERAGE registry, each doing its real read + a scratch write; a degraded verdict FAILS `deploy/post_cdk_smoke.sh` | `deploy/sensor_self_test.py`; `tests/test_sensor_self_test_4034.py` |
+| A deploy renames a metric, disables an alarm's actions or deletes a heartbeat alarm, and the ledger (which checks NAMES in source) stays green over a blind sensor | Post-deploy sensor self-tests (#4034): the set derived from the heartbeat COVERAGE registry, each doing its real read + a scratch write. It runs as the LAST step of every `deploy/cdk_deploy.sh` (#5522; also `deploy/post_cdk_smoke.sh`) and a degraded verdict exits 1 there; its own silence is the `sensor-self-test-stale` alarm (no `SelfTestWrite` in 35 days, via pipeline-health-check's `SensorSelfTestStale` gauge). CI's own `cdk deploy` path does not run it | `deploy/sensor_self_test.py`; `tests/test_sensor_self_test_4034.py`; `tests/test_sensor_self_test_caller_5522.py` |
 | A deploy gate carves out a legitimately-absent value with a **day-number proxy** instead of the real predicate — the proxy expires while the condition still holds, so every subsequent `site/**` merge deploys, fails smoke, and auto-rolls-back (the 2026-08-18 `/api/vitals` class: `day_n <= 1` vs. "has a weigh-in happened") | Weigh-in-keyed vitals carve-out (#2878): the predicate is read from `/api/source_freshness` — a different lambda module and an un-genesis-clamped query — so the two sources must agree, and a dropped in-cycle weigh-in still FAILs. Unreadable freshness fails closed | `deploy/smoke_test_site.sh` § "API data quality" |
 | A public route serves **handled** 5xx indefinitely at AWS/Lambda `Errors` = 0 — the top-level `except` returns `_error(500, …)` instead of re-raising, so every existing alarm stays OK (the 2026-07-19 `/api/fulfillment_ritual` ~4h class) | Handled-5xx EMF metric + `site-api-handled-5xx` alarm (#2819), emitted from the error **envelope** — not the route log, which the early-returning routes never reach | `tests/test_handled_5xx_metric_2819.py`; `site_api_common::emit_handled_5xx`; `serve_stack.py` |
 | A tracked file instructs — or a commit on `main` carries — a Claude tool-attribution trailer, against the owner's 2026-08-12 authorship decision (CLAUDE.md "Authorship"); four instruction files drifted, one driving the unattended remediation agent (#3005) | No-tool-attribution guard (#3005): tracked-file instruction scan (allowlist = only the files that state the ban) + reachable-history trailer scan since the ban date; predicates mutation-proved both directions | `tests/test_no_tool_attribution_3005.py` |
@@ -1685,6 +1719,7 @@ commit — the step letters below stay the per-gate contract anchors):
 | The season loses its memory — a thread leads a third week running, a promised payoff never returns, a tombstoned prior-cycle row becomes last week's bet | Season-ledger continuity (#4533) | `lambdas/content/story_ledger.py::continuity_findings` + `latest_visible`; `tests/test_story_desk.py` |
 | A change to the training charter, the engine templates, the planning skills or the coach prompts quietly makes the plan worse — or the rubric that grades it stops telling a good plan from a bad one (the 2026-10-18 panel review had no baseline) | Panel rubric regression gate (#5072): the golden plan cases graded by `config/panel_rubric.json` — the code pre-score (ADR-105) plus the blinded judge — fail when the good charter plan drops below the charter's `panel_target` (overall letter, every seat's floor) or a negative control (frozen accessories + no progression, a scheduled deload, a 2.5 h session, cardio with no dose) passes a criterion it exists to fail. `--recorded` (replayed judge, offline) runs in the unit suite on every PR; `--live` (route `charter.judge_gate`, a band-3 CI feature in `budget_guard.CI_GATE_FEATURES`) is the path-filtered `panel-rubric-gate.yml` job (owner-approved workflow). Mutation evidence 2026-10-19 (each restored, md5 checked): the dose check made to pass everything (exit 1, the no-dose control named), the gate's exit forced to 0 (the mutation test red), the session-band floor raised 10 min (exit 1, the good plan named) | `scripts/panel_rubric_gate.py`; `tests/test_panel_rubric_5072.py`; fixtures `tests/fixtures/panel_golden_5072/` |
 | A grading code path rewrites a settled `PREDICTION#` grade (`status`/`outcome`/`outcome_notes`) without the correction ledger, stamps an `evaluator_version` beside grade text another version wrote, or a rule bump re-selects an already-corrected (owner-ruled) row | Settled-grade invariants (#5613, owner integrity item 7): a settled grade changes only through `grade_corrections.apply_correction` (original kept; `corrected_at`, `reason`, `evaluator_version`, `basis` recorded); the scheduled grader's write refuses a settled row; a verdict that stands is a `restate` correction, never a bare stamp; re-grade selection keys on `has_correction_history`, never on a reason prefix. An AST sweep of `lambdas/`, `deploy/`, `scripts/`, `mcp/` fails on any other writer | `lambdas/coach/grade_corrections.py`; `tests/test_settled_grade_writers_5613.py` |
+| A public payload names a restraint habit outside the two categories `docs/DATA_GOVERNANCE.md` allows to be named (alcohol, food delivery) — by label, slug or tracker id — because a new route, a new field or a renamed habit reached the wire without asking the policy; or the rule is "fixed" in a renderer while the payload still carries the label (#5948: one renderer on one page was fixed on 2026-06-23 and five payloads served the labels for 144 more days) | Restraint-label wire gate: both issue endpoints at handler level on fixture rows holding nameable and non-nameable habits, and a fresh-interpreter walk of EVERY public GET route (the set is read from the router) against a table planted with synthetic restraint names, each marked a restraint by a different signal (tracker group, stored streak key, registry flag). Must-fail controls: a label let back through the policy reds the handler assertions, and the `--ungated` walk must find the canaries on exactly the routes the policy governs. The governance sentence and the module's two categories are held equal | `tests/test_restraint_labels_5948.py`; `tests/restraint_route_walk.py`; `lambdas/common/restraint_publication.py` |
 
 **Pre-commit hook** (`scripts/install_hooks.sh`, installed once per clone — runs on every local commit):
 
@@ -1808,8 +1843,14 @@ touches (`docs/`, `CLAUDE.md`, `.claude/README.md`, and — **on `main` only, #3
 `lambdas/web/platform_counts.py`; off main the hook restores the counter to HEAD and stages
 only the docs). If you run the script by hand outside a commit
 (or add a new doc to its `RULES` table that falls outside that stage glob), fold
-the changes into the commit yourself (`git add … && git commit --amend --no-edit
---no-verify`) or `test_platform_stats_truth.py` reds CI.
+the changes into the commit yourself (`git add … && LP_AGENT_COMMIT=1 git commit --amend --no-edit` —
+hooks intact, the sweep left out so it does not run a second time) or `test_platform_stats_truth.py` reds CI.
+
+**No routine hook bypass (owner ruling 2026-11-14).** Nothing in this repository commits with a hook-skipping flag:
+`deploy/agent_commit.sh` commits through the hooks and asks the pre-commit hook, by name (`LP_AGENT_COMMIT=1`), to
+leave out only its doc-sync sweep. `scripts/check_no_verify_sites.py` holds the set of execution sites at zero. A
+genuine emergency bypass is the owner's call each time: the four hook-bypass affordances stay in the `ask` list, and
+the commit message must say why.
 
 **On a branch, none of that applies — the counters are not yours to carry (#3101).**
 `deploy/agent_commit.sh` refuses `lambdas/web/platform_counts.py` outright (no

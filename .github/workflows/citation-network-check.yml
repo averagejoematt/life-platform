@@ -86,7 +86,7 @@ jobs:
         env:
           CITATION_NETWORK: "1"
         run: |
-          PINS=$(python3 scripts/ci_pins.py pytest)
+          PINS=$(python3 scripts/ci_pins.py pytest pytest-timeout)
           pip install -q $PINS
           python3 -m pytest tests/test_citation_resolution_1892.py tests/test_experiment_library_citations_1983.py -q -p no:randomly
 

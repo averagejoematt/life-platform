@@ -13,11 +13,20 @@ the W rows and the PREVIOUS column, so the note carries only what a row cannot:
     RPE a–b[, last set RPE c–d]     line 1, always — the charter's band (`session_cues.exposure_cue`)
     ‹one reason›                    only when a row moves more than one step from PREVIOUS, or the scheme changes
     ‹one cue›                       the first exercise of a movement family (`movement_cues`)
+                                    + an anchor lift's one sheet cue (`form_cue_sheets`, #5817)
+    If taken: ‹X›, then ‹Y›.        last, when it fits: the ranked same-stimulus fallback (#5771, `fit_fallback`)
 
 A movement with no session on file, or none in `STALE_AFTER_DAYS`, is the pick-load form: a no-load W row of 8 ahead
 of the engine's start load, and `W set: up to 8 easy reps, test the load.` (`find the load.` when the rows carry
 no load). A stale PREVIOUS more than one step from the row still gets its reason (`Lighter: first time in 2 years.`):
 Hevy shows that PREVIOUS beside the row, and the drop needs a why (#5428 re-grade #2, 2026-10-31).
+
+A FIRST SESSION BACK after a long layoff (owner ruling 2026-11-10, charter 1.41.0) is easy: line 1 is the charter's
+`effort_ceilings.layoff_return_rpe` with no last-set target, the reason is the one layoff line (`Same load all sets: first
+time in 2 years.` — the load rule's step is off), and the rows carry ONE W row at half the work (`warmup_sets.
+layoff_warmup`), never the feeler AT the work. "Long" is the OD1 exposure-cap line, `layoff_tiers.REENTRY_MAX_GAP_DAYS`
+(`is_layoff_return`); a stale PREVIOUS is past it, so the stale pick-load form above is now for a lift never logged (or
+unloaded rows). The 11-11 torso rotation read `RPE 8–9, last set RPE 9–10` over a W row at its working 100 lb.
 
 WHAT LEAVES THE WIRE, NOT THE RECORD. The passes still compute everything they did — the floor, the ramp, the hold, the
 progression — and their text is kept on `inputs_snapshot["lift_notes"][key]["detail"]` and in the rationale, where
@@ -31,7 +40,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from training import hevy_note_grammar, movement_cues
+from training import form_cue_sheets, hevy_note_grammar, movement_cues
 from training.rep_scheme import LB_IN_KG, implement_step_lb
 from training.session_cues import effort_line, exposure_cue
 
@@ -212,6 +221,10 @@ def _skip(block: Any) -> bool:
     tag = str(getattr(block, "rationale_tag", "") or "")
     if tag.startswith(("cardio", "mobility", "stretch")):
         return True
+    # #6020: a fitness-test block keeps its protocol note. The engine tags it `fitness_test:`, but a `draft_custom` re-tags
+    # every block `custom`, so the note's own `Test ·` line 1 (§3.8) is the other half of the test
+    if tag.startswith("fitness_test:") or hevy_note_grammar.is_test_note(str(getattr(block, "notes", "") or "")):
+        return True
     return any(getattr(s, "duration_seconds", None) for s in block.sets or [])
 
 
@@ -237,23 +250,84 @@ def _stray_number(line: str) -> bool:
     return any(ch.isdigit() for ch in _COUNTED_RE.sub("", line))
 
 
+# #5782: a caller's effort CAP written beside other words (`RPE 7 · per hand.`, `RPE 7 cap.`, `cap at RPE 7`, `RPE ≤7`) — on
+# 2026-11-11 only a sentence that WAS `RPE 7` was kept, so three capped accessories went out at the slot's `RPE 8–9, last
+# set RPE 9–10`. The segment must be the effort phrase alone; one embedded in a restated row (`3 sets of 8-15 @ RPE 8-9`)
+# is not a cap and the composer's line stands.
+_AUTHORED_CAP_RE = re.compile(
+    r"^(?:(?:cap(?:ped)?|max(?:imum)?|stay|keep it)\s+(?:at\s+|to\s+|under\s+)?)?RPE\s*(?:≤|<=)?\s*"
+    r"(?P<lo>\d+(?:\.5)?)(?:\s*[–-]\s*(?P<hi>\d+(?:\.5)?))?(?:\s+(?:cap|max|ceiling|or (?:less|below)|tops?))?$",
+    re.I,
+)
+# a unit qualifier the rows already carry (Hevy shows a dumbbell load per hand) — never the exercise's cue
+_QUALIFIER_RE = re.compile(r"^(?:weight is |loads? (?:is |are )?)?(?:per|each) (?:hand|side|arm|leg)$", re.I)
+# #5782: the caller's conditional instruction (`if set 1 stalls short of 8 at RPE 7, drop to 25`) — the one line a row
+# cannot show, so it is kept with its numbers; a restated row or a `Last:` lead-in before it is not (`Last 30x8 was RPE
+# 8.5: if …` keeps the `if …` clause only).
+_CONDITIONAL_RE = re.compile(r"(?:^|:\s+)(?P<clause>(?:if|when|once)\b[^:]+)$|^(?P<whole>[^:]+\s(?:if|when|once)\s[^:]+)$", re.I)
+_CONDITIONAL_DIRTY_RE = re.compile(r"\d\s*(?:x|×)\s*\d|@|Last:|\bsets? of\b|GREEN|YELLOW|RED\b")
+
+
+def _authored_effort(segment: str) -> str | None:
+    """The effort line a segment states, in the standard's form (`RPE 7`, `RPE 6–7`), or None."""
+    if _AUTHORED_EFFORT_RE.match(segment):
+        return segment
+    m = _AUTHORED_CAP_RE.match(segment)
+    if not m:
+        return None
+    return f"RPE {m.group('lo')}" + (f"–{m.group('hi')}" if m.group("hi") else "")
+
+
+def _authored_conditional(segment: str) -> str | None:
+    """The segment's conditional clause as a sentence (`If set 1 stalls short of 8 at RPE 7, drop to 25.`), or None when
+    there is none or it reads as something the standard keeps off the wire (a banned word, a restated row, truncation)."""
+    m = _CONDITIONAL_RE.search(segment)
+    if not m:
+        return None
+    clause = (m.group("clause") or m.group("whole") or "").strip().rstrip(".")
+    line = clause[:1].upper() + clause[1:] + "."
+    if any(re.search(pat, line, flags=0 if case else re.I) for pat, _label, case in hevy_note_grammar.BANNED):
+        return None
+    if len(line) > AUTHORED_LINE_MAX_CHARS or hevy_note_grammar.TRUNCATION_RE.search(line) or _CONDITIONAL_DIRTY_RE.search(line):
+        return None
+    return line
+
+
 def authored_lines(note: str | None) -> dict[str, str]:
     """The chat author's sentences that already read as the standard (#5428), for `compose_blocks(authored=...)`:
-    `effort` — a sentence that IS an effort line (`RPE 7`), kept as line 1; `line` — the first other sentence of at most
-    AUTHORED_LINE_MAX_CHARS with no restated row, no load or date, no banned word — the coach's own cue ("Elbows to
-    hips, no lean-back."), which the standard counts as the exercise's cue (§4). Everything else is left to the composer
-    and kept on the record as `detail`. Empty when nothing qualifies."""
+    `effort` — a segment that IS an effort line or an effort cap (`RPE 7`, `RPE 7 cap`; #5782: a sentence's ` · ` parts
+    are read one by one, so `RPE 7 · per hand.` keeps its cap), kept as line 1; `conditional` — the author's first
+    conditional instruction (`If set 1 stalls short of 8 at RPE 7, drop to 25.`, #5782), kept with its numbers; `line` —
+    the first other sentence of at most AUTHORED_LINE_MAX_CHARS with no restated row, no load or date, no banned word —
+    the coach's own cue ("Elbows to hips, no lean-back."), which the standard counts as the exercise's cue (§4).
+    Everything else is left to the composer and kept on the record as `detail`. Empty when nothing qualifies."""
     out: dict[str, str] = {}
     for raw in str(note or "").split("\n"):
         for part in _SENTENCE_RE.split(raw):
-            line = " ".join(part.split())
-            if not line:
-                continue
-            if _AUTHORED_EFFORT_RE.match(line.rstrip(".")):
-                out.setdefault("effort", line.rstrip("."))
-            elif "line" not in out and line not in hevy_note_grammar.PREP_CUES.values() and _clean_authored(line):
-                out["line"] = line
+            for seg in part.split(" · "):
+                line = " ".join(seg.split())
+                if not line or _QUALIFIER_RE.match(line.rstrip(".")):
+                    continue
+                effort = _authored_effort(line.rstrip("."))
+                if effort:
+                    out.setdefault("effort", effort)
+                elif "conditional" not in out and _authored_conditional(line):
+                    out["conditional"] = _authored_conditional(line) or ""
+                elif "line" not in out and line not in hevy_note_grammar.PREP_CUES.values() and _clean_authored(line):
+                    out["line"] = line
     return out
+
+
+def _effort_top(line: str | None) -> float | None:
+    m = re.match(r"^RPE (\d+(?:\.5)?)(?:–(\d+(?:\.5)?))?", line or "")
+    return float(m.group(2) or m.group(1)) if m else None
+
+
+def keep_stricter(own: str | None, charter: str) -> str:
+    """#5782: the caller's effort line when it caps LOWER than the charter's (an OD1 exposure cap, the layoff-return band);
+    the charter's otherwise — a caller's cap never raises a charter cap, and a charter cap never raises the caller's."""
+    mine, theirs = _effort_top(own), _effort_top(charter)
+    return own if own and mine is not None and theirs is not None and mine < theirs else charter
 
 
 def _clean_authored(line: str) -> bool:
@@ -366,14 +440,53 @@ def _feeler_fits(block: Any, entry: dict[str, Any], chat: bool) -> bool:
     return True
 
 
+def is_layoff_return(caps: dict[str, Any] | None, previous: dict[str, Any] | None, target_date: str) -> bool:
+    """A movement's FIRST session back after a long layoff (owner ruling 2026-11-10, charter 1.41.0): the ramp's OD1
+    exposure cap at exposure 1, or — where the ramp set no cap (a nearest-band fallback, an unramped accessory) — a
+    PREVIOUS older than the same OD1 line, `layoff_tiers.REENTRY_MAX_GAP_DAYS` (PREVIOUS is his newest session, so the
+    session being drafted is exposure 1). No new threshold: the exposure-cap gap is the long-layoff line. A lift with no
+    session on file is new, not a return; exposures 2–3 keep the OD1 cap."""
+    from training.layoff_tiers import REENTRY_MAX_GAP_DAYS
+
+    if caps:
+        return int(caps.get("exposure") or 1) == 1
+    if not previous:
+        return False
+    gap = _days_between(str(previous.get("date") or ""), target_date)
+    return gap is not None and gap > REENTRY_MAX_GAP_DAYS
+
+
+def layoff_return_effort() -> str | None:
+    """Line 1 of a layoff return: the charter's `effort_ceilings.layoff_return_rpe`, with no last-set target; None when
+    the charter does not state it (the lift keeps its line 1)."""
+    from training import effort_ceilings
+
+    band = effort_ceilings.layoff_return_band()
+    return effort_line(tuple(band)) if band else None
+
+
+def _layoff_return_treatment(block: Any, line1: str) -> str:
+    """Owner ruling 2026-11-10 (A), IN PLACE: a layoff return's working sets run at the layoff band (the returned line 1,
+    no `last set RPE 9–10`), behind a W row lighter than the work (`warmup_sets.layoff_warmup`) when the block carries no
+    W row yet — a warmed compound already climbs below its work. A block with no load on its rows keeps what it has."""
+    from training.warmup_sets import layoff_warmup
+
+    top = max((float(s.weight_kg) for s in _working(block.sets) if getattr(s, "weight_kg", None)), default=None)
+    if top is not None and not any(_is_warmup(s) for s in block.sets or []):
+        block.sets = layoff_warmup(top) + list(block.sets or [])
+    return layoff_return_effort() or line1
+
+
 def no_jumps_line(caps: dict[str, Any]) -> str:
-    """A capped exposure's reason (standard §3.2, R3 "opts out by name"): exposure 1 names the gap,
-    `No jumps: first time in 19 weeks.`; exposures 2–3 `No jumps today: session 2 back after a break.`"""
-    n = int(caps.get("exposure") or 1)
-    gap = hevy_note_grammar.gap_text(caps.get("gap_days"))
-    if n == 1:
-        return f"{hevy_note_grammar.NO_JUMPS}: first time in {gap}." if gap else f"{hevy_note_grammar.NO_JUMPS}: first time on it."
-    return f"{hevy_note_grammar.NO_JUMPS} today: session {n} back after a break."
+    """A capped exposure's one line (standard §3.2, R3 "opts out by name"; re-grade #6, 2026-11-08: one grammar, no
+    "No jumps"): `Same load all sets: first time in 19 weeks.` on exposure 1, `Same load all sets: 2nd session back after
+    19 months off.` on exposures 2–3, `Same load all sets: back after a break.` when the gap is unknown
+    (`hevy_note_grammar.layoff_gap_words`). The name is historical: the coach's critic pass imports it by this name."""
+    words = hevy_note_grammar.layoff_gap_words(caps.get("gap_days"), int(caps.get("exposure") or 1))
+    return hevy_note_grammar.layoff_line(words)
+
+
+layoff_line_for = no_jumps_line
 
 
 def _ex1_room() -> int:
@@ -386,13 +499,47 @@ def _ex1_room() -> int:
     return min(hevy_note_grammar.LIFT_MAX_LINES, hevy_note_grammar.EX1_MAX_LINES - 1 - hevy_note_grammar.phone_lines(block))
 
 
-def _cue_for(family: str | None, entry: dict[str, Any], lines: list[str], room: int) -> str:
+def _cue_for(family: str | None, entry: dict[str, Any], lines: list[str], room: int, sheet_cue: str = "") -> str:
     """The family cue, with the #5049 prep clause when the note still fits its budget with it (R8: one prep cue per
-    compound family, "if overkill skip"); a reason line no longer drops the prep by itself."""
+    compound family, "if overkill skip"); a reason line no longer drops the prep by itself.
+
+    `sheet_cue` (#5817, owner ruling 2026-11-11 D8): an anchor lift's one still-visible cue from its cue sheet
+    (`form_cue_sheets.anchor_note_cue`) rides between the prep clause and the family cue. It outranks the prep clause
+    and never displaces the family breathing cue (standard §6.1): `prep + sheet + family`, then `sheet + family`, then
+    the family cue's own forms. Empty for every non-anchor, which is then exactly the old two-step choice."""
     with_prep = movement_cues.cue_line(family, entry.get("anchor_family"), with_prep=True)
-    if hevy_note_grammar.phone_lines("\n".join(lines + [with_prep])) <= room:
-        return with_prep
-    return movement_cues.cue_line(family, entry.get("anchor_family"), with_prep=False)
+    bare = movement_cues.cue_line(family, entry.get("anchor_family"), with_prep=False)
+    tries = [with_prep]
+    if sheet_cue and bare:
+        prefix = with_prep[: -len(bare)]  # the prep clause and its space, or "" when the family has none
+        tries = [f"{prefix}{sheet_cue} {bare}", f"{sheet_cue} {bare}", with_prep]
+    for line in tries:
+        if hevy_note_grammar.phone_lines("\n".join(lines + [line])) <= room:
+            return line
+    return bare
+
+
+def fit_fallback(lines: list[str], cue: str, names: list[str] | None, room: int) -> tuple[str, str]:
+    """(cue, fallback line) for a lift note whose other lines are `lines` (#5771, owner ruling 2026-11-11: every movement's
+    ranked same-stimulus fallback renders in its note). The fallback line is LAST and is the first thing the budget takes,
+    after the optional prep clause (standard §3.2, the fallback line): try it with the cue as chosen, then with the prep
+    clause dropped from the cue; two names, then one; else no fallback line. The breathing / family cue and an anchor's
+    sheet cue never yield to it. ("", cue unchanged) when it does not fit or there is no clean name."""
+    g = hevy_note_grammar
+    names = [n for n in names or [] if g.fallback_line([n])]  # a title that cannot go on the wire is skipped, not the line
+    if not names:
+        return cue, ""
+    cues = [cue]
+    if cue:
+        lead = next((p for p in g.PREP_CUES.values() if cue.startswith(p + " ")), None)
+        if lead:
+            cues.append(cue[len(lead) + 1 :])
+    for c in cues:
+        for n in range(min(len(names), g.FALLBACK_MAX_NAMES), 0, -1):
+            line = g.fallback_line(names[:n])
+            if line and g.phone_lines("\n".join(lines + ([c] if c else []) + [line])) <= room:
+                return c, line
+    return cue, ""
 
 
 def compose_blocks(
@@ -404,6 +551,8 @@ def compose_blocks(
     target_date: str,
     rotations: dict[str, str] | None = None,
     authored: dict[str, dict[str, str]] | None = None,
+    fallbacks: dict[str, list[str]] | None = None,
+    familiar: set[str] | None = None,
 ) -> dict[str, Any]:
     """Rewrite every lift block's note to the standard, IN PLACE, after every load and warm-up pass. Returns the
     `inputs_snapshot` record: `previous_loads` (Hevy's PREVIOUS, for the linter) and `lift_notes` (per movement: the
@@ -415,22 +564,31 @@ def compose_blocks(
     lateral raise whose PREVIOUS column showed 65 lb x 10 from 2024 read "New" beside a 35 lb row). A stale PREVIOUS
     more than one step from the row gets `stale_reason_line` (`Lighter: first time in 2 years.`) instead; a rotation onto
     a lift with any PREVIOUS keeps its computed reason and the swap stays on the record (`rotation_of`). The line never
-    outranks a capped exposure's `No jumps` line, and the pick-load W line still follows it — that line is the
-    instruction for the feeler W row, not a second reason.
+    outranks a capped exposure's layoff line (`Same load all sets: …`), and the pick-load W line still follows it on an
+    uncapped lift — that line is the instruction for the feeler W row, not a second reason. A capped lift holds its load,
+    so it never carries the W step line (re-grade #6, 2026-11-08; lint L4).
 
     A capped exposure (OD1, the ramp's `exposure_caps`) reads `RPE 7` and opts out of the load rule by name
-    (`no_jumps_line`); a critic's layoff set cap gets the same treatment downstream (`session_block.add_capped_reason`).
+    (`no_jumps_line`, the one layoff line); a critic's layoff set cap gets the same treatment downstream (`session_block.add_capped_reason`).
+    A FIRST session back (`is_layoff_return`, owner ruling 2026-11-10) reads the layoff-return band instead, takes the same
+    layoff line when the ramp set no cap, and gets one W row lighter than the work (`_layoff_return_treatment`).
 
     `authored` is the chat path's (`draft_custom`, #5428): per movement, the author's own sentences that already read as
     the standard (`authored_lines`) — `effort` replaces line 1, `line` takes the cue slot (a chat-era technique cue counts
     as the cue, standard §4, so the family cue is not added beside it). On that path a block whose rows carry the
-    author's load never gets the pick-load feeler (the load is chosen)."""
+    author's load never gets the pick-load feeler (the load is chosen).
+
+    `fallbacks` (`selection_engine.note_fallbacks`, #5771: served key -> ranked same-stimulus Hevy titles, unavailable ones
+    never named) gives a lift its LAST line, `If taken: X, then Y.`, when it fits the budget (`fit_fallback`: it yields
+    before the breathing cue and an anchor's sheet cue, after the prep clause). A carry keeps its own four-line grammar."""
     from training.exercise_history import previous_load
 
     movements = (load_floors or {}).get("movements") or {}
     previous_loads: dict[str, Any] = {}
     notes: dict[str, Any] = {}
     seen_families: set[str] = set()
+    # #6020: the titles this session serves — `New: replaces X` is never written beside an X block (a note that contradicts its session)
+    served_titles = {str(((catalog_movements or {}).get(str(b.movement_key)) or {}).get("title") or "") for b in blocks or []} - {""}
     for index, block in enumerate(blocks or []):
         if _skip(block):
             continue
@@ -457,12 +615,20 @@ def compose_blocks(
         row = movements.get(key) or {}
         caps = (row.get("ramp") or {}).get("exposure_caps")
         stale = is_stale(previous, target_date)
+        layoff = is_layoff_return(caps, previous, target_date)
+        if familiar is not None and key in familiar:  # #5861 fix round 9 (live only): a familiar pattern has no re-entry cap
+            caps, layoff = None, False
         line1 = own.get("effort") or exposure_cue(intensity, [{}] * max(1, len(_working(block.sets))))
         line2, pick, reason_kind = "", False, None
         if caps:
             # OD1: a capped exposure after a long gap opts out of the session's load rule, by name
-            line1 = effort_line(caps.get("rpe_max"))
+            line1 = keep_stricter(own.get("effort"), effort_line(caps.get("rpe_max")))
             line2, reason_kind = no_jumps_line(caps), "no_jumps"
+        elif layoff and _has_load(block):
+            # owner 2026-11-10 (A): a return the ramp did not cap is eased the same way — one load all sets at the layoff
+            # band, behind a W row lighter than the work (never the pick-load feeler AT the work, whose step would undo it)
+            gap = _days_between(str((previous or {}).get("date") or ""), target_date)
+            line2, reason_kind = no_jumps_line({"gap_days": gap, "exposure": 1}), "no_jumps"
         elif stale:
             pick = _feeler_fits(block, entry, authored is not None) and _add_feeler(block)
             reason_kind = "pick_load" if pick else None
@@ -474,25 +640,36 @@ def compose_blocks(
             if not line2 and index == 0:
                 line2 = _one_set_line(block, entry)
             reason_kind = line2.split(":")[0] if line2 else None
+        if layoff:
+            line1 = keep_stricter(own.get("effort"), _layoff_return_treatment(block, line1))
         swapped = (rotations or {}).get(key)
-        lead = rotation_line(swapped) if swapped and previous is None and reason_kind != "no_jumps" else ""
+        lead = rotation_line(swapped) if swapped and previous is None and reason_kind != "no_jumps" and swapped not in served_titles else ""
         if lead:
             reason_kind = "rotation"
         pick_line = (_pick_result_line(block, entry) if _has_load(block) else PICK_LOAD_OPEN_LINE) if pick else ""
-        body = [x for x in (line1, lead, line2, pick_line) if x]
+        body = [x for x in (line1, lead, line2, own.get("conditional"), pick_line) if x]  # #5782: the caller's if-then
         cue = own.get("line") or ""
+        room = _ex1_room() if index == 0 else hevy_note_grammar.LIFT_MAX_LINES
+        sheet_cue = "" if cue else form_cue_sheets.anchor_note_cue(key, entry)  # #5817: an author's own cue wins
         if family and family not in seen_families:
-            cue = cue or _cue_for(family, entry, body, _ex1_room() if index == 0 else hevy_note_grammar.LIFT_MAX_LINES)
+            cue = cue or _cue_for(family, entry, body, room, sheet_cue)
             seen_families.add(family)
-        block.notes = "\n".join(body + ([cue] if cue else []))
+        elif sheet_cue and hevy_note_grammar.phone_lines("\n".join(body + [sheet_cue])) <= room:
+            cue = sheet_cue  # an anchor after its family's first exercise: its sheet cue alone (the family cue was given)
+        cue, fb_line = fit_fallback(body, cue, (fallbacks or {}).get(key), room)  # #5771: last, and first to yield
+        block.notes = "\n".join(body + ([cue] if cue else []) + ([fb_line] if fb_line else []))
         notes[key] = {
             "note": block.notes,
+            "layoff_return": layoff,
             "reason": reason_kind,
             "reason_line": (lead or line2) or None,
             "authored_line": own.get("line"),
             "pick_load": pick,
             "detail": detail,
         }
+        fb_names = (fallbacks or {}).get(key)
+        if fb_names:  # #5771: the ranked names, and whether the budget let the line on the wire
+            notes[key]["fallback"] = {"names": list(fb_names), "line": fb_line or None}
         if swapped and not lead:
             notes[key]["rotation_of"] = swapped  # #5428: a swap onto a lift he did recently is not "New" on the wire
     return {"previous_loads": previous_loads, "lift_notes": notes}

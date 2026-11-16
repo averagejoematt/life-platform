@@ -20,6 +20,7 @@ import ast
 import json
 import os
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -200,7 +201,11 @@ def test_the_handler_routes_the_rules_input_to_the_predraft_and_not_the_warmer()
         patch("mcp.nightly_predraft.lambda_entry", return_value={"statusCode": 200, "body": "{}"}) as entry,
         patch.object(handler, "nightly_cache_warmer", side_effect=AssertionError("warmer must not run")),
     ):
-        handler.lambda_handler(dict(npd.JOB["event"]), None)
+        # #5540: privileged jobs run only on the warmer — the function the rule targets
+        ctx = SimpleNamespace(
+            function_name=npd.JOB["function"], invoked_function_arn=f"arn:aws:lambda:us-west-2:1:function:{npd.JOB['function']}"
+        )
+        handler.lambda_handler(dict(npd.JOB["event"]), ctx)
     entry.assert_called_once()
 
 

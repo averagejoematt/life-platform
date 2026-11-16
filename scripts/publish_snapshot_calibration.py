@@ -1,0 +1,237 @@
+#!/usr/bin/env python3
+"""scripts/publish_snapshot_calibration.py — the Coaching Room's data file (CR1), written ONLY for a dark build.
+
+The owner's ruling of 2026-11-08: the Coaching Room stays NO-GO for publication but may be implemented and tested
+privately; on 2026-11-09 he ruled that CR1 launches ahead of CR2/CR3. So this data file exists only when the room's
+scope is on (``room_scope`` below, the twin of ``www/src/lib/room.js``): ``WEB_ROOM=1`` / ``WEB_ROOM=cr1`` for a private
+look, or the committed ``room_public: "cr1"`` in ``www/owned_paths.json`` — the one-line launch merge, which the deploy
+reads. With both off the producer neither fetches it nor writes it, and the snapshot — manifest included — is
+byte-identical to a snapshot made without this module. The deploy workflow never sets WEB_ROOM.
+
+What it carries, never recomputed (README requirement A — the snapshot is the only source of a published statistic):
+  * ``/api/calibration`` as served, minus its ``_meta`` clock — the platform card and its strata, each coach's
+    record with its Wilson interval and its stated-confidence bins, the comparison with a simple guess, the
+    voided-by-reset counts, the hash-sealed pre-registration;
+  * ``/api/predictions`` ``overall`` — the coaches' own record (checked calls, right, the percentage, the base-rate
+    guess) as the public API serves it.
+Each coach entry gains ``persona`` (the coach-page id the rest of the snapshot uses) and ``coach_ref`` (that id when
+the coach is a public Coach object in this snapshot, else null) — an id mapping, not a statistic — and
+``assessment_v2``: its calibration-v2 assessment exactly as ``/api/calibration`` serves it under
+``assessment_v2.coaches`` (owner ruling 2026-11-09), moved beside the entry, never recomputed.
+
+No new endpoint, no non-public read: both are public Site API routes the platform already serves anonymously.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+import urllib.request
+from typing import Any, Callable
+
+ROOM_ENV = "WEB_ROOM"
+CALIBRATION_PATH = "/api/calibration"
+PREDICTIONS_PATH = "/api/predictions"
+ABSENT_CALIBRATION = {
+    "state": "absent",
+    "absent_text": "The platform did not serve the calibration figures for this snapshot.",
+    "source": [CALIBRATION_PATH, PREDICTIONS_PATH],
+    "as_of": None,
+    "calibration": None,
+    "record": None,
+}
+_RECORD_KEYS = (
+    "total",
+    "observational",
+    "pending",
+    "expired",
+    "inconclusive",
+    "decided",
+    "confirmed",
+    "refuted",
+    "accuracy_pct",
+    "baseline",
+    "under_review",
+    "counted_text",
+    "lifetime",
+)
+
+
+OWNED_PATHS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "www", "owned_paths.json")
+ROOM_PUBLIC_KEY = "room_public"
+
+
+#: The committed switch's published values (www/src/lib/room.js ROOM_PUBLIC_VALUES minus "off").
+PUBLISHED_SCOPES = ("cr1", "cr2")
+#: WEB_ROOM's private values and the scope each builds.
+PRIVATE_SCOPES = {"1": "all", "cr1": "cr1", "cr2": "cr2"}
+
+
+def committed_room_public(path: str = OWNED_PATHS) -> str:
+    """The committed production switch in www/owned_paths.json (www/src/lib/room.js::committedRoomPublic's twin):
+    "cr1" or "cr2", else "off" — a missing file, an unreadable one or any other value is off (fail closed)."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            v = json.load(fh).get(ROOM_PUBLIC_KEY)
+    except (OSError, ValueError, AttributeError):
+        return "off"
+    return v if isinstance(v, str) and v in PUBLISHED_SCOPES else "off"
+
+
+def room_scope(env: dict | None = None, committed: str | None = None) -> str:
+    """The Python twin of www/src/lib/room.js::roomScope: "all" (WEB_ROOM=1, private), "cr1" / "cr2" (WEB_ROOM=cr1 /
+    cr2, private — or the committed `room_public`, published) or "off". WEB_ROOM wins when it is "1", "cr1" or "cr2"."""
+    v = (os.environ if env is None else env).get(ROOM_ENV)
+    if isinstance(v, str) and v in PRIVATE_SCOPES:
+        return PRIVATE_SCOPES[v]
+    c = committed_room_public() if committed is None else committed
+    return c if c in PUBLISHED_SCOPES else "off"
+
+
+def room_enabled(env: dict | None = None, committed: str | None = None) -> bool:
+    """Is CR1 (at least) on? calibration.json is written exactly then."""
+    return room_scope(env, committed) != "off"
+
+
+def room_all(env: dict | None = None, committed: str | None = None) -> bool:
+    """Is the WHOLE room on (CR2 + CR3)? Only WEB_ROOM=1 — the committed switch never publishes CR3."""
+    return room_scope(env, committed) == "all"
+
+
+def room_cr2(env: dict | None = None, committed: str | None = None) -> bool:
+    """Is CR2 on (the committed "cr2", WEB_ROOM=cr2, or the whole room)? coach_room.json is written exactly then —
+    never on a CR1 build; on a CR2 build without its CR3 (docket) parts."""
+    return room_scope(env, committed) in ("cr2", "all")
+
+
+def _persona(short: str) -> str:
+    return short if short.endswith("_coach") or short == "eli_marsh" else f"{short}_coach"
+
+
+def shape(calibration: Any, predictions: Any) -> dict:
+    """The data file from the two served payloads; ABSENT_CALIBRATION when either is missing or malformed."""
+    if not isinstance(calibration, dict) or not isinstance(predictions, dict) or not isinstance(predictions.get("overall"), dict):
+        return dict(ABSENT_CALIBRATION)
+    cal = {k: v for k, v in calibration.items() if k != "_meta"}
+    v2_coaches = ((cal.get("assessment_v2") or {}).get("coaches") or {}) if isinstance(cal.get("assessment_v2"), dict) else {}
+    coaches = []
+    for c in cal.get("coaches") or []:
+        if isinstance(c, dict) and isinstance(c.get("coach_id"), str):
+            # calibration-v2 (owner 2026-11-09): the coach's served assessment rides on its entry — carried, not computed.
+            coaches.append({**c, "persona": _persona(c["coach_id"]), "assessment_v2": v2_coaches.get(c["coach_id"])})
+    cal["coaches"] = coaches
+    overall = predictions["overall"]
+    return {
+        "state": "ok",
+        "absent_text": None,
+        "source": [CALIBRATION_PATH, PREDICTIONS_PATH],
+        "as_of": cal.get("as_of"),
+        "calibration": cal,
+        "record": {k: overall.get(k) for k in _RECORD_KEYS},
+    }
+
+
+SEAL_ORIGIN = "https://averagejoematt.com/"
+
+
+def _seal_state():
+    """lambdas/web/prereg_seal_state.py — the one rule the Site API also applies (imported, never restated)."""
+    lambdas = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas")
+    if lambdas not in sys.path:
+        sys.path.insert(0, lambdas)
+    from web import prereg_seal_state  # type: ignore
+
+    return prereg_seal_state
+
+
+def guard_seal(seal: Any, get_bytes: Callable[[str], bytes] | None, log: Callable[[str], None] = print) -> Any:
+    """Owner ruling 2026-11-11 (item 3): the published page offers the verify command and the file link only when the
+    file served at the sealed address hashes, here and now, to the published digest. Otherwise both are removed and the
+    seal carries ``verifiable: false`` with the reason. The served value is never trusted on its own (a Site API not
+    yet redeployed still serves the command), and any fetch failure is unverifiable — fail closed. The digest is kept."""
+    if not isinstance(seal, dict) or not seal.get("sha256"):
+        return seal
+    rule = _seal_state()
+    url = seal.get("artifact_url")
+    served = None
+    if get_bytes is not None and isinstance(url, str) and url.startswith(SEAL_ORIGIN):
+        try:
+            served = get_bytes(url)
+        except Exception as exc:  # noqa: BLE001 — unreadable is unverifiable, never assumed to match
+            log(f"  sealed file unreadable ({exc}); the seal is published without a check")
+    verifiable, why_not = rule.assess(seal.get("genesis"), seal.get("sha256"), served)
+    out = {k: v for k, v in seal.items() if k not in ("verify", "artifact_url", "verifiable", "unverifiable_text")}
+    out["verifiable"] = verifiable
+    if verifiable:
+        out["artifact_url"] = url
+        out["verify"] = seal.get("verify")
+    else:
+        out["unverifiable_text"] = why_not
+    return out
+
+
+def fetch_bytes(url: str, timeout: float = 30.0) -> bytes:
+    """The raw bytes of one public URL (the seal's hash needs the bytes, not a parse). guard_seal passes only SEAL_ORIGIN."""
+    req = urllib.request.Request(url, headers={"User-Agent": "life-platform publish_snapshot"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 — the site's own origin only
+        return resp.read()
+
+
+def live_calibration(
+    get: Callable[[str], Any],
+    log: Callable[[str], None] = print,
+    get_bytes: Callable[[str], bytes] = fetch_bytes,
+) -> dict:
+    """Fetch the two public routes; a failure leaves the room's data file absent (the page then says so). The sealed
+    pre-registration is re-checked against the served file (``guard_seal``)."""
+    try:
+        out = shape(get(CALIBRATION_PATH), get(PREDICTIONS_PATH))
+    except Exception as exc:  # noqa: BLE001 — any fetch/parse failure is an absent record, never a partial one
+        log(f"  calibration unavailable ({exc}); calibration.json written absent")
+        return dict(ABSENT_CALIBRATION)
+    cal = out.get("calibration")
+    if isinstance(cal, dict) and "prereg_seal" in cal:
+        cal["prereg_seal"] = guard_seal(cal["prereg_seal"], get_bytes, log)
+    return out
+
+
+def fixture_calibration(fixtures_dir: str) -> dict:
+    """The committed sample (content/fixtures/calibration.json, already in data-file shape)."""
+    path = os.path.join(fixtures_dir, "calibration.json")
+    if not os.path.exists(path):
+        return dict(ABSENT_CALIBRATION)
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def _is_num(v: Any) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def resolve_and_validate(payload: dict, public: dict[str, list[dict]]) -> dict:
+    """Set each coach's ``coach_ref`` against the public Coach set and check the shape the room reads.
+
+    Raises ValueError (the caller maps it to SchemaError) on a malformed ok payload."""
+    if payload.get("state") != "ok":
+        return payload
+    cal = payload.get("calibration")
+    rec = payload.get("record")
+    if not isinstance(cal, dict) or not isinstance(rec, dict):
+        raise ValueError("calibration.json: an ok record needs calibration and record objects")
+    for k in ("decided", "confirmed"):
+        if not isinstance(rec.get(k), int):
+            raise ValueError(f"calibration.json: record.{k} must be an integer")
+    platform = cal.get("platform")
+    if not isinstance(platform, dict) or not isinstance((platform.get("strata") or {}).get("coaches"), dict):
+        raise ValueError("calibration.json: platform.strata.coaches is required (the coaches' stratum)")
+    coach_ids = {o["id"] for o in public.get("coach", [])}
+    for c in cal.get("coaches") or []:
+        for k in ("n", "confirmed"):
+            if not isinstance(c.get(k), int):
+                raise ValueError(f"calibration.json: coaches[{c.get('coach_id')}].{k} must be an integer")
+        for b in c.get("reliability_bins") or []:
+            if not (_is_num(b.get("mean_confidence")) and isinstance(b.get("n"), int) and _is_num(b.get("observed_rate"))):
+                raise ValueError(f"calibration.json: a malformed stated-confidence bin for {c.get('coach_id')}")
+        c["coach_ref"] = c.get("persona") if c.get("persona") in coach_ids else None
+    return payload

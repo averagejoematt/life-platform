@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 
 from common.metric_truth import resolved_metric, resolved_rows, sources_for  # #4630: resolved pseudo-sources
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device duplicates removed at the read
-from experiment.measurable_metrics import METRIC_SOURCES, base_metric
+from experiment.measurable_metrics import METRIC_SOURCES, base_metric, row_is_reading
 from experiment.phase_filter import with_phase_filter
 
 from coach.grading_quality import is_zero_entry_day
@@ -63,7 +63,7 @@ def trailing_values(table, user_id, metric_key, lookback_days):
         start = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
         rows = []
         for item in source_items(table, user_id, source, start, end):
-            val = item.get(base)
+            val = item.get(base) if row_is_reading(item, base) else None
             if val is None:
                 continue
             try:
@@ -97,7 +97,8 @@ def window_readings(table, user_id, metric_key, start, end):
     try:
         out = []
         for item in source_items(table, user_id, source, start, end):
-            val = None if is_zero_entry_day(item) else item.get(base)  # #5533 (c): an unlogged day is no reading
+            # #5533 (c): an unlogged day is no reading; nor is a row the metric's reading rule excludes
+            val = None if is_zero_entry_day(item) or not row_is_reading(item, base) else item.get(base)
             if val is None:
                 continue
             try:

@@ -60,3 +60,15 @@ def tolerance_rpe(read: Reader = charter_value) -> float | None:
 def proposal_rule(read: Reader = charter_value) -> dict[str, Any]:
     """`effort_ceilings.ceiling_change_proposal` ({} when unreadable)."""
     return dict(read("effort_ceilings.ceiling_change_proposal", {}) or {})
+
+
+LAYOFF_RETURN = "layoff_return_rpe"
+
+
+def layoff_return_band(read: Reader = charter_value) -> list[Any] | None:
+    """`effort_ceilings.layoff_return_rpe` as [lo, hi] — the band of a movement's FIRST session back after a gap longer
+    than the OD1 exposure-cap line (`layoff_tiers.REENTRY_MAX_GAP_DAYS`), with no last-set target (owner ruling
+    2026-11-10, charter 1.41.0). None when the charter does not state it: the caller keeps its normal band, never a
+    typed default."""
+    band = read(f"effort_ceilings.{LAYOFF_RETURN}")
+    return [min(band), max(band)] if band else None
