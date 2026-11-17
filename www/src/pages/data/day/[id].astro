@@ -32,7 +32,7 @@ import {
   tileValue,
   unservedText,
 } from "../../../lib/day.js";
-import { callOutcome, chapterCovers, dayInWords, heldCallWords, num } from "../../../lib/format.js";
+import { callOutcome, chapterCovers, dayInWords, heldCallWords, num, weekOfDay } from "../../../lib/format.js";
 import { VISIBLE_CAP, callsAboutDay, leadLine } from "../../../lib/day_coaching.js";
 import StatusTag from "../../../components/StatusTag.astro";
 import { gradeNoteRows } from "../../../lib/corrections.js";
@@ -88,7 +88,7 @@ const status = `The data · one day · ${words(d.date)}`;
 const weeks: { n: number; days: any[] }[] = [];
 for (const x of days) {
   const ch = x.chapter_id ? all.get("chapter", x.chapter_id) : null;
-  const n = ch && ch.week >= 1 ? ch.week : Math.floor((x.day_number - 1) / 7) + 1; // the chapter's interval decided the day's week at export
+  const n = ch && ch.week >= 1 ? ch.week : weekOfDay(x.day_number); // the chapter's interval decided the day's week at export
   if (!weeks.length || weeks[weeks.length - 1].n !== n) weeks.push({ n, days: [] });
   weeks[weeks.length - 1].days.push(x);
 }

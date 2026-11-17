@@ -56,8 +56,8 @@
     "reason": "POST-only \u2014 #4182 two-question reader door (did this page make sense?), writes to DynamoDB (write)"
   },
   "/api/reader_call": {
-    "category": "write-path",
-    "reason": "#6088 (2026-11-16) \u2014 a reader's call beside a coach's open call: POST records a tap, and the GET mints a per-reader, identity-bound timing token (no-store), so no response is a standing artefact to snapshot or archive. Built DARK: 404 'not available' for every request while reader_call_rules.READER_CALL_LIVE is committed off. Its shape is pinned offline by tests/test_reader_call_6088.py; after the owner's go and a deploy, capture the bare GET ({available}) if a live shape is wanted"
+    "category": "capture-failed",
+    "reason": "#6114 (2026-11-16) go-live: the route is LIVE in code (READER_CALL_LIVE committed on) but answers the shut door's {available: false} until the driver sets SSM /life-platform/reader-call to on after the deploy, so there is no live shape to snapshot at merge (the #1373 disposition). The bare GET is the standing shape ({available: true}); a GET with ?call= mints a per-reader no-store token and is not a standing artefact. Post-deploy, once the parameter is on: python3 deploy/capture_api_schemas.py --only /api/reader_call, commit tests/api_schemas/api_reader_call.json and drop this entry. Payload contract pinned meanwhile in tests/test_reader_call_6088.py and tests/test_reader_call_golive_6114.py"
   },
   "/api/replicate_certify": {
     "category": "write-path",

@@ -13,7 +13,15 @@
 //     from anywhere else would invent one. Then it is a TREND: a line on the series' own range, and the range is
 //     printed beside it (scaleWords) — a nonzero scale is never drawn unlabelled.
 //   * A missing week is a dashed hollow tick on the baseline in both forms; nothing is interpolated across it.
-import { num } from "./format.js";
+//
+// #6122: a tile printed "8.9 h" beside "weekly means 7.7 to 8.8 h · line on that range" — one night beside a range of
+// weekly means, two quantities with nothing saying so, and a reader (and the reader-truth judge) read the night as
+// outside its own range. Every tile that prints a latest reading beside the spark now names both: the figure says what
+// it is (readingWords — "latest night", "latest weigh-in"), and the scale line says which weeks it covers ("weekly
+// means to 16 Nov"). scripts/www_label_contract.py fails the build when a figure lies outside the range its tile states
+// and the figure carries no such words.
+import { dayInWords, num } from "./format.js";
+import { NIGHT_METRICS } from "./provisional.js";
 
 export const TREND_BELOW = 0.25;
 export const SPARK_W = 96;
@@ -35,11 +43,29 @@ export function sparkPlan(values) {
   return { kind: "bars", lo: 0, hi };
 }
 
-/** The scale in words, for the label under the spark: bars say they start at zero; a line names the range it is drawn on. Null when empty. */
-export function scaleWords(plan, { decimals = 0, unit = "" } = {}) {
+/**
+ * The scale in words, for the label under the spark: which weeks the means cover (`through`, the series' last day, ISO —
+ * weeklyBars cuts its weeks back from that day) and the scale — bars say they start at zero; a line names the range it
+ * is drawn on. Null when empty.
+ */
+export function scaleWords(plan, { decimals = 0, unit = "", through = null } = {}) {
   if (!plan || plan.kind === "empty") return null;
-  if (plan.kind === "bars") return "weekly means · bars from zero";
-  return `weekly means ${num(plan.lo, decimals)} to ${num(plan.hi, decimals)}${unit ? ` ${unit}` : ""} · line on that range`;
+  const to = dayInWords(through, { short: true });
+  const means = to ? `weekly means to ${to}` : "weekly means";
+  if (plan.kind === "bars") return `${means} · bars from zero`;
+  return `${means} · line on ${num(plan.lo, decimals)}–${num(plan.hi, decimals)}${unit ? ` ${unit}` : ""}`;
+}
+
+/** What a tile's figure is — one reading, never a mean — in the words printed beside it ({fullDay}: a running daily
+ * total shown at its last complete day). */
+export const WEIGHIN_METRICS = new Set(["weight_lbs"]);
+export const MORNING_METRICS = new Set(["hrv", "recovery_score", "resting_hr"]);
+export function readingWords(metricId, { fullDay = false } = {}) {
+  if (fullDay) return "last full day";
+  if (NIGHT_METRICS.has(metricId)) return "latest night";
+  if (WEIGHIN_METRICS.has(metricId)) return "latest weigh-in";
+  if (MORNING_METRICS.has(metricId)) return "latest morning";
+  return "latest day";
 }
 
 const tick = (i, h) => `<rect x="${i * SLOT + 0.5}" y="${h - 4.5}" width="9" height="4" fill="none" stroke="${MUTED}" stroke-dasharray="2 2"/>`;

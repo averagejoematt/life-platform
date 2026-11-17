@@ -78,6 +78,28 @@ export function chapterPublished(c, opts = {}) {
 
 const SPELLED = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"];
 
+/**
+ * Weeks elapsed, said ONE way on every page (#6122). A week in progress is never counted as a week done: Day 72 is
+ * "10 full weeks and 2 days of week 11", not "11 weeks". An ordinal ("Week 11") names the week a day falls in; a count
+ * says the full weeks and, when one is under way, the days of it. Program weeks run from the experiment's first day
+ * (Day 1–7 is week 1), the same arithmetic the exporter used. `dayN` is the edition's day number (never the clock).
+ * Null unless dayN is a whole number of at least 1.
+ */
+export function weekOfDay(dayN) {
+  return Number.isInteger(dayN) && dayN >= 1 ? Math.floor((dayN - 1) / 7) + 1 : null;
+}
+
+export function weeksElapsed(dayN) {
+  if (!Number.isInteger(dayN) || dayN < 1) return null;
+  const full = Math.floor(dayN / 7);
+  const rest = dayN % 7;
+  const weeks = (n) => `${n === 1 ? "One" : n} full ${n === 1 ? "week" : "weeks"}`;
+  const days = (n) => `${n} ${n === 1 ? "day" : "days"}`;
+  const week = weekOfDay(dayN);
+  const words = rest === 0 ? weeks(full) : full === 0 ? `${days(rest)} of week 1` : `${weeks(full)} and ${days(rest)} of week ${week}`;
+  return { full, rest, week, words };
+}
+
 /** A chapter as every page names it: {week, number, name, prologue, window, windowShort, programWeek, published, weekNote, tick}.
  * `number` "10" (`00` for the prologue, "—" without a week); `name` "Chapter 10" / "Prologue"; `window` "Days 60–66 · 4 to 10
  * November" or "program week 11 to 17 October" (null for the prologue, which has neither); `published` "Published 13

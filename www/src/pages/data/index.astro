@@ -8,7 +8,7 @@ import LabEntry from "../../components/LabEntry.astro"; // the Laboratory (L1): 
 import FourParts from "../../components/FourParts.astro"; // the four parts of the experiment; this room holds the body
 import { labEnabled } from "../../lib/lab.js";
 import { headline, weeklyBars } from "../../lib/chart.js";
-import { scaleWords, weeklySpark } from "../../lib/spark.js";
+import { readingWords, scaleWords, weeklySpark } from "../../lib/spark.js";
 import { dayInWords, num } from "../../lib/format.js";
 import { loadAll, loadJourney, loadPairs, loadSeries } from "../../lib/snapshot.js";
 import { PROVISIONAL_WORDS, provisionalNights } from "../../lib/provisional.js";
@@ -109,7 +109,7 @@ const meansWords = (days: any[]) => {
           const s = series[m.id];
           const h = s ? headline(s.days) : null;
           const spark = s ? sparkOf(s.days) : null;
-          const scale = spark ? scaleWords(spark.plan, { decimals: m.decimals, unit: m.unit }) : null;
+          const scale = spark ? scaleWords(spark.plan, { decimals: m.decimals, unit: m.unit, through: s.days.length ? s.days[s.days.length - 1].date : null }) : null;
           // 2026-11-14: a behavioral series' newest day is often partial ("13 Nov, so far" read 80 kcal and 15 g of
           // protein at breakfast), and the tile set it as the headline. The headline is the last FULL day; the partial
           // day stays in the caption, labelled.
@@ -129,7 +129,7 @@ const meansWords = (days: any[]) => {
               </span>
               {h && h.last != null ? (
                 <span class="v num" style="font-size:30px" data-provisional={provisional ? "" : undefined}>
-                  {num(full ? full.value : h.last, m.decimals)} <small>{m.unit}</small>
+                  {num(full ? full.value : h.last, m.decimals)} <small>{m.unit}</small> <small class="v-what">{readingWords(m.id, { fullDay: Boolean(full) })}</small>
                 </span>
               ) : (
                 <span class="v num muted" style="font-size:22px">

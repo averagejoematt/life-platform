@@ -11,7 +11,7 @@ import VersusGuess from "../components/VersusGuess.astro";
 import OpenQuestions from "../components/OpenQuestions.astro";
 import OwnWords from "../components/OwnWords.astro";
 import { headline, weeklyBars } from "../lib/chart.js";
-import { scaleWords, weeklySpark } from "../lib/spark.js";
+import { readingWords, scaleWords, weeklySpark } from "../lib/spark.js";
 import { chapterCount, chapterMeta, chapterWindow, dayInWords, nextChapter, domainWords, num, kOfN, clip, heldCallWords } from "../lib/format.js";
 import { connectedTo, loadAll, loadSeries, latestEdition, dayLine, loadCalibration, loadJourney, loadLab } from "../lib/snapshot.js";
 import { labEnabled } from "../lib/lab.js";
@@ -130,14 +130,18 @@ const lineSvg = lineData ? theLine({ ...lineData, aria: lineAria }) : "";
 
 // ── Fig. 1 — the portrait. Body, Sleep and Recovery read their series; Mind and Connection read
 // the edition's published counts; Purpose has no instrument. Bars are eight weekly means (or counts).
-type Dim = { id: string; label: string; instrument: string; value: string | null; unit: string; bars: (number | null)[] | null; note: string; href: string | null; measured: boolean; key?: string; decimals?: number; latest?: number | null };
+type Dim = { id: string; label: string; instrument: string; value: string | null; unit: string; bars: (number | null)[] | null; note: string; href: string | null; measured: boolean; key?: string; decimals?: number; latest?: number | null; through?: string | null; what?: string };
 function seriesDim(id: string, key: string, label: string, decimals: number, unit: string, noteOf: (h: any, bars: (number | null)[]) => string): Dim {
   const s = series[key];
   const m = all.get("metric", key);
   if (!s) return { id, label, instrument: m?.instrument || "", value: null, unit, bars: null, note: "No series served for this yet.", href: m ? pathOf("metric", key) : null, measured: false };
   const h = headline(s.days);
   const bars = weeklyBars(s.days, 8);
-  return { id, label, instrument: m?.instrument || s.source_id || "", value: h.last == null ? null : num(h.last, decimals), unit, bars, note: noteOf(h, bars), href: pathOf("metric", key), measured: h.last != null, key, decimals, latest: h.last };
+  // #6122: the figure is one reading and the line is weekly means — the figure says which (readingWords) and the scale
+  // line says the weeks it covers (`through`, the series' last day), so a night outside the weekly range is not read as
+  // a contradiction. The words ride in the figure's own line (the phone hides the note).
+  const through = s.days.length ? s.days[s.days.length - 1].date : null;
+  return { id, label, instrument: m?.instrument || s.source_id || "", value: h.last == null ? null : num(h.last, decimals), unit, bars, note: noteOf(h, bars), href: pathOf("metric", key), measured: h.last != null, key, decimals, latest: h.last, through, what: readingWords(key) };
 }
 const firstBar = (bars: (number | null)[]) => bars.find((v) => v != null);
 // #5953 contract: the notes name how many weeks are drawn (a series shorter than eight weeks draws fewer), and the
@@ -328,7 +332,7 @@ const standing: Standing[] = [
     <div class="wrap">
       <figure class="portrait" id="portrait">
         <figcaption class="between">
-          <span class="label">Fig. 2 — The portrait{edition?.day_n != null && `, day ${edition.day_n}`} · six dimensions, eight weekly means</span>
+          <span class="label">Fig. 2 — The portrait{edition?.day_n != null && `, day ${edition.day_n}`}</span>
           <span class="verified" style="font-size:11px">{edition ? `As of ${dayInWords(edition.as_of, { short: true })}` : "From the platform"} · blank where nothing is measured in public</span>
         </figcaption>
         <div class="tiles portrait-tiles">
@@ -337,7 +341,7 @@ const standing: Standing[] = [
               d.href ? (
                 <a class="tile" href={href(d.href)}>
                   <span class="label">{d.label} · {d.instrument}</span>
-                  <span class={`v num ${d.value == null ? "hollow" : ""}`}>{d.value == null ? "—" : d.value}{d.value != null && d.unit && <small> {d.unit}</small>}</span>
+                  <span class={`v num ${d.value == null ? "hollow" : ""}`}>{d.value == null ? "—" : d.value}{d.value != null && d.unit && <small> {d.unit}</small>}{d.value != null && d.what && <small class="v-what"> {d.what}</small>}</span>
                   <span class="spark" data-spark-of={d.key} data-latest={d.latest} set:html={sparkOf(d).svg} />
                   {scaleWords(sparkOf(d).plan, d) && <span class="spark-scale mono">{scaleWords(sparkOf(d).plan, d)}</span>}
                   <span class="note">{d.note}</span>
@@ -345,7 +349,7 @@ const standing: Standing[] = [
               ) : (
                 <div class="tile">
                   <span class="label">{d.label} · {d.instrument}</span>
-                  <span class={`v num ${d.value == null ? "hollow" : ""}`}>{d.value == null ? "—" : d.value}{d.value != null && d.unit && <small> {d.unit}</small>}</span>
+                  <span class={`v num ${d.value == null ? "hollow" : ""}`}>{d.value == null ? "—" : d.value}{d.value != null && d.unit && <small> {d.unit}</small>}{d.value != null && d.what && <small class="v-what"> {d.what}</small>}</span>
                   <span class="spark" data-spark-of={d.key} data-latest={d.latest} set:html={sparkOf(d).svg} />
                   {scaleWords(sparkOf(d).plan, d) && <span class="spark-scale mono">{scaleWords(sparkOf(d).plan, d)}</span>}
                   <span class="note">{d.note}</span>

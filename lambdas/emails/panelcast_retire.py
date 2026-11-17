@@ -26,6 +26,13 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
+
+try:  # #6112: the owner hold — the Panel reaches it through this module (coach_panel_podcast_lambda._panel_hold)
+    from emails import panelcast_hold
+except ImportError:  # the flat layout; one canonical module name for mypy (#1656)
+    if not TYPE_CHECKING:
+        import panelcast_hold
 
 RETIRED_BY = "owner ruling 2026-10-18"
 _RETIRED_KEY_RE = re.compile(r"/wk(\d+)\.retired\.json$")
@@ -116,10 +123,20 @@ def episodes_doc(_g: dict) -> dict:
 
 
 def index_doc(episodes: list, _g: dict) -> dict:
-    """episodes.json as a publish writes it: the episodes, plus the weeks retired by name that never aired."""
+    """episodes.json as a publish writes it: the episodes, plus the weeks retired by name that never aired, plus the
+    weeks the owner holds (#6112) — re-derived on every write from panelcast-holds/ (the authority), so a later
+    week's publish can neither drop nor invent a held line. An unreadable hold store raises (fail closed)."""
     aired = {str(e.get("week")) for e in episodes}
-    kept = [r for r in episodes_doc(_g).get("retired") or [] if isinstance(r, dict) and str(r.get("week")) not in aired]
-    return {"episodes": episodes, "retired": kept} if kept else {"episodes": episodes}
+    current = episodes_doc(_g)
+    kept = [r for r in current.get("retired") or [] if isinstance(r, dict) and str(r.get("week")) not in aired]
+    owner = panelcast_hold.owner_held_weeks(_g["s3"], _g["S3_BUCKET"], _g["HOLD_PREFIX"])
+    held = [panelcast_hold.public_entry(owner[w]) for w in sorted(owner) if str(w) not in aired]
+    doc: dict = {"episodes": episodes}
+    if kept:
+        doc["retired"] = kept
+    if held:
+        doc[panelcast_hold.PUBLIC_KEY] = held
+    return doc
 
 
 def _write_doc(doc: dict, _g: dict) -> None:

@@ -5,6 +5,7 @@ import Base from "../../../layouts/Base.astro";
 import StatusTag from "../../../components/StatusTag.astro";
 import Quote from "../../../components/Quote.astro";
 import Glossary from "../../../components/Glossary.astro";
+import ReaderCallList from "../../../components/ReaderCallList.astro";
 import { DISPUTED_NOTE, isDisputed, verified } from "../../../lib/disputed.js";
 import { callOutcome, dayInWords } from "../../../lib/format.js";
 import { loadAll, latestEdition, loadCalibration } from "../../../lib/snapshot.js";
@@ -89,10 +90,10 @@ const KIND_WORDS: Record<string, string> = { number: "a number", direction: "a d
         <p class="muted" style="margin-top:8px;font-size:13px" data-method>
           Method {method.version}, from {dayInWords(method.effective)}: {method.note}
         </p>
-      )}
+      )}<ReaderCallList rows={rows} recordAnchor="#calls" />
     </div>
   </section>
-  <section class="wrap" style="padding-bottom:56px" data-ledger>
+  <section class="wrap" style="padding-bottom:56px" data-ledger id="calls">
     <div class="controls" data-needs-js hidden style="display:flex;flex-wrap:wrap;gap:12px 18px;align-items:flex-end;margin-bottom:16px">
       <label class="sel-wrap"><span class="label">Coach</span><select class="sel" data-f-coach aria-label="Filter by coach"><option value="">every coach</option>{coaches.map((c) => <option value={c.id}>{c.name}{c.retired ? " · retired" : ""}</option>)}</select></label>
       <span class="seg" role="group" aria-label="Filter by status">

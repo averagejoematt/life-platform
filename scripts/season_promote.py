@@ -632,6 +632,26 @@ def audit_gate(staging: str, weeks: List[int]) -> List[str]:
     return reasons
 
 
+def owner_hold_gate(weeks: List[int], steps: List[str]) -> List[str]:
+    """#6112: the panel step never publishes a week the owner holds (``panelcast-holds/wk{N}.json``, hold_class owner).
+    Checked before the backup or any write, beside the audit gate — the Panel's own chokepoints would also refuse, but
+    only after the chronicle, ledger and pages steps had already run. Fails closed: an unreadable hold store refuses."""
+    if "panel" not in steps:
+        return []
+    import boto3
+    from emails import panelcast_hold
+
+    try:
+        held = panelcast_hold.owner_held_weeks(boto3.client("s3", region_name=REGION), BUCKET, HOLD_PREFIX)
+    except panelcast_hold.HoldStateUnreadable as exc:
+        return [f"the Panel hold store could not be read, so no week can be shown un-held (fail closed): {exc}"]
+    return [
+        f"week {w} is held by the owner ({held[w].get('reason')}) — release it first, or leave panel out of --only"
+        for w in weeks
+        if w in held
+    ]
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--staging", default=None, help="the staging folder (required except with --effects-only)")
@@ -696,12 +716,18 @@ def main(argv: Optional[List[str]] = None) -> int:
     refusals = audit_gate(args.staging, weeks)
     for r in refusals:
         print(f"AUDIT GATE: {r}")
+    held = owner_hold_gate(weeks, steps)
+    for r in held:
+        print(f"OWNER HOLD: {r}")
     if not args.apply:
         print("\nDRY RUN — nothing written. Re-run with --apply (owner act).")
         return 0
     if refusals:
         print("\nREFUSING: the audit gate is not satisfied (#4549).")
         return 5
+    if held:
+        print("\nREFUSING: the panel step would publish a week the owner holds (#6112).")
+        return 6
     if "backup" in steps:
         backup(args.backup_dir or os.path.join(args.staging, "backup"))
     if "chronicle" in steps:

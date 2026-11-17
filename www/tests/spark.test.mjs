@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { SPARK_H, TREND_BELOW, scaleWords, sparkPlan, weeklySpark } from "../src/lib/spark.js";
+import { SPARK_H, TREND_BELOW, readingWords, scaleWords, sparkPlan, weeklySpark } from "../src/lib/spark.js";
 
 const weight = [327.3, 322.1, 318.9, 314.0, 308.3, 302.2, 298.8, 291.4]; // a 11% fall: the series the review read two ways
 const hrv = [34, 43, 50, 49, 70, 57, 59, 58]; // moves by half its level
@@ -15,13 +15,15 @@ test("a small change against the level is a trend line on its own labelled range
   assert.equal(plan.kind, "trend");
   assert.equal(heights(svg).length, 0, "no bars: a bar from zero would hide the fall, a bar from the minimum would invent a collapse");
   assert.match(svg, /<polyline/);
-  assert.equal(scaleWords(plan, { decimals: 1, unit: "lb" }), "weekly means 291.4 to 327.3 lb · line on that range");
+  assert.equal(scaleWords(plan, { decimals: 1, unit: "lb" }), "weekly means · line on 291.4–327.3 lb");
+  assert.equal(scaleWords(plan, { decimals: 1, unit: "lb", through: "2026-11-16" }), "weekly means to 16 Nov · line on 291.4–327.3 lb");
 });
 
 test("bars start at zero and their heights are the values in proportion — no floor, no offset", () => {
   const { svg, plan } = weeklySpark(hrv);
   assert.equal(plan.kind, "bars");
   assert.equal(scaleWords(plan), "weekly means · bars from zero");
+  assert.equal(scaleWords(plan, { through: "2026-11-16" }), "weekly means to 16 Nov · bars from zero");
   const h = heights(svg);
   assert.equal(h.length, 8);
   const top = Math.max(...hrv);
@@ -51,5 +53,22 @@ test("both doors draw through the contract and neither keeps a scale of its own"
     const src = readFileSync(new URL(page, import.meta.url), "utf8");
     assert.match(src, /weeklySpark\(/, page);
     assert.doesNotMatch(src, /Math\.min\(\.\.\.vals|\(v - lo\) \/ \(hi - lo\)/, `${page} still scales its own bars`);
+  }
+});
+
+// #6122: "8.9 h" beside "weekly means 7.7 to 8.8 h" — one night beside weekly means, with nothing saying which is which.
+test("a tile's figure is named for the one reading it is, never left to read as a weekly mean (#6122)", () => {
+  assert.equal(readingWords("sleep_duration_hours"), "latest night");
+  assert.equal(readingWords("rem_pct"), "latest night");
+  assert.equal(readingWords("deep_pct"), "latest night");
+  assert.equal(readingWords("weight_lbs"), "latest weigh-in");
+  assert.equal(readingWords("hrv"), "latest morning");
+  assert.equal(readingWords("resting_hr"), "latest morning");
+  assert.equal(readingWords("steps"), "latest day");
+  assert.equal(readingWords("total_protein_g", { fullDay: true }), "last full day");
+  for (const page of ["src/pages/index.astro", "src/pages/data/index.astro"]) {
+    const src = readFileSync(new URL(`../${page}`, import.meta.url), "utf8");
+    assert.match(src, /class="v-what"/, `${page}: the figure carries its reading words`);
+    assert.match(src, /through/, `${page}: the scale line names the weeks it covers`);
   }
 });

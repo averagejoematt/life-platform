@@ -185,15 +185,24 @@ export function renderZone2(d) {
     const per = d.period || {};
     const perA = per.start_date ? String(per.start_date).slice(0, 10) : "";
     const perB = per.end_date ? String(per.end_date).slice(0, 10) : "";
-    // The bars are whole calendar weeks, so the first and last can run past the data window.
-    const partial = perA && perB && (perA !== first || perB !== lastEnd)
-      ? ` The bars are whole calendar weeks around the data window, ${esc(monthDay(perA))} – ${esc(monthDay(perB))}, so the first and last are partial.`
+    // The bars are whole calendar weeks, so the first and last can run past the data window. #6122: it said "the
+    // first and last are partial" whenever EITHER end ran past (live 2026-11-16: data Aug 29 – Nov 15, bars Aug 24 –
+    // Nov 15 — only the first was); it names the one(s) that are.
+    const firstPartial = Boolean(perA && perA > first);
+    const lastPartial = Boolean(perB && lastEnd && perB < lastEnd);
+    const whichPartial = firstPartial && lastPartial ? "the first and last are" : firstPartial ? "the first is" : "the last is";
+    const partial = perA && perB && (firstPartial || lastPartial)
+      ? ` The bars are whole calendar weeks around the data window, ${esc(monthDay(perA))} – ${esc(monthDay(perB))}, so ${whichPartial} partial.`
       : "";
     const frame = before.length
       ? `This window reaches back before the experiment: ${before.length} of these ${weeks.length} weeks ended before it began on <strong>${esc(start)}</strong>; the other ${since.length} include that day or come after it. From the week of ${esc(start)} on, ${sinceMet} of ${since.length} week${since.length === 1 ? "" : "s"} hit the 150-min mark. `
       : "";
-    parts.push(sec(`Zone-2 minutes by week, ${win}`,
-      barChart(items, { valueKey: "value", labelKey: "label", label: `Zone-2 min / week, ${win}` }) +
+    // #6122: the heading and the chart's own label stated "Aug 24 – Nov 15" on a page stamped "since September 6" and
+    // left the before-the-start weeks to the prose under the chart (visual QA, 2026-11-16: "window reaches back before
+    // the experiment"). The label now says what the window is: the weeks before the start are pre-experiment baseline.
+    const pre = before.length ? `, ${before.length} pre-experiment week${before.length === 1 ? "" : "s"} before ${start}` : "";
+    parts.push(sec(`Zone-2 minutes by week, ${win}${pre}`,
+      barChart(items, { valueKey: "value", labelKey: "label", label: `Zone-2 min / week, ${win}${pre}` }) +
       // #3286: `weeks` holds only the weeks that HAD qualifying activity — a blank week is
       // absent from this chart, not a zero bar. Said out loud so the last bar is never read
       // as "the current week" the way `current_week` used to be.

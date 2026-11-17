@@ -2126,6 +2126,12 @@ figure.portrait-words {
   .portrait-band .portrait-tiles .tile .note {
     display: none;
   }
+  /* #6122: what the figure is ("latest night") sits under it on a phone, at label height, so naming it costs no row */
+  .portrait-band .portrait-tiles .tile .v-what {
+    display: block;
+    font-size: 12px;
+    line-height: 1.2;
+  }
 }
 @media (max-width: 640px) {
   /* the chapter section starts one screen below; on a phone the jump button only repeated the scroll */
