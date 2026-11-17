@@ -1,0 +1,23 @@
+{
+  "captured_at": "2026-11-17T03:29:43.966328+00:00",
+  "fetch_path": "/api/reader_call",
+  "is_prefix_sample": false,
+  "path": "/api/reader_call",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "available": {
+        "type": "boolean"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

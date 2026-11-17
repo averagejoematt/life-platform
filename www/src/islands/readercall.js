@@ -3,7 +3,7 @@
 // Vanilla, no dependency, same origin (CSP connect-src 'self'), no cookie and no storage: the server's per-reader
 // marker remembers a call, and a reload asks again. The server decides what may be shown: while a call is open no
 // count reaches this script at all.
-import { afterSentence, closedSentence, coachLine, gradedSentence, labelOf, listRow, openSentence, splitRows, splitSentence, viewState } from "../lib/readercall_view.js";
+import { CLOSED_HEADING, afterSentence, closedSentence, coachLine, gradedSentence, labelOf, listRow, openSentence, splitRows, splitSentence, viewState } from "../lib/readercall_view.js";
 
 const MIN_WAIT_MS = 2500; // the server refuses a call whose token is under 2 s old; a quick tap simply waits
 
@@ -89,6 +89,11 @@ async function tap(root, body, view, choice, fetchedAt, row, status) {
 }
 
 function renderClosed(root, body, view) {
+  // a closed call is no longer an invitation: lead with what the block is, and drop the "make your own call" line
+  const heading = root.querySelector("[data-rc-heading]");
+  if (heading) heading.textContent = CLOSED_HEADING;
+  const copy = root.querySelector("[data-rc-copy]");
+  if (copy) copy.remove();
   body.replaceChildren(
     para(view.question, "font-size:15px;font-weight:700;line-height:1.4"),
     para(closedSentence(view), "font-size:14px;line-height:1.5"),
