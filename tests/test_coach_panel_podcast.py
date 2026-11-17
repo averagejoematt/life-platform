@@ -636,3 +636,15 @@ def test_4514_a_truncated_judge_reply_holds_and_names_the_stop_reason(monkeypatc
     ok, fails, cited = qa._craft_judge([{"speaker": "elena_voss", "line": "hi"}], "1. anything")
     assert ok is False and cited == []
     assert "fail-closed" in fails[0] and "stop_reason=max_tokens" in fails[0]
+
+
+# #6112: every Panel publish now asks the owner-hold store first (emails/panelcast_hold.refuse, fail closed). These
+# tests are about other gates, and their S3 fakes carry no hold store — so the store reads as "no owner holds" here.
+# The hold itself, and the fail-closed read, are tested in tests/test_panel_owner_hold_6112.py.
+import pytest as _pytest_6112  # noqa: E402
+from emails import panelcast_hold as _panelcast_hold_6112  # noqa: E402
+
+
+@_pytest_6112.fixture(autouse=True)
+def _no_owner_holds_6112(monkeypatch):
+    monkeypatch.setattr(_panelcast_hold_6112, "owner_held_weeks", lambda *a, **k: {})

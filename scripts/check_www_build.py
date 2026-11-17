@@ -486,12 +486,15 @@ def story_leaks(dist: str, story_js: str = STORY_JS, live: bool | None = None) -
 READERCALL_NEEDLES = ("data-readercall", "/api/reader_call")
 
 
-def readercall_leaks(dist: str) -> list[str]:
-    """#6088 (built dark, owner ruling 2026-11-16: develop and test privately): the reader-call control is NEVER
-    deployed. A dist with the control's marker (`data-readercall`, on the page and in the island's chunk) or its route
+def readercall_leaks(dist: str, live: bool | None = None) -> list[str]:
+    """#6088 (built dark, owner ruling 2026-11-16: develop and test privately): while dark, the reader-call control is
+    never deployed. A dist with the control's marker (`data-readercall`, on the page and in the island's chunk) or its route
     (`/api/reader_call`) in any page, script or data file is a WEB_READERCALL=1 build; this scan runs on every deploy
-    (`--scan-only`), so such a dist is refused before it can reach S3. There is no go-live constant yet: launching is
-    a reviewed change to this rule as well as to the switch."""
+    (`--scan-only`), so such a dist is refused before it can reach S3. #6114: once READERCALL_LIVE is committed true (read by
+    scripts/www_launch_switch.py, unreadable = dark) the control is ordinary build output and is not refused."""
+    live = www_launch_switch.readercall_live() if live is None else live
+    if live:
+        return []
     out = []
     for dirpath, _d, files in os.walk(dist):
         for name in files:

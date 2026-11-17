@@ -58,6 +58,11 @@ _SITE_OWNED_FIXTURES = {
     "/archive/manifest.json": os.path.join(HERE, "fixtures", "web_gate_site_owned", "archive_manifest.json"),
     "/archive/continuity.json": os.path.join(HERE, "fixtures", "web_gate_site_owned", "archive_continuity.json"),
 }
+# #6114: the reader-call API the live call pages and the ledger index ask (/api/reader_call?call=<item id>). The static
+# server has no API, so it is answered with the SHUT door's real GET body ({"available": false} — the state every
+# deploy ships in until SSM /life-platform/reader-call is set): the control stays hidden and the "Make your own call"
+# block shows its empty state, exactly as in production before the switch. Matched by glob (the query varies).
+_READER_CALL_FIXTURE = ("**/api/reader_call*", os.path.join(HERE, "fixtures", "web_gate_site_owned", "reader_call_shut.json"))
 AXE_GATING_IMPACTS = ("critical", "serious")
 PHONE = {"width": 390, "height": 844}
 LAPTOP = {"width": 1280, "height": 900}
@@ -248,6 +253,7 @@ def gate(dist: str, base: str, out_dir: str | None, verbose: bool = True, snapsh
                 ctx = browser.new_context(viewport=vp, color_scheme="light", service_workers="block")
                 for fixture_path, fixture_file in _SITE_OWNED_FIXTURES.items():
                     ctx.route(f"{origin}{fixture_path}", _fulfil_with(fixture_file))
+                ctx.route(_READER_CALL_FIXTURE[0], _fulfil_with(_READER_CALL_FIXTURE[1]))
                 page = ctx.new_page()
                 errors: list[str] = []
                 page.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))

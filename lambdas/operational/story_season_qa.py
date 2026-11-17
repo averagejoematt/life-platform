@@ -35,8 +35,21 @@ THE HOLD IS READ FROM THE PUBLIC MARKER, NOT THE PRIVATE DRAFT
   also runs on a clock no retry can reset — how long the week has been past its
   48 h window. Whichever is older decides.
 
+THE OWNER'S HOLD IS A THIRD STATE (#6112, owner ruling 2026-11-16)
+  A week now reads as exactly one of: DELIVERED (an episode row in episodes.json), HELD (a named record says why it
+  is not on air) or MISSING (neither) — and only MISSING fails. An owner hold is `panelcast-holds/wk{N}.json` with
+  `hold_class: "owner"` (private, the authority — emails/panelcast_hold.py); its public face is a line in
+  episodes.json's `held` list, re-derived from the private record on every index write. The line is accepted only
+  when it is structurally complete — a week, a held_at date, a decider and a reason (`panelcast_hold.public_problems`,
+  the writer's own validator); an empty or malformed line is NOT a hold and the week reads as missing.
+  A held week is reported on the green line, named and aged — visible, never silent. It does not hold the
+  delivery-FAILURE alarm red: the episode did not fail to deliver, the owner decided it should not. But a hold must
+  not be forgettable either, so past OWNER_HOLD_REVIEW_DAYS the check WARNs (an alarmed warn — `qa-smoke-warnings`,
+  never `qa-smoke-failures`, never chronic) until the owner releases, retires or re-records the hold. An automated
+  `pending` hold keeps its 7-day FAIL escalation: that one is a gate result nobody has looked at yet.
+
 WHAT IS NOT CLAIMED
-  * The marker holds ONE week. Two weeks held at once show as one hold and one
+  * The `pending` marker holds ONE week (owner holds are a list and have no such limit). Two weeks held at once show as one hold and one
     bare miss, which is the louder reading and the correct one.
   * A week the owner RETIRED by name (episodes.json `retired`, #4536) is accounted for:
     named in the green line, never a miss and never an escalated hold.
@@ -57,6 +70,7 @@ from typing import Any, Callable, Optional
 from boto3.dynamodb.conditions import Key
 from common.pacific_time import parse_iso_utc  # #1964/#3609: THE ISO-8601 instant parser
 from content.story_dossier import week_containing
+from emails.panelcast_hold import PUBLIC_KEY as OWNER_HELD_KEY, public_problems as owner_hold_problems
 from experiment.phase_filter import singleton_visible
 
 CHRONICLE_SUFFIX = "chronicle"
@@ -72,6 +86,11 @@ HOLD_ESCALATE_DAYS = 7
 # The reason `coach_panel_podcast_lambda._hold_and_alert` publishes. `awaiting_material`
 # (the other marker) is not a hold: a PUBLISHED week has its material by definition.
 HOLD_REASON = "held_for_review"
+# #6112: an OWNER hold is reported OK until it is this old, then WARNs (alarmed, never a FAIL). Four weekly editions and
+# the monthly full review: long enough that a deliberate hold is not nagged, short enough that it cannot be forgotten.
+# Re-recording the hold (scripts/panel_owner_hold.py --apply with a new --decided date) is the owner's way to say
+# "still held, on purpose".
+OWNER_HOLD_REVIEW_DAYS = 28
 
 # (d) `StoryQuestionsMonday` — its config/schedules.json row, Pacific wall clock (the table's
 # platform_timezone, #4284 / ADR-165). Pinned to the row by tests/test_heartbeat_completeness.py,
@@ -165,12 +184,32 @@ def retired_weeks(doc: dict) -> dict[int, str]:
     return out
 
 
-def episode_findings(weeks: dict[int, dict], doc: dict, now: datetime) -> tuple[list[str], list[str], list[str]]:
-    """`(missing, escalated, sanctioned)` — each a list of sentences naming a week.
+def owner_holds(doc: dict) -> tuple[dict[int, dict], dict[int, str]]:
+    """`(valid, malformed)` from episodes.json's `held` list — `{week: line}` and `{week: why it is not a hold}`."""
+    valid: dict[int, dict] = {}
+    malformed: dict[int, str] = {}
+    for e in doc.get(OWNER_HELD_KEY) or []:
+        problems = owner_hold_problems(e)
+        try:
+            wk = int(e.get("week"))
+        except (AttributeError, TypeError, ValueError):
+            continue  # a line naming no week excuses nothing and names nothing
+        if problems:
+            malformed[wk] = ", ".join(problems)
+        else:
+            valid[wk] = e
+    return valid, malformed
 
-    missing    past 48 h, no episode, no hold naming the week          -> FAIL
-    escalated  held, and the hold or the overdue clock is past 7 days   -> FAIL
-    sanctioned inside the 48 h window, held for under 7 days, or retired by name (#4536) -> named, green
+
+def episode_verdicts(weeks: dict[int, dict], doc: dict, now: datetime) -> dict[str, list[str]]:
+    """Every published week, sorted into exactly one bucket — each a list of sentences naming a week.
+
+    delivered  an episode row in episodes.json                                  -> counted, green
+    held       the owner holds it (a valid `held` line), under the review bound  -> named + aged, green
+    aged       the owner holds it, past OWNER_HOLD_REVIEW_DAYS                   -> WARN (never a FAIL)
+    sanctioned retired by name, inside the 48 h window, or an automated hold < 7 d -> named, green
+    escalated  an automated (`pending`) hold past 7 days                         -> FAIL
+    missing    past 48 h with none of the above                                  -> FAIL
     """
     aired: set[int] = set()
     for e in doc.get("episodes") or []:
@@ -186,29 +225,49 @@ def episode_findings(weeks: dict[int, dict], doc: dict, now: datetime) -> tuple[
         held_week = None
     held_at = parse_iso_utc(pending.get("noted_at")) if held_week is not None else None
     retired = retired_weeks(doc)
+    owner, malformed = owner_holds(doc)
 
-    missing: list[str] = []
-    escalated: list[str] = []
-    sanctioned: list[str] = []
+    out: dict[str, list[str]] = {k: [] for k in ("delivered", "held", "aged", "sanctioned", "escalated", "missing")}
     for wk in sorted(weeks):
-        if wk in aired:
-            continue
         published = weeks[wk]["published"]
+        if wk in aired:
+            out["delivered"].append(f"week {wk}")
+            continue
         if wk in retired:  # #4536: the owner retired the week by name — accounted for, never a bare miss
-            sanctioned.append(f"week {wk} retired by name {retired[wk] or ''}".rstrip() + f" (chronicle published {published.isoformat()})")
+            out["sanctioned"].append(
+                f"week {wk} retired by name {retired[wk] or ''}".rstrip() + f" (chronicle published {published.isoformat()})"
+            )
+            continue
+        if wk in owner:  # #6112: held on purpose, for a recorded reason — visible, aged, never a delivery failure
+            line = owner[wk]
+            since = parse_iso_utc(line.get("held_at"))
+            age = (now - since).total_seconds() / 86400 if since is not None else 0.0
+            sentence = (
+                f"week {wk} HELD by {line.get('decided_by')} since {str(line.get('held_at'))[:10]} ({age:.1f} d): "
+                f"{line.get('reason')} (chronicle published {published.isoformat()})"
+            )
+            out["aged" if age > OWNER_HOLD_REVIEW_DAYS else "held"].append(sentence)
             continue
         due = published + timedelta(hours=EPISODE_WINDOW_HOURS)
         if now <= due:
-            sanctioned.append(f"week {wk} published {published.isoformat()} — inside its {EPISODE_WINDOW_HOURS} h window")
+            out["sanctioned"].append(f"week {wk} published {published.isoformat()} — inside its {EPISODE_WINDOW_HOURS} h window")
             continue
         overdue_days = (now - due).total_seconds() / 86400
         if held_week == wk and held_at is not None:
             age_days = max((now - held_at).total_seconds() / 86400, overdue_days)
-            line = f"week {wk} held since {held_at.isoformat()} ({age_days:.1f} d, chronicle published {published.isoformat()})"
-            (escalated if age_days > HOLD_ESCALATE_DAYS else sanctioned).append(line)
-        else:
-            missing.append(f"week {wk} (chronicle published {published.isoformat()}, {overdue_days:.1f} d past its window)")
-    return missing, escalated, sanctioned
+            line_s = f"week {wk} held since {held_at.isoformat()} ({age_days:.1f} d, chronicle published {published.isoformat()})"
+            out["escalated" if age_days > HOLD_ESCALATE_DAYS else "sanctioned"].append(line_s)
+            continue
+        why = f"; its `held` line was not accepted as a hold ({malformed[wk]})" if wk in malformed else ""
+        out["missing"].append(f"week {wk} (chronicle published {published.isoformat()}, {overdue_days:.1f} d past its window{why})")
+    return out
+
+
+def episode_findings(weeks: dict[int, dict], doc: dict, now: datetime) -> tuple[list[str], list[str], list[str]]:
+    """`(missing, escalated, sanctioned)` — the #4539 shape, kept for its callers. An owner hold (held or aged) is
+    folded into `sanctioned`: it is never missing and never escalated."""
+    v = episode_verdicts(weeks, doc, now)
+    return v["missing"], v["escalated"], v["sanctioned"] + v["held"] + v["aged"]
 
 
 def ledger_gaps(weeks: dict[int, dict], ledger_rows: list[dict]) -> list[str]:
@@ -319,23 +378,32 @@ def check_story_season(
         episode_c.warn(f"{EPISODES_PATH} could not be read ({why}) — no verdict was reached on {len(weeks)} published week(s)")
         return out
 
-    missing, escalated, sanctioned = episode_findings(weeks, doc, now)
-    if missing or escalated:
+    v = episode_verdicts(weeks, doc, now)
+    open_lines = v["held"] + v["aged"] + v["sanctioned"]
+    note = f" Open: {'; '.join(open_lines)}." if open_lines else ""
+    if v["missing"] or v["escalated"]:
         parts = []
-        if missing:
+        if v["missing"]:
             parts.append(
-                f"published with NO Panel episode and no hold after {EPISODE_WINDOW_HOURS} h: {'; '.join(missing)} — "
+                f"published with NO Panel episode and no hold after {EPISODE_WINDOW_HOURS} h: {'; '.join(v['missing'])} — "
                 "the episode was silently skipped (#4365)"
             )
-        if escalated:
+        if v["escalated"]:
             parts.append(
-                f"HELD more than {HOLD_ESCALATE_DAYS} days: {'; '.join(escalated)} — release it, re-generate it or retire the week by name"
+                f"HELD more than {HOLD_ESCALATE_DAYS} days: {'; '.join(v['escalated'])} — release it, re-generate it or retire the week by name"
             )
-        episode_c.fail(". ".join(parts) + ". Check /aws/lambda/coach-panel-podcast and s3 panelcast-holds/.")
+        others = f" Also open: {'; '.join(v['held'] + v['aged'])}." if v["held"] or v["aged"] else ""
+        episode_c.fail(". ".join(parts) + ". Check /aws/lambda/coach-panel-podcast and s3 panelcast-holds/." + others)
+    elif v["aged"]:
+        episode_c.warn(
+            f"owner hold(s) older than {OWNER_HOLD_REVIEW_DAYS} days: {'; '.join(v['aged'])}. Not a delivery failure — the owner "
+            "decided it — but a hold is not meant to be forgotten: release it (scripts/panel_owner_hold.py --release), retire "
+            f"the week by name, or re-record the hold with a new decided date.{note}"
+        )
     else:
-        note = f" Open: {'; '.join(sanctioned)}." if sanctioned else ""
         episode_c.ok(
-            f"every one of the {len(weeks)} published season week(s) has a Panel episode or a hold under {HOLD_ESCALATE_DAYS} days.{note}"
+            f"{len(v['delivered'])} of the {len(weeks)} published season week(s) delivered; every other one is held for a "
+            f"recorded reason, retired by name, or inside its window.{note}"
         )
     return out
 
