@@ -82,7 +82,7 @@ def test_each_lock_closes_the_door_without_a_write():
     for row in (DUE_TODAY_ROW, WINDOW_ENDED_ROW, outcome_but_pending, expired):
         call = _call_id(row)
         view = _body(_ask(table, _event(params={"call": call}), raw=raw))
-        assert view["open"] is False and "token" not in view, row["claim_natural"]
+        assert view.get("open") is False and "token" not in view, (row["claim_natural"], view)
         tok = R.mint_token(KEY, call, _salted("203.0.113.7"), NOW)
         resp = _ask(table, _event("POST", body={"call": call, "choice": "up", "token": tok}), now=NOW + 5, raw=raw)
         assert resp["statusCode"] == 409, (row["claim_natural"], resp)
@@ -344,3 +344,22 @@ def test_committed_on_with_the_parameter_absent_or_off_keeps_the_door_shut(_fres
             assert _is_shut(resp, ev), resp
         assert raw.reads == [] and raw.writes == []
         assert ssm.calls == 1, "read once, then cached"
+
+
+def test_the_public_id_resolves_only_inside_a_request_and_only_for_a_public_call():
+    """#6120: the door is addressed by the call's PUBLIC id and reads the row by the stored key behind it, from the same
+    complete, policy-filtered map every public route's ids come from. Outside a request opened with a table there is no
+    map (None); a private call's public id is not in the map."""
+    from web import narrative_publication, public_call_id, publication_snapshot
+
+    pub = _call_id(DIR_ROW).split(":")[1]
+    assert public_call_id.stored_of("sleep", pub) is None  # no request open: no map, never a guess
+    raw, table = _table()
+    narrative_publication.begin_request()  # as site_api_lambda opens every request
+    publication_snapshot.begin_request(table)
+    try:
+        assert public_call_id.stored_of("sleep", pub) == DIR_ROW["prediction_id"]
+        assert public_call_id.stored_of("sleep", _call_id(PRIVATE_ROW).split(":")[1]) is None
+        assert public_call_id.stored_of("sleep", DIR_ROW["prediction_id"]) is None  # a stored, word-made key is never an address
+    finally:
+        publication_snapshot.begin_request(None)

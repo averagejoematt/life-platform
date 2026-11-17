@@ -148,6 +148,7 @@ def _presence(table: Any) -> list:
 
 def load_call(table: Any, item_id: str, today: str, *, genesis: Optional[str], presence: Callable = _presence) -> tuple:
     """``(view, None)`` for an eligible call, else ``(None, (status, message, reason))``. See the module docstring."""
+    from web import public_call_id
     from web.prediction_reason import _notes, metric_unit, metric_words
     from web.site_api_ledger_export import export_item, servable
 
@@ -155,14 +156,19 @@ def load_call(table: Any, item_id: str, today: str, *, genesis: Optional[str], p
     if sp is None:
         return None, (404, "Unknown call", "unknown_call")
     short, pid = sp
-    row = (table.get_item(Key={"pk": f"COACH#{short}_coach", "sk": f"PREDICTION#{pid}"}) or {}).get("Item")
-    if not isinstance(row, dict) or coach_record.prediction_key(row) != pid or row.get("coach_id") == "":
+    # #6120: the item id is the call's PUBLIC id (opaque, never its words); the row is read by the stored key behind it,
+    # from the same complete, policy-filtered map every public route's ids come from — a private call is not in it.
+    key = public_call_id.stored_of(short, pid)
+    if key is None:
+        return None, (404, "Unknown call", "unknown_call")
+    row = (table.get_item(Key={"pk": f"COACH#{short}_coach", "sk": f"PREDICTION#{key}"}) or {}).get("Item")
+    if not isinstance(row, dict) or coach_record.prediction_key(row) != key or row.get("coach_id") == "":
         return None, (404, "Unknown call", "unknown_call")
     if not coach_record.counts_this_cycle(row, genesis):
         return None, (404, "Unknown call", "unknown_call")
     item = export_item(short, row, presence(table))
     kept, _ = servable([item])
-    if not kept or item.get("item_id") != item_id:
+    if not kept:
         return None, (404, "Unknown call", "unknown_call")
     ev = row.get("evaluation")
     spec: dict = ev if isinstance(ev, dict) else {}

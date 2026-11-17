@@ -224,6 +224,26 @@ def of(coach: Optional[str], key: Any) -> Optional[str]:
     return next(iter(ids)) if len(ids) == 1 else None
 
 
+def stored_of(coach: Optional[str], public: Any) -> Optional[str]:
+    """The stored key behind a coach's PUBLIC id — the reverse of ``of`` (#6114: the reader-call door is addressed by the
+    public ``item_id`` and must read the call's row). Built from the same complete, policy-filtered map, so a private
+    call, an unknown id or one that is not exactly one call answers None. Outside a request opened with a table, None."""
+    p = str(public or "").strip()
+    if not coach or not PUBLIC_ID.match(p):
+        return None
+    _ensure(coach)
+
+    def _hits() -> list:
+        with _LOCK:
+            return [key for (c, key), pub in _PUBLIC.items() if c == coach and pub == p]
+
+    hits = _hits()
+    if not hits and not _refreshed(coach):
+        _ensure(coach, force=True)  # a call filed since the map was read
+        hits = _hits()
+    return hits[0] if len(hits) == 1 else None
+
+
 def _coach_short(v: Any) -> Optional[str]:
     s = str(v or "").strip()
     if s.endswith("_coach"):
