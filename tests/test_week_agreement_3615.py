@@ -512,3 +512,47 @@ def test_stats_line_weight_reads_live_and_legacy_shapes_4907():
     assert _t_stats_line_weight(LEGACY_LINE) == (305.4, None)
     assert _t_stats_line_weight("Prologue, no numbers") == (None, None)
     assert _t_stats_line_weight(None) == (None, None)
+
+
+# ── #6113: the absence leg runs late in the sweep, on a budget other checks must not spend ──
+def _late_budget(payloads, clock, read_cost=0.5, idle_before=80.0):
+    """A budget that has been ALIVE for `idle_before`s of unrelated checks (the live shape: the
+    first census leg starts ~20 checks before this one) while each read costs `read_cost`s."""
+
+    def opener(url, timeout):
+        clock["t"] += read_cost
+        for path, payload in payloads.items():
+            if url.endswith(path):
+                return 200, json.dumps(payload)
+        return 404, "{}"
+
+    budget = ProbeBudget(opener=opener, clock=lambda: clock["t"])
+    clock["t"] += idle_before
+    return budget
+
+
+def test_absence_leg_reaches_a_verdict_when_the_budget_is_old_but_reads_are_fast_6113():
+    """Live 2026-11-16: NOT OBSERVED on api_status because 60s of wall-clock had passed since the
+    census budget was built, not because 60s of reading had. Fails on the wall-clock budget."""
+    clock = {"t": 0.0}
+    payloads = _absence_payloads("PAUSED in the source registry — paused. Last record: 97d ago.")
+    check = wq.check_absence_agreement(Check, CONTENT_TRUTH, None, site_base_url="https://site", budget=_late_budget(payloads, clock))[0]
+    assert "NOT OBSERVED" not in check.message, check.message
+
+
+def test_absence_leg_still_fails_a_genuine_contradiction_on_an_old_budget_6113():
+    """Negative control: the fix must not weaken the verdict — a real disagreement is still a FAIL."""
+    clock = {"t": 0.0}
+    payloads = _absence_payloads("Pipeline may need attention — was flowing regularly but stopped 97d ago. Check auth/webhook.")
+    check = wq.check_absence_agreement(Check, CONTENT_TRUTH, None, site_base_url="https://site", budget=_late_budget(payloads, clock))[0]
+    assert check.passed is False and "broken pipe" in check.message
+
+
+def test_absence_leg_is_still_not_observed_when_reads_genuinely_spend_the_budget_6113():
+    """Negative control: slow READS (65s each) still exhaust the budget and warn — never a green."""
+    clock = {"t": 0.0}
+    payloads = _absence_payloads("PAUSED in the source registry — paused. Last record: 97d ago.")
+    check = wq.check_absence_agreement(
+        Check, CONTENT_TRUTH, None, site_base_url="https://site", budget=_late_budget(payloads, clock, read_cost=65.0, idle_before=0.0)
+    )[0]
+    assert check.passed is None and "NOT OBSERVED" in check.message

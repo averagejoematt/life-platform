@@ -168,13 +168,38 @@ def test_probe_budget_fetches_each_url_once():
 def test_a_spent_budget_defers_rather_than_pretending():
     clock = {"t": 0.0}
 
-    def opener(url, timeout):  # pragma: no cover — must never be reached
-        raise AssertionError("a spent budget must not issue requests")
+    calls = []
+
+    def opener(url, timeout):
+        calls.append(url)
+        clock["t"] += 11.0  # one slow read spends the whole 10s budget
+        return 200, "{}"
 
     budget = ProbeBudget(total_seconds=10.0, opener=opener, clock=lambda: clock["t"])
-    clock["t"] = 11.0
-    result = budget.get("https://x/a")
+    assert budget.get("https://x/a").ok
+    result = budget.get("https://x/b")
     assert result.deferred and not result.ok and "budget" in result.error
+    assert calls == ["https://x/a"], "a spent budget must not issue requests"
+
+
+def test_idle_time_between_reads_is_not_charged_to_the_budget_6113():
+    """#6113: the budget is shared by legs separated by ~20 unrelated checks. Wall-clock between
+    reads (other checks running) must not spend it; only time inside reads does. Negative control:
+    the same slow READS do spend it (test above), so this is not a budget that cannot be spent."""
+    clock = {"t": 0.0}
+
+    def opener(url, timeout):
+        clock["t"] += 0.5
+        return 200, "{}"
+
+    budget = ProbeBudget(total_seconds=10.0, opener=opener, clock=lambda: clock["t"])
+    assert budget.get("https://x/a").ok
+    clock["t"] += 80.0  # unrelated checks run between census legs
+    result = budget.get("https://x/b")
+    assert result.ok and not result.deferred, "idle sweep time was billed to the census"
+    # ...but the budget's own age is still capped so the census cannot outlive the Lambda
+    clock["t"] += 100.0
+    assert budget.get("https://x/c").deferred
 
 
 def test_the_census_budget_times_census_reads_not_the_sweep_before_them(monkeypatch):
@@ -406,8 +431,13 @@ def test_predict_week_dark_with_no_live_cycle_is_honestly_absent(monkeypatch):
 def test_an_unread_cell_is_a_WARN_never_a_pass():
     clock = {"t": 0.0}
     table, s3, _ = _ctx()
-    budget = ProbeBudget(total_seconds=1.0, opener=_opener_factory(), clock=lambda: clock["t"])
-    clock["t"] = 99.0
+    inner = _opener_factory()
+
+    def slow(url, timeout):
+        clock["t"] += 99.0  # every read is slow enough to spend the 1s budget
+        return inner(url, timeout)
+
+    budget = ProbeBudget(total_seconds=1.0, opener=slow, clock=lambda: clock["t"])
     check = hq.check_hook_liveness(table, s3, "bucket", Check, CONTENT_TRUTH, _frozen_pt_now, site_base_url="https://site", budget=budget)[
         0
     ]
