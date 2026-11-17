@@ -164,6 +164,12 @@ def compute_daily_metrics() -> list[iam.PolicyStatement]:
                 actions=["ssm:GetParameter"],
                 resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle"],
             ),
+            # #5906: store_computed_metrics -> common.compute_metadata.tag_record emits
+            # LifePlatform/Compute RecordWritten on every write; with no grant it was AccessDenied
+            # (swallowed) on all 98 runs in 14 days. LifePlatform/DynamoDB is owed by the import
+            # closure (ingestion_validator -> item_size_guard), which rule 3 of
+            # tests/test_putmetricdata_namespace_condition_5545.py holds every role to.
+            _put_metric_data_statement("SharedModuleMetrics", NS_COMPUTE, NS_DYNAMODB),
         ],
     )
 
@@ -171,13 +177,15 @@ def compute_daily_metrics() -> list[iam.PolicyStatement]:
 def compute_scenario_explorer() -> list[iam.PolicyStatement]:
     """#550 scenario explorer: DDB read (9 source partitions via the hypothesis
     engine's gather) + write (SOURCE#scenarios), KMS. Pure Python — no AI."""
-    return _compute_base(needs_kms=True)
+    # #5906: tag_record (common.compute_metadata) emits LifePlatform/Compute RecordWritten on every write.
+    return _compute_base(needs_kms=True, extra_statements=[_put_metric_data_statement("SharedModuleMetrics", NS_COMPUTE)])
 
 
 def compute_forecast_engine() -> list[iam.PolicyStatement]:
     """#541 forecast engine: DDB read (whoop/withings history + own partition) + write
     (SOURCE#forecast rows + CROSS_PHASE calibration resolutions), KMS. Pure Python — no AI."""
-    return _compute_base(needs_kms=True)
+    # #5906: tag_record (common.compute_metadata) emits LifePlatform/Compute RecordWritten on every write.
+    return _compute_base(needs_kms=True, extra_statements=[_put_metric_data_statement("SharedModuleMetrics", NS_COMPUTE)])
 
 
 def compute_episode_detect() -> list[iam.PolicyStatement]:
@@ -409,7 +417,8 @@ def compute_challenge_generator() -> list[iam.PolicyStatement]:
 
 def compute_weekly_correlations() -> list[iam.PolicyStatement]:
     """Weekly correlation compute (R8-LT9): reads 8 source partitions, writes SOURCE#weekly_correlations."""
-    return _compute_base(needs_kms=True)
+    # #5906: tag_record (common.compute_metadata) emits LifePlatform/Compute RecordWritten on every write.
+    return _compute_base(needs_kms=True, extra_statements=[_put_metric_data_statement("SharedModuleMetrics", NS_COMPUTE)])
 
 
 def compute_dashboard_refresh() -> list[iam.PolicyStatement]:
@@ -641,4 +650,6 @@ def compute_circadian_compliance() -> list[iam.PolicyStatement]:
             actions=["sqs:SendMessage"],
             resources=[DLQ_ARN],
         ),
+        # #5906: store_circadian_score -> tag_record emits LifePlatform/Compute RecordWritten.
+        _put_metric_data_statement("SharedModuleMetrics", NS_COMPUTE),
     ]
