@@ -148,10 +148,11 @@
   "note": "Prior causes: og-image-generator board-roster read (2026-10-27, resolved by PR #5459); charter-private-twin-absent-403 (2026-10-20 → 10-25, resolved by the charter-twin grant PR 5354, applied 2026-10-25 06:33Z)."
  },
  "nightly-predraft-missing": {
-  "added": "2026-10-04",
-  "cause": "predraft-run-failed",
-  "cause_observed": "2026-10-03T02:00:40Z",
-  "citation": "#4568 — one episode: the 2026-10-03 02:00Z run failed (the draft landed on an archived routine's id and the read-back treated it as not ours), the dead-man went ALARM at 04:01Z, and it cleared after the 2026-10-04 02:00Z run drafted on fresh ids. PR 4572 (merged, deployed 2026-10-04 03:25Z) marks a draft by its version and emits a failed outcome; its live proof is the first night whose date already holds an archived draft."
+  "added": "2026-11-17",
+  "cause": "predraft-run-failed (duplicate invocation)",
+  "cause_observed": "2026-11-17T03:01Z",
+  "citation": "#6014 — NEW EPISODE, ALARM since 2026-11-17T05:01Z. The nightly pre-draft Lambda started twice at 03:00Z (03:00:04Z and 03:00:15Z; the first double start in seven nights, consistent with an at-least-once duplicate delivery). Both drafted the 2026-11-17 routine; the slower run lost on `RoutineConflict: VERSION#000003 … already exists` and emitted PredraftOutcome=0 at 03:01Z, while the other finished cleanly (draft adopted, unpushed, note lint clean). Net effect for the owner: none. The alarm needs 24 healthy hourly datapoints, so it self-clears about 2026-11-18T05:00Z if tonight's run succeeds once. The idempotency fix (claim once per target date) is fenced in lambdas/training/ until 2026-11-29 and is recorded on #6014 for the 11-30 review. EXPIRES 2026-11-18T12:00Z: still lit then means a second failure — read that night's NIGHTLY_PREDRAFT line.",
+  "note": "Re-cited 2026-11-17 at the paydown wrap: the prior entry described the closed 2026-10-03 episode (issue 4568)."
  },
  "site-api-p95-latency-high": {
   "added": "2026-10-04",
@@ -267,7 +268,7 @@
   "added": "2026-10-27",
   "cause_observed": "2026-11-17",
   "updated": "2026-11-17",
-  "citation": "#6112 — week 10 has no Panel episode and no hold. Live cause 2026-11-16: `story_season:episode_or_hold` — the week-10 chronicle was published 2026-11-14T00:24Z and 48 h later there is no episode and no hold marker where the check reads one (first FAIL 2026-11-16T01:59Z, every run since). Clears when the episode publishes or a dated hold names week 10 — an owner-approved write. The 2026-11-14 `reader_truth:verdict` episode (#5939) is superseded: it self-cleared. UPDATE 2026-11-17: `story_season:episode_or_hold` is answered — the owner's hold on week 10 was recorded 2026-11-17T01:38Z (PR 6123, `panelcast-holds/wk10.json`; `panel_owner_hold.py --verify` PASS, qa-smoke reads it as held), so this id stops firing on the next run. New live cause `hooks:liveness_matrix` (first seen ~03:19Z 2026-11-17): the `reader_call/door` row reads `missing — served payload fails {'truthy_path': 'available'}` after the reader-call go-live PR 6125 (Refs issue 6114) merged at 01:39Z; owned by the website session under #6138.",
+  "citation": "Both of this episode's causes are answered, and the alarm is a dated, self-clearing count. `story_season:episode_or_hold`: the owner's hold on week 10 was recorded 2026-11-17T01:38Z (PR 6123; `panel_owner_hold.py --verify` PASS, qa-smoke reads it as held; issue 6112 closed on it). `hooks:liveness_matrix`: the reader-call door read missing until its runtime switch was set at ~03:10Z (issue 6138 closed on it). The 2026-11-17 04:44Z qa-smoke run logged `[QA] CAUSE fail none`. FailCount is count-aggregated, so the alarm stays lit until the failing datapoints leave its window. EXPIRES 2026-11-18T12:00Z: still lit then means a new FAIL — read the latest `[QA] CAUSE fail` line.",
   "cause": "story_season:episode_or_hold,hooks:liveness_matrix"
  },
  "ingest-reconciliation-whoop": {
