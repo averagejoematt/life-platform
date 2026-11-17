@@ -1293,14 +1293,18 @@ def test_an_alarm_with_no_live_cause_reading_is_unknown_never_mismatched():
     assert cac.cause_mismatches(alarms, citations, {}) == []
 
 
-def test_a_run_that_went_clean_while_the_alarm_is_still_lit_is_a_mismatch():
-    """An empty live cause set is a READING, not an absence: the alarm is lit and the
-    latest run found nothing, so the citation no longer explains the live state."""
+def test_a_run_that_went_clean_while_the_alarm_is_still_lit_is_judged_by_the_stale_window():
+    """An empty live cause set is a READING, not an absence — but since #5934 it is the
+    subset rule's trivially-explained case, and the citation is judged by the OTHER
+    direction instead: a declared id the channel has not named in 7 days reds
+    (tests/test_alarm_citation_subset_5934.py owns the full matrix)."""
     alarms = [_lit_episode("qa-smoke-failures", "2026-09-03T11:31:55-07:00")]
     citations = {"qa-smoke-failures": {"citation": "#3598", "cause": "reader_truth:frozen_artifacts"}}
-    assert cac.cause_mismatches(alarms, citations, {"qa-smoke-failures": []}) == [
-        ("qa-smoke-failures", "reader_truth:frozen_artifacts", "-")
-    ]
+    assert cac.cause_mismatches(alarms, citations, {"qa-smoke-failures": []}) == []
+    import alarm_citation_causes as acc
+
+    quiet = {"qa-smoke-failures": set()}
+    assert acc.stale_declared_causes(alarms, citations, quiet) == [("qa-smoke-failures", "reader_truth:frozen_artifacts")]
 
 
 # ── the cause channel is the REAL emitter's wire format, not a copy of it ──────
@@ -1367,7 +1371,7 @@ def test_fetch_qa_smoke_causes_degrades_when_aws_is_unreachable(monkeypatch):
             raise RuntimeError("no creds")
 
     monkeypatch.setitem(sys.modules, "boto3", _Boom())
-    causes, err = cac.fetch_qa_smoke_causes()
+    causes, err, _seen = cac.fetch_qa_smoke_causes()
     assert causes == {} and "no creds" in err
 
 
@@ -1437,7 +1441,8 @@ class _PagedLogs:
         self.calls.append(kwargs.get("nextToken"))
         idx = 0 if kwargs.get("nextToken") is None else int(kwargs["nextToken"])
         events, nxt = self.pages[idx]
-        base = idx * 1000
+        # Inside the live 48h window (#5934 reads the latest run from the last 48h only).
+        base = int(datetime.now(timezone.utc).timestamp() * 1000) - 3_600_000 + idx * 1000
         out = {"events": [{"message": m, "timestamp": base + i} for i, m in enumerate(events)]}
         if nxt is not None:
             out["nextToken"] = str(nxt)
@@ -1459,7 +1464,7 @@ def test_live_cause_read_follows_pagination_to_the_newest_line(monkeypatch):
         ]
     )
     _patch_boto(monkeypatch, client)
-    causes, err = cac.fetch_qa_smoke_causes()
+    causes, err, _seen = cac.fetch_qa_smoke_causes()
     assert err is None
     # Against the pre-#3729 single-page implementation this is [] — the phantom
     # "no failures" that flagged a correct citation as a mismatch.
@@ -1471,7 +1476,7 @@ def test_live_cause_read_degrades_rather_than_returning_a_partial_map(monkeypatc
     """A token still outstanding at the cap is an INCOMPLETE read, not a clean answer."""
     pages = [(["[QA] CAUSE fail none -"], i + 1) for i in range(cac._CAUSE_PAGE_CAP + 2)]
     _patch_boto(monkeypatch, _PagedLogs(pages))
-    causes, err = cac.fetch_qa_smoke_causes()
+    causes, err, _seen = cac.fetch_qa_smoke_causes()
     assert causes == {}
     assert err and "pages" in err
 
@@ -1482,7 +1487,7 @@ def test_live_cause_read_still_degrades_honestly_on_an_aws_error(monkeypatch):
             raise RuntimeError("AccessDenied")
 
     _patch_boto(monkeypatch, _Boom())
-    causes, err = cac.fetch_qa_smoke_causes()
+    causes, err, _seen = cac.fetch_qa_smoke_causes()
     assert causes == {} and "AccessDenied" in err
 
 

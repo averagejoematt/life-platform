@@ -245,7 +245,9 @@ Every issue closed this session gets an outcome verdict from the session that me
 cross-references `docs/alarm_citations.json`: an alarm in ALARM >72h needs an entry, one
 >14 days needs a filed issue `#N` (#2378), and a fired-and-cleared flap inside the window
 is answered the same way (#2912). Add the entry (file the issue first), or write the
-shortfall into the handover and re-run with `--decoded`. **One leg `--decoded` cannot release** (#5934): an
+shortfall into the handover and re-run with `--decoded`. A qa-smoke entry's `cause` lists every id it explains,
+each named in a sentence: a live id it does not declare reds, and so does a declared id the cause channel has not
+named in 7 days — prune it (#5934; the any-WARN alarm's cause is a union, never one id). **One leg `--decoded` cannot release** (#5934): an
 alarm lit >14 days whose citation has no OPEN `#N` (no entry, prose only, or every cited issue closed)
 exits 1 regardless and blocks the wrap — fix it or re-point it at an open issue. AWS unreachable → `UNVERIFIED`,
 exit 0 — say so. The handover carries one line either way: `**Alarms:** <N> red >72h, all cited`,

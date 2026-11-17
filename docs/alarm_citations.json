@@ -241,9 +241,15 @@
   "added": "2026-10-28",
   "cause_observed": "2026-11-16",
   "updated": "2026-11-16",
-  "citation": "#5928 — the 'no red without an owner' review epic owns this standing WARN; #6113 owns the census-budget cause when it recurs. Live cause 2026-11-16 ~19:50Z (Monday's public-brief cycle 2026-11-16, run status ok): `public_brief:cycle_liveness` warns because 2 of 4 coaches were held, not failed — nutrition_coach `inputs_stale` (`total_calories_kcal`: no MacroFactor export after 2026-11-13, the owner upload the earlier `macrofactor_export_age` cause asked for) and glucose_coach `required_inputs_absent` (`blood_glucose_avg`: no glucose source, chronic). Both are sanctioned holds; the WARN clears on the next cycle once an export is uploaded.",
-  "note": "Re-cited 2026-11-16 at the paydown session's wrap: the earlier causes (`public_brief:macrofactor_export_age`, `weeks:absence_agreement`) were replaced in the live run by the Monday cycle's held coaches. `reader_truth:confirm` / `reader_truth:verdict` join intermittently and will read as a mismatch on those runs.",
-  "cause": "public_brief:cycle_liveness"
+  "citation": "#5928 — the 'no red without an owner' review epic owns this standing any-WARN alarm; its live cause line is a union of the intermittent ids below, so each declared id carries its own sentence and owner (#5934: live ⊆ declared, and a declared id unseen in /aws/lambda/life-platform-qa-smoke for 7 days is reported for pruning). (1) `public_brief:cycle_liveness` (#5928) — Monday's public-brief cycle 2026-11-16 (run status ok) held 2 of 4 coaches, not failed: nutrition_coach `inputs_stale` (`total_calories_kcal`: no MacroFactor export after 2026-11-13) and glucose_coach `required_inputs_absent` (no glucose source, chronic); sanctioned holds, clears on the next cycle once an export is uploaded. (2) `public_brief:macrofactor_export_age` (#5928) — the weekly Saturday-to-Monday export-age WARN asking for the owner's MacroFactor upload; last seen 2026-11-16T08:42Z, recurs from Saturday 2026-11-21 if no export lands. (3) `weeks:absence_agreement` (#6113) — the check spends its 60 s census budget on api_status and reports NOT OBSERVED; intermittent, several runs a day on 2026-11-16. (4) `reader_truth:verdict` and (5) `reader_truth:confirm` — the Reader Truth LLM pass's low/med site-copy findings and its unconfirmed-high demotion (a high that did not reproduce on the second pass); a site-copy finding owned by the website session, intermittent several times a day since 2026-11-10.",
+  "note": "Re-cited 2026-11-16 for #5934: every id named in `[QA] CAUSE warn` lines over the 168 h before 2026-11-16T23:30Z, read by filter-log-events on /aws/lambda/life-platform-qa-smoke, is declared except `morning_checkin:weekday_liveness` and `data:orphan_routine_drafts` (last seen 2026-11-13T19:32Z, absent from every run since). The earlier single-id citation chased the union run to run (tracker #6053).",
+  "cause": [
+   "public_brief:cycle_liveness",
+   "public_brief:macrofactor_export_age",
+   "reader_truth:confirm",
+   "reader_truth:verdict",
+   "weeks:absence_agreement"
+  ]
  },
  "field-notes-missing": {
   "added": "2026-10-25",
