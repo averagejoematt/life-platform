@@ -4,6 +4,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+
+// Paths resolve from this file, not the cwd: the repo-root `node --test` job runs it from the checkout root.
+const src = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
 import { weekOfDay, weeksElapsed } from "../src/lib/format.js";
 import { soFar } from "../src/lib/story.js";
 
@@ -37,11 +40,10 @@ test("the story-so-far entry counts weeks from the edition's day, not from the l
 
 test("every page that counts weeks elapsed reads the one helper; none counts the list's rows as weeks done", () => {
   for (const p of ["src/components/StoryEntry.astro", "src/story/timeline.astro"]) {
-    const src = readFileSync(p, "utf8");
-    assert.match(src, /so\.weeksWords\} so far/, `${p} prints the shared wording`);
+    assert.match(src(p), /so\.weeksWords\} so far/, `${p} prints the shared wording`);
   }
-  const story = readFileSync("src/lib/story.js", "utf8");
+  const story = src("src/lib/story.js");
   assert.doesNotMatch(story, /`\$\{weeks\} weeks`/, "the bare row count is never worded as weeks elapsed");
-  const day = readFileSync("src/pages/data/day/[id].astro", "utf8");
+  const day = src("src/pages/data/day/[id].astro");
   assert.match(day, /weekOfDay\(x\.day_number\)/, "the Day page's fallback week is the shared ordinal");
 });

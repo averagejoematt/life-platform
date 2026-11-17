@@ -67,7 +67,7 @@ test("a tile's figure is named for the one reading it is, never left to read as 
   assert.equal(readingWords("steps"), "latest day");
   assert.equal(readingWords("total_protein_g", { fullDay: true }), "last full day");
   for (const page of ["src/pages/index.astro", "src/pages/data/index.astro"]) {
-    const src = readFileSync(page, "utf8");
+    const src = readFileSync(new URL(`../${page}`, import.meta.url), "utf8");
     assert.match(src, /class="v-what"/, `${page}: the figure carries its reading words`);
     assert.match(src, /through/, `${page}: the scale line names the weeks it covers`);
   }
