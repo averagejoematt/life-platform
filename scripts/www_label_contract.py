@@ -28,6 +28,13 @@ Surfaces (each label it reads, and what that label must equal):
     still-recording note appears exactly when the mattress's night is provisional, and each "Recovery, decomposed" line
     prints the day's reading and the normal its label names (the 7-day or 30-day mean, its n, the sleep target).
 
+  * Every tile above that draws a weekly spark (#6122): the scale line names the weeks its means cover ("weekly means to
+    <day>", the series' last day — weeklyBars cuts its weeks back from it), and a figure that lies OUTSIDE the range the
+    same tile states ("line on A–B") carries the words naming what it is instead ("latest night", "latest weigh-in",
+    "latest morning", "latest day", "last full day") — one reading beside weekly means is two quantities, and a tile
+    printing "8.9 h" beside "weekly means 7.7 to 8.8 h" without saying so read as a contradiction to the reader-truth
+    judge (qa-smoke temporal_contradiction, 2026-11-16).
+
 A surface the build did not produce (a fixture without that series) is skipped, never failed: absence is not a label.
 
 Run by `scripts/check_www_build.py`'s scan (CI's web gate on the fixture build, and the deploy's `--scan-only` on the live
@@ -181,6 +188,54 @@ def _span(tile: str, cls: str) -> str:
     return text(m.group(1)) if m else ""
 
 
+#: What a tile's figure is, in the words it must carry (www/src/lib/spark.js readingWords — restated here from the
+#: label's meaning, not imported): a night's reading, a weigh-in, a morning's reading, a day's.
+WEIGHIN_METRICS = {"weight_lbs"}
+MORNING_METRICS = {"hrv", "recovery_score", "resting_hr"}
+_RANGE = re.compile(r"line on " + _NUM + r"\s*[–-]\s*" + _NUM + r"|weekly means " + _NUM + r" to " + _NUM)
+
+
+def reading_words(key: str, full_day: bool = False) -> str:
+    if full_day:
+        return "last full day"
+    if key in NIGHT_METRICS:
+        return "latest night"
+    if key in WEIGHIN_METRICS:
+        return "latest weigh-in"
+    if key in MORNING_METRICS:
+        return "latest morning"
+    return "latest day"
+
+
+def scale_and_figure(tile: str, key: str, s: dict, rel: str, full_day: bool = False) -> list[str]:
+    """#6122: the scale line names its weeks; a figure outside the range its tile states names the quantity it is."""
+    scale = _span(tile, "spark-scale mono")
+    if not scale:
+        return []
+    out = []
+    days = s.get("days") or []
+    if days:
+        want = f"weekly means to {short_day(days[-1]['date'])}"
+        if want not in scale:
+            out.append(f"{rel}: the {key} scale line does not name the weeks it covers ({want!r}): {scale!r}")
+    m = _RANGE.search(scale)
+    printed = _value(tile)
+    if not m or printed is None:
+        return out
+    lo, hi = (m.group(1), m.group(2)) if m.group(1) is not None else (m.group(3), m.group(4))
+    v = _number(printed)
+    if _number(lo) <= v <= _number(hi):
+        return out
+    figure = _span(tile, r"v num[^\"]*")
+    words = reading_words(key, full_day)
+    if words not in figure:
+        out.append(
+            f"{rel}: the {key} tile prints {printed} outside the range it states ({lo} to {hi}) without naming what the figure is "
+            f"({words!r}) — one reading beside weekly means: {figure!r} / {scale!r}"
+        )
+    return out
+
+
 # ── the checks ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
@@ -198,6 +253,7 @@ def front_page(page: str, snap: dict, rel: str = "index.html") -> list[str]:
         printed = _value(tile)
         if printed is None or not agrees(printed, last["value"]):
             out.append(f"{rel}: the {key} tile prints {printed!r}; its latest reading is {last['value']} ({last['date']})")
+        out.extend(scale_and_figure(tile, key, s, rel))
         note = _span(tile, "note")
         bars = weekly_chunks(s["days"])
         first_bar = next((v for v in bars if v is not None), None)
@@ -245,6 +301,7 @@ def data_room(page: str, snap: dict, rel: str = os.path.join("data", "index.html
         printed = _value(tile)
         if printed is None or not agrees(printed, shown["value"]):
             out.append(f"{rel}: the {key} tile prints {printed!r}; the reading it names is {shown['value']} ({shown['date']})")
+        out.extend(scale_and_figure(tile, key, s, rel, full_day=shown is not last))
         caption = _span(tile, "muted")
         if not caption.startswith(short_day(shown["date"])):
             out.append(f"{rel}: the {key} caption opens {caption[:24]!r}; the figure is {short_day(shown['date'])}'s")
@@ -427,9 +484,13 @@ def _synthetic(root: str, mutate: str | None = None) -> tuple[str, str]:
     vals7 = [v for v in hours[-7:] if v is not None]
     seven = f"{_mean(vals7) + (0.5 if mutate == 'mean' else 0):.1f}"
     first = f"{weekly_chunks(s_sleep['days'])[0]:.1f}"
+    what = "" if mutate == "unlabelled" else '<small class="v-what"> latest night</small>'
+    lo, hi = (f"{v:.1f}" for v in (min(weekly_chunks(s_sleep["days"])), max(weekly_chunks(s_sleep["days"]))))
     front = (
         '<div class="tiles"><a class="tile" href="/data/sleep_duration_hours/"><span class="label">Sleep</span>'
-        f'<span class="v num ">{last_sleep}<small> h</small></span><span class="spark" data-spark-of="sleep_duration_hours"></span>'
+        f'<span class="v num ">{last_sleep}<small> h</small>{what}</span>'
+        '<span class="spark" data-spark-of="sleep_duration_hours"></span>'
+        f'<span class="spark-scale mono">weekly means to {"13 Oct" if mutate == "through" else "14 Oct"} · line on {lo}–{hi} h</span>'
         f'<span class="note">{opening} The last seven nights average {seven} h; the first of the {"eight" if mutate == "weeks" else "two"} weeks drawn, {first} h.</span></a></div>'
     )
     present_deep = _present(s_deep["days"])
@@ -481,6 +542,8 @@ PLANTED = {
     "provisional": "provisional in the snapshot",
     "night_of": "the wake morning less one",
     "decomposed": "recovery_pct mean7 is",
+    "unlabelled": "outside the range it states",
+    "through": "does not name the weeks it covers",
 }
 
 

@@ -157,6 +157,30 @@ test("the by-week chart dates its window and names the weeks from before the exp
   assert.ok(!/cycle/i.test(html), "no cycle count on the site (owner ruling 2026-09-26)");
 });
 
+// #6122 (visual QA 2026-11-16, "window reaches back before the experiment"): the heading and the chart label stated a
+// window opening before the start on a page stamped "since September 6"; the label now names the pre-experiment weeks.
+// And "the first and last are partial" was said when only the first bar ran past the data window.
+test("the window's label names its pre-experiment weeks, and only the partial bars are called partial (#6122)", () => {
+  const html = renderZone2(WINDOW_SPANS_START);
+  assert.match(html, /Zone-2 minutes by week, Jun 29 – Oct 4, 9 pre-experiment weeks before Sep 6/, "the heading");
+  assert.match(html, /Zone-2 min \/ week, Jun 29 – Oct 4, 9 pre-experiment weeks before Sep 6/, "the chart's own label");
+  const nov = {
+    ...WINDOW_SPANS_START,
+    period: { start_date: "2026-08-29", end_date: "2026-11-15" },
+    weeks: [["2026-08-24", "2026-08-30", 20], ["2026-08-31", "2026-09-06", 40], ["2026-11-09", "2026-11-15", 131]].map(
+      ([week_start, week_end, zone_2_minutes]) => ({ week_start, week_end, zone_2_minutes, activity_count: 1 }),
+    ),
+  };
+  const live = renderZone2(nov);
+  assert.match(live, /Zone-2 minutes by week, Aug 24 – Nov 15, 1 pre-experiment week before Sep 6/);
+  assert.match(live, /around the data window, Aug 29 – Nov 15, so the first is partial\./, "the last bar ends with the data: only the first is partial");
+  const lastOnly = renderZone2({ ...nov, period: { start_date: "2026-08-24", end_date: "2026-11-12" } });
+  assert.match(lastOnly, /so the last is partial\./);
+  const inside = renderZone2({ ...nov, period: { start_date: "2026-08-24", end_date: "2026-11-15" } });
+  assert.ok(!/so the (first|last)/.test(inside), "bars that match the data window are not called partial");
+  assert.ok(!/cycle/i.test(live), "no cycle count on the site (owner ruling 2026-09-26)");
+});
+
 test("a window wholly inside the experiment carries no before-the-start note (#4474 control)", () => {
   const inside = {
     ...WINDOW_SPANS_START,

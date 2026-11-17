@@ -3,7 +3,7 @@
 // render out. Nothing here reads a journal, a State of Mind or a video-diary field, and nothing counts, dates or marks
 // any of them: a week is its seven days and, when one was approved and published, its installment. A week without an
 // installment says only that — never held, skipped, quiet or why.
-import { dayInWords, num } from "./format.js";
+import { dayInWords, num, weeksElapsed } from "./format.js";
 
 const iso = (s) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
 
@@ -58,8 +58,8 @@ export function timelineRows(story, days = []) {
 }
 
 /**
- * The "story so far" entry: where the experiment is (the edition's day number and the genesis date, both public), how
- * many weeks the platform lists, and the first and the latest installment in the index. Null when the file is absent.
+ * The "story so far" entry: where the experiment is (the edition's day number and the genesis date, both public), the
+ * weeks elapsed in the one wording (format.js weeksElapsed) and how many weeks the platform lists, and the first and the latest installment in the index. Null when the file is absent.
  */
 export function soFar(story, edition) {
   if (!story || story.state !== "ok") return null;
@@ -71,7 +71,10 @@ export function soFar(story, edition) {
   return {
     sentence: where ? `${where}.` : null,
     weeks,
-    weeksWords: weeks === 1 ? "One week" : `${weeks} weeks`,
+    // #6122: "11 weeks so far" on Day 72 counted the week under way as one done. The count is the edition's day number
+    // in full weeks and the days of the week in progress (format.js weeksElapsed, the one wording); without a day
+    // number it says only how many program weeks the list holds.
+    weeksWords: dayN != null ? weeksElapsed(dayN).words : `${weeks} program ${weeks === 1 ? "week" : "weeks"} listed`,
     count: rows.length,
     first: rows[0] || null,
     latest: rows.length > 1 ? rows[rows.length - 1] : null,
