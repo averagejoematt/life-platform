@@ -76,6 +76,12 @@ write surface is your own worktree and your own branch.
    refuses `aws`/`cdk deploy` (exit 97) unless the test declares its stub with
    `LP_TEST_AWS_IS_STUB=<stub path>` (`deploy/lib/prod_write_guard.sh` + `.py`). A refusal
    in your test means you forgot the stub. It does not mean you should find a way around it.
+3d. **A `Refs` PR never puts a closing verb beside the issue number — not even negated.**
+   GitHub closes #N on merge for "close/closes/fix/fixes/resolve/resolves #N" anywhere in
+   the PR body or a commit message; "does not close #N" closes it too (2026-11-17, an
+   issue that closes on live proof was closed by exactly that sentence). Write
+   "Refs #N; the issue stays open until …". `scripts/assert_pr_green.py <PR>` prints the
+   CLOSING-SET it parsed.
 3b. **Never run `git stash` (or `stash pop`/`stash apply`) in a lane.** `refs/stash` is
    a repository-level ref — per `git help worktree` §DETAILS, refs are shared across
    all worktrees except `refs/bisect`, `refs/worktree` and `refs/rewritten`, and
