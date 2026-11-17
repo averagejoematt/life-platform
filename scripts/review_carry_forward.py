@@ -30,6 +30,10 @@ The assembler for the carried set, and the reader of a run's planted-control res
   keeps its expired from-scratch date and every other lens in the run advances. Two
   consecutive full runs (2026-10-31, 2026-11-13) refuted every planted control and were
   still voided whole — 17 rows each — by a single row's miss.
+* ``advanced_lenses`` — the one definition of "the rows this run moved": graded, in a run
+  that counts, less both per-row holds below. ``scratch_dates`` advances exactly these, and
+  ``calibrated_run`` refuses a run for which it is empty — the two holds together can leave a
+  PARTIAL run that re-dated no grade, and that run must not move the ritual clock (#5914).
 * ``estate_incomplete_lenses`` — the estate sweep as a gate, not prose (#6068). From
   ``review_estate.REQUIRED_FROM`` a row whose sweep is absent, unrun or uncounted keeps its
   old from-scratch date, exactly as a row that missed its withheld issue does.
@@ -193,13 +197,21 @@ def calibration_verdict(run: dict) -> str:
 def calibrated_run(path: str) -> bool:
     """Entry qualifier: may this artifact advance a review clock? A JSON we cannot read is
     treated as a run (the probe's job is cadence, not schema validation — a parse error
-    must not silently stop a clock), an UNCALIBRATED one is not."""
+    must not silently stop a clock), an UNCALIBRATED one is not.
+
+    A run that counts but advanced NO lens does not move the clock either (#5914): the
+    per-row holds (a missed withheld issue, #5914; an incomplete estate sweep, #6068) can
+    together hold back every row of a run whose calibration verdict alone reads PARTIAL or
+    CALIBRATED, and a ritual that re-dated no grade is not evidence the ritual happened.
+    """
     try:
         with open(path, encoding="utf-8") as fh:
             run = json.load(fh)
     except (OSError, ValueError):
         return True
-    return run_counts(run, artifact_date(path, run))  # #3919: UNSTATED after the cutoff is a missing run
+    when = artifact_date(path, run)
+    # #3919: UNSTATED after the cutoff is a missing run; #5914: so is one that advanced no lens.
+    return run_counts(run, when) and bool(advanced_lenses(run, when))
 
 
 def carried_lenses(run: dict) -> dict[str, date | None]:
@@ -280,6 +292,22 @@ def estate_incomplete_lenses(run: dict, when: date | None) -> set[str]:
     return {str(lens).strip().lower() for lens in _review_estate().incomplete_lenses(stamped)}
 
 
+def advanced_lenses(run: dict, when: date | None) -> set[str]:
+    """The lenses ONE run graded from scratch and may vouch for — the rows whose clock it moves.
+
+    Graded (in `lenses`, not carried), in a run that counts (#3919), less the rows that missed
+    their own withheld issue (#5914) and, from `review_estate.REQUIRED_FROM`, the rows whose
+    estate sweep is incomplete (#6068). `scratch_dates` advances exactly these, and
+    `calibrated_run` refuses a run for which this is empty, so the lens clocks and the ritual
+    clock read one definition.
+    """
+    if not run_counts(run, when):
+        return set()
+    graded = {str(k).strip().lower() for k in (run.get("lenses") or {})} - set(carried_lenses(run))
+    graded -= withheld_missed_lenses(run) or set()
+    return graded - estate_incomplete_lenses(run, when)
+
+
 def scratch_dates(runs: list[tuple[date, dict]]) -> dict[str, date | None]:
     """{lens: the newest date it was graded FROM SCRATCH} across a run history.
 
@@ -297,12 +325,10 @@ def scratch_dates(runs: list[tuple[date, dict]]) -> dict[str, date | None]:
         carried = carried_lenses(run)
         # #3919: a run that does not count (UNCALIBRATED, or UNSTATED after the cutoff) grades
         # nothing from scratch — it may still SEED a lens through a citation, never advance one.
-        graded = ({str(k).strip().lower() for k in (run.get("lenses") or {})} - set(carried)) if run_counts(run, run_date) else set()
         # #5914: a lens that missed its own withheld issue was not graded by an instrument
         # anyone can vouch for — the run counts, that row does not.
-        graded -= withheld_missed_lenses(run) or set()
         # #6068: a row that did not walk its estate graded a sample, not its area.
-        graded -= estate_incomplete_lenses(run, run_date)
+        graded = advanced_lenses(run, run_date)
         for lens in graded:
             if lens not in out or out[lens] is None or run_date > out[lens]:
                 out[lens] = run_date
@@ -346,6 +372,13 @@ def claiming_runs(runs) -> list[tuple[date, dict]]:
     ordered = sorted(runs, key=lambda r: (r[0], _is_partial(r[1])))
     whole = [i for i, r in enumerate(ordered) if not _is_partial(r[1])]
     return ordered[whole[-1] :] if whole else ordered[-1:]
+
+
+def _run_label(when: date, run: dict) -> str:
+    """How the sweep names one run: its date, plus `partial` for a `_partial` artifact — a
+    whole run and a partial can share a date (2026-11-14), and a line about one must not
+    read as a line about the other."""
+    return f"{when} partial" if _is_partial(run) else str(when)
 
 
 def expired_carry_forward(runs, today: date, max_days: int = CARRY_FORWARD_MAX_DAYS) -> list[dict]:
@@ -538,13 +571,24 @@ def carry_forward_report(today: date, repo: str = REPO) -> tuple[list[str], list
     for when, run in claiming[1:]:
         graded = ", ".join(sorted(str(k) for k in (run.get("lenses") or {}))) or "no lens"
         lines.append(f"   partial run {when} re-graded {graded}: calibration {calibration_verdict(run)}")
+    ordered = sorted(runs, key=lambda r: (r[0], _is_partial(r[1])))
     for when, run in claiming:
-        for lens, why in control_defects(run, [r for d, r in runs if d < when]):
-            lines.append(f"   ⚠️  withheld control, {when} run, {lens}: {why} (#5914) — the row's result says less than it reads")
+        # Earlier = filed before this run in the claiming order, so a partial is checked against
+        # the whole run of its own date too (a same-day partial re-using its control is spent).
+        earlier = [r for _, r in ordered[: next(i for i, o in enumerate(ordered) if o[1] is run)]]
+        for lens, why in control_defects(run, earlier):
+            lines.append(
+                f"   ⚠️  withheld control, {_run_label(when, run)} run, {lens}: {why} (#5914) — the row's result says less than it reads"
+            )
     for when, run in claiming:
         held = ", ".join(sorted(estate_incomplete_lenses(run, when)))
         if held:
-            lines.append(f"   {when} run: estate sweep incomplete, so these rows did NOT advance (#6068): {held}")
+            lines.append(f"   {_run_label(when, run)} run: estate sweep incomplete, so these rows did NOT advance (#6068): {held}")
+        if run_counts(run, when) and not advanced_lenses(run, when):
+            lines.append(
+                f"   {_run_label(when, run)} run advanced NO lens — every graded row was held back, so it does not move the "
+                "fullreview-full clock (#5914)"
+            )
     if not expired:
         lines.append("   ✅ every graded lens is within the cap.")
         return lines, expired
