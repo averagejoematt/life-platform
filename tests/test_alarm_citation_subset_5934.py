@@ -240,6 +240,10 @@ def test_3258_a_cause_sentence_claiming_no_recurrence_still_needs_its_derivation
 
 def _run_main(monkeypatch, *, citations, latest, seen, two_tuple=False):
     transitioned = (datetime.now(timezone.utc) - timedelta(hours=6)).replace(microsecond=0).isoformat()
+    # The episode is placed relative to NOW, so the citation's `cause_observed` must come from the same clock:
+    # a literal date here turned this file red the day after it merged (the #3501 "citation predates the
+    # current episode" leg fired on the fixture, not on the rule under test).
+    citations = {k: (dict(v, cause_observed=transitioned[:10]) if "cause_observed" in v else v) for k, v in citations.items()}
     monkeypatch.setattr(cac, "fetch_alarms", lambda: ([_lit(WARN, transitioned)], None))
     monkeypatch.setattr(cac, "load_citations", lambda: citations)
     monkeypatch.setattr(cac, "load_alarm_audience", lambda: {})
