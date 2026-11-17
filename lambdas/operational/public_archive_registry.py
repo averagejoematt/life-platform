@@ -132,6 +132,10 @@ PARAMETERISED_ROUTES: dict[str, str] = {
         "2026-10-11 (#4738): his words stay public live (E2) but never enter the public archive"
     ),
     "/api/experiment_detail": "requires ?id= — per-experiment slice; the set is archived via /api/experiments",
+    "/api/reader_call": (
+        "#6114: the bare GET is the door's state ({available}), and a GET with ?call= mints a per-reader, no-store timing "
+        "token — neither is a standing artefact; the calls themselves are archived via /api/ledger_export"
+    ),
     "/api/social_context": "requires ?route= — per-route slice of data archived elsewhere",
 }
 

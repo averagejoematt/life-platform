@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { READERCALL_ENV, READERCALL_ISLAND, READERCALL_LIVE, itemIdOf, readerCallEnabled, readerCallFor, readerCallIntegration, readerCallPrivate } from "../src/lib/readercall.js";
-import { COPY, LIST_EMPTY, LIST_INTRO, afterSentence, closedSentence, coachLine, gradedSentence, listRow, openSentence, splitRows, splitSentence, viewState } from "../src/lib/readercall_view.js";
+import { CLOSED_HEADING, COPY, LIST_EMPTY, LIST_INTRO, afterSentence, closedSentence, coachLine, gradedSentence, listRow, openSentence, splitRows, splitSentence, viewState } from "../src/lib/readercall_view.js";
 
 const injected = (env, live = false) => {
   const calls = [];
@@ -114,3 +114,15 @@ test("the page state for every API answer — a shut door or an ineligible call 
   assert.equal(viewState(ok({ open: false })), "closed");
   assert.equal(viewState(ok({ open: false, graded: { coach_status: "refuted" } })), "graded");
 });
+
+test("a closed call leads with what the block is, never an invitation to call", () => {
+  assert.equal(CLOSED_HEADING, "Reader calls");
+  const island = readFileSync(new URL("../src/islands/readercall.js", import.meta.url), "utf8");
+  const closed = island.slice(island.indexOf("function renderClosed"), island.indexOf("function renderGraded"));
+  assert.ok(closed.includes("heading.textContent = CLOSED_HEADING"), "the closed state replaces the 'Your call' heading");
+  assert.ok(closed.includes('querySelector("[data-rc-copy]")') && closed.includes("copy.remove()"), "the closed state drops the invitation");
+  assert.ok(!closed.includes("COPY"), "the closed state never writes the invitation");
+  const comp = readFileSync(new URL("../src/components/ReaderCall.astro", import.meta.url), "utf8");
+  assert.ok(comp.includes("data-rc-heading>Your call</h2>") && comp.includes("data-rc-copy>{COPY}</p>"));
+});
+

@@ -35,8 +35,8 @@ const guess = p.simple_guess;
           </>
         ) : (
           <>
-            <h2 class="label" id={`rc-h-${p.id}`} style="font-size:13px">Your call</h2>
-            <p style="font-size:14px;line-height:1.5">{COPY}</p>
+            <h2 class="label" id={`rc-h-${p.id}`} style="font-size:13px" data-rc-heading>Your call</h2>
+            <p style="font-size:14px;line-height:1.5" data-rc-copy>{COPY}</p>
             <div data-rc-body aria-live="polite"><p class="muted" style="font-size:13px">Reading the reader calls…</p></div>
             <div hidden><label>Leave this empty<input name="hp" type="text" autocomplete="off" data-rc-hp /></label></div>
           </>

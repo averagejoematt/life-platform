@@ -5,6 +5,9 @@
 export const COPY = "Make your own call. It is counted with the other reader calls, apart from the coach's record.";
 export const NOT_OPEN = "This call is not open for reader calls.";
 export const UNREAD = "Reader calls could not be read just now.";
+/** The heading of a CLOSED call's block (#6114 follow-up): it says what the block is, never invites a call that can
+ *  no longer be made — the "Your call" heading and the invitation are for an open call only. */
+export const CLOSED_HEADING = "Reader calls";
 
 const callsWord = (n) => `${n} reader ${n === 1 ? "call" : "calls"}`;
 
