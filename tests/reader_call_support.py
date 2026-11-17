@@ -128,8 +128,11 @@ def _row(claim, spec, *, coach="sleep_coach", day="2026-11-14", **extra):
 
 
 def _call_id(row):
-    """The call's PUBLIC item id, as /api/ledger_export serves it: ``<coach short id>:<prediction id>``."""
-    return f"{row['pk'][len('COACH#'):-len('_coach')]}:{row['prediction_id']}"
+    """The call's PUBLIC item id, as /api/ledger_export serves it (#6120): ``<coach short id>:<public id>`` — the opaque id
+    from the call's first-filed instant (``web.public_call_id.public_id``), never its stored, word-made key."""
+    from web import public_call_id
+
+    return f"{row['pk'][len('COACH#'):-len('_coach')]}:{public_call_id.public_id(row['created_at'])}"
 
 
 DIR_ROW = _row(DIRECTION_CLAIM, DIRECTION_SPEC)
@@ -180,9 +183,18 @@ def _body(resp):
 
 
 def _ask(table, event, *, now=NOW, today=TODAY, live=True, runtime=lambda: True, raw=None):
-    resp = rc.handle_reader_call(
-        event, table=table, live=live, runtime=runtime, now=now, today=today, presence=lambda t: [], key_fn=lambda p, lg=None: KEY
-    )
+    """One request, opened the way site_api_lambda opens it: the complete-read snapshot (#6120) against this table, so
+    the public id resolves through the same policy-filtered map production uses; closed again afterwards."""
+    from web import narrative_publication, publication_snapshot
+
+    narrative_publication.begin_request()  # as site_api_lambda does: forget the previous request's table and taint
+    publication_snapshot.begin_request(table)
+    try:
+        resp = rc.handle_reader_call(
+            event, table=table, live=live, runtime=runtime, now=now, today=today, presence=lambda t: [], key_fn=lambda p, lg=None: KEY
+        )
+    finally:
+        publication_snapshot.begin_request(None)
     if raw is not None:  # the isolation proof, after EVERY request it is given a raw table for
         owner = [w for w in raw.writes if str(w[1]).startswith(OWNER_PREFIXES)]
         assert not owner, f"the reader-call route wrote an owner partition: {owner}"
@@ -203,3 +215,13 @@ def _tap(raw, table, call, choice, ip="203.0.113.7", at=NOW, delay=5, token=None
 
 def _tally(raw):
     return {s[len(R.TALLY_SK_PREFIX) :]: v["count"] for (p, s), v in raw.reader_rows().items() if s.startswith(R.TALLY_SK_PREFIX)}
+
+
+def _is_shut(resp, event) -> bool:
+    """The shut / not-callable answer (#6114): a POST is refused 404 "not available"; a GET gets the uniform non-error
+    ``{"available": false}`` so no call page logs a failed request."""
+    method = ((event.get("requestContext") or {}).get("http") or {}).get("method", "GET")
+    body = {k: v for k, v in _body(resp).items() if k != "_meta"}
+    if method == "POST":
+        return resp["statusCode"] == 404 and body.get("error") == rc.NOT_AVAILABLE
+    return resp["statusCode"] == 200 and body == {"available": False}

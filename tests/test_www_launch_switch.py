@@ -21,6 +21,7 @@ import www_launch_switch as sw  # noqa: E402
 def test_each_committed_switch_is_read_exactly():
     assert sw.read_flag(sw.LAB_JS, "LAB_LIVE") in (True, False)
     assert sw.read_flag(sw.STORY_JS, "STORY_LIVE") in (True, False)
+    assert sw.read_flag(sw.READERCALL_JS, "READERCALL_LIVE") in (True, False)  # #6114
 
 
 def test_the_producer_twins_follow_the_committed_switch():

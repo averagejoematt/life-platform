@@ -4,12 +4,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { READERCALL_ENV, READERCALL_ISLAND, itemIdOf, readerCallEnabled, readerCallFor, readerCallIntegration } from "../src/lib/readercall.js";
-import { COPY, closedSentence, coachLine, gradedSentence, openSentence, splitRows, splitSentence } from "../src/lib/readercall_view.js";
+import { READERCALL_ENV, READERCALL_ISLAND, READERCALL_LIVE, itemIdOf, readerCallEnabled, readerCallFor, readerCallIntegration, readerCallPrivate } from "../src/lib/readercall.js";
+import { COPY, LIST_EMPTY, LIST_INTRO, afterSentence, closedSentence, coachLine, gradedSentence, listRow, openSentence, splitRows, splitSentence, viewState } from "../src/lib/readercall_view.js";
 
-const injected = (env) => {
+const injected = (env, live = false) => {
   const calls = [];
-  readerCallIntegration(env).hooks["astro:config:setup"]({ injectScript: (stage, src) => calls.push([stage, src]) });
+  readerCallIntegration(env, live).hooks["astro:config:setup"]({ injectScript: (stage, src) => calls.push([stage, src]) });
   return calls;
 };
 
@@ -19,14 +19,20 @@ const choices = [
   { id: "same", label: "About the same" },
 ];
 
-test("only the literal 1 turns the private switch on", () => {
-  assert.equal(readerCallEnabled({}), false);
-  for (const v of ["0", "true", "yes", "", " 1", "1 "]) assert.equal(readerCallEnabled({ [READERCALL_ENV]: v }), false, v);
-  assert.equal(readerCallEnabled({ [READERCALL_ENV]: "1" }), true);
+test("committed live (#6114); with live off only the literal 1 turns the private switch on", () => {
+  assert.equal(READERCALL_LIVE, true);
+  assert.equal(readerCallEnabled({}), true);
+  assert.equal(readerCallPrivate({ [READERCALL_ENV]: "1" }), false, "a live build is not private");
+  assert.equal(readerCallEnabled({}, false), false);
+  for (const v of ["0", "true", "yes", "", " 1", "1 "]) assert.equal(readerCallEnabled({ [READERCALL_ENV]: v }, false), false, v);
+  assert.equal(readerCallEnabled({ [READERCALL_ENV]: "1" }, false), true);
+  assert.equal(readerCallPrivate({ [READERCALL_ENV]: "1" }, false), true);
 });
 
-test("off injects nothing; on injects exactly the island", () => {
+test("only a private build injects the island; live builds carry it in the two components", () => {
   assert.deepEqual(injected({}), []);
+  assert.deepEqual(injected({}, true), [], "live: the island ships with the components, never injected on every page");
+  assert.deepEqual(injected({ [READERCALL_ENV]: "1" }, true), []);
   const on = injected({ [READERCALL_ENV]: "1" });
   assert.equal(on.length, 1);
   assert.equal(on[0][0], "page");
@@ -47,12 +53,15 @@ test("the page id maps to the public item id the API keys on", () => {
   assert.equal(itemIdOf("nohyphen"), null);
 });
 
-test("both components gate on the switch before they render anything, and carry no style or script", () => {
+test("both components gate on the switch before they render anything, and carry only the island import", () => {
   for (const name of ["ReaderCall.astro", "ReaderCallList.astro"]) {
     const src = readFileSync(new URL(`../src/components/${name}`, import.meta.url), "utf8");
     assert.match(src, /const on = readerCallEnabled\(\)/, name);
     assert.match(src, /^\{\s*on && \(/m, name);
-    assert.doesNotMatch(src, /<script|<style/, name);
+    assert.doesNotMatch(src, /<style/, name);
+    // counted by plain string search (no tag-matching regex): exactly one script block, the island import
+    assert.equal(src.toLowerCase().split("<script").length - 1, 1, name);
+    assert.ok(src.includes('<script>\n  import "../islands/readercall.js";\n</script>'), name);
   }
 });
 
@@ -71,15 +80,37 @@ test("the words count reader calls, never readers, and never read as evidence", 
   const graded = { choices, reader_calls: { counts: { up: 2, down: 5, same: 1 }, total: 8 }, graded: { coach_status: "confirmed", coach_choice: "down", reading_side: "down" } };
   assert.equal(gradedSentence(graded), "Most reader calls said Down (5 of 8). The reading: Down — 5 reader calls said that.");
   assert.equal(coachLine(graded), "Down · right");
-  const open = { choices, your_call: null, closes_on_words: "28 November", result_due_words: "12 December" };
-  assert.equal(openSentence(open), "Calls close on 28 November. Reader calls stay hidden until then, so no one's call steers yours.");
+  const open = { choices, your_call: null, called_on_words: "14 November", open_until_words: "21 November", result_due_words: "12 December" };
   assert.equal(
-    openSentence({ ...open, your_call: "up" }),
-    "You called: Up. Reader calls stay hidden until calls close on 28 November. The result arrives from 12 December: come back then to see your call beside the coach's.",
+    openSentence(open),
+    "The coach called this on 14 November, before any of it happened; reader calls are open until the end of 21 November. Reader calls stay hidden until then, so no one's call steers yours.",
   );
-  assert.equal(closedSentence({ ...open, your_call: "up" }), "You called: Up. Reader calls are closed. The result arrives from 12 December.");
-  for (const s of [gradedSentence(graded), splitSentence(choices, graded.reader_calls), openSentence(open), closedSentence(open)]) {
+  assert.equal(
+    afterSentence({ ...open, your_call: "up" }),
+    "You called: Up. Reader calls stay hidden until they close at the end of 21 November. The result arrives from 12 December: come back then to see your call beside the coach's.",
+  );
+  assert.equal(closedSentence({ ...open, your_call: "up" }), "You called: Up. Reader calls are closed; the call is graded from 12 December.");
+  assert.equal(
+    listRow("Lisa Park", { short_question: "weight — up, down or about the same by 28 November", open_until_words: "21 November" }),
+    "Lisa Park · weight — up, down or about the same by 28 November · open until 21 November",
+  );
+  // a cold landing on a graded call (no stored choice anywhere): the comparison stands alone
+  assert.equal(gradedSentence({ ...graded, your_call: null }), "Most reader calls said Down (5 of 8). The reading: Down — 5 reader calls said that.");
+  assert.match(LIST_INTRO, /not as equivalent scientific evidence/);
+  assert.match(LIST_EMPTY, /^No coach call is open right now\./);
+  for (const s of [gradedSentence(graded), splitSentence(choices, graded.reader_calls), openSentence(open), closedSentence(open), LIST_INTRO, LIST_EMPTY]) {
     assert.doesNotMatch(s, /\breaders?\b(?! call)/i, s);
-    assert.doesNotMatch(s, /evidence|proves?/i, s);
+    assert.doesNotMatch(s.replace("not as equivalent scientific evidence", ""), /evidence|proves?/i, s);
   }
+});
+
+test("the page state for every API answer — a shut door or an ineligible call shows nothing, never an error", () => {
+  const ok = (body) => ({ ok: true, status: 200, body: { available: true, choices, ...body } });
+  assert.equal(viewState(null), "hidden");
+  assert.equal(viewState({ ok: false, status: 404, body: { error: "Reader calls are not available." } }), "hidden"); // switch off
+  assert.equal(viewState({ ok: false, status: 409, body: { error: "This call is not open for reader calls." } }), "hidden");
+  assert.equal(viewState({ ok: true, status: 200, body: { available: true } }), "hidden"); // the bare probe
+  assert.equal(viewState(ok({ open: true })), "open");
+  assert.equal(viewState(ok({ open: false })), "closed");
+  assert.equal(viewState(ok({ open: false, graded: { coach_status: "refuted" } })), "graded");
 });

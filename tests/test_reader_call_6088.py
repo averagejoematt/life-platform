@@ -37,6 +37,7 @@ from reader_call_support import (
     _body,
     _call_id,
     _event,
+    _is_shut,
     _row,
     _table,
     _tally,
@@ -60,15 +61,22 @@ def _strip_meta(d):
 # ── the switches ───────────────────────────────────────────────────────────────────────────────────────
 
 
-def test_the_switch_is_committed_off_and_off_touches_nothing():
-    assert R.READER_CALL_LIVE is False, "the master switch is committed OFF until the owner's go"
+def test_the_committed_switch_is_on_and_a_shut_runtime_switch_touches_nothing():
+    """Go-live (#6114): READER_CALL_LIVE is committed True, ANDed with the runtime switch. With the committed switch off
+    nothing is read (not even the runtime switch); with the runtime switch shut, nothing is parsed, metered, read or
+    written either."""
+    assert R.READER_CALL_LIVE is True, "the go-live PR commits the switch on; SSM decides at runtime"
+    events = (_event(params={"call": _call_id(DIR_ROW)}), _event("POST", body={"call": _call_id(DIR_ROW), "choice": "up"}), _event())
     raw, table = _table()
     reads = []
-    for ev in (_event(params={"call": _call_id(DIR_ROW)}), _event("POST", body={"call": _call_id(DIR_ROW), "choice": "up"}), _event()):
-        resp = rc.handle_reader_call(ev, table=table, now=NOW, today=TODAY, runtime=lambda: reads.append(1) or True)
-        assert resp["statusCode"] == 404 and _body(resp)["error"] == rc.NOT_AVAILABLE
-    assert raw.writes == [] and raw.reads == [], "off must not read, meter or write"
+    for ev in events:
+        resp = rc.handle_reader_call(ev, table=table, live=False, now=NOW, today=TODAY, runtime=lambda: reads.append(1) or True)
+        assert _is_shut(resp, ev), resp
     assert reads == [], "with the committed switch off the runtime switch is not even read"
+    for ev in events:
+        resp = rc.handle_reader_call(ev, table=table, now=NOW, today=TODAY, runtime=lambda: False)  # committed ON
+        assert _is_shut(resp, ev), resp
+    assert raw.writes == [] and raw.reads == [], "a shut door must not read, meter or write"
 
 
 def test_the_route_is_mounted_for_get_and_post():
@@ -88,7 +96,8 @@ def test_a_call_is_recorded_and_no_count_or_split_is_served_while_open():
     assert view["open"] is True and view["kind"] == "direction"
     assert view["question"] == "From 14 November to 28 November, will the weight go up, go down, or stay about the same?"
     assert [c["id"] for c in view["choices"]] == ["up", "down", "same"]
-    assert view["closes_on_words"] == "28 November" and view["your_call"] is None
+    assert view["open_until_words"] == "21 November" and view["called_on_words"] == "14 November" and view["your_call"] is None
+    assert view["short_question"] == "weight — up, down or about the same by 28 November"
     for hidden in ("reader_calls", "graded", "coach_choice"):
         assert hidden not in view, f"{hidden} must not be served while the call is open"
     assert view["copy"] == R.COPY and "reader calls" in view["note"]
@@ -98,9 +107,9 @@ def test_a_call_is_recorded_and_no_count_or_split_is_served_while_open():
         "recorded": True,
         "call": call,
         "your_call": "same",
-        "closes_on": "2026-11-28",
-        "closes_on_words": "28 November",
-        "result_due_words": "12 December",  # closes when the window ends (28 Nov); graded from the due day (12 Dec)
+        "open_until": "2026-11-21",
+        "open_until_words": "21 November",
+        "result_due_words": "12 December",  # open until the midpoint (21 Nov); graded from the due day (12 Dec)
     }
     again = _body(_ask(table, _event(params={"call": call}), raw=raw))
     assert again["your_call"] == "same" and "token" not in again and "reader_calls" not in again
@@ -240,11 +249,31 @@ def test_a_failed_count_write_loses_the_tap_and_never_double_counts():
 
 
 def test_only_a_public_eligible_call_is_served():
+    """A GET for a call readers cannot call — private, sealed, unknown, malformed — gets ONE uniform non-error answer
+    (#6114), so a private call is indistinguishable from a missing one and no page logs a failed request. A POST for
+    such a call is refused with its reason."""
     raw, table = _table()
-    for row, status in ((PRIVATE_ROW, 404), (SEALED_ROW, 409)):
-        assert _ask(table, _event(params={"call": _call_id(row)}), raw=raw)["statusCode"] == status
-    for bad in ("sleep:pred_nope", "nosuchcoach:pred_x", "../etc", "x" * 300, "sleep-" + DIR_ROW["prediction_id"]):
-        assert _ask(table, _event(params={"call": bad}), raw=raw)["statusCode"] == 404, bad
+    for call in (
+        _call_id(PRIVATE_ROW),
+        _call_id(SEALED_ROW),
+        "sleep:pred_nope",
+        "nosuchcoach:pred_x",
+        "../etc",
+        "x" * 300,
+        "sleep-" + DIR_ROW["prediction_id"],
+    ):
+        ev = _event(params={"call": call})
+        assert _is_shut(_ask(table, ev, raw=raw), ev), call
+    tok = R.mint_token(KEY, _call_id(SEALED_ROW), _salted("203.0.113.7"), NOW)
+    assert (
+        _ask(table, _event("POST", body={"call": _call_id(SEALED_ROW), "choice": "up", "token": tok}), now=NOW + 5, raw=raw)["statusCode"]
+        == 409
+    )
+    tok = R.mint_token(KEY, _call_id(PRIVATE_ROW), _salted("203.0.113.7"), NOW)
+    assert (
+        _ask(table, _event("POST", body={"call": _call_id(PRIVATE_ROW), "choice": "up", "token": tok}), now=NOW + 5, raw=raw)["statusCode"]
+        == 404
+    )
     bare = _body(_ask(table, _event(params={}), raw=raw))
     assert _strip_meta(bare) == {"available": True}  # the bare probe the hook census reads
     assert raw.reader_rows() == {}

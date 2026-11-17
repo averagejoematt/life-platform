@@ -31,19 +31,47 @@ export function labelOf(choices, id) {
   return c ? c.label : null;
 }
 
-/** While a call is open: what the reader called (if they have) and when to come back. Never a count. */
+/** While a call is open, before the reader's call: when the coach called it and how long reader calls stay open — the
+ *  fairness line (#6114: a reader never holds more than half the window the coach called blind) — and why no count. */
 export function openSentence(view) {
   const mine = labelOf(view.choices, view.your_call);
+  if (mine) return afterSentence(view);
+  const fair = view.called_on_words ? `The coach called this on ${view.called_on_words}, before any of it happened; reader calls are open until the end of ${view.open_until_words}.` : `Reader calls are open until the end of ${view.open_until_words}.`;
+  return `${fair} Reader calls stay hidden until then, so no one's call steers yours.`;
+}
+
+/** After the reader's call, still open: what they called and when to come back. Never a count. */
+export function afterSentence(view) {
+  const mine = labelOf(view.choices, view.your_call);
   const back = view.result_due_words ? ` The result arrives from ${view.result_due_words}: come back then to see your call beside the coach's.` : "";
-  if (mine) return `You called: ${mine}. Reader calls stay hidden until calls close on ${view.closes_on_words}.${back}`;
-  return `Calls close on ${view.closes_on_words}. Reader calls stay hidden until then, so no one's call steers yours.`;
+  return `You called: ${mine}. Reader calls stay hidden until they close at the end of ${view.open_until_words}.${back}`;
+}
+
+/** The intro of the "Make your own call" block — the owner's product line, without overclaiming (2026-11-16). */
+export const LIST_INTRO =
+  "Can an ordinary reader call it as well as the AI coaches? Make your own call on an open coach forecast. Reader calls are audience participation, shown beside the coaches' record, not as equivalent scientific evidence.";
+export const LIST_EMPTY = "No coach call is open right now. A new one opens when a coach files its next forecast; this is where it will appear.";
+export const LIST_CHECKING = "Checking which calls are open…";
+
+/** One list row's words: "Lisa Park · weight — up, down or about the same by 28 November · open until 21 November". */
+export function listRow(coachName, view) {
+  const until = view.your_call ? `you called · open until ${view.open_until_words}` : `open until ${view.open_until_words}`;
+  return [coachName, view.short_question, until].filter(Boolean).join(" · ");
+}
+
+/** What the call page shows for an API answer: "hidden" (shut door, not eligible, unread — nothing reader-facing),
+ *  "graded", "open" or "closed". The page never shows an error: a shut or broken door simply hides the control. */
+export function viewState(res) {
+  if (!res || !res.ok || !res.body || res.body.available !== true || !Array.isArray(res.body.choices)) return "hidden";
+  if (res.body.graded) return "graded";
+  return res.body.open ? "open" : "closed";
 }
 
 /** Closed, not yet graded: the counts, and when the result arrives. */
 export function closedSentence(view) {
   const mine = labelOf(view.choices, view.your_call);
-  const due = view.result_due_words ? ` The result arrives from ${view.result_due_words}.` : "";
-  return `${mine ? `You called: ${mine}. ` : ""}Reader calls are closed.${due}`;
+  const due = view.result_due_words ? `; the call is graded from ${view.result_due_words}` : "";
+  return `${mine ? `You called: ${mine}. ` : ""}Reader calls are closed${due}.`;
 }
 
 /** Graded: the coach's call and the reading, beside what the reader calls said. A count of calls, never a claim. */
