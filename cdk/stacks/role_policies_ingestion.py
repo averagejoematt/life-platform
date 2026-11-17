@@ -712,6 +712,10 @@ def ingestion_weather() -> list[iam.PolicyStatement]:
             actions=["sqs:SendMessage"],
             resources=[DLQ_ARN],
         ),
+        # #5906: run_ingestion's breaker hooks (common.auth_breaker) emit LifePlatform/OAuth
+        # IngestAuthHealthy on every clean run — 28 AccessDenied in 14 days before this — and
+        # _store_item -> item_size_guard.safe_put_item emits LifePlatform/DynamoDB on a large item.
+        _put_metric_data_statement("CloudWatchMetrics", *NS_INGEST_SHARED),
     ]
 
 

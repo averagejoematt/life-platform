@@ -4745,15 +4745,20 @@ STRUCTURAL_HAND_PROOFS["structural::test_rate_policy_5861.py"] = {
 
 STRUCTURAL_HAND_PROOFS["structural::test_putmetricdata_namespace_condition_5545.py"] = {
     "gate_name": "test_putmetricdata_namespace_condition_5545.py",
-    "command": "python3 -m pytest tests/test_putmetricdata_namespace_condition_5545.py -q -p no:warnings   # baseline 11 passed",
+    "command": "python3 -m pytest tests/test_putmetricdata_namespace_condition_5545.py -q -p no:warnings   # baseline 17 passed (#5906)",
     "mutation": (
         "M1 `_put_metric_data_statement` drops its `cloudwatch:namespace` condition (rule 1); M2 a hand-spelled "
         "`cloudwatch:PutMetricData` PolicyStatement in role_policies_operational.py (rule 2); M3 the whoop role loses "
         "LifePlatform/IngestReconciliation its _reconcile emits (rule 3, coverage); M4 daily-brief gains LifePlatform/Budget "
-        "no code it reaches emits (rule 4, justification)."
+        "no code it reaches emits (rule 4, justification). #5906 (rule 5, grantless roles): M5 weather-data-ingestion "
+        "loses its CloudWatchMetrics grant; M6 the life-platform-site-api CALLED_BUT_UNREACHABLE row is renamed away; "
+        "M7 daily-metrics-compute loses its SharedModuleMetrics grant."
     ),
     "observed": (
-        "2026-11-15, #5545 lane. BASELINE 11 passed. M1: 3 failed. M2: 1 failed. M3: 1 failed. M4: 1 failed. " "REVERTED 11 passed."
+        "2026-11-15, #5545 lane. BASELINE 11 passed. M1: 3 failed. M2: 1 failed. M3: 1 failed. M4: 1 failed. "
+        "REVERTED 11 passed. "
+        "2026-11-16, #5906 lane. BASELINE 17 passed. M5: 1 failed (weather-data-ingestion: [DynamoDB, OAuth]). M6: 1 failed "
+        "(life-platform-site-api: [Compute]). M7: 1 failed (daily-metrics-compute: [Compute]). REVERTED 17 passed."
     ),
     "scope": (
         "Repo-side only: the CDK role builders and the static import closure of each handler in the one bundle. NOT SEEN: "

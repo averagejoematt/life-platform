@@ -32,7 +32,9 @@ THE FAILURE MODE OF THE FIX, WHICH IS WHAT THIS FILE MOSTLY GUARDS
   rather than the import closure. A shared module that merely imports an emitter no longer
   hands every importer a write grant to the cost series.
 
-THE FOUR RULES
+THE RULES (1-4 from #5545/#5905; 5 from #5906 — rules 3/4 only see roles that already hold a grant,
+  so rule 5 covers the grantless ones: a grantless role whose handler can CALL an emitter, per the call
+  graph, reds unless a CALLED_BUT_UNREACHABLE row carries the code trace)
   1. No `cloudwatch:PutMetricData` statement in any role_policies* builder lacks a
      `cloudwatch:namespace` StringEquals condition (and no wildcard / cloudwatch:* grant).
   2. The literal action string lives in ONE place — `_put_metric_data_statement()` — so a
@@ -650,6 +652,77 @@ def test_the_call_graph_still_sees_the_real_callers():
             assert any(ns in GRAPH.called_namespaces(_handler_module(e.source_file)) for e in enrolments), (policy_fn, ns)
 
 
+#: #5906 — family functions whose role holds NO PutMetricData grant and whose handler the call graph
+#: says CAN call an emitter, but a code read shows cannot. The graph over-approximates here because a
+#: module-level `from m import f as _f` is an edge to f even when nothing calls _f. Each row was read on
+#: 2026-11-16 and checked live: no AccessDenied on PutMetricData in 14 days of the function's log, and
+#: no series of its own in the namespace. A row whose function stops being graph-called, or gains a
+#: grant, reds below — delete it then.
+CALLED_BUT_UNREACHABLE = {
+    "life-platform-site-api": (
+        "web.site_api_character hands the character_engine MODULE to progression_receipts.replay(engine=_ce), so the "
+        "graph reaches every unit of it, store_character_sheet -> tag_record included; replay only calls "
+        "evaluate_level_changes / pillar_xp_transition / _roll_xp_buffer and reads constants. No web/ module calls "
+        "tag_record or store_character_sheet."
+    ),
+    "food-delivery-ingestion": (
+        "imports only ingestion_framework.phase_for_date; the framework's module-level `from common.auth_breaker "
+        "import mark_failure as _ab_mark_failure` (and check/clear) is the edge. The handler never runs run_ingestion, "
+        "so no breaker hook — and no safe_put_item — executes."
+    ),
+    "health-auto-export-webhook": "same as food-delivery-ingestion: only ingestion_framework.phase_for_date is called",
+    "measurements-ingestion": "same as food-delivery-ingestion: only ingestion_framework.phase_for_date is called",
+}
+
+
+def _no_grant_enrolments() -> list:
+    """Every family enrolment whose role has no PutMetricData statement at all."""
+    out = []
+    for e in family.ROLE_FAMILY:
+        if family.policy_is_defined(e.policy_fn) and not _pmd_statements(family.policy_statements(e.policy_fn)):
+            out.append(e)
+    return out
+
+
+def no_grant_callers(graph: CallGraph, enrolments, exempt: dict) -> dict:
+    """{function: namespaces its handler can CALL} for no-grant enrolments not exempted — each is a metric
+    that is AccessDenied today (#5906)."""
+    out: dict = {}
+    for e in enrolments:
+        handler = _handler_module(e.source_file)
+        if handler not in graph.units or e.function_name in exempt:
+            continue
+        called = graph.called_namespaces(handler)
+        if called:
+            out[e.function_name] = sorted(called)
+    return out
+
+
+def test_no_role_without_a_grant_can_call_an_emitter():
+    """Rule 5 (#5906) — rule 3 only sees roles that already hold a PutMetricData statement, so a role with
+    NONE was invisible to it: 26 such functions reached an emitter through their imports. Reaching one only
+    through the import closure is fine (the code never runs); CALLING one is a dark metric. A grantless
+    role whose handler can call an emitter must get a namespace-conditioned grant, or a reasoned
+    CALLED_BUT_UNREACHABLE row."""
+    enrolments = _no_grant_enrolments()
+    assert len(enrolments) >= 10, f"only {len(enrolments)} grantless family roles — the derivation went blind"
+    dark = no_grant_callers(GRAPH, enrolments, CALLED_BUT_UNREACHABLE)
+    assert not dark, (
+        "these Lambdas' role has NO cloudwatch:PutMetricData grant, yet their handler can call put_metric_data — "
+        "every emit is AccessDenied (swallowed) and the metric is dark. Grant the namespaces with "
+        "_put_metric_data_statement(...), or add a CALLED_BUT_UNREACHABLE row with the code trace:\n  "
+        + "\n  ".join(f"{k}: {v}" for k, v in sorted(dark.items()))
+    )
+    names = {e.function_name for e in enrolments}
+    stale = [f"{fn}: now holds a PutMetricData grant" for fn in CALLED_BUT_UNREACHABLE if fn not in names]
+    stale += [
+        f"{e.function_name}: the call graph no longer reaches an emitter"
+        for e in enrolments
+        if e.function_name in CALLED_BUT_UNREACHABLE and not GRAPH.called_namespaces(_handler_module(e.source_file))
+    ]
+    assert not stale, "stale CALLED_BUT_UNREACHABLE rows — delete them:\n  " + "\n  ".join(stale)
+
+
 def test_every_parameterised_emitter_is_resolved():
     """A `put_metric_data(Namespace=<variable>)` or `import_module(<variable>)` the index cannot
     resolve must be resolved by hand above — never silently contribute nothing."""
@@ -747,6 +820,23 @@ def test_MUTATION_a_parameterised_namespace_is_reported_not_dropped(tmp_path):
     index = _planted_tree(tmp_path, "def go(ns):\n    cw.put_metric_data(Namespace=ns, MetricData=[])\n")
     assert index.info("common.shared_emit")[2] == ["common.shared_emit:2"]
     assert index.namespaces("ops.handler_lambda") == set()
+
+
+def test_MUTATION_a_grantless_role_that_calls_an_emitter_reds(tmp_path):
+    """#5906 — a handler that only imports an emitter's module passes; one that calls the emitter reds."""
+    body = (
+        "NS = 'LifePlatform/Compute'\n\ndef emit():\n    cw.put_metric_data(Namespace=NS, MetricData=[])\n\ndef harmless():\n    return 1\n"
+    )
+    _planted_tree(tmp_path, body)
+    handler = tmp_path / "lambdas" / "ops" / "handler_lambda.py"
+    enrol = family.Enrolment("planted_stack.py", "planted-fn", "lambdas/ops/handler_lambda.py", "planted")
+    handler.write_text("from common import shared_emit\n\ndef lambda_handler(e, c):\n    return shared_emit.harmless()\n")
+    graph = CallGraph(BundleIndex(str(tmp_path)))
+    assert no_grant_callers(graph, [enrol], {}) == {}
+    handler.write_text("from common import shared_emit\n\ndef lambda_handler(e, c):\n    return shared_emit.emit()\n")
+    graph = CallGraph(BundleIndex(str(tmp_path)))
+    assert no_grant_callers(graph, [enrol], {}) == {"planted-fn": ["LifePlatform/Compute"]}
+    assert no_grant_callers(graph, [enrol], {"planted-fn": "read"}) == {}
 
 
 def test_MUTATION_dropping_a_namespace_from_a_real_role_reds():
