@@ -265,10 +265,10 @@
  },
  "qa-smoke-failures": {
   "added": "2026-10-27",
-  "cause_observed": "2026-11-16",
-  "updated": "2026-11-16",
-  "citation": "#6112 — week 10 has no Panel episode and no hold. Live cause 2026-11-16: `story_season:episode_or_hold` — the week-10 chronicle was published 2026-11-14T00:24Z and 48 h later there is no episode and no hold marker where the check reads one (first FAIL 2026-11-16T01:59Z, every run since). Clears when the episode publishes or a dated hold names week 10 — an owner-approved write. The 2026-11-14 `reader_truth:verdict` episode (#5939) is superseded: it self-cleared.",
-  "cause": "story_season:episode_or_hold"
+  "cause_observed": "2026-11-17",
+  "updated": "2026-11-17",
+  "citation": "#6112 — week 10 has no Panel episode and no hold. Live cause 2026-11-16: `story_season:episode_or_hold` — the week-10 chronicle was published 2026-11-14T00:24Z and 48 h later there is no episode and no hold marker where the check reads one (first FAIL 2026-11-16T01:59Z, every run since). Clears when the episode publishes or a dated hold names week 10 — an owner-approved write. The 2026-11-14 `reader_truth:verdict` episode (#5939) is superseded: it self-cleared. UPDATE 2026-11-17: `story_season:episode_or_hold` is answered — the owner's hold on week 10 was recorded 2026-11-17T01:38Z (PR 6123, `panelcast-holds/wk10.json`; `panel_owner_hold.py --verify` PASS, qa-smoke reads it as held), so this id stops firing on the next run. New live cause `hooks:liveness_matrix` (first seen ~03:19Z 2026-11-17): the `reader_call/door` row reads `missing — served payload fails {'truthy_path': 'available'}` after the reader-call go-live PR 6125 (Refs issue 6114) merged at 01:39Z; owned by the website session under #6138.",
+  "cause": "story_season:episode_or_hold,hooks:liveness_matrix"
  },
  "ingest-reconciliation-whoop": {
   "added": "2026-10-26",
@@ -297,5 +297,11 @@
   "cause": "dead-man born in ALARM: no PreRegisteredOverdue datapoint emitted yet (missing data breaches); its first emits will count the two genesis hypotheses until their voids are written",
   "citation": "#5928 (the 'no red without an owner' epic; the story 5518 closed 2026-11-15T20:13Z after the Sunday hypothesis-engine run wrote both genesis voids at 20:00:55Z) — the sealed-pre-registration dead-man shipped by PR 5898 (LifePlatformMonitoring deployed 2026-11-14 04:56Z). Read 2026-11-14 (describe-alarms + list-metrics): ALARM since 2026-11-14T05:12Z on 'no datapoints were received for 2 periods ... treated as [Breaching]' — LifePlatform/Predictions PreRegisteredOverdue had no datapoint yet; the coach-prediction-evaluator emits it on its daily 18:00 UTC run. Per story 5518's dry run the overdue count is exactly the two genesis hypotheses (h1, h2), whose voids the scheduled hypothesis-engine run writes on Sun 2026-11-15 12:00 America/Los_Angeles; the first emit after that reads 0 and the alarm clears. EXPIRES 2026-11-17: if it is still lit then, the voids did not land or the emitter is not running — re-open on story 5518.",
   "note": "Added 2026-11-14 (#5934): the alarm went red within the hour of its creation and had no row."
+ },
+ "fitness-battery-missed": {
+  "added": "2026-11-17",
+  "cause": "fitness battery cadence state missed (due 2026-11-01)",
+  "cause_observed": "2026-11-17",
+  "citation": "Fired-and-cleared episode, #5760 / #5051. The nightly pre-draft's fitness-battery leg (`mcp/tools_fitness_tests.py::nightly_leg`) emitted FitnessBatteryMissed=1 from 2026-11-15 (cadence state `missed`, due_on 2026-11-01): the alarm fired once, as designed, when the battery dead-man (#5078) first saw a missed window. It cleared 2026-11-17T03:01Z when the same leg read state `upcoming`, due_on 2026-12-13, basis `program_week` — the cadence re-based after Monday 2026-11-16's test-first session. No code defect; the next breach is a real miss."
  }
 }
