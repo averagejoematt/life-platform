@@ -20,6 +20,15 @@ group and render here with no special case.
 If the queue is empty AND nothing is standing in ALARM, sends nothing
 (no "all clear" emails).
 
+ADR-170 (2026-11-21): the EMAIL carries only what the owner himself must do. The full
+record above (every transition, every standing red) is still built each run and LOGGED
+(`digest_record`), where a Claude session reads it; the email is sent only when an entry
+in operational/owner_actions.py is live, with the instruction as its subject. Nobody acted
+on the all-alarms email in six months — code and config reds belong to sessions (the
+SessionStart pre-flight prints every red) and the remediation agent. The urgent topic
+(`life-platform-alerts`) now feeds this queue too, in place of its raw "ALARM: …" email
+subscription, so an owner action raised there lands here as well.
+
 Replaces the previous model where every CloudWatch alarm produced an
 immediate email — see DECISIONS.md ADR-050 for rationale.
 
@@ -39,6 +48,8 @@ from datetime import datetime, timezone
 import boto3
 from common.pacific_time import pacific_today  # #2798: the digest names the Pacific day
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
+
+from operational.owner_actions import STANDING_REMINDER_WEEKDAY, owner_action_for  # ADR-170
 
 try:
     from common.platform_logger import get_logger
@@ -73,9 +84,23 @@ def _parse_alarm_payload(body):
         return {"AlarmName": "unparseable", "NewStateReason": body[:200]}
     if isinstance(payload, dict) and "Message" in payload and "AlarmName" not in payload:
         try:
-            return json.loads(payload["Message"])
+            inner = json.loads(payload["Message"])
+            if isinstance(inner, dict):
+                return inner
         except (TypeError, ValueError):
-            return {"AlarmName": "unparseable", "NewStateReason": str(payload["Message"])[:200]}
+            pass
+        # ADR-170: a plain-text publish on the urgent topic (a Panel hold, a budget tier-3
+        # notice) arrives in its SNS envelope; its Subject is the line's name, so it can be
+        # matched by owner_actions and grouped, instead of collapsing into `unparseable`.
+        subject = payload.get("Subject")
+        if subject:
+            return {
+                "AlarmName": str(subject)[:200],
+                "NewStateValue": "NOTICE",
+                "NewStateReason": str(payload["Message"])[:300],
+                "StateChangeTime": payload.get("Timestamp", ""),
+            }
+        return {"AlarmName": "unparseable", "NewStateReason": str(payload["Message"])[:200]}
     return payload
 
 
@@ -105,8 +130,16 @@ def _drain_queue():
 def _group_by_alarm(alarms):
     """Dedupe by AlarmName. Count fires, keep first reason + latest state-change time."""
     grouped = defaultdict(lambda: {"count": 0, "reason": "", "last_state_change": "", "last_state": ""})
+    seen = set()
     for a in alarms:
         name = a.get("AlarmName", "unknown")
+        # ADR-170: an alarm routed digest+urgent now reaches this queue through both topics —
+        # the same transition (name, state, time) is one fire, not two.
+        ident = (name, a.get("NewStateValue", ""), a.get("StateChangeTime", ""))
+        if ident[2]:
+            if ident in seen:
+                continue
+            seen.add(ident)
         entry = grouped[name]
         entry["count"] += 1
         if not entry["reason"]:
@@ -218,9 +251,53 @@ def _format_email(grouped, standing=None):
             lines.append("")
         lines.append("A standing red stays in this section every day until it returns to OK.")
         lines.append("")
-    lines.append("Urgent alarms (canary, daily-brief, DLQ depth, cost runaway) still")
-    lines.append("page in real time on the life-platform-alerts topic, as do a budget-tier-3")
-    lines.append("hard stop and a QA deploy-health failure (#5821).")
+    lines.append("Urgent alarms still dispatch the remediation agent in real time, and the four")
+    lines.append("paging alarms still text. Only owner actions (ADR-170) are emailed.")
+    return subject, "\n".join(lines)
+
+
+def _owner_items(grouped, standing, weekday):
+    """ADR-170: the live entries only the owner can act on, one per action, newest cause first.
+
+    A line counts when it fired in the window and is not back to OK, or — once a week, on
+    STANDING_REMINDER_WEEKDAY — when it is still standing red from before.
+    """
+    items = {}
+    for name, entry in grouped.items():
+        action = owner_action_for(name)
+        if action and entry.get("last_state") != "OK":
+            items.setdefault(action.short, {"action": action, "signals": []})["signals"].append(
+                f"{name} — {entry.get('reason') or 'no reason given'}"
+            )
+    if weekday == STANDING_REMINDER_WEEKDAY:
+        for s in standing:
+            action = owner_action_for(s["name"])
+            if action and s["name"] not in grouped:
+                items.setdefault(action.short, {"action": action, "signals": []})["signals"].append(
+                    f"{s['name']} — still waiting on you, red for {s['age']}"
+                )
+    return list(items.values())
+
+
+def _format_owner_email(items, grouped, standing):
+    today = pacific_today()
+    first = items[0]["action"].short
+    subject = f"Do: {first}" + (f" (+{len(items) - 1} more)" if len(items) > 1 else "")
+    lines = [f"Life Platform — what only you can do ({today})", ""]
+    for i, item in enumerate(items, 1):
+        a = item["action"]
+        lines.append(f"{i}. {a.do}")
+        lines.append(f"   Why you: {a.why_you}")
+        for sig in item["signals"]:
+            lines.append(f"   Signal: {sig[:300]}")
+        lines.append("")
+    owner_names = {n for n in grouped if owner_action_for(n)} | {s["name"] for s in standing if owner_action_for(s["name"])}
+    others = len((set(grouped) | {s["name"] for s in standing}) - owner_names)
+    if others:
+        lines.append(
+            f"Not for you: {others} other alarm(s) are with the remediation agent and the next Claude "
+            "session (its pre-flight lists every red). Nothing to do about them here."
+        )
     return subject, "\n".join(lines)
 
 
@@ -234,7 +311,17 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
             return {"statusCode": 200, "drained": 0, "standing": 0, "sent": False}
 
         grouped = _group_by_alarm(alarms)
-        subject, body = _format_email(grouped, standing)
+        record_subject, record = _format_email(grouped, standing)
+        # ADR-170: the full record is for sessions, not the inbox — log it whole.
+        logger.info("digest_record %s\n%s", record_subject, record)
+
+        weekday = datetime.strptime(pacific_today(), "%Y-%m-%d").weekday()
+        items = _owner_items(grouped, standing, weekday)
+        base = {"statusCode": 200, "drained": len(alarms), "distinct": len(grouped), "standing": len(standing)}
+        if not items:
+            logger.info("digest_no_owner_action drained=%d distinct=%d standing=%d", len(alarms), len(grouped), len(standing))
+            return {**base, "owner_items": 0, "sent": False, "record_subject": record_subject, "record": record}
+        subject, body = _format_owner_email(items, grouped, standing)
 
         guarded_send_email(
             ses,
@@ -248,8 +335,8 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
                 }
             },
         )
-        logger.info("digest_sent drained=%d distinct=%d standing=%d", len(alarms), len(grouped), len(standing))
-        return {"statusCode": 200, "drained": len(alarms), "distinct": len(grouped), "standing": len(standing), "sent": True}
+        logger.info("owner_action_sent items=%d drained=%d distinct=%d standing=%d", len(items), len(alarms), len(grouped), len(standing))
+        return {**base, "owner_items": len(items), "sent": True, "record_subject": record_subject, "record": record}
     except Exception as e:
         logger.error("alert_digest_failed: %s", e)
         raise

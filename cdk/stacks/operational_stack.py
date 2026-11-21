@@ -150,6 +150,12 @@ class OperationalStack(Stack):
         local_digest_topic.add_subscription(
             sns_subs.SqsSubscription(digest_queue, raw_message_delivery=True),
         )
+        # ADR-170: the urgent topic feeds the same queue, so an owner action raised there (a
+        # Panel hold, a tier-3 hard stop) reaches the one owner email. NOT raw: plain-text
+        # publishes need their SNS Subject, which only the envelope carries.
+        local_alerts_topic.add_subscription(
+            sns_subs.SqsSubscription(digest_queue, raw_message_delivery=False),
+        )
 
         digest_lambda = create_platform_lambda(
             self,
@@ -447,20 +453,11 @@ class OperationalStack(Stack):
         )
         local_alerts_topic.add_subscription(sns_subs.LambdaSubscription(dispatcher_lambda))
 
-        # #1444: the alerts topic's ONLY IaC-declared subscriber was this Lambda —
-        # the human email leg existed only as a manual (console) subscription,
-        # invisible to IaC and at risk of silently vanishing on any topic
-        # recreation. Codify it so an urgent alarm always has a human fast path
-        # even when the dispatcher itself is the thing that's broken.
-        # Live check (2026-07-18, `aws sns list-subscriptions-by-topic
-        # --topic-arn arn:aws:sns:us-west-2:205930651321:life-platform-alerts`):
-        # a CONFIRMED manual email subscription to this same address already
-        # exists. On first deploy of this construct, `cdk import` it (the same
-        # CDK-managed-via-import pattern core_stack.py already uses for the
-        # alerts/digest topics themselves) rather than letting `cdk deploy`
-        # create a second, separately-pending subscription to the same inbox.
-        alerts_email = self.node.try_get_context("alerts_email") or "awsdev@mattsusername.com"
-        local_alerts_topic.add_subscription(sns_subs.EmailSubscription(alerts_email))
+        # ADR-170 (2026-11-21): the raw "ALARM: …" email subscription (#1444) is retired. In six
+        # months its mail was never acted on; the urgent topic now reaches the owner only through
+        # the digest queue above, which emails just the steps only he can take
+        # (operational/owner_actions.py). The dispatcher above keeps the real-time triage path,
+        # and the four life-platform-paging alarms keep their SMS for a dead pipeline / tier 3.
 
         # ── 4. (retired 2026-10-30, #5474) Pip Audit — `life-platform-pip-audit` scanned the pinned layer manifests on
         # a Monday cron, but the python3.12 runtime ships no pip, so every scan errored and read "0 vulnerabilities"

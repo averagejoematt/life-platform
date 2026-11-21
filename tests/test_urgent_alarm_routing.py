@@ -303,11 +303,10 @@ def test_the_sibling_derivation_sees_its_subject():
     assert "ai-daily-spend-high" not in combined, "the raw spend alarm must carry no routing of its own (#3505) — only its composites route"
 
 
-def test_alerts_topic_has_an_iac_email_subscription():
-    """AC: 'The email subscription is codified in monitoring_stack.py either
-    way (import or create).' It landed in operational_stack.py instead (same
-    file that already wires the dispatcher's LambdaSubscription to the same
-    local_alerts_topic handle) — assert both subscriptions exist on it.
+def test_alerts_topic_reaches_the_owner_only_through_the_digest_queue():
+    """ADR-170 (supersedes #1444's codified raw email): the urgent topic keeps its dispatcher
+    LambdaSubscription (real-time triage) and feeds the digest queue (the one owner-action
+    email); a raw EmailSubscription — mail nobody acted on in six months — must not return.
     """
     tree = _tree(OPERATIONAL)
     init = next(node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == "__init__")
@@ -327,7 +326,11 @@ def test_alerts_topic_has_an_iac_email_subscription():
                 subscription_kinds.append(sub_call.func.attr)
 
     assert "LambdaSubscription" in subscription_kinds, "local_alerts_topic lost its dispatcher LambdaSubscription"
-    assert "EmailSubscription" in subscription_kinds, (
-        "local_alerts_topic has no EmailSubscription — the urgent SNS topic's human fast path "
-        "must be codified in IaC, not left as a manual console-only subscription (#1444)"
+    assert "SqsSubscription" in subscription_kinds, (
+        "local_alerts_topic no longer feeds the digest queue — an owner action raised on the urgent "
+        "topic (a Panel hold, a tier-3 stop) would reach nobody (ADR-170)"
+    )
+    assert "EmailSubscription" not in subscription_kinds, (
+        "a raw EmailSubscription is back on the urgent topic — every urgent alarm emails the owner "
+        "again whether or not he can act on it (ADR-170)"
     )
