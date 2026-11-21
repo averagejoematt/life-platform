@@ -128,7 +128,8 @@ def test_the_two_latency_tiers_are_declared_with_the_ruled_shape():
     assert blip["threshold"] == held["threshold"] == 5000, "both tiers watch the same 5 s p95 line"
     assert blip.get("evaluation_periods") == 1
     assert held.get("evaluation_periods") == 3 and held.get("datapoints_to_alarm") == 3, "sustained = 3 of 3 five-minute periods"
-    assert blip["metric"] == held["metric"] == "<site_api_duration_p95>", "both tiers must read the same 5-minute p95 metric"
+    assert blip["metric"] == "<site_api_duration_p95>", "the blip tier reads the raw 5-minute p95"
+    assert held["metric"] == "<site_api_latency_with_traffic>", "the sustained tier reads p95 gated on a traffic floor"
 
 
 def test_a_single_blip_datapoint_does_not_email_but_reaches_the_digest():
@@ -267,3 +268,52 @@ def test_the_synthesized_template_matches():
     assert topics(LATENCY_BLIP) == {DIGEST_TOPIC}
     assert topics(LATENCY_SUSTAINED) == {DIGEST_TOPIC, URGENT_TOPIC}
     assert got[LATENCY_SUSTAINED]["EvaluationPeriods"] == 3 and got[LATENCY_SUSTAINED]["DatapointsToAlarm"] == 3
+
+
+# ── (3) a quiet-night trickle of cold loads is not "sustained" (2026-11-21) ────
+# 02:00-03:45 PT: one /api/predictions request every ~10 min, each a 5-7 s cold load. With
+# n=1 the period's p95 IS that request, and CloudWatch looks back past empty periods, so
+# three lone requests 30 minutes apart read as 3-of-3 — 8 urgent emails, no reader waiting.
+# The sustained alarm now reads IF(inv >= LATENCY_TRAFFIC_FLOOR, p95, 0).
+
+
+def _traffic_floor() -> int:
+    tree = ast.parse(open(SERVE_STACK, encoding="utf-8").read())
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(getattr(t, "id", None) == "LATENCY_TRAFFIC_FLOOR" for t in node.targets):
+            return int(node.value.value)
+    raise AssertionError("LATENCY_TRAFFIC_FLOOR is not a module-level literal in serve_stack.py")
+
+
+def _gated(p95: list[float], invocations: list[int], floor: int) -> list[float]:
+    """The math expression, evaluated per non-empty period (empty periods are skipped, as CloudWatch does)."""
+    return [v if n >= floor else 0.0 for v, n in zip(p95, invocations) if n > 0]
+
+
+NIGHT_P95 = [5423.0, 5098.0, 5703.0, 5315.0, 5128.0, 5047.0, 5034.0, 5376.0, 5429.0, 5702.0]  # live, 2026-11-21
+NIGHT_INV = [2, 1, 1, 1, 1, 3, 1, 2, 1, 1]
+
+
+def test_the_sustained_alarm_expression_uses_the_floor():
+    src = open(SERVE_STACK, encoding="utf-8").read()
+    assert 'expression=f"IF(inv >= {LATENCY_TRAFFIC_FLOOR}, p95, 0)"' in src
+    assert 2 <= _traffic_floor() <= 50, "a floor outside 2..50 either restores the noise or hides real reader traffic"
+
+
+def test_a_quiet_night_trickle_of_cold_loads_does_not_email():
+    alarms = _alarm_kwargs()
+    series = _gated(NIGHT_P95, NIGHT_INV, _traffic_floor())
+    assert _urgent_emails(series, alarms, _routes) == [], "lone cold loads paged again — the 2026-11-21 noise"
+
+
+def test_sustained_slowness_under_real_traffic_still_emails():
+    alarms = _alarm_kwargs()
+    floor = _traffic_floor()
+    series = _gated(SUSTAINED, [floor, floor + 5, floor * 3], floor)
+    assert LATENCY_SUSTAINED in _urgent_emails(series, alarms, _routes)
+
+
+def test_mutation_without_the_floor_the_quiet_night_emails():
+    """MUTATION: floor 1 (= the raw p95, the pre-fix alarm) must red the quiet-night control."""
+    alarms = _alarm_kwargs()
+    assert LATENCY_SUSTAINED in _urgent_emails(_gated(NIGHT_P95, NIGHT_INV, 1), alarms, _routes)

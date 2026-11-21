@@ -59,6 +59,12 @@ LIFE_PLATFORM_TABLE = TABLE_NAME
 LIFE_PLATFORM_BUCKET = "matthew-life-platform"
 DIGEST_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"
 ALERTS_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:{URGENT_TOPIC_NAME}"  # #3499: ADR-052 tier 1, real-time
+# A 5-minute period counts toward `site-api-p95-latency-sustained` only when at least this many
+# requests arrived in it. Below it "p95" is one or two cold loads, not readers waiting: on
+# 2026-11-21 02:00-03:45 PT one /api/predictions request every ~10 min (5-7 s cold each)
+# sent 8 urgent emails, because CloudWatch looks back past empty periods and read three lone
+# requests 30 minutes apart as "15 minutes sustained". Median traffic is 2 requests / 5 min.
+LATENCY_TRAFFIC_FLOOR = 10
 
 
 class ServeStack(Stack):
@@ -357,6 +363,14 @@ class ServeStack(Stack):
         )
         _site_api_latency_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
+        # p95 where the period had real traffic, else 0 — so a quiet-night trickle of cold
+        # loads can never assemble "3 of 3" (LATENCY_TRAFFIC_FLOOR above).
+        site_api_latency_with_traffic = cloudwatch.MathExpression(
+            expression=f"IF(inv >= {LATENCY_TRAFFIC_FLOOR}, p95, 0)",
+            using_metrics={"inv": site_api_invocations, "p95": site_api_duration_p95},
+            label="site-api p95 Duration (periods with traffic)",
+            period=Duration.minutes(5),
+        )
         _site_api_latency_sustained_alarm = cloudwatch.Alarm(
             self,
             "SiteApiLatencySustained",
@@ -364,9 +378,10 @@ class ServeStack(Stack):
             alarm_description=(
                 "Readers are waiting (#5821): site-api p95 Duration >= 5 s in 3 of 3 consecutive 5-minute "
                 "periods (15 minutes sustained). Digest + urgent email (reader-audience facet). "
-                "Check recent site-api deploys and /api/edition upstream latency first."
+                "Check recent site-api deploys and /api/edition upstream latency first. A period counts only "
+                f"with >= {LATENCY_TRAFFIC_FLOOR} requests in it (a lone cold load is not readers waiting)."
             ),
-            metric=site_api_duration_p95,
+            metric=site_api_latency_with_traffic,
             threshold=5000,
             evaluation_periods=3,
             datapoints_to_alarm=3,
