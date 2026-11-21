@@ -29,8 +29,14 @@ Empty list / `green` = nothing's currently firing.
 
 | Tier | SNS Topic | Action | When |
 |---|---|---|---|
-| **Urgent** | `life-platform-alerts` | Email immediately | Lambda outright failing, data loss risk, security incident |
+| **Urgent** | `life-platform-alerts` | Remediation dispatcher in real time + the digest queue | Lambda outright failing, data loss risk, security incident |
 | **Digest** | `life-platform-alerts-digest` | Batched daily via `alert-digest` Lambda | Warnings, slow trends, single-eval failures |
+| **Paging** | `life-platform-paging` | SMS | Dead pipeline, canary storage failure, budget tier 3 |
+
+**Who gets email (ADR-170, 2026-11-21):** neither topic emails the owner raw. The daily `alert-digest`
+logs the full record (`digest_record`) for sessions and emails only the steps only the owner can take —
+the registry `lambdas/operational/owner_actions.py` — with `Do: <action>` as the subject. Code and
+config reds are a Claude session's (the SessionStart pre-flight lists every red).
 
 In code (CDK), alarm constructor chooses the topic via `digest=True/False` flag in `lambda_helpers.create_platform_lambda()`.
 
@@ -41,7 +47,7 @@ In code (CDK), alarm constructor chooses the topic via `digest=True/False` flag 
 The **canonical set is generated below straight from the CDK stacks** — it cannot drift
 from `cdk/stacks/*.py` (that was the failure mode: this doc once named four alarms that
 didn't exist, hand-fixed in #932; #934 machine-maintains it). Alarms route to one of two
-SNS topics by tier (ADR-050/052): **urgent** (`life-platform-alerts`, immediate email —
+SNS topics by tier (ADR-050/052): **urgent** (`life-platform-alerts`, real-time remediation dispatch, no raw email since ADR-170 —
 e.g. `life-platform-daily-brief-errors`, `life-platform-canary-anthropic-failure`,
 `life-platform-dlq-depth-warning`) or **digest** (`life-platform-alerts-digest`, batched
 daily — e.g. `slo-source-freshness`, `ingest-consecutive-failures-*`). Which tier an alarm

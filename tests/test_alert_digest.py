@@ -154,18 +154,17 @@ def test_handler_non_empty_sends_one_email(env):
         {
             "Messages": [
                 {"MessageId": "1", "ReceiptHandle": "h1", "Body": _alarm("ingestion-error-whoop")},
-                {"MessageId": "2", "ReceiptHandle": "h2", "Body": _alarm("ingestion-error-whoop")},
+                {"MessageId": "2", "ReceiptHandle": "h2", "Body": _alarm("ingestion-error-whoop", t="2026-05-16T16:00:00Z")},
             ]
         },
         {"Messages": []},
     ]
     result = mod.lambda_handler({}, None)
-    assert result["sent"] is True
+    assert result["sent"] is False  # ADR-170: no owner action, so no email — the record is logged
     assert result["drained"] == 2
     assert result["distinct"] == 1
-    mod._ses_mock.send_email.assert_called_once()
-    call_kwargs = mod._ses_mock.send_email.call_args.kwargs
-    body_text = call_kwargs["Content"]["Simple"]["Body"]["Text"]["Data"]
+    mod._ses_mock.send_email.assert_not_called()
+    body_text = result["record"]
     assert "ingestion-error-whoop" in body_text
     assert "×2" in body_text
     # Batch delete called once with both messages.
@@ -199,9 +198,8 @@ def test_qa_paused_by_budget_alarm_reaches_the_digest_email(env):
         {"Messages": []},
     ]
     result = mod.lambda_handler({}, None)
-    assert result["sent"] is True
-    call_kwargs = mod._ses_mock.send_email.call_args.kwargs
-    body_text = call_kwargs["Content"]["Simple"]["Body"]["Text"]["Data"]
+    assert result["sent"] is False  # ADR-170: no owner action, so no email — the record is logged
+    body_text = result["record"]
     assert "qa-paused-by-budget" in body_text  # the AI QA pause reaches the digest, never silent
 
 
@@ -227,11 +225,10 @@ def test_long_red_alarm_renders_in_still_in_alarm_section_with_age(env):
         "CompositeAlarms": [],
     }
     result = mod.lambda_handler({}, None)
-    assert result["sent"] is True
+    assert result["sent"] is False  # ADR-170: no owner action, so no email — the record is logged
     assert result["standing"] == 2
-    call_kwargs = mod._ses_mock.send_email.call_args.kwargs
-    body_text = call_kwargs["Content"]["Simple"]["Body"]["Text"]["Data"]
-    subject = call_kwargs["Content"]["Simple"]["Subject"]["Data"]
+    body_text = result["record"]
+    subject = result["record_subject"]
     assert "STILL IN ALARM (2)" in body_text
     assert "qa-smoke-content-alarm" in body_text
     assert "red for 29d 4h" in body_text  # the age is rendered, not just the name
@@ -253,11 +250,11 @@ def test_empty_queue_with_standing_red_still_sends_digest(env):
         "CompositeAlarms": [],
     }
     result = mod.lambda_handler({}, None)
-    assert result["sent"] is True
+    assert result["sent"] is False  # ADR-170: no owner action, so no email — the record is logged
     assert result["drained"] == 0
     assert result["standing"] == 1
-    mod._ses_mock.send_email.assert_called_once()
-    body_text = mod._ses_mock.send_email.call_args.kwargs["Content"]["Simple"]["Body"]["Text"]["Data"]
+    mod._ses_mock.send_email.assert_not_called()
+    body_text = result["record"]
     assert "No new alarm state transitions" in body_text
     assert "STILL IN ALARM (1)" in body_text
     assert "red for 29d 0h" in body_text
@@ -284,9 +281,9 @@ def test_describe_alarms_failure_fails_open(env):
     ]
     mod._cw_mock.describe_alarms.side_effect = Exception("throttled")
     result = mod.lambda_handler({}, None)
-    assert result["sent"] is True
+    assert result["sent"] is False  # ADR-170: no owner action, so no email — the record is logged
     assert result["standing"] == 0
-    body_text = mod._ses_mock.send_email.call_args.kwargs["Content"]["Simple"]["Body"]["Text"]["Data"]
+    body_text = result["record"]
     assert "ingestion-error-whoop" in body_text
     assert "STILL IN ALARM" not in body_text
 
@@ -307,7 +304,7 @@ def test_standing_sweep_paginates_and_includes_composite_alarms(env):
     assert result["standing"] == 3
     assert mod._cw_mock.describe_alarms.call_count == 2
     assert mod._cw_mock.describe_alarms.call_args_list[1].kwargs["NextToken"] == "t1"
-    body_text = mod._ses_mock.send_email.call_args.kwargs["Content"]["Simple"]["Body"]["Text"]["Data"]
+    body_text = result["record"]
     for name in ("page-1-metric", "composite-red", "page-2-metric"):
         assert name in body_text
     # Oldest first: composite-red (5d) before page-1-metric (2d) before page-2-metric (3h).
@@ -333,8 +330,8 @@ def test_an_ops_digest_line_renders_as_its_own_line_in_the_digest_email(env):
         {"Messages": []},
     ]
     result = mod.lambda_handler({}, None)
-    assert result["sent"] is True and result["distinct"] == 2
-    body_text = mod._ses_mock.send_email.call_args.kwargs["Content"]["Simple"]["Body"]["Text"]["Data"]
+    assert result["sent"] is False  # ADR-170: no owner action, so no email — the record is logged and result["distinct"] == 2
+    body_text = result["record"]
     assert "• budget-tier: raised 0→1  ×1  [TIER 1]" in body_text
     assert "Caution — internal/dev AI paused" in body_text
     assert "• qa-smoke: content-truth failures  ×1  [FAIL]" in body_text

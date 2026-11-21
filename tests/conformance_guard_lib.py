@@ -77,6 +77,13 @@ _SANCTIONED_REGISTRY_FILES = {
     # reviewer decision on the #5980 code PR; the alternative is a CDK-injected env var,
     # which makes that PR a CDK deploy.
     "lambdas/operational/redrive_targets.py",
+    # ADR-170: the owner-action facet — WHICH alarms only the owner can act on. No registry
+    # holds that fact (the CDK declaration says where an alarm routes, not who must act), and
+    # the alert-digest runtime cannot read cdk/stacks, so it is spelled out once, on the
+    # redrive_targets precedent. Not a free-standing copy: tests/test_owner_action_inbox.py
+    # holds every pattern to a declared alarm (or a notice subject literal in its producer),
+    # so an entry cannot outlive the alarm it names.
+    "lambdas/operational/owner_actions.py",
 }
 
 _MIN_MEMBERS = 2  # a one-string literal is a reference, not an enumeration
