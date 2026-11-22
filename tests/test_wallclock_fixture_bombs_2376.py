@@ -84,6 +84,11 @@ EXEMPT_DATED_FIXTURE_FILES: dict[str, str] = {
         "on the clock, and the stale-sweep fixture's generated_at is computed FROM datetime.now() (60 h ago), so it moves "
         "with the clock the sweep reads."
     ),
+    "test_retire_held_weeks_6194.py": (
+        "TODAY is passed EXPLICITLY to site_api_chapters.compose (the pure function; the route's pacific_today() is never "
+        "read); store_installment's outcome depends only on the fake table's existing status, and qa_archive.archive_text "
+        "is stubbed; the sender case mocks table.query, so its pacific_now() window bounds select nothing."
+    ),
     "test_narratives_follow_authoritative_grades.py": (
         "every dated case compares STORED instants with each other (a read's created_at / derived_from.as_of against a "
         "correction's corrected_at; a call's said_on against the text's as_of passed EXPLICITLY); the wall clock only "

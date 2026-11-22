@@ -331,7 +331,7 @@ def _chapter_body(ctx: LiveContext, url: str | None) -> str | None:
 
 def _live_week_states(ctx: LiveContext) -> None:
     """Weeks with no published chapter, each with its one WEEK_STATE_TEXT line (#6178): held (one neutral line, never
-    "waiting"/"sent back"), retired (owner decided not to publish), skipped, pending; an unknown state is held. From
+    "waiting"/"sent back"), retired (a draft that did not meet the standard), skipped, pending; an unknown state is held. From
     `/api/chapters`, else derived from the published weeks and the edition's day count — never a title or a body."""
     published = {c["week"] for c in ctx.objs["chapter"] if isinstance(c.get("week"), int)}
     weeks_api = (ctx.fetched.get("chapters") or {}).get("weeks") or []

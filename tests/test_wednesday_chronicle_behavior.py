@@ -1688,7 +1688,7 @@ def test_a_refused_conditional_put_suppresses_the_preview_email(env):
 
 def test_the_installment_put_is_conditional_unless_overwrite_is_explicit(env):
     """Mutation proof for the guard itself: the put carries a ConditionExpression that
-    names both protected statuses, and only `force` drops it."""
+    names every protected status, and only `force` narrows it (to the retired guard, #6194)."""
     m.lambda_handler({}, None)
     kwargs = [
         k
@@ -1704,7 +1704,9 @@ def test_the_installment_put_is_conditional_unless_overwrite_is_explicit(env):
         for k in env["table"].put_kwargs
         if (k.get("Item") or {}).get("source") == "chronicle" and str((k.get("Item") or {}).get("sk", "")).startswith("DATE#")
     ][0]
-    assert "ConditionExpression" not in forced
+    # #6194: force drops the draft/published guard, and keeps exactly one: never over a week the owner retired
+    assert forced["ConditionExpression"] == "attribute_not_exists(sk) OR attribute_not_exists(#s) OR #s <> :retired"
+    assert forced["ExpressionAttributeValues"] == {":retired": "retired"}
 
 
 def test_a_dry_run_invocation_builds_the_week_without_mailing_it(env):
