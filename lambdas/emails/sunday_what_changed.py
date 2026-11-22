@@ -82,7 +82,9 @@ def _delta(cur: float, prev: float, unit: str, dec: int) -> str:
 
 def compare(this: dict, prior: dict) -> dict:
     """Pure: split METRICS into changed / unchanged / unknown lines for this week vs last."""
-    changed, unchanged, unknown = [], [], []
+    changed: list[str] = []
+    unchanged: list[str] = []
+    unknown: list[str] = []
     for key, label, get, unit, dec, threshold, source in METRICS:
         cur, prev = get(this or {}), get(prior or {})
         if cur is None:
