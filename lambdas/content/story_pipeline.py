@@ -10,7 +10,7 @@ import os as _os
 import re
 from typing import Any, Dict, List, Optional
 
-from content import story_checks, story_craft, story_editor, story_ledger, story_writers
+from content import chapter_reads, private_call_check, story_checks, story_craft, story_editor, story_ledger, story_writers
 
 MAX_REWRITES = int(_os.environ.get("STORY_DESK_MAX_REWRITES", "2"))  # live: 1 (the 900s Lambda ceiling, #4535)
 
@@ -26,8 +26,11 @@ class _Gates:
         prev_ledger: Dict[str, Any],
         prev_dossier: Optional[Dict[str, Any]] = None,
         previous: Optional[Dict[int, str]] = None,
+        private_calls: Any = private_call_check.NOT_WIRED,
     ):
         self.n, self.dossier = n, dossier
+        # #6199 P: the calls the publication policy keeps private, read at run time (None: unreadable → every text is held)
+        self.private_calls = private_calls
         self.previous = previous or {}  # week -> that installment's post + episode text (callback checks)
         self.corpus = story_craft.quote_corpus(dossier)
         self.owner_lines = [a.get("quotable") or a.get("answer") or "" for a in (dossier.get("owner_voice") or {}).get("answers", [])]
@@ -52,13 +55,21 @@ class _Gates:
             "previous_week_dossier": prev_dossier or {},
         }
 
+    def private(self, text: str) -> List[str]:
+        """#6199 P: blocking findings for text that echoes, names or describes a call the policy keeps private. A gate
+        built without the calls (an offline re-check) skips it; the live paths always pass them."""
+        return _private(self, text)
+
     def dek(self, top_line: str) -> List[str]:
         """The desk's top line sits above the piece and is added after the writer's gates — so it gets its own."""
         if not top_line:
             return []
         return [
             f"dek: {f}"
-            for f in story_checks.ungrounded_numbers(top_line, self.allowed) + story_checks.story_door(top_line) + self.craft_dek(top_line)
+            for f in story_checks.ungrounded_numbers(top_line, self.allowed)
+            + story_checks.story_door(top_line)
+            + self.craft_dek(top_line)
+            + self.private(top_line)
         ] + [f"dek: {f}" for f in story_writers.fact_check(top_line, self.dossier, context=self.context)]
 
     def craft_dek(self, top_line: str) -> List[str]:
@@ -72,7 +83,13 @@ class _Gates:
             + story_craft.callback_findings(body, self.previous)
             + story_craft.quote_findings(body, self.corpus)
             + story_craft.repeat_findings(body, self.previous, self.owner_lines)
+            + story_checks.activity_word_findings(body, self.dossier)  # #6199: a review note (``review``), never a hold
         )
+
+    def review(self, body: str) -> List[str]:
+        """#6199: the review's regression cases that are notes, not holds (an activity word the stored sport type
+        contradicts). ``craft:``-prefixed, so they route the week to the owner's preview and never block it."""
+        return story_checks.activity_word_findings(body, self.dossier)
 
     def craft_episode(self, ep: Dict[str, Any]) -> List[str]:
         txt = story_writers.episode_text(ep)
@@ -85,9 +102,15 @@ class _Gates:
     def post(self, md: str, stop: Optional[str]) -> List[str]:
         return (
             story_checks.all_findings(
-                md, stop_reason=stop, allowed=self.allowed, not_yet_exported=self.nye, footer_pattern=story_writers.CHRONICLE_FOOTER
+                md,
+                stop_reason=stop,
+                allowed=self.allowed,
+                not_yet_exported=self.nye,
+                footer_pattern=story_writers.CHRONICLE_FOOTER,
+                owner_lines=self.owner_lines,
             )
             + self.craft_post(md)
+            + _private(self, md)
             + story_writers.fact_check(md, self.dossier, context=self.context)
         )
 
@@ -103,10 +126,16 @@ class _Gates:
         _title, body = story_writers.split_title(md)
         return (
             story_checks.all_findings(
-                md, stop_reason=stop, allowed=self.allowed, not_yet_exported=self.nye, footer_pattern=story_writers.CHRONICLE_FOOTER
+                md,
+                stop_reason=stop,
+                allowed=self.allowed,
+                not_yet_exported=self.nye,
+                footer_pattern=story_writers.CHRONICLE_FOOTER,
+                owner_lines=self.owner_lines,
             )
             + story_craft.callback_findings(body, self.previous)
             + story_craft.quote_findings(body, self.corpus)
+            + _private(self, md)
         )
 
     def post_hard(self, md: str, stop: Optional[str]) -> List[str]:
@@ -118,9 +147,8 @@ class _Gates:
         style (``craft_dek``) and, with the editor on, advisory."""
         if not top_line:
             return []
-        return [f"dek: {f}" for f in story_checks.ungrounded_numbers(top_line, self.allowed) + story_checks.story_door(top_line)] + [
-            f"dek: {f}" for f in story_writers.fact_check(top_line, self.dossier, context=self.context)
-        ]
+        hard = story_checks.ungrounded_numbers(top_line, self.allowed) + story_checks.story_door(top_line) + self.private(top_line)
+        return [f"dek: {f}" for f in hard] + [f"dek: {f}" for f in story_writers.fact_check(top_line, self.dossier, context=self.context)]
 
     def episode(self, ep: Dict[str, Any], stop: Optional[str]) -> List[str]:
         txt = story_writers.episode_text(ep)
@@ -130,8 +158,18 @@ class _Gates:
             + story_checks.ungrounded_numbers(txt, self.allowed)
             + story_writers.spoken_word_findings(ep.get("turns", []), body_weights=self.weights)
             + self.craft_episode(ep)
+            + self.private(txt + "\n" + "\n".join(str(ep.get(k) or "") for k in ("title", "excerpt")))
             + story_writers.fact_check(txt, self.dossier, context=self.context)
         )
+
+
+def load_private_calls(table: Any) -> Any:
+    """#6199 P: the calls the policy keeps private, read once for the week; None when they cannot be read (fail closed:
+    the gates then hold every text with ``private_call_check.UNAVAILABLE``)."""
+    try:
+        return private_call_check.load(table)
+    except Exception:  # noqa: BLE001 — an unreadable call record is a hold, never a pass
+        return None
 
 
 def strip_dek(md: str) -> str:
@@ -248,11 +286,7 @@ def _published_before(table: Any, chronicle_pk: str, date_str: str, n: int) -> D
     resp = table.query(
         KeyConditionExpression=Key("pk").eq(chronicle_pk) & Key("sk").between("DATE#", f"DATE#{date_str}~"), ScanIndexForward=False
     )
-    prior = [
-        it
-        for it in resp.get("Items", [])
-        if it.get("status") == "published" and not it.get("tombstone") and not it.get("unlisted") and it.get("date", "") < date_str
-    ][:2]
+    prior = [it for it in resp.get("Items", []) if chapter_reads.writer_may_read(it) and it.get("date", "") < date_str][:2]  # #6199 G1
     return {max(0, n - 1 - i): str(it.get("content_markdown") or "") for i, it in enumerate(prior)}
 
 
@@ -299,11 +333,17 @@ def _title_findings(title: str, ledger: Dict[str, Any]) -> List[str]:
     return [f"ledger: the title {title!r} repeats one the season has already used"] if title and title.strip().lower() in used else []
 
 
+def _private(g: Any, text: str) -> List[str]:
+    """#6199 P on any gate object: a gate built without the calls skips the check (``_Gates.private``)."""
+    calls = getattr(g, "private_calls", private_call_check.NOT_WIRED)
+    return [] if calls is private_call_check.NOT_WIRED else private_call_check.findings(text, calls)
+
+
 def legacy_findings(g: _Gates, md: str, ledger: Dict[str, Any]) -> List[str]:
     """The desk's quote and ledger checks on a legacy draft: exact quotes against what the platform holds, callbacks
     against the published installments, and the title against the season's titles. Pure."""
-    title, _md, body = _legacy_text(md)
-    out = story_craft.quote_findings(body, g.corpus) + story_craft.callback_findings(body, g.previous)
+    title, gmd, body = _legacy_text(md)
+    out = story_craft.quote_findings(body, g.corpus) + story_craft.callback_findings(body, g.previous) + _private(g, gmd)
     return out + _title_findings(title, ledger)
 
 
@@ -322,6 +362,7 @@ def legacy_gate_findings(g: _Gates, md: str, ledger: Dict[str, Any], *, fact_che
             ),
         ),
         ("quote, callback, craft and repeat checks", lambda: g.craft_post(gmd)),
+        ("private-call check", lambda: _private(g, gmd)),  # #6199 P
         ("fact read", lambda: fact(gmd, g.dossier, context=g.context)),
     )
     out: List[str] = []
@@ -356,7 +397,7 @@ def legacy_audit(
         previous = _published_before(table, chronicle_pk, date_str, n)
     except Exception as e:  # noqa: BLE001 — a check that cannot run holds the week, it never passes it
         return [LEGACY_NOTE, f"legacy audit: the desk's quote and ledger checks could not run ({type(e).__name__}: {e})"]
-    g = _Gates(n, dossier, {}, ledger, None, previous)
+    g = _Gates(n, dossier, {}, ledger, None, previous, private_calls=load_private_calls(table))
     if not on:
         return [LEGACY_NOTE] + legacy_findings(g, md, ledger)
     return [autopublish_audit.LEGACY_CHECKED_NOTE] + legacy_gate_findings(g, md, ledger, fact_check=fact_check)
@@ -377,7 +418,7 @@ def live_week(table: Any, date_str: str, *, chronicle_pk: str = "USER#matthew#SO
     previous = _published_before(table, chronicle_pk, date_str, n)  # the writer's continuity and the callback/repeat gates' memory
     previous_post = previous.get(n - 1)
     budget = story_desk.run_desk(dossier, ledger, week=n, log=log)
-    g = _Gates(n, dossier, budget, ledger, None, previous)
+    g = _Gates(n, dossier, budget, ledger, None, previous, private_calls=load_private_calls(table))
     editor: Optional[Dict[str, Any]] = None
     if story_editor.enabled():  # #6179: the editor revises, the verifier verifies; off = the lines below it, unchanged
         md, findings, editor = _write_post_edited(g, dossier, budget, ledger, n, previous_post, log=log)
@@ -402,7 +443,7 @@ def live_week(table: Any, date_str: str, *, chronicle_pk: str = "USER#matthew#SO
         # the craft verdict is the editor's input and the owner's ADVISORY notes; never empty, so a revised week always
         # routes to the preview and waits for his click (publish_holds / craft_hold), whatever PREVIEW_MODE says
         craft = story_editor.advisory_lines(editor) + [
-            story_editor.ADVISORY_PREFIX + f for f in g.craft_episode(ep) + g.craft_dek(budget.get("top_line") or "")
+            story_editor.ADVISORY_PREFIX + f for f in g.craft_episode(ep) + g.craft_dek(budget.get("top_line") or "") + g.review(body)
         ]
         return {
             "week": n,

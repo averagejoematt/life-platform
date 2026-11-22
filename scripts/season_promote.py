@@ -38,6 +38,9 @@ THE AUDIT GATE (#4549). ``--apply`` refuses (exit 5, before the backup or any wr
 is a JSON object with an empty ``blocking`` list, verdict ``publishable``, the per-week floors on
 ``items_checked`` / ``raw_verified``, and a ``staged_sha256`` map whose hash for every file that
 publishes (``AUDITED_FILES`` for each promoted week) matches the staging folder now.
+
+THE PRIVATE-CALL GATE (#6199). ``--apply`` refuses (exit 7) when any staged text that would publish echoes, names or
+describes a call the publication policy keeps private (``content.private_call_check``); calls it cannot read refuse too.
 """
 
 from __future__ import annotations
@@ -652,6 +655,49 @@ def owner_hold_gate(weeks: List[int], steps: List[str]) -> List[str]:
     ]
 
 
+def private_call_gate(staging: str, weeks: List[int], calls: Any = None, *, load: Any = None) -> List[str]:
+    """#6199 P: no staged text that would publish — the chronicle, the episode's turns, title and excerpt — echoes, names
+    or describes a call the publication policy keeps private. Fails closed: calls that cannot be read refuse."""
+    from content import private_call_check
+
+    if calls is None:
+        try:
+            calls = (load or _read_calls)()
+        except Exception as exc:  # noqa: BLE001 — unreadable calls: nothing is shown clean
+            return [f"the calls the publication policy classifies could not be read, so no week can be shown clean ({type(exc).__name__})"]
+    out: List[str] = []
+    for w in weeks:
+        md = _load_text(staging, f"wk{w}_chronicle.md")
+        ep = _load_json(staging, f"wk{w}_episode.json") or {}
+        spoken = "\n".join(str(t.get("line") or "") for t in ep.get("turns") or [] if isinstance(t, dict))
+        text = "\n".join([md, spoken, str(ep.get("title") or ""), str(ep.get("excerpt") or "")])
+        out += [f"week {w}: {f}" for f in private_call_check.findings(text, calls)]
+    return out
+
+
+def _read_calls() -> Any:
+    import boto3
+    from content import private_call_check
+
+    return private_call_check.load(boto3.resource("dynamodb", region_name=REGION).Table(TABLE))
+
+
+def _load_text(staging: str, name: str) -> str:
+    try:
+        with open(os.path.join(staging, name), encoding="utf-8") as fh:
+            return fh.read()
+    except OSError:
+        return ""
+
+
+def _load_json(staging: str, name: str) -> Any:
+    try:
+        with open(os.path.join(staging, name), encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return None
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--staging", default=None, help="the staging folder (required except with --effects-only)")
@@ -719,6 +765,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     held = owner_hold_gate(weeks, steps)
     for r in held:
         print(f"OWNER HOLD: {r}")
+    private = private_call_gate(args.staging, weeks)
+    for r in private:
+        print(f"PRIVATE CALL: {r}")
     if not args.apply:
         print("\nDRY RUN — nothing written. Re-run with --apply (owner act).")
         return 0
@@ -728,6 +777,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if held:
         print("\nREFUSING: the panel step would publish a week the owner holds (#6112).")
         return 6
+    if private:
+        print("\nREFUSING: staged text echoes, names or describes a call the publication policy keeps private (#6199).")
+        return 7
     if "backup" in steps:
         backup(args.backup_dir or os.path.join(args.staging, "backup"))
     if "chronicle" in steps:

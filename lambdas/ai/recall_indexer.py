@@ -46,6 +46,8 @@ from __future__ import annotations
 import logging
 from typing import NamedTuple, Optional
 
+from content import chapter_reads  # #6199 G1
+
 from ai import recall_consent as rc, semantic_recall as sr
 
 logger = logging.getLogger(__name__)
@@ -174,7 +176,7 @@ def chronicle_doc(item: dict, links: dict) -> dict | None:
     offer, never in how a doc is built from one.
     """
     date = date_from_sk(str(item.get("sk", "")))
-    if not date:
+    if not date or chapter_reads.is_withdrawn(item):  # #6199 G1: a chapter the owner withdrew is no one's memory
         return None
     text = " ".join(s for s in (item.get("title", ""), item.get("subtitle", ""), item.get("content_markdown", "")) if s).strip()
     if not text:
