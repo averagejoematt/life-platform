@@ -100,9 +100,9 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 2. DynamoDB Partitions (ADR-077 census)
 
-### cross_phase (24)
+### cross_phase (25)
 
-`benchmarks`, `calibration`, `checkin_intake_pairs`, `chronicling`, `clinical`, `coach_corrections`, `coach_vision`, `dexa`, `effect_fits`, `eyeball_estimate`, `fitness_tests`, `genome`, `labs`, `may_tracker`, `milestones`, `nutrition_titration`, `progress_photos`, `public_corrections`, `recall_embeddings`, `subscribers`, `supplements`, `training_constraints`, `training_reference`, `weight_episodes`
+`benchmarks`, `calibration`, `checkin_intake_pairs`, `chronicling`, `clinical`, `coach_corrections`, `coach_recommendations`, `coach_vision`, `dexa`, `effect_fits`, `eyeball_estimate`, `fitness_tests`, `genome`, `labs`, `may_tracker`, `milestones`, `nutrition_titration`, `progress_photos`, `public_corrections`, `recall_embeddings`, `subscribers`, `supplements`, `training_constraints`, `training_reference`, `weight_episodes`
 
 ### experiment_scoped (37)
 
@@ -118,7 +118,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-793 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+797 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -146,12 +146,13 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `coach_corrections` | coach_corrections.py | coach_corrections.py |
 | `coach_credibility` | — | intelligence_common.py |
 | `coach_gen_cache` | generation_cache.py | generation_cache.py |
+| `coach_recommendations` | — | — |
 | `coach_thread` | intelligence_common.py, training_notes.py | tools_coach_intelligence.py |
 | `coach_vision` | — | coach_vision.py |
 | `computed_insights` | daily_brief_lambda.py, daily_insight_compute_lambda.py | daily_insight_compute_lambda.py, weekly_signal_lambda.py |
 | `computed_metrics` | acwr_compute_lambda.py, daily_metrics_compute_lambda.py | ai_calls.py, ai_expert_analyzer_lambda.py, ai_output_validator.py, anomaly_detector_lambda.py, coach_nudge_lambda.py, coherence_sentinel_lambda.py, daily_debrief_lambda.py, field_notes_lambda.py, monday_compass_lambda.py, recap_data.py, site_api_discovery.py, site_api_habits.py, site_stats_refresh_lambda.py, tools_health.py, tools_training.py, weekly_digest_lambda.py |
 | `day_grade` | daily_brief_lambda.py, daily_metrics_compute_lambda.py | adaptive_mode_lambda.py, coherence_sentinel_lambda.py, monday_compass_lambda.py, recap_data.py |
-| `decisions` | — | site_api_thirdwall.py |
+| `decisions` | — | site_api_thirdwall.py, tools_coach_recommendations.py |
 | `deletion_log` | delete_user_data_lambda.py | — |
 | `dexa` | — | ai_expert_analyzer_lambda.py, calibration_cadence.py, nutrition_review_lambda.py, shared_quantities.py, site_api_physical.py |
 | `diary_claims` | tools_journal.py | site_api_diary.py, tools_coach_intelligence.py |
@@ -472,6 +473,7 @@ Default: public — an unlisted source/field is TIER_PUBLIC by omission (field_t
 | `cgm_readings` | owner_only |
 | `checkin_intake_pairs` | owner_only |
 | `clinical` | internal |
+| `coach_recommendations` | owner_only |
 | `coach_vision` | owner_only |
 | `dexa` | owner_published |
 | `early_warning_flag` | owner_only |
@@ -593,10 +595,10 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1385 total · 996 resolved · 389 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1391 total · 1002 resolved · 389 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 80 resolved · 0 dynamic of 80 scheduled lambdas (107 lambdas total)
 - Alarms: 152 literal-named declarations across three idioms, 4 composite; routing digest 108 · digest+paging 2 · digest+urgent 10 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
-- Privacy: 25 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only
+- Privacy: 26 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only
 - Schedules: 97 (lambda, cron) rows; UTC clock on fixed rows, zone + wall-clock if zoned (#4284)
 - Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)
