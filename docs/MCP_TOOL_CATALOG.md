@@ -1,8 +1,8 @@
 # Life Platform — MCP Tool Catalog
 
-> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-11-15
+> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-11-22
 
-**Version:** v8.6.0 | **Last updated:** 2026-11-15 | **Total tools:** 93
+**Version:** v8.6.0 | **Last updated:** 2026-11-22 | **Total tools:** 94
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;
@@ -21,7 +21,7 @@
 
 ---
 
-## All 93 Tools — by module
+## All 94 Tools — by module
 
 | Module | Tools |
 |---|---|
@@ -50,6 +50,7 @@
 | `mcp/tools_memory.py` | 4 |
 | `mcp/tools_decisions.py` | 3 |
 | `mcp/tools_advice_links.py` | 1 |
+| `mcp/tools_coach_recommendations.py` | 1 |
 | `mcp/tools_advice_queue.py` | 1 |
 | `mcp/tools_hevy.py` | 2 |
 | `mcp/tools_hevy_routine.py` | 1 |
@@ -252,6 +253,12 @@
 |------|-----------|-------------|
 | `log_advice_link` | decision_sk=, coach_id, ref_kind, ref_id, state=, evidence_text=, evidence_ref=, withdraw= | #5612 (owner ruling F): record whether Matthew acted on ONE coach recommendation, linked to ONE logged decision (sk from get_decisions). state: acted_on / declined / partially_followed / unknown. ONLY when Matthew has SAID so — pass his own words as evidence_text (or evidence_ref: where he recorded it). NEVER from data: a workout, a meal, a metric or any behaviour that happens to match the advice is NOT evidence, and the tool must not be called on that basis. Any state but unknown without evidence is refused. The recommendation is ref_kind + ref_id + coach_id: prediction (prediction_id from get_predictions), coach_output (<YYYY-MM-DD>#<type>, e.g. 2026-11-02#daily_brief_sleep) or coach_action (<YYYY-MM-DD>-<domain>). Both records are checked to exist first. Re-calling with a new state supersedes and keeps the old one. A COACH ASK is answered differently: ref_kind='commitment', ref_id=<ask_id from get_advice_link_queue>, coach_id, NO decision_sk needed, state = what Matthew SAYS he did: acted_on / declined / partially_followed / not_yet_decided; evidence_text is an optional PRIVATE note (his words, never published). withdraw=true (no state) takes his answer back. Each call appends a revision (history kept, private); the public coach page shows only the newest answered state, its day and 'self-reported' (not_yet_decided, withdrawn and unanswered all read 'not recorded'). Never call it for an ask he did not answer, and never read an answer off the grader or the data. |
 
+### mcp.tools_coach_recommendations (`mcp/tools_coach_recommendations.py`)
+
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `manage_coach_recommendation` | action, rec_id=, coach_id=, text=, channel=, evidence=[], context=, date=, decide_by=, decision_sk=, response=, withdraw=, words=, follow_up_on=, outcome_notes=, outcome_metric=, outcome_delta=, effectiveness=, correction_sk=, status= | OWNER-ONLY. The ONE recommendation record (#6158): coach recommendation -> his response -> follow-up -> outcome. action='record': a coach's MATERIAL, ACTIONABLE recommendation — coach_id, text (the coach's exact words), channel (telegram \| claude_chat \| coach_brief \| other), optional evidence (list of what it rested on), context, date, decide_by, decision_sk. It is refused, with the reason, unless it tells him to DO something checkable (a number or a time anchor) — never record a passing suggestion or encouragement. action='respond' with rec_id + response (accepted \| declined \| partially_followed \| deferred \| not_yet_decided = still deciding) and his words; withdraw=true takes an answer back. ONLY on his explicit answer: never set a response from training, food or wearable data — an unanswered recommendation stays 'not recorded'. action='follow_up' with follow_up_on (YYYY-MM-DD), only when he agreed to check back. action='outcome' with outcome_notes (+ optional outcome_metric, outcome_delta, effectiveness 1-5). action='link_correction' with correction_sk (CORRECTION#...). action='list' (status active \| due \| closed \| all, optional coach_id, rec_id). Never quoted on the site or in an email to readers. |
+
 ### mcp.tools_advice_queue (`mcp/tools_advice_queue.py`)
 
 | Tool | Key Params | Description |
@@ -318,7 +325,7 @@
 
 | Tool | Key Params | Description |
 |------|-----------|-------------|
-| `log_coach_correction` | item_number=, signal=, coach=, surface=, correction, error_class= | #1690 (epic #1687) + #4083: log a correction to the corrections ledger, via EXACTLY ONE of two paths. Path 1 — item_number: correct a weekly AI-review-pack item by its NUMBER. Matthew reads the ranked review-pack email (each generation carries a stable #N) and corrects an item that's wrong or misleading — this resolves #N back to the exact archived generation the pack numbered and writes ONE row to the corrections ledger, tagged by error-class. An unknown or out-of-range number is REPORTED (with how many items the week's pack has), never silently dropped. Twin of the email-reply channel — a reply of '#N <correction>' lines lands the same rows. Path 2 — signal: use this DURING A LIVE CHAT SESSION (daily-debrief, speak-to-coaches, open-checkin) when Matthew overrides a coach's flag/verdict and there is no pack number to resolve — name the SIGNAL that was wrong (the metric/flag id, e.g. 'readiness_low_streak_days' or 'toe_flag'), optionally coach (bare id, e.g. 'physical') and surface (defaults 'chat_coaching'). Always required: correction (what's wrong + what it should say, VERBATIM), error_class (OPTIONAL override — one of stale-baseline, ungrounded-behavioral, cross-coach-inconsistency, framing, checkable-metric, hedged-safe, defense-held, other; an unrecognized value is stored as 'other', never rejected). Every logged correction, from either path, feeds `get_intelligence_quality`'s signal false-positive ranking — always name the signal so that ranking can attribute it. |
+| `log_coach_correction` | item_number=, signal=, coach=, surface=, action=, sk=, disposition=, evidence=, reason=, status=, correction=, error_class= | #1690 (epic #1687) + #4083: log a correction to the corrections ledger, via EXACTLY ONE of two paths. Path 1 — item_number: correct a weekly AI-review-pack item by its NUMBER. Matthew reads the ranked review-pack email (each generation carries a stable #N) and corrects an item that's wrong or misleading — this resolves #N back to the exact archived generation the pack numbered and writes ONE row to the corrections ledger, tagged by error-class. An unknown or out-of-range number is REPORTED (with how many items the week's pack has), never silently dropped. Twin of the email-reply channel — a reply of '#N <correction>' lines lands the same rows. Path 2 — signal: use this DURING A LIVE CHAT SESSION (daily-debrief, speak-to-coaches, open-checkin) when Matthew overrides a coach's flag/verdict and there is no pack number to resolve — name the SIGNAL that was wrong (the metric/flag id, e.g. 'readiness_low_streak_days' or 'toe_flag'), optionally coach (bare id, e.g. 'physical') and surface (defaults 'chat_coaching'). Always required: correction (what's wrong + what it should say, VERBATIM), error_class (OPTIONAL override — one of stale-baseline, ungrounded-behavioral, cross-coach-inconsistency, framing, checkable-metric, hedged-safe, defense-held, other; an unrecognized value is stored as 'other', never rejected). Every logged correction, from either path, feeds `get_intelligence_quality`'s signal false-positive ranking — always name the signal so that ranking can attribute it. OWNER-ONLY LIFECYCLE (owner ruling 2026-11-22 §11, #6158) — action='close' with sk (CORRECTION#...), disposition (fixed \| superseded \| no_longer_applicable), evidence (public-safe: issue/PR numbers, a commit, a dated ruling) closes an OPEN row only on his say-so — never because a row is old; the original text is never edited. action='reopen' with sk + reason. action='list' with optional status (open \| applied-to-prompt \| applied-to-gate \| closed). A closed row leaves every coach prompt and every open count and stays readable as history. |
 
 ### mcp.tools_challenges (`mcp/tools_challenges.py`)
 
