@@ -191,9 +191,6 @@ def _render_monthly_digest():
             for i, d in enumerate(days)
         ]
 
-    def chronicling_list(days):
-        return [{"total_score": 74 + (i % 6) * 3, "group_scores": {"body": 78, "mind": 71, "craft": 69}} for i, d in enumerate(days)]
-
     def hevy_list(days):
         # #4636: one stored Hevy row IS one workout (sk DATE#<d>#WORKOUT#<id>, set weights in kg) —
         # the monthly extractor reads that shape now, not a per-day nested `workouts` list. One set
@@ -237,7 +234,6 @@ def _render_monthly_digest():
             "strava": m.ex_strava(strava_list(_MONTH_DAYS), _DIGEST_PROFILE),
             "hevy": m.ex_hevy(hevy_list(_MONTH_DAYS)),
             "macrofactor": m.ex_macrofactor(macro_list(_MONTH_DAYS), _DIGEST_PROFILE),
-            "chronicling": m.ex_chronicling(chronicling_list(_MONTH_DAYS)),
         }
 
     data = {
