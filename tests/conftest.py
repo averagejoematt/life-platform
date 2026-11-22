@@ -585,6 +585,23 @@ def _publication_snapshot_hermetic(monkeypatch):
     _snap.reset()
 
 
+# #6176: the owner's two-week outbound-mail trial is committed ON until common.outbound_trial.TRIAL_ENDS_ON, after which
+# the BASELINE behaviour returns by itself. The rest of the suite pins that baseline, so every test starts with the
+# switchboard OFF (monkeypatch: restored after). The trial's own tests opt in explicitly (tests/test_outbound_trial_6176.py
+# `trial_on`, and its pin reads the committed values captured at its import).
+@pytest.fixture(autouse=True)
+def _outbound_trial_baseline_off_6176(monkeypatch):
+    try:
+        from common import outbound_trial as _ot
+    except Exception:  # a test tree without the lambdas layer on its path
+        yield
+        return
+    for _item in list(_ot.TRIAL):
+        monkeypatch.setitem(_ot.TRIAL, _item, False)
+    monkeypatch.setattr(_ot, "TRIAL_ENDS_ON", None)
+    yield
+
+
 # Owner ruling 2026-11-11 (item 2): the plan root's private part lives OFF the repo — on a developer's machine at
 # ~/.config/life-platform/user_goals_private.json (common.user_goals). A test must never read the owner's real private
 # part, so the suite points the loader at a path that does not exist; a test that needs a private part writes a
