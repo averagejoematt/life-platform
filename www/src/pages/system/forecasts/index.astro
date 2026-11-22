@@ -1,0 +1,47 @@
+---
+// The rules-based platform forecast: where the forecast stream is explained and listed (#6156, owner ruling 2026-11-22
+// §5). It is always built, so the link from the ledger never lands on a 404; while the stream is dark (the public route
+// serves no forecast, so forecasts.json is absent) it says so plainly. Never a coach's call: the page names the rule,
+// not a person, and nothing here is part of any coach's record.
+import Base from "../../../layouts/Base.astro";
+import StatusTag from "../../../components/StatusTag.astro";
+import { dayInWords, num } from "../../../lib/format.js";
+import { loadForecasts } from "../../../lib/snapshot.js";
+import { href } from "../../../lib/url.js";
+
+const { forecasts } = await loadForecasts();
+const rows = [...(forecasts || [])].sort((a, b) => (a.made < b.made ? 1 : a.made > b.made ? -1 : a.id < b.id ? -1 : 1));
+---
+
+<Base title="The rules-based platform forecast" top="system" description="One forecast a week from a fixed rule, checked against a guess that nothing changes. Not a coach's call.">
+  <section class="section">
+    <div class="wrap" style="max-width:900px;display:flex;flex-direction:column;gap:18px">
+      <p class="label">System · the rules-based platform forecast</p>
+      <h1 style="font-size:36px;margin-top:2px">The rules-based platform forecast</h1>
+      <p class="muted" style="font-size:14px;max-width:62ch" data-forecast-frame>
+        A fixed rule run on the public readings anyone can see on this site — not an AI coach, and not part of any coach's record or the ledger's counts. About one forecast a week, each checked against a guess that nothing changes.
+      </p>
+      {
+        rows.length ? (
+          <div class="rows">
+            {rows.map((f) => (
+              <a href={href(`/system/forecasts/${f.id}/`)} data-row>
+                <span style="display:flex;flex-direction:column;gap:4px;min-width:0">
+                  <span style="font-size:14px;line-height:1.35">
+                    <b>Rules-based platform forecast</b>
+                    <span class="muted"> · {dayInWords(f.made, { short: true })} · {f.measure}, about {num(f.forecast, f.metric === "weight_lbs" ? 1 : 2)}{f.unit || ""} on {dayInWords(f.target_date, { short: true })}</span>
+                  </span>
+                </span>
+                <StatusTag status={f.status} date={f.graded ? f.graded.on : null} call />
+              </a>
+            ))}
+          </div>
+        ) : (
+          <div class="empty" data-forecast-empty>
+            <span>No forecast has been published yet. When one is, it will be listed here with its rule, the readings it used and how it was graded.</span>
+          </div>
+        )
+      }
+    </div>
+  </section>
+</Base>

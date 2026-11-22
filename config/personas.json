@@ -305,11 +305,11 @@
       "type": "narrator",
       "operational": false,
       "domain": "narrative",
-      "short_bio": "Embedded journalist — The Measured Life. Narrates the experiment from the inside.",
+      "short_bio": "Narrator of The Measured Life, an AI editorial persona. Writes the weekly chronicle from what the platform holds.",
       "emoji": "✍️",
       "color": "#94a3b8",
       "board_persona_key": "elena_voss",
-      "board_role": "Embedded Journalist — The Measured Life",
+      "board_role": "Narrator — The Measured Life (an AI editorial persona)",
       "tts_voice": "en-US-Chirp3-HD-Aoede"
     },
     "margaret_calloway": {

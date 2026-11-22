@@ -93,6 +93,7 @@
     "/system/coaches/training_coach/",
     "/system/coaches/training_coach/record/",
     "/system/everything-else/",
+    "/system/forecasts/",
     "/system/ledger/",
     "/system/ledger/disagreements/protein-deep-sleep-2026-10-29/",
     "/system/ledger/glucose-20260920-cgm01/",
@@ -130,6 +131,7 @@
     "/system/",
     "/system/calibration/",
     "/system/everything-else/",
+    "/system/forecasts/",
     "/system/ledger/",
     "/system/ledger/refuted/",
     "/system/sources/"
