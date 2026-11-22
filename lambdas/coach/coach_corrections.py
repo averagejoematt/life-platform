@@ -359,6 +359,53 @@ def _item_ref_matches(item: dict, *, surface: Optional[str], coach: Optional[str
     return True
 
 
+# #6149 (amendment): the SELECTION inside the bound. Before this, the bound was pure
+# newest-first over every open row, so five cycle-9/10 seed rows (coach-less, stale-baseline)
+# filled every coach's five slots and crowded out the owner's own recent corrections. Status
+# is still never written here — closing a row stays the owner's decision; this only decides
+# which open rows a prompt carries.
+_RANK_NAMES_COACH, _RANK_CHAT_SURFACE_WIDE, _RANK_CURRENT_SURFACE_WIDE, _RANK_OLDER_CYCLE = range(4)
+_BASELINE_CLASS = "stale-baseline"
+_CYCLE_FROM_SSM = object()  # sentinel: "not supplied — read it"; None means "unreadable"
+
+
+def _row_day(item: dict) -> str:
+    """The row's Pacific logging day from its sk (`CORRECTION#<YYYY-MM-DD>#<id>`), else created_at."""
+    parts = str(item.get("sk") or "").split("#")
+    if len(parts) >= 2 and len(parts[1]) == 10:
+        return parts[1]
+    return str(item.get("created_at") or "")[:10]
+
+
+def is_older_cycle(item: dict, *, current_cycle: int) -> bool:
+    """True when the row was logged before the current experiment cycle: its stamped `cycle`
+    is older, or (no stamp — the pre-#1791 seed rows) it was logged before the current
+    genesis (`constants.EXPERIMENT_START_DATE`). An unstamped row dated on/after genesis is
+    current — absence of a stamp is not staleness."""
+    cyc = item.get("cycle")
+    if cyc is not None:
+        return int(cyc) < int(current_cycle)
+    from common import constants  # read at call time so a re-anchor is never cached here
+
+    day = _row_day(item)
+    return bool(day) and day < str(constants.EXPERIMENT_START_DATE)
+
+
+def injection_rank(item: dict, *, coach: Optional[str], current_cycle: int) -> Optional[int]:
+    """The rank class of one in-scope open row, or None = NEVER injected.
+
+    None: an older-cycle `stale-baseline` row — it corrects a baseline that no longer exists.
+    (a) 0 rows naming this coach · (b) 1 coach-less `chat_coaching` rows (the owner in
+    conversation) · (c) 2 other coach-less rows of the current cycle · (d) 3 older-cycle rows
+    of any other class (still eligible, ranked last)."""
+    if is_older_cycle(item, current_cycle=current_cycle):
+        return None if item.get("error_class") == _BASELINE_CLASS else _RANK_OLDER_CYCLE
+    ref = item.get("item_ref") or {}
+    if ref.get("coach") not in (None, ""):
+        return _RANK_NAMES_COACH
+    return _RANK_CHAT_SURFACE_WIDE if ref.get("surface") == "chat_coaching" else _RANK_CURRENT_SURFACE_WIDE
+
+
 def open_corrections_for(
     table,
     *,
@@ -366,22 +413,45 @@ def open_corrections_for(
     coach: Optional[str] = None,
     limit: int = PROMPT_MEMORY_MAX_PER_COACH,
     surfaces=None,
+    current_cycle=_CYCLE_FROM_SSM,
 ) -> list:
-    """The S5 read: OPEN corrections scoped to one coach/surface, newest-first,
-    bounded to `limit` (the rolling window).
+    """The S5 read: OPEN corrections scoped to one coach/surface, bounded to `limit`
+    (the rolling window).
 
     Status is NOT mutated here — a read never transitions a correction (see the
     module note: rolling window, not auto-transition). Newest-first is enforced by
     sorting on `sk` (`CORRECTION#<YYYY-MM-DD>#<id8>`) descending, so the bound is
-    deterministic regardless of the table's native scan order (real DDB already
-    returns newest-first via ScanIndexForward=False; the sort also makes the bound
-    stable under the in-memory test fake).
+    deterministic regardless of the table's native scan order.
+
+    #6149: with the current cycle known (`current_cycle`, read via `read_cycle()` when not
+    supplied), an older-cycle stale-baseline row is dropped and the rest are ranked by
+    `injection_rank` (a → d), newest-first within a class, BEFORE the bound. Cycle
+    unreadable (None) → the pre-#6149 pure newest-first selection, unchanged.
     """
     _surface_scope(surface, surfaces)  # raise on a both-named call before the read, not after
     opened = list_corrections(table, status="open", limit=10000)
     scoped = [i for i in opened if _item_ref_matches(i, surface=surface, coach=coach, surfaces=surfaces)]
     scoped.sort(key=lambda i: i.get("sk", ""), reverse=True)
+    if current_cycle is _CYCLE_FROM_SSM:
+        current_cycle = read_cycle() if scoped else None
+    if current_cycle is not None:
+        ranked = [(injection_rank(i, coach=coach, current_cycle=current_cycle), i) for i in scoped]
+        scoped = [i for _, i in sorted(((r, i) for r, i in ranked if r is not None), key=lambda p: p[0])]  # stable: newest-first kept
     return scoped[: max(0, int(limit))]
+
+
+def never_injected(table, *, current_cycle: int) -> list:
+    """#6149: the open rows NO prompt will ever carry at `current_cycle` — an older-cycle
+    stale-baseline row, or a row on a surface outside `OWNER_FACING_SURFACES` (no prompt reads
+    it). Read-only; the owner's candidate list for closing (never closed here). A row merely
+    displaced by the bound today is NOT listed — it returns when a newer row is resolved."""
+    rows = list_corrections(table, status="open", limit=10000)
+    return [
+        r
+        for r in rows
+        if (r.get("item_ref") or {}).get("surface") not in OWNER_FACING_SURFACES
+        or injection_rank(r, coach=None, current_cycle=current_cycle) is None
+    ]
 
 
 def _provenance_stamp(item: dict, *, current_cycle: Optional[int]) -> str:
@@ -475,11 +545,12 @@ def corrections_prompt_block(
     correction logged before the most recent experiment reset. Pass it explicitly
     to avoid the SSM read (e.g. from a caller that already resolved it).
     """
-    opened = open_corrections_for(table, surface=surface, coach=coach, limit=limit, surfaces=surfaces)
+    cycle = _CYCLE_FROM_SSM if current_cycle is None else current_cycle
+    opened = open_corrections_for(table, surface=surface, coach=coach, limit=limit, surfaces=surfaces, current_cycle=cycle)
     if not opened:
-        return ""  # #6149: nothing to render — skip the SSM cycle read (the chat path runs this every turn)
+        return ""
     if current_cycle is None:
-        current_cycle = read_cycle()
+        current_cycle = read_cycle()  # cached after the selection's own read (coach_checkin caches a success)
     return render_corrections_block(opened, current_cycle=current_cycle, header=header)
 
 

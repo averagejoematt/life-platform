@@ -185,3 +185,77 @@ def test_session_packet_carries_the_training_coachs_open_corrections(monkeypatch
     monkeypatch.setattr(mcp.config, "table", _table())
     value, status = pkt._open_corrections("2026-11-21")
     assert value == [] and status["state"] == "absent"
+
+
+# ── #6149 amendment: the selection inside the bound ────────────────────────────────────
+def _cycle_table():
+    """Live-shaped: July seed rows (no cycle stamp, pre-genesis) beside current-cycle rows."""
+    t = _table()
+    for i in range(4):
+        _write(
+            t,
+            {"surface": "coach_brief", "pack_number": i},
+            f"SEED-BASELINE-{i}",
+            cid=f"seed000{i}",
+            date="2026-07-22",
+            cls="stale-baseline",
+        )
+    _write(
+        t, {"surface": "coach_brief", "pack_number": 9}, "SEED-XCOACH", cid="seed0009", date="2026-07-22", cls="cross-coach-inconsistency"
+    )
+    _write(t, {"surface": "chat_coaching", "coach": None, "signal": "s"}, "CHAT-ALL-NOW", cid="eeee0001", date="2026-11-08")
+    _write(t, {"surface": "chat_coaching", "coach": "mind", "signal": "s"}, "MIND-NOW", cid="eeee0002", date="2026-11-01")
+    return t
+
+
+def test_older_cycle_stale_baseline_is_never_rendered():
+    """Mutation: drop the stale-baseline exclusion — the four July baseline seeds fill the bound again."""
+    for coach in ("mind_coach", "sleep_coach"):
+        block = cc.corrections_prompt_block(_cycle_table(), coach=coach, surfaces=cc.OWNER_FACING_SURFACES, current_cycle=17)
+        assert "SEED-BASELINE" not in block, coach
+    stamped = _table()
+    cc.write_correction(stamped, {"surface": "coach_brief"}, "OLD-CYCLE-BASELINE", "stale-baseline", cycle=16)
+    cc.write_correction(stamped, {"surface": "coach_brief"}, "NOW-CYCLE-BASELINE", "stale-baseline", cycle=17)
+    rows = cc.open_corrections_for(stamped, coach="sleep_coach", surfaces=cc.OWNER_FACING_SURFACES, current_cycle=17)
+    assert [r["correction_text"] for r in rows] == ["NOW-CYCLE-BASELINE"]
+
+
+def test_ranking_a_then_b_then_d_and_never_injected_list():
+    """Mutation: rank by recency alone, or put a coach-less brief seed above the owner's chat correction."""
+    rows = cc.open_corrections_for(_cycle_table(), coach="mind_coach", surfaces=cc.OWNER_FACING_SURFACES, current_cycle=17)
+    assert [r["correction_text"] for r in rows] == ["MIND-NOW", "CHAT-ALL-NOW", "SEED-XCOACH"]
+    rows = cc.open_corrections_for(_cycle_table(), coach="sleep_coach", surfaces=cc.OWNER_FACING_SURFACES, current_cycle=17)
+    assert [r["correction_text"] for r in rows] == ["CHAT-ALL-NOW", "SEED-XCOACH"]
+    never = {r["correction_text"] for r in cc.never_injected(_cycle_table(), current_cycle=17)}
+    assert never == {f"SEED-BASELINE-{i}" for i in range(4)}
+
+
+def test_current_cycle_surface_wide_brief_row_ranks_c_below_chat_b():
+    t = _table()
+    _write(t, {"surface": "coach_brief"}, "BRIEF-ALL-NEWER", cid="ffff0001", date="2026-11-10")
+    _write(t, {"surface": "chat_coaching"}, "CHAT-ALL-OLDER", cid="ffff0002", date="2026-10-01")
+    rows = cc.open_corrections_for(t, coach="sleep_coach", surfaces=cc.OWNER_FACING_SURFACES, current_cycle=17)
+    assert [r["correction_text"] for r in rows] == ["CHAT-ALL-OLDER", "BRIEF-ALL-NEWER"]
+
+
+def test_ranked_selection_holds_the_bound():
+    t = _cycle_table()
+    for i in range(8):
+        _write(t, {"surface": "chat_coaching", "coach": "mind"}, f"MIND-{i}", cid=f"gggg000{i}", date=f"2026-10-1{i}")
+    rows = cc.open_corrections_for(t, coach="mind_coach", surfaces=cc.OWNER_FACING_SURFACES, current_cycle=17)
+    assert len(rows) == cc.PROMPT_MEMORY_MAX_PER_COACH
+    assert all(r["correction_text"].startswith("MIND") for r in rows)
+
+
+def test_unreadable_cycle_falls_back_to_newest_first(monkeypatch):
+    """Mutation: exclude/rank without a cycle — an SSM outage would silently change what the coach is told."""
+    monkeypatch.setattr(cc, "read_cycle", lambda *a, **k: None)
+    rows = cc.open_corrections_for(_cycle_table(), coach="sleep_coach", surfaces=cc.OWNER_FACING_SURFACES)
+    assert [r["sk"] for r in rows] == sorted((r["sk"] for r in rows), reverse=True)
+    assert len(rows) == cc.PROMPT_MEMORY_MAX_PER_COACH and any("SEED-BASELINE" in r["correction_text"] for r in rows)
+
+
+def test_cycle_is_read_through_read_cycle_when_not_supplied(monkeypatch):
+    monkeypatch.setattr(cc, "read_cycle", lambda *a, **k: 17)
+    block = cc.chat_corrections_block(_cycle_table(), "sleep_coach")
+    assert "CHAT-ALL-NOW" in block and "SEED-BASELINE" not in block
