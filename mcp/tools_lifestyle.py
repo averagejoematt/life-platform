@@ -633,7 +633,9 @@ def tool_create_experiment(args):
     when you call get_experiment_results.
 
     Board of Directors rules:
-      - One variable at a time (Huberman)
+      - One variable at a time (Huberman) — enforced proportionally (#6210): a behavioural
+        experiment on the same criterion metric (or inside another's washout) is refused
+        unless `acknowledge_overlap` carries the owner's reason; everything looser is a note.
       - Minimum 14 days for meaningful signal (Attia)
       - Define success criteria upfront (Ferriss)
     """
@@ -660,6 +662,11 @@ def tool_create_experiment(args):
     # machine's read. Opt-in per experiment; absent = the field simply isn't written
     # and the card renders nothing for it (no nag state).
     matthew_note = (args.get("matthew_note") or "").strip()
+    # #6210: overlap rule inputs. Validated up front so a bad value never half-creates.
+    from experiment import experiment_overlap
+
+    intervention_kind = experiment_overlap.normalize_kind(args.get("intervention_kind"))
+    acknowledge_reason = experiment_overlap.validate_acknowledgement(args.get("acknowledge_overlap"))
 
     if not name:
         raise ValueError("name is required (e.g. 'Creatine 5g daily', 'No caffeine after 10am')")
@@ -735,6 +742,41 @@ def tool_create_experiment(args):
     if existing:
         raise ValueError(f"Experiment '{exp_id}' already exists. Choose a different name or start date.")
 
+    # #6210: proportional overlap rule — read ALL experiment rows once (active ones feed the
+    # assessment). A read failure fails open to "none": the check is advisory infrastructure,
+    # it must not take creation down.
+    try:
+        all_rows = table.query(
+            KeyConditionExpression=Key("pk").eq(EXPERIMENTS_PK) & Key("sk").begins_with("EXP#"),
+        ).get("Items", [])
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"create_experiment: overlap read failed, treating as none: {e}")
+        all_rows = []
+    overlap = experiment_overlap.assess_overlap(
+        {
+            "start_date": start_date,
+            "design": design,
+            "intervention_kind": intervention_kind,
+            "library_id": library_id or None,
+            "tags": tags,
+        },
+        [r for r in all_rows if r.get("status") == "active"],
+    )
+    overlap_acknowledged = None
+    if overlap["level"] == "warning":
+        if not acknowledge_reason:
+            raise ValueError(
+                "overlap refused (#6210): "
+                + "; ".join(
+                    f"{c['name'] or c['experiment_id']} ({c['kind']}: {c['detail']})"
+                    for c in overlap["conflicts"]
+                    if c["kind"] in ("metric", "washout")
+                )
+                + ". Re-run with acknowledge_overlap=<your reason, 20-300 chars> to proceed, "
+                "or intervention_kind='observational' if this changes no behaviour."
+            )
+        overlap_acknowledged = experiment_overlap.acknowledgement_record(acknowledge_reason, overlap, now.strftime("%Y-%m-%dT%H:%M:%SZ"))
+
     # EL-F5: Auto-detect iteration count from past experiments with same library_id or slug
     iteration = 1
     try:
@@ -769,6 +811,8 @@ def tool_create_experiment(args):
         "experiment_type": experiment_type or None,
         "planned_duration_days": int(planned_duration_days) if planned_duration_days else None,
         "iteration": iteration,
+        "intervention_kind": intervention_kind,
+        "overlap_acknowledged": overlap_acknowledged,
         # #539: the frozen n-of-1 design + its public pre-registration stamp.
         # Floats → Decimal for DDB (min_effect is commonly fractional).
         "design": json.loads(json.dumps(design), parse_float=Decimal) if design else None,
@@ -869,6 +913,9 @@ def tool_create_experiment(args):
         "duration_tier": duration_tier or None,
         "experiment_type": experiment_type or None,
         "iteration": iteration,
+        "intervention_kind": intervention_kind,
+        "overlap": overlap,
+        **({"overlap_acknowledged": overlap_acknowledged} if overlap_acknowledged else {}),
         "design": design,
         "pre_registered_at": item.get("pre_registered_at"),
         "pre_registration_url": prereg_url,
@@ -885,7 +932,7 @@ def tool_create_experiment(args):
         **({"matthew_note": matthew_note[:500]} if matthew_note else {}),
         **({"pre_registration_warning": prereg_warning} if prereg_warning else {}),
         "board_of_directors": {
-            "Huberman": "One variable at a time. Track for at least 2 weeks before drawing conclusions. Control for confounders: sleep timing, stress, travel.",
+            "Huberman": "One variable at a time (enforced proportionally, #6210: a same-metric behavioural overlap needs acknowledge_overlap). Track for at least 2 weeks before drawing conclusions. Control for confounders: sleep timing, stress, travel.",
             "Attia": "Define your primary endpoint now. What number would convince you this worked? Statistical noise requires \u226514 days of data.",
             "Ferriss": "What does the minimum effective dose look like? Start with the smallest intervention that could produce a measurable change.",
         },
@@ -1269,6 +1316,21 @@ def tool_end_experiment(args):
             analysis = _run_design_analysis(existing, design, end_date)
         except Exception as e:
             logger.warning(f"end_experiment: design analysis failed for {exp_id}: {e}")
+    # #6210: an acknowledged overlap leaves a one-line caveat on the closing summary — the
+    # verdict logic is untouched. Fail-soft like the analysis itself.
+    if analysis is not None:
+        try:
+            from experiment import experiment_overlap
+
+            all_rows = table.query(
+                KeyConditionExpression=Key("pk").eq(EXPERIMENTS_PK) & Key("sk").begins_with("EXP#"),
+            ).get("Items", [])
+            caveat = experiment_overlap.closing_caveat(existing, all_rows)
+            if caveat:
+                analysis["overlap_caveat"] = caveat
+                analysis["summary"] = f"{analysis.get('summary', '')} {caveat}".strip()
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"end_experiment: overlap caveat failed for {exp_id}: {e}")
     if analysis is not None:
         update_expr += ", analysis = :an"
         expr_values[":an"] = json.loads(json.dumps(analysis), parse_float=Decimal)
