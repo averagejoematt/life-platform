@@ -39,7 +39,7 @@ MANAGE_REC_DESCRIPTION = (
     "OWNER-ONLY. The ONE recommendation record (#6158): coach recommendation -> his response -> follow-up -> outcome. "
     "action='record': a coach's MATERIAL, ACTIONABLE recommendation — coach_id, text (the coach's exact words), channel "
     "(telegram | claude_chat | coach_brief | other), optional evidence (list of what it rested on), context, date, decide_by, "
-    "decision_sk. It is refused, with the reason, unless it tells him to DO something checkable (a number or a time anchor) "
+    "decision_sk, finding_id (rf_YYYYMMDD_<8 hex>, the research finding it came from — a link only). It is refused, with the reason, unless it tells him to DO something checkable (a number or a time anchor) "
     "— never record a passing suggestion or encouragement. action='respond' with rec_id + response (accepted | declined | "
     "partially_followed | deferred | not_yet_decided = still deciding) and his words; withdraw=true takes an answer back. "
     "ONLY on his explicit answer: never set a response from training, food or wearable data — an unanswered recommendation "
@@ -72,6 +72,10 @@ MANAGE_REC_INPUT = {
         "date": {"type": "string", "description": "record: the day it was given, YYYY-MM-DD (default today, Pacific)."},
         "decide_by": {"type": "string", "description": "record: end of the decision window, YYYY-MM-DD (default date + 7 days)."},
         "decision_sk": {"type": "string", "description": "record/respond: a DECISION# row this answers (optional)."},
+        "finding_id": {
+            "type": "string",
+            "description": "record: the research finding that motivated it, rf_YYYYMMDD_<8 hex> (optional; a link only, never a response).",
+        },
         "response": {
             "type": "string",
             "enum": ["accepted", "declined", "partially_followed", "deferred", "not_yet_decided"],
@@ -139,6 +143,7 @@ def _record(args: dict[str, Any]) -> dict[str, Any]:
         context=args.get("context"),
         window_end=args.get("decide_by"),
         decision_sk=decision_sk,
+        finding_id=args.get("finding_id") or None,
         recorded_at=rr.now_instant(),
     )
     try:

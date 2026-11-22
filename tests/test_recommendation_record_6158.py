@@ -1029,3 +1029,65 @@ def test_live_on_an_equal_stamp_his_message_goes_before_the_reply(pilot_table, m
         "synthetic question two",
         "Send me a photo of the shelf.",
     ], "the tie-break does not depend on the stored order"
+
+
+# ── #6211: the optional finding_id link ──────────────────────────────────────────────────────────
+
+
+def _head(**kw):
+    return rr.build_head(
+        user_id="matthew", coach_id="eli_marsh", channel="claude_chat", text=GOOD, day="2026-11-20", recorded_at="t0", **kw
+    )
+
+
+def test_finding_id_absent_is_valid_and_the_row_is_unchanged():
+    row = _head()
+    assert "finding_id" not in row
+    assert row == _head(finding_id=None)
+    assert "finding_id" not in rr.fold([row])[0]
+
+
+def test_finding_id_valid_is_stored_and_does_not_change_the_id():
+    row = _head(finding_id="rf_20261122_0123abcd")
+    assert row["finding_id"] == "rf_20261122_0123abcd"
+    assert row["rec_id"] == _head()["rec_id"]
+    assert rr.fold([row])[0]["finding_id"] == "rf_20261122_0123abcd"
+
+
+@pytest.mark.parametrize(
+    "bad", ["", "rf_2026112_0123abcd", "rf_20261122_0123ABCD", "rf_20261122_0123abc", "x_20261122_0123abcd", "rf_20261122_0123abcd\n"]
+)
+def test_a_malformed_finding_id_is_refused(bad):
+    with pytest.raises(rr.RecommendationError):
+        _head(finding_id=bad)
+
+
+def test_fold_and_status_are_identical_with_and_without_the_link():
+    plain, linked = _head(), _head(finding_id="rf_20261122_0123abcd")
+    a, b = rr.fold([plain])[0], dict(rr.fold([linked])[0])
+    assert b.pop("finding_id")
+    assert a == b
+    for today in ("2026-11-21", "2026-12-30"):
+        assert rr.status_of(a, today) == rr.status_of(rr.fold([linked])[0], today)
+        assert rr.is_closed(a) == rr.is_closed(rr.fold([linked])[0])
+        assert rr.is_due(a, today) == rr.is_due(rr.fold([linked])[0], today)
+
+
+def test_record_and_list_expose_the_link_when_present(table):
+    res = tcr.tool_manage_coach_recommendation(
+        {
+            "action": "record",
+            "coach_id": "eli_marsh",
+            "channel": "claude_chat",
+            "text": GOOD,
+            "date": "2026-11-20",
+            "finding_id": "rf_20261122_0123abcd",
+        }
+    )
+    assert res["status"] == "recorded"
+    listed = tcr.tool_manage_coach_recommendation({"action": "list", "status": "all"})
+    assert listed["recommendations"][0]["finding_id"] == "rf_20261122_0123abcd"
+    bad = tcr.tool_manage_coach_recommendation(
+        {"action": "record", "coach_id": "eli_marsh", "channel": "claude_chat", "text": GOOD, "finding_id": "nope"}
+    )
+    assert "error" in bad
