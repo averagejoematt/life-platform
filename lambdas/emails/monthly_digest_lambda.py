@@ -449,7 +449,7 @@ def _build_monthly_prompt_from_config():
     prompt = f"""You are the coordinating intelligence for Matthew's Monthly Health Board of Advisors.
 
 CONTEXT:
-Matthew Walker, Seattle. Senior Director at a SaaS company. Goals: lose weight, build muscle,
+Matthew Walker, Seattle. Goals: lose weight, build muscle,
 improve sleep and stress management. He tracks obsessively but struggles to translate data into
 consistent behavioural change.
 His CURRENT weight goal, journey start weight and progress are in the ANNUAL GOALS CONTEXT block
@@ -495,7 +495,7 @@ Be honest. A month of data deserves a month's worth of insight."""
 _FALLBACK_MONTHLY_PROMPT = """You are the coordinating intelligence for Matthew's Monthly Health Board of Advisors.
 
 CONTEXT:
-Matthew Walker, Seattle. Senior Director at a SaaS company. Goals: lose weight, build muscle,
+Matthew Walker, Seattle. Goals: lose weight, build muscle,
 improve sleep and stress management. He tracks obsessively but struggles to translate data into
 consistent behavioural change.
 His CURRENT weight goal, journey start weight and progress are in the ANNUAL GOALS CONTEXT block

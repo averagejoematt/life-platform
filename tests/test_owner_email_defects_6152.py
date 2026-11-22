@@ -25,9 +25,7 @@ def test_no_email_prompt_carries_a_literal_age_or_start_month():
         for pat in (_AGE, _START_MONTH):
             for hit in pat.finditer(text):
                 offenders.append(f"{path.name}: {hit.group(0)}")
-    # The Chronicle's Elena fallback template predates this rule and is owned by the
-    # chronicle lane (not in #6152's list); it is the one named, counted exemption.
-    offenders = [o for o in offenders if not o.startswith("wednesday_chronicle_lambda.py")]
+    # #6155 removed the Chronicle's Elena fallback age, so no file is exempt.
     assert not offenders, offenders
 
 

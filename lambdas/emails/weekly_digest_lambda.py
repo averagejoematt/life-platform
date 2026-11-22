@@ -666,7 +666,7 @@ def gather_all():
 BOARD_PROMPT = """You are the coordinating intelligence for Matthew's Weekly Health Board of Advisors.
 
 CONTEXT:
-Matthew Walker, Seattle. Senior Director at a SaaS company. Goal: lose ~{lbs_to_lose} lbs ({start_w}→185),
+Matthew Walker, Seattle. Goal: lose ~{lbs_to_lose} lbs ({start_w}→185),
 build muscle, improve sleep and stress management. He tracks obsessively but struggles with consistency.
 
 {journey_context}

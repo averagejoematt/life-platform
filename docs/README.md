@@ -138,7 +138,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | `_lint/` | CI lint data — `tombstones.txt`, the retired-concept list `scripts/check_doc_tombstones.py` scans for |
 | `design-review/` | The paste-ready design-review prompt kit (current tooling) |
 | `coaching/` | Coaching *system* docs (deliberately public); owner-private coaching material lives at the S3 owner prefix — see [coaching/README.md](coaching/README.md) (#3043) |
-| `content/` | Content-production checklists (build dispatches etc.) + [REDDIT_PLAYBOOK.md](content/REDDIT_PLAYBOOK.md) — the manual Reddit operating procedure (**do-not-automate**, #1625) |
+| `content/` | Content-production checklists (build dispatches etc.) + [STORY_BIBLE.md](content/STORY_BIBLE.md) — the series' continuity guide (pointers only, #6155) + [REDDIT_PLAYBOOK.md](content/REDDIT_PLAYBOOK.md) — the manual Reddit operating procedure (**do-not-automate**, #1625) |
 | `briefs/` | Dated feature briefs (historical) |
 | `audits/` · `v2-audits/` · `rca/` | Dated audit + post-mortem records |
 | `restart/` | **Machine-written** reset-pipeline run reports (the restart scripts write here — do not relocate) |

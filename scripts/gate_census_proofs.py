@@ -4949,3 +4949,33 @@ GUARD_PROOFS["guard::deploy/lib/prod_write_guard.py"] = {
     ),
     "proved_on": "2026-11-16",
 }
+
+# #6155 — one Elena: no prompt states the owner's age or job title, no narrator prompt states a relationship detail or a
+# real person, the legacy writer's team is the operational roster, the old Elena contradictions cannot return, and the
+# story bible points only at objects that exist.
+STRUCTURAL_HAND_PROOFS["structural::test_elena_canon_6155.py"] = {
+    "gate_name": "test_elena_canon_6155.py",
+    "command": "python3 -m pytest tests/test_elena_canon_6155.py -q -p no:warnings   # baseline 17 passed",
+    "mutation": (
+        "Five plants, ONE AT A TIME, each restored with `git checkout --`: M1 hypothesis_engine_lambda's 'Adult male' "
+        "context line → '36-year-old male' (a literal age in a prompt); M2 a 'Don't break the fourth wall about being an AI' "
+        "bullet added back to chronicle_prompt.LEGACY_PROMPT_TEMPLATE; M3 two board-only persona ids appended to "
+        "chronicle_prompt.operational_team's roster loop (a real person and an off-roster coach as interviewees); M4 a "
+        "STORY_BIBLE.md pointer renamed to a file that does not exist; M5 (behaviour twin, "
+        "tests/test_wednesday_chronicle_behavior.py) chronicle_store.publish_holds' legacy audit replaced by `craft = []`."
+    ),
+    "observed": (
+        "2026-11-21, #6155 lane. BASELINE 17 passed. M1 1 failed (the lambdas/+mcp/ sweep); M2 1 failed; M3 2 failed "
+        "(roster subset + real-name check); M4 1 failed; M5 1 failed (the legacy draft published immediately). "
+        "REVERTED 17 passed."
+    ),
+    "scope": (
+        "Every string literal in every .py under lambdas/ and mcp/ (age, job-title class); the rendered narrator prompts "
+        "(canon, desk writer + Panel script, legacy writer + fallback, recap, Episode 0's host line) for relationship "
+        "details, real names (privacy_guard's list) and the resolved contradictions; the legacy team against "
+        "persona_registry.OPERATIONAL_COACH_IDS; docs/content/STORY_BIBLE.md's path pointers. NOT SEEN: an age or title "
+        "assembled at runtime from parts; prompt text read from S3 config (the board and bible objects themselves); "
+        "a real person outside privacy_guard's list."
+    ),
+    "proved_on": "2026-11-21",
+}
