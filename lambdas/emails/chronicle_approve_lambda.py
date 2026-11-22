@@ -62,6 +62,8 @@ CHRONICLE_PK = f"USER#{USER_ID}#SOURCE#chronicle"
 # #4694: the literal the stale-draft sweep logs when it refuses an unaudited draft — equal to
 # content.autopublish_audit.HELD_TOKEN, and the MetricFilter behind the `chronicle-autopublish-held` alarm.
 HELD_TOKEN = "CHRONICLE-AUTOPUBLISH-HELD"  # noqa: S105 — a log token, not a credential
+# #6178: equal to content.autopublish_audit.RETIRED_STATUS (pinned by tests/test_chronicle_week_states_6178.py).
+RETIRED_STATUS = "retired"
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
@@ -578,7 +580,7 @@ def _find_stale_drafts(hours: float, max_days: float) -> list[dict]:
         return out
     for it in resp.get("Items", []):
         if it.get("status") != "draft":
-            continue
+            continue  # a published, changes_requested or RETIRED (#6178) row is never swept
         if not _publishable(it):
             # #3485: an archived draft (reset tombstone / previous-cycle phase) is not a
             # "forgot to click" case — it is history, and the sweep must never promote it.
@@ -719,6 +721,19 @@ def _handle(event: dict) -> dict:
             f"<h1>Changes Already Requested</h1>"
             f"<p>Week {week_num} is queued for regeneration. "
             f"Re-run the wednesday-chronicle Lambda to generate a new draft.</p>",
+        )
+
+    # #6178 (owner ruling 2026-11-22 §4): a week the owner RETIRED never publishes and never changes state from a link —
+    # not by approve (one passing audit away from publishing otherwise), and not by request-changes. A still-live preview
+    # link for it lands here.
+    if str(current_status).strip().lower() == RETIRED_STATUS:
+        logger.warning("chronicle-approve: refused %s for %s — the week is retired", action, date_str)
+        return _html_response(
+            409,
+            "Retired",
+            f'<div class="icon">🔒</div>'
+            f"<h1>Week {week_num} is retired</h1>"
+            "<p>You decided this week will not be published. Nothing was published and the draft is unchanged.</p>",
         )
 
     # ── Validate token ───────────────────────────────────────────────────────

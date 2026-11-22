@@ -209,12 +209,20 @@ def _grade_line(rec: dict, verdict: str) -> str:
     return f'Graded {verdict}: "{claim}"' + (f" ({when})." if when else ".")
 
 
-def terminal_prediction_lines(items: list) -> list:
+def terminal_prediction_lines(
+    items: list, *, ledger_rows: Optional[list] = None, genesis: Optional[str] = None, as_of: Optional[str] = None
+) -> list:
     """The coach's decided calls — misses first-class, and the record with its n.
 
     ``items`` are the PREDICTION# rows already fetched for the open-calls surface
     (#2498); this deliberately takes rows rather than a table so one chat turn makes
     one query of one partition.
+
+    #6172: when ``ledger_rows`` (the coach's UNFILTERED PREDICTION# rows from that same
+    query) is given — the caller does so only under ``coach_record.SELF_RECORD_UNIFIED`` —
+    the record line and the calls quoted beside it come from ``coach.coach_record``: one
+    resolution per prediction, this cycle's only, a verdict under classification review
+    left out and disclosed. That is the count the public page and the brief print.
 
     The selection rule is the point of the story. Newest-first alone lets three
     fresh hits bury the one refuted call, and the refuted call is the humanising
@@ -222,6 +230,8 @@ def terminal_prediction_lines(items: list) -> list:
     chosen slot is given to the newest miss. A coach is not allowed to present a
     flattering sample of its own record as its record (ADR-104/105).
     """
+    if ledger_rows is not None:
+        return _ledger_record_lines(items, ledger_rows, genesis=genesis, as_of=as_of)
     graded = [i for i in items if str(i.get("status") or "").strip().lower() in (_HIT, _MISS) and str(i.get("claim_natural") or "").strip()]
     undecided = [i for i in items if str(i.get("status") or "").strip().lower() in _UNDECIDED]
     if not graded:
@@ -240,6 +250,36 @@ def terminal_prediction_lines(items: list) -> list:
     hits = len(graded) - len(misses)
     record = f"Your graded record this cycle: {hits} right, {len(misses)} wrong out of {len(graded)} decided calls"
     lines.append(record + (f" ({len(undecided)} more could not be decided — those count as neither)." if undecided else "."))
+    return lines
+
+
+def _chosen_calls(graded: list) -> list:
+    """The selection rule of ``terminal_prediction_lines``, unchanged: newest first, and the newest miss keeps a slot."""
+
+    def _recency(rec):
+        return (str(rec.get("outcome_date") or ""), str(rec.get("created_date") or ""), str(rec.get("sk") or ""))
+
+    graded = sorted(graded, key=_recency, reverse=True)
+    misses = [i for i in graded if str(i.get("status")).strip().lower() == _MISS]
+    chosen = graded[:MAX_TERMINAL_CALLS]
+    if misses and not any(str(c.get("status")).strip().lower() == _MISS for c in chosen):
+        chosen = chosen[: MAX_TERMINAL_CALLS - 1] + [misses[0]]
+    return chosen
+
+
+def _ledger_record_lines(items: list, ledger_rows: list, *, genesis: Optional[str], as_of: Optional[str]) -> list:
+    """#6172: the track-record lines with the count read through ``coach.coach_record`` (see the caller)."""
+    from coach import coach_record
+
+    report = coach_record.self_report_from_rows(ledger_rows, genesis=genesis, as_of=as_of)
+    decided = report["decided"]
+    if not decided and not report["under_review"]:
+        return [TRACK_RECORD_EMPTY_LINE] if items else []
+    quotable = [r for r in decided if str(r.get("claim_natural") or "").strip()]
+    lines = [_grade_line(rec, "WRONG" if coach_record.graded_status(rec) == _MISS else "RIGHT") for rec in _chosen_calls(quotable)]
+    undecided = [i for i in items if str(i.get("status") or "").strip().lower() in _UNDECIDED]
+    tail = f" ({len(undecided)} more could not be decided — those count as neither.)" if undecided else ""
+    lines.append(report["line"] + tail)
     return lines
 
 
