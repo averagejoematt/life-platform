@@ -12,10 +12,10 @@ tests/test_check_public_copies_6083.py fails on one that is not classified — g
 
   root      the v9 build's documents at site/            (rules A C D)
   preview   site/next/v9/                                  (rules A B C)
-  legacy    site/ documents the v9 build does not own      (rules C D; the location check)
+  legacy    site/ documents the v9 build does not own      (rules C D E; the location check)
   retired   site/_v9_previous/ — the old public rollback copy, retired 2026-11-14; site/chronicle/, site/evidence/ and
             site/now/ — the pre-v9 legacy locations, retired 2026-11-16 (#6115)   (rule B: must hold nothing)
-  archive   /archive/latest.tar.gz (generated/archive/)    (rules A B C)
+  archive   /archive/latest.tar.gz (generated/archive/)    (rules A B C E)
   private, not in scope: www-previous/ (the rollback copies since 2026-11-14), backups/, and prior object versions —
   no anonymous s3:GetObject / s3:GetObjectVersion is granted on them (deploy/bucket_policy.json; GET answers 403).
 
@@ -34,6 +34,10 @@ THE RULES
      The build's correctness members (label contract, chapter agreement, dates in words) are NOT re-run on a copy: the
      build gated them pre-sync, and against a later snapshot they move with the daily data, not with a publication.
   D  every URL in the sitemaps and feeds resolves to an object that is served and is not a rule-A orphan.
+  E  a retired legacy installment stays retired (#6148): at every slug in RETIRED_INSTALLMENTS the served object, the
+     archive member and the committed file under site/ are each no larger than the "no longer available" stub. Three
+     full pages sat at such slugs until their quarantine on 2026-11-22, and site/ syncs legacy/ with no exclusion, so a
+     committed full page is a re-publication waiting for the next site deploy.
 
 Usage:
   python3 scripts/check_public_copies.py --check          # read-only; exit 1 on any violation (the deploy's gate)
@@ -92,6 +96,11 @@ RETIRED_PREFIXES = {
     "site/evidence/": "the v4 evidence pages (written 2026-06-24), retired 2026-11-16 (#6115); /evidence/* 301s to each page's home",
     "site/now/": "the v4 /now/ page (written 2026-07-12), retired 2026-11-16 (#6115); /now/ 301s to /cockpit/",
 }
+#: #6148: every legacy chronicle installment is retired to the same stub (week-01..04 since the v4 move; interview,
+#: issue-05 and week-00 quarantined 2026-11-22T00:29Z, per docs/audits/AUDIT_2026-11-16_legacy_locations.md). Rule E.
+RETIRED_INSTALLMENT_DIR = "legacy/chronicle/posts/"
+RETIRED_INSTALLMENTS = ("interview", "issue-05", "week-00", "week-01", "week-02", "week-03", "week-04")
+RETIRED_INSTALLMENT_STUB = os.path.join(SITE_DIR, RETIRED_INSTALLMENT_DIR, "week-01", "index.html")
 SYNC_WINDOW = timedelta(minutes=15)  # a v9 sync writes ~1,300 objects in seconds (measured 2026-11-16: 3 s and 6 s)
 PREVIEW_MAX_LAG = timedelta(hours=24)  # a rehearsal lives one root cycle (the daily 15:30 UTC rebuild); then empty it
 ARCHIVE_MAX_AGE = timedelta(hours=26)  # the nightly cadence plus two hours of slack
@@ -100,9 +109,9 @@ ARCHIVE_PUBLIC_URL = SITE_ORIGIN + reg.ARCHIVE_PUBLIC_PATH
 COPIES = {
     "root": ("site/ (the v9 build's paths)", "/", "A C D"),
     "preview": (PREVIEW_PREFIX, "/next/v9/", "A B C"),
-    "legacy": ("site/ (not the v9 build's)", "/", "C D"),
+    "legacy": ("site/ (not the v9 build's)", "/", "C D E"),
     "retired": ("site/{_v9_previous,chronicle,evidence,now}/", "(none: must be empty)", "B"),
-    "archive": (reg.ARCHIVE_TARBALL_KEY, reg.ARCHIVE_PUBLIC_PATH, "A B C"),
+    "archive": (reg.ARCHIVE_TARBALL_KEY, reg.ARCHIVE_PUBLIC_PATH, "A B C E"),
 }
 PRIVATE = {
     "www-previous/": "the previous green root builds (the rollback source) — no anonymous read in deploy/bucket_policy.json",
@@ -277,6 +286,34 @@ def derived_issues(feeds: dict[str, str], listing_keys: set[str], orphan_keys: s
                 out.append(("root" if "sitemap-0" in key else "legacy", "D", f"{key} lists {path} — no object serves it"))
             elif found and all(c in orphan_keys for c in found):
                 out.append(("root", "D", f"{key} lists {path} — served only by an orphan the newest build did not write"))
+    return out
+
+
+# ── rule E: the retired legacy installments ───────────────────────────────────────────────────────────────────────────
+def stub_size() -> int:
+    """The byte size of the committed "no longer available" stub — the most a retired installment may weigh."""
+    return os.path.getsize(RETIRED_INSTALLMENT_STUB)
+
+
+def retired_installment_issues(
+    listing: list[dict], members: dict[str, bytes] | None, site_dir: str | None = SITE_DIR, limit: int | None = None
+) -> list[tuple[str, str, str]]:
+    """Rule E: at a retired slug, a served object, an archive member or a committed file larger than the stub fails.
+    ``site_dir=None`` skips the committed tree (the archive pass). Sizes only — the page's words are never read or
+    printed (the CI log is public)."""
+    limit = stub_size() if limit is None else limit
+    rels = [f"{RETIRED_INSTALLMENT_DIR}{slug}/index.html" for slug in RETIRED_INSTALLMENTS]
+    sizes = {o["Key"]: int(o.get("Size") or 0) for o in listing}
+    out = []
+    for rel in rels:
+        if sizes.get("site/" + rel, 0) > limit:
+            out.append(("legacy", "E", f"site/{rel} — served at {sizes['site/' + rel]} bytes, larger than the {limit}-byte stub"))
+        body = (members or {}).get("web/" + rel)
+        if body is not None and len(body) > limit:
+            out.append(("archive", "E", f"web/{rel} — archived at {len(body)} bytes, larger than the {limit}-byte stub"))
+        path = os.path.join(site_dir, rel) if site_dir else ""
+        if path and os.path.isfile(path) and os.path.getsize(path) > limit:
+            out.append(("legacy", "E", f"site/{rel} — committed at {os.path.getsize(path)} bytes, larger than the {limit}-byte stub"))
     return out
 
 
@@ -503,6 +540,7 @@ def evaluate(listing, archive_blob, snapshot_dir, mode, now, fetch_key=None, liv
     copies = classify(listing, owned, site_dir)
     violations, facts = bucket_rules(copies, listing)
     violations += location_issues(copies, owned, site_dir)
+    violations += retired_installment_issues(listing, None, site_dir)
     keys = {o["Key"] for o in listing}
     orphan_keys = {k for ks in facts["orphans"].values() for k in ks}
     fetch_key = fetch_key or (lambda k: http_get(s3_object_url(k)))
@@ -529,6 +567,7 @@ def evaluate(listing, archive_blob, snapshot_dir, mode, now, fetch_key=None, liv
                 json.loads(members.get("MANIFEST.json") or b"{}"), mode, now, [facts["root_marker"], facts["preview_marker"]]
             )
             violations += archive_admission(members, keys)
+            violations += retired_installment_issues([], members, None)
             for sub, pre in (("archive-preview", "web/next/v9/"), ("archive-web", "web/")):
                 tree = os.path.join(tmp, sub)
                 for n, body in members.items():

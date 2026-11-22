@@ -55,10 +55,6 @@ ALLOWED_CITATIONS = {
     # not voices the platform claims.
     ("experiments/index.html", "huberman"): 1,
     ("experiments/index.html", "attia"): 1,
-    # The subject's own quoted speech in an archived interview ("Not a
-    # Goggins cycle, he said") — a cultural reference in first-person
-    # narrative, not a coach attribution.
-    ("chronicle/posts/interview/index.html", "goggins"): 1,
     # Research citation: "Dr. Vivek Murthy's research on loneliness convinced
     # me that social connection is a health metric" — cites the former Surgeon
     # General's published work as motivation; no voice or staff claim.

@@ -1,6 +1,6 @@
 """
 Weekly Digest Lambda — v4.0.0 (Weekly Digest v2)
-Fires Sunday 8:30 AM PT via EventBridge.
+Fires Sunday 9:00 AM PT via EventBridge (config/schedules.json).
 
 Major rewrite from v3.3.0:
   - Day grade weekly trend (from retrocomputed grades)
@@ -666,7 +666,7 @@ def gather_all():
 BOARD_PROMPT = """You are the coordinating intelligence for Matthew's Weekly Health Board of Advisors.
 
 CONTEXT:
-Matthew. Goal: lose ~{lbs_to_lose} lbs ({start_w}→185),
+Matthew Walker, Seattle. Goal: lose ~{lbs_to_lose} lbs ({start_w}→185),
 build muscle, improve sleep and stress management. He tracks obsessively but struggles with consistency.
 
 {journey_context}
@@ -1744,7 +1744,7 @@ def lambda_handler(event, context):
 
     if hasattr(logger, "set_date"):
         logger.set_date(dates.get("this_end", ""))  # OBS-1
-    logger.info("Calling Haiku for Board commentary...")
+    logger.info(f"Calling {model_for('weekly_digest')} for Board commentary...")
     # #2221: whether the Board actually spoke is tracked as a FLAG, never sniffed back
     # out of the rendered text (the #1658 lesson from the monthly letter, whose
     # substring sentinel could not fire). The stub keeps the email section rendered,
@@ -1753,7 +1753,7 @@ def lambda_handler(event, context):
     try:
         commentary = call_haiku(data, profile)
     except Exception as e:
-        logger.warning(f"Haiku failed: {e}")
+        logger.warning(f"Commentary model call failed: {e}")
         commentary = COMMENTARY_UNAVAILABLE
         commentary_ok = False
 
