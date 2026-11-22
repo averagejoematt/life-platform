@@ -245,7 +245,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 
 ## 4. MCP Layer
 
-**94 tools across 43 modules** (AST-counted from `mcp/registry.py`;
+**95 tools across 44 modules** (AST-counted from `mcp/registry.py`;
 the same counter `deploy/sync_doc_metadata.py` uses). MCP modules appear in §3 as
 readers under the `life-platform-mcp` lambda.
 

@@ -355,6 +355,11 @@ SOURCE_CLASS: dict[str, str] = {
     # score it cannot be recomputed from anything, because the input was a sentence he spoke
     # once. NEVER tagged, never wiped, never phase-filtered.
     "training_constraints": CROSS_PHASE,
+    # #6158: the recommendation record (REC#<rec_id> + its REC#<rec_id>#EV# events, `coach/recommendation_record.py`).
+    # CROSS_PHASE for the coach_corrections reason: his answers to coaching are his own statements, and the
+    # record of what he was told and what came of it is the learning — it must outlive any cycle. Never tagged,
+    # never wiped, never phase-filtered. (Under the 2026-09-21 no-further-resets ruling there is no wipe to join.)
+    "coach_recommendations": CROSS_PHASE,
     "coach_corrections": CROSS_PHASE,  # #1689 (epic #1687 "The Coach Correction Loop"): Matthew's
     # class-tagged corrections to weekly AI-review-pack items (`lambdas/coach_corrections.py`,
     # pk USER#matthew#SOURCE#coach_corrections / sk CORRECTION#<date>#<id8>). Same rationale as

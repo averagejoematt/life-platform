@@ -41,6 +41,7 @@ from mcp.tools_coach_intelligence import (
     tool_get_predictions,
 )
 from mcp.tools_coach_packet import COACH_PACKET_DESCRIPTION, COACH_PACKET_INPUT, tool_get_coach_session_packet  # #4082
+from mcp.tools_coach_recommendations import MANAGE_REC_DESCRIPTION, MANAGE_REC_INPUT, tool_manage_coach_recommendation  # #6158
 from mcp.tools_coach_vision import GET_COACH_VISION_DESCRIPTION, GET_COACH_VISION_INPUT, tool_get_coach_vision  # #3759
 from mcp.tools_correlation import tool_get_zone2_breakdown
 from mcp.tools_data import (
@@ -84,6 +85,7 @@ from mcp.tools_descriptions import (
     GET_EXERCISE_NOTES_DESCRIPTION,
     GET_EXERCISE_NOTES_INPUT,
     GET_EXPERIMENT_CYCLE_DESCRIPTION,
+    GET_EXPERIMENT_CYCLE_INPUT,
     GET_EXPERIMENT_RESULTS_DESCRIPTION,
     GET_FIELD_NOTES_DESCRIPTION,
     GET_FLOURISHING_TREND_DESCRIPTION,
@@ -1519,6 +1521,10 @@ TOOLS = {
         "fn": tool_log_advice_link,
         "schema": {"name": "log_advice_link", "description": LOG_ADVICE_LINK_DESCRIPTION, "inputSchema": LOG_ADVICE_LINK_INPUT},
     },
+    "manage_coach_recommendation": {  # #6158: the ONE recommendation record — owner-only, every write his explicit act
+        "fn": tool_manage_coach_recommendation,
+        "schema": {"name": "manage_coach_recommendation", "description": MANAGE_REC_DESCRIPTION, "inputSchema": MANAGE_REC_INPUT},
+    },
     "get_advice_link_queue": {  # read-only: the coaches' recent asks beside what Matthew recorded; writes nothing
         "fn": tool_get_advice_link_queue,
         "schema": {"name": "get_advice_link_queue", "description": ADVICE_QUEUE_DESCRIPTION, "inputSchema": ADVICE_QUEUE_INPUT},
@@ -2095,13 +2101,7 @@ TOOLS = {
         "schema": {
             "name": "get_experiment_cycle",
             "description": GET_EXPERIMENT_CYCLE_DESCRIPTION,
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "date": {"type": "string", "description": "YYYY-MM-DD — which cycle a past date belonged to. Default: today (PT)."}
-                },
-                "required": [],
-            },
+            "inputSchema": GET_EXPERIMENT_CYCLE_INPUT,  # #6177: moved beside its description (pays the two new tools' lines)
         },
     },
     "get_habit_completion": {

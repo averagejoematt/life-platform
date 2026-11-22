@@ -4980,6 +4980,34 @@ STRUCTURAL_HAND_PROOFS["structural::test_elena_canon_6155.py"] = {
     "proved_on": "2026-11-21",
 }
 
+# #6158 — the recommendation record and the coach-context pilot (owner ruling 2026-11-22 §1, §11): one writer, the
+# publication boundary, the admission rule, owner-only answers, the dark switch, the de-duplication cap, and the
+# correction close that never closes on age.
+STRUCTURAL_HAND_PROOFS["structural::test_recommendation_record_6158.py"] = {
+    "gate_name": "test_recommendation_record_6158.py",
+    "command": "python3 -m pytest tests/test_recommendation_record_6158.py -q -p no:warnings   # baseline 49 passed",
+    "mutation": (
+        "Six plants, ONE AT A TIME, each restored from a copy: M1 coach_context_pilot.LIVE = True; M2 "
+        "`from coach import recommendation_record` appended to lambdas/web/site_api_status.py; M3 MAX_PER_THEME 2 -> 7; "
+        "M4 coach_corrections.close_correction's checkable-evidence check disabled; M5 recommendation_record.fold's "
+        "recorded_by == owner condition removed; M6 the admission rule's directive check disabled."
+    ),
+    "observed": (
+        "2026-11-22, #6158 lane. BASELINE 49 passed. M1 2 failed (switch ships off; dark worker turn); M2 2 failed "
+        "(publication boundary closure + the naming allowlist); M3 1 failed (dominant theme); M4 3 failed (age alone "
+        "cannot close, x3); M5 1 failed (only owner events count); M6 3 failed (encouragement / no-directive refused). "
+        "REVERTED 49 passed."
+    ),
+    "scope": (
+        "Every tracked .py outside tests/ for record constructors and modules naming the record; the static import graph "
+        "(module-level and lazy) of lambdas/web, lambdas/content and lambdas/emails, with the Telegram worker's one lazy "
+        "edge cut and proven never loaded at import; the admission rule, fold, close/reopen and the pilot context on "
+        "fixtures. NOT SEEN: a dynamic import by string; a public reader that queries the partition by a pk it builds "
+        "without naming the source."
+    ),
+    "proved_on": "2026-11-22",
+}
+
 # #6177 — dated public chapter corrections: the platform signs (never a persona), nothing is public before the owner's
 # recorded approval, supersession keeps the replaced record, and no source writes a new persona-signed note.
 STRUCTURAL_HAND_PROOFS["structural::test_chapter_corrections_6177.py"] = {

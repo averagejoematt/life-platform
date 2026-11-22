@@ -421,6 +421,62 @@ def headline(record: dict | None) -> str:
     return f"{k} of {n} {calls} right ({round(k / n * 100):.0f}%){tail}"
 
 
+# ── #6172: what a coach is TOLD about its own record ────────────────────────────────────
+# The chat facts (``coach_team_texture.terminal_prediction_lines``) and the daily brief
+# (``coach_narrative_orchestrator._graded_record``) each derived a coach's record on their
+# own: the chat path over phase-filtered PREDICTION# rows with none of the rules above (no
+# one-resolution-per-prediction, no genesis test, no classification-review exclusion), the
+# brief over a rolling 60 days of LEARNING# rows with no window label. On 2026-11-21 the
+# sleep coach was told one count in chat and a different count in the brief, beside a third
+# on its public page. Both prompt surfaces now read ``self_report`` here — the SAME
+# ``record_from_rows`` / ``headline`` the public pages and the MCP headline print — behind
+# the switch below, because what a coach is told changes live coaching text.
+
+#: Default OFF (owner Phase 2 rule 12: a change to live coaching text ships dark). True puts
+#: ``self_record_line`` into the chat facts and the brief; False keeps both prompt texts
+#: byte-identical to before #6172. Turning it on is one reviewed line + a deploy.
+SELF_RECORD_UNIFIED = False
+
+
+def self_record_line(record: dict | None, under_review: int = 0) -> str:
+    """The one sentence a coach is told about its own record — ``headline`` labelled as this cycle's,
+    with the under-review disclosure beside it (owner ruling 2026-11-03), never inside it."""
+    if record is None:
+        return "Your record this cycle could not be read just now — claim no record either way."
+    text = f"Your record this cycle (the prediction ledger, the same count your public page prints): {headline(record)}."
+    if under_review:
+        verb = "is" if under_review == 1 else "are"
+        calls = "graded call" if under_review == 1 else "graded calls"
+        text += f" {under_review} further {calls} {verb} under classification review and counted neither way."
+    return text
+
+
+def self_report_from_rows(rows: Iterable[Any], *, genesis: str | None, as_of: str | None = None) -> dict:
+    """``{record, decided, under_review, line}`` over a coach's UNFILTERED PREDICTION# rows (pure)."""
+    rows = list(rows or [])
+    record = record_from_rows(rows, genesis=genesis, as_of=as_of)
+    n_review = len(under_review_rows(rows, genesis=genesis))
+    return {
+        "record": record,
+        "decided": decided_rows(rows, genesis=genesis),
+        "under_review": n_review,
+        "line": self_record_line(record, n_review),
+    }
+
+
+def self_report(table: Any, coach_id: str, *, genesis: str | None, as_of: str | None = None) -> dict:
+    """``self_report_from_rows`` over ONE read of the coach's partition; a failed read is absence
+    (``record`` None, the "could not be read" line), never a zero record."""
+    try:
+        if not coach_id or table is None:
+            raise ValueError("no coach or no table")
+        rows = _query_rows(table, coach_id)
+    except Exception as exc:  # noqa: BLE001 — absence is the honest degradation, logged
+        logger.warning("[coach_record] self_report %s: %s", coach_id, exc)
+        return {"record": None, "decided": [], "under_review": 0, "line": self_record_line(None)}
+    return self_report_from_rows(rows, genesis=genesis, as_of=as_of)
+
+
 def _query_rows(table: Any, coach_id: str) -> list:
     kwargs: dict = {
         "KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("PREDICTION#"),

@@ -931,7 +931,12 @@ LOG_COACH_CORRECTION_DESCRIPTION = (
     "cross-coach-inconsistency, framing, checkable-metric, hedged-safe, defense-held, other; an "
     "unrecognized value is stored as 'other', never rejected). Every logged correction, from either "
     "path, feeds `get_intelligence_quality`'s signal false-positive ranking — always name the signal "
-    "so that ranking can attribute it."
+    "so that ranking can attribute it. "
+    "OWNER-ONLY LIFECYCLE (owner ruling 2026-11-22 §11, #6158) — action='close' with sk (CORRECTION#...), disposition "
+    "(fixed | superseded | no_longer_applicable), evidence (public-safe: issue/PR numbers, a commit, a dated ruling) closes "
+    "an OPEN row only on his say-so — never because a row is old; the original text is never edited. action='reopen' with "
+    "sk + reason. action='list' with optional status (open | applied-to-prompt | applied-to-gate | closed). A closed row "
+    "leaves every coach prompt and every open count and stays readable as history."
 )
 
 # #4078: moved out of `mcp/registry.py` to pay for `manage_pending_writes` under the #1665
@@ -944,7 +949,21 @@ LOG_COACH_CORRECTION_INPUT = {
         "signal": {"type": "string", "description": "Path 2 (#4083): live-session override — the metric/flag id."},
         "coach": {"type": "string", "description": "Path 2 only. Optional bare coach id; omitted = surface-wide."},
         "surface": {"type": "string", "description": "Path 2 only. Optional; defaults to 'chat_coaching'."},
-        "correction": {"type": "string", "description": "What was wrong and what it should say, verbatim."},
+        "action": {
+            "type": "string",
+            "enum": ["log", "close", "reopen", "list"],
+            "description": "log (default) | close | reopen | list (#6158).",
+        },
+        "sk": {"type": "string", "description": "close/reopen: the correction's sort key (CORRECTION#...)."},
+        "disposition": {
+            "type": "string",
+            "enum": ["fixed", "superseded", "no_longer_applicable"],
+            "description": "close: why it is closed.",
+        },
+        "evidence": {"type": "string", "description": "close: public-safe evidence (issue/PR numbers, a commit, a dated ruling)."},
+        "reason": {"type": "string", "description": "reopen: why it is open again."},
+        "status": {"type": "string", "enum": ["open", "applied-to-prompt", "applied-to-gate", "closed"], "description": "list: filter."},
+        "correction": {"type": "string", "description": "log: what was wrong and what it should say, verbatim."},
         "error_class": {
             "type": "string",
             "description": (
@@ -953,7 +972,7 @@ LOG_COACH_CORRECTION_INPUT = {
             ),
         },
     },
-    "required": ["correction"],
+    "required": [],
 }
 
 DESCRIBE_PLATFORM_SURFACES_DESCRIPTION = (
@@ -984,6 +1003,13 @@ GET_EXPERIMENT_CYCLE_DESCRIPTION = (
     "the experiment is it?', 'when did this cycle start?', and before quoting any cycle number from memory or from a "
     "document — cycle numbers move weekly and a correct-when-written number goes stale silently."
 )
+
+# #6177: get_experiment_cycle's input table, moved out of mcp/registry.py beside its description.
+GET_EXPERIMENT_CYCLE_INPUT = {
+    "type": "object",
+    "properties": {"date": {"type": "string", "description": "YYYY-MM-DD — which cycle a past date belonged to. Default: today (PT)."}},
+    "required": [],
+}
 
 GET_HABIT_COMPLETION_DESCRIPTION = (
     "How the habits are going: today's completion, per-habit streaks, and the DATE RULE behind both. Use for 'how are "

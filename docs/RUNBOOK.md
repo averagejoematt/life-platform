@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-Last updated: 2026-11-22 (v8.6.0 — 94 MCP tools, 98-module package, 107 Lambdas, 20 data sources)
+Last updated: 2026-11-22 (v8.6.0 — 95 MCP tools, 99-module package, 107 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
 - Lambda functions defined (CDK): 107 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
@@ -675,22 +675,26 @@ logs an error), a POST 404 "Reader calls are not available."; call pages hide th
 (digest, >= 60 accepted reader calls in one hour); refusals by reason in Logs Insights on the site-api log group:
 `fields Reason | filter ReaderCallEvent = "refused" | stats count(*) by Reason`.
 
-## Chapter corrections — propose, approve, publish (#6177)
+## The coach-context pilot and the recommendation record (#6158)
 
-A dated public correction to a published chapter is a record beside the chapter, never an edit of it
-(`lambdas/content/chapter_corrections.py`). Signed by the platform: "Correction, <date> — Average Joe Matt editorial record".
+**Live on merge (Part A):** the owner-only recommendation record (`USER#matthew#SOURCE#coach_recommendations`,
+`lambdas/coach/recommendation_record.py`) and its one door, the MCP tool `manage_coach_recommendation`. Nothing reads it
+on a live coaching path until the switch below is on; nothing ever writes it but that tool.
 
-1. **Propose** (a session, from verified wording): MCP `manage_chapter_corrections` `action=propose` with `chapter_id`
-   (`week-NN`, as in `/story/week-NN/`), `correction_id`, `kind`, `published_said`, `record_shows`, `evidence`. Renders nowhere.
-2. **Approve** (Matthew, in a Claude conversation, after reading the exact words): `action=approve`, `approved=true`. This
-   dates it today (Pacific) and stamps the signature. To change approved words, propose a new record with `supersedes`.
-3. **Publish**: the next `www/**` deploy (or `gh workflow run web-preview-deploy.yml -f target=root`) renders it on the
-   chapter page and the story list; the next site deploy (`gh workflow run site-deploy.yml`) rebuilds `/rss.xml` with it.
-4. **Check**: `curl -s https://averagejoematt.com/api/chapters | jq .corrections` lists it; a `null` there means the read
-   failed and both builds refuse to run rather than drop it.
+**Dark (Part B):** `lambdas/coach/coach_context_pilot.py` — the coach's context in the owner's priority order (his recorded
+decisions and platform memory first, today's planned session, the recommendations on record with his answers, the chat
+thread and notes with repeated themes left out, his corrections, what the coach can and cannot remember), and the lead's
+one due follow-up. It is gated by ONE committed switch, `coach_context_pilot.LIVE` (ships `False`). Off, the Telegram worker
+and `get_coach_session_packet` behave exactly as before.
 
-The October 2026 editor's notes signed "Margaret Calloway" stay word for word; every surface that renders one carries
-"Margaret Calloway is an AI editorial persona of the platform, not a person."
+```bash
+# Preview the pilot context for one coach on one day — reads only, writes and sends nothing (the private harness's call):
+python3 -c "import sys; sys.path[:0]=['lambdas']; from coach import coach_context_pilot as c, telegram_worker_lambda as w; \
+a=w._assemble('eli_marsh','headcoach'); print(c.build_turn_context(w._table(),'eli_marsh','2026-11-23',memory=a['memory'],thread=a['thread'])['memory'])"
+# Turn it on (owner, after the blind re-evaluation): merge `LIVE = True`, then deploy the worker and the MCP server
+#   bash deploy/deploy_fleet.sh          # telegram-coach-worker + life-platform-mcp (or the CI deploy on merge)
+# Roll back: merge `LIVE = False` and deploy the same two functions. The record and its rows are untouched either way.
+```
 
 ## Common Issues
 
