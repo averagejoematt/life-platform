@@ -80,6 +80,9 @@ const KIND_WORDS: Record<string, string> = { number: "a number", direction: "a d
         {flagged} listed {flagged === 1 ? "grade is" : "grades are"} flagged (marked, still counted) and {corrected} carry a correction (the original is kept).
         Every count is the producer's or a count of the rows listed; the filter below only hides and shows.
       </p>
+      <p class="muted" style="margin-top:8px;font-size:13px" data-forecast-link>
+        Not in these counts: the <a href={href("/system/forecasts/")}>rules-based platform forecast</a> is a fixed rule's weekly number, checked against a guess that nothing changes. It is not a coach's call.
+      </p>
       <Glossary />
       {rows.some((p) => p.claim_withheld === "no_words") && (
         <p class="muted" style="margin-top:8px;font-size:13px" data-no-words-note>

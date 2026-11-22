@@ -709,6 +709,18 @@ PAGE_BINDINGS.extend(
         },
     ]
 )
+# #6156: the rules-based platform forecast index — a fixed rule's weekly number against a guess that nothing changes;
+# never a coach's call. Static build from the publication snapshot (forecasts.json, absent while the stream is dark).
+PAGE_BINDINGS.append(
+    {
+        "path": "/system/forecasts/",
+        "name": "System · the rules-based platform forecast",
+        "door": "method",
+        "narrative_order": 113,
+        "story_intent": "the rules-based platform forecast, one a week from a fixed rule, each checked against a guess that nothing changes, and never a coach's call",
+        "endpoints": [{"url": "/api/platform_forecasts", "role": "primary", "metrics": []}],
+    }
+)
 PAGE_BINDINGS.append(
     {
         "path": "/privacy/",
