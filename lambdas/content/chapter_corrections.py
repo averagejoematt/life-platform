@@ -28,7 +28,6 @@ THE RULES THIS MODULE HOLDS (pure; the MCP tool is the only writer, the Site API
 from __future__ import annotations
 
 import re
-from datetime import date
 from typing import Any, Iterable, Optional
 
 USER_ID_DEFAULT = "matthew"
@@ -87,7 +86,11 @@ def sk(chapter_id: str, correction_id: str) -> str:
 
 def day_words(iso_day: str) -> str:
     """ "2026-11-22" -> "22 November 2026" (the site prints dates in words)."""
-    d = date.fromisoformat(iso_day)
+    from common.pacific_time import parse_day_key  # THE calendar-day parse (#3741, #3609)
+
+    d = parse_day_key(iso_day)
+    if d is None:
+        raise CorrectionError(f"not a day: {iso_day!r}")
     return f"{d.day} {d.strftime('%B %Y')}"
 
 
@@ -235,14 +238,6 @@ def validate(item: Any) -> dict:
     if sup is not None and (not CORRECTION_ID.match(str(sup)) or sup == corr):
         raise CorrectionError("supersedes must name another correction")
     return item
-
-
-def is_approved(item: Any) -> bool:
-    try:
-        validate(item)
-        return True
-    except CorrectionError:
-        return False
 
 
 def _public(item: dict) -> dict:

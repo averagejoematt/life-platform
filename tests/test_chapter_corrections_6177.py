@@ -53,6 +53,14 @@ HISTORICAL = {
 }
 
 
+def _is_approved(item):
+    try:
+        CC.validate(item)
+        return True
+    except CC.CorrectionError:
+        return False
+
+
 def _proposal(**kw):
     base = dict(
         chapter_id="week-09",
@@ -116,13 +124,13 @@ def test_a_proposal_is_unapproved_unsigned_undated_and_never_public():
     p = _proposal()
     assert p["approvals"] == [] and p["signature"] is None and p["dated_on"] is None
     assert p["sk"] == "CHAPTER_CORRECTION#week-09#interview-scene" and p["pk"] == "USER#matthew#SOURCE#chronicle"
-    assert not CC.is_approved(p)
+    assert not _is_approved(p)
     assert CC.public_view([p]) == []
 
 
 def test_validation_refuses_what_must_not_be_served():
     good = _approved()
-    assert CC.is_approved(good)
+    assert _is_approved(good)
     for mutate in (
         lambda i: i.update(approvals=[]),
         lambda i: i.update(approvals=[{"by": "session", "at": "2026-11-23T17:00:00Z"}]),
@@ -135,7 +143,7 @@ def test_validation_refuses_what_must_not_be_served():
     ):
         bad = json.loads(json.dumps(good))
         mutate(bad)
-        assert not CC.is_approved(bad), bad
+        assert not _is_approved(bad), bad
 
 
 def test_public_view_keeps_a_superseded_correction_marked_and_drops_the_unapproved():
