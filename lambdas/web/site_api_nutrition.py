@@ -135,6 +135,80 @@ def _held(channels):
     return len(calm) - few - drift, drift, few
 
 
+def _trend_dir(vals):
+    """A channel's first-third vs last-third direction (moved out of ``deficit_sustainability`` for #4880, unchanged)."""
+    v = [x for x in vals if x is not None]
+    if len(v) < 6:
+        return "insufficient_data", 0
+    third = len(v) // 3
+    first_avg = sum(v[:third]) / third
+    last_avg = sum(v[-third:]) / third
+    if first_avg == 0:
+        return "stable", 0
+    dp = round((last_avg - first_avg) / abs(first_avg) * 100, 1)
+    return ("declining", dp) if dp < -5 else ("improving", dp) if dp > 5 else ("stable", dp)
+
+
+def _eating_window(items):
+    """The average first/last meal time and window over the days with 2+ timed food-log entries (moved out of
+    ``nutrition_overview`` for the #4880 function ceiling, unchanged)."""
+    eating_windows = []
+    for i in items:
+        food_log = i.get("food_log") or []
+        times = []
+        for entry in food_log:
+            t = entry.get("time")
+            if t:
+                try:
+                    parts = t.split(":")
+                    hour_min = int(parts[0]) * 60 + int(parts[1])
+                    times.append(hour_min)
+                except (ValueError, IndexError):
+                    pass
+        if len(times) >= 2:
+            first = min(times)
+            last = max(times)
+            window_hrs = round((last - first) / 60, 1)
+            eating_windows.append(
+                {
+                    "first_meal_min": first,
+                    "last_meal_min": last,
+                    "window_hrs": window_hrs,
+                }
+            )
+
+    eating_window = None
+    if eating_windows:
+        avg_first = round(sum(e["first_meal_min"] for e in eating_windows) / len(eating_windows))
+        avg_last = round(sum(e["last_meal_min"] for e in eating_windows) / len(eating_windows))
+        avg_window = round(sum(e["window_hrs"] for e in eating_windows) / len(eating_windows), 1)
+        eating_window = {
+            "avg_hours": avg_window,
+            "avg_first_meal": f"{avg_first // 60}:{avg_first % 60:02d}",
+            "avg_last_meal": f"{avg_last // 60}:{avg_last % 60:02d}",
+            "days_with_data": len(eating_windows),
+        }
+    return eating_window
+
+
+def _switched_verdict(severity, verdict, channels, start, today, deficit_published):
+    """#6195 F1 (PUBLIC_VERDICT_NOT_CLEARANCE, default OFF; owner ruling 2026-11-22): five recovery channels holding is not
+    a clearance of the deficit. With the switch on, the no-strain verdict says what held, what drifted, over which dates and
+    what the read cannot say, and the basis fields join the payload. Every strain verdict passes through unchanged."""
+    if not nc.on(nc.PUBLIC_VERDICT_NOT_CLEARANCE):
+        return severity, verdict, {}
+    basis = {
+        "as_of": today,
+        "based_on": list(nc.PUBLIC_BASED_ON),
+        "not_based_on": list(nc.PUBLIC_NOT_BASED_ON),
+        "honesty": nc.PUBLIC_HONESTY,
+    }
+    if severity != "sustainable":
+        return severity, verdict, basis
+    hold, drift, few = _held(channels)
+    return "channels_holding", nc.public_holding_verdict(hold, start, today, deficit_published, drifting=drift, too_few=few), basis
+
+
 def _mifflin_tdee(weight_lbs, strava_items=None, profile=None, hevy_items=None):
     """The ADR-152 TDEE estimate — Mifflin-St Jeor BMR + MEASURED trailing-7-day exercise
     energy — from the ONE shared implementation in ``health.tdee`` (#2310).
@@ -568,42 +642,7 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
     weekday_vs_weekend = _weekday_vs_weekend(items, protein_target)
 
     # ── Eating window (first/last meal time from food_log) ──
-    eating_windows = []
-    for i in items:
-        food_log = i.get("food_log") or []
-        times = []
-        for entry in food_log:
-            t = entry.get("time")
-            if t:
-                try:
-                    parts = t.split(":")
-                    hour_min = int(parts[0]) * 60 + int(parts[1])
-                    times.append(hour_min)
-                except (ValueError, IndexError):
-                    pass
-        if len(times) >= 2:
-            first = min(times)
-            last = max(times)
-            window_hrs = round((last - first) / 60, 1)
-            eating_windows.append(
-                {
-                    "first_meal_min": first,
-                    "last_meal_min": last,
-                    "window_hrs": window_hrs,
-                }
-            )
-
-    eating_window = None
-    if eating_windows:
-        avg_first = round(sum(e["first_meal_min"] for e in eating_windows) / len(eating_windows))
-        avg_last = round(sum(e["last_meal_min"] for e in eating_windows) / len(eating_windows))
-        avg_window = round(sum(e["window_hrs"] for e in eating_windows) / len(eating_windows), 1)
-        eating_window = {
-            "avg_hours": avg_window,
-            "avg_first_meal": f"{avg_first // 60}:{avg_first % 60:02d}",
-            "avg_last_meal": f"{avg_last // 60}:{avg_last % 60:02d}",
-            "days_with_data": len(eating_windows),
-        }
+    eating_window = _eating_window(items)
 
     # ── Caloric periodization (training days vs rest days) ──
     strava_items_30d = _query_source("strava", d30, today)
@@ -1042,8 +1081,7 @@ def deficit_sustainability(*, _g) -> dict:
     today = datetime.now(PT).strftime("%Y-%m-%d")  # #2414: the reader's "today" is the Pacific day
     start = _experiment_date(14)
     mf = _query_source("macrofactor", start, today)
-    if nc.on(nc.PARTIAL_EXPORT_EXCLUDED):
-        mf = nutrition_logging.complete_logs(mf)  # #6195 F3: the overview's rule (#5607/#5954) — a partial export is not a day eaten
+    mf = nutrition_logging.complete_logs(mf) if nc.on(nc.PARTIAL_EXPORT_EXCLUDED) else mf  # #6195 F3: a partial export is not a day eaten
     if len(mf) < 7:
         return _ok(
             {
@@ -1104,21 +1142,9 @@ def deficit_sustainability(*, _g) -> dict:
     strava = _by_day("strava")
     hevy = _by_day("hevy")
 
-    def trend_dir(vals):
-        v = [x for x in vals if x is not None]
-        if len(v) < 6:
-            return "insufficient_data", 0
-        third = len(v) // 3
-        first_avg = sum(v[:third]) / third
-        last_avg = sum(v[-third:]) / third
-        if first_avg == 0:
-            return "stable", 0
-        dp = round((last_avg - first_avg) / abs(first_avg) * 100, 1)
-        return ("declining", dp) if dp < -5 else ("improving", dp) if dp > 5 else ("stable", dp)
-
     # Channel 1 — HRV
     hrv = [_f(w.get("hrv")) for w in whoop if w.get("hrv")]
-    hrv_dir, hrv_d = trend_dir(hrv)
+    hrv_dir, hrv_d = _trend_dir(hrv)
     hrv_bad = hrv_dir == "declining" and abs(hrv_d) > 8
     # Channel 2 — sleep quality (efficiency OR deep%)
     eff = [
@@ -1131,8 +1157,8 @@ def deficit_sustainability(*, _g) -> dict:
         for w in whoop
         if w.get("slow_wave_sleep_hours") and w.get("sleep_duration_hours")
     ]
-    eff_dir, eff_d = trend_dir(eff)
-    deep_dir, deep_d = trend_dir(deep)
+    eff_dir, eff_d = _trend_dir(eff)
+    deep_dir, deep_d = _trend_dir(deep)
     sleep_bad = (eff_dir == "declining" and abs(eff_d) > 3) or (deep_dir == "declining" and abs(deep_d) > 8)
     # Surface the sub-signal that actually triggered the strain (deep% can flag while
     # efficiency holds) so the displayed direction never reads "stable" next to "strain".
@@ -1140,7 +1166,7 @@ def deficit_sustainability(*, _g) -> dict:
         eff_dir, eff_d = deep_dir, deep_d
     # Channel 3 — recovery
     rec = [_f(w.get("recovery_score")) for w in whoop if w.get("recovery_score")]
-    rec_dir, rec_d = trend_dir(rec)
+    rec_dir, rec_d = _trend_dir(rec)
     rec_bad = rec_dir == "declining" and abs(rec_d) > 10
     # Channel 4 — habit completion.
     # #2221 READER/WRITER AGREEMENT: `ingestion/habitify_lambda.py` writes
@@ -1159,14 +1185,14 @@ def deficit_sustainability(*, _g) -> dict:
             hv = _f(h.get("completion_pct_strict"))
         if hv is not None:
             t0.append(hv)
-    t0_dir, t0_d = trend_dir(t0)
+    t0_dir, t0_d = _trend_dir(t0)
     t0_bad = t0_dir == "declining" and abs(t0_d) > 10
     # Channel 5 — training output. #3754 (2026-10-04 sweep): this read the Strava day
     # row's `total_kilojoules`, > 0 on 0 of 1,242 stored day rows all-time, so the public
     # channel could never read "degraded". It is now the daily training load — the same
     # model the TSB/ACWR surfaces read (#4075) — see health/training_output_channel.py.
     training = training_output_channel.series(strava, hevy)
-    train_dir, train_d = trend_dir(training["values"])
+    train_dir, train_d = _trend_dir(training["values"])
     train_bad = train_dir == "declining" and abs(train_d) > 15
 
     channels = [
@@ -1202,21 +1228,7 @@ def deficit_sustainability(*, _g) -> dict:
             "sustainable",
             "The body's absorbing the deficit — recovery, sleep, and output are holding while the weight comes off.",
         )
-        if nc.on(nc.PUBLIC_VERDICT_NOT_CLEARANCE):
-            # #6195 F1 (owner ruling 2026-11-22): five recovery channels holding is not a clearance of the deficit
-            _hold, _drift, _few = _held(channels)
-            severity = "channels_holding"
-            verdict = nc.public_holding_verdict(_hold, start, today, deficit_published, drifting=_drift, too_few=_few)
-    _verdict_basis = (
-        {
-            "as_of": today,
-            "based_on": list(nc.PUBLIC_BASED_ON),
-            "not_based_on": list(nc.PUBLIC_NOT_BASED_ON),
-            "honesty": nc.PUBLIC_HONESTY,
-        }
-        if nc.on(nc.PUBLIC_VERDICT_NOT_CLEARANCE)
-        else {}
-    )
+    severity, verdict, _verdict_basis = _switched_verdict(severity, verdict, channels, start, today, deficit_published)  # #6195 F1
 
     return _ok(
         {

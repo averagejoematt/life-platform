@@ -413,7 +413,7 @@ def test_the_retired_clearance_wording_lives_only_in_the_off_branch():
     assert hits == ALLOWED_PUBLIC, hits
     src = (ROOT / "lambdas" / "web" / "site_api_nutrition.py").read_text(encoding="utf-8")
     i = src.index("The body's absorbing the deficit")
-    assert "if nc.on(nc.PUBLIC_VERDICT_NOT_CLEARANCE):" in src[i : i + 400], "the old verdict must sit directly above its switch"
+    assert "_switched_verdict(severity, verdict" in src[i : i + 400], "the old verdict must sit directly above its switch"
 
 
 def test_no_config_persona_or_catalog_text_calls_1500_a_deficit_or_the_monitor_a_safety_rating():
@@ -431,12 +431,17 @@ def test_the_set_guard_catches_a_planted_copy():
     assert RETIRED_PUBLIC.search("The body's absorbing the deficit — recovery")
 
 
+IMPORTS_SWITCHBOARD = re.compile(
+    r"^\s*(from common import [^\n]*\bnutrition_consistency\b|import common\.nutrition_consistency|\s+nutrition_consistency as )", re.M
+)
+
+
 def test_the_switchboard_reaches_only_the_modules_it_was_written_for():
     """The set of modules that read the switchboard. A new reader is a reviewed addition here, never silent."""
     readers = set()
     for base in ("lambdas", "mcp", "scripts"):
         for path in (ROOT / base).rglob("*.py"):
-            if "nutrition_consistency" in path.read_text(encoding="utf-8") and path.name != "nutrition_consistency.py":
+            if IMPORTS_SWITCHBOARD.search(path.read_text(encoding="utf-8")) and path.name != "nutrition_consistency.py":
                 readers.add(str(path.relative_to(ROOT)))
     assert readers == {
         "lambdas/ai/ai_calls.py",
