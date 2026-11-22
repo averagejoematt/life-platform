@@ -2314,3 +2314,38 @@ figure.portrait-words {
 figure.moment-own {
   margin-top: 12px;
 }
+
+/* #6177: a dated public correction sits beside a chapter's text, signed by the platform, in the machine voice (sans),
+   never inside the narrator's serif; a replaced one stays, muted. The persona disclosure is one plain line. */
+.persona-disclosure {
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 0 0 14px;
+}
+.chapter-corrections {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0 0 32px;
+}
+.chapter-correction {
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.5;
+  border-left: 3px solid var(--ink);
+  padding: 4px 0 4px 14px;
+}
+.chapter-correction p {
+  margin: 0 0 6px;
+}
+.chapter-correction .correction-foot,
+.chapter-correction .correction-replaced {
+  font-size: 13px;
+  color: var(--muted);
+}
+.chapter-correction.replaced {
+  border-left-color: var(--rule);
+  color: var(--muted);
+}

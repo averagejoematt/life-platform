@@ -1004,6 +1004,13 @@ GET_EXPERIMENT_CYCLE_DESCRIPTION = (
     "document — cycle numbers move weekly and a correct-when-written number goes stale silently."
 )
 
+# #6177: get_experiment_cycle's input table, moved out of mcp/registry.py beside its description.
+GET_EXPERIMENT_CYCLE_INPUT = {
+    "type": "object",
+    "properties": {"date": {"type": "string", "description": "YYYY-MM-DD — which cycle a past date belonged to. Default: today (PT)."}},
+    "required": [],
+}
+
 GET_HABIT_COMPLETION_DESCRIPTION = (
     "How the habits are going: today's completion, per-habit streaks, and the DATE RULE behind both. Use for 'how are "
     "my habits going?', 'what streaks am I on?', 'did I hit my habits today?'. A zero here is annotated with the date "
