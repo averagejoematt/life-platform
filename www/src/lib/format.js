@@ -119,7 +119,8 @@ export function chapterMeta(c) {
   const window = covers || (programWeek ? `program week ${programWeek}` : null);
   const windowShort = coversShort || (programShort ? `program week ${programShort}` : null);
   const differs = covers && programWeek && (c.covers_start !== c.week_start || c.covers_end !== c.week_end);
-  const weekNote = differs && week >= 1 ? `“Week ${week}” names the program week, ${programWeek}; this chapter covers ${covers.replace(/^Day/, "day").replace(" · ", ", ")}.` : null;
+  // #6161: a plain sentence, shown at the foot of the chapter (never before its prose); none for the prologue
+  const weekNote = differs && week >= 1 ? `This chapter covers ${covers.replace(/^Day/, "day").replace(" · ", ", ")}; program week ${week} ran ${programWeek}.` : null;
   const win = chapterWindow(c);
   const tick = isPub && week >= 1 && win ? { date: win[1], n: String(week) } : null;
   return { week, number, name, prologue, window, windowShort, programWeek, published: chapterPublished(c), weekNote, tick };
@@ -279,6 +280,14 @@ export function glossText(text) {
   return n ? `${n === 1 ? "The date quoted is" : "The dates quoted are"} ${glossList(text)}.` : "";
 }
 
+/** A grader's frozen test in words a reader can follow (#6161): "within ±12.49 out of 100 of 65 out of 100" reads "within
+ * 12.5 points of 65 (out of 100)"; "1 days" reads "1 day". Every other test is returned as served. */
+export function readableTest(how) {
+  return String(how || "")
+    .replace(/\b1 days\b/, "1 day")
+    .replace(/within ±([\d.]+) out of 100 of ([\d.]+) out of 100/g, (_, tol, at) => `within ${num(Number(tol), Number.isInteger(Number(tol)) ? 0 : 1)} points of ${at} (out of 100)`);
+}
+
 /**
  * A call whose words are withheld, in a compact mention (2026-11-14): its frozen test as the grader states it — already
  * public on the call's own page — instead of repeating the ledger's one sentence ("The words of this call are not
@@ -288,7 +297,7 @@ export function glossText(text) {
 export function heldCallWords(p, max = 90) {
   const how = p && p.grading && typeof p.grading.how === "string" ? p.grading.how.trim() : "";
   if (!how) return null;
-  const t = how.replace(/\b1 days\b/, "1 day").replace(/\d{4}-\d{2}-\d{2}/g, (iso) => dayInWords(iso, { short: true }) || iso);
+  const t = readableTest(how).replace(/\d{4}-\d{2}-\d{2}/g, (iso) => dayInWords(iso, { short: true }) || iso);
   // An observation is never graded, so it has no test: its line reads as itself ("…: an observation, not graded").
   const observation = p.status === "observation" || p.kind === "observation" || /observation, not graded/.test(t);
   return observation ? clip(t, max) : `the test: ${clip(t, max)}`;

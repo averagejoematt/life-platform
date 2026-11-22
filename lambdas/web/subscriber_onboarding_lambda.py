@@ -31,6 +31,7 @@ import boto3
 from common.email_identity import TRANSACTIONAL_SENDER  # #3568 — ONE sending vocabulary, gated against the SES-verified set
 from common.journal_silence import reader_mail  # #5131: the one public-surface guard
 from common.pacific_time import PACIFIC as PT  # #2414: reader-facing days anchor in the Pacific frame
+from common.reader_email import FOOTER_TEXT, head_meta, preheader_html, simple_content  # #6151 — the ONE reader envelope
 from common.send_guard import guarded_send_email, is_dry_run
 from common.subscriber_cadence import days_until_next, promise_sentence, signal_weekday, weekday_name  # #3564
 from common.unsubscribe_token import unsub_url_or_fallback  # #3044 — signed unsub link, never plaintext email
@@ -134,8 +135,9 @@ def _build_onboarding_email(email: str) -> tuple[str, str]:
 
     html = f"""<!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<head>{head_meta()}</head>
 <body style="margin:0;padding:0;background:#0D1117;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+{preheader_html(f"Your first Signal arrives {weekday_name(signal_weekday())}. While you wait, three places to start.")}
 <div style="max-width:520px;margin:40px auto;padding:0 16px;">
 
   <p style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:3px;
@@ -157,13 +159,13 @@ def _build_onboarding_email(email: str) -> tuple[str, str]:
   {cards_html}
 
   <div style="border-top:1px solid rgba(230,237,243,0.06);padding:20px 0 40px;margin-top:24px;">
-    <p style="font-size:11px;color:#30363d;margin:0 0 8px;line-height:1.6;text-align:center;">
+    <p style="font-size:11px;color:{FOOTER_TEXT};margin:0 0 8px;line-height:1.6;text-align:center;">
       You subscribed to The Weekly Signal at averagejoematt.com.
     </p>
     <p style="font-size:11px;text-align:center;margin:0;">
-      <a href="{unsub_url}" style="color:#484f58;text-decoration:underline;">Unsubscribe</a>
+      <a href="{unsub_url}" style="color:{FOOTER_TEXT};text-decoration:underline;">Unsubscribe</a>
       &nbsp;\u00b7&nbsp;
-      <a href="{SITE_URL}" style="color:#484f58;text-decoration:underline;">averagejoematt.com</a>
+      <a href="{SITE_URL}" style="color:{FOOTER_TEXT};text-decoration:underline;">averagejoematt.com</a>
     </p>
   </div>
 
@@ -235,12 +237,8 @@ def lambda_handler(event, context):
                 dry_run,
                 FromEmailAddress=SENDER,
                 Destination={"ToAddresses": [email]},
-                Content={
-                    "Simple": {
-                        "Subject": {"Data": reader_mail(subject), "Charset": "UTF-8"},
-                        "Body": {"Html": {"Data": reader_mail(html), "Charset": "UTF-8"}},
-                    }
-                },
+                # #6151: text part derived from the scrubbed HTML + List-Unsubscribe headers
+                Content=simple_content(reader_mail(subject), html=reader_mail(html), unsub_url=unsub_url_or_fallback(email, SITE_URL)),
             )
 
             if dry_run:

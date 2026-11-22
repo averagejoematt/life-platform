@@ -207,7 +207,9 @@ test("CR2 · the exact sentence for a coach without published historical comment
 
 test("CR2 · an annotated read shows only WITH its dated correction; a broken correction drops the read (control)", () => {
   const good = { kind: "correction", annotated_at: "2026-11-11", note: "Correction added 11 November 2026. A note." };
-  assert.deepEqual(correctionOf(good), { day: "11 November 2026", note: good.note });
+  assert.deepEqual(correctionOf(good), { day: "11 November 2026", note: "A note." }, "#6161: the label carries the day; the note's own 'Correction added' is not repeated");
+  const bare = { annotated_at: "2026-11-11", note: "Correction added 11 November 2026." };
+  assert.equal(correctionOf(bare).note, bare.note, "a note that is only the opening is kept as served, never emptied");
   assert.equal(correctionOf(undefined), null, "a read with no correction is an ordinary read");
   assert.equal(correctionOf({ annotated_at: "2026-11-11" }), false, "a correction without its note is unusable");
   const entry = {

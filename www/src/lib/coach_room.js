@@ -358,7 +358,10 @@ export function approvedWords(entry) {
 export function correctionOf(c) {
   if (c === undefined || c === null) return null;
   if (!c || typeof c.note !== "string" || !c.note.trim() || !dayInWords(c.annotated_at)) return false;
-  return { day: dayInWords(c.annotated_at), note: c.note };
+  // #6161: the label already reads "Correction · <day>", so the note's own opening "Correction added <day>." is not
+  // printed a second time. The rest of the note is shown as served.
+  const rest = c.note.replace(/^\s*Correction added [^.]+\.\s*/, "");
+  return { day: dayInWords(c.annotated_at), note: rest.trim() ? rest : c.note };
 }
 
 /** The one sentence every coach without published historical commentary carries (owner ruling 2026-11-11, second

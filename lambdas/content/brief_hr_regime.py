@@ -14,6 +14,8 @@ from __future__ import annotations
 from common.digest_utils import safe_float
 from health import hr_regime
 
+from content import brief_editorial  # #6163: each readiness figure names its morning
+
 REBASELINING_GREY = "#94a3b8"
 # The scorecard tiles computed from heart rate (Whoop recovery = HRV + RHR).
 HR_DERIVED_SCORE_TILES = frozenset({"Recovery"})
@@ -102,6 +104,7 @@ def readiness_signal_html(data, readiness_colour) -> str:
                 '<p style="color:#475569;font-size:9px;margin:0;">' + r_label + "</p></div>"
             )
         out += "</div>"
+    out += brief_editorial.readiness_morning_html(data)
     return out + "</div><!-- /S:readiness -->"
 
 
