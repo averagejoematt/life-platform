@@ -11,6 +11,8 @@ tests/test_chronicle_week_states_6178.py and is not repeated here):
     wire is unchanged. A held-marker reason still wins for the week it names.
   * PRESERVATION: the Wednesday writer never writes over a retired row — not on a re-run, and not under
     {"force": true}; a draft or published row keeps its existing guard.
+  * DELIVERY: the subscriber sender mails only a published installment. Before this, only `draft` was skipped, so a
+    retired (or sent-back) row that was the newest in the 7-day window would have been mailed on any manual invoke.
 """
 
 from __future__ import annotations
@@ -182,3 +184,20 @@ def test_the_other_statuses_keep_their_existing_guard(no_archive):
 def test_the_retired_status_is_one_name_across_the_writer_and_the_audit():
     assert chronicle_store.RETIRED_STATUS == autopublish_audit.RETIRED_STATUS == chapters.RETIRED_STATUS == "retired"
     assert chronicle_store.RETIRED_STATUS in chronicle_store.PROTECTED_STATUSES
+
+
+# ── the subscriber sender mails only a published installment ─────────────────
+
+
+def test_the_subscriber_sender_never_mails_a_retired_or_sent_back_week():
+    from unittest import mock
+
+    cel = importlib.import_module("chronicle_email_sender_lambda")
+    base = {"pk": "USER#matthew#SOURCE#chronicle", "sk": "DATE#2026-11-17", "date": "2026-11-17", "week_number": 11, "title": SENTINEL}
+    for status in ("retired", "changes_requested", "draft", "some-future-state"):
+        with mock.patch.object(cel.table, "query", return_value={"Items": [{**base, "status": status}]}):
+            assert cel._get_this_weeks_installment() is None, status
+    # mutation control: the same row, published (or a legacy row with no status), is still the week's installment
+    for row in ({**base, "status": "published"}, dict(base)):
+        with mock.patch.object(cel.table, "query", return_value={"Items": [row]}):
+            assert cel._get_this_weeks_installment() is not None, row.get("status")

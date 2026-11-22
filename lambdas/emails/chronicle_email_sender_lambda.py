@@ -230,6 +230,16 @@ def _get_this_weeks_installment() -> dict | None:
         if installment.get("status") == "draft":
             logger.info("Most recent Chronicle installment is still a draft — no-op (awaiting approval)")
             return None
+        # #6194: only a PUBLISHED installment is ever mailed. A week the owner retired (or sent back) is not a draft, and
+        # used to fall through this gate to the subscriber send. A row with no status at all is a legacy published row.
+        _status = str(installment.get("status") or "published").strip().lower()
+        if _status != "published":
+            logger.info(
+                "Most recent Chronicle installment (week %s) is %s, not published — no-op",
+                _fmt_week(installment.get("week_number", "?")),
+                _status,
+            )
+            return None
         # #2112: already delivered by the other trigger (cron or approve-invoke,
         # whichever fired first) — never re-send the same installment.
         if installment.get("delivered_at"):
