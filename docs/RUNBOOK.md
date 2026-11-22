@@ -702,6 +702,53 @@ SSM `/life-platform/reader-call` = `off` shuts both); the forecast page is `/sys
 Dead-man: `public_forecast:cycle_liveness` in qa-smoke (quiet while `STREAM_LIVE` is off; FAIL when a live cycle has no
 `RUN#` stamp after Monday 10:00 PT; WARN when the runtime switch is off or a rule was held for thin/stale inputs).
 
+## Second editions of a chapter (#6193)
+
+Dark behind ONE committed switch, `lambdas/content/chapter_editions.py::LIVE` (ships `False`). Off, `/api/chapters` never
+reads the edition rows and serves no `editions` field, the exporter writes no `chapter_editions.json`, and the site is
+unchanged. Records can be proposed and approved while it is off; nothing renders.
+
+The owner's steps, in order (the MCP door is `manage_chapter_corrections`; `chapter_id` is the PAGE address `week-NN`,
+not the program week):
+
+1. `action=propose_edition`, `chapter_id`, `edition` (2-9), `text` (the full chapter, markdown), `first_published`
+   (the original YYYY-MM-DD), optional `carries` (approved correction ids the edition makes). The gates run first; the
+   reply carries the stored text's `sha256` — it must equal the hash he approved.
+2. Render it on the real site, locally, before anything is public (reads the public site only; writes no record):
+   ```bash
+   python3 scripts/chronicle_edition_preview.py --chapter week-NN --text-file <private>.md [--archival-file <private>.md] --out <private dir>
+   ```
+   Screenshots at 390 px and 1280 px; `www/dist` is then a preview build — never deploy it.
+3. Keep the first edition privately (owner-attended S3 + DynamoDB write):
+   ```bash
+   python3 scripts/chronicle_edition_backup.py --chapter week-NN --row-sk DATE#YYYY-MM-DD          # dry run: reads only
+   python3 scripts/chronicle_edition_backup.py --chapter week-NN --row-sk DATE#YYYY-MM-DD --apply  # write-once copy + pointer
+   ```
+4. `action=approve_edition`, `chapter_id`, `edition`, `approved=true`, `sha256` (the approved hash; refused unless it is
+   the stored text's) — only after he approved THIS text.
+5. Optional, per chapter: `action=propose_archival` (`archival_id`, a privacy-safe rendering of the first edition —
+   never the raw original), then `action=approve_archival` (`approved=true`, `sha256`). Without it there is no
+   first-edition page.
+6. `action=list_editions` shows what would render and why not.
+7. After the deploy, prove the deployed prose is the approved bytes (read-only):
+   ```bash
+   python3 scripts/chronicle_edition_verify.py --chapter week-NN --sha256 <approved> [--archival-sha256 <approved>]
+   ```
+   Permitted presentation (never inside a sentence): evidence figures and call cards between paragraphs, the dated record
+   note, a dek printed once in the header, a signature line's class — `content.chapter_editions.PERMITTED_PRESENTATION`.
+
+An edition that fails a check at build time is HELD on its own (its page keeps the first edition; the build log names
+it); other editions publish. When the body of an edition carries his approved own-words line word for word, the page
+does not also place it beside the chapter.
+
+Turn on: merge `LIVE = True`, deploy the Site API (`bash deploy/deploy_site_api.sh`, or the CI path on merge), let the
+site deploy rebuild. Rollback: merge `LIVE = False`, deploy the Site API, rebuild — the canonical page serves the first
+edition again (its row was never changed); the archival page leaves the root on the next sync.
+
+What it does NOT change: the journal page `/journal/posts/<id>/` (still the first edition — restricted material there is
+`scripts/chronicle_revision_apply.py`'s job), the feed (no new item, date or guid), any delivery marker or subscriber mail,
+or any `www-previous/` rollback tree.
+
 ## The coach-context pilot and the recommendation record (#6158)
 
 **Live on merge (Part A):** the owner-only recommendation record (`USER#matthew#SOURCE#coach_recommendations`,
