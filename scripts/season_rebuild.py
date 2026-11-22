@@ -39,7 +39,7 @@ from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
-from content import story_desk, story_dossier, story_ledger, story_writers  # noqa: E402
+from content import chapter_reads, story_desk, story_dossier, story_ledger, story_writers  # noqa: E402
 from content.story_pipeline import MAX_REWRITES, _Gates, _write_ep, _write_post, strip_dek, with_dek  # noqa: E402,F401
 
 CHRONICLE_PK = "USER#matthew#SOURCE#chronicle"
@@ -70,9 +70,28 @@ def _table():
     return boto3.resource("dynamodb", region_name="us-west-2").Table("life-platform")
 
 
+_CALLS: Dict[str, Any] = {}
+
+
+def _private_calls(table) -> Any:
+    """#6199 P: the calls the policy keeps private, read once per run (None when unreadable: every week holds)."""
+    if "calls" not in _CALLS:
+        from content.story_pipeline import load_private_calls
+
+        _CALLS["calls"] = load_private_calls(table)
+    return _CALLS["calls"]
+
+
 def _plan_prologue(table) -> str:
     it = table.get_item(Key={"pk": CHRONICLE_PK, "sk": PLAN_PROLOGUE_SK}).get("Item") or {}
-    return str(it.get("content_markdown") or "")
+    return str(it.get("content_markdown") or "") if chapter_reads.writer_may_read(it) else ""  # #6199 G1: withdrawn → ""
+
+
+def _with_plan_prologue(prev_post: str, table) -> str:
+    """The week-0→1 "previous post": the prologue, then the sealed-plan chapter when a writer may read it. A withdrawn
+    plan chapter (#6199 G1) leaves the prologue alone — the prompt says nothing about a sealed-plan chapter."""
+    plan = _plan_prologue(table)
+    return prev_post + "\n\n(Then, the day before Day 1, the sealed plan was published as:)\n\n" + plan if plan else prev_post
 
 
 def prologue_dossier(table) -> Dict[str, Any]:
@@ -182,7 +201,15 @@ def run_week(
     _save(out, f"wk{n}_dossier.json", dossier)
     budget = story_desk.run_desk(dossier, ledger, week=n)
     _save(out, f"wk{n}_budget.json", budget)
-    g = _Gates(n, dossier, budget, ledger, _load(out, f"wk{n - 1}_dossier.json") if n > 0 else None, _previous_texts(out, n))
+    g = _Gates(
+        n,
+        dossier,
+        budget,
+        ledger,
+        _load(out, f"wk{n - 1}_dossier.json") if n > 0 else None,
+        _previous_texts(out, n),
+        private_calls=_private_calls(table),  # #6199 P: a rebuilt week is held to the private-call check like a live one
+    )
 
     md, findings = _write_post(g, dossier, budget, ledger, n, previous_post)
     findings += g.dek(budget.get("top_line") or "")
@@ -623,14 +650,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 2
     prev_post = _load(args.out, f"wk{first - 1}_chronicle.md") if first > 0 else None
     if first == 1:
-        prev_post = (prev_post or "") + "\n\n(Then, the day before Day 1, the sealed plan was published as:)\n\n" + _plan_prologue(table)
+        prev_post = _with_plan_prologue(prev_post or "", table)
     prev_ep = _load(args.out, f"wk{first - 1}_episode.txt") if first > 0 else None
     for n in todo:
         print(f"week {n}…")
         res = run_week(table, by_week[n], args.out, ledger, prev_post, prev_ep)
         ledger, prev_post, prev_ep = res["ledger"], res["post"], res["episode"]
         if n == 0:
-            prev_post = prev_post + "\n\n(Then, the day before Day 1, the sealed plan was published as:)\n\n" + _plan_prologue(table)
+            prev_post = _with_plan_prologue(prev_post, table)
     return 0
 
 

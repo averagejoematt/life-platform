@@ -596,6 +596,17 @@ def _find_stale_drafts(hours: float, max_days: float) -> list[dict]:
     return out
 
 
+def _private_calls():
+    """#6199 P: the calls the publication policy keeps private, read now; None when unreadable (the audit then refuses)."""
+    from content import private_call_check
+
+    try:
+        return private_call_check.load(table)
+    except Exception as e:  # noqa: BLE001 — fail closed: blocking_items turns None into a refusal
+        logger.error("[#6199] private-call check: the coach calls could not be read (%s: %s) — the audit refuses", type(e).__name__, e)
+        return None
+
+
 def _audit_refusal(item: dict) -> list[str]:
     """#4694: the blocking items that keep an UNAPPROVED draft from publishing itself (empty = the audit passed).
 
@@ -604,7 +615,7 @@ def _audit_refusal(item: dict) -> list[str]:
     try:
         from content import autopublish_audit
 
-        return autopublish_audit.blocking_items(item)
+        return autopublish_audit.blocking_items(item, private_calls=_private_calls(), check_private_calls=True)
     except Exception as exc:  # noqa: BLE001 — a broken audit holds the week; it never waves it through
         return [f"the audit could not run: {exc}"]
 

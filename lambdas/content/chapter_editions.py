@@ -182,8 +182,13 @@ def word_count(text: str) -> int:
 
 # ── the gates ────────────────────────────────────────────────────────────────────────────────
 
+#: #6199: a rendering-only or synthetic-fixture caller of the gates — there is no call record to check against.
+PRIVATE_CALLS_NOT_WIRED: Any = object()
 
-def gate_findings(text: Any, *, tainted: Optional[Callable[[str], bool]], filter_hits: Optional[Callable[[str], list]] = None) -> list:
+
+def gate_findings(
+    text: Any, *, tainted: Optional[Callable[[str], bool]], private_calls: Any, filter_hits: Optional[Callable[[str], list]] = None
+) -> list:
     """Every reason ``text`` may not reach a public page; ``[]`` = it may. Fail-closed on every unreadable input.
 
     * content filter — ``privacy.privacy_guard.find_violations`` (the chronicle's own publish gate; its vocabulary is
@@ -192,7 +197,14 @@ def gate_findings(text: Any, *, tainted: Optional[Callable[[str], bool]], filter
     * private calls — ``tainted`` is ``web.narrative_publication.is_tainted`` (a SHINGLE-word run of a call the
       publication record withholds, ``common.prediction_publication``); ``None`` means no record could be opened;
     * truth — ``content.story_checks``: a staged encounter no source holds, a cycle/attempt count, off-record
-      specifics, a cut reader-vocabulary term.
+      specifics, a cut reader-vocabulary term;
+    * #6199 — ``content.private_call_check.findings``, THE publish-time check for a call or ask the publication policy
+      classifies private (echo, id, described), injected like the two above so this module never reaches AWS:
+      ``private_calls`` is required — ``lambda t: private_call_check.findings(t, calls)`` over the calls read at run time
+      (``private_call_check.for_text``), None when they could not be read (refused, fail closed), or
+      ``PRIVATE_CALLS_NOT_WIRED`` for a rendering-only or synthetic-fixture caller, each registered in
+      tests/test_chapter_reads_withdrawn_6199.py. ``tainted`` above is a different policy (the narrative record's
+      verbatim taint) and stays beside it.
     """
     from content import story_checks  # noqa: PLC0415
 
@@ -221,6 +233,13 @@ def gate_findings(text: Any, *, tainted: Optional[Callable[[str], bool]], filter
                 out.append("private-call: the text carries the words of a call that is not public")
         except Exception as exc:  # noqa: BLE001
             out.append(f"private-call: the publication record could not be read ({type(exc).__name__}) — nothing is published unchecked")
+    if private_calls is None:
+        out.append("private call: the check could not read the calls the publication policy classifies, so nothing publishes")
+    elif private_calls is not PRIVATE_CALLS_NOT_WIRED:
+        try:
+            out += list(private_calls(text))
+        except Exception as exc:  # noqa: BLE001
+            out.append(f"private call: the check could not run ({type(exc).__name__}) — nothing is published unchecked")
     return out
 
 
@@ -428,7 +447,12 @@ def _public_approvals(item: dict) -> list:
 
 
 def public_view(
-    items: Iterable[Any], *, tainted: Optional[Callable[[str], bool]], filter_hits: Optional[Callable[[str], list]] = None, log=None
+    items: Iterable[Any],
+    *,
+    tainted: Optional[Callable[[str], bool]],
+    private_calls: Any,
+    filter_hits: Optional[Callable[[str], list]] = None,
+    log=None,
 ) -> list:
     """Per chapter, the LATEST approved edition that passes every gate — with its approved archival rendering, if one
     passes too — as the public may read it. Withheld (and logged), fail-closed: an unapproved or malformed record; an
@@ -468,7 +492,7 @@ def public_view(
             if str(original["backed_up_at"]) > str(e.get("approved_at") or ""):
                 say(f"[chapter-editions] {e['sk']} withheld: approved before the first edition was backed up")
                 continue
-            findings = gate_findings(e["text"], tainted=tainted, filter_hits=filter_hits)
+            findings = gate_findings(e["text"], tainted=tainted, private_calls=private_calls, filter_hits=filter_hits)
             if findings:
                 say(f"[chapter-editions] {e['sk']} withheld by the publication gates: {len(findings)} finding(s)")
                 continue
@@ -478,7 +502,7 @@ def public_view(
             continue
         archival = None
         for a in sorted(archivals.get(cid, []), key=lambda a: a["archival_id"], reverse=True):
-            findings = gate_findings(a["text"], tainted=tainted, filter_hits=filter_hits)
+            findings = gate_findings(a["text"], tainted=tainted, private_calls=private_calls, filter_hits=filter_hits)
             if findings:
                 say(f"[chapter-editions] {a['sk']} withheld by the publication gates: {len(findings)} finding(s)")
                 continue
