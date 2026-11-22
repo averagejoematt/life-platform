@@ -2348,6 +2348,13 @@
       "via": "local-seam"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/emails/advice_status.py",
+      "partition": "decisions",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": "ai-review-pack",
       "module": "lambdas/emails/ai_review_pack_lambda.py",
@@ -8372,7 +8379,7 @@
       "contracts_enrolled": 16,
       "contracts_known": 15,
       "contracts_ratchet": 16,
-      "edges": 798,
+      "edges": 799,
       "lambdas": 107,
       "mcp_tool_modules": 43,
       "mcp_tools": 94,
@@ -8387,8 +8394,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 389,
-        "sites_resolved": 1003,
-        "sites_total": 1392
+        "sites_resolved": 1004,
+        "sites_total": 1393
       },
       "schedule_resolution": {
         "dynamic": 0,
