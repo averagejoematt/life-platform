@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-Last updated: 2026-11-16 (v8.6.0 — 93 MCP tools, 97-module package, 107 Lambdas, 20 data sources)
+Last updated: 2026-11-22 (v8.6.0 — 94 MCP tools, 98-module package, 107 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
 - Lambda functions defined (CDK): 107 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
@@ -674,6 +674,23 @@ logs an error), a POST 404 "Reader calls are not available."; call pages hide th
 "Make your own call" block reads as empty. Nothing already recorded is touched. Watch: the `reader-call-accepted-spike` alarm
 (digest, >= 60 accepted reader calls in one hour); refusals by reason in Logs Insights on the site-api log group:
 `fields Reason | filter ReaderCallEvent = "refused" | stats count(*) by Reason`.
+
+## Chapter corrections — propose, approve, publish (#6177)
+
+A dated public correction to a published chapter is a record beside the chapter, never an edit of it
+(`lambdas/content/chapter_corrections.py`). Signed by the platform: "Correction, <date> — Average Joe Matt editorial record".
+
+1. **Propose** (a session, from verified wording): MCP `manage_chapter_corrections` `action=propose` with `chapter_id`
+   (`week-NN`, as in `/story/week-NN/`), `correction_id`, `kind`, `published_said`, `record_shows`, `evidence`. Renders nowhere.
+2. **Approve** (Matthew, in a Claude conversation, after reading the exact words): `action=approve`, `approved=true`. This
+   dates it today (Pacific) and stamps the signature. To change approved words, propose a new record with `supersedes`.
+3. **Publish**: the next `www/**` deploy (or `gh workflow run web-preview-deploy.yml -f target=root`) renders it on the
+   chapter page and the story list; the next site deploy (`gh workflow run site-deploy.yml`) rebuilds `/rss.xml` with it.
+4. **Check**: `curl -s https://averagejoematt.com/api/chapters | jq .corrections` lists it; a `null` there means the read
+   failed and both builds refuse to run rather than drop it.
+
+The October 2026 editor's notes signed "Margaret Calloway" stay word for word; every surface that renders one carries
+"Margaret Calloway is an AI editorial persona of the platform, not a person."
 
 ## Common Issues
 

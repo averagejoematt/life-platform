@@ -1,8 +1,8 @@
 # Life Platform — MCP Tool Catalog
 
-> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-11-15
+> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-11-22
 
-**Version:** v8.6.0 | **Last updated:** 2026-11-15 | **Total tools:** 93
+**Version:** v8.6.0 | **Last updated:** 2026-11-22 | **Total tools:** 94
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;
@@ -21,7 +21,7 @@
 
 ---
 
-## All 93 Tools — by module
+## All 94 Tools — by module
 
 | Module | Tools |
 |---|---|
@@ -60,6 +60,7 @@
 | `mcp/tools_capture.py` | 1 |
 | `mcp/tools_coach_corrections.py` | 1 |
 | `mcp/tools_challenges.py` | 1 |
+| `mcp/tools_chapter_corrections.py` | 1 |
 | `mcp/tools_owner_words.py` | 1 |
 | `mcp/tools_pending_writes.py` | 1 |
 | `mcp/tools_surfaces.py` | 2 |
@@ -325,6 +326,12 @@
 | Tool | Key Params | Description |
 |------|-----------|-------------|
 | `log_challenge_checkin` | challenge_id, completed, date= | #6087: log Matthew's OWN daily check-in on one of his ACTIVE challenges (did he do today's rep). Call it only when he says he did or missed a challenge day. challenge_id = the challenge's id (the part after 'CHALLENGE#', as /api/challenges serves it); completed = true (done) or false (missed); date = YYYY-MM-DD, default today (Pacific), never a future day. One entry per day: logging the same day again REPLACES that day. Readers' check-ins are stored elsewhere and never count here. |
+
+### mcp.tools_chapter_corrections (`mcp/tools_chapter_corrections.py`)
+
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `manage_chapter_corrections` | action, chapter_id=, correction_id=, kind=, published_said=, record_shows=, evidence=, supersedes=, approved=, note= | #6177: dated PUBLIC corrections to published chapters, signed by the platform ('Correction, <date> — Average Joe Matt editorial record'), never by a persona. action='list' (optional chapter_id) shows every correction on record and whether it renders. action='propose' writes ONE unapproved correction: chapter_id (the v9 id, e.g. week-09), correction_id (lowercase slug), kind ('correction' \| 'qualification'), published_said (what the chapter published), record_shows (what the record shows), evidence (where it is checked), optional supersedes (an earlier correction_id of the same chapter). A proposal renders nowhere. action='approve' records Matthew's approval on ONE proposal: chapter_id, correction_id, approved=true — ONLY after he explicitly approved THIS correction's exact words; never inferred. Approval dates it today (Pacific) and it appears on the site from the next build. Records are append-only: nothing is edited or deleted; replace one by proposing a new one that supersedes it. |
 
 ### mcp.tools_owner_words (`mcp/tools_owner_words.py`)
 
