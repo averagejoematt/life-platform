@@ -22,6 +22,14 @@ from coach import coach_corrections as cc  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _pre_6149_selection(monkeypatch):
+    """#6149: the cycle-aware ranking has its own tests (test_coach_corrections_follow_the_coach_6149);
+    pin the cycle unreadable so these fixtures (July-dated rows) exercise the newest-first selection
+    deterministically, whatever an earlier test or the runner's AWS credentials would return."""
+    monkeypatch.setattr(cc, "read_cycle", lambda *a, **k: None)
+
+
 @pytest.fixture
 def table():
     return FakeDdbTable()
@@ -346,7 +354,9 @@ def test_render_corrections_block_never_flags_when_cycle_unknown():
 
 
 def test_corrections_prompt_block_passes_current_cycle_through_to_render(table):
-    sk = cc.write_correction(table, {"surface": "coach_brief"}, "315 lbs is stale", "stale-baseline", cycle=9)
+    # #6149: an older-cycle STALE-BASELINE row is never injected any more, so the PRIOR CYCLE render is
+    # exercised on another class (an older-cycle non-baseline row stays eligible, ranked last).
+    sk = cc.write_correction(table, {"surface": "coach_brief"}, "315 lbs is stale", "cross-coach-inconsistency", cycle=9)
     got = cc.get_correction(table, sk)
     got["status"] = "open"
     t2 = FakeDdbTable(rows=[got])
