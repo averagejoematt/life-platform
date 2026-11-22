@@ -828,3 +828,158 @@ def test_nothing_closes_a_correction_but_the_owner_door():
         if "close_correction(" in src or "reopen_correction(" in src:
             callers.add(rel)
     assert callers == {"lambdas/coach/coach_corrections.py", "mcp/tools_coach_corrections.py"}, sorted(callers)
+
+
+# ── #6149: the dated thread and the labelled cycle day (round-4 pass-bar items 6 and 5), same switch ──────
+
+
+DATED_NOTES = (
+    "RECENT CONVERSATIONS (your own compressed notes from earlier days):\n"
+    "- [2026-09-14] Synthetic note one: asked him to stretch after work.\n"
+    "- [2026-10-06] Synthetic note two: asked him to take the stairs at the office."
+)
+FRAME_LINE = "Experiment: Day 40 of cycle 9 (week 6)."
+
+
+def _chat_row(role: str, text: str, created_at, sk: str) -> dict:
+    row = {"pk": "COACH#nutrition_coach", "sk": sk, "role": role, "text": text, "coach_id": "nutrition", "provenance": "x"}
+    if created_at is not None:
+        row["created_at"] = created_at
+    return row
+
+
+# Stored KEY order (oldest first, as `_chat_rows` returns it): within 2026-10-25 the random key suffix puts his
+# message AFTER the coach's reply, although he sent it first; the last reply is stamped 03:30Z on the 26th,
+# which is still the 25th in Pacific.
+CHAT_ROWS = [
+    _chat_row("matthew", "synthetic question one", "2026-10-20T16:00:00+00:00", "CHAT#2026-10-20#11111111"),
+    _chat_row("coach", "Try the blue water bottle.", "2026-10-20T16:00:05+00:00", "CHAT#2026-10-20#22222222"),
+    _chat_row("coach", "Send me a photo of the shelf.", "2026-10-25T17:00:05+00:00", "CHAT#2026-10-25#33333333"),
+    _chat_row("matthew", "synthetic question two", "2026-10-25T17:00:00+00:00", "CHAT#2026-10-25#44444444"),
+    _chat_row("matthew", "synthetic reply three", "2026-10-26T03:29:00+00:00", "CHAT#2026-10-25#55555555"),
+    _chat_row("coach", "Noted, talk tomorrow.", "2026-10-26T03:30:00+00:00", "CHAT#2026-10-25#66666666"),
+]
+
+
+def _assemble_on_fixture(monkeypatch, rows=CHAT_ROWS):
+    """`_assemble` over fixed reads: CHAT# rows, dated notes, a domain pack carrying the cycle-day line."""
+    from datetime import datetime
+
+    import coach.coach_domain_facts as cdf
+    from coach import telegram_worker_lambda as worker
+
+    monkeypatch.setattr(worker, "display_name", lambda *a, **k: "Coach")
+    monkeypatch.setattr(worker, "_chat_rows", lambda cid, limit=40: [dict(r) for r in rows])
+    monkeypatch.setattr(worker, "_memory_block", lambda cid: DATED_NOTES)
+    monkeypatch.setattr(worker, "_facts", dict)
+    monkeypatch.setattr(worker, "_s3_client", lambda: None)
+    monkeypatch.setattr(worker, "_emit_metric", lambda name, cid: None)
+    monkeypatch.setattr(worker, "_current_moment_line", lambda: "CURRENT MOMENT: Sunday, 2026-11-22, 9:00 AM Pacific.")
+    monkeypatch.setattr(worker, "_pacific_now", lambda: datetime(2026, 11, 22, 9, 0))
+    monkeypatch.setattr(worker, "_colleagues_block", lambda *a, **k: "")
+    monkeypatch.setattr(cdf, "domain_facts_block", lambda *a, **k: f"{FRAME_LINE}\nSynthetic pack line.")
+    monkeypatch.setattr("coach.coach_vision.thread_block", lambda *a, **k: "")
+    return worker._assemble("nutrition_coach", "nutrition")
+
+
+#: sha256 of `_offpath_digest` over `_assemble_on_fixture`, measured on origin/main f1effb89e BEFORE this change
+#: (scratch copy of main's lambdas/, same fixture) and on this branch with the switch off: identical.
+MAIN_OFFPATH_DIGEST = "08627fae67582ab537b772a2b3148aa66cee28e9227363a4edcb9dc455d6dfe2"
+
+
+def _offpath_digest(a: dict) -> str:
+    import hashlib
+    import json
+
+    from coach import coach_chat
+
+    ctx = {k: a[k] for k in ("thread", "memory", "facts_block", "domain", "record_extra")}
+    ctx["messages"] = coach_chat.format_thread(a["thread"])
+    return hashlib.sha256(json.dumps(ctx, sort_keys=True, default=str).encode()).hexdigest()
+
+
+def test_dark_the_assembled_context_is_byte_identical_to_main(monkeypatch):
+    """Switch off, the worker hands the model exactly what it did before #6149: `{role, text}` turns in stored
+    key order, the memory as rendered, and the domain pack's cycle-day line untouched."""
+    assert ccp.LIVE is False
+    a = _assemble_on_fixture(monkeypatch)
+    assert a["thread"] == [{"role": r["role"], "text": r["text"]} for r in CHAT_ROWS]
+    assert a["memory"] == DATED_NOTES and FRAME_LINE in a["domain"] and FRAME_LINE in a["facts_block"]
+    assert _offpath_digest(a) == MAIN_OFFPATH_DIGEST
+
+
+def test_live_each_visible_message_carries_its_own_pacific_day_and_the_newest_is_placed_against_the_notes(pilot_table, monkeypatch):
+    monkeypatch.setattr(ccp, "LIVE", True)
+    thread = ccp.thread_turns(CHAT_ROWS)
+    assert [t[ccp.STAMP_FIELD] for t in thread] == [r["created_at"] for r in CHAT_ROWS], "the stored stamp, unaltered"
+    ctx = ccp.build_turn_context(pilot_table, "nutrition_coach", TODAY, memory=DATED_NOTES, thread=thread)
+    section = ctx["sections"]["thread_dates"]
+    assert section.splitlines()[1:7] == [
+        "- him: Tuesday, October 20 (2026-10-20)",
+        "- you: Tuesday, October 20 (2026-10-20)",
+        "- him: Sunday, October 25 (2026-10-25)",
+        "- you: Sunday, October 25 (2026-10-25)",
+        "- him: Sunday, October 25 (2026-10-25)",
+        "- you: Sunday, October 25 (2026-10-25)",
+    ], "03:30Z on the 26th is the 25th in Pacific"
+    assert (
+        "Your newest message in this chat was sent Sunday, October 25 (2026-10-25): LATER than your newest note, "
+        "dated Tuesday, October 6 (2026-10-06)."
+    ) in section
+    assert "undated" not in section
+    m = ctx["memory"]
+    assert m.index("[2026-10-06]") < m.index(ccp.THREAD_DATES_HEADER) < m.index("6. WHAT YOU CAN AND CANNOT REMEMBER")
+    assert "only his own recorded answer says what he did" in m, "the no-inference rule stands"
+
+
+def test_live_the_thread_is_put_in_send_order_not_key_order(pilot_table, monkeypatch):
+    """Within one day the CHAT# key suffix is random, so key order put the reply ahead of his question."""
+    monkeypatch.setattr(ccp, "LIVE", True)
+    ctx = ccp.build_turn_context(pilot_table, "nutrition_coach", TODAY, memory=DATED_NOTES, thread=ccp.thread_turns(CHAT_ROWS))
+    texts = [t["text"] for t in ctx["thread"]]
+    assert texts.index("synthetic question two") < texts.index("Send me a photo of the shelf.")
+    assert texts[-1] == "Noted, talk tomorrow.", "the coach's newest message is last"
+
+
+def test_live_a_message_with_no_timestamp_is_called_undated_and_the_order_is_left_as_stored(pilot_table, monkeypatch):
+    monkeypatch.setattr(ccp, "LIVE", True)
+    rows = [dict(r) for r in CHAT_ROWS]
+    rows[-1].pop("created_at")
+    thread = ccp.thread_turns(rows)
+    ctx = ccp.build_turn_context(pilot_table, "nutrition_coach", TODAY, memory=DATED_NOTES, thread=thread)
+    section = ctx["sections"]["thread_dates"]
+    assert section.splitlines()[-2:] == [
+        "Your newest message in this chat was sent Sunday, October 25 (2026-10-25): LATER than your newest note, "
+        "dated Tuesday, October 6 (2026-10-06).",
+        "1 of these messages are undated: when they were sent, and whether before or after a note, is not known.",
+    ]
+    assert "- you: undated (no timestamp stored)" in section
+    assert [t["text"] for t in ctx["thread"]] == [r["text"] for r in rows], "no guessed place for an undated turn"
+
+
+def test_live_the_worker_dates_the_thread_and_labels_the_cycle_day(pilot_table, monkeypatch):
+    from coach import telegram_worker_lambda as worker
+
+    monkeypatch.setattr(ccp, "LIVE", True)
+    monkeypatch.setattr(worker, "_table", lambda: pilot_table)
+    a = _assemble_on_fixture(monkeypatch)
+    assert ccp.THREAD_DATES_HEADER in a["memory"] and "LATER than your newest note" in a["memory"]
+    assert FRAME_LINE not in a["domain"] and FRAME_LINE not in a["facts_block"]
+    assert ccp.FRAME_LABEL.format(day="40", cycle=" of cycle 9", week="6") in a["facts_block"]
+    assert "Synthetic pack line." in a["domain"], "only the one line changes"
+
+
+def test_the_cycle_day_label_matches_the_line_the_domain_pack_really_renders():
+    """The label is a rewrite of `_experiment_frame_lines`' own output; if that wording drifts the rewrite must
+    not silently stop matching."""
+    from coach.coach_domain_facts import _experiment_frame_lines
+
+    real = _experiment_frame_lines("2026-11-22")[0]
+    labelled = ccp.frame_label(f"head\n{real}\ntail", live=True)
+    assert real not in labelled and labelled.startswith("head\nCycle calendar (") and labelled.endswith("\ntail")
+    assert "not how long he has been tracking" in labelled
+    day = ccp._FRAME.search(real).group(1)
+    assert f"Day {day}" in labelled, "the number itself is kept, so the grounder's Day-N check still reads it"
+    assert ccp.frame_label(real) == real, "switch off: untouched"
+    pre = "Experiment: cycle 18 starts 2026-12-01 — pre-genesis, there is no Day 1 yet."
+    assert ccp.frame_label(pre, live=True) == pre

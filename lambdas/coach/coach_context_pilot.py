@@ -28,6 +28,19 @@ THE ORDER (the owner's, verbatim in intent):
   6. what the coach can and cannot remember, worded so it cannot be read as "I have no memory", and that
      what he DID comes only from his recorded answer, never from his data.
 
+DATED THREAD (#6149, round 4 of the blind evaluation, pass-bar item 6). The notes are dated but the stored chat
+thread reached the prompt undated, and it is often NEWER than the newest note — so asked "what did you last
+tell me to do", the coach cited an old note over a newer chat message. Under the switch each stored turn
+carries its row's own `created_at` (`thread_turns`), the thread is put in time order (`order_thread`: the
+CHAT# sort key's suffix is random within a day, so key order is not send order), and `thread_dates_section`
+names the Pacific day of every message the model will see plus where the newest one falls against the newest
+note. A turn with no stored timestamp is called undated, never given a guessed day. Nothing here reads whether
+he followed anything; section 6's rule stands.
+
+CYCLE CALENDAR (#6149, pass-bar item 5). The domain pack's "Experiment: Day N of cycle C" line was quoted in a
+reflective reply as "N days of tracking". Under the switch `frame_label` re-labels that one line for what it
+is — a calendar position, not a measurement and not a tracking length — and says when it is worth naming.
+
 THE LEAD. Eli Marsh coordinates: he sees every coach's open recommendations and is the one who asks
 about a due follow-up — ONE recommendation, once, inside a reply or a scheduled message that already
 exists. Specialists keep their voice and see their own. No orchestration, no new model call. This module
@@ -102,6 +115,19 @@ CAPABILITY = (
     "(an average, a count, a logged workout or meal): only his own recorded answer says what he did. If he has not "
     "told you, say you do not know."
 )
+
+STAMP_FIELD = "sent_at"
+THREAD_DATES_HEADER = (
+    "4b. THE DAY EACH MESSAGE OF THIS CHAT WAS SENT (Pacific), in the order the conversation after this prompt shows "
+    "them, oldest first — the last line is the newest message:"
+)
+UNDATED = "undated (no timestamp stored)"
+FRAME_LABEL = (
+    "Cycle calendar (a position in the calendar, not a measurement of him and not how long he has been tracking; "
+    "name it only if he asks where he is in the cycle or the program): Day {day}{cycle} (week {week})."
+)
+_FRAME = re.compile(r"^Experiment: Day (\d+)((?: of cycle \d+)?) \(week (\d+)\)\.$", re.M)
+_NOTE_DAY = re.compile(r"^- \[(\d{4}-\d{2}-\d{2})\]", re.M)
 
 _STOP = frozenset(
     "that this with have just your youre what from been they them then than when were will would could should about into "
@@ -199,6 +225,97 @@ def dedupe_thread(thread: list[dict], cap: int = MAX_PER_THEME) -> tuple[list[di
     dropped = {coach_idx[k] for k in range(len(coach_idx)) if not keep[k]}
     new_thread = [dict(t, text=OMITTED_REPLY) if i in dropped else t for i, t in enumerate(thread)]
     return new_thread, {"replies_left_out": len(dropped)}
+
+
+# ── 4b. the thread, dated (#6149) ───────────────────────────────────────────────────────────
+
+
+def thread_turns(rows: list, *, live: Optional[bool] = None) -> list[dict]:
+    """The worker's thread projection. Switch off: exactly the `{role, text}` it always built. On: each turn
+    also carries its stored row's `created_at` as STAMP_FIELD (None when the row has none)."""
+    if not (LIVE if live is None else live):
+        return [{"role": i.get("role"), "text": i.get("text")} for i in rows]
+    return [{"role": i.get("role"), "text": i.get("text"), STAMP_FIELD: i.get("created_at")} for i in rows]
+
+
+def _sent(turn: dict):
+    from common.pacific_time import parse_iso_utc
+
+    return parse_iso_utc(turn.get(STAMP_FIELD))
+
+
+def _sent_day(turn: dict) -> Optional[str]:
+    from common.pacific_time import pacific_date_of
+
+    stamp = turn.get(STAMP_FIELD)
+    return pacific_date_of(str(stamp)) if stamp else None
+
+
+def order_thread(thread: list) -> list:
+    """Send order, by each turn's stored timestamp (a stable sort). The CHAT# key is `CHAT#<day>#<random>`, so
+    within a day key order is not send order. If ANY turn is undated the order is left as stored: there is
+    no honest place to put an undated turn."""
+    thread = list(thread or [])
+    if not thread or any(_sent(t) is None for t in thread):
+        return thread
+    return sorted(thread, key=_sent)
+
+
+def _visible(thread: list) -> list:
+    """The turns `coach_chat.format_thread` actually sends: the last MAX_THREAD_TURNS with text, minus any
+    leading coach turns (a prompt must open on his message)."""
+    from coach import coach_chat
+
+    turns = [t for t in thread if (t or {}).get("text")][-coach_chat.MAX_THREAD_TURNS :]
+    while turns and turns[0].get("role") != coach_chat.ROLE_MATTHEW:
+        turns.pop(0)
+    return turns
+
+
+def _day_label(day: Optional[str]) -> str:
+    return f"{_in_words(day)} ({day})" if day else UNDATED
+
+
+def thread_dates_section(thread: list, notes: str) -> str:
+    """Every visible message's Pacific send day, oldest first, then where the coach's newest message falls
+    against its newest dated note — so "the newest thing you said to him" is decidable from dates alone."""
+    from coach import coach_chat
+
+    turns = _visible(thread)
+    if not turns:
+        return ""
+    lines = [THREAD_DATES_HEADER]
+    for t in turns:
+        who = "him" if t.get("role") == coach_chat.ROLE_MATTHEW else "you"
+        left_out = " (an earlier reply of yours, left out)" if t.get("text") == OMITTED_REPLY else ""
+        lines.append(f"- {who}{left_out}: {_day_label(_sent_day(t))}")
+    note_days = _NOTE_DAY.findall(notes or "")
+    newest_note = max(note_days) if note_days else None
+    mine = [d for d in (_sent_day(t) for t in turns if t.get("role") == coach_chat.ROLE_COACH) if d]
+    newest_mine = max(mine) if mine else None
+    if newest_mine and newest_note:
+        if newest_mine > newest_note:
+            rel = "LATER than your newest note"
+        elif newest_mine == newest_note:
+            rel = "the SAME day as your newest note"
+        else:
+            rel = "EARLIER than your newest note"
+        lines.append(f"Your newest message in this chat was sent {_day_label(newest_mine)}: {rel}, dated {_day_label(newest_note)}.")
+    elif newest_mine:
+        lines.append(f"Your newest message in this chat was sent {_day_label(newest_mine)}. None of your notes is dated.")
+    elif newest_note:
+        lines.append(f"None of your messages in this chat is dated. Your newest note is dated {_day_label(newest_note)}.")
+    undated = sum(1 for t in turns if not _sent_day(t))
+    if undated:
+        lines.append(f"{undated} of these messages are undated: when they were sent, and whether before or after a note, is not known.")
+    return "\n".join(lines)
+
+
+def frame_label(domain: str, *, live: Optional[bool] = None) -> str:
+    """The domain pack with its cycle-day line labelled for what it is. Switch off: `domain` untouched."""
+    if not (LIVE if live is None else live) or not domain:
+        return domain
+    return _FRAME.sub(lambda m: FRAME_LABEL.format(day=m.group(1), cycle=m.group(2), week=m.group(3)), domain)
 
 
 # ── 1. priorities ───────────────────────────────────────────────────────────────────────────
@@ -347,13 +464,14 @@ def build_turn_context(table, persona_id: str, day: str, *, memory: str = "", th
     views = rr.fold(rr.read_rows(table, USER_ID))
     follow_up = follow_up_to_raise(table, views, persona_id, day)
     notes, corrections = _split_memory_core(memory)
-    new_thread, removed = dedupe_thread(list(thread or []))
+    new_thread, removed = dedupe_thread(order_thread(thread or []))
     sections = {
         "lead": LEAD_LINE if persona_id == rr.LEAD_COACH_ID else "",
         "priorities": priorities_section(table, persona_id, day),
         "planned_session": session_section(persona_id, day),
         "recommendations": recommendations_section(views, persona_id, day, follow_up),
         "notes": f"{NOTES_HEADER}\n{notes}" if notes else "",
+        "thread_dates": thread_dates_section(new_thread, notes),
         "corrections": corrections,
         "capability": CAPABILITY,
     }
