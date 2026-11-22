@@ -52,6 +52,13 @@ marked ``superseded_by``. An unapproved proposal is never read into the response
 field is ``null`` and ``corrections_error`` says so — never ``[]``, so a reader cannot take a failed read for "no
 corrections" and drop a published correction from the site.
 
+THE EDITIONS (#6193), only while ``content.chapter_editions.LIVE`` is True. Off, the rows are never read and the field
+is never in the response — byte-identical to the response before #6193. On, ``editions`` lists, per chapter, the latest
+APPROVED second (or later) edition that passes every publication gate at serve time (``chapter_editions.public_view``
+with this request's ``narrative_publication.is_tainted``), with its approved archival rendering of the first edition when
+one passes too; a failed read is ``null`` + ``editions_error``, never ``[]``. The weeks, their dates and their urls are
+never changed by an edition: the chapter keeps its first-published date, and nothing here reaches a feed or a sender.
+
 The prologue (manifest ``week`` 0, dated before genesis) is not a program week and is not
 listed. A tombstoned or pre-genesis row is not read (``_query_source`` applies the phase
 filter and the genesis clamp).
@@ -70,7 +77,7 @@ from datetime import timedelta
 from typing import Any, Callable
 
 from common.pacific_time import pacific_today, parse_day_key
-from content import chapter_corrections
+from content import chapter_corrections, chapter_editions
 
 from web.site_api_common import EXPERIMENT_START, USER_ID, _error, _load_s3_json, _ok, _query_source, logger, table
 
@@ -291,12 +298,48 @@ def corrections_field(read_corrections: Callable[[], list]) -> dict:
         return {"corrections": None, "corrections_error": "the corrections could not be read for this response"}
 
 
+def _read_editions() -> list:
+    """Every ``CHAPTER_EDITION#`` row of the chronicle partition (#6193; ``public_view`` keeps the approved, gated ones)."""
+    from boto3.dynamodb.conditions import Key
+
+    kw: dict = {"KeyConditionExpression": Key("pk").eq(chapter_editions.pk(USER_ID)) & Key("sk").begins_with(chapter_editions.SK_PREFIX)}
+    out: list = []
+    while True:
+        resp = table.query(**kw)
+        out.extend(resp.get("Items") or [])
+        if not resp.get("LastEvaluatedKey"):
+            return out
+        kw["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+
+
+def _is_tainted(text: str) -> bool:
+    from web import narrative_publication  # noqa: PLC0415 — the request's complete withheld-call record (#6111)
+
+    return narrative_publication.is_tainted(text)
+
+
+def editions_field(read_editions: Callable[[], list], tainted: Callable[[str], bool] = _is_tainted) -> dict:
+    """``{}`` while the switch is off (the reader is never called); else ``{"editions": [...]}`` — or ``{"editions": None,
+    "editions_error": ...}`` when the rows cannot be read."""
+    if not chapter_editions.LIVE:
+        return {}
+    try:
+        from privacy import privacy_guard  # noqa: PLC0415 — the chronicle's publish gate (fail-closed on no vocabulary)
+
+        view = chapter_editions.public_view(read_editions(), tainted=tainted, filter_hits=privacy_guard.find_violations, log=logger.warning)
+        return {"editions": view}
+    except Exception as e:  # noqa: BLE001 — a failed read is said, never served as "no editions"
+        logger.error(f"[chapters] editions read failed: {type(e).__name__}: {e}")
+        return {"editions": None, "editions_error": "the editions could not be read for this response"}
+
+
 def handle_chapters(
     event,
     *,
     query: Callable = _query_source,
     read_manifest: Callable[[], dict | None] = _read_manifest,
     read_corrections: Callable[[], list] = _read_corrections,
+    read_editions: Callable[[], list] = _read_editions,
     today: str | None = None,
 ):
     """GET /api/chapters — see the module docstring. ``query`` / ``read_manifest`` are the injectable readers."""
@@ -315,6 +358,7 @@ def handle_chapters(
     journal = read_manifest()
     doc = compose(rows, journal, genesis, today, retired_on=retired_state_on())
     doc.update(corrections_field(read_corrections))
+    doc.update(editions_field(read_editions))  # #6193: {} while chapter_editions.LIVE is False
     degraded = None
     if journal is None:
         degraded = "journal manifest unreadable — published weeks may read as skipped"

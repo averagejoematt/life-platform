@@ -29,6 +29,7 @@
     "/data/lab/experiments/*/",
     "/data/lab/tests/*/",
     "/story/*/",
+    "/story/*/first-edition/",
     "/story/essays/*/",
     "/system/coaches/*/",
     "/system/coaches/*/record/",

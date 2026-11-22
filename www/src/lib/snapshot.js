@@ -153,6 +153,20 @@ export async function loadChapterCorrections() {
   return _chapterCorrections;
 }
 
+let _chapterEditions = null;
+/** Approved second editions (#6193): the exporter writes chapter_editions.json ONLY while the platform's switch is on,
+ *  so a missing file is the switch off — nothing is placed and no first-edition page is built. Pages read it only
+ *  through lib/chapter_editions.js. */
+export async function loadChapterEditions() {
+  if (_chapterEditions) return _chapterEditions;
+  try {
+    _chapterEditions = JSON.parse(await readFile(join(SNAPSHOT_DIR, "chapter_editions.json"), "utf8"));
+  } catch {
+    _chapterEditions = { state: "absent", editions: [] };
+  }
+  return _chapterEditions;
+}
+
 let _calibration = null;
 /** The Coaching Room's data file (CR1, built dark): written by the producer ONLY on a WEB_ROOM=1 export and read only
  *  by room pages, which exist only on a room build. Throws when absent — a room build over a flag-off snapshot is a
