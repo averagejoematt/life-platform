@@ -6,6 +6,7 @@ import { getCollection } from "astro:content";
 import { buildIndex, COLLECTION_OF, connected } from "./edges.js";
 import { hasPage } from "./url.js";
 import { applyDerivedCovers, applyHeaderRevisions } from "./chapter_truth.js";
+import { editionFor } from "./chapter_editions.js";
 
 let _cache = null;
 
@@ -35,7 +36,9 @@ export async function loadAll() {
   // #6177 (behind lib/chapter_truth.js CHAPTER_TRUTH_LIVE; a no-op while it is off): a published chapter with no stored
   // covered days reads the days the platform's rule gives every other chapter, so every page names one span for it.
   applyDerivedCovers(byType.chapter || []);
-  applyHeaderRevisions(byType.chapter || []); // the owner-approved replacement summaries (owner ruling 2026-11-22 §10)
+  // the owner-approved replacement summaries (owner ruling 2026-11-22 §10) — never on a chapter serving a later edition
+  const editionDoc = await loadChapterEditions();
+  applyHeaderRevisions(byType.chapter || [], undefined, undefined, (id) => Boolean(editionFor(editionDoc, id)));
   const index = buildIndex(objects);
   const lookup = new Map(objects.map((o) => [`${o.type}:${o.id}`, o]));
   _cache = { byType, objects, index, get: (type, id) => lookup.get(`${type}:${id}`) || null };
@@ -156,6 +159,20 @@ export async function loadChapterCorrections() {
     _chapterCorrections = { state: "absent", corrections: [] };
   }
   return _chapterCorrections;
+}
+
+let _chapterEditions = null;
+/** Approved second editions (#6193): the exporter writes chapter_editions.json ONLY while the platform's switch is on,
+ *  so a missing file is the switch off — nothing is placed and no first-edition page is built. Pages read it only
+ *  through lib/chapter_editions.js. */
+export async function loadChapterEditions() {
+  if (_chapterEditions) return _chapterEditions;
+  try {
+    _chapterEditions = JSON.parse(await readFile(join(SNAPSHOT_DIR, "chapter_editions.json"), "utf8"));
+  } catch {
+    _chapterEditions = { state: "absent", editions: [] };
+  }
+  return _chapterEditions;
 }
 
 let _calibration = null;

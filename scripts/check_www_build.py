@@ -10,6 +10,10 @@ exits 2 — "blind" — if a planted defect builds clean, and never grades on.
   reproducible   export the fixture snapshot, build twice, compare the tree hashes
   corrections    (#6177) the clean build renders the fixture's approved corrections; a build with them removed must
                  carry byte-identical chapter bodies (a correction sits beside a chapter, never in it)
+  editions       (#6193) on a production-base build: the switch-off fixture build writes no edition and no first-edition
+                 page; the same build with the editions fixture (WEB_EDITIONS=1) changes ONLY the edited chapter's page
+                 (its edition line, its later text) and adds ONLY the approved archival page (noindex, canonical to the
+                 chapter, the platform's fixed note, out of the sitemap); no unapproved record's sentinel reaches a page
   held           flip one public object to `held` in the snapshot → `astro build` MUST fail
   dangling       add one edge to a non-existent object → `astro build` MUST fail
   scan           the clean build carries no fixture sentinel, no inline <script>, no ISO date
@@ -218,6 +222,105 @@ def check_corrections_mutation(preview: bool) -> int:
         log(f"  ✗ a correction changed a chapter's published body: {changed or sorted(set(bare_bodies) ^ set(clean_bodies))}")
         return 1
     log(f"  ✓ corrections render beside {len(clean_has)} chapter(s); all {len(clean_bodies)} chapter bodies byte-identical without them")
+    return 0
+
+
+def file_hashes(root: str) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for dirpath, _dirs, filenames in os.walk(root):
+        for name in filenames:
+            path = os.path.join(dirpath, name)
+            with open(path, "rb") as fh:
+                out[os.path.relpath(path, root)] = hashlib.sha256(fh.read()).hexdigest()
+    return out
+
+
+def check_editions_mutation() -> int:
+    """#6193: a second edition is dark by default and, when on, changes exactly what it should. Production base (no
+    global noindex, a sitemap), so the archival page's own noindex and its absence from the sitemap are visible.
+    0 ok · 1 a property failed · 2 blind (the fixture rendered no edition, so nothing was compared). Restores the
+    default fixture snapshot before it returns."""
+    sys.path.insert(0, os.path.join(REPO, "scripts"))
+    import publish_snapshot_chapter_editions as editions_exporter  # noqa: PLC0415
+
+    ed_file = os.path.join(SNAPSHOT, "chapter_editions.json")
+    try:
+        export_fixture_snapshot()
+        if os.path.exists(ed_file):
+            log("  ✗ the switch-off fixture export wrote chapter_editions.json")
+            return 1
+        cp = build(False)
+        if cp.returncode != 0:
+            log(f"  ✗ the switch-off production build failed:\n{cp.stderr[-1500:]}")
+            return 1
+        clean = file_hashes(DIST)
+        if any(p.endswith(os.path.join("first-edition", "index.html")) for p in clean):
+            log("  ✗ a first-edition page was built with the switch off")
+            return 1
+        cp = run(
+            [sys.executable, os.path.join(REPO, "scripts", "publish_snapshot.py"), "--mode", "fixture", "--out", SNAPSHOT],
+            cwd=REPO,
+            env={editions_exporter.FIXTURE_ENV: "1"},
+        )
+        if cp.returncode != 0 or not os.path.exists(ed_file):
+            log(f"  ✗ the editions fixture export failed (exit {cp.returncode}):\n{cp.stderr[-1500:]}")
+            return 1
+        with open(ed_file, encoding="utf-8") as fh:
+            served = json.load(fh)["editions"]
+        cp = build(False)
+        if cp.returncode != 0:
+            log(f"  ✗ the editions production build failed:\n{cp.stderr[-1500:]}")
+            return 1
+        on = file_hashes(DIST)
+    finally:
+        export_fixture_snapshot()
+    if not served:
+        log("  ✗ BLIND: the editions fixture serves no edition")
+        return 2
+    pages = {os.path.join("story", e["chapter_id"], "index.html"): e for e in served}
+    archives = {os.path.join("story", e["chapter_id"], "first-edition", "index.html"): e for e in served if e["archival"]}
+    changed = {p for p in clean if p in on and on[p] != clean[p]}
+    added, removed = set(on) - set(clean), set(clean) - set(on)
+    issues = []
+    sitemap = ""
+    for p in [p for p in on if os.path.basename(p).startswith("sitemap")]:
+        with open(os.path.join(DIST, p), encoding="utf-8") as fh:
+            sitemap += fh.read()
+    if changed != set(pages):
+        issues.append(f"the edition changed pages other than its chapter's: {sorted(changed ^ set(pages))}")
+    if added != set(archives) or removed:
+        issues.append(f"pages added/removed beyond the approved archival pages: +{sorted(added ^ set(archives))} -{sorted(removed)}")
+    for p, e in pages.items():
+        page = open(os.path.join(DIST, p), encoding="utf-8").read() if p in on else ""
+        line = re.search(r"data-edition-line><b[^>]*>([^<]*)</b>", page)
+        if not line or html_lib.unescape(line.group(1)) != e["edition_line"]:
+            issues.append(f"{p}: no edition line, or not the platform's words")
+        body = re.search(r"<div data-published-body>([\s\S]*?)</div>", page)
+        first = re.search(r"<p>([^<]{20,})", e["body_html"])
+        if not body or not first or first.group(1)[:60] not in body.group(1):
+            issues.append(f"{p}: the canonical address does not serve the edition's text")
+    for p, e in archives.items():
+        page = open(os.path.join(DIST, p), encoding="utf-8").read() if p in on else ""
+        if not NOINDEX.search(page):
+            issues.append(f"{p}: the archival page is not noindex")
+        if f'<link rel="canonical" href="https://averagejoematt.com/story/{e["chapter_id"]}/">' not in page:
+            issues.append(f"{p}: the archival page is not canonical to its chapter")
+        if html_lib.escape(e["archival"]["note"]) not in page and e["archival"]["note"] not in html_lib.unescape(page):
+            issues.append(f"{p}: the archival page does not carry the platform's note")
+        if f"/story/{e['chapter_id']}/first-edition/" in sitemap:
+            issues.append(f"{p}: the archival page is in the sitemap")
+    for p in sorted(changed | added):
+        with open(os.path.join(DIST, p), encoding="utf-8", errors="replace") as fh:
+            if any(s in fh.read() for s in SENTINELS):
+                issues.append(f"{p}: an unapproved record's sentinel reached a page")
+    for i in issues:
+        log(f"  ✗ {i}")
+    if issues:
+        return 1
+    log(
+        f"  ✓ switch off: no edition, no first-edition page; on: {len(pages)} chapter page(s) serve their edition, "
+        f"{len(archives)} archival page(s) noindex + canonical + out of the sitemap, nothing else changed"
+    )
     return 0
 
 
@@ -849,6 +952,10 @@ def main() -> int:
             return code
         log("mutation: dangling edge")
         code = check_dangling_mutation(preview)
+        if code:
+            return code
+        log("second editions, dark by default (#6193)")
+        code = check_editions_mutation()
         if code:
             return code
         # the clean build again, so the scan grades what the mutations restored

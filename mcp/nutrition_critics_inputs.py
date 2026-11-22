@@ -28,9 +28,10 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+from common import nutrition_consistency as _nc  # #6195: the target-neutral consistency switchboard
 from common.constants import day_n
 from common.pacific_time import shift_day_key
-from health import nutrition_critics, weight_trend
+from health import nutrition_critics, nutrition_logging, weight_trend
 from training import walking_volume
 
 from mcp import shared_quantities
@@ -235,6 +236,8 @@ def resolve(
     start = keys[0]
     unresolved: dict[str, str] = {}
     mf = _safe(query_source, "macrofactor", start, end_date)
+    if mf is not None and _nc.on(_nc.PARTIAL_EXPORT_EXCLUDED):
+        mf = nutrition_logging.complete_logs(mf)  # #6195 F3: a partial export or stub is an unlogged day here, never a low one
     hevy = _safe(query_source, "hevy", start, end_date)
     # the oldest weekly checkpoint (`end - 7`) reads its own 14-day trend, so weigh-ins reach back
     # LOSS_RATE_WINDOW_DAYS + 7 days; a 14-day fetch left it the week's own slope (#5100, live 10-20)

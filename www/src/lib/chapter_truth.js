@@ -150,11 +150,13 @@ export function revisedHeader(c, table = HEADER_REVISIONS) {
 
 /** Put the approved replacement summaries in place (on only): `excerpt` and `summary` read the new line everywhere a page
  *  prints a chapter's summary (header, description and og metadata, /story/ rows, the front page, Moments); the served
- *  line is kept as `excerpt_first`, so the chapter page still recognises it at the top of the body. Returns the ids. */
-export function applyHeaderRevisions(chapters, live = CHAPTER_TRUTH_LIVE, table = HEADER_REVISIONS) {
+ *  line is kept as `excerpt_first`, so the chapter page still recognises it at the top of the body. A chapter that serves
+ *  an approved later edition (`hasEdition`, lib/chapter_editions.js editionFor) is never touched. Returns the ids. */
+export function applyHeaderRevisions(chapters, live = CHAPTER_TRUTH_LIVE, table = HEADER_REVISIONS, hasEdition = () => false) {
   if (!live) return [];
   const done = [];
   for (const c of chapters || []) {
+    if (hasEdition(c.id)) continue; // #6193 serves an approved later edition here: its own summary governs, never this one
     const r = revisedHeader(c, table);
     if (!r) continue;
     c.excerpt_first = c.excerpt;

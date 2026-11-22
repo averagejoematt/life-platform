@@ -47,6 +47,8 @@ WHAT STAYED INLINE, AND WHY
   All three exceptions are visible at their call site in the table.
 """
 
+from common import nutrition_consistency as _nc  # #6195: the target-neutral consistency switchboard
+
 GET_EXERCISE_NOTES_DESCRIPTION = (
     "The per-exercise TRAINING-NOTE timeline (the arc Matthew wrote on a lift across sessions), "
     "derived from his freeform Hevy notes — progression/form/equipment/limiter/sentiment signals + "
@@ -721,6 +723,11 @@ GET_DEFICIT_SUSTAINABILITY_DESCRIPTION = (
     "Use for: 'is my deficit sustainable?', 'am I cutting too hard?', "
     "'deficit health check', 'should I eat more?', 'deficit sustainability', 'refeed or diet break?'."
 )
+# #6195 F16 (MCP_SUSTAINABILITY_WORDING, default OFF): the tool's own honesty line says it is not a clearance, so the
+# switched description stops routing "is my deficit sustainable?" to it. Kept out of the literal above so the catalog
+# generator (scripts/generate_mcp_tool_catalog.py, top-level literals only) still reads the default text.
+if _nc.on(_nc.MCP_SUSTAINABILITY_WORDING):
+    GET_DEFICIT_SUSTAINABILITY_DESCRIPTION = GET_DEFICIT_SUSTAINABILITY_DESCRIPTION.replace(_nc.MCP_USE_FOR_OFF, _nc.MCP_USE_FOR_ON)
 
 GET_WORKOUTS_DESCRIPTION = (
     "List normalized workouts across all logging sources (Hevy + MacroFactor) "

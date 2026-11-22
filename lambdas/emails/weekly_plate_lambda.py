@@ -29,6 +29,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from common import (
     digest_utils,  # shared query_range implementations (#970)
+    nutrition_consistency as _nc,  # #6195: the target-neutral consistency switchboard
     outbound_trial,  # #6176: the outbound trial's switchboard
     send_ledger,  # #3113 / DIL-025: the durable replay guard
 )
@@ -40,7 +41,7 @@ from health import (
     eating_window,  # #5099: THE eating window (charter nutrition.eating_window, via public_view)
     weekly_menu_feed,  # #5103 box 4: the code-built menu ahead, printed by code and written around
 )
-from health.calorie_target import target_kcal  # #5095: the ONE calorie target
+from health.calorie_target import layers_phrase, target_kcal  # #5095: the ONE calorie target
 
 _logger_std = logging.getLogger()
 _logger_std.setLevel(logging.INFO)
@@ -526,6 +527,7 @@ def build_user_message(data):
         "weight_trend": weight,
         "profile_targets": {
             "calorie_target": target_kcal(),
+            **({"calorie_target_layers": layers_phrase()} if _nc.on(_nc.OWNER_TARGET_LAYERS) else {}),  # #6195 F10
             "protein_target_g": PLAN_DAILY_PROTEIN_MIN_G,
             "goal_weight_lbs": data["profile"].get("goal_weight_lbs", 185),
             "eating_window": eating_window.published_text(),  # #5099: the charter's window (published whitelist)
@@ -541,7 +543,10 @@ def build_system_prompt(profile, withings_data):
     weight_ctx = build_weight_context(withings_data, profile)
     cal = target_kcal() or "—"  # #5095; "—" = none resolved
     pro = PLAN_DAILY_PROTEIN_MIN_G
-    return SYSTEM_PROMPT.format(
+    template = SYSTEM_PROMPT
+    if _nc.on(_nc.OWNER_TARGET_LAYERS):  # #6195 F10: the layers named, never one layer as "cal/day"
+        template, cal = template.replace("Targets: {calorie_target} cal/day,", "Targets: {calorie_target},"), layers_phrase()
+    return template.format(
         weight_context=weight_ctx,
         calorie_target=cal,
         protein_target_g=pro,

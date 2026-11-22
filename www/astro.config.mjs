@@ -18,6 +18,8 @@ import { labIntegration, notLabPage } from "./src/lib/lab.js";
 import { notStoryPage, storyIntegration } from "./src/lib/story_dark.js";
 // "Your call beside the coaches" (#6088), built dark: the island is injected only when WEB_READERCALL=1 (src/lib/readercall.js).
 import { readerCallIntegration } from "./src/lib/readercall.js";
+// #6193: an archival first-edition page is noindex and canonical to its chapter, so it is never in the sitemap.
+import { notArchivalPage } from "./src/lib/chapter_editions.js";
 
 const base = process.env.WEB_BASE || "/";
 const noindex = process.env.WEB_NOINDEX === "1";
@@ -57,6 +59,6 @@ export default defineConfig({
         labIntegration(),
         storyIntegration(),
         readerCallIntegration(),
-        sitemap({ filter: (url) => notRoomPage(url) && notLabPage(url) && notStoryPage(url) }),
+        sitemap({ filter: (url) => notRoomPage(url) && notLabPage(url) && notStoryPage(url) && notArchivalPage(url) }),
       ],
 });

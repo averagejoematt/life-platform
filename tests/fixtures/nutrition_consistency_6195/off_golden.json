@@ -1,0 +1,401 @@
+{
+ "brief": {
+  "bod_phase_targets": "Phase 1 Ignition: 3 lbs/week, 1500 kcal deficit, 1600 cal daily.",
+  "profile_calorie_line": "- Calorie target: 1600 kcal",
+  "tile_calorie_label": "/1600"
+ },
+ "critics": {
+  "overshoot_to_text": "to 1650"
+ },
+ "day_pages": {
+  "after_as_of": {
+   "calories": 1000,
+   "carbs_g": 80,
+   "fat_g": 40,
+   "floor_g": 170,
+   "logging_gap": false,
+   "protein_g": 150,
+   "tdee": 3000
+  },
+  "before_as_of": {
+   "calories": 1000,
+   "carbs_g": 80,
+   "fat_g": 40,
+   "floor_g": 170,
+   "logging_gap": false,
+   "protein_g": 150,
+   "tdee": 3000
+  },
+  "partial": {
+   "calories": 80,
+   "carbs_g": 4,
+   "fat_g": 0,
+   "floor_g": 170,
+   "logging_gap": false,
+   "protein_g": 10,
+   "tdee": 3000
+  }
+ },
+ "emails": {
+  "nutrition_review_fallback_calorie_line": "Analyze: Weekly calorie avg vs target (1600 kcal) and deficit consistency. Protein total AND distribution (a feeding is 40 g or more of protein: flag days short of the plan's feedings, praise days that reach them). Target: 170g. Protein source diversity. Carb/fat balance relative to training. Meal frequency and eating window. Fiber trend.",
+  "weekly_plate_targets_line": "Targets: 1600 cal/day, 170g protein, eating window 16:8 (one 8-hour eating window)."
+ },
+ "mcp": {
+  "deficit_tool": {
+   "channels": [
+    {
+     "avg": 60.0,
+     "cutoff_pct": 8,
+     "delta_pct": 0.0,
+     "direction": "stable",
+     "name": "HRV",
+     "provenance": "population-derived",
+     "status": "stable"
+    },
+    {
+     "cutoff_pct": {
+      "deep_sleep_share": 8,
+      "efficiency": 3
+     },
+     "delta_pct": 0.0,
+     "direction": "stable",
+     "name": "Sleep Quality",
+     "provenance": "population-derived",
+     "status": "stable"
+    },
+    {
+     "avg": 60.0,
+     "cutoff_pct": 10,
+     "delta_pct": 0.0,
+     "direction": "stable",
+     "name": "Recovery",
+     "provenance": "population-derived",
+     "status": "stable"
+    },
+    {
+     "avg": 0.8,
+     "cutoff_pct": 10,
+     "delta_pct": 0.0,
+     "direction": "stable",
+     "name": "Habit Completion",
+     "provenance": "population-derived",
+     "status": "stable"
+    },
+    {
+     "avg": null,
+     "cutoff_pct": 15,
+     "delta_pct": 0,
+     "direction": "insufficient_data",
+     "input": {
+      "confidence": "none",
+      "days_observed": 0,
+      "days_with_load": 0,
+      "measure": "daily_training_load",
+      "model": "trimp_above_z1_plus_hevy_worked_set_v2",
+      "replaced": "strava.total_kilojoules (> 0 on 0 of 1,242 stored day rows all-time — 2026-10-04 sweep, #3754)",
+      "series": "observed_training_days",
+      "sessions": 0,
+      "unit": "tss_proxy"
+     },
+     "name": "Training Output",
+     "provenance": "population-derived",
+     "status": "stable"
+    }
+   ],
+   "critics": {
+    "veto": true
+   },
+   "decisions_offered": [],
+   "deficit": {
+    "avg_intake_kcal": 934,
+    "basis": "macrofactor_profile_tdee_estimate",
+    "deficit_kcal": 2066,
+    "deficit_label": "aggressive",
+    "deficit_pct": 68.9,
+    "deficit_published": true,
+    "estimated_tdee": 3000,
+    "in_deficit": true,
+    "tdee_method": "macrofactor_profile_tdee_estimate",
+    "trend_check": null
+   },
+   "degraded_count": 0,
+   "honesty": "This tool reads HRV, sleep, recovery, habit-completion and training-output only — it has NO intake floor, NO protein channel, and NO electrolyte or DXA input. A SUSTAINABLE verdict is a statement about those five channels holding steady, not a clearance of the deficit itself — the deficit can be nutritionally unsound (too low, too little protein, no electrolyte tracking) while every channel here still reads clean.",
+   "methodology": "Monitors 5 channels: HRV trend, sleep quality, recovery, habit completion, training output. Compares first-third vs last-third of the window. 3+ concurrent degradations = deficit unsustainable. Based on Attia, Huberman: aggressive deficits erode adherence, sleep, and lean mass.",
+   "period": {
+    "days": 14,
+    "days_with_data": 14,
+    "end_date": "2026-05-10",
+    "start_date": "2026-04-27"
+   },
+   "phase_scope": {
+    "phase_filter": "derived per source from phase_filter.source_reads_cross_phase (ADR-077/#2109) — a raw_timeseries partition is read across every phase, bounded only by the window",
+    "sources": {
+     "habitify[2026-04-27..2026-05-10]": {
+      "phases": [
+       "unstamped"
+      ],
+      "rows": 6
+     },
+     "hevy[2026-04-27..2026-05-10]": {
+      "phases": [],
+      "rows": 0
+     },
+     "macrofactor[2026-04-27..2026-05-10]": {
+      "phases": [
+       "unstamped"
+      ],
+      "rows": 14
+     },
+     "strava[2026-04-27..2026-05-10]": {
+      "phases": [],
+      "rows": 0
+     },
+     "whoop[2026-04-27..2026-05-10]": {
+      "phases": [
+       "unstamped"
+      ],
+      "rows": 6
+     }
+    }
+   },
+   "prior_cut_comparability": "intake is NOT comparable to the prior cut — MacroFactor begins 2025-11-24 (ADR-104)",
+   "recommendation": "Deficit appears sustainable. All systems holding.",
+   "severity": "SUSTAINABLE",
+   "thresholds": {
+    "channel_cutoffs": {
+     "habit_completion": {
+      "decline_pct": 10,
+      "label": "Habit Completion",
+      "note": "10% Habitify completion-rate decline — a generic cutoff, not his own baseline noise band.",
+      "provenance": "population-derived"
+     },
+     "hrv": {
+      "decline_pct": 8,
+      "label": "HRV",
+      "note": "8% HRV decline (first-vs-last third) — a generic ANS-stress heuristic, not fitted to his own HRV variance.",
+      "provenance": "population-derived"
+     },
+     "recovery": {
+      "decline_pct": 10,
+      "label": "Recovery",
+      "note": "10% Whoop recovery-score decline — a generic cutoff, not his own baseline noise band.",
+      "provenance": "population-derived"
+     },
+     "sleep_deep_pct": {
+      "decline_pct": 8,
+      "label": "Sleep Quality — deep sleep share",
+      "note": "8% deep-sleep-share decline — a generic cutoff, not his own baseline noise band.",
+      "provenance": "population-derived"
+     },
+     "sleep_efficiency": {
+      "decline_pct": 3,
+      "label": "Sleep Quality — efficiency",
+      "note": "3% sleep-efficiency decline — a generic cutoff, not his own baseline noise band.",
+      "provenance": "population-derived"
+     },
+     "training_output": {
+      "decline_pct": 15,
+      "input": "training.training_load.daily_training_load (TSS-proxy points, Strava + Hevy) — replaces strava.total_kilojoules, which is 0 on every stored day row",
+      "label": "Training Output",
+      "note": "15% daily-training-load decline — a generic cutoff, not his own baseline noise band.",
+      "provenance": "population-derived"
+     }
+    },
+    "concurrent_degradation_bands": {
+     "critical": {
+      "min_channels": 4,
+      "note": "4+ of 5 channels degrading concurrently — same composite rule, escalated.",
+      "provenance": "population-derived"
+     },
+     "warning": {
+      "min_channels": 3,
+      "note": "3+ of 5 channels degrading concurrently is the BS-12 'unsustainable' call — an Attia/Huberman-style heuristic threshold, never validated against his own outcomes.",
+      "provenance": "population-derived"
+     },
+     "watch": {
+      "min_channels": 2,
+      "note": "2+ of 5 channels degrading concurrently — an arbitrary composite floor, not fitted to his history.",
+      "provenance": "population-derived"
+     }
+    },
+    "deficit_label_bands": {
+     "aggressive_above_pct": 25,
+     "mild_above_pct": 5,
+     "moderate_above_pct": 15,
+     "note": "deficit_pct bands (>25 / >15 / >5 of estimated TDEE) are round-number labels, not derived from his own adherence/outcome history.",
+     "provenance": "population-derived"
+    },
+    "in_deficit_floor_kcal": {
+     "note": "A gap under 200 kcal/day vs TDEE is read as noise rather than an active cut — an arbitrary floor.",
+     "provenance": "population-derived",
+     "value": 200
+    },
+    "trend_window": {
+     "method": "first_third_vs_last_third_of_window",
+     "note": "A channel is only called 'declining'/'improving' outside a flat +/-5% band between the first third and last third of the requested window — an arbitrary noise margin, not a figure derived from his own day-to-day variance.",
+     "provenance": "population-derived",
+     "stable_band_pct": 5
+    }
+   }
+  },
+  "description": "BS-12: Multi-signal early warning for unsustainable caloric deficit. Monitors 5 channels simultaneously: HRV trend, sleep quality, recovery, Tier 0 habit completion, and training output. When 3+ degrade concurrently during an active deficit → flags with severity and calorie increase recommendation. Attia / Huberman: aggressive deficits destroy adherence, sleep, and muscle. Also carries `critics` (deficit advocate / muscle defense / adherence, verdicts against the owner's redlines) and `decisions_offered` — refeed / diet-break decisions with a ready `log_decision` payload the owner accepts or declines himself (#3754). Use for: 'is my deficit sustainable?', 'am I cutting too hard?', 'deficit health check', 'should I eat more?', 'deficit sustainability', 'refeed or diet break?'."
+ },
+ "site_api": {
+  "deficit_sustainability": {
+   "deficit_sustainability": {
+    "available": true,
+    "channels": [
+     {
+      "delta_pct": 0.0,
+      "direction": "stable",
+      "name": "HRV",
+      "status": "stable"
+     },
+     {
+      "delta_pct": 0.0,
+      "direction": "stable",
+      "name": "Sleep quality",
+      "status": "stable"
+     },
+     {
+      "delta_pct": 0.0,
+      "direction": "stable",
+      "name": "Recovery",
+      "status": "stable"
+     },
+     {
+      "delta_pct": 0.0,
+      "direction": "stable",
+      "name": "Habit completion",
+      "status": "stable"
+     },
+     {
+      "delta_pct": 0,
+      "direction": "insufficient_data",
+      "input": {
+       "confidence": "none",
+       "days_observed": 0,
+       "days_with_load": 0,
+       "measure": "daily_training_load",
+       "model": "trimp_above_z1_plus_hevy_worked_set_v2",
+       "replaced": "strava.total_kilojoules (> 0 on 0 of 1,242 stored day rows all-time — 2026-10-04 sweep, #3754)",
+       "series": "observed_training_days",
+       "sessions": 0,
+       "unit": "tss_proxy"
+      },
+      "name": "Training output",
+      "status": "stable"
+     }
+    ],
+    "deficit": {
+     "avg_intake_kcal": 934,
+     "basis": "refused: deficit_exceeds_50pct_of_tdee — model says 2066 kcal/day (68.9% of a 3000 kcal TDEE) against a measured intake of 934 kcal/day",
+     "deficit_kcal": null,
+     "deficit_pct": null,
+     "deficit_published": false,
+     "in_deficit": true,
+     "label": null,
+     "tdee": 3000,
+     "tdee_method": "macrofactor_adaptive_expenditure",
+     "tdee_source": "macrofactor_adaptive",
+     "trend_check": {
+      "basis": "refused: deficit_exceeds_50pct_of_tdee — model says 2066 kcal/day (68.9% of a 3000 kcal TDEE) against a measured intake of 934 kcal/day",
+      "deficit_fraction_of_tdee": 0.689,
+      "gap_kcal_per_day": null,
+      "implied_deficit_kcal_per_day": 2066,
+      "intake_avg_kcal": 934,
+      "max_deficit_fraction_of_tdee": 0.5,
+      "method": "implied_deficit_vs_measured_weight_trend",
+      "min_trend_days": 7,
+      "publish": false,
+      "tdee": 3000,
+      "tolerance_floor_kcal_per_day": 400.0,
+      "tolerance_fraction": 0.4,
+      "tolerance_kcal_per_day": null,
+      "trend_days": 0,
+      "trend_implied_deficit_kcal_per_day": null,
+      "weight_trend_lb_per_wk": null
+     }
+    },
+    "degraded_count": 0,
+    "period": {
+     "days": 14,
+     "end": "2026-05-10",
+     "start": "2026-04-27"
+    },
+    "severity": "sustainable",
+    "verdict": "The body's absorbing the deficit — recovery, sleep, and output are holding while the weight comes off."
+   }
+  },
+  "nutrition_overview.loss_rate": {
+   "actual_deficit_kcal": null,
+   "basis": "refused: deficit_exceeds_50pct_of_tdee — model says 2000 kcal/day (66.7% of a 3000 kcal TDEE) against a measured intake of 1000 kcal/day",
+   "deficit_label": null,
+   "deficit_pct": null,
+   "deficit_published": false,
+   "implied_rate_lb_wk": null,
+   "implied_rate_pct_bodyweight_per_wk": null,
+   "protein_floor_g": 170.0,
+   "protein_floor_hit_pct": 0,
+   "protein_hit_pct": 0,
+   "tdee_method": "macrofactor_adaptive_expenditure",
+   "trend_check": {
+    "basis": "refused: deficit_exceeds_50pct_of_tdee — model says 2000 kcal/day (66.7% of a 3000 kcal TDEE) against a measured intake of 1000 kcal/day",
+    "deficit_fraction_of_tdee": 0.667,
+    "gap_kcal_per_day": null,
+    "implied_deficit_kcal_per_day": 2000,
+    "intake_avg_kcal": 1000,
+    "max_deficit_fraction_of_tdee": 0.5,
+    "method": "implied_deficit_vs_measured_weight_trend",
+    "min_trend_days": 7,
+    "publish": false,
+    "tdee": 3000,
+    "tolerance_floor_kcal_per_day": 400.0,
+    "tolerance_fraction": 0.4,
+    "tolerance_kcal_per_day": null,
+    "trend_days": 0,
+    "trend_implied_deficit_kcal_per_day": null,
+    "weight_trend_lb_per_wk": null
+   }
+  },
+  "nutrition_overview.nutrition": {
+   "as_of": "2026-05-09",
+   "avg_calories": 1000,
+   "avg_carbs_g": 80.0,
+   "avg_deficit": null,
+   "avg_deficit_published": false,
+   "avg_fat_g": 40.0,
+   "avg_fiber_g": null,
+   "avg_protein_g": 150.0,
+   "basis": "refused: deficit_exceeds_50pct_of_tdee — model says 2000 kcal/day (66.7% of a 3000 kcal TDEE) against a measured intake of 1000 kcal/day",
+   "cal_7d_avg": 1000,
+   "cal_avg_recent": 1000,
+   "cal_avg_recent_window_days": 7,
+   "days_logged": 13,
+   "incomplete_days": [
+    "2026-05-10"
+   ],
+   "lag_days": 1,
+   "latest_calories": 1000,
+   "latest_date": "2026-05-09",
+   "latest_protein_g": 150.0,
+   "partial_days": [
+    "2026-05-10"
+   ],
+   "pro_7d_avg": 150.0,
+   "pro_avg_recent_g": 150.0,
+   "pro_avg_recent_g_window_days": 7,
+   "protein_floor_g": 170.0,
+   "protein_floor_hit_days": 0,
+   "protein_floor_hit_pct": 0,
+   "protein_hit_days": 0,
+   "protein_hit_pct": 0,
+   "protein_target_g": 170.0,
+   "stalled": false,
+   "tdee": 3000,
+   "tdee_method": "macrofactor_adaptive_expenditure",
+   "tdee_source": "macrofactor_adaptive",
+   "today_pending": true
+  }
+ }
+}

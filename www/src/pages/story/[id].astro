@@ -10,7 +10,7 @@ import Quote from "../../components/Quote.astro";
 import { isDisputed } from "../../lib/disputed.js";
 import { CALL_OUTCOME, chapterMeta, chapterPublished, chapterWindow, clip, dayInWords, gapWords, heldCallWords, num } from "../../lib/format.js";
 import { latestEdition, loadAll, loadOwnWords, loadSeries } from "../../lib/snapshot.js";
-import { ownWords, withinDays } from "../../lib/own_words.js";
+import { bodyCarriesQuote, ownWords, withinDays } from "../../lib/own_words.js";
 import { dailyBars, placeEvidence, windowValues } from "../../lib/evidence.js";
 import { theLine } from "../../lib/theline.js";
 import { hasPage, href, pathOf } from "../../lib/url.js";
@@ -18,6 +18,8 @@ import { placeRecordNote } from "../../lib/record_note.js";
 import { PERSONA_DISCLOSURE, correctionsFor, correctionsHtml, namesLegacyPersona } from "../../lib/chapter_corrections.js"; // #6177
 import { loadChapterCorrections } from "../../lib/snapshot.js";
 import { CHAPTER_TRUTH_LIVE, chapterByline, headerRevisedLine, recordAsOf } from "../../lib/chapter_truth.js"; // #6177: byline, record date, covered days
+import { ARCHIVE_SEGMENT, archivalFor, editionFor, editionReading } from "../../lib/chapter_editions.js"; // #6193
+import { loadChapterEditions } from "../../lib/snapshot.js";
 
 export async function getStaticPaths() {
   const all = await loadAll();
@@ -109,12 +111,20 @@ function bodyForPage(html: string | null | undefined, dek: string | null | undef
   if (dropped || !dek) return out;
   return out.replace(/<p>([\s\S]*?)<\/p>/, (whole, inner) => (plain(inner) === dek.trim() ? "" : whole));
 }
-const rawBody = bodyForPage(c.body_html, c.excerpt_first || c.excerpt); // #6177: the served summary, even when revised
+// #6193: an approved later edition is the text at the canonical address (chapter_editions.json exists only while the
+// switch is on); the chronicle row and its first edition are never changed, and the header says which edition this is.
+const editionDoc = await loadChapterEditions();
+const chapterEdition = c.status === "published" ? editionFor(editionDoc, c.id) : null;
+const archival = chapterEdition ? archivalFor(editionDoc, c.id) : null;
+const bodySource = chapterEdition ? chapterEdition.body_html : c.body_html;
+const reading = chapterEdition ? editionReading(chapterEdition) : { word_count: c.word_count, read_minutes: c.read_minutes };
+// #6177: the served summary, even when an approved replacement is shown in the header (never with an edition)
+const rawBody = bodyForPage(bodySource, c.excerpt_first || c.excerpt);
 const revisedLine = headerRevisedLine(c);
 // #6177: approved, platform-signed corrections sit BESIDE the text (above it), never in it; a body that carries a note
 // signed by the legacy editor persona gets the one disclosure line above it. Neither touches the body's bytes.
 const corrections = c.status === "published" ? correctionsFor(await loadChapterCorrections(), c.id) : [];
-const discloseEditor = c.status === "published" && namesLegacyPersona(c.body_html);
+const discloseEditor = c.status === "published" && namesLegacyPersona(bodySource);
 // Evidence in the margin (2026-11-14, sprint II): the week's weight, recovery and protein drawn beside the paragraph
 // that first talks about each, and a graded call's card beside the paragraph that names its coach. Every figure reads a
 // public series or ledger object; the chapter's words are untouched (lib/evidence.js places figures between paragraphs).
@@ -186,7 +196,9 @@ if (ev && c.status === "published" && rawBody) {
 // chapter the flag is the title of, only when the line's day is one of that chapter's days, and only when the platform
 // serves the approved words exactly. The platform's flag and his sentence disagree; the page settles nothing.
 const paceWords = ownWords(await loadOwnWords(), "pace");
-if (paceWords && ev && rawBody && /rate flag/i.test(c.title || "") && withinDays(paceWords.date, ev.from, ev.to)) {
+// #6193 (final approval §4): when the body itself carries his approved line word for word (a later edition quotes it), the
+// side copy is suppressed — the line appears once, in the body, wording and date unchanged.
+if (paceWords && ev && rawBody && /rate flag/i.test(c.title || "") && withinDays(paceWords.date, ev.from, ev.to) && !bodyCarriesQuote(rawBody, paceWords.text)) {
   figures.push({
     key: "own-words",
     match: /\bflag\b/i,
@@ -197,10 +209,16 @@ const placedBody = rawBody ? placeEvidence(rawBody, figures).html : rawBody;
 // #6161: a coach record quoted in the chapter is the record as published; the coach's record today can differ. One
 // dated line beside the first paragraph that quotes one (rendering only — the chapter's words are never edited).
 // the served publication day only: a chapter whose publication is not served (the prologue) gets no date guessed for it.
-// #6177 (on): a chapter rewritten after publication dates its records to the rewrite (lib/chapter_truth.js recordAsOf).
-const asPublished = recordAsOf(c);
-const recordNote = asPublished
-  ? `<p class="evidence-note" style="font-family:var(--sans);font-size:13px;line-height:1.5;border-left:3px solid var(--ink);padding-left:10px" data-record-as-published>${esc(asPublished)} Each coach's current record is on <a href="${href("/system/")}">the system page</a>.</p>`
+// #6193: a later edition was written on its revision day, so its quoted records are as of that day, said as such.
+// #6177 (on): otherwise a chapter rewritten after publication dates its records to the rewrite (chapter_truth recordAsOf).
+const truthLine = recordAsOf(c);
+const recordLead = chapterEdition
+  ? `Coach records quoted in this chapter are as of this edition, revised ${esc(dayInWords(chapterEdition.revised_on) || "")}.`
+  : truthLine
+    ? esc(truthLine)
+    : null;
+const recordNote = recordLead
+  ? `<p class="evidence-note" style="font-family:var(--sans);font-size:13px;line-height:1.5;border-left:3px solid var(--ink);padding-left:10px" data-record-as-published>${recordLead} Each coach's current record is on <a href="${href("/system/")}">the system page</a>.</p>`
   : null;
 const body = placedBody ? placeRecordNote(placedBody, recordNote).html : placedBody;
 // the read-along's text as spoken, without the voice tool's pause marks ("Voss — — an AI" reads "Voss — an AI")
@@ -231,11 +249,11 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
         <h1>{c.title}</h1>
         {c.excerpt && <p class="dek">{c.excerpt}</p>}{revisedLine && <p class="muted" style="font-size:13px" data-header-revised>{revisedLine}</p>}
         <div class="row muted" style="font-size:14px">
-          {c.read_minutes && <span>Read · {c.read_minutes} min</span>}
-          {c.word_count && <span>{num(c.word_count)} words</span>}
+          {reading.read_minutes && <span>Read · {reading.read_minutes} min</span>}
+          {reading.word_count && <span>{num(reading.word_count)} words</span>}
           {episode && episode.duration_sec && <span>Listen · {mins(episode.duration_sec)}</span>}
           {c.status === "published" && <span class="muted" data-byline>{chapterByline(c)}</span>}
-        </div>
+        </div>{/* #6193: nothing (not even whitespace) is emitted here without an edition */ chapterEdition && <p class="muted" style="font-size:14px;line-height:1.5;margin:0;font-family:var(--sans)" data-edition-line><b style="color:var(--ink)">{chapterEdition.edition_line}</b> <span>Signed: {chapterEdition.signature.split(" — ").slice(-1)[0]}.</span>{archival && <> <a href={href(`/story/${c.id}/${ARCHIVE_SEGMENT}/`)} data-first-edition-link>The first edition, as archived →</a></>}</p>}
       </div>
     </div>
   </section>
@@ -286,7 +304,7 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
             </div>
           ) : body ? (
             <>
-              {corrections.length > 0 && <div class="chapter-corrections" data-chapter-corrections set:html={correctionsHtml(corrections)} />}
+              {corrections.length > 0 && <div class="chapter-corrections" data-chapter-corrections set:html={correctionsHtml(corrections, chapterEdition)} />}
               {discloseEditor && <p class="persona-disclosure" data-persona-disclosure>{PERSONA_DISCLOSURE}</p>}
               <div data-published-body set:html={body} />
               {(meta.weekNote || idNote) && (

@@ -67,6 +67,7 @@ _WRITTEN_KEYS = [
     "COHORT#resting_heart_rate#2026-W30",  # #1394: anonymous cohort-strip submissions (COHORT#<metric>#<week>)
     "RATE#board_ask#deadbeef",  # shared rate_limiter.py → RATE#{endpoint}#{ip_hash}
     "READERCALL#sleep-pred_20261114_x",  # #6088: web/site_api_reader_call.py — TAP#<ip_hash> + TALLY#<choice>
+    "USER#matthew#SOURCE#brief_trial",  # #6175: web/site_api_brief_response.py — TOKEN# spend + SEND# answer (POST only)
 ]
 
 

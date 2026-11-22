@@ -169,3 +169,10 @@ test("the committed replacement summaries restate no threshold and carry no ISO 
     assert.ok(h.replaces.length >= 20, id);
   }
 });
+
+test("on: a chapter serving an approved later edition keeps its own summary; no replacement is applied to it", () => {
+  const a = ch({ excerpt: "Old words, as served." });
+  assert.deepEqual(applyHeaderRevisions([a], true, TABLE, (id) => id === "week-30"), []);
+  assert.equal(a.excerpt, "Old words, as served.");
+  assert.equal(a.excerpt_first, undefined);
+});

@@ -675,6 +675,26 @@ logs an error), a POST 404 "Reader calls are not available."; call pages hide th
 (digest, >= 60 accepted reader calls in one hour); refusals by reason in Logs Insights on the site-api log group:
 `fields Reason | filter ReaderCallEvent = "refused" | stats count(*) by Reason`.
 
+## The Morning Brief hybrid-format trial — its one switch (#6175)
+
+Owner ruling 2026-11-22 §2 (two weeks). One DynamoDB item, no deploy to flip, no IAM on the brief side:
+
+```bash
+# Turn the trial on (the hybrid block above the full current brief + one private SEND# row per send):
+aws dynamodb put-item --table-name life-platform --item '{"pk":{"S":"USER#matthew#SOURCE#brief_trial"},"sk":{"S":"SWITCH#format"},"value":{"S":"hybrid"}}'
+# Comparison arm (today's brief byte for byte, plus the SEND# measurement row):
+aws dynamodb put-item --table-name life-platform --item '{"pk":{"S":"USER#matthew#SOURCE#brief_trial"},"sk":{"S":"SWITCH#format"},"value":{"S":"measure"}}'
+# ROLLBACK — today's brief, byte for byte, from the next send (absent, "off" or any other value = off):
+aws dynamodb put-item --table-name life-platform --item '{"pk":{"S":"USER#matthew#SOURCE#brief_trial"},"sk":{"S":"SWITCH#format"},"value":{"S":"off"}}'
+# Read the trial (variant, word counts, NEW/REPEAT counts, answers):
+aws dynamodb query --table-name life-platform --key-condition-expression "pk = :p AND begins_with(sk, :s)" \
+  --expression-attribute-values '{":p":{"S":"USER#matthew#SOURCE#brief_trial"},":s":{"S":"SEND#"}}'
+```
+
+Same send time, schedule, recipient and sender. The answer door (`/api/brief_response`) needs the site-api role's
+`USER#matthew#SOURCE#brief_trial` LeadingKey (`cdk/stacks/role_policies_serve.py`, `LifePlatformServe`) — without it a
+POST answers 503 and records nothing; the brief itself is unaffected.
+
 ## The public forecast stream — its two switches (#6156)
 
 The rules-based platform forecast (`lambdas/coach/public_forecast.py`) files ONE number call a week in the pilot (weight;
@@ -701,6 +721,53 @@ SSM `/life-platform/reader-call` = `off` shuts both); the forecast page is `/sys
 
 Dead-man: `public_forecast:cycle_liveness` in qa-smoke (quiet while `STREAM_LIVE` is off; FAIL when a live cycle has no
 `RUN#` stamp after Monday 10:00 PT; WARN when the runtime switch is off or a rule was held for thin/stale inputs).
+
+## Second editions of a chapter (#6193)
+
+Dark behind ONE committed switch, `lambdas/content/chapter_editions.py::LIVE` (ships `False`). Off, `/api/chapters` never
+reads the edition rows and serves no `editions` field, the exporter writes no `chapter_editions.json`, and the site is
+unchanged. Records can be proposed and approved while it is off; nothing renders.
+
+The owner's steps, in order (the MCP door is `manage_chapter_corrections`; `chapter_id` is the PAGE address `week-NN`,
+not the program week):
+
+1. `action=propose_edition`, `chapter_id`, `edition` (2-9), `text` (the full chapter, markdown), `first_published`
+   (the original YYYY-MM-DD), optional `carries` (approved correction ids the edition makes). The gates run first; the
+   reply carries the stored text's `sha256` — it must equal the hash he approved.
+2. Render it on the real site, locally, before anything is public (reads the public site only; writes no record):
+   ```bash
+   python3 scripts/chronicle_edition_preview.py --chapter week-NN --text-file <private>.md [--archival-file <private>.md] --out <private dir>
+   ```
+   Screenshots at 390 px and 1280 px; `www/dist` is then a preview build — never deploy it.
+3. Keep the first edition privately (owner-attended S3 + DynamoDB write):
+   ```bash
+   python3 scripts/chronicle_edition_backup.py --chapter week-NN --row-sk DATE#YYYY-MM-DD          # dry run: reads only
+   python3 scripts/chronicle_edition_backup.py --chapter week-NN --row-sk DATE#YYYY-MM-DD --apply  # write-once copy + pointer
+   ```
+4. `action=approve_edition`, `chapter_id`, `edition`, `approved=true`, `sha256` (the approved hash; refused unless it is
+   the stored text's) — only after he approved THIS text.
+5. Optional, per chapter: `action=propose_archival` (`archival_id`, a privacy-safe rendering of the first edition —
+   never the raw original), then `action=approve_archival` (`approved=true`, `sha256`). Without it there is no
+   first-edition page.
+6. `action=list_editions` shows what would render and why not.
+7. After the deploy, prove the deployed prose is the approved bytes (read-only):
+   ```bash
+   python3 scripts/chronicle_edition_verify.py --chapter week-NN --sha256 <approved> [--archival-sha256 <approved>]
+   ```
+   Permitted presentation (never inside a sentence): evidence figures and call cards between paragraphs, the dated record
+   note, a dek printed once in the header, a signature line's class — `content.chapter_editions.PERMITTED_PRESENTATION`.
+
+An edition that fails a check at build time is HELD on its own (its page keeps the first edition; the build log names
+it); other editions publish. When the body of an edition carries his approved own-words line word for word, the page
+does not also place it beside the chapter.
+
+Turn on: merge `LIVE = True`, deploy the Site API (`bash deploy/deploy_site_api.sh`, or the CI path on merge), let the
+site deploy rebuild. Rollback: merge `LIVE = False`, deploy the Site API, rebuild — the canonical page serves the first
+edition again (its row was never changed); the archival page leaves the root on the next sync.
+
+What it does NOT change: the journal page `/journal/posts/<id>/` (still the first edition — restricted material there is
+`scripts/chronicle_revision_apply.py`'s job), the feed (no new item, date or guid), any delivery marker or subscriber mail,
+or any `www-previous/` rollback tree.
 
 ## The coach-context pilot and the recommendation record (#6158)
 
@@ -783,6 +850,33 @@ the status page wording needs the site-api deploy too (`bash deploy/deploy_site_
 Every held send logs ONE `[outbound-trial] {"event": "suppressed", ...}` line in its own log group, so a held send
 is never a silent failure. Volume before and after: `python3 scripts/owner_outbound_volume.py --weeks 2` (read-only;
 log groups keep 30 days, so run it within 30 days of the window).
+
+## Nutrition consistency — the target-neutral switchboard (#6195)
+
+Owner ruling 2026-11-22 (remaster-2 §11): labels, windows, as-of dates, partial-export exclusions and explanatory copy
+only — no calorie target, deficit cut-off, protein line, rate band, titration rule, clinical stop line or training
+prescription changes (`tests/test_nutrition_consistency_6195.py` resolves them all with every item on and off). ONE
+committed module, `lambdas/common/nutrition_consistency.py`; each item is one line in `SWITCHES` and ships `False`
+(today's output, pinned byte-for-byte against origin/main by the same test). Turn an item on, or roll one back alone,
+by flipping its line in a PR; then the fleet deploy and the site-api deploy (CONVENTIONS: from main, by the driver);
+the MCP description needs the MCP deploy; the day pages change at the next snapshot build. The site JavaScript needs
+no deploy either way: it renders the new fields only when the API sends them.
+
+| Item | Group | On | Rollback |
+|---|---|---|---|
+| `public_verdict_not_clearance` | labelling | /api/deficit_sustainability's no-strain verdict says what held, what drifted, its dates and that it is not a clearance; adds `as_of`, `based_on`, `not_based_on`, `honesty` | flip to `False` |
+| `maintenance_labelled` | labelling | maintenance carries `tdee_as_of`; the page names its source and date; the calorie chart says "estimated maintenance", not "goal" | flip to `False` |
+| `rate_line_wording` | labelling | the loss-rate line drops "defensible early at this size" | flip to `False` |
+| `mcp_sustainability_wording` | labelling | MCP get_deficit_sustainability's all-holding line is not a clearance; description re-routed | flip to `False` |
+| `owner_target_layers` | labelling | brief, Board intro, Nutrition Review and Weekly Plate prompts name rest/lifting minimums and the base | flip to `False` |
+| `brief_tile_layers` | labelling | the Morning Brief calorie tile label shows the served band (grading unchanged) | flip to `False` |
+| `overshoot_option_layers` | labelling | the critics' overshoot option says what the step moves on each layer | flip to `False` |
+| `partial_export_excluded` | computed | a partial export is not a day eaten in the public five-channel mean, the MCP mean and the critics' series | flip to `False` |
+| `day_page_maintenance_dated` | computed | day pages print maintenance only from its as-of date (needs `maintenance_labelled`) | flip to `False`, rebuild |
+| `day_page_partial_labelled` | computed | a partial-export day page is labelled and not graded against the protein floor | flip to `False`, rebuild |
+| `bod_intro_charter_rate` | computed | the Board intro states the charter's rate band, not `PROFILE#v1` phases | flip to `False` |
+
+Activate the labelling group first; read the before/after numbers before the computed group.
 
 ## Common Issues
 

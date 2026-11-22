@@ -31,10 +31,11 @@ from typing import Any, Optional
 import boto3
 import coach.coach_presence_gate as _presence  # #4217 — the absent coach is not asked
 from coach import coach_brief_input_gate as _in_gate  # #3107 — the upstream change-gate + the shared data-inventory block
+from common import nutrition_consistency as _nc  # #6195: the target-neutral consistency switchboard
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_PROTEIN_MIN_G
 from common.metric_truth import STEPS  # #4630: the resolved steps key build_data_summary fills
 from common.pacific_time import pacific_today, shift_day_key
-from health.calorie_target import target_kcal, target_phrase  # #5095: the ONE calorie target
+from health.calorie_target import layers_phrase, rate_band_phrase, target_kcal, target_phrase  # #5095: the ONE calorie target
 from training.coach_context import charter_goal_lines  # #5109: the standing targets are the charter's, never typed here
 
 from ai import (
@@ -257,7 +258,7 @@ def daily_brief_shared_system(
         phase_block,
         "",
         "## Profile snapshot (stable across this brief)",
-        f"- Calorie target: {target_phrase((data or {}).get('date'))}",
+        f"- Calorie target: {(layers_phrase if _nc.on(_nc.OWNER_TARGET_LAYERS) else target_phrase)((data or {}).get('date'))}",
         f"- Protein floor: {PLAN_DAILY_PROTEIN_MIN_G} g",
         f"- Goals: {', '.join(profile.get('active_goals', [])) or 'unspecified'}",
     ]
@@ -614,14 +615,18 @@ def _bod_phase_targets(data, profile):
 
         targets = []
         weekly = phase.get("weekly_target_lbs")
+        deficit = phase.get("deficit_target_kcal") or phase.get("calorie_deficit_target")
+        if _nc.on(_nc.BOD_INTRO_CHARTER_RATE):  # #6195 F13: the charter's rate band, not the profile row's February phases
+            weekly, deficit = None, None
+            targets.append(rate_band_phrase() or "rate band unreadable")
         if weekly:
             targets.append(f"{float(weekly):g} lbs/week")
-        deficit = phase.get("deficit_target_kcal") or phase.get("calorie_deficit_target")
         if deficit:
             targets.append(f"{int(float(deficit))} kcal deficit")
         # #4540/#5095: the ONE calorie target (health.calorie_target), never the profile row's `calorie_target`.
         if target_kcal(data.get("date")):
-            targets.append(f"{target_kcal(data.get('date'))} cal daily")
+            _cal = layers_phrase(data.get("date")) if _nc.on(_nc.OWNER_TARGET_LAYERS) else f"{target_kcal(data.get('date'))} cal daily"
+            targets.append(_cal)  # #6195 F11: the layers named, with the switch on
 
         return f"{label}: {', '.join(targets)}." if targets else f"{label}."
     except Exception as e:

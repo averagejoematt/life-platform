@@ -118,7 +118,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-800 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+802 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -133,6 +133,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `anomalies` | anomaly_detector_lambda.py | anomaly_detector_lambda.py, daily_brief_lambda.py |
 | `apple_health` | freshness_checker_lambda.py, health_auto_export_lambda.py | ai_expert_analyzer_lambda.py, evening_nudge_lambda.py, freshness_checker_lambda.py, health_auto_export_lambda.py, instrument_presence.py, protein_nudge_runner.py, qa_smoke_lambda.py, site_api_autonomic.py, site_api_biomarkers.py, site_api_body.py, site_api_fingerprint.py, site_api_freshness.py, site_api_journey.py, site_api_meals.py, site_api_mind.py, site_api_physical.py, site_api_pulse.py, site_api_rollups.py, site_api_training.py, site_stats_refresh_lambda.py, tools_cgm.py, tools_correlation.py, tools_health.py, tools_lifestyle.py, tools_training.py |
 | `benchmarks` | — | site_api_training.py |
+| `brief_trial` | site_api_brief_response.py | site_api_brief_response.py |
 | `calibration` | — | state_of_matthew_lambda.py |
 | `centenarian_progress` | weekly_correlation_compute_lambda.py | — |
 | `challenges` | challenge_generator_lambda.py, character_sheet_lambda.py | challenge_generator_lambda.py, site_api_social_challenges.py |
@@ -596,12 +597,12 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1394 total · 1005 resolved · 389 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1397 total · 1008 resolved · 389 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 80 resolved · 0 dynamic of 80 scheduled lambdas (107 lambdas total)
 - Alarms: 152 literal-named declarations across three idioms, 4 composite; routing digest 108 · digest+paging 2 · digest+urgent 10 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 26 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only
 - Schedules: 97 (lambda, cron) rows; UTC clock on fixed rows, zone + wall-clock if zoned (#4284)
-- Record families referenced in code but outside the SOURCE_CLASS census (6): `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
+- Record families referenced in code but outside the SOURCE_CLASS census (7): `brief_trial`, `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)
 
 ## 7. Cost-bearing surface (#3374 R1)

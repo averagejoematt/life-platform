@@ -15,69 +15,10 @@ from common.journal_silence import public_body  # #5131: the one public-surface 
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.text_utils import truncate_at_word
 from content import chronicle_schema  # #4191 — the ONE envelope→body / stat-line→words derivation
+from content.chronicle_markdown import markdown_to_html  # noqa: F401 — #6193: moved, one copy, re-exported here
 from training import session_count  # #5398: THE session count
 
 _HAS_CONFIDENCE = True
-
-
-def markdown_to_html(md_text):
-    """Convert Elena's markdown prose to clean HTML for email and journal."""
-    lines = md_text.strip().split("\n")
-    html_parts = []
-    in_blockquote = False
-    bq_buffer = []
-
-    for line in lines:
-        stripped = line.strip()
-
-        # Blockquotes (Board interviews). #2221: the marker is ">" — the space after
-        # it is OPTIONAL in markdown. Requiring "> " rendered an interview written as
-        # ">Park said..." as ordinary prose with a stray ">" in front of it.
-        if stripped.startswith(">"):
-            if not in_blockquote:
-                in_blockquote = True
-                bq_buffer = []
-            bq_buffer.append(stripped[1:].lstrip())
-            continue
-        elif in_blockquote:
-            # End of blockquote
-            bq_text = " ".join(bq_buffer)
-            # Convert **bold** and *italic*
-            bq_text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", bq_text)
-            bq_text = re.sub(r"\*(.+?)\*", r"<em>\1</em>", bq_text)
-            html_parts.append(f"<blockquote>{bq_text}</blockquote>")
-            in_blockquote = False
-            bq_buffer = []
-
-        # Horizontal rule
-        if stripped == "---":
-            html_parts.append("<hr>")
-            continue
-
-        # Empty line
-        if not stripped:
-            continue
-
-        # Italic line (closing signature like *Week N of The Measured Life*)
-        if stripped.startswith("*") and stripped.endswith("*") and not stripped.startswith("**"):
-            inner = stripped[1:-1]
-            html_parts.append(f'<p class="signature"><em>{inner}</em></p>')
-            continue
-
-        # Regular paragraph — apply inline formatting
-        text = stripped
-        text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
-        text = re.sub(r"\*(.+?)\*", r"<em>\1</em>", text)
-        html_parts.append(f"<p>{text}</p>")
-
-    # Flush any remaining blockquote
-    if in_blockquote and bq_buffer:
-        bq_text = " ".join(bq_buffer)
-        bq_text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", bq_text)
-        bq_text = re.sub(r"\*(.+?)\*", r"<em>\1</em>", bq_text)
-        html_parts.append(f"<blockquote>{bq_text}</blockquote>")
-
-    return "\n".join(html_parts)
 
 
 def parse_installment(raw_text):

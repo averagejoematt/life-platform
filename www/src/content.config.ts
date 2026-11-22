@@ -380,7 +380,20 @@ const night = z
     by_device: z.object({ eightsleep: device, whoop: device }).strict(),
   })
   .strict();
-const food = z.object({ calories: n, protein_g: n, carbs_g: n, fat_g: n, logging_gap: z.boolean(), floor_g: n, tdee: n }).strict();
+// #6195: `tdee_as_of` and `partial` are sent only with their switches on (common/nutrition_consistency.py), so both are optional.
+const food = z
+  .object({
+    calories: n,
+    protein_g: n,
+    carbs_g: n,
+    fat_g: n,
+    logging_gap: z.boolean(),
+    floor_g: n,
+    tdee: n,
+    tdee_as_of: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+    partial: z.boolean().optional(),
+  })
+  .strict();
 const engine = z
   .object({
     level: z.number(),

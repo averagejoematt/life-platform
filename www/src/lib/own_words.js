@@ -64,3 +64,20 @@ export function ownWords(served, key) {
 export function withinDays(iso, from, to) {
   return Boolean(iso && from && to && iso >= from && iso <= to);
 }
+
+const plainWords = (x) =>
+  String(x ?? "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&#39;|&#x27;|&rsquo;|&lsquo;|[’‘]/g, "'")
+    .replace(/&quot;|&ldquo;|&rdquo;|[“”]/g, '"')
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** #6193 (owner ruling 2026-11-22, final approval §4): does a chapter's body already carry this approved quotation, word
+ *  for word? Then the page does not ALSO place it beside the chapter — the body keeps it, the side copy is suppressed,
+ *  wording and date unchanged. Derived from the text itself, so no per-edition flag can drift from what the body says. */
+export function bodyCarriesQuote(bodyHtml, quote) {
+  const q = plainWords(quote).replace(/^["']|["']$/g, "");
+  return q.length > 0 && plainWords(bodyHtml).includes(q);
+}
