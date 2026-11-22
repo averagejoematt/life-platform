@@ -74,7 +74,7 @@ const chapters = defineCollection({
     week: z.number().int().nullable(),
     week_label: z.string().min(1),
     date: z.string().regex(ISO_DAY),
-    status: z.enum(["published", "held", "skipped", "pending"]),
+    status: z.enum(["published", "held", "skipped", "pending", "retired"]),
     // the program week's explicit interval (/api/chapters), null for a prologue — never inferred from `date`
     week_start: z.string().regex(ISO_DAY).nullable(),
     week_end: z.string().regex(ISO_DAY).nullable(),

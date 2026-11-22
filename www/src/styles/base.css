@@ -534,6 +534,7 @@ th.r {
 .status.observation,
 .status.inconclusive,
 .status.held,
+.status.retired,
 .status.skipped {
   color: var(--muted);
 }

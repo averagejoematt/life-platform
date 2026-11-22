@@ -5007,3 +5007,25 @@ STRUCTURAL_HAND_PROOFS["structural::test_recommendation_record_6158.py"] = {
     ),
     "proved_on": "2026-11-22",
 }
+
+# #6178 — the narrator named on every byline: the chapter page, the home card and the story index read one definition
+# (www/src/lib/narrator.js), the RSS channel and the subscribe page carry it verbatim, the owner's first-person lines
+# stay byte-identical, and no rendered byline under www/src still says "the platform's narrator".
+STRUCTURAL_HAND_PROOFS["structural::test_narrator_byline_6178.py"] = {
+    "gate_name": "test_narrator_byline_6178.py",
+    "command": "python3 -m pytest tests/test_narrator_byline_6178.py -q -p no:warnings   # baseline 5 passed",
+    "mutation": (
+        "Three plants, ONE AT A TIME, each restored from a copy: M1 www/src/pages/story/[id].astro's {CHAPTER_BYLINE} "
+        "span put back to the old 'Written by the platform's narrator…' sentence; M2 one word of the owner's approved "
+        "home-card sentence changed ('The figures' → 'All the figures'); M3 site/subscribe/index.html's disclosure put "
+        "back to 'Elena Voss, the site's AI journalist'."
+    ),
+    "observed": "2026-11-21, #6178 lane. BASELINE 5 passed. M1 2 failed; M2 1 failed; M3 1 failed. REVERTED 5 passed.",
+    "scope": (
+        "www/src/**/*.astro|js|ts (the unnamed-narrator sweep, comments excluded); the three v9 byline call sites; "
+        "scripts/v4_build_rss.py DESC (imported) and the committed site/rss.xml + site/feed.xml; site/subscribe/index.html. "
+        "NOT SEEN: the built dist (the Python suite cannot run astro build; www/tests/week_states_6178.test.mjs pins the "
+        "strings); legacy /legacy/ pages; the podcast feed's own channel text."
+    ),
+    "proved_on": "2026-11-21",
+}
