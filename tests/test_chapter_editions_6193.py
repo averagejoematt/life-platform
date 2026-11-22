@@ -419,10 +419,26 @@ def test_switch_on_the_route_serves_approved_editions_and_says_when_it_cannot_re
     def same_instant(resp):
         return re.sub(r'"(generated_at|served_at)": "[^"]*"', r'"\1": "T"', resp["body"])
 
+    # (#6199: the route also reads the private-call record from the raw table, cached 900 s — one more read, no body change)
+    monkeypatch.setattr(chapters.private_call_check, "load", lambda _table: private_call_check.CallSet())
+    chapters._CALLS_CACHE.update(at=None, calls=None)
     on_empty = json.loads(same_instant(_handle(chapters, lambda: [])))
     monkeypatch.setattr(CE, "LIVE", False)
     off = json.loads(same_instant(_handle(chapters, lambda: [])))
     assert on_empty.pop("editions") == [] and on_empty == off
+    monkeypatch.setattr(CE, "LIVE", True)
+
+    # Failure modes of the two reads, as served: an unreadable editions read -> "editions": null + editions_error; an
+    # unreadable private-call read -> every edition withheld ("editions": [], 200) and a logged error, never served.
+    rows = [_original(), _edition(2)]
+    assert [e["edition"] for e in chapters.editions_field(lambda: rows, tainted=NEVER)["editions"]] == [2]
+
+    def calls_down(_table):
+        raise RuntimeError("throttled")
+
+    monkeypatch.setattr(chapters.private_call_check, "load", calls_down)
+    chapters._CALLS_CACHE.update(at=None, calls=None)
+    assert chapters.editions_field(lambda: rows, tainted=NEVER)["editions"] == []
 
     # The documented failure mode (not changed here): with the switch on, an unreadable editions read is a schema error
     # in the snapshot exporter, so that build exits non-zero instead of building without editions.
