@@ -5106,3 +5106,26 @@ STRUCTURAL_HAND_PROOFS["structural::test_nutrition_consistency_6195.py"] = {
     ),
     "proved_on": "2026-11-22",
 }
+
+# #6212 — grounded nutrition and body-composition facts: pure, unwired, qualified wording, no personal literal
+STRUCTURAL_HAND_PROOFS["structural::test_grounded_intake_facts_6212.py"] = {
+    "gate_name": "test_grounded_intake_facts_6212.py",
+    "command": "python3 -m pytest tests/test_grounded_intake_facts_6212.py -q -p no:cacheprovider   # baseline 20 passed",
+    "mutation": (
+        "Five plants, ONE AT A TIME, each restored from a scratch copy: M1 a new lambdas/health/zz_mut_6212.py importing "
+        "`from health import grounded_intake_facts`; M2 a bare four-digit numeric literal added inside intake_fact; M3 the "
+        "consistent-verdict statement replaced with 'The log is accurate.'; M4 the complete-day minimum dropped from the "
+        "insufficient-data check; M5 the scan label made to ignore the phase-start weight tolerance."
+    ),
+    "observed": (
+        "2026-11-22, #6212 lane. BASELINE 20 passed. M1 1 failed (unwired guard names the importer); M2 1 failed "
+        "(no-personal-literal); M3 2 failed (verbatim approved sentence + forbidden phrase); M4 1 failed (insufficient "
+        "paths); M5 1 failed (in-phase scan far from start weight). REVERTED 20 passed."
+    ),
+    "scope": (
+        "The module's three facts on synthetic series; every .py under lambdas/ and mcp/ for the module name (text match, "
+        "so a dynamic import by a computed string is NOT seen); numeric and string literals of the module source only. "
+        "NOT SEEN: live data, any context builder (none exists until #6149)."
+    ),
+    "proved_on": "2026-11-22",
+}
