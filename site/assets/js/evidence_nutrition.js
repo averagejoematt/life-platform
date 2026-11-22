@@ -272,7 +272,8 @@ export function nutritionDeficitSustainability(ds) {
     const degraded = c.status === "degraded";
     const insuf = c.direction === "insufficient_data";
     const tone = degraded ? "dsx-strain" : insuf ? "dsx-none" : "dsx-hold";
-    const statusWord = degraded ? "strain" : insuf ? "too few days" : "holding";
+    // #6195 F2: with `honesty` a channel that fell without crossing its cut-off reads "drifting", never "holding"
+    const statusWord = degraded ? "strain" : insuf ? "too few days" : ds.honesty && c.direction === "declining" ? "drifting" : "holding";
     const delta = (!insuf && c.delta_pct) ? ` ${c.delta_pct > 0 ? "+" : ""}${fmt(c.delta_pct)}%` : "";
     return `<div class="dsx-row ${tone}"><span class="dsx-name">${esc(c.name)}</span>` +
       `<span class="dsx-dir mono">${esc(ARROW[c.direction] || "·")}${esc(delta)}</span>` +
@@ -293,7 +294,9 @@ export function nutritionDeficitSustainability(ds) {
     `<div class="dsx-verdict ${sevTone}"><span class="dsx-count mono">${ds.degraded_count}/5</span><span class="dsx-vtext">${esc(ds.verdict || "")}</span></div>` +
     (ds.honesty ? `<p class="rd-meta label dsx-honesty">${esc(ds.honesty)}${Array.isArray(ds.not_based_on) && ds.not_based_on.length ? ` Not based on: ${esc(ds.not_based_on.join(", "))}.` : ""}${ds.as_of ? ` As of ${esc(fmtShort(ds.as_of))}.` : ""}</p>` : "") +
     `<div class="dsx-rows">${rows}</div>` +
-    `<p class="rd-meta label">${defLine} The five channels — HRV, sleep quality, recovery, habit adherence, training output — are watched together: a deficit that's working shows up as the weight falling while these <em>hold</em>; one that's costing too much shows up as three or more slipping at once. A single strained channel is noise, not a verdict. Correlative, n=1 — an early signal, never alarm.</p>`);
+    (ds.honesty
+      ? `<p class="rd-meta label">${defLine} The five channels — HRV, sleep quality, recovery, habit adherence, training output — are watched together: three or more slipping at once is the strain signal this read can give, and all of them holding is not a clearance. A single strained channel is noise, not a verdict. Correlative, n=1 — an early signal, never alarm.</p>`
+      : `<p class="rd-meta label">${defLine} The five channels — HRV, sleep quality, recovery, habit adherence, training output — are watched together: a deficit that's working shows up as the weight falling while these <em>hold</em>; one that's costing too much shows up as three or more slipping at once. A single strained channel is noise, not a verdict. Correlative, n=1 — an early signal, never alarm.</p>`));
 }
 
 // #4182 — the weekday/weekend split with labels a reader can read (the kvtable printed

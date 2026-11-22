@@ -380,6 +380,7 @@ def test_the_new_public_sentences_survive_the_publication_gate():
         nc.PUBLIC_HONESTY,
         "How fast is too fast is contested, and this page does not rate the pace as safe or unsafe. What it can show is the protein floor beside it.",
         "Recovery channels during the cut — the five-channel read",
+        "three or more slipping at once is the strain signal this read can give, and all of them holding is not a clearance.",
     ]
     NP.reset_taint()
     try:

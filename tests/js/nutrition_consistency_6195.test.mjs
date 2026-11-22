@@ -47,6 +47,10 @@ test("F1/F2 ON: the five-channel read carries its limits and date, and its headi
   assert.match(html, /a day from Apr 27 to May 10 against an estimated 3,000 to maintain \(MacroFactor's adaptive estimate, as of May 1\)/);
   // the strain tone is the same as before: channels_holding is not a warning
   assert.match(html, /dsx-sev-ok/);
+  // a channel that fell under its cut-off is "drifting", and the footer no longer equates holding with working
+  assert.match(html, /<span class="dsx-name">Recovery<\/span><span class="dsx-dir mono">↓ -4%<\/span><span class="dsx-status label">drifting<\/span>/);
+  assert.doesNotMatch(html, /a deficit that's working/);
+  assert.match(html, /all of them holding is not a clearance/);
 });
 
 test("F4/F6 ON: the hero names maintenance's source and date; the calorie chart captions it, never 'goal'", () => {
