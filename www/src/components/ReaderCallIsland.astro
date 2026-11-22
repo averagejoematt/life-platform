@@ -1,0 +1,9 @@
+---
+// The reader-call island, loaded ONCE for every reader-call block (#6170): the coach call's block (ReaderCall.astro),
+// the open-calls list (ReaderCallList.astro) and a platform forecast's block (ForecastReaderCall.astro) share this one
+// chunk, so a forecast page that is not built (none while the stream is dark) leaves no orphan chunk behind.
+---
+
+<script>
+  import "../islands/readercall.js";
+</script>

@@ -57,7 +57,9 @@ WHAT IT GOVERNS (``kind_of``): ``PREDICTION#`` and ``COMMITMENT#`` rows under a 
 ``CORRECTION#`` rows and the calibration ledger's ``prediction_void`` rows — which follow the call they name. A private
 call's rows are OMITTED from every public read (``web.narrative_publication.PublicationTable`` drops them before any
 handler sees them, so every public total, denominator, accuracy and list is computed over eligible calls only; omit,
-never mark — no placeholder, no count of what was left out).
+never mark — no placeholder, no count of what was left out). #6156: the platform's forecast rule's ``PREDICTION#``
+rows (``common.public_forecast_policy.FORECAST_PK``) are calls too — PRIVATE while its ``STREAM_LIVE`` is off, then
+decided by their structure like every call filed after the registry.
 
 THE STORED ROWS ARE NEVER CHANGED. The owner's tools (MCP, the coaches, the evaluator) read the table directly and keep
 every call with its complete original grading history.
@@ -69,7 +71,13 @@ import hashlib
 import re
 from typing import Any, Callable, Iterable, Mapping, Optional
 
-from common import activity_publication as AP, journal_silence, narrative_provenance as NP, prediction_publication_registry as REG
+from common import (
+    activity_publication as AP,
+    journal_silence,
+    narrative_provenance as NP,
+    prediction_publication_registry as REG,
+    public_forecast_policy as FPOL,
+)
 
 PUBLIC = NP.PUBLIC
 PRIVATE = NP.PRIVATE
@@ -121,11 +129,13 @@ def governs_partition(pk: Any) -> bool:
     if pk is None:
         return True
     pk = str(pk)
-    return pk.startswith("COACH#") or pk == DOCKET_PK or pk.endswith(_CALIB_PK_SUFFIX)
+    return pk.startswith("COACH#") or pk == DOCKET_PK or pk.endswith(_CALIB_PK_SUFFIX) or FPOL.is_forecast_partition(pk)
 
 
 def kind_of(pk: Any, sk: Any) -> Optional[str]:
     pk, sk = str(pk or ""), str(sk or "")
+    if FPOL.is_forecast_partition(pk):  # #6156: the platform's forecast rule's calls are calls
+        return CALL if sk.startswith(CALL_ROW_PREFIX) else None
     if pk.startswith("COACH#"):
         if sk.startswith("PREDICTION#"):
             return CALL
@@ -385,6 +395,8 @@ def classify_call(pk: Any, row: Mapping) -> tuple:
         return PRIVATE, UNREVIEWED_BET
     if row.get("source") == PUBLIC_BRIEF_SOURCE and not _public_brief_live():
         return PRIVATE, PUBLIC_BRIEF_DARK
+    if (row.get("source") == FPOL.FORECAST_SOURCE or FPOL.is_forecast_partition(pk)) and not FPOL.STREAM_LIVE:
+        return PRIVATE, FPOL.DARK_REASON  # #6156: graded and kept, published only once the stream's switch is on
     ev = _map(row.get("evaluation"))
     texts = (row.get("claim_natural"), row.get("prediction_id"), row.get("sk"))
     if str(_map(row.get("filing")).get("verdict") or "") != "gradeable":

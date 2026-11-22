@@ -164,6 +164,9 @@ PARTITIONS = [
     # (SOURCE#notion is RAW_TIMESERIES — his words are kept forever; only the forecast
     # bookkeeping resets).
     ("diary_claims", "pregenesis", {}),
+    # #6156: the platform's forecast rule's calls (sk PREDICTION#pred_<cycle>_forecast_<rule>) and RUN#<cycle>
+    # stamps. "all": every forecast is about the cycle it was filed in, so a restart tombstones the whole partition.
+    ("public_forecast", "all", {}),
     # #3860: the #3741 daily recap card's render/delivery log, sk DATE#<date>. "pregenesis" like
     # every other DATE#-keyed derived artifact — post-genesis cards accumulate from Day 1, and the
     # closing cycle's cards are tombstoned + cycle-stamped so cycle N stays navigable in the

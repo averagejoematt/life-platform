@@ -34,6 +34,7 @@ queryable in Logs Insights. A distributed botnet holding many networks is the ed
 from __future__ import annotations
 
 import json
+import re
 import sys
 import threading
 import time
@@ -42,6 +43,7 @@ from typing import Any, Callable, Optional
 
 from boto3.dynamodb.conditions import Key
 from coach import coach_record, prediction_windows
+from common import public_forecast_policy as FPOL
 from common.client_ip import extract_client_ip, salt_derived_key, salted_ip_hash
 from common.metric_namespaces import SITE_API_METRIC_NAMESPACE
 from common.pacific_time import pacific_today
@@ -60,6 +62,9 @@ NOT_OPEN = "This call is not open for reader calls."
 CLOSED = "Reader calls on this one are closed."
 UNAVAILABLE = "Reader calls are unavailable right now. Please try again shortly."
 _GRADED = ("confirmed", "refuted")
+#: #6170: a platform forecast's block, in the machine voice (never "the coach").
+FORECAST_COPY = "Make your own call. It is counted with the other reader calls, apart from the forecast's record."
+FORECAST_NOT_EVIDENCE = "A count of reader calls. It is not evidence about the experiment and is never part of the forecast's record."
 
 #: The runtime kill switch (#6114): `aws ssm put-parameter --name /life-platform/reader-call --value off --type String
 #: --overwrite` shuts the door within SWITCH_CACHE_S without a deploy. Only the literal "on" opens it.
@@ -137,7 +142,69 @@ def _short_and_pid(item_id: str) -> Optional[tuple]:
     if not isinstance(item_id, str) or not R.ITEM_ID_RE.match(item_id):
         return None
     short, pid = item_id.split(":", 1)
+    if short == FPOL.READER_SHORT:  # #6170: a rules-based platform forecast (never a coach's short id)
+        return (short, pid) if FORECAST_ID_RE.match(pid) else None
     return (short, pid) if short in _CALIB_COACH_NAMES else None
+
+
+#: A forecast's stored id (``coach.public_forecast``: ``pred_<cycle YYYYMMDD>_forecast_<rule id>``) — made of a date and
+#: a rule name, never of words, so it is its own public id (no ``public_call_id`` mapping is needed or consulted).
+FORECAST_ID_RE = re.compile(r"^pred_\d{8}_forecast_[a-z][a-z_]{0,40}$")
+
+
+def load_forecast(table: Any, item_id: str, pid: str, today: str, *, genesis: Optional[str]) -> tuple:
+    """``(view, None)`` for an eligible rules-based platform forecast (#6170), else the same refusals as a coach call.
+
+    The row is read through the governed table, so a forecast the publication policy keeps private (every one while
+    ``public_forecast_policy.STREAM_LIVE`` is off) reads as absent: "Unknown call". Eligible = the forecast partition's
+    own row (``coach_id`` empty, its source and record), counted in this cycle, pending or graded, and a ``closer`` call
+    (the frozen head-to-head spec). The lock, the token, the meter, the dedup marker and the counter are the coach
+    calls' own, unchanged: only the row a view is built from differs."""
+    from web.prediction_reason import _notes, metric_unit, metric_words
+
+    row = (table.get_item(Key={"pk": FPOL.FORECAST_PK, "sk": f"{FPOL.SK_PREFIX}{pid}"}) or {}).get("Item")
+    if (
+        not isinstance(row, dict)
+        or coach_record.prediction_key(row) != pid
+        or row.get("coach_id") != ""
+        or row.get("source") != FPOL.FORECAST_SOURCE
+        or row.get("record") != FPOL.RECORD
+    ):
+        return None, (404, "Unknown call", "unknown_call")
+    if not coach_record.counts_this_cycle(row, genesis):
+        return None, (404, "Unknown call", "unknown_call")
+    ev = row.get("evaluation")
+    spec: dict = ev if isinstance(ev, dict) else {}
+    kind = R.call_kind(spec)
+    measure = metric_words(spec.get("metric"))
+    status = row.get("status")
+    if kind != R.CLOSER or not measure or status not in ("pending", *_GRADED):
+        return None, (409, NOT_OPEN, "not_eligible")
+    eff = prediction_windows.effective_window_days(spec, row.get("subdomain", ""))
+    made = str(row.get("created_date") or "")[:10]
+    due = prediction_windows.due_date(made, spec, row.get("subdomain", ""))
+    last = R.open_until(spec, made, eff, due)
+    unit = metric_unit(spec.get("metric"))
+    q = R.question(spec, measure, made, eff, unit)
+    if not q or not last:
+        return None, (409, NOT_OPEN, "not_eligible")
+    view = {
+        "item_id": item_id,
+        "spec": spec,
+        "kind": kind,
+        "status": status,
+        "question": q,
+        "short_question": R.short_question(spec, measure, made, eff, unit),
+        "made": made,
+        "unit": unit,
+        "due": due,
+        "open_until": last,
+        "open": R.is_open(row, status, last, today),
+        "graded": status in _GRADED,
+        "notes": _notes(row.get("outcome_notes")),
+        "author": FPOL.RECORD,
+    }
+    return view, None
 
 
 def _presence(table: Any) -> list:
@@ -156,6 +223,8 @@ def load_call(table: Any, item_id: str, today: str, *, genesis: Optional[str], p
     if sp is None:
         return None, (404, "Unknown call", "unknown_call")
     short, pid = sp
+    if short == FPOL.READER_SHORT:
+        return load_forecast(table, item_id, pid, today, genesis=genesis)
     # #6120: the item id is the call's PUBLIC id (opaque, never its words); the row is read by the stored key behind it,
     # from the same complete, policy-filtered map every public route's ids come from — a private call is not in it.
     key = public_call_id.stored_of(short, pid)
@@ -280,14 +349,24 @@ def view_payload(view: dict, reader_calls: Optional[dict], your_call: Optional[s
         "copy": R.COPY,
         "note": R.NOT_EVIDENCE,
     }
+    if view.get("author") == FPOL.RECORD:  # #6170: the machine voice — never "the coach" (owner ruling 2026-11-22 §5)
+        payload.update(author=FPOL.RECORD, author_words=FPOL.AUTHOR_WORDS, copy=FORECAST_COPY, note=FORECAST_NOT_EVIDENCE)
     if not view["open"]:
         payload["reader_calls"] = reader_calls
         if view["graded"]:
-            payload["graded"] = {
-                "coach_status": view["status"],
-                "coach_choice": R.coach_choice(view["spec"]),
-                "reading_side": R.reading_side(view["spec"], view["notes"]),
-            }
+            payload["graded"] = (
+                {
+                    "forecast_status": view["status"],
+                    "forecast_choice": R.coach_choice(view["spec"]),
+                    "reading_side": R.reading_side(view["spec"], view["notes"]),
+                }
+                if view.get("author") == FPOL.RECORD
+                else {
+                    "coach_status": view["status"],
+                    "coach_choice": R.coach_choice(view["spec"]),
+                    "reading_side": R.reading_side(view["spec"], view["notes"]),
+                }
+            )
     return payload
 
 

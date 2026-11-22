@@ -58,7 +58,17 @@ const privateRoom = roomScope() !== "off" && roomPrivate();
 // #6088: a PRIVATE reader-call build (WEB_READERCALL=1 while READERCALL_LIVE is false) is local in exactly the same way;
 // once live (#6114) the control is ordinary build output.
 const readercall = readerCallPrivate();
-const room = privateRoom || lab || story || readercall;
+// #6170: a FIXTURE snapshot carrying forecasts.json is the private WEB_FORECAST=1 review build (the deploy's fixture never
+// carries one; a live snapshot does only once the stream is on, and then its pages are ordinary output) — local alike.
+const SNAP = join(WWW, "content", "snapshot");
+const forecastFixture = (() => {
+  try {
+    return JSON.parse(readFileSync(join(SNAP, "manifest.json"), "utf8")).mode === "fixture" && existsSync(join(SNAP, "forecasts.json"));
+  } catch {
+    return false;
+  }
+})();
+const room = privateRoom || lab || story || readercall || forecastFixture;
 const base = "/" + rawBase.replace(/^\/+|\/+$/g, "");
 
 function walk(dir, out = []) {
@@ -237,7 +247,7 @@ if (!room) writeFileSync(REACH_OUT, JSON.stringify(reach, null, 2) + "\n");
 
 if (room) {
   console.log(
-    `postbuild: ${lab ? "WEB_LAB=1 — a private Laboratory build" : story ? "WEB_STORY=1 — a private Human Story build" : readercall ? "WEB_READERCALL=1 — a private reader-call build" : `WEB_ROOM=${process.env[ROOM_ENV]} — a private Coaching Room build`} (${routes.size} routes); owned_paths.json and reach.json left as committed. Never deploy this dist.`
+    `postbuild: ${lab ? "WEB_LAB=1 — a private Laboratory build" : story ? "WEB_STORY=1 — a private Human Story build" : readercall ? "WEB_READERCALL=1 — a private reader-call build" : forecastFixture ? "WEB_FORECAST=1 — a private platform-forecast fixture build" : `WEB_ROOM=${process.env[ROOM_ENV]} — a private Coaching Room build`} (${routes.size} routes); owned_paths.json and reach.json left as committed. Never deploy this dist.`
   );
 } else {
   console.log(

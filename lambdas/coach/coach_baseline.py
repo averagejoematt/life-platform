@@ -8,7 +8,10 @@ the SAME call, by the SAME grader, against the SAME tolerance; only the predicti
 
   * **Number call** (``point`` — "recovery will be about 61 tomorrow, ±1 SD"): the rule
     predicts the target-date reading equals the filed reading; it is right iff
-    ``|graded reading − filed reading| <= the call's own frozen tolerance``.
+    ``|graded reading − filed reading| <= the call's own frozen tolerance``. A rules-based platform
+    forecast (#6156, its own partition — never a coach's record) is graded head-to-head instead: its
+    spec carries ``scoring: closer_than_nothing_changes`` and the rule is right iff it is AS close or
+    closer to the reading than the forecast (the complement of the forecast's own grade).
   * **Direction call** (``directional``, and a threshold-less ``machine`` spec the grader
     re-routes to directional): the rule predicts FLAT; it is right iff the grader's own
     measured change sits inside the grader's own noise band — since #4617 the change across
@@ -60,7 +63,7 @@ from experiment import calibration_core
 from experiment.measurable_metrics import METRIC_SOURCES
 
 from coach import coach_record
-from coach.prediction_point_grader import POINT_GRACE_DAYS, POINT_LOOKBACK_DAYS, evaluate_condition
+from coach.prediction_point_grader import HEAD_TO_HEAD, POINT_GRACE_DAYS, POINT_LOOKBACK_DAYS, evaluate_condition, forecast_closer
 
 logger = logging.getLogger(__name__)
 
@@ -182,6 +185,13 @@ def verdict(kind: str | None, spec: dict, *, actual: Any = None, filed_value: An
             return None, NO_GRADED_READING
         return abs(float(actual)) <= float(noise_band), None
     if kind == "number":
+        if spec.get("scoring") == HEAD_TO_HEAD:  # #6156: the platform-forecast partition's frozen head-to-head rule
+            if actual is None:
+                return None, NO_GRADED_READING
+            guess = spec.get("baseline_value", filed_value)
+            if guess is None or spec.get("threshold") is None:
+                return None, INCOMPLETE_SPEC
+            return not forecast_closer(actual, spec["threshold"], guess), None
         tol = spec.get("tolerance")
         if tol is None:
             return None, INCOMPLETE_SPEC

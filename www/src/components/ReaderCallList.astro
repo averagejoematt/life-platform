@@ -4,6 +4,7 @@
 // (open coach calls of a one-tap kind in the snapshot) as hidden rows the island asks /api/reader_call about — each
 // row it shows names the coach, the question and the last open day — and, when none is open (or the door is shut), an
 // empty state that says so and points to the record of past calls below. It never reads as broken.
+import ReaderCallIsland from "./ReaderCallIsland.astro";
 import { READERCALL_API, READERCALL_MARKER, itemIdOf, readerCallEnabled, readerCallFor } from "../lib/readercall.js";
 import { LIST_CHECKING, LIST_EMPTY, LIST_INTRO } from "../lib/readercall_view.js";
 import { href, pathOf } from "../lib/url.js";
@@ -36,6 +37,4 @@ const mark = { [READERCALL_MARKER]: "list" };
   )
 }
 
-<script>
-  import "../islands/readercall.js";
-</script>
+<ReaderCallIsland />

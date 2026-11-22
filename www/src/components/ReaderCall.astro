@@ -6,6 +6,7 @@
 // hidden, so the page never shows an error and nothing reader-facing appears. Once revealed: while the call is
 // open, the question and one tap, then what the reader called and when to come back (never a count); once closed, the
 // reader calls; once graded, the coach, the simple guess and the reader calls side by side — apart from the record.
+import ReaderCallIsland from "./ReaderCallIsland.astro";
 import { READERCALL_API, READERCALL_MARKER, itemIdOf, readerCallEnabled, readerCallFor } from "../lib/readercall.js";
 import { COPY } from "../lib/readercall_view.js";
 
@@ -47,6 +48,4 @@ const guess = p.simple_guess;
   )
 }
 
-<script>
-  import "../islands/readercall.js";
-</script>
+<ReaderCallIsland />

@@ -393,10 +393,12 @@ class TestEveryPathFiles:
             "lambdas/coach/prediction_emission.py": "build_prediction_record runs/stamps the rules (coach_state_updater files through it)",
             "lambdas/privacy/diary_claims.py": "admit_claim refuses a claim that fails the rules",
             "lambdas/coach/public_brief.py": "file_call runs validate_filing at filing and drops a call that is not gradeable (2026-11-09 E)",
+            "lambdas/coach/public_forecast.py": "build runs validate_filing at filing and files nothing that is not gradeable (#6156)",
         }
         named = {
             "lambdas/coach/dispute_docket.py": "a docket position: written already resolved from a code-validated criterion (validate_criterion)",
             "lambdas/coach/advice_links.py": "a key builder for links to an existing call; writes no prediction",
+            "lambdas/common/public_forecast_policy.py": "#6156: names the forecast partition's sort-key prefix; writes nothing",
             "lambdas/web/trail_corrections.py": "reads an existing row by key; writes no prediction",
             "lambdas/web/site_api_coach_brief.py": "reads a brief's filed calls by key (public chokepoint); writes no prediction",
             "lambdas/web/site_api_reader_call.py": "#6088: reads one public call by key (governed handle); writes only READERCALL# rows",
@@ -452,6 +454,7 @@ class TestNoRetrospectiveInvention:
             "lambdas/coach/coach_state_updater.py",
             "lambdas/privacy/diary_claims.py",
             "lambdas/coach/public_brief.py",  # 2026-11-09 E: files a NEW brief call at filing; never touches a stored row
+            "lambdas/coach/public_forecast.py",  # #6156: files a NEW forecast-rule call at filing; never touches a stored row
         }
         importers = set()
         for top in ("lambdas", "mcp", "scripts", "deploy"):
