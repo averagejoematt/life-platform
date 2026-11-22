@@ -118,6 +118,7 @@ def test_held_and_private_objects_never_reach_the_snapshot(tmp_path):
             "pairs.json",
             "journey.json",
             "own_words.json",
+            "chapter_corrections.json",  # #6177: approved corrections, not envelopes
             "series",
             "lab.json",
             "story.json",
@@ -236,17 +237,22 @@ def test_manifest_hashes_match_the_files(tmp_path):
                         else (
                             data["quotes"]
                             if "quotes" in data and "absent_text" in data
-                            # the switch-gated data files (in a default export once their go-live line is committed)
+                            # chapter_corrections.json (#6177): counted by `corrections`
                             else (
-                                data["lab_experiments"]
-                                if "lab_experiments" in data
+                                data["corrections"]
+                                if "corrections" in data and "absent_text" in data
+                                # the switch-gated data files (in a default export once their go-live line is committed)
                                 else (
-                                    data["installments_index"]
-                                    if "installments_index" in data
+                                    data["lab_experiments"]
+                                    if "lab_experiments" in data
                                     else (
-                                        data["calibration"]["coaches"]
-                                        if "calibration" in data
-                                        else data["coaches"] if "voice_fidelity" in data else data["pairs"]
+                                        data["installments_index"]
+                                        if "installments_index" in data
+                                        else (
+                                            data["calibration"]["coaches"]
+                                            if "calibration" in data
+                                            else data["coaches"] if "voice_fidelity" in data else data["pairs"]
+                                        )
                                     )
                                 )
                             )

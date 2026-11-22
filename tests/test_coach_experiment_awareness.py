@@ -151,8 +151,11 @@ def test_the_prediction_read_goes_through_the_phase_filter(monkeypatch):
     """ADR-058. Without the wrapper a reset's pilot-tagged calls keep being quoted
     as live — and the wrapper is invisible to any assertion on the RESULT, so the
     pin is on the call itself."""
+    from coach import coach_record
     from experiment import phase_filter
 
+    # The pre-#6172 path (the rollback state): the unified path reads unfiltered and filters in code.
+    monkeypatch.setattr(coach_record, "SELF_RECORD_UNIFIED", False)
     seen = []
     real = phase_filter.with_phase_filter
 
