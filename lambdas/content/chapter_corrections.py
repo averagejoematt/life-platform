@@ -169,7 +169,7 @@ def new_proposal(
         raise CorrectionError("a correction cannot supersede itself")
     if not ISO_INSTANT.match(str(proposed_at or "")):
         raise CorrectionError("proposed_at must be an ISO-8601 instant")
-    item = {
+    item: dict[str, Any] = {
         "pk": pk(user_id),
         "sk": sk(chapter_id, correction_id),
         "record_type": RECORD_TYPE,
