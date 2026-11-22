@@ -278,10 +278,10 @@ def fetch_live(base_url: str, timeout: float) -> dict[str, Any]:
 
 
 def _live_episodes(ctx: LiveContext) -> None:
-    withdrawn = withdrawn_episode_weeks(ctx.fetched.get("episodes"))  # #6177: held/retired — never a player or transcript
     for e in ctx.rows("episodes", "episodes"):
         m = re.search(r"wk(\d+)", e.get("url") or "")
-        if not m or int(m.group(1)) in withdrawn:
+        # #6177: a week the manifest lists as held or retired is never published — no player, no transcript, no edge
+        if not m or int(m.group(1)) in withdrawn_episode_weeks(ctx.fetched.get("episodes")):
             continue
         n = int(m.group(1))
         eid = f"wk{n}"
