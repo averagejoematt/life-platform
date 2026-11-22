@@ -5079,3 +5079,27 @@ STRUCTURAL_HAND_PROOFS["structural::test_chapter_corrections_6177.py"] = {
     ),
     "proved_on": "2026-11-22",
 }
+
+STRUCTURAL_HAND_PROOFS["structural::test_chapter_reads_withdrawn_6199.py"] = {
+    "gate_name": "test_chapter_reads_withdrawn_6199.py",
+    "command": "python3 -m pytest tests/test_chapter_reads_withdrawn_6199.py -q -p no:warnings   # baseline 12 passed",
+    "mutation": (
+        "Four plants, ONE AT A TIME, each restored with `git checkout --` (M3 by deleting the planted file): M1 "
+        "chronicle_recap._published_installments' chapter_reads.writer_may_read call reverted to the pre-#6199 "
+        "status/unlisted check; M2 whole_life_context.fetch_full_installment_archive reads resp Items unfiltered; M3 a new "
+        "module lambdas/emails/zz_new_reader_6199_mutation.py that returns a chapter row's text field with no predicate; "
+        "M4 panelcast_desk.season_ledger returns the raw ledger instead of story_ledger.public_view(...)."
+    ),
+    "observed": (
+        "2026-11-22, #6199 lane. BASELINE 12 passed. M1 2 failed (the set sweep + the recap reader); M2 2 failed (the "
+        "set sweep + the archive reader); M3 1 failed (the set sweep names the new module); M4 1 failed (the ledger-door "
+        "sweep). REVERTED 12 passed."
+    ),
+    "scope": (
+        "Every .py under lambdas/ and scripts/ (archive/ and __pycache__ excluded) that mentions the chapter text field must call "
+        "content.chapter_reads (writer_may_read / readable / is_withdrawn) or be registered in NOT_A_WRITER_READ with a "
+        "reason; every module that mentions ledger_json must call story_ledger.public_view or be registered in "
+        "LEDGER_NOT_A_WRITER_READ. NOT SEEN: deploy/ one-off scripts; a reader that reaches the text under another key name."
+    ),
+    "proved_on": "2026-11-22",
+}
