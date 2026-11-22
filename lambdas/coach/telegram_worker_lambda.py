@@ -55,7 +55,7 @@ except ImportError:  # pragma: no cover
 
 from coach import coach_chat, coach_outbound, coach_reactions, coach_voice, telegram_gateway, telegram_group, telegram_reply_gate
 from coach.coach_chat_grounding import build_facts_block, build_grounder, chat_available_logs
-from coach.coach_context_pilot import for_turn as pilot_context  # #6158: dark until coach_context_pilot.LIVE
+from coach.coach_context_pilot import for_turn as pilot_context, frame_label as pilot_frame, thread_turns as pilot_thread  # dark
 from coach.persona_registry import LEAD_PERSONA_ID, display_name, persona_for_telegram_route
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -328,8 +328,9 @@ def _chat_rows(coach_id: str, limit: int = 40) -> list:
 
 
 def _thread_today(coach_id: str, limit: int = 40) -> list:
-    """Today's + yesterday's stored turns, oldest-first — the conversational memory."""
-    return [{"role": i.get("role"), "text": i.get("text")} for i in _chat_rows(coach_id, limit)]
+    """Today's + yesterday's stored turns, oldest-first — the conversational memory. `{role, text}` per turn;
+    under the context pilot each also carries its stored send time (#6149)."""
+    return pilot_thread(_chat_rows(coach_id, limit))
 
 
 def _turns_today(thread: list) -> int:
@@ -627,7 +628,7 @@ def _assemble(persona_id: str, coach_id: str, *, allow_referral: bool = False) -
     try:
         from coach.coach_domain_facts import domain_facts_block
 
-        domain = domain_facts_block(persona_id, _table(), today_pt)
+        domain = pilot_frame(domain_facts_block(persona_id, _table(), today_pt))  # #6149: labels the cycle day under the pilot
     except Exception as e:
         logger.warning("[telegram] domain facts unavailable: %s", e)
     # #3759: the owner's coach thread is one of the TWO sanctioned consumers of the weekly
