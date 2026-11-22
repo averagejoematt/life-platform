@@ -32,7 +32,9 @@ MODES
   --verify            re-fetch every public URL the manifest lists and fail (exit 1) if any listed
                       original phrase is still served. A URL marked `pending_owner_decision` (a page
                       that embeds audio the owner has not ruled on) reports HELD, not FAIL, unless
-                      --strict.
+                      --strict. #6199: each page is also checked for text that echoes, names or
+                      describes a call the publication policy keeps private (reported PRIVATE; a
+                      failure only with --strict).
 
 SAFETY
   * The backup prefix must not be under a public prefix (`site/`, `generated/`) — refused otherwise.
@@ -59,6 +61,7 @@ import copy
 import hashlib
 import html
 import json
+import os
 import re
 import sys
 import urllib.error
@@ -66,6 +69,10 @@ import urllib.request
 from collections import OrderedDict
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Tuple
+
+_LAMBDAS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas")
+if _LAMBDAS not in sys.path:
+    sys.path.insert(0, _LAMBDAS)  # the private-call check (content.private_call_check) for --verify
 
 SCHEMA = "chronicle-revision/v1"
 PUBLIC_PREFIXES = ("site/", "generated/")
@@ -380,8 +387,11 @@ def _norm_phrase(p: str) -> str:
     return re.sub(r"\s+", " ", p).replace("’", "'").casefold()
 
 
-def verify(m: dict, fetch: Callable[[str], str], *, strict: bool = False, log: Callable = print) -> int:
-    fails = held = ok = 0
+def verify(m: dict, fetch: Callable[[str], str], *, strict: bool = False, log: Callable = print, private_calls: Any = None) -> int:
+    """Re-fetch every listed URL. #6199 P: with ``private_calls`` (a ``content.private_call_check.CallSet``; the CLI reads
+    one), each served page is also checked for text that echoes, names or describes a call the publication policy keeps
+    private. This is read-only, so it REPORTS those (``PRIVATE``) and fails on them only with ``--strict``."""
+    fails = held = ok = flagged = 0
     for v in m.get("verify", []):
         url, phrases = v["url"], v.get("phrases") or []
         try:
@@ -390,6 +400,14 @@ def verify(m: dict, fetch: Callable[[str], str], *, strict: bool = False, log: C
             log(f"ERROR {url}: {e}")
             fails += 1
             continue
+        if private_calls is not None:
+            from content import private_call_check
+
+            found = private_call_check.findings(served_forms(body)[1], private_calls)
+            if found:
+                flagged += 1
+                fails += 1 if strict else 0
+                log(f"PRIVATE {url}: {len(found)} finding(s): {'; '.join(found)}")
         forms = [f.replace("’", "'").casefold() for f in served_forms(body)]
         still = [p for p in phrases if any(_norm_phrase(p) in f for f in forms)]
         if not still:
@@ -405,8 +423,20 @@ def verify(m: dict, fetch: Callable[[str], str], *, strict: bool = False, log: C
             continue
         fails += 1
         log(f"FAIL  {url}: {len(unexpected) if not strict else len(still)} original phrase(s) still served")
-    log(f"verify: {ok} clean, {held} held, {fails} failing of {len(m.get('verify', []))} URL(s)")
+    log(f"verify: {ok} clean, {held} held, {fails} failing of {len(m.get('verify', []))} URL(s); {flagged} with a private-call finding")
     return 1 if fails else 0
+
+
+def read_private_calls(region: str = "us-west-2", table_name: str = "life-platform") -> Any:
+    """The calls the publication policy classifies (read-only); None when they cannot be read — the verify then says so."""
+    try:
+        import boto3
+        from content import private_call_check
+
+        return private_call_check.load(boto3.resource("dynamodb", region_name=region).Table(table_name))
+    except Exception as e:  # noqa: BLE001 — read-only verify: report, never crash the phrase check
+        print(f"PRIVATE: the private-call check could not read the calls ({type(e).__name__}) — not run")
+        return None
 
 
 def http_fetch(url: str, timeout: float = 30.0) -> str:
@@ -452,7 +482,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"BAD MANIFEST — {e}")
         return 2
     if args.verify:
-        return verify(m, http_fetch, strict=args.strict)
+        calls = read_private_calls(m.get("region", "us-west-2"), m.get("table", "life-platform"))
+        return verify(m, http_fetch, strict=args.strict, private_calls=calls)
     print_plan(m)
     if args.offline and not args.apply:
         print("dry-run (offline): nothing read, nothing written.")

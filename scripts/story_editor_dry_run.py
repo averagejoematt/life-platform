@@ -70,7 +70,7 @@ def main(argv: List[str]) -> int:
     block_writes()
     import boto3
     from ai import bedrock_client
-    from content import story_dossier, story_editor, story_ledger, story_pipeline, story_writers
+    from content import chapter_reads, story_dossier, story_editor, story_ledger, story_pipeline, story_writers
 
     spend: List[Dict[str, Any]] = []
     real = bedrock_client.invoke_with_retry
@@ -92,7 +92,7 @@ def main(argv: List[str]) -> int:
         return 2
     n = wk["week"]
     row = table.get_item(Key={"pk": CHRONICLE_PK, "sk": f"DATE#{args.week_end}"}).get("Item") or {}
-    if row.get("status") != "published":
+    if not chapter_reads.writer_may_read(row):  # #6199 G1: a withdrawn/unlisted/tombstoned chapter is no one's draft
         print(f"refusing: the row for {args.week_end} is {row.get('status')!r}, not an already-published week")
         return 2
     dossier, _nye = story_dossier.week_dossier(table, wk)
