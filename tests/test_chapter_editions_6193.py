@@ -78,7 +78,10 @@ def _edition(n=2, chapter="week-04", approved_at="2026-11-23T18:00:00Z", text=TE
     if approved_at:
         day = approved_at[:10]
         item.update(
-            approvals=[CE.approval(at=approved_at, dated_on=day)], approved_at=approved_at, revised_on=day, signature=CE.signature(n, day)
+            approvals=[CE.approval(at=approved_at, dated_on=day, sha256=item["text_sha256"])],
+            approved_at=approved_at,
+            revised_on=day,
+            signature=CE.signature(n, day),
         )
     return item
 
@@ -87,7 +90,9 @@ def _archival(n=1, chapter="week-04", approved_at="2026-11-23T19:00:00Z", text=A
     item = CE.new_archival(chapter_id=chapter, archival_id=n, text=text, proposed_at="2026-11-22T19:00:00Z")
     if approved_at:
         item.update(
-            approvals=[CE.approval(at=approved_at, dated_on=approved_at[:10])], approved_at=approved_at, approved_on=approved_at[:10]
+            approvals=[CE.approval(at=approved_at, dated_on=approved_at[:10], sha256=item["text_sha256"])],
+            approved_at=approved_at,
+            approved_on=approved_at[:10],
         )
     return item
 
@@ -278,14 +283,22 @@ def test_propose_backup_approve_is_append_only_and_never_inferred(tool):
     dup = _call(t, action="propose_edition", chapter_id="week-04", edition=2, text=TEXT + " Other.", first_published="2026-09-11")
     assert "append-only" in dup["error"]
     for not_true in (None, False, "true", 1):
-        assert "exactly true" in _call(t, action="approve_edition", chapter_id="week-04", edition=2, approved=not_true)["error"]
-    refused = _call(t, action="approve_edition", chapter_id="week-04", edition=2, approved=True)
+        assert (
+            "exactly true"
+            in _call(t, action="approve_edition", chapter_id="week-04", edition=2, approved=not_true, sha256=_sha(TEXT))["error"]
+        )
+    assert "required" in _call(t, action="approve_edition", chapter_id="week-04", edition=2, approved=True)["error"]
+    other = _call(t, action="approve_edition", chapter_id="week-04", edition=2, approved=True, sha256=_sha(TEXT + " other bytes"))
+    assert "does not bind to these bytes" in other["error"]  # the approval binds to the exact approved bytes
+    refused = _call(t, action="approve_edition", chapter_id="week-04", edition=2, approved=True, sha256=_sha(TEXT))
     assert "no private backup" in refused["error"]  # the first edition is kept before anything changes
     table.put_item(Item=_original())
-    ok = _call(t, action="approve_edition", chapter_id="week-04", edition=2, approved=True)
+    ok = _call(t, action="approve_edition", chapter_id="week-04", edition=2, approved=True, sha256=_sha(TEXT))
     assert ok["approved"] and ok["revised_on"] == "2026-11-23" and ok["renders"] is False  # the switch is off
     assert ok["signature"] == "Second edition, revised 23 November 2026 — Average Joe Matt editorial record"
-    assert "already approved" in _call(t, action="approve_edition", chapter_id="week-04", edition=2, approved=True)["error"]
+    assert (
+        "already approved" in _call(t, action="approve_edition", chapter_id="week-04", edition=2, approved=True, sha256=_sha(TEXT))["error"]
+    )
     stored = table.get_item(Key={"pk": CE.pk(), "sk": CE.sk_edition("week-04", 2)})["Item"]
     assert stored["text"] == TEXT and stored["first_published"] == "2026-09-11"
     listing = _call(t, action="list_editions", chapter_id="week-04")
@@ -306,7 +319,7 @@ def test_the_gates_refuse_at_proposal_and_carried_corrections_must_be_approved(t
     )
     assert r["stored"]
     table.put_item(Item=_original())
-    r = _call(t, action="approve_edition", chapter_id="week-04", edition=2, approved=True)
+    r = _call(t, action="approve_edition", chapter_id="week-04", edition=2, approved=True, sha256=_sha(TEXT))
     assert "not approved" in r["error"]
 
 
@@ -314,12 +327,18 @@ def test_the_archival_rendering_needs_an_approved_edition_and_its_own_approval(t
     t, table = tool
     r = _call(t, action="propose_archival", chapter_id="week-04", archival_id=1, text=ARCHIVAL)
     assert r["stored"] and r["renders"] is False
-    assert "no approved second edition" in _call(t, action="approve_archival", chapter_id="week-04", archival_id=1, approved=True)["error"]
+    assert (
+        "no approved second edition"
+        in _call(t, action="approve_archival", chapter_id="week-04", archival_id=1, approved=True, sha256=_sha(ARCHIVAL))["error"]
+    )
     table.put_item(Item=_original())
     _call(t, action="propose_edition", chapter_id="week-04", edition=2, text=TEXT, first_published="2026-09-11")
-    _call(t, action="approve_edition", chapter_id="week-04", edition=2, approved=True)
-    assert "exactly true" in _call(t, action="approve_archival", chapter_id="week-04", archival_id=1, approved="yes")["error"]
-    ok = _call(t, action="approve_archival", chapter_id="week-04", archival_id=1, approved=True)
+    _call(t, action="approve_edition", chapter_id="week-04", edition=2, approved=True, sha256=_sha(TEXT))
+    assert (
+        "exactly true"
+        in _call(t, action="approve_archival", chapter_id="week-04", archival_id=1, approved="yes", sha256=_sha(ARCHIVAL))["error"]
+    )
+    ok = _call(t, action="approve_archival", chapter_id="week-04", archival_id=1, approved=True, sha256=_sha(ARCHIVAL))
     assert ok["approved"] and ok["approved_on"] == "2026-11-23"
     rows = [v for v in table.items.values()]
     assert _view(rows)[0]["archival"]["archival_id"] == 1
@@ -429,7 +448,7 @@ def test_the_fixture_export_with_the_switch_off_writes_no_editions_file(tmp_path
     assert "chapter_editions" not in (tmp_path / "snap" / "manifest.json").read_text()
 
 
-def test_the_snapshot_validation_refuses_what_it_cannot_vouch_for():
+def test_the_snapshot_validation_holds_each_failing_edition_on_its_own():
     import publish_snapshot_chapter_editions as SE
 
     corrections = {"corrections": [{"chapter_id": "week-04", "id": "walk-distance"}]}
@@ -438,29 +457,75 @@ def test_the_snapshot_validation_refuses_what_it_cannot_vouch_for():
     assert SE.compose({"weeks": []}) is None
     with pytest.raises(ValueError):
         SE.compose({"editions": None, "editions_error": "x"})
+    with pytest.raises(ValueError):  # a malformed FILE stops the build
+        SE.validate(SE.compose({"editions": [dict(view[0], extra=1)]}), _public(), corrections)
     for mutate, public, corr in (
         (lambda e: None, _public("2026-09-12T00:00:00+00:00"), corrections),  # a first-published day that is not the chapter's
         (lambda e: e.update(chapter_id="week-10"), _public(), corrections),  # a held chapter has no page
         (lambda e: None, _public(), {"corrections": []}),  # a carried correction that is not approved
         (lambda e: e.update(body_html=""), _public(), corrections),  # a wire-emptied body never renders blank
+        (lambda e: e.update(body_html=e["body_html"].replace("nothing more", "nothing else")), _public(), corrections),  # bytes != approved
+        (lambda e: e.update(text=e["text"] + " x"), _public(), corrections),  # text != its approved hash
         (lambda e: e.update(edition_line="Second edition, revised whenever."), _public(), corrections),
         (
             lambda e: e.update(signature=e["signature"].replace("Average Joe Matt editorial record", "Margaret Calloway")),
             _public(),
             corrections,
         ),
-        (lambda e: e["archival"].update(note=e["archival"]["note"] + " Two passages were removed."), _public(), corrections),
-        (
-            lambda e: e.update(body_html="<p>When I reached Lisa Park she paused, then answered the question for the record.</p>"),
-            _public(),
-            corrections,
-        ),
-        (lambda e: e.update(extra=1), _public(), corrections),
     ):
         bad = json.loads(json.dumps(view))
         mutate(bad[0])
-        with pytest.raises(ValueError):
-            SE.validate(SE.compose({"editions": bad}), public, corr)
+        other = dict(json.loads(json.dumps(view))[0], chapter_id="week-05", carries=[])
+        pub = {"chapter": public["chapter"] + [{"id": "week-05", "status": "published", "published_at": "2026-09-11T00:00:00+00:00"}]}
+        held: list = []
+        out = SE.validate(SE.compose({"editions": [bad[0], other]}), pub, corr, log=lambda m: None, held=held)
+        assert [e["chapter_id"] for e in out["editions"]] == ["week-05"], "one held edition never blocks an unrelated verified one"
+        assert held == [bad[0]["chapter_id"]]
+    bad = json.loads(json.dumps(view))
+    bad[0]["archival"]["note"] += " Two passages were removed."
+    held = []
+    out = SE.validate(SE.compose({"editions": bad}), _public(), corrections, log=lambda m: None, held=held)
+    assert out["editions"][0]["archival"] is None and held == ["week-04#archival"]  # only the archival page is held
+
+
+def test_a_deployed_page_verifies_against_the_approved_bytes_and_permitted_presentation_only():
+    import chronicle_edition_verify as V
+
+    body = CE.render_html(TEXT)
+    figure = '<figure class="evidence" data-evidence="weight"><figcaption>Evidence</figcaption><p>A chart note.</p></figure>'
+    placed = body.replace("</p>\n<p>", "</p>" + figure + "<p>", 1)
+
+    def page(b, line=CE.edition_line(2, "2026-11-23", "2026-09-11")):
+        return (
+            f'<p class="dek">A dek.</p><p data-edition-line><b>{line}</b></p>'
+            f'<article><div data-published-body>{b}</div></article><link rel="canonical" href="x">'
+        )
+
+    assert CE.verify_page(page(placed), TEXT, _sha(TEXT)) == []  # an evidence figure between paragraphs is permitted
+    assert CE.verify_page(page(placed.replace("nothing more", "nothing else")), TEXT, _sha(TEXT))  # one word changed
+    assert CE.verify_page(page(placed), TEXT, _sha(TEXT + "x"))  # not the approved hash
+    view = _view([_original(), _edition(2)])
+    rss = '<guid isPermaLink="true">https://s/journal/posts/week-04/</guid>'
+    site = {
+        "https://s/api/chapters": json.dumps({"editions": view, "weeks": [{"url": "/journal/posts/week-04/"}]}),
+        "https://s/story/week-04/": page(placed),
+        "https://s/rss.xml": rss,
+    }
+    assert V.verify(site.__getitem__, "week-04", _sha(TEXT), base="https://s") == []
+    assert V.verify(site.__getitem__, "week-04", _sha(TEXT + " other"), base="https://s")  # not the approved bytes
+    site["https://s/rss.xml"] = rss * 2
+    assert any("2 time(s)" in p for p in V.verify(site.__getitem__, "week-04", _sha(TEXT), base="https://s"))
+
+
+def test_the_preview_renders_in_memory_records_that_never_claim_a_real_approval_date():
+    import chronicle_edition_preview as P
+
+    rows = P.preview_records("week-04", TEXT, "2026-09-11", ARCHIVAL, "2026-11-30")
+    (e,) = _view(rows)
+    assert e["edition_line"].startswith("Second edition, revised 30 November 2026") and e["archival"] is not None
+    src = open(os.path.join(_REPO, "scripts", "chronicle_edition_preview.py"), encoding="utf-8").read()
+    for forbidden in ("put_item", "update_item", "put_object", "safe_sync", "s3 sync", "create_invalidation", "deploy/"):
+        assert forbidden not in src, forbidden
 
 
 # ── the backup script ─────────────────────────────────────────────────────────────────────
@@ -538,7 +603,8 @@ def test_a_backup_that_does_not_read_back_equal_writes_no_pointer():
 def _feed(monkeypatch, tmp_path, chapters):
     import v4_build_rss
 
-    dateline = datetime.now(timezone.utc).strftime("%Y-%m-%d")  # fresh, so the builder's freshness guard passes
+    # utc-exempt(#6193): the feed builder's freshness guard compares a post date with its own UTC clock, not a Pacific day
+    dateline = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     posts = {"posts": [{"date": dateline, "title": "A week", "url": "/journal/posts/week-04/", "excerpt": "The first edition's excerpt."}]}
 
     class _Resp(io.BytesIO):

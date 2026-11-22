@@ -41,7 +41,8 @@
      "at": "2026-11-21T18:00:00Z",
      "on": "2026-11-21",
      "via": "MCP manage_chapter_corrections (owner-only)",
-     "note": ""
+     "note": "",
+     "sha256": "94c0bdc4f3bab3829194f2418d178963247cfd2b2c0d2c2ca50e01f159bf6164"
     }
    ],
    "approved_at": "2026-11-21T18:00:00Z",
@@ -83,7 +84,8 @@
      "at": "2026-11-21T17:30:00Z",
      "on": "2026-11-21",
      "via": "MCP manage_chapter_corrections (owner-only)",
-     "note": ""
+     "note": "",
+     "sha256": "650324abf597465f42094db4d1cfa50cdca0de52a069a4c59210f37d6d2257ea"
     }
    ],
    "approved_at": "2026-11-21T17:30:00Z",

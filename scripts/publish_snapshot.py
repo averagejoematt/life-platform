@@ -56,7 +56,7 @@ from publish_snapshot_calibration import (  # noqa: E402 — the Coaching Room's
     room_enabled,
 )
 from publish_snapshot_chapter_corrections import resolve as resolve_chapter_corrections  # noqa: E402 — #6177, approved corrections only
-from publish_snapshot_chapter_editions import resolve as resolve_chapter_editions  # noqa: E402 — #6193, dark: None while the switch is off
+from publish_snapshot_chapter_editions import attach as attach_chapter_editions  # noqa: E402 — #6193, dark: nothing while the switch is off
 from publish_snapshot_chapters import (
     CALL_OUTCOME,
     apply_week_intervals,
@@ -1082,11 +1082,7 @@ def run(mode: str, out_dir: str, fixtures_dir: str, base_url: str, timeout: floa
     # and the rules-based platform forecasts (#6170): only when the route served one (none while dark) or WEB_FORECAST=1
     attach_own_words_and_forecasts(data_files, mode, fixtures_dir, lambda p: _get(base_url, p, timeout))
     data_files["chapter_corrections"] = resolve_chapter_corrections(mode, fixtures_dir, lambda p: _get(base_url, p, timeout), log, public)
-    editions = resolve_chapter_editions(
-        mode, fixtures_dir, lambda p: _get(base_url, p, timeout), log, public, data_files["chapter_corrections"]
-    )
-    if editions is not None:  # #6193: no key = no file, so a switch-off snapshot is byte-identical to the one before it
-        data_files["chapter_editions"] = editions
+    attach_chapter_editions(data_files, mode, fixtures_dir, lambda p: _get(base_url, p, timeout), log, public)  # #6193: no file while dark
     return write_snapshot(out_dir, public, excluded, mode, base_url, build_appendix(), data_files)
 
 

@@ -10,10 +10,12 @@ THE SWITCH, TWICE. The file is written only when the repo's ``chapter_editions.L
 field (live mode) — or, in fixture mode, when ``WEB_EDITIONS=1`` is set (the build gate's mutation and local review).
 Otherwise ``resolve`` returns None and NO file is written: a switch-off snapshot, and so the built site, is unchanged.
 
-Fail closed, loudly: a served ``null`` (the route could not read the rows), a malformed entry, an edition of a chapter
-that is not a published chapter of this snapshot, a first-published day that disagrees with the chapter's served one, a
-carried correction that is not approved, an emptied body or a body the truth checks refuse — each is a schema error
-(exit 2); the build stops rather than publish an edition it cannot vouch for.
+Fail closed, loudly — and per edition. A served ``null`` (the route could not read the rows) or a malformed FILE is a
+schema error (exit 2). Each ENTRY is then checked on its own and HELD (logged, left out: its page keeps the first
+edition) when it fails: a chapter that is not a published chapter of this snapshot, a first-published day that disagrees
+with the chapter's served one, a carried correction that is not approved, text bytes that do not hash to the approved
+SHA-256, a body that is not exactly the chronicle renderer's output for that text, an emptied body, or a body the truth
+checks refuse. One held edition never blocks an unrelated verified one (owner ruling 2026-11-22, final approval §12).
 """
 
 from __future__ import annotations
@@ -74,13 +76,64 @@ def _day(value: Any) -> Optional[str]:
     return str(value)[:10] if isinstance(value, str) and CE.ISO_DAY.match(str(value)[:10]) else None
 
 
-def validate(doc: Any, public: dict, corrections: Optional[dict]) -> dict:
-    """Exact shape, every entry re-derived and re-checked; every chapter a published public chapter of this snapshot."""
+def _check_text(cid: str, what: str, block: dict) -> None:
+    """The served bytes are the approved bytes: the text hashes to the SHA-256 the approval is bound to, and the body is
+    exactly the chronicle renderer's output for that text — so nothing between approval and page can change the prose."""
+    text, body = block.get("text"), block.get("body_html")
+    if not isinstance(text, str) or CE.text_sha256(text) != block.get("text_sha256"):
+        raise ValueError(f"chapter_editions.json: {cid}: the {what} text does not hash to its approved SHA-256")
+    if not isinstance(body, str) or body != CE.render_html(text):
+        raise ValueError(f"chapter_editions.json: {cid}: the {what} body is not the rendering of its approved text")
+    plain = CE.plain_text(body)
+    if len(plain.strip()) < CE.MIN_TEXT:
+        raise ValueError(f"chapter_editions.json: {cid}: the {what} is empty (a withheld or unread text never renders as blank)")
+    found = story_checks.staged_encounter_findings(plain) + story_checks.reader_surface(plain)
+    if found:
+        raise ValueError(f"chapter_editions.json: {cid}: the {what} fails the truth checks ({len(found)} finding(s))")
+
+
+def _check_edition(e: dict, chapters: dict, approved: set) -> None:
+    cid = str(e["chapter_id"])
+    if cid not in chapters:
+        raise ValueError(f"chapter_editions.json: {cid} is not a published chapter of this snapshot; an edition has no page to serve")
+    try:
+        line = CE.edition_line(e["edition"], e["revised_on"], e["first_published"])
+        sig = CE.signature(e["edition"], e["revised_on"])
+    except (CE.EditionError, CC.CorrectionError) as exc:
+        raise ValueError(f"chapter_editions.json: {cid}: {exc}") from exc
+    if e["edition_line"] != line or e["signature"] != sig:
+        raise ValueError(f"chapter_editions.json: {cid}: the edition line and signature must be the platform's ({line!r})")
+    served_day = _day(chapters[cid].get("published_at"))
+    if served_day and served_day != e["first_published"]:
+        raise ValueError(
+            f"chapter_editions.json: {cid}: first published {e['first_published']}, but the chapter was published {served_day}"
+        )
+    if not isinstance(e["approvals"], list) or not e["approvals"] or any(a.get("by") != CC.APPROVER for a in e["approvals"]):
+        raise ValueError(f"chapter_editions.json: {cid}: no owner approval")
+    missing = [c for c in e["carries"] or [] if (cid, c) not in approved]
+    if missing:
+        raise ValueError(f"chapter_editions.json: {cid}: carries corrections that are not approved and served: {missing}")
+    _check_text(cid, "edition", e)
+
+
+def _check_archival(cid: str, e: dict, a: Any) -> None:
+    if not isinstance(a, dict) or set(a) != set(CE.PUBLIC_ARCHIVAL_FIELDS):
+        raise ValueError(f"chapter_editions.json: {cid}: an archival rendering is exactly {sorted(CE.PUBLIC_ARCHIVAL_FIELDS)}")
+    if a["note"] != CE.archival_note(e["first_published"], e["revised_on"]) or a["signature"] != CE.archival_signature(a["approved_on"]):
+        raise ValueError(f"chapter_editions.json: {cid}: the archival note and signature are the platform's fixed words only")
+    _check_text(cid, "archival", a)
+
+
+def validate(doc: Any, public: dict, corrections: Optional[dict], log: Callable[[str], None] = print, held: Optional[list] = None) -> dict:
+    """Exact shape (a malformed FILE stops the build); then every entry re-derived and re-checked ON ITS OWN. An entry
+    that fails is withheld — its chapter serves the first edition — and named loudly, and the others go on: one held
+    edition never blocks an unrelated verified one (final approval §12). A failing archival rendering drops only itself."""
     if not isinstance(doc, dict) or set(doc) != KEYS or doc["state"] != "ok" or not isinstance(doc["editions"], list):
         raise ValueError(f"chapter_editions.json: keys must be exactly {sorted(KEYS)}, state ok, a list of editions")
     chapters = {c["id"]: c for c in public.get("chapter", []) if c.get("status") == "published"}
     approved = {(c["chapter_id"], c["id"]) for c in ((corrections or {}).get("corrections") or [])}
-    seen = set()
+    held = held if held is not None else []
+    seen, kept = set(), []
     for e in doc["editions"]:
         if not isinstance(e, dict) or set(e) != set(CE.PUBLIC_FIELDS):
             raise ValueError(f"chapter_editions.json: an edition is exactly {sorted(CE.PUBLIC_FIELDS)}")
@@ -88,43 +141,29 @@ def validate(doc: Any, public: dict, corrections: Optional[dict]) -> dict:
         if not CE.CHAPTER_ID.match(cid) or cid in seen:
             raise ValueError(f"chapter_editions.json: malformed or repeated chapter id {cid!r}")
         seen.add(cid)
-        if cid not in chapters:
-            raise ValueError(f"chapter_editions.json: {cid} is not a published chapter of this snapshot; an edition has no page to serve")
         try:
-            line = CE.edition_line(e["edition"], e["revised_on"], e["first_published"])
-            sig = CE.signature(e["edition"], e["revised_on"])
-        except (CE.EditionError, CC.CorrectionError) as exc:
-            raise ValueError(f"chapter_editions.json: {cid}: {exc}") from exc
-        if e["edition_line"] != line or e["signature"] != sig:
-            raise ValueError(f"chapter_editions.json: {cid}: the edition line and signature must be the platform's ({line!r})")
-        served_day = _day(chapters[cid].get("published_at"))
-        if served_day and served_day != e["first_published"]:
-            raise ValueError(
-                f"chapter_editions.json: {cid}: first published {e['first_published']}, but the chapter was published {served_day}"
-            )
-        if not isinstance(e["approvals"], list) or not e["approvals"] or any(a.get("by") != CC.APPROVER for a in e["approvals"]):
-            raise ValueError(f"chapter_editions.json: {cid}: no owner approval")
-        missing = [c for c in e["carries"] or [] if (cid, c) not in approved]
-        if missing:
-            raise ValueError(f"chapter_editions.json: {cid}: carries corrections that are not approved and served: {missing}")
-        texts = [("body", e["body_html"])]
-        a = e["archival"]
-        if a is not None:
-            if not isinstance(a, dict) or set(a) != set(CE.PUBLIC_ARCHIVAL_FIELDS):
-                raise ValueError(f"chapter_editions.json: {cid}: an archival rendering is exactly {sorted(CE.PUBLIC_ARCHIVAL_FIELDS)}")
-            if a["note"] != CE.archival_note(e["first_published"], e["revised_on"]) or a["signature"] != CE.archival_signature(
-                a["approved_on"]
-            ):
-                raise ValueError(f"chapter_editions.json: {cid}: the archival note and signature are the platform's fixed words only")
-            texts.append(("archival", a["body_html"]))
-        for what, body in texts:
-            plain = CE.plain_text(body)
-            if not isinstance(body, str) or len(plain.strip()) < CE.MIN_TEXT:
-                raise ValueError(f"chapter_editions.json: {cid}: the {what} is empty (a withheld or unread text never renders as blank)")
-            found = story_checks.staged_encounter_findings(plain) + story_checks.reader_surface(plain)
-            if found:
-                raise ValueError(f"chapter_editions.json: {cid}: the {what} fails the truth checks ({len(found)} finding(s))")
-    return doc
+            _check_edition(e, chapters, approved)
+        except (ValueError, KeyError, TypeError) as exc:
+            held.append(cid)
+            log(f"  ✗ HELD edition {cid}: {exc} — its page keeps the first edition; other editions are unaffected")
+            continue
+        if e["archival"] is not None:
+            try:
+                _check_archival(cid, e, e["archival"])
+            except (ValueError, KeyError, TypeError) as exc:
+                held.append(f"{cid}#archival")
+                log(f"  ✗ HELD archival rendering {cid}: {exc} — no first-edition page; the edition itself is unaffected")
+                e = {**e, "archival": None}
+        kept.append(e)
+    return {**doc, "editions": kept}
+
+
+def attach(data_files: dict, mode: str, fixtures_dir: str, get: Callable[[str], Any], log: Callable[[str], None], public: dict) -> None:
+    """``data_files["chapter_editions"]`` only when the switch is on — no key = no file, so a switch-off snapshot is
+    byte-identical to the one before #6193."""
+    doc = resolve(mode, fixtures_dir, get, log, public, data_files.get("chapter_corrections"))
+    if doc is not None:
+        data_files["chapter_editions"] = doc
 
 
 def resolve(
@@ -137,6 +176,6 @@ def resolve(
         return None
     try:
         doc = fixture(fixtures_dir) if mode == "fixture" else live(get, log)
-        return None if doc is None else validate(doc, public, corrections)
+        return None if doc is None else validate(doc, public, corrections, log=log)
     except ValueError as exc:
         raise SchemaError(str(exc)) from exc

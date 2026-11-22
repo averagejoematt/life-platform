@@ -84,10 +84,25 @@ PUBLIC_FIELDS = (
     "approvals",
     "carries",
     "word_count",
+    "text_sha256",
+    "text",
     "body_html",
     "archival",
 )
-PUBLIC_ARCHIVAL_FIELDS = ("archival_id", "approved_on", "note", "signature", "body_html")
+PUBLIC_ARCHIVAL_FIELDS = ("archival_id", "approved_on", "note", "signature", "text_sha256", "text", "body_html")
+
+#: The ONLY things the chapter page may add to, or take from, an edition's prose (owner ruling 2026-11-22, final approval
+#: §1: "the deployed texts match the approved hashes, except for explicitly permitted presentation metadata"). Every
+#: one sits BETWEEN prose blocks or outside the body, never inside a sentence; ``verify_page`` removes exactly these and
+#: then requires the page's prose blocks to equal the approved text's, block for block, word for word.
+PERMITTED_PRESENTATION = (
+    ("data-evidence", "an evidence figure or graded-call card placed between paragraphs (www/src/lib/evidence.js)"),
+    ("data-record-as-published", "the dated coach-record note placed between paragraphs (www/src/lib/record_note.js)"),
+    ("dek-duplicate", "a first signature line or first paragraph identical to the header dek, printed once in the header"),
+    ("signature-class", "the `note` / `filed` class on an emphasised signature line (a class, not a word)"),
+)
+#: Outside the body, and so never compared: the edition line, the dates, the addresses, the corrections beside the text,
+#: the approval metadata, the byline, the header and the walk.
 
 
 class EditionError(ValueError):
@@ -152,9 +167,9 @@ def text_sha256(text: str) -> str:
 
 
 def render_html(text: str) -> str:
-    """The chronicle's own markdown renderer (``emails.chronicle_render.markdown_to_html`` — the one the journal page and
+    """The chronicle's own markdown renderer (``content.chronicle_markdown.markdown_to_html``, re-exported by ``emails.chronicle_render`` — the one the journal page and
     the mailed copy use), over the text with ``&`` and ``<`` escaped, so a stored edition can never inject markup."""
-    from emails.chronicle_render import markdown_to_html  # noqa: PLC0415 — lazy: the renderer pulls the chronicle's helpers
+    from content.chronicle_markdown import markdown_to_html  # noqa: PLC0415 — the ONE copy chronicle_render re-exports
 
     return markdown_to_html(str(text).replace("&", "&amp;").replace("<", "&lt;"))
 
@@ -170,7 +185,8 @@ def gate_findings(text: Any, *, tainted: Optional[Callable[[str], bool]], filter
     """Every reason ``text`` may not reach a public page; ``[]`` = it may. Fail-closed on every unreadable input.
 
     * content filter — ``privacy.privacy_guard.find_violations`` (the chronicle's own publish gate; its vocabulary is
-      off-repo and is never echoed here; ``filter_hits`` replaces it only for the build's synthetic fixture);
+      off-repo and is never echoed here; the CALLER passes it as ``filter_hits`` — the Site API and the MCP tool pass the real one, only the build's
+      synthetic fixture passes none-found — so this module never reaches the off-repo channel's AWS read itself);
     * private calls — ``tainted`` is ``web.narrative_publication.is_tainted`` (a SHINGLE-word run of a call the
       publication record withholds, ``common.prediction_publication``); ``None`` means no record could be opened;
     * truth — ``content.story_checks``: a staged encounter no source holds, a cycle/attempt count, off-record
@@ -186,10 +202,8 @@ def gate_findings(text: Any, *, tainted: Optional[Callable[[str], bool]], filter
     for f in story_checks.reader_surface(text):
         out.append(f"truth: {f}")
     try:
-        if filter_hits is None:
-            from privacy import privacy_guard  # noqa: PLC0415
-
-            filter_hits = privacy_guard.find_violations
+        if filter_hits is None:  # the caller passes privacy_guard.find_violations; none given = nothing unchecked
+            raise LookupError("no content-filter vocabulary was given")
         hits = filter_hits(text)
     except Exception as exc:  # noqa: BLE001 — no vocabulary = no publication (fail closed)
         out.append(f"content-filter: unavailable ({type(exc).__name__}) — nothing is published unchecked")
@@ -328,9 +342,12 @@ def original_record(
     return item
 
 
-def approval(*, at: str, dated_on: str, note: str = "") -> dict:
-    """The approval entry the owner's approve call appends (the corrections' shape: who, when, through what)."""
-    return CC.approval(at=at, dated_on=dated_on, note=note)
+def approval(*, at: str, dated_on: str, sha256: str, note: str = "") -> dict:
+    """The approval entry the owner's approve call appends (the corrections' shape: who, when, through what) — bound to
+    the SHA-256 of the exact text he approved (final approval §1)."""
+    if not SHA256.match(str(sha256 or "")):
+        raise EditionError("an approval names the SHA-256 of the exact text approved")
+    return {**CC.approval(at=at, dated_on=dated_on, note=note), "sha256": sha256}
 
 
 def _approved(item: dict) -> list:
@@ -340,6 +357,8 @@ def _approved(item: dict) -> list:
     for a in approvals:
         if not isinstance(a, dict) or a.get("by") != APPROVER or not ISO_INSTANT.match(str(a.get("at") or "")):
             raise EditionError("an approval must be the owner's, with its instant")
+        if a.get("sha256") != item.get("text_sha256"):
+            raise EditionError("the approval is bound to a different text (its SHA-256 is not this record's)")
     return approvals
 
 
@@ -466,6 +485,8 @@ def public_view(
                 "approved_on": a["approved_on"],
                 "note": archival_note(served["first_published"], served["revised_on"]),
                 "signature": archival_signature(a["approved_on"]),
+                "text_sha256": a["text_sha256"],
+                "text": a["text"],
                 "body_html": render_html(a["text"]),
             }
             break
@@ -480,6 +501,8 @@ def public_view(
                 "approvals": _public_approvals(served),
                 "carries": list(served.get("carries") or []),
                 "word_count": word_count(served["text"]),
+                "text_sha256": served["text_sha256"],
+                "text": served["text"],
                 "body_html": render_html(served["text"]),
                 "archival": archival,
             }
@@ -490,3 +513,59 @@ def public_view(
 def plain_text(body_html: str) -> str:
     """A served body's words, for the snapshot's re-check (tags dropped, entities read)."""
     return html.unescape(re.sub(r"<[^>]+>", " ", str(body_html or "")))
+
+
+# ── verification of a deployed page against the approved bytes (final approval §1) ──────────────
+
+
+def _norm(text: str) -> str:
+    return " ".join(html.unescape(re.sub(r"<[^>]+>", " ", str(text or ""))).split())
+
+
+def prose_blocks(body_html: str) -> list:
+    """The prose of a rendered body, block by block (each ``<p>`` / ``<blockquote>``), words normalised. A block inside a
+    permitted presentation element (``data-evidence``, ``data-record-as-published``) is not prose and is dropped."""
+    h = str(body_html or "")
+    for marker in ("data-evidence", "data-record-as-published"):
+        while True:
+            m = re.search(r"<(figure|aside|p)\b[^>]*\b" + marker + r"\b[^>]*>", h)
+            if not m:
+                break
+            tag = m.group(1)
+            depth, i = 0, m.start()
+            for t in re.finditer(r"<(/?)" + tag + r"\b[^>]*>", h[m.start() :]):
+                depth += -1 if t.group(1) else 1
+                if depth == 0:
+                    i = m.start() + t.end()
+                    break
+            else:
+                i = len(h)
+            h = h[: m.start()] + h[i:]
+    return [b for b in (_norm(x) for x in re.findall(r"<(?:p|blockquote)\b[^>]*>([\s\S]*?)</(?:p|blockquote)>", h)) if b]
+
+
+def verify_page(page_html: str, text: str, sha256: str, dek: Optional[str] = None) -> list:
+    """Problems with a deployed chapter page against the approved edition; ``[]`` = its prose IS the approved bytes.
+
+    The text must hash to ``sha256``; the page's ``data-published-body`` must exist; after removing only the
+    ``PERMITTED_PRESENTATION`` set, its prose blocks must equal the approved text's rendered blocks exactly — save the
+    one permitted drop of a first block identical to the header dek."""
+    problems = []
+    if text_sha256(str(text or "").replace("\r\n", "\n").strip()) != sha256:
+        problems.append("the served edition text does not hash to the approved SHA-256")
+    m = re.search(
+        r"<div data-published-body>([\s\S]*?)</div>\s*(?:<p class=\"muted\"[^>]*data-numbering-note|</article>|<div style=\"margin-top:48px\" id=\"days\")",
+        page_html or "",
+    )
+    if not m:
+        return problems + ["the page carries no published body"]
+    want = prose_blocks(render_html(text))
+    got = prose_blocks(m.group(1))
+    if dek and want and got != want and want[0] == _norm(dek) and got == want[1:]:
+        return problems  # the one permitted drop: the dek, printed once in the header
+    if got != want:
+        first = next((i for i, (a, b) in enumerate(zip(got, want)) if a != b), min(len(got), len(want)))
+        problems.append(
+            f"the page's prose differs from the approved text at block {first + 1} ({len(got)} blocks served, {len(want)} approved)"
+        )
+    return problems

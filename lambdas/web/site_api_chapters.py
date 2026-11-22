@@ -318,7 +318,10 @@ def editions_field(read_editions: Callable[[], list], tainted: Callable[[str], b
     if not chapter_editions.LIVE:
         return {}
     try:
-        return {"editions": chapter_editions.public_view(read_editions(), tainted=tainted, log=logger.warning)}
+        from privacy import privacy_guard  # noqa: PLC0415 — the chronicle's publish gate (fail-closed on no vocabulary)
+
+        view = chapter_editions.public_view(read_editions(), tainted=tainted, filter_hits=privacy_guard.find_violations, log=logger.warning)
+        return {"editions": view}
     except Exception as e:  # noqa: BLE001 — a failed read is said, never served as "no editions"
         logger.error(f"[chapters] editions read failed: {type(e).__name__}: {e}")
         return {"editions": None, "editions_error": "the editions could not be read for this response"}

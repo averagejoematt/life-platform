@@ -10,7 +10,7 @@ import Quote from "../../components/Quote.astro";
 import { isDisputed } from "../../lib/disputed.js";
 import { CALL_OUTCOME, chapterMeta, chapterPublished, chapterWindow, clip, dayInWords, gapWords, heldCallWords, num } from "../../lib/format.js";
 import { latestEdition, loadAll, loadOwnWords, loadSeries } from "../../lib/snapshot.js";
-import { ownWords, withinDays } from "../../lib/own_words.js";
+import { bodyCarriesQuote, ownWords, withinDays } from "../../lib/own_words.js";
 import { dailyBars, placeEvidence, windowValues } from "../../lib/evidence.js";
 import { theLine } from "../../lib/theline.js";
 import { hasPage, href, pathOf } from "../../lib/url.js";
@@ -192,7 +192,9 @@ if (ev && c.status === "published" && rawBody) {
 // chapter the flag is the title of, only when the line's day is one of that chapter's days, and only when the platform
 // serves the approved words exactly. The platform's flag and his sentence disagree; the page settles nothing.
 const paceWords = ownWords(await loadOwnWords(), "pace");
-if (paceWords && ev && rawBody && /rate flag/i.test(c.title || "") && withinDays(paceWords.date, ev.from, ev.to)) {
+// #6193 (final approval §4): when the body itself carries his approved line word for word (a later edition quotes it), the
+// side copy is suppressed — the line appears once, in the body, wording and date unchanged.
+if (paceWords && ev && rawBody && /rate flag/i.test(c.title || "") && withinDays(paceWords.date, ev.from, ev.to) && !bodyCarriesQuote(rawBody, paceWords.text)) {
   figures.push({
     key: "own-words",
     match: /\bflag\b/i,

@@ -55,10 +55,10 @@ MCC_DESCRIPTION = (
     "nothing is edited or deleted; replace one by proposing a new one that supersedes it. #6193 second editions (same "
     "rules, nothing renders until approved and the switch is on): action='list_editions' (optional chapter_id); "
     "'propose_edition' chapter_id, edition (2-9), text (the full chapter, markdown), first_published (the original "
-    "YYYY-MM-DD), optional carries (approved correction_ids it makes); 'approve_edition' chapter_id, edition, approved=true "
+    "YYYY-MM-DD), optional carries (approved correction_ids it makes); 'approve_edition' chapter_id, edition, approved=true, sha256 "
     "— refused until the first edition's private backup is recorded (scripts/chronicle_edition_backup.py --apply); "
     "'propose_archival' chapter_id, archival_id (1-99), text (a privacy-safe rendering of the first edition, never the raw "
-    "original); 'approve_archival' chapter_id, archival_id, approved=true. Every text passes the publication gates "
+    "original); 'approve_archival' chapter_id, archival_id, approved=true, sha256 (of the exact approved text). Every text passes the publication gates "
     "(content filter, private calls, truth checks) at proposal and approval. No feed item, no new date, no mail."
 )
 
@@ -99,6 +99,10 @@ MCC_INPUT = {
         "text": {"type": "string", "description": "propose_edition/propose_archival: the full text, in the chronicle's markdown."},
         "first_published": {"type": "string", "description": "propose_edition: the chapter's original publication day, YYYY-MM-DD."},
         "carries": {"type": "array", "items": {"type": "string"}, "description": "propose_edition: correction_ids this edition makes."},
+        "sha256": {
+            "type": "string",
+            "description": "approve_edition/approve_archival: the SHA-256 of the exact text Matthew approved; must equal the stored text's.",
+        },
     },
     "required": ["action"],
 }
@@ -239,8 +243,14 @@ def _tainted():
         return None
 
 
+def _filter_hits(text: str) -> list:
+    from privacy import privacy_guard  # noqa: PLC0415 — the chronicle's publish gate; no vocabulary raises (fail closed)
+
+    return privacy_guard.find_violations(text)
+
+
 def _gate(text) -> list:
-    return CE.gate_findings(text, tainted=_tainted())
+    return CE.gate_findings(text, tainted=_tainted(), filter_hits=_filter_hits)
 
 
 def _int_arg(args: dict, key: str):
@@ -275,6 +285,19 @@ def _approve_once(key: dict, sets: str, values: dict, what: str) -> dict | None:
     return None
 
 
+def _hash_mismatch(args: dict, item: dict) -> dict | None:
+    """The approval binds to the exact bytes he approved: ``sha256`` must be given and equal the stored text's."""
+    given = str(args.get("sha256") or "").strip().lower()
+    if not CE.SHA256.match(given):
+        return {"error": "sha256 (the SHA-256 of the exact text Matthew approved) is required. Nothing was stored."}
+    if given != item.get("text_sha256"):
+        return {
+            "error": f"the stored text hashes to {item.get('text_sha256')}, not the approved {given}; the approval does not "
+            "bind to these bytes. Propose the approved text as a new edition number. Nothing was stored."
+        }
+    return None
+
+
 def _refused(findings: list) -> dict:
     return {"error": "the publication gates refused the text. Nothing was stored.", "findings": findings}
 
@@ -298,7 +321,14 @@ def _propose_edition(args: dict) -> dict:
     err = _put_once(item, f"edition {item['edition']} of {item['chapter_id']}")
     if err:
         return err
-    return {"stored": True, "approved": False, "renders": False, "chapter_id": item["chapter_id"], "edition": item["edition"]}
+    return {
+        "stored": True,
+        "approved": False,
+        "renders": False,
+        "chapter_id": item["chapter_id"],
+        "edition": item["edition"],
+        "sha256": item["text_sha256"],
+    }
 
 
 def _approve_edition(args: dict) -> dict:
@@ -315,6 +345,9 @@ def _approve_edition(args: dict) -> dict:
         return {"error": f"no proposed edition {edition} of {chapter_id}. Nothing was stored."}
     if item.get("approvals"):
         return {"error": f"edition {edition} of {chapter_id} is already approved (revised {item.get('revised_on')}). Nothing was stored."}
+    bound = _hash_mismatch(args, item)
+    if bound:
+        return bound
     original = _table_ref.get_item(Key={"pk": key["pk"], "sk": CE.sk_original(chapter_id)}, ConsistentRead=True).get("Item")
     try:
         CE.validate_original(original)
@@ -332,7 +365,7 @@ def _approve_edition(args: dict) -> dict:
         return _refused(findings)
     day = pacific_today()
     try:
-        entry = CE.approval(at=_now(), dated_on=day, note=str(args.get("note") or ""))
+        entry = CE.approval(at=_now(), dated_on=day, sha256=item["text_sha256"], note=str(args.get("note") or ""))
         sig = CE.signature(edition, day)
         CE.validate_edition({**item, "approvals": [entry], "approved_at": entry["at"], "revised_on": day, "signature": sig})
     except (CE.EditionError, CC.CorrectionError) as exc:
@@ -374,7 +407,14 @@ def _propose_archival(args: dict) -> dict:
     err = _put_once(item, f"archival rendering {item['archival_id']} of {item['chapter_id']}")
     if err:
         return err
-    return {"stored": True, "approved": False, "renders": False, "chapter_id": item["chapter_id"], "archival_id": item["archival_id"]}
+    return {
+        "stored": True,
+        "approved": False,
+        "renders": False,
+        "chapter_id": item["chapter_id"],
+        "archival_id": item["archival_id"],
+        "sha256": item["text_sha256"],
+    }
 
 
 def _approve_archival(args: dict) -> dict:
@@ -389,6 +429,9 @@ def _approve_archival(args: dict) -> dict:
         return {"error": f"no proposed archival rendering {n} of {chapter_id}. Nothing was stored."}
     if item.get("approvals"):
         return {"error": f"archival rendering {n} of {chapter_id} is already approved. Nothing was stored."}
+    bound = _hash_mismatch(args, item)
+    if bound:
+        return bound
     approved_editions = [r for r in _edition_rows(chapter_id) if r.get("record_type") == CE.EDITION_TYPE and r.get("approvals")]
     if not approved_editions:
         return {"error": f"{chapter_id} has no approved second edition; the first edition is still its current text. Nothing was stored."}
@@ -397,7 +440,7 @@ def _approve_archival(args: dict) -> dict:
         return _refused(findings)
     day = pacific_today()
     try:
-        entry = CE.approval(at=_now(), dated_on=day, note=str(args.get("note") or ""))
+        entry = CE.approval(at=_now(), dated_on=day, sha256=item["text_sha256"], note=str(args.get("note") or ""))
         CE.validate_archival({**item, "approvals": [entry], "approved_at": entry["at"], "approved_on": day})
     except (CE.EditionError, CC.CorrectionError) as exc:
         return {"error": f"{exc}. Nothing was stored."}
@@ -411,7 +454,7 @@ def _approve_archival(args: dict) -> dict:
 
 def _list_editions(chapter_id: str | None) -> dict:
     rows = _edition_rows(chapter_id)
-    served = {e["chapter_id"]: e for e in CE.public_view(rows, tainted=_tainted(), log=logger.info)}
+    served = {e["chapter_id"]: e for e in CE.public_view(rows, tainted=_tainted(), filter_hits=_filter_hits, log=logger.info)}
     items = []
     for r in sorted(rows, key=lambda r: str(r.get("sk"))):
         cid, kind = r.get("chapter_id"), r.get("record_type")
@@ -439,6 +482,7 @@ def _list_editions(chapter_id: str | None) -> dict:
                 "revised_on": r.get("revised_on") or r.get("approved_on"),
                 "backed_up_at": r.get("backed_up_at"),
                 "words": CE.word_count(r.get("text")) if r.get("text") else None,
+                "sha256": r.get("text_sha256"),
                 "would_render": renders,
                 "renders": renders and CE.LIVE,
             }

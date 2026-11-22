@@ -51,3 +51,12 @@ test("a correction's foot is #6177's sentence without an edition, and says where
   assert.match(correctionHtml(c, [c], edition()), /a later edition, and it makes this correction\./);
   assert.match(correctionHtml({ ...c, id: "other" }, [c], edition()), /made to the first edition; the text below is a later edition\./);
 });
+
+test("an approved quotation the body already carries is not placed beside it again (final approval §4)", async () => {
+  const { bodyCarriesQuote } = await import("../src/lib/own_words.js");
+  const quote = "A sample approved line, for a test, about the pace.";
+  assert.equal(bodyCarriesQuote(`<p>He wrote: “A sample approved line, for a test, about the pace.”</p>`, quote), true);
+  assert.equal(bodyCarriesQuote(`<p>He wrote: <em>A sample approved line,</em> for a test, about the pace.</p>`, quote), true);
+  assert.equal(bodyCarriesQuote(`<p>A sample approved line, for a test, about the speed.</p>`, quote), false); // not word for word
+  assert.equal(bodyCarriesQuote(`<p>Anything.</p>`, ""), false);
+});
