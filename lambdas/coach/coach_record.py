@@ -432,10 +432,11 @@ def headline(record: dict | None) -> str:
 # ``record_from_rows`` / ``headline`` the public pages and the MCP headline print — behind
 # the switch below, because what a coach is told changes live coaching text.
 
-#: Default OFF (owner Phase 2 rule 12: a change to live coaching text ships dark). True puts
-#: ``self_record_line`` into the chat facts and the brief; False keeps both prompt texts
-#: byte-identical to before #6172. Turning it on is one reviewed line + a deploy.
-SELF_RECORD_UNIFIED = False
+#: ON by owner ruling 2026-11-22 (it began dark: owner Phase 2 rule 12). True puts ``self_record_line``
+#: into the chat facts and the brief; False restores both prompt texts byte-identical to before #6172.
+#: ROLLBACK: set False, then ``bash deploy/deploy_fleet.sh``. The broader coach-context
+#: pilot switch is separate and stays False.
+SELF_RECORD_UNIFIED = True
 
 
 def self_headline(record: dict | None) -> str:
