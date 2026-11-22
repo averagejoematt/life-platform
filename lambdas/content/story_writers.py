@@ -153,6 +153,12 @@ def _context(dossier: Dict[str, Any], budget: Dict[str, Any], ledger: Dict[str, 
     )
 
 
+def evidence_packet(dossier: Dict[str, Any], budget: Dict[str, Any], ledger: Dict[str, Any], week: int, previous: Optional[str]) -> str:
+    """The evidence the chronicle writer is given, as one string — the same bytes the editor (#6179) works from, so the
+    editor can never see a fact the writer did not."""
+    return _context(dossier, budget, ledger, week, previous)
+
+
 def write_chronicle(
     dossier: Dict[str, Any],
     budget: Dict[str, Any],

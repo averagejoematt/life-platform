@@ -32,6 +32,16 @@ experiment, ADR-077):
                      words for why no week landed) when the marker names this week, else
                      "no chapter was published".
   * ``pending``    — the week in progress, with nothing yet: the draft day has not come.
+  * ``retired``    — (#6178, owner ruling 2026-11-22 §4; behind ``CHAPTERS_RETIRED_STATE``, default OFF) a draft
+                     existed and the OWNER decided it will not be published: the row's status is ``retired``. Like a
+                     held week, ONLY ``status`` and ``drafted_at`` are served. With the switch off a retired row is
+                     served as ``held`` (a draft exists and is unpublished — true either way), never as skipped.
+
+HELD IS ONE NEUTRAL STATE (#6178). A held week carries no ``reason``: the stored statuses do not say whether the owner
+sent a week back (weeks 8 and 9 carry ``changes_requested`` written as a lock, not as his rejection) or whether it only
+awaits his approval (a draft the audit refuses is not merely waiting). The page says one true line for every held week.
+A row in a status this route does not know is a draft that exists and is unpublished: it is served as ``held``, never
+as ``skipped`` ("no chapter was published" would erase that a draft exists).
 
 THE CORRECTIONS (#6177). ``corrections`` lists every APPROVED dated public correction to a published chapter
 (``content.chapter_corrections.public_view`` over the chronicle partition's ``CHAPTER_CORRECTION#`` rows): keyed by
@@ -69,6 +79,22 @@ MANIFEST_KEY = "generated/journal/posts.json"
 NO_CHAPTER = "no chapter was published"
 UNAVAILABLE = "The chapter list is not served right now."
 HELD_STATUSES = ("draft", "changes_requested")
+#: #6178: the row status the owner sets when he decides a drafted week will not be published (equal to
+#: content.autopublish_audit.RETIRED_STATUS, pinned by a test — this route does not import the audit's dependencies).
+RETIRED_STATUS = "retired"
+#: The switch that lets ``retired`` reach the page (default off): the site-api Lambda's environment.
+RETIRED_SWITCH_ENV = "CHAPTERS_RETIRED_STATE"
+#: Every status a week can be served with.
+WEEK_STATUSES = ("published", "held", "skipped", "pending", "retired")
+
+
+def retired_state_on(env=None) -> bool:
+    """The #6178 switch, default OFF: only on/1/true turn it on."""
+    import os
+
+    return str((os.environ if env is None else env).get(RETIRED_SWITCH_ENV) or "").strip().lower() in ("on", "1", "true")
+
+
 #: The chronicle row attributes this route reads — never the title or body of an unpublished week. ``approved_at``
 #: is served for a published week only.
 ROW_PROJECTION = ("date", "week_number", "status", "generated_at", "approved_at")
@@ -164,8 +190,9 @@ def _published_posts(journal: dict | None, today: str) -> dict[int, dict]:
     return out
 
 
-def compose(rows: list, journal: dict | None, genesis: str, today: str) -> dict:
-    """The document — pure: the chronicle rows, the manifest, genesis and today in; the weeks out."""
+def compose(rows: list, journal: dict | None, genesis: str, today: str, *, retired_on: bool = False) -> dict:
+    """The document — pure: the chronicle rows, the manifest, genesis and today in; the weeks out. ``retired_on`` is the
+    #6178 switch (the handler reads it from the environment)."""
     posts = _published_posts(journal, today)
     marker = held_marker(journal)
     marker_week = _int((marker or {}).get("week")) if marker else None
@@ -200,14 +227,16 @@ def compose(rows: list, journal: dict | None, genesis: str, today: str) -> dict:
             entry.update(status="published", date=post.get("date"), title=post.get("title"), url=post.get("url"), label=post.get("label"))
             covers = covered_days(post.get("stats_line"), genesis)
             entry.update(published_at=_approved_at(published_rows.get(wk)), covers_start=covers[0], covers_end=covers[1])
-        elif row is not None and row_status in HELD_STATUSES:
-            entry.update(status="held", drafted_at=row.get("generated_at"))
-            if marker_week == wk and marker:
-                entry["reason"] = marker.get("display") or marker.get("reason")
         elif row is not None and row_status == "published":
             # Published in the store, not yet in the manifest (a publish in flight): the state is the store's.
             entry.update(status="published", date=str(row.get("date") or "")[:10] or None)
             entry.update(published_at=_approved_at(row), covers_start=None, covers_end=None)
+        elif row is not None and row_status == RETIRED_STATUS and retired_on:
+            entry.update(status="retired", drafted_at=row.get("generated_at"))
+        elif row is not None:
+            # draft / changes_requested, a retired row while the switch is off, or a status this route does not know: a
+            # draft exists and is unpublished. One neutral state, no reason (#6178).
+            entry.update(status="held", drafted_at=row.get("generated_at"))
         elif bin_["end"] >= today:
             entry["status"] = "pending"
         else:
@@ -220,7 +249,8 @@ def compose(rows: list, journal: dict | None, genesis: str, today: str) -> dict:
         "week_length_days": WEEK_DAYS,
         "weeks": weeks,
         "held": marker,
-        "counts": {s: sum(1 for w in weeks if w["status"] == s) for s in ("published", "held", "skipped", "pending")},
+        # the wire is unchanged while the switch is off: `retired` is counted only when it can be served
+        "counts": {s: sum(1 for w in weeks if w["status"] == s) for s in WEEK_STATUSES if s != RETIRED_STATUS or retired_on},
         "source": SOURCE,
     }
 
@@ -277,7 +307,7 @@ def handle_chapters(
         logger.error(f"[chapters] chronicle read failed: {type(e).__name__}: {e}")
         return _error(503, UNAVAILABLE)
     journal = read_manifest()
-    doc = compose(rows, journal, genesis, today)
+    doc = compose(rows, journal, genesis, today, retired_on=retired_state_on())
     doc.update(corrections_field(read_corrections))
     degraded = None
     if journal is None:

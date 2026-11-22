@@ -306,6 +306,14 @@ EXEMPTIONS: dict[str, dict[str, str]] = {
 # exemptions: each says what a reader sees and where the fix is tracked. An entry
 # leaves this table by landing a SURFACES registration, never by being re-described.
 UNGATED_READER_KNOWN: dict[str, dict[str, object]] = {
+    "lambdas/content/story_editor.py": {
+        "issue": 4535,
+        "note": "the Story Desk's editor (#6179, STORY_EDITOR, default off) revises the writer's chronicle post; its revision is "
+        "reader prose held by the same desk gates as the writer's (content.story_checks, the exact-quote and callback gates, "
+        "the structured fact read, the publish audit) plus a mechanical no-new-claims check that discards any revision adding "
+        "a number, date, name, quote, scene, feeling or cause — real gates, not yet the registered grounding chokepoint; "
+        "registering the desk's gates as SURFACES is tracked on #4535, as for story_writers.",
+    },
     "lambdas/content/story_writers.py": {
         "issue": 4535,
         "note": "the Story Desk's chronicle post and Panel script are reader prose held by the desk's OWN gates "

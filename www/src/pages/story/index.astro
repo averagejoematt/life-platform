@@ -9,6 +9,7 @@ import { weekStrip } from "../../lib/theline.js";
 import { hasPage, href, pathOf } from "../../lib/url.js";
 import { PERSONA_DISCLOSURE, correctionsFor, rowMark } from "../../lib/chapter_corrections.js"; // #6177
 import { loadChapterCorrections } from "../../lib/snapshot.js";
+import { INDEX_BYLINE } from "../../lib/narrator.js";
 
 const all = await loadAll();
 const correctionDoc = await loadChapterCorrections(); // #6177: a chapter with a standing approved correction is marked on its row
@@ -38,7 +39,7 @@ const stripOf = (c: any) => {
 };
 ---
 
-<Base title="The story" top="story" description="Every weekly chapter of an experiment in changing a life with AI coaches — the weight is the part that's working; the rest is still open. The chapters published, and the weeks held or skipped, said plainly.">
+<Base title="The story" top="story" description="Every weekly chapter of an experiment in changing a life with AI coaches — the weight is the part that's working; the rest is still open. The chapters published, and the weeks held, skipped or retired, said plainly.">
   <section class="section">
     <div class="wrap">
       <p class="label">Story · <span data-ch-count>{count.words}</span> published{episodes ? ` · ${episodes} with audio` : ""}</p>
@@ -49,8 +50,7 @@ const stripOf = (c: any) => {
         are still open — and that is what the chapters are about.
       </p>
       <p class="muted" style="margin-top:12px;max-width:720px;font-size:15px">
-        Each chapter is written by the platform's narrator from that week's data and published only after Matthew approves it. A week with
-        no chapter says so here, in its place.
+        <span data-byline>{INDEX_BYLINE}</span> A week with no chapter says so here, in its place.
       </p>
       <p class="persona-disclosure" style="margin-top:8px;max-width:720px" data-persona-disclosure>{PERSONA_DISCLOSURE}</p>
       <p style="margin-top:16px;font-size:15px;font-weight:700;display:flex;flex-wrap:wrap;gap:8px 28px">

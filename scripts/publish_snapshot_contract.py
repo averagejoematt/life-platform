@@ -145,6 +145,13 @@ COLLECTION_OF = {
     "day": "days",
 }
 VISIBILITIES = ("public", "held", "private")
+# The one line each program week without a chapter shows (#6178). Never a title, a teaser or a reason a held draft carries.
+WEEK_STATE_TEXT = {
+    "held": "Drafted, not approved. No chapter for this week yet.",
+    "retired": "A draft was written for this week and Matthew decided not to publish it. The days are still on the record.",
+    "skipped": "No chapter was published for this week.",
+    "pending": "No chapter yet for this week.",
+}
 
 # ── the schema mirror ────────────────────────────────────────────────────────────────────
 # Each field: (kind, nullable). kinds: str (non-empty), text (may be empty), int, num, bool, day, id, list[str], list[id], list[obj],
@@ -170,7 +177,7 @@ SCHEMA: dict[str, dict[str, tuple[str, bool]]] = {
         "week": ("int", True),
         "week_label": ("str", False),
         "date": ("day", False),
-        "status": ("enum:published|held|skipped|pending", False),
+        "status": ("enum:published|held|skipped|pending|retired", False),
         "week_start": ("day", True),
         "week_end": ("day", True),
         "published_at": ("day", True),

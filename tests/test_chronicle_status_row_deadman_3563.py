@@ -653,7 +653,7 @@ def _door(iso_utc, doc=None, http=(200, None)):
 def test_the_live_door_is_green_and_names_the_open_weeks():
     c = _door("2026-11-15T06:49:00")
     assert c.passed is True and c.partition == CONTENT_TRUTH, c.message
-    assert "week 7 skipped" in c.message and "week 8 drafted 2026-10-28, awaiting approval" in c.message and "week 9" in c.message
+    assert "week 7 skipped" in c.message and "week 8 drafted 2026-10-28, not approved" in c.message and "week 9" in c.message
 
 
 def test_HISTORY_the_27_day_gap_after_week_6_would_have_alarmed_on_its_eleventh_day():

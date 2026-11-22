@@ -75,7 +75,8 @@ OUT_ALIAS = Path("site/feed.xml")
 TITLE = "The Measured Life — averagejoematt"
 DESC = (
     "The weekly chronicle of an ordinary life, measured in full — every number, "
-    "every week, including the weeks it dips. Written by Elena Voss."
+    "every week, including the weeks it dips. Written by Elena Voss, an AI editorial persona (a language model writing "
+    "from the platform's data); Matthew approves each chapter before it publishes."
 )
 
 

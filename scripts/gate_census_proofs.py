@@ -4985,18 +4985,18 @@ STRUCTURAL_HAND_PROOFS["structural::test_elena_canon_6155.py"] = {
 # correction close that never closes on age.
 STRUCTURAL_HAND_PROOFS["structural::test_recommendation_record_6158.py"] = {
     "gate_name": "test_recommendation_record_6158.py",
-    "command": "python3 -m pytest tests/test_recommendation_record_6158.py -q -p no:warnings   # baseline 49 passed",
+    "command": "python3 -m pytest tests/test_recommendation_record_6158.py -q -p no:warnings   # baseline 53 passed",
     "mutation": (
         "Six plants, ONE AT A TIME, each restored from a copy: M1 coach_context_pilot.LIVE = True; M2 "
         "`from coach import recommendation_record` appended to lambdas/web/site_api_status.py; M3 MAX_PER_THEME 2 -> 7; "
         "M4 coach_corrections.close_correction's checkable-evidence check disabled; M5 recommendation_record.fold's "
-        "recorded_by == owner condition removed; M6 the admission rule's directive check disabled."
+        "recorded_by == owner condition removed; M6 the admission rule's directive check disabled. Follow-up (round-3 context fixes, notes never edited): N1 a dated note line dropped in build_turn_context; N2 the thread cap keeping the OLDEST repeats; N3 the data-honesty line reworded; N4 the notes-order line removed."
     ),
     "observed": (
         "2026-11-22, #6158 lane. BASELINE 49 passed. M1 2 failed (switch ships off; dark worker turn); M2 2 failed "
         "(publication boundary closure + the naming allowlist); M3 1 failed (dominant theme); M4 3 failed (age alone "
         "cannot close, x3); M5 1 failed (only owner events count); M6 3 failed (encouragement / no-directive refused). "
-        "REVERTED 49 passed."
+        "REVERTED 49 passed. 2026-11-22 follow-up lane (issue-6158-context-fixes): BASELINE 53 passed; N1-N4 each 1 failed; REVERTED 53 passed. M3 retired with the notes de-duplication it mutated (the thread cap is covered by N2)."
     ),
     "scope": (
         "Every tracked .py outside tests/ for record constructors and modules naming the record; the static import graph "
@@ -5006,6 +5006,28 @@ STRUCTURAL_HAND_PROOFS["structural::test_recommendation_record_6158.py"] = {
         "without naming the source."
     ),
     "proved_on": "2026-11-22",
+}
+
+# #6178 — the narrator named on every byline: the chapter page, the home card and the story index read one definition
+# (www/src/lib/narrator.js), the RSS channel and the subscribe page carry it verbatim, the owner's first-person lines
+# stay byte-identical, and no rendered byline under www/src still says "the platform's narrator".
+STRUCTURAL_HAND_PROOFS["structural::test_narrator_byline_6178.py"] = {
+    "gate_name": "test_narrator_byline_6178.py",
+    "command": "python3 -m pytest tests/test_narrator_byline_6178.py -q -p no:warnings   # baseline 5 passed",
+    "mutation": (
+        "Three plants, ONE AT A TIME, each restored from a copy: M1 www/src/pages/story/[id].astro's {CHAPTER_BYLINE} "
+        "span put back to the old 'Written by the platform's narrator…' sentence; M2 one word of the owner's approved "
+        "home-card sentence changed ('The figures' → 'All the figures'); M3 site/subscribe/index.html's disclosure put "
+        "back to 'Elena Voss, the site's AI journalist'."
+    ),
+    "observed": "2026-11-21, #6178 lane. BASELINE 5 passed. M1 2 failed; M2 1 failed; M3 1 failed. REVERTED 5 passed.",
+    "scope": (
+        "www/src/**/*.astro|js|ts (the unnamed-narrator sweep, comments excluded); the three v9 byline call sites; "
+        "scripts/v4_build_rss.py DESC (imported) and the committed site/rss.xml + site/feed.xml; site/subscribe/index.html. "
+        "NOT SEEN: the built dist (the Python suite cannot run astro build; www/tests/week_states_6178.test.mjs pins the "
+        "strings); legacy /legacy/ pages; the podcast feed's own channel text."
+    ),
+    "proved_on": "2026-11-21",
 }
 
 # #6177 — dated public chapter corrections: the platform signs (never a persona), nothing is public before the owner's
