@@ -36,12 +36,21 @@ os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "testing")
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
+import pytest  # noqa: E402
 from ai import (
     ai_calls,  # noqa: E402
     bedrock_client,  # noqa: E402
 )
 from coach import coach_corrections as cc  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _pre_6149_selection(monkeypatch):
+    """#6149: the cycle-aware ranking has its own tests (test_coach_corrections_follow_the_coach_6149);
+    pin the cycle unreadable so these fixtures (July-dated rows) exercise the newest-first selection
+    deterministically, whatever an earlier test or the runner's AWS credentials would return."""
+    monkeypatch.setattr(cc, "read_cycle", lambda *a, **k: None)
 
 
 def _seed_correction(coach, *, cid, cls="stale-baseline", text, surface="coach_brief", date="2026-07-22"):

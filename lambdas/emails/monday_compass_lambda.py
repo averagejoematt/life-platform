@@ -1,6 +1,6 @@
 """
 Monday Compass Lambda — v1.0.0
-Fires Monday 7:00 AM PT (Monday 15:00 UTC via EventBridge).
+Fires Monday 8:00 AM PT (cron(0 8 ? * MON *) wall-clock, config/schedules.json).
 
 A forward-looking weekly planning email that bridges Matthew's health state
 with his task and project load — answering "what matters most THIS week and why."
@@ -903,6 +903,17 @@ def record_email_send(table, lambda_name, period_key):
     send_ledger.record_sent(table, lambda_name, period_key, now=int(datetime.now(timezone.utc).timestamp()), logger=logger)
 
 
+# The fallback HTML says "unavailable" ~150 chars in, so the old `"unavailable" not in
+# ai_content[:50]` check could never fire: a failed AI call was validated and
+# written as a coach insight (#6152). A leading marker makes the check structural.
+_AI_FALLBACK_MARKER = "<!--compass-ai-fallback-->"
+
+
+def _ai_ok(ai_content):
+    """True only for real model output - not empty, not one of the fallback blocks."""
+    return bool(ai_content) and not ai_content.startswith(_AI_FALLBACK_MARKER)
+
+
 def lambda_handler(event, context):
     dry_run = is_dry_run(event)
 
@@ -953,17 +964,17 @@ def lambda_handler(event, context):
         ai_content = call_anthropic(system, user_message, max_tokens=3500)
     except Exception as e:
         logger.error(f"Anthropic failed: {e}")
-        ai_content = (
+        ai_content = _AI_FALLBACK_MARKER + (
             '<div style="background:#16213e;border-radius:8px;padding:20px;color:#e0e0e0;">'
             "Monday Compass AI unavailable this week. Check CloudWatch logs.</div>"
         )
 
     # AI-3: Validate output before rendering
-    if _HAS_AI_VALIDATOR and ai_content and "unavailable" not in ai_content[:50]:
+    if _HAS_AI_VALIDATOR and _ai_ok(ai_content):
         _val = validate_ai_output(ai_content, AIOutputType.WEEKLY_DIGEST)
         if _val.blocked:
             logger.error(f"[AI-3] Monday Compass output BLOCKED: {_val.block_reason}")
-            ai_content = (
+            ai_content = _AI_FALLBACK_MARKER + (
                 _val.safe_fallback
                 or '<div style="background:#16213e;border-radius:8px;padding:20px;color:#e0e0e0;">Monday Compass AI unavailable. Check CloudWatch logs.</div>'
             )
@@ -997,9 +1008,9 @@ def lambda_handler(event, context):
     # to sit between the send and its only completion record.
     if not dry_run:
         record_email_send(table, LEDGER_NAME, period_key)
-    logger.info(f"Sent: {subject}")
+    logger.info(f"{'DRY-RUN (not sent)' if dry_run else 'Sent'}: {subject}")
 
-    if _HAS_INSIGHT_WRITER and ai_content and "unavailable" not in ai_content[:50]:
+    if _HAS_INSIGHT_WRITER and _ai_ok(ai_content):
         try:
             insight_writer.write_insight(
                 digest_type="monday_compass",
