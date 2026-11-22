@@ -172,21 +172,11 @@ def stats_line(week: int, dossier: Dict[str, Any]) -> str:
     return " · ".join(p for p in parts if p)
 
 
-def live_week(table: Any, date_str: str, *, chronicle_pk: str = "USER#matthew#SOURCE#chronicle", log=print) -> Optional[Dict[str, Any]]:
-    """One live week through the desk (#4535): the week ending ``date_str``, built from that window only, picking up
-    the season ledger the last published installment left. Returns the installment + its episode + the ledger the
-    week will leave on publish, or None when ``date_str`` is not a week end (the caller keeps the legacy path)."""
+def _published_before(table: Any, chronicle_pk: str, date_str: str, n: int) -> Dict[int, str]:
+    """The last two published installments before ``date_str``, keyed n-1 and n-2: the writer's continuity and the
+    callback/repeat gates' memory. One read for the desk and the legacy audit, so the two gates see the same past."""
     from boto3.dynamodb.conditions import Key
 
-    from content import story_desk, story_dossier
-
-    wk = next((w for w in story_dossier.season_weeks(through=date_str) if w["end"] == date_str), None)
-    if wk is None:
-        return None
-    n = wk["week"]
-    dossier, _nye = story_dossier.week_dossier(table, wk)
-    ledger = story_ledger.latest_visible(table, chronicle_pk, date_str)
-    # the last two published installments: the writer's continuity and the callback/repeat gates' memory
     resp = table.query(
         KeyConditionExpression=Key("pk").eq(chronicle_pk) & Key("sk").between("DATE#", f"DATE#{date_str}~"), ScanIndexForward=False
     )
@@ -195,7 +185,69 @@ def live_week(table: Any, date_str: str, *, chronicle_pk: str = "USER#matthew#SO
         for it in resp.get("Items", [])
         if it.get("status") == "published" and not it.get("tombstone") and not it.get("unlisted") and it.get("date", "") < date_str
     ][:2]
-    previous = {max(0, n - 1 - i): str(it.get("content_markdown") or "") for i, it in enumerate(prior)}
+    return {max(0, n - 1 - i): str(it.get("content_markdown") or "") for i, it in enumerate(prior)}
+
+
+# ── the legacy writer's door (#6155) ─────────────────────────────────────────
+#
+# When the desk declines or fails, the legacy writer drafts the week behind the same approval door. It never had the
+# desk's quote or ledger checks, so a legacy week could carry a quote the platform does not hold (the 2026-10 wk6
+# interview) or repeat a title the season already used. The legacy draft now runs those checks — the same functions
+# the desk's gates call, on the same dossier, ledger and published past — and is ALWAYS held for the owner with the
+# reasons named: the desk's fact read and craft gates did not run, and a legacy week leaves no ledger entry.
+
+LEGACY_HOLD = "legacy_hold"
+LEGACY_NOTE = (
+    "legacy writer: the Story Desk did not write this draft, so its fact read and craft gates did not run and the "
+    "season ledger will not advance on publish — held for the owner"
+)
+_STAT_HEADER = re.compile(r"^\s*\[[^\]\n]*\]\s*$")
+
+
+def legacy_findings(g: _Gates, md: str, ledger: Dict[str, Any]) -> List[str]:
+    """The desk's quote and ledger checks on a legacy draft: exact quotes against what the platform holds, callbacks
+    against the published installments, and the title against the season's titles. Pure."""
+    title, body = story_writers.split_title(md)
+    body = "\n".join(line for line in body.splitlines() if not _STAT_HEADER.match(line))  # the legacy machine header
+    out = story_craft.quote_findings(body, g.corpus) + story_craft.callback_findings(body, g.previous)
+    used = {str((t or {}).get("title") if isinstance(t, dict) else t).strip().lower() for t in ledger.get("titles", [])}
+    if title and title.strip().lower() in used:
+        out.append(f"ledger: the title {title!r} repeats one the season has already used")
+    return out
+
+
+def legacy_audit(table: Any, date_str: str, md: str, *, chronicle_pk: str = "USER#matthew#SOURCE#chronicle") -> List[str]:
+    """Every reason a LEGACY-written draft for the week ending ``date_str`` is held (#6155). Never empty: the first item
+    is ``LEGACY_NOTE``; the desk's quote/callback/title findings follow. A week the checks cannot read (not a season
+    week end, a read failure) is held with that reason instead — never a silent pass."""
+    from content import story_dossier
+
+    try:
+        wk = next((w for w in story_dossier.season_weeks(through=date_str) if w["end"] == date_str), None)
+        if wk is None:
+            return [LEGACY_NOTE, f"legacy audit: {date_str} is not a season week end, so the desk's quote and ledger checks had no dossier"]
+        n = wk["week"]
+        dossier, _nye = story_dossier.week_dossier(table, wk)
+        ledger = story_ledger.latest_visible(table, chronicle_pk, date_str)
+        previous = _published_before(table, chronicle_pk, date_str, n)
+    except Exception as e:  # noqa: BLE001 — a check that cannot run holds the week, it never passes it
+        return [LEGACY_NOTE, f"legacy audit: the desk's quote and ledger checks could not run ({type(e).__name__}: {e})"]
+    return [LEGACY_NOTE] + legacy_findings(_Gates(n, dossier, {}, ledger, None, previous), md, ledger)
+
+
+def live_week(table: Any, date_str: str, *, chronicle_pk: str = "USER#matthew#SOURCE#chronicle", log=print) -> Optional[Dict[str, Any]]:
+    """One live week through the desk (#4535): the week ending ``date_str``, built from that window only, picking up
+    the season ledger the last published installment left. Returns the installment + its episode + the ledger the
+    week will leave on publish, or None when ``date_str`` is not a week end (the caller keeps the legacy path)."""
+    from content import story_desk, story_dossier
+
+    wk = next((w for w in story_dossier.season_weeks(through=date_str) if w["end"] == date_str), None)
+    if wk is None:
+        return None
+    n = wk["week"]
+    dossier, _nye = story_dossier.week_dossier(table, wk)
+    ledger = story_ledger.latest_visible(table, chronicle_pk, date_str)
+    previous = _published_before(table, chronicle_pk, date_str, n)  # the writer's continuity and the callback/repeat gates' memory
     previous_post = previous.get(n - 1)
     budget = story_desk.run_desk(dossier, ledger, week=n, log=log)
     g = _Gates(n, dossier, budget, ledger, None, previous)

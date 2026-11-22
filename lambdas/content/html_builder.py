@@ -18,7 +18,7 @@ from common.pacific_time import day_in_words, shift_day_key  # #4182: dates in w
 from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 from health.scoring_engine import habitify_reading  # #4362
 
-from content import brief_hr_regime  # #5029: the brief's reading of the HR regime markers
+from content import brief_editorial, brief_hr_regime  # #5029: the brief's reading of the HR regime markers; #6163 editorial labels
 from content.brief_format import esc, supplement_timing_label, supplement_timing_order, v2_coach_header_titles, weather_context_cells
 
 # ==============================================================================
@@ -188,8 +188,11 @@ def _brief_header(brief_mode, data, day_grade_score, grade, tldr_guidance, vacat
             'padding:12px 16px;text-align:center;">'
             '<p style="color:#94a3b8;font-size:10px;margin:0 0 2px;font-weight:600;">DAY GRADE</p>'
             '<p style="color:' + grade_color + ';font-size:36px;font-weight:800;margin:0;line-height:1;">' + grade + "</p>"
-            '<p style="color:#94a3b8;font-size:11px;margin:2px 0 0;">' + str(day_grade_score) + "/100</p>"
-            "</div>"
+            '<p style="color:#94a3b8;font-size:11px;margin:2px 0 0;">'
+            + str(day_grade_score)
+            + "/100</p>"
+            + brief_editorial.grade_provisional_html(data, day_grade_score)  # #6163: no food log -> labelled provisional
+            + "</div>"
         )
 
     out += "</div></div>"
@@ -250,7 +253,7 @@ def _brief_header(brief_mode, data, day_grade_score, grade, tldr_guidance, vacat
     return out
 
 
-def _brief_character(character_sheet, protocol_recs, triggered_rewards):
+def _brief_character(character_sheet, protocol_recs, triggered_rewards, data=None):
     """Section group of the daily brief (extracted from build_html, ADR-pending).
 
     Returns the HTML fragment for these sections; behavior-preserving extraction.
@@ -435,27 +438,8 @@ def _brief_character(character_sheet, protocol_recs, triggered_rewards):
                     )
                 out += "</div>"
 
-            # Protocol recommendations (pre-computed, passed in)
-            if protocol_recs:
-                out += '<div style="padding:8px 24px 12px;background:rgba(0,0,0,0.15);border-top:1px solid #2d2d5e;">'
-                out += (
-                    '<p style="color:#94a3b8;font-size:10px;margin:0 0 4px;font-weight:700;">PROTOCOLS TO TRY</p>'
-                    '<p style="color:#64748b;font-size:10px;margin:0 0 4px;">A protocol is a rule followed on purpose, to see if a number moves.</p>'
-                )
-                for rec in protocol_recs:
-                    pillar_name = (rec.get("pillar") or "").capitalize()
-                    dropped = rec.get("dropped", False)
-                    arrow = "↓" if dropped else "⚠"
-                    protos = rec.get("protocols", [])
-                    out += '<p style="color:#f87171;font-size:11px;margin:2px 0;">' + arrow + " " + pillar_name + ":</p>"
-                    for proto in protos:
-                        if isinstance(proto, dict):
-                            out += (
-                                '<p style="color:#9ca3af;font-size:10px;margin:0 0 2px 12px;">• ' + str(proto.get("name", proto)) + "</p>"
-                            )
-                        else:
-                            out += '<p style="color:#9ca3af;font-size:10px;margin:0 0 2px 12px;">• ' + str(proto) + "</p>"
-                out += "</div>"
+            # Protocol recommendations (pre-computed, passed in); a bullet unchanged since the previous brief folds (#6163)
+            out += brief_editorial.protocols_html(protocol_recs, data)
 
             out += "<!-- /S:character_sheet --></div>"
 
@@ -959,7 +943,7 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
             if fiber:
                 out += '<p style="color:#475569;font-size:10px;margin:0;">Fiber: ' + str(round(fiber)) + "g</p>"
         else:
-            out += '<p style="color:#64748b;font-size:12px;margin:0;">No nutrition data logged yesterday.</p>'
+            out += brief_editorial.nutrition_absent_html(data)  # #6163: 'not logged' only once an export has arrived
 
         nutrition_text = (training_nutrition or {}).get("nutrition", "")
         if nutrition_text:
@@ -1899,6 +1883,7 @@ def build_html(
     steps_line=None,
     rhythm_lines=None,
     folded_sections=None,
+    editorial=None,
 ):
     """Build the full daily brief HTML email.
 
@@ -1915,8 +1900,10 @@ def build_html(
     # #4182: the H1 names the morning the brief is read (data day + 1); the freshness line names the data day.
     day_label = day_in_words(shift_day_key(date_str, 1))
 
-    # Defaults
+    # Defaults; #6163: the editorial inputs ride a render-local copy of `data`, never the caller's dict
     triggered_rewards, protocol_recs = triggered_rewards or [], protocol_recs or []
+    data = {**data, "brief_editorial": editorial or {}}
+    tldr_guidance = brief_editorial.collapse_guidance(tldr_guidance, data)  # #6163: unchanged items fold into one line
 
     # Adaptive mode banner colour
     banner_color = "#1a1a2e"
@@ -1928,7 +1915,7 @@ def build_html(
     html = _brief_header(
         brief_mode, data, day_grade_score, grade, tldr_guidance, vacation_fund, banner_color, day_label, data_through=day_in_words(date_str)
     )
-    html += _brief_character(character_sheet, protocol_recs, triggered_rewards)
+    html += _brief_character(character_sheet, protocol_recs, triggered_rewards, data)
     html += _brief_scorecards(component_details, component_scores, data, mvp_streak, profile, readiness_colour, vice_streaks)
     html += _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrition)
     html += _brief_lifestyle(data, profile, tldr_guidance)

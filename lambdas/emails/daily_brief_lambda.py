@@ -192,7 +192,7 @@ from training import (
     training_load,  # shared TSS-like load model + Banister core (layer module, #490)
 )
 
-from emails import brief_lines  # #5056: fail-soft one-line readouts, extracted for the module-size ratchet
+from emails import brief_editorial_inputs, brief_lines  # #5056: fail-soft one-line readouts; #6163 editorial inputs (read-only)
 from emails.brief_data_status import (  # #2326 quiet notice / #3049 partial-input notice
     build_data_status_banner_html,
     qualified_compute_outputs,
@@ -2164,6 +2164,7 @@ def lambda_handler(event, context):
             rhythm_lines=_rhythm_lines,
             folded_sections=_folded,
             journal_coach_absent=_journal_coach_absent,  # #2944: explicit declared-absent label
+            editorial=brief_editorial_inputs.gather(table, fetch_date, USER_PREFIX, yesterday, logger),  # #6163: read-only, fail-soft
         )
     except Exception as e:
         logger.error("build_html crashed, sending minimal brief: " + str(e))

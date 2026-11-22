@@ -1396,9 +1396,45 @@ def test_a_desk_failure_never_sends_the_legacy_draft_as_an_ordinary_preview(env,
     assert "The Story Desk failed this week" in _preview_email(env)
 
 
-def test_a_desk_week_or_an_ordinary_run_keeps_the_plain_preview_subject(env):
+def _clean_desk_week(*a, **k):
+    """A desk-written week 5 with nothing left to hold — the same text the fake model writes on the legacy path."""
+    return {
+        "week": 5,
+        "title": TITLE,
+        "raw_installment": RAW_INSTALLMENT,
+        "findings": {"post": [], "episode": []},
+        "craft_findings": [],
+        "budget": {},
+        "episode": {},
+        "ledger": {},
+    }
+
+
+def test_a_clean_desk_week_keeps_the_plain_preview_subject(env, monkeypatch):
+    from content import story_pipeline
+
+    monkeypatch.setattr(story_pipeline, "live_week", _clean_desk_week)
+    monkeypatch.setattr(m, "_attach_desk_artifacts", lambda *a, **k: None)
     m.lambda_handler({}, None)
     assert _subject(env).startswith("[PREVIEW] ") and "LEGACY" not in _subject(env)
+
+
+def test_6155_an_ordinary_legacy_run_is_previewed_as_a_named_legacy_hold(env):
+    """#6155: the legacy writer drafted the week (the desk declined: not a season week end), so the desk's quote and
+    ledger checks ran on it and the week is held for the owner with the reasons named in the preview."""
+    m.lambda_handler({}, None)
+    assert _subject(env).startswith("[PREVIEW · LEGACY HOLD]")
+    html = _preview_email(env)
+    assert "LEGACY HOLD (#6155)" in html and "the Story Desk did not write this draft" in html
+    assert "not a season week end" in html
+
+
+def test_6155_a_legacy_draft_is_never_published_immediately(env):
+    """Mutation control: skip the legacy audit in chronicle_store.publish_holds (``craft`` stays []) and this reds."""
+    env["monkeypatch"].setattr(m, "PREVIEW_MODE", False)
+    m.lambda_handler({}, None)
+    assert _stored_installment(env)["status"] == "draft"
+    assert env["lambda_client"].invocations == []  # a draft is not a publication
 
 
 def test_the_preview_email_goes_only_to_the_configured_recipient(env):
@@ -1420,7 +1456,16 @@ def test_the_preview_run_does_not_advance_elenas_persistent_memory(env):
 
 @pytest.fixture
 def publish_env(env):
+    """Immediate publish is reachable only by a desk week with nothing left to hold (#6155: a legacy draft is always
+    held for the owner — test_6155_a_legacy_draft_is_never_published_immediately)."""
+    from content import story_pipeline
+
+    def _desk_writes(*a, **k):
+        env["calls"]["ai"].append({"desk": True})  # one generation, the desk's writer, from the fake model's text
+        return dict(_clean_desk_week(), raw_installment=env["state"]["ai"])
+
     env["monkeypatch"].setattr(m, "PREVIEW_MODE", False)
+    env["monkeypatch"].setattr(story_pipeline, "live_week", _desk_writes)
     return env
 
 
@@ -1938,11 +1983,9 @@ def _format_block(src: str) -> str:
 
 
 def _both_prompt_sources():
-    """The two copies of Elena's prompt: the config-driven module's literal and the
-    Lambda's in-code fallback template (the same words must reach the model either way)."""
-    import inspect
-
-    return (inspect.getsource(m._prompt._build_elena_prompt_from_config), m._FALLBACK_ELENA_PROMPT_TEMPLATE)
+    """The two ways Elena's legacy prompt reaches the model: the primary builder and the facade's fallback. Since #6155
+    both render ONE template (chronicle_prompt.LEGACY_PROMPT_TEMPLATE) around content.elena_canon."""
+    return (m._prompt.LEGACY_PROMPT_TEMPLATE, m._FALLBACK_ELENA_PROMPT_TEMPLATE)
 
 
 def test_4191_the_format_block_names_the_third_line_as_a_parsed_header_not_prose():

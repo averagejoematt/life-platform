@@ -5,6 +5,7 @@ wednesday_chronicle_lambda.py (#1654). Facade state via the `_g` hand-off."""
 from datetime import datetime, timezone
 
 from common.constants import EXPERIMENT_START_DATE
+from content import elena_canon
 
 # ══════════════════════════════════════════════════════════════════════════════
 # "PREVIOUSLY ON" RECAP (backend serial phase 3) — Elena's cold-open catch-up
@@ -16,7 +17,7 @@ from common.constants import EXPERIMENT_START_DATE
 # published — so it can never run ahead of the history it summarizes. Low-fabrication
 # by construction; the deterministic date cross-check below is the strongest guard.
 
-_RECAP_SYSTEM_PROMPT = """You are Elena Voss, the embedded journalist narrating "The Measured Life." \
+_RECAP_SYSTEM_PROMPT = elena_canon.identity_line() + """ \
 Write a short "previously on" recap — a serial cold-open that catches a reader up on the story so far.
 
 GROUND TRUTH — you may ONLY reference what appears in the PUBLISHED INSTALLMENTS and NARRATIVE ARC provided below:
@@ -36,7 +37,7 @@ Return ONLY valid JSON, no markdown, no preamble:
   ],
   "where_we_are_now": "1-2 sentences on the present state of the experiment",
   "threads_to_watch": ["an unresolved tension going forward", "another"]
-}"""
+}"""  # #6155: who is speaking comes from the one canon
 
 # The raw-vital detector. A recap is narrative: the prompt allows a number ONLY when it
 # appears verbatim in a provided installment, and this is the code that holds it to that.

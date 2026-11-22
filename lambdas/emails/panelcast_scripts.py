@@ -32,7 +32,10 @@ except ImportError:
 
 from ai import prompt_cache  # #2888: the per-model minimum-cacheable-prefix registry + breakpoint helper
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
-from content import body_numbers  # #5949: the ONE spoken-weight rule
+from content import (
+    body_numbers,  # #5949: the ONE spoken-weight rule
+    elena_canon,  # #6155: the one Elena
+)
 
 from emails.chronicle_prompt import _vice_terms_clause  # #2370: channel-derived never-name enumeration
 
@@ -50,6 +53,12 @@ CONVO_DIRECTIVE = (
     "Never stack more than about three heavy exchanges in a row without a lighter one to let the listener breathe — that swing "
     "between light and heavy IS the show."
 )
+
+
+def _elena_host_summary() -> str:
+    """Elena as Episode 0 introduces her — from the one canon (#6155), not the series bible's ``characters.elena``,
+    which gave her an invented past the canon forbids."""
+    return elena_canon.host_summary()
 
 
 def build_intro_script(bible: dict, zeitgeist: list | None, deps: dict) -> list:
@@ -136,7 +145,7 @@ def build_intro_script(bible: dict, zeitgeist: list | None, deps: dict) -> list:
     )
     zg = deps["zeitgeist"].zeitgeist_prompt_block(zeitgeist or [])
     user = (
-        f"ELENA (host): {ch.get('elena', '')}\n\n"
+        f"ELENA (host): {_elena_host_summary()}\n\n"  # #6155: the one canon, not the bible's characters.elena
         f"MATTHEW (the subject — NEVER a weight or body number): {ch.get('matthew', '')}\n\n"
         f"ELI (guest): {ch.get('eli', '')}\nHis philosophy: {g['philosophy']}\nHis expertise: {', '.join(g['expertise'])}\n\n"
         f"WHAT A LISTENER CAN EXPLORE (weave these in naturally, do NOT list them robotically):\n{site}\n\n"

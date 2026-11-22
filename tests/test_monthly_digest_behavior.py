@@ -404,7 +404,7 @@ def test_an_experiment_scoped_source_defaults_to_the_current_cycle_only(monkeypa
 
     table = _table_with([])
     monkeypatch.setattr(m, "table", table)
-    for source in ("chronicling", "whoop", "macrofactor", "strava"):
+    for source in ("whoop", "macrofactor", "strava"):
         table.query_calls.clear()
         m.fetch_range(source, MON_CUR_START, MON_CUR_END)
         expected = with_phase_filter(
@@ -775,61 +775,6 @@ def test_the_character_extractor_does_not_reorder_its_callers_list():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# ex_chronicling
-# ══════════════════════════════════════════════════════════════════════════════
-
-
-def test_no_habit_records_reports_absence():
-    assert m.ex_chronicling([]) is None
-
-
-def test_the_habit_average_is_the_mean_of_the_days_that_scored():
-    recs = [{"total_score": 60}, {"total_score": 80}, {"total_score": 70}]
-    assert m.ex_chronicling(recs)["score_avg"] == 70.0  # (60 + 80 + 70) / 3
-
-
-def test_group_averages_are_computed_per_group_across_the_month():
-    recs = [
-        {"total_score": 70, "group_scores": {"sleep": 80, "food": 40}},
-        {"total_score": 70, "group_scores": {"sleep": 60, "food": 60}},
-    ]
-    g = m.ex_chronicling(recs)["group_avgs"]
-    assert g["sleep"] == 70.0  # (80 + 60) / 2
-    assert g["food"] == 50.0  # (40 + 60) / 2
-
-
-def test_the_best_and_weakest_groups_are_the_highest_and_lowest_averages():
-    recs = [{"group_scores": {"sleep": 90, "food": 40, "mind": 65}}]
-    s = m.ex_chronicling(recs)
-    assert s["best_group"] == "sleep"
-    assert s["worst_group"] == "food"
-
-
-def test_a_month_with_scores_but_no_groups_names_no_best_or_worst():
-    s = m.ex_chronicling([{"total_score": 70}])
-    assert s["best_group"] is None and s["worst_group"] is None
-
-
-# FIXED #1658 (found as a tranche-3 xfail, P2 / ADR-105): monthly_digest_lambda.ex_chronicling (lines 292-298) publishes
-# `score_avg` (mean of the records that carry total_score) next to `days` = len(recs) — every record in the window, scored or
-# not. build_html shows the average as the month's headline P40 figure; the n it is presented with is not the n it was computed
-# over. Every statistical claim must carry ITS OWN n.
-def test_the_habit_average_is_reported_with_the_number_of_days_it_averaged():
-    recs = [{"total_score": 60}, {"total_score": 80}, {"note": "no score today"}]
-    s = m.ex_chronicling(recs)
-    assert s["score_avg"] == 70.0  # (60 + 80) / 2
-    assert s["days"] == 2  # not 3
-
-
-# FIXED #1658 (found as a tranche-3 xfail, P2 / ADR-104): ex_chronicling line 291 sorts groups by `x[1] or 0`, so a group whose
-# average is None (present in the schema, never scored this month) sorts as ZERO and is named the month's '⚠️ Weakest Group' in
-# the email. An unmeasured group is being reported to the reader as the worst-performing one.
-def test_a_group_that_was_never_scored_is_not_named_the_weakest():
-    recs = [{"group_scores": {"sleep": 80, "food": 55}}, {"group_scores": {"mind": None}}]
-    assert m.ex_chronicling(recs)["worst_group"] == "food"
-
-
-# ══════════════════════════════════════════════════════════════════════════════
 # compute_annual_goals
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -872,11 +817,6 @@ def test_training_consistency_carries_the_activity_and_zone_two_counts(frozen_mo
     goals = m.compute_annual_goals(cur, WINDOWS, PROFILE)
     assert goals["training_activities_30d"] == 18
     assert goals["zone2_minutes_30d"] == 540
-
-
-def test_habit_adherence_is_carried_from_the_chronicling_average(frozen_monday):
-    goals = m.compute_annual_goals({"chronicling": {"score_avg": 71.5}}, WINDOWS, PROFILE)
-    assert goals["habit_score_avg"] == 71.5
 
 
 def test_a_month_with_no_training_publishes_no_training_goal_numbers(frozen_monday):
@@ -1206,7 +1146,6 @@ def _seeded_table():
         _row_for("whoop", MON_CUR_END, hrv=54, recovery_score=70, resting_heart_rate=56),
         _row_for("withings", MON_CUR_END, weight_lbs=Decimal("305.0"), body_fat_pct=Decimal("36.0")),
         _row_for("macrofactor", "2026-07-10", total_calories_kcal=1700, total_protein_g=200),
-        _row_for("chronicling", "2026-07-10", total_score=72, group_scores={"sleep": 80, "food": 60}),
         _row_for("todoist", "2026-07-10", completed_count=6),
         _row_for("todoist", MON_CUR_END, completed_count=4),
         _hevy_workout("2026-07-10", "w1", 12000),
@@ -1397,13 +1336,6 @@ def _data(**over):
                 "protein_hit_rate": 71,
                 "calorie_hit_rate": 64,
             },
-            "chronicling": {
-                "score_avg": 71.0,
-                "group_avgs": {"sleep": 80.0, "food": 55.0},
-                "days": 30,
-                "best_group": "sleep",
-                "worst_group": "food",
-            },
             "hevy": {"workout_count": 12},
             "character_sheet": {
                 "character_level": 14.0,
@@ -1421,7 +1353,6 @@ def _data(**over):
             "strava": {"total_miles": 50.0, "total_minutes": 800, "activity_count": 14, "total_elevation_feet": 2900},
             "withings": {"weight_latest": 312.0, "weight_avg": 313.5, "body_fat_avg": 37.0},
             "macrofactor": {"calories_avg": 1900.0, "protein_avg_g": 175.0},
-            "chronicling": {"score_avg": 66.0, "group_avgs": {"sleep": 75.0, "food": 50.0}},
             "hevy": {"workout_count": 9},
             "character_sheet": {"character_level": 13.0, "pillars": {"sleep": {"level": 11.0}}},
         },
@@ -1538,13 +1469,6 @@ def test_the_nutrition_section_reports_the_days_logged_behind_the_averages():
     assert _row(html, "Days Logged")[1] == "28"
 
 
-def test_the_habits_section_lists_every_group_it_scored():
-    html = _html()
-    labels = [r[0] for r in _rows(html) if r]
-    assert "↳ sleep" in labels and "↳ food" in labels
-    assert _row(html, "🏆 Best Group")[1] == "sleep"
-
-
 def test_the_character_section_reports_the_level_and_the_months_xp():
     html = _html()
     assert "Level 14" in _row(html, "Character Level")[1]
@@ -1567,11 +1491,14 @@ def test_a_month_with_no_nutrition_data_says_so_instead_of_showing_zeroes():
     assert _row(html, "Avg Calories") is None
 
 
-def test_a_month_with_no_habit_data_says_so_instead_of_showing_zeroes():
+def test_the_letter_carries_no_habits_section_fed_by_the_frozen_archive():
+    """#6152: the section read `chronicling` (a frozen, writer-less archive), so a live
+    month always rendered the empty-state line. Removed with its heading and its pill."""
     d = _data()
-    d["cur"]["chronicling"] = None
     html = m.build_html(d, GOALS, COMMENTARY, d["windows"])
-    assert "Chronicling data not available" in _text(html)
+    text = _text(html)
+    assert "Habits & P40" not in text and "Chronicling" not in text
+    assert "chronicling" not in m.SOURCES
 
 
 def test_a_month_with_no_recovery_data_omits_the_recovery_section_entirely():
@@ -1672,9 +1599,10 @@ def test_a_month_with_no_training_does_not_publish_a_fitness_verdict():
 # guard should test for None, not falsiness.
 def test_an_improvement_from_zero_still_shows_its_arrow():
     d = _data()
-    d["prior"]["chronicling"]["group_avgs"]["food"] = 0
+    d["prior"]["character_sheet"]["pillars"]["sleep"]["level"] = 0
     html = m.build_html(d, GOALS, COMMENTARY, d["windows"])
-    assert "↑55" in _row(html, "↳ food")[1]  # 55.0 - 0
+    row = next(r for r in _rows(html) if r and r[0].endswith("Sleep") and "Level" in r[1])
+    assert "↑12" in row[2] if len(row) > 2 else "↑12" in row[1]  # 12.0 - 0
 
 
 # ══════════════════════════════════════════════════════════════════════════════

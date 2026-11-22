@@ -56,7 +56,7 @@ _WORDED_TEXT_KEYS = frozenset(
         "aggregate_impact",
         "absent_text",
         "excerpt",
-        "absent_text",
+        "used_by",  # #6161: a method's "Used by" text, now printed as served (it was split into characters before)
         "label",
         "name",
         "outcome_notes",

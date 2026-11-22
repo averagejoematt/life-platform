@@ -251,7 +251,7 @@ def held_week(week_num, reason, display, body, status_code=500, dry_run=False, *
     return {"statusCode": status_code, "body": body}
 
 
-def publish_holds(week_num, title, stats_line, raw_installment, desk, dry_run, preview_mode, *, _g):
+def publish_holds(week_num, title, stats_line, raw_installment, desk, dry_run, preview_mode, *, _g, date_str=None):
     """The publish-path holds at the one point every writer passes: ``(held, preview, craft)``.
 
     Story door (#4538, fail-closed): the ONE shared reader-surface check -- no cycle/reset/attempt count in the title,
@@ -261,12 +261,20 @@ def publish_holds(week_num, title, stats_line, raw_installment, desk, dry_run, p
     story_craft finding after its corrective rewrites is never auto-published and never writes a reader-facing marker.
     ``preview`` is forced true, so the week is stored as a draft and the preview email lists ``craft``; the draft row
     carries ``publish_hold = craft_hold`` (approval metadata), which the 48 h sweep refuses, so only the owner's approve
-    click publishes it. A week with no residual craft finding returns ``(None, preview_mode, [])`` -- as on main."""
+    click publishes it. A week with no residual craft finding returns ``(None, preview_mode, [])`` -- as on main.
+    Legacy door (#6155): a draft the desk did not write (``desk`` is None and ``date_str`` names its week) runs the desk's
+    quote and ledger checks (``story_pipeline.legacy_audit``); ``craft`` is then that never-empty hold list, ``preview``
+    is forced true, and the handler stores the list on the row as the blocking audit the approve path reads."""
     from content import story_checks
 
     logger = _g["logger"]
     door = story_checks.reader_surface(f"{title}\n{stats_line}\n{raw_installment}")
     craft = list((desk or {}).get("craft_findings") or [])
+    if desk is None and date_str and not door:
+        from content import story_pipeline
+
+        craft = story_pipeline.legacy_audit(_g["table"], date_str, f'"{title}"\n\n{raw_installment}')
+        logger.warning(f"[legacy-door] week {week_num} held for the owner (#6155) — {craft}")
     if door:
         logger.error(f"[story-door] BLOCKED chronicle week {week_num} — {door}")
         display = (
@@ -279,6 +287,39 @@ def publish_holds(week_num, title, stats_line, raw_installment, desk, dry_run, p
     if craft:
         logger.warning(f"[craft] week {week_num} routed to the preview (owner approval; never auto-published) — {craft}")
     return None, bool(preview_mode or craft), craft
+
+
+def _is_legacy_hold(craft) -> bool:
+    """True when ``craft`` is the legacy door's hold list (#6155), whose first item is story_pipeline.LEGACY_NOTE."""
+    from content import story_pipeline
+
+    items = list(craft or [])
+    return bool(items) and items[0] == story_pipeline.LEGACY_NOTE
+
+
+def attach_legacy_audit(date_str, findings, *, _g):
+    """#6155: the legacy door's findings ride on the draft row as the audit the approve path reads
+    (``desk_findings_json`` post half; every item is blocking — none is a ``craft:``/``repeat:`` note), with
+    ``publish_hold = legacy_hold``. No desk budget, episode or ledger is written: the desk did not write the week."""
+    from content import story_pipeline
+
+    findings = list(findings or [])
+    if story_pipeline.LEGACY_NOTE not in findings:  # the hold is never an empty (passing) record
+        findings.insert(0, story_pipeline.LEGACY_NOTE)
+    try:
+        _g["table"].update_item(
+            Key={"pk": f"USER#{_g['USER_ID']}#SOURCE#chronicle", "sk": f"DATE#{date_str}"},
+            UpdateExpression="SET desk_findings_json = :f, desk_craft_json = :c, publish_hold = :h, #p = if_not_exists(#p, :ph)",
+            ExpressionAttributeNames={"#p": "phase"},
+            ExpressionAttributeValues={
+                ":f": json.dumps({"post": list(findings), "episode": []}, default=str),
+                ":c": "[]",
+                ":h": story_pipeline.LEGACY_HOLD,
+                ":ph": "experiment",
+            },
+        )
+    except Exception as e:  # noqa: BLE001 — the row without a record is still blocked ("no audit on record")
+        _g["logger"].error(f"[#6155] could not attach the legacy audit to {date_str}: {e}")
 
 
 def dry_run_response(week_num, date_str, title, stats_line, raw_markdown, conf_level, has_board, share_kit, recap, preview_mode, *, _g):
@@ -364,9 +405,15 @@ def _send_preview_email(
         import html as _html
 
         items = "".join(f"<li>{_html.escape(str(f)[:300])}</li>" for f in list(craft)[:20])
+        lead = (
+            "LEGACY HOLD (#6155): the legacy writer drafted this week; the desk's quote and ledger checks ran on it and the "
+            "audit holds it. The approve link will refuse it until the items below are resolved."
+            if _is_legacy_hold(craft)
+            else "CRAFT HOLD (#4545): the craft gate still found these after the rewrites, so this week will NOT publish "
+            "itself after 48 h. Approve to publish it as is."
+        )
         craft_html = (
-            '<p style="margin:0 0 6px;font-size:13px;color:#fcd34d;">CRAFT HOLD (#4545): the craft gate still found these after '
-            "the rewrites, so this week will NOT publish itself after 48 h. Approve to publish it as is.</p>"
+            f'<p style="margin:0 0 6px;font-size:13px;color:#fcd34d;">{lead}</p>'
             f'<ul style="margin:0 0 16px;font-size:13px;color:#fcd34d;">{items}</ul>'
         )
     preview_banner = f"""
@@ -396,7 +443,11 @@ def _send_preview_email(
         else:
             preview_email = preview_email + kit_block
 
-    tag = "[PREVIEW · LEGACY WRITER — desk failed]" if desk_fallback else ("[PREVIEW · CRAFT HOLD]" if craft else "[PREVIEW]")
+    tag = (
+        "[PREVIEW · LEGACY WRITER — desk failed]"
+        if desk_fallback
+        else ("[PREVIEW · LEGACY HOLD]" if _is_legacy_hold(craft) else ("[PREVIEW · CRAFT HOLD]" if craft else "[PREVIEW]"))
+    )
     subject = f'{tag} The Measured Life — Week {week_num}: "{title}"'
     try:
         ses.send_email(

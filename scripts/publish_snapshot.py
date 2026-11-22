@@ -329,7 +329,7 @@ def _chapter_body(ctx: LiveContext, url: str | None) -> str | None:
 
 
 def _live_week_states(ctx: LiveContext) -> None:
-    """Program weeks with no published chapter: `held` (a draft awaiting approval), `skipped`
+    """Program weeks with no published chapter: `held` (drafted, not approved: the API does not say waiting vs sent back, #6161), `skipped`
     (a later week published, this one never was) or `pending` (the current or most recent week,
     not yet written). From `/api/chapters` when it is served; otherwise derived from the
     published weeks and the edition's day count — never a title or a body for any of them."""
@@ -362,7 +362,7 @@ def _live_week_states(ctx: LiveContext) -> None:
     for n, st in sorted(states.items()):
         status = st["status"]
         text = {
-            "held": "Drafted and waiting for approval.",
+            "held": "Drafted, not approved. No chapter for this week yet.",
             "skipped": "No chapter was published for this week.",
             "pending": "No chapter yet for this week.",
         }[status]
@@ -893,7 +893,7 @@ def _live_methods(ctx: LiveContext) -> None:
                 window=m.get("window"),
                 limitations=m.get("limitations"),
                 min_n=int(m["min_n"]) if isinstance(m.get("min_n"), int) else None,
-                used_by=[str(x) for x in (m.get("used_by") or [])],
+                used_by=[str(x) for x in ([m["used_by"]] if isinstance(m.get("used_by"), str) else m.get("used_by") or []) if x],
             )
         )
 

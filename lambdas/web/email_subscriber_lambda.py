@@ -104,6 +104,7 @@ from common.client_ip import extract_client_ip, salted_ip_hash  # #1221 / #3620 
 from common.constants import EXPERIMENT_START_DATE  # #5939 — the welcome email's day counter
 from common.email_identity import TRANSACTIONAL_SENDER  # #3568 — ONE sending vocabulary, gated against the SES-verified set
 from common.pacific_time import PACIFIC, pacific_day_n, pacific_today  # #2414 Pacific day boundary; #5939 the one day-index formula
+from common.reader_email import FOOTER_TEXT, head_meta, preheader_html, simple_content  # #6151 — the ONE reader envelope
 from common.send_guard import guarded_send_email, is_dry_run  # #2291 — explicit dry_run honored
 from common.subscriber_cadence import (  # #3564/#3565 — copy RENDERED from the senders' crons + the source registry, never re-typed
     confirmation_cadence_phrase,
@@ -453,8 +454,12 @@ def handle_subscribe(
     if is_canary:
         logger.info("subscribe: canary synthetic — skipping confirmation email for %s", email_hash[:8])
     else:
-        _send_confirmation_email(email, confirm_url, dry_run=dry_run)
-        logger.info("subscribe: pending confirmation sent to %s", email_hash[:8])
+        if _send_confirmation_email(email, confirm_url, dry_run=dry_run):
+            logger.info("subscribe: pending confirmation sent to %s", email_hash[:8])
+        elif dry_run:
+            logger.info("subscribe: DRY-RUN pending confirmation not sent to %s", email_hash[:8])
+        else:
+            logger.error("subscribe: pending confirmation NOT sent to %s (send failed)", email_hash[:8])
     body = {"status": "pending_confirmation", "message": "Check your inbox."}
     if dry_run:
         body["dry_run"] = True
@@ -472,8 +477,9 @@ def _confirmation_email_content(confirm_url: str) -> tuple[str, str]:
     subject = f"One click to confirm — then the actual numbers {confirmation_cadence_phrase()}"
     html = f"""<!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"></head>
+<head>{head_meta()}</head>
 <body style="margin:0;padding:0;background:#0D1117;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+{preheader_html("One click confirms your subscription. The link expires in 48 hours.")}
 <div style="max-width:520px;margin:40px auto;padding:40px 32px;background:#161b22;border-radius:8px;border:1px solid rgba(230,237,243,0.08);">
 
   <p style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#F0B429;margin:0 0 24px;">The Weekly Signal</p>
@@ -498,7 +504,7 @@ def _confirmation_email_content(confirm_url: str) -> tuple[str, str]:
     Confirm my subscription &rarr;
   </a>
 
-  <p style="font-size:12px;color:#484f58;margin:28px 0 0;line-height:1.6;">
+  <p style="font-size:12px;color:{FOOTER_TEXT};margin:28px 0 0;line-height:1.6;">
     This link expires in 48 hours. If you didn't request this, you can safely ignore it.
   </p>
 
@@ -508,7 +514,8 @@ def _confirmation_email_content(confirm_url: str) -> tuple[str, str]:
     return subject, html
 
 
-def _send_confirmation_email(email: str, confirm_url: str, dry_run: bool = False) -> None:
+def _send_confirmation_email(email: str, confirm_url: str, dry_run: bool = False) -> bool:
+    """True only when the send call returned; a failure (or a dry run) is False (#6152)."""
     subject, html = _confirmation_email_content(confirm_url)
     try:
         guarded_send_email(
@@ -516,16 +523,16 @@ def _send_confirmation_email(email: str, confirm_url: str, dry_run: bool = False
             dry_run,
             FromEmailAddress=SENDER,
             Destination={"ToAddresses": [email]},
-            Content={
-                "Simple": {
-                    "Subject": {"Data": subject, "Charset": "UTF-8"},
-                    "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
-                }
-            },
+            # #6151: a text part derived from the HTML. Deliberately NO List-Unsubscribe: the requester is not on a
+            # list yet, and an unsubscribe of a PENDING row leaves its confirm_token live — a later confirm click would
+            # then confirm a row whose address was already redacted. Ignoring the mail is the documented opt-out.
+            Content=simple_content(subject, html=html),
         )
-        logger.info("confirmation email sent")
+        logger.info("DRY-RUN confirmation email not sent" if dry_run else "confirmation email sent")
+        return not dry_run
     except Exception as exc:
         logger.error("_send_confirmation_email failed: %s", exc)
+        return False
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -663,6 +670,7 @@ def _send_welcome_email(email: str, dry_run: bool = False) -> None:
     """Welcome email — direct dispatch from Matthew. Sets honest expectations
     and gives the subscriber one concrete thing to do right now."""
     subject, body_text = _welcome_email_content(email)
+    unsub_url = unsub_url_or_fallback(email, SITE_URL)  # #6151: the List-Unsubscribe header (the body carries its own)
 
     try:
         guarded_send_email(
@@ -670,14 +678,10 @@ def _send_welcome_email(email: str, dry_run: bool = False) -> None:
             dry_run,
             FromEmailAddress=SENDER,
             Destination={"ToAddresses": [email]},
-            Content={
-                "Simple": {
-                    "Subject": {"Data": subject, "Charset": "UTF-8"},
-                    "Body": {"Text": {"Data": body_text, "Charset": "UTF-8"}},
-                }
-            },
+            # #6151: still text-only (its first line is its preview); gains List-Unsubscribe
+            Content=simple_content(subject, text=body_text, unsub_url=unsub_url),
         )
-        logger.info("welcome email sent")
+        logger.info("DRY-RUN welcome email not sent" if dry_run else "welcome email sent")
     except Exception as exc:
         logger.error("_send_welcome_email failed: %s", exc)
 

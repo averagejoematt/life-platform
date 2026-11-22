@@ -531,7 +531,7 @@ _CURATED = [
     },
     {
         "path": "/story/attempts/",
-        "name": "Story · the attempts (#1375)",
+        "name": "Story · the attempts",
         "tier": 2,
         "content_class": "live-data",
         "api_deps": ["/api/cycle_compare"],
@@ -589,7 +589,7 @@ _CURATED = [
         # remediation-log audit trail via remediation/track_record.py) into the HTML,
         # so there is NO /api dep and no autodeploy race. Re-run the builder to refresh.
         "path": "/story/build/agent-review/",
-        "name": "Story · agent performance review (#1399)",
+        "name": "Story · agent performance review",
         "tier": 3,
         "content_class": "static",
         "api_deps": [],
@@ -666,7 +666,7 @@ _CURATED = [
         # "nothing published yet" line, or the fetch-failed line — so the visual
         # check is not_empty regardless of how much (if anything) is consented.
         "path": "/story/diary/",
-        "name": "Story · the diary shelf (#1846)",
+        "name": "Story · the diary shelf",
         "tier": 3,
         "content_class": "live-data",
         "api_deps": ["/api/diary_shelf"],
@@ -734,7 +734,7 @@ _CURATED = [
     },
     {
         "path": "/method/game/",
-        "name": "Method · the game, explained (GENERATED — v4_build_game_explained.py)",
+        "name": "Method · the game, explained",
         "tier": 3,
         "content_class": "generated",
         "api_deps": [],
@@ -995,7 +995,7 @@ _CURATED = [
     # ── Mind (redirect shell → /data/reading/) ───────────────────────────────
     {
         "path": "/mind/",
-        "name": "Mind → /data/reading (redirect + readout)",
+        "name": "Mind (now part of Reading)",
         "tier": 4,
         "content_class": "utility",
         "api_deps": [],
@@ -1096,7 +1096,7 @@ _CURATED = [
     },
     {
         "path": "/subscribe.html",
-        "name": "Legacy /subscribe.html (meta-refresh stub → /subscribe/)",
+        "name": "Subscribe (old address)",
         "tier": 4,
         "content_class": "utility",
         "api_deps": [],

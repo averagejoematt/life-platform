@@ -1,6 +1,6 @@
 """
 Partner Weekly Email — v2.0.0
-Fires Sunday 9:30 AM PT (17:30 UTC) via EventBridge.
+Fires Sunday 10:30 AM PT via EventBridge (config/schedules.json).
 
 Design philosophy: narrative-first, not a data dashboard.
 The recipient is Matthew's partner, not his doctor. She doesn't need Whoop
@@ -305,8 +305,7 @@ He tracks everything obsessively. This email is for Partner so she understands h
 and how to be a great partner to him this week.
 
 IMPORTANT CONTEXT ABOUT MATTHEW:
-- 36 years old, Senior Director at a SaaS company in Seattle
-- He is in week {journey_week} of his transformation. He has lost {lbs_lost} lbs and has {lbs_to_go} lbs to go. His target is roughly 10 months away from when he started (February 2026). When referencing where he is in his journey, be accurate: he is early — a few weeks in — not in the middle. Do NOT say "10% of the way there" or imply he’s halfway. If you can’t reference his timeline accurately, don’t mention it at all.
+- He is in week {journey_week} of his transformation. He has lost {lbs_lost} lbs and has {lbs_to_go} lbs to go. His target is roughly 10 months away from when he started ({start_month}). When referencing where he is in his journey, be accurate: he is early — a few weeks in — not in the middle. Do NOT say "10% of the way there" or imply he’s halfway. If you can’t reference his timeline accurately, don’t mention it at all.
 - He tends to intellectualise his feelings and rarely asks for help directly
 - High-achiever who can be hard on himself when he falls short
 - Tracking obsessively is part coping mechanism, part genuine commitment to change
@@ -388,6 +387,7 @@ def build_commentary(data):
         lbs_lost=fmt(w.get("lbs_lost")),
         lbs_to_go=fmt(w.get("lbs_to_go")),
         journey_week=data.get("journey_week", 1),
+        start_month=datetime.strptime(EXPERIMENT_START_DATE, "%Y-%m-%d").strftime("%B %Y"),
     )
 
     # #2423: ONE model call, then the grounding chokepoint, regenerate-once-then-HOLD.

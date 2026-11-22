@@ -1431,12 +1431,14 @@ def _build_journal_mood_prompt_block(journal_mood, voice_spec):
     return block
 
 
-def _coach_corrections_block(coach_id, *, surface="coach_brief", table=None):
+def _coach_corrections_block(coach_id, *, surface=None, table=None):
     """S5 (#1697, epic #1687): the per-coach prompt-memory block — THIS coach's OWN
     open corrections, bounded + newest-first, rendered for injection into the
     DYNAMIC user portion of its generation prompt (never the cached system prefix —
     COST-OPT-2). Scoped by (surface, coach) so each coach sees only its own
-    corrections, never the global list.
+    corrections, never the global list. `surface=None` (#6149) reads every
+    OWNER-FACING surface (`coach_corrections.OWNER_FACING_SURFACES`), so a correction
+    given in conversation reaches the brief; a named surface still scopes to that one.
 
     Rolling bounded window, not auto-transition: corrections stay `status="open"`
     and keep suppressing their error-class every cycle until genuinely resolved
@@ -1450,7 +1452,8 @@ def _coach_corrections_block(coach_id, *, surface="coach_brief", table=None):
 
         if table is None:
             table = boto3.resource("dynamodb", region_name="us-west-2").Table(os.environ.get("TABLE_NAME", "life-platform"))
-        block = _cc.corrections_prompt_block(table, surface=surface, coach=coach_id)
+        scope = {"surface": surface} if surface else {"surfaces": _cc.OWNER_FACING_SURFACES}
+        block = _cc.corrections_prompt_block(table, coach=coach_id, **scope)
         if block:
             print(f"[COACH-V2:{coach_id}] prompt-memory: injecting {block.count(chr(10))} prior-correction line(s)")
         return block
@@ -1642,7 +1645,7 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
         # pairs, #2889). The full rationale + the fail-closed rules: coach_brief_input_gate.
         output_type = f"daily_brief_{domain_label.lower().replace(' ', '_')}"
         _data_inventory = _in_gate.data_inventory(data)
-        corrections_block = _coach_corrections_block(coach_id, surface="coach_brief")
+        corrections_block = _coach_corrections_block(coach_id)  # #6149: every owner-facing surface, not coach_brief alone
         # Step 3 (voice spec) runs HERE — a deterministic S3 read, and a gate input.
         try:
             voice_spec = json.loads(s3.get_object(Bucket="matthew-life-platform", Key=f"config/coaches/{coach_id}.json")["Body"].read())

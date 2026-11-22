@@ -143,8 +143,6 @@ def build_html(data, goals, commentary, windows):
     s_p = prior.get("sleep") or {}
     st_c = cur.get("strava")
     st_p = prior.get("strava") or {}
-    ch_c = cur.get("chronicling")
-    ch_p = prior.get("chronicling") or {}
     wi_c = cur.get("withings")
     wi_p = prior.get("withings") or {}
 
@@ -156,7 +154,6 @@ def build_html(data, goals, commentary, windows):
         f'{sc_pill("Recovery", w_c["recovery_avg"] if w_c else None, w_p.get("recovery_avg"))}'
         f'{sc_pill("Sleep",    s_c["score_avg"] if s_c else None, s_p.get("score_avg"), thresholds=(65, 82))}'
         f'{sc_pill("HRV ms",   w_c["hrv_avg"] if w_c else None, w_p.get("hrv_avg"), unit="ms", thresholds=(45, 60))}'
-        f'{sc_pill("Habits",   ch_c["score_avg"] if ch_c else None, ch_p.get("score_avg"), thresholds=(55, 75))}'
         f'{sc_pill("RHR bpm",  w_c["rhr_avg"] if w_c else None, w_p.get("rhr_avg"), unit=" bpm", invert=True, thresholds=(55, 65))}'
         f"</div></div>"
     )
@@ -307,31 +304,6 @@ def build_html(data, goals, commentary, windows):
         nu_rows = '<tr><td colspan="2" style="padding:12px;color:#999;font-size:13px;font-style:italic;">MacroFactor pending — export CSV from app</td></tr>'
     nutrition_section = section("Nutrition — 30 Days", "🥗", tbl(nu_rows))
 
-    # ── Habits ──
-    hab_rows = ""
-    if ch_c:
-        scol = "#27ae60" if (ch_c.get("score_avg") or 0) >= 75 else "#e67e22" if (ch_c.get("score_avg") or 0) >= 55 else "#e74c3c"
-        hab_rows += row(
-            "Avg P40 Score",
-            f'<span style="color:{scol};font-weight:700;">{fmt(ch_c.get("score_avg"), "%")}</span>',
-            delta(ch_c.get("score_avg"), ch_p.get("score_avg"), "%"),
-            highlight=True,
-        )
-        if ch_c.get("group_avgs"):
-            for g, v in sorted(ch_c["group_avgs"].items(), key=lambda x: x[1] or 0):
-                gcol = "#27ae60" if (v or 0) >= 75 else "#e67e22" if (v or 0) >= 55 else "#e74c3c"
-                cp = ch_p.get("group_avgs", {}).get(g)
-                hab_rows += row(f"↳ {g}", f'<span style="color:{gcol};">{fmt(v, "%")}</span>', delta(v, cp, "%") if cp is not None else "")
-        if ch_c.get("best_group"):
-            hab_rows += row("🏆 Best Group", ch_c["best_group"])
-        if ch_c.get("worst_group"):
-            hab_rows += row("⚠️ Weakest Group", ch_c["worst_group"])
-    else:
-        hab_rows = (
-            '<tr><td colspan="2" style="padding:12px;color:#999;font-size:13px;font-style:italic;">Chronicling data not available</td></tr>'
-        )
-    habits_section = section("Habits & P40 — 30 Days", "🎯", tbl(hab_rows))
-
     # ── Character Sheet ──
     cs_c = cur.get("character_sheet")
     cs_p = prior.get("character_sheet") or {}
@@ -396,7 +368,6 @@ def build_html(data, goals, commentary, windows):
       {sleep_section}
       {weight_section}
       {nutrition_section}
-      {habits_section}
       {cs_html}
     </div>
 

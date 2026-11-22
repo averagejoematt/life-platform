@@ -1022,7 +1022,7 @@ def generate_hypotheses(daily_rows, existing_hypotheses, profile=None, journal_c
 {json.dumps(watch_hypotheses.generation_rows(daily_rows), indent=2)}
 
 Context:
-- 36-year-old male, {total_loss} lb weight loss transformation (started {start_w} lbs, goal {goal_w} lbs)
+- Adult male, {total_loss} lb weight loss transformation (started {start_w} lbs, goal {goal_w} lbs)
 - Calorie target: {cal_target}/day, protein target: {pro_target}g/day
 - Eating window: {eating_window.describe()} (the charter's nutrition.eating_window, #5099)
 - Primary training: walking + strength training, building Zone 2 base
