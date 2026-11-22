@@ -255,6 +255,15 @@ def _track_record_text(state: dict, coach_id: str) -> str:
     return gr["block"] if isinstance(gr, dict) and "block" in gr else _track_record_block(coach_id)
 
 
+def _track_record_heading() -> str:
+    """#6172: the heading names BOTH windows when the block leads with the cycle record (``SELF_RECORD_UNIFIED``)."""
+    from coach import coach_record as _coach_record
+
+    if _coach_record.SELF_RECORD_UNIFIED:
+        return "## Your Track Record (your record this cycle, then your resolved calls of the last 60 days)"
+    return "## Your Track Record (resolved predictions, last 60 days)"
+
+
 def _track_record_block(coach_id: str) -> str:
     """Summarize this coach's resolved verdicts for prompt injection — at their CURRENT grades (``_graded_record``).
 
@@ -981,12 +990,7 @@ def _build_user_message(state, coach_id, today):
     # Coach memory (2026-06-13): the coach's own resolved track record, so it
     # can reference past calls — and acknowledge misses — in its own voice.
     # Empty right after a reset; fills as the evaluator resolves predictions.
-    from coach import coach_record as _coach_record  # #6172
-
-    if _coach_record.SELF_RECORD_UNIFIED:
-        parts.append("## Your Track Record (your record this cycle, then your resolved calls of the last 60 days)")
-    else:
-        parts.append("## Your Track Record (resolved predictions, last 60 days)")
+    parts.append(_track_record_heading())
     parts.append(_track_record_text(state, coach_id))
     parts.append("")
 
