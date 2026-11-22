@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-Last updated: 2026-11-16 (v8.6.0 — 93 MCP tools, 97-module package, 107 Lambdas, 20 data sources)
+Last updated: 2026-11-22 (v8.6.0 — 93 MCP tools, 97-module package, 107 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
 - Lambda functions defined (CDK): 107 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
@@ -677,8 +677,10 @@ logs an error), a POST 404 "Reader calls are not available."; call pages hide th
 
 ## The public forecast stream — its two switches (#6156)
 
-The platform's forecast rule (`lambdas/coach/public_forecast.py`) files one or two number calls a week from public
-series, on `coach-history-summarizer`'s Monday `public_brief` run. It files only when BOTH the committed
+The rules-based platform forecast (`lambdas/coach/public_forecast.py`) files ONE number call a week in the pilot (weight;
+`public_forecast_policy.FORECASTS_PER_CYCLE = 1`) from public series, on `coach-history-summarizer`'s Monday
+`public_brief` run. It is graded head-to-head against a guess that nothing changes (`SCORING_RULE`
+`closer_than_nothing_changes` v1, frozen at filing; `scripts/public_forecast_backtest.py` is the evidence for it). It files only when BOTH the committed
 `lambdas/common/public_forecast_policy.py` `STREAM_LIVE` is `True` AND SSM `/life-platform/public-forecast` reads exactly
 `on` (absent, unreadable or anything else = off). While `STREAM_LIVE` is `False` every forecast row is PRIVATE
 (`prediction_publication`, reason `public_forecast_dark`). Both ship off; the parameter does not exist yet.
@@ -692,6 +694,10 @@ aws ssm put-parameter --name /life-platform/public-forecast --value on --type St
 # Stop new filings without a deploy (filed rows are kept and still graded):
 aws ssm put-parameter --name /life-platform/public-forecast --value off --type String --overwrite
 ```
+
+Readers call it through the SAME door and kill switch as a coach's call (`/api/reader_call`, `forecast:<prediction id>`;
+SSM `/life-platform/reader-call` = `off` shuts both); the forecast page is `/system/forecasts/<id>/`, built only when
+`/api/platform_forecasts` serves a forecast (it serves none while `STREAM_LIVE` is off).
 
 Dead-man: `public_forecast:cycle_liveness` in qa-smoke (quiet while `STREAM_LIVE` is off; FAIL when a live cycle has no
 `RUN#` stamp after Monday 10:00 PT; WARN when the runtime switch is off or a rule was held for thin/stale inputs).
