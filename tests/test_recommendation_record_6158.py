@@ -303,13 +303,11 @@ def test_the_tool_is_registered_as_a_write_with_replay_semantics():
 
 def test_the_source_is_owner_only_cross_phase_and_never_publishable():
     from experiment import phase_taxonomy
-    from ingestion import source_registry
     from privacy import field_tiers
 
     assert field_tiers.SOURCE_TIERS[rr.SOURCE] == field_tiers.TIER_OWNER_ONLY
     assert not field_tiers.is_publishable(field_tiers.source_tier_of(rr.SOURCE))
     assert phase_taxonomy.SOURCE_CLASS[rr.SOURCE] == phase_taxonomy.CROSS_PHASE
-    assert rr.SOURCE in source_registry.UNREGISTERED_PARTITIONS
 
 
 # ── Part A: one writer, and the publication boundary (tree sweeps) ───────────────────────────
@@ -332,7 +330,6 @@ ALLOWED_TO_NAME = frozenset(
         "mcp/registry.py",  # registers the tool
         "lambdas/privacy/field_tiers.py",  # TIER_OWNER_ONLY
         "lambdas/experiment/phase_taxonomy.py",  # CROSS_PHASE
-        "lambdas/ingestion/source_registry.py",  # UNREGISTERED_PARTITIONS
     }
 )
 

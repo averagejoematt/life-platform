@@ -29,8 +29,8 @@ Extension was tried first and is not enough, for three reasons:
   * the ask-response family has a PUBLIC projection (`coach/ask_outcomes.py`) by design.
 So the record is a new owner-only source on the charter's paved road: `privacy.field_tiers.SOURCE_TIERS`
 (TIER_OWNER_ONLY), `experiment.phase_taxonomy.SOURCE_CLASS` (CROSS_PHASE: his answers outlive any cycle,
-exactly as coach_corrections do), `ingestion.source_registry.UNREGISTERED_PARTITIONS` (an owner act, not a
-vendor feed). It REUSES rather than copies: coach ids from the persona registry, the decision outcome terms
+exactly as coach_corrections do). The live-census exemption in `ingestion.source_registry.UNREGISTERED_PARTITIONS`
+is added once the first row exists (that test refuses an exemption for a partition the census has not seen). It REUSES rather than copies: coach ids from the persona registry, the decision outcome terms
 (`outcome_notes` / `outcome_metric` / `outcome_delta` / `effectiveness` 1-5, as `update_decision_outcome`
 writes them), a pointer to a DECISION# row, and pointers to CORRECTION# rows in the corrections ledger.
 
