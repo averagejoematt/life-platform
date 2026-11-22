@@ -351,6 +351,12 @@ SOURCE_TIERS: dict[str, int] = {
     # arguments — journal-grade text, a pain-site statement, a meal — so it takes the highest tier
     # of anything it can hold. Declared before the first row exists (ADR-154's ordering). MCP-only.
     "pending_writes": TIER_OWNER_ONLY,
+    # #6158: the recommendation record — a coach's exact advice to him, the evidence it used, HIS answer in his
+    # words, the follow-up he agreed and the outcome. Private coaching, so owner-only with no public projection and
+    # no aggregate carve-out. Declared before the first row exists (ADR-154's ordering). Readers: the owner's MCP
+    # tool `manage_coach_recommendation` and the coach-context pilot (his Telegram coach thread, the coach session
+    # packet); `tests/test_recommendation_record_6158.py` holds that no public-pipeline module can reach it.
+    "coach_recommendations": TIER_OWNER_ONLY,
     # ── internal: never published, but inside owner-facing tooling and AI context ──
     # ADR-155 amendment (2026-10-12, owner ruling): the owner clinical record
     # (`scripts/load_clinical_record.py`, data kept off-repo) may enter the AI coaches'

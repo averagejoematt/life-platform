@@ -219,6 +219,14 @@ ROW_MAP: list[dict] = [
     # #4078: the chat pending-writes queue — owner-only because a queued row carries whatever
     # the target write tool accepts. Declared before the first row exists.
     {"key": "pending_writes", "pattern": r"^Chat pending-writes queue", "requirements": [("source", "pending_writes", OO)], "claims": []},
+    # #6158: the recommendation record — a coach's exact advice, his answer in his words, the follow-up and the outcome.
+    # Owner-only, declared before the first row exists. No `claims`: no public projection at all.
+    {
+        "key": "coach_recommendations",
+        "pattern": r"^Recommendation record",
+        "requirements": [("source", "coach_recommendations", OO)],
+        "claims": [],
+    },
     # ADR-155 amendment (2026-10-12): the owner clinical record. Owner-only in THIS document's
     # sense (never on a public surface) but registry tier TIER_INTERNAL, because the owner
     # ruled it may enter AI coach context. No `claims`: no public projection at all.

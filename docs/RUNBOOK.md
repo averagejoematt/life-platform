@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-Last updated: 2026-11-22 (v8.6.0 — 93 MCP tools, 97-module package, 107 Lambdas, 20 data sources)
+Last updated: 2026-11-22 (v8.6.0 — 94 MCP tools, 98-module package, 107 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
 - Lambda functions defined (CDK): 107 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
@@ -701,6 +701,27 @@ SSM `/life-platform/reader-call` = `off` shuts both); the forecast page is `/sys
 
 Dead-man: `public_forecast:cycle_liveness` in qa-smoke (quiet while `STREAM_LIVE` is off; FAIL when a live cycle has no
 `RUN#` stamp after Monday 10:00 PT; WARN when the runtime switch is off or a rule was held for thin/stale inputs).
+
+## The coach-context pilot and the recommendation record (#6158)
+
+**Live on merge (Part A):** the owner-only recommendation record (`USER#matthew#SOURCE#coach_recommendations`,
+`lambdas/coach/recommendation_record.py`) and its one door, the MCP tool `manage_coach_recommendation`. Nothing reads it
+on a live coaching path until the switch below is on; nothing ever writes it but that tool.
+
+**Dark (Part B):** `lambdas/coach/coach_context_pilot.py` — the coach's context in the owner's priority order (his recorded
+decisions and platform memory first, today's planned session, the recommendations on record with his answers, the chat
+thread and notes with repeated themes left out, his corrections, what the coach can and cannot remember), and the lead's
+one due follow-up. It is gated by ONE committed switch, `coach_context_pilot.LIVE` (ships `False`). Off, the Telegram worker
+and `get_coach_session_packet` behave exactly as before.
+
+```bash
+# Preview the pilot context for one coach on one day — reads only, writes and sends nothing (the private harness's call):
+python3 -c "import sys; sys.path[:0]=['lambdas']; from coach import coach_context_pilot as c, telegram_worker_lambda as w; \
+a=w._assemble('eli_marsh','headcoach'); print(c.build_turn_context(w._table(),'eli_marsh','2026-11-23',memory=a['memory'],thread=a['thread'])['memory'])"
+# Turn it on (owner, after the blind re-evaluation): merge `LIVE = True`, then deploy the worker and the MCP server
+#   bash deploy/deploy_fleet.sh          # telegram-coach-worker + life-platform-mcp (or the CI deploy on merge)
+# Roll back: merge `LIVE = False` and deploy the same two functions. The record and its rows are untouched either way.
+```
 
 ## Chronicle: two default-off switches (#6178)
 
