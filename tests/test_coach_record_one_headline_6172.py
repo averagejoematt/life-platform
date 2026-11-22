@@ -310,18 +310,21 @@ def test_the_pre_6172_chat_derivation_disagrees_on_this_wire(monkeypatch):
     """The test can fail: with the switch OFF the chat facts count the re-write trail and the pre-genesis call
     (the latent split #6172 names), so they do NOT state the record the public page prints."""
     monkeypatch.setattr(coach_record, "today_pt", lambda: TODAY)
-    assert coach_record.SELF_RECORD_UNIFIED is False
+    monkeypatch.setattr(coach_record, "SELF_RECORD_UNIFIED", False)  # the rollback state, set explicitly
     table, _rows = _ledger()
     chat = _chat_block(table)
     assert "Your graded record this cycle: 3 right, 3 wrong out of 6 decided calls" in chat, chat
     assert "Your record this cycle (the prediction ledger" not in chat
 
 
-def test_the_switch_ships_off_and_off_keeps_the_brief_text(monkeypatch):
-    """Owner Phase 2 rule 12: what a coach is told about itself changes only by a reviewed flip."""
-    from coach import coach_narrative_orchestrator as orch
+def test_the_switch_is_on_the_pilot_stays_off_and_off_keeps_the_brief_text(monkeypatch):
+    """Owner ruling 2026-11-22: the record line is ON; the broader coach-context pilot stays OFF.
+    ROLLBACK is set SELF_RECORD_UNIFIED False, then ``bash deploy/deploy_fleet.sh``; False keeps the old brief text."""
+    from coach import coach_context_pilot, coach_narrative_orchestrator as orch
 
-    assert coach_record.SELF_RECORD_UNIFIED is False
+    assert coach_record.SELF_RECORD_UNIFIED is True
+    assert coach_context_pilot.LIVE is False
+    monkeypatch.setattr(coach_record, "SELF_RECORD_UNIFIED", False)
     table, _rows = _ledger()
     monkeypatch.setattr(orch, "table", table)
     monkeypatch.setattr(orch, "pacific_now", lambda: datetime.fromisoformat(TODAY + "T12:00:00+00:00"))
