@@ -26,7 +26,12 @@ import sys
 from typing import Any, Callable, Optional
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
-from content import chapter_corrections as CC, chapter_editions as CE, story_checks  # noqa: E402 — the record's rules, one copy
+from content import (
+    chapter_corrections as CC,
+    chapter_editions as CE,
+    private_call_check,
+    story_checks,
+)  # noqa: E402 — the record's rules, one copy
 
 CHAPTERS_PATH = "/api/chapters"
 FIXTURE_NAME = "chapter_editions.json"
@@ -68,7 +73,11 @@ def fixture(fixtures_dir: str) -> Optional[dict]:
         doc = json.load(fh)
     # The fixture's records are synthetic: there is no coach partition to echo and no private vocabulary to read (the
     # filter is off-repo and CI has no channel), so those two gates see nothing; the truth checks run for real.
-    view = CE.public_view(doc.get("records") or [], tainted=lambda _t: False, filter_hits=lambda _t: [])
+    # #6199: nor a call record to classify — the private-call check is not wired here (live mode carries the Site API's
+    # view, which ran it on the real calls).
+    view = CE.public_view(
+        doc.get("records") or [], tainted=lambda _t: False, private_calls=private_call_check.NOT_WIRED, filter_hits=lambda _t: []
+    )
     return {"state": "ok", "source": [CHAPTERS_PATH], "editions": view}
 
 

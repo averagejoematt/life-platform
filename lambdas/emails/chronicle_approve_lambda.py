@@ -602,7 +602,8 @@ def _private_calls():
 
     try:
         return private_call_check.load(table)
-    except Exception:  # noqa: BLE001 — fail closed: blocking_items turns None into a refusal
+    except Exception as e:  # noqa: BLE001 — fail closed: blocking_items turns None into a refusal
+        logger.error("[#6199] private-call check: the coach calls could not be read (%s: %s) — the audit refuses", type(e).__name__, e)
         return None
 
 

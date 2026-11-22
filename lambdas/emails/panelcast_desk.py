@@ -191,7 +191,8 @@ def arm_private_calls(table) -> None:
 
     try:
         calls = private_call_check.load(table)
-    except Exception:  # noqa: BLE001 — unreadable calls: every line holds (fail closed)
+    except Exception as e:  # noqa: BLE001 — unreadable calls: every line holds (fail closed)
+        print(f"[panel] #6199 private-call check: the coach calls could not be read ({type(e).__name__}: {e}) — every line holds")
         calls = None
     _PRIVATE_CALLS.update(armed=True, calls=calls)
 

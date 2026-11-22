@@ -148,9 +148,9 @@ NOT_A_WRITER_READ = {
 MARKER = "content_markdown"
 
 
-def _modules_reading_chapters(marker: str = MARKER) -> list:
+def _modules_reading_chapters(marker: str = MARKER, top_dirs: tuple = ("lambdas", "scripts")) -> list:
     out = []
-    for top in ("lambdas", "scripts"):
+    for top in top_dirs:
         for dirpath, dirs, files in os.walk(os.path.join(ROOT, top)):
             dirs[:] = [d for d in dirs if d not in ("__pycache__", "archive")]
             for name in files:
@@ -221,3 +221,41 @@ def test_every_ledger_reader_returns_the_public_view():
     assert {"lambdas/content/story_ledger.py", "lambdas/emails/panelcast_desk.py"} <= set(paths)
     stale = sorted(set(LEDGER_NOT_A_WRITER_READ) - set(paths))
     assert not stale, f"LEDGER_NOT_A_WRITER_READ names modules that no longer touch ledger_json: {stale}"
+
+
+# ── #6199 P on the second-edition publish path (#6193) ───────────────────────
+# Every call of the edition gate (chapter_editions.gate_findings / public_view, imported as CE or by name) must pass
+# private_calls= — the ONE private-call check — and only the registered rendering/fixture callers may pass NOT_WIRED.
+EDITION_NOT_WIRED = {
+    "scripts/publish_snapshot_chapter_editions.py": "fixture mode only: synthetic records, no call record exists; live mode carries the Site API's gated view",
+    "scripts/chronicle_edition_preview.py": "the rendering pass after its gates (which ran the check on the real calls) — publishes nothing",
+}
+
+
+def edition_gate_offenders(paths: list, read=None) -> list:
+    read = read or (lambda p: open(os.path.join(ROOT, p), encoding="utf-8").read())
+    bad = []
+    for p in paths:
+        tree = ast.parse(read(p))
+        for n in ast.walk(tree):
+            if not (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr in ("gate_findings", "public_view")):
+                continue
+            if not (isinstance(n.func.value, ast.Name) and n.func.value.id in ("CE", "chapter_editions")):
+                continue
+            kw = {k.arg: k.value for k in n.keywords}
+            if "private_calls" not in kw:
+                bad.append(f"{p}:{n.lineno} calls {n.func.attr} without private_calls=")
+            elif "NOT_WIRED" in ast.unparse(kw["private_calls"]) and p not in EDITION_NOT_WIRED:
+                bad.append(f"{p}:{n.lineno} passes NOT_WIRED and is not a registered rendering/fixture caller")
+    return bad
+
+
+def test_every_edition_publish_path_runs_the_private_call_check():
+    paths = [p for top in ("lambdas", "mcp", "scripts") for p in _modules_reading_chapters(marker="chapter_editions", top_dirs=(top,))]
+    assert {"lambdas/web/site_api_chapters.py", "mcp/tools_chapter_corrections.py", "scripts/publish_snapshot_chapter_editions.py"} <= set(
+        paths
+    )
+    bad = edition_gate_offenders(paths)
+    assert not bad, "edition gate calls that skip the #6199 private-call check:\n" + "\n".join(bad)
+    fake = {"mcp/new_tool.py": "def f(t):\n    return CE.gate_findings(t, tainted=None)\n"}
+    assert edition_gate_offenders(list(fake), read=fake.get) == ["mcp/new_tool.py:2 calls gate_findings without private_calls="]

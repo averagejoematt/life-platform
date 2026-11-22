@@ -200,6 +200,9 @@ def load(table: Any) -> CallSet:
     from common import public_forecast_policy as FPOL
     from web import publication_snapshot
 
+    # The Site API's table is a publication wrapper that drops private calls before any reader sees them; this check
+    # must see exactly those, so it reads the raw table underneath.
+    table = getattr(table, "wrapped", table)
     pks = [p for p in publication_snapshot.partitions() if p.startswith("COACH#")] + [FPOL.FORECAST_PK]
     rows: List[Tuple[str, Mapping]] = []
     for pk in pks:

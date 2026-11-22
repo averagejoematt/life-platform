@@ -35,7 +35,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WWW = os.path.join(REPO, "www")
 SNAPSHOT = os.path.join(WWW, "content", "snapshot")
 sys.path.insert(0, os.path.join(REPO, "lambdas"))
-from content import chapter_editions as CE  # noqa: E402
+from content import chapter_editions as CE, private_call_check  # noqa: E402
 
 WIDTHS = {"phone": (390, 844), "desktop": (1280, 900)}
 
@@ -79,6 +79,17 @@ def _tainted_or_none():
         return None
 
 
+def _private_calls_or_none():
+    """#6199: the calls the publication policy classifies, read-only; None (reported as a refusal) when unreadable."""
+    try:
+        import boto3  # noqa: PLC0415
+
+        return private_call_check.load(boto3.resource("dynamodb", region_name="us-west-2").Table("life-platform"))
+    except Exception as exc:  # noqa: BLE001
+        print(f"  (the coach calls could not be read: {type(exc).__name__}; the private-call check refuses)")
+        return None
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Render a proposed edition locally and screenshot it; publishes nothing.")
     ap.add_argument("--chapter", required=True)
@@ -91,11 +102,12 @@ def main(argv=None) -> int:
     archival = open(args.archival_file, encoding="utf-8").read() if args.archival_file else None
     print(f"edition text sha256 {CE.text_sha256(text.replace(chr(13) + chr(10), chr(10)).strip())}")
     tainted = _tainted_or_none()
+    calls = _private_calls_or_none()
     for what, t in (("edition", text), ("archival", archival)):
         if t is not None:
             from privacy import privacy_guard  # noqa: PLC0415 — the real content filter (local channel or read-only S3)
 
-            findings = CE.gate_findings(t, tainted=tainted, filter_hits=privacy_guard.find_violations)
+            findings = CE.gate_findings(t, tainted=tainted, private_calls=calls, filter_hits=privacy_guard.find_violations)
             print(f"gates on the {what}: {'clean' if not findings else ''}")
             for f in findings:
                 print(f"  - {f}")
@@ -131,7 +143,8 @@ def main(argv=None) -> int:
         except CE.EditionError as exc:
             print(f"bad input: {exc}", file=sys.stderr)
             return 2
-        view = CE.public_view(rows, tainted=lambda _t: False, filter_hits=lambda _t: [])  # rendering only; the gates ran above
+        # rendering only; the gates (the private-call check included) ran above
+        view = CE.public_view(rows, tainted=lambda _t: False, private_calls=private_call_check.NOT_WIRED, filter_hits=lambda _t: [])
         with open(os.path.join(SNAPSHOT, "chapter_editions.json"), "w", encoding="utf-8") as fh:
             json.dump({"state": "ok", "source": ["/api/chapters"], "editions": view}, fh)
         cp = subprocess.run(["npm", "run", "build", "--silent"], cwd=WWW, capture_output=True, text=True)

@@ -249,8 +249,20 @@ def _filter_hits(text: str) -> list:
     return privacy_guard.find_violations(text)
 
 
+def _private_calls():
+    """#6199: the calls and asks the publication policy classifies, read now — or None when they cannot be read (the
+    gates then refuse: an edition is never proposed or approved with the private-call check unrun)."""
+    from content import private_call_check  # noqa: PLC0415
+
+    try:
+        return private_call_check.load(_table_ref)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"[#6199] private-call check: the coach calls could not be read ({type(exc).__name__}: {exc}) — refusing")
+        return None
+
+
 def _gate(text) -> list:
-    return CE.gate_findings(text, tainted=_tainted(), filter_hits=_filter_hits)
+    return CE.gate_findings(text, tainted=_tainted(), private_calls=_private_calls(), filter_hits=_filter_hits)
 
 
 def _int_arg(args: dict, key: str):
@@ -454,7 +466,10 @@ def _approve_archival(args: dict) -> dict:
 
 def _list_editions(chapter_id: str | None) -> dict:
     rows = _edition_rows(chapter_id)
-    served = {e["chapter_id"]: e for e in CE.public_view(rows, tainted=_tainted(), filter_hits=_filter_hits, log=logger.info)}
+    served = {
+        e["chapter_id"]: e
+        for e in CE.public_view(rows, tainted=_tainted(), private_calls=_private_calls(), filter_hits=_filter_hits, log=logger.info)
+    }
     items = []
     for r in sorted(rows, key=lambda r: str(r.get("sk"))):
         cid, kind = r.get("chapter_id"), r.get("record_type")

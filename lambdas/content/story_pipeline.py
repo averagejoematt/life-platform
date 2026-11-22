@@ -168,7 +168,8 @@ def load_private_calls(table: Any) -> Any:
     the gates then hold every text with ``private_call_check.UNAVAILABLE``)."""
     try:
         return private_call_check.load(table)
-    except Exception:  # noqa: BLE001 — an unreadable call record is a hold, never a pass
+    except Exception as e:  # noqa: BLE001 — an unreadable call record is a hold, never a pass
+        print(f"[#6199] private-call check: the coach calls could not be read ({type(e).__name__}: {e}) — every text holds")
         return None
 
 

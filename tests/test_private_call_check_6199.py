@@ -326,3 +326,32 @@ def test_a_clean_week_gates_byte_identically_with_and_without_the_check(no_fact)
         assert json.dumps(getattr(off, name)(*args)) == json.dumps(getattr(on, name)(*args)), name
     assert json.dumps(off.episode(episode, "end_turn")) == json.dumps(on.episode(episode, "end_turn"))
     assert json.dumps(off.post(CLEAN_POST, "end_turn")) == json.dumps(on.post(CLEAN_POST, "end_turn"))
+
+
+# ── the second-edition publish path (#6193) runs the same check ──────────────
+
+
+def test_an_edition_or_archival_text_is_refused_by_the_one_check():
+    from content import chapter_editions as CE
+
+    leaky = "He walked every day. Quill's sleep call missed."
+    found = CE.gate_findings(leaky, tainted=lambda t: False, private_calls=_calls(), filter_hits=lambda t: [])
+    assert found and all(f.startswith(P.PREFIX) for f in found)
+    assert CE.gate_findings("He walked every day.", tainted=lambda t: False, private_calls=_calls(), filter_hits=lambda t: []) == []
+    unreadable = CE.gate_findings("He walked every day.", tainted=lambda t: False, private_calls=None, filter_hits=lambda t: [])
+    assert unreadable == [P.UNAVAILABLE], "calls that cannot be read refuse the edition (fail closed)"
+
+
+def test_the_mcp_edition_actions_and_the_site_api_field_pass_the_calls(monkeypatch):
+    import inspect
+
+    from web import site_api_chapters as chapters
+
+    from mcp import tools_chapter_corrections as t  # noqa: E402
+
+    assert "private_calls=_private_calls()" in inspect.getsource(t._gate)
+    monkeypatch.setattr(P, "load", lambda table: (_ for _ in ()).throw(RuntimeError("AccessDenied")))
+    assert t._private_calls() is None
+    monkeypatch.setattr(chapters, "_CALLS_CACHE", {"at": None, "calls": None})
+    assert chapters._private_calls() is None, "the Site API withholds every edition when the calls cannot be read"
+    assert "private_calls=private_calls()" in inspect.getsource(chapters.editions_field)
