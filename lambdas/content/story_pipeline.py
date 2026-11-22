@@ -10,7 +10,7 @@ import os as _os
 import re
 from typing import Any, Dict, List, Optional
 
-from content import story_checks, story_craft, story_ledger, story_writers
+from content import story_checks, story_craft, story_editor, story_ledger, story_writers
 
 MAX_REWRITES = int(_os.environ.get("STORY_DESK_MAX_REWRITES", "2"))  # live: 1 (the 900s Lambda ceiling, #4535)
 
@@ -91,6 +91,37 @@ class _Gates:
             + story_writers.fact_check(md, self.dossier, context=self.context)
         )
 
+    # ── the hard gates alone (#6179) ─────────────────────────────────────────
+    # With the editor on, the writer's corrective rewrites and the final verdict use these: every check of ``post``
+    # except story_craft's STYLE findings (``chronicle_findings``, ``repeat_findings``), which become the editor's
+    # notes. The quote and callback checks live in story_craft but are claims about sources and numbers, so they stay
+    # here, hard. tests/test_story_editor_6179.py holds ``post_hard`` equal to ``post`` minus its style findings.
+
+    def post_deterministic(self, md: str, stop: Optional[str]) -> List[str]:
+        """The hard gates that need no model call: completeness, the story door, the figures against the dossier, the
+        exact-quote gate and the callback gate."""
+        _title, body = story_writers.split_title(md)
+        return (
+            story_checks.all_findings(
+                md, stop_reason=stop, allowed=self.allowed, not_yet_exported=self.nye, footer_pattern=story_writers.CHRONICLE_FOOTER
+            )
+            + story_craft.callback_findings(body, self.previous)
+            + story_craft.quote_findings(body, self.corpus)
+        )
+
+    def post_hard(self, md: str, stop: Optional[str]) -> List[str]:
+        """``post_deterministic`` plus the fact read: the verifier's full verdict on one installment."""
+        return self.post_deterministic(md, stop) + story_writers.fact_check(md, self.dossier, context=self.context)
+
+    def dek_hard(self, top_line: str) -> List[str]:
+        """The dek's truth checks (figures, the story door, the fact read). Its length, figure count and jargon are
+        style (``craft_dek``) and, with the editor on, advisory."""
+        if not top_line:
+            return []
+        return [f"dek: {f}" for f in story_checks.ungrounded_numbers(top_line, self.allowed) + story_checks.story_door(top_line)] + [
+            f"dek: {f}" for f in story_writers.fact_check(top_line, self.dossier, context=self.context)
+        ]
+
     def episode(self, ep: Dict[str, Any], stop: Optional[str]) -> List[str]:
         txt = story_writers.episode_text(ep)
         return (
@@ -136,6 +167,43 @@ def _write_post(g: _Gates, dossier, budget, ledger, n, previous, md=None, findin
         md, stop = story_writers.write_chronicle(dossier, budget, ledger, week=n, previous=previous, fix=findings, prior_draft=md)
         findings = g.post(md, stop)
     return md, findings or []
+
+
+def _write_post_edited(g: _Gates, dossier, budget, ledger, n, previous, log=print):
+    """#6179, behind ``STORY_EDITOR=on``: the writer drafts; corrective rewrites answer only the HARD findings; the
+    editor revises (at most two rounds, every revision checked for new claims and new hard findings); then the hard
+    gates run, unchanged, on the text the editor hands back. Returns ``(md, hard_findings, editor_record)``.
+
+    The verifier's verdict on the final text is stored exactly as the off path stores it, so a revised draft that
+    fails any hard gate is held exactly as before."""
+    from content import story_editor
+
+    md, stop = story_writers.write_chronicle(dossier, budget, ledger, week=n, previous=previous)
+    findings = g.post_hard(md, stop)
+    for _ in range(MAX_REWRITES):
+        if not findings:
+            break
+        print(f"  wk{n} post: {len(findings)} hard finding(s) → corrective rewrite: {[f[:160] for f in findings]}")
+        md, stop = story_writers.write_chronicle(dossier, budget, ledger, week=n, previous=previous, fix=findings, prior_draft=md)
+        findings = g.post_hard(md, stop)
+    if stop != "end_turn":
+        return md, findings, {"accepted": 0, "rounds": [], "advisory": ["editor skipped: the writer's draft was cut off"], "cost_usd": 0.0}
+    record = story_editor.revise(
+        md,
+        packet=story_editor.packet_for(dossier, budget, ledger, n, previous),
+        allowed=g.allowed | story_editor.packet_numbers(dossier, budget, ledger),
+        notes_for=lambda body: story_editor.craft_notes(
+            body, dossier=dossier, weight_known=g.weight_known, previous=g.previous, owner_lines=g.owner_lines
+        )
+        + story_editor.review_notes(body, dossier),
+        hard_check=lambda text: g.post_deterministic(text, "end_turn"),
+        log=log,
+    )
+    if record.get("accepted"):
+        md = record["text"]
+        findings = g.post_hard(md, "end_turn")  # the verifier, on the revised text — the same gates, never fewer
+    record.pop("text", None)
+    return md, findings, record
 
 
 def _write_ep(g: _Gates, dossier, budget, ledger, n, body, previous_episode, guest, ep=None, findings=None):
@@ -251,8 +319,13 @@ def live_week(table: Any, date_str: str, *, chronicle_pk: str = "USER#matthew#SO
     previous_post = previous.get(n - 1)
     budget = story_desk.run_desk(dossier, ledger, week=n, log=log)
     g = _Gates(n, dossier, budget, ledger, None, previous)
-    md, findings = _write_post(g, dossier, budget, ledger, n, previous_post)
-    findings += g.dek(budget.get("top_line") or "")
+    editor: Optional[Dict[str, Any]] = None
+    if story_editor.enabled():  # #6179: the editor revises, the verifier verifies; off = the lines below it, unchanged
+        md, findings, editor = _write_post_edited(g, dossier, budget, ledger, n, previous_post, log=log)
+        findings += g.dek_hard(budget.get("top_line") or "")
+    else:
+        md, findings = _write_post(g, dossier, budget, ledger, n, previous_post)
+        findings += g.dek(budget.get("top_line") or "")
     title, body = story_writers.split_title(md)
     roster = dossier.get("roster", [])
     want = (budget.get("featured_coaches") or [None])[0]
@@ -266,6 +339,24 @@ def live_week(table: Any, date_str: str, *, chronicle_pk: str = "USER#matthew#SO
     md = with_dek(md, dossier, new_ledger, budget, n)
     _t, body_with_dek = story_writers.split_title(md)
     sl = stats_line(n, dossier)
+    if editor is not None:
+        # the craft verdict is the editor's input and the owner's ADVISORY notes; never empty, so a revised week always
+        # routes to the preview and waits for his click (publish_holds / craft_hold), whatever PREVIEW_MODE says
+        craft = story_editor.advisory_lines(editor) + [
+            story_editor.ADVISORY_PREFIX + f for f in g.craft_episode(ep) + g.craft_dek(budget.get("top_line") or "")
+        ]
+        return {
+            "week": n,
+            "title": title,
+            "stats_line": sl,
+            "raw_installment": f'"{title}"\n\n[{sl}]\n\n{body_with_dek}',
+            "budget": budget,
+            "episode": ep,
+            "ledger": new_ledger,
+            "findings": {"post": findings, "episode": efind},
+            "craft_findings": craft,
+            "editor": editor,
+        }
     return {
         "week": n,
         "title": title,

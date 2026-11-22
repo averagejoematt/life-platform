@@ -110,6 +110,7 @@ _BEFORE_4770 = {
     "reading.recall": _H45,
     "review_pack.critic": _H45,
     "story.desk": _S46,
+    "story.editor": _H45,  # #6179: a NEW route for a new caller (the Story Desk's editor) — no existing caller moved
     "story.questions": _S46,
     "story.writer": _S46,
     "voice_fidelity": _H45,
