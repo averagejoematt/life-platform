@@ -154,7 +154,7 @@ def test_the_forecast_is_right_only_when_strictly_closer_than_the_guess(actual, 
 
 
 def test_the_literal_the_grader_reads_is_the_policys_rule():
-    assert PG.HEAD_TO_HEAD == FP.SCORING_RULE and FP.is_head_to_head(H2H) and not FP.is_head_to_head({"type": "point"})
+    assert PG.HEAD_TO_HEAD == FP.SCORING_RULE == H2H["scoring"]
 
 
 def test_a_coach_number_call_is_graded_exactly_as_before():

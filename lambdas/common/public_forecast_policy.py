@@ -75,8 +75,3 @@ def is_forecast_partition(pk) -> bool:
 
 def run_sk(cycle: str) -> str:
     return f"{RUN_SK_PREFIX}{cycle}"
-
-
-def is_head_to_head(spec) -> bool:
-    """Is this evaluation spec graded by the frozen head-to-head rule? Only a spec this partition's producer wrote."""
-    return isinstance(spec, dict) and spec.get("scoring") == SCORING_RULE
