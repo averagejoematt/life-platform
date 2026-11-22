@@ -50,6 +50,20 @@ PANEL_HELD_TOKEN = "PANELCAST-AUTOPUBLISH-HELD"  # noqa: S105 — a log token, n
 # A writer's notes, not claims about the world: length, figure density, a repeated phrase. They do not block a publish.
 STYLE_PREFIXES = ("craft:", "repeat:")
 
+# #6178 (owner ruling 2026-11-22 §7): the first line of a legacy-written draft's record when the desk's full post gate
+# ran on it (story_pipeline.legacy_audit, switch on). Information for the owner, never a blocking item: the draft is
+# held or approvable on the findings that follow it, exactly as a desk draft is. Written only by that path.
+LEGACY_CHECKED_NOTE = (
+    "legacy writer: the Story Desk did not write this draft; it went through the desk's source, privacy, quote, fact "
+    "and craft checks, and the season ledger will not advance on publish"
+)
+# #6178 (owner ruling 2026-11-22 §4): a chronicle row the OWNER retired — a draft existed and he decided it will not be
+# published. The row is kept unchanged otherwise. Nothing publishes it: the approve click, the sweep and this audit all
+# refuse it. Setting it is an owner-approved write, never a pipeline one; no row carries it today.
+RETIRED_STATUS = "retired"
+# The row marker every legacy-written draft carries (story_pipeline.LEGACY_HOLD; kept equal by a test).
+LEGACY_HOLD = "legacy_hold"
+
 # The wrappers the desk puts in front of a finding — the dek's "dek: " and an episode turn's "turn 3 (elena): ".
 _WRAPPER = re.compile(r"^(?:dek:\s*|turn\s+\d+\s*\([^)]*\):\s*)+", re.IGNORECASE)
 
@@ -89,7 +103,7 @@ def desk_blocking(raw: Any) -> List[str]:
         return ["the desk's audit record is not {post: [...], episode: [...]}"]
     out: List[str] = []
     for part in ("post", "episode"):
-        out += [f"desk {part}: {f}" for f in found[part] if not is_style_finding(f) and not is_na_outcome(f)]
+        out += [f"desk {part}: {f}" for f in found[part] if not is_style_finding(f) and not is_na_outcome(f) and f != LEGACY_CHECKED_NOTE]
     return out
 
 
@@ -137,6 +151,10 @@ def legacy_episode_blocking(chronicle_row: Optional[Dict[str, Any]], text: str, 
     through the shared reader door and the dated-weekday check. Empty means the audit passed."""
     row = chronicle_row or {}
     out = [f for f in desk_blocking(row.get("desk_findings_json")) if not f.startswith("desk episode: ")]
+    if row.get("publish_hold") == LEGACY_HOLD:
+        # #6178: an approvable legacy chronicle is approvable by the owner's click on the CHRONICLE; the Panel's legacy
+        # writer still never publishes an episode about a legacy-written week by itself.
+        out.append("the week's chronicle was written by the legacy writer: the Panel waits for the owner")
     if not str(text or "").strip():
         out.append("no episode text to audit")
     out += [f"reader surface: {f}" for f in story_checks.reader_surface(text or "")]
@@ -164,10 +182,14 @@ def craft_hold_blocking(item: Dict[str, Any]) -> List[str]:
 def blocking_items(item: Dict[str, Any]) -> List[str]:
     """Every reason the sweep may NOT publish this unapproved draft. Empty means the deterministic audit passed."""
     text = "\n".join(str(item.get(k) or "") for k in ("title", "stats_line", "content_markdown"))
+    if str(item.get("status") or "").strip().lower() == RETIRED_STATUS:
+        return ["retired by the owner: this draft is never published"]  # #6178: first, and on its own — nothing answers it
     out = desk_blocking(item.get("desk_findings_json")) + craft_hold_blocking(item)
     if not str(item.get("content_markdown") or "").strip():
         out.append("no stored text to audit")
     out += [f"reader surface: {f}" for f in story_checks.reader_surface(text)]
+    # #6178: a staged interview is a hard source finding on every stored draft, desk or legacy, re-run at publish time
+    out += story_checks.staged_encounter_findings(str(item.get("content_markdown") or ""))
     out += weekday_mismatches(text, item.get("date") or str(item.get("sk", "")).replace("DATE#", ""))
     if prediction_publication.words_name_private_activity(text):
         # Owner ruling 2026-11-06: a draft that names private activity waits for him; it never publishes itself.

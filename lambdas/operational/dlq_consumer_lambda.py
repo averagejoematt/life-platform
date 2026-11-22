@@ -77,7 +77,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 import boto3
-from common import pacific_time
+from common import outbound_trial, pacific_time  # #6176: the outbound trial's switchboard
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 from operational.redrive_targets import REDRIVE_TARGETS  # #5980: the only functions a re-drive may invoke
@@ -588,17 +588,17 @@ def archive_to_s3(message: dict, classification: str, retry_attempted: bool, att
 # ── Escalation / Alerting ────────────────────────────────────────────────────────
 
 
-def page_operator(escalations: list[dict]) -> None:
+def page_operator(escalations: list[dict]) -> bool:
     """Publish an URGENT escalation to the existing operator paging channel — the
     life-platform-alerts SNS topic (the same real-time page as canary /
     daily-brief / cost-runaway). Reuses the platform's channel; no new one.
 
     Fail-soft: an SNS hiccup must not crash the run — the SES summary below is
-    the redundant record."""
+    the redundant record. Returns True only when the SNS publish went out (#6176)."""
     if not escalations or not ALERTS_TOPIC_ARN:
         if escalations and not ALERTS_TOPIC_ARN:
             logger.warning("  ALERTS_TOPIC_ARN not set — SNS page skipped (SES summary still sent)")
-        return
+        return False
 
     count = len(escalations)
     lines = [
@@ -634,8 +634,10 @@ def page_operator(escalations: list[dict]) -> None:
             Message=body,
         )
         logger.info(f"  🚨 Paged operator via SNS: {count} escalation(s)")
+        return True
     except Exception as e:
         logger.error(f"  Failed to publish SNS escalation: {e}")
+        return False
 
 
 def send_alert(escalations: list[dict], dry_run: bool = False) -> None:
@@ -894,8 +896,20 @@ def lambda_handler(event, context):
 
         # ── Escalate (page + summary) ──────────────────────────────────────────────
         if escalations:
-            page_operator(escalations)
-            send_alert(escalations, dry_run=dry_run)
+            paged = page_operator(escalations)
+            # #6176 item 6a (outbound trial): life-platform-alerts delivers into the digest queue and the remediation
+            # dispatcher (ADR-170), so once the SNS escalation is out the SES summary is a second copy to the inbox.
+            # Only then is it held: no publish (unset topic, SNS error) means the summary still goes, as before.
+            if paged and outbound_trial.is_on(outbound_trial.OPS_DLQ_SUMMARY):
+                outbound_trial.suppressed(
+                    outbound_trial.OPS_DLQ_SUMMARY,
+                    "life-platform-dlq-consumer",
+                    log=logger.info,
+                    escalations=len(escalations),
+                    functions=sorted({str(e.get("function_name") or "unknown") for e in escalations}),
+                )
+            else:
+                send_alert(escalations, dry_run=dry_run)
 
         logger.info(
             f"DLQ run complete: processed={processed} "

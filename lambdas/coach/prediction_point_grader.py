@@ -27,6 +27,33 @@ POINT_LOOKBACK_DAYS = 60
 _AGGREGATE_SUFFIXES = (("_30day_avg", 30), ("_14day_avg", 14), ("_7day_avg", 7))
 
 
+#: #6156 (owner ruling 2026-11-22 §5): the frozen head-to-head rule of the rules-based platform forecast partition —
+#: ``common.public_forecast_policy.SCORING_RULE``, repeated here as a literal so this grader imports nothing from the
+#: producer side (tests/test_public_forecast_backtest_6156.py pins the two equal). A spec without it is graded exactly
+#: as before.
+HEAD_TO_HEAD = "closer_than_nothing_changes"
+
+
+def forecast_closer(actual, forecast, guess):
+    """True when ``forecast`` is STRICTLY closer to ``actual`` than ``guess`` is (a tie counts for the guess)."""
+    return abs(float(actual) - float(forecast)) < abs(float(actual) - float(guess))
+
+
+def head_to_head_result(metric_key, actual, on_date, forecast, guess):
+    """The evaluator's result shape for a head-to-head spec: confirmed iff the forecast beat the frozen guess."""
+    hit = forecast_closer(actual, forecast, guess)
+    e_f, e_g = abs(actual - forecast), abs(actual - guess)
+    return {
+        "status": "confirmed" if hit else "refuted",
+        "reason": (
+            f"{metric_key}={actual:.2f} on {on_date}: the forecast {forecast:g} was {e_f:.2f} away, the guess that nothing "
+            f"changes {guess:g} was {e_g:.2f} away → {'the forecast was closer' if hit else 'the guess was as close or closer'}"
+        ),
+        "actual_value": round(actual, 4),
+        "beats_null": hit,
+    }
+
+
 def evaluate_condition(actual, condition, threshold):
     """Evaluate a machine spec's condition against a threshold — None (inconclusive)
     when either side is missing. Shared by the evaluator's machine path; lives here
@@ -104,7 +131,10 @@ def evaluate_point(pred, eval_spec, data_cache, today_str, *, get_source_data, e
     metric_key = eval_spec.get("metric")
     target = eval_spec.get("threshold")
     tolerance = eval_spec.get("tolerance")
-    if not metric_key or target is None or tolerance is None:
+    head_to_head = eval_spec.get("scoring") == HEAD_TO_HEAD  # #6156: the platform-forecast partition's frozen rule only
+    if not metric_key or target is None or (tolerance is None and not head_to_head):
+        return None
+    if head_to_head and eval_spec.get("baseline_value") is None:
         return None
     target_date = eval_spec.get("target_date")
     if not target_date:
@@ -129,6 +159,8 @@ def evaluate_point(pred, eval_spec, data_cache, today_str, *, get_source_data, e
             "actual_value": None,
             "beats_null": False,
         }
+    if head_to_head:
+        return head_to_head_result(metric_key, actual, on_date, float(target), float(eval_spec["baseline_value"]))
     target = float(target)
     tolerance = float(tolerance)
     delta = actual - target

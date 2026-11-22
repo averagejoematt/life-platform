@@ -35,7 +35,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-from common import send_ledger  # #3113 / DIL-025: the durable replay guard
+from common import outbound_trial, send_ledger  # #6176: the outbound trial; #3113 / DIL-025: the durable replay guard
 from common.constants import (
     EXPERIMENT_BASELINE_WEIGHT_LBS,
     EXPERIMENT_START_DATE,
@@ -1061,6 +1061,23 @@ def record_email_send(table, lambda_name, period_key):
     send_ledger.record_sent(table, lambda_name, period_key, user_id=USER_ID, now=int(datetime.now(timezone.utc).timestamp()), logger=logger)
 
 
+def menu_html_with_fold(data):
+    """The menu-ahead block, plus (#6176 item 2, while the trial holds the Friday Plate) the Plate's code-built section."""
+    html = weekly_menu_feed.html_block(data["menu_feed"], accent="#4cc9f0")
+    if outbound_trial.is_on(outbound_trial.PLATE_INTO_NUTRITION_REVIEW):
+        html += plate_fold_section(data)
+    return html
+
+
+def plate_fold_section(data):
+    """#6176 item 2: the Weekly Plate's most-logged-foods section over the two weeks this review already read."""
+    from emails import plate_fold
+
+    rows = list((data.get("macrofactor_prior") or {}).values()) + list((data.get("macrofactor_this") or {}).values())
+    menu_built = bool((data.get("menu_feed") or {}).get("built"))
+    return plate_fold.html_section(plate_fold.top_foods(rows), menu_built=menu_built)
+
+
 def lambda_handler(event, context):
     # #2216: {"dry_run": true} builds the whole review — data, prompt, panel call,
     # validation, HTML — and returns it without calling SES or writing any durable
@@ -1195,7 +1212,7 @@ def lambda_handler(event, context):
         dates,
         weight_info,
         build_titration_html(pacific_now().date().isoformat()),
-        weekly_menu_feed.html_block(data["menu_feed"], accent="#4cc9f0"),
+        menu_html_with_fold(data),
     )
 
     summary = compute_weekly_summary(days_this)
@@ -1220,6 +1237,7 @@ def lambda_handler(event, context):
             "micro_column": f"MICRO ({_micro_column_scope(days_this)[0]})",
             "prompt_source": prompt_source,
             "prompt_micro_scoped": MICRONUTRIENT_SCOPE_NOTE in system and not _FOOD_ONLY_MICRO_RULE.search(system),
+            "plate_folded": outbound_trial.is_on(outbound_trial.PLATE_INTO_NUTRITION_REVIEW),  # #6176 item 2
             "body": f"Nutrition review DRY RUN (not sent): {subject}",
         }
 

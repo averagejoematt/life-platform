@@ -54,15 +54,18 @@ test("the page id maps to the public item id the API keys on", () => {
 });
 
 test("both components gate on the switch before they render anything, and carry only the island import", () => {
-  for (const name of ["ReaderCall.astro", "ReaderCallList.astro"]) {
+  for (const name of ["ReaderCall.astro", "ReaderCallList.astro", "ForecastReaderCall.astro"]) {
     const src = readFileSync(new URL(`../src/components/${name}`, import.meta.url), "utf8");
     assert.match(src, /const on = readerCallEnabled\(\)/, name);
     assert.match(src, /^\{\s*on && \(/m, name);
     assert.doesNotMatch(src, /<style/, name);
-    // counted by plain string search (no tag-matching regex): exactly one script block, the island import
-    assert.equal(src.toLowerCase().split("<script").length - 1, 1, name);
-    assert.ok(src.includes('<script>\n  import "../islands/readercall.js";\n</script>'), name);
+    // #6170: no script block of its own — the ONE shared island component, so an unbuilt page leaves no orphan chunk
+    assert.equal(src.toLowerCase().split("<script").length - 1, 0, name);
+    assert.ok(src.includes('import ReaderCallIsland from "./ReaderCallIsland.astro";') && src.includes("<ReaderCallIsland />"), name);
   }
+  const island = readFileSync(new URL("../src/components/ReaderCallIsland.astro", import.meta.url), "utf8");
+  assert.equal(island.toLowerCase().split("<script").length - 1, 1);
+  assert.ok(island.includes('<script>\n  import "../islands/readercall.js";\n</script>'));
 });
 
 test("the words count reader calls, never readers, and never read as evidence", () => {
@@ -126,3 +129,23 @@ test("a closed call leads with what the block is, never an invitation to call", 
   assert.ok(comp.includes("data-rc-heading>Your call</h2>") && comp.includes("data-rc-copy>{COPY}</p>"));
 });
 
+
+// #6170 (owner ruling 2026-11-22 §5): a rules-based platform forecast is never "the coach" on the page.
+test("a platform forecast's block speaks in the machine voice and reads the forecast's own grade", async () => {
+  const { FORECAST_AUTHOR, FORECAST_COPY, FORECAST_NOTE } = await import("../src/lib/readercall_view.js");
+  const fc = [
+    { id: "forecast", label: "Closer to 281.7 lb, the forecast" },
+    { id: "no_change", label: "Closer to 285.9 lb, no change" },
+  ];
+  const base = { author: FORECAST_AUTHOR, choices: fc, called_on_words: "16 November", open_until_words: "19 November", result_due_words: "23 November" };
+  const open = openSentence(base);
+  assert.equal(open, "The rules-based platform forecast was made on 16 November, before any of it happened; reader calls are open until the end of 19 November. Reader calls stay hidden until then, so no one's call steers yours.");
+  assert.match(afterSentence({ ...base, your_call: "no_change" }), /beside the forecast's\.$/);
+  const graded = { ...base, graded: { forecast_status: "refuted", forecast_choice: "forecast", reading_side: "no_change" } };
+  assert.equal(coachLine(graded), "Closer to 281.7 lb, the forecast · wrong");
+  for (const s of [open, afterSentence({ ...base, your_call: "forecast" }), coachLine(graded), FORECAST_COPY, FORECAST_NOTE]) assert.doesNotMatch(s, /coach/i, s);
+  // a coach call's words are unchanged
+  assert.match(openSentence({ choices, called_on_words: "1 May", open_until_words: "4 May" }), /^The coach called this on 1 May/);
+  const comp = readFileSync(new URL("../src/components/ForecastReaderCall.astro", import.meta.url), "utf8");
+  assert.ok(comp.includes("data-rc-copy>{FORECAST_COPY}</p>") && comp.includes("{FORECAST_NOTE}") && !/the coach/i.test(comp.replace(/\/\/.*$/gm, "")));
+});

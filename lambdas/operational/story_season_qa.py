@@ -114,7 +114,9 @@ DOOR_CHECK = "story_season:chapter_door"
 # unwritten, and nothing on the platform said so. A newest chapter older than this reds.
 CHAPTERS_PATH = "/api/chapters"
 DOOR_STALE_DAYS = 10
-WEEK_STATUSES = ("published", "held", "skipped", "pending")
+# #6178: `retired` (the owner decided a drafted week will not be published) is a recognised, final state — never
+# "unexplained" and never an open week. Equal to site_api_chapters.WEEK_STATUSES (pinned by a test).
+WEEK_STATUSES = ("published", "held", "skipped", "pending", "retired")
 
 _WEEKDAYS = ("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
 
@@ -329,7 +331,16 @@ def check_story_season(
     # ── (d) the Monday questions — needs no season rows, so it is graded first ──
     slot = last_questions_send(now)
     owed = week_containing(slot.date().isoformat()) if slot.date().isoformat() >= QUESTIONS_FIRST_SEND else None
-    if owed is None:
+    from common import outbound_trial
+
+    if outbound_trial.is_on(outbound_trial.STORY_QUESTIONS_PAUSED):
+        # #6176 item 4: the sender reads this same committed switch and logs '[outbound-trial] ... suppressed' instead of
+        # sending, so a paused Monday is the recognised state, not a miss.
+        questions_c.ok(
+            f"Monday story questions paused by the outbound trial ({outbound_trial.TRIAL_ISSUE}, #6174) — "
+            f"no send owed for {slot.date().isoformat()}; the sender logs its suppression"
+        )
+    elif owed is None:
         questions_c.ok(
             f"no questions send owed for {slot.date().isoformat()} (first live send {QUESTIONS_FIRST_SEND}; "
             "a Monday outside every season week sends nothing)"
@@ -434,7 +445,7 @@ def door_findings(doc: dict, now: datetime) -> tuple[list[str], Optional[float],
             else:
                 open_weeks.append(f"week {wk} skipped ({reason})")
         elif status == "held":
-            open_weeks.append(f"week {wk} drafted {str(w.get('drafted_at') or '?')[:10]}, awaiting approval")
+            open_weeks.append(f"week {wk} drafted {str(w.get('drafted_at') or '?')[:10]}, not approved")
         elif status == "published":
             when = parse_iso_utc(w.get("published_at")) or parse_iso_utc(str(w.get("date") or "")[:10])
             if when is not None and (newest is None or when > newest):

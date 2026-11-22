@@ -32,7 +32,8 @@ export function href(path, base = import.meta.env.BASE_URL) {
  * state pages (no draft exists behind them). Every template that links a chapter asks this first.
  */
 export function hasPage(type, obj) {
-  if (type === "chapter") return !!obj && obj.status !== "held";
+  // #6178: a retired week, like a held one, had a draft that is not public: listed in words, never given a page
+  if (type === "chapter") return !!obj && obj.status !== "held" && obj.status !== "retired";
   return true;
 }
 

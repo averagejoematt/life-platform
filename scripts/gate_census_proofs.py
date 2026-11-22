@@ -4979,3 +4979,77 @@ STRUCTURAL_HAND_PROOFS["structural::test_elena_canon_6155.py"] = {
     ),
     "proved_on": "2026-11-21",
 }
+
+# #6158 — the recommendation record and the coach-context pilot (owner ruling 2026-11-22 §1, §11): one writer, the
+# publication boundary, the admission rule, owner-only answers, the dark switch, the de-duplication cap, and the
+# correction close that never closes on age.
+STRUCTURAL_HAND_PROOFS["structural::test_recommendation_record_6158.py"] = {
+    "gate_name": "test_recommendation_record_6158.py",
+    "command": "python3 -m pytest tests/test_recommendation_record_6158.py -q -p no:warnings   # baseline 53 passed",
+    "mutation": (
+        "Six plants, ONE AT A TIME, each restored from a copy: M1 coach_context_pilot.LIVE = True; M2 "
+        "`from coach import recommendation_record` appended to lambdas/web/site_api_status.py; M3 MAX_PER_THEME 2 -> 7; "
+        "M4 coach_corrections.close_correction's checkable-evidence check disabled; M5 recommendation_record.fold's "
+        "recorded_by == owner condition removed; M6 the admission rule's directive check disabled. Follow-up (round-3 context fixes, notes never edited): N1 a dated note line dropped in build_turn_context; N2 the thread cap keeping the OLDEST repeats; N3 the data-honesty line reworded; N4 the notes-order line removed."
+    ),
+    "observed": (
+        "2026-11-22, #6158 lane. BASELINE 49 passed. M1 2 failed (switch ships off; dark worker turn); M2 2 failed "
+        "(publication boundary closure + the naming allowlist); M3 1 failed (dominant theme); M4 3 failed (age alone "
+        "cannot close, x3); M5 1 failed (only owner events count); M6 3 failed (encouragement / no-directive refused). "
+        "REVERTED 49 passed. 2026-11-22 follow-up lane (issue-6158-context-fixes): BASELINE 53 passed; N1-N4 each 1 failed; REVERTED 53 passed. M3 retired with the notes de-duplication it mutated (the thread cap is covered by N2)."
+    ),
+    "scope": (
+        "Every tracked .py outside tests/ for record constructors and modules naming the record; the static import graph "
+        "(module-level and lazy) of lambdas/web, lambdas/content and lambdas/emails, with the Telegram worker's one lazy "
+        "edge cut and proven never loaded at import; the admission rule, fold, close/reopen and the pilot context on "
+        "fixtures. NOT SEEN: a dynamic import by string; a public reader that queries the partition by a pk it builds "
+        "without naming the source."
+    ),
+    "proved_on": "2026-11-22",
+}
+
+# #6178 — the narrator named on every byline: the chapter page, the home card and the story index read one definition
+# (www/src/lib/narrator.js), the RSS channel and the subscribe page carry it verbatim, the owner's first-person lines
+# stay byte-identical, and no rendered byline under www/src still says "the platform's narrator".
+STRUCTURAL_HAND_PROOFS["structural::test_narrator_byline_6178.py"] = {
+    "gate_name": "test_narrator_byline_6178.py",
+    "command": "python3 -m pytest tests/test_narrator_byline_6178.py -q -p no:warnings   # baseline 5 passed",
+    "mutation": (
+        "Three plants, ONE AT A TIME, each restored from a copy: M1 www/src/pages/story/[id].astro's {CHAPTER_BYLINE} "
+        "span put back to the old 'Written by the platform's narrator…' sentence; M2 one word of the owner's approved "
+        "home-card sentence changed ('The figures' → 'All the figures'); M3 site/subscribe/index.html's disclosure put "
+        "back to 'Elena Voss, the site's AI journalist'."
+    ),
+    "observed": "2026-11-21, #6178 lane. BASELINE 5 passed. M1 2 failed; M2 1 failed; M3 1 failed. REVERTED 5 passed.",
+    "scope": (
+        "www/src/**/*.astro|js|ts (the unnamed-narrator sweep, comments excluded); the three v9 byline call sites; "
+        "scripts/v4_build_rss.py DESC (imported) and the committed site/rss.xml + site/feed.xml; site/subscribe/index.html. "
+        "NOT SEEN: the built dist (the Python suite cannot run astro build; www/tests/week_states_6178.test.mjs pins the "
+        "strings); legacy /legacy/ pages; the podcast feed's own channel text."
+    ),
+    "proved_on": "2026-11-21",
+}
+
+# #6176 — the owner's outbound trial: every switchboard item ships OFF, only the owner-facing senders read it (no
+# subscriber sender, Morning Brief or chronicle preview), and each held send is a recognised state.
+STRUCTURAL_HAND_PROOFS["structural::test_outbound_trial_6176.py"] = {
+    "gate_name": "test_outbound_trial_6176.py",
+    "command": "python3 -m pytest tests/test_outbound_trial_6176.py -q -p no:cacheprovider   # baseline 34 passed",
+    "mutation": (
+        "Five plants, ONE AT A TIME, each restored from a scratch copy: M1 monday_compass_lambda's trial gate → `if False:`; "
+        "M2 story_season_qa's pause branch → `if False:`; M3 `from common import outbound_trial` appended to "
+        "lambdas/compute/weekly_signal_lambda.py (a subscriber sender reading the switchboard); M4 evening_nudge_lambda's "
+        "quiet-rule gate → `if False:`; M5 outbound_trial.TRIAL[OPS_MONDAY_PACK] shipped True."
+    ),
+    "observed": (
+        "2026-11-21, #6176 lane. BASELINE 34 passed. M1 1 failed (compass held); M2 1 failed (dead-man reads the pause); "
+        "M3 1 failed (the reader-set sweep); M4 2 failed (stale items dropped / nothing sent); M5 1 failed (every item "
+        "ships off). REVERTED 34 passed."
+    ),
+    "scope": (
+        "Every .py under lambdas/ that imports common.outbound_trial (AST), the committed TRIAL defaults, and each gated "
+        "sender's on/off path through fakes. NOT SEEN: a sender that reads the switchboard by another import spelling "
+        "(importlib, a re-export); the deployed fleet's flag state."
+    ),
+    "proved_on": "2026-11-21",
+}

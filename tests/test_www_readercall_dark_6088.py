@@ -58,7 +58,7 @@ def test_a_private_build_never_rewrites_the_committed_deploy_maps():
     """postbuild leaves owned_paths.json / reach.json as committed on a PRIVATE reader-call build (the room's rule)."""
     src = open(os.path.join(_REPO, "www", "scripts", "postbuild.mjs"), encoding="utf-8").read()
     assert "const readercall = readerCallPrivate();" in src
-    assert "const room = privateRoom || lab || story || readercall;" in src
+    assert "const room = privateRoom || lab || story || readercall || forecastFixture;" in src  # #6170 joins the rule
     assert "if (!room) writeFileSync(OWNED_OUT" in src and "if (!room) writeFileSync(REACH_OUT" in src
 
 

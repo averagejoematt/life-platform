@@ -1,0 +1,68 @@
+---
+// A RULES-BASED PLATFORM FORECAST's own page (#6170, owner ruling 2026-11-22 §5): what is predicted, by what fixed rule,
+// from which public readings, against what simple guess, when reader calls close and when the result is due — and the
+// reader's own call beside it. Never a coach's call: the page names the rule, not a person, and nothing here is part of
+// any coach's record. A page exists only for a forecast the snapshot carries (forecasts.json: written only when the
+// public route served one — none while the stream is dark — so with the switch off this route builds no page at all).
+import Base from "../../../layouts/Base.astro";
+import ForecastReaderCall from "../../../components/ForecastReaderCall.astro";
+import StatusTag from "../../../components/StatusTag.astro";
+import { dayInWords, num } from "../../../lib/format.js";
+import { loadForecasts } from "../../../lib/snapshot.js";
+
+export async function getStaticPaths() {
+  const { forecasts } = await loadForecasts();
+  return (forecasts || []).map((f) => ({ params: { id: f.id }, props: { f } }));
+}
+const { f } = Astro.props;
+const unit = f.unit || "";
+const places = f.metric === "weight_lbs" ? 1 : 2;
+const said = (v: number) => `${num(v, places)}${unit}`;
+const measure = f.measure ? f.measure[0].toUpperCase() + f.measure.slice(1) : "The measure";
+const headline = `${measure} will be about ${said(f.forecast)} on ${dayInWords(f.target_date)}.`;
+const graded = f.graded && (f.status === "confirmed" || f.status === "refuted");
+---
+
+<Base title={`Rules-based platform forecast of ${dayInWords(f.made)}`} top="system" description={headline} status={dayInWords(f.made)}>
+  <section class="section">
+    <div class="wrap grid cols2" style="gap:56px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <p class="label">Rules-based platform forecast · a number</p>
+        <div class="row"><StatusTag status={f.status} date={graded ? f.graded.on : null} call /></div>
+        <h1 style="font-size:28px;font-family:var(--mono);font-weight:500;letter-spacing:-.01em;line-height:1.3;overflow-wrap:anywhere">{headline}</h1>
+        <p class="muted" style="font-size:13px;max-width:56ch" data-forecast-frame>
+          A fixed rule run on the public readings anyone can see on this site — not an AI coach, and not part of any coach's record. It is checked against a guess that nothing changes.
+        </p>
+        <div class="rows">
+          <span><span>Made by</span><span>A rules-based platform forecast</span></span>
+          <span><span>The rule</span><span style="text-align:right;max-width:60%">{f.rule.words} (version {f.rule.version})</span></span>
+          <span><span>Made</span><span>{dayInWords(f.made)}</span></span>
+          <span><span>Reader calls close</span><span>{f.reader_calls_close ? `end of ${dayInWords(f.reader_calls_close)}` : "—"}</span></span>
+          <span><span>Result due</span><span>{dayInWords(f.result_due)}</span></span>
+          <span><span>Inputs</span><span style="text-align:right;max-width:60%">{f.inputs.n} public readings, {dayInWords(f.inputs.from)} to {dayInWords(f.inputs.to)}</span></span>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <div>
+          <p class="label" style="margin-bottom:8px">How it is graded</p>
+          <p style="font-size:14px;line-height:1.55">
+            On {dayInWords(f.target_date)} the forecast ({said(f.forecast)}) is set beside a guess that nothing changes ({said(f.guess.value)}, the reading of {dayInWords(f.guess.on)}, the last before the forecast was made). The forecast is right if it lands closer to that day's reading; if the guess is as close or closer, the forecast is wrong. The rule was fixed before the forecast was made.
+          </p>
+        </div>
+        {
+          graded && (
+            <div style="border:1px solid var(--ink);padding:16px 18px;display:flex;flex-direction:column;gap:6px">
+              <span class="label">What happened</span>
+              <div class="rows" style="font-size:14px">
+                <span><span>The reading</span><span>{f.graded.actual == null ? "—" : said(f.graded.actual)}</span></span>
+                <span><span>The forecast</span><span>{said(f.forecast)} · {f.status === "confirmed" ? "closer · right" : "not closer · wrong"}</span></span>
+                <span><span>Nothing changes</span><span>{said(f.guess.value)} · {f.status === "confirmed" ? "further · wrong" : "as close or closer · right"}</span></span>
+              </div>
+            </div>
+          )
+        }
+        <ForecastReaderCall forecast={f} />
+      </div>
+    </div>
+  </section>
+</Base>

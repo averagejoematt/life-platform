@@ -256,40 +256,96 @@ def _published_before(table: Any, chronicle_pk: str, date_str: str, n: int) -> D
     return {max(0, n - 1 - i): str(it.get("content_markdown") or "") for i, it in enumerate(prior)}
 
 
-# ── the legacy writer's door (#6155) ─────────────────────────────────────────
+# ── the legacy writer's door (#6155, #6178) ──────────────────────────────────
 #
 # When the desk declines or fails, the legacy writer drafts the week behind the same approval door. It never had the
 # desk's quote or ledger checks, so a legacy week could carry a quote the platform does not hold (the 2026-10 wk6
-# interview) or repeat a title the season already used. The legacy draft now runs those checks — the same functions
-# the desk's gates call, on the same dossier, ledger and published past — and is ALWAYS held for the owner with the
-# reasons named: the desk's fact read and craft gates did not run, and a legacy week leaves no ledger entry.
+# interview) or repeat a title the season already used.
+#
+# Switch OFF (the default, #6155 behaviour): the legacy draft runs the desk's quote, callback and title checks and is
+# ALWAYS held, the reasons named.
+# Switch ON (``CHRONICLE_LEGACY_ELIGIBLE=on`` on the chronicle Lambda; owner ruling 2026-11-22 §7, #6178): the draft runs
+# EXACTLY the checks the desk's ``_Gates.post`` runs — the same functions, on the same dossier, ledger and published
+# past: completeness + story door + figure grounding + staged encounters (``story_checks.all_findings``), the craft,
+# callback, quote and repeat gates (``_Gates.craft_post``) and the fact read (``story_writers.fact_check``) — plus the
+# season-title check. It then becomes ELIGIBLE for the owner's approve click when every non-craft finding is clear, the
+# way a desk draft does. It is never published by anything but that click. A check that cannot run holds the draft and
+# names which.
 
 LEGACY_HOLD = "legacy_hold"
 LEGACY_NOTE = (
     "legacy writer: the Story Desk did not write this draft, so its fact read and craft gates did not run and the "
     "season ledger will not advance on publish — held for the owner"
 )
+LEGACY_ELIGIBLE_ENV = "CHRONICLE_LEGACY_ELIGIBLE"
 _STAT_HEADER = re.compile(r"^\s*\[[^\]\n]*\]\s*$")
+
+
+def legacy_eligibility_on(env=None) -> bool:
+    """The #6178 switch, default OFF: only the literals on/1/true turn it on."""
+    return str((_os.environ if env is None else env).get(LEGACY_ELIGIBLE_ENV) or "").strip().lower() in ("on", "1", "true")
+
+
+def _legacy_text(md: str):
+    """``(title, md_for_the_gates)``: the legacy draft as the desk's gates read a desk post — the quoted title, then the
+    body, without the legacy machine header (a parsed data field, never prose)."""
+    title, body = story_writers.split_title(md)
+    body = "\n".join(line for line in body.splitlines() if not _STAT_HEADER.match(line))
+    return title, f'"{title}"\n\n{body.strip()}', body
+
+
+def _title_findings(title: str, ledger: Dict[str, Any]) -> List[str]:
+    used = {str((t or {}).get("title") if isinstance(t, dict) else t).strip().lower() for t in ledger.get("titles", [])}
+    return [f"ledger: the title {title!r} repeats one the season has already used"] if title and title.strip().lower() in used else []
 
 
 def legacy_findings(g: _Gates, md: str, ledger: Dict[str, Any]) -> List[str]:
     """The desk's quote and ledger checks on a legacy draft: exact quotes against what the platform holds, callbacks
     against the published installments, and the title against the season's titles. Pure."""
-    title, body = story_writers.split_title(md)
-    body = "\n".join(line for line in body.splitlines() if not _STAT_HEADER.match(line))  # the legacy machine header
+    title, _md, body = _legacy_text(md)
     out = story_craft.quote_findings(body, g.corpus) + story_craft.callback_findings(body, g.previous)
-    used = {str((t or {}).get("title") if isinstance(t, dict) else t).strip().lower() for t in ledger.get("titles", [])}
-    if title and title.strip().lower() in used:
-        out.append(f"ledger: the title {title!r} repeats one the season has already used")
-    return out
+    return out + _title_findings(title, ledger)
 
 
-def legacy_audit(table: Any, date_str: str, md: str, *, chronicle_pk: str = "USER#matthew#SOURCE#chronicle") -> List[str]:
-    """Every reason a LEGACY-written draft for the week ending ``date_str`` is held (#6155). Never empty: the first item
-    is ``LEGACY_NOTE``; the desk's quote/callback/title findings follow. A week the checks cannot read (not a season
-    week end, a read failure) is held with that reason instead — never a silent pass."""
-    from content import story_dossier
+def legacy_gate_findings(g: _Gates, md: str, ledger: Dict[str, Any], *, fact_check=None) -> List[str]:
+    """#6178: the desk's FULL post gate on a legacy draft — the three parts of ``_Gates.post`` called one by one, so a
+    part that cannot run is named. ``stop_reason`` is None: the legacy writer does not carry the model's stop signal, so
+    completeness reads the text (a cut last line, a missing footer). Returns the findings; a part that raised adds a
+    ``legacy audit: … could not run`` item, which blocks (it is not a craft note). ``fact_check`` defaults to the desk's."""
+    title, gmd, _body = _legacy_text(md)
+    fact = fact_check or story_writers.fact_check
+    parts = (
+        (
+            "source, privacy and figure checks",
+            lambda: story_checks.all_findings(
+                gmd, stop_reason=None, allowed=g.allowed, not_yet_exported=g.nye, footer_pattern=story_writers.CHRONICLE_FOOTER
+            ),
+        ),
+        ("quote, callback, craft and repeat checks", lambda: g.craft_post(gmd)),
+        ("fact read", lambda: fact(gmd, g.dossier, context=g.context)),
+    )
+    out: List[str] = []
+    for name, run in parts:
+        try:
+            out += list(run())
+        except Exception as e:  # noqa: BLE001 — a check that cannot run holds the draft, named
+            out.append(f"legacy audit: the {name} could not run ({type(e).__name__}: {e})")
+    return out + _title_findings(title, ledger)
 
+
+def legacy_audit(
+    table: Any, date_str: str, md: str, *, chronicle_pk: str = "USER#matthew#SOURCE#chronicle", eligible=None, fact_check=None
+) -> List[str]:
+    """Every finding on a LEGACY-written draft for the week ending ``date_str`` (#6155, #6178). Never empty.
+
+    Switch off (``eligible`` defaults to ``legacy_eligibility_on()``): the first item is ``LEGACY_NOTE`` (blocking), then
+    the desk's quote/callback/title findings. Switch on: the first item is ``autopublish_audit.LEGACY_CHECKED_NOTE`` (an
+    information line the audit does not block on), then every finding of the desk's full post gate. Either way, a week
+    the checks cannot read (not a season week end, a read failure) is held with ``LEGACY_NOTE`` and the reason — never a
+    silent pass."""
+    from content import autopublish_audit, story_dossier
+
+    on = legacy_eligibility_on() if eligible is None else bool(eligible)
     try:
         wk = next((w for w in story_dossier.season_weeks(through=date_str) if w["end"] == date_str), None)
         if wk is None:
@@ -300,7 +356,10 @@ def legacy_audit(table: Any, date_str: str, md: str, *, chronicle_pk: str = "USE
         previous = _published_before(table, chronicle_pk, date_str, n)
     except Exception as e:  # noqa: BLE001 — a check that cannot run holds the week, it never passes it
         return [LEGACY_NOTE, f"legacy audit: the desk's quote and ledger checks could not run ({type(e).__name__}: {e})"]
-    return [LEGACY_NOTE] + legacy_findings(_Gates(n, dossier, {}, ledger, None, previous), md, ledger)
+    g = _Gates(n, dossier, {}, ledger, None, previous)
+    if not on:
+        return [LEGACY_NOTE] + legacy_findings(g, md, ledger)
+    return [autopublish_audit.LEGACY_CHECKED_NOTE] + legacy_gate_findings(g, md, ledger, fact_check=fact_check)
 
 
 def live_week(table: Any, date_str: str, *, chronicle_pk: str = "USER#matthew#SOURCE#chronicle", log=print) -> Optional[Dict[str, Any]]:

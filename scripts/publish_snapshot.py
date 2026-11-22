@@ -96,11 +96,13 @@ from publish_snapshot_contract import (  # noqa: E402,F401 — re-exported: the 
     SCHEMA,
     UTILITY,
     VISIBILITIES,
+    WEEK_STATE_TEXT,
     SchemaError,
     _check,
     _dump,
     _words_in_text,
     _write_data_files,
+    attach_own_words_and_forecasts,
     build_appendix,
     dangling_edges,
     day_in_words,
@@ -129,7 +131,6 @@ from publish_snapshot_lab import (  # noqa: E402 — the Laboratory's data file,
     live_lab,
     resolve_and_validate as resolve_lab,
 )
-from publish_snapshot_own_words import resolve as resolve_own_words  # noqa: E402 — his approved lines, as /api/journal_quotes serves them
 from publish_snapshot_story import (  # noqa: E402 — HS1, WEB_STORY=1 only
     fixture_story,
     live_story,
@@ -329,17 +330,17 @@ def _chapter_body(ctx: LiveContext, url: str | None) -> str | None:
 
 
 def _live_week_states(ctx: LiveContext) -> None:
-    """Program weeks with no published chapter: `held` (drafted, not approved: the API does not say waiting vs sent back, #6161), `skipped`
-    (a later week published, this one never was) or `pending` (the current or most recent week,
-    not yet written). From `/api/chapters` when it is served; otherwise derived from the
-    published weeks and the edition's day count — never a title or a body for any of them."""
+    """Weeks with no published chapter, each with its one WEEK_STATE_TEXT line (#6178): held (one neutral line, never
+    "waiting"/"sent back"), retired (owner decided not to publish), skipped, pending; an unknown state is held. From
+    `/api/chapters`, else derived from the published weeks and the edition's day count — never a title or a body."""
     published = {c["week"] for c in ctx.objs["chapter"] if isinstance(c.get("week"), int)}
     weeks_api = (ctx.fetched.get("chapters") or {}).get("weeks") or []
     states: dict[int, dict] = {}
     if weeks_api:
         for w in weeks_api:
             n, st = w.get("week"), w.get("status")
-            if isinstance(n, int) and st in ("held", "skipped", "pending") and n not in published:
+            if isinstance(n, int) and st != "published" and n not in published:
+                st = st if st in WEEK_STATE_TEXT else "held"  # an unknown state is an unpublished draft, never "skipped"
                 states[n] = {"status": st, "start": w.get("start"), "reason": w.get("reason"), "drafted_at": w.get("drafted_at")}
     else:
         edition = ctx.fetched.get("edition") or {}
@@ -361,12 +362,8 @@ def _live_week_states(ctx: LiveContext) -> None:
             }
     for n, st in sorted(states.items()):
         status = st["status"]
-        text = {
-            "held": "Drafted, not approved. No chapter for this week yet.",
-            "skipped": "No chapter was published for this week.",
-            "pending": "No chapter yet for this week.",
-        }[status]
-        if st.get("reason"):
+        text = WEEK_STATE_TEXT[status]
+        if st.get("reason") and status == "skipped":  # a held or retired week says only its one line (#6178)
             text = str(st["reason"])[:1].upper() + str(st["reason"])[1:].rstrip(".") + "."  # a sentence, like its siblings
         ctx.objs["chapter"].append(
             envelope(
@@ -1080,8 +1077,9 @@ def run(mode: str, out_dir: str, fixtures_dir: str, base_url: str, timeout: floa
             data_files["story"] = validate_story(story, public)
         except ValueError as exc:
             raise SchemaError(str(exc)) from exc
-    # his own words (owner ruling 2026-11-15): a page places a line only where own_words.js pins it AND this file carries it
-    data_files["own_words"] = resolve_own_words(mode, fixtures_dir, lambda p: _get(base_url, p, timeout), log)
+    # his own words (owner ruling 2026-11-15): a page places a line only where own_words.js pins it AND this file carries it;
+    # and the rules-based platform forecasts (#6170): only when the route served one (none while dark) or WEB_FORECAST=1
+    attach_own_words_and_forecasts(data_files, mode, fixtures_dir, lambda p: _get(base_url, p, timeout))
     return write_snapshot(out_dir, public, excluded, mode, base_url, build_appendix(), data_files)
 
 

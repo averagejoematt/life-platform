@@ -800,6 +800,7 @@ class TestPredictionScan:
         ev._fetch_predictions()
         scanned = {q["ExpressionAttributeValues"][":pk"] for q in table.queries}
         expected = {f"COACH#{c}" for c in OPERATIONAL_COACH_IDS} | {f"COACH#{c}" for c in RETIRED_COACH_IDS} | {ev.DIARY_CLAIMS_PK}
+        expected |= {ev.FORECAST_PK}  # #6156: the platform's forecast rule's calls, graded by this same scan
         assert scanned == expected
         assert RETIRED_COACH_IDS, "the fix is only exercised while the registry carries a retired seat"
 
@@ -1614,3 +1615,51 @@ class TestSecondLook:
         daily_series("hrv", [60.0], table=table)
         ev._evaluate_all(ev._fetch_predictions()[0], TODAY)
         assert len([p for p in table.puts if str(p.get("sk", "")).startswith("LEARNING#")]) == 1
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #6156 — the platform's forecast rule: filed from the PUBLIC series, graded here
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class TestPublicForecastIsGradedByThisGrader:
+    """The must-agree pair: the "nothing changes" value the forecast rule freezes AT FILING (from the public series)
+    and the one this grader stamps AT GRADING (from its own read of the table) — the same function on the same
+    readings. And a forecast row moves no coach's confidence and writes no coach's learning row (coach_id "")."""
+
+    FILED = days_before(7)
+
+    def _seed_weight(self, table):
+        values = [300.0 - 0.3 * i + (0.4 if i % 3 else -0.4) for i in range(37)]  # through TODAY (the target day)
+        return daily_series("weight_lbs", values, end_date=TODAY, source="withings", table=table)
+
+    def _row(self, mapping):
+        from coach import public_forecast as F
+
+        payload = {
+            "metric": "weight_lbs",
+            "unit": "lb",
+            "source_id": "withings",
+            "as_of": self.FILED,
+            "days": [{"date": d, "value": v, "present": True, "gap": False} for d, v in sorted(mapping.items())],
+        }
+        row, why = F.build("weight_trend", self.FILED, payload, "https://example.invalid/api/series", "2026-05-11", phase_stamp=False)
+        assert why is None, why
+        return json.loads(json.dumps(row, default=float))  # the row as the grader reads it back (no Decimals)
+
+    def test_graded_with_the_baseline_it_froze_at_filing_and_no_coach_rows(self, table, monkeypatch):
+        from coach import coach_baseline
+
+        monkeypatch.setattr(coach_baseline, "EXPERIMENT_START_DATE", "2026-01-01")  # the fixture clock predates genesis
+        row = self._row(self._seed_weight(table))
+        assert row["lineage"]["readings"][-1][0] < self.FILED, "nothing on or after the filing day is an input"
+        seed(table, row)
+        evaluable, _ = ev._fetch_predictions()
+        assert [p["sk"] for p in evaluable] == [row["sk"]]
+        evaluations, _ = ev._evaluate_all(evaluable, TODAY)
+        assert [e["status"] for e in evaluations] in (["confirmed"], ["refuted"])
+        stored = table.items[(ev.FORECAST_PK, row["sk"])]
+        assert stored["status"] == evaluations[0]["status"]
+        frozen, graded = row["baseline_at_filing"], stored["baseline"]
+        assert float(graded["filed_value"]) == pytest.approx(frozen["filed_value"]) and graded["filed_on"] == frozen["filed_on"]
+        assert confidence_rows(table) == [] and learning_rows(table) == []

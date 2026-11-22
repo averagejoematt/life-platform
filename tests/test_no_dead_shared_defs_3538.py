@@ -93,6 +93,9 @@ LIVE_DIRS = ("lambdas", "mcp", "deploy", "scripts", "cdk")
 # request_validator.validate_source (deploy/dedup_source_records.py). That they ride in
 # the bundle unused at RUNTIME is a packaging question (#781), not a dead-code one.
 ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
+    "lambdas/content/elena_canon.py:verify_anchors": (
+        "#6178 (owner ruling 2026-11-22 §7, 'only eligible, verified voice examples'): the voice-anchor re-verification, run by hand against the live site whenever VOICE_ANCHORS changes (its fetch is injected, so no Lambda calls it); pinned by tests/test_elena_canon_refinements_6178.py. Delete this entry if the check moves into a script."
+    ),
     "lambdas/common/goals_field_privacy.py:is_named": (
         "Owner ruling 2026-11-10 (6): the coverage guard's predicate - every config/user_goals.json field is named by the field review (tests/test_goals_field_privacy.py). Delete this entry if the guard moves into a script."
     ),
@@ -234,9 +237,6 @@ ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
     ),
     "lambdas/coach/coach_checkin.py:recent_checkins_block": (
         "#3609 box 2 widen: exercised by tests/test_coach_checkin_tools.py; named only in a COMMENT in lambdas/ai/platform_memory.py (not an actual call — the AST scan correctly ignores prose mentions, same caveat as hard_stopped above). No production caller found; registered pending owner triage."
-    ),
-    "lambdas/coach/coach_corrections.py:get_correction": (
-        "#3609 box 2 widen: exercised only by tests/test_coach_corrections.py (also named in docs/SCHEMA.md); no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."
     ),
     "lambdas/coach/coach_corrections.py:stale_cycle_corrections": (
         "#3609 box 2 widen: exercised only by tests/test_coach_corrections.py; no production caller found on the live surface (lambdas/ mcp/ deploy/ scripts/ cdk/ + live tests/ harnesses) as of 2026-09-19. Registered pending owner triage (wire it in or retire it with its test) rather than deleted in this structural PR."

@@ -1187,6 +1187,7 @@ def check_steps():
         ("phase_eval_liveness", lambda: phase_eval_qa.check_phase_eval_liveness(table, Check, CONTENT_TRUTH, pt_now)),  # #5575 dead-man
         ("planning_loop_liveness", lambda: planning_loop_qa.check_planning_loop_liveness(table, Check, CONTENT_TRUTH, pt_now)),  # #5761
         ("public_brief_liveness", lambda: public_brief_qa.check_public_brief_liveness(table, Check, CONTENT_TRUTH, pt_now)),
+        ("public_forecast_liveness", lambda: public_brief_qa.check_public_forecast_liveness(table, Check, CONTENT_TRUTH, pt_now)),  # #6156
         # the Monday brief's one manual input: MacroFactor's export age, WARN from Saturday while an upload can still land
         (
             "macrofactor_export_age",

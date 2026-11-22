@@ -15,6 +15,7 @@ import { dailyBars, placeEvidence, windowValues } from "../../lib/evidence.js";
 import { theLine } from "../../lib/theline.js";
 import { hasPage, href, pathOf } from "../../lib/url.js";
 import { placeRecordNote } from "../../lib/record_note.js";
+import { CHAPTER_BYLINE } from "../../lib/narrator.js";
 
 export async function getStaticPaths() {
   const all = await loadAll();
@@ -68,6 +69,7 @@ const weekCalls =
 const callWords = (p: any) => heldCallWords(p) || p.claim;
 const stateCopy: Record<string, string> = {
   held: "Held.",
+  retired: "Retired.",
   skipped: "Skipped.",
   pending: "Not yet.",
 };
@@ -222,7 +224,7 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
           {c.read_minutes && <span>Read · {c.read_minutes} min</span>}
           {c.word_count && <span>{num(c.word_count)} words</span>}
           {episode && episode.duration_sec && <span>Listen · {mins(episode.duration_sec)}</span>}
-          {c.status === "published" && <span class="muted">Written by the platform's narrator from the week's data; published after Matthew approved it.</span>}
+          {c.status === "published" && <span class="muted" data-byline>{CHAPTER_BYLINE}</span>}
         </div>
       </div>
     </div>

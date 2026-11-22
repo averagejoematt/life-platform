@@ -268,7 +268,11 @@ REPLAY_SEMANTICS: dict[str, tuple[str, str]] = {
     # ── #3114: the timestamp/uuid-keyed writes this change fixed ──────────────
     "log_decision": (CLAIM_LEDGER, "DECISION#{ms-ts} kept for ordering; claim on (date, decision, source, followed, note)"),
     "save_insight": (CLAIM_LEDGER, "INSIGHT#{second-ts} kept for ordering; claim on (date, text, source, tags)"),
-    "log_coach_correction": (CONTENT_KEY, "correction_id defaults to sha256(item_ref, text, error_class)[:8]; conditional put"),
+    "log_coach_correction": (
+        CONTENT_KEY,
+        "correction_id defaults to sha256(item_ref, text, error_class)[:8]; conditional put. #6158 close/reopen are "
+        "conditional updates on the current status (open / closed), so a replayed close or reopen writes nothing",
+    ),
     "audit_coach_dossier": (CONTENT_KEY, "retract/correct route through the same coach_corrections.write_correction"),
     "manage_reading": (
         CLAIM_LEDGER,
@@ -306,6 +310,11 @@ REPLAY_SEMANTICS: dict[str, tuple[str, str]] = {
         "ADVICELINK#<decision-ts>#<kind>#<coach>#<ref> from the call's own args; an identical replay is read first and writes nothing (#5612). "
         "A coach ask's answer appends ASKRESPONSE#<coach>#<ask>#<ts> revisions by design, but reads the newest first: a replay of the "
         "same answer writes nothing",
+    ),
+    "manage_coach_recommendation": (
+        READ_BEFORE_WRITE,
+        "#6158: record writes REC#<rec_id>, rec_id = sha256(coach, day, exact words), under attribute_not_exists; the other "
+        "writes append REC#<rec_id>#EV#<ts>#<kind> but read the newest event of that kind first — an identical replay writes nothing",
     ),
     "update_decision_outcome": (DETERMINISTIC_KEY, "updates the caller-supplied DECISION# sk in place; no new row is ever created"),
     "update_insight_outcome": (DETERMINISTIC_KEY, "updates the caller-supplied INSIGHT# sk in place; no new row is ever created"),
