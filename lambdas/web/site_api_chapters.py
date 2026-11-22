@@ -33,6 +33,13 @@ experiment, ADR-077):
                      "no chapter was published".
   * ``pending``    — the week in progress, with nothing yet: the draft day has not come.
 
+THE CORRECTIONS (#6177). ``corrections`` lists every APPROVED dated public correction to a published chapter
+(``content.chapter_corrections.public_view`` over the chronicle partition's ``CHAPTER_CORRECTION#`` rows): keyed by
+the chapter's v9 id (the prologue included), platform-signed, with its approval history; a superseded one stays,
+marked ``superseded_by``. An unapproved proposal is never read into the response. When the rows cannot be read the
+field is ``null`` and ``corrections_error`` says so — never ``[]``, so a reader cannot take a failed read for "no
+corrections" and drop a published correction from the site.
+
 The prologue (manifest ``week`` 0, dated before genesis) is not a program week and is not
 listed. A tombstoned or pre-genesis row is not read (``_query_source`` applies the phase
 filter and the genesis clamp).
@@ -51,8 +58,9 @@ from datetime import timedelta
 from typing import Any, Callable
 
 from common.pacific_time import pacific_today, parse_day_key
+from content import chapter_corrections
 
-from web.site_api_common import EXPERIMENT_START, _error, _load_s3_json, _ok, _query_source, logger
+from web.site_api_common import EXPERIMENT_START, USER_ID, _error, _load_s3_json, _ok, _query_source, logger, table
 
 SOURCE = "/api/chapters"
 CACHE_SECONDS = 600
@@ -222,11 +230,37 @@ def _read_manifest() -> dict | None:
     return doc if isinstance(doc, dict) and doc else None
 
 
+def _read_corrections() -> list:
+    """Every ``CHAPTER_CORRECTION#`` row of the chronicle partition (proposed and approved; ``public_view`` keeps the approved)."""
+    from boto3.dynamodb.conditions import Key
+
+    kw: dict = {
+        "KeyConditionExpression": Key("pk").eq(chapter_corrections.pk(USER_ID)) & Key("sk").begins_with(chapter_corrections.SK_PREFIX)
+    }
+    out: list = []
+    while True:
+        resp = table.query(**kw)
+        out.extend(resp.get("Items") or [])
+        if not resp.get("LastEvaluatedKey"):
+            return out
+        kw["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+
+
+def corrections_field(read_corrections: Callable[[], list]) -> dict:
+    """``{"corrections": [...]}`` — or ``{"corrections": None, "corrections_error": ...}`` when the rows cannot be read."""
+    try:
+        return {"corrections": chapter_corrections.public_view(read_corrections(), log=logger.warning)}
+    except Exception as e:  # noqa: BLE001 — a failed read is said, never served as "no corrections"
+        logger.error(f"[chapters] corrections read failed: {type(e).__name__}: {e}")
+        return {"corrections": None, "corrections_error": "the corrections could not be read for this response"}
+
+
 def handle_chapters(
     event,
     *,
     query: Callable = _query_source,
     read_manifest: Callable[[], dict | None] = _read_manifest,
+    read_corrections: Callable[[], list] = _read_corrections,
     today: str | None = None,
 ):
     """GET /api/chapters — see the module docstring. ``query`` / ``read_manifest`` are the injectable readers."""
@@ -244,6 +278,7 @@ def handle_chapters(
         return _error(503, UNAVAILABLE)
     journal = read_manifest()
     doc = compose(rows, journal, genesis, today)
+    doc.update(corrections_field(read_corrections))
     degraded = None
     if journal is None:
         degraded = "journal manifest unreadable — published weeks may read as skipped"

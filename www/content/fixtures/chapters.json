@@ -7,7 +7,7 @@
    "via": "chronicle-approve"
   },
   "as_of": "2026-10-31",
-  "body_html": "<p>Sample chapter body, for layout only. The published chronicle text moves here in Phase 1.</p><h2>What Lisa got wrong</h2><p>Two weeks later the evaluator looked at the window and graded it.</p>",
+  "body_html": "<p class=\"signature\"><em>Editor's note, October 2026 — Margaret Calloway: a sample editor's note, for layout only.</em></p><p>Sample chapter body, for layout only. The published chronicle text moves here in Phase 1.</p><h2>What Lisa got wrong</h2><p>Two weeks later the evaluator looked at the window and graded it.</p>",
   "covers_end": "2026-10-12",
   "covers_start": "2026-10-06",
   "data_through": "2026-10-13",

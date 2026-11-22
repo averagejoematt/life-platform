@@ -126,6 +126,20 @@ export async function loadOwnWords() {
   return _ownWords;
 }
 
+let _chapterCorrections = null;
+/** The approved, platform-signed chapter corrections (#6177): the exporter always writes the file (absent when the
+ *  route did not serve the field). A snapshot made before it existed reads as absent, so nothing is placed. Pages
+ *  read it only through lib/chapter_corrections.js::correctionsFor. */
+export async function loadChapterCorrections() {
+  if (_chapterCorrections) return _chapterCorrections;
+  try {
+    _chapterCorrections = JSON.parse(await readFile(join(SNAPSHOT_DIR, "chapter_corrections.json"), "utf8"));
+  } catch {
+    _chapterCorrections = { state: "absent", corrections: [] };
+  }
+  return _chapterCorrections;
+}
+
 let _calibration = null;
 /** The Coaching Room's data file (CR1, built dark): written by the producer ONLY on a WEB_ROOM=1 export and read only
  *  by room pages, which exist only on a room build. Throws when absent — a room build over a flag-off snapshot is a

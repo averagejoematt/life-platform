@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-"""scripts/publish_snapshot.py — the publication snapshot: the ONE boundary between the
-platform and the v9 static build (docs/design/v9/STAGE4_ENGINEERING_PLAN.md §B, §D; #5530,
-epic #5529).
+"""scripts/publish_snapshot.py — the publication snapshot: the ONE boundary between the platform and the
+v9 static build (docs/design/v9/STAGE4_ENGINEERING_PLAN.md §B, §D; #5530, epic #5529).
 
 What it does
   * reads the platform's PUBLIC surface over HTTPS (``--mode live``) — never DynamoDB, never
@@ -56,6 +55,7 @@ from publish_snapshot_calibration import (  # noqa: E402 — the Coaching Room's
     room_cr2,
     room_enabled,
 )
+from publish_snapshot_chapter_corrections import resolve as resolve_chapter_corrections  # noqa: E402 — #6177, approved corrections only
 from publish_snapshot_chapters import (
     CALL_OUTCOME,
     apply_week_intervals,
@@ -1082,6 +1082,7 @@ def run(mode: str, out_dir: str, fixtures_dir: str, base_url: str, timeout: floa
             raise SchemaError(str(exc)) from exc
     # his own words (owner ruling 2026-11-15): a page places a line only where own_words.js pins it AND this file carries it
     data_files["own_words"] = resolve_own_words(mode, fixtures_dir, lambda p: _get(base_url, p, timeout), log)
+    data_files["chapter_corrections"] = resolve_chapter_corrections(mode, fixtures_dir, lambda p: _get(base_url, p, timeout), log, public)
     return write_snapshot(out_dir, public, excluded, mode, base_url, build_appendix(), data_files)
 
 

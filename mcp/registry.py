@@ -19,6 +19,7 @@ from mcp.tools_benchmark import GET_BENCHMARK_DESCRIPTION, tool_get_benchmark
 from mcp.tools_capture import tool_get_capture_queues
 from mcp.tools_cgm import tool_get_cgm
 from mcp.tools_challenges import CHALLENGE_CHECKIN_DESCRIPTION, CHALLENGE_CHECKIN_INPUT, tool_log_challenge_checkin  # #6087
+from mcp.tools_chapter_corrections import MCC_DESCRIPTION, MCC_INPUT, tool_manage_chapter_corrections  # #6177
 
 # #915: ad-hoc coach check-in loop — coaches ask, Matthew answers verbatim.
 from mcp.tools_coach_checkin import (
@@ -2055,6 +2056,10 @@ TOOLS = {
     "log_challenge_checkin": {  # #6087: the owner's own challenge check-in — the public door can no longer write his row
         "fn": tool_log_challenge_checkin,
         "schema": {"name": "log_challenge_checkin", "description": CHALLENGE_CHECKIN_DESCRIPTION, "inputSchema": CHALLENGE_CHECKIN_INPUT},
+    },
+    "manage_chapter_corrections": {  # #6177: dated public chapter corrections, platform-signed, public only once he approves
+        "fn": tool_manage_chapter_corrections,
+        "schema": {"name": "manage_chapter_corrections", "description": MCC_DESCRIPTION, "inputSchema": MCC_INPUT},
     },
     "log_owner_note": {
         "fn": tool_log_owner_note,

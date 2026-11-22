@@ -257,17 +257,20 @@ def html_body_to_markdown(body_html: str) -> str:
 
 
 def render_editors_note(note: str) -> tuple[str, str]:
-    """(html, markdown) for a Margaret-Calloway editor's note, or ('', '') when empty.
+    """(html, markdown) for a platform-signed editor's note (#6177; Margaret-Calloway-signed before), or ('', '') when empty.
 
     Reuses the chronicle's existing device (lambdas/margaret_editor_pass.splice_editors_note):
     a signed blockquote. The HTML form is a <blockquote> so restart_leadin_pages renders it
     with the same ember-rule prose styling every chronicle blockquote gets; the markdown form
-    is the identical '> **Editor's note — Margaret Calloway:** …' the live weekly path emits."""
+    is the identical platform-signed '> **Editor's note — <platform signature>:** …' the live weekly path emits."""
     note = (note or "").strip()
     if not note:
         return "", ""
-    note_html = f'<blockquote class="editors-note"><strong>Editor\'s note — Margaret Calloway:</strong> {note}</blockquote>\n'
-    note_md = f"> **Editor's note — Margaret Calloway:** {note}\n\n"
+    # #6177 (owner ruling 2026-11-22 §7): a new note is signed by the platform, never by the Margaret persona. The notes
+    # already published under her name stay as they are (their audit trail); only what this writes from now changes.
+    sig = "Average Joe Matt editorial record"  # = lambdas/content/chapter_corrections.PLATFORM_SIGNATURE (pinned by its test)
+    note_html = f'<blockquote class="editors-note"><strong>Editor\'s note — {sig}:</strong> {note}</blockquote>\n'
+    note_md = f"> **Editor's note — {sig}:** {note}\n\n"
     return note_html, note_md
 
 

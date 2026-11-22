@@ -37,7 +37,7 @@ REGISTRY_PATH = os.path.join(MCP_DIR, "registry.py")
 # Expected tool count range — update when consolidating or adding tools
 EXPECTED_MIN_TOOLS = 50  # #395 ER-04 prune (2026-07-08): registry cut 143 -> 60 against 30d usage telemetry
 EXPECTED_MAX_TOOLS = (
-    92  # #395 held 70; +2 Horizons (#1705); +1 log_coach_calibration (#1481); +1 mark_journal_quote (#1568);
+    93  # #395 held 70; +2 Horizons (#1705); +1 log_coach_calibration (#1481); +1 mark_journal_quote (#1568);
     # +1 audit_coach_dossier (#1387); +1 manage_diary_claims (#1841) — deliberate additions.
     # +5 (#3668): describe_platform_surfaces + get_platform_surface (the index and the waiter — TWO tools
     # covering 59 unreachable owner-relevant endpoints, deliberately NOT 59 tools, because an oversized
@@ -82,6 +82,10 @@ EXPECTED_MAX_TOOLS = (
     # challenge record, so the anonymous door lost its write on his row and his own check-in needed an
     # owner-authenticated door. An MCP tool rather than a Site API owner-token route, so the public role holds no
     # write grant on the partition at all.
+    # +1 (#6177): manage_chapter_corrections — owner rulings 2026-11-22 §3/§7: a dated public correction to a published
+    # chapter, signed by the platform, public only once his approval is recorded ON it. ONE tool, three actions
+    # (list/propose/approve); the sole writer of the CHAPTER_CORRECTION# rows, and an MCP door because the approval
+    # must be his (the Site API stays read-only for it).
 )
 
 
