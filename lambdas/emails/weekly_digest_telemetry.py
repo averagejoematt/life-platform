@@ -1,4 +1,4 @@
-"""emails/weekly_digest_gate.py — the weekly digest's PROD-MON-06 gate-readout inputs (pure).
+"""emails/weekly_digest_telemetry.py — the weekly digest's PROD-MON-06 gate-readout inputs (pure).
 
 Moved out of ``weekly_digest_lambda.py`` unchanged (#6176) so the digest stays inside its module-size baseline (#1665);
 the digest re-exports ``_gate_telemetry`` under its old name, so every caller and test is unchanged.

@@ -65,7 +65,7 @@ from health.calorie_target import target_phrase  # #5095: the ONE calorie target
 from training import self_added_volume_report  # #4111: the end-of-week self_added_volume report
 
 from emails import weekly_what_changed_send  # #6176 item 1: the Sunday "what changed" email
-from emails.weekly_digest_gate import _gate_telemetry  # noqa: F401 — PROD-MON-06, moved out for #1665 headroom (#6176)
+from emails.weekly_digest_telemetry import _gate_telemetry  # noqa: F401 — PROD-MON-06, moved out for #1665 headroom (#6176)
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
 _REGION = os.environ.get("AWS_REGION", "us-west-2")
