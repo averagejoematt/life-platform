@@ -20,11 +20,13 @@ THE ORDER (the owner's, verbatim in intent):
   2. today's planned training session when relevant (the lead and the Performance seat) — read through
      `training.session_sequence`, the program's own derivation; nothing in `lambdas/training/` changes;
   3. the recommendations on record (`coach.recommendation_record`) with HIS recorded answers only;
-  4. the chat history and the coach's compressed notes with redundant repeats removed — a theme the
-     coach has already made in MAX_PER_THEME newer places is not carried again (his own words are
-     never removed);
+  4. the coach's compressed notes, exactly as rendered (never edited — round 3 of the blind evaluation
+     showed editing them lost dates and order), and the chat THREAD with the coach's own repeated themes
+     capped: the newest MAX_PER_THEME replies carrying a theme are kept, older repeats left out (his own
+     words are never removed);
   5. the corrections he has made (already in the memory block since #6153 — kept, after the notes);
-  6. what the coach can and cannot remember, worded so it cannot be read as "I have no memory".
+  6. what the coach can and cannot remember, worded so it cannot be read as "I have no memory", and that
+     what he DID comes only from his recorded answer, never from his data.
 
 THE LEAD. Eli Marsh coordinates: he sees every coach's open recommendations and is the one who asks
 about a due follow-up — ONE recommendation, once, inside a reply or a scheduled message that already
@@ -81,7 +83,10 @@ RECS_HEADER = (
     "3. RECOMMENDATIONS ON RECORD and what he answered. Only his explicit answers count: 'not recorded' means he "
     "has not answered, and you never read an answer into his training, food or wearable data."
 )
-NOTES_HEADER = "4. YOUR OWN NOTES AND THIS CHAT (repeats already left out):"
+NOTES_HEADER = (
+    "4. YOUR OWN NOTES FROM EARLIER CHATS, oldest first and each with its date — the NEWEST note is the last one. "
+    "When you say what you told him, name the date of the note you are citing:"
+)
 LEAD_LINE = (
     "You are the lead coach: you hold the thread across his coaches so he never has to repeat himself. Bring a "
     "specialist in by name only when their lane genuinely decides the answer."
@@ -92,7 +97,10 @@ CAPABILITY = (
     "corrections, all above. When he asks what you told him or what he decided, answer from them and name the "
     "day. You do not have word-for-word transcripts of older chats, and you cannot save anything new from this "
     "chat — that is all the WRITES rule below means. Never tell him you have no memory or that this chat does not "
-    "keep earlier sessions; if a specific thing is not in your notes, say that thing is not in your notes."
+    "keep earlier sessions; if a specific thing is not in your notes, say that thing is not in your notes. "
+    "Never state or imply that he did or did not do something because of his sensor, nutrition or training data "
+    "(an average, a count, a logged workout or meal): only his own recorded answer says what he did. If he has not "
+    "told you, say you do not know."
 )
 
 _STOP = frozenset(
@@ -105,7 +113,6 @@ _STOP = frozenset(
 )
 _DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
 _TOKEN = re.compile(r"[a-z][a-z']{3,}|\d+(?:\.\d+)?")
-_SEGMENT_SPLIT = re.compile(r"((?<=[.!?])\s+|\s+·\s+)")
 
 
 def _clip(text: Any, n: int = LINE_CAP) -> str:
@@ -162,7 +169,7 @@ def select_units(units: list[str], cap: int = MAX_PER_THEME) -> list[bool]:
 
 
 def _split_memory_core(memory: str) -> tuple[str, str]:
-    """(notes, corrections): the corrections block (#6153) is never de-duplicated and stays after the notes."""
+    """(notes, corrections): the corrections block (#6153) is kept as given and stays after the notes."""
     from coach.coach_corrections import CHAT_CORRECTIONS_HEADER
 
     idx = (memory or "").find(CHAT_CORRECTIONS_HEADER)
@@ -171,41 +178,27 @@ def _split_memory_core(memory: str) -> tuple[str, str]:
     return memory[:idx].rstrip(), memory[idx:].strip()
 
 
-def dedupe(notes: str, thread: list[dict], cap: int = MAX_PER_THEME) -> tuple[str, list[dict], dict[str, int]]:
-    """Drop the coach's own repeats across the chat thread and its compressed notes.
+def dedupe_thread(thread: list[dict], cap: int = MAX_PER_THEME) -> tuple[list[dict], dict[str, int]]:
+    """Cap the coach's own repeated themes in the CHAT THREAD only.
 
-    Units, newest first: the coach's replies in the thread (newest to oldest), then the note segments
-    (last line to first — the summaries render oldest first). Matthew's messages are never units and
-    never dropped. A dropped reply is replaced by a short placeholder so the turn order he sees is kept."""
+    Round 3 of the blind evaluation (2026-11-22) showed that editing the compressed notes was harmful: splitting
+    them into sentences stripped date labels, cut a sentence at "vs.", emptied one coach's notes and halved the
+    time-gap line, and the coach then quoted its OLDEST surviving note as its latest. So the notes are never
+    edited here; they reach the prompt exactly as `_memory_block` rendered them, every date label intact.
+
+    In the thread the units are whole coach replies, newest first: the NEWEST `cap` replies carrying a dominant
+    theme are kept and older repeats are replaced by a placeholder (so the turn order he saw is kept). Matthew's
+    messages are never touched, and the newest coach reply is always kept."""
     from coach import coach_chat
 
     thread = list(thread or [])
     coach_idx = [i for i in range(len(thread) - 1, -1, -1) if thread[i].get("role") == coach_chat.ROLE_COACH and thread[i].get("text")]
-    lines = (notes or "").split("\n")
-    seg_index: list[tuple[int, int]] = []
-    parts_by_line: dict[int, list[str]] = {}
-    for li in range(len(lines) - 1, -1, -1):
-        line = lines[li]
-        if not line.strip() or line.rstrip().endswith(":"):
-            continue
-        parts = _SEGMENT_SPLIT.split(line)  # one capture group: [segment, separator, segment, ...]
-        parts_by_line[li] = parts
-        seg_index += [(li, pi) for pi in reversed(range(0, len(parts), 2)) if parts[pi].strip()]
-    units = [thread[i]["text"] for i in coach_idx] + [parts_by_line[li][pi] for li, pi in seg_index]
-    keep = select_units(units, cap)
-    dropped_turns = {coach_idx[k] for k in range(len(coach_idx)) if not keep[k]}
-    dropped_segs = {seg_index[k - len(coach_idx)] for k in range(len(coach_idx), len(units)) if not keep[k]}
-    new_thread = [dict(t, text=OMITTED_REPLY) if i in dropped_turns else t for i, t in enumerate(thread)]
-    out_lines = []
-    for li, line in enumerate(lines):
-        if li not in parts_by_line:
-            out_lines.append(line)
-            continue
-        parts = parts_by_line[li]
-        kept = [parts[pi] for pi in range(0, len(parts), 2) if (li, pi) not in dropped_segs and parts[pi].strip()]
-        if kept:
-            out_lines.append(" ".join(kept))
-    return "\n".join(out_lines).strip(), new_thread, {"replies_left_out": len(dropped_turns), "note_segments_left_out": len(dropped_segs)}
+    keep = select_units([thread[i]["text"] for i in coach_idx], cap)
+    if keep:
+        keep[0] = True  # the newest reply is the coach's latest word — never left out
+    dropped = {coach_idx[k] for k in range(len(coach_idx)) if not keep[k]}
+    new_thread = [dict(t, text=OMITTED_REPLY) if i in dropped else t for i, t in enumerate(thread)]
+    return new_thread, {"replies_left_out": len(dropped)}
 
 
 # ── 1. priorities ───────────────────────────────────────────────────────────────────────────
@@ -354,7 +347,7 @@ def build_turn_context(table, persona_id: str, day: str, *, memory: str = "", th
     views = rr.fold(rr.read_rows(table, USER_ID))
     follow_up = follow_up_to_raise(table, views, persona_id, day)
     notes, corrections = _split_memory_core(memory)
-    notes, new_thread, removed = dedupe(notes, list(thread or []))
+    new_thread, removed = dedupe_thread(list(thread or []))
     sections = {
         "lead": LEAD_LINE if persona_id == rr.LEAD_COACH_ID else "",
         "priorities": priorities_section(table, persona_id, day),
