@@ -1,0 +1,112 @@
+{
+ "_comment": "#6193 fixture: sample CHAPTER_EDITION# records as the chronicle partition holds them — the first edition's evidence pointer (#01), an approved second edition, an unapproved third, an approved archival rendering and an unapproved one. Read ONLY when the switch is on (content.chapter_editions.LIVE) or WEB_EDITIONS=1, so the default fixture build is unchanged; the unapproved records carry sentinels the build scan must never find on a page. Sample content, for layout only.",
+ "records": [
+  {
+   "pk": "USER#matthew#SOURCE#chronicle",
+   "sk": "CHAPTER_EDITION#week-06#01",
+   "record_type": "chapter_edition_original",
+   "phase": "experiment",
+   "chapter_id": "week-06",
+   "edition": 1,
+   "row_sk": "DATE#2026-10-13",
+   "backup_prefix": "backups/chronicle-editions/week-06/20261120T170000Z/",
+   "backed_up_at": "2026-11-20T17:00:00Z",
+   "objects": [
+    {
+     "source": "ddb:DATE#2026-10-13",
+     "backup_key": "backups/chronicle-editions/week-06/20261120T170000Z/ddb/row.json",
+     "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+     "source": "s3:generated/journal/posts/week-06/index.html",
+     "backup_key": "backups/chronicle-editions/week-06/20261120T170000Z/s3/generated/journal/posts/week-06/index.html",
+     "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+   ]
+  },
+  {
+   "pk": "USER#matthew#SOURCE#chronicle",
+   "sk": "CHAPTER_EDITION#week-06#01#archival#01",
+   "record_type": "chapter_edition_archival",
+   "phase": "experiment",
+   "chapter_id": "week-06",
+   "archival_id": 1,
+   "text": "Sample content, for layout only. This is the fixture's archival rendering of the first edition, prepared for public reading and approved separately from the second edition.\n\nIt stands at the first-edition address with the platform's archival note above it.",
+   "text_sha256": "94c0bdc4f3bab3829194f2418d178963247cfd2b2c0d2c2ca50e01f159bf6164",
+   "proposed_at": "2026-11-20T18:00:00Z",
+   "proposed_via": "MCP manage_chapter_corrections",
+   "approvals": [
+    {
+     "by": "owner",
+     "at": "2026-11-21T18:00:00Z",
+     "on": "2026-11-21",
+     "via": "MCP manage_chapter_corrections (owner-only)",
+     "note": ""
+    }
+   ],
+   "approved_at": "2026-11-21T18:00:00Z",
+   "approved_on": "2026-11-21"
+  },
+  {
+   "pk": "USER#matthew#SOURCE#chronicle",
+   "sk": "CHAPTER_EDITION#week-06#01#archival#02",
+   "record_type": "chapter_edition_archival",
+   "phase": "experiment",
+   "chapter_id": "week-06",
+   "archival_id": 2,
+   "text": "SENTINEL-UNAPPROVED-ARCHIVAL: a rendering proposed and never approved must never reach a page, whatever it says here.",
+   "text_sha256": "0f07c29dc66c97c513e102adba870226cb95f3fe78523b3a4f0821098ea38da2",
+   "proposed_at": "2026-11-21T19:00:00Z",
+   "proposed_via": "MCP manage_chapter_corrections",
+   "approvals": [],
+   "approved_at": null,
+   "approved_on": null
+  },
+  {
+   "pk": "USER#matthew#SOURCE#chronicle",
+   "sk": "CHAPTER_EDITION#week-06#02",
+   "record_type": "chapter_edition",
+   "phase": "experiment",
+   "chapter_id": "week-06",
+   "edition": 2,
+   "text": "Sample content, for layout only. This is the fixture's second edition of the protein chapter, written to exercise the edition line, the carried correction and the page that serves a later text at the same address.\n\nThe week's protein days are counted from the log as it stands, and the walk is described in the distance the record holds.\n\n> A quoted line from the plan, attributed to the plan, renders as a block quotation.\n\n*Week 6 of the sample chronicle, second edition*",
+   "text_sha256": "650324abf597465f42094db4d1cfa50cdca0de52a069a4c59210f37d6d2257ea",
+   "first_published": "2026-10-17",
+   "carries": [
+    "sample-walk-distance-2"
+   ],
+   "proposed_at": "2026-11-20T18:00:00Z",
+   "proposed_via": "MCP manage_chapter_corrections",
+   "approvals": [
+    {
+     "by": "owner",
+     "at": "2026-11-21T17:30:00Z",
+     "on": "2026-11-21",
+     "via": "MCP manage_chapter_corrections (owner-only)",
+     "note": ""
+    }
+   ],
+   "approved_at": "2026-11-21T17:30:00Z",
+   "revised_on": "2026-11-21",
+   "signature": "Second edition, revised 21 November 2026 — Average Joe Matt editorial record"
+  },
+  {
+   "pk": "USER#matthew#SOURCE#chronicle",
+   "sk": "CHAPTER_EDITION#week-06#03",
+   "record_type": "chapter_edition",
+   "phase": "experiment",
+   "chapter_id": "week-06",
+   "edition": 3,
+   "text": "SENTINEL-UNAPPROVED-EDITION: an edition proposed and never approved must never reach a page, whatever it says here.",
+   "text_sha256": "c045c965fdcc55e361b5f6801d7cdb879c663da968fea03690b6f2f7e179ad3f",
+   "first_published": "2026-10-17",
+   "carries": [],
+   "proposed_at": "2026-11-21T19:00:00Z",
+   "proposed_via": "MCP manage_chapter_corrections",
+   "approvals": [],
+   "approved_at": null,
+   "revised_on": null,
+   "signature": null
+  }
+ ]
+}

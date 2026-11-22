@@ -47,8 +47,16 @@ function approvalWords(c) {
   return days.length ? `Approved by Matthew on ${days.join(", then ")}, through the platform's owner-only approval tool.` : "";
 }
 
+/** The foot's last sentence: where the text below stands against this correction. Without an edition (#6193) it is the
+ *  sentence #6177 shipped, unchanged; with one, it says whether the edition makes the correction. */
+function textBelow(c, edition) {
+  if (!edition) return "The chapter's text below is unchanged; it reads as first published.";
+  const carried = Array.isArray(edition.carries) && edition.carries.includes(c.id);
+  return carried ? "The text below is a later edition, and it makes this correction." : "It was made to the first edition; the text below is a later edition.";
+}
+
 /** One correction as an HTML block, every value escaped. A replaced one says what replaced it. */
-export function correctionHtml(c, all = []) {
+export function correctionHtml(c, all = [], edition = null) {
   const by = c.superseded_by ? all.find((x) => x.id === c.superseded_by) : null;
   const replaced = c.superseded_by
     ? `<p class="correction-replaced" data-correction-replaced>Replaced by the ${esc(by ? by.kind : "correction")}${by ? ` of ${esc(dayInWords(by.dated_on))}` : ""}. Kept here as it was published.</p>`
@@ -58,13 +66,14 @@ export function correctionHtml(c, all = []) {
     `<p class="label correction-signature">${esc(c.signature)}</p>` +
     `<p><b>What the chapter published.</b> ${esc(c.published_said)}</p>` +
     `<p><b>What the record shows.</b> ${esc(c.record_shows)}</p>` +
-    `<p class="correction-foot">Evidence: ${esc(c.evidence)} ${esc(approvalWords(c))} The chapter's text below is unchanged; it reads as first published.</p>` +
+    `<p class="correction-foot">Evidence: ${esc(c.evidence)} ${esc(approvalWords(c))} ${esc(textBelow(c, edition))}</p>` +
     replaced +
     `</aside>`
   );
 }
 
-/** Every correction of a chapter, standing first, as one HTML string ("" when there is none). */
-export function correctionsHtml(corrections) {
-  return (corrections || []).map((c) => correctionHtml(c, corrections)).join("");
+/** Every correction of a chapter, standing first, as one HTML string ("" when there is none). ``edition`` (#6193): the
+ *  served later edition, if any — only the foot's last sentence changes. */
+export function correctionsHtml(corrections, edition = null) {
+  return (corrections || []).map((c) => correctionHtml(c, corrections, edition)).join("");
 }

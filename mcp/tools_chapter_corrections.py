@@ -11,6 +11,25 @@
                   correction in the conversation; ``approved`` must be exactly true. The site shows it from the next
                   site build (the chapter page, the story list, the feed).
 
+#6193 adds the SECOND-EDITION actions on the same door (``lambdas/content/chapter_editions.py`` holds their rules; the
+tool count is unchanged):
+
+  * ``list_editions``    — every edition, archival rendering and first-edition evidence record (or one chapter's), with
+                           whether each would render and why not (the switch, the evidence record, the gates).
+  * ``propose_edition``  — write ONE edition (number 2..9) of a published chapter: its full text, its original
+                           first-published day, the corrections it carries. Every publication gate runs first; a
+                           finding refuses the proposal. Unapproved, it renders nowhere.
+  * ``approve_edition``  — record Matthew's explicit approval on ONE edition (``approved`` exactly true): refused unless
+                           the first edition's private evidence record exists (``scripts/chronicle_edition_backup.py``),
+                           every carried correction is approved, and every gate passes again. Stamps ``revised_on``
+                           (today, Pacific) and the platform's signature, once.
+  * ``propose_archival`` / ``approve_archival`` — the same for an ARCHIVAL RENDERING of the first edition: separately
+                           stored text, never derived from the original, gated at both steps; approval needs an approved
+                           edition of the chapter. Without one, that chapter has no ``first-edition`` page.
+
+An edition approval writes ONE row of its own: it never changes the chronicle row, the journal page, the feed manifest or
+a delivery marker, and it never invokes a sender — no feed item, no new date, no subscriber mail.
+
 Nothing here edits a chapter, deletes a record or sends anything: no email, no notification.
 """
 
@@ -20,7 +39,7 @@ from datetime import datetime, timezone
 
 from boto3.dynamodb.conditions import Key
 from common.pacific_time import pacific_today
-from content import chapter_corrections as CC
+from content import chapter_corrections as CC, chapter_editions as CE
 
 from mcp.config import USER_ID, logger, table as _table_ref
 
@@ -33,13 +52,33 @@ MCC_DESCRIPTION = (
     "of the same chapter). A proposal renders nowhere. action='approve' records Matthew's approval on ONE proposal: "
     "chapter_id, correction_id, approved=true — ONLY after he explicitly approved THIS correction's exact words; never "
     "inferred. Approval dates it today (Pacific) and it appears on the site from the next build. Records are append-only: "
-    "nothing is edited or deleted; replace one by proposing a new one that supersedes it."
+    "nothing is edited or deleted; replace one by proposing a new one that supersedes it. #6193 second editions (same "
+    "rules, nothing renders until approved and the switch is on): action='list_editions' (optional chapter_id); "
+    "'propose_edition' chapter_id, edition (2-9), text (the full chapter, markdown), first_published (the original "
+    "YYYY-MM-DD), optional carries (approved correction_ids it makes); 'approve_edition' chapter_id, edition, approved=true "
+    "— refused until the first edition's private backup is recorded (scripts/chronicle_edition_backup.py --apply); "
+    "'propose_archival' chapter_id, archival_id (1-99), text (a privacy-safe rendering of the first edition, never the raw "
+    "original); 'approve_archival' chapter_id, archival_id, approved=true. Every text passes the publication gates "
+    "(content filter, private calls, truth checks) at proposal and approval. No feed item, no new date, no mail."
 )
 
 MCC_INPUT = {
     "type": "object",
     "properties": {
-        "action": {"type": "string", "enum": ["list", "propose", "approve"], "description": "list, propose one, or approve one."},
+        "action": {
+            "type": "string",
+            "enum": [
+                "list",
+                "propose",
+                "approve",
+                "list_editions",
+                "propose_edition",
+                "approve_edition",
+                "propose_archival",
+                "approve_archival",
+            ],
+            "description": "Corrections: list, propose, approve. Second editions (#6193): list_editions, propose/approve_edition, propose/approve_archival.",
+        },
         "chapter_id": {"type": "string", "description": "The chapter's v9 id (week-NN, as in /story/week-NN/)."},
         "correction_id": {"type": "string", "description": "propose/approve: the correction's id (lowercase letters, digits, hyphens)."},
         "kind": {"type": "string", "enum": ["correction", "qualification"], "description": "propose: correction or qualification."},
@@ -52,6 +91,14 @@ MCC_INPUT = {
             "description": "approve: MUST be exactly true, and only after Matthew explicitly approved THIS correction. Never inferred.",
         },
         "note": {"type": "string", "description": "approve: optional short note kept in the approval history."},
+        "edition": {
+            "type": "integer",
+            "description": "propose_edition/approve_edition: the edition number, 2-9 (the published chapter is the first).",
+        },
+        "archival_id": {"type": "integer", "description": "propose_archival/approve_archival: the rendering's number, 1-99."},
+        "text": {"type": "string", "description": "propose_edition/propose_archival: the full text, in the chronicle's markdown."},
+        "first_published": {"type": "string", "description": "propose_edition: the chapter's original publication day, YYYY-MM-DD."},
+        "carries": {"type": "array", "items": {"type": "string"}, "description": "propose_edition: correction_ids this edition makes."},
     },
     "required": ["action"],
 }
@@ -162,10 +209,260 @@ def _approve(args: dict) -> dict:
     return {"stored": True, "approved": True, "chapter_id": chapter_id, "correction_id": correction_id, "dated_on": day, "signature": sig}
 
 
+# ── #6193: second editions and the first edition's archival rendering ─────────────────────────────
+
+
+def _edition_rows(chapter_id: str | None = None) -> list:
+    prefix = CE.SK_PREFIX + (f"{chapter_id}#" if chapter_id else "")
+    kw = {"KeyConditionExpression": Key("pk").eq(CE.pk(USER_ID)) & Key("sk").begins_with(prefix)}
+    out: list = []
+    while True:
+        resp = _table_ref.query(**kw)
+        out.extend(resp.get("Items") or [])
+        if not resp.get("LastEvaluatedKey"):
+            return out
+        kw["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+
+
+def _tainted():
+    """``web.narrative_publication.is_tainted`` over the complete withheld-call record, read now — or None when that record
+    cannot be read (the gates then refuse: nothing is proposed or approved unchecked)."""
+    try:
+        from web import narrative_publication as NPub, publication_snapshot as PS  # noqa: PLC0415
+
+        NPub.begin_request()
+        PS.begin_request(_table_ref)
+        PS.complete()
+        return NPub.is_tainted
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"[#6193] publication record unreadable: {type(exc).__name__}")
+        return None
+
+
+def _gate(text) -> list:
+    return CE.gate_findings(text, tainted=_tainted())
+
+
+def _int_arg(args: dict, key: str):
+    v = args.get(key)
+    return v if isinstance(v, int) and not isinstance(v, bool) else None
+
+
+def _put_once(item: dict, what: str) -> dict | None:
+    try:
+        _table_ref.put_item(Item=item, ConditionExpression="attribute_not_exists(sk)")
+    except Exception as exc:  # noqa: BLE001
+        if "ConditionalCheckFailed" in str(exc) or "ConditionalCheckFailed" in type(exc).__name__:
+            return {"error": f"{what} already exists; records are append-only (propose a new number). Nothing was stored."}
+        logger.warning(f"[#6193] {what} write failed: {type(exc).__name__}")
+        return {"error": f"{what} could not be stored ({type(exc).__name__}). Nothing was stored."}
+    return None
+
+
+def _approve_once(key: dict, sets: str, values: dict, what: str) -> dict | None:
+    try:
+        _table_ref.update_item(
+            Key=key,
+            UpdateExpression="SET approvals = list_append(approvals, :a), " + sets,
+            ConditionExpression="attribute_exists(sk) AND size(approvals) = :zero",
+            ExpressionAttributeValues={**values, ":zero": 0},
+        )
+    except Exception as exc:  # noqa: BLE001
+        if "ConditionalCheckFailed" in str(exc) or "ConditionalCheckFailed" in type(exc).__name__:
+            return {"error": f"{what} changed under the approval (already approved?). Nothing was stored."}
+        logger.warning(f"[#6193] {what} approval write failed: {type(exc).__name__}")
+        return {"error": f"the approval could not be stored ({type(exc).__name__}). Nothing was stored."}
+    return None
+
+
+def _refused(findings: list) -> dict:
+    return {"error": "the publication gates refused the text. Nothing was stored.", "findings": findings}
+
+
+def _propose_edition(args: dict) -> dict:
+    try:
+        item = CE.new_edition(
+            chapter_id=str(args.get("chapter_id") or "").strip(),
+            edition=_int_arg(args, "edition"),
+            text=args.get("text"),
+            first_published=str(args.get("first_published") or "").strip(),
+            proposed_at=_now(),
+            carries=args.get("carries") or [],
+            user_id=USER_ID,
+        )
+    except CE.EditionError as exc:
+        return {"error": f"{exc}. Nothing was stored."}
+    findings = _gate(item["text"])
+    if findings:
+        return _refused(findings)
+    err = _put_once(item, f"edition {item['edition']} of {item['chapter_id']}")
+    if err:
+        return err
+    return {"stored": True, "approved": False, "renders": False, "chapter_id": item["chapter_id"], "edition": item["edition"]}
+
+
+def _approve_edition(args: dict) -> dict:
+    if args.get("approved") is not True:
+        return {"error": "approved must be exactly true, given only after Matthew explicitly approved this edition. Nothing was stored."}
+    chapter_id, edition = str(args.get("chapter_id") or "").strip(), _int_arg(args, "edition")
+    try:
+        CE.ordinal(edition)
+        key = {"pk": CE.pk(USER_ID), "sk": CE.sk_edition(chapter_id, edition)}
+    except (CE.EditionError, TypeError) as exc:
+        return {"error": f"{exc}. Nothing was stored."}
+    item = _table_ref.get_item(Key=key, ConsistentRead=True).get("Item")
+    if not item or item.get("record_type") != CE.EDITION_TYPE:
+        return {"error": f"no proposed edition {edition} of {chapter_id}. Nothing was stored."}
+    if item.get("approvals"):
+        return {"error": f"edition {edition} of {chapter_id} is already approved (revised {item.get('revised_on')}). Nothing was stored."}
+    original = _table_ref.get_item(Key={"pk": key["pk"], "sk": CE.sk_original(chapter_id)}, ConsistentRead=True).get("Item")
+    try:
+        CE.validate_original(original)
+    except CE.EditionError:
+        return {
+            "error": f"the first edition of {chapter_id} has no private backup on record; run scripts/chronicle_edition_backup.py "
+            "--apply for it first (the original is kept before anything changes). Nothing was stored."
+        }
+    approved_corrections = {c["id"] for c in CC.public_view(_rows(chapter_id)) if c["chapter_id"] == chapter_id}
+    missing = [c for c in item.get("carries") or [] if c not in approved_corrections]
+    if missing:
+        return {"error": f"carried corrections not approved for {chapter_id}: {', '.join(missing)}. Nothing was stored."}
+    findings = _gate(item.get("text"))
+    if findings:
+        return _refused(findings)
+    day = pacific_today()
+    try:
+        entry = CE.approval(at=_now(), dated_on=day, note=str(args.get("note") or ""))
+        sig = CE.signature(edition, day)
+        CE.validate_edition({**item, "approvals": [entry], "approved_at": entry["at"], "revised_on": day, "signature": sig})
+    except (CE.EditionError, CC.CorrectionError) as exc:
+        return {"error": f"{exc}. Nothing was stored."}
+    err = _approve_once(
+        key,
+        "approved_at = :at, revised_on = :d, signature = :s",
+        {":a": [entry], ":at": entry["at"], ":d": day, ":s": sig},
+        f"edition {edition} of {chapter_id}",
+    )
+    if err:
+        return err
+    return {
+        "stored": True,
+        "approved": True,
+        "chapter_id": chapter_id,
+        "edition": edition,
+        "revised_on": day,
+        "signature": sig,
+        "renders": CE.LIVE,
+        "note": None if CE.LIVE else "approved and recorded; nothing renders while content.chapter_editions.LIVE is False",
+    }
+
+
+def _propose_archival(args: dict) -> dict:
+    try:
+        item = CE.new_archival(
+            chapter_id=str(args.get("chapter_id") or "").strip(),
+            archival_id=_int_arg(args, "archival_id"),
+            text=args.get("text"),
+            proposed_at=_now(),
+            user_id=USER_ID,
+        )
+    except CE.EditionError as exc:
+        return {"error": f"{exc}. Nothing was stored."}
+    findings = _gate(item["text"])
+    if findings:
+        return _refused(findings)
+    err = _put_once(item, f"archival rendering {item['archival_id']} of {item['chapter_id']}")
+    if err:
+        return err
+    return {"stored": True, "approved": False, "renders": False, "chapter_id": item["chapter_id"], "archival_id": item["archival_id"]}
+
+
+def _approve_archival(args: dict) -> dict:
+    if args.get("approved") is not True:
+        return {"error": "approved must be exactly true, given only after Matthew explicitly approved this rendering. Nothing was stored."}
+    chapter_id, n = str(args.get("chapter_id") or "").strip(), _int_arg(args, "archival_id")
+    if not CE.CHAPTER_ID.match(chapter_id) or not isinstance(n, int) or not 1 <= n <= 99:
+        return {"error": "chapter_id (week-NN) and archival_id (1-99) are required. Nothing was stored."}
+    key = {"pk": CE.pk(USER_ID), "sk": CE.sk_archival(chapter_id, n)}
+    item = _table_ref.get_item(Key=key, ConsistentRead=True).get("Item")
+    if not item or item.get("record_type") != CE.ARCHIVAL_TYPE:
+        return {"error": f"no proposed archival rendering {n} of {chapter_id}. Nothing was stored."}
+    if item.get("approvals"):
+        return {"error": f"archival rendering {n} of {chapter_id} is already approved. Nothing was stored."}
+    approved_editions = [r for r in _edition_rows(chapter_id) if r.get("record_type") == CE.EDITION_TYPE and r.get("approvals")]
+    if not approved_editions:
+        return {"error": f"{chapter_id} has no approved second edition; the first edition is still its current text. Nothing was stored."}
+    findings = _gate(item.get("text"))
+    if findings:
+        return _refused(findings)
+    day = pacific_today()
+    try:
+        entry = CE.approval(at=_now(), dated_on=day, note=str(args.get("note") or ""))
+        CE.validate_archival({**item, "approvals": [entry], "approved_at": entry["at"], "approved_on": day})
+    except (CE.EditionError, CC.CorrectionError) as exc:
+        return {"error": f"{exc}. Nothing was stored."}
+    err = _approve_once(
+        key, "approved_at = :at, approved_on = :d", {":a": [entry], ":at": entry["at"], ":d": day}, f"archival rendering {n}"
+    )
+    if err:
+        return err
+    return {"stored": True, "approved": True, "chapter_id": chapter_id, "archival_id": n, "approved_on": day, "renders": CE.LIVE}
+
+
+def _list_editions(chapter_id: str | None) -> dict:
+    rows = _edition_rows(chapter_id)
+    served = {e["chapter_id"]: e for e in CE.public_view(rows, tainted=_tainted(), log=logger.info)}
+    items = []
+    for r in sorted(rows, key=lambda r: str(r.get("sk"))):
+        cid, kind = r.get("chapter_id"), r.get("record_type")
+        s = served.get(cid) or {}
+        if kind == CE.EDITION_TYPE:
+            n = int(r.get("edition") or 0)
+            renders = bool(s) and s.get("edition") == n
+        elif kind == CE.ARCHIVAL_TYPE:
+            n = int(r.get("archival_id") or 0)
+            renders = bool(s.get("archival")) and s["archival"]["archival_id"] == n
+        else:
+            n, renders = 1, False
+        items.append(
+            {
+                "chapter_id": cid,
+                "sk": r.get("sk"),
+                "kind": {CE.EDITION_TYPE: "edition", CE.ARCHIVAL_TYPE: "archival", CE.ORIGINAL_TYPE: "first-edition evidence"}.get(
+                    kind, kind
+                ),
+                "number": n,
+                "first_published": r.get("first_published"),
+                "carries": r.get("carries"),
+                "proposed_at": r.get("proposed_at"),
+                "approved": bool(r.get("approvals")),
+                "revised_on": r.get("revised_on") or r.get("approved_on"),
+                "backed_up_at": r.get("backed_up_at"),
+                "words": CE.word_count(r.get("text")) if r.get("text") else None,
+                "would_render": renders,
+                "renders": renders and CE.LIVE,
+            }
+        )
+    return {"switch_live": CE.LIVE, "records": items, "count": len(items), "chapters_with_an_edition": sorted(served)}
+
+
 def tool_manage_chapter_corrections(args):
-    """List, propose or approve a dated public correction to a published chapter."""
+    """List, propose or approve a dated public correction to a published chapter — or (#6193) a second edition of one."""
     args = args or {}
     action = str(args.get("action") or "list").strip()
+    editions = {
+        "propose_edition": _propose_edition,
+        "approve_edition": _approve_edition,
+        "propose_archival": _propose_archival,
+        "approve_archival": _approve_archival,
+    }
+    if action in editions:
+        return editions[action](args)
+    if action == "list_editions":
+        chapter_id = str(args.get("chapter_id") or "").strip() or None
+        if chapter_id and not CE.CHAPTER_ID.match(chapter_id):
+            return {"error": "chapter_id must be week-NN."}
+        return _list_editions(chapter_id)
     if action == "list":
         chapter_id = str(args.get("chapter_id") or "").strip() or None
         if chapter_id and not CC.CHAPTER_ID.match(chapter_id):
@@ -175,4 +472,6 @@ def tool_manage_chapter_corrections(args):
         return _propose(args)
     if action == "approve":
         return _approve(args)
-    return {"error": f"unknown action {action!r}: list, propose or approve."}
+    return {
+        "error": f"unknown action {action!r}: list, propose, approve, list_editions, propose_edition, approve_edition, propose_archival or approve_archival."
+    }
