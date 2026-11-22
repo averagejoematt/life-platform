@@ -342,7 +342,7 @@ def prepare(
 
 
 # The handler locals `run` reads, by name — and nothing else (never the rendered `html`: the email body reaches
-# only the sanitiser, the banner/trial `_re.sub`, `len` and SES, tests/test_rhythm_owner_4972.py).
+# only the sanitiser, the banner/trial `_re.sub`, `len` and SES — the owner-only heart-rhythm section rides in it).
 HANDLER_NAMES = (
     "data",
     "profile",

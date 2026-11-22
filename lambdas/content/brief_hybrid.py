@@ -541,14 +541,5 @@ def inject(full_html: str, block: str) -> str:
     return full_html[: m.end()] + block + full_html[m.end() :]
 
 
-def html_to_words(html: str) -> int:
-    """Visible-word count of an HTML email (tags, comments, style and script removed)."""
-    s = re.sub(r"<!--.*?-->", " ", html or "", flags=re.S)
-    s = re.sub(r"<(style|script)[^>]*>.*?</\1>", " ", s, flags=re.S | re.I)
-    s = re.sub(r"<[^>]+>", " ", s)
-    s = re.sub(r"&[a-z#0-9]+;", " ", s, flags=re.I)
-    return len(s.split())
-
-
 def word_count(text: str) -> int:
     return len((text or "").split())
