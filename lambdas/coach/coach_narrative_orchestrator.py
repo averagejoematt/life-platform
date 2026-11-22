@@ -195,7 +195,15 @@ def _graded_record(coach_id: str) -> dict:
     call is shown at its current grade, and a call that is no longer decided leaves the right/wrong list. Returns
     ``{block, cited, notes}`` — the prompt text, the prediction ids it was built from (``derived_from``), and one
     dated note per corrected call (its recorded reason, verbatim). Failure never blocks the narrative run.
+
+    #6172: under ``coach_record.SELF_RECORD_UNIFIED`` the block LEADS with the coach's record this cycle from
+    ``coach.coach_record`` (the count the chat facts, the MCP headline and the public page print), and the
+    LEARNING# counts below it are labelled as the last 60 days — memory across cycles, not the record.
     """
+    from coach import coach_record as _coach_record
+
+    unified = _coach_record.SELF_RECORD_UNIFIED
+    self_line = _coach_record.self_report(table, coach_id, genesis=str(EXPERIMENT_START_DATE))["line"] if unified else ""
     try:
         from datetime import timedelta as _td
 
@@ -212,12 +220,16 @@ def _graded_record(coach_id: str) -> dict:
         recs, notes, _rows = _ag.reconcile_from_table(table, coach_id, raw)
         cited = sorted({str(x.get("prediction_id")) for x in recs if x.get("prediction_id")})
         if not recs:
+            if unified:
+                return {"block": self_line + "\nNone of your calls resolved in the last 60 days.", "cited": [], "notes": notes}
             return {"block": "Nothing resolved yet this cycle. Make calls; they will be scored.", "cited": [], "notes": notes}
         counts: dict[str, int] = {}
         for x in recs:
             st = str(x.get("status", "unknown"))
             counts[st] = counts.get(st, 0) + 1
         lines = [", ".join(f"{k}: {v}" for k, v in sorted(counts.items()))]
+        if unified:
+            lines = [self_line, "Last 60 days, by outcome (memory across cycles, not your record): " + lines[0]]
         resolved = [x for x in recs if x.get("status") in ("confirmed", "refuted")]
         resolved.sort(key=lambda x: str(x.get("date", "")), reverse=True)
         for x in resolved[:2]:
@@ -232,6 +244,8 @@ def _graded_record(coach_id: str) -> dict:
         )
         return {"block": "\n".join(lines), "cited": cited, "notes": notes}
     except Exception:
+        if unified:
+            return {"block": self_line + "\nYour last 60 days of resolved calls are unavailable this run.", "cited": [], "notes": []}
         return {"block": "Track record unavailable this run.", "cited": [], "notes": []}
 
 
@@ -967,7 +981,12 @@ def _build_user_message(state, coach_id, today):
     # Coach memory (2026-06-13): the coach's own resolved track record, so it
     # can reference past calls — and acknowledge misses — in its own voice.
     # Empty right after a reset; fills as the evaluator resolves predictions.
-    parts.append("## Your Track Record (resolved predictions, last 60 days)")
+    from coach import coach_record as _coach_record  # #6172
+
+    if _coach_record.SELF_RECORD_UNIFIED:
+        parts.append("## Your Track Record (your record this cycle, then your resolved calls of the last 60 days)")
+    else:
+        parts.append("## Your Track Record (resolved predictions, last 60 days)")
     parts.append(_track_record_text(state, coach_id))
     parts.append("")
 
