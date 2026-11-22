@@ -299,11 +299,34 @@ def update_status(table, sk: str, new_status: str) -> bool:
 # and satisfies "no unbounded re-injection" without a status transition.
 PROMPT_MEMORY_MAX_PER_COACH = 5
 
+# #6149: the OWNER-FACING surfaces — a correction logged on any of these is about what a
+# coach said to Matthew, so it follows that coach to every place it speaks to him (the
+# daily brief, the Telegram chat, the Claude coach-session packet). Before #6149 the brief
+# read `coach_brief` alone and the chat read nothing, so a correction given in conversation
+# (`log_coach_correction`'s signal path defaults to `chat_coaching`) reached no coach.
+# NOT here, by design: `plan_critics` (`critic_overrides.OVERRIDE_SURFACE` — an audit row
+# for an override of the red team's veto, not a correction of a coach's words) and
+# `coach_dossier` (`coach_dossier.CORRECTION_SURFACE` — a retraction of a public dossier
+# record, which that module already applies on its own surface).
+OWNER_FACING_SURFACES = ("coach_brief", "chat_coaching")
 
-def _item_ref_matches(item: dict, *, surface: Optional[str], coach: Optional[str]) -> bool:
+
+def _surface_scope(surface: Optional[str], surfaces) -> Optional[frozenset]:
+    """The surface filter as a set, or None (wildcard). `surface=` (one) is the pre-#6149
+    spelling and keeps working; `surfaces=` (several) is the #6149 one. Naming both is a
+    caller bug — raised, never silently resolved in favour of either."""
+    if surface is not None and surfaces is not None:
+        raise ValueError("pass surface= or surfaces=, not both")
+    if surfaces is not None:
+        return frozenset(surfaces)
+    return None if surface is None else frozenset((surface,))
+
+
+def _item_ref_matches(item: dict, *, surface: Optional[str], coach: Optional[str], surfaces=None) -> bool:
     """True if `item`'s `item_ref` matches the requested coach/surface scope.
 
-    A `None` filter is a wildcard for that axis. Scoping is what makes each coach
+    A `None` filter is a wildcard for that axis. `surfaces=` (#6149) matches a row on ANY
+    of the named surfaces — the owner-facing set the brief, chat and packet read. Scoping is what makes each coach
     see ONLY its own corrections (never the global list) — the core #1697 acceptance.
 
     TWO id-form rules, both from #1786 (the S5 injection was a live no-op because
@@ -324,7 +347,8 @@ def _item_ref_matches(item: dict, *, surface: Optional[str], coach: Optional[str
          a row that NAMES a coach reaches only that coach.
     """
     ref = item.get("item_ref") or {}
-    if surface is not None and ref.get("surface") != surface:
+    scope = _surface_scope(surface, surfaces)
+    if scope is not None and ref.get("surface") not in scope:
         return False
     if coach is not None:
         row_coach = ref.get("coach")
@@ -341,6 +365,7 @@ def open_corrections_for(
     surface: Optional[str] = None,
     coach: Optional[str] = None,
     limit: int = PROMPT_MEMORY_MAX_PER_COACH,
+    surfaces=None,
 ) -> list:
     """The S5 read: OPEN corrections scoped to one coach/surface, newest-first,
     bounded to `limit` (the rolling window).
@@ -352,8 +377,9 @@ def open_corrections_for(
     returns newest-first via ScanIndexForward=False; the sort also makes the bound
     stable under the in-memory test fake).
     """
+    _surface_scope(surface, surfaces)  # raise on a both-named call before the read, not after
     opened = list_corrections(table, status="open", limit=10000)
-    scoped = [i for i in opened if _item_ref_matches(i, surface=surface, coach=coach)]
+    scoped = [i for i in opened if _item_ref_matches(i, surface=surface, coach=coach, surfaces=surfaces)]
     scoped.sort(key=lambda i: i.get("sk", ""), reverse=True)
     return scoped[: max(0, int(limit))]
 
@@ -388,7 +414,19 @@ def _provenance_stamp(item: dict, *, current_cycle: Optional[int]) -> str:
     return stamp
 
 
-def render_corrections_block(corrections: list, *, current_cycle: Optional[int] = None) -> str:
+# #6149: the chat wording. The brief header speaks to a generation ("do not reproduce any of
+# them in this generation"); a text conversation needs two more things said — he has ALREADY
+# told the coach this, and reciting the correction back to him unprompted is its own failure
+# (the same rule CONVERSATION RULES states for a correction made inside the thread).
+CHAT_CORRECTIONS_HEADER = (
+    "THINGS MATTHEW HAS ALREADY CORRECTED YOU ON (he told you these before, in a review or a conversation). "
+    "Do not repeat any of these errors. Do not recite a correction back to him, thank him for it, or bring it "
+    "up unprompted — just don't make the mistake again. A line flagged PRIOR CYCLE was logged before a fresh "
+    "start, so a number it cites may no longer be current:"
+)
+
+
+def render_corrections_block(corrections: list, *, current_cycle: Optional[int] = None, header: Optional[str] = None) -> str:
     """Pure: render scoped, bounded, newest-first corrections into a compact
     "PRIOR CORRECTIONS — DO NOT REPEAT" prompt block.
 
@@ -404,7 +442,8 @@ def render_corrections_block(corrections: list, *, current_cycle: Optional[int] 
     if not corrections:
         return ""
     lines = [
-        "PRIOR CORRECTIONS — DO NOT REPEAT (Matthew corrected these exact error classes in past reviews of YOUR"
+        header
+        or "PRIOR CORRECTIONS — DO NOT REPEAT (Matthew corrected these exact error classes in past reviews of YOUR"
         " output; do not reproduce any of them in this generation. Treat each as a standing constraint on the "
         "error PATTERN — but a line flagged PRIOR CYCLE was logged before a subsequent experiment reset, so "
         "verify any specific number it cites is still current before repeating it):",
@@ -425,6 +464,8 @@ def corrections_prompt_block(
     coach: Optional[str] = None,
     limit: int = PROMPT_MEMORY_MAX_PER_COACH,
     current_cycle: Optional[int] = None,
+    surfaces=None,
+    header: Optional[str] = None,
 ) -> str:
     """Convenience: fetch (open, scoped, newest-first, bounded) + render in one
     call. Returns "" when there is nothing to inject for this coach/surface.
@@ -434,10 +475,27 @@ def corrections_prompt_block(
     correction logged before the most recent experiment reset. Pass it explicitly
     to avoid the SSM read (e.g. from a caller that already resolved it).
     """
+    opened = open_corrections_for(table, surface=surface, coach=coach, limit=limit, surfaces=surfaces)
+    if not opened:
+        return ""  # #6149: nothing to render — skip the SSM cycle read (the chat path runs this every turn)
     if current_cycle is None:
         current_cycle = read_cycle()
-    opened = open_corrections_for(table, surface=surface, coach=coach, limit=limit)
-    return render_corrections_block(opened, current_cycle=current_cycle)
+    return render_corrections_block(opened, current_cycle=current_cycle, header=header)
+
+
+def chat_corrections_block(table, coach: str) -> str:
+    """#6149: the Telegram chat's block — this coach's open corrections from every
+    owner-facing surface, bounded and newest-first exactly as the brief reads them, in the
+    conversational wording. The worker appends it to the memory block, which rides the
+    system prompt's DYNAMIC tail (`coach_chat._system_parts`), never the cached prefix.
+
+    Fail-soft: any error -> "" (logged). A corrections read can never break a chat turn —
+    the coach then speaks exactly as it did before #6149."""
+    try:
+        return corrections_prompt_block(table, coach=coach, surfaces=OWNER_FACING_SURFACES, header=CHAT_CORRECTIONS_HEADER)
+    except Exception as e:  # noqa: BLE001 — prompt memory is never load-bearing
+        print(f"[coach_corrections] chat corrections unavailable for {coach!r} (non-blocking): {type(e).__name__}: {e}")
+        return ""
 
 
 # ── #1791 — the review-on-reset primitive ─────────────────────────────────────
