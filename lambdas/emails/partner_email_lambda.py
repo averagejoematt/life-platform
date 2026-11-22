@@ -305,7 +305,6 @@ He tracks everything obsessively. This email is for Partner so she understands h
 and how to be a great partner to him this week.
 
 IMPORTANT CONTEXT ABOUT MATTHEW:
-- 36 years old, Senior Director at a SaaS company in Seattle
 - He is in week {journey_week} of his transformation. He has lost {lbs_lost} lbs and has {lbs_to_go} lbs to go. His target is roughly 10 months away from when he started (February 2026). When referencing where he is in his journey, be accurate: he is early — a few weeks in — not in the middle. Do NOT say "10% of the way there" or imply he’s halfway. If you can’t reference his timeline accurately, don’t mention it at all.
 - He tends to intellectualise his feelings and rarely asks for help directly
 - High-achiever who can be hard on himself when he falls short

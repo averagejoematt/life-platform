@@ -428,11 +428,15 @@ def test_4363_no_persona_or_prompt_claims_a_real_publication_credit():
     from ai import margaret_editor_pass
 
     walk(margaret_editor_pass._FALLBACK_NARRATOR, "margaret_editor_pass._FALLBACK_NARRATOR")
-    for rel in ("lambdas/emails/chronicle_prompt.py", "lambdas/emails/wednesday_chronicle_lambda.py"):
+    # #6155: the legacy prompt and its fallback are ONE template in chronicle_prompt.py, around content.elena_canon
+    for rel in ("lambdas/emails/chronicle_prompt.py", "lambdas/emails/wednesday_chronicle_lambda.py", "lambdas/content/elena_canon.py"):
         with open(os.path.join(_REPO, rel), encoding="utf-8") as fh:
-            src = fh.read()
-        assert "NO INVENTED CAREER (#4363)" in src, f"{rel}: the prompt must forbid invented real-world credits"
-        walk(src, rel)
+            walk(fh.read(), rel)
+    with open(os.path.join(_REPO, "lambdas/emails/chronicle_prompt.py"), encoding="utf-8") as fh:
+        assert "NO INVENTED CAREER (#4363)" in fh.read(), "chronicle_prompt.py: the prompt must forbid invented real-world credits"
+    from content import elena_canon
+
+    assert "no career" in elena_canon.DISCLOSURE, "the canon must say she has no career outside the series"
     assert offenders == [], "\n".join(f"{p}: {c}" for p, c in offenders)
 
 

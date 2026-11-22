@@ -27,6 +27,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from ai.ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
+from content import elena_canon as _canon  # #6155: the one Elena
 
 # #1178: optional topical color — the caller fetches once per run into beats["zeitgeist"].
 try:
@@ -265,7 +266,8 @@ def build_weekly_script_v2(beats: dict, bible: dict, deps: dict) -> dict:
 
     # Pass 1 — Elena's half. She owns the structure, the bet, the title.
     elena_system = (
-        f'You are Elena Voss, embedded journalist and host of "{bible.get("show_name", "The Measured Life")}". '
+        f"{_canon.host_block()}\n\n"  # #6155: Elena from the one canon, not the bible's characters.elena
+        f'You host "{bible.get("show_name", "The Measured Life")}". '
         "Write YOUR half of this week's episode: your opening hook, your framings and questions to the guest, and your sign-off. "
         "The guest's answers will be written separately — for each of your turns, say what you're asking or putting to them. "
         f"FORMAT:\n{json.dumps(fmt.get('segments', []))}\nSign-off line: {fmt.get('sign_off', '')}\n\n"
