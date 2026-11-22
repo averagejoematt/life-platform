@@ -395,6 +395,25 @@ def _calibration_block(pred_recs: list) -> dict:
     }
 
 
+def _window_labels(days: int, cutoff: str, subdomain_filter) -> dict:
+    """#6172: which window each part of the track-record payload covers, in words."""
+    from common.constants import EXPERIMENT_START_DATE
+
+    record_scope = "subdomain-filtered breakdown window (see breakdown_window)" if subdomain_filter else "this cycle"
+    return {
+        "record_window": (
+            f"this cycle: every call resolved on or after {EXPERIMENT_START_DATE} (genesis), one resolution per prediction, "
+            "from the PREDICTION# ledger (coach.coach_record). The days argument does not narrow record, headline or "
+            "decided_count. The same count the public coach page and the coach's chat facts and brief use."
+        ),
+        "hit_rate_window": record_scope,
+        "breakdown_window": (
+            f"last {days} days ({cutoff} onward) of the LEARNING# audit trail, one result per prediction: by_outcome, "
+            "by_subdomain, by_metric, total_evaluations and recent_evaluations cover this window only and are not the record."
+        ),
+    }
+
+
 def tool_get_coach_track_record(args):
     """Hit-rate track record for a coach over a time window.
 
@@ -555,6 +574,8 @@ def tool_get_coach_track_record(args):
         # /api/predictions and /api/wrong serve; None = the read failed (never a zero).
         "record": record,
         "headline": coach_record.headline(record),
+        # #6172: the payload carries two windows; each is named so the 30-day breakdown is never read as the record.
+        **_window_labels(days, cutoff, subdomain_filter),
         "excluded_learnings": {"no_prediction_id": unkeyed, "repeat_result_for_a_prediction": rewrites},
         **_learning_layer(learnings),
         "calibration": calibration,

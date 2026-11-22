@@ -118,7 +118,7 @@ def test_hook_exits_zero_on_an_unrelated_command(script):
 @pytest.mark.parametrize("script", ALL_HOOKS)
 def test_hook_never_blocks_in_advisory_mode(script):
     """Advisory is the default posture. Nothing here may return 2 until armed."""
-    for c in ("gh pr merge 1 --squash", "git push --force origin main", "bash deploy/deploy_lambda.sh x y"):
+    for c in ("gh pr merge 1 --squash", "git push origin main", "bash deploy/deploy_lambda.sh x y"):
         r = run(script, cmd(c), mode="warn")
         assert r.returncode == 0, f"{script} blocked in advisory mode on: {c}"
         spec = (hook_json(r) or {}).get("hookSpecificOutput") or {}
@@ -330,3 +330,162 @@ def test_settings_permissions_survived_the_hooks_edit():
         settings = json.load(f)
     assert len(settings["permissions"]["ask"]) > 80, "the ask-list was truncated by the hooks edit"
     assert len(settings["permissions"]["allow"]) > 80, "the allow-list was truncated by the hooks edit"
+
+
+# ── #6157: force-push is refused on ANY branch, in EVERY mode ─────────────────
+REFUSED = [
+    "git push --force",
+    "git push --force origin feature",
+    "git push -f origin feature",
+    "git push origin feature -f",
+    "git push -fu origin feature",
+    "git push -uf origin feature",
+    "git push --force-with-lease",
+    "git push --force-with-lease=feature:abc123 origin feature",
+    "git push --force-if-includes --force-with-lease origin feature",
+    "git push --forc origin feature",
+    "git push origin +feature",
+    "git push origin +HEAD:feature",
+    "git push --mirror",
+    "git -C /tmp/wt push --force-with-lease origin x",
+    "git -C /tmp/wt push -f",
+    "git --git-dir=/tmp/x/.git push --force",
+    "git --git-dir /tmp/x/.git --work-tree /tmp/x push origin +x",
+    "git --no-pager push -f",
+    "git -c core.editor=true push --force",
+    "cd /tmp/wt && git push --force",
+    "cd /tmp/wt; git push origin +x",
+    "git fetch && git push -f origin x",
+    "git status\ngit push --force",
+    "echo hi | git push -f",
+    "(git push --force)",
+    "echo $(git push --force)",
+    "FOO=1 git push --force",
+    "env GIT_TRACE=1 git push -f",
+    "/usr/bin/git push -f",
+    "bash -c 'git push --force origin x'",
+    'sh -c "cd /tmp && git push origin +x"',
+    "xargs git push --force",
+    "git push origin x -- +y",
+    # review of PR #6160 (2026-11-21): shell grammar words lead the command
+    "if true; then git push -f; fi",
+    "for r in origin; do git push -f $r x; done",
+    "while true; do git push -f; break; done",
+    "{ git push -f; }",
+    "! git push -f",
+    "f() { git push -f; }; f",
+    # substitution inside double quotes still runs
+    'echo "$(git push -f)"',
+    'echo "`git push -f`"',
+    'x="$(git push -f origin x)"',
+    # eval, `-c --`, other shells, a here-doc FED TO a shell
+    'eval "git push -f origin x"',
+    "eval git push -f origin x",
+    'bash -c -- "git push -f origin x"',
+    "ksh -c 'git push -f'",
+    "fish -c 'git push -f'",
+    "bash <<'EOF'\ngit push -f origin x\nEOF",
+    "sh <<EOF\ngit push --force\nEOF",
+    "cat <<EOF | bash\ngit push -f\nEOF",
+    # wrappers with value-taking options, and wrappers once off the list
+    "timeout -s KILL 60 git push -f",
+    "env -u FOO git push -f",
+    "sudo -u me git push -f",
+    "nice -n 5 git push -f",
+    "time -p git push -f",
+    "stdbuf -oL git push -f",
+    "caffeinate git push -f",
+    "watch git push -f",
+    "find . -exec git push -f origin x \\;",
+    'env -S "git push -f"',
+    # git send-pack rewrites a ref the same way
+    "git send-pack --force origin x",
+    "git send-pack origin +x",
+    # a comment ends at the newline
+    "echo hi # note\ngit push -f",
+]
+PASSES = [
+    "git push",
+    "git push origin feature",
+    "git push -u origin feature",
+    "git push --set-upstream origin issue-6157-force-push-deny",
+    "git push origin HEAD:refs/heads/feature",
+    "git push --follow-tags origin main",
+    "git push origin feature-fix",
+    "git push origin fix/force-thing",
+    "git -C /tmp/wt push origin feature",
+    "git --git-dir=/tmp/x/.git push origin main",
+    "git fetch --force",
+    "git checkout -f main",
+    "git pull --force",
+    "git commit -m 'document force-push policy'",
+    'git commit -m "git push --force is refused"',
+    "echo git push --force",
+    "echo 'git push -f origin x'",
+    "grep -rn 'git push --force' docs/",
+    "gh pr create --title t --body 'agents must never git push --force or use +refspec'",
+    'gh issue create --title t --body "A lane force-pushed main; git push -f origin x was used"',
+    "gh issue create --title t --body-file - <<'EOF'\nWe must stop git push --force and git push origin +x.\nEOF",
+    "cat <<EOF > notes.md\ngit push --force-with-lease\nEOF",
+    "git log --oneline && echo done",
+    "ls -la",
+    # review of PR #6160 (2026-11-21): regression set
+    "git push origin HEAD",
+    "git push -n origin x",
+    "git push -o ci.skip origin x",
+    "git push --no-force-if-includes origin x",
+    "git push origin x # never -f",
+    "git push -ofix origin x",
+    'git commit -m "no -f"',
+    "rm -f x && git push",
+    "git checkout -f main && git push",
+    "git commit -F - <<EOF\nfix: stop git push --force\nEOF",
+    "git commit -m \"$(cat <<'EOF'\nfix: never git push -f again\nEOF\n)\" && git push",
+    'gh pr create --title t --body "\\`git push -f\\` was used"',
+    "gh pr create --title t --body \"run: bash -c 'git push -f origin x' was the bug\"",
+    'echo "a#b" && git push',
+]
+
+
+@pytest.mark.parametrize("mode", ["warn", "ask", "block"])
+def test_force_push_spellings_are_refused_in_every_mode(mode):
+    missed = []
+    for c in REFUSED:
+        r = run(GUARD, cmd(c), mode=mode)
+        try:
+            spec = assert_heard("PreToolUse", r, decision="deny")
+            assert "force-push refused" in spec["permissionDecisionReason"]
+        except AssertionError as e:
+            missed.append(f"{c!r}: {e}")
+    assert not missed, "force forms NOT refused:\n" + "\n".join(missed)
+
+
+def test_plain_pushes_and_non_git_commands_naming_force_pass():
+    wrong = [c for c in PASSES if run(GUARD, cmd(c), mode="block").stdout.strip()]
+    assert not wrong, f"false positives (refused or advised): {wrong}"
+
+
+def test_the_false_positive_that_motivated_6157_is_silent():
+    """2026-11-21: `gh issue create` whose BODY mentioned force-pushing main drew a force-push
+    advisory because the old guard substring-matched the whole command line."""
+    c = 'gh issue create --title "x" --body "Agents force-push main: git push --force origin main is not blocked"'
+    assert_silent(run(GUARD, cmd(c), mode="warn"))
+
+
+def test_settings_deny_force_forms_and_ask_no_longer_lists_them():
+    with open(os.path.join(REPO, ".claude", "settings.json"), encoding="utf-8") as f:
+        perms = json.load(f)["permissions"]
+    deny = set(perms["deny"])
+    for rule in (
+        "Bash(git push --force:*)",
+        "Bash(git push -f:*)",
+        "Bash(git push --force-with-lease:*)",
+        "Bash(git push --force-if-includes:*)",
+        "Bash(git push * --force*)",
+        "Bash(git push * +*)",
+        "Bash(git -C * push --force*)",
+        "Bash(git -C * push * --force*)",
+        "Bash(git -C * push * +*)",
+    ):
+        assert rule in deny, rule
+    assert not [r for r in perms["ask"] if "git push" in r], "a force form is still ask, not deny"
