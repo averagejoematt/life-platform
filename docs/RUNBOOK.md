@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-Last updated: 2026-11-16 (v8.6.0 — 93 MCP tools, 97-module package, 107 Lambdas, 20 data sources)
+Last updated: 2026-11-22 (v8.6.0 — 93 MCP tools, 97-module package, 107 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
 - Lambda functions defined (CDK): 107 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
@@ -674,6 +674,26 @@ logs an error), a POST 404 "Reader calls are not available."; call pages hide th
 "Make your own call" block reads as empty. Nothing already recorded is touched. Watch: the `reader-call-accepted-spike` alarm
 (digest, >= 60 accepted reader calls in one hour); refusals by reason in Logs Insights on the site-api log group:
 `fields Reason | filter ReaderCallEvent = "refused" | stats count(*) by Reason`.
+
+## The Morning Brief hybrid-format trial — its one switch (#6175)
+
+Owner ruling 2026-11-22 §2 (two weeks). One DynamoDB item, no deploy to flip, no IAM on the brief side:
+
+```bash
+# Turn the trial on (the hybrid block above the full current brief + one private SEND# row per send):
+aws dynamodb put-item --table-name life-platform --item '{"pk":{"S":"USER#matthew#SOURCE#brief_trial"},"sk":{"S":"SWITCH#format"},"value":{"S":"hybrid"}}'
+# Comparison arm (today's brief byte for byte, plus the SEND# measurement row):
+aws dynamodb put-item --table-name life-platform --item '{"pk":{"S":"USER#matthew#SOURCE#brief_trial"},"sk":{"S":"SWITCH#format"},"value":{"S":"measure"}}'
+# ROLLBACK — today's brief, byte for byte, from the next send (absent, "off" or any other value = off):
+aws dynamodb put-item --table-name life-platform --item '{"pk":{"S":"USER#matthew#SOURCE#brief_trial"},"sk":{"S":"SWITCH#format"},"value":{"S":"off"}}'
+# Read the trial (variant, word counts, NEW/REPEAT counts, answers):
+aws dynamodb query --table-name life-platform --key-condition-expression "pk = :p AND begins_with(sk, :s)" \
+  --expression-attribute-values '{":p":{"S":"USER#matthew#SOURCE#brief_trial"},":s":{"S":"SEND#"}}'
+```
+
+Same send time, schedule, recipient and sender. The answer door (`/api/brief_response`) needs the site-api role's
+`USER#matthew#SOURCE#brief_trial` LeadingKey (`cdk/stacks/role_policies_serve.py`, `LifePlatformServe`) — without it a
+POST answers 503 and records nothing; the brief itself is unaffected.
 
 ## Common Issues
 
