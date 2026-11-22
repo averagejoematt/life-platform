@@ -82,6 +82,9 @@ const chapters = defineCollection({
     // and the days the chapter covers (its "Day A to Day B" stats line). `date` is the chronicle's DATA date. Null when
     // not served — a page then never calls `date` the publication date.
     published_at: z.string().regex(ISO_DAY).nullable(),
+    // #6177: how it was published — the owner's recorded approval, or the 48-hour rule (the sweep) — null when it cannot
+    // be told from the record (scripts/publish_snapshot_chapters.py publication_via). Read only by lib/chapter_truth.js.
+    published_via: z.enum(["approval", "rule"]).nullable(),
     covers_start: z.string().regex(ISO_DAY).nullable(),
     covers_end: z.string().regex(ISO_DAY).nullable(),
     excerpt: z.string().nullable(),

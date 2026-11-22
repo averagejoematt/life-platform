@@ -1,0 +1,22 @@
+{
+  "about": "#6177: owner-approved replacement summary lines (owner ruling 2026-11-22, final approval section 10) for published chapters whose served summary carried a factual error or restated a withheld comparison. Each is the first sentence(s) of the chapter's approved second-edition summary. Applied only behind www/src/lib/chapter_truth.js CHAPTER_TRUTH_LIVE, and only while the served summary still begins with `replaces` (once a second edition serves its own summary, the entry retires itself). Read by www/src/lib/chapter_truth.js and scripts/v4_build_rss.py.",
+  "revised_on": "2026-11-22",
+  "headers": {
+    "week-05": {
+      "replaces": "He weighed 318.9 pounds on Day 10, down 8.4 from",
+      "text": "He weighed 318.9 pounds on Day 10, 8.4 below the first weigh-in, and the platform's rate flag was lit."
+    },
+    "week-08": {
+      "replaces": "After 23 consecutive training days, three rest days this week sent recovery to 98%",
+      "text": "After 23 days in a row, three days without a weight session, a 12-mile walk, four mornings at 98 percent recovery and the scale under 310 for the first time."
+    },
+    "week-09": {
+      "replaces": "The Monday afternoon walk covered 5.4 miles in just under two hours,",
+      "text": "Four weight sessions, three walks, no day without one, and the heaviest bench press of the experiment. The scale reached 305.4."
+    },
+    "week-12": {
+      "replaces": "Monday's weigh-in read 292.6 pounds. A 5.2-pound week tripped the platform's rate flag",
+      "text": "Between the Monday weigh-ins of 2 and 9 November the scale fell 5.2 pounds and the platform's rate flag was lit."
+    }
+  }
+}

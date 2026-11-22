@@ -182,6 +182,7 @@ SCHEMA: dict[str, dict[str, tuple[str, bool]]] = {
         "week_start": ("day", True),
         "week_end": ("day", True),
         "published_at": ("day", True),
+        "published_via": ("enum:approval|rule", True),  # #6177: how it was published (publish_snapshot_chapters.publication_via)
         "covers_start": ("day", True),
         "covers_end": ("day", True),
         "excerpt": ("str", True),

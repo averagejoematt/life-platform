@@ -11,6 +11,14 @@
 // (tests/test_chapter_corrections_6177.py).
 
 import { dayInWords } from "./format.js";
+import { CHAPTER_TRUTH_LIVE } from "./chapter_truth.js";
+
+/** The note's last sentence. Off: as before. On (#6177): the claim that the chapter "reads as first published" is not
+ *  made — some chapters' text was later revised (a rewrite, a privacy revision, a removed passage), and a page cannot
+ *  show which; what is always true is that the note itself changes no word of the text. */
+export function footLine(live = CHAPTER_TRUTH_LIVE) {
+  return live ? "This note does not change the chapter's text." : "The chapter's text below is unchanged; it reads as first published.";
+}
 
 export const PERSONA_DISCLOSURE = "Margaret Calloway is an AI editorial persona of the platform, not a person.";
 export const LEGACY_SIGNER = "Margaret Calloway";
@@ -50,7 +58,7 @@ function approvalWords(c) {
 /** The foot's last sentence: where the text below stands against this correction. Without an edition (#6193) it is the
  *  sentence #6177 shipped, unchanged; with one, it says whether the edition makes the correction. */
 function textBelow(c, edition) {
-  if (!edition) return "The chapter's text below is unchanged; it reads as first published.";
+  if (!edition) return footLine(); // #6177: off = "The chapter's text below is unchanged; it reads as first published."
   const carried = Array.isArray(edition.carries) && edition.carries.includes(c.id);
   return carried ? "The text below is a later edition, and it makes this correction." : "It was made to the first edition; the text below is a later edition.";
 }
