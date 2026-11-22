@@ -124,6 +124,7 @@ MAIL_SENDERS = {
     "emails/panelcast_repair.py": "owner mail (the exhaustion escalation)",
     "emails/wednesday_chronicle_lambda.py": "owner mail (preview + story questions to RECIPIENT)",
     "emails/weekly_digest_lambda.py": "owner mail",
+    "emails/weekly_what_changed_send.py": "owner mail (#6176: the Sunday what-changed email, the weekly digest's trial slot, owner recipient only)",
     "emails/weekly_plate_lambda.py": "owner mail",
     "operational/alert_digest_lambda.py": "ops mail to the owner",
     "operational/canary_lambda.py": "ops mail to the owner",

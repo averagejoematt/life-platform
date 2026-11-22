@@ -219,10 +219,22 @@ def _stamp_eval(table, day: str, reason: str, now_utc: datetime) -> None:
         logger.warning("[evening-checkin] eval stamp failed: %s", type(e).__name__)
 
 
+#: #6176: the EVAL# verdict stamped when the outbound trial gives the 20:00 slot to the evening-nudge email.
+OUTBOUND_TRIAL_REASON = "outbound_trial_email_owns_evening"
+
+
 def decide(table, day: str, now_pt: datetime, seat: Callable[[str], tuple]) -> tuple[str, Optional[tuple]]:
     """``(reason, (token, chat_id) or None)`` — whether tonight's prompt goes out, and through which bot."""
+    from common import outbound_trial
+
     from coach.coach_outbound import in_quiet_hours
 
+    # #6176 item 5 (outbound trial): the 20:00 check-in has ONE channel, the evening-nudge email (1 Telegram reply in
+    # 28 evenings). The verdict is still stamped as EVAL#<day> by run_prompt, so the dead-man sees a run, not a gap.
+    # A /checkin he sends himself is unaffected: only the scheduled prompt is held.
+    if outbound_trial.is_on(outbound_trial.EVENING_ONE_CHANNEL, day):
+        outbound_trial.suppressed(outbound_trial.EVENING_ONE_CHANNEL, "telegram-coach-worker#TelegramEveningCheckin", log=logger.info)
+        return OUTBOUND_TRIAL_REASON, None
     if in_quiet_hours(now_pt):
         return "quiet_hours", None
     row = read_day(table, day) or {}

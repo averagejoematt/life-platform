@@ -126,6 +126,19 @@ export async function loadOwnWords() {
   return _ownWords;
 }
 
+let _forecasts = null;
+/** The rules-based platform forecasts (#6170): written by the producer ONLY when the public route served one (none while
+ *  the stream is dark) or on a private WEB_FORECAST=1 fixture export. Absent = no forecast = no page (never an error). */
+export async function loadForecasts() {
+  if (_forecasts) return _forecasts;
+  try {
+    _forecasts = JSON.parse(await readFile(join(SNAPSHOT_DIR, "forecasts.json"), "utf8"));
+  } catch {
+    _forecasts = { forecasts: [] };
+  }
+  return _forecasts;
+}
+
 let _chapterCorrections = null;
 /** The approved, platform-signed chapter corrections (#6177): the exporter always writes the file (absent when the
  *  route did not serve the field). A snapshot made before it existed reads as absent, so nothing is placed. Pages

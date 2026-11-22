@@ -808,6 +808,20 @@ def _write_data_files(out_dir: str, data_files: dict, files: dict) -> None:
         }
     elif os.path.exists(story_path):
         os.remove(story_path)  # a flag-off export over a story export's directory leaves no story file behind
+    # forecasts.json — the rules-based platform forecasts (#6170; scripts/publish_snapshot_forecasts.py), present ONLY when
+    # the public route served one (none while the stream is dark) or on a WEB_FORECAST=1 fixture export.
+    fc_path = os.path.join(out_dir, "forecasts.json")
+    forecasts = data_files.get("forecasts")
+    if forecasts is not None:
+        text = _dump(forecasts)
+        with open(fc_path, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        files["forecasts.json"] = {
+            "count": len(forecasts.get("forecasts") or []),
+            "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        }
+    elif os.path.exists(fc_path):
+        os.remove(fc_path)  # an export with no forecast over a directory that had one leaves no forecast file behind
 
 
 ABSENT_JOURNEY = {
@@ -1013,6 +1027,23 @@ def write_snapshot(
 
 def log(msg: str) -> None:
     print(msg, file=sys.stderr)
+
+
+def attach_own_words_and_forecasts(data_files: dict, mode: str, fixtures_dir: str, get) -> None:
+    """Two data files resolved from public routes (kept out of publish_snapshot.py's size ceiling):
+    ``own_words`` (scripts/publish_snapshot_own_words.py — always written, absent when the route did not answer) and
+    ``forecasts`` (scripts/publish_snapshot_forecasts.py, #6170 — set only when there is a forecast to show: none while
+    the stream is dark; a WEB_FORECAST=1 fixture export). A malformed forecasts file is a schema error."""
+    from publish_snapshot_forecasts import resolve
+    from publish_snapshot_own_words import resolve as resolve_own_words
+
+    data_files["own_words"] = resolve_own_words(mode, fixtures_dir, get, log)
+    try:
+        forecasts = resolve(mode, fixtures_dir, get, log)
+    except ValueError as exc:
+        raise SchemaError(str(exc)) from exc
+    if forecasts is not None:
+        data_files["forecasts"] = forecasts
 
 
 def load_fixture_data_files(fixtures_dir: str) -> dict:

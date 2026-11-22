@@ -5030,6 +5030,30 @@ STRUCTURAL_HAND_PROOFS["structural::test_narrator_byline_6178.py"] = {
     "proved_on": "2026-11-21",
 }
 
+# #6176 — the owner's outbound trial: every switchboard item ships OFF, only the owner-facing senders read it (no
+# subscriber sender, Morning Brief or chronicle preview), and each held send is a recognised state.
+STRUCTURAL_HAND_PROOFS["structural::test_outbound_trial_6176.py"] = {
+    "gate_name": "test_outbound_trial_6176.py",
+    "command": "python3 -m pytest tests/test_outbound_trial_6176.py -q -p no:cacheprovider   # baseline 34 passed",
+    "mutation": (
+        "Five plants, ONE AT A TIME, each restored from a scratch copy: M1 monday_compass_lambda's trial gate → `if False:`; "
+        "M2 story_season_qa's pause branch → `if False:`; M3 `from common import outbound_trial` appended to "
+        "lambdas/compute/weekly_signal_lambda.py (a subscriber sender reading the switchboard); M4 evening_nudge_lambda's "
+        "quiet-rule gate → `if False:`; M5 outbound_trial.TRIAL[OPS_MONDAY_PACK] shipped True."
+    ),
+    "observed": (
+        "2026-11-21, #6176 lane. BASELINE 34 passed. M1 1 failed (compass held); M2 1 failed (dead-man reads the pause); "
+        "M3 1 failed (the reader-set sweep); M4 2 failed (stale items dropped / nothing sent); M5 1 failed (every item "
+        "ships off). REVERTED 34 passed."
+    ),
+    "scope": (
+        "Every .py under lambdas/ that imports common.outbound_trial (AST), the committed TRIAL defaults, and each gated "
+        "sender's on/off path through fakes. NOT SEEN: a sender that reads the switchboard by another import spelling "
+        "(importlib, a re-export); the deployed fleet's flag state."
+    ),
+    "proved_on": "2026-11-21",
+}
+
 # #6177 — dated public chapter corrections: the platform signs (never a persona), nothing is public before the owner's
 # recorded approval, supersession keeps the replaced record, and no source writes a new persona-signed note.
 STRUCTURAL_HAND_PROOFS["structural::test_chapter_corrections_6177.py"] = {

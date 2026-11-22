@@ -1091,11 +1091,17 @@ def handle_event(table: Any, event: dict) -> dict:
             return {"status": "refused", "reason": "today_override_requires_dry_run"}
         if not isinstance(today, str) or not _ISO_DAY.match(today):
             return {"status": "refused", "reason": "malformed_today"}
-    if dry_run:
+    if dry_run:  # the forecast rule's rehearsal is scripts/public_forecast_dry_run.py (live public data, no writes)
         return run(table, today=today, coach_ids=event.get("coach_ids"), persist=False)
     from common.pacific_time import pacific_today
+
+    from coach import public_forecast  # #6156: the forecast rule rides this Monday run; it never reads or writes a brief
 
     today = pacific_today()
     result = run(table, today=today, coach_ids=event.get("coach_ids"), persist=True)
     stamp_run(table, today, result, merge=bool(event.get("coach_ids")))
+    forecast = public_forecast.run(table, today=today, persist=True)  # never raises; off unless both switches say on
+    if forecast.get("reason") != "committed_switch_off":  # committed off: no read, no write, nothing for the dead-man
+        public_forecast.stamp(table, today, forecast)
+    result["forecast"] = {k: forecast.get(k) for k in ("status", "reason", "results") if forecast.get(k)}
     return result

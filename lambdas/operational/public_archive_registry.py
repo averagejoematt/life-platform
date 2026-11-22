@@ -218,6 +218,7 @@ ARCHIVE_ROUTES: tuple[str, ...] = (
     "/api/phenoage",
     "/api/physical_overview",
     "/api/pillar_coupling",
+    "/api/platform_forecasts",  # #6170: the rules-based platform forecasts (an empty list while the stream is dark)
     "/api/platform_stats",
     "/api/predict_week",
     "/api/predictions",

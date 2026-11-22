@@ -1,0 +1,96 @@
+{
+  "source": [
+    "/api/platform_forecasts"
+  ],
+  "as_of": "2026-11-16",
+  "sample": true,
+  "forecasts": [
+    {
+      "id": "pred_20261116_forecast_weight_trend",
+      "call": "forecast:pred_20261116_forecast_weight_trend",
+      "label": "rules-based platform forecast",
+      "author_words": "Rules-based platform forecast",
+      "rule": {
+        "id": "forecast_rule.weight_trend",
+        "version": 1,
+        "words": "the least-squares line through the last 14 days of weigh-ins, read on the target day"
+      },
+      "metric": "weight_lbs",
+      "measure": "weight",
+      "unit": " lb",
+      "claim": "Weight will be about 281.7 lb on 2026-11-23.",
+      "made": "2026-11-16",
+      "target_date": "2026-11-23",
+      "reader_calls_close": "2026-11-19",
+      "result_due": "2026-11-23",
+      "status": "pending",
+      "evaluation_rule": "Graded on the reading on 2026-11-23: confirmed if it is closer to 281.7 (the forecast) than to 285.9 (a guess that nothing changes: the reading of 2026-11-15, the last before the forecast was made); refuted if the guess is as close or closer; inconclusive with no reading.",
+      "scoring": {
+        "rule": "closer_than_nothing_changes",
+        "version": 1,
+        "words": "right when the forecast lands closer to the reading on the target day than a guess that nothing changes (the last reading before the forecast was made); a tie counts for the guess"
+      },
+      "forecast": 281.7,
+      "guess": {
+        "value": 285.9,
+        "on": "2026-11-15",
+        "words": "a guess that nothing changes"
+      },
+      "inputs": {
+        "route": "/api/series",
+        "url": "https://example.invalid/api/series",
+        "from": "2026-10-17",
+        "to": "2026-11-15",
+        "n": 30,
+        "sha256": "42b8e57c9e16960795b0ff173bf7c2ad8e10b2da8400d74576a65b7021575af9"
+      },
+      "graded": null
+    },
+    {
+      "id": "pred_20261109_forecast_weight_trend",
+      "call": "forecast:pred_20261109_forecast_weight_trend",
+      "label": "rules-based platform forecast",
+      "author_words": "Rules-based platform forecast",
+      "rule": {
+        "id": "forecast_rule.weight_trend",
+        "version": 1,
+        "words": "the least-squares line through the last 14 days of weigh-ins, read on the target day"
+      },
+      "metric": "weight_lbs",
+      "measure": "weight",
+      "unit": " lb",
+      "claim": "Weight will be about 281.7 lb on 2026-11-16.",
+      "made": "2026-11-09",
+      "target_date": "2026-11-16",
+      "reader_calls_close": "2026-11-12",
+      "result_due": "2026-11-16",
+      "status": "refuted",
+      "evaluation_rule": "Graded on the reading on 2026-11-16: confirmed if it is closer to 281.7 (the forecast) than to 285.9 (a guess that nothing changes: the reading of 2026-11-08, the last before the forecast was made); refuted if the guess is as close or closer; inconclusive with no reading.",
+      "scoring": {
+        "rule": "closer_than_nothing_changes",
+        "version": 1,
+        "words": "right when the forecast lands closer to the reading on the target day than a guess that nothing changes (the last reading before the forecast was made); a tie counts for the guess"
+      },
+      "forecast": 281.7,
+      "guess": {
+        "value": 285.9,
+        "on": "2026-11-08",
+        "words": "a guess that nothing changes"
+      },
+      "inputs": {
+        "route": "/api/series",
+        "url": "https://example.invalid/api/series",
+        "from": "2026-10-10",
+        "to": "2026-11-08",
+        "n": 30,
+        "sha256": "776b5457ca8b35665f2a25a7f9b06d4371cca9e447687d149cd962ab646146ae"
+      },
+      "graded": {
+        "status": "refuted",
+        "actual": 286.09999999999997,
+        "reading_side": "no_change",
+        "on": "2026-11-16"
+      }
+    }
+  ]
+}

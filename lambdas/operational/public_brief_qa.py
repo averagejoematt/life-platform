@@ -103,6 +103,61 @@ def check_public_brief_liveness(table, check_cls, partition, pt_now, *, coaches=
     return [c]
 
 
+# ── #6156: the platform's forecast rule rides the same Monday run ───────────────────────────────────
+def check_public_forecast_liveness(table, check_cls, partition, pt_now, *, live=None):
+    """The forecast stream's dead-man. Committed off (``public_forecast_policy.STREAM_LIVE``): nothing is due, OK.
+    Live: the cycle's ``RUN#`` stamp must exist after the Monday deadline (FAIL when absent, errored, or a picked rule
+    has no outcome, an unsanctioned hold, or a ``written``/``exists`` with no row behind it); the runtime kill switch
+    being off, or a rule held for thin/stale public inputs, is a WARN."""
+    from coach import public_forecast as F
+    from common import public_forecast_policy as FP
+
+    c = check_cls("public_forecast:cycle_liveness", "Data Freshness", partition)
+    if not (FP.STREAM_LIVE if live is None else live):
+        c.ok("public forecast stream is off by commit (STREAM_LIVE = False); no forecast is due")
+        return [c]
+    cycle = due_cycle(pt_now())
+    try:
+        stamp = table.get_item(Key={"pk": FP.FORECAST_PK, "sk": FP.run_sk(cycle)}).get("Item")
+    except Exception as exc:  # noqa: BLE001
+        c.fail(f"public forecast run stamp - DDB error: {exc}")
+        return [c]
+    if not stamp:
+        c.fail(f"public forecast cycle {cycle}: no run stamp after Monday {DUE_HOUR_PT}:00 PT + {GRACE_MINUTES} min")
+        return [c]
+    status = str(stamp.get("status") or "")
+    if status == "off":
+        c.warn(f"public forecast cycle {cycle}: off ({stamp.get('reason') or 'no reason'}) - no forecast this week")
+        return [c]
+    if status != "ok":
+        c.fail(f"public forecast cycle {cycle}: the run ended '{status}' ({stamp.get('reason') or stamp.get('error') or 'no reason'})")
+        return [c]
+    results, bad, warn = stamp.get("results") or {}, [], []
+    for rule_id in F.picks(cycle):
+        r = results.get(rule_id) or {}
+        st, why = str(r.get("status") or "no outcome"), str(r.get("reason") or "")
+        if st in F.SANCTIONED:
+            sk = FP.SK_PREFIX + str(r.get("prediction_id") or "")
+            try:
+                ok = bool(table.get_item(Key={"pk": FP.FORECAST_PK, "sk": sk}).get("Item"))
+            except Exception as exc:  # noqa: BLE001
+                bad.append(f"{rule_id}=row unreadable ({exc})")
+                continue
+            if not ok:
+                bad.append(f"{rule_id}={st} but no forecast row")
+        elif st == "held" and why in F.SANCTIONED_HOLDS:
+            warn.append(f"{rule_id}=held ({why})")
+        else:
+            bad.append(f"{rule_id}={st}" + (f" ({why})" if why else ""))
+    if bad:
+        c.fail(f"public forecast cycle {cycle}: " + "; ".join(bad))
+    elif warn:
+        c.warn(f"public forecast cycle {cycle}: " + "; ".join(warn))
+    else:
+        c.ok(f"public forecast cycle {cycle}: {len(F.picks(cycle))} forecast(s) filed")
+    return [c]
+
+
 # ── the pre-run signal: MacroFactor's manual export, needed by the Monday brief ─────────────────────
 #: MacroFactor arrives ONLY as a manual export landing in s3://<bucket>/uploads/macrofactor/ (the Dropbox poller or a
 #: hand upload; ``ingestion.macrofactor_lambda`` writes the rows). Nothing else refreshes it, so a week without an

@@ -3,6 +3,12 @@
 // no count is ever presented as evidence about the experiment: every view carries the API's own note.
 
 export const COPY = "Make your own call. It is counted with the other reader calls, apart from the coach's record.";
+/** #6170 (owner ruling 2026-11-22 §5): a rules-based platform forecast's block, in the machine voice — never "the coach".
+ *  The API marks such a view `author: "platform_forecast"` (web/site_api_reader_call.py FORECAST_COPY / _NOT_EVIDENCE). */
+export const FORECAST_AUTHOR = "platform_forecast";
+export const FORECAST_COPY = "Make your own call. It is counted with the other reader calls, apart from the forecast's record.";
+export const FORECAST_NOTE = "A count of reader calls. It is not evidence about the experiment and is never part of the forecast's record.";
+const isForecast = (view) => Boolean(view) && view.author === FORECAST_AUTHOR;
 export const NOT_OPEN = "This call is not open for reader calls.";
 export const UNREAD = "Reader calls could not be read just now.";
 /** The heading of a CLOSED call's block (#6114 follow-up): it says what the block is, never invites a call that can
@@ -39,14 +45,16 @@ export function labelOf(choices, id) {
 export function openSentence(view) {
   const mine = labelOf(view.choices, view.your_call);
   if (mine) return afterSentence(view);
-  const fair = view.called_on_words ? `The coach called this on ${view.called_on_words}, before any of it happened; reader calls are open until the end of ${view.open_until_words}.` : `Reader calls are open until the end of ${view.open_until_words}.`;
+  const who = isForecast(view) ? "The rules-based platform forecast was made" : "The coach called this";
+  const fair = view.called_on_words ? `${who} on ${view.called_on_words}, before any of it happened; reader calls are open until the end of ${view.open_until_words}.` : `Reader calls are open until the end of ${view.open_until_words}.`;
   return `${fair} Reader calls stay hidden until then, so no one's call steers yours.`;
 }
 
 /** After the reader's call, still open: what they called and when to come back. Never a count. */
 export function afterSentence(view) {
   const mine = labelOf(view.choices, view.your_call);
-  const back = view.result_due_words ? ` The result arrives from ${view.result_due_words}: come back then to see your call beside the coach's.` : "";
+  const whose = isForecast(view) ? "the forecast's" : "the coach's";
+  const back = view.result_due_words ? ` The result arrives from ${view.result_due_words}: come back then to see your call beside ${whose}.` : "";
   return `You called: ${mine}. Reader calls stay hidden until they close at the end of ${view.open_until_words}.${back}`;
 }
 
@@ -97,7 +105,8 @@ export function gradedSentence(view) {
 export function coachLine(view) {
   const g = view && view.graded;
   if (!g) return null;
-  const said = labelOf(view.choices, g.coach_choice);
-  const grade = g.coach_status === "confirmed" ? "right" : g.coach_status === "refuted" ? "wrong" : "not graded";
+  const said = labelOf(view.choices, isForecast(view) ? g.forecast_choice : g.coach_choice);
+  const status = isForecast(view) ? g.forecast_status : g.coach_status;
+  const grade = status === "confirmed" ? "right" : status === "refuted" ? "wrong" : "not graded";
   return said ? `${said} · ${grade}` : grade;
 }

@@ -675,6 +675,33 @@ logs an error), a POST 404 "Reader calls are not available."; call pages hide th
 (digest, >= 60 accepted reader calls in one hour); refusals by reason in Logs Insights on the site-api log group:
 `fields Reason | filter ReaderCallEvent = "refused" | stats count(*) by Reason`.
 
+## The public forecast stream — its two switches (#6156)
+
+The rules-based platform forecast (`lambdas/coach/public_forecast.py`) files ONE number call a week in the pilot (weight;
+`public_forecast_policy.FORECASTS_PER_CYCLE = 1`) from public series, on `coach-history-summarizer`'s Monday
+`public_brief` run. It is graded head-to-head against a guess that nothing changes (`SCORING_RULE`
+`closer_than_nothing_changes` v1, frozen at filing; `scripts/public_forecast_backtest.py` is the evidence for it). It files only when BOTH the committed
+`lambdas/common/public_forecast_policy.py` `STREAM_LIVE` is `True` AND SSM `/life-platform/public-forecast` reads exactly
+`on` (absent, unreadable or anything else = off). While `STREAM_LIVE` is `False` every forecast row is PRIVATE
+(`prediction_publication`, reason `public_forecast_dark`). Both ship off; the parameter does not exist yet.
+
+```bash
+# Preview what it would file now (live public data over HTTPS, writes nothing, no AWS client):
+python3 scripts/public_forecast_dry_run.py
+# Turn it on (owner): merge a one-line STREAM_LIVE = True, deploy the coach-history-summarizer code (deploy_fleet / CI),
+# `bash deploy/cdk_deploy.sh LifePlatformCompute` for the SSM read grant, then:
+aws ssm put-parameter --name /life-platform/public-forecast --value on --type String
+# Stop new filings without a deploy (filed rows are kept and still graded):
+aws ssm put-parameter --name /life-platform/public-forecast --value off --type String --overwrite
+```
+
+Readers call it through the SAME door and kill switch as a coach's call (`/api/reader_call`, `forecast:<prediction id>`;
+SSM `/life-platform/reader-call` = `off` shuts both); the forecast page is `/system/forecasts/<id>/`, built only when
+`/api/platform_forecasts` serves a forecast (it serves none while `STREAM_LIVE` is off).
+
+Dead-man: `public_forecast:cycle_liveness` in qa-smoke (quiet while `STREAM_LIVE` is off; FAIL when a live cycle has no
+`RUN#` stamp after Monday 10:00 PT; WARN when the runtime switch is off or a rule was held for thin/stale inputs).
+
 ## The coach-context pilot and the recommendation record (#6158)
 
 **Live on merge (Part A):** the owner-only recommendation record (`USER#matthew#SOURCE#coach_recommendations`,
@@ -695,6 +722,67 @@ a=w._assemble('eli_marsh','headcoach'); print(c.build_turn_context(w._table(),'e
 #   bash deploy/deploy_fleet.sh          # telegram-coach-worker + life-platform-mcp (or the CI deploy on merge)
 # Roll back: merge `LIVE = False` and deploy the same two functions. The record and its rows are untouched either way.
 ```
+
+## Chronicle: two default-off switches (#6178)
+
+Both ship OFF; neither publishes anything. The owner's approve click stays the only way a chronicle publishes.
+
+| Switch | Where | Off (default) | On (`on`) |
+|---|---|---|---|
+| `CHRONICLE_LEGACY_ELIGIBLE` | the `wednesday-chronicle` Lambda's environment | a legacy-writer (fallback) draft is always held (`LEGACY_NOTE` blocks the approve click) | the draft runs the Story Desk's full post gate (`story_pipeline.legacy_gate_findings`: source, privacy, figures, staged encounters, quote, callback, craft, repeat, the fact read) plus the season-title check, and becomes approvable when no non-craft finding remains; a check that cannot run holds it and is named |
+| `CHAPTERS_RETIRED_STATE` | the `life-platform-site-api` Lambda's environment | a chronicle row with `status = retired` is served by `/api/chapters` as `held` | it is served as `retired`, and `counts.retired` appears |
+
+Rollback for either: remove the variable (a Lambda configuration change through CDK, then deploy). A legacy draft drafted
+while the switch was on keeps its stored audit; refuse it with Request Changes if it should not be approvable.
+
+Retiring a week is the owner's decision and a DynamoDB write the owner approves: set the row's `status` to `retired`
+(keep every other attribute). From then on, both approve-link actions return 409 and nothing changes. The stale sweep
+never selects the row, and the publish audit refuses it. The Story page shows the retired line only once
+`CHAPTERS_RETIRED_STATE=on`.
+
+## The coach-context pilot and the recommendation record (#6158)
+
+**Live on merge (Part A):** the owner-only recommendation record (`USER#matthew#SOURCE#coach_recommendations`,
+`lambdas/coach/recommendation_record.py`) and its one door, the MCP tool `manage_coach_recommendation`. Nothing reads it
+on a live coaching path until the switch below is on; nothing ever writes it but that tool.
+
+**Dark (Part B):** `lambdas/coach/coach_context_pilot.py` — the coach's context in the owner's priority order (his recorded
+decisions and platform memory first, today's planned session, the recommendations on record with his answers, the chat
+thread and notes with repeated themes left out, his corrections, what the coach can and cannot remember), and the lead's
+one due follow-up. It is gated by ONE committed switch, `coach_context_pilot.LIVE` (ships `False`). Off, the Telegram worker
+and `get_coach_session_packet` behave exactly as before.
+
+```bash
+# Preview the pilot context for one coach on one day — reads only, writes and sends nothing (the private harness's call):
+python3 -c "import sys; sys.path[:0]=['lambdas']; from coach import coach_context_pilot as c, telegram_worker_lambda as w; \
+a=w._assemble('eli_marsh','headcoach'); print(c.build_turn_context(w._table(),'eli_marsh','2026-11-23',memory=a['memory'],thread=a['thread'])['memory'])"
+# Turn it on (owner, after the blind re-evaluation): merge `LIVE = True`, then deploy the worker and the MCP server
+#   bash deploy/deploy_fleet.sh          # telegram-coach-worker + life-platform-mcp (or the CI deploy on merge)
+# Roll back: merge `LIVE = False` and deploy the same two functions. The record and its rows are untouched either way.
+```
+
+## Owner outbound trial — the switchboard (#6176)
+
+The owner's two-week outbound-mail trial (ruling 2026-11-22 §9) is ONE committed module,
+`lambdas/common/outbound_trial.py`. Each item is one line in its `TRIAL` dict and ships `False` (today's behaviour).
+Start an item, or roll one back alone, by flipping its line in a PR and deploying the fleet (`bash deploy/deploy_fleet.sh`);
+the status page wording needs the site-api deploy too (`bash deploy/deploy_site_api.sh`). `TRIAL_ENDS_ON` (a Pacific
+`YYYY-MM-DD`) turns every item off by itself from that day.
+
+| Item | On | Rollback |
+|---|---|---|
+| `sunday_what_changed` | the Sunday weekly-digest slot sends "what changed and what matters"; Monday Compass is held | flip to `False` |
+| `plate_into_nutrition_review` | Friday Plate held; its most-logged-foods section rides Saturday's Nutrition Review | flip to `False` |
+| `review_pack_not_emailed` | the AI Review Pack is built and logged (`[ai-review-pack] pack_record`), not emailed | flip to `False` |
+| `story_questions_paused` | Monday story questions + Tuesday owner-words question held before generation (#6174) | flip to `False` |
+| `evening_one_channel` | Telegram 20:00 prompt held (EVAL# still stamped); the nudge drops items unlogged 14+ days | flip to `False` |
+| `ops_dlq_summary` | the DLQ SES summary is held when its SNS escalation went out | flip to `False` |
+| `ops_canary_alarmed` | a canary failure a declared alarm already carries is not also emailed | flip to `False` |
+| `ops_monday_pack` | the Monday ops pack is logged (`[traffic-digest] ops_pack_record`), not emailed | flip to `False` |
+
+Every held send logs ONE `[outbound-trial] {"event": "suppressed", ...}` line in its own log group, so a held send
+is never a silent failure. Volume before and after: `python3 scripts/owner_outbound_volume.py --weeks 2` (read-only;
+log groups keep 30 days, so run it within 30 days of the window).
 
 ## Common Issues
 

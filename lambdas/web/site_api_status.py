@@ -25,7 +25,10 @@ from typing import Any
 
 import boto3
 from boto3.dynamodb.conditions import Attr, Key
-from common import activity_publication as _activity_publication  # owner ruling 2026-11-03: private sources off the board
+from common import (
+    activity_publication as _activity_publication,  # owner ruling 2026-11-03: private sources off the board
+    outbound_trial,  # #6176: a sender the outbound trial paused reads as paused, not missed
+)
 from common.macrofactor_fields import latest_day_condition, latest_sk_ceiling  # #5431: intake reads bounded at the Pacific today
 from common.pacific_time import anchor_day_key  # #3913: a DATE# day key is aged in the calendar that NAMED it — never a hardcoded tz
 from common.subscriber_cadence import cron_hour, cron_minute, required_weekday, sender, weekday_name  # #3619 (#3564 registry)
@@ -653,6 +656,13 @@ def _read_health_check(table) -> tuple:
     return info, failed_sources
 
 
+def _trial_paused(sender_id, status, comment, alarming):
+    """#6176: a sender the owner's outbound trial has paused reads as paused, not missed — its own run logs the
+    suppression. A firing alarm still wins (red)."""
+    note = None if alarming else outbound_trial.status_page_note(sender_id)
+    return {"status": "green", "comment": note} if note else {"status": status, "comment": comment}
+
+
 def status(*, _g) -> dict:
     """
     GET /api/status — full system status for status page
@@ -1169,10 +1179,9 @@ def status(*, _g) -> dict:
                 "id": lid,
                 "name": name,
                 "description": desc,
-                "status": status,
                 "last_sync_relative": rel,
                 "uptime_90d": uptime,
-                "comment": comment,
+                **_trial_paused(lid, status, comment, lid in alarming_sources),  # #6176
             }
         )
 

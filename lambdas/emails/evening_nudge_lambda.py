@@ -26,7 +26,7 @@ import os
 from datetime import datetime, timedelta
 
 import boto3
-from common import send_ledger  # #3113 / DIL-025: the durable replay guard
+from common import outbound_trial, send_ledger  # #6176: the outbound trial; #3113 / DIL-025: the durable replay guard
 from common.pacific_time import pacific_today, shift_day_key
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 from content.ritual_link import morning_note_link, sign_ritual_token
@@ -485,6 +485,45 @@ def _build_html(today_str: str, missing: list[dict], complete: list[dict], ritua
 #: The `email_log#` partition this sender's completion rows live in (#3113).
 LEDGER_NAME = "evening_nudge"
 
+# ── #6176 item 5: the quiet rule (outbound trial) ─────────────────────────────────────────────────
+#: An item not logged on any of the last STALE_AFTER_DAYS days (today included) has stopped being a reminder and become
+#: a repeat: for 30 nights the same four items were listed and nothing changed (review 2026-11-21). While the trial's
+#: EVENING_ONE_CHANNEL item is on, such an item is left out, and when nothing is left nothing is sent. Logging it
+#: once brings it back the next evening. Owner preference: minimal reminders, quiet defaults.
+STALE_AFTER_DAYS = 14
+_CORE_RITUAL = ("connection", "mood_valence", "intake_count")
+
+
+def _logged_on(name: str, day: str) -> bool:
+    """Whether checklist item ``name`` was logged on Pacific ``day`` — the same checks the nudge itself runs."""
+    if name == "Supplements":
+        return _check_supplements(day)[0]
+    if name == "Journal":
+        done, detail = _check_journal(day)
+        return done and detail != "Journal check failed"
+    if name == "How We Feel":
+        return _check_how_we_feel(day)[0]
+    if name == "Evening Ritual":
+        missing, _ = _check_evening_ritual(day)
+        return len([m for m in missing if m in _CORE_RITUAL]) < len(_CORE_RITUAL)
+    return True  # an unknown item is never treated as stale
+
+
+def last_logged_within(name: str, today: str, horizon: int = STALE_AFTER_DAYS) -> int | None:
+    """Days since ``name`` was last logged, looking back over the ``horizon - 1`` days before today; None = not in the window."""
+    base = datetime.strptime(today, "%Y-%m-%d").date()
+    for n in range(1, horizon):
+        if _logged_on(name, (base - timedelta(days=n)).isoformat()):
+            return n
+    return None
+
+
+def split_stale(missing: list[dict], last_logged: dict) -> tuple[list[dict], list[dict]]:
+    """Pure: ``(kept, dropped)`` — an item with no log in the window (``last_logged[name] is None``) is dropped."""
+    kept = [m for m in missing if last_logged.get(m["name"], 0) is not None]
+    dropped = [m for m in missing if last_logged.get(m["name"], 0) is None]
+    return kept, dropped
+
 
 def _run_named_human_contact_leg(today: str, dry_run: bool) -> None:
     """#4063: the named-human contact path rides this daily cron (no new schedule).
@@ -598,6 +637,24 @@ def lambda_handler(event, context):
         if not missing:
             logger.info("[nudge] All sources complete — no email needed today")
             return {"statusCode": 200, "body": "All complete — no nudge sent"}
+
+        if outbound_trial.is_on(outbound_trial.EVENING_ONE_CHANNEL, today):
+            # #6176 item 5: drop items unlogged for STALE_AFTER_DAYS+ days, and the "gone quiet" mentions with them.
+            last_logged = {m["name"]: last_logged_within(m["name"], today) for m in missing}
+            missing, dropped = split_stale(missing, last_logged)
+            quiet_html = ""
+            if any(d["name"] == "Evening Ritual" for d in dropped):
+                ritual_html = _build_morning_note_section(today)
+            logger.info(f"[nudge] quiet rule (#6176): kept {[m['name'] for m in missing]} | dropped stale {[d['name'] for d in dropped]}")
+            if not missing:
+                rec = outbound_trial.suppressed(
+                    outbound_trial.EVENING_ONE_CHANNEL,
+                    "evening-nudge",
+                    f"every missing item has gone unlogged for {STALE_AFTER_DAYS}+ days, so nothing is left to remind",
+                    log=logger.info,
+                    dropped=[d["name"] for d in dropped],
+                )
+                return {"statusCode": 200, "suppressed": True, "record": rec, "body": "Quiet rule: nothing left to remind — no nudge sent"}
 
         html = _build_html(today, missing, complete, ritual_html, quiet_html)
         subject = f"Evening nudge · {len(missing)} thing(s) to log before bed"

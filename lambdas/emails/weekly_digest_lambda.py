@@ -41,7 +41,7 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 from ai.model_routing import model_for  # #4770: the one model registry
-from common import digest_utils, send_ledger  # shared query_range impls (#970); the DIL-025 replay guard (#3113)
+from common import digest_utils, outbound_trial, send_ledger  # shared query_range impls (#970); DIL-025 (#3113); #6176
 from common.constants import (
     EXPERIMENT_BASELINE_WEIGHT_LBS,
     EXPERIMENT_START_DATE,
@@ -63,6 +63,9 @@ from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058: default-deny pilot data
 from health.calorie_target import target_phrase  # #5095: the ONE calorie target
 from training import self_added_volume_report  # #4111: the end-of-week self_added_volume report
+
+from emails import weekly_what_changed_send  # #6176 item 1: the Sunday "what changed" email
+from emails.weekly_digest_telemetry import _gate_telemetry  # noqa: F401 — PROD-MON-06, moved out for #1665 headroom (#6176)
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
 _REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -1697,21 +1700,6 @@ def record_email_send(table, lambda_name, period_key):
     send_ledger.record_sent(table, lambda_name, period_key, now=int(datetime.now(timezone.utc).timestamp()), logger=logger)
 
 
-def _gate_telemetry(data, profile, real_subscribers, attribution=None):
-    """PROD-MON-06 gate readout inputs (pure). A wiped/genesis week stores the
-    source key WITH value None — `.get(k, {})` does not guard an existing-None
-    key (the 2026-07-19 Sunday-digest DLQ crash: this.withings was None the
-    morning after a reset; recurs every future reset without the `or {}`)."""
-    return {
-        "real_subscribers": real_subscribers,
-        # #1621 — list of (label, count); [] when unavailable or nothing attributed yet.
-        "attribution": attribution or [],
-        "current_weight": ((data.get("this") or {}).get("withings") or {}).get("weight_latest"),
-        "start_weight": profile.get("journey_start_weight_lbs", 0),
-        "goal_weight": profile.get("goal_weight_lbs", 185),
-    }
-
-
 def lambda_handler(event, context):
     dry_run = is_dry_run(event)
     # DIL-025/#3113 replay guard, before the gather AND the Haiku call. Keyed on
@@ -1722,6 +1710,9 @@ def lambda_handler(event, context):
     if send_ledger.should_skip_replay(table, LEDGER_NAME, period_key, dry_run=dry_run, event=event, logger=logger):
         logger.warning("[DIL-025] weekly digest for %s already sent — refusing to send it twice (force_send overrides)", period_key)
         return {"statusCode": 200, "body": f"Weekly digest for {period_key} already sent — skipped (replay guard)"}
+    if outbound_trial.is_on(outbound_trial.SUNDAY_WHAT_CHANGED):  # #6176: the Sunday slot sends the "what changed" email
+        kw = dict(gather=gather_all, table=table, ses=ses, sender=SENDER, recipient=RECIPIENT, user_id=USER_ID, log=logger.info)
+        return weekly_what_changed_send.send(dry_run, period_key, record=record_email_send, ledger_name=LEDGER_NAME, **kw)
     logger.info("Weekly Digest v4.0 starting...")
     result = gather_all()
     if result is None or result[0] is None:

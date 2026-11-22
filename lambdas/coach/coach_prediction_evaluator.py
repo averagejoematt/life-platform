@@ -72,8 +72,10 @@ from coach.grading_quality import EVALUATOR_VERSION as ALGO_VERSION  # noqa: E40
 # grader that would drift from this one. They carry `coach_id: ""`, which the existing
 # `if bayesian_update and coach_id` guard below already honours — a claim of Matthew's
 # must never move a coach's Bayesian confidence or write to a coach's LEARNING# trail.
-DIARY_CLAIMS_PK = f"{USER_PREFIX}diary_claims"
-HYPOTHESES_PK = f"{USER_PREFIX}hypotheses"  # #5518: read-only, for the pre-registration overdue count
+# #6156: the platform's forecast rule files into its own partition the same way (coach_id "", FORECAST_PK).
+# #5518: HYPOTHESES_PK is read-only, for the pre-registration overdue count.
+DIARY_CLAIMS_PK, HYPOTHESES_PK = f"{USER_PREFIX}diary_claims", f"{USER_PREFIX}hypotheses"
+from common.public_forecast_policy import FORECAST_PK  # noqa: E402
 
 # Coach IDs — exhaustive list of all coaches that can issue predictions, derived
 # from the canonical persona registry, never re-typed (#2334; guard:
@@ -267,7 +269,7 @@ def _fetch_predictions():
     ungradeable = []
     reclaimed = 0
     second_look = 0
-    partitions = [f"COACH#{coach_id}" for coach_id in GRADING_COACH_IDS] + [DIARY_CLAIMS_PK]  # #5533 (b): retired seats included
+    partitions = [f"COACH#{coach_id}" for coach_id in GRADING_COACH_IDS] + [DIARY_CLAIMS_PK, FORECAST_PK]  # #5533 (b): retired incl.
     for partition_pk in partitions:
         try:
             kwargs = {

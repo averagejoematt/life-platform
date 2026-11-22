@@ -66,8 +66,11 @@ from functools import partial
 import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.config import Config
+from common import outbound_trial  # #6176: the outbound trial's switchboard
 from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive input == UTC)
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
+
+from operational.ops_pack_record import pack_text  # #6176: the pack as a log record
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -1266,6 +1269,13 @@ def lambda_handler(event, context):
             if quiet
             else f"Weekly ops pack — {agg['page_views']} views, {agg['unique_visitors']} visitors{subject_suffix}"
         )
+        if outbound_trial.is_on(outbound_trial.OPS_MONDAY_PACK):
+            # #6176 item 6c (outbound trial): nothing in the pack is a step only the owner can take, so it is written
+            # whole to this log group for a working session instead of the inbox. The no-log-source alert above and
+            # every metric put are unchanged.
+            logger.info("[traffic-digest] ops_pack_record %s\n%s", subject, pack_text(html))
+            rec = outbound_trial.suppressed(outbound_trial.OPS_MONDAY_PACK, "life-platform-traffic-digest", log=logger.info)
+            return {"statusCode": 200, "suppressed": True, "record": rec, "body": f"logged, not emailed: {agg['page_views']} views"}
         guarded_send_email(
             boto3.client("sesv2", region_name=REGION),
             dry_run,
@@ -1278,6 +1288,7 @@ def lambda_handler(event, context):
                 }
             },
         )
+        logger.info("[traffic-digest] ops pack %s: %s", "DRY-RUN (not sent)" if dry_run else "Sent", subject)  # #6176: the count line
         return {"statusCode": 200, "body": f"sent: {agg['page_views']} views"}
     except Exception as e:
         logger.error("traffic digest failed: %s", e)

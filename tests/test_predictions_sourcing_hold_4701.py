@@ -222,6 +222,11 @@ CLAIM_NATURAL_READERS = {
         "filing), so a brief call never rests on a dark sensor; the route reads claim_natural only to drop a call the "
         "chokepoint emptied"
     ),
+    "site_api_platform_forecasts.py": (
+        "exempt: a rules-based platform forecast (#6170) is not a coach claim; its words are rendered from structure by "
+        "coach.public_forecast, which files only when the public series has a reading within 3 days of filing and at "
+        "least the rule's minimum readings, so it never rests on a dark sensor"
+    ),
     "narrative_publication.py": (
         "exempt: the provenance chokepoint (owner ruling 2026-11-03) names `claim_natural` only as a key whose "
         "words it withholds; it serves no claim and sits in front of the readers above, which apply the hold"
