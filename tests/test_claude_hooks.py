@@ -367,6 +367,42 @@ REFUSED = [
     'sh -c "cd /tmp && git push origin +x"',
     "xargs git push --force",
     "git push origin x -- +y",
+    # review of PR #6160 (2026-11-21): shell grammar words lead the command
+    "if true; then git push -f; fi",
+    "for r in origin; do git push -f $r x; done",
+    "while true; do git push -f; break; done",
+    "{ git push -f; }",
+    "! git push -f",
+    "f() { git push -f; }; f",
+    # substitution inside double quotes still runs
+    'echo "$(git push -f)"',
+    'echo "`git push -f`"',
+    'x="$(git push -f origin x)"',
+    # eval, `-c --`, other shells, a here-doc FED TO a shell
+    'eval "git push -f origin x"',
+    "eval git push -f origin x",
+    'bash -c -- "git push -f origin x"',
+    "ksh -c 'git push -f'",
+    "fish -c 'git push -f'",
+    "bash <<'EOF'\ngit push -f origin x\nEOF",
+    "sh <<EOF\ngit push --force\nEOF",
+    "cat <<EOF | bash\ngit push -f\nEOF",
+    # wrappers with value-taking options, and wrappers once off the list
+    "timeout -s KILL 60 git push -f",
+    "env -u FOO git push -f",
+    "sudo -u me git push -f",
+    "nice -n 5 git push -f",
+    "time -p git push -f",
+    "stdbuf -oL git push -f",
+    "caffeinate git push -f",
+    "watch git push -f",
+    "find . -exec git push -f origin x \\;",
+    'env -S "git push -f"',
+    # git send-pack rewrites a ref the same way
+    "git send-pack --force origin x",
+    "git send-pack origin +x",
+    # a comment ends at the newline
+    "echo hi # note\ngit push -f",
 ]
 PASSES = [
     "git push",
@@ -393,6 +429,21 @@ PASSES = [
     "cat <<EOF > notes.md\ngit push --force-with-lease\nEOF",
     "git log --oneline && echo done",
     "ls -la",
+    # review of PR #6160 (2026-11-21): regression set
+    "git push origin HEAD",
+    "git push -n origin x",
+    "git push -o ci.skip origin x",
+    "git push --no-force-if-includes origin x",
+    "git push origin x # never -f",
+    "git push -ofix origin x",
+    'git commit -m "no -f"',
+    "rm -f x && git push",
+    "git checkout -f main && git push",
+    "git commit -F - <<EOF\nfix: stop git push --force\nEOF",
+    "git commit -m \"$(cat <<'EOF'\nfix: never git push -f again\nEOF\n)\" && git push",
+    'gh pr create --title t --body "\\`git push -f\\` was used"',
+    "gh pr create --title t --body \"run: bash -c 'git push -f origin x' was the bug\"",
+    'echo "a#b" && git push',
 ]
 
 
