@@ -1588,7 +1588,13 @@ To re-anchor the experiment to a new genesis date:
 python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --dry-run
 # 3. Review the report, then commit:
 python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --apply
+# Override Withings baseline when the genesis date has no weigh-in yet:
+python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --override-weight-lbs <weight> --apply
+# Carry forward selected chronicle issues as pre-genesis lead-ins (ADR-077):
+python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --keep-chronicle DATE#... --apply
 ```
+
+**What resets vs. what's kept is `lambdas/experiment/phase_taxonomy.py`** (`docs/PHASE_TAXONOMY.md`) — preview with the tagger/wipe in dry-run (no `--apply`).
 
 The pipeline runs (in order, each idempotent; **fail-fast since #918** — any sub-step exiting
 nonzero aborts the run and prints what already ran; `--continue-on-error` is the escape hatch):
@@ -1787,6 +1793,8 @@ The monthly AWS budget — **$215 base** (ADR-133 amendment 2026-08-28, #2801; w
 - **`life-platform-cost-governor`** Lambda (every 8h — `cron(0 1/8 * * ? *)` Pacific wall clock, its `config/schedules.json` row) — projects month-end spend, writes tier 0–3 to SSM `/life-platform/budget-tier`.
 - **`lambdas/ai/budget_guard.py`** (bundled module, #781) — calling code uses `allow(feature)` to gate AI by tier.
 
+**Single chokepoint:** every Claude call goes through `bedrock_client.invoke()` (ADR-062), IAM auth, cross-region inference profiles (`us.anthropic.claude-sonnet-4-6`, `us.anthropic.claude-haiku-4-5-20251001-v1:0`). **The AWS Budgets backstop is resolved at CDK synth time from the governor source, so `cdk deploy LifePlatformCore` is required whenever the ceiling changes, even with no CDK diff.** One AWS budget covers ALL spend (`life-platform-monthly-75` — the name is historical, never rename it). At tier 3 the AI CI gates (`reader_truth_qa`, `visual_ai_qa`) pause here and ONLY here.
+
 **Tier behavior** (priority: protect daily brief longest):
 
 | Tier | Projected (vs effective ceiling) | What pauses (audience-ordered, ADR-125) |
@@ -1854,7 +1862,7 @@ gh workflow run remediation-agent.yml
 
 **Classifier rubric:** `docs/REMEDIATION_TAXONOMY.md` (A=auto-fix-safe, B=fix-via-pr, C=needs-human, D=stale).
 
-**Nothing merges.** The agent opens PRs labeled `auto-fix-safe` (template-shaped, low-risk) or `needs-review`; a human merges both. The deterministic auto-merge gate (`remediation/automerge.py`, a separate workflow step that merged only in `auto`) was retired 2026-08-30 with the mode (#2833) — `gh pr merge` stays in the agent's `disallowed_tools` and the workflow has no merge step. `ci-cd.yml`'s production approval gate is untouched; a PR touching `cdk/` still needs an operator `cdk deploy` after merge.
+**Nothing merges.** The agent opens PRs labeled `auto-fix-safe` (template-shaped, low-risk) or `needs-review`; a human merges both. The deterministic auto-merge gate (`remediation/automerge.py`, a separate workflow step that merged only in `auto`) was retired 2026-08-30 with the mode (#2833) — `gh pr merge` stays in the agent's `disallowed_tools` and the workflow has no merge step. `ci-cd.yml`'s production approval gate is untouched; a PR touching `cdk/` still needs an operator `cdk deploy` after merge. **CI's production approval gate is untouched — a merged PR is never a deployed one.** Auth: OIDC → `github-actions-remediation-role` (no deploy/IAM mutate). A stale `auto` is coerced to `shadow` and never honoured, and reopening it is a new ADR, not an SSM flip. Rent: `docs/PROPORTIONALITY.md`.
 
 ## QA Depth Dial (#1452)
 
