@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Optional
@@ -80,7 +81,13 @@ ERROR_CLASSES = (
 # The lifecycle a correction moves through once #1690's channels + #1691's gate
 # start consuming the ledger. "open" is the only state this story ever writes;
 # the other two are downstream transitions via `update_status()`.
-STATUSES = ("open", "applied-to-prompt", "applied-to-gate")
+TRANSITION_STATUSES = ("open", "applied-to-prompt", "applied-to-gate")
+# Owner ruling 2026-11-22 §11 (#6158): a correction that is demonstrably fixed, superseded or no longer
+# applicable may be CLOSED, with an auditable disposition — never merely because it is old. `closed` is
+# reachable ONLY through `close_correction` (and left only through `reopen_correction`), never `update_status`.
+CLOSED = "closed"
+STATUSES = TRANSITION_STATUSES + (CLOSED,)
+DISPOSITIONS = ("fixed", "superseded", "no_longer_applicable")
 
 _ID_LEN = 8
 
@@ -256,8 +263,11 @@ def update_status(table, sk: str, new_status: str) -> bool:
 
     Raises ValueError on an unknown status rather than writing a typo'd state.
     """
-    if new_status not in STATUSES:
-        raise ValueError(f"unknown correction status {new_status!r} (expected one of {STATUSES})")
+    if new_status not in TRANSITION_STATUSES:
+        raise ValueError(
+            f"unknown correction status {new_status!r} (expected one of {TRANSITION_STATUSES}; "
+            "closing goes through close_correction, with a disposition and evidence)"
+        )
     table.update_item(
         Key={"pk": PK, "sk": sk},
         UpdateExpression="SET #s = :s",
@@ -265,6 +275,99 @@ def update_status(table, sk: str, new_status: str) -> bool:
         ExpressionAttributeValues={":s": new_status},
     )
     return True
+
+
+# ── closing a correction (owner ruling 2026-11-22 §11, #6158) ─────────────────────────────────
+# A close is a DISPOSITION, never an expiry: it names why (fixed / superseded / no longer applicable)
+# and the evidence that shows it (an issue, a PR, an owner ruling), written by one conditional update
+# that touches only the lifecycle fields. The original `correction_text`, `item_ref`, `error_class`,
+# `created_at` and the sk date are never altered, and every close and reopen is appended to
+# `status_history`, so the audit trail only grows. Prompt readers select `status == "open"`
+# (`open_corrections_for`, `never_injected`), so a closed row leaves every prompt and every open count
+# and stays readable as history (`get_correction`, `list_corrections(status="closed")`).
+
+EVIDENCE_MAX = 300
+#: Demonstrable means a pointer someone can check: an issue/PR number, a commit, or a dated owner ruling.
+_EVIDENCE_REF = re.compile(
+    r"#\d+|\bPR\s*#?\d+|\b[0-9a-f]{7,40}\b|\bruling\b.*\d{4}-\d{2}-\d{2}|\d{4}-\d{2}-\d{2}.*\bruling\b", re.IGNORECASE
+)
+
+
+class CorrectionCloseError(ValueError):
+    """A close or reopen the ruling forbids — refused before any write."""
+
+
+def _closing_instant(now: Optional[datetime]) -> str:
+    return (now or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
+
+
+def close_correction(table, sk: str, *, disposition: str, evidence: str, closed_by: str, now: Optional[datetime] = None) -> dict:
+    """Close ONE open correction with a disposition and public-safe evidence. Conditional: the row
+    must exist and be open (`ConditionalCheckFailed` otherwise — re-read, never force). Nothing here
+    looks at the row's age; age is not a disposition and cannot be evidence on its own."""
+    if not str(sk or "").startswith(SK_PREFIX):
+        raise CorrectionCloseError(f"sk must start with {SK_PREFIX}")
+    if disposition not in DISPOSITIONS:
+        raise CorrectionCloseError(f"disposition must be one of {list(DISPOSITIONS)}")
+    ev = " ".join(str(evidence or "").split())
+    if not ev or len(ev) > EVIDENCE_MAX:
+        raise CorrectionCloseError(
+            f"evidence is required, at most {EVIDENCE_MAX} characters, public-safe (issue/PR numbers, a ruling date)"
+        )
+    if not _EVIDENCE_REF.search(ev):
+        raise CorrectionCloseError(
+            "evidence must point at something checkable — an issue or PR number, a commit, or a dated owner ruling. "
+            "A correction is never closed because it is old (owner ruling 2026-11-22 §11)."
+        )
+    if not str(closed_by or "").strip():
+        raise CorrectionCloseError("closed_by is required")
+    at = _closing_instant(now)
+    entry = {"action": "close", "at": at, "by": str(closed_by).strip(), "disposition": disposition, "evidence": ev, "from_status": "open"}
+    table.update_item(
+        Key={"pk": PK, "sk": sk},
+        UpdateExpression=(
+            "SET #s = :closed, disposition = :d, disposition_evidence = :e, closed_at = :t, closed_by = :b, "
+            "status_history = list_append(if_not_exists(status_history, :empty), :entry)"
+        ),
+        ConditionExpression="attribute_exists(sk) AND #s = :open",
+        ExpressionAttributeNames={"#s": "status"},
+        ExpressionAttributeValues={
+            ":closed": CLOSED,
+            ":open": "open",
+            ":d": disposition,
+            ":e": ev,
+            ":t": at,
+            ":b": entry["by"],
+            ":empty": [],
+            ":entry": [entry],
+        },
+    )
+    return entry
+
+
+def reopen_correction(table, sk: str, *, reason: str, reopened_by: str, now: Optional[datetime] = None) -> dict:
+    """Reopen ONE closed correction, with a reason. The closure's fields move into `status_history`
+    (already there from the close) and are cleared from the row so an open row never reads closed."""
+    if not str(sk or "").startswith(SK_PREFIX):
+        raise CorrectionCloseError(f"sk must start with {SK_PREFIX}")
+    why = " ".join(str(reason or "").split())
+    if not why or len(why) > EVIDENCE_MAX:
+        raise CorrectionCloseError(f"reason is required, at most {EVIDENCE_MAX} characters")
+    if not str(reopened_by or "").strip():
+        raise CorrectionCloseError("reopened_by is required")
+    at = _closing_instant(now)
+    entry = {"action": "reopen", "at": at, "by": str(reopened_by).strip(), "reason": why, "from_status": CLOSED}
+    table.update_item(
+        Key={"pk": PK, "sk": sk},
+        UpdateExpression=(
+            "SET #s = :open, status_history = list_append(if_not_exists(status_history, :empty), :entry) "
+            "REMOVE disposition, disposition_evidence, closed_at, closed_by"
+        ),
+        ConditionExpression="attribute_exists(sk) AND #s = :closed",
+        ExpressionAttributeNames={"#s": "status"},
+        ExpressionAttributeValues={":open": "open", ":closed": CLOSED, ":empty": [], ":entry": [entry]},
+    )
+    return entry
 
 
 # ==============================================================================
