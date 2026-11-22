@@ -254,6 +254,9 @@ def _assert_one_record(out: dict, *, confirmed: int, n: int, under_review: int) 
     line = coach_record.self_record_line(public, under_review)
     assert out["mcp"]["record"] == public, "the MCP headline is not the public page's record"
     assert out["mcp"]["headline"] == headline
+    k, n = public["confirmed"], public["n"]
+    assert f"{k} right and {n - k} wrong of {n} checked call" in line, line
+    assert "%" not in line or n >= coach_record.PERCENT_FLOOR, line
     assert line in out["chat"], f"chat facts disagree with the record:\n{out['chat']}"
     assert line in out["brief"], f"the brief disagrees with the record:\n{out['brief']}"
     # No other K-of-N or right/wrong tally rides beside it unlabelled.
@@ -348,3 +351,18 @@ def test_a_failed_ledger_read_is_absence_not_a_zero():
     report = coach_record.self_report(_Broken(), COACH, genesis=GENESIS, as_of=TODAY)
     assert report["record"] is None
     assert report["line"] == "Your record this cycle could not be read just now — claim no record either way."
+
+
+def test_the_self_line_states_right_and_wrong_and_no_percent_below_the_floor():
+    below = {"confirmed": 2, "refuted": 1, "n": 3, "through": TODAY}
+    assert "2 right and 1 wrong of 3 checked calls through" in coach_record.self_record_line(below)
+    assert "%" not in coach_record.self_record_line(below)
+    at = {"confirmed": 16, "refuted": 18, "n": coach_record.PERCENT_FLOOR + 24, "through": TODAY}
+    at["refuted"] = at["n"] - at["confirmed"]
+    line = coach_record.self_record_line(at)
+    assert f"16 right and {at['n'] - 16} wrong of {at['n']} checked calls (47%)" in line, line
+    one = {"confirmed": 0, "refuted": 1, "n": 1, "through": None}
+    assert "0 right and 1 wrong of 1 checked call." in coach_record.self_record_line(one)
+    assert coach_record.self_record_line({"confirmed": 0, "refuted": 0, "n": 0}).endswith("no checked call yet.")
+    # the public headline is untouched
+    assert coach_record.headline(below).startswith("2 of 3 checked calls right")

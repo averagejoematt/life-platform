@@ -438,12 +438,31 @@ def headline(record: dict | None) -> str:
 SELF_RECORD_UNIFIED = False
 
 
+def self_headline(record: dict | None) -> str:
+    """``headline`` for a coach's OWN prompt: right AND wrong stated as counts, never only "K of N".
+
+    "16 of 34 checked calls" let a coach answer with a bare fraction and a percentage; a miss has to be
+    named as a miss. Same numbers as ``headline`` (K = confirmed, N = confirmed + refuted — a pending,
+    inconclusive, expired or under-review call is in neither, so M = N - K is exactly the refuted count).
+    Below ``PERCENT_FLOOR`` no percentage is printed (ADR-104/105).
+    """
+    if record is None or not int(record.get("n") or 0):
+        return headline(record)
+    n = int(record["n"])
+    k = int(record.get("confirmed") or 0)
+    calls = "checked call" if n == 1 else "checked calls"
+    through = day_words(record.get("through"))
+    tail = f" through {through}" if through else ""
+    pct = f" ({round(k / n * 100):.0f}%)" if n >= PERCENT_FLOOR else ""
+    return f"{k} right and {n - k} wrong of {n} {calls}{pct}{tail}"
+
+
 def self_record_line(record: dict | None, under_review: int = 0) -> str:
     """The one sentence a coach is told about its own record — ``headline`` labelled as this cycle's,
     with the under-review disclosure beside it (owner ruling 2026-11-03), never inside it."""
     if record is None:
         return "Your record this cycle could not be read just now — claim no record either way."
-    text = f"Your record this cycle (the prediction ledger, the same count your public page prints): {headline(record)}."
+    text = f"Your record this cycle (the prediction ledger, the same count your public page prints): {self_headline(record)}."
     if under_review:
         verb = "is" if under_review == 1 else "are"
         calls = "graded call" if under_review == 1 else "graded calls"
