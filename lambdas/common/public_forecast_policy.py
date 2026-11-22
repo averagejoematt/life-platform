@@ -27,7 +27,7 @@ only through the existing structural rule (it is graded on a public metric).
 from __future__ import annotations
 
 #: The committed switch. Turning it on is the owner's act (one reviewed line); tests/test_public_forecast_6156.py pins it.
-STREAM_LIVE = False
+STREAM_LIVE = True
 
 USER_ID = "matthew"
 SOURCE_NAME = "public_forecast"

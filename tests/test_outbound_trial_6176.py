@@ -49,6 +49,20 @@ for _p in (ROOT / "lambdas", ROOT / "scripts"):
 from common import outbound_trial as ot  # noqa: E402
 
 ITEMS = tuple(ot.TRIAL)
+# The committed state, captured at import BEFORE any fixture touches it (the pin below reads these).
+COMMITTED_TRIAL = dict(ot.TRIAL)
+COMMITTED_ENDS_ON = ot.TRIAL_ENDS_ON
+
+
+@pytest.fixture(autouse=True)
+def trial_off(monkeypatch):
+    """The trial is committed ON (owner switched it on 2026-11-22), so every test starts from an explicit OFF.
+
+    OFF is the pre-trial behaviour; a test that wants an item on says so through ``trial_on``.
+    """
+    for item in ot.TRIAL:
+        monkeypatch.setitem(ot.TRIAL, item, False)
+    monkeypatch.setattr(ot, "TRIAL_ENDS_ON", None)
 
 
 @pytest.fixture
@@ -70,12 +84,29 @@ def _trial_lines(caplog_or_list):
 # ── the switchboard ────────────────────────────────────────────────────────────────────────────
 
 
-def test_every_item_ships_off_and_has_a_description():
-    """The trial starts by a deliberate, reviewed line — never by merging this lane."""
-    assert ITEMS and all(v is False for v in ot.TRIAL.values()), ot.TRIAL
-    assert ot.TRIAL_ENDS_ON is None
-    assert set(ot.DESCRIPTIONS) == set(ot.TRIAL)
+def test_the_committed_trial_state_is_pinned_exactly_and_every_item_has_a_description():
+    """The trial is ON by a deliberate, reviewed change (owner ruling 2026-11-22, #6176).
+
+    ROLLBACK: set the eight items to False in common/outbound_trial.py (then deploy_fleet.sh and deploy_site_api.sh).
+    The end date also turns everything off by itself.
+    """
+    assert len(COMMITTED_TRIAL) == 8 and all(v is True for v in COMMITTED_TRIAL.values()), COMMITTED_TRIAL
+    assert COMMITTED_ENDS_ON == "2026-12-07"
+    assert set(ot.DESCRIPTIONS) == set(COMMITTED_TRIAL)
+
+
+def test_with_every_item_set_off_nothing_is_paused():
+    """OFF is the pre-trial behaviour: the autouse fixture sets it explicitly, and is_on agrees."""
     assert all(not ot.is_on(i, "2026-11-22") for i in ITEMS)
+
+
+def test_the_real_committed_end_date_turns_everything_off_by_itself(monkeypatch):
+    for item in ITEMS:
+        monkeypatch.setitem(ot.TRIAL, item, True)
+    monkeypatch.setattr(ot, "TRIAL_ENDS_ON", COMMITTED_ENDS_ON)
+    assert all(ot.is_on(i, "2026-12-06") for i in ITEMS)  # the last Sunday of the trial is still inside it
+    assert not any(ot.is_on(i, "2026-12-07") for i in ITEMS)
+    assert not any(ot.is_on(i, "2026-12-08") for i in ITEMS)
 
 
 def test_an_unknown_item_raises_instead_of_reading_off():

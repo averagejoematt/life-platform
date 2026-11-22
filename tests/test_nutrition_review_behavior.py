@@ -1567,7 +1567,8 @@ def test_outbound_trial_off_the_review_is_unchanged_and_carries_no_plate_section
     """#6176 item 2, OFF (the committed default): today's email, one send, no folded Plate section."""
     from common import outbound_trial
 
-    assert outbound_trial.TRIAL[outbound_trial.PLATE_INTO_NUTRITION_REVIEW] is False
+    # the committed default is now ON for the trial (#6176); OFF is set explicitly here, never assumed
+    handler_env["monkeypatch"].setitem(outbound_trial.TRIAL, outbound_trial.PLATE_INTO_NUTRITION_REVIEW, False)
     m.lambda_handler({}, None)
     assert len(handler_env["ses"].sent) == 1
     assert "From the Weekly Plate" not in _sent_html(handler_env)
