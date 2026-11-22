@@ -617,6 +617,21 @@ def _nutrition_consistency_baseline_off_6195(monkeypatch):
     yield
 
 
+# #6193: second editions of published chapters are committed LIVE (owner ruling 2026-11-22; nothing renders until an
+# edition is approved by hash). The rest of the suite pins the pre-#6193 baseline, so every test starts with the switch
+# OFF (monkeypatch: restored after). tests/test_chapter_editions_6193.py opts in explicitly and pins the committed value
+# from a capture at its import.
+@pytest.fixture(autouse=True)
+def _chapter_editions_baseline_off_6193(monkeypatch):
+    try:
+        from content import chapter_editions as _ce
+    except Exception:  # a test tree without the lambdas layer on its path
+        yield
+        return
+    monkeypatch.setattr(_ce, "LIVE", False)
+    yield
+
+
 # Owner ruling 2026-11-11 (item 2): the plan root's private part lives OFF the repo — on a developer's machine at
 # ~/.config/life-platform/user_goals_private.json (common.user_goals). A test must never read the owner's real private
 # part, so the suite points the loader at a path that does not exist; a test that needs a private part writes a
