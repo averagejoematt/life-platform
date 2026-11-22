@@ -260,5 +260,7 @@ def fetch_full_installment_archive(table, pk: str, *, d2f=None, phase_filter=Non
         resp = table.query(**params)
     except Exception:  # noqa: BLE001 — the archive is context, never load-bearing
         return []
-    items = resp.get("Items", []) or []
+    from content import chapter_reads  # #6199 G1: a withdrawn/unlisted/tombstoned/draft chapter is never writer input
+
+    items = chapter_reads.readable(resp.get("Items", []) or [])
     return [d2f(i) for i in items] if d2f else list(items)

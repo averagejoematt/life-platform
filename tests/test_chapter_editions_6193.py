@@ -45,7 +45,7 @@ for _p in (_REPO, os.path.join(_REPO, "lambdas"), os.path.join(_REPO, "scripts")
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from content import chapter_corrections as CC, chapter_editions as CE  # noqa: E402
+from content import chapter_corrections as CC, chapter_editions as CE, private_call_check  # noqa: E402
 
 TEXT = (
     "Sample edition text for a test, for layout only. The week's figures are counted from the log as it stands.\n\n"
@@ -98,7 +98,9 @@ def _archival(n=1, chapter="week-04", approved_at="2026-11-23T19:00:00Z", text=A
 
 
 def _view(rows, tainted=NEVER, hits=NO_FILTER_HITS):
-    return CE.public_view(rows, tainted=tainted, filter_hits=hits)
+    return CE.public_view(
+        rows, tainted=tainted, private_calls=private_call_check.for_text(private_call_check.CallSet()), filter_hits=hits
+    )  # #6199: no private calls
 
 
 # ── the record ────────────────────────────────────────────────────────────────────────────

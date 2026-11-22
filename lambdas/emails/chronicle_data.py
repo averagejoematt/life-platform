@@ -21,6 +21,7 @@ from common import activity_publication  # owner ruling 2026-11-05: only PUBLIC 
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, PLAN_DAILY_PROTEIN_MIN_G
 from common.digest_utils import d2f, safe_float
 from common.pacific_time import pacific_now  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from content import chapter_reads  # #6199 G1: a withdrawn/unlisted/tombstoned/draft chapter is never writer input
 from experiment.phase_filter import singleton_visible
 from health import character_privacy, day_grade_public  # owner rulings 2026-11-03/06: the chronicle is public — private-source pillars held
 from health.calorie_target import target_phrase  # #5095: the ONE calorie target
@@ -160,7 +161,7 @@ def gather_chronicle_data(*, _g):
                 }
             )
         )
-        prev_installments = [d2f(i) for i in resp.get("Items", [])]
+        prev_installments = [d2f(i) for i in chapter_reads.readable(resp.get("Items", []))]  # #6199 G1
         logger.info(f"Previous installments: {len(prev_installments)}")
     except Exception as e:
         logger.warning(f"Previous installments: {e}")

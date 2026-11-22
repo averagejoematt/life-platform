@@ -51,6 +51,18 @@ BET_CARRY_WEEKS = 2
 
 LEDGER_PREFIX = "LEDGER#"
 
+# ── lineage and the public view (#6199 G2) ───────────────────────────────────
+# A thread, bet or ask the budget derived from a graded call carries ``call_refs`` (``"COACH#<coach>/<call id>"``); an
+# arc line is a string, so its refs sit in ``arc_refs[<who>]``. The dossier already gives a writer public calls only,
+# so a forward-written ref is public by construction; the refs make the read filter exact if a call is reclassified.
+# A row written before lineage existed is annotated instead: ``withheld_paths`` on the row (never in ``ledger_json``,
+# which stays byte-identical) names entries or sentences ``public_view`` removes.
+CALL_REFS = "call_refs"
+ARC_REFS = "arc_refs"
+WITHHELD_ATTR = "withheld_paths"
+_PATH = re.compile(r"^(?P<top>[a-z_]+)(?:\[(?P<i>\d+)\])?(?:\.(?P<field>[A-Za-z0-9_]+))?(?:#sentence=(?P<n>\d+))?$")
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+
 # ── the ask rule (#4914) ─────────────────────────────────────────────────────
 CARRIED = "carried"  # an asks_followed_up outcome: no reply, no data yet
 CARRIED_MAX_WEEKS = 3  # carried this many installments → escalated to the reply desk (#4546)
@@ -302,6 +314,7 @@ def apply_budget(
             t["last_week"] = week
         if act.get("note"):
             t["note"] = act["note"]
+        _add_refs(t, act.get(CALL_REFS))  # #6199 G2: the calls this thread's notes derive from
     scored = budget.get("bet_scored") or {}
     if scored.get("result", "none") != "none":
         for b in reversed(led.get("bets", [])):
@@ -328,6 +341,10 @@ def apply_budget(
     for upd in budget.get("arc_updates") or []:
         if upd.get("who"):
             led.setdefault("arcs", {})[upd["who"]] = upd.get("line", "")
+            if upd.get(CALL_REFS):  # #6199 G2: an arc line is a string, so its lineage sits beside it
+                led.setdefault(ARC_REFS, {})[upd["who"]] = _refs(upd.get(CALL_REFS))
+            else:
+                (led.get(ARC_REFS) or {}).pop(upd["who"], None)
     led.setdefault("titles", []).append({"week": week, "date": date, "title": title})
     if not led.get("spine"):
         from content.story_craft import season_spine
@@ -373,6 +390,138 @@ def ledger_for_prompt(ledger: Dict[str, Any], week: int) -> Dict[str, Any]:
         "open_coach_asks": [{**a, "id": ask_key(a)} for a in open_asks(ledger)],
         "throughline_log": ledger.get("throughline_log", [])[-4:],
     }
+
+
+# ── the public view (#6199 G2) ───────────────────────────────────────────────
+
+
+def _refs(raw: Any) -> List[str]:
+    """``call_refs`` as sorted unique strings; a ``{"pk", "id"}`` dict is accepted and stored as ``pk/id``."""
+    out = set()
+    for r in raw if isinstance(raw, (list, tuple)) else ([raw] if raw else []):
+        if isinstance(r, dict):
+            r = f"{r.get('pk') or ''}/{r.get('id') or ''}"
+        if str(r or "").strip():
+            out.add(str(r).strip())
+    return sorted(out)
+
+
+def _add_refs(entry: Dict[str, Any], raw: Any) -> None:
+    refs = _refs(raw)
+    if refs:
+        entry[CALL_REFS] = sorted(set(_refs(entry.get(CALL_REFS))) | set(refs))
+
+
+def parse_ref(ref: Any) -> tuple:
+    """``(pk, call_id)`` of one ref; ``("", ref)`` when it names no partition (then it cannot be classified)."""
+    pk, sep, cid = str(ref or "").partition("/")
+    return (pk, cid) if sep and pk.startswith("COACH#") and cid else ("", str(ref or ""))
+
+
+def sentences(text: Any) -> List[str]:
+    """The sentence split ``withheld_paths`` addresses (``#sentence=N`` is 1-based over this list)."""
+    return [x for x in _SENTENCE_END.split(str(text or "").strip()) if x]
+
+
+def has_lineage(ledger: Dict[str, Any]) -> bool:
+    """True when any entry carries call refs (only then does ``public_view`` need the calls classified)."""
+    if (ledger or {}).get(ARC_REFS):
+        return True
+    return any(isinstance(e, dict) and e.get(CALL_REFS) for k in ("threads", "bets", "asks") for e in (ledger or {}).get(k) or [])
+
+
+_DROP = object()
+
+
+def _withhold(led: Dict[str, Any], path: str) -> bool:
+    """Apply one withheld path in place (an entry to drop is replaced by ``_DROP``). False when it does not resolve."""
+    m = _PATH.match(str(path or "").strip())
+    if not m or not isinstance(led.get(m["top"]), (list, dict)):
+        return False
+    top, n = led[m["top"]], m["n"]
+    if isinstance(top, list):
+        i = int(m["i"]) if m["i"] is not None else -1
+        if not 0 <= i < len(top) or top[i] is _DROP:
+            return False
+        if m["field"] is None:
+            if n is not None:
+                return False
+            top[i] = _DROP
+            return True
+        holder, key = top[i], m["field"]
+    else:
+        if m["i"] is not None or m["field"] is None:
+            return False
+        holder, key = top, m["field"]
+    if not isinstance(holder, dict) or key not in holder:
+        return False
+    if n is None:
+        holder[key] = ""
+        return True
+    parts = holder[key] if isinstance(holder[key], _Split) else _Split(sentences(holder[key])) if isinstance(holder[key], str) else []
+    if not 1 <= int(n) <= len(parts):
+        return False
+    parts[int(n) - 1] = ""
+    holder[key] = parts  # joined after every path is applied, so two sentences of one field address the same split
+    return True
+
+
+class _Split(list):
+    """A field split into sentences while withheld paths are applied; ``_rejoin`` puts it back together."""
+
+
+def _rejoin(node: Any) -> Any:
+    if isinstance(node, _Split):
+        return " ".join(x for x in node if x)
+    if isinstance(node, dict):
+        return {k: _rejoin(v) for k, v in node.items()}
+    if isinstance(node, list):
+        return [x if x is _DROP else _rejoin(x) for x in node]
+    return node
+
+
+def public_view(ledger: Dict[str, Any], is_private: Any, withheld_paths: Any = None) -> Dict[str, Any]:
+    """The ledger a writer may read (#6199 G2): every thread, bet or ask whose ``call_refs`` name a call
+    ``is_private(pk, call_id)`` holds private is dropped, every arc whose ``arc_refs`` do is dropped, and every entry,
+    field or sentence ``withheld_paths`` names is removed. A ref that names no partition is private (it cannot be
+    classified); a withheld path that does not resolve withholds its whole top-level section (fail closed).
+
+    A ledger with neither lineage nor withheld paths is returned AS IS — the same object, no copy, no read."""
+    paths = [str(p) for p in (withheld_paths or []) if str(p or "").strip()]
+    if not paths and not has_lineage(ledger):
+        return ledger
+    led = copy.deepcopy(ledger or {})
+    cleared = set()
+    for p in paths:
+        if not _withhold(led, p):
+            m = _PATH.match(p.strip())
+            if m is None:
+                return empty_ledger()  # an unreadable annotation withholds the whole row
+            cleared.add(m["top"])
+    led = _rejoin(led)
+    for top in cleared:
+        led[top] = {} if isinstance(led.get(top), dict) else []
+
+    def private(refs: Any) -> bool:
+        for ref in _refs(refs):
+            pk, cid = parse_ref(ref)
+            try:
+                if not pk or is_private(pk, cid):
+                    return True
+            except Exception:  # noqa: BLE001 — an unreadable classification counts as private
+                return True
+        return False
+
+    for k in ("threads", "bets", "asks"):
+        if isinstance(led.get(k), list):
+            led[k] = [e for e in led[k] if e is not _DROP and not (isinstance(e, dict) and private(e.get(CALL_REFS)))]
+    for who, refs in list((led.get(ARC_REFS) or {}).items()):
+        if private(refs):
+            (led.get("arcs") or {}).pop(who, None)
+    for k, v in list(led.items()):
+        if isinstance(v, list):
+            led[k] = [e for e in v if e is not _DROP]
+    return led
 
 
 # ── persistence (the only I/O) ───────────────────────────────────────────────
@@ -439,7 +588,9 @@ def latest_visible(table: Any, pk: str, before_date: str, *, cycle: Any = _UNSET
 
     The ONE read door for the season memory: the chronicle desk, the Panel episode written with it
     (``story_pipeline.live_week``) and the Monday questions all read through here, so a tombstoned or
-    previous-cycle row is invisible to every writer at once. ``cycle`` defaults to ``current_cycle()``."""
+    previous-cycle row is invisible to every writer at once. ``cycle`` defaults to ``current_cycle()``.
+    #6199 G2: what it returns is ``public_view`` of the row — no entry tied to a private call, nothing the row's
+    ``withheld_paths`` names."""
     import json
 
     from boto3.dynamodb.conditions import Key
@@ -453,7 +604,21 @@ def latest_visible(table: Any, pk: str, before_date: str, *, cycle: Any = _UNSET
         if it.get("sk") == f"{LEDGER_PREFIX}{before_date}" or not row_visible(it, cycle):
             continue
         try:
-            return json.loads(it.get("ledger_json") or "{}") or empty_ledger()
+            led = json.loads(it.get("ledger_json") or "{}") or empty_ledger()
         except ValueError:
             continue
+        return public_view(led, call_classifier(table, led), it.get(WITHHELD_ATTR))  # #6199 G2: the writer's view
     return empty_ledger()
+
+
+def call_classifier(table: Any, ledger: Dict[str, Any]) -> Any:
+    """``is_private(pk, call_id)`` for a ledger's refs: the publication policy over the calls read at run time (#6199).
+    A ledger with no lineage needs no read. Fail closed: when the calls cannot be read, every ref is private."""
+    if not has_lineage(ledger):
+        return lambda _pk, _cid: True
+    try:
+        from content import private_call_check
+
+        return private_call_check.load(table).is_private
+    except Exception:  # noqa: BLE001 — an unreadable classification counts as private
+        return lambda _pk, _cid: True

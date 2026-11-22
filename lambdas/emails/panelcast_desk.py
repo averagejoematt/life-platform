@@ -9,10 +9,13 @@ import os
 import re
 
 from common import constants
-from content import autopublish_audit, story_checks
+from content import autopublish_audit, story_checks, story_ledger
 from experiment.phase_filter import singleton_visible
 
 # The season ledger's verdict vocabulary (content.story_ledger bets[].result) → the Panel scoreboard's (#4536).
+#: #6199 G2: the withheld-paths annotation for the desk's copy of the ledger on a chapter row (``desk_ledger_json``); the
+#: chapter row's own fields are not ledger paths, so the name says whose paths they are.
+DESK_LEDGER_WITHHELD_ATTR = "desk_ledger_withheld_paths"
 _OUTCOME = {"right": "won", "wrong": "lost", "won": "won", "lost": "lost", "not_gradable": "none", "none": "none"}
 
 
@@ -59,10 +62,13 @@ def season_ledger(post: dict, *, _g) -> dict:
     pk = f"USER#{_g['USER_ID']}#SOURCE#chronicle"
     try:
         row = visible(_g["table"].get_item(Key={"pk": pk, "sk": f"LEDGER#{post.get('date')}"}).get("Item"))
-        raw = row.get("ledger_json")
+        raw, withheld = row.get("ledger_json"), row.get(story_ledger.WITHHELD_ATTR)
         if not raw:
-            raw = visible(_g["table"].get_item(Key={"pk": pk, "sk": f"DATE#{post.get('date')}"}).get("Item")).get("desk_ledger_json")
-        return json.loads(raw) if raw else {}
+            day = visible(_g["table"].get_item(Key={"pk": pk, "sk": f"DATE#{post.get('date')}"}).get("Item"))
+            raw, withheld = day.get("desk_ledger_json"), day.get(DESK_LEDGER_WITHHELD_ATTR)
+        led = json.loads(raw) if raw else {}
+        # #6199 G2: the second read door to the season memory returns the same public view as latest_visible
+        return story_ledger.public_view(led, story_ledger.call_classifier(_g["table"], led), withheld) if led else {}
     except Exception as e:  # noqa: BLE001 — an unread ledger leaves bets open, never invents a verdict
         _g["logger"].warning("[panel] season ledger read failed — %s; bets stay open", e)
         return {}
@@ -171,6 +177,36 @@ def door_reasons(text: str) -> list:
     """The shared reader-surface check (#4538) as a Panel hold reason: a cycle/reset/attempt count or an off-record
     specific in a spoken line holds the episode, exactly as a blocked vice does — on the desk AND the legacy writer."""
     return ["story-door"] if story_checks.reader_surface(text) else []
+
+
+# ── #6199 P: the calls the publication policy keeps private, checked on every voiced line ─────────────
+# A run ARMS the check (``arm_private_calls``) by reading the calls once: the Panel's handler at the start of every run,
+# and scripts/panel_recut.py before it gates a re-cut. Armed with None (the calls could not be read), every line holds.
+# A process that never armed it (a unit test calling ``_safety_gate`` on a literal) skips it.
+_PRIVATE_CALLS: dict = {"armed": False, "calls": None}
+
+
+def arm_private_calls(table) -> None:
+    from content import private_call_check
+
+    try:
+        calls = private_call_check.load(table)
+    except Exception as e:  # noqa: BLE001 — unreadable calls: every line holds (fail closed)
+        print(f"[panel] #6199 private-call check: the coach calls could not be read ({type(e).__name__}: {e}) — every line holds")
+        calls = None
+    _PRIVATE_CALLS.update(armed=True, calls=calls)
+
+
+def private_call_reasons(text: str) -> list:
+    """A Panel hold reason for a line that echoes, names or describes a private call (``private-call``), or for every
+    line when the calls could not be read (``private-call-check-unavailable``). Empty when the check is not armed."""
+    if not _PRIVATE_CALLS["armed"]:
+        return []
+    from content import private_call_check
+
+    if _PRIVATE_CALLS["calls"] is None:
+        return ["private-call-check-unavailable"]
+    return ["private-call"] if private_call_check.findings(text, _PRIVATE_CALLS["calls"]) else []
 
 
 def door_safe(text: str) -> str:
