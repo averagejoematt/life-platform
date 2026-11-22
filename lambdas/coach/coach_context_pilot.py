@@ -126,7 +126,9 @@ FRAME_LABEL = (
     "Cycle calendar (a position in the calendar, not a measurement of him and not how long he has been tracking; "
     "name it only if he asks where he is in the cycle or the program): Day {day}{cycle} (week {week})."
 )
-_FRAME = re.compile(r"^Experiment: Day (\d+)((?: of cycle \d+)?) \(week (\d+)\)\.$", re.M)
+# `domain_facts_block` renders each frame line as a bullet ("- Experiment: Day N ..."); the bare form is
+# `_experiment_frame_lines`' own output. Both match, and the bullet is kept.
+_FRAME = re.compile(r"^((?:- )?)Experiment: Day (\d+)((?: of cycle \d+)?) \(week (\d+)\)\.$", re.M)
 _NOTE_DAY = re.compile(r"^- \[(\d{4}-\d{2}-\d{2})\]", re.M)
 
 _STOP = frozenset(
@@ -253,12 +255,15 @@ def _sent_day(turn: dict) -> Optional[str]:
 
 def order_thread(thread: list) -> list:
     """Send order, by each turn's stored timestamp (a stable sort). The CHAT# key is `CHAT#<day>#<random>`, so
-    within a day key order is not send order. If ANY turn is undated the order is left as stored: there is
+    within a day key order is not send order; equal stamps (one exchange) put his message before the reply. If ANY turn is undated the order is left as stored: there is
     no honest place to put an undated turn."""
     thread = list(thread or [])
     if not thread or any(_sent(t) is None for t in thread):
         return thread
-    return sorted(thread, key=_sent)
+    from coach import coach_chat
+
+    # One exchange stores his message and the reply with the SAME `created_at`; on a tie his message goes first.
+    return sorted(thread, key=lambda t: (_sent(t), 0 if t.get("role") == coach_chat.ROLE_MATTHEW else 1))
 
 
 def _visible(thread: list) -> list:
@@ -315,7 +320,7 @@ def frame_label(domain: str, *, live: Optional[bool] = None) -> str:
     """The domain pack with its cycle-day line labelled for what it is. Switch off: `domain` untouched."""
     if not (LIVE if live is None else live) or not domain:
         return domain
-    return _FRAME.sub(lambda m: FRAME_LABEL.format(day=m.group(1), cycle=m.group(2), week=m.group(3)), domain)
+    return _FRAME.sub(lambda m: m.group(1) + FRAME_LABEL.format(day=m.group(2), cycle=m.group(3), week=m.group(4)), domain)
 
 
 # ── 1. priorities ───────────────────────────────────────────────────────────────────────────

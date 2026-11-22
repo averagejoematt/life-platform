@@ -978,8 +978,54 @@ def test_the_cycle_day_label_matches_the_line_the_domain_pack_really_renders():
     labelled = ccp.frame_label(f"head\n{real}\ntail", live=True)
     assert real not in labelled and labelled.startswith("head\nCycle calendar (") and labelled.endswith("\ntail")
     assert "not how long he has been tracking" in labelled
-    day = ccp._FRAME.search(real).group(1)
+    day = ccp._FRAME.search(real).group(2)
     assert f"Day {day}" in labelled, "the number itself is kept, so the grounder's Day-N check still reads it"
     assert ccp.frame_label(real) == real, "switch off: untouched"
     pre = "Experiment: cycle 18 starts 2026-12-01 — pre-genesis, there is no Day 1 yet."
     assert ccp.frame_label(pre, live=True) == pre
+
+
+class _EmptyTable:
+    """No rows anywhere: `domain_facts_block` still renders its EXPERIMENT FRAME section from the constants."""
+
+    def query(self, **kw):
+        return {"Items": []}
+
+    def get_item(self, **kw):
+        return {}
+
+
+def test_the_cycle_day_label_applies_to_what_domain_facts_block_really_renders():
+    """The live block bullets each frame line ("- Experiment: Day N ..."); the first version of the rewrite
+    matched only the bare line and changed nothing on live data. This runs the real renderer, unpatched."""
+    from coach.coach_domain_facts import domain_facts_block
+
+    rendered = domain_facts_block("mind_coach", _EmptyTable(), "2026-11-22")
+    assert "\n- Experiment: Day " in rendered, "the fixture must carry the real bulleted shape"
+    labelled = ccp.frame_label(rendered, live=True)
+    assert "\n- Cycle calendar (" in labelled, "the bullet is kept and the label applied"
+    assert "Experiment: Day " not in labelled
+    assert ccp.frame_label(rendered) == rendered, "switch off: untouched"
+
+
+def test_live_on_an_equal_stamp_his_message_goes_before_the_reply(pilot_table, monkeypatch):
+    """One exchange stores both rows with the same `created_at`; key order then puts the reply first about half
+    the time. Under the pilot the tie goes to his message."""
+    monkeypatch.setattr(ccp, "LIVE", True)
+    same = "2026-10-25T17:00:00+00:00"
+    rows = [
+        _chat_row("matthew", "synthetic question one", "2026-10-25T16:00:00+00:00", "CHAT#2026-10-25#00000001"),
+        _chat_row("coach", "Try the blue water bottle.", "2026-10-25T16:00:00+00:00", "CHAT#2026-10-25#00000002"),
+        _chat_row("coach", "Send me a photo of the shelf.", same, "CHAT#2026-10-25#0000000a"),
+        _chat_row("matthew", "synthetic question two", same, "CHAT#2026-10-25#0000000b"),
+    ]
+    assert [t["text"] for t in ccp.order_thread(ccp.thread_turns(rows))] == [
+        "synthetic question one",
+        "Try the blue water bottle.",
+        "synthetic question two",
+        "Send me a photo of the shelf.",
+    ]
+    assert [t["text"] for t in ccp.order_thread(ccp.thread_turns(list(reversed(rows))))][2:] == [
+        "synthetic question two",
+        "Send me a photo of the shelf.",
+    ], "the tie-break does not depend on the stored order"
