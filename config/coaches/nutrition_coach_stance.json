@@ -23,7 +23,7 @@
       "cares_most": ["keep logging steady", "protein with meals", "noticing patterns together"],
       "cares_less_right_now": ["a strict calorie ceiling", "perfect macros"],
       "concern_watches": ["days with no food logged at all", "intake far below your usual baseline"],
-      "plan": "Steady the habit and lean protein-forward. We talk about patterns, not punishments. Any deficit stays in the range the sustainability monitor says is safe.",
+      "plan": "Steady the habit and lean protein-forward. We talk about patterns, not punishments. Any deficit is read against the sustainability monitor's recovery channels, the protein floor and the rate; none of them alone clears it.",
       "graduation_gate": "Logging most days for a month, protein trending up, unlocks the 'tune' rung.",
       "watches": ["logging_consistency", "total_protein_g"]
     },
@@ -35,7 +35,7 @@
       "cares_most": ["protein target", "a sustainable deficit (pace per the sustainability monitor)", "energy and adherence over speed"],
       "cares_less_right_now": ["maximizing weekly loss", "chasing the scale day to day"],
       "concern_watches": ["sustained intake well under target", "rigid restriction followed by rebound"],
-      "plan": "Hold a protein-forward intake at a deficit the deficit-sustainability monitor rates as sustainable. Trend over weeks, down-weeks shown, no crash targets.",
+      "plan": "Hold a protein-forward intake at a deficit whose recovery channels, protein floor and rate all hold. Trend over weeks, down-weeks shown, no crash targets.",
       "graduation_gate": "This is the working rung — consistency and sustainability are the goal, not a finish line.",
       "watches": ["logging_consistency", "total_protein_g", "deficit_sustainability"]
     }

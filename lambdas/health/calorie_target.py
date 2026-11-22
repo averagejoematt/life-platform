@@ -389,3 +389,31 @@ def target_phrase(day: DayLike = None, **readers: Any) -> str:
     charter reads as an absence, never as ``None kcal``."""
     kcal = target_kcal(day, **readers)
     return f"{kcal} kcal" if kcal is not None else "no calorie target resolved"
+
+
+def layers_phrase(day: DayLike = None, **readers: Any) -> str:
+    """#6195 F9 (owner ruling 2026-11-22): the calorie target with its layers named — the served rest-day and lifting-day
+    minimums and the base they are clamped from — so an owner-facing line never calls one layer "the target" without
+    saying which. A pure restatement of ``resolve``: it changes no number. ``"no calorie target resolved"`` when either
+    day type cannot be resolved."""
+    rest = resolve(day, day_type="rest", **readers)
+    lift = resolve(day, day_type="lifting", **readers)
+    if rest["kcal"] is None or lift["kcal"] is None:
+        return "no calorie target resolved"
+    base = rest.get("base_kcal")
+    return (
+        f"{int(rest['kcal'])} kcal on rest days and {int(lift['kcal'])} kcal on lifting days (the served daily minimums, "
+        f"owner ruling 2026-11-11)" + (f"; the base plan is {int(base)} kcal (owner ruling 2026-10-23)" if base is not None else "")
+    )
+
+
+RATE_BAND_PATH = "governing_goal.rate_band_lb_per_wk"
+
+
+def rate_band_phrase(charter_reader: Optional[CharterReader] = None) -> Optional[str]:
+    """#6195 F13: the charter's weekly loss-rate band as an owner-facing phrase (``"rate band 3–3.5 lb/week (charter)"``),
+    read where the plan keeps it — never the profile row's February phase targets. None when the band is unreadable.
+    Owner-facing only: the charter marks this block unpublished."""
+    band = (charter_reader or _default_charter_reader)(RATE_BAND_PATH)
+    lo, hi = (_num(band.get("floor")), _num(band.get("ceiling"))) if isinstance(band, dict) else (None, None)
+    return f"rate band {lo:g}–{hi:g} lb/week (charter)" if lo is not None and hi is not None else None

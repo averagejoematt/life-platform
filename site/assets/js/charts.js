@@ -74,7 +74,7 @@ export const baselineChangeNote = (bc) => ` · <span class="chart-bc-note">${BAS
 // re-derived here (the whole point is to plot ONE authoritative projection, not a second one that
 // disagrees with it); the segment only engages when the value is finite, the series carries dates,
 // and the projection date sits after the last actual date. Absent/invalid → solid line only.
-export function lineChart(data, { valueKey = "value", dateKey = "date", goal = null, height = 130, unit = "", label = "", emptyMsg = "", spine = false, projection = null, baselineChange = null } = {}) {
+export function lineChart(data, { valueKey = "value", dateKey = "date", goal = null, goalWord = "goal", height = 130, unit = "", label = "", emptyMsg = "", spine = false, projection = null, baselineChange = null } = {}) {
   const pts = _points(data || [], valueKey, dateKey);
   // Fewer than 4 points can't show a real trend — two points draw a straight diagonal that
   // reads as broken/misleading. Show an honest count + latest value instead of a fake line.
@@ -150,7 +150,7 @@ export function lineChart(data, { valueKey = "value", dateKey = "date", goal = n
   const goalOff = goalV == null ? 0 : (goalV > max ? 1 : (goalV < min ? -1 : 0));
   const goalY = goalV == null ? 0 : (goalOff === 0 ? y(goalV) : (goalOff > 0 ? P / 2 : H - P / 2));
   const goalGap = goalV == null ? null : _r(Math.abs((goalOff > 0 ? max : min) - goalV));
-  const goalTxt = goalV == null ? "" : `goal ${_r(goalV)}${unit}${goalOff ? ` — off scale, ${goalGap}${unit} ${goalOff > 0 ? "above" : "below"} the plotted range` : ""}`;
+  const goalTxt = goalV == null ? "" : `${goalWord} ${_r(goalV)}${unit}${goalOff ? ` — off scale, ${goalGap}${unit} ${goalOff > 0 ? "above" : "below"} the plotted range` : ""}`;
   const summary = `${label || "Trend"}: ${pts.length} readings${_span ? `, ${_span}` : ""}, latest ${_r(last.v)}${unit}, ${dir}${goalV != null ? `, ${goalTxt}` : ""}${projActive ? `, projected ${_r(projVal)}${unit} by month-end (estimate)` : ""}${bcI > 0 ? `, line broken at the ${BASELINE_CHANGE_LABEL} on ${_shortDate(baselineChange)}` : ""}.`;
   const goalLine = goalV != null ? `<line class="chart-goal${goalOff ? " chart-goal--off" : ""}" x1="${P}" y1="${goalY.toFixed(1)}" x2="${W - P}" y2="${goalY.toFixed(1)}" vector-effect="non-scaling-stroke"/>` : "";
   // SIGNATURE 1 — a measuring-rule tick spine on the y-axis: a ticked rail with the

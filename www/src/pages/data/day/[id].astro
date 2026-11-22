@@ -127,7 +127,7 @@ const heldText = (id: string, fallback: string) => heldCallWords(all.get("predic
 const disputedNote = (id: string) => (isDisputed(all.get("prediction", id)) ? ` · ${DISPUTED_NOTE}` : "");
 const coachHref = (id: string) => (all.get("coach", id) ? href(pathOf("coach", id)) : null);
 const foodTile = food
-  ? { value: food.calories != null ? num(food.calories, 0) : "—", unit: "kcal", d: food.logging_gap ? "a logging gap — entries not made; not counted as eaten" : `${food.protein_g != null ? `${num(food.protein_g, 0)} g protein` : "protein not logged"}${food.floor_g != null ? ` · floor ${num(food.floor_g, 0)} g` : ""}` }
+  ? { value: food.calories != null ? num(food.calories, 0) : "—", unit: "kcal", d: food.logging_gap ? "a logging gap — entries not made; not counted as eaten" : food.partial ? "a partial export — taken before the day ended; not counted as the day's intake" : `${food.protein_g != null ? `${num(food.protein_g, 0)} g protein` : "protein not logged"}${food.floor_g != null ? ` · floor ${num(food.floor_g, 0)} g` : ""}` }
   : { value: "—", unit: "", d: d.food_state === "not logged" ? "not logged — missing, not zero" : "not readable for this day" };
 // The day → what the coaches called about it → how the window closed (owner brief 2026-11-12). The public ledger's own
 // objects, withheld calls left out entirely (lib/day_coaching.js); no calls, no section — the part stays as an empty
@@ -417,6 +417,11 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
                     record holds{d.workout ? `, beside a ${num(d.workout.duration_min, 0)}-minute session` : ""}, not what he ate, so intake that day is unknown. No
                     deficit is published from it, and since 31 October the grader reads such a day as missing. The coaches' notes and the engine's nutrition
                     score for this day were written from the record as if it were eaten; a correction stands beside each line that quotes it.
+                  </div>
+                ) : food.partial ? (
+                  <div class="callout">
+                    <b>A partial export, stated as one.</b> The record for {when} was exported before the day ended, so the figures above are what
+                    had been logged by then, not what he ate that day. It is not graded against the protein floor here, and the nutrition page leaves it out of its averages.
                   </div>
                 ) : (
                   <p class="small">

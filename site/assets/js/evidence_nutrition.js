@@ -13,6 +13,14 @@ import { dayInWords } from "/assets/js/entry_age.js"; // #4182 D5 — the ONE pr
 // (—%, )" was the audit's specimen).
 export const DEFICIT_REFUSED = "The engine does not publish a deficit — its estimate exceeds what it will vouch for.";
 const _int = (v) => Math.round(Number(v)).toLocaleString("en-US");
+// #6195 F4: a maintenance figure names its source and the date it is from. The API sends `tdee_as_of` only with its
+// switch on; an absent field (undefined) leaves every line exactly as it was.
+const _MAINT_SRC = { macrofactor_adaptive: "MacroFactor's adaptive estimate", estimate_mifflin: "formula estimate", estimate_default: "default estimate" };
+function _maintLabel(source, asOf) {
+  if (asOf === undefined) return "";
+  const src = _MAINT_SRC[source] || "estimate";
+  return asOf ? ` (${src}, as of ${fmtShort(asOf)})` : ` (${src}, date unknown)`;
+}
 const _kOfN = (k, n) => `${k} of ${n}`;
 
 // #4182 — the nutrition fold: days logged against the window, the latest complete day
@@ -53,8 +61,8 @@ export function nutritionVerdict(n) {
   if (!hasDef && !hasHit) return null;
   const d = Number(n.avg_deficit), h = Number(hasFloor ? n.protein_floor_hit_pct : n.protein_hit_pct);
   const machine = [
-    n.avg_calories != null ? `${fmt(n.avg_calories)} in` : null,
-    n.tdee != null ? `${fmt(n.tdee)} estimated maintenance` : null,
+    n.avg_calories != null ? `${fmt(n.avg_calories)} in${n.tdee_as_of !== undefined && n.days_logged != null ? ` (${fmt(n.days_logged)} complete days)` : ""}` : null,
+    n.tdee != null ? `${fmt(n.tdee)} estimated maintenance${_maintLabel(n.tdee_source, n.tdee_as_of)}` : null,
     hasDef ? `${d >= 0 ? "−" : "+"}${fmt(Math.abs(Math.round(d)))} kcal/day` : null,
     hasHit ? `protein ${hasFloor ? "floor" : "target"} ${_hitPhrase(n, hasFloor, h)}` : null,
   ].filter(Boolean).join(" · ");
@@ -156,7 +164,10 @@ export function nutritionLossRate(lr, n) {
   else if (fp != null && fp < 100) floorClause = ", and right now that floor's missed most days";
   else if (fp != null && fp >= 100) floorClause = ", and right now that floor's holding";
   else floorClause = "";
-  const serif = `A fast rate is contested. The bench is split on it — defensible early at this size if it's monitored, but only while the protein floor holds${floorClause}. That's why the rate and the protein sit on the same line here.`;
+  // #6195 F7: with `rate_line_v2` the page states no verdict on the pace — it shows the protein floor beside it.
+  const serif = lr.rate_line_v2
+    ? `How fast is too fast is contested, and this page does not rate the pace as safe or unsafe. What it can show is the protein floor beside it${floorClause}.`
+    : `A fast rate is contested. The bench is split on it — defensible early at this size if it's monitored, but only while the protein floor holds${floorClause}. That's why the rate and the protein sit on the same line here.`;
   return `<div class="two-voice nut-lossrate"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(chain)} ${flag}</p><p class="tv-human">${esc(serif)}</p></div>`;
 }
 
@@ -269,14 +280,18 @@ export function nutritionDeficitSustainability(ds) {
   }).join("");
   const sevTone = (ds.severity === "warning" || ds.severity === "critical") ? "dsx-sev-attn" : "dsx-sev-ok";
   // #4182: a refused or unpublished deficit reads as the refusal, never as "about a — kcal/day (—%, )".
-  const intake = def.avg_intake_kcal != null && def.tdee != null ? `Eating ~${_int(def.avg_intake_kcal)} calories a day against an estimated ${_int(def.tdee)} to maintain (TDEE, total daily energy expenditure). ` : "";
+  const _win = def.tdee_as_of !== undefined && ds.period && ds.period.start && ds.period.end ? ` from ${fmtShort(ds.period.start)} to ${fmtShort(ds.period.end)}` : "";
+  const intake = def.avg_intake_kcal != null && def.tdee != null ? `Eating ~${_int(def.avg_intake_kcal)} calories a day${_win} against an estimated ${_int(def.tdee)} to maintain${_maintLabel(def.tdee_source, def.tdee_as_of)} (TDEE, total daily energy expenditure). ` : "";
   const defLine = !def.in_deficit
     ? "No active deficit in the window."
     : def.deficit_published === false || def.deficit_kcal == null
       ? `${intake}The deficit itself is not published.`
       : `${intake}That is about a <strong>${_int(def.deficit_kcal)} calorie/day deficit${def.deficit_pct != null ? ` (${fmt(def.deficit_pct)}%${def.label ? `, ${esc(def.label)}` : ""})` : ""}</strong> — maintenance is estimated, so read it as a ballpark.`;
-  return sec("Is the cut costing you? — the five-channel read",
+  // #6195 F2: with `honesty` the heading stops asking a yes/no question the read cannot answer, and the read carries its
+  // own limits and date. Without it (the switch off, or a cached older body) the section is byte-for-byte as before.
+  return sec(ds.honesty ? "Recovery channels during the cut — the five-channel read" : "Is the cut costing you? — the five-channel read",
     `<div class="dsx-verdict ${sevTone}"><span class="dsx-count mono">${ds.degraded_count}/5</span><span class="dsx-vtext">${esc(ds.verdict || "")}</span></div>` +
+    (ds.honesty ? `<p class="rd-meta label dsx-honesty">${esc(ds.honesty)}${Array.isArray(ds.not_based_on) && ds.not_based_on.length ? ` Not based on: ${esc(ds.not_based_on.join(", "))}.` : ""}${ds.as_of ? ` As of ${esc(fmtShort(ds.as_of))}.` : ""}</p>` : "") +
     `<div class="dsx-rows">${rows}</div>` +
     `<p class="rd-meta label">${defLine} The five channels — HRV, sleep quality, recovery, habit adherence, training output — are watched together: a deficit that's working shows up as the weight falling while these <em>hold</em>; one that's costing too much shows up as three or more slipping at once. A single strained channel is noise, not a verdict. Correlative, n=1 — an early signal, never alarm.</p>`);
 }
@@ -409,7 +424,7 @@ export async function renderNutrition(d) {
   const trend = (d && d.nutrition_trend) || [];
   if (trend.length) {
     parts.push(sec("Energy — the deficit story",
-      lineChart(trend, { valueKey: "calories", goal: n.tdee || null, unit: " kcal", label: "Calories vs maintenance", spine: true, emptyMsg: "The calorie trend fills as days are logged." }) +
+      lineChart(trend, { valueKey: "calories", goal: n.tdee || null, goalWord: n.tdee_as_of !== undefined ? "estimated maintenance" : "goal", unit: " kcal", label: "Calories vs maintenance", spine: true, emptyMsg: "The calorie trend fills as days are logged." }) +
       nutritionLossRate(d && d.loss_rate, n)));
     parts.push(sec("Protein vs target",
       lineChart(trend, { valueKey: "protein_g", goal: n.protein_target_g || null, unit: "g", label: "Protein per day vs target", spine: true }) +

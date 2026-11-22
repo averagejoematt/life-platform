@@ -12,6 +12,7 @@ site_api_common (identical binding semantics to the pre-split facade).
 import os
 from datetime import datetime, timedelta
 
+from common import nutrition_consistency as nc  # #6195: the target-neutral consistency switchboard (all OFF = today)
 from common.constants import PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's targets, never the profile row
 from common.pacific_time import shift_day_key  # #5584: the window's sub-bounds
 from health import (
@@ -110,6 +111,24 @@ def _resolve_mf_tdee(items):
             if val > 0:
                 return val, "macrofactor_adaptive"
     return None, None
+
+
+def _tdee_as_of(items, tdee_source, today):
+    """#6195 (MAINTENANCE_LABELLED): the date the served maintenance estimate is FROM — the MacroFactor row
+    ``_resolve_mf_tdee`` read for an adaptive figure (it can be weeks old), else ``today`` for a formula estimate."""
+    if tdee_source != "macrofactor_adaptive":
+        return today
+    for it in reversed(items or []):
+        for field in _TDEE_FIELDS:
+            val = _num(it.get(field))
+            if val is not None and val > 0:
+                return str(it.get("date") or it.get("sk", "")).replace("DATE#", "")[:10] or None
+    return None
+
+
+def _held(channels):
+    """#6195 F1: the channels that MEASURED steady — a channel with too few days held nothing."""
+    return sum(1 for c in channels if c["status"] == "stable" and c["direction"] != "insufficient_data")
 
 
 def _mifflin_tdee(weight_lbs, strava_items=None, profile=None, hevy_items=None):
@@ -645,6 +664,7 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
         # The plan's floor is what "the protein floor holds" language grades against.
         "protein_floor_hit_pct": floor_hit_pct,
         "protein_floor_g": protein_floor,
+        **({"rate_line_v2": True} if nc.on(nc.RATE_LINE_WORDING) else {}),  # #6195 F7: the page drops "defensible early"
     }
 
     # ── Meal rhythm (P1.1): per-meal timing + protein, from food_log entries (each entry
@@ -918,6 +938,8 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
                 "partial_days": partial_days,  # #5954: the subset of incomplete_days exported mid-day
                 "tdee": round(tdee) if tdee else None,
                 "tdee_source": tdee_source,
+                # #6195 (MAINTENANCE_LABELLED): the estimate's own date — an adaptive figure can be weeks old
+                **({"tdee_as_of": _tdee_as_of(items, tdee_source, today) if tdee else None} if nc.on(nc.MAINTENANCE_LABELLED) else {}),
                 # #3931 box 4: the method behind the number, and the impossibility verdict.
                 "tdee_method": tdee_method,
                 "basis": trend_check.get("basis"),
@@ -1016,6 +1038,8 @@ def deficit_sustainability(*, _g) -> dict:
     today = datetime.now(PT).strftime("%Y-%m-%d")  # #2414: the reader's "today" is the Pacific day
     start = _experiment_date(14)
     mf = _query_source("macrofactor", start, today)
+    if nc.on(nc.PARTIAL_EXPORT_EXCLUDED):
+        mf = nutrition_logging.complete_logs(mf)  # #6195 F3: the overview's rule (#5607/#5954) — a partial export is not a day eaten
     if len(mf) < 7:
         return _ok(
             {
@@ -1174,6 +1198,19 @@ def deficit_sustainability(*, _g) -> dict:
             "sustainable",
             "The body's absorbing the deficit — recovery, sleep, and output are holding while the weight comes off.",
         )
+        if nc.on(nc.PUBLIC_VERDICT_NOT_CLEARANCE):
+            # #6195 F1 (owner ruling 2026-11-22): five recovery channels holding is not a clearance of the deficit
+            severity, verdict = "channels_holding", nc.public_holding_verdict(_held(channels), start, today, deficit_published)
+    _verdict_basis = (
+        {
+            "as_of": today,
+            "based_on": list(nc.PUBLIC_BASED_ON),
+            "not_based_on": list(nc.PUBLIC_NOT_BASED_ON),
+            "honesty": nc.PUBLIC_HONESTY,
+        }
+        if nc.on(nc.PUBLIC_VERDICT_NOT_CLEARANCE)
+        else {}
+    )
 
     return _ok(
         {
@@ -1189,6 +1226,7 @@ def deficit_sustainability(*, _g) -> dict:
                     "avg_intake_kcal": avg_cal,
                     "tdee": round(tdee),
                     "tdee_source": tdee_source,
+                    **({"tdee_as_of": _tdee_as_of(mf, tdee_source, today)} if nc.on(nc.MAINTENANCE_LABELLED) else {}),  # #6195 F4
                     "deficit_kcal": deficit_kcal if deficit_published else None,
                     "deficit_pct": deficit_pct if deficit_published else None,
                     "label": deficit_label if deficit_published else None,
@@ -1203,6 +1241,7 @@ def deficit_sustainability(*, _g) -> dict:
                 "degraded_count": degraded,
                 "severity": severity,
                 "verdict": verdict,
+                **_verdict_basis,  # #6195 F1: as_of, based_on, not_based_on, honesty — only when the switch is on
             }
         },
         cache_seconds=3600,

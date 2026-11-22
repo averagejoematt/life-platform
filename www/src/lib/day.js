@@ -236,7 +236,7 @@ export function recoveryRows(day) {
 export function foodRows(food) {
   const g = (v) => (v == null ? "not logged" : `${num(v, 0)} g`);
   return [
-    ["Calories logged", food.calories == null ? "not logged" : `${num(food.calories, 0)} kcal${food.tdee != null ? ` · maintenance about ${num(food.tdee, 0)}` : ""}`],
+    ["Calories logged", food.calories == null ? "not logged" : `${num(food.calories, 0)} kcal${food.tdee != null ? ` · maintenance about ${num(food.tdee, 0)}${food.tdee_as_of ? ` (an estimate as of ${dayInWords(food.tdee_as_of, { short: true })})` : ""}` : ""}`],
     ["Protein", `${g(food.protein_g)}${food.floor_g != null ? ` · floor ${num(food.floor_g, 0)} g` : ""}`],
     ["Carbohydrate", g(food.carbs_g)],
     ["Fat", g(food.fat_g)],

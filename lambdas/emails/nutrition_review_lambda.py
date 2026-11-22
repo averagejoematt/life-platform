@@ -35,7 +35,11 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-from common import outbound_trial, send_ledger  # #6176: the outbound trial; #3113 / DIL-025: the durable replay guard
+from common import (  # #6176: the outbound trial; #3113 / DIL-025: the durable replay guard
+    nutrition_consistency as _nc,  # #6195: the target-neutral consistency switchboard
+    outbound_trial,
+    send_ledger,
+)
 from common.constants import (
     EXPERIMENT_BASELINE_WEIGHT_LBS,
     EXPERIMENT_START_DATE,
@@ -640,6 +644,22 @@ def _rescope_micro_rule(text, member_id="fallback"):
     return rescoped
 
 
+def _fallback_system_prompt(cal_target, pro_target):
+    """The hardcoded panel prompt, rendered. #6195 F10 (OWNER_TARGET_LAYERS, default OFF): with the switch on the calorie
+    line names the layers ("vs the calorie target (<rest> on rest days and <lifting> on lifting days ...; the base plan
+    is ...)") instead of calling one layer "the" target. The grid and grading keep ``target_kcal()``."""
+    template = _FALLBACK_SYSTEM_PROMPT
+    if _nc.on(_nc.OWNER_TARGET_LAYERS):
+        template = template.replace("vs target ({calorie_target} kcal)", "vs the calorie target ({calorie_target})")
+        cal_target = calorie_target.layers_phrase()
+    return template.format(
+        calorie_target=cal_target,
+        protein_target_g=pro_target,
+        feeding_threshold_g=_feeding_threshold_text(),
+        eating_window=eating_window.published_text(),  # #5099
+    )
+
+
 # Fallback prompt (original hardcoded version, used if S3 config unavailable)
 _FALLBACK_SYSTEM_PROMPT = (
     """You are the Saturday Nutrition Review panel for Matthew's Life Platform. You write a weekly email arriving Saturday morning before his grocery shopping trip to Metropolitan Market in Seattle.
@@ -729,6 +749,8 @@ def build_user_message(data):
         "dexa": extract_dexa_context(data["latest_dexa"]),
         "profile_targets": {
             "calorie_target": calorie_target.target_kcal(),  # #5095: the ONE calorie target
+            # #6195 F10 (OWNER_TARGET_LAYERS): the layers named beside the number — the number itself is unchanged
+            **({"calorie_target_layers": calorie_target.layers_phrase()} if _nc.on(_nc.OWNER_TARGET_LAYERS) else {}),
             "protein_target_g": PLAN_DAILY_PROTEIN_MIN_G,
             "goal_weight_lbs": data["profile"].get("goal_weight_lbs", 185),
         },
@@ -1136,12 +1158,7 @@ def lambda_handler(event, context):
         logger.info("Using config-driven nutrition panel prompt")
     else:
         logger.info("Using fallback hardcoded nutrition panel prompt")
-        system = _FALLBACK_SYSTEM_PROMPT.format(
-            calorie_target=cal_target,
-            protein_target_g=pro_target,
-            feeding_threshold_g=_feeding_threshold_text(),
-            eating_window=eating_window.published_text(),  # #5099
-        )
+        system = _fallback_system_prompt(cal_target, pro_target)
 
     # P2: Dynamic journey context — panel must know stage for appropriate coaching
     try:
