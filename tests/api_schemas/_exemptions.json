@@ -55,10 +55,6 @@
     "category": "write-path",
     "reason": "POST-only \u2014 #4182 two-question reader door (did this page make sense?), writes to DynamoDB (write)"
   },
-  "/api/platform_forecasts": {
-    "category": "capture-failed",
-    "reason": "#6170 (owner ruling 2026-11-22 \u00a75): the rules-based platform forecasts serve an empty list while common/public_forecast_policy.STREAM_LIVE is off, so a live capture has no forecast row to reduce to a shape; its shape is pinned by tests/test_public_forecast_reader_6170.py (FIELDS) \u2014 capture a snapshot once the owner turns the stream on"
-  },
   "/api/replicate_certify": {
     "category": "write-path",
     "reason": "POST-only \u2014 #1393 engagement-ladder Replicator self-cert; deduped per source, increments the VOTES#ladder_replicator aggregate counter (write)"

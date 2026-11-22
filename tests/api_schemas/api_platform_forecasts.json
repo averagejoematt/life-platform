@@ -1,0 +1,156 @@
+{
+  "captured_at": "2026-11-22T06:19:52.223348+00:00",
+  "fetch_path": "/api/platform_forecasts",
+  "is_prefix_sample": false,
+  "path": "/api/platform_forecasts",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "served_at": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "as_of": {
+        "type": "string"
+      },
+      "forecasts": {
+        "items": {
+          "keys": {
+            "author_words": {
+              "type": "string"
+            },
+            "call": {
+              "type": "string"
+            },
+            "claim": {
+              "type": "string"
+            },
+            "evaluation_rule": {
+              "type": "string"
+            },
+            "forecast": {
+              "type": "number"
+            },
+            "graded": {
+              "type": "null"
+            },
+            "guess": {
+              "keys": {
+                "on": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "number"
+                },
+                "words": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "id": {
+              "type": "string"
+            },
+            "inputs": {
+              "keys": {
+                "from": {
+                  "type": "string"
+                },
+                "n": {
+                  "type": "integer"
+                },
+                "route": {
+                  "type": "string"
+                },
+                "sha256": {
+                  "type": "string"
+                },
+                "to": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "label": {
+              "type": "string"
+            },
+            "made": {
+              "type": "string"
+            },
+            "measure": {
+              "type": "string"
+            },
+            "metric": {
+              "type": "string"
+            },
+            "reader_calls_close": {
+              "type": "string"
+            },
+            "result_due": {
+              "type": "string"
+            },
+            "rule": {
+              "keys": {
+                "id": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "integer"
+                },
+                "words": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "scoring": {
+              "keys": {
+                "rule": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "integer"
+                },
+                "words": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "status": {
+              "type": "string"
+            },
+            "target_date": {
+              "type": "string"
+            },
+            "unit": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 2,
+        "type": "array"
+      },
+      "label": {
+        "type": "string"
+      },
+      "source": {
+        "type": "string"
+      }
+    },
+    "type": "object"
+  }
+}
