@@ -675,6 +675,29 @@ logs an error), a POST 404 "Reader calls are not available."; call pages hide th
 (digest, >= 60 accepted reader calls in one hour); refusals by reason in Logs Insights on the site-api log group:
 `fields Reason | filter ReaderCallEvent = "refused" | stats count(*) by Reason`.
 
+## Owner outbound trial — the switchboard (#6176)
+
+The owner's two-week outbound-mail trial (ruling 2026-11-22 §9) is ONE committed module,
+`lambdas/common/outbound_trial.py`. Each item is one line in its `TRIAL` dict and ships `False` (today's behaviour).
+Start an item, or roll one back alone, by flipping its line in a PR and deploying the fleet (`bash deploy/deploy_fleet.sh`);
+the status page wording needs the site-api deploy too (`bash deploy/deploy_site_api.sh`). `TRIAL_ENDS_ON` (a Pacific
+`YYYY-MM-DD`) turns every item off by itself from that day.
+
+| Item | On | Rollback |
+|---|---|---|
+| `sunday_what_changed` | the Sunday weekly-digest slot sends "what changed and what matters"; Monday Compass is held | flip to `False` |
+| `plate_into_nutrition_review` | Friday Plate held; its most-logged-foods section rides Saturday's Nutrition Review | flip to `False` |
+| `review_pack_not_emailed` | the AI Review Pack is built and logged (`[ai-review-pack] pack_record`), not emailed | flip to `False` |
+| `story_questions_paused` | Monday story questions + Tuesday owner-words question held before generation (#6174) | flip to `False` |
+| `evening_one_channel` | Telegram 20:00 prompt held (EVAL# still stamped); the nudge drops items unlogged 14+ days | flip to `False` |
+| `ops_dlq_summary` | the DLQ SES summary is held when its SNS escalation went out | flip to `False` |
+| `ops_canary_alarmed` | a canary failure a declared alarm already carries is not also emailed | flip to `False` |
+| `ops_monday_pack` | the Monday ops pack is logged (`[traffic-digest] ops_pack_record`), not emailed | flip to `False` |
+
+Every held send logs ONE `[outbound-trial] {"event": "suppressed", ...}` line in its own log group, so a held send
+is never a silent failure. Volume before and after: `python3 scripts/owner_outbound_volume.py --weeks 2` (read-only;
+log groups keep 30 days, so run it within 30 days of the window).
+
 ## Common Issues
 
 ### Whoop/Withings/Strava: "Token expired" error
