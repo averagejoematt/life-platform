@@ -297,15 +297,29 @@ def _is_legacy_hold(craft) -> bool:
     return bool(items) and items[0] == story_pipeline.LEGACY_NOTE
 
 
+def _is_legacy_checked(craft) -> bool:
+    """True when ``craft`` is the legacy door's record with the desk's full post gate run on it (#6178, switch on)."""
+    from content import autopublish_audit
+
+    items = list(craft or [])
+    return bool(items) and items[0] == autopublish_audit.LEGACY_CHECKED_NOTE
+
+
 def attach_legacy_audit(date_str, findings, *, _g):
     """#6155: the legacy door's findings ride on the draft row as the audit the approve path reads
-    (``desk_findings_json`` post half; every item is blocking — none is a ``craft:``/``repeat:`` note), with
-    ``publish_hold = legacy_hold``. No desk budget, episode or ledger is written: the desk did not write the week."""
-    from content import story_pipeline
+    (``desk_findings_json`` post half), with ``publish_hold = legacy_hold``. No desk budget, episode or ledger is
+    written: the desk did not write the week.
+
+    #6178: with the eligibility switch on, the record opens with ``LEGACY_CHECKED_NOTE`` (information, not blocking) and
+    carries the desk's full post-gate findings; its ``craft:``/``repeat:`` notes also ride as ``desk_craft_json``, the
+    residual the owner's click answers — exactly as on a desk row. Any other record opens with the blocking
+    ``LEGACY_NOTE``: the hold is never an empty (passing) record."""
+    from content import autopublish_audit, story_pipeline
 
     findings = list(findings or [])
-    if story_pipeline.LEGACY_NOTE not in findings:  # the hold is never an empty (passing) record
+    if story_pipeline.LEGACY_NOTE not in findings and not _is_legacy_checked(findings):
         findings.insert(0, story_pipeline.LEGACY_NOTE)
+    craft = [f for f in findings if autopublish_audit.is_style_finding(f)] if _is_legacy_checked(findings) else []
     try:
         _g["table"].update_item(
             Key={"pk": f"USER#{_g['USER_ID']}#SOURCE#chronicle", "sk": f"DATE#{date_str}"},
@@ -313,7 +327,7 @@ def attach_legacy_audit(date_str, findings, *, _g):
             ExpressionAttributeNames={"#p": "phase"},
             ExpressionAttributeValues={
                 ":f": json.dumps({"post": list(findings), "episode": []}, default=str),
-                ":c": "[]",
+                ":c": json.dumps(craft, default=str),
                 ":h": story_pipeline.LEGACY_HOLD,
                 ":ph": "experiment",
             },
@@ -409,8 +423,14 @@ def _send_preview_email(
             "LEGACY HOLD (#6155): the legacy writer drafted this week; the desk's quote and ledger checks ran on it and the "
             "audit holds it. The approve link will refuse it until the items below are resolved."
             if _is_legacy_hold(craft)
-            else "CRAFT HOLD (#4545): the craft gate still found these after the rewrites, so this week will NOT publish "
-            "itself after 48 h. Approve to publish it as is."
+            else (
+                "LEGACY WRITER (#6178): the legacy writer drafted this week and the desk's source, privacy, quote, fact and "
+                "craft checks ran on it. It publishes only on your approve click, and the link refuses it while any item below "
+                "other than a craft note remains."
+                if _is_legacy_checked(craft)
+                else "CRAFT HOLD (#4545): the craft gate still found these after the rewrites, so this week will NOT publish "
+                "itself after 48 h. Approve to publish it as is."
+            )
         )
         craft_html = (
             f'<p style="margin:0 0 6px;font-size:13px;color:#fcd34d;">{lead}</p>'
@@ -446,7 +466,11 @@ def _send_preview_email(
     tag = (
         "[PREVIEW · LEGACY WRITER — desk failed]"
         if desk_fallback
-        else ("[PREVIEW · LEGACY HOLD]" if _is_legacy_hold(craft) else ("[PREVIEW · CRAFT HOLD]" if craft else "[PREVIEW]"))
+        else (
+            "[PREVIEW · LEGACY HOLD]"
+            if _is_legacy_hold(craft)
+            else ("[PREVIEW · LEGACY WRITER]" if _is_legacy_checked(craft) else ("[PREVIEW · CRAFT HOLD]" if craft else "[PREVIEW]"))
+        )
     )
     subject = f'{tag} The Measured Life — Week {week_num}: "{title}"'
     try:
