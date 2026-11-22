@@ -222,10 +222,11 @@ def test_the_url_carries_an_opaque_token_and_nothing_else():
 
 def test_the_rendered_link_has_no_recommendation_text_in_it():
     v = _view(_data(intake=1480), guidance=["🚶 a 30-minute walk today"])
-    tok = rr.new_token()
+    tok = "A" * 43  # fixed: a random 43-char token can legitimately contain "30" or a day fragment (CI flake, #6175)
     v.respond_url = rr.response_url("https://averagejoematt.com", tok)
     v.respond_rec = v.decision
     q = urlparse(v.respond_url).query
+    assert q == "t=" + tok  # the query is the token and nothing else
     for word in ("walk", "30", "movement", DAY, "2026", "%20"):
         assert word not in q
 
