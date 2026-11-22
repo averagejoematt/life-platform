@@ -42,12 +42,17 @@ def test_the_disclosure_names_her_says_ai_and_says_language_model():
 
 
 def test_the_v9_bylines_read_the_one_definition():
+    # #6177: the chapter page and the story index read their bylines through lib/chapter_truth.js, which returns
+    # CHAPTER_BYLINE / INDEX_BYLINE while its switch is off and builds every other byline on NARRATOR_BYLINE / NARRATOR_WHO
     page = _read("www/src/pages/story/[id].astro")
-    assert "{CHAPTER_BYLINE}" in page and 'from "../../lib/narrator.js"' in page
+    assert "{chapterByline(c)}" in page and 'from "../../lib/chapter_truth.js"' in page
     home = _read("www/src/pages/index.astro")
     assert "{NARRATOR_BYLINE}" in home and 'from "../lib/narrator.js"' in home
     index = _read("www/src/pages/story/index.astro")
-    assert "{INDEX_BYLINE}" in index and 'from "../../lib/narrator.js"' in index
+    assert "{indexByline()}" in index and 'from "../../lib/chapter_truth.js"' in index
+    truth = _read("www/src/lib/chapter_truth.js")
+    assert 'import { CHAPTER_BYLINE, INDEX_BYLINE, NARRATOR_BYLINE, NARRATOR_WHO } from "./narrator.js";' in truth
+    assert "return CHAPTER_BYLINE;" in truth and "INDEX_BYLINE;" in truth
     src = _read("www/src/lib/narrator.js")
     for name in ("NARRATOR_BYLINE", "CHAPTER_BYLINE", "INDEX_BYLINE"):
         assert re.search(rf"export const {name} = `[^`]*\$\{{NARRATOR_(?:WHO|BYLINE)\}}", src), name

@@ -136,6 +136,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     ext = audio_key.rsplit(".", 1)[-1]
     live = json.loads(s3.get_object(Bucket=BUCKET, Key=f"{PANEL_PREFIX}/wk{wk}.transcript.json")["Body"].read()).get("turns") or []
 
+    panel._panel_desk().arm_private_calls(panel.table)  # #6199 P: the re-cut's lines are checked against the private calls
     refusals = gate_findings(turns, panel._safety_gate) + shape_findings(live, turns)
     labels = sorted({t["speaker"] for t in turns})
     if set(labels) != {"Elena", row.get("guest_name")}:

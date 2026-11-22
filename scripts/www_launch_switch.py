@@ -29,6 +29,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LAB_JS = os.path.join(REPO, "www", "src", "lib", "lab.js")
 STORY_JS = os.path.join(REPO, "www", "src", "lib", "story_dark.js")
 READERCALL_JS = os.path.join(REPO, "www", "src", "lib", "readercall.js")
+CHAPTER_TRUTH_JS = os.path.join(REPO, "www", "src", "lib", "chapter_truth.js")
 
 
 def read_flag(path: str, name: str) -> bool | None:
@@ -59,6 +60,12 @@ def readercall_live(path: str = READERCALL_JS) -> bool:
     return read_flag(path, "READERCALL_LIVE") is True
 
 
+def chapter_truth_live(path: str = CHAPTER_TRUTH_JS) -> bool:
+    """Are the #6177 truthful chapter displays committed live? (www/src/lib/chapter_truth.js CHAPTER_TRUTH_LIVE; unreadable
+    = off.) The RSS builder reads it for the feed's channel line."""
+    return read_flag(path, "CHAPTER_TRUTH_LIVE") is True
+
+
 if __name__ == "__main__":
-    print(f"LAB_LIVE={lab_live()} STORY_LIVE={story_live()} READERCALL_LIVE={readercall_live()}")
+    print(f"LAB_LIVE={lab_live()} STORY_LIVE={story_live()} READERCALL_LIVE={readercall_live()} CHAPTER_TRUTH_LIVE={chapter_truth_live()}")
     sys.exit(0)

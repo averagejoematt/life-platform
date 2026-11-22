@@ -49,7 +49,7 @@ import boto3
 from ai import google_tts
 from coach import persona_registry
 from common.journal_silence import public_body, scrub_document  # #5131: the one public-surface guard
-from content import chronicle_schema
+from content import chapter_reads, chronicle_schema  # #6199 G1: a withdrawn chapter is never voiced
 
 try:
     from common.platform_logger import get_logger
@@ -132,7 +132,7 @@ def _content_for(date_str: str, title: str) -> str | None:
         d = (base + _td(days=off)).strftime("%Y-%m-%d")
         r = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#chronicle", "sk": f"DATE#{d}"})
         item = r.get("Item") or {}
-        md = item.get("content_markdown")
+        md = item.get("content_markdown") if chapter_reads.writer_may_read(item) else None  # #6199 G1
         if not md:
             continue
         rec_title = str(item.get("title") or "").strip().lower()

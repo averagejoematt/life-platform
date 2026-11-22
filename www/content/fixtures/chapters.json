@@ -34,6 +34,7 @@
   "id": "week-06",
   "method_ids": [],
   "published_at": "2026-10-17",
+  "published_via": "approval",
   "read_minutes": 8,
   "sample": true,
   "source": [
@@ -67,6 +68,7 @@
   "id": "week-07",
   "method_ids": [],
   "published_at": null,
+  "published_via": null,
   "read_minutes": null,
   "sample": true,
   "source": [
@@ -106,6 +108,7 @@
   "id": "week-08",
   "method_ids": [],
   "published_at": null,
+  "published_via": null,
   "read_minutes": null,
   "sample": true,
   "source": [
@@ -139,6 +142,7 @@
   "id": "week-10",
   "method_ids": [],
   "published_at": null,
+  "published_via": null,
   "read_minutes": 1,
   "sample": true,
   "source": [
@@ -172,6 +176,7 @@
   "id": "program-week-09",
   "method_ids": [],
   "published_at": null,
+  "published_via": null,
   "read_minutes": null,
   "sample": true,
   "source": [

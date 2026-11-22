@@ -8,6 +8,7 @@ import { soFar } from "../lib/story.js";
 import { STORY_MARKER, storyEnabled, storyPrivate } from "../lib/story_dark.js";
 import { latestEdition, loadAll, loadStory } from "../lib/snapshot.js";
 import { chapterPublished } from "../lib/format.js";
+import { entryVerb } from "../lib/chapter_truth.js"; // #6177: "where one was approved" only while the switch is off
 import { href, pathOf } from "../lib/url.js";
 
 const on = storyEnabled();
@@ -32,7 +33,7 @@ const when = (r: any) => {
           <>
             {so.sentence && <h2 style="font-size:30px;line-height:1.15">{so.sentence}</h2>}
             <p class="dek" style="max-width:70ch">
-              {so.weeksWords} so far. Each week has its days and, where one was approved, its installment.
+              {so.weeksWords} so far. Each week has its days and, where one was {entryVerb()}, its installment.
             </p>
             {(so.first || so.latest) && (
               <nav class="rows" aria-label="Where to start">
