@@ -19,6 +19,7 @@ from mcp.tools_benchmark import GET_BENCHMARK_DESCRIPTION, tool_get_benchmark
 from mcp.tools_capture import tool_get_capture_queues
 from mcp.tools_cgm import tool_get_cgm
 from mcp.tools_challenges import CHALLENGE_CHECKIN_DESCRIPTION, CHALLENGE_CHECKIN_INPUT, tool_log_challenge_checkin  # #6087
+from mcp.tools_chapter_corrections import MCC_DESCRIPTION, MCC_INPUT, tool_manage_chapter_corrections  # #6177
 
 # #915: ad-hoc coach check-in loop — coaches ask, Matthew answers verbatim.
 from mcp.tools_coach_checkin import (
@@ -84,6 +85,7 @@ from mcp.tools_descriptions import (
     GET_EXERCISE_NOTES_DESCRIPTION,
     GET_EXERCISE_NOTES_INPUT,
     GET_EXPERIMENT_CYCLE_DESCRIPTION,
+    GET_EXPERIMENT_CYCLE_INPUT,
     GET_EXPERIMENT_RESULTS_DESCRIPTION,
     GET_FIELD_NOTES_DESCRIPTION,
     GET_FLOURISHING_TREND_DESCRIPTION,
@@ -2061,6 +2063,10 @@ TOOLS = {
         "fn": tool_log_challenge_checkin,
         "schema": {"name": "log_challenge_checkin", "description": CHALLENGE_CHECKIN_DESCRIPTION, "inputSchema": CHALLENGE_CHECKIN_INPUT},
     },
+    "manage_chapter_corrections": {  # #6177: dated public chapter corrections, platform-signed, public only once he approves
+        "fn": tool_manage_chapter_corrections,
+        "schema": {"name": "manage_chapter_corrections", "description": MCC_DESCRIPTION, "inputSchema": MCC_INPUT},
+    },
     "log_owner_note": {
         "fn": tool_log_owner_note,
         "schema": {"name": "log_owner_note", "description": LOG_OWNER_NOTE_DESCRIPTION, "inputSchema": LOG_OWNER_NOTE_INPUT},
@@ -2095,13 +2101,7 @@ TOOLS = {
         "schema": {
             "name": "get_experiment_cycle",
             "description": GET_EXPERIMENT_CYCLE_DESCRIPTION,
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "date": {"type": "string", "description": "YYYY-MM-DD — which cycle a past date belonged to. Default: today (PT)."}
-                },
-                "required": [],
-            },
+            "inputSchema": GET_EXPERIMENT_CYCLE_INPUT,  # #6177: moved beside its description (pays the two new tools' lines)
         },
     },
     "get_habit_completion": {

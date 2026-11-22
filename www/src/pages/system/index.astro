@@ -12,6 +12,7 @@ import VersusGuess from "../../components/VersusGuess.astro";
 import OwnWords from "../../components/OwnWords.astro";
 import FourParts from "../../components/FourParts.astro"; // the four parts of the experiment; this door holds the AI
 import { href, pathOf } from "../../lib/url.js";
+import { PERSONA_DISCLOSURE } from "../../lib/chapter_corrections.js"; // #6177
 
 const all = await loadAll();
 const edition = await latestEdition();
@@ -138,6 +139,7 @@ const steps = [
             From my essay <a href={href(pathOf("essay", essay.id))}><b>{essay.title}</b></a>
             {essay.date && dayInWords(essay.date) ? `, published ${dayInWords(essay.date)}` : ""}. The weekly chapters are written by the platform's narrator and published after I approve them; the essay is in my voice.
           </p>
+          <p class="persona-disclosure" style="margin-top:8px" data-persona-disclosure>{PERSONA_DISCLOSURE}</p>
         </div>
       </section>
     )

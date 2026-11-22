@@ -8,6 +8,8 @@ cannot fail is a green light wired to nothing (CHARTER §paved roads), so this s
 exits 2 — "blind" — if a planted defect builds clean, and never grades on.
 
   reproducible   export the fixture snapshot, build twice, compare the tree hashes
+  corrections    (#6177) the clean build renders the fixture's approved corrections; a build with them removed must
+                 carry byte-identical chapter bodies (a correction sits beside a chapter, never in it)
   held           flip one public object to `held` in the snapshot → `astro build` MUST fail
   dangling       add one edge to a non-existent object → `astro build` MUST fail
   scan           the clean build carries no fixture sentinel, no inline <script>, no ISO date
@@ -162,6 +164,60 @@ def check_dangling_mutation(preview: bool) -> int:
         return 2
     named = "dangling edge" in out
     log(f"  ✓ dangling edge refused by the build (exit {code}{', named' if named else ''})")
+    return 0
+
+
+_PUBLISHED_BODY = re.compile(
+    r"<div data-published-body>([\s\S]*?)</div>\s*(?:<p class=\"muted\"[^>]*data-numbering-note|</article>|<div style=\"margin-top:48px\" id=\"days\")"
+)
+
+
+def published_bodies(dist: str) -> dict[str, str]:
+    """{chapter page: the bytes inside its data-published-body} for every built chapter page."""
+    out: dict[str, str] = {}
+    for path in sorted(glob.glob(os.path.join(dist, "**", "story", "*", "index.html"), recursive=True)):
+        with open(path, encoding="utf-8") as fh:
+            m = _PUBLISHED_BODY.search(fh.read())
+        if m:
+            out[os.path.relpath(path, dist)] = m.group(1)
+    return out
+
+
+def check_corrections_mutation(preview: bool) -> int:
+    """#6177: a dated public correction is placed BESIDE a chapter, never in it. The clean fixture build renders the
+    sample approved corrections; the same build with chapter_corrections.json emptied must carry byte-identical chapter
+    bodies — and must NOT carry the corrections (else the comparison proves nothing). 0 ok · 1 a body changed · 2 blind."""
+    clean_bodies = published_bodies(DIST)
+    clean_has = [p for p in clean_bodies if "data-chapter-corrections" in open(os.path.join(DIST, p), encoding="utf-8").read()]
+    if not clean_bodies or not clean_has:
+        log("  ✗ BLIND: the clean fixture build renders no chapter body or no correction to compare")
+        return 2
+
+    path = os.path.join(SNAPSHOT, "chapter_corrections.json")
+    backup = path + ".bak"
+    shutil.copyfile(path, backup)
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+        data["corrections"] = []
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(data, fh)
+        cp = build(preview)
+        if cp.returncode != 0:
+            log(f"  ✗ the build without corrections failed:\n{cp.stderr[-1500:]}")
+            return 1
+        bare_bodies = published_bodies(DIST)
+        still = [p for p in clean_has if "data-chapter-corrections" in open(os.path.join(DIST, p), encoding="utf-8").read()]
+    finally:
+        shutil.move(backup, path)
+    if still:
+        log(f"  ✗ BLIND: corrections still rendered with the file emptied: {still}")
+        return 2
+    changed = sorted(p for p in clean_bodies if bare_bodies.get(p) != clean_bodies[p])
+    if changed or set(bare_bodies) != set(clean_bodies):
+        log(f"  ✗ a correction changed a chapter's published body: {changed or sorted(set(bare_bodies) ^ set(clean_bodies))}")
+        return 1
+    log(f"  ✓ corrections render beside {len(clean_has)} chapter(s); all {len(clean_bodies)} chapter bodies byte-identical without them")
     return 0
 
 
@@ -783,6 +839,10 @@ def main() -> int:
         log("reproducible build")
         if not check_reproducible(preview):
             return 1
+        log("corrections beside the text (#6177)")
+        code = check_corrections_mutation(preview)
+        if code:
+            return code
         log("mutation: held object")
         code = check_held_mutation(preview)
         if code:

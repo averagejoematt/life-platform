@@ -15,6 +15,8 @@ import { dailyBars, placeEvidence, windowValues } from "../../lib/evidence.js";
 import { theLine } from "../../lib/theline.js";
 import { hasPage, href, pathOf } from "../../lib/url.js";
 import { placeRecordNote } from "../../lib/record_note.js";
+import { PERSONA_DISCLOSURE, correctionsFor, correctionsHtml, namesLegacyPersona } from "../../lib/chapter_corrections.js"; // #6177
+import { loadChapterCorrections } from "../../lib/snapshot.js";
 import { CHAPTER_BYLINE } from "../../lib/narrator.js";
 
 export async function getStaticPaths() {
@@ -108,6 +110,10 @@ function bodyForPage(html: string | null | undefined, dek: string | null | undef
   return out.replace(/<p>([\s\S]*?)<\/p>/, (whole, inner) => (plain(inner) === dek.trim() ? "" : whole));
 }
 const rawBody = bodyForPage(c.body_html, c.excerpt);
+// #6177: approved, platform-signed corrections sit BESIDE the text (above it), never in it; a body that carries a note
+// signed by the legacy editor persona gets the one disclosure line above it. Neither touches the body's bytes.
+const corrections = c.status === "published" ? correctionsFor(await loadChapterCorrections(), c.id) : [];
+const discloseEditor = c.status === "published" && namesLegacyPersona(c.body_html);
 // Evidence in the margin (2026-11-14, sprint II): the week's weight, recovery and protein drawn beside the paragraph
 // that first talks about each, and a graded call's card beside the paragraph that names its coach. Every figure reads a
 // public series or ledger object; the chapter's words are untouched (lib/evidence.js places figures between paragraphs).
@@ -276,6 +282,8 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
             </div>
           ) : body ? (
             <>
+              {corrections.length > 0 && <div class="chapter-corrections" data-chapter-corrections set:html={correctionsHtml(corrections)} />}
+              {discloseEditor && <p class="persona-disclosure" data-persona-disclosure>{PERSONA_DISCLOSURE}</p>}
               <div data-published-body set:html={body} />
               {(meta.weekNote || idNote) && (
                 <p class="muted" style="font-size:13px;margin-top:32px;font-family:var(--sans)" data-numbering-note>

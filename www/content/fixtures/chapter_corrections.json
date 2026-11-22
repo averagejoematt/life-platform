@@ -1,0 +1,62 @@
+{
+ "_comment": "#6177 fixture: sample CHAPTER_CORRECTION# records as the chronicle partition holds them, approved and not. The exporter runs content.chapter_corrections.public_view over them, the same filter /api/chapters applies; the unapproved one carries a sentinel the build scan must never find on a page. Sample content, for layout only.",
+ "records": [
+  {
+   "pk": "USER#matthew#SOURCE#chronicle",
+   "sk": "CHAPTER_CORRECTION#week-06#sample-walk-distance",
+   "record_type": "chapter_correction",
+   "phase": "experiment",
+   "chapter_id": "week-06",
+   "correction_id": "sample-walk-distance",
+   "kind": "correction",
+   "published_said": "Sample correction, for layout only: the chapter said the Tuesday walk covered seven miles.",
+   "record_shows": "The sample record shows the walk covered five miles.",
+   "evidence": "The sample walking log for that Tuesday.",
+   "supersedes": null,
+   "proposed_at": "2026-10-19T18:00:00Z",
+   "proposed_via": "MCP manage_chapter_corrections",
+   "approvals": [{"by": "owner", "at": "2026-10-20T17:00:00Z", "on": "2026-10-20", "via": "MCP manage_chapter_corrections (owner-only)", "note": ""}],
+   "approved_at": "2026-10-20T17:00:00Z",
+   "dated_on": "2026-10-20",
+   "signature": "Correction, 20 October 2026 — Average Joe Matt editorial record"
+  },
+  {
+   "pk": "USER#matthew#SOURCE#chronicle",
+   "sk": "CHAPTER_CORRECTION#week-06#sample-walk-distance-2",
+   "record_type": "chapter_correction",
+   "phase": "experiment",
+   "chapter_id": "week-06",
+   "correction_id": "sample-walk-distance-2",
+   "kind": "qualification",
+   "published_said": "Sample qualification, for layout only: the earlier sample correction said the walk covered five miles.",
+   "record_shows": "The sample record shows five miles by the watch and five and a half by the phone; the chapter's figure stands corrected either way.",
+   "evidence": "The sample walking log and the sample phone export for that Tuesday.",
+   "supersedes": "sample-walk-distance",
+   "proposed_at": "2026-10-24T18:00:00Z",
+   "proposed_via": "MCP manage_chapter_corrections",
+   "approvals": [{"by": "owner", "at": "2026-10-25T17:00:00Z", "on": "2026-10-25", "via": "MCP manage_chapter_corrections (owner-only)", "note": ""}],
+   "approved_at": "2026-10-25T17:00:00Z",
+   "dated_on": "2026-10-25",
+   "signature": "Qualification, 25 October 2026 — Average Joe Matt editorial record"
+  },
+  {
+   "pk": "USER#matthew#SOURCE#chronicle",
+   "sk": "CHAPTER_CORRECTION#week-06#sample-unapproved",
+   "record_type": "chapter_correction",
+   "phase": "experiment",
+   "chapter_id": "week-06",
+   "correction_id": "sample-unapproved",
+   "kind": "correction",
+   "published_said": "SENTINEL-UNAPPROVED-CORRECTION: a proposal the owner has not approved.",
+   "record_shows": "SENTINEL-UNAPPROVED-CORRECTION must never render.",
+   "evidence": "SENTINEL-UNAPPROVED-CORRECTION",
+   "supersedes": null,
+   "proposed_at": "2026-10-28T18:00:00Z",
+   "proposed_via": "MCP manage_chapter_corrections",
+   "approvals": [],
+   "approved_at": null,
+   "dated_on": null,
+   "signature": null
+  }
+ ]
+}

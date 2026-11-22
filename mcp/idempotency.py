@@ -339,6 +339,12 @@ REPLAY_SEMANTICS: dict[str, tuple[str, str]] = {
         "one daily_checkins entry per (challenge, date): a replay replaces that day with the same value, under a "
         "checkin_rev-conditioned update so a concurrent write is retried on a fresh read, never lost",
     ),
+    # ── #6177 ──────────────────────────────────────────────────────────────────
+    "manage_chapter_corrections": (
+        DETERMINISTIC_KEY,
+        "propose puts CHAPTER_CORRECTION#<chapter>#<id> under attribute_not_exists(sk), so a replay is refused and writes nothing; "
+        "approve appends the approval only while size(approvals) = 0, so a replayed approve is refused",
+    ),
     # ── #4401: read-verb tools reclassified as writes (mcp/audit.py WRITE_TOOLS_BEHIND_READ_VERB) ──
     "get_exercise_notes": (
         DETERMINISTIC_KEY,
