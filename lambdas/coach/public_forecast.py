@@ -14,8 +14,12 @@ WHAT IT IS. A DETERMINISTIC RULE, not a language model and not a coach (``common
   * ``recovery_mean`` / ``sleep_mean`` — the mean of the last 28 days (a night is expected to look like the month).
 
 Each forecast is a NUMBER call (``point`` spec) on the day ``HORIZON_DAYS`` after filing: "Weight will be about 281.4 lb
-on 2026-11-30", graded within ±1 SD of the series' own last 30 days — the SAME tolerance rule a coach's number call is
-filed with (``prediction_emission.point_tolerance_from_series``), so the grade is the grader's existing one.
+on 2026-11-30". It is labelled a **rules-based platform forecast** (owner ruling 2026-11-22 §5) and graded by the
+partition's FROZEN head-to-head rule (``common.public_forecast_policy.SCORING_RULE``): right when it lands closer to the
+reading than the "nothing changes" guess does. Not the ±1 SD band a coach's number call is graded with — the backtest
+(``scripts/public_forecast_backtest.py``) showed that band confirms the rule and the guess alike on most weeks. The band
+is still computed, because ``filing_rules.validate_filing`` files a point call with one, and then removed from the
+frozen spec (``head_to_head_spec``). The pilot files ONE forecast a week (``FORECASTS_PER_CYCLE``): weight.
 
 THE INPUTS are read ONLY over HTTPS from the public Site API (``/api/series``, the route the data room charts) — the
 values any reader sees — and only for a metric that route's own catalogue serves and whose every source the publication
@@ -95,10 +99,36 @@ ALWAYS = ("weight_trend",)
 ALTERNATE = ("recovery_mean", "sleep_mean")
 
 
-def picks(cycle: str) -> list:
-    """The rules filed for ``cycle`` (at most ``MAX_PER_CYCLE``), in order."""
+def picks(cycle: str, per_cycle: Optional[int] = None) -> list:
+    """The rules filed for ``cycle``, in order: at most the policy's ``FORECASTS_PER_CYCLE`` (1 in the pilot: weight
+    only) and never more than ``MAX_PER_CYCLE``. ``per_cycle`` is for the rotation's own tests."""
+    n = POL.FORECASTS_PER_CYCLE if per_cycle is None else per_cycle
     week = datetime.strptime(cycle, "%Y-%m-%d").isocalendar()[1]
-    return (list(ALWAYS) + [ALTERNATE[week % len(ALTERNATE)]])[:MAX_PER_CYCLE]
+    return (list(ALWAYS) + [ALTERNATE[week % len(ALTERNATE)]])[: max(0, min(int(n), MAX_PER_CYCLE))]
+
+
+def head_to_head_spec(spec: dict, filed_value: float, filed_on: str) -> dict:
+    """The frozen evaluation spec of a forecast: the filed ``point`` spec with the ±1 SD band REMOVED (so nothing can
+    grade it by that band by accident) and the partition's head-to-head rule frozen in its place, beside the value of
+    the "nothing changes" guess it is compared with (``common.public_forecast_policy.SCORING_RULE``)."""
+    out = {k: v for k, v in spec.items() if k not in ("tolerance", "tolerance_rule")}
+    out.update(
+        scoring=POL.SCORING_RULE,
+        scoring_version=POL.SCORING_VERSION,
+        baseline_value=float(filed_value),
+        baseline_on=filed_on,
+    )
+    return out
+
+
+def evaluation_sentence(spec: dict) -> str:
+    """How a forecast is graded, in words stored on the row at filing (deterministic copy)."""
+    return (
+        f"Graded on the reading on {spec.get('target_date')}: confirmed if it is closer to {spec.get('threshold'):g} (the "
+        f"forecast) than to {spec.get('baseline_value'):g} (a guess that nothing changes: the reading of "
+        f"{spec.get('baseline_on')}, the last before the forecast was made); refuted if the guess is as close or closer; "
+        "inconclusive with no reading."
+    )
 
 
 def _day(s: str, delta: int = 0) -> str:
@@ -170,6 +200,17 @@ def fit(method: str, readings: list, target: str) -> Optional[float]:
     return None
 
 
+def sd_band(readings: list, today: str) -> Optional[tuple]:
+    """``(tolerance, rule, n)`` — ±1 SD of the trailing 30-day series before ``today``: the band a COACH's number call is
+    graded with (``prediction_emission.point_tolerance_from_series``). A forecast is filed with it (the filing rules
+    want a point call to carry one) and then graded head-to-head instead; the backtest reports what the band would do."""
+    from coach import prediction_emission as PE
+
+    through = _day(today, -1)
+    rows = [v for d, v in readings if _day(through, -(TOLERANCE_LOOKBACK_DAYS - 1)) <= d <= through]
+    return PE.point_tolerance_from_series(rows, lookback_days=TOLERANCE_LOOKBACK_DAYS)
+
+
 # ── one forecast ────────────────────────────────────────────────────────────────────────────────
 def build(rule_id: str, today: str, payload: dict, url: str, cycle: str, *, phase_stamp: bool = True) -> tuple:
     """``(row, None)`` — the PREDICTION# row this rule would file today from ``payload`` (the served series) — or
@@ -193,8 +234,7 @@ def build(rule_id: str, today: str, payload: dict, url: str, cycle: str, *, phas
         return None, "too_few_readings"
     level = fit(rule["method"], fit_rows, target)
     places = PB.METRIC_WORDS[metric][2]
-    tol_rows = [v for d, v in readings if d >= _day(through, -(TOLERANCE_LOOKBACK_DAYS - 1))]
-    tol = PE.point_tolerance_from_series(tol_rows, lookback_days=TOLERANCE_LOOKBACK_DAYS)
+    tol = sd_band(readings, today)
     if level is None or tol is None:
         return None, "no_level" if level is None else "no_tolerance"
     level = round(level, places)
@@ -209,7 +249,8 @@ def build(rule_id: str, today: str, payload: dict, url: str, cycle: str, *, phas
     row = PE.build_prediction_record("", today, claim, verdict["eval_spec"], None, "observational", filing=verdict["filing"])
     if row.get("status") != "pending":
         return None, "not_pending"
-    spec = row["evaluation"]
+    spec = head_to_head_spec(row["evaluation"], filed_value, filed_on)
+    row["evaluation"] = spec
     due = prediction_windows.due_date(today, spec, row.get("subdomain", ""))
     closes = R.open_until(spec, today, prediction_windows.effective_window_days(spec, row.get("subdomain", "")), due)
     if not closes or _days_between(today, closes) + 1 < MIN_OPEN_DAYS:
@@ -220,6 +261,8 @@ def build(rule_id: str, today: str, payload: dict, url: str, cycle: str, *, phas
         prediction_id=pred_id,
         coach_id="",
         source=POL.FORECAST_SOURCE,
+        record=POL.RECORD,
+        label=POL.LABEL,
         author=POL.AUTHOR_ID,
         author_words=POL.AUTHOR_WORDS,
         forecast_cycle=cycle,
@@ -253,9 +296,15 @@ def build(rule_id: str, today: str, payload: dict, url: str, cycle: str, *, phas
             "words": coach_baseline.RULE_WORDS,
             "filed_value": filed_value,
             "filed_on": filed_on,
-            "guess": f"the reading on {target} is within {tol[0]:g} of {filed_value:g}",
+            "guess": f"the reading on {target} is {filed_value:g}, unchanged from {filed_on}",
         },
-        evaluation_rule=PB.criteria_rule(spec),
+        evaluation_rule=evaluation_sentence(spec),
+        scoring={
+            "rule": POL.SCORING_RULE,
+            "version": POL.SCORING_VERSION,
+            "words": POL.SCORING_WORDS,
+            "frozen_at": "filing",
+        },
         submission_window={"opens": today, "closes": closes, "result_due": due, "rule": "web.reader_call_rules.open_until"},
     )
     row[NP.PROVENANCE_KEY] = NP.stamp(BPOL.families_for([metric]), producer=PRODUCER)

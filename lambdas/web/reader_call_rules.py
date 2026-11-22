@@ -7,8 +7,10 @@ closes, and nothing is accepted once the deadline is reached or the outcome is a
 about a reader's call that needs no AWS and no clock of its own:
 
   * WHO MAY BE CALLED BESIDE — a coach's direction call (``directional`` spec, ``up``/``down``) or number call
-    (``point`` spec with a level and a tolerance). Nothing else: a yes/no, a sealed bet, an observation and a
-    conditional are refused, because their "same kind of call" is not one tap.
+    (``point`` spec with a level and a tolerance); and (#6170) a RULES-BASED PLATFORM FORECAST, whose frozen spec is
+    graded head-to-head against a guess that nothing changes (``point`` + ``scoring: closer_than_nothing_changes``): the
+    ``closer`` kind. Nothing else: a yes/no, a sealed bet, an observation and a conditional are refused, because their
+    "same kind of call" is not one tap.
   * THE QUESTION — ``question``: stated ENTIRELY from fields the call's own public page already prints for a call whose
     words are withheld (the measure in reader words, the day it was made, the call's kind, and the grading line —
     ``grading.how`` — which already carries the window length, the level and the tolerance). Never the claim, never
@@ -54,7 +56,11 @@ DEDUP_GRACE_S = 3 * 86400
 
 DIRECTION = "direction"
 NUMBER = "number"
-CHOICES = {DIRECTION: ("up", "down", "same"), NUMBER: ("above", "within", "below")}
+#: #6170: a rules-based platform forecast — will the reading land closer to the forecast or to the "nothing changes" guess?
+CLOSER = "closer"
+CHOICES = {DIRECTION: ("up", "down", "same"), NUMBER: ("above", "within", "below"), CLOSER: ("forecast", "no_change")}
+#: The literal ``common.public_forecast_policy.SCORING_RULE`` (pinned equal by tests/test_public_forecast_reader_6170.py).
+HEAD_TO_HEAD = "closer_than_nothing_changes"
 _DIRECTION_WORDS = {"up": "Up", "down": "Down", "same": "About the same"}
 #: Row fields that mean an outcome exists. Any one present closes the call, whatever the status says.
 OUTCOME_FIELDS = ("outcome", "outcome_date", "outcome_notes", "outcome_value", "evaluated_date", "settled_date")
@@ -99,6 +105,16 @@ def call_kind(spec: Any) -> Optional[str]:
     if not isinstance(spec, dict):
         return None
     t = str(spec.get("type") or "").strip().lower()
+    if spec.get("scoring") is not None:  # #6170: only the platform forecast's frozen rule; any other scoring is refused
+        ok = (
+            t == "point"
+            and spec.get("scoring") == HEAD_TO_HEAD
+            and _num(spec.get("threshold")) is not None
+            and _num(spec.get("baseline_value")) is not None
+            and _num(spec.get("threshold")) != _num(spec.get("baseline_value"))
+            and _day(spec.get("target_date"))
+        )
+        return CLOSER if ok else None
     if t == "directional" and str(spec.get("condition") or "").strip().lower() in ("up", "down"):
         return DIRECTION
     if (
@@ -120,6 +136,12 @@ def choices(spec: dict, unit: Optional[str] = None) -> list[dict]:
     kind = call_kind(spec)
     if kind == DIRECTION:
         return [{"id": c, "label": _DIRECTION_WORDS[c]} for c in CHOICES[DIRECTION]]
+    if kind == CLOSER:
+        f, g, u = _fmt(_num(spec["threshold"])), _fmt(_num(spec["baseline_value"])), _unit(unit)
+        return [
+            {"id": "forecast", "label": f"Closer to {f}{u}, the forecast"},
+            {"id": "no_change", "label": f"Closer to {g}{u}, no change"},
+        ]
     if kind == NUMBER:
         level, tol = _fmt(_num(spec["threshold"])), _fmt(_num(spec["tolerance"]))
         u = _unit(unit)
@@ -132,8 +154,11 @@ def choices(spec: dict, unit: Optional[str] = None) -> list[dict]:
 
 
 def coach_choice(spec: dict) -> Optional[str]:
-    """The coach's own call in the reader vocabulary: its direction, or ``within`` for a number call."""
+    """The coach's own call in the reader vocabulary: its direction, or ``within`` for a number call (a platform forecast's
+    own call is ``forecast``: it says it will land closer than the guess)."""
     kind = call_kind(spec)
+    if kind == CLOSER:
+        return "forecast"
     if kind == DIRECTION:
         return str(spec["condition"]).strip().lower()
     if kind == NUMBER:
@@ -155,7 +180,7 @@ def window(spec: dict, made_on: Any, effective_days: Any) -> Optional[tuple]:
     start = _day(made_on)
     if start is None:
         return None
-    if kind == NUMBER:
+    if kind in (NUMBER, CLOSER):
         t = _day(spec.get("target_date"))
         return (start.isoformat(), t.isoformat()) if t and t >= start else None
     days = spec.get("evaluation_window_days") or effective_days
@@ -211,6 +236,12 @@ def question(spec: dict, measure: str, made_on: Any, effective_days: Any, unit: 
         return None
     if kind == DIRECTION:
         return f"From {day_words(w[0])} to {day_words(w[1])}, will the {measure} go up, go down, or stay about the same?"
+    if kind == CLOSER:
+        f, g, u = _fmt(_num(spec["threshold"])), _fmt(_num(spec["baseline_value"])), _unit(unit)
+        return (
+            f"On {day_words(w[1])}, will the {measure} be closer to the forecast's {f}{u}, or to {g}{u}, where it stood "
+            "before the forecast was made?"
+        )
     level, tol = _fmt(_num(spec["threshold"])), _fmt(_num(spec["tolerance"]))
     return f"On {day_words(w[1])}, will the {measure} be above, within {tol} of, or below {level}{_unit(unit)}?"
 
@@ -224,6 +255,9 @@ def short_question(spec: dict, measure: str, made_on: Any, effective_days: Any, 
         return None
     if kind == DIRECTION:
         return f"{measure} — up, down or about the same by {day_words(w[1])}"
+    if kind == CLOSER:
+        f, g, u = _fmt(_num(spec["threshold"])), _fmt(_num(spec["baseline_value"])), _unit(unit)
+        return f"{measure} on {day_words(w[1])} — closer to {f}{u} (the forecast) or {g}{u} (no change)"
     level, tol = _fmt(_num(spec["threshold"])), _fmt(_num(spec["tolerance"]))
     return f"{measure} on {day_words(w[1])} — above, within {tol} of, or below {level}{_unit(unit)}"
 
@@ -243,6 +277,11 @@ def reading_side(spec: dict, notes: Any) -> Optional[str]:
         w = notes.get("window")
         d = str(w.get("direction") or "").lower() if isinstance(w, dict) else ""
         return {"up": "up", "down": "down", "flat": "same"}.get(d)
+    if kind == CLOSER:  # the grader's own head-to-head rule (prediction_point_grader.forecast_closer): a tie is the guess's
+        actual, f, g = _num(notes.get("actual_value")), _num(spec.get("threshold")), _num(spec.get("baseline_value"))
+        if actual is None or f is None or g is None:
+            return None
+        return "forecast" if abs(actual - f) < abs(actual - g) else "no_change"
     actual, level, tol = _num(notes.get("actual_value")), _num(spec.get("threshold")), _num(spec.get("tolerance"))
     if actual is None or level is None or tol is None:
         return None

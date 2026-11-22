@@ -126,3 +126,23 @@ test("a closed call leads with what the block is, never an invitation to call", 
   assert.ok(comp.includes("data-rc-heading>Your call</h2>") && comp.includes("data-rc-copy>{COPY}</p>"));
 });
 
+
+// #6170 (owner ruling 2026-11-22 §5): a rules-based platform forecast is never "the coach" on the page.
+test("a platform forecast's block speaks in the machine voice and reads the forecast's own grade", async () => {
+  const { FORECAST_AUTHOR, FORECAST_COPY, FORECAST_NOTE } = await import("../src/lib/readercall_view.js");
+  const fc = [
+    { id: "forecast", label: "Closer to 281.7 lb, the forecast" },
+    { id: "no_change", label: "Closer to 285.9 lb, no change" },
+  ];
+  const base = { author: FORECAST_AUTHOR, choices: fc, called_on_words: "16 November", open_until_words: "19 November", result_due_words: "23 November" };
+  const open = openSentence(base);
+  assert.equal(open, "The rules-based platform forecast was made on 16 November, before any of it happened; reader calls are open until the end of 19 November. Reader calls stay hidden until then, so no one's call steers yours.");
+  assert.match(afterSentence({ ...base, your_call: "no_change" }), /beside the forecast's\.$/);
+  const graded = { ...base, graded: { forecast_status: "refuted", forecast_choice: "forecast", reading_side: "no_change" } };
+  assert.equal(coachLine(graded), "Closer to 281.7 lb, the forecast · wrong");
+  for (const s of [open, afterSentence({ ...base, your_call: "forecast" }), coachLine(graded), FORECAST_COPY, FORECAST_NOTE]) assert.doesNotMatch(s, /coach/i, s);
+  // a coach call's words are unchanged
+  assert.match(openSentence({ choices, called_on_words: "1 May", open_until_words: "4 May" }), /^The coach called this on 1 May/);
+  const comp = readFileSync(new URL("../src/components/ForecastReaderCall.astro", import.meta.url), "utf8");
+  assert.ok(comp.includes("data-rc-copy>{FORECAST_COPY}</p>") && comp.includes("{FORECAST_NOTE}") && !/the coach/i.test(comp.replace(/\/\/.*$/gm, "")));
+});

@@ -1,0 +1,50 @@
+---
+// A reader's call beside a RULES-BASED PLATFORM FORECAST (#6170, owner ruling 2026-11-22 §5). The same door and the same
+// island as a coach call's block (components/ReaderCall.astro, islands/readercall.js) — the same kill switch (SSM
+// /life-platform/reader-call), meter, token, lock and isolation — with the words in the machine voice: it is never "the
+// coach". Self-gating like ReaderCall: a HIDDEN frame the island fills and reveals from /api/reader_call; a shut door,
+// an ineligible or private forecast or an unread answer leaves it hidden, so nothing reader-facing appears.
+import { READERCALL_API, READERCALL_MARKER, readerCallEnabled } from "../lib/readercall.js";
+import { FORECAST_COPY, FORECAST_NOTE } from "../lib/readercall_view.js";
+
+interface Props {
+  forecast: any;
+}
+const { forecast: f } = Astro.props;
+const graded = f.status === "confirmed" || f.status === "refuted";
+const on = readerCallEnabled() && ["pending", "confirmed", "refuted"].includes(f.status);
+const mark = { [READERCALL_MARKER]: graded ? "graded" : "open" };
+const hid = `rc-h-${f.id}`;
+---
+
+{
+  on && (
+    <section {...mark} data-call={f.call} data-api={READERCALL_API} data-author="platform_forecast" aria-labelledby={hid} data-rc-frame style="display:none;border:1px solid var(--ink);padding:16px 18px;flex-direction:column;gap:12px">
+      {
+        graded ? (
+          <>
+            <h2 class="label" id={hid} style="font-size:13px">The forecast, a guess that nothing changes and the reader calls</h2>
+            <div class="rows" style="font-size:14px">
+              <span><span>The forecast</span><span data-rc-coach>…</span></span>
+              <span><span>Nothing changes</span><span>{f.graded && f.graded.reading_side === "no_change" ? "closer · right" : f.graded && f.graded.reading_side === "forecast" ? "further · wrong" : "not scored"}</span></span>
+              <span><span>Reader calls</span><span data-rc-readers>…</span></span>
+            </div>
+            <p style="font-size:14px;line-height:1.5" data-rc-body aria-live="polite">Reading the reader calls…</p>
+          </>
+        ) : (
+          <>
+            <h2 class="label" id={hid} style="font-size:13px" data-rc-heading>Your call</h2>
+            <p style="font-size:14px;line-height:1.5" data-rc-copy>{FORECAST_COPY}</p>
+            <div data-rc-body aria-live="polite"><p class="muted" style="font-size:13px">Reading the reader calls…</p></div>
+            <div hidden><label>Leave this empty<input name="hp" type="text" autocomplete="off" data-rc-hp /></label></div>
+          </>
+        )
+      }
+      <p class="muted" style="font-size:12px" data-rc-note>{FORECAST_NOTE}</p>
+    </section>
+  )
+}
+
+<script>
+  import "../islands/readercall.js";
+</script>

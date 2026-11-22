@@ -7,7 +7,8 @@ The owner's ten requirements, each proved here on the producer's real code (``co
   2. identified model and prompt version — ``model.id``/``version``; ``prompt_version`` null with its reason;
   3. immutable timestamp — the write is ``attribute_not_exists(sk)``; a re-run finds it and changes nothing;
   4. a clear prediction and target — a number call (``point`` spec) on a stated day;
-  5. a frozen evaluation method — the spec, tolerance rule and the evaluation sentence are on the row at filing;
+  5. a frozen evaluation method — the spec, the head-to-head scoring rule (owner ruling 2026-11-22 §5), the guess's
+     value and the evaluation sentence are on the row at filing;
   6. publication through the existing rules — ``prediction_publication`` classifies the rows PRIVATE while the stream's
      committed switch is off, by structure once on;
   7. a meaningful submission window — the REAL reader-call rule (``open_until``) leaves the door open >= 2 days, for
@@ -135,7 +136,7 @@ def test_a_live_run_files_append_only_and_a_rerun_changes_nothing(monkeypatch):
     table = Table()
     first = F.run(table, today=TODAY, fetch_json=_fetch(), switch=lambda: True)
     assert {v["status"] for v in first["results"].values()} == {"written"}
-    assert len(table.writes) == len(F.picks(CYCLE)) == 2
+    assert len(table.writes) == len(F.picks(CYCLE)) == FP.FORECASTS_PER_CYCLE == 1, "the pilot: one forecast a week"
     before = {k: dict(v) for k, v in table.store.items()}
     again = F.run(table, today=TODAY, fetch_json=_fetch(), switch=lambda: True)
     assert {v["status"] for v in again["results"].values()} == {"exists"}
@@ -156,6 +157,8 @@ def test_the_record_carries_every_field_the_owner_asked_for():
         spec = row["evaluation"]
         assert row["pk"] == FP.FORECAST_PK and row["sk"] == FP.SK_PREFIX + row["prediction_id"]
         assert row["coach_id"] == "" and row["author"] == FP.AUTHOR_ID and "coach" not in row["author_words"].lower()
+        assert row["author_words"] == "Rules-based platform forecast" and row["label"] == "rules-based platform forecast"
+        assert row["record"] == FP.RECORD == "platform_forecast"
         assert row["source"] == FP.FORECAST_SOURCE and row["status"] == "pending" and row["gradeable_by"] == "deterministic"
         assert row["filing"]["verdict"] == "gradeable" and row["created_date"] == TODAY and row["created_at"]
         # model + prompt version
@@ -165,8 +168,15 @@ def test_the_record_carries_every_field_the_owner_asked_for():
         # a clear prediction and target, frozen evaluation
         assert spec["type"] == "point" and spec["metric"] == rule["metric"]
         assert spec["target_date"] == "2026-11-30" and spec["evaluation_window_days"] == F.HORIZON_DAYS
-        assert spec["tolerance"] > 0 and "trailing 30-day" in spec["tolerance_rule"]
-        assert row["claim_natural"].endswith("on 2026-11-30.") and spec["tolerance_rule"] in row["evaluation_rule"]
+        # the frozen head-to-head rule replaces the ±1 SD band (owner ruling 2026-11-22 §5), recorded with its version
+        assert "tolerance" not in spec and "tolerance_rule" not in spec, "nothing may grade a forecast by the SD band"
+        assert spec["scoring"] == FP.SCORING_RULE and spec["scoring_version"] == FP.SCORING_VERSION == 1
+        assert row["scoring"] == {"rule": FP.SCORING_RULE, "version": 1, "words": FP.SCORING_WORDS, "frozen_at": "filing"}
+        assert (
+            spec["baseline_value"] == row["baseline_at_filing"]["filed_value"]
+            and spec["baseline_on"] == row["baseline_at_filing"]["filed_on"]
+        )
+        assert row["claim_natural"].endswith("on 2026-11-30.") and "closer to" in row["evaluation_rule"]
         # lineage: public only, reproducible
         lin = row["lineage"]
         assert lin["public_only"] is True and lin["route"] == "/api/series" and f"metric={rule['metric']}" in lin["url"]
@@ -208,10 +218,13 @@ def test_thin_or_stale_inputs_hold_the_rule(case, payload, reason):
     assert F.build("weight_trend", TODAY, payload, "u", CYCLE, phase_stamp=False) == (None, reason), case
 
 
-def test_a_metric_the_public_route_does_not_serve_or_cannot_be_read_is_held():
-    out = F.run(None, today=TODAY, persist=False, fetch_json=_fetch(served=["recovery_score"], fail=("recovery_score",)))
+def test_a_metric_the_public_route_does_not_serve_or_cannot_be_read_is_held(monkeypatch):
+    out = F.run(None, today=TODAY, persist=False, fetch_json=_fetch(served=["recovery_score"]))
     assert out["results"]["weight_trend"] == {"status": "held", "reason": "not_served_publicly"}
-    assert out["results"][F.picks(CYCLE)[1]]["status"] == "held"
+    monkeypatch.setattr(FP, "FORECASTS_PER_CYCLE", 2)  # the second rule is still available, only off in the pilot
+    second = F.picks(CYCLE)[1]
+    out = F.run(None, today=TODAY, persist=False, fetch_json=_fetch(fail=(F.RULES[second]["metric"],)))
+    assert out["results"][second]["status"] == "held" and out["results"]["weight_trend"]["status"] == "dry_run"
 
 
 # ── registry + derivation ─────────────────────────────────────────────────────────────────────────
@@ -227,11 +240,14 @@ def test_every_rule_reads_a_key_the_public_series_route_offers_and_the_policy_ca
     assert set(F.ALWAYS) | set(F.ALTERNATE) == set(F.RULES)
 
 
-def test_one_or_two_a_week_weight_every_week_and_the_rest_rotate():
+def test_the_pilot_files_weight_only_and_the_second_rule_stays_available_but_off():
     cycles = [(datetime(2026, 11, 23) + timedelta(days=7 * i)).strftime("%Y-%m-%d") for i in range(8)]
-    seen = [F.picks(c) for c in cycles]
-    assert all(1 <= len(p) <= F.MAX_PER_CYCLE and p[0] == "weight_trend" for p in seen)
+    assert FP.FORECASTS_PER_CYCLE == 1, "owner ruling 2026-11-22 §5: a limited one-forecast-per-week pilot"
+    assert all(F.picks(c) == ["weight_trend"] for c in cycles)
+    seen = [F.picks(c, per_cycle=2) for c in cycles]  # the rotation, were the policy constant raised
+    assert all(len(p) == 2 and p[0] == "weight_trend" for p in seen)
     assert {p[1] for p in seen} == set(F.ALTERNATE)
+    assert F.picks(cycles[0], per_cycle=9) == seen[0], "never more than MAX_PER_CYCLE"
 
 
 # ── the reader window, by the REAL reader-call rule ───────────────────────────────────────────────
@@ -242,13 +258,13 @@ def test_every_filing_day_leaves_the_reader_door_open_at_least_two_days():
     for offset in range(7):  # whichever day of the cycle the run lands on
         today = (datetime(2026, 11, 23) + timedelta(days=offset)).strftime("%Y-%m-%d")
         out = F.run(None, today=today, persist=False, fetch_json=_fetch(today))
-        assert len(out["forecasts"]) == 2, out["results"]
+        assert len(out["forecasts"]) == FP.FORECASTS_PER_CYCLE, out["results"]
         for row in out["forecasts"]:
             spec, sub = row["evaluation"], row["subdomain"]
             eff = prediction_windows.effective_window_days(spec, sub)
             due = prediction_windows.due_date(today, spec, sub)
             last = R.open_until(spec, today, eff, due)
-            assert R.call_kind(spec) == R.NUMBER and last == row["submission_window"]["closes"]
+            assert R.call_kind(spec) == R.CLOSER and last == row["submission_window"]["closes"]
             assert (datetime.strptime(last, "%Y-%m-%d") - datetime.strptime(today, "%Y-%m-%d")).days + 1 >= F.MIN_OPEN_DAYS
             assert R.is_open(row, row["status"], last, today) and not R.is_open(row, row["status"], last, due)
             assert due == row["submission_window"]["result_due"] == spec["target_date"]
@@ -303,7 +319,8 @@ def test_the_dry_run_cli_prints_lineage_writes_nothing_and_creates_no_aws_client
     monkeypatch.setattr(F, "run", lambda table, **kw: real_run(table, **{**kw, "fetch_json": _fetch(kw["today"])}))
     assert cli.main(["--today", TODAY]) == 0
     out = capsys.readouterr().out
-    assert "The platform's forecast rule" in out and "sha256" in out and "prompt_version: None" in out
+    assert "Rules-based platform forecast" in out and "sha256" in out and "prompt_version: None" in out
+    assert "closer_than_nothing_changes v1" in out
     assert "open_until=2026-11-26 (4 days open)" in out and "On 30 November, will the weight" in out
 
 

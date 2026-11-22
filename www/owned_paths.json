@@ -32,6 +32,7 @@
     "/story/essays/*/",
     "/system/coaches/*/",
     "/system/coaches/*/record/",
+    "/system/forecasts/*/",
     "/system/ledger/*/",
     "/system/ledger/disagreements/*/",
     "/system/methods/*/",

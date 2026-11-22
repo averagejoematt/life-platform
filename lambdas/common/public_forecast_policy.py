@@ -1,7 +1,7 @@
 """The public-input forecast stream's identity and switches (#6156; owner requirements 2026-11-21).
 
-WHAT IT IS. A narrow stream of one or two deterministic forecasts a week, written by THE PLATFORM'S FORECAST RULE (a
-named, versioned statistical rule — never a coach, never a language model), from the values the public Site API
+WHAT IT IS. A narrow stream of deterministic forecasts — one a week in the pilot (``FORECASTS_PER_CYCLE``) — each a
+**rules-based platform forecast** (a named, versioned statistical rule — never a coach, never a language model), from the values the public Site API
 already serves, so readers have a prospective call to make their own call beside (#6114). The producer is
 ``coach.public_forecast``; this module is the part every reader of the rows needs without importing it.
 
@@ -36,10 +36,37 @@ SK_PREFIX = "PREDICTION#"
 RUN_SK_PREFIX = "RUN#"  # one stamp per cycle — the dead-man's input (operational.public_brief_qa)
 #: ``PREDICTION#.source`` of every forecast row.
 FORECAST_SOURCE = "public_forecast"
-#: Who made the call, in the machine voice a page prints. Never a coach name.
+#: Who made the call, in the machine voice a page prints. Never a coach name (owner ruling 2026-11-22 §5: label it
+#: accurately as a **rules-based platform forecast** — a deterministic public-data rule, not an AI coach).
 AUTHOR_ID = "forecast_rule"
-AUTHOR_WORDS = "The platform's forecast rule"
+LABEL = "rules-based platform forecast"
+AUTHOR_WORDS = "Rules-based platform forecast"
+#: The record this row belongs to: its own — never a coach's record, never the coaches-versus-guess sample, never a
+#: calibration total. The "nothing changes" guess graded beside it keeps its own rule id (``coach_baseline.RULE_ID``).
+RECORD = "platform_forecast"
 DARK_REASON = "public_forecast_dark"
+
+#: The pilot (owner ruling 2026-11-22 §5: "a limited one-forecast-per-week pilot"): forecasts filed per weekly cycle.
+#: Weight only; the alternating recovery/sleep rule stays in the registry but is not filed while this is 1.
+FORECASTS_PER_CYCLE = 1
+
+#: THE FROZEN EVALUATION RULE for this partition (owner ruling 2026-11-22 §5 "Scoring"; chosen before the first live
+#: forecast and never tuned against outcomes). A forecast is RIGHT when its number lands strictly closer to the graded
+#: reading than the "nothing changes" guess does (the last reading before filing); a tie goes to the guess, because the
+#: rule has to beat doing nothing. It has no tolerance to tune. The ±1 SD band coach number calls are graded with is
+#: NOT used here: ``scripts/public_forecast_backtest.py`` showed it cannot tell this rule from the guess. The grading
+#: of existing coach calls and historical rows is unchanged — the grader applies this only to a spec carrying
+#: ``scoring == SCORING_RULE``, which only this partition's producer writes.
+SCORING_RULE = "closer_than_nothing_changes"
+SCORING_VERSION = 1
+SCORING_WORDS = (
+    "right when the forecast lands closer to the reading on the target day than a guess that nothing changes (the last "
+    "reading before the forecast was made); a tie counts for the guess"
+)
+
+#: The reader-call door's item id for a forecast is ``<READER_SHORT>:<prediction id>`` (#6170). Never a coach's short id
+#: (tests/test_public_forecast_reader_6170.py pins that no coach is named this).
+READER_SHORT = "forecast"
 
 
 def is_forecast_partition(pk) -> bool:
@@ -48,3 +75,8 @@ def is_forecast_partition(pk) -> bool:
 
 def run_sk(cycle: str) -> str:
     return f"{RUN_SK_PREFIX}{cycle}"
+
+
+def is_head_to_head(spec) -> bool:
+    """Is this evaluation spec graded by the frozen head-to-head rule? Only a spec this partition's producer wrote."""
+    return isinstance(spec, dict) and spec.get("scoring") == SCORING_RULE

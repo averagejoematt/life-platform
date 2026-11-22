@@ -80,10 +80,12 @@ def main(argv=None) -> int:
         print(
             f"    model      : {model['id']} v{model['version']} ({model['kind']}: {model['words']}); prompt_version: {model['prompt_version']}"
         )
-        print(f"    target     : {spec['metric']} on {spec['target_date']}, within ±{spec['tolerance']:g} of {spec['threshold']:g}")
-        print(f"    tolerance  : {spec['tolerance_rule']}")
+        print(
+            f"    target     : {spec['metric']} on {spec['target_date']}: {spec['threshold']:g} (forecast) vs {spec['baseline_value']:g} (no change)"
+        )
+        print(f"    scoring    : {spec['scoring']} v{spec['scoring_version']} (frozen at filing) - {row['scoring']['words']}")
         print(f"    evaluation : {row['evaluation_rule']}")
-        print(f"    baseline   : {base['words']} - {base['guess']} (reading of {base['filed_on']}, fixed at filing)")
+        print(f"    baseline   : {base['words']} - {base['guess']} (fixed at filing; the {base['rule']} rule, its own record)")
         print(f"    lineage    : GET {lin['url']}")
         print(
             f"                 served as_of {lin['served_as_of']}, source {lin['source_id']}, window {lin['window']['from']}..{lin['window']['to']}"
