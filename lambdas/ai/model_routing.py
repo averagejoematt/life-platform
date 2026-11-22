@@ -140,6 +140,9 @@ ROUTES: dict[str, Route] = {
     "chronicle.panelcast_qa": Route(feature="chronicle", env="AI_MODEL_HAIKU"),
     "chronicle.panelcast_craft": Route(feature="chronicle", tier=_N, env="AI_MODEL_SONNET"),
     "chronicle.panelcast_punch_up": Route(feature="chronicle", tier=_N, env="AI_MODEL_SONNET"),
+    # #6179: the Story Desk's editor — a DIFFERENT model from the writer (story.writer is narrative-tier Sonnet), spent
+    # under the chronicle feature (band 2, reader narrative). A new route, not a model swap: no existing caller moves.
+    "story.editor": Route(feature="chronicle", tier=_W),
     "coach_narrative": Route(feature="coach_narrative", env="AI_MODEL_HAIKU"),  # the orchestrator
     "coach_narrative.elena_state": Route(feature="coach_narrative", env="AI_MODEL_HAIKU"),
     "coach_narrative.history_summary": Route(feature="coach_narrative", env="AI_MODEL_HAIKU"),
