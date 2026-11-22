@@ -25,12 +25,12 @@ import os
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from decimal import Decimal
 
 from boto3.dynamodb.conditions import Key
 from coach import brief_recommendations as rr
 from common.digest_utils import safe_float
 from common.habit_registry import habit_tier
+from common.numeric import floats_to_decimal
 from common.pacific_time import day_in_words, shift_day_key
 from content import brief_editorial, brief_hybrid
 from content.brief_hybrid import SWITCH_HYBRID, SWITCH_MEASURE, SWITCH_OFF, SWITCH_VALUES
@@ -390,14 +390,9 @@ def apply(trial: Trial | None, html: str, subject: str) -> tuple:
     return brief_hybrid.inject(html, trial.block_html), (trial.subject or subject)
 
 
-def _ddb(v):
-    if isinstance(v, float):
-        return Decimal(str(v))
-    if isinstance(v, dict):
-        return {k: _ddb(x) for k, x in v.items() if x is not None}
-    if isinstance(v, list):
-        return [_ddb(x) for x in v]
-    return v
+def _ddb(item: dict) -> dict:
+    """Top-level None fields dropped; floats to Decimal via the shared walker (NaN/Inf -> None, #5524)."""
+    return floats_to_decimal({k: v for k, v in item.items() if v is not None})
 
 
 def record(table, user_prefix: str, trial: Trial | None, sent_html: str, persist: bool, logger) -> None:
