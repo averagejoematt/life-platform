@@ -39,7 +39,7 @@ from datetime import datetime, timezone
 
 from boto3.dynamodb.conditions import Key
 from common.pacific_time import pacific_today
-from content import chapter_corrections as CC, chapter_editions as CE
+from content import chapter_corrections as CC, chapter_editions as CE, private_call_check
 
 from mcp.config import USER_ID, logger, table as _table_ref
 
@@ -252,8 +252,6 @@ def _filter_hits(text: str) -> list:
 def _private_calls():
     """#6199: the calls and asks the publication policy classifies, read now — or None when they cannot be read (the
     gates then refuse: an edition is never proposed or approved with the private-call check unrun)."""
-    from content import private_call_check  # noqa: PLC0415
-
     try:
         return private_call_check.load(_table_ref)
     except Exception as exc:  # noqa: BLE001
@@ -262,7 +260,7 @@ def _private_calls():
 
 
 def _gate(text) -> list:
-    return CE.gate_findings(text, tainted=_tainted(), private_calls=_private_calls(), filter_hits=_filter_hits)
+    return CE.gate_findings(text, tainted=_tainted(), private_calls=private_call_check.for_text(_private_calls()), filter_hits=_filter_hits)
 
 
 def _int_arg(args: dict, key: str):
@@ -468,7 +466,9 @@ def _list_editions(chapter_id: str | None) -> dict:
     rows = _edition_rows(chapter_id)
     served = {
         e["chapter_id"]: e
-        for e in CE.public_view(rows, tainted=_tainted(), private_calls=_private_calls(), filter_hits=_filter_hits, log=logger.info)
+        for e in CE.public_view(
+            rows, tainted=_tainted(), private_calls=private_call_check.for_text(_private_calls()), filter_hits=_filter_hits, log=logger.info
+        )
     }
     items = []
     for r in sorted(rows, key=lambda r: str(r.get("sk"))):

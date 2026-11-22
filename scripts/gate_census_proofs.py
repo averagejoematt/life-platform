@@ -5117,7 +5117,7 @@ STRUCTURAL_HAND_PROOFS["structural::test_chapter_reads_withdrawn_6199.py"] = {
         "module lambdas/emails/zz_new_reader_6199_mutation.py that returns a chapter row's text field with no predicate; "
         "M4 panelcast_desk.season_ledger returns the raw ledger instead of story_ledger.public_view(...); M5 (after #6193 landed) "
         "site_api_chapters.editions_field calls chapter_editions.public_view without private_calls=; M6 the MCP edition gate "
-        "passes private_call_check.NOT_WIRED."
+        "passes chapter_editions.PRIVATE_CALLS_NOT_WIRED (both re-run on the final injected-callable shape)."
     ),
     "observed": (
         "2026-11-22, #6199 lane. BASELINE 12 passed (M1-M4), 13 after the edition section (M5-M6). M1 2 failed (the set sweep + the recap reader); M2 2 failed (the "

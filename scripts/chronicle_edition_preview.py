@@ -107,7 +107,9 @@ def main(argv=None) -> int:
         if t is not None:
             from privacy import privacy_guard  # noqa: PLC0415 — the real content filter (local channel or read-only S3)
 
-            findings = CE.gate_findings(t, tainted=tainted, private_calls=calls, filter_hits=privacy_guard.find_violations)
+            findings = CE.gate_findings(
+                t, tainted=tainted, private_calls=private_call_check.for_text(calls), filter_hits=privacy_guard.find_violations
+            )
             print(f"gates on the {what}: {'clean' if not findings else ''}")
             for f in findings:
                 print(f"  - {f}")
@@ -144,7 +146,7 @@ def main(argv=None) -> int:
             print(f"bad input: {exc}", file=sys.stderr)
             return 2
         # rendering only; the gates (the private-call check included) ran above
-        view = CE.public_view(rows, tainted=lambda _t: False, private_calls=private_call_check.NOT_WIRED, filter_hits=lambda _t: [])
+        view = CE.public_view(rows, tainted=lambda _t: False, private_calls=CE.PRIVATE_CALLS_NOT_WIRED, filter_hits=lambda _t: [])
         with open(os.path.join(SNAPSHOT, "chapter_editions.json"), "w", encoding="utf-8") as fh:
             json.dump({"state": "ok", "source": ["/api/chapters"], "editions": view}, fh)
         cp = subprocess.run(["npm", "run", "build", "--silent"], cwd=WWW, capture_output=True, text=True)

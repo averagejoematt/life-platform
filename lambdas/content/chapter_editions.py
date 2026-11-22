@@ -180,6 +180,9 @@ def word_count(text: str) -> int:
 
 # ── the gates ────────────────────────────────────────────────────────────────────────────────
 
+#: #6199: a rendering-only or synthetic-fixture caller of the gates — there is no call record to check against.
+PRIVATE_CALLS_NOT_WIRED: Any = object()
+
 
 def gate_findings(
     text: Any, *, tainted: Optional[Callable[[str], bool]], private_calls: Any, filter_hits: Optional[Callable[[str], list]] = None
@@ -194,10 +197,12 @@ def gate_findings(
     * truth — ``content.story_checks``: a staged encounter no source holds, a cycle/attempt count, off-record
       specifics, a cut reader-vocabulary term;
     * #6199 — ``content.private_call_check.findings``, THE publish-time check for a call or ask the publication policy
-      classifies private (echo, id, described). ``private_calls`` is required: a ``CallSet`` read at run time, None when
-      it could not be read (refused, fail closed), or ``private_call_check.NOT_WIRED`` for a rendering-only or synthetic
-      fixture caller, each registered in tests/test_chapter_reads_withdrawn_6199.py. ``tainted`` above is a different
-      policy (the narrative record's verbatim taint) and stays beside it.
+      classifies private (echo, id, described), injected like the two above so this module never reaches AWS:
+      ``private_calls`` is required — ``lambda t: private_call_check.findings(t, calls)`` over the calls read at run time
+      (``private_call_check.for_text``), None when they could not be read (refused, fail closed), or
+      ``PRIVATE_CALLS_NOT_WIRED`` for a rendering-only or synthetic-fixture caller, each registered in
+      tests/test_chapter_reads_withdrawn_6199.py. ``tainted`` above is a different policy (the narrative record's
+      verbatim taint) and stays beside it.
     """
     from content import story_checks  # noqa: PLC0415
 
@@ -226,10 +231,13 @@ def gate_findings(
                 out.append("private-call: the text carries the words of a call that is not public")
         except Exception as exc:  # noqa: BLE001
             out.append(f"private-call: the publication record could not be read ({type(exc).__name__}) — nothing is published unchecked")
-    from content import private_call_check  # noqa: PLC0415
-
-    if private_calls is not private_call_check.NOT_WIRED:
-        out += private_call_check.findings(text, private_calls)
+    if private_calls is None:
+        out.append("private call: the check could not read the calls the publication policy classifies, so nothing publishes")
+    elif private_calls is not PRIVATE_CALLS_NOT_WIRED:
+        try:
+            out += list(private_calls(text))
+        except Exception as exc:  # noqa: BLE001
+            out.append(f"private call: the check could not run ({type(exc).__name__}) — nothing is published unchecked")
     return out
 
 

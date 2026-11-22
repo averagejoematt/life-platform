@@ -225,6 +225,12 @@ def _read_rows(table: Any, pk: str, prefix: str) -> List[Mapping]:
         kw["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
 
 
+def for_text(calls: Optional[CallSet]) -> Any:
+    """The check as a ``text -> findings`` callable over ``calls`` (None when unreadable: the caller then refuses) — the
+    shape the second-edition gates take (``chapter_editions.gate_findings(private_calls=...)``)."""
+    return None if calls is None else (lambda text: findings(text, calls))
+
+
 def findings(text: Any, calls: Optional[CallSet]) -> List[str]:
     """Blocking findings for ``text`` against ``calls`` (empty = clean). ``calls=None`` means the calls could not be
     read: one ``UNAVAILABLE`` finding (the publish paths fail closed on it)."""

@@ -98,7 +98,9 @@ def _archival(n=1, chapter="week-04", approved_at="2026-11-23T19:00:00Z", text=A
 
 
 def _view(rows, tainted=NEVER, hits=NO_FILTER_HITS):
-    return CE.public_view(rows, tainted=tainted, private_calls=private_call_check.CallSet(), filter_hits=hits)  # #6199: no private calls
+    return CE.public_view(
+        rows, tainted=tainted, private_calls=private_call_check.for_text(private_call_check.CallSet()), filter_hits=hits
+    )  # #6199: no private calls
 
 
 # ── the record ────────────────────────────────────────────────────────────────────────────

@@ -77,7 +77,7 @@ from datetime import timedelta
 from typing import Any, Callable
 
 from common.pacific_time import pacific_today, parse_day_key
-from content import chapter_corrections, chapter_editions
+from content import chapter_corrections, chapter_editions, private_call_check
 
 from web.site_api_common import EXPERIMENT_START, USER_ID, _error, _load_s3_json, _ok, _query_source, logger, table
 
@@ -327,8 +327,6 @@ def _private_calls() -> Any:
     they cannot be read — every edition is then withheld (fail closed)."""
     import time  # noqa: PLC0415
 
-    from content import private_call_check  # noqa: PLC0415
-
     now = time.monotonic()
     if _CALLS_CACHE["at"] is not None and now - _CALLS_CACHE["at"] < _CALLS_TTL_S and _CALLS_CACHE["calls"] is not None:
         return _CALLS_CACHE["calls"]
@@ -354,7 +352,11 @@ def editions_field(
         from privacy import privacy_guard  # noqa: PLC0415 — the chronicle's publish gate (fail-closed on no vocabulary)
 
         view = chapter_editions.public_view(
-            read_editions(), tainted=tainted, private_calls=private_calls(), filter_hits=privacy_guard.find_violations, log=logger.warning
+            read_editions(),
+            tainted=tainted,
+            private_calls=private_call_check.for_text(private_calls()),
+            filter_hits=privacy_guard.find_violations,
+            log=logger.warning,
         )
         return {"editions": view}
     except Exception as e:  # noqa: BLE001 — a failed read is said, never served as "no editions"
