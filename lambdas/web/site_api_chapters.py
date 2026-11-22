@@ -36,6 +36,8 @@ experiment, ADR-077):
                      existed and the OWNER decided it will not be published: the row's status is ``retired``. Like a
                      held week, ONLY ``status`` and ``drafted_at`` are served. With the switch off a retired row is
                      served as ``held`` (a draft exists and is unpublished — true either way), never as skipped.
+                     #6194: with the switch on, a skipped week's default reason is "no chapter was written" (there is
+                     no row, so no draft) instead of "no chapter was published", which a retired week is too.
 
 HELD IS ONE NEUTRAL STATE (#6178). A held week carries no ``reason``: the stored statuses do not say whether the owner
 sent a week back (weeks 8 and 9 carry ``changes_requested`` written as a lock, not as his rejection) or whether it only
@@ -77,6 +79,9 @@ CACHE_SECONDS = 600
 WEEK_DAYS = 7
 MANIFEST_KEY = "generated/journal/posts.json"
 NO_CHAPTER = "no chapter was published"
+#: #6194: with the retired state on, a skipped week (no row in the store: no draft exists) says what is true of it beside
+#: the retired weeks, whose drafts were written and also not published — "published" no longer tells the two apart.
+NO_CHAPTER_WRITTEN = "no chapter was written"
 UNAVAILABLE = "The chapter list is not served right now."
 HELD_STATUSES = ("draft", "changes_requested")
 #: #6178: the row status the owner sets when he decides a drafted week will not be published (equal to
@@ -241,7 +246,8 @@ def compose(rows: list, journal: dict | None, genesis: str, today: str, *, retir
             entry["status"] = "pending"
         else:
             entry["status"] = "skipped"
-            entry["reason"] = (marker.get("display") or marker.get("reason")) if (marker and marker_week == wk) else NO_CHAPTER
+            fallback = NO_CHAPTER_WRITTEN if retired_on else NO_CHAPTER  # #6194: the wire is unchanged while the switch is off
+            entry["reason"] = (marker.get("display") or marker.get("reason")) if (marker and marker_week == wk) else fallback
         weeks.append(entry)
     return {
         "genesis": genesis,

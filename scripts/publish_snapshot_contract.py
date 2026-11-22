@@ -148,7 +148,8 @@ VISIBILITIES = ("public", "held", "private")
 # The one line each program week without a chapter shows (#6178). Never a title, a teaser or a reason a held draft carries.
 WEEK_STATE_TEXT = {
     "held": "Drafted, not approved. No chapter for this week yet.",
-    "retired": "A draft was written for this week and Matthew decided not to publish it. The days are still on the record.",
+    # #6194 (owner ruling 2026-11-22): the fact and nothing more — no reason, no blame, no description of the draft.
+    "retired": "A draft was written for this week and did not meet the standard for publication. The days are still on the record.",
     "skipped": "No chapter was published for this week.",
     "pending": "No chapter yet for this week.",
 }

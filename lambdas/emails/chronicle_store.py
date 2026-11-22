@@ -15,7 +15,11 @@ from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DA
 # is deliberately absent — that status is the documented signal to re-run the generator
 # (see chronicle_approve_lambda: "Re-run the wednesday-chronicle Lambda"), so a put over
 # it must succeed.
-PROTECTED_STATUSES = ("draft", "published")
+# #6194: `retired` = a draft the OWNER decided will not be published (owner ruling 2026-11-22: "Preserve all original
+# records and evidence"). A regenerating run must not clobber it either — and, unlike the other two, not even under
+# {"force": true} (store_installment). Equal to content.autopublish_audit.RETIRED_STATUS (pinned by a test).
+RETIRED_STATUS = "retired"
+PROTECTED_STATUSES = ("draft", "published", RETIRED_STATUS)
 
 
 def _is_conditional_check_failure(exc):
@@ -139,16 +143,23 @@ def store_installment(
         if not allow_overwrite:
             # Allowed when: no row yet, the row carries no status at all, or the row is
             # in a status outside PROTECTED_STATUSES (changes_requested, a legacy row).
-            put_kwargs["ConditionExpression"] = "attribute_not_exists(sk) OR attribute_not_exists(#s) OR NOT #s IN (:s0, :s1)"
+            names = ", ".join(f":s{i}" for i in range(len(PROTECTED_STATUSES)))
+            put_kwargs["ConditionExpression"] = f"attribute_not_exists(sk) OR attribute_not_exists(#s) OR NOT #s IN ({names})"
             put_kwargs["ExpressionAttributeNames"] = {"#s": "status"}
             put_kwargs["ExpressionAttributeValues"] = {f":s{i}": v for i, v in enumerate(PROTECTED_STATUSES)}
+        else:
+            # #6194: even a deliberate {"force": true} regeneration never writes over a week the owner RETIRED — its
+            # original text is the record he ruled kept. Un-retiring is a separate, owner-approved status write.
+            put_kwargs["ConditionExpression"] = "attribute_not_exists(sk) OR attribute_not_exists(#s) OR #s <> :retired"
+            put_kwargs["ExpressionAttributeNames"] = {"#s": "status"}
+            put_kwargs["ExpressionAttributeValues"] = {":retired": RETIRED_STATUS}
         try:
             table.put_item(**put_kwargs)
         except Exception as put_e:
             if _is_conditional_check_failure(put_e):
                 logger.warning(
                     f"[#2254] REFUSED to overwrite Week {week_num} ({date_str}) — a record already exists in a "
-                    f"protected status {PROTECTED_STATUSES}. Nothing was written; the existing draft/published "
+                    f"protected status {PROTECTED_STATUSES}. Nothing was written; the existing draft/published/retired "
                     "installment and its approval token are intact."
                 )
                 return False
