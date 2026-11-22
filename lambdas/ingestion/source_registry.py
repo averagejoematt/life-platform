@@ -2098,6 +2098,14 @@ UNREGISTERED_PARTITIONS: dict[str, dict[str, str]] = {
             "TIER_OWNER_ONLY."
         ),
     },
+    "coach_recommendations": {
+        "dated": "2026-11-22",
+        "reason": (
+            "The recommendation record (#6158): a coach's material recommendation, his explicit answer, the agreed "
+            "follow-up and the outcome, written only by the owner's MCP tool manage_coach_recommendation "
+            "(coach/recommendation_record.py). An owner act, not a vendor feed: no cadence, no staleness. TIER_OWNER_ONLY."
+        ),
+    },
 }
 
 # ── Non-ingestion / accidental raw/ prefixes (#3570) ──────────────────────────────

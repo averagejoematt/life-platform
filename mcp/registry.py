@@ -40,6 +40,7 @@ from mcp.tools_coach_intelligence import (
     tool_get_predictions,
 )
 from mcp.tools_coach_packet import COACH_PACKET_DESCRIPTION, COACH_PACKET_INPUT, tool_get_coach_session_packet  # #4082
+from mcp.tools_coach_recommendations import MANAGE_REC_DESCRIPTION, MANAGE_REC_INPUT, tool_manage_coach_recommendation  # #6158
 from mcp.tools_coach_vision import GET_COACH_VISION_DESCRIPTION, GET_COACH_VISION_INPUT, tool_get_coach_vision  # #3759
 from mcp.tools_correlation import tool_get_zone2_breakdown
 from mcp.tools_data import (
@@ -1517,6 +1518,10 @@ TOOLS = {
     "log_advice_link": {  # #5612 (ruling F): owner-asserted decision <-> coach recommendation link
         "fn": tool_log_advice_link,
         "schema": {"name": "log_advice_link", "description": LOG_ADVICE_LINK_DESCRIPTION, "inputSchema": LOG_ADVICE_LINK_INPUT},
+    },
+    "manage_coach_recommendation": {  # #6158: the ONE recommendation record — owner-only, every write his explicit act
+        "fn": tool_manage_coach_recommendation,
+        "schema": {"name": "manage_coach_recommendation", "description": MANAGE_REC_DESCRIPTION, "inputSchema": MANAGE_REC_INPUT},
     },
     "get_advice_link_queue": {  # read-only: the coaches' recent asks beside what Matthew recorded; writes nothing
         "fn": tool_get_advice_link_queue,
