@@ -696,6 +696,23 @@ a=w._assemble('eli_marsh','headcoach'); print(c.build_turn_context(w._table(),'e
 # Roll back: merge `LIVE = False` and deploy the same two functions. The record and its rows are untouched either way.
 ```
 
+## Chronicle: two default-off switches (#6178)
+
+Both ship OFF; neither publishes anything. The owner's approve click stays the only way a chronicle publishes.
+
+| Switch | Where | Off (default) | On (`on`) |
+|---|---|---|---|
+| `CHRONICLE_LEGACY_ELIGIBLE` | the `wednesday-chronicle` Lambda's environment | a legacy-writer (fallback) draft is always held (`LEGACY_NOTE` blocks the approve click) | the draft runs the Story Desk's full post gate (`story_pipeline.legacy_gate_findings`: source, privacy, figures, staged encounters, quote, callback, craft, repeat, the fact read) plus the season-title check, and becomes approvable when no non-craft finding remains; a check that cannot run holds it and is named |
+| `CHAPTERS_RETIRED_STATE` | the `life-platform-site-api` Lambda's environment | a chronicle row with `status = retired` is served by `/api/chapters` as `held` | it is served as `retired`, and `counts.retired` appears |
+
+Rollback for either: remove the variable (a Lambda configuration change through CDK, then deploy). A legacy draft drafted
+while the switch was on keeps its stored audit; refuse it with Request Changes if it should not be approvable.
+
+Retiring a week is the owner's decision and a DynamoDB write the owner approves: set the row's `status` to `retired`
+(keep every other attribute). From then on, both approve-link actions return 409 and nothing changes. The stale sweep
+never selects the row, and the publish audit refuses it. The Story page shows the retired line only once
+`CHAPTERS_RETIRED_STATE=on`.
+
 ## Common Issues
 
 ### Whoop/Withings/Strava: "Token expired" error
