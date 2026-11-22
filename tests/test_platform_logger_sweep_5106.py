@@ -45,6 +45,7 @@ ALLOWED = {
     "coach_checkin": "no INFO line (joined the closure via coach_corrections.chat_corrections_block, #6149)",
     "coach_domain_facts": "no INFO line",
     "coach_open_loops": "no INFO line",
+    "coach_record": "no INFO line (joined the closure via coach_team_texture's ledger record, #6172)",
     "coach_team_texture": "no INFO line",
     "coach_vision": "no INFO line",
     "coach_voice": "no INFO line",
