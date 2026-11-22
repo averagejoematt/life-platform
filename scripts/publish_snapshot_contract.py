@@ -148,7 +148,8 @@ VISIBILITIES = ("public", "held", "private")
 # The one line each program week without a chapter shows (#6178). Never a title, a teaser or a reason a held draft carries.
 WEEK_STATE_TEXT = {
     "held": "Drafted, not approved. No chapter for this week yet.",
-    "retired": "A draft was written for this week and Matthew decided not to publish it. The days are still on the record.",
+    # #6194 (owner ruling 2026-11-22): the fact and nothing more — no reason, no blame, no description of the draft.
+    "retired": "A draft was written for this week and did not meet the standard for publication. The days are still on the record.",
     "skipped": "No chapter was published for this week.",
     "pending": "No chapter yet for this week.",
 }
@@ -758,6 +759,19 @@ def _write_data_files(out_dir: str, data_files: dict, files: dict) -> None:
         "count": len(chapter_corrections.get("corrections") or []),
         "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
     }
+    # chapter_editions.json (#6193) — approved second editions, written ONLY when the switch is on (an absent key writes
+    # nothing, so a switch-off snapshot is unchanged; scripts/publish_snapshot_chapter_editions.py).
+    editions_path = os.path.join(out_dir, "chapter_editions.json")
+    if data_files.get("chapter_editions") is not None:
+        text = _dump(data_files["chapter_editions"])
+        with open(editions_path, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        files["chapter_editions.json"] = {
+            "count": len(data_files["chapter_editions"].get("editions") or []),
+            "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        }
+    elif os.path.exists(editions_path):
+        os.remove(editions_path)  # a switch-off export over an editions export's directory leaves no edition behind
     # calibration.json — the Coaching Room's data file, present ONLY on a WEB_ROOM=1 export (CR1, built dark;
     # scripts/publish_snapshot_calibration.py). Absent key = nothing written, so a flag-off snapshot is unchanged.
     cal_path = os.path.join(out_dir, "calibration.json")

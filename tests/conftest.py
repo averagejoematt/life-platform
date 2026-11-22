@@ -630,6 +630,21 @@ def _outbound_trial_baseline_off_6176(monkeypatch):
     yield
 
 
+# #6195: the target-neutral nutrition consistency switchboard. Every item ships OFF; when one is switched on, the rest
+# of the suite still pins the OFF (baseline) output, so every test starts with the switchboard OFF (monkeypatch:
+# restored after). tests/test_nutrition_consistency_6195.py opts in per item and pins the committed values itself.
+@pytest.fixture(autouse=True)
+def _nutrition_consistency_baseline_off_6195(monkeypatch):
+    try:
+        from common import nutrition_consistency as _nc
+    except Exception:  # a test tree without the lambdas layer on its path
+        yield
+        return
+    for _item in list(_nc.SWITCHES):
+        monkeypatch.setitem(_nc.SWITCHES, _item, False)
+    yield
+
+
 # Owner ruling 2026-11-11 (item 2): the plan root's private part lives OFF the repo — on a developer's machine at
 # ~/.config/life-platform/user_goals_private.json (common.user_goals). A test must never read the owner's real private
 # part, so the suite points the loader at a path that does not exist; a test that needs a private part writes a
