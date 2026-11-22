@@ -1,6 +1,6 @@
 # Data Governance — PII Classification + Retention Policy
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-08-23
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-11-22
 
 Phase 7 (2026-05-16, refreshed 2026-07-18 — #1351 current-truth pass: repo visibility,
 delete-lambda status, current data classes, subscriber-retention readiness #1350):
@@ -179,8 +179,8 @@ No Glacier or deep-archive tier is in use today. Could be added if compliance de
 
 ### Export
 - Two distinct artefacts, and conflating them would be a privacy incident: `lambdas/operational/data_export_lambda.py` is the **owner's** full export (every partition, private `exports/` prefix, on demand); the #1400 nightly archive at `/archive/latest.tar.gz` is **public** and contains only the Tier 0 surface. The public archive makes no promise about the owner's export, and the owner's export never enters it — see `docs/PERMANENCE_CONTRACT.md` §6.
-- `lambdas/data_export_lambda.py` exists; on-demand only. Generates a snapshot of all DDB partitions + S3 archive references.
-- Census derives from `phase_taxonomy.SOURCE_CLASS` (#498/X-10), not a hand count — every non-`SYSTEM_STATE` source is covered automatically as new sources are added (86 sources as of 2026-07-18). The prior "audit P7.1 still outstanding" concern (a hand-maintained count that would silently drift) is resolved structurally by that dynamic derivation.
+- `lambdas/operational/data_export_lambda.py` exists; on-demand only. Generates a snapshot of all DDB partitions + S3 archive references.
+- Census derives from `phase_taxonomy.SOURCE_CLASS` (#498/X-10), not a hand count — every non-`SYSTEM_STATE` source is covered automatically as new sources are added (105 non-`SYSTEM_STATE` of 125 classified sources as of 2026-11-22). The prior "audit P7.1 still outstanding" concern (a hand-maintained count that would silently drift) is resolved structurally by that dynamic derivation.
 
 ### Deletion
 - `lambdas/delete_user_data_lambda.py` is **implemented, CDK-deployed** (`life-platform-delete-user-data`, `cdk/stacks/operational_stack.py`), **alarmed** (`life-platform-delete-user-data-errors`), and **unit-tested** (`tests/test_delete_user_data.py`). It wipes a user's DDB items + S3 objects + per-user Secrets Manager entries in one call, writes an audit record to `USER#admin#SOURCE#deletion_log`, and refuses protected users (`matthew`/`admin`/`system`) in code.
@@ -277,10 +277,11 @@ If any of these become relevant (e.g., onboarding a second user from CA, sale of
 | 2026-08-30 | #3278: the 90-day security-log tier was prose only — measured live: 30d in us-east-1/us-west-2, NEVER_EXPIRE in eu-west-2/eu-west-1/eu-central-1/us-east-2/us-west-1 (Lambda@Edge replica groups of the auth gates), and no group anywhere at 90. Decision: the CONFIGURATION moves to 90 (the row stands; it matches the CloudTrail/`mcp-audit/` 90d audit class) — declared once in `cdk/stacks/constants.py`, derived by CDK for the three regional functions, written by `deploy/apply_log_retention.py` for the edge replicas, asserted weekly across every enabled region by `drift_sentinel.check_log_retention` (+ `ec2:DescribeRegions` on the remediation role). `buddy-auth` added to the row — same auth-gate class, same edge mechanism | #3278 |
 | 2026-08-31 | #3368 (fin-diligence): `deploys/` noncurrent-version expiry tightened 7d → 1d (keep-newest-1 retained). ~72GB of noncurrent deploy bundles measured under the 7d window (one-bundle fleet sweeps mint ~1.7GB each; 14 sweeps on 08-31 alone) and nothing reads them — the scripted rollback (`rollback_lambda.sh`, CI auto-rollback, `deploy_fleet.sh::seed_artifacts`) reads only the CURRENT `deploys/<fn>/previous.zip`; repo sweep found zero `list-object-versions`/VersionId S3 reads. Trade-off accepted: the MANUAL deep-rollback window (older versions via S3 versioning) shrinks to ~1 day + the 1 kept newest noncurrent generation; beyond that, re-deploy from a git ref | #3368 |
 | 2026-11-14 | #5948: the Vices guardrail below was enforced by one renderer on one page (2026-06-23) while five public payloads (`/api/vice_streaks`, `/api/habits` `per_habit`, `/api/mind_overview`, `/api/habit_registry`, `/api/domains`) and the static `config/domains.json` + `config/protocols.json` served every restraint label. Enforcement moved to the serving side (`lambdas/common/restraint_publication.py`, exact-name allowlist of the two permitted categories, fail closed); the non-permitted categories now reach the wire as unlabelled aggregates only; the names were removed from the two static config files, a test fixture and three shape snapshots; guard `tests/test_restraint_labels_5948.py` (handler-level + a walk of every public GET route, each with a must-fail control). No new data class; no owner ruling relaxed or widened | #5948 |
+| 2026-11-22 | #6162 re-verification against code: tier registry (`field_tiers.py` four tiers incl. `TIER_OWNER_PUBLISHED`), ADR-155 date, security-tier log functions and 30-day default, every referenced test/script path and the source census re-checked; corrected the stale data-export lambda path and the source census count (105 non-`SYSTEM_STATE` of 125) | #6162 |
 
 ---
 
-**Verified:** 2026-07-25
+**Verified:** 2026-11-22
 
 
 ## Editorial guardrails (public surfaces) — canonical home
