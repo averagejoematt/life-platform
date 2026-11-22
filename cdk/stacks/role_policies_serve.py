@@ -99,6 +99,9 @@ def site_api() -> list[iam.PolicyStatement]:
                         "USER#matthew#SOURCE#evening_ritual",  # #769 (ADR-124): one-tap ritual taps
                         "COHORT#*",  # #1394 (epic #1366): anonymous cohort-strip submissions (COHORT#<metric>#<week>)
                         "READERCALL#*",  # #6088: a reader's call beside a coach's call — TAP# dedup + TALLY# counters, DARK
+                        # #6175 (OWNER-REQUIRED, additive): the Morning Brief trial's answer door spends a TOKEN# row and
+                        # stamps the answer on its SEND# row — POST only, behind a one-use 256-bit token.
+                        "USER#matthew#SOURCE#brief_trial",
                     ],
                 },
             },

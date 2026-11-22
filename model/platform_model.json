@@ -4870,6 +4870,20 @@
     {
       "direction": "read",
       "lambda": null,
+      "module": "lambdas/web/site_api_brief_response.py",
+      "partition": "brief_trial",
+      "via": "pk"
+    },
+    {
+      "direction": "write",
+      "lambda": null,
+      "module": "lambdas/web/site_api_brief_response.py",
+      "partition": "brief_trial",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
       "module": "lambdas/web/site_api_character.py",
       "partition": "character_receipt",
       "via": "pk"
@@ -8386,7 +8400,7 @@
       "contracts_enrolled": 16,
       "contracts_known": 15,
       "contracts_ratchet": 16,
-      "edges": 800,
+      "edges": 802,
       "lambdas": 107,
       "mcp_tool_modules": 44,
       "mcp_tools": 95,
@@ -8401,8 +8415,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 389,
-        "sites_resolved": 1005,
-        "sites_total": 1394
+        "sites_resolved": 1008,
+        "sites_total": 1397
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -8410,6 +8424,7 @@
       }
     },
     "non_census_families": [
+      "brief_trial",
       "coach_credibility",
       "coach_thread",
       "intelligence_quality",
