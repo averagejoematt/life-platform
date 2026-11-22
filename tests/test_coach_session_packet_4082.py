@@ -174,6 +174,14 @@ def stub_readers(monkeypatch):
         "phase_brief_field",
         lambda table=None: ({"phase": "foundation", "phase_title": "Foundation", "next_phase": "build"}, input_status("measured")),
     )
+    # #6149: open_corrections reads the corrections ledger through `coach_corrections.open_corrections_for`; one open row.
+    from coach import coach_corrections
+
+    monkeypatch.setattr(
+        coach_corrections,
+        "open_corrections_for",
+        lambda table, **kw: [{"sk": "CORRECTION#2026-09-20#abcd1234", "error_class": "other", "item_ref": {"surface": "chat_coaching"}}],
+    )
 
 
 # #5078: one battery as the store's reader returns it (decimals_to_float of the BATTERY# item).
@@ -559,7 +567,7 @@ def test_morning_note_is_measured_with_the_four_words_the_day_and_the_pt_instant
     assert v["written_at_pt"].endswith("PT") and "written_at" not in v
     expected = {k: val for k, val in mn.coach_fact(dict(MORNING_NOTE_ROW)).items() if k != "state"}
     assert v == expected, "the packet must carry coach_fact's shape verbatim"
-    assert out["packet_version"] == "coach-session-packet@1.13.0"
+    assert out["packet_version"] == "coach-session-packet@1.14.0"
 
 
 def test_morning_note_no_row_is_absent_and_a_failed_read_is_read_failed(stub_readers, monkeypatch):

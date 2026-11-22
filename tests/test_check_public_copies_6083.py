@@ -222,6 +222,21 @@ def test_a_new_undeclared_location_holding_documents_is_caught(snapshot, site_di
     assert ("legacy", "location") in rules(v)
 
 
+# ── rule E (#6148) ────────────────────────────────────────────────────────────────────────────────────────────────────
+def test_a_full_page_at_a_retired_legacy_installment_reds_the_run_and_the_stub_does_not_6148(snapshot, site_dir):
+    """End to end through evaluate(): a served full page at a retired slug, and its archived copy, fail rule E; the
+    stub at the same address does not. Filler text only."""
+    key = "site/legacy/chronicle/posts/week-00/index.html"
+    full = "<!doctype html><html><body>" + "<p>Planted filler for a retired slug.</p>" * 30 + "</body></html>"
+    with open(G.RETIRED_INSTALLMENT_STUB, encoding="utf-8") as fh:
+        stub = fh.read()
+    blob = clean_archive(**{"web/legacy/chronicle/posts/week-00/index.html": full})
+    v, _ = run(clean_bucket() + [obj(key, body=full)], blob, snapshot, site_dir)
+    assert {("legacy", "E"), ("archive", "E")} <= set(rules(v)), v
+    v, _ = run(clean_bucket() + [obj(key, body=stub)], clean_archive(), snapshot, site_dir)
+    assert not [d for _c, r, d in v if r == "E"], v
+
+
 # ── the inventory, pinned as a set against its sources ───────────────────────────────────────────────────────────────
 def test_every_anonymously_readable_resource_is_classified():
     with open(os.path.join(REPO, "deploy", "bucket_policy.json"), encoding="utf-8") as fh:

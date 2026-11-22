@@ -4836,7 +4836,14 @@ GUARD_PROOFS["guard::scripts/check_public_copies.py"] = {
         "2026-11-16, this lane. M1 3 failed / 14 passed; M2-M5 1 failed / 16 passed each; the two pins 1 failed each. "
         "RESTORED 17 passed. LIVE read-only `--check` against production: exit 1 on three real rule-A orphans."
     ),
-    "scope": "See ci::web-preview-deploy.yml::public-copies::2. Fixtures are synthetic; the live run is read-only.",
+    "scope": (
+        "See ci::web-preview-deploy.yml::public-copies::2. Fixtures are synthetic; the live run is read-only. #6148 added "
+        "rule E (a retired legacy chronicle installment larger than the stub, served, archived or committed): M6 every "
+        "rule-E size test `> limit:` → `> limit and False:` in the real tracked file, restored from a byte copy (md5 "
+        "2f262a63… before and after) — tests/test_retired_legacy_installments_6148.py + tests/test_check_public_copies_6083.py "
+        "4 failed / 23 passed; restored 27 passed (6083 file now 18). M7 filler appended to the committed "
+        "site/legacy/chronicle/posts/week-04/index.html — the repo test 2 failed / 5 passed; restored 7 passed."
+    ),
     "proved_on": "2026-11-16",
 }
 

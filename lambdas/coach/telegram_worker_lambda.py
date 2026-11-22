@@ -438,12 +438,14 @@ def _memory_block(coach_id: str) -> str:
     try:
         from coach.coach_chat_summary import read_recent_summaries
 
-        summaries = read_recent_summaries(_table(), pk)
-        if summaries:
-            block = f"{block}\n\n{summaries}" if block else summaries
+        block = "\n\n".join(b for b in (block, read_recent_summaries(_table(), pk)) if b)
     except Exception as e:
         logger.warning("[telegram] chat summaries unavailable: %s", e)
-    return block
+    # #6149: what he has already corrected this coach on (any owner-facing surface) — memory rides the
+    # DYNAMIC tail of the system prompt, never the cached prefix; fail-soft to "" inside the helper.
+    from coach.coach_corrections import chat_corrections_block
+
+    return "\n\n".join(b for b in (block, chat_corrections_block(_table(), coach_id)) if b)
 
 
 def _facts() -> dict:

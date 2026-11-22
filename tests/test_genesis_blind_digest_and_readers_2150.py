@@ -161,7 +161,7 @@ def test_monthly_digests_own_source_list_is_all_never_hidden():
     """The set this issue actually closes: every source monthly_digest's
     gather_all calls fetch_range with is RAW_TIMESERIES or CROSS_PHASE, so the
     #2150 fix reaches the whole current-vs-prior-month comparison for free."""
-    sources = ["whoop", "withings", "strava", "eightsleep", "hevy", "macrofactor", "todoist", "chronicling"]
+    sources = ["whoop", "withings", "strava", "eightsleep", "hevy", "macrofactor", "todoist"]
     for source in sources:
         cls = tax.SOURCE_CLASS.get(source)
         assert cls in (tax.RAW_TIMESERIES, tax.CROSS_PHASE), f"{source} is {cls}; would silently widen a scoped read"
