@@ -453,8 +453,12 @@ def handle_subscribe(
     if is_canary:
         logger.info("subscribe: canary synthetic — skipping confirmation email for %s", email_hash[:8])
     else:
-        _send_confirmation_email(email, confirm_url, dry_run=dry_run)
-        logger.info("subscribe: pending confirmation sent to %s", email_hash[:8])
+        if _send_confirmation_email(email, confirm_url, dry_run=dry_run):
+            logger.info("subscribe: pending confirmation sent to %s", email_hash[:8])
+        elif dry_run:
+            logger.info("subscribe: DRY-RUN pending confirmation not sent to %s", email_hash[:8])
+        else:
+            logger.error("subscribe: pending confirmation NOT sent to %s (send failed)", email_hash[:8])
     body = {"status": "pending_confirmation", "message": "Check your inbox."}
     if dry_run:
         body["dry_run"] = True
@@ -508,7 +512,8 @@ def _confirmation_email_content(confirm_url: str) -> tuple[str, str]:
     return subject, html
 
 
-def _send_confirmation_email(email: str, confirm_url: str, dry_run: bool = False) -> None:
+def _send_confirmation_email(email: str, confirm_url: str, dry_run: bool = False) -> bool:
+    """True only when the send call returned; a failure (or a dry run) is False (#6152)."""
     subject, html = _confirmation_email_content(confirm_url)
     try:
         guarded_send_email(
@@ -523,9 +528,11 @@ def _send_confirmation_email(email: str, confirm_url: str, dry_run: bool = False
                 }
             },
         )
-        logger.info("confirmation email sent")
+        logger.info("DRY-RUN confirmation email not sent" if dry_run else "confirmation email sent")
+        return not dry_run
     except Exception as exc:
         logger.error("_send_confirmation_email failed: %s", exc)
+        return False
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -677,7 +684,7 @@ def _send_welcome_email(email: str, dry_run: bool = False) -> None:
                 }
             },
         )
-        logger.info("welcome email sent")
+        logger.info("DRY-RUN welcome email not sent" if dry_run else "welcome email sent")
     except Exception as exc:
         logger.error("_send_welcome_email failed: %s", exc)
 

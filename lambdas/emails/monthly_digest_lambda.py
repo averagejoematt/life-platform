@@ -1,7 +1,7 @@
 """
 Monthly Coach's Letter Lambda — v1.2.0 (digest_utils consolidation)
-Fires first Sunday of each month at 16:00 UTC (8am PT).
-EventBridge cron: cron(0 16 ? * 1#1 *)
+Fires first Sunday of each month at 9:00 AM PT (config/schedules.json).
+EventBridge cron: cron(0 9 ? * 1#1 *), wall-clock in platform_timezone.
 
 Delivers a narrative coach's letter: 30-day current vs 30-day prior month,
 6-person council loaded from centralized S3 config, annual goals tracking,
@@ -125,7 +125,7 @@ PROTEIN_TARGET_G = PLAN_DAILY_PROTEIN_MIN_G
 # queries a month were issued and discarded while Whoop remained the sleep SOT
 # (#1658). Kept module-level so the behaviour test can derive the fetched set from
 # the code instead of restating it — a fetch with no consumer reds the test.
-SOURCES = ["whoop", "withings", "strava", "hevy", "macrofactor", "todoist", "chronicling"]
+SOURCES = ["whoop", "withings", "strava", "hevy", "macrofactor", "todoist"]
 
 # The stub the letter ships when the board could not speak. It is a NAMED constant
 # because the handler must be able to tell it apart from a real verdict by identity
@@ -351,42 +351,6 @@ def ex_character_sheet(recs):
     }
 
 
-def ex_chronicling(recs):
-    """Habit / P40 summary for the window.
-
-    #1658, two ADR-104/105 corrections:
-      * `days` is now the n `score_avg` was actually computed over, not every row
-        in the window — a mean must be published with ITS OWN n;
-      * a group present in the schema but never scored this month (value None)
-        used to reach `float(v)` and raise, and — had it not — would have sorted
-        as zero and been named the month's "⚠️ Weakest Group". An unmeasured
-        group is neither the best nor the worst; it is unmeasured.
-    """
-    if not recs:
-        return None
-    scores = []
-    group_totals = {}
-    for r in recs:
-        s = float(r["total_score"]) if r.get("total_score") is not None else None
-        if s is not None:
-            scores.append(s)
-        for g, v in (r.get("group_scores") or {}).items():
-            group_totals.setdefault(g, [])
-            if v is not None:
-                group_totals[g].append(float(v))
-    group_avgs = {g: avg(v) for g, v in group_totals.items()}
-    # Rank only the groups that carry a measured average.
-    ranked = sorted(((g, v) for g, v in group_avgs.items() if v is not None), key=lambda x: x[1])
-    return {
-        "score_avg": avg(scores),
-        "group_avgs": group_avgs,
-        "days": len(scores),
-        "days_in_window": len(recs),
-        "best_group": ranked[-1][0] if ranked else None,
-        "worst_group": ranked[0][0] if ranked else None,
-    }
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # BANISTER  — compute_banister_from_list imported from digest_utils
 # ══════════════════════════════════════════════════════════════════════════════
@@ -443,11 +407,6 @@ def compute_annual_goals(cur, windows, profile=None):
         goals["training_activities_30d"] = st.get("activity_count", 0)  # session-count: ex_strava's own count (THE count)
         goals["zone2_minutes_30d"] = st.get("zone2_minutes", 0)
 
-    # Habit adherence monthly avg
-    ch = cur.get("chronicling")
-    if ch:
-        goals["habit_score_avg"] = ch.get("score_avg")
-
     return goals
 
 
@@ -490,7 +449,7 @@ def _build_monthly_prompt_from_config():
     prompt = f"""You are the coordinating intelligence for Matthew's Monthly Health Board of Advisors.
 
 CONTEXT:
-Matthew Walker, 36, Seattle. Senior Director at a SaaS company. Goals: lose weight, build muscle,
+Matthew Walker, Seattle. Senior Director at a SaaS company. Goals: lose weight, build muscle,
 improve sleep and stress management. He tracks obsessively but struggles to translate data into
 consistent behavioural change.
 His CURRENT weight goal, journey start weight and progress are in the ANNUAL GOALS CONTEXT block
@@ -536,7 +495,7 @@ Be honest. A month of data deserves a month's worth of insight."""
 _FALLBACK_MONTHLY_PROMPT = """You are the coordinating intelligence for Matthew's Monthly Health Board of Advisors.
 
 CONTEXT:
-Matthew Walker, 36, Seattle. Senior Director at a SaaS company. Goals: lose weight, build muscle,
+Matthew Walker, Seattle. Senior Director at a SaaS company. Goals: lose weight, build muscle,
 improve sleep and stress management. He tracks obsessively but struggles to translate data into
 consistent behavioural change.
 His CURRENT weight goal, journey start weight and progress are in the ANNUAL GOALS CONTEXT block
@@ -709,7 +668,6 @@ def gather_all():
             "strava": ex_strava(raw["strava"], profile, raw["hevy"]),  # #5387: Hevy anchors a gym visit
             "hevy": ex_hevy(raw["hevy"]),
             "macrofactor": ex_macrofactor(raw["macrofactor"], profile),
-            "chronicling": ex_chronicling(raw["chronicling"]),
         }
 
     cur = _extract(raw_cur)
@@ -860,7 +818,7 @@ def lambda_handler(event, context):
     windows = data["windows"]
     logger.info(f"{windows['month_label']} | {windows['cur_start']} → {windows['cur_end']}")
 
-    logger.info("Calling Haiku for monthly council commentary...")
+    logger.info(f"Calling {model_for('monthly_digest')} for monthly council commentary...")
     # Whether the board actually spoke is tracked as a FLAG, not sniffed back out of
     # the rendered text (#1658). The old gate was `"unavailable" not in
     # commentary[:50]`, and the failure stub's word "unavailable" starts at index 42
@@ -873,7 +831,7 @@ def lambda_handler(event, context):
     try:
         commentary = call_haiku_monthly(data, goals)
     except Exception as e:
-        logger.warning(f"Haiku failed: {e}")
+        logger.warning(f"Commentary model call failed: {e}")
         commentary = COMMENTARY_UNAVAILABLE
         commentary_ok = False
 
@@ -904,7 +862,7 @@ def lambda_handler(event, context):
         ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking
         EmailTags=[{"Name": "message_type", "Value": "monthly_digest"}],
     )
-    logger.info(f"Sent: Monthly Coach's Letter · {month}")
+    logger.info(f"{'DRY-RUN (not sent)' if dry_run else 'Sent'}: Monthly Coach's Letter · {month}")
 
     # A dry run must leave NO trace that looks like a delivery: writing the send
     # record would make the real scheduled invocation later that month skip as

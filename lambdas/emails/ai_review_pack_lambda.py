@@ -40,8 +40,8 @@ Design notes:
     is the point). A single corrupt archived object is skipped and counted, never
     fatal — the editorial email is the priority.
 
-Schedule: Sunday 18:00 UTC (fixed, no DST drift) — after the Sunday weekly-digest
-(16:00 UTC), covering the week just ended.
+Schedule: Sunday 11:00 AM PT (config/schedules.json, wall-clock) — after the Sunday weekly-digest
+(9:00 AM PT), covering the week just ended.
 
 Liveness: operator-email class (a missing Sunday issue is noticed by its reader),
 dated-exempt in tests/test_heartbeat_completeness.py (#1455).
@@ -680,7 +680,7 @@ def _run(event, context):
     # row a `period_key` so a redrive can be recognised).
     if not dry_run:
         record_email_send(table, LEDGER_NAME, period_key)
-    logger.info(f"Sent: {subject}")
+    logger.info(f"{'DRY-RUN (not sent)' if dry_run else 'Sent'}: {subject}")
 
     return {
         "statusCode": 200,
