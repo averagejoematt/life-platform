@@ -122,11 +122,17 @@ def short_day(iso: str) -> str:
         return str(iso)
 
 
-def public_holding_verdict(holding: int, start: str, end: str, deficit_published: bool) -> str:
-    """The all-channels-holding verdict with the switch on (F1): what held, over which dates, and what it cannot say."""
+def public_holding_verdict(holding: int, start: str, end: str, deficit_published: bool, drifting: int = 0, too_few: int = 0) -> str:
+    """The no-strain verdict with the switch on (F1): what held, what drifted down without crossing its strain line, what
+    had too few days, over which dates, and what the read cannot say."""
+    parts = [f"{holding} of 5 recovery channels held steady from {short_day(start)} to {short_day(end)}"]
+    if drifting:
+        parts.append(f"{drifting} drifted down without crossing its strain line")
+    if too_few:
+        parts.append(f"{too_few} had too few days to read")
     text = (
-        f"{holding} of 5 recovery channels held steady from {short_day(start)} to {short_day(end)}. This read has no food, protein, lab or "
-        "lean-mass input, so it does not say whether the deficit itself is safe or sustainable."
+        "; ".join(parts) + ". This read has no food, protein, lab or lean-mass input, so it does not say whether the deficit "
+        "itself is safe or sustainable."
     )
     if not deficit_published:
         text += " The deficit is not published: the platform's estimate of it fails its own plausibility check."

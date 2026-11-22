@@ -127,8 +127,25 @@ def test_f1_the_public_verdict_is_not_a_clearance_and_carries_its_basis_and_date
     assert ds["based_on"] == ["HRV", "sleep quality", "recovery", "habit completion", "training output"]
     assert {"food intake", "protein", "blood tests"} <= set(ds["not_based_on"])
     assert "not a statement that the deficit is safe" in ds["honesty"]
-    # the channel count is what MEASURED steady: the training channel had too few days, so 4 of 5
-    assert v.startswith("4 of 5 recovery channels held steady")
+    # the channel count is what MEASURED steady: the training channel had too few days, so 4 of 5, and it says so
+    assert v.startswith("4 of 5 recovery channels held steady from Apr 27 to May 10; 1 had too few days to read.")
+
+
+def test_f1_a_channel_that_fell_under_its_strain_line_is_not_called_steady():
+    from web import site_api_nutrition as nut
+
+    channels = [
+        {"status": "stable", "direction": "stable"},
+        {"status": "stable", "direction": "improving"},
+        {"status": "stable", "direction": "declining"},  # fell, but not past its cut-off
+        {"status": "stable", "direction": "insufficient_data"},
+        {"status": "degraded", "direction": "declining"},
+    ]
+    assert nut._held(channels) == (2, 1, 1)
+    v = nc.public_holding_verdict(2, "2026-04-27", "2026-05-10", True, drifting=1, too_few=1)
+    assert v.startswith(
+        "2 of 5 recovery channels held steady from Apr 27 to May 10; 1 drifted down without crossing its strain line; 1 had"
+    )
 
 
 def test_f1_the_strain_verdicts_are_untouched_with_the_switch_on():
@@ -359,6 +376,7 @@ def test_the_new_public_sentences_survive_the_publication_gate():
     new = [
         nc.public_holding_verdict(4, "2026-04-27", "2026-05-10", False),
         nc.public_holding_verdict(5, "2026-04-27", "2026-05-10", True),
+        nc.public_holding_verdict(3, "2026-04-27", "2026-05-10", True, drifting=1, too_few=1),
         nc.PUBLIC_HONESTY,
         "How fast is too fast is contested, and this page does not rate the pace as safe or unsafe. What it can show is the protein floor beside it.",
         "Recovery channels during the cut — the five-channel read",

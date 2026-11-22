@@ -127,8 +127,12 @@ def _tdee_as_of(items, tdee_source, today):
 
 
 def _held(channels):
-    """#6195 F1: the channels that MEASURED steady — a channel with too few days held nothing."""
-    return sum(1 for c in channels if c["status"] == "stable" and c["direction"] != "insufficient_data")
+    """#6195 F1: (held steady, drifted down under the strain line, too few days) — a channel with too few days held
+    nothing, and one that fell without crossing its cut-off did not hold steady."""
+    calm = [c for c in channels if c["status"] == "stable"]
+    few = sum(1 for c in calm if c["direction"] == "insufficient_data")
+    drift = sum(1 for c in calm if c["direction"] == "declining")
+    return len(calm) - few - drift, drift, few
 
 
 def _mifflin_tdee(weight_lbs, strava_items=None, profile=None, hevy_items=None):
@@ -1200,7 +1204,9 @@ def deficit_sustainability(*, _g) -> dict:
         )
         if nc.on(nc.PUBLIC_VERDICT_NOT_CLEARANCE):
             # #6195 F1 (owner ruling 2026-11-22): five recovery channels holding is not a clearance of the deficit
-            severity, verdict = "channels_holding", nc.public_holding_verdict(_held(channels), start, today, deficit_published)
+            _hold, _drift, _few = _held(channels)
+            severity = "channels_holding"
+            verdict = nc.public_holding_verdict(_hold, start, today, deficit_published, drifting=_drift, too_few=_few)
     _verdict_basis = (
         {
             "as_of": today,
