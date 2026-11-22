@@ -126,6 +126,7 @@ EXPECTED_ROUTE_MAP = {
     "/api/observatory_week": "handle_observatory_week",
     "/api/page_feedback": "_handle_page_feedback",  # #4182
     "/api/morning_note": "_route_morning_note",  # #4189 — GET served note / POST owner write
+    "/api/brief_response": "handle_brief_response",  # #6175 — the brief trial's answer door (GET page / POST one-use token)
     "/api/series": "handle_series",  # #5532 — one metric's daily series (v9 data room)
     "/api/ledger_export": "handle_ledger_export",  # #5532 — the whole ledger, paged (v9 ledger)
     "/api/reader_call": "handle_reader_call",  # #6088 — a reader's call beside a coach's open call (DARK)

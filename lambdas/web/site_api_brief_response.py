@@ -73,7 +73,11 @@ def _page(status: int, title: str, body: str) -> dict:
 
 
 def _gone(reason: str) -> dict:
-    return _page(410 if reason != "invalid" else 404, "This link can't record an answer", "<p>" + _html.escape(_GONE[reason]) + "</p>")
+    return _page(
+        410 if reason != "invalid" else 404,
+        "This link can't record an answer",
+        "<p>" + _html.escape(_GONE.get(reason, _GONE["used"])) + "</p>",
+    )
 
 
 _GONE = {
@@ -83,17 +87,25 @@ _GONE = {
 }
 
 
-def _state(row: dict | None, now: int) -> str:
+def verify_brief_response_token(table, token, now: int) -> tuple:
+    """The owner check for this door: ``(state, row)`` with state ``open`` | ``invalid`` | ``expired`` | ``used``.
+
+    ``open`` only for a well-formed token whose SHA-256 names a minted row that is unspent and unexpired — the
+    token is the owner's one-use grant for one recommendation of one send. The POST's conditional write re-checks
+    the same three facts atomically, so a race between two submissions still records at most one answer."""
+    if not rr.token_valid_shape(token):
+        return "invalid", None
+    row = _read_token(table, token)
     if not row:
-        return "invalid"
+        return "invalid", None
     if row.get("used_at"):
-        return "used"
+        return "used", row
     try:
         if int(row.get("expires_at") or 0) <= now:
-            return "expired"
+            return "expired", row
     except (TypeError, ValueError):
-        return "invalid"
-    return "open"
+        return "invalid", row
+    return "open", row
 
 
 def _read_token(table, token: str) -> dict | None:
@@ -150,14 +162,11 @@ def handle_brief_response(event: dict, *, table=None) -> dict:
 
     if method != "POST":
         token = ((event.get("queryStringParameters") or {}).get("t") or "").strip()
-        if not rr.token_valid_shape(token):
-            return _gone("invalid")
         try:
-            row = _read_token(table, token)
+            state, row = verify_brief_response_token(table, token, int(time.time()))
         except Exception as e:  # noqa: BLE001
             logger.error(f"[brief_response] token read failed: {e}")
             return _page(503, "Try again shortly", "<p>The answer page is unavailable. Nothing was recorded.</p>")
-        state = _state(row, int(time.time()))
         return _confirm_page(token, row) if state == "open" else _gone(state)
 
     raw = event.get("body") or ""
@@ -172,9 +181,16 @@ def handle_brief_response(event: dict, *, table=None) -> dict:
         return _gone("invalid")
     token = (form.get("t") or [""])[0].strip()
     choice = (form.get("response") or [""])[0].strip()
-    if not rr.token_valid_shape(token) or choice not in rr.RESPONSES:
+    if choice not in rr.RESPONSES:
         return _gone("invalid")
     now = int(time.time())
+    try:
+        state, _row = verify_brief_response_token(table, token, now)  # the owner check, before any write
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[brief_response] token read failed: {e}")
+        return _page(503, "Try again shortly", "<p>The answer could not be recorded. Nothing was recorded; the link still works.</p>")
+    if state != "open":
+        return _gone(state)
     now_iso = datetime.now(timezone.utc).isoformat()
     status = rr.RESPONSES[choice]
     try:
@@ -188,7 +204,7 @@ def handle_brief_response(event: dict, *, table=None) -> dict:
     except Exception as e:  # noqa: BLE001
         if "ConditionalCheckFailed" in str(e) or "ConditionalCheckFailed" in type(e).__name__:
             try:
-                return _gone(_state(_read_token(table, token), now))
+                return _gone(verify_brief_response_token(table, token, now)[0])
             except Exception:  # noqa: BLE001
                 return _gone("invalid")
         logger.error(f"[brief_response] write failed: {e}")

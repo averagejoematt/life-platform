@@ -44,7 +44,7 @@ def test_rewordings_of_the_same_ask_are_one_action_class():
         "📊 Three days without a food log means nutrition is invisible right now — open MacroFactor before your first meal",
     ]
     assert {bh.classify(a) for a in asks} == {"food_log"}
-    assert bh.classify("📊 1,152 kcal is 23% below your 1,500 target") == "intake" and "intake" in bh.FOOD_CLASSES
+    assert bh.classify("📊 1,152 kcal is 23% below your 1,500 target") == "intake" and "intake" in bh.FOOD_KEYS
     assert bh.classify("🚶 a deliberate 15-minute walk today") == bh.classify("one 30-minute walk closes the movement gap") == "movement"
 
 
@@ -157,7 +157,7 @@ def test_a_pending_export_is_pending_data_and_its_food_asks_are_held_back():
     text = bh.render_text(v)
     assert "export not arrived — pending data, not a missed log" in text
     assert "not logged" not in text.lower().replace("not a missed log", "")
-    assert not any(r.key in bh.FOOD_CLASSES for r in v.recs)  # neither "log a meal" nor the protein ask
+    assert not any(r.key in bh.FOOD_KEYS for r in v.recs)  # neither "log a meal" nor the protein ask
     assert v.held_back == 2 and "2 food suggestions held back" in text
     assert any(r.source == "food_export" and r.kind == "housekeeping" for r in v.recs)
     assert any("pending data, not a missed log" in u for u in v.unknown)
@@ -276,18 +276,18 @@ def _trial():
 
 def test_a_dry_run_or_demo_writes_nothing_for_the_trial():
     tbl = _Tbl()
-    bt.record(tbl, "USER#matthew#SOURCE#", _trial(), "<html><body>x</body></html>", persist=False, logger=_Log())
-    bt.record(tbl, "USER#matthew#SOURCE#", None, "<html></html>", persist=True, logger=_Log())
+    bt.record(tbl, "USER#matthew#SOURCE#", _trial(), 27, persist=False, logger=_Log())
+    bt.record(tbl, "USER#matthew#SOURCE#", None, 13, persist=True, logger=_Log())
     assert tbl.puts == []
 
 
 def test_the_send_records_the_token_hash_never_the_token_and_the_measurement_row():
     tbl, t = _Tbl(), _trial()
-    bt.record(tbl, "USER#matthew#SOURCE#", t, "<html><body>one two three</body></html>", persist=True, logger=_Log())
+    bt.record(tbl, "USER#matthew#SOURCE#", t, 41, persist=True, logger=_Log())
     (tok_row, tok_kw), (send_row, _) = tbl.puts
     assert tok_row["sk"] == "TOKEN#" + rr.token_hash(t.token) and t.token not in json.dumps(tok_row, default=str)
     assert tok_kw["ConditionExpression"] == "attribute_not_exists(sk)"
-    assert send_row["sk"] == "SEND#" + DAY and send_row["variant"] == "hybrid" and send_row["total_words"] == 3
+    assert send_row["sk"] == "SEND#" + DAY and send_row["variant"] == "hybrid" and send_row["total_html_chars"] == 41
     assert send_row["n_new"] == 1 and send_row["response"] == "not_recorded" and send_row["hybrid_words"] > 0
 
 
@@ -371,7 +371,7 @@ def test_measure_arm_sends_the_current_brief_and_records_the_send(env):
     baseline = _run(env)
     assert _run(env, "measure") == baseline
     sends = [p for p in _trial_writes(env) if p["sk"].startswith("SEND#")]
-    assert sends and sends[-1]["variant"] == "measure" and sends[-1]["total_words"] > 0
+    assert sends and sends[-1]["variant"] == "measure" and sends[-1]["total_html_chars"] > 0
     assert not any(p["sk"].startswith("TOKEN#") for p in _trial_writes(env))  # no link in the current render
 
 

@@ -321,7 +321,8 @@ def prepare(
             "variant": variant,
             "format_version": brief_hybrid.FORMAT_VERSION if variant == SWITCH_HYBRID else "current",
             "recs": [
-                {"id": r.rec_id, "key": r.key, "source": r.source, "status": r.status, "day_n": r.day_n, "kind": r.kind} for r in view.recs
+                {"id": r.rec_id, "key": r.key, "source": r.source, "status": r.status, "run_day": r.day_n, "kind": r.kind}
+                for r in view.recs
             ],
             "n_recs": len(view.recs),
             "n_new": sum(1 for r in view.recs if r.status == "NEW"),
@@ -340,22 +341,40 @@ def prepare(
         return None
 
 
-def run(g: dict, data, profile, scores: tuple, html: str, subject: str, demo_mode: bool) -> tuple:
-    """The handler's one call: (trial | None, html, subject). `g` is the handler module's globals (its table,
-    fetch_range/fetch_date, USER_PREFIX, RECIPIENT, logger); `scores` = (day_grade_score, grade, readiness_score,
-    readiness_colour, mvp_streak, component_details, tldr_guidance, today_short). Off — or a demo brief — returns
-    the html and subject it was given, untouched, after at most one read."""
-    if demo_mode:
-        return None, html, subject
+# The handler locals `run` reads, by name — and nothing else (never the rendered `html`: the email body reaches
+# only the sanitiser, the banner/trial `_re.sub`, `len` and SES, tests/test_rhythm_owner_4972.py).
+HANDLER_NAMES = (
+    "data",
+    "profile",
+    "day_grade_score",
+    "grade",
+    "readiness_score",
+    "readiness_colour",
+    "mvp_streak",
+    "component_details",
+    "tldr_guidance",
+    "today_short",
+    "demo_mode",
+)
+
+
+def run(g: dict, handler_locals: dict, subject: str) -> tuple:
+    """The handler's one call: ``(trial | None, block_html, subject)``. ``g`` is the handler module's globals (its
+    table, fetch_range/fetch_date, USER_PREFIX, RECIPIENT, logger); ``handler_locals`` is read for HANDLER_NAMES
+    only. Off — or a demo brief — returns ``(None, "", subject)`` after at most one read, so the handler's
+    block injection is the identity and the brief is byte for byte today's."""
+    v = {k: handler_locals.get(k) for k in HANDLER_NAMES}
+    if v["demo_mode"]:
+        return None, "", subject
     table, logger = g["table"], g["logger"]
     variant = read_switch(table, g["USER_PREFIX"], logger)
     if variant == SWITCH_OFF:
-        return None, html, subject
-    day_grade_score, grade, readiness_score, readiness_colour, mvp_streak, component_details, tldr_guidance, today_short = scores
+        return None, "", subject
+    data = v["data"] or {}
     try:
         from emails import brief_editorial_inputs
 
-        editorial = brief_editorial_inputs.gather(table, g["fetch_date"], g["USER_PREFIX"], (data or {}).get("date"), logger)
+        editorial = brief_editorial_inputs.gather(table, g["fetch_date"], g["USER_PREFIX"], data.get("date"), logger)
     except Exception as e:  # noqa: BLE001
         logger.warning("brief trial: editorial inputs failed: %s", e)
         editorial = {}
@@ -365,22 +384,24 @@ def run(g: dict, data, profile, scores: tuple, html: str, subject: str, demo_mod
         fetch_range=g["fetch_range"],
         user_prefix=g["USER_PREFIX"],
         data=data,
-        profile=profile,
-        computed=(data or {}).get("computed_metrics"),
-        component_details=component_details,
-        readiness_score=readiness_score,
-        readiness_colour=readiness_colour,
-        mvp_streak=mvp_streak,
-        day_grade_score=day_grade_score,
-        grade=grade,
-        tldr_guidance=tldr_guidance,
+        profile=v["profile"],
+        computed=data.get("computed_metrics"),
+        component_details=v["component_details"],
+        readiness_score=v["readiness_score"],
+        readiness_colour=v["readiness_colour"],
+        mvp_streak=v["mvp_streak"],
+        day_grade_score=v["day_grade_score"],
+        grade=v["grade"],
+        tldr_guidance=v["tldr_guidance"],
         editorial=editorial,
-        today_short=today_short,
+        today_short=v["today_short"],
         site_url=os.environ.get("SITE_URL", "https://averagejoematt.com"),
         recipient=g.get("RECIPIENT", ""),
         logger=logger,
     )
-    return (trial, *apply(trial, html, subject))
+    if trial is None or trial.variant != SWITCH_HYBRID or not trial.block_html:
+        return trial, "", subject
+    return trial, trial.block_html, (trial.subject or subject)
 
 
 def apply(trial: Trial | None, html: str, subject: str) -> tuple:
@@ -395,7 +416,7 @@ def _ddb(item: dict) -> dict:
     return floats_to_decimal({k: v for k, v in item.items() if v is not None})
 
 
-def record(table, user_prefix: str, trial: Trial | None, sent_html: str, persist: bool, logger) -> None:
+def record(table, user_prefix: str, trial: Trial | None, html_chars: int, persist: bool, logger) -> None:
     """After the send: the token row (so the link works) and the SEND# measurement row. Fail-soft.
     `persist` False (dry run / demo) writes nothing."""
     if trial is None or not persist:
@@ -411,7 +432,7 @@ def record(table, user_prefix: str, trial: Trial | None, sent_html: str, persist
         logger.warning("brief trial token write failed (the response link will say 'not valid'): %s", e)
     try:
         m = dict(trial.measurement)
-        m["total_words"] = brief_hybrid.html_to_words(sent_html)
+        m["total_html_chars"] = int(html_chars)  # the whole sent email's length (the handler hands `len(html)`, never the html)
         m["sent_at"] = datetime.now(timezone.utc).isoformat()
         table.put_item(Item=_ddb({"pk": pk, "sk": "SEND#" + trial.data_day, "date": trial.data_day, **m}))
     except Exception as e:  # noqa: BLE001

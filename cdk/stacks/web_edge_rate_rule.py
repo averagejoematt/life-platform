@@ -74,6 +74,7 @@ SUBSCRIBER_POST_PREFIX = "/api/subscribe"
 # Routed POST doors deliberately OUT of scope — each verifies an owner token before writing.
 OWNER_TOKEN_POST_DOORS = {
     "/api/morning_note": "_handle_morning_note",  # #4189: the owner's morning-note write (verify_morning_note_token)
+    "/api/brief_response": "handle_brief_response",  # #6175: the brief trial's answer (verify_brief_response_token)
 }
 
 # Doors in the scope that a pending PR routes; the coverage test tolerates their absence

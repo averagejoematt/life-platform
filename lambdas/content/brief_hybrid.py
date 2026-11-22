@@ -54,7 +54,7 @@ FORMAT_VERSION = "hybrid-v1"
 # ── action classes ───────────────────────────────────────────────────────────────────────────────
 # A guidance sentence is reworded every day; its ACTION is not. Ordered: the first match wins, so a
 # sentence about logging a meal to fix protein is a food-log ask, not a protein ask.
-_CLASSES: tuple[tuple[str, tuple[str, ...]], ...] = (
+_ACTION_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     (
         "food_log",
         (
@@ -80,10 +80,10 @@ _CLASSES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("sleep", (r"\bbedtime\b", r"\bwind[- ]down\b", r"\bsleep (earlier|by)\b")),
     ("weight_marker", (r"\b285\b", r"\bsleep threshold\b", r"\bmilestone\b")),
 )
-_CLASS_RES = tuple((name, tuple(re.compile(p, re.I) for p in pats)) for name, pats in _CLASSES)
-FOOD_CLASSES = frozenset({"food_log", "protein", "intake"})
+_CLASS_RES = tuple((name, tuple(re.compile(p, re.I) for p in pats)) for name, pats in _ACTION_PATTERNS)
+FOOD_KEYS = frozenset({"food_log", "protein", "intake"})
 # Observations, not asks: a distance-to-marker line is shown in the full detail, never as a recommendation.
-OBSERVATION_CLASSES = frozenset({"weight_marker"})
+OBSERVATION_KEYS = frozenset({"weight_marker"})
 _WORD = re.compile(r"[a-z0-9]+")
 
 
@@ -236,9 +236,9 @@ def guidance_recs(guidance_items: list, data_day: str, food_pending: bool) -> tu
         if not text:
             continue
         key = classify(text)
-        if key in OBSERVATION_CLASSES:
+        if key in OBSERVATION_KEYS:
             continue
-        if food_pending and key in FOOD_CLASSES:
+        if food_pending and key in FOOD_KEYS:
             held += 1
             continue
         if key in seen:
