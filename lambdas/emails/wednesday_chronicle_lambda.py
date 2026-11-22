@@ -1230,6 +1230,9 @@ def _attach_desk_artifacts(date_str, desk, legacy_findings=()):
             ":ph": "experiment",
         }
         expr = "SET desk_budget_json = :b, desk_episode_json = :e, desk_ledger_json = :l, desk_findings_json = :f, desk_craft_json = :c"
+        if desk.get("editor") is not None:  # #6179 (STORY_EDITOR=on only): what the editor did, round by round, and its cost
+            values[":ed"] = json.dumps(desk["editor"], default=str)
+            expr += ", desk_editor_json = :ed"
         expr += ", #p = if_not_exists(#p, :ph)"
         if craft:
             values[":h"] = "craft_hold"

@@ -549,9 +549,10 @@ def test_the_writers_pending_marker_is_the_served_reason_and_the_editions_held()
         "display": "Week 7 was not written: the AI budget was paused.",
         "noted_at": "2026-10-21T15:00:00+00:00",
     }
-    # the marker on the held week reads as the held reason; a marker without a week is not a marker
+    # #6178: a held week carries NO reason, even when the marker names it — the stored statuses cannot say whether it was
+    # sent back or only awaits approval, so the page says one neutral line; a marker without a week is not a marker
     journal["pending"]["week"] = 8
-    assert _chapters(journal)["weeks"][7]["reason"] == "Week 7 was not written: the AI budget was paused."
+    assert _chapters(journal)["weeks"][7]["status"] == "held" and _chapters(journal)["weeks"][7]["reason"] is None
     journal["pending"] = {"reason": "x"}
     assert _chapters(journal)["held"] is None and edition._held_chapter(journal) is None
     assert edition._held_chapter(_journal()) is None  # the live manifest carries no marker

@@ -143,7 +143,7 @@ export function countWords(n, prologue, opts = {}) {
 }
 
 /** The weeks between two published chapters, in the words /story/ shows for them (its status tags: skipped, held,
- * pending): "Week 7 was skipped; weeks 8 and 9 are held." `chapters` is the whole chapter list; a week with no chapter
+ * retired, pending): "Week 7 was skipped; weeks 8 and 9 are held; week 11 was retired." `chapters` is the whole chapter list; a week with no chapter
  * object "has no chapter". null when there is no week between. Never a title, an excerpt or a reason. */
 export function gapWords(chapters, fromWeek, toWeek) {
   if (!Number.isInteger(fromWeek) || !Number.isInteger(toWeek) || toWeek < fromWeek) return null;
@@ -158,7 +158,12 @@ export function gapWords(chapters, fromWeek, toWeek) {
   const said = groups.map(({ st, weeks }) => {
     const one = weeks.length === 1;
     const which = one ? `week ${weeks[0]}` : weeks.length === 2 ? `weeks ${weeks[0]} and ${weeks[1]}` : `weeks ${weeks[0]} to ${weeks[weeks.length - 1]}`;
-    const verb = st === "none" ? (one ? "has no chapter" : "have no chapter") : st === "skipped" ? (one ? "was skipped" : "were skipped") : `${one ? "is" : "are"} ${st}`;
+    const verb =
+      st === "none"
+        ? one ? "has no chapter" : "have no chapter"
+        : st === "skipped" || st === "retired"
+          ? `${one ? "was" : "were"} ${st}`
+          : `${one ? "is" : "are"} ${st}`;
     return `${which} ${verb}`;
   });
   const text = said.join("; ");
