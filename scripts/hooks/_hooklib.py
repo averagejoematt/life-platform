@@ -186,9 +186,10 @@ def state_path(name: str) -> Path:
     return d / name
 
 
-def render(title: str, lines: list[str]) -> str:
+def render(title: str, lines: list[str], mode: str | None = None) -> str:
+    mode = mode or HOOK_MODE
     body = "\n".join(f"  {ln}" for ln in lines)
-    return f"[claude-hook: {title}] ({HOOK_MODE if HOOK_MODE in ('ask', 'block') else 'advisory'})\n{body}"
+    return f"[claude-hook: {title}] ({mode if mode in ('ask', 'block') else 'advisory'})\n{body}"
 
 
 def output(event: str, text: str, mode: str | None = None) -> dict:
@@ -208,13 +209,14 @@ def output(event: str, text: str, mode: str | None = None) -> dict:
     return out
 
 
-def emit(title: str, lines: list[str], event: str = "PreToolUse") -> int:
+def emit(title: str, lines: list[str], event: str = "PreToolUse", mode: str | None = None) -> int:
     """Report a finding where the MODEL reads it: one JSON object on stdout, exit 0.
 
     The mode only changes whether the call is asked about or refused (see the table in the
-    module docstring). A copy also goes to stderr for anyone running the hook by hand."""
-    text = render(title, lines)
-    print(json.dumps(output(event, text)))
+    module docstring). `mode` overrides it for a finding that must refuse in EVERY mode (#6157:
+    force-push). A copy also goes to stderr for anyone running the hook by hand."""
+    text = render(title, lines, mode)
+    print(json.dumps(output(event, text, mode)))
     print(text, file=sys.stderr)
     return 0
 

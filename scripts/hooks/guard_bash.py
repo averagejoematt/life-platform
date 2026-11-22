@@ -25,9 +25,13 @@ Three checks, each a measured incident class. Advisory by default (see _hooklib)
    deploy script is EXECUTED (not when a read-only `grep`/`cat`/`sed` names a deploy/
    path), and stays silent in a worktree DETACHED at origin/main's tip.
 
-3. FORCE-PUSH TO MAIN
-   Distinct from the settings.json `ask` rule, which prompts a human. This names the
-   branch in the warning so the answer is not a reflex.
+3. FORCE-PUSH, ANY BRANCH — REFUSED IN EVERY MODE (#6157)
+   A lane agent force-pushed its own PR branch unasked (2026-11-16). Every force form of
+   `git push` is a hard deny regardless of CLAUDE_HOOK_MODE: --force, -f (alone or in a
+   combined short flag), --force-with-lease[=..], --force-if-includes, --mirror, a `+refspec`,
+   behind `git -C <dir>` / `--git-dir=` / `cd x &&` / `bash -c`. The command is TOKENISED
+   (shlex), never substring-matched: a `gh issue create --body "...force-push..."` or a
+   heredoc body that merely talks about force-pushing is one quoted token, not a git push.
 
 4. A SQUASH MESSAGE NO GUARD HAS SEEN (#3863)
    `scripts/check_pr_closing_set.py` validates three texts and all three are PRE-merge: the
@@ -42,6 +46,7 @@ Three checks, each a measured incident class. Advisory by default (see _hooklib)
 """
 
 import re
+import shlex
 import sys
 from pathlib import Path
 
@@ -71,10 +76,102 @@ _DEPLOY = re.compile(
     r"(?:(?:bash|sh|zsh|source|\.)\s+(?:-\S+\s+)*)?"
     r"(?P<hit>(?:\S*/)?deploy/(?:deploy_|cdk_deploy|sync_site_to_s3)[\w.]*\.sh|aws\s+lambda\s+update-function-code)\b"
 )
-_FORCE = re.compile(r"\bgit\s+push\b.*(--force\b|-f\b)")
+#: Long options that rewrite remote history. git accepts any unambiguous prefix of a long option
+#: (`--force-w`), so a prefix of one of these names counts.
+_FORCE_LONG = ("force", "force-with-lease", "force-if-includes", "mirror")
+_WRAPPERS = {"env", "nohup", "time", "command", "sudo", "exec", "xargs", "nice", "builtin"}
+_SHELLS = {"bash", "sh", "zsh", "dash"}
+_HEREDOC = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_]\w*)\1")
+#: git's global options that consume the NEXT token as their value.
+_GIT_VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--super-prefix", "--config-env"}
 #: A merge that SUPPLIES its own commit text. `--body-file`, `--body`, `--subject` (and the
 #: `-F`/`-b`/`-t` short forms `gh` accepts for them).
 _SUPPLIED_MSG = re.compile(r"(?:^|\s)(--body-file|--body|--subject|-F|-b|-t)(?:[=\s]|$)")
+
+
+def _strip_heredocs(cmd: str) -> str:
+    """Drop heredoc BODIES: text fed to a command on stdin is data, not commands."""
+    lines, out, delim, dash = cmd.split("\n"), [], None, False
+    for line in lines:
+        if delim is not None:
+            if (line.strip() if dash else line) == delim:
+                delim = None
+            continue
+        out.append(line)
+        m = _HEREDOC.search(line)
+        if m:
+            delim, dash = m.group(2), "<<-" in line[m.start() : m.start() + 3]
+    return "\n".join(out)
+
+
+def _segments(cmd: str) -> list[list[str]]:
+    """Token lists, one per simple command (split on ; & | ( ) ` and unquoted newlines)."""
+    try:
+        lex = shlex.shlex(cmd, posix=True, punctuation_chars=";&|()`\n")
+        lex.whitespace, lex.whitespace_split, lex.commenters = " \t\r", True, ""
+        tokens = list(lex)
+    except ValueError:  # unbalanced quote: refuse to guess, fall back to whitespace tokens
+        tokens = cmd.replace(";", " ; ").replace("&", " ; ").replace("|", " ; ").split()
+    segs: list[list[str]] = [[]]
+    for t in tokens:
+        if t and set(t) <= set(";&|()`\n"):
+            segs.append([])
+        else:
+            segs[-1].append(t)
+    return [s for s in segs if s]
+
+
+def _push_args_force(args: list[str]) -> str | None:
+    """The first history-rewriting argument of a `git push`, else None."""
+    for a in args:
+        if a == "--":
+            continue
+        if a.startswith("--"):
+            name = a[2:].split("=", 1)[0]
+            if name and any(o.startswith(name) for o in _FORCE_LONG):
+                return a
+        elif a.startswith("-") and len(a) > 1:
+            if "f" in a[1:]:
+                return a
+        elif a.startswith("+") and len(a) > 1:
+            return a
+    return None
+
+
+def force_pushes(cmd: str, depth: int = 0) -> list[str]:
+    """Every force-form `git push` in `cmd`, as the offending argument. Parses tokens."""
+    found: list[str] = []
+    for seg in _segments(_strip_heredocs(cmd)):
+        i = 0
+        while i < len(seg):  # skip VAR=x assignments and transparent wrappers
+            t = seg[i]
+            if re.fullmatch(r"\w+=.*", t) or t in _WRAPPERS:
+                i += 1
+            elif t == "timeout" and i + 1 < len(seg):
+                i += 2
+            elif t.startswith("-") and i > 0 and seg[i - 1] in _WRAPPERS:
+                i += 1
+            else:
+                break
+        rest = seg[i:]
+        if not rest:
+            continue
+        word = rest[0].rsplit("/", 1)[-1]
+        if word in _SHELLS and depth < 3:
+            for j, a in enumerate(rest[1:-1], 1):
+                if a.startswith("-") and not a.startswith("--") and "c" in a:
+                    found += force_pushes(rest[j + 1], depth + 1)
+                    break
+        if word != "git":
+            continue
+        k = 1
+        while k < len(rest) and rest[k].startswith("-"):
+            k += 2 if rest[k] in _GIT_VALUE_OPTS else 1
+        if k < len(rest) and rest[k] == "push":
+            hit = _push_args_force(rest[k + 1 :])
+            if hit:
+                found.append(hit)
+    return found
 
 
 def _detached_at_main(where) -> bool:
@@ -196,11 +293,17 @@ def main() -> int:
                 )
             )
 
-    f = _FORCE.search(cmd)
-    if f:
-        code, branch = git("rev-parse", "--abbrev-ref", "HEAD", cwd=command_cwd(cmd, f.start()))
-        if code == 0 and branch in ("main", "master"):
-            findings.append(("force-push to main", [f"This force-pushes `{branch}`. Confirm this is deliberate."]))
+    forced = force_pushes(cmd)
+    if forced:
+        return emit(
+            "force-push refused",
+            [
+                f"`git push` carries a history-rewriting form ({', '.join(forced)}). Force-pushing ANY branch is refused (#6157).",
+                "Push a new commit (merge, never rebase-and-force) or a new branch name; ask the owner if a pushed branch truly must be rewritten.",
+            ],
+            event="PreToolUse",
+            mode="block",
+        )
 
     if not findings:
         return ok()
