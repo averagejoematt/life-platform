@@ -192,7 +192,12 @@ from training import (
     training_load,  # shared TSS-like load model + Banister core (layer module, #490)
 )
 
-from emails import brief_editorial_inputs, brief_lines  # #5056: fail-soft one-line readouts; #6163 editorial inputs (read-only)
+from emails import (
+    brief_editorial_inputs,
+    brief_food_delivery,
+    brief_lines,
+    brief_trial,
+)  # #5056: fail-soft one-line readouts; #6163 editorial inputs (read-only)
 from emails.brief_data_status import (  # #2326 quiet notice / #3049 partial-input notice
     build_data_status_banner_html,
     qualified_compute_outputs,
@@ -215,7 +220,7 @@ ai_calls.init(
 # ==============================================================================
 # HELPERS
 # ==============================================================================
-from common.digest_utils import coerce_int, d2f, get_food_delivery_streak_state, rhr_trend_str, safe_float  # shared helpers (#970)
+from common.digest_utils import coerce_int, d2f, rhr_trend_str, safe_float  # shared helpers (#970)
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 
 from emails.daily_brief_signals import (  # noqa: F401,E402
@@ -1187,47 +1192,8 @@ def _init_output_writers():
 
 
 def get_food_delivery_brief_signal():
-    """Returns a one-line signal for the daily brief nutrition section.
-
-    Reads the food_delivery STREAK#current record via the shared #2235 read path
-    (get_food_delivery_streak_state) and returns a contextual message about the
-    current delivery-free streak or recent order — None (no line at all) once the
-    source is stale, rather than a frozen count from the last import. Non-fatal —
-    returns None on any error.
-
-    Gated by nutrition_delivery_public() (P2.3, #2209/#2210, this door #2233) —
-    checked BEFORE the query, matching the sibling readers in
-    web/site_api_meals.py and web/site_api_nutrition.py. With the flag off
-    (default), the food_delivery partition is never queried and no
-    delivery-derived narrative reaches the daily brief, group_narratives, or
-    the public public_stats.json artifact it feeds. The gate lives INSIDE this
-    function (not at its one current call site) so every future caller is
-    protected without anyone needing to remember to re-check the flag.
-    """
-    from web.site_api_common import nutrition_delivery_public
-
-    if not nutrition_delivery_public():
-        return None
-    try:
-        streak = get_food_delivery_streak_state(table, USER_ID, now=datetime.now(timezone.utc))
-        if not streak:
-            return None
-        streak_days = int(streak.get("streak_days", 0))
-        last_order = streak.get("last_order_date", "")
-        today_str = pacific_today()
-        if last_order == today_str:
-            return "Food delivery ordered today — nutrition score modifier applied (0.85x)."
-        if streak_days >= 30:
-            return f"Delivery-free streak: {streak_days} days — nutrition bonus active (1.10x)."
-        if streak_days >= 14:
-            return f"Delivery-free streak: {streak_days} days — nutrition bonus active (1.05x)."
-        if streak_days >= 7:
-            return f"Delivery-free streak: {streak_days} days — nutrition bonus active (1.02x)."
-        if streak_days > 0:
-            return f"Delivery-free streak: {streak_days} days."
-        return None
-    except Exception:
-        return None
+    """The nutrition section's delivery-streak line, or None — `emails.brief_food_delivery.signal` (gated, fail-soft)."""
+    return brief_food_delivery.signal(table, USER_ID, datetime.now(timezone.utc), pacific_today())
 
 
 def record_email_send(table, lambda_name, period_key):
@@ -2228,6 +2194,11 @@ def lambda_handler(event, context):
     except Exception as _be:
         logger.warning(f"WR-48 banner failed (non-fatal): {_be}")
 
+    # #6175: the hybrid-format trial — ONE switch (brief_trial.read_switch); absent/unknown/unreadable = off, which costs
+    # one DynamoDB read and changes nothing. Never in a demo brief. Everything else lives in emails/brief_trial.py.
+    _scores = (day_grade_score, grade, readiness_score, readiness_colour, mvp_streak, component_details, tldr_guidance, today_short)
+    _trial, html, subject = brief_trial.run(globals(), data, profile, _scores, html, subject, demo_mode)
+
     if demo_mode:
         html = output_writers.sanitize_for_demo(html, data, profile)
         prefix = (profile.get("demo_mode_rules") or {}).get("subject_prefix", "[DEMO]")
@@ -2255,6 +2226,7 @@ def lambda_handler(event, context):
         # DLQ redrive (6h later, long past the #2860 lease) free to send it again.
         record_email_send(table, "daily_brief", yesterday)
         logger.info("Sent: " + subject)
+    brief_trial.record(table, USER_PREFIX, _trial, html, _persist, logger)  # #6175: no-op when off, dry run or demo
 
     if _persist:  # #2255: demo_mode OR dry_run
         output_writers.write_dashboard_json(

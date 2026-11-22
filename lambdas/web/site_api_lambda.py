@@ -69,6 +69,7 @@ from web.site_api_autonomic import (
     handle_autonomic_balance,
     handle_zone2_breakdown,
 )
+from web.site_api_brief_response import handle_brief_response  # #6175 — the Morning Brief trial's answer door (owner-only)
 from web.site_api_cadence import handle_content_cadence  # #1972 — cron-derived next-installment line
 from web.site_api_chapters import handle_chapters  # #5532 — every program week's chapter state (v9 Story)
 
@@ -469,6 +470,7 @@ ROUTES = {
     "/api/submit_finding": None,  # NEW-1: POST handler in lambda_handler
     "/api/page_feedback": None,  # #4182: POST handler in _SIMPLE_ROUTES
     "/api/morning_note": None,  # #4189: GET read + POST owner write in _SIMPLE_ROUTES
+    "/api/brief_response": None,  # #6175: GET confirmation page (no write) + POST the owner's answer, in _SIMPLE_ROUTES
     # #5532 (epic #5529): the four v9 reads — query-string routes, so each is a GET entry in _SIMPLE_ROUTES below.
     "/api/series": None,  # one metric's daily series with presence/gap flags
     "/api/ledger_export": None,  # the whole prediction ledger, paged, with the grader's flags and corrections
@@ -616,6 +618,7 @@ _SIMPLE_ROUTES = {
     "/api/board_question": ({"POST"}, _handle_board_question),
     "/api/replicate_certify": ({"POST"}, _handle_replicate_certify),  # #1393 — Replicator self-cert
     "/api/page_feedback": ({"POST"}, _handle_page_feedback),  # #4182 — the two-question reader door
+    "/api/brief_response": ({"GET", "POST"}, handle_brief_response),  # #6175 — GET confirmation page (no write) / POST the answer
     "/api/morning_note": ({"GET", "POST"}, _route_morning_note),  # #4189 — the morning note: GET served / POST owner write
     # #5532: the v9 reads (read-only, query-string GETs; privacy through field_tiers + the dossier filter)
     "/api/series": ({"GET"}, handle_series),

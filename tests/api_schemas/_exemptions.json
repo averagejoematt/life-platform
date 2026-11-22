@@ -7,6 +7,10 @@
     "category": "write-path",
     "reason": "POST-only \u2014 board follow-up turn (write)"
   },
+  "/api/brief_response": {
+    "category": "auth-gated",
+    "reason": "#6175: an owner-only HTML door behind a one-use 256-bit token minted by the Morning Brief \u2014 GET is a confirmation page, POST records his answer; no public JSON contract to snapshot"
+  },
   "/api/challenge_checkin": {
     "category": "write-path",
     "reason": "POST-only \u2014 records a challenge check-in (write)"
