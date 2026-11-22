@@ -10,6 +10,7 @@ import StatusTag from "../components/StatusTag.astro";
 import VersusGuess from "../components/VersusGuess.astro";
 import OpenQuestions from "../components/OpenQuestions.astro";
 import OwnWords from "../components/OwnWords.astro";
+import { NARRATOR_BYLINE } from "../lib/narrator.js";
 import { headline, weeklyBars } from "../lib/chart.js";
 import { readingWords, scaleWords, weeklySpark } from "../lib/spark.js";
 import { chapterCount, chapterMeta, chapterWindow, dayInWords, nextChapter, domainWords, num, kOfN, clip, heldCallWords } from "../lib/format.js";
@@ -403,6 +404,8 @@ const standing: Standing[] = [
                 </span>
               ) : null}
             </div>
+            {/* #6178: the narrator is named beside the owner's approved first-person line, never inside it (that line is byte-identical) */}
+            <p class="muted ch-byline" style="font-size:13px" data-byline>{NARRATOR_BYLINE}</p>
             <p class="muted ch-byline" style="font-size:13px">Written by the platform's narrator from the week's data; published after I approved it. The figures in it are explorable in the data room.</p>
           </article>
           <aside style="flex:1 1 240px;min-width:0">

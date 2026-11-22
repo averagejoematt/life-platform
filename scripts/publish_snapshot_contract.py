@@ -170,7 +170,7 @@ SCHEMA: dict[str, dict[str, tuple[str, bool]]] = {
         "week": ("int", True),
         "week_label": ("str", False),
         "date": ("day", False),
-        "status": ("enum:published|held|skipped|pending", False),
+        "status": ("enum:published|held|skipped|pending|retired", False),
         "week_start": ("day", True),
         "week_end": ("day", True),
         "published_at": ("day", True),

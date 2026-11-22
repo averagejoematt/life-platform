@@ -370,6 +370,42 @@ def story_door(text: str, *, not_yet_exported: Iterable[str] = ()) -> List[str]:
     return findings
 
 
+# ── staged encounters (#6178) ────────────────────────────────────────────────
+# Owner ruling 2026-11-22 §3/§7: the narrator has interviewed no one. A published chapter staged one ("when I reached
+# him this week … He paused."), and no source held it. A first-person encounter with a coach or with Matthew, or a
+# witnessed reaction beat, is a HARD source finding (``source:`` — never a ``craft:`` note, so it always blocks): the
+# platform holds stored words, not conversations. Keyed on STRUCTURE (the narrator's "I" reaching someone; a pronoun's
+# reaction beat ending a clause), never on one sentence. Chronicle posts only: the Panel is the series' disclosed
+# conversation and is not read by this check.
+_WHO = r"(?:him|her|them|Matthew|[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)"
+_STAGED = [
+    re.compile(
+        r"\b(?:when|after|before|as|once)\s+I\s+(?:reached|called|rang|phoned|asked|interviewed|met|visited|"
+        r"spoke\s+(?:to|with)|talked\s+(?:to|with)|caught\s+up\s+with|sat\s+down\s+with|put\s+(?:it|this|that|the\s+question)\s+to)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bI\s+(?:reached|interviewed|called|rang|phoned|asked|met\s+with|visited|sat\s+down\s+with|caught\s+up\s+with|"
+        r"spoke\s+(?:to|with)|talked\s+(?:to|with))\s+" + _WHO + r"\b"
+    ),
+    re.compile(r"\b(?:he|she|they|" + _WHO + r")\s+(?:told|said\s+to|explained\s+to|admitted\s+to|confided\s+to)\s+me\b"),
+    re.compile(r"\b(?:in|during)\s+our\s+(?:interview|conversation|call|chat|talk)\b|\bwhen\s+we\s+(?:spoke|talked|met)\b", re.IGNORECASE),
+    re.compile(r"\b(?:He|he|She|she)\s+(?:paused|laughed|shrugged|sighed|smiled|leaned\s+(?:back|forward|in))\s*(?:[.,;:!?]|—|–)"),
+]
+
+
+def staged_encounter_findings(text: str) -> List[str]:
+    """``source:`` findings for an interview, call or meeting the narrator claims, or a reaction she claims to have
+    witnessed. Pure. A coach's read is paraphrased from the record; a staged encounter never is."""
+    out: List[str] = []
+    for pat in _STAGED:
+        for m in pat.finditer(text or ""):
+            out.append(
+                f"source: a staged encounter no source holds ({m.group(0)!r}) — the narrator interviews no one; paraphrase the record"
+            )
+    return out
+
+
 # ── number grounding ─────────────────────────────────────────────────────────
 
 _NUM = re.compile(r"(?<![\w.])(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?(?![\w])")
@@ -449,4 +485,5 @@ def all_findings(
         completeness(text, stop_reason=stop_reason, footer_pattern=footer_pattern)
         + story_door(text, not_yet_exported=not_yet_exported)
         + ungrounded_numbers(text, allowed)
+        + staged_encounter_findings(text)
     )
