@@ -65,6 +65,19 @@ def week_id(url: str | None) -> str | None:
     return f"week-{int(m.group(1)):02d}" if m else None
 
 
+def withdrawn_episode_weeks(manifest: Any) -> set[int]:
+    """The weeks the episodes manifest lists under ``held`` or ``retired`` (#6177, owner 2026-11-22: episodes 0 and 4 were
+    taken off public access). Such a week's episode is never written to the snapshot even if ``episodes`` still lists it,
+    so no chapter page renders a player or a transcript for it. Read off the manifest's own lists, never guessed."""
+    out: set[int] = set()
+    for key in ("held", "retired"):
+        for r in (manifest.get(key) or []) if isinstance(manifest, dict) else []:
+            wk = r.get("week") if isinstance(r, dict) else None
+            if isinstance(wk, int) and not isinstance(wk, bool):
+                out.add(wk)
+    return out
+
+
 def call_outcome(status: str) -> str:
     return CALL_OUTCOME.get(status, status)
 

@@ -17,7 +17,7 @@ import { hasPage, href, pathOf } from "../../lib/url.js";
 import { placeRecordNote } from "../../lib/record_note.js";
 import { PERSONA_DISCLOSURE, correctionsFor, correctionsHtml, namesLegacyPersona } from "../../lib/chapter_corrections.js"; // #6177
 import { loadChapterCorrections } from "../../lib/snapshot.js";
-import { CHAPTER_TRUTH_LIVE, chapterByline, recordAsOf } from "../../lib/chapter_truth.js"; // #6177: byline, record date, covered days
+import { CHAPTER_TRUTH_LIVE, chapterByline, headerRevisedLine, recordAsOf } from "../../lib/chapter_truth.js"; // #6177: byline, record date, covered days
 
 export async function getStaticPaths() {
   const all = await loadAll();
@@ -109,7 +109,8 @@ function bodyForPage(html: string | null | undefined, dek: string | null | undef
   if (dropped || !dek) return out;
   return out.replace(/<p>([\s\S]*?)<\/p>/, (whole, inner) => (plain(inner) === dek.trim() ? "" : whole));
 }
-const rawBody = bodyForPage(c.body_html, c.excerpt);
+const rawBody = bodyForPage(c.body_html, c.excerpt_first || c.excerpt); // #6177: the served summary, even when revised
+const revisedLine = headerRevisedLine(c);
 // #6177: approved, platform-signed corrections sit BESIDE the text (above it), never in it; a body that carries a note
 // signed by the legacy editor persona gets the one disclosure line above it. Neither touches the body's bytes.
 const corrections = c.status === "published" ? correctionsFor(await loadChapterCorrections(), c.id) : [];
@@ -228,7 +229,7 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
           <Provenance object={c} />
         </div>
         <h1>{c.title}</h1>
-        {c.excerpt && <p class="dek">{c.excerpt}</p>}
+        {c.excerpt && <p class="dek">{c.excerpt}</p>}{revisedLine && <p class="muted" style="font-size:13px" data-header-revised>{revisedLine}</p>}
         <div class="row muted" style="font-size:14px">
           {c.read_minutes && <span>Read · {c.read_minutes} min</span>}
           {c.word_count && <span>{num(c.word_count)} words</span>}

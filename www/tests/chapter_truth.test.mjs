@@ -12,6 +12,9 @@ import {
   CHAPTER_TRUTH_LIVE,
   INDEX_BYLINE_TRUE,
   applyDerivedCovers,
+  applyHeaderRevisions,
+  headerRevisedLine,
+  revisedHeader,
   cardCorrection,
   cardQuote,
   chapterByline,
@@ -24,6 +27,7 @@ import {
   rewriteOf,
 } from "../src/lib/chapter_truth.js";
 import { CHAPTER_BYLINE, INDEX_BYLINE, NARRATOR_BYLINE } from "../src/lib/narrator.js";
+import { correctionHtml, footLine } from "../src/lib/chapter_corrections.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const NOTE = `<p class="signature"><em>Editor&#39;s note, October 2026 — A. Persona: this installment was rewritten after a review.</em></p><p>Body.</p>`;
@@ -125,4 +129,43 @@ test("on: a card under a chapter with standing corrections says so; replaced one
   assert.equal(cardCorrection([c("correction", "2030-02-01"), c("correction", "2030-02-03")], true), "This chapter carries 2 dated corrections, the newest of 3 February 2030.");
   assert.equal(momentsQuoteWho(true), "a published");
   assert.equal(entryVerb(true), "published");
+});
+
+// Owner ruling 2026-11-22, final approval §10: the approved replacement summaries, and the correction note's last line.
+const TABLE = { revised_on: "2030-02-02", headers: { "week-30": { replaces: "Old words", text: "New words." } } };
+
+test("off: no summary is replaced, and the note keeps its sentence", () => {
+  const list = [ch({ excerpt: "Old words, as served.", summary: "Old words, as served." })];
+  assert.deepEqual(applyHeaderRevisions(list, false, TABLE), []);
+  assert.equal(list[0].excerpt, "Old words, as served.");
+  assert.equal(headerRevisedLine({ header_revised_on: "2030-02-02" }, false), null);
+  assert.equal(footLine(false), "The chapter's text below is unchanged; it reads as first published.");
+  assert.match(correctionHtml({ id: "x", kind: "correction", signature: "s", published_said: "a", record_shows: "b", evidence: "c", approvals: [] }), /it reads as first published\.<\/p>/);
+});
+
+test("on: the approved summary replaces the served one only while the served one begins with the words it replaces", () => {
+  const a = ch({ excerpt: "Old words, as served.", summary: "Old words, as served." });
+  const edition = ch({ id: "week-30", excerpt: "A second edition's own summary." });
+  assert.deepEqual(revisedHeader(a, TABLE), { text: "New words.", revised_on: "2030-02-02" });
+  assert.equal(revisedHeader(edition, TABLE), null, "a second edition's own summary is never overridden");
+  assert.equal(revisedHeader(ch({ id: "week-31", excerpt: "Old words." }), TABLE), null);
+  assert.equal(revisedHeader(ch({ status: "held", excerpt: "Old words." }), TABLE), null);
+  assert.deepEqual(applyHeaderRevisions([a], true, TABLE), ["week-30"]);
+  assert.equal(a.excerpt, "New words.");
+  assert.equal(a.summary, "New words.");
+  assert.equal(a.excerpt_first, "Old words, as served.");
+  assert.equal(headerRevisedLine(a, true), "Summary revised on 2 February 2030.");
+  assert.deepEqual(cardQuote({ text: "New words.", cite: "T" }, true, a), { text: "New words.", cite: "T", citeWords: "T, summary as revised on 2 February 2030" });
+  assert.equal(footLine(true), "This note does not change the chapter's text.");
+});
+
+test("the committed replacement summaries restate no threshold and carry no ISO date or internal identifier", () => {
+  const table = JSON.parse(readFileSync(join(HERE, "..", "src", "lib", "chapter_header_revisions.json"), "utf8"));
+  assert.deepEqual(Object.keys(table.headers).sort(), ["week-05", "week-08", "week-09", "week-12"]);
+  for (const [id, h] of Object.entries(table.headers)) {
+    assert.ok(!quotesThreshold(h.text), id);
+    assert.ok(!/\b20\d\d-\d\d-\d\d\b|[a-z]+_[a-z]+/.test(h.text), id);
+    assert.ok(!/season high|tripped/.test(h.text), id);
+    assert.ok(h.replaces.length >= 20, id);
+  }
 });

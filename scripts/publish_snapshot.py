@@ -64,6 +64,7 @@ from publish_snapshot_chapters import (
     versus_guess,
     week_id as _week_id,  # None for a withdrawn installment: never a chapter (owner ruling 2026-11-10)
     whole_sentence_summary,
+    withdrawn_episode_weeks,
 )  # noqa: E402 — one vocabulary for weeks, excerpts and calls
 from publish_snapshot_coach_room import (  # noqa: E402 — the Coaching Room's coach profiles, WEB_ROOM=1 only (CR2)
     fixture_coach_room,
@@ -276,9 +277,10 @@ def fetch_live(base_url: str, timeout: float) -> dict[str, Any]:
 
 
 def _live_episodes(ctx: LiveContext) -> None:
+    withdrawn = withdrawn_episode_weeks(ctx.fetched.get("episodes"))  # #6177: held/retired — never a player or transcript
     for e in ctx.rows("episodes", "episodes"):
         m = re.search(r"wk(\d+)", e.get("url") or "")
-        if not m:
+        if not m or int(m.group(1)) in withdrawn:
             continue
         n = int(m.group(1))
         eid = f"wk{n}"

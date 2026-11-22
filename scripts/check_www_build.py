@@ -63,8 +63,8 @@ sys.path.insert(0, os.path.join(REPO, "scripts"))
 import www_label_contract  # noqa: E402 — #5953: each tile/series/Day label names the number printed beside it, fixture AND live
 import www_launch_switch  # noqa: E402 — the committed go-live constants (LAB_LIVE, STORY_LIVE): a live feature is not a leak
 import www_verbatim  # noqa: E402 — dates in words, quote-aware (owner ruling 2026-11-02); a page-universal rule, fixture AND live
+from content.public_text_rules import SENTINELS  # noqa: E402 — #6177: one list for the gate and the corrections proposal
 
-SENTINELS = ("SENTINEL", "DO-NOT-PUBLISH", "POISON-HELD")
 SAMPLE_CHIP = "Sample content, for layout only"  # fixture-only (#5581): on a LIVE build it is a false claim on a real page
 SCRIPT_TAG = re.compile(r"<script\b[^>]*>", re.IGNORECASE)
 NOINDEX = re.compile(r'<meta name="robots" content="noindex', re.IGNORECASE)

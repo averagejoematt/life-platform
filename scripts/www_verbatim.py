@@ -27,8 +27,11 @@ import html as _html
 import json
 import os
 import re
+import sys
 
-ISO_DATE = re.compile(r"\b20\d\d-\d\d-\d\d\b")
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
+from content.public_text_rules import ISO_DATE  # noqa: E402 — #6177: one rule for the gate and the corrections proposal
+
 PUBLISHED_BODY = re.compile(r"<div data-published-body[^>]*>[\s\S]*?</div>\s*(?=</article>)", re.IGNORECASE)
 VERBATIM = re.compile(r"<(q|blockquote)\b([^>]*?\bdata-verbatim=\"coach\"[^>]*)>([\s\S]*?)</\1\s*>", re.IGNORECASE)
 ANY_VERBATIM_TAG = re.compile(r"<([a-z][a-z0-9-]*)\b[^>]*\bdata-verbatim(?:=\"([^\"]*)\")?[^>]*>", re.IGNORECASE)

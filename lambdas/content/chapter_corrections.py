@@ -193,7 +193,18 @@ def new_proposal(
     }
     for f in ("published_said", "record_shows", "evidence"):
         _no_persona_signoff(item[f], f)
+        _renders_on_the_site(item[f], f)
     return item
+
+
+def _renders_on_the_site(value: str, field: str) -> None:
+    """#6177: refuse at proposal what the site build gate would refuse once the correction is approved and rendered —
+    the gate's own rules (content.public_text_rules), not a copy of them."""
+    from content.public_text_rules import text_issues
+
+    issues = text_issues(value)
+    if issues:
+        raise CorrectionError(f"{field}: the site build would refuse this text — " + "; ".join(issues))
 
 
 def approval(*, at: str, dated_on: str, note: str = "") -> dict:

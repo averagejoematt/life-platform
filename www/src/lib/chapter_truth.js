@@ -21,6 +21,7 @@
 // back to `false`.
 import { CHAPTER_BYLINE, INDEX_BYLINE, NARRATOR_BYLINE, NARRATOR_WHO } from "./narrator.js";
 import { dayInWords } from "./format.js";
+import HEADER_REVISIONS from "./chapter_header_revisions.json" with { type: "json" };
 
 /** THE SWITCH — keep it one line: `export const CHAPTER_TRUTH_LIVE = true|false;` (read as text by Python). */
 export const CHAPTER_TRUTH_LIVE = false;
@@ -126,12 +127,48 @@ export function quotesThreshold(text) {
 }
 
 /** A Moments card's quotation of a chapter header, or null for none. Off: as before. On: no quotation that restates a
- *  threshold, and the citation says it is the chapter as it now reads (the snapshot's excerpt is read off today's text). */
-export function cardQuote(quote, live = CHAPTER_TRUTH_LIVE) {
-  if (!quote || !quote.text) return quote && quote.text ? quote : null;
+ *  threshold, and the citation says what the quotation is — the summary as revised on its day (applyHeaderRevisions),
+ *  or the chapter as it now reads (the snapshot's excerpt is read off today's text). */
+export function cardQuote(quote, live = CHAPTER_TRUTH_LIVE, chapter = null) {
+  if (!quote || !quote.text) return null;
   if (!live) return { ...quote, citeWords: `${quote.cite}, as published` };
   if (quotesThreshold(quote.text)) return null;
+  if (chapter && chapter.header_revised_on && quote.text === chapter.excerpt) {
+    return { ...quote, citeWords: `${quote.cite}, summary as revised on ${dayInWords(chapter.header_revised_on)}` };
+  }
   return { ...quote, citeWords: `${quote.cite}, as the chapter now reads` };
+}
+
+/** The owner-approved replacement summary for a chapter (chapter_header_revisions.json), or null: only while the served
+ *  summary still begins with the words it replaces, so a second edition's own summary is never overridden. */
+export function revisedHeader(c, table = HEADER_REVISIONS) {
+  const h = c && c.status === "published" && table && table.headers ? table.headers[c.id] : null;
+  if (!h || typeof h.text !== "string" || typeof h.replaces !== "string" || !h.replaces) return null;
+  if (typeof c.excerpt !== "string" || !c.excerpt.startsWith(h.replaces)) return null;
+  return { text: h.text, revised_on: ISO.test(table.revised_on || "") ? table.revised_on : null };
+}
+
+/** Put the approved replacement summaries in place (on only): `excerpt` and `summary` read the new line everywhere a page
+ *  prints a chapter's summary (header, description and og metadata, /story/ rows, the front page, Moments); the served
+ *  line is kept as `excerpt_first`, so the chapter page still recognises it at the top of the body. Returns the ids. */
+export function applyHeaderRevisions(chapters, live = CHAPTER_TRUTH_LIVE, table = HEADER_REVISIONS) {
+  if (!live) return [];
+  const done = [];
+  for (const c of chapters || []) {
+    const r = revisedHeader(c, table);
+    if (!r) continue;
+    c.excerpt_first = c.excerpt;
+    c.excerpt = r.text;
+    c.summary = r.text;
+    c.header_revised_on = r.revised_on;
+    done.push(c.id);
+  }
+  return done;
+}
+
+/** The muted line under a revised summary on the chapter page: "Summary revised on 22 November 2026." (on only). */
+export function headerRevisedLine(c, live = CHAPTER_TRUTH_LIVE) {
+  return live && c && c.header_revised_on ? `Summary revised on ${dayInWords(c.header_revised_on)}.` : null;
 }
 
 /** The line under a card whose chapter carries a standing dated correction (on only): "This chapter carries a dated

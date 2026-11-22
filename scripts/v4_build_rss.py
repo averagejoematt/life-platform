@@ -99,6 +99,34 @@ def channel_desc(live: bool | None = None) -> str:
     return DESC_TRUE if live else DESC
 
 
+HEADER_REVISIONS = Path(__file__).resolve().parent.parent / "www" / "src" / "lib" / "chapter_header_revisions.json"
+
+
+def revised_excerpt(url: str | None, excerpt: str, live: bool | None = None, table: dict | None = None) -> str:
+    """#6177 (owner ruling 2026-11-22 §10): an item whose served summary still begins with words an owner-approved
+    replacement retires carries the replacement instead (www/src/lib/chapter_header_revisions.json, the table the site
+    reads), after any October editor's note it opens with. Off, or no entry, or a summary that no longer begins with
+    those words (a second edition's own): the excerpt unchanged. The item's guid and pubDate are never touched."""
+    if live is None:
+        live = channel_desc() == DESC_TRUE
+    if not live:
+        return excerpt
+    if table is None:
+        try:
+            table = json.loads(HEADER_REVISIONS.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return excerpt
+    m = re.search(r"/(week-\d+)/?$", url or "")
+    h = ((table or {}).get("headers") or {}).get(m.group(1)) if m else None
+    if not isinstance(h, dict) or not h.get("replaces") or not h.get("text"):
+        return excerpt
+    lead = _EDITORS_NOTE.match(excerpt)
+    rest = excerpt[lead.end() :].strip() if lead else excerpt
+    if not rest.lstrip("*_ ").startswith(h["replaces"]):
+        return excerpt
+    return f"{lead.group(1)} {h['text']}" if lead else h["text"]
+
+
 def rfc822(date_str: str) -> str:
     dt = datetime.strptime(date_str, "%Y-%m-%d").replace(hour=12, tzinfo=timezone.utc)
     return format_datetime(dt)
@@ -341,6 +369,7 @@ def main() -> int:
         excerpt = " ".join(chronicle_schema.body_markdown(p.get("excerpt") or "", p.get("title") or "").split())
         # Word-boundary truncation (#1224 helper) — never a mid-word slice (#1261); #6177: an approved correction leads,
         # a Margaret-signed editor's note is followed by the persona disclosure, and neither is cut.
+        excerpt = revised_excerpt(p.get("url"), excerpt)  # #6177: the owner-approved replacement summary, behind the switch
         excerpt = item_description(excerpt, corrections.get(p.get("url") or ""), 360)
         pub = p["_pub"] if "_pub" in p else rfc822(p["date"])  # #5946: chronicle = published_at; essay = its date
         items.append(

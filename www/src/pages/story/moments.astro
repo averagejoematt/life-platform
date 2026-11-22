@@ -62,7 +62,7 @@ const chMeta = (c: any) => chapterMeta(c) || ({} as any);
 const correctionDoc = CHAPTER_TRUTH_LIVE ? await loadChapterCorrections() : null;
 const cards = list.map((m: any) => ({
   ...m,
-  shown: cardQuote(m.quote),
+  shown: cardQuote(m.quote, CHAPTER_TRUTH_LIVE, m.chapter),
   correction: m.chapter ? cardCorrection(correctionsFor(correctionDoc, m.chapter.id)) : null,
 }));
 const dated = list.map((m, i) => ({ ...m, n: String(i + 1) })).filter((m) => m.date);

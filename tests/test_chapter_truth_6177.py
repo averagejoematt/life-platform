@@ -18,6 +18,7 @@ Synthetic instants only.
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 
@@ -122,3 +123,85 @@ def test_the_rss_channel_line_reads_the_switch_and_is_unchanged_while_off():
     on = rss.channel_desc(True)
     assert on == rss.DESC_TRUE and "approves each chapter before it publishes" not in on
     assert "48-hour rule he had authorised" in on and "Written by Elena Voss, an AI editorial persona" in on
+
+
+# ── Coordinator follow-ups (owner ruling 2026-11-22, final approval §10) ─────────────────────────────────────────────
+
+
+def test_a_held_or_retired_episode_is_never_written_to_the_snapshot():
+    manifest = {
+        "episodes": [{"url": "/panelcast/wk4.wav"}],
+        "held": [{"week": 0, "status": "held"}, {"week": 4, "status": "held"}],
+        "retired": [{"week": 1}, {"week": True}, {"week": "6"}, "bad"],
+    }
+    assert PSC.withdrawn_episode_weeks(manifest) == {0, 1, 4}
+    assert PSC.withdrawn_episode_weeks(None) == set() and PSC.withdrawn_episode_weeks([]) == set()
+    import publish_snapshot as PS
+
+    class Ctx:
+        fetched = {"episodes": manifest}
+        ep_by_week: dict = {}
+        objs: dict = {"episode": []}
+        base_url = "https://example.invalid"
+        timeout = 1
+
+        def rows(self, key, field):
+            return self.fetched[key][field]
+
+    ctx = Ctx()
+    PS._live_episodes(ctx)
+    assert ctx.objs["episode"] == [] and ctx.ep_by_week == {}, "a held week's episode yields no player, no transcript, no edge"
+
+
+def test_a_correction_the_site_build_would_refuse_is_refused_when_proposed():
+    from content import chapter_corrections as CC, public_text_rules as R
+
+    base = dict(
+        chapter_id="week-09",
+        correction_id="a-planted-one",
+        kind="correction",
+        published_said="The chapter said seven miles.",
+        record_shows="The walking log shows five miles.",
+        evidence="The day's page.",
+        proposed_at="2026-11-22T10:00:00Z",
+    )
+    assert CC.new_proposal(**base)["evidence"] == "The day's page."
+    bad = {
+        "evidence": ["/data/day/2026-10-07/ shows it.", "Lisa Park's page, /system/coaches/sleep_coach/.", "A SENTINEL here."],
+        "record_shows": ["It came in on 2026-10-01."],
+        "published_said": ["It quoted nutrition_science words."],
+    }
+    passed = []
+    for field, texts in bad.items():
+        for t in texts:
+            try:
+                CC.new_proposal(**{**base, field: t})
+                passed.append((field, t))
+            except CC.CorrectionError as e:
+                assert "the site build would refuse" in str(e)
+    assert not passed, passed
+    # one rule, two callers: the gate reads the very objects the proposal checks with
+    import check_www_build
+    import www_verbatim
+
+    assert www_verbatim.ISO_DATE is R.ISO_DATE and check_www_build.SENTINELS is R.SENTINELS
+    assert R.text_issues("On 7 October, Lisa Park's page.") == []
+
+
+def test_the_rss_item_carries_the_approved_summary_only_behind_the_switch_and_only_over_the_words_it_replaces():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("v4_build_rss_6177_rev", os.path.join(_REPO, "scripts", "v4_build_rss.py"))
+    rss = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(rss)
+    table = {"headers": {"week-30": {"replaces": "Old words", "text": "New words."}}}
+    note = "*Editor's note, October 2030 — X: a note.*"
+    url = "/journal/posts/week-30/"
+    assert rss.revised_excerpt(url, "*Old words and more.*", live=False, table=table) == "*Old words and more.*"
+    assert rss.revised_excerpt(url, "*Old words and more.*", live=True, table=table) == "New words."
+    assert rss.revised_excerpt(url, f"{note} *Old words.*", live=True, table=table) == f"{note} New words."
+    assert rss.revised_excerpt(url, "A second edition's own words.", live=True, table=table) == "A second edition's own words."
+    assert rss.revised_excerpt("/journal/posts/week-31/", "Old words.", live=True, table=table) == "Old words."
+    assert rss.revised_excerpt(url, "*Old words.*") == "*Old words.*"  # the committed switch is off
+    committed = json.loads(open(rss.HEADER_REVISIONS, encoding="utf-8").read())
+    assert set(committed["headers"]) == {"week-05", "week-08", "week-09", "week-12"}

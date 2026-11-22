@@ -11,6 +11,14 @@
 // (tests/test_chapter_corrections_6177.py).
 
 import { dayInWords } from "./format.js";
+import { CHAPTER_TRUTH_LIVE } from "./chapter_truth.js";
+
+/** The note's last sentence. Off: as before. On (#6177): the claim that the chapter "reads as first published" is not
+ *  made — some chapters' text was later revised (a rewrite, a privacy revision, a removed passage), and a page cannot
+ *  show which; what is always true is that the note itself changes no word of the text. */
+export function footLine(live = CHAPTER_TRUTH_LIVE) {
+  return live ? "This note does not change the chapter's text." : "The chapter's text below is unchanged; it reads as first published.";
+}
 
 export const PERSONA_DISCLOSURE = "Margaret Calloway is an AI editorial persona of the platform, not a person.";
 export const LEGACY_SIGNER = "Margaret Calloway";
@@ -58,7 +66,7 @@ export function correctionHtml(c, all = []) {
     `<p class="label correction-signature">${esc(c.signature)}</p>` +
     `<p><b>What the chapter published.</b> ${esc(c.published_said)}</p>` +
     `<p><b>What the record shows.</b> ${esc(c.record_shows)}</p>` +
-    `<p class="correction-foot">Evidence: ${esc(c.evidence)} ${esc(approvalWords(c))} The chapter's text below is unchanged; it reads as first published.</p>` +
+    `<p class="correction-foot">Evidence: ${esc(c.evidence)} ${esc(approvalWords(c))} ${footLine()}</p>` +
     replaced +
     `</aside>`
   );
