@@ -54,15 +54,18 @@ test("the page id maps to the public item id the API keys on", () => {
 });
 
 test("both components gate on the switch before they render anything, and carry only the island import", () => {
-  for (const name of ["ReaderCall.astro", "ReaderCallList.astro"]) {
+  for (const name of ["ReaderCall.astro", "ReaderCallList.astro", "ForecastReaderCall.astro"]) {
     const src = readFileSync(new URL(`../src/components/${name}`, import.meta.url), "utf8");
     assert.match(src, /const on = readerCallEnabled\(\)/, name);
     assert.match(src, /^\{\s*on && \(/m, name);
     assert.doesNotMatch(src, /<style/, name);
-    // counted by plain string search (no tag-matching regex): exactly one script block, the island import
-    assert.equal(src.toLowerCase().split("<script").length - 1, 1, name);
-    assert.ok(src.includes('<script>\n  import "../islands/readercall.js";\n</script>'), name);
+    // #6170: no script block of its own — the ONE shared island component, so an unbuilt page leaves no orphan chunk
+    assert.equal(src.toLowerCase().split("<script").length - 1, 0, name);
+    assert.ok(src.includes('import ReaderCallIsland from "./ReaderCallIsland.astro";') && src.includes("<ReaderCallIsland />"), name);
   }
+  const island = readFileSync(new URL("../src/components/ReaderCallIsland.astro", import.meta.url), "utf8");
+  assert.equal(island.toLowerCase().split("<script").length - 1, 1);
+  assert.ok(island.includes('<script>\n  import "../islands/readercall.js";\n</script>'));
 });
 
 test("the words count reader calls, never readers, and never read as evidence", () => {

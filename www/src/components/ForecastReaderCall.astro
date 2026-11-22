@@ -4,6 +4,7 @@
 // /life-platform/reader-call), meter, token, lock and isolation — with the words in the machine voice: it is never "the
 // coach". Self-gating like ReaderCall: a HIDDEN frame the island fills and reveals from /api/reader_call; a shut door,
 // an ineligible or private forecast or an unread answer leaves it hidden, so nothing reader-facing appears.
+import ReaderCallIsland from "./ReaderCallIsland.astro";
 import { READERCALL_API, READERCALL_MARKER, readerCallEnabled } from "../lib/readercall.js";
 import { FORECAST_COPY, FORECAST_NOTE } from "../lib/readercall_view.js";
 
@@ -45,6 +46,4 @@ const hid = `rc-h-${f.id}`;
   )
 }
 
-<script>
-  import "../islands/readercall.js";
-</script>
+<ReaderCallIsland />
