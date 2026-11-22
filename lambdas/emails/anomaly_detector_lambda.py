@@ -1,6 +1,6 @@
 """
 Anomaly Detector Lambda — v2.5.0 (TB7-21: raise Z-floor to 2.0, reduce single-day FP rate)
-Fires at 8:05am PT daily (16:05 UTC via EventBridge) — after enrichment, before daily brief.
+Fires at 8:05am PT daily (config/schedules.json) — after enrichment, before daily brief.
 
 v2.5.0 Changes:
   - CV_THRESHOLDS: floor raised from Z=1.5/1.75 to Z=2.0 across all buckets
@@ -778,13 +778,23 @@ def build_sustained_alert_html(sustained_list, date_str):
 </html>"""
 
 
+def _direction_word(sustained_list):
+    """The subject's verb names the direction of the reading (#6152): a low HRV is not 'elevated'."""
+    directions = {s["direction"] for s in sustained_list[:3]}
+    if directions == {"low"}:
+        return "low"
+    if directions == {"high"}:
+        return "elevated"
+    return "off baseline"
+
+
 def send_sustained_alert_email(sustained_list, date_str, dry_run: bool = False):
     """Send sustained anomaly trend alert email."""
     metrics_summary = ", ".join(s["label"] for s in sustained_list[:3])
     if len(sustained_list) > 3:
         metrics_summary += f" +{len(sustained_list) - 3} more"
 
-    subject = f"Trend Alert — {metrics_summary} elevated {sustained_list[0]['streak_days']} consecutive days"
+    subject = f"Trend Alert — {metrics_summary} {_direction_word(sustained_list)} {sustained_list[0]['streak_days']} consecutive days"
     html = build_sustained_alert_html(sustained_list, date_str)
 
     guarded_send_email(

@@ -41,7 +41,8 @@ test("one chapter, one name: number, days and publication from chapterMeta on ev
   assert.equal(m.window, "Days 60–66 · 4 to 10 November");
   assert.equal(m.windowShort, "Days 60–66 · 4–10 Nov");
   assert.equal(m.published, "Published 13 November 2026");
-  assert.equal(m.weekNote, "“Week 10” names the program week, 8 to 14 November; this chapter covers days 60–66, 4 to 10 November.");
+  // #6161: a plain sentence, rendered at the foot of the chapter (never before its prose)
+  assert.equal(m.weekNote, "This chapter covers days 60–66, 4 to 10 November; program week 10 ran 8 to 14 November.");
   assert.deepEqual(m.tick, { date: "2026-11-10", n: "10" });
   // Week 6 serves no covered days: the program week, said as one — never bare, never a span off the data date
   const week6 = { ...week10, week: 6, week_label: "Week 6", week_start: "2026-10-11", week_end: "2026-10-17", date: "2026-10-13", covers_start: null, covers_end: null, published_at: "2026-10-17" };

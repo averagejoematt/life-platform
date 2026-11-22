@@ -48,6 +48,7 @@ from coach.persona_registry import plain_name  # #4564 — bylines carry no hono
 from common.email_identity import CHRONICLE_SENDER  # #3568 — ONE sending vocabulary, gated against the SES-verified set
 from common.journal_silence import reader_mail  # #5131: the one public-surface guard
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from common.reader_email import FOOTER_TEXT, head_meta, html_to_text, preheader_html, simple_content  # #6151 — the ONE reader envelope
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 try:
@@ -572,12 +573,9 @@ def _build_subscriber_email(installment: dict, subscriber: dict) -> tuple[str, s
 
     html = f"""<!DOCTYPE html>
 <html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{title}</title>
-</head>
+<head>{head_meta()}<title>{title}</title></head>
 <body style="margin:0;padding:0;background:#0D1117;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+{preheader_html(html_to_text(preview_html))}
 <div style="max-width:600px;margin:0 auto;padding:0 16px;">
 
   <!-- Header -->
@@ -594,14 +592,14 @@ def _build_subscriber_email(installment: dict, subscriber: dict) -> tuple[str, s
 
   <!-- Footer (CAN-SPAM) -->
   <div style="border-top:1px solid rgba(230,237,243,0.06);padding:20px 0 40px;">
-    <p style="font-size:11px;color:#30363d;margin:0 0 8px;line-height:1.6;text-align:center;">
+    <p style="font-size:11px;color:{FOOTER_TEXT};margin:0 0 8px;line-height:1.6;text-align:center;">
       You subscribed to The Weekly Signal at averagejoematt.com.<br>
       This is a real person's real data, published every Wednesday.
     </p>
     <p style="font-size:11px;text-align:center;margin:0;">
-      <a href="{unsub_url}" style="color:#484f58;text-decoration:underline;">Unsubscribe</a>
+      <a href="{unsub_url}" style="color:{FOOTER_TEXT};text-decoration:underline;">Unsubscribe</a>
       &nbsp;\u00b7&nbsp;
-      <a href="{SITE_URL}" style="color:#484f58;text-decoration:underline;">averagejoematt.com</a>
+      <a href="{SITE_URL}" style="color:{FOOTER_TEXT};text-decoration:underline;">averagejoematt.com</a>
     </p>
   </div>
 
@@ -709,17 +707,14 @@ def lambda_handler(event, context):
                 continue
 
             subject, html = _build_subscriber_email(installment, sub)
+            unsub_url = unsub_url_or_fallback(email, SITE_URL)  # #6151: a signed link for the same subscriber as the footer (secret cached)
 
             try:
                 ses.send_email(
                     FromEmailAddress=SENDER,
                     Destination={"ToAddresses": [email]},
-                    Content={
-                        "Simple": {
-                            "Subject": {"Data": reader_mail(subject), "Charset": "UTF-8"},
-                            "Body": {"Html": {"Data": reader_mail(html), "Charset": "UTF-8"}},
-                        }
-                    },
+                    # #6151: text part derived from the scrubbed HTML + List-Unsubscribe headers
+                    Content=simple_content(reader_mail(subject), html=reader_mail(html), unsub_url=unsub_url),
                 )
                 sent += 1
                 logger.info("Sent %d/%d (%s...)", i + 1, len(subscribers), email[:6])

@@ -156,30 +156,6 @@ def build_narrator_prompt(config, narrator_id="elena_voss"):
     }
 
 
-def build_interviewee_descriptions(config, feature_name="chronicle"):
-    """Build Board interview personality descriptions for the Chronicle.
-
-    Returns a string describing each interviewee's personality for Elena's prompt.
-    """
-    members = get_feature_members(config, feature_name)
-    if not members:
-        return ""
-
-    descriptions = []
-    for mid, member, feat_cfg in members:
-        if feat_cfg.get("role") != "interviewee":
-            continue
-        name = member["name"]
-        personality = feat_cfg.get("personality", member.get("voice", {}).get("tone", ""))
-        if personality:
-            descriptions.append(f"{name} is {personality}")
-
-    if not descriptions:
-        return ""
-
-    return "These feel like real interviews — " + ". ".join(descriptions) + "."
-
-
 def get_member_color(config, member_id):
     """Get a member's color for HTML styling."""
     if not config:

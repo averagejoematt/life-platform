@@ -317,7 +317,8 @@ const methods = defineCollection({
     window: z.string().nullable(),
     limitations: z.string().nullable(),
     min_n: z.number().int().nullable(),
-    used_by: z.array(z.string()),
+    // #6161: a list item of one character is a string iterated as a list ("T, h, e, …") — the build refuses it
+    used_by: z.array(z.string().min(2, "a one-character used_by item: a string was iterated as a list")),
   }),
 });
 

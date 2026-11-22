@@ -4836,7 +4836,14 @@ GUARD_PROOFS["guard::scripts/check_public_copies.py"] = {
         "2026-11-16, this lane. M1 3 failed / 14 passed; M2-M5 1 failed / 16 passed each; the two pins 1 failed each. "
         "RESTORED 17 passed. LIVE read-only `--check` against production: exit 1 on three real rule-A orphans."
     ),
-    "scope": "See ci::web-preview-deploy.yml::public-copies::2. Fixtures are synthetic; the live run is read-only.",
+    "scope": (
+        "See ci::web-preview-deploy.yml::public-copies::2. Fixtures are synthetic; the live run is read-only. #6148 added "
+        "rule E (a retired legacy chronicle installment larger than the stub, served, archived or committed): M6 every "
+        "rule-E size test `> limit:` → `> limit and False:` in the real tracked file, restored from a byte copy (md5 "
+        "2f262a63… before and after) — tests/test_retired_legacy_installments_6148.py + tests/test_check_public_copies_6083.py "
+        "4 failed / 23 passed; restored 27 passed (6083 file now 18). M7 filler appended to the committed "
+        "site/legacy/chronicle/posts/week-04/index.html — the repo test 2 failed / 5 passed; restored 7 passed."
+    ),
     "proved_on": "2026-11-16",
 }
 
@@ -4941,4 +4948,34 @@ GUARD_PROOFS["guard::deploy/lib/prod_write_guard.py"] = {
         "botocore client class other than BaseClient."
     ),
     "proved_on": "2026-11-16",
+}
+
+# #6155 — one Elena: no prompt states the owner's age or job title, no narrator prompt states a relationship detail or a
+# real person, the legacy writer's team is the operational roster, the old Elena contradictions cannot return, and the
+# story bible points only at objects that exist.
+STRUCTURAL_HAND_PROOFS["structural::test_elena_canon_6155.py"] = {
+    "gate_name": "test_elena_canon_6155.py",
+    "command": "python3 -m pytest tests/test_elena_canon_6155.py -q -p no:warnings   # baseline 17 passed",
+    "mutation": (
+        "Five plants, ONE AT A TIME, each restored with `git checkout --`: M1 hypothesis_engine_lambda's 'Adult male' "
+        "context line → '36-year-old male' (a literal age in a prompt); M2 a 'Don't break the fourth wall about being an AI' "
+        "bullet added back to chronicle_prompt.LEGACY_PROMPT_TEMPLATE; M3 two board-only persona ids appended to "
+        "chronicle_prompt.operational_team's roster loop (a real person and an off-roster coach as interviewees); M4 a "
+        "STORY_BIBLE.md pointer renamed to a file that does not exist; M5 (behaviour twin, "
+        "tests/test_wednesday_chronicle_behavior.py) chronicle_store.publish_holds' legacy audit replaced by `craft = []`."
+    ),
+    "observed": (
+        "2026-11-21, #6155 lane. BASELINE 17 passed. M1 1 failed (the lambdas/+mcp/ sweep); M2 1 failed; M3 2 failed "
+        "(roster subset + real-name check); M4 1 failed; M5 1 failed (the legacy draft published immediately). "
+        "REVERTED 17 passed."
+    ),
+    "scope": (
+        "Every string literal in every .py under lambdas/ and mcp/ (age, job-title class); the rendered narrator prompts "
+        "(canon, desk writer + Panel script, legacy writer + fallback, recap, Episode 0's host line) for relationship "
+        "details, real names (privacy_guard's list) and the resolved contradictions; the legacy team against "
+        "persona_registry.OPERATIONAL_COACH_IDS; docs/content/STORY_BIBLE.md's path pointers. NOT SEEN: an age or title "
+        "assembled at runtime from parts; prompt text read from S3 config (the board and bible objects themselves); "
+        "a real person outside privacy_guard's list."
+    ),
+    "proved_on": "2026-11-21",
 }

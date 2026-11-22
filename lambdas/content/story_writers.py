@@ -20,9 +20,9 @@ from ai.model_routing import model_for  # noqa: E402 — #4770: the one model re
 
 WRITER_MODEL = model_for("story.writer")
 
-from content import body_numbers, story_checks, story_craft, story_ledger
+from content import body_numbers, elena_canon, story_checks, story_craft, story_ledger
 
-CHRONICLE_MAX_TOKENS = 7000  # ~1,100-1,500 words lands near 2,500 tokens; the ceiling is headroom, never the target
+CHRONICLE_MAX_TOKENS = 7000  # the canon's 900-1,200 body words land near 2,000 tokens; the ceiling is headroom, never the target
 EPISODE_MAX_TOKENS = 8000
 
 CHRONICLE_FOOTER = r"\*Week \d+ of The Measured Life\*|\*Prologue — The Measured Life\*"
@@ -59,18 +59,16 @@ FACTS (absolute):
 
 PRIVACY (absolute):
 - No cycle, reset, restart or attempt counts, ever. The frame is THE experiment and the day.
-- Never name a vice or substance. The journal is off the record: its weather may inform you, its words and its
-  specifics may not (no job details, no third parties, no family members, no partner).
+- Never name a vice or substance. The journal is off the record and you do not read it: never quote it, never
+  narrate from it (no job details, no third parties, no family members, no partner).
 - No real-world experts, authors or public figures. Only the fictional team appears.
 - No genome identifiers."""
 
-ELENA_VOICE = """You are Elena Voss, the embedded journalist writing "The Measured Life", a weekly long-form chronicle of one
-man's year-long health experiment. You are an AI narrator — a character written from Matthew's data — and you have
-said so plainly in the prologue; you never claim a career, byline or employer outside this series.
-
-VOICE: literary, observant, wry, compassionate without being soft. Third person; Matthew is your subject. A
-long-form magazine feature writer: concrete details, specific moments, show don't tell. You explain wearables and
-scores in half a sentence the first time, for a reader who knows nothing about them.
+# Who Elena is, how she reasons and what she never does live in ONE place, content.elena_canon (#6155); the desk
+# writer adds only its craft. Kept as ELENA_VOICE: the season runner, the tests and the prompt contract read this name.
+DESK_CRAFT = """VOICE: third person; Matthew is your subject. A long-form magazine feature writer: concrete details, specific
+moments, show don't tell. You explain wearables and scores in half a sentence the first time, for a reader who knows
+nothing about them.
 
 CRAFT:
 - Open on one specific, real moment from the dossier (a session, a morning's number, a meal, a walk) — never a
@@ -83,12 +81,17 @@ CRAFT:
   transformation clichés, no emoji, no headers, no bullet points.
 - Close with something unresolved: a question the next week will answer, or a callback."""
 
-EPISODE_VOICE = """You write the script for "The Measured Life — The Panel", a weekly two-voice podcast that reports the same
-week as the chronicle. ELENA VOSS (an AI journalist, the host) talks with ONE coach from the team — the guest the
+ELENA_VOICE = elena_canon.voice_block() + "\n\n" + DESK_CRAFT
+
+EPISODE_VOICE = (
+    """You write the script for "The Measured Life — The Panel", a weekly two-voice podcast that reports the same
+week as the chronicle. ELENA VOSS (the series' AI narrator, the host) talks with ONE coach from the team — the guest the
 desk chose — about what the week's data showed. Two people with all the numbers in front of them, talking like
 colleagues: warm, specific, sometimes disagreeing, never a lecture.
 
-SHOW SHAPE (1,250-1,450 spoken words, about 9 minutes):
+{ELENA_HOST}
+
+SHOW SHAPE ({PANEL_LENGTH}):
 1. Cold open — Elena, one vivid real moment from the week, two or three sentences.
 2. Welcome — Elena names the show, the day number of the experiment, and the guest (name and what they cover).
    One or two sentences of "previously" for a cold listener.
@@ -107,8 +110,11 @@ SPOKEN-WORD RULES (the episode is held at render if it breaks these):
 - No causal phrasing: never "caused", "led to", "resulted in", "thanks to", "because of the/his", "is why".
 - Write numbers the way people say them ("about seventy-eight percent" or "78 percent", "fifty-one milliseconds").
 - Speaker ids: "elena" for Elena; "coach" for the guest. Every line is one turn, 1-4 sentences.""".replace(
-    "{SPOKEN_WEIGHT_RULE}", body_numbers.SPOKEN_WEIGHT_RULE  # #5949: the ONE statement of the rule, shared with the Panel's judge
-)
+        "{SPOKEN_WEIGHT_RULE}", body_numbers.SPOKEN_WEIGHT_RULE  # #5949: the ONE statement of the rule, shared with the Panel's judge
+    )
+    .replace("{ELENA_HOST}", elena_canon.host_block())
+    .replace("{PANEL_LENGTH}", elena_canon.panel_length_line())
+)  # #6155: one Elena
 
 _TURN = {
     "type": "object",
@@ -163,7 +169,7 @@ def write_chronicle(
     footer = "*Prologue — The Measured Life*" if week == 0 else f"*Week {week} of The Measured Life*"
     fmt = (
         "FORMAT: line 1 is the title in double quotes (your editorial choice). Line 2 blank. Then the body, "
-        f"900-1,200 words of clean prose. Then a line with --- and finally the line {footer}"
+        f"{elena_canon.chronicle_length_line()} of clean prose. Then a line with --- and finally the line {footer}"
     )
     messages = [{"role": "user", "content": _context(dossier, budget, ledger, week, previous) + "\n\n" + fmt}]
     if fix and prior_draft:

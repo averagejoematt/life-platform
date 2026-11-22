@@ -208,6 +208,7 @@ METHOD1_ASOF_READERS = {
     "lambdas/compute/hypothesis_engine_lambda.py",  # cross-pillar effect refit (calibration of the effects)
     "lambdas/ai/ai_calls.py",  # the daily brief's AI context
     "lambdas/content/output_writers.py",  # the owner dashboard (buddy is written from a public sheet by the caller)
+    "lambdas/emails/brief_editorial_inputs.py",  # #6163: the previous day's stored sheet -> its protocol block (owner email only)
     "lambdas/emails/monday_compass_lambda.py",
     "lambdas/emails/monthly_digest_lambda.py",
     "lambdas/emails/monthly_digest_render.py",

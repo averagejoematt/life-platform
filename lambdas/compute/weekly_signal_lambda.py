@@ -1,7 +1,7 @@
 """
 weekly_signal_lambda.py — PB-06: "The Weekly Signal" subscriber email.
 
-Curated 5-section summary sent to subscribers every Sunday at 9:30 AM PT.
+Curated summary sent to subscribers every Sunday at 9:30 AM PT.
 Reads pre-computed data from S3 + DynamoDB — no AI calls.
 
 Schedule: cron(30 16 ? * SUN *)  (9:30 AM PT = 16:30 UTC)
@@ -10,11 +10,16 @@ Model: chronicle_email_sender_lambda.py (same subscriber query, SES pattern, rat
 Sections:
   1. The Numbers — weight, sleep, recovery, character
   2. Chronicle Preview — latest Elena Voss headline
-  3. What Worked / What Didn't — top weekly insight
-  4. The Board Says — rotating board member quote
-  5. Observatory Spotlight — rotating page highlight
+  3. What Worked This Week — the newest computed insight, ONLY when the public narrative gate
+     (web.narrative_publication, the Site API's own chokepoint) passes its row; omitted otherwise
+  4. Observatory Spotlight — rotating page highlight
+
+#6151: "The Board Says" is gone. It printed one fixed sentence and attributed it to a different
+board member each week — words nobody on the board said (ADR-104). Nothing replaces it.
+Every send carries a text part, a preheader and List-Unsubscribe (common.reader_email).
 """
 
+import html as _html
 import json
 import logging
 import os
@@ -25,6 +30,7 @@ import boto3
 from common import send_ledger  # #3113 / DIL-025: the durable replay guard
 from common.email_identity import SIGNAL_SENDER  # #3568 — ONE sending vocabulary, gated against the SES-verified set
 from common.journal_silence import reader_mail  # #5131: the one public-surface guard
+from common.reader_email import FOOTER_TEXT, head_meta, preheader_html, simple_content  # #6151 — the ONE reader envelope
 from experiment.phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 try:
@@ -88,19 +94,11 @@ OBSERVATORY_ROTATION = [
     {"name": "Inner Life", "path": "/mind/", "hook": "Journaling, habits, and the behavioral data behind consistency."},
 ]
 
-BOARD_ROTATION = [
-    {"name": "The Chair", "title": "Board Chair"},
-    {"name": "Sarah Chen", "title": "Behavioral Science"},
-    {"name": "James Okafor", "title": "Longevity Medicine"},
-    {"name": "Lisa Park", "title": "Sleep & Circadian"},
-    {"name": "Amara Patel", "title": "Metabolic Health"},
-]
-
-
 from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
 from common.pacific_time import pacific_now  # #2811: THE Pacific day helper — DATE# keys are Pacific days, pacific_today
 from common.subscriber_cadence import genesis_week_label, genesis_week_number  # #3564 — ONE week numbering
 from common.unsubscribe_token import unsub_url_or_fallback  # #3044 — signed unsub link, never plaintext email
+from web import narrative_publication  # #6151: the Site API's public narrative gate — imported, never re-implemented
 
 
 def _s3_json(key):
@@ -136,8 +134,42 @@ def _get_confirmed_subscribers():
     return confirmed
 
 
+#: The insight fields read, in order. `guidance_given` is stored as a JSON-encoded list (the daily brief's write).
+INSIGHT_FIELDS = ("guidance_given", "top_insight", "summary")
+
+
+def _insight_text(value):
+    """One reader sentence from a stored insight field: a string, or the first string of a list (or of a
+    JSON-encoded list — `guidance_given` is written as `json.dumps([...])`). Anything else is None."""
+    if isinstance(value, str) and value.strip().startswith("["):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            return None
+    if isinstance(value, list):
+        value = next((v for v in value if isinstance(v, str) and v.strip()), None)
+    return value.strip() if isinstance(value, str) and value.strip() else None
+
+
+def _public_insight(item):
+    """The insight text of one `computed_insights` row IF the public narrative gate passes the row, else None.
+
+    #6151: this read went straight into reader mail, owner-facing and unescaped. The row now passes the SAME
+    decision the Site API applies to every narrative read (`web.narrative_publication.gate_item` — the row's
+    provenance record decides, fail-closed; `strict=True` because a mail has no wire half). A withheld row
+    comes back with every free-text field emptied, so it can never render."""
+    gated = narrative_publication.gate_item(item, f"{USER_PREFIX}computed_insights", strict=True)
+    if narrative_publication.is_withheld(gated):
+        return None
+    for field in INSIGHT_FIELDS:
+        text = _insight_text(gated.get(field))
+        if text:
+            return text
+    return None
+
+
 def _get_weekly_insight():
-    """Get the most recent coaching/guidance insight from last 7 days."""
+    """The most recent PUBLISHABLE insight from the last 7 days (None when no row passes the public gate)."""
     today = pacific_now().date()
     week_ago = (today - timedelta(days=7)).isoformat()
     try:
@@ -155,11 +187,10 @@ def _get_weekly_insight():
                 }
             )
         )
-        items = [_d2f(i) for i in resp.get("Items", [])]
-        for item in items:
-            guidance = item.get("guidance_given") or item.get("top_insight") or item.get("summary")
-            if guidance:
-                return guidance
+        for item in (_d2f(i) for i in resp.get("Items", [])):
+            text = _public_insight(item)
+            if text:
+                return text
     except Exception as e:
         logger.warning("Insight query failed: %s", e)
     return None
@@ -240,18 +271,11 @@ def _build_chronicle(posts_data):
 
 
 def _build_worked(insight_text):
+    """Render the gated insight. Escaped: stored text is data, never markup (#6151)."""
     if not insight_text:
         return ""
-    return _sec("What Worked This Week", f'<p style="font-size:13px;color:#c9d1d9;line-height:1.7;margin:0;">{insight_text}</p>')
-
-
-def _build_board_quote(week_num):
-    member = BOARD_ROTATION[week_num % len(BOARD_ROTATION)]
-    return _sec(
-        "The Board Says",
-        f'<p style="font-size:13px;color:#c9d1d9;line-height:1.7;margin:0 0 8px;font-style:italic;">"Check the data, not the mirror. Progress at this stage is measured in trends, not snapshots."</p>'
-        f'<p style="font-family:\'Courier New\',monospace;font-size:10px;color:#8b949e;margin:0;">— {member["name"]}, {member["title"]}</p>',
-    )
+    body = _html.escape(str(insight_text))
+    return _sec("What Worked This Week", f'<p style="font-size:13px;color:#c9d1d9;line-height:1.7;margin:0;">{body}</p>')
 
 
 def _build_spotlight(week_num):
@@ -271,30 +295,31 @@ def _build_email(stats, posts_data, insight_text, week_num, unsub_url, week_labe
     s1 = _build_numbers(stats) if stats else ""
     s2 = _build_chronicle(posts_data) if posts_data else ""
     s3 = _build_worked(insight_text)
-    s4 = _build_board_quote(week_num)
-    s5 = _build_spotlight(week_num)
+    s4 = _build_spotlight(week_num)
 
     subject = f"{week_label} — The Measured Life"
+    preheader = preheader_html(f"{week_label}: the week's numbers, the latest chapter and one page to explore.")
 
     html = f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html><head>{head_meta()}
 <title>{week_label} — The Weekly Signal</title></head>
 <body style="margin:0;padding:0;background:#0D1117;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+{preheader}
 <div style="max-width:600px;margin:0 auto;padding:0 16px;">
   <div style="padding:32px 0 24px;">
     <p style="font-family:'Courier New',monospace;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#3db88a;margin:0 0 8px;">The Weekly Signal</p>
     <p style="font-size:12px;color:#484f58;margin:0;">{week_label} — {display_date}</p>
   </div>
-  {s1}{s2}{s3}{s4}{s5}
+  {s1}{s2}{s3}{s4}
   <div style="border-top:1px solid rgba(230,237,243,0.06);padding:20px 0 40px;">
-    <p style="font-size:11px;color:#30363d;margin:0 0 8px;line-height:1.6;text-align:center;">
+    <p style="font-size:11px;color:{FOOTER_TEXT};margin:0 0 8px;line-height:1.6;text-align:center;">
       You subscribed to The Weekly Signal at averagejoematt.com.<br>
       One person's real data, published without filters.
     </p>
     <p style="font-size:11px;text-align:center;margin:0;">
-      <a href="{unsub_url}" style="color:#484f58;text-decoration:underline;">Unsubscribe</a>
+      <a href="{unsub_url}" style="color:{FOOTER_TEXT};text-decoration:underline;">Unsubscribe</a>
       &nbsp;&middot;&nbsp;
-      <a href="{SITE_URL}" style="color:#484f58;text-decoration:underline;">averagejoematt.com</a>
+      <a href="{SITE_URL}" style="color:{FOOTER_TEXT};text-decoration:underline;">averagejoematt.com</a>
     </p>
   </div>
 </div></body></html>"""
@@ -398,12 +423,8 @@ def lambda_handler(event, context):
                 ses.send_email(
                     FromEmailAddress=SENDER,
                     Destination={"ToAddresses": [email]},
-                    Content={
-                        "Simple": {
-                            "Subject": {"Data": reader_mail(subject), "Charset": "UTF-8"},
-                            "Body": {"Html": {"Data": reader_mail(html), "Charset": "UTF-8"}},
-                        }
-                    },
+                    # #6151: text part derived from the scrubbed HTML + List-Unsubscribe headers
+                    Content=simple_content(reader_mail(subject), html=reader_mail(html), unsub_url=unsub_url),
                 )
                 sent += 1
                 if sent == 1:

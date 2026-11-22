@@ -243,7 +243,6 @@
     <div class="series-intro__label">The Series</div>
     <div class="series-intro__heading">The Measured Life</div>
     <div class="series-intro__body">Matthew is attempting to transform his body and health using a custom-built platform that pulls data from <span data-const="platform.data_sources">26</span> sources. He started at <span data-const="journey.start_weight">307</span> lbs. The goal is <span data-const="journey.goal_weight">185</span>. This is the weekly account of what the data actually shows — not a highlight reel.</div>
-    <a href="/legacy/journal/posts/week-00/" class="series-intro__start">Start from the beginning →</a>
   </div>
   <div class="series-intro__card">
     <div class="series-intro__label">The Reporter</div>
@@ -338,12 +337,6 @@
           });
         });
       }
-
-      // Binge read entry point (21l)
-      html += `<div style="padding:var(--space-8) 0;text-align:center;border-top:1px solid var(--border);">
-        <a href="/legacy/chronicle/posts/week-00/" style="font-family:var(--font-display);font-size:var(--text-lg);color:var(--accent);text-decoration:none;letter-spacing:var(--ls-display);">Start from the beginning →</a>
-        <div style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);margin-top:var(--space-2);letter-spacing:var(--ls-tag);">${sorted.length} installments · ${sorted.reduce((a,p) => a + (p.word_count||0), 0).toLocaleString()} words</div>
-      </div>`;
 
       list.innerHTML = html;
     })

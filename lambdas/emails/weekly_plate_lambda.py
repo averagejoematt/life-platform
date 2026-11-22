@@ -1,6 +1,6 @@
 """
 The Weekly Plate Lambda — v1.0.0
-Fires Friday 6:00 PM PT (Saturday 02:00 UTC via EventBridge).
+Fires Friday 7:00 PM PT (cron(0 19 ? * FRI *) wall-clock, config/schedules.json).
 
 A magazine-style Friday evening email about food — personalized from actual
 MacroFactor data. Designed to be a fun couch read that ends with an actionable
@@ -789,7 +789,7 @@ def lambda_handler(event, context):
     # to sit between the send and its only completion record.
     if not dry_run:
         record_email_send(table, LEDGER_NAME, period_key)
-    logger.info(f"Sent: {subject}")
+    logger.info(f"{'DRY-RUN (not sent)' if dry_run else 'Sent'}: {subject}")
 
     # IC-15: Persist plate insight (only when the edition is genuine AI writing, #2221)
     # #5297: never on a dry run — the insight is replayed into later meal-planning prompts.
