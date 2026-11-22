@@ -118,7 +118,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-799 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+800 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -247,7 +247,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 
 ## 4. MCP Layer
 
-**94 tools across 43 modules** (AST-counted from `mcp/registry.py`;
+**95 tools across 44 modules** (AST-counted from `mcp/registry.py`;
 the same counter `deploy/sync_doc_metadata.py` uses). MCP modules appear in §3 as
 readers under the `life-platform-mcp` lambda.
 
@@ -596,7 +596,7 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1393 total · 1004 resolved · 389 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1394 total · 1005 resolved · 389 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 80 resolved · 0 dynamic of 80 scheduled lambdas (107 lambdas total)
 - Alarms: 152 literal-named declarations across three idioms, 4 composite; routing digest 108 · digest+paging 2 · digest+urgent 10 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 26 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only

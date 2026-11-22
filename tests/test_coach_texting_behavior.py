@@ -778,9 +778,13 @@ def _block(coach="sleep_coach", items=(), today="2026-08-12"):
 # — the graded record —
 
 
-def test_a_coach_names_its_own_miss_as_plainly_as_its_hit():
+def test_a_coach_names_its_own_miss_as_plainly_as_its_hit(monkeypatch):
     """Track-record humility is the whole point: a coach that only quotes its live
-    positions is a brochure. WRONG is stated as a word, not implied by an absence."""
+    positions is a brochure. WRONG is stated as a word, not implied by an absence.
+    (Pinned on the pre-#6172 path: the record-line switch is set False explicitly, the rollback state.)"""
+    from coach import coach_record
+
+    monkeypatch.setattr(coach_record, "SELF_RECORD_UNIFIED", False)
     block = _block(items=[_pred(claim="HRV climbs on a 10pm lights-out", status="refuted", graded="2026-08-11")])
     assert "YOUR TRACK RECORD" in block
     assert 'Graded WRONG: "HRV climbs on a 10pm lights-out" (made 2026-08-11, graded 2026-08-11).' in block

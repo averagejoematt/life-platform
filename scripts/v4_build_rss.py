@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import html
 import json
+import re
 import sys
 from datetime import datetime, timedelta, timezone
 from email.utils import format_datetime
@@ -35,7 +36,10 @@ from urllib.request import urlopen
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lambdas"))
 from common.text_utils import truncate_at_word  # noqa: E402
 from common.utm import with_utm  # noqa: E402  — the ONE canonical outbound UTM tagger (#1621)
-from content import chronicle_schema  # noqa: E402  — #4191: a stored excerpt may still open on the envelope head
+from content import (
+    chapter_corrections,  # noqa: E402  — #6177: approved platform corrections + the persona disclosure
+    chronicle_schema,  # noqa: E402  — #4191: a stored excerpt may still open on the envelope head
+)
 
 # /journal/posts.json is the live genesis-anchored chronicle feed (served from
 # generated/journal/posts.json on S3).  The old /chronicle/posts.json was a
@@ -94,6 +98,46 @@ def published_at_by_url(chapters) -> dict[str, str]:
     """``{post url: published_at}`` for every published week /api/chapters serves with one."""
     weeks = chapters.get("weeks") if isinstance(chapters, dict) else None
     return {w["url"]: w["published_at"] for w in weeks or [] if isinstance(w, dict) and w.get("url") and w.get("published_at")}
+
+
+_EDITORS_NOTE = re.compile(r"^(\*Editor[’']s note\b[^*]*\*)", re.IGNORECASE)  # the stored note is one emphasised paragraph
+
+
+def corrections_by_url(chapters) -> dict[str, list[dict]]:
+    """``{post url: [approved corrections, standing first]}`` from /api/chapters' ``corrections`` (#6177). A served
+    ``null`` means the platform could not read them — the feed is not built without them (an approved correction is
+    never dropped quietly); a payload without the field (a Site API from before #6177) has none."""
+    if not isinstance(chapters, dict) or "corrections" not in chapters:
+        return {}
+    if chapters["corrections"] is None:
+        print("❌ /api/chapters could not read the chapter corrections — not building a feed without them", file=sys.stderr)
+        raise SystemExit(1)
+    out: dict[str, list[dict]] = {}
+    for c in chapters["corrections"]:
+        if isinstance(c, dict) and chapter_corrections.CHAPTER_ID.match(str(c.get("chapter_id") or "")):
+            out.setdefault(f"/journal/posts/{c['chapter_id']}/", []).append(c)
+    for url, cs in out.items():
+        cs.sort(key=lambda c: (c.get("superseded_by") is not None, [-ord(ch) for ch in str(c.get("dated_on") or "")]))
+    return out
+
+
+def item_description(excerpt: str, corrections: list[dict] | None = None, limit: int = 360) -> str:
+    """One item's description (#6177): the newest standing approved correction first, in the platform's signature; an
+    October 2026 editor's note kept word for word with the persona disclosure right after it; then the excerpt, cut at
+    a word boundary (#1224) — the correction and the disclosure are never cut."""
+    text = " ".join((excerpt or "").split())
+    lead = ""
+    m = _EDITORS_NOTE.match(text)
+    if m and chapter_corrections.names_legacy_persona(m.group(1)):
+        lead = f"{m.group(1)} ({chapter_corrections.PERSONA_DISCLOSURE})"
+        text = text[m.end() :].strip()
+    elif chapter_corrections.names_legacy_persona(text):
+        lead = f"({chapter_corrections.PERSONA_DISCLOSURE})"
+    standing = [c for c in corrections or [] if not c.get("superseded_by")]
+    head = chapter_corrections.summary_line(standing[0]) if standing else ""
+    fixed = " ".join(x for x in (head, lead) if x)
+    rest = truncate_at_word(text, max(80, limit - len(fixed))) if text else ""
+    return " ".join(x for x in (fixed, rest) if x)
 
 
 def esc(s) -> str:
@@ -248,7 +292,9 @@ def main() -> int:
     posts = [p for p in posts if p.get("date") and p.get("title")]
     posts.sort(key=lambda p: p["date"], reverse=True)
     with urlopen(CHAPTERS_SRC, timeout=20) as r:  # #5946: a fetch failure fails the build, as SRC does
-        published = published_at_by_url(json.load(r))
+        chapters = json.load(r)
+    published = published_at_by_url(chapters)
+    corrections = corrections_by_url(chapters)  # #6177: approved platform corrections, keyed by the post url
     for p in posts:  # chronicle items only: an essay's `date` (blog.json) is its publication day
         p["_pub"] = rfc822_instant(published[p["url"]]) if p.get("url") in published else None
 
@@ -274,8 +320,9 @@ def main() -> int:
         # #4191: the manifest excerpts written before the fix open on the quoted title and
         # the bracketed stat line; the feed description is the BODY, same derivation as the writer.
         excerpt = " ".join(chronicle_schema.body_markdown(p.get("excerpt") or "", p.get("title") or "").split())
-        # Word-boundary truncation (#1224 helper) — never a mid-word slice (#1261).
-        excerpt = truncate_at_word(excerpt, 360)
+        # Word-boundary truncation (#1224 helper) — never a mid-word slice (#1261); #6177: an approved correction leads,
+        # a Margaret-signed editor's note is followed by the persona disclosure, and neither is cut.
+        excerpt = item_description(excerpt, corrections.get(p.get("url") or ""), 360)
         pub = p["_pub"] if "_pub" in p else rfc822(p["date"])  # #5946: chronicle = published_at; essay = its date
         items.append(
             "    <item>\n"

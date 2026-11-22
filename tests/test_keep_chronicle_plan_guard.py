@@ -136,7 +136,8 @@ def test_editors_note_reconciles_part_i_and_survives_header_strip():
     html, md, _ = repair.build_content_fields(reg, "<p>The first thing you notice is the charging cables.</p>")
 
     # reuses the Margaret device (signed blockquote), references Part II by title, is honest
-    assert "Editor's note — Margaret Calloway:" in md
+    assert "Editor's note — Average Joe Matt editorial record:" in md  # #6177: the platform signs a new note
+    assert "Margaret Calloway" not in md
     assert 'class="editors-note"' in html
     assert "The Plan, On the Record" in md and "The Plan, On the Record" in html
     assert "before the plan was frozen" in md.lower()
@@ -150,4 +151,4 @@ def test_editors_note_reconciles_part_i_and_survives_header_strip():
     stripped = leadin.body_html_from_record({"content_html": html})
     assert not stripped.startswith("<h1>")
     assert stripped.lstrip().startswith("<blockquote")
-    assert "Margaret Calloway" in stripped
+    assert "Average Joe Matt editorial record" in stripped

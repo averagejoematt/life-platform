@@ -54,18 +54,18 @@ OPS_CANARY_ALARMED = "ops_canary_alarmed"
 OPS_MONDAY_PACK = "ops_monday_pack"
 
 TRIAL: dict[str, bool] = {
-    SUNDAY_WHAT_CHANGED: False,
-    PLATE_INTO_NUTRITION_REVIEW: False,
-    REVIEW_PACK_NOT_EMAILED: False,
-    STORY_QUESTIONS_PAUSED: False,
-    EVENING_ONE_CHANNEL: False,
-    OPS_DLQ_SUMMARY: False,
-    OPS_CANARY_ALARMED: False,
-    OPS_MONDAY_PACK: False,
+    SUNDAY_WHAT_CHANGED: True,
+    PLATE_INTO_NUTRITION_REVIEW: True,
+    REVIEW_PACK_NOT_EMAILED: True,
+    STORY_QUESTIONS_PAUSED: True,
+    EVENING_ONE_CHANNEL: True,
+    OPS_DLQ_SUMMARY: True,
+    OPS_CANARY_ALARMED: True,
+    OPS_MONDAY_PACK: True,
 }
 
 #: The first Pacific day on which every item reads OFF again (None = no end date).
-TRIAL_ENDS_ON: Optional[str] = None
+TRIAL_ENDS_ON: Optional[str] = "2026-12-07"
 
 #: Plain-language description per item — the status page note and the suppression log both use it.
 DESCRIPTIONS: dict[str, str] = {

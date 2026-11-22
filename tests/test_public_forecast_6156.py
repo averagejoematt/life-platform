@@ -109,8 +109,11 @@ def _rows(today=TODAY, **kw):
 # ── the switches ──────────────────────────────────────────────────────────────────────────────────
 
 
-def test_both_switches_default_off_and_an_off_run_reads_and_writes_nothing(monkeypatch):
-    assert FP.STREAM_LIVE is False, "the stream ships dark; turning it on is the owner's one reviewed line"
+def test_the_committed_switch_is_on_for_the_pilot_and_an_off_run_reads_and_writes_nothing(monkeypatch):
+    # The owner switched the one-a-week pilot on (2026-11-22, #6156). Rollback = STREAM_LIVE = False + redeploy
+    # (or the runtime kill switch /life-platform/public-forecast). OFF behaviour is proven below with it set False.
+    assert FP.STREAM_LIVE is True, "the pilot is committed ON; rollback is this line -> False"
+    monkeypatch.setattr(FP, "STREAM_LIVE", False)
     table, fetch = Table(), _fetch()
     assert F.run(table, today=TODAY, fetch_json=fetch, switch=lambda: True) == {"status": "off", "reason": "committed_switch_off"}
     monkeypatch.setattr(FP, "STREAM_LIVE", True)
@@ -278,6 +281,7 @@ def test_the_publication_gate_keeps_forecasts_private_until_the_stream_is_on(mon
     row = rows[0]
     assert PP.governs_partition(FP.FORECAST_PK) and PP.kind_of(FP.FORECAST_PK, row["sk"]) == PP.CALL
     assert PP.kind_of(FP.FORECAST_PK, FP.run_sk(CYCLE)) is None
+    monkeypatch.setattr(FP, "STREAM_LIVE", False)
     assert PP.classify(row["pk"], row) == (PP.PRIVATE, FP.DARK_REASON)
     monkeypatch.setattr(FP, "STREAM_LIVE", True)
     assert PP.classify(row["pk"], row) == (PP.PUBLIC, "structured_public")
@@ -377,6 +381,7 @@ def test_the_monday_door_runs_the_stream_after_the_brief_and_stamps_only_when_co
     monkeypatch.setattr(pt, "pacific_today", lambda: TODAY)
     monkeypatch.setattr(PB, "run", lambda table, **kw: {"status": "ok", "cycle": CYCLE, "results": {}})
     monkeypatch.setattr(PB, "stamp_run", lambda *a, **k: True)
+    monkeypatch.setattr(FP, "STREAM_LIVE", False)
     table = Table()
     out = PB.handle_event(table, {"mode": "public_brief"})
     assert out["forecast"] == {"status": "off", "reason": "committed_switch_off"} and table.writes == []

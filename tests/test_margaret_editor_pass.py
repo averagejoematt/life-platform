@@ -227,7 +227,8 @@ def test_extract_editors_note_clean_note_passes():
 
 def test_splice_editors_note_before_signature():
     out = mep.splice_editors_note(SAMPLE_INSTALLMENT, "A note.")
-    assert "> **Editor's note — Margaret Calloway:** A note." in out
+    assert "> **Editor's note — Average Joe Matt editorial record:** A note." in out  # #6177: the platform signs it
+    assert "Margaret Calloway" not in out
     # inserted BEFORE the closing signature, not after
     assert out.index("Editor's note") < out.index("*Week 8 of The Measured Life*")
 

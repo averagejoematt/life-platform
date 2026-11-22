@@ -7,9 +7,12 @@ import { chapterCount, chapterMeta, dayInWords, num, rangeInWords } from "../../
 import { loadAll, loadJourney, loadSeries } from "../../lib/snapshot.js";
 import { weekStrip } from "../../lib/theline.js";
 import { hasPage, href, pathOf } from "../../lib/url.js";
+import { PERSONA_DISCLOSURE, correctionsFor, rowMark } from "../../lib/chapter_corrections.js"; // #6177
+import { loadChapterCorrections } from "../../lib/snapshot.js";
 import { INDEX_BYLINE } from "../../lib/narrator.js";
 
 const all = await loadAll();
+const correctionDoc = await loadChapterCorrections(); // #6177: a chapter with a standing approved correction is marked on its row
 const chapters = [...all.byType.chapter].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.week ?? 0) - (a.week ?? 0)));
 // #6081: counted the way every page counts them — the numbered chapters, and the prologue said as such (format.js)
 const count = chapterCount(chapters);
@@ -49,6 +52,7 @@ const stripOf = (c: any) => {
       <p class="muted" style="margin-top:12px;max-width:720px;font-size:15px">
         <span data-byline>{INDEX_BYLINE}</span> A week with no chapter says so here, in its place.
       </p>
+      <p class="persona-disclosure" style="margin-top:8px;max-width:720px" data-persona-disclosure>{PERSONA_DISCLOSURE}</p>
       <p style="margin-top:16px;font-size:15px;font-weight:700;display:flex;flex-wrap:wrap;gap:8px 28px">
         <a href={href("/story/moments/")}>New here? Start with the moments that explain it →</a>
         <a href="https://averagejoematt.com/subscribe/">Get each chapter by email →</a>
@@ -113,6 +117,11 @@ const stripOf = (c: any) => {
                 {meta.published && (
                   <span class="mono muted" style="font-size:12px" data-published>
                     {meta.published}
+                  </span>
+                )}
+                {c.status === "published" && rowMark(correctionsFor(correctionDoc, c.id)) && (
+                  <span class="mono" style="font-size:12px" data-corrected>
+                    {rowMark(correctionsFor(correctionDoc, c.id))}
                   </span>
                 )}
                 {c.status !== "published" && <StatusTag status={c.status} />}
