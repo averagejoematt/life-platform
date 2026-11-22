@@ -1313,7 +1313,7 @@ def _run_design_analysis(existing, design, end_date):
     criterion via experiment_design (stats_core underneath). Returns the analysis
     dict (windows + stats + verdict + summary sentence), or None when the washout
     consumed the whole experiment."""
-    from experiment import experiment_design
+    from experiment import experiment_design, lift_outcomes
 
     design_f = json.loads(json.dumps(design, default=float))  # Decimals → floats for math
     windows = experiment_design.design_windows(existing.get("start_date", ""), end_date, design_f)
@@ -1332,6 +1332,8 @@ def _run_design_analysis(existing, design, end_date):
         source/field (from DESIGN_METRICS) through the same fetch path."""
         src = metric_source or source
         fld = metric_field or field
+        if lift_outcomes.is_lift_metric(fld):  # #6209: derived from logged sets, against the FROZEN baseline window
+            return lift_outcomes.read_series(query_source, src, fld, windows, start, end)
         items = _query_metric_source(src, start, end)
         if src == "whoop":
             items = [normalize_whoop_sleep(i) for i in items]
@@ -1343,12 +1345,10 @@ def _run_design_analysis(existing, design, end_date):
                 out[date] = v
         return out
 
-    def _values(start, end):
-        return [v for _d, v in sorted(_dated_values(start, end).items())]
-
-    baseline_vals = _values(windows["baseline_start"], windows["baseline_end"])
-    window_vals = _values(windows["analysis_start"], windows["analysis_end"])
+    baseline_vals = [v for _d, v in sorted(_dated_values(windows["baseline_start"], windows["baseline_end"]).items())]
+    window_vals = [v for _d, v in sorted(_dated_values(windows["analysis_start"], windows["analysis_end"]).items())]
     stats = experiment_design.evaluate_design(design_f, baseline_vals, window_vals)
+    lift_outcomes.attach_observations(stats, query_source, source, field, windows)  # #6209: raw observations beside a lift series
 
     # #1413 SCED: a randomized-start design ALSO closes with the start-point
     # randomization test — the observed pre/post difference ranked against every

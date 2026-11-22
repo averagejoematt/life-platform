@@ -7,6 +7,7 @@ from typing import Any, cast
 from common.constants import PLAN_DAILY_PROTEIN_MIN_G
 
 from mcp.config import RAW_DAY_LIMIT, SOURCES
+from mcp.experiment_metrics import DESIGN_METRIC_DESCRIPTION  # #6209: the criterion slugs, derived from DESIGN_METRICS
 from mcp.tool_annotations import annotate_tools  # #4286: readOnlyHint/destructiveHint/idempotentHint
 from mcp.tool_output_schemas import attach_output_schemas  # #4286 box 2: outputSchema, the ten most-called tools
 from mcp.tools_advice_links import LOG_ADVICE_LINK_DESCRIPTION, LOG_ADVICE_LINK_INPUT, tool_log_advice_link  # #5612
@@ -983,15 +984,7 @@ TOOLS = {
                                 "type": "object",
                                 "description": "The frozen success criterion.",
                                 "properties": {
-                                    "metric": {
-                                        "type": "string",
-                                        "description": (
-                                            "One of: sleep_score, sleep_efficiency_pct, deep_pct, rem_pct, sleep_duration_hours, "
-                                            "sleep_onset_latency_min, recovery_score, hrv_rmssd, resting_heart_rate, garmin_stress, "
-                                            "body_battery_high, weight_lbs, calories, protein_g, steps, cgm_mean_glucose, "
-                                            "cgm_time_in_range_pct."
-                                        ),
-                                    },
+                                    "metric": {"type": "string", "description": DESIGN_METRIC_DESCRIPTION},  # #6209: derived
                                     "direction": {"type": "string", "description": "'higher' or 'lower' — the predicted change."},
                                     "min_effect": {
                                         "type": "number",

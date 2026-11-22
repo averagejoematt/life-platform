@@ -18,7 +18,7 @@ storytelling. This module is the deterministic core that fixes that:
   - `analysis_summary` — the human sentence built ONLY from computed stats
     ("criterion X · result Y [CI, n]"); narration may quote it, never replace it.
 
-Pure (stdlib + stats_core only, no boto3): callers own the data fetch and the write.
+Pure (stdlib + stats_core + lift_outcomes only, no boto3): callers own the data fetch and the write.
 Bundled module (#781 — ships in every function's code bundle, no separate layer);
 imported flat (`import experiment_design`) from mcp/ and lambdas/.
 """
@@ -29,6 +29,8 @@ from datetime import datetime, timedelta
 
 from common import stats_core
 from common.metric_truth import resolved_source_id  # #4630: steps resolve per day, never one partition
+
+from experiment import lift_outcomes  # #6209: the training outcomes derived from logged sets
 
 # The criterion metric universe: slug → where the daily value lives. Slugs are what
 # a design names; source/field are what the closing analysis queries. Whoop sleep
@@ -56,6 +58,11 @@ DESIGN_METRICS = {
     "steps": (resolved_source_id("steps"), "steps", "Steps"),
     "cgm_mean_glucose": ("apple_health", "blood_glucose_avg", "Mean Glucose"),
     "cgm_time_in_range_pct": ("apple_health", "blood_glucose_time_in_range_pct", "CGM Time in Range %"),
+    # #6209: training outcomes. No stored field holds them — the field IS the slug, and the close path
+    # (mcp/tools_lifestyle._run_design_analysis) derives the per-session series from the hevy partition's logged
+    # sets via lift_outcomes, against the frozen baseline window. Definitions and caveats: lift_outcomes.LIFT_METRICS —
+    # lift_e1rm_index confounds programmed load with performance; the effort-adjusted one depends on self-reported RPE.
+    **{slug: (lift_outcomes.LIFT_SOURCE, slug, entry["label"]) for slug, entry in lift_outcomes.LIFT_METRICS.items()},
 }
 
 VALID_DIRECTIONS = ("higher", "lower")
