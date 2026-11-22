@@ -459,6 +459,9 @@ def extract_editors_note(critique, note_eligible, allowed_numbers):
     note = (critique.get("editors_note") or "").strip()
     if not note:
         return None
+    if "Margaret" in note:  # #6177: the platform signs the note; a persona sign-off inside it is refused
+        logger.warning("[margaret] editor's note rejected: it names the persona (the platform signs notes, #6177)")
+        return None
     ok, reason = _deterministic_ok(note, allowed_numbers)
     if not ok:
         logger.warning("[margaret] editor's note rejected by deterministic gate: %s", reason)
@@ -471,10 +474,16 @@ _SIGNATURE_RE = re.compile(r"\n-{3,}\s*\n\*Week", re.IGNORECASE)
 
 def splice_editors_note(text, note):
     """Insert the note as a signed blockquote before the closing signature line
-    (or append at the end if the expected signature isn't found)."""
+    (or append at the end if the expected signature isn't found).
+
+    #6177 (owner ruling 2026-11-22 §7): the note is signed by the PLATFORM, never by the Margaret persona — "do not
+    present Margaret as an independent human editor"; the persona still does the critique, the reader sees the
+    platform's editorial signature (content.chapter_corrections.PLATFORM_SIGNATURE)."""
     if not note:
         return text
-    block = f"\n\n> **Editor's note — Margaret Calloway:** {note}\n"
+    from content.chapter_corrections import PLATFORM_SIGNATURE
+
+    block = f"\n\n> **Editor's note — {PLATFORM_SIGNATURE}:** {note}\n"
     m = _SIGNATURE_RE.search(text)
     if m:
         idx = m.start()

@@ -743,6 +743,21 @@ def _write_data_files(out_dir: str, data_files: dict, files: dict) -> None:
     with open(os.path.join(out_dir, "own_words.json"), "w", encoding="utf-8") as fh:
         fh.write(text)
     files["own_words.json"] = {"count": len(own_words.get("quotes") or []), "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
+    # chapter_corrections.json (#6177) — the approved, platform-signed corrections /api/chapters serves
+    # (scripts/publish_snapshot_chapter_corrections.py). Always written: absent when the route does not serve the field.
+    chapter_corrections = data_files.get("chapter_corrections") or {
+        "state": "absent",
+        "source": ["/api/chapters"],
+        "absent_text": "The platform did not serve chapter corrections for this snapshot.",
+        "corrections": [],
+    }
+    text = _dump(chapter_corrections)
+    with open(os.path.join(out_dir, "chapter_corrections.json"), "w", encoding="utf-8") as fh:
+        fh.write(text)
+    files["chapter_corrections.json"] = {
+        "count": len(chapter_corrections.get("corrections") or []),
+        "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+    }
     # calibration.json — the Coaching Room's data file, present ONLY on a WEB_ROOM=1 export (CR1, built dark;
     # scripts/publish_snapshot_calibration.py). Absent key = nothing written, so a flag-off snapshot is unchanged.
     cal_path = os.path.join(out_dir, "calibration.json")
