@@ -135,7 +135,7 @@ _CREDIT = re.compile(
     r"called\s+it|right\s+call|correct(?:ly)?)\b",
     re.IGNORECASE,
 )
-_BASELINE = re.compile(
+_NOTHING_CHANGES_RE = re.compile(
     r"\bnothing\s+chang|\bno-change\b|\bdid\s+nothing\b|\bsimply\s+repeat|\brepeat(?:ed|ing)?\s+(?:the\s+)?(?:last|that|the\s+day|"
     r"Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)|\bbaseline\b|\bguess\b",
     re.IGNORECASE,
@@ -171,7 +171,7 @@ def review_notes(body: str, dossier: Dict[str, Any]) -> List[str]:
         out.append(f"a scene or interview the record cannot hold: {m.group(0)!r} — cut it")
     surnames = {str(c.get("name") or "").split()[-1] for c in dossier.get("roster") or [] if c.get("name")}
     for i, p in enumerate(paras):
-        if any(re.search(rf"\b{re.escape(s)}\b", p) for s in surnames if s) and _CREDIT.search(p) and not _BASELINE.search(p):
+        if any(re.search(rf"\b{re.escape(s)}\b", p) for s in surnames if s) and _CREDIT.search(p) and not _NOTHING_CHANGES_RE.search(p):
             out.append(
                 f"paragraph {i + 1} credits a coach's call without the 'nothing changes' comparison: if the packet shows the "
                 "reading on the day the call was made, say whether simply repeating it would also have landed"
@@ -310,7 +310,7 @@ def new_claims(revision: str, draft: str, packet_text: str, allowed: Optional[Se
     in_draft = _number_set(draft)
     in_packet = _number_set(packet_text) | set(allowed or ())
     for sent in _sentences(revision):
-        baseline = bool(_BASELINE.search(sent))
+        baseline = bool(_NOTHING_CHANGES_RE.search(sent))
         found = [(raw, _fmt(v)) for raw, v in _numbers(sent)] + [
             (m.group(0), _fmt(_WORD_NUMS[m.group(1).lower()])) for m in _WORD_NUM_RE.finditer(sent)
         ]
