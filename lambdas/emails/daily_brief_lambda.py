@@ -192,7 +192,7 @@ from training import (
     training_load,  # shared TSS-like load model + Banister core (layer module, #490)
 )
 
-from emails import brief_editorial_inputs, brief_lines  # #5056: fail-soft one-line readouts; #6163 editorial inputs (read-only)
+from emails import brief_editorial_inputs, brief_lines, brief_trial  # #5056 readouts; #6163 editorial inputs; #6175 trial
 from emails.brief_data_status import (  # #2326 quiet notice / #3049 partial-input notice
     build_data_status_banner_html,
     qualified_compute_outputs,
@@ -2214,9 +2214,8 @@ def lambda_handler(event, context):
         )
         _banner = build_data_status_banner_html(_stale, _quiet, compute_partial=_compute_partial)
         if _banner:
-            # Inject banner immediately after <body...> tag
-            import re as _re
-
+            # Inject banner immediately after <body...> tag (`_re` is the module-level import; #6175 dropped the
+            # local re-import that made `_re` a handler-local name, unbound whenever there was no banner)
             html = _re.sub(
                 r"(<body[^>]*>)",
                 r"\1" + _banner,
@@ -2228,6 +2227,9 @@ def lambda_handler(event, context):
     except Exception as _be:
         logger.warning(f"WR-48 banner failed (non-fatal): {_be}")
 
+    # #6175 hybrid trial: ONE switch (emails/brief_trial.py); off = one read, an empty block, today's brief byte for byte
+    _trial, _block, subject = brief_trial.run(globals(), locals(), subject)
+    html = _re.sub(r"(<body[^>]*>)", lambda m: m.group(1) + _block, html, count=1, flags=_re.IGNORECASE)
     if demo_mode:
         html = output_writers.sanitize_for_demo(html, data, profile)
         prefix = (profile.get("demo_mode_rules") or {}).get("subject_prefix", "[DEMO]")
@@ -2255,6 +2257,7 @@ def lambda_handler(event, context):
         # DLQ redrive (6h later, long past the #2860 lease) free to send it again.
         record_email_send(table, "daily_brief", yesterday)
         logger.info("Sent: " + subject)
+    brief_trial.record(table, USER_PREFIX, _trial, len(html), _persist, logger)  # #6175: no-op when off, dry run or demo
 
     if _persist:  # #2255: demo_mode OR dry_run
         output_writers.write_dashboard_json(
