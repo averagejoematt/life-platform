@@ -759,6 +759,13 @@ def tool_get_coach_session_packet(args):
             "Consult a qualified healthcare provider before making health decisions based on this data."
         ),
     }
+    from coach import coach_context_pilot  # #6158: priorities, recommendations and the one due follow-up — dark until LIVE
+
+    from mcp.config import table as _pilot_table
+
+    pilot = coach_context_pilot.packet_context(_pilot_table, target_date)
+    if pilot is not None:
+        out["coaching_context"] = pilot
     from mcp.plan_helpers import attach_coach_context  # #5071: the pre-flight call carries the guidance, the charter and the May tracker
 
     return attach_coach_context(out, target_date, packet=out)

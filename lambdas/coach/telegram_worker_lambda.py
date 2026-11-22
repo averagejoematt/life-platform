@@ -40,7 +40,6 @@ import logging
 import os
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
 from typing import Optional
 
 import boto3
@@ -56,6 +55,7 @@ except ImportError:  # pragma: no cover
 
 from coach import coach_chat, coach_outbound, coach_reactions, coach_voice, telegram_gateway, telegram_group, telegram_reply_gate
 from coach.coach_chat_grounding import build_facts_block, build_grounder, chat_available_logs
+from coach.coach_context_pilot import for_turn as pilot_context  # #6158: dark until coach_context_pilot.LIVE
 from coach.persona_registry import LEAD_PERSONA_ID, display_name, persona_for_telegram_route
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -588,7 +588,8 @@ def _assemble(persona_id: str, coach_id: str, *, allow_referral: bool = False) -
 
     thread = _thread_today(persona_id)
     facts = _facts()
-    memory = _memory_block(persona_id)
+    # #6158: the pilot re-orders memory (priorities first) and de-duplicates the thread — inputs untouched while dark
+    memory, thread, record_extra = pilot_context(_table, persona_id, _memory_block(persona_id), thread)
 
     try:
         from coach.persona_core import load_voice_spec, persona_block, texting_block
@@ -661,6 +662,7 @@ def _assemble(persona_id: str, coach_id: str, *, allow_referral: bool = False) -
         "domain": domain,
         "today_pt": today_pt,
         "colleagues": _colleagues_block(persona_id, allow_referral=allow_referral),
+        "record_extra": record_extra,  # #6158: a raised follow-up's id, stored on the coach's reply row
     }
 
 
@@ -990,7 +992,7 @@ def _morning_checkin() -> dict:
     sent = _send_bubbles(token, chat_id, result.bubbles or [result.text], max_bubbles=2)
     if not sent:
         return {"ok": True, "reason": "empty"}
-    _store_outbound(persona_id, a["coach_name"], frame, result, coach_outbound.PROVENANCE_CHECKIN)
+    _store_outbound(persona_id, a["coach_name"], frame, result, coach_outbound.PROVENANCE_CHECKIN, extra=a.get("record_extra"))
     logger.info("[telegram] morning check-in sent (%s bubbles)", len(sent))
     return {"ok": True, "status": result.status, "bubbles": len(sent)}
 
@@ -1290,7 +1292,7 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
         table = _table()
         for item in coach_chat.turn_records(persona_id, coach_name, text, result, cycle=cycle):
             if item.get("role") == coach_chat.ROLE_COACH:
-                item["text"] = reply_text
+                item.update(text=reply_text, **(a.get("record_extra") or {}))
             table.put_item(Item=item)
     except Exception as e:
         logger.warning("[telegram] turn storage failed (reply already sent): %s", e)
@@ -1330,10 +1332,6 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
     if referred:
         out["referred_to"] = referred
     return out
-
-
-def _now_iso() -> str:  # pragma: no cover — debugging aid
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 # Alias kept for callers/tests that used the short name pre-I3 rename.

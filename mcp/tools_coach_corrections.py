@@ -140,11 +140,69 @@ def _log_signal_correction(args, correction_text):
     return result
 
 
+CLOSED_BY_OWNER = "owner (manage via log_coach_correction)"
+LIFECYCLE_ACTIONS = ("close", "reopen", "list")
+
+
+def _lifecycle(args: dict) -> dict:
+    """#6158 (owner ruling 2026-11-22 §11): close / reopen / list — the owner's only door to a correction's
+    lifecycle. A close needs a disposition and checkable evidence and touches an OPEN row only; nothing here
+    reads a row's age, and nothing edits its text."""
+    action = args.get("action")
+    if action == "list":
+        status = args.get("status")
+        if status is not None and status not in coach_corrections.STATUSES:
+            return {"error": f"status must be one of {list(coach_corrections.STATUSES)}"}
+        rows = coach_corrections.list_corrections(_table_ref, status=status, limit=200)
+        keep = (
+            "sk",
+            "status",
+            "error_class",
+            "item_ref",
+            "correction_text",
+            "created_at",
+            "disposition",
+            "disposition_evidence",
+            "closed_at",
+        )
+        from mcp.core import decimal_to_float
+
+        return decimal_to_float(
+            {"count": len(rows), "status_filter": status, "corrections": [{k: r.get(k) for k in keep if k in r} for r in rows]}
+        )
+    sk = str(args.get("sk") or "").strip()
+    try:
+        if action == "close":
+            entry = coach_corrections.close_correction(
+                _table_ref,
+                sk,
+                disposition=str(args.get("disposition") or ""),
+                evidence=str(args.get("evidence") or ""),
+                closed_by=CLOSED_BY_OWNER,
+            )
+        else:
+            entry = coach_corrections.reopen_correction(_table_ref, sk, reason=str(args.get("reason") or ""), reopened_by=CLOSED_BY_OWNER)
+    except coach_corrections.CorrectionCloseError as e:
+        return {"error": str(e)}
+    except Exception as e:  # noqa: BLE001 — a conditional failure is the honest answer, never a forced write
+        if "ConditionalCheckFailed" in type(e).__name__ or "ConditionalCheckFailed" in str(e):
+            want = "open" if action == "close" else "closed"
+            return {"error": f"{sk} is not an existing {want} correction — re-read it (list); nothing was written"}
+        raise
+    return {"status": "closed" if action == "close" else "reopened", "sk": sk, "audit": entry}
+
+
 def tool_log_coach_correction(args):
     """Correct a weekly-review-pack item by its number (`item_number`), OR log a live
     chat-session override by naming the SIGNAL that was wrong (`signal`, #4083). Exactly
-    one of the two is required. An unknown pack number is reported, not dropped."""
+    one of the two is required. An unknown pack number is reported, not dropped.
+    #6158: action='close' | 'reopen' | 'list' is the owner's lifecycle door (`_lifecycle`)."""
     args = args or {}
+    action = args.get("action") or "log"
+    if action in LIFECYCLE_ACTIONS:
+        return _lifecycle(args)
+    if action != "log":
+        return {"error": "action must be one of log, close, reopen, list"}
 
     correction_text = (args.get("correction") or args.get("correction_text") or "").strip()
     if not correction_text:

@@ -242,10 +242,12 @@ def test_update_status_rejects_unknown_status(table):
     sk = cc.write_correction(table, {}, "x", "framing")
     with pytest.raises(ValueError):
         cc.update_status(table, sk, "resolved-forever")
+    with pytest.raises(ValueError):
+        cc.update_status(table, sk, cc.CLOSED)  # #6158: closing needs close_correction's disposition + evidence
     assert len(table.updates) == 0
 
 
-@pytest.mark.parametrize("status", list(cc.STATUSES))
+@pytest.mark.parametrize("status", list(cc.TRANSITION_STATUSES))
 def test_all_known_statuses_accepted(table, status):
     sk = cc.write_correction(table, {}, "x", "framing")
     assert cc.update_status(table, sk, status) is True
