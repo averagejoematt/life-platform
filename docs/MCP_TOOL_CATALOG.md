@@ -21,7 +21,7 @@
 
 ---
 
-## All 94 Tools — by module
+## All 95 Tools — by module
 
 | Module | Tools |
 |---|---|
