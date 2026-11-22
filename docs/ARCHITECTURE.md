@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-Last updated: 2026-11-21 (v8.6.0 — 93 tools, 97-module MCP package, 20 data sources, 107 Lambdas, 26 secrets, 148 alarms, 10 CDK stacks deployed).
+Last updated: 2026-11-22 (v8.6.0 — 93 tools, 97-module MCP package, 20 data sources, 107 Lambdas, 29 secrets, 148 alarms, 10 CDK stacks deployed).
 
 > **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **Home + five doors** (v5 IA): the cockpit (`/cockpit/`, live data), the data (`/data/`, the evidence archive — old `/evidence/*` slugs 301), the coaching, the protocols, and the story (`/story/`, the writing hub); the pre-v4 site is preserved verbatim at `/legacy`. Shared code ships **bundled inside every function** (#781/ADR-131 — the shared layer is retired; see [CONVENTIONS.md §1](CONVENTIONS.md)). **169 ADRs** (ADR-001 → ADR-171 — full index auto-generated in [DECISIONS.md](DECISIONS.md)). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
@@ -76,7 +76,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | SQS queue | Dead-letter queue | `life-platform-ingestion-dlq` |
 | Lambda Function URL (remote MCP) | Remote MCP HTTPS endpoint | `<not committed — SEC-02 #780; read live: aws lambda get-function-url-config --function-name life-platform-mcp --region us-west-2>` (OAuth 2.1 auto-approve + HMAC Bearer) |
 | API Gateway | HTTP endpoint | `health-auto-export-api` (`p6clybdkkc`, CDK-owned; the older `a76xwxt2wa` is the retired orphan — `tests/test_teardown_hae_orphan_api.py`) — webhook ingest |
-| Secrets Manager | Credential store | **26 active secrets** at $0.40/month each = **~$10.40/month**
+| Secrets Manager | Credential store | **29 active secrets** at $0.40/month each = **~$11.60/month**
 | SNS topic | Alert routing | `life-platform-alerts` (urgent) + `life-platform-alerts-digest` (batched daily by `alert-digest-lambda` per ADR-050) |
 | CloudFront (amj) | CDN (public) | `E3S424OXQZ8NBE` → site-api Lambda + S3 `/site`, alias `averagejoematt.com` |
 | CloudFront (dash) | CDN + auth | `EM5NPX6NJN095` (`d14jnhrgfrte42.cloudfront.net`) → S3 `/dashboard`, Lambda@Edge auth, alias `dash.averagejoematt.com` |
@@ -356,7 +356,7 @@ Role categories (counts are deliberately not stated — they are the per-stack `
 
 ## Secrets Manager
 
-**26 active secrets** at $0.40/month each = **~$10.40/month**
+**29 active secrets** at $0.40/month each = **~$11.60/month**
 
 The count and the table below must agree, and the count's `live-verified` stamp must be under 90 days old — both enforced by `scripts/check_doc_facts.py` (#1957). Re-verify against AWS with `python3 deploy/sync_doc_metadata.py --refresh-secrets` (read-only), then `--apply` to propagate. Per-secret consumers, rotation procedures and the retire ledger live in [SECRETS_MAP.md](SECRETS_MAP.md).
 
@@ -365,7 +365,7 @@ The count and the table below must agree, and the count's `live-verified` stamp 
 | `life-platform/whoop` | Whoop Lambda — OAuth2 tokens |
 | `life-platform/withings` | Withings Lambda — OAuth2 tokens |
 | `life-platform/strava` | Strava Lambda — OAuth2 tokens |
-| `life-platform/garmin` | RETIRED (#4640) — no consumer; owner-attended delete pending |
+| ~~`life-platform/garmin`~~ | **DELETED** — retired #4640; deletion window began 2026-10-12, no longer listed live |
 | `life-platform/eightsleep` | Eight Sleep Lambda — username + password |
 | `life-platform/eightsleep-client` | Eight Sleep Lambda — client credential alongside user creds |
 | `life-platform/ai-keys` | Legacy direct-API fallback across the intelligence/email Lambdas — Anthropic API key (Bedrock/IAM is the primary path, ADR-062) |
@@ -388,6 +388,10 @@ The count and the table below must agree, and the count's `live-verified` stamp 
 | `life-platform/bluesky` | Syndication — handle + scoped app password (`docs/RUNBOOK_SYNDICATION.md`) |
 | `life-platform/digest` | `milestone-digest` — operator-configured recipient list (kept out of git) |
 | `life-platform/telegram` | Telegram coach chat (#2364) — per-bot tokens, chat-id allow-list, webhook secret |
+| `life-platform/hae-webhook` | `health-auto-export-webhook` + `pipeline-health-check` — the webhook's own bearer token (#5513 c) |
+| `life-platform/ip-hash-salt` | Site API social-engage doors — reader `ip_hash` salt, fail-closed when absent (#3620) |
+| `life-platform/progress-photos-signing` | `telegram-coach-worker` + `progress-viewer` — HMAC key for the owner photo-viewer link (#3760) |
+| `life-platform/progress-token-secret` | None — orphan, delete candidate (owner-attended); see SECRETS_MAP.md |
 | ~~`life-platform/dropbox`~~ | **DELETED** — window closed 2026-05; the `ingestion-keys` bundle is authoritative |
 | ~~`life-platform/anthropic-api-key`~~ | **DELETED** — window closed 2026-05 (orphan, no consumer in source) |
 | ~~`life-platform/webhook-key`~~ | **HARD-DELETED 2026-03-14** |
