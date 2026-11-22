@@ -4979,3 +4979,29 @@ STRUCTURAL_HAND_PROOFS["structural::test_elena_canon_6155.py"] = {
     ),
     "proved_on": "2026-11-21",
 }
+
+# #6177 — dated public chapter corrections: the platform signs (never a persona), nothing is public before the owner's
+# recorded approval, supersession keeps the replaced record, and no source writes a new persona-signed note.
+STRUCTURAL_HAND_PROOFS["structural::test_chapter_corrections_6177.py"] = {
+    "gate_name": "test_chapter_corrections_6177.py",
+    "command": "python3 -m pytest tests/test_chapter_corrections_6177.py -q -p no:warnings   # baseline 18 passed",
+    "mutation": (
+        "Four plants, ONE AT A TIME, each restored with `git checkout --`: M1 margaret_editor_pass.splice_editors_note's "
+        "block signed '— Margaret Calloway:' again; M2 chapter_corrections.validate's 'no approval recorded' check deleted; "
+        "M3 chapter_corrections.signature() signs with LEGACY_SIGNER instead of PLATFORM_SIGNATURE; M4 the MCP tool's "
+        "'already approved' pre-check replaced by `if False:`."
+    ),
+    "observed": (
+        "2026-11-22, #6177 lane. BASELINE 18 passed. M1 2 failed (the lambdas/mcp/deploy/scripts sweep + the legacy-writer "
+        "check); M2 1 failed; M3 8 failed; M4 18 passed — SURVIVED by design: the conditional update "
+        "(size(approvals) = 0) still refuses the second approval, so behaviour is unchanged; the pre-check is a friendlier "
+        "message, not the guard. REVERTED 18 passed."
+    ),
+    "scope": (
+        "The record's rules (content/chapter_corrections.py), the MCP writer against a fake table, the /api/chapters field "
+        "builder, the snapshot module and the feed builder; every .py under lambdas/, mcp/, deploy/, scripts/ (archive "
+        "excluded) for a persona-signed note literal. NOT SEEN: a persona name assembled at runtime from parts; the "
+        "built pages (held by check_www_build's corrections mutation and www/tests/chapter_corrections.test.mjs)."
+    ),
+    "proved_on": "2026-11-22",
+}
