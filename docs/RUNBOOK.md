@@ -851,6 +851,33 @@ Every held send logs ONE `[outbound-trial] {"event": "suppressed", ...}` line in
 is never a silent failure. Volume before and after: `python3 scripts/owner_outbound_volume.py --weeks 2` (read-only;
 log groups keep 30 days, so run it within 30 days of the window).
 
+## Nutrition consistency — the target-neutral switchboard (#6195)
+
+Owner ruling 2026-11-22 (remaster-2 §11): labels, windows, as-of dates, partial-export exclusions and explanatory copy
+only — no calorie target, deficit cut-off, protein line, rate band, titration rule, clinical stop line or training
+prescription changes (`tests/test_nutrition_consistency_6195.py` resolves them all with every item on and off). ONE
+committed module, `lambdas/common/nutrition_consistency.py`; each item is one line in `SWITCHES` and ships `False`
+(today's output, pinned byte-for-byte against origin/main by the same test). Turn an item on, or roll one back alone,
+by flipping its line in a PR; then the fleet deploy and the site-api deploy (CONVENTIONS: from main, by the driver);
+the MCP description needs the MCP deploy; the day pages change at the next snapshot build. The site JavaScript needs
+no deploy either way: it renders the new fields only when the API sends them.
+
+| Item | Group | On | Rollback |
+|---|---|---|---|
+| `public_verdict_not_clearance` | labelling | /api/deficit_sustainability's no-strain verdict says what held, what drifted, its dates and that it is not a clearance; adds `as_of`, `based_on`, `not_based_on`, `honesty` | flip to `False` |
+| `maintenance_labelled` | labelling | maintenance carries `tdee_as_of`; the page names its source and date; the calorie chart says "estimated maintenance", not "goal" | flip to `False` |
+| `rate_line_wording` | labelling | the loss-rate line drops "defensible early at this size" | flip to `False` |
+| `mcp_sustainability_wording` | labelling | MCP get_deficit_sustainability's all-holding line is not a clearance; description re-routed | flip to `False` |
+| `owner_target_layers` | labelling | brief, Board intro, Nutrition Review and Weekly Plate prompts name rest/lifting minimums and the base | flip to `False` |
+| `brief_tile_layers` | labelling | the Morning Brief calorie tile label shows the served band (grading unchanged) | flip to `False` |
+| `overshoot_option_layers` | labelling | the critics' overshoot option says what the step moves on each layer | flip to `False` |
+| `partial_export_excluded` | computed | a partial export is not a day eaten in the public five-channel mean, the MCP mean and the critics' series | flip to `False` |
+| `day_page_maintenance_dated` | computed | day pages print maintenance only from its as-of date (needs `maintenance_labelled`) | flip to `False`, rebuild |
+| `day_page_partial_labelled` | computed | a partial-export day page is labelled and not graded against the protein floor | flip to `False`, rebuild |
+| `bod_intro_charter_rate` | computed | the Board intro states the charter's rate band, not `PROFILE#v1` phases | flip to `False` |
+
+Activate the labelling group first; read the before/after numbers before the computed group.
+
 ## Common Issues
 
 ### Whoop/Withings/Strava: "Token expired" error

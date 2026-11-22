@@ -6,11 +6,13 @@ import math
 from collections import defaultdict
 from datetime import datetime, timedelta
 
+from common import nutrition_consistency as _nc  # #6195: the target-neutral consistency switchboard
 from health import (
     calorie_target as calorie_resolver,  # #5095: the ONE calorie target
     deficit_disclosures,  # #3754: BS-12 cutoff provenance + the ADR-104 sentence
     eating_window,  # #5099: THE eating window (charter nutrition.eating_window)
     macro_floors,
+    nutrition_logging,  # #6195 F3: the complete-log rule (#5607/#5954)
     protein_engine,  # #5098: THE protein hit, the charter range and the feedings
     tdee as tdee_core,  # ADR-152 / #2310: THE one TDEE definition
     training_output_channel,  # #3754: THE training-output input (daily training load, never Strava kJ)
@@ -786,6 +788,7 @@ def tool_get_deficit_sustainability(args):
 
     # ── 1. Caloric deficit detection ──
     mf_items = query_source_cross_phase("macrofactor", start_date, end_date)
+    mf_items = nutrition_logging.complete_logs(mf_items) if _nc.on(_nc.PARTIAL_EXPORT_EXCLUDED) else mf_items  # #6195 F3 (#5954)
     if len(mf_items) < 7:
         return {"error": f"Need ≥7 days of MacroFactor data. Found {len(mf_items)}."}
 
@@ -994,18 +997,9 @@ def tool_get_deficit_sustainability(args):
         severity = "SUSTAINABLE"
         recommendation = "Deficit appears sustainable. All systems holding."
 
-    _label_bands = deficit_disclosures.DEFICIT_LABEL_BANDS
-    deficit_label = (
-        "aggressive"
-        if deficit_pct > _label_bands["aggressive_above_pct"]
-        else (
-            "moderate"
-            if deficit_pct > _label_bands["moderate_above_pct"]
-            else "mild" if deficit_pct > _label_bands["mild_above_pct"] else "maintenance"
-        )
-    )
+    deficit_label = _deficit_label(deficit_pct)
 
-    return {
+    out = {
         # ADR-105/#1917: `days` is the REQUESTED window; every intake figure below is
         # computed over however many days actually carried a calorie rollup. Publishing
         # only the request let seven logged days inside a fourteen-day ask read as "days: 14".
@@ -1059,6 +1053,26 @@ def tool_get_deficit_sustainability(args):
         # Withings trend; a reader that fails is named in `critics.unknown`, never a crash.
         **_nutrition_critics_block(end_date, severity, degraded_count, tdee_estimate if _deficit_published else None, args),
     }
+    return _holding_wording(out, severity, _deficit_published)
+
+
+def _deficit_label(deficit_pct):
+    """The deficit-intensity label from deficit_disclosures' bands (moved out of the tool for the #4880 ceiling, unchanged)."""
+    bands = deficit_disclosures.DEFICIT_LABEL_BANDS
+    if deficit_pct > bands["aggressive_above_pct"]:
+        return "aggressive"
+    if deficit_pct > bands["moderate_above_pct"]:
+        return "moderate"
+    return "mild" if deficit_pct > bands["mild_above_pct"] else "maintenance"
+
+
+def _holding_wording(out, severity, deficit_published):
+    """#6195 F15 (MCP_SUSTAINABILITY_WORDING, default OFF): the severity token stays (the critics and the deload word read
+    it); with the switch on, the all-holding recommendation stops reading as a clearance and names a refused deficit and
+    a critic veto when the same response carries them."""
+    if severity == "SUSTAINABLE" and _nc.on(_nc.MCP_SUSTAINABILITY_WORDING):
+        out["recommendation"] = _nc.mcp_holding_recommendation(deficit_published, bool((out.get("critics") or {}).get("veto")))
+    return out
 
 
 def _nutrition_critics_block(end_date, severity, degraded_count, maintenance_kcal, args=None):

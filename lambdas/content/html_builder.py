@@ -10,12 +10,13 @@ Exports:
   _section_error_html()  — graceful section error placeholder
 """
 
+from common import nutrition_consistency as _nc  # #6195: the target-neutral consistency switchboard
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, PLAN_DAILY_PROTEIN_MIN_G
 from common.digest_utils import compute_confidence, safe_float  # safe_float: shared bundled helper (#970; the local d2f copy was unused)
 from common.habit_registry import habit_tier  # #5232
 from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from common.pacific_time import day_in_words, shift_day_key  # #4182: dates in words, one PT spelling
-from health.calorie_target import target_kcal  # #5095: the ONE calorie target
+from health.calorie_target import calorie_band, target_kcal  # #5095: the ONE calorie target
 from health.scoring_engine import habitify_reading  # #4362
 
 from content import brief_editorial, brief_hr_regime  # #5029: the brief's reading of the HR regime markers; #6163 editorial labels
@@ -926,7 +927,7 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
 
             out += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">'
             macro_items = [
-                ("Calories", fmt_num(cals), "/" + str(cal_target or "—"), cal_color),
+                ("Calories", fmt_num(cals), _cal_tile_label(data.get("date"), cal_target), cal_color),
                 ("Protein", str(round(protein)) + "g" if protein else "—", "/" + str(protein_target) + "g", prot_color),
                 ("Fat", str(round(fat)) + "g" if fat else "—", "", "#94a3b8"),
                 ("Carbs", str(round(carbs)) + "g" if carbs else "—", "", "#94a3b8"),
@@ -1944,3 +1945,11 @@ def build_html(
     html += _brief_rhythm(rhythm_lines)
     html += _brief_footer(compute_age_msg, compute_stale, data, date_str, budget_headroom_line=budget_headroom_line)
     return html
+
+
+def _cal_tile_label(day, cal_target):
+    """The NUTRITION REPORT tile's calorie label. #6195 F12 (BRIEF_TILE_LAYERS): with the switch on it names the served
+    band — the rest-day to the lifting-day minimum — so a lifting morning does not read one layer as the day's figure.
+    Label only: the tile's colour still grades against ``target_kcal`` exactly as before."""
+    band = calorie_band(day) if _nc.on(_nc.BRIEF_TILE_LAYERS) else None
+    return f"/{band[0]}–{band[1]}" if band else "/" + str(cal_target or "—")

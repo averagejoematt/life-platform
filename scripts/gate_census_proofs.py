@@ -5079,3 +5079,30 @@ STRUCTURAL_HAND_PROOFS["structural::test_chapter_corrections_6177.py"] = {
     ),
     "proved_on": "2026-11-22",
 }
+
+# #6195 — the target-neutral nutrition consistency switchboard: every item ships OFF, OFF renders every touched surface
+# byte-for-byte as origin/main did, no switch moves a target value, and the retired clearance wording is gone.
+STRUCTURAL_HAND_PROOFS["structural::test_nutrition_consistency_6195.py"] = {
+    "gate_name": "test_nutrition_consistency_6195.py",
+    "command": "python3 -m pytest tests/test_nutrition_consistency_6195.py -q -p no:cacheprovider   # baseline 28 passed",
+    "mutation": (
+        "Six plants, ONE AT A TIME, each restored from a scratch copy: M1 the OFF public verdict literal loses a comma; "
+        "M2 nutrition_consistency.SWITCHES[PUBLIC_VERDICT_NOT_CLEARANCE] shipped True; M3 nutrition_critics._energy sets "
+        "step_kcal 200 when OVERSHOOT_OPTION_LAYERS is on; M4 config/challenges_catalog.json says 'At a 1500 kcal deficit' "
+        "again; M5 `from common import nutrition_consistency` added to lambdas/health/protein_floor.py; M6 "
+        "html_builder._cal_tile_label ignores its switch."
+    ),
+    "observed": (
+        "2026-11-22, #6195 lane. BASELINE 28 passed. M1 1 failed (OFF golden); M2 1 failed (every item ships off); M3 1 "
+        "failed (no target moves); M4 1 failed (config wording sweep); M5 1 failed (reader set); M6 2 failed (OFF golden + "
+        "ownership). REVERTED 28 passed."
+    ),
+    "scope": (
+        "Every surface the switchboard reaches, rendered from synthetic fixtures and compared with a golden written by the "
+        "same harness from origin/main; resolved calorie/protein/rate/titration/redline values with all items on vs off; "
+        "public site-API modules, site JS and config JSON for the retired wording; every .py under lambdas/, mcp/, scripts/ "
+        "that names the switchboard. NOT SEEN: live data, the deployed flag state, the Astro-built day pages (www/tests "
+        "day_food_6195.test.mjs holds the row text)."
+    ),
+    "proved_on": "2026-11-22",
+}

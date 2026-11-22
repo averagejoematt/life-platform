@@ -55,6 +55,7 @@ import itertools
 from typing import Any
 
 from coach.critics import deterministic_verdict, reconcile
+from common import nutrition_consistency as _nc  # #6195: the target-neutral consistency switchboard
 from training import owner_redlines
 from training.training_charter import charter_value
 
@@ -169,7 +170,24 @@ def _overshoot_to_text(energy: dict[str, Any]) -> str:
     """The decision option's destination — the resolver's target + one step, exactly as
     `_overshoot_cap_flag` computes `to` (#5325 box 3), never the logged mean."""
     base, step = energy.get("base_kcal"), energy.get("step_kcal")
+    if base is not None and step is not None and _nc.on(_nc.OVERSHOOT_OPTION_LAYERS):
+        return _overshoot_layers_text(energy, base, step)
     return f"to {base + step:.0f}" if (base is not None and step is not None) else "from an unknown target"
+
+
+def _overshoot_layers_text(energy: dict[str, Any], base: float, step: float) -> str:
+    """#6195 F14: what the one step moves — the base, and the served rest-day and lifting-day minimums before and after
+    (``max(base, any-day floor)``, ``max(base + lifting uplift, lifting-day floor)``, owner ruling 2026-11-13, #5794).
+    A restatement of the resolver's rule: no number here is new, and the step itself is unchanged."""
+    fa, fl = energy.get("floor_any_day"), energy.get("floor_lifting_day")
+    up = _num(charter_value(calorie_target.BAND_UPLIFT_PATH))
+    nb = base + step
+    if fa is None or fl is None or up is None:
+        return f"base {base:.0f} -> {nb:.0f}"
+    return (
+        f"base {base:.0f} -> {nb:.0f}; served minimums: rest days {max(base, fa):.0f} -> {max(nb, fa):.0f}, "
+        f"lifting days {max(base + up, fl):.0f} -> {max(nb + up, fl):.0f}"
+    )
 
 
 def _energy_floor_tripped(

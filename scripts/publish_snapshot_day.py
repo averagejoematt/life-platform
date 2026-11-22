@@ -30,6 +30,8 @@ from datetime import date, timedelta
 from typing import Any, Callable
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(1, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
+from common import nutrition_consistency as _nc  # noqa: E402 — #6195: the target-neutral consistency switchboard
 from publish_snapshot_contract import ID_RE, ISO_DAY, SchemaError, envelope, log  # noqa: E402
 from publish_snapshot_corrections import (
     annotate_coach_lines,  # noqa: E402
@@ -312,15 +314,26 @@ def night_of(row: dict | None) -> dict | None:
     }
 
 
-def food_of(row: dict | None, *, logging_gap: bool, floor_g: Any = None, tdee: Any = None) -> dict | None:
+def food_of(row: dict | None, *, logging_gap: bool, floor_g: Any = None, tdee: Any = None, tdee_as_of: Any = None) -> dict | None:
     """The four macros as logged, plus the platform's logging-gap flag. No row is no food object —
-    a day with no entries is missing, never zero intake."""
+    a day with no entries is missing, never zero intake.
+
+    #6195, both default OFF (``common.nutrition_consistency``): with DAY_PAGE_MAINTENANCE_DATED on and the API serving
+    the estimate's date, the maintenance figure is printed only on days on or after that date, and carries it
+    (``tdee_as_of``); with DAY_PAGE_PARTIAL_LABELLED on, a row exported mid-day carries ``partial: true``."""
     if not isinstance(row, dict):
         return None
     macros = {k: _num(row.get(k)) for k in ("calories", "protein_g", "carbs_g", "fat_g")}
     if all(v is None for v in macros.values()):
         return None
-    return {**macros, "logging_gap": bool(logging_gap), "floor_g": _num(floor_g), "tdee": _num(tdee)}
+    out = {**macros, "logging_gap": bool(logging_gap), "floor_g": _num(floor_g), "tdee": _num(tdee)}
+    day = str(row.get("date") or "")[:10]
+    if _nc.on(_nc.DAY_PAGE_MAINTENANCE_DATED) and isinstance(tdee_as_of, str) and ISO_DAY.match(tdee_as_of):
+        out["tdee"] = out["tdee"] if day >= tdee_as_of else None
+        out["tdee_as_of"] = tdee_as_of if out["tdee"] is not None else None
+    if _nc.on(_nc.DAY_PAGE_PARTIAL_LABELLED):
+        out["partial"] = row.get("partial_export") is True
+    return out
 
 
 def engine_of(payload: Any, day: str) -> dict | None:
@@ -418,6 +431,7 @@ def day_detail(
     gap_days: set[str],
     floor_g: Any = None,
     tdee: Any = None,
+    tdee_as_of: Any = None,
     character: Any = None,
     coach_moves: Any = None,
     predictions: list[dict] | None = None,
@@ -436,7 +450,7 @@ def day_detail(
 
     workout = workout_of(workouts)
     night = night_of(night_row)
-    food = food_of(food_row, logging_gap=day in gap_days, floor_g=floor_g, tdee=tdee)
+    food = food_of(food_row, logging_gap=day in gap_days, floor_g=floor_g, tdee=tdee, tdee_as_of=tdee_as_of)
     lines = coach_lines_of(coach_moves, day)
     settled, open_, n_open = calls_for(predictions or [], day)
     edges, seen = [], set()
@@ -506,7 +520,15 @@ def check_layers(o: dict, where: str) -> None:
                 _nums(dev, ("hours", "deep_hours", "rem_hours", "light_hours", "score"), f"{where}.night.device")
     f = o["food"]
     if f is not None:
-        _keys(f, {"calories", "protein_g", "carbs_g", "fat_g", "logging_gap", "floor_g", "tdee"}, f"{where}.food")
+        _keys(
+            f,
+            {"calories", "protein_g", "carbs_g", "fat_g", "logging_gap", "floor_g", "tdee"} | ({"tdee_as_of", "partial"} & set(f)),
+            f"{where}.food",
+        )  # #6195: the two optional keys appear only with their switches on
+        if f.get("tdee_as_of") is not None and not ISO_DAY.match(str(f["tdee_as_of"])):
+            raise SchemaError(f"{where}.food.tdee_as_of: a day or null")
+        if "partial" in f and not isinstance(f["partial"], bool):
+            raise SchemaError(f"{where}.food.partial: a boolean")
         _nums(f, ("calories", "protein_g", "carbs_g", "fat_g", "floor_g", "tdee"), f"{where}.food")
         if not isinstance(f["logging_gap"], bool):
             raise SchemaError(f"{where}.food.logging_gap: a boolean")
@@ -594,7 +616,7 @@ def fetch_windowed(get: Callable[[str], Any], first: str, last: str, fallback: d
     answered no window falls back to its default (undated) payload, covering only the dates it served."""
     rows: dict[str, list[dict]] = {k: [] for k in WINDOWED}
     covered: dict[str, set[str] | None] = {}
-    food_ctx: dict[str, tuple[Any, Any]] = {}
+    food_ctx: dict[str, tuple[Any, Any, Any]] = {}
     for key, (path, field, ck) in WINDOWED.items():
         got: set[str] = set()
         answered = False
@@ -616,7 +638,7 @@ def fetch_windowed(get: Callable[[str], Any], first: str, last: str, fallback: d
             if key == "nutrition_overview":
                 nut = payload.get("nutrition") if isinstance(payload.get("nutrition"), dict) else {}
                 for d in _days(wa, wb):
-                    food_ctx[d] = (nut.get("protein_floor_g"), nut.get("tdee"))
+                    food_ctx[d] = (nut.get("protein_floor_g"), nut.get("tdee"), nut.get("tdee_as_of"))
         if not answered:
             fb = fallback.get(key) if isinstance(fallback.get(key), dict) else None
             span = _span([r.get("date") for r in (fb or {}).get(field) or [] if isinstance(r, dict)])
@@ -626,7 +648,7 @@ def fetch_windowed(get: Callable[[str], Any], first: str, last: str, fallback: d
                 if key == "nutrition_overview":
                     nut = fb.get("nutrition") if isinstance(fb.get("nutrition"), dict) else {}
                     for d in got:
-                        food_ctx[d] = (nut.get("protein_floor_g"), nut.get("tdee"))
+                        food_ctx[d] = (nut.get("protein_floor_g"), nut.get("tdee"), nut.get("tdee_as_of"))
             covered[ck] = got if span else None
         else:
             covered[ck] = got
@@ -669,7 +691,7 @@ def layers_for(ctx: Any, get: Callable[[str], Any], rows: list[dict]) -> dict[st
             except Exception as exc:  # noqa: BLE001 — a day the endpoint does not answer shows its absent state
                 log(f"  day: {path}?date={day} unavailable ({exc})")
                 per[key] = None
-        floor_g, tdee = food_ctx.get(day, (None, None))
+        floor_g, tdee, tdee_as_of = food_ctx.get(day, (None, None, None))
         out[day] = day_detail(
             day,
             workouts=by_date.get(day, []),
@@ -679,6 +701,7 @@ def layers_for(ctx: Any, get: Callable[[str], Any], rows: list[dict]) -> dict[st
             gap_days=gaps,
             floor_g=floor_g,
             tdee=tdee,
+            tdee_as_of=tdee_as_of,
             character=per["character"],
             coach_moves=per["coach_moves"],
             predictions=preds,
