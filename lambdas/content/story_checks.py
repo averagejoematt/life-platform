@@ -371,8 +371,8 @@ def story_door(text: str, *, not_yet_exported: Iterable[str] = ()) -> List[str]:
 
 
 # ── staged encounters (#6178) ────────────────────────────────────────────────
-# Owner ruling 2026-11-22 §3/§7: the narrator has interviewed no one. A published chapter staged one ("when I reached
-# him this week … He paused."), and no source held it. A first-person encounter with a coach or with Matthew, or a
+# Owner ruling 2026-11-22 §3/§7: the narrator has interviewed no one. A published chapter staged one (the narrator
+# reaching a coach, then a witnessed reaction beat), and no source held it. A first-person encounter with a coach or with Matthew, or a
 # witnessed reaction beat, is a HARD source finding (``source:`` — never a ``craft:`` note, so it always blocks): the
 # platform holds stored words, not conversations. Keyed on STRUCTURE (the narrator's "I" reaching someone; a pronoun's
 # reaction beat ending a clause), never on one sentence. Chronicle posts only: the Panel is the series' disclosed

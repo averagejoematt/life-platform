@@ -22,7 +22,7 @@ from content import story_ledger  # noqa: E402
 
 PK = bf.PK
 CYCLE = "17"
-ROSTER = [{"coach_id": "nutrition_coach", "name": "Marcus Webb"}, {"coach_id": "sleep_coach", "name": "Lisa Park"}]
+ROSTER = [{"coach_id": "nutrition_coach", "name": "Tobias Fenn"}, {"coach_id": "sleep_coach", "name": "Lisa Park"}]
 
 TEXT = """"The Quiet Accumulation"
 
@@ -30,7 +30,7 @@ The waypoint ladder is a math problem now.
 
 The HRV promise from last week is now scoreable. The 7-day rolling average through Tuesday sits at 55.8 milliseconds, against 55.0.
 
-> Marcus Webb, when I reached him this week, said protein has to lead.
+> Tobias Fenn's read this week: protein has to lead.
 """
 
 

@@ -25,8 +25,8 @@ sys.path.insert(0, str(_REPO / "lambdas"))
 
 from content import autopublish_audit, elena_canon, story_checks, story_craft, story_writers  # noqa: E402
 
-# The shape the published week-6 chapter carried (the editorial review's specimen), as a synthetic paragraph.
-STAGED = "Marcus Webb, when I reached him this week, was blunt about it. 'It's a target he's not aiming at.' He paused."
+# A wholly fictional specimen of the staged-interview shape: an invented coach, invented words.
+STAGED = "Tobias Fenn, when I reached him this week, was curt about it. 'The floor is a suggestion until it isn't.' He paused."
 
 
 def _all_text() -> str:
