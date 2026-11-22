@@ -591,6 +591,13 @@ def compute_coach_orchestrator() -> list[iam.PolicyStatement]:
                 actions=["ssm:GetParameter"],
                 resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle"],
             ),
+            # #6156: the forecast rule (coach.public_forecast, on coach-history-summarizer's Monday public_brief run)
+            # reads its runtime kill switch. Read-only, one parameter; absent or unreadable = off (fail closed).
+            iam.PolicyStatement(
+                sid="PublicForecastSwitchRead",
+                actions=["ssm:GetParameter"],
+                resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/public-forecast"],
+            ),
         ],
         # #5545: coach-ensemble-digest (shares this role) reaches dispute_docket -> coach_prediction_evaluator.
         metric_namespaces=(NS_AI, NS_COMPUTE, NS_PREDICTIONS),

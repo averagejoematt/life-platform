@@ -461,6 +461,9 @@ SOURCE_CLASS: dict[str, str] = {
     # cycle-stamps and tombstones it so cycle N's on-tape record stays navigable in the archive. NB
     # the SOURCE ENTRY the claim points at (notion) is RAW_TIMESERIES and is kept forever — his words
     # survive the reset; only the ledger's forecast bookkeeping resets with the run.
+    "public_forecast": EXPERIMENT_SCOPED,  # #6156: the platform's forecast rule — deterministic number calls from
+    # public series (coach/public_forecast.py), sk PREDICTION#pred_<cycle>_forecast_<rule> + RUN#<cycle>, graded by the
+    # same evaluator as diary_claims. EXPERIMENT_SCOPED for the same reason: a forecast is about THIS run's calendar.
     "ai_analysis": EXPERIMENT_SCOPED,
     "decisions": EXPERIMENT_SCOPED,
     "rewards": EXPERIMENT_SCOPED,
