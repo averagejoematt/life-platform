@@ -1214,6 +1214,13 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/coach_context_pilot.py",
+      "partition": "decisions",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": null,
       "module": "lambdas/coach/coach_corrections.py",
@@ -1477,6 +1484,13 @@
       "lambda": null,
       "module": "lambdas/coach/progress_capture.py",
       "partition": "progress_photos",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/coach/recommendation_record.py",
+      "partition": "coach_recommendations",
       "via": "pk"
     },
     {
@@ -6235,6 +6249,20 @@
     {
       "direction": "read",
       "lambda": "life-platform-mcp",
+      "module": "mcp/tools_coach_recommendations.py",
+      "partition": "decisions",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": "life-platform-mcp",
+      "module": "mcp/tools_coach_recommendations.py",
+      "partition": "decisions",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": "life-platform-mcp",
       "module": "mcp/tools_correlation.py",
       "partition": "apple_health",
       "via": "seam"
@@ -8337,14 +8365,14 @@
       "contracts_enrolled": 16,
       "contracts_known": 15,
       "contracts_ratchet": 16,
-      "edges": 793,
+      "edges": 797,
       "lambdas": 107,
-      "mcp_tool_modules": 42,
-      "mcp_tools": 93,
-      "partitions": 125,
+      "mcp_tool_modules": 43,
+      "mcp_tools": 94,
+      "partitions": 126,
       "privacy_fields_owner_only": 69,
       "privacy_fields_owner_published": 11,
-      "privacy_sources_owner_only": 25,
+      "privacy_sources_owner_only": 26,
       "privacy_sources_owner_published": 3,
       "scheduled_lambdas": 80,
       "schedules": 97
@@ -8352,8 +8380,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 389,
-        "sites_resolved": 996,
-        "sites_total": 1385
+        "sites_resolved": 1002,
+        "sites_total": 1391
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -8521,6 +8549,11 @@
       "class": "system_state",
       "ingestion": false,
       "privacy_tier": "public"
+    },
+    "coach_recommendations": {
+      "class": "cross_phase",
+      "ingestion": false,
+      "privacy_tier": "owner_only"
     },
     "coach_vision": {
       "class": "cross_phase",
@@ -9260,6 +9293,7 @@
       "cgm_readings": "owner_only",
       "checkin_intake_pairs": "owner_only",
       "clinical": "internal",
+      "coach_recommendations": "owner_only",
       "coach_vision": "owner_only",
       "dexa": "owner_published",
       "early_warning_flag": "owner_only",
