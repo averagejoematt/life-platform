@@ -146,7 +146,8 @@ fi
 # 2. datadrops originals (genome, physicals, HAE exports, backfills)
 if [ -r "$REPO/datadrops" ] && ls "$REPO/datadrops" > /dev/null 2>&1; then
     "$AWS" s3 sync "$REPO/datadrops/" "s3://$BUCKET/datadrops-archive/" \
-        --region "$REGION" --exclude "logs/*" --exclude "*.DS_Store" || rc=1
+        --region "$REGION" --exclude "logs/*" --exclude "*.DS_Store" \
+        --exclude "habits_drop/processed/chronicling_events_*" || rc=1
 else
     echo "WARN: $REPO/datadrops is missing or unreadable — the datadrops leg did NOT run."
     echo "      datadrops/ is gitignored, so a fresh clone has none: restore it from"
