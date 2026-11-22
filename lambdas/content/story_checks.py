@@ -406,6 +406,74 @@ def staged_encounter_findings(text: str) -> List[str]:
     return out
 
 
+# ── his words, claimed without a record of them (#6199) ──────────────────────
+# The 2026-11-21 review: a chapter attributed a statement to him ("he has said …") in a week when no words of his were on
+# record. A writer may report what he SAID only from the words the platform holds (the dossier's owner_voice answers);
+# with none on record, a perfect-tense attribution claims a statement nobody can produce. Keyed on the attribution
+# itself, never on what follows: "he said he'd walk" (a narrated past) is not one, "he has said" / "in his own words" is.
+_ATTRIBUTION = re.compile(
+    r"\b(?:he|matt(?:hew)?)\s+(?:has|had|['’]s)\s+(?:said|told\s+(?:us|me|readers|the\s+\w+)|written|admitted|insisted|put\s+it)\b"
+    r"|\bin\s+his\s+own\s+words\b|\bas\s+he\s+(?:has\s+)?(?:put|puts)\s+it\b|\bby\s+his\s+own\s+account\b",
+    re.IGNORECASE,
+)
+
+
+def attribution_findings(text: str, owner_lines: Optional[Iterable[str]]) -> List[str]:
+    """``source:`` findings (blocking) for a first-person attribution to him when no words of his are on record this week.
+    ``owner_lines=None`` (a caller that does not pass the record) skips the check."""
+    if owner_lines is None or any(str(x or "").strip() for x in owner_lines):
+        return []
+    return [
+        f"source: {m.group(0)!r} attributes words to him, and no words of his are on record this week — report what the "
+        "record shows, never a statement he did not make"
+        for m in _ATTRIBUTION.finditer(text or "")
+    ]
+
+
+# ── an activity word the stored sport type contradicts (#6199) ───────────────
+# The review: a walk told as a "hike". The dossier names each session's stored label (the training block's Whoop cardio
+# ``sport`` and the Strava walks). A word for an activity family the week's stored labels never name is a note for the
+# editor and the owner's preview (``craft:`` — advisory, never a hold): a label can be coarse (a Strava walk list does not
+# keep the walk/hike split), so it is not precise enough to block. Pre-#4629 Whoop rows carry the table label "Hiking"
+# for the vendor's walking (``story_dossier``'s own note), so a capitalised "Hiking" label counts as a walk.
+_ACTIVITY_WORDS = {
+    "hike": re.compile(r"\bhik(?:e|es|ed|ing)\b", re.IGNORECASE),
+    "run": re.compile(r"\b(?:jog(?:s|ged|ging)?|went (?:for )?a run|went running)\b", re.IGNORECASE),
+    "ride": re.compile(r"\b(?:bike rides?|cycl(?:ed|ing)|biked|rode (?:his|a) bike)\b", re.IGNORECASE),
+    "swim": re.compile(r"\b(?:swim(?:s|ming)?|swam)\b", re.IGNORECASE),
+}
+_LABEL_FAMILY = (("hike", ("hik", "ruck")), ("run", ("run", "jog")), ("ride", ("cycl", "bik", "ride", "spin")), ("swim", ("swim",)))
+
+
+def _activity_families(dossier: Any) -> Set[str]:
+    training = (dossier or {}).get("training") or {}
+    labels = [str(c.get("sport") or "") for c in training.get("cardio_and_walks_whoop") or [] if isinstance(c, dict)]
+    fams: Set[str] = {"walk"} if training.get("strava_walks") else set()
+    for label in labels:
+        low = label.lower()
+        if label == "Hiking":
+            fams.add("walk")  # the pre-#4629 table label for the vendor's walking
+            continue
+        fams.update(f for f, stems in _LABEL_FAMILY if any(x in low for x in stems))
+        if "walk" in low:
+            fams.add("walk")
+    return fams
+
+
+def activity_word_findings(text: str, dossier: Any) -> List[str]:
+    """``craft:`` notes for an activity word no stored session label of the week supports ("hike" for a walk)."""
+    have = _activity_families(dossier)
+    out: List[str] = []
+    for fam, rx in _ACTIVITY_WORDS.items():
+        m = rx.search(text or "")
+        if m and fam not in have:
+            out.append(
+                f"craft: {m.group(0)!r} — no stored session this week is a {fam}; name the activity as the record labels it "
+                f"({', '.join(sorted(have)) or 'no cardio sessions stored'})"
+            )
+    return out
+
+
 # ── number grounding ─────────────────────────────────────────────────────────
 
 _NUM = re.compile(r"(?<![\w.])(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?(?![\w])")
@@ -479,11 +547,14 @@ def all_findings(
     allowed: Set[str],
     not_yet_exported: Iterable[str] = (),
     footer_pattern: Optional[str] = None,
+    owner_lines: Optional[Iterable[str]] = None,
 ) -> List[str]:
-    """The full gate a staged installment must pass."""
+    """The full gate a staged installment must pass. ``owner_lines`` (his words on record this week) arms the
+    attribution check (#6199); a caller without the record leaves it None."""
     return (
         completeness(text, stop_reason=stop_reason, footer_pattern=footer_pattern)
         + story_door(text, not_yet_exported=not_yet_exported)
         + ungrounded_numbers(text, allowed)
         + staged_encounter_findings(text)
+        + attribution_findings(text, owner_lines)
     )

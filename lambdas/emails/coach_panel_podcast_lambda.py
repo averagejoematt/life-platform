@@ -33,7 +33,7 @@ from common import journal_silence, media_tombstone  # #4365: a tombstone is not
 from common.constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.unsubscribe_token import unsub_url_or_fallback  # #3044 — signed unsub link, never plaintext email
-from content import body_numbers  # #4993: ONE body-number detector with the story desk
+from content import body_numbers, chapter_reads  # #4993: ONE body-number detector with the story desk; #6199 G1
 from experiment import er03_gate
 from experiment.phase_filter import with_phase_filter
 
@@ -91,8 +91,8 @@ def _chronicle_md(date_str: str) -> str | None:
     base = datetime.strptime(date_str, "%Y-%m-%d")
     for off in (0, 1, -1, 2, -2, 3, -3):
         d = (base + _td(days=off)).strftime("%Y-%m-%d")
-        r = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#chronicle", "sk": f"DATE#{d}"})
-        md = (r.get("Item") or {}).get("content_markdown")
+        it = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#chronicle", "sk": f"DATE#{d}"}).get("Item") or {}
+        md = it.get("content_markdown") if chapter_reads.writer_may_read(it) else None  # #6199 G1
         if md:
             return md
     return None
@@ -294,7 +294,7 @@ def _safety_gate(text: str) -> list:
         reasons.append("report-card-tone")
     if _CAUSAL_RE.search(t):
         reasons.append("causal-claim")
-    return reasons + _panel_desk().door_reasons(t)  # #4538: the shared story door — no cycle/attempt counts, off-record stays off
+    return reasons + _panel_desk().door_reasons(t) + _panel_desk().private_call_reasons(t)  # #4538 story door; #6199 private calls
 
 
 # ── synthesis + publish ──────────────────────────────────────────────────────
@@ -1860,10 +1860,10 @@ def lambda_handler(event, context):
             return {"skipped": True, "tier": tier}
     except Exception:
         pass
+    _panel_desk().arm_private_calls(table)  # #6199 P: every voiced line is checked against the private calls this run
 
-    # Test-first subscriber notify: email ONLY the given address, using the latest
-    # published episode, without publishing anything. Verify before flipping
-    # PANELCAST_NOTIFY_SUBSCRIBERS=true. Usage: {"notify_test": "you@example.com"}.
+    # Test-first subscriber notify: email ONLY the given address, using the latest published episode, without
+    # publishing anything. Verify before flipping PANELCAST_NOTIFY_SUBSCRIBERS=true. Usage: {"notify_test": "you@example.com"}.
     if event.get("notify_test"):
         try:
             eps = json.loads(s3.get_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/episodes.json")["Body"].read()).get("episodes", [])
