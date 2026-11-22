@@ -112,6 +112,7 @@ def test_status_page_reads_a_paused_sender_as_paused_only_when_on(trial_on):
 # premerge-gate: 6176: an rglob sweep of lambdas/ for importers of common.outbound_trial — a subscriber sender, the Morning Brief or the chronicle preview that starts reading the owner's trial switchboard must red BEFORE merge.
 ALLOWED_READERS = {
     "lambdas/emails/weekly_digest_lambda.py",
+    "lambdas/emails/weekly_what_changed_send.py",
     "lambdas/emails/monday_compass_lambda.py",
     "lambdas/emails/weekly_plate_lambda.py",
     "lambdas/emails/nutrition_review_lambda.py",
@@ -199,7 +200,7 @@ def test_what_changed_splits_by_threshold_and_never_prints_an_absence_as_zero():
 def test_the_sunday_email_has_one_decision_at_most_and_states_no_calorie_target():
     from emails import sunday_what_changed as swc
 
-    advice = {"readable": True, "decisions_this_week": 0, "decisions_last_week": 6, "linked_states": {}, "linked_decisions": 0}
+    advice = {"readable": True, "decisions_this_week": 0, "decisions_last_week": 6}
     email = swc.build({"this": _week(), "prior": _week(), "dates": DATES}, advice, week_number=11)
     assert email["subject"].startswith("Week 11: nothing new needs you")
     assert email["sections"]["ONE DECISION"] == ["Nothing new needs you this week."]
@@ -230,52 +231,41 @@ def test_unreadable_advice_status_says_so_and_is_never_zero():
 def test_advice_status_counts_only_what_he_recorded():
     from emails import advice_status as AS
 
-    rows = [
+    decisions = [
         {"sk": "DECISION#2026-11-16T10:00:00.000Z", "date": "2026-11-16", "followed": True},
         {"sk": "DECISION#2026-11-10T10:00:00.000Z", "date": "2026-11-10", "followed": False},
-        {
-            "sk": "ADVICELINK#2026-11-16T10:00:00.000Z#prediction#nutrition_coach#p1",
-            "state": "acted_on",
-            "recorded_by": "owner",
-            "evidence": {"text": "did it"},
-        },
-        {
-            "sk": "ASKRESPONSE#nutrition_coach#a1#2026-11-17T00:00:00Z",
-            "coach_id": "nutrition_coach",
-            "ask_id": "a1",
-            "state": "acted_on",
-            "recorded_at": "2026-11-17T00:00:00Z",
-        },
-        {
-            "sk": "ASKRESPONSE#nutrition_coach#a2#2026-11-12T00:00:00Z",
-            "coach_id": "nutrition_coach",
-            "ask_id": "a2",
-            "state": "not_yet_decided",
-            "recorded_at": "2026-11-12T00:00:00Z",
-        },
     ]
-    out = AS.summarize(rows, "2026-11-15", "2026-11-21", "2026-11-08", "2026-11-14")
+    answers = {
+        ("nutrition_coach", "a1"): {"state": "acted_on", "recorded_at": "2026-11-17T00:00:00Z", "revisions": 1},
+        ("nutrition_coach", "a2"): {"state": "not_yet_decided", "recorded_at": "2026-11-12T00:00:00Z", "revisions": 1},
+        ("sleep_coach", "a3"): {"state": "declined", "recorded_at": "2026-11-01T00:00:00Z", "revisions": 2},
+    }
+    out = AS.summarize(decisions, answers, "2026-11-15", "2026-11-21", "2026-11-08", "2026-11-14")
     assert (out["decisions_this_week"], out["decisions_last_week"]) == (1, 1)
-    # The DECISION row's `followed` flag is NOT a link (coach/advice_links.py): only the ADVICELINK row counts.
-    assert out["linked_states"] == {"acted_on": 1} and out["linked_decisions"] == 1
-    assert out["ask_answers_this_week"] == {"acted_on": 1}
+    assert out["ask_answers_this_week"] == {"acted_on": 1}  # the 11-01 answer is not this week's
     assert out["open_decision"] == {"coach_id": "nutrition_coach", "ask_id": "a2", "since": "2026-11-12"}
+    assert "linked_states" not in out  # links have one reader, the owner's MCP tool — never this email
 
 
-def test_advice_status_hides_tombstoned_rows_and_reports_a_read_failure():
+def test_advice_status_narrows_on_decisions_hides_tombstones_and_reports_a_read_failure(monkeypatch):
     from emails import advice_status as AS
+
+    seen = []
 
     class T:
         def __init__(self, items=None, err=None):
             self.items, self.err = items or [], err
 
         def query(self, **kw):
+            seen.append(kw["KeyConditionExpression"].get_expression()["values"][1].get_expression()["values"][1])
             if self.err:
                 raise self.err
             return {"Items": self.items}
 
+    monkeypatch.setattr(AS, "_answers", lambda table, user_id: {})
     wiped = {"sk": "DECISION#2026-11-16T10:00:00.000Z", "date": "2026-11-16", "tombstone": True}
     assert AS.read(T([wiped]), "matthew", "2026-11-15", "2026-11-21", "2026-11-08", "2026-11-14")["decisions_this_week"] == 0
+    assert seen == ["DECISION#"]
     assert AS.read(T(err=RuntimeError("x")), "matthew", "2026-11-15", "2026-11-21", "2026-11-08", "2026-11-14") == {
         "readable": False,
         "error": "RuntimeError",
@@ -284,20 +274,22 @@ def test_advice_status_hides_tombstoned_rows_and_reports_a_read_failure():
 
 @pytest.fixture
 def digest(monkeypatch):
-    from emails import weekly_digest_lambda as wd
+    from emails import weekly_digest_lambda as wd, weekly_what_changed_send as wws
 
     sent, recorded = [], []
     monkeypatch.setattr(wd.send_ledger, "should_skip_replay", lambda *a, **k: False)
-    monkeypatch.setattr(wd, "guarded_send_email", lambda ses, dry, **kw: sent.append(kw) or {"MessageId": "m"})
+    monkeypatch.setattr(wws, "guarded_send_email", lambda ses, dry, **kw: sent.append(kw) or {"MessageId": "m"})
     monkeypatch.setattr(wd, "record_email_send", lambda table, name, key: recorded.append((name, key)))
     monkeypatch.setattr(wd, "call_haiku", lambda *a, **k: pytest.fail("the Sunday email makes no model call"))
-    monkeypatch.setattr(wd.advice_status, "read", lambda *a, **k: {"readable": True, "decisions_this_week": 0, "decisions_last_week": 0})
+    monkeypatch.setattr(wws.advice_status, "read", lambda *a, **k: {"readable": True, "decisions_this_week": 0, "decisions_last_week": 0})
     return wd, sent, recorded
 
 
 def test_sunday_slot_off_is_the_weekly_report_path(digest, monkeypatch):
     wd, sent, _ = digest
-    monkeypatch.setattr(wd, "send_what_changed", lambda *a: pytest.fail("trial path taken with the item off"))
+    from emails import weekly_what_changed_send as wws
+
+    monkeypatch.setattr(wws, "send", lambda *a, **k: pytest.fail("trial path taken with the item off"))
     monkeypatch.setattr(wd, "gather_all", lambda: None)
     assert wd.lambda_handler({}, None) == {"statusCode": 500, "body": "Failed to gather data"}
     assert sent == []
@@ -595,9 +587,9 @@ def test_canary_only_holds_failures_a_declared_alarm_carries():
 
 
 def test_ops_pack_text_is_readable():
-    from operational import traffic_digest_lambda as td
+    from operational import ops_pack_record
 
-    text = td.pack_text(
+    text = ops_pack_record.pack_text(
         "<html><style>.x{}</style><h2>Weekly ops</h2><p>17 views &amp; 4 visitors</p><table><tr><td>a</td></tr></table></html>"
     )
     assert text.splitlines()[:2] == ["Weekly ops", "17 views & 4 visitors"] and ".x" not in text

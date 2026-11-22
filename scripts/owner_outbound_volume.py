@@ -10,7 +10,7 @@ WHAT IT COUNTS, per 7-day window ending on ``--end`` (default: yesterday, Pacifi
   * sends the trial suppressed — the ``[outbound-trial] {"event": "suppressed", ...}`` lines (``common.outbound_trial``);
   * Lambda errors per sending function (``AWS/Lambda Errors``);
   * owner responses — rows only he creates: evening check-ins, evening-ritual taps, story-question replies,
-    decisions, advice links and ask responses;
+    and decisions (advice links and ask responses have their own sanctioned readers — read them in a session);
   * owner actions — ``Do:`` emails the ADR-170 digest sent, and chronicle drafts still waiting for approval after 7 days
     (the owner action measurably missed).
 
@@ -242,16 +242,13 @@ def responses(table: Any, start: date, end: date) -> dict[str, Optional[int]]:
     except Exception:  # noqa: BLE001
         out["Story-question replies stored"] = None
     try:
-        dec = _query_sks(table, f"USER#{USER}#SOURCE#decisions", "", "sk, recorded_at")
-        out["Decisions logged"] = sum(1 for r in dec if str(r["sk"]).startswith("DECISION#") and _in(_pt_day(str(r["sk"])[9:]), start, end))
-        out["Advice links recorded"] = sum(
-            1 for r in dec if str(r["sk"]).startswith("ADVICELINK#") and _in(_pt_day(r.get("recorded_at")), start, end)
-        )
-        out["Ask responses recorded"] = sum(
-            1 for r in dec if str(r["sk"]).startswith("ASKRESPONSE#") and _in(_pt_day(r.get("recorded_at")), start, end)
-        )
+        from boto3.dynamodb.conditions import Key
+
+        cond = Key("pk").eq(f"USER#{USER}#SOURCE#decisions") & Key("sk").begins_with("DECISION#")
+        dec = table.query(KeyConditionExpression=cond, ProjectionExpression="sk").get("Items") or []
+        out["Decisions logged"] = sum(1 for r in dec if _in(_pt_day(str(r["sk"])[9:]), start, end))
     except Exception:  # noqa: BLE001
-        out["Decisions logged"] = out["Advice links recorded"] = out["Ask responses recorded"] = None
+        out["Decisions logged"] = None
     return out
 
 
@@ -381,6 +378,8 @@ def report(weeks: int, end: date) -> str:
         "- Remediation-agent email (a GitHub Actions job; it mails only on manual dispatch or a digest failure).",
         "- The continuity switch and the paging SMS (unchanged by the trial; event-driven and rare).",
         "- Subscriber mail (out of scope: the trial does not touch it).",
+        "- Advice links and ask responses: their one sanctioned reader is the owner's MCP tool (get_decisions / "
+        "get_advice_link_queue), so this script does not read them.",
         "- Opens and reads: SES events are not split by message type, so whether an email was read is unknown.",
     ]
     return "\n".join(lines) + "\n"

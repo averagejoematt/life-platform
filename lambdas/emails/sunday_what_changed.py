@@ -130,11 +130,7 @@ def advice_lines(advice: dict) -> list[str]:
         "Morning Brief recommendations: not recorded. No store links a brief item to your answer yet.",
         f"Decisions you logged: {advice.get('decisions_this_week', 0)} this week, {advice.get('decisions_last_week', 0)} last week.",
     ]
-    linked = advice.get("linked_decisions") or 0
-    if linked:
-        lines.append(f"Linked by you to a coach recommendation: {_states(advice.get('linked_states') or {})}. The rest: not recorded.")
-    else:
-        lines.append("Linked by you to a coach recommendation: none recorded.")
+    lines.append("Which decisions you linked to a coach recommendation: not read here (ask for get_decisions in a Claude session).")
     answered = advice.get("ask_answers_this_week") or {}
     if answered:
         lines.append(f"Coach asks you answered this week: {_states(answered)}.")
