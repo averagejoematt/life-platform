@@ -388,7 +388,7 @@ _OPEN_PREDICTION_STATUSES = ("pending", "confirming")
 _MAX_PREDICTION_PAGES = 5  # a chat turn is latency-bound; the partition is small
 
 
-def _fetch_own_predictions(coach_id: str, table) -> list:
+def _fetch_own_predictions(coach_id: str, table, *, include_pilot: bool = False) -> list:
     """Every visible PREDICTION# row in this coach's partition.
 
     Read-only: this surface never writes a prediction, never grades one, and never
@@ -398,6 +398,10 @@ def _fetch_own_predictions(coach_id: str, table) -> list:
     ONE fetch serves both the open calls and the graded ones (#2496). Splitting it
     into a query per renderer would double the round-trips on the platform's most
     latency-sensitive surface to read the same small partition twice.
+
+    #6172: ``include_pilot=True`` (only under ``coach_record.SELF_RECORD_UNIFIED``) skips the
+    query filter so ``coach_record`` can see a re-write's tombstoned original; the caller then
+    applies ``singleton_visible`` itself for the open calls. Still ONE query.
     """
     from experiment.phase_filter import with_phase_filter
 
@@ -407,7 +411,7 @@ def _fetch_own_predictions(coach_id: str, table) -> list:
     }
     items: list = []
     for _page in range(_MAX_PREDICTION_PAGES):
-        resp = table.query(**with_phase_filter(kwargs))
+        resp = table.query(**with_phase_filter(kwargs, include_pilot=include_pilot))
         items.extend(resp.get("Items") or [])
         if "LastEvaluatedKey" not in resp:
             break
@@ -737,9 +741,23 @@ def domain_facts_block(coach_id: str, table, today: Optional[str] = None) -> str
     track_lines: list = []
     if operational:
         try:
-            predictions = _fetch_own_predictions(persona, table)
-            frame += _open_predictions_lines(predictions)
-            track_lines = coach_team_texture.terminal_prediction_lines(predictions)
+            # #6172 seam: the record facts read through coach.coach_record when the switch is on.
+            from coach import coach_record
+
+            if coach_record.SELF_RECORD_UNIFIED:
+                from common.constants import EXPERIMENT_START_DATE
+                from experiment.phase_filter import singleton_visible
+
+                ledger = _fetch_own_predictions(persona, table, include_pilot=True)
+                predictions = [r for r in ledger if singleton_visible(r)]
+                frame += _open_predictions_lines(predictions)
+                track_lines = coach_team_texture.terminal_prediction_lines(
+                    predictions, ledger_rows=ledger, genesis=str(EXPERIMENT_START_DATE), as_of=today
+                )
+            else:
+                predictions = _fetch_own_predictions(persona, table)
+                frame += _open_predictions_lines(predictions)
+                track_lines = coach_team_texture.terminal_prediction_lines(predictions)
         except Exception as e:
             logger.warning("[domain_facts] own predictions unavailable for %s: %s", persona, e)
 

@@ -30,6 +30,44 @@ The desk is the pipeline that makes that hold without hand correction.
 | **Elena** | `lambdas/content/elena_canon.py` | The ONE specification of the narrator (#6155): identity and AI disclosure, how she reasons, her range, what she never does, the one length range, voice anchors from published chapters. Both writers here, the legacy writer and the Panel's legacy scripts render her from it. The legacy writer's drafts run this desk's quote, callback and title checks (`story_pipeline.legacy_audit`) and are always held for the owner. Continuity guide: `docs/content/STORY_BIBLE.md`. |
 | **Checks** | `lambdas/content/story_checks.py` | Four checks. Completeness: `stop_reason`, the last sentence, the footer. The story door: no cycle or attempt counts, no off-record specifics, no machinery words, no export lag told as silence — its reader-surface half (`reader_surface`) is also run by the chronicle handler, the recap and the Panel at their own chokepoints, so a legacy writer cannot bypass it (#4538). The count rule is a structure (a number beside the restart vocabulary: "the 17th start", "16 earlier starts", "attempt 17", "started 16 times", "16 lost · 0 kept"), and a date, a year, a lift or a sleep-stage count beside the same words is not a finding. The recap cards keep their own rule for now; `reader_surface(..., constructed=True)` is the mode they would call. Number grounding against the dossier. The Panel renderer's spoken-word rules, run before staging rather than at render. A failure buys one corrective rewrite; a second failure stops the week. |
 
+## The editor (#6179, behind `STORY_EDITOR`, default off)
+
+Owner ruling 2026-11-22: "An editor should make the writing better; a verifier should establish that the result is
+true. They have different jobs." The craft gate failed every desk-written week and failing it did not improve the draft.
+With `STORY_EDITOR=on` on `wednesday-chronicle`, the live week runs:
+
+```
+writer draft ──► HARD gates ──(hard findings only)──► writer rewrite (MAX_REWRITES) ──► EDITOR (≤ 2 rounds) ──► HARD gates ──► draft row
+                                                                                         │
+                                       story_craft's style findings + the review's tics ─┘ (the editor's input; advisory notes after)
+```
+
+- **The editor** (`lambdas/content/story_editor.py`) revises the post from the writer's own evidence packet
+  (`story_writers.evidence_packet`), on a different model from the writer (route `story.editor`, workhorse tier, budget
+  feature `chronicle`, band 2). Elena's voice is `elena_canon.voice_block()`, imported. At most two calls a week; the
+  packet is the cached prompt prefix (about 25K tokens on Haiku 4.5, which clears its 4,096-token floor).
+- **No new claims, in code.** `new_claims` discards a revision carrying any number, weekday or month, capitalised name,
+  quotation, scene/interview marker, feeling word or causal connective that neither the draft nor the packet holds. A
+  figure the draft never printed may come in from the packet only inside a "nothing changes" comparison. A revision
+  that adds a deterministic hard-gate finding is discarded too. The title cannot change.
+- **The hard gates, unchanged, on the revised text:** completeness, the story door (counts, off-record, machinery
+  words, export lag), number grounding, the exact-quote gate and the callback gate (kept hard: they are claims about
+  sources and numbers), the fact read, then at the handler the privacy gate and `publish_holds`' reader door, at
+  approval the publish audit (`autopublish_audit`) and the owner's click. `tests/test_story_editor_6179.py` holds
+  `post_hard` equal to `post` minus its style findings and shows a failing revision held exactly as before.
+- **One reclassification:** the dek's top-line length, figure count and jargon (`top line:` findings) used to block;
+  with the editor on they are advisory.
+- **Advisory, never a blocker:** the residual style notes, the editor's own remarks (labelled unverified) and the
+  episode's craft notes ride on the row as `desk_craft_json` with `publish_hold = craft_hold`. The list is never empty
+  when the editor ran, so a revised week always waits in the preview for the owner's click. `desk_editor_json` records
+  each round (accepted or discarded, and why) and its cost.
+- **Cost:** about $0.02-0.05 of Haiku a week for the editor, plus one more Sonnet fact read (~$0.06) when a revision is
+  accepted. Measured on a dry run of week 5, 2026-11-22: editor $0.022-0.052, whole dry run $0.14-0.17.
+- **Dry run:** `python3 scripts/story_editor_dry_run.py --week-end <published week>` — every AWS write blocked, output is
+  private.
+- **Rollback:** unset `STORY_EDITOR` (or set `off`) on `wednesday-chronicle`. Off is today's pipeline exactly. The
+  season rebuild (`scripts/season_rebuild.py`) does not use the editor.
+
 ## The rubric, in one paragraph
 
 Rank the week's candidate stories by **change**, then **a prediction tested**, then

@@ -186,6 +186,10 @@ write surface is your own worktree and your own branch.
    NAME the first live output the issue will be closed on, because `Fixes` closes at merge,
    before the deploy (#3595; the closure contract's `no-live-proof` code is armed BLOCK).
 
+## Force-push (#6157)
+
+Never rewrite a pushed branch: no `git push --force`/`-f`/`--force-with-lease`/`--force-if-includes`/`--mirror`/`+refspec` on ANY branch (also via `git -C`) — add a merge commit or use a new branch; the guard hook and `.claude/settings.json` deny these.
+
 ## Report back (your final message)
 
 PR number and URL · what changed and why · lint/test results (real output, including
