@@ -1550,6 +1550,13 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": null,
+      "module": "lambdas/common/public_forecast_policy.py",
+      "partition": "public_forecast",
+      "via": "pk"
+    },
+    {
       "direction": "read",
       "lambda": null,
       "module": "lambdas/common/send_ledger.py",
@@ -8365,11 +8372,11 @@
       "contracts_enrolled": 16,
       "contracts_known": 15,
       "contracts_ratchet": 16,
-      "edges": 797,
+      "edges": 798,
       "lambdas": 107,
       "mcp_tool_modules": 43,
       "mcp_tools": 94,
-      "partitions": 126,
+      "partitions": 127,
       "privacy_fields_owner_only": 69,
       "privacy_fields_owner_published": 11,
       "privacy_sources_owner_only": 26,
@@ -8380,8 +8387,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 389,
-        "sites_resolved": 1002,
-        "sites_total": 1391
+        "sites_resolved": 1003,
+        "sites_total": 1392
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -8956,6 +8963,11 @@
     },
     "public_corrections": {
       "class": "cross_phase",
+      "ingestion": false,
+      "privacy_tier": "public"
+    },
+    "public_forecast": {
+      "class": "experiment_scoped",
       "ingestion": false,
       "privacy_tier": "public"
     },

@@ -104,9 +104,9 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 `benchmarks`, `calibration`, `checkin_intake_pairs`, `chronicling`, `clinical`, `coach_corrections`, `coach_recommendations`, `coach_vision`, `dexa`, `effect_fits`, `eyeball_estimate`, `fitness_tests`, `genome`, `labs`, `may_tracker`, `milestones`, `nutrition_titration`, `progress_photos`, `public_corrections`, `recall_embeddings`, `subscribers`, `supplements`, `training_constraints`, `training_reference`, `weight_episodes`
 
-### experiment_scoped (37)
+### experiment_scoped (38)
 
-`achievements`, `adaptive_mode`, `ai_analysis`, `anomalies`, `centenarian_progress`, `challenges`, `character_receipt`, `character_sheet`, `chronicle`, `circadian`, `coach_actions`, `computed_insights`, `computed_metrics`, `decisions`, `diary_claims`, `diary_reactions`, `discovery_annotations`, `early_warning_flag`, `engagement_state`, `experiments`, `field_notes`, `field_notes_held`, `forecast`, `habit_scores`, `hypotheses`, `illness_triad_flag`, `insights`, `ledger`, `nutrition_review`, `panelcast`, `protocols`, `recap_cards`, `rewards`, `scenarios`, `state_of_matthew`, `weekly_correlations`, `what_changed`
+`achievements`, `adaptive_mode`, `ai_analysis`, `anomalies`, `centenarian_progress`, `challenges`, `character_receipt`, `character_sheet`, `chronicle`, `circadian`, `coach_actions`, `computed_insights`, `computed_metrics`, `decisions`, `diary_claims`, `diary_reactions`, `discovery_annotations`, `early_warning_flag`, `engagement_state`, `experiments`, `field_notes`, `field_notes_held`, `forecast`, `habit_scores`, `hypotheses`, `illness_triad_flag`, `insights`, `ledger`, `nutrition_review`, `panelcast`, `protocols`, `public_forecast`, `recap_cards`, `rewards`, `scenarios`, `state_of_matthew`, `weekly_correlations`, `what_changed`
 
 ### raw_timeseries (44)
 
@@ -118,7 +118,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-797 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+798 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -215,6 +215,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `private_intake` | — | intake_response.py |
 | `progress_photos` | progress_capture.py | calibration_cadence.py, progress_capture.py |
 | `protocols` | — | site_api_protocols.py |
+| `public_forecast` | — | — |
 | `qa_hook_matrix` | hook_liveness_qa.py | — |
 | `qa_predict_dark` | qa_smoke_lambda.py | qa_smoke_lambda.py |
 | `reader_feedback` | site_api_social_engage.py | — |
@@ -595,7 +596,7 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1391 total · 1002 resolved · 389 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1392 total · 1003 resolved · 389 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 80 resolved · 0 dynamic of 80 scheduled lambdas (107 lambdas total)
 - Alarms: 152 literal-named declarations across three idioms, 4 composite; routing digest 108 · digest+paging 2 · digest+urgent 10 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 26 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only
