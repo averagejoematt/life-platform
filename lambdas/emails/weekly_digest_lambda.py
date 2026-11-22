@@ -41,7 +41,7 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 from ai.model_routing import model_for  # #4770: the one model registry
-from common import digest_utils, send_ledger  # shared query_range impls (#970); the DIL-025 replay guard (#3113)
+from common import digest_utils, outbound_trial, send_ledger  # shared query_range impls (#970); DIL-025 (#3113); #6176
 from common.constants import (
     EXPERIMENT_BASELINE_WEIGHT_LBS,
     EXPERIMENT_START_DATE,
@@ -63,6 +63,8 @@ from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-
 from experiment.phase_filter import source_reads_cross_phase, with_phase_filter  # ADR-058: default-deny pilot data
 from health.calorie_target import target_phrase  # #5095: the ONE calorie target
 from training import self_added_volume_report  # #4111: the end-of-week self_added_volume report
+
+from emails import advice_status, sunday_what_changed  # #6176 item 1: the Sunday "what changed" email
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
 _REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -1712,6 +1714,57 @@ def _gate_telemetry(data, profile, real_subscribers, attribution=None):
     }
 
 
+def _week_number(this_end: str):
+    """The experiment week ``this_end`` falls in (1-based), or None before genesis / on a bad date."""
+    try:
+        days = (datetime.strptime(this_end, "%Y-%m-%d").date() - datetime.strptime(EXPERIMENT_START_DATE, "%Y-%m-%d").date()).days
+    except (TypeError, ValueError):
+        return None
+    return days // 7 + 1 if days >= 0 else None
+
+
+def build_what_changed(data):
+    """#6176 item 1: the Sunday "what changed and what matters" email from ``gather_all``'s data. No model call."""
+    dates = data["dates"]
+    advice = advice_status.read(table, USER_ID, dates["this_start"], dates["this_end"], dates["prior_start"], dates["prior_end"])
+    return sunday_what_changed.build(data, advice, week_number=_week_number(dates["this_end"]))
+
+
+def send_what_changed(dry_run, period_key):
+    """#6176 item 1 (outbound trial): the Weekly Report's slot sends the one Sunday email instead. Same recipient, same
+    replay ledger (so it can never go out twice, and a mid-week rollback finds the week already recorded), no Board."""
+    logger.info("[#6176] outbound trial: the Sunday slot sends 'what changed and what matters', not the Weekly Report")
+    result = gather_all()
+    if result is None or result[0] is None:
+        return {"statusCode": 500, "body": "Failed to gather data"}
+    data, _profile = result
+    email = build_what_changed(data)
+    guarded_send_email(
+        ses,
+        dry_run,
+        FromEmailAddress=SENDER,
+        Destination={"ToAddresses": [RECIPIENT]},
+        Content={
+            "Simple": {
+                "Subject": {"Data": email["subject"], "Charset": "UTF-8"},
+                "Body": {
+                    "Text": {"Data": email["text"], "Charset": "UTF-8"},
+                    "Html": {"Data": email["html"], "Charset": "UTF-8"},
+                },
+            }
+        },
+        ConfigurationSetName="life-platform-emails",
+        EmailTags=[{"Name": "message_type", "Value": "weekly_what_changed"}],
+    )
+    if not dry_run:
+        record_email_send(table, LEDGER_NAME, period_key)
+    outbound_trial.sent(
+        outbound_trial.SUNDAY_WHAT_CHANGED, "weekly-digest", log=logger.info, dry_run=bool(dry_run), subject=email["subject"]
+    )
+    logger.info("DRY_RUN, not sent." if dry_run else f"Sent (what changed): {email['subject']}")
+    return {"statusCode": 200, "body": "What-changed email generated (DRY_RUN, not sent)." if dry_run else "What-changed email sent."}
+
+
 def lambda_handler(event, context):
     dry_run = is_dry_run(event)
     # DIL-025/#3113 replay guard, before the gather AND the Haiku call. Keyed on
@@ -1722,6 +1775,8 @@ def lambda_handler(event, context):
     if send_ledger.should_skip_replay(table, LEDGER_NAME, period_key, dry_run=dry_run, event=event, logger=logger):
         logger.warning("[DIL-025] weekly digest for %s already sent — refusing to send it twice (force_send overrides)", period_key)
         return {"statusCode": 200, "body": f"Weekly digest for {period_key} already sent — skipped (replay guard)"}
+    if outbound_trial.is_on(outbound_trial.SUNDAY_WHAT_CHANGED):  # #6176: the Sunday slot sends the "what changed" email
+        return send_what_changed(dry_run, period_key)
     logger.info("Weekly Digest v4.0 starting...")
     result = gather_all()
     if result is None or result[0] is None:

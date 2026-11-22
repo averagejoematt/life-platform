@@ -74,6 +74,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 import boto3
+from common import outbound_trial  # #6176: the outbound trial's switchboard
 from common.mcp_url import resolve_mcp_url  # SEC-02 #780: discover the URL at runtime, not a committed env var
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
@@ -564,6 +565,42 @@ def check_subscribe_flow(canary_ts: str) -> tuple[bool, str, float, dict]:
         return False, f"subscribe canary error: {e}", latency, {}
 
 
+#: #6176 item 6b: each canary check whose failure a DECLARED CloudWatch alarm already carries to the daily digest
+#: record (operational_stack._canary_alarm; dynamodb and s3 also page by SMS). While the trial's OPS_CANARY_ALARMED
+#: item is on, a failure of one of these is not emailed as well. A check NOT listed here (the subscribe flow) still
+#: emails. tests/test_outbound_trial_6176.py holds every alarm name to a declared CDK alarm.
+CHECK_ALARM_NAMES: dict[str, str] = {
+    "dynamodb": "life-platform-canary-ddb-failure",
+    "s3": "life-platform-canary-s3-failure",
+    "mcp": "life-platform-canary-mcp-failure",
+    "anthropic": "life-platform-canary-anthropic-failure",
+    "subscribe_cleanup": "life-platform-canary-subscribe-cleanup-failure",
+    "subscribe_residue": "life-platform-canary-subscribe-residue",
+}
+
+
+def split_alarmed(failures: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Pure: ``(email, alarmed)`` — the failures still to email, and those a declared alarm already carries."""
+    alarmed = [f for f in failures if f.get("check_key") in CHECK_ALARM_NAMES]
+    return [f for f in failures if f.get("check_key") not in CHECK_ALARM_NAMES], alarmed
+
+
+def send_or_hold(to_alert: list[dict], canary_ts: str, dry_run: bool = False) -> None:
+    """Email ``to_alert`` — less, while the trial's OPS_CANARY_ALARMED item is on, what a declared alarm already carries."""
+    if outbound_trial.is_on(outbound_trial.OPS_CANARY_ALARMED):
+        to_alert, alarmed = split_alarmed(to_alert)
+        if alarmed:
+            outbound_trial.suppressed(
+                outbound_trial.OPS_CANARY_ALARMED,
+                "life-platform-canary",
+                log=print,
+                checks=sorted(f["check_key"] for f in alarmed),
+                alarms=sorted(CHECK_ALARM_NAMES[f["check_key"]] for f in alarmed),
+            )
+    if to_alert:
+        send_alert(to_alert, canary_ts, dry_run=dry_run)
+
+
 def send_alert(failures: list[dict], canary_ts: str, dry_run: bool = False) -> None:
     rows = ""
     for f in failures:
@@ -833,7 +870,7 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
                     f"  Sending alert: {len(persistent_failures)} persistent + "
                     f"{len(first_occurrence_stored_state)} first-occurrence stored-state failure(s)"
                 )
-                send_alert(to_alert, canary_ts, dry_run=dry_run)
+                send_or_hold(to_alert, canary_ts, dry_run=dry_run)
             elif failures:
                 print(f"  Suppressed first-occurrence alert ({len(failures)} new infra failure(s)); will alert if repeat next run")
 

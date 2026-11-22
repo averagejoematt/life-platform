@@ -1250,7 +1250,15 @@ def _send_story_questions(event):
     """#4546: Monday — the week's gap questions by email, Reply-To the SES inbound address. Never blocks anything."""
     import datetime as _dtm
 
+    from common import outbound_trial
     from common.pacific_time import pacific_today
+
+    # #6176 item 4 (outbound trial, #6174): no reply to these has been stored since February, so they pause until the
+    # reply path is proven. Nothing else reads the generated questions (only the reply parser does), so generation
+    # pauses too: no dossier read, no model call, no marker. story_season_qa reads the same switch.
+    if outbound_trial.is_on(outbound_trial.STORY_QUESTIONS_PAUSED):
+        rec = outbound_trial.suppressed(outbound_trial.STORY_QUESTIONS_PAUSED, "wednesday-chronicle#StoryQuestionsMonday", log=logger.info)
+        return {"statusCode": 200, "body": json.dumps({"status": "suppressed", **rec})}
     from content import story_dossier, story_ledger, story_questions
 
     today = _dtm.datetime.strptime(pacific_today(), "%Y-%m-%d").date()  # pacific_today() is a YYYY-MM-DD string
@@ -1300,8 +1308,15 @@ def _send_tuesday_question(event):
     call, no dossier read. Never blocks anything; sends once per week (the marker), ``force`` re-sends."""
     import datetime as _dtm
 
+    from common import outbound_trial
     from common.pacific_time import pacific_today
     from content import story_dossier, story_questions
+
+    if outbound_trial.is_on(outbound_trial.STORY_QUESTIONS_PAUSED):  # #6176 item 4 / #6174 — see _send_story_questions
+        rec = outbound_trial.suppressed(
+            outbound_trial.STORY_QUESTIONS_PAUSED, "wednesday-chronicle#OwnerWordsQuestionTuesday", log=logger.info
+        )
+        return {"statusCode": 200, "body": json.dumps({"status": "suppressed", **rec})}
 
     today = _dtm.datetime.strptime(pacific_today(), "%Y-%m-%d").date()
     week = story_dossier.week_containing(today.isoformat())
@@ -1315,6 +1330,7 @@ def _send_tuesday_question(event):
     if event.get("dry_run"):
         return {"statusCode": 200, "body": json.dumps({"status": "dry_run", "week": n, "question": question})}
     resp = story_questions.send_tuesday(ses, week=n, question=question, to=RECIPIENT, sender=SENDER)
+    logger.info(f"[#4584] owner-words question sent for week {n}: {resp.get('MessageId', '')}")  # #6176: the send's count line
     from experiment.phase_taxonomy import experiment_stamp_for
 
     table.put_item(

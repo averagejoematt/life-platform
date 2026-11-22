@@ -37,7 +37,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import boto3
-from common import send_ledger  # #3113 / DIL-025: the durable replay guard
+from common import outbound_trial, send_ledger  # #6176: the outbound trial; #3113 / DIL-025: the durable replay guard
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from common.macrofactor_fields import intake_window  # #5431: intake reads bounded at the Pacific today
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
@@ -916,6 +916,12 @@ def _ai_ok(ai_content):
 
 def lambda_handler(event, context):
     dry_run = is_dry_run(event)
+
+    # #6176 item 1 (outbound trial): the Sunday "what changed" email replaces this one. Checked first, so a suppressed
+    # Monday makes no Todoist, data or model call — and logs one line, so it is never mistaken for a dead cron.
+    if outbound_trial.is_on(outbound_trial.SUNDAY_WHAT_CHANGED):
+        rec = outbound_trial.suppressed(outbound_trial.SUNDAY_WHAT_CHANGED, "monday-compass", log=logger.info)
+        return {"statusCode": 200, "body": json.dumps({"suppressed": True, **rec})}
 
     # DIL-025 / #3113 replay guard — before the Todoist fetch and the Bedrock
     # call, not merely before the send. A redrive carries the original payload.

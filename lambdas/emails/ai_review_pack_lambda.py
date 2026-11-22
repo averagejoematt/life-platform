@@ -48,6 +48,7 @@ dated-exempt in tests/test_heartbeat_completeness.py (#1455).
 """
 
 import html
+import json
 import logging
 import os
 from datetime import datetime, timedelta, timezone
@@ -55,6 +56,7 @@ from urllib.parse import quote
 
 import boto3
 from common import (
+    outbound_trial,  # #6176: the outbound trial's switchboard
     qa_archive,  # #1691 (epic #1687): re-run the baseline-freshness gate over each archived
     send_ledger,  # #3113 / DIL-025: the durable replay guard
 )
@@ -604,6 +606,31 @@ def record_email_send(table, lambda_name, period_key):
     send_ledger.record_sent(table, lambda_name, period_key, now=int(datetime.now(timezone.utc).timestamp()), logger=logger)
 
 
+def pack_record(dates, by_surface, read_errors, ranking=None, proposals=None):
+    """#6176 item 3: the week's pack as one plain-text log record — every generation, ranked most-likely-wrong first
+    when a ranking exists, each with its stable #N, surface, date, error class, checkable claim and archive key."""
+    lines = [
+        f"[ai-review-pack] pack_record {dates[0]}..{dates[-1]} generations={sum(len(v) for v in by_surface.values())} read_errors={read_errors}"
+    ]
+    ranked = (ranking or {}).get("ranked") or []
+    if ranked:
+        lines.append(f"ranked (critic_ran={ranking.get('critic_ran')} tier={ranking.get('tier')}):")
+        for n, entry, analysis in ranked:
+            lines.append(
+                f"#{n} [{(analysis or {}).get('error_class', 'other')} score={(analysis or {}).get('score')}] "
+                f"{entry.get('surface', 'unknown')} {entry.get('date', '')} key={entry.get('_key', '')} :: "
+                f"{(analysis or {}).get('checkable_claim') or '(no checkable claim)'}"
+            )
+    else:
+        for surface, entries in sorted(by_surface.items()):
+            for entry in entries:
+                text = " ".join(str(entry.get("text") or "").split())[:_SNIPPET_CHARS]
+                lines.append(f"{surface} {entry.get('date', '')} key={entry.get('_key', '')} :: {text}")
+    for p in proposals or []:
+        lines.append(f"proposal: {json.dumps(p, default=str)[:500]}")
+    return "\n".join(lines)
+
+
 def lambda_handler(event, context):
     try:
         return _run(event, context)
@@ -662,6 +689,19 @@ def _run(event, context):
 
     html_body = build_html(dates, by_surface, screenshots_by_date, read_errors, ranking=ranking, proposals=proposals)
     subject = f"🗂️ Weekly AI Review Pack · {_fmt_date(dates[0])}–{_fmt_date(dates[-1])} · {total} generation(s)"
+
+    # #6176 item 3 (outbound trial): the pack is still built (ranking, critic, proposals) but not emailed. Its record
+    # goes to this function's own log group, where a working session reads it (filter `[ai-review-pack] pack_record`).
+    if outbound_trial.is_on(outbound_trial.REVIEW_PACK_NOT_EMAILED):
+        logger.info(pack_record(dates, by_surface, read_errors, ranking=ranking, proposals=proposals))
+        rec = outbound_trial.suppressed(
+            outbound_trial.REVIEW_PACK_NOT_EMAILED,
+            "ai-review-pack",
+            log=logger.info,
+            subject=subject,
+            where="CloudWatch Logs /aws/lambda/ai-review-pack, line '[ai-review-pack] pack_record'",
+        )
+        return {"statusCode": 200, "suppressed": True, "record": rec, "body": f"{total} generations built and logged, not emailed (#6176)"}
 
     ses = boto3.client("sesv2", region_name=REGION)
     guarded_send_email(
