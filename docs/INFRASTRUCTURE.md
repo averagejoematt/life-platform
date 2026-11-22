@@ -3,7 +3,7 @@
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-11-16 (v8.6.0 — 107 Lambdas, 26 active secrets, 93 MCP tools, ~148 alarms)
+> Last updated: 2026-11-22 (v8.6.0 — 107 Lambdas, 29 active secrets, 93 MCP tools, ~148 alarms)
 
 ---
 
@@ -160,7 +160,7 @@ All DNS-validated via Route 53 CNAME records.
 
 ---
 
-## Secrets Manager (26 active secrets)
+## Secrets Manager (29 active secrets)
 
 All under prefix `life-platform/`. No values stored in this doc — access via AWS console or CLI. The table below is a subset of the long-lived ones; the authoritative name set is `KNOWN_SECRETS` in `tests/test_secret_references.py`.
 
