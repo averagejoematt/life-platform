@@ -542,21 +542,72 @@ def test_the_planned_session_is_for_the_lead_and_performance_seat_only(pilot_tab
     assert "not available" in ccp.build_turn_context(pilot_table, "eli_marsh", TODAY)["memory"]
 
 
-def test_a_dominant_theme_is_carried_at_most_twice_and_his_words_are_kept():
+class _StringKeyTable:
+    """The string-KeyCondition shape coach_chat_summary queries with (`pk = :pk AND begins_with(sk, :pfx)`)."""
+
+    def __init__(self, rows):
+        self.rows = rows
+
+    def query(self, **kw):
+        v = kw.get("ExpressionAttributeValues") or {}
+        rows = [r for r in self.rows if r["pk"] == v.get(":pk") and r["sk"].startswith(v.get(":pfx", ""))]
+        rows.sort(key=lambda r: r["sk"], reverse=kw.get("ScanIndexForward") is False)
+        return {"Items": rows[: kw["Limit"]] if kw.get("Limit") else rows}
+
+
+def _rendered_notes() -> str:
+    """Notes through the REAL renderer (`read_recent_summaries`) — the wire the round-3 evaluation saw: dated
+    summary entries that all share one theme, a "vs." mid-sentence, and the time-gap line."""
+    from coach.coach_chat_summary import read_recent_summaries
+
+    pk = "COACH#eli_marsh"
+    rows = [
+        {
+            "pk": pk,
+            "sk": "CHAT#summary#2026-09-17",
+            "text": "Protein came up again. He should start logging food daily; asked about full-fat vs. low-fat yogurt.",
+        },
+        {"pk": pk, "sk": "CHAT#summary#2026-10-02", "text": "Protein is the one job this month. Travel next week."},
+        {"pk": pk, "sk": "CHAT#summary#2026-10-04", "text": "Protein at 147 g vs. the 170 g floor; he asked about the deadlift."},
+        {"pk": pk, "sk": "CHAT#2026-10-04#aaaa1111", "role": "coach", "text": "Protein first."},
+    ]
+    return read_recent_summaries(_StringKeyTable(rows), pk, today="2026-11-24")
+
+
+def test_the_notes_reach_the_prompt_exactly_as_rendered(pilot_table):
+    """Round 3: editing the notes lost dates, cut at "vs.", emptied a coach's notes and halved the time-gap line.
+    Every rendered byte of the notes now survives, in order, whatever their themes."""
+    notes = _rendered_notes()
+    assert "TIME GAP: it has been 51 days" in notes and notes.count("[2026-") == 3, "the fixture must carry the real shapes"
+    memory = "WHAT YOU REMEMBER ABOUT MATTHEW:\n- Commitments you hold him to: protein at breakfast · protein after lifting\n\n" + notes
+    ctx = ccp.build_turn_context(pilot_table, "eli_marsh", TODAY, memory=_memory_with_corrections(memory), thread=[])
+    assert memory in ctx["memory"], "the notes were edited"
+    assert "full-fat vs. low-fat yogurt" in ctx["memory"] and "acknowledge it naturally" in ctx["memory"]
+    for day in ("[2026-09-17]", "[2026-10-02]", "[2026-10-04]"):
+        assert day in ctx["memory"]
+    assert ctx["memory"].index("[2026-09-17]") < ctx["memory"].index("[2026-10-04]"), "oldest first, the newest last"
+    assert "the NEWEST note is the last one" in ctx["memory"]
+
+
+def test_a_notes_block_where_every_entry_shares_a_theme_is_never_reduced(pilot_table):
+    notes = "RECENT CONVERSATIONS (your own compressed notes from earlier days):\n" + "\n".join(
+        f"- [2026-10-0{d}] Sleep was short again, sleep is the lever." for d in range(1, 8)
+    )
+    ctx = ccp.build_turn_context(pilot_table, "sleep_coach", TODAY, memory=notes, thread=[])
+    assert notes in ctx["memory"]
+
+
+def test_the_thread_keeps_the_newest_repeats_and_all_his_words():
     protein = "Protein is averaging 147 g over 26 logged days against the 170 g floor."
     thread = []
     for i in range(7):
-        thread += [{"role": "matthew", "text": f"question {i} about my week"}, {"role": "coach", "text": protein}]
-    notes = (
-        "RECENT CONVERSATIONS (your own compressed notes from earlier days):\n- [2026-10-01] Protein at 147 g, floor 170 g. He travelled."
-    )
-    new_notes, new_thread, removed = ccp.dedupe(notes, thread)
-    kept = [t for t in new_thread if t["role"] == "coach" and t["text"] == protein]
-    assert len(kept) == 2 and new_thread[-1]["text"] == protein, "the newest two repeats survive"
+        thread += [{"role": "matthew", "text": f"question {i} about my week"}, {"role": "coach", "text": f"{protein} ({i})"}]
+    new_thread, removed = ccp.dedupe_thread(thread)
+    kept = [t["text"] for t in new_thread if t["role"] == "coach" and t["text"] != ccp.OMITTED_REPLY]
+    assert kept == [f"{protein} (5)", f"{protein} (6)"], "the NEWEST two repeats survive, older ones are left out"
     assert [t["text"] for t in new_thread if t["role"] == "matthew"] == [t["text"] for t in thread if t["role"] == "matthew"]
     assert len(new_thread) == len(thread), "a left-out reply keeps its place, so the turn order he saw is kept"
-    assert "He travelled." in new_notes and "Protein at 147 g" not in new_notes
-    assert removed == {"replies_left_out": 5, "note_segments_left_out": 1}
+    assert removed == {"replies_left_out": 5}
 
 
 def test_a_thread_with_no_dominant_theme_is_untouched():
@@ -566,8 +617,23 @@ def test_a_thread_with_no_dominant_theme_is_untouched():
         {"role": "matthew", "text": "lift?"},
         {"role": "coach", "text": "Squat day tomorrow."},
     ]
-    notes, new_thread, removed = ccp.dedupe("", thread)
+    new_thread, removed = ccp.dedupe_thread(thread)
     assert new_thread == thread and removed["replies_left_out"] == 0
+
+
+def test_the_memory_section_forbids_reading_what_he_did_from_his_data(pilot_table):
+    m = ccp.build_turn_context(pilot_table, "eli_marsh", TODAY)["memory"]
+    assert "Never state or imply that he did or did not do something because of his sensor, nutrition or training data" in m
+    assert "only his own recorded answer says what he did" in m
+
+
+def test_the_production_prompt_text_is_unchanged():
+    """The honesty line lives in the dark pilot section only — never in coach_chat's production rules."""
+    from coach import coach_chat
+
+    rules = coach_chat.build_system_prompt("P", "", "F", "Eli")
+    assert "only his own recorded answer says what he did" not in rules
+    assert "cannot save it to his platform memory" in rules
 
 
 def test_a_due_follow_up_is_raised_by_the_lead_once(pilot_table):

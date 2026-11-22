@@ -4985,18 +4985,18 @@ STRUCTURAL_HAND_PROOFS["structural::test_elena_canon_6155.py"] = {
 # correction close that never closes on age.
 STRUCTURAL_HAND_PROOFS["structural::test_recommendation_record_6158.py"] = {
     "gate_name": "test_recommendation_record_6158.py",
-    "command": "python3 -m pytest tests/test_recommendation_record_6158.py -q -p no:warnings   # baseline 49 passed",
+    "command": "python3 -m pytest tests/test_recommendation_record_6158.py -q -p no:warnings   # baseline 53 passed",
     "mutation": (
         "Six plants, ONE AT A TIME, each restored from a copy: M1 coach_context_pilot.LIVE = True; M2 "
         "`from coach import recommendation_record` appended to lambdas/web/site_api_status.py; M3 MAX_PER_THEME 2 -> 7; "
         "M4 coach_corrections.close_correction's checkable-evidence check disabled; M5 recommendation_record.fold's "
-        "recorded_by == owner condition removed; M6 the admission rule's directive check disabled."
+        "recorded_by == owner condition removed; M6 the admission rule's directive check disabled. Follow-up (round-3 context fixes, notes never edited): N1 a dated note line dropped in build_turn_context; N2 the thread cap keeping the OLDEST repeats; N3 the data-honesty line reworded; N4 the notes-order line removed."
     ),
     "observed": (
         "2026-11-22, #6158 lane. BASELINE 49 passed. M1 2 failed (switch ships off; dark worker turn); M2 2 failed "
         "(publication boundary closure + the naming allowlist); M3 1 failed (dominant theme); M4 3 failed (age alone "
         "cannot close, x3); M5 1 failed (only owner events count); M6 3 failed (encouragement / no-directive refused). "
-        "REVERTED 49 passed."
+        "REVERTED 49 passed. 2026-11-22 follow-up lane (issue-6158-context-fixes): BASELINE 53 passed; N1-N4 each 1 failed; REVERTED 53 passed. M3 retired with the notes de-duplication it mutated (the thread cap is covered by N2)."
     ),
     "scope": (
         "Every tracked .py outside tests/ for record constructors and modules naming the record; the static import graph "
