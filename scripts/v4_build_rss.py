@@ -78,6 +78,25 @@ DESC = (
     "every week, including the weeks it dips. Written by Elena Voss, an AI editorial persona (a language model writing "
     "from the platform's data); Matthew approves each chapter before it publishes."
 )
+# #6177 (owner ruling 2026-11-22 §6): four early chapters were published by the 48-hour rule, not by a separate approval,
+# so the channel stops saying he approved each one. Read behind the ONE switch, www/src/lib/chapter_truth.js
+# CHAPTER_TRUTH_LIVE (scripts/www_launch_switch.py reads the line as text); off = DESC above, byte for byte.
+DESC_TRUE = (
+    "The weekly chronicle of an ordinary life, measured in full — every number, "
+    "every week, including the weeks it dips. Written by Elena Voss, an AI editorial persona (a language model writing "
+    "from the platform's data). Earlier chapters were published either after Matthew's approval or automatically under "
+    "a 48-hour rule he had authorised; a chapter now publishes only after he approves it."
+)
+
+
+def channel_desc(live: bool | None = None) -> str:
+    """The channel description: DESC while the #6177 switch is off, DESC_TRUE when it is on."""
+    if live is None:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from www_launch_switch import chapter_truth_live
+
+        live = chapter_truth_live()
+    return DESC_TRUE if live else DESC
 
 
 def rfc822(date_str: str) -> str:
@@ -338,7 +357,7 @@ def main() -> int:
         "  <channel>\n"
         f"    <title>{esc(TITLE)}</title>\n"
         f"    <link>{BASE}/story/chronicle/</link>\n"
-        f"    <description>{esc(DESC)}</description>\n"
+        f"    <description>{esc(channel_desc())}</description>\n"
         "    <language>en-us</language>\n"
         f"    <lastBuildDate>{now}</lastBuildDate>\n"
         f'    <atom:link href="{BASE}/rss.xml" rel="self" type="application/rss+xml"/>\n'

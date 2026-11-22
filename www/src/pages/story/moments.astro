@@ -2,7 +2,9 @@
 // The moments that explain it (2026-11-14, sprint III): the few documented events that best explain the experiment so
 // far, numbered on The Line, each a card tied to its evidence (lib/moments.js picks them by rule from published objects).
 import Base from "../../layouts/Base.astro";
-import { loadAll, loadCalibration, loadJourney, loadLab, loadOwnWords, loadSeries } from "../../lib/snapshot.js";
+import { loadAll, loadCalibration, loadChapterCorrections, loadJourney, loadLab, loadOwnWords, loadSeries } from "../../lib/snapshot.js";
+import { correctionsFor } from "../../lib/chapter_corrections.js";
+import { CHAPTER_TRUTH_LIVE, cardCorrection, cardQuote, momentsQuoteWho } from "../../lib/chapter_truth.js"; // #6177
 import OwnWords from "../../components/OwnWords.astro";
 import { ownWords } from "../../lib/own_words.js";
 import { moments, heldEveryWeek } from "../../lib/moments.js";
@@ -55,6 +57,14 @@ const list = moments({
   coachPath: (id: string) => pathOf("coach", id),
 });
 const chMeta = (c: any) => chapterMeta(c) || ({} as any);
+// #6177 (behind CHAPTER_TRUTH_LIVE): a quoted header is cited as the chapter now reads, never one that restates a
+// withheld threshold, and a chapter with a standing dated correction says so under the quotation, linked to it.
+const correctionDoc = CHAPTER_TRUTH_LIVE ? await loadChapterCorrections() : null;
+const cards = list.map((m: any) => ({
+  ...m,
+  shown: cardQuote(m.quote),
+  correction: m.chapter ? cardCorrection(correctionsFor(correctionDoc, m.chapter.id)) : null,
+}));
 const dated = list.map((m, i) => ({ ...m, n: String(i + 1) })).filter((m) => m.date);
 const start = journey?.start_date || null;
 const lineData =
@@ -79,7 +89,7 @@ const lineSvg = lineData ? theLine({ ...lineData, aria: lineAria }) : null;
       <h1 style="margin-top:10px">The moments that explain it</h1>
       <p class="dek" style="margin-top:14px">
         {list.length} {list.length === 1 ? "moment" : "moments"} from the first {journey?.day_n ?? "few"} days, chosen because the record can show each one. Every number is the platform's,
-        every quotation is an approved chapter's own words — or mine, where it says so — and each card leads to the evidence.
+        every quotation is {momentsQuoteWho()} chapter's own words — or mine, where it says so — and each card leads to the evidence.
       </p>
     </div>
   </section>
@@ -97,7 +107,7 @@ const lineSvg = lineData ? theLine({ ...lineData, aria: lineAria }) : null;
     <div class="wrap">
       <ol class="moments">
         {
-          list.map((m, i) => (
+          cards.map((m: any, i: number) => (
             <li class="moment" id={m.key} data-chapter={m.chapter ? m.chapter.id : undefined}>
               <span class="moment-n num">{i + 1}</span>
               <div class="moment-body">
@@ -116,11 +126,15 @@ const lineSvg = lineData ? theLine({ ...lineData, aria: lineAria }) : null;
                 )}
                 <h2 class="moment-title">{m.title}</h2>
                 <p class="moment-text">{m.body}</p>
-                {m.quote && m.quote.text && (
+                {m.shown && (
                   <blockquote class="moment-quote">
-                    <q>{m.quote.text}</q>
-                    <cite>— {m.quote.cite}, as published</cite>
+                    <q>{m.shown.text}</q>
+                    <cite>— {m.shown.citeWords}</cite>
                   </blockquote>
+                )}{m.correction && (
+                  <p class="moment-correction" data-moment-correction style="font-size:14px;margin-top:8px">
+                    <a href={href(pathOf("chapter", m.chapter.id))}>{m.correction} →</a>
+                  </p>
                 )}
                 {m.own && <OwnWords id={m.own} compact class="moment-own" note={OWN_NOTES[m.own] ?? null} />}
                 <p class="moment-links">

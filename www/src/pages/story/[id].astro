@@ -17,7 +17,7 @@ import { hasPage, href, pathOf } from "../../lib/url.js";
 import { placeRecordNote } from "../../lib/record_note.js";
 import { PERSONA_DISCLOSURE, correctionsFor, correctionsHtml, namesLegacyPersona } from "../../lib/chapter_corrections.js"; // #6177
 import { loadChapterCorrections } from "../../lib/snapshot.js";
-import { CHAPTER_BYLINE } from "../../lib/narrator.js";
+import { CHAPTER_TRUTH_LIVE, chapterByline, recordAsOf } from "../../lib/chapter_truth.js"; // #6177: byline, record date, covered days
 
 export async function getStaticPaths() {
   const all = await loadAll();
@@ -120,8 +120,10 @@ const discloseEditor = c.status === "published" && namesLegacyPersona(c.body_htm
 const series = await loadSeries();
 const edition = await latestEdition();
 const startDate: string | null = edition?.start_date || edition?.blocks?.today?.data?.start_date || null;
-// the same days the header and the day list read (format.js chapterWindow); a prologue has none
-const ev = win && c.status === "published" && (c.week ?? 0) >= 1 ? { from: win[0], to: win[1] } : null;
+// the same days the header and the day list read (format.js chapterWindow); a prologue has none. #6177 (on): a published
+// chapter with no covered days (stored or derived, lib/chapter_truth.js) draws no evidence — never the program week's.
+const noDays = CHAPTER_TRUTH_LIVE && c.status === "published" && !covered;
+const ev = win && c.status === "published" && (c.week ?? 0) >= 1 && !noDays ? { from: win[0], to: win[1] } : null;
 const dayById = new Map(all.byType.day.map((d: any) => [d.date, d]));
 const dayLink = (iso: string) => (dayById.get(iso) ? href(pathOf("day", (dayById.get(iso) as any).id)) : null);
 const winWords = ev ? `${(dayInWords(ev.from, { short: true }) || "").replace(/ \d{4}$/, "")} to ${dayInWords(ev.to, { short: true })}` : "";
@@ -193,10 +195,11 @@ if (paceWords && ev && rawBody && /rate flag/i.test(c.title || "") && withinDays
 const placedBody = rawBody ? placeEvidence(rawBody, figures).html : rawBody;
 // #6161: a coach record quoted in the chapter is the record as published; the coach's record today can differ. One
 // dated line beside the first paragraph that quotes one (rendering only — the chapter's words are never edited).
-// the served publication day only: a chapter whose publication is not served (the prologue) gets no date guessed for it
-const asPublished = c.status === "published" && c.published_at ? dayInWords(c.published_at) : null;
+// the served publication day only: a chapter whose publication is not served (the prologue) gets no date guessed for it.
+// #6177 (on): a chapter rewritten after publication dates its records to the rewrite (lib/chapter_truth.js recordAsOf).
+const asPublished = recordAsOf(c);
 const recordNote = asPublished
-  ? `<p class="evidence-note" style="font-family:var(--sans);font-size:13px;line-height:1.5;border-left:3px solid var(--ink);padding-left:10px" data-record-as-published>Coach records quoted in this chapter are as published on ${esc(asPublished)}. Each coach's current record is on <a href="${href("/system/")}">the system page</a>.</p>`
+  ? `<p class="evidence-note" style="font-family:var(--sans);font-size:13px;line-height:1.5;border-left:3px solid var(--ink);padding-left:10px" data-record-as-published>${esc(asPublished)} Each coach's current record is on <a href="${href("/system/")}">the system page</a>.</p>`
   : null;
 const body = placedBody ? placeRecordNote(placedBody, recordNote).html : placedBody;
 // the read-along's text as spoken, without the voice tool's pause marks ("Voss — — an AI" reads "Voss — an AI")
@@ -230,7 +233,7 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
           {c.read_minutes && <span>Read · {c.read_minutes} min</span>}
           {c.word_count && <span>{num(c.word_count)} words</span>}
           {episode && episode.duration_sec && <span>Listen · {mins(episode.duration_sec)}</span>}
-          {c.status === "published" && <span class="muted" data-byline>{CHAPTER_BYLINE}</span>}
+          {c.status === "published" && <span class="muted" data-byline>{chapterByline(c)}</span>}
         </div>
       </div>
     </div>

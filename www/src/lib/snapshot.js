@@ -5,6 +5,7 @@ import { getCollection } from "astro:content";
 
 import { buildIndex, COLLECTION_OF, connected } from "./edges.js";
 import { hasPage } from "./url.js";
+import { applyDerivedCovers } from "./chapter_truth.js";
 
 let _cache = null;
 
@@ -31,6 +32,9 @@ export async function loadAll() {
     byType[type] = entries.map((e) => plainIds(e.data));
     for (const o of byType[type]) objects.push(o);
   }
+  // #6177 (behind lib/chapter_truth.js CHAPTER_TRUTH_LIVE; a no-op while it is off): a published chapter with no stored
+  // covered days reads the days the platform's rule gives every other chapter, so every page names one span for it.
+  applyDerivedCovers(byType.chapter || []);
   const index = buildIndex(objects);
   const lookup = new Map(objects.map((o) => [`${o.type}:${o.id}`, o]));
   _cache = { byType, objects, index, get: (type, id) => lookup.get(`${type}:${id}`) || null };

@@ -9,7 +9,7 @@ import { weekStrip } from "../../lib/theline.js";
 import { hasPage, href, pathOf } from "../../lib/url.js";
 import { PERSONA_DISCLOSURE, correctionsFor, rowMark } from "../../lib/chapter_corrections.js"; // #6177
 import { loadChapterCorrections } from "../../lib/snapshot.js";
-import { INDEX_BYLINE } from "../../lib/narrator.js";
+import { indexByline } from "../../lib/chapter_truth.js"; // #6177: the index byline claims no approval it cannot show
 
 const all = await loadAll();
 const correctionDoc = await loadChapterCorrections(); // #6177: a chapter with a standing approved correction is marked on its row
@@ -50,7 +50,7 @@ const stripOf = (c: any) => {
         are still open — and that is what the chapters are about.
       </p>
       <p class="muted" style="margin-top:12px;max-width:720px;font-size:15px">
-        <span data-byline>{INDEX_BYLINE}</span> A week with no chapter says so here, in its place.
+        <span data-byline>{indexByline()}</span> A week with no chapter says so here, in its place.
       </p>
       <p class="persona-disclosure" style="margin-top:8px;max-width:720px" data-persona-disclosure>{PERSONA_DISCLOSURE}</p>
       <p style="margin-top:16px;font-size:15px;font-weight:700;display:flex;flex-wrap:wrap;gap:8px 28px">

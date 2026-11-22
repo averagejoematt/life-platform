@@ -16,7 +16,9 @@ Three pure pieces the owner's Journey/Day review asked to be one thing everywher
   `covers_end` (the days the chapter is about, from its "Day A to Day B" stats line). A chapter's `date` is the
   chronicle's DATA date — Week 10 is dated 10 November, covers 4–10 November and was approved on 13 November
   (2026-11-14). All three are null when not served (an older Lambda, fixture mode, a held/skipped/pending week);
-  `approved.at` becomes the approval day when it is known and otherwise stays as it was.
+  `approved.at` becomes the approval day when it is known and otherwise stays as it was. #6177: `published_via` says
+  HOW it was published — "approval" or "rule" (the 48-hour sweep), read off the served instant (`publication_via`), null
+  when it cannot be told; the page's byline reads it behind www/src/lib/chapter_truth.js CHAPTER_TRUTH_LIVE.
 * `clean_excerpt` — a chapter's excerpt without the editor's note the body already opens with, and without the
   Markdown emphasis markers the feed carries literally. The body itself is never touched.
 """
@@ -114,9 +116,48 @@ def pacific_day(ts: Any) -> str | None:
     return dt.astimezone(PACIFIC).date().isoformat()
 
 
+# How a published chapter was published (#6177, owner ruling 2026-11-22 §6: "Do not falsely imply I personally reviewed
+# every automatically published first edition"). The chronicle row's `approved_at` (served as `published_at`) was written
+# by two paths: the owner's approve click (any time of day), and — until #5884 (merged 2026-11-13 12:14 PT) — the daily
+# 48-hour sweep, which published a draft nobody had approved. The sweep wrote the same field and no marker of its own,
+# so its record is its schedule: cron(0 18 * * ? *) in UTC until 2026-10-18 (#5031), then cron(0 11 * * ? *) Pacific
+# (config/schedules.json "chronicle-approve"). Every sweep publication on record landed 43–45 s past the slot.
+#   "approval" — an `approved_at` outside the sweep's slot: written by the approve click (or the owner's season approval).
+#   "rule"     — an `approved_at` inside the sweep's slot, before the sweep stopped publishing.
+#   None       — no instant, an unreadable one, or one in the slot AFTER the sweep stopped publishing (it cannot be the
+#                sweep, and an approval cannot be told from it): the page then says nothing about approval.
+# An approve click that happened to land inside the two-minute slot reads as "rule" — the error runs toward never
+# claiming an approval, which is the direction the ruling asks for.
+PUBLISHED_VIA = ("approval", "rule")
+SWEEP_STOPPED_PUBLISHING = datetime.fromisoformat("2026-11-13T12:14:04-08:00")
+_SWEEP_SLOTS = ((ZoneInfo("UTC"), 18), (PACIFIC, 11))  # (clock, hour): the slot is the first two minutes of that hour
+_SWEEP_SLOT_SECONDS = 120
+
+
+def publication_via(ts: Any) -> str | None:
+    """``"approval"`` / ``"rule"`` / None for a served ``published_at`` instant (see the table above)."""
+    s = str(ts or "").strip()
+    if not s or ISO_DAY.fullmatch(s):
+        return None  # a bare day has no time of day: the slot cannot be read
+    try:
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+    in_slot = False
+    for tz, hour in _SWEEP_SLOTS:
+        local = dt.astimezone(tz)
+        if local.hour == hour and local.minute * 60 + local.second < _SWEEP_SLOT_SECONDS:
+            in_slot = True
+    if not in_slot:
+        return "approval"
+    return "rule" if dt < SWEEP_STOPPED_PUBLISHING else None
+
+
 def served_dates(chapters_api: dict | None) -> dict[int, dict]:
-    """``{week: {published_at, covers_start, covers_end}}`` for the PUBLISHED weeks `/api/chapters` serves — nothing
-    is read off a held, skipped or pending week."""
+    """``{week: {published_at, published_via, covers_start, covers_end}}`` for the PUBLISHED weeks `/api/chapters`
+    serves — nothing is read off a held, skipped or pending week."""
     out: dict[int, dict] = {}
     for w in (chapters_api or {}).get("weeks") or []:
         n = w.get("week")
@@ -124,7 +165,13 @@ def served_dates(chapters_api: dict | None) -> dict[int, dict]:
             continue
         a, b = str(w.get("covers_start") or ""), str(w.get("covers_end") or "")
         span = (a, b) if ISO_DAY.fullmatch(a) and ISO_DAY.fullmatch(b) and a <= b else (None, None)
-        out[n] = {"published_at": pacific_day(w.get("published_at")), "covers_start": span[0], "covers_end": span[1]}
+        day = pacific_day(w.get("published_at"))
+        out[n] = {
+            "published_at": day,
+            "published_via": publication_via(w.get("published_at")) if day else None,
+            "covers_start": span[0],
+            "covers_end": span[1],
+        }
     return out
 
 
@@ -133,7 +180,7 @@ def apply_chapter_dates(chapters: list[dict], chapters_api: dict | None) -> None
     for c in chapters:
         n = c.get("week")
         d = dates.get(n) if c.get("status") == "published" and isinstance(n, int) and not isinstance(n, bool) else None
-        d = d or {"published_at": None, "covers_start": None, "covers_end": None}
+        d = d or {"published_at": None, "published_via": None, "covers_start": None, "covers_end": None}
         c.update(d)
         if d["published_at"] and isinstance(c.get("approved"), dict):
             c["approved"] = {**c["approved"], "at": d["published_at"]}
