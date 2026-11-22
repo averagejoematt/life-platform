@@ -14,6 +14,7 @@ import { ownWords, withinDays } from "../../lib/own_words.js";
 import { dailyBars, placeEvidence, windowValues } from "../../lib/evidence.js";
 import { theLine } from "../../lib/theline.js";
 import { hasPage, href, pathOf } from "../../lib/url.js";
+import { placeRecordNote } from "../../lib/record_note.js";
 
 export async function getStaticPaths() {
   const all = await loadAll();
@@ -81,15 +82,17 @@ const meta = chapterMeta(c)!;
 const span = meta.window;
 const publishedWords = chapterPublished(c, { lower: true });
 const legacyNo = /^week-(\d+)$/.exec(c.id);
-const idNote = legacyNo && c.week != null && Number(legacyNo[1]) !== c.week ? `This page's address keeps the journal's post number (${legacyNo[1]}); the chapter is program ${c.week >= 1 ? `week ${c.week}` : "prologue"}.` : null;
+// #6161: the numbering notes are plain sentences at the foot of the chapter, never before its prose; the prologue has none.
+const idNote = legacyNo && c.week >= 1 && Number(legacyNo[1]) !== c.week ? "This page keeps the address it was first published at." : null;
 // The body as published, with two presentation-only touches (2026-11-14): the narrator's opening "signature" lines are
 // told apart — an editor's note (`note`) and the filed stat line, "Day N · …" (`filed`) — and the dek the header
-// already shows is not printed twice. No word of the text changes.
+// already shows is not printed twice — as a signature line, or as the first plain paragraph (#6161: Week 6 printed its
+// dek, then the same sentence as paragraph one). No word of the text changes.
 const plain = (h: string) => h.replace(/<[^>]+>/g, "").replace(/&#39;|&#x27;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
 function bodyForPage(html: string | null | undefined, dek: string | null | undefined): string | null {
   if (!html) return null;
   let dropped = false;
-  return html.replace(/<p class="signature">([\s\S]*?)<\/p>/g, (whole, inner) => {
+  const out = html.replace(/<p class="signature">([\s\S]*?)<\/p>/g, (whole, inner) => {
     const t = plain(inner);
     if (!dropped && dek && t === dek.trim()) {
       dropped = true;
@@ -99,6 +102,8 @@ function bodyForPage(html: string | null | undefined, dek: string | null | undef
     if (/^Day \d+\s*·/.test(t)) return `<p class="signature filed">${inner}</p>`;
     return whole;
   });
+  if (dropped || !dek) return out;
+  return out.replace(/<p>([\s\S]*?)<\/p>/, (whole, inner) => (plain(inner) === dek.trim() ? "" : whole));
 }
 const rawBody = bodyForPage(c.body_html, c.excerpt);
 // Evidence in the margin (2026-11-14, sprint II): the week's weight, recovery and protein drawn beside the paragraph
@@ -177,7 +182,17 @@ if (paceWords && ev && rawBody && /rate flag/i.test(c.title || "") && withinDays
     html: `<figure class="evidence ownwords-ev" data-evidence="own-words" data-own-words="pace"><figcaption class="label">In my words · ${dayInWords(paceWords.date)}</figcaption><blockquote>“${esc(paceWords.text)}”</blockquote><p class="evidence-note">Written in the days this chapter covers, the week the platform's rate flag fired on the pace of loss. The flag and the sentence disagree, and both are left as they are.</p></figure>`,
   });
 }
-const body = rawBody ? placeEvidence(rawBody, figures).html : rawBody;
+const placedBody = rawBody ? placeEvidence(rawBody, figures).html : rawBody;
+// #6161: a coach record quoted in the chapter is the record as published; the coach's record today can differ. One
+// dated line beside the first paragraph that quotes one (rendering only — the chapter's words are never edited).
+// the served publication day only: a chapter whose publication is not served (the prologue) gets no date guessed for it
+const asPublished = c.status === "published" && c.published_at ? dayInWords(c.published_at) : null;
+const recordNote = asPublished
+  ? `<p class="evidence-note" style="font-family:var(--sans);font-size:13px;line-height:1.5;border-left:3px solid var(--ink);padding-left:10px" data-record-as-published>Coach records quoted in this chapter are as published on ${esc(asPublished)}. Each coach's current record is on <a href="${href("/system/")}">the system page</a>.</p>`
+  : null;
+const body = placedBody ? placeRecordNote(placedBody, recordNote).html : placedBody;
+// the read-along's text as spoken, without the voice tool's pause marks ("Voss — — an AI" reads "Voss — an AI")
+const spoken = (line: string) => String(line || "").replace(/—\s*—/g, "—");
 const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
 ---
 
@@ -203,16 +218,6 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
         </div>
         <h1>{c.title}</h1>
         {c.excerpt && <p class="dek">{c.excerpt}</p>}
-        {meta.weekNote && (
-          <p class="muted" style="font-size:13px" data-week-note>
-            {meta.weekNote}
-          </p>
-        )}
-        {idNote && (
-          <p class="muted" style="font-size:13px" data-id-note>
-            {idNote}
-          </p>
-        )}
         <div class="row muted" style="font-size:14px">
           {c.read_minutes && <span>Read · {c.read_minutes} min</span>}
           {c.word_count && <span>{num(c.word_count)} words</span>}
@@ -235,8 +240,11 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
         {episode.transcript && episode.transcript.length > 0 && (
           <details style="margin-top:12px">
             <summary class="label" style="cursor:pointer;min-height:44px;display:flex;align-items:center">
-              Read along · {episode.transcript.length} turns
+              Read along · a scripted episode · {episode.transcript.length} turns
             </summary>
+            <p class="muted" style="font-size:14px;line-height:1.5;margin-top:8px;max-width:62ch" data-scripted>
+              A scripted episode voiced by AI personas: both voices are written by a language model from the week's record and spoken by synthetic voices. A coach's lines here were written for the episode; the coach's graded forecasts are in <a href={href("/system/ledger/")}>the ledger</a>.
+            </p>
             <div class="rows" style="margin-top:8px">
               {episode.transcript.map((t) => (
                 <span style="justify-content:flex-start;gap:14px;align-items:flex-start;flex-wrap:nowrap">
@@ -244,7 +252,7 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
                     {t.speaker}
                   </span>
                   <span class="serif" style="font-size:16px;line-height:1.5;flex:1 1 auto;min-width:0">
-                    {t.line}
+                    {spoken(t.line)}
                   </span>
                 </span>
               ))}
@@ -265,7 +273,14 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
               <span>{c.absent_text || ""}</span>
             </div>
           ) : body ? (
-            <div data-published-body set:html={body} />
+            <>
+              <div data-published-body set:html={body} />
+              {(meta.weekNote || idNote) && (
+                <p class="muted" style="font-size:13px;margin-top:32px;font-family:var(--sans)" data-numbering-note>
+                  {[meta.weekNote, idNote].filter(Boolean).join(" ")}
+                </p>
+              )}
+            </>
           ) : (
             <div class="empty" style="font-family:var(--sans)">
               <b style="color:var(--ink)">The text lives on the current site.</b>
