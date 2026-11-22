@@ -40,6 +40,17 @@ voice anchors quoted only from published chapters. Every writer renders her from
 (`lambdas/content/story_writers.py`), the legacy writer (`lambdas/emails/chronicle_prompt.py`), and the Panel's scripts
 (`lambdas/emails/podcast_script_v2.py`, `lambdas/emails/panelcast_scripts.py`). Edit her there, nowhere else.
 
+The owner's refinements of 2026-11-22 (canon 1.1.0, #6178):
+- "compassionate without being soft" stays.
+- She may be hopeful when the evidence warrants it; optimism is never a standing obligation.
+- She has no invented career, employment history or first-hand interview. A staged encounter in a draft is a hard
+  source finding (`lambdas/content/story_checks.py::staged_encounter_findings`).
+- No journal text enters an editorial prompt without the owner's explicit authorisation.
+- Voice anchors are eligible and verified only (`lambdas/content/elena_canon.py::verify_anchors`).
+- A coach is quoted only in approved original wording.
+
+On the site she is named the same way on every byline (`www/src/lib/narrator.js`).
+
 ## 4. The coaches' canonical roles
 
 The coach registry: `config/personas.json`, read through `lambdas/coach/persona_registry.py`
@@ -49,7 +60,9 @@ in a chapter.
 
 ## 5. Chronology and milestones
 
-- The published chapters: the site's chapter list (`www/src/pages/story/`), built from the publication snapshot.
+- The published chapters: the site's chapter list (`www/src/pages/story/`), built from the publication snapshot. A
+  week without a chapter is held (a draft exists, not approved), skipped (no chapter was published), pending (in
+  progress) or retired (the owner decided the draft will not be published); `lambdas/web/site_api_chapters.py`.
 - The documented moments a stranger should see: `www/src/lib/moments.js` (selected by rule from published objects).
 - Threads opened, advanced and resolved, bets and their results, titles used: the season ledger
   (`lambdas/content/story_ledger.py`). It advances only when a desk-written week publishes.
