@@ -39,6 +39,7 @@ from boto3.dynamodb.conditions import Key
 from common import activity_publication  # owner rulings 2026-11-03/05: private metrics off public mail
 from common.email_identity import CHRONICLE_SENDER  # #3568 — ONE sending vocabulary, gated against the SES-verified set
 from common.journal_silence import reader_mail  # #5131: the one public-surface guard
+from common.reader_email import head_meta, preheader_html, simple_content  # #6151 — the ONE reader envelope
 
 try:
     from common.platform_logger import get_logger
@@ -215,9 +216,16 @@ def has_real_content(digest: dict) -> bool:
 # ── Build (plain HTML, no tracking pixel, no per-link redirects) ─────────────
 
 
+#: #6151: this note's own muted green, kept for the footer — 7.56:1 on #0b0f0d (the old #5a7565 was 3.83:1).
+FOOTER_TEXT = "#8aaa90"
+
+
 def build_email(digest: dict, sub_email: str) -> tuple:
     unsub = unsub_url_or_fallback(sub_email, SITE_URL)  # #3044
     parts = [
+        # #6151: a whole document (it was a bare <div>) so the dark colour scheme is declared, plus a preheader
+        f'<!DOCTYPE html><html><head>{head_meta()}</head><body style="margin:0;padding:0;background:#0b0f0d;">',
+        preheader_html("Since the last installment: what the machine found between chronicles."),
         '<div style="background:#0b0f0d;color:#e8f0e8;font-family:Georgia,serif;padding:28px;max-width:640px;margin:auto;">',
         '<p style="font-family:monospace;font-size:11px;letter-spacing:.08em;color:#8aaa90;text-transform:uppercase;">since the last installment · what the machine found</p>',
     ]
@@ -261,8 +269,8 @@ def build_email(digest: dict, sub_email: str) -> tuple:
     parts.append(
         f'<p style="margin-top:22px;font-size:13px;color:#8aaa90;">Every number above is the same one the public site serves. '
         f'Single-subject experiment (N=1) — patterns, never proof. <a href="{SITE_URL}/cockpit/" style="color:#8aaa90;">The live cockpit →</a></p>'
-        f'<p style="margin-top:14px;font-family:monospace;font-size:11px;color:#5a7565;">No open tracking on this email. '
-        f'<a href="{unsub}" style="color:#5a7565;">unsubscribe</a></p></div>'
+        f'<p style="margin-top:14px;font-family:monospace;font-size:11px;color:{FOOTER_TEXT};">No open tracking on this email. '
+        f'<a href="{unsub}" style="color:{FOOTER_TEXT};">unsubscribe</a></p></div></body></html>'
     )
     n_bits = len(digest["deltas"]) + len(digest["unlocked"]) + len(digest["decided"]) + len(digest["stance_shifts"])
     subject = f"Between chronicles: {n_bits} thing{'s' if n_bits != 1 else ''} the machine found"
@@ -360,12 +368,8 @@ def lambda_handler(event: dict, context) -> dict:
             ses.send_email(
                 FromEmailAddress=SENDER,
                 Destination={"ToAddresses": [email]},
-                Content={
-                    "Simple": {
-                        "Subject": {"Data": reader_mail(subject), "Charset": "UTF-8"},
-                        "Body": {"Html": {"Data": reader_mail(html), "Charset": "UTF-8"}},
-                    }
-                },
+                # #6151: text part derived from the scrubbed HTML + List-Unsubscribe headers
+                Content=simple_content(reader_mail(subject), html=reader_mail(html), unsub_url=unsub_url_or_fallback(email, SITE_URL)),
             )
             sent += 1
             if sent == 1:
