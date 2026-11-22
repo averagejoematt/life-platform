@@ -2,7 +2,7 @@
 
 > **Status:** generated · **Owner:** Matthew · **Verified:** 2026-11-22
 
-**Version:** v8.6.0 | **Last updated:** 2026-11-22 | **Total tools:** 95
+**Version:** v8.6.0 | **Last updated:** 2026-11-22 | **Total tools:** 96
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;
@@ -21,7 +21,7 @@
 
 ---
 
-## All 95 Tools — by module
+## All 96 Tools — by module
 
 | Module | Tools |
 |---|---|
@@ -51,6 +51,7 @@
 | `mcp/tools_decisions.py` | 3 |
 | `mcp/tools_advice_links.py` | 1 |
 | `mcp/tools_coach_recommendations.py` | 1 |
+| `mcp/tools_research_findings.py` | 1 |
 | `mcp/tools_advice_queue.py` | 1 |
 | `mcp/tools_hevy.py` | 2 |
 | `mcp/tools_hevy_routine.py` | 1 |
@@ -259,6 +260,12 @@
 | Tool | Key Params | Description |
 |------|-----------|-------------|
 | `manage_coach_recommendation` | action, rec_id=, coach_id=, text=, channel=, evidence=[], context=, date=, decide_by=, decision_sk=, response=, withdraw=, words=, follow_up_on=, outcome_notes=, outcome_metric=, outcome_delta=, effectiveness=, correction_sk=, status= | OWNER-ONLY. The ONE recommendation record (#6158): coach recommendation -> his response -> follow-up -> outcome. action='record': a coach's MATERIAL, ACTIONABLE recommendation — coach_id, text (the coach's exact words), channel (telegram \| claude_chat \| coach_brief \| other), optional evidence (list of what it rested on), context, date, decide_by, decision_sk. It is refused, with the reason, unless it tells him to DO something checkable (a number or a time anchor) — never record a passing suggestion or encouragement. action='respond' with rec_id + response (accepted \| declined \| partially_followed \| deferred \| not_yet_decided = still deciding) and his words; withdraw=true takes an answer back. ONLY on his explicit answer: never set a response from training, food or wearable data — an unanswered recommendation stays 'not recorded'. action='follow_up' with follow_up_on (YYYY-MM-DD), only when he agreed to check back. action='outcome' with outcome_notes (+ optional outcome_metric, outcome_delta, effectiveness 1-5). action='link_correction' with correction_sk (CORRECTION#...). action='list' (status active \| due \| closed \| all, optional coach_id, rec_id). Never quoted on the site or in an email to readers. |
+
+### mcp.tools_research_findings (`mcp/tools_research_findings.py`)
+
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `manage_research_finding` | action, finding_id=, question=, dedupe_key=, sources=[], source=, evidence_summary=, evidence_strength=, applicability=, limitations=, risk_tier=, touches=[], clinical_review_required=, responsible_coach=, review_by=, origin=, surfaced_by=, date=, state=, reason=, superseded_by=, link_kind=, rec_id=, experiment_id=, verdict=, simulated=, words=, field=, value=, status=, include_simulated= | OWNER-ONLY. The research findings store (#6208): a finding's question, its VERIFIED sources, the evidence and its limits, and an append-only history. action='record': question, dedupe_key (lowercase slug), sources (1-12 objects printed by scripts/research_finding_verify.py: id_kind pmid\|doi\|guideline_url, id, design, review_depth abstract_only\|full_text, resolved_title, verified_on), evidence_summary, evidence_strength strong\|moderate\|weak\|insufficient ('strong' needs a full_text source), applicability {text, population_match direct\|partial\|poor}, limitations, risk_tier 1-5 (1 observational, 2 reversible behavioural, 3 training/nutrition, 4 supplement/electrolyte, 5 medication), touches, clinical_review_required, responsible_coach (persona id), review_by, origin prospective\|retrospective\|simulated, surfaced_by, date. A live finding with the same dedupe_key is refused and named. action='add_source' (finding_id, source). action='set_state' (finding_id, state, reason; superseded_by). action='link' (finding_id, link_kind recommendation + rec_id \| experiment + experiment_id \| personal_result + experiment_id: the verdict is COPIED from that experiment's analysis; simulated=true + verdict for a rehearsal). action='decide' (finding_id, words — his words verbatim). action='correct' (finding_id, field, value, reason). action='list' (status live\|stale\|closed\|all, state, finding_id, responsible_coach, include_simulated). Never set a state or a decision he did not state. Never quoted on the site, in an email or in a coach prompt. |
 
 ### mcp.tools_advice_queue (`mcp/tools_advice_queue.py`)
 

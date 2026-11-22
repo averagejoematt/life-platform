@@ -828,6 +828,30 @@ a=w._assemble('eli_marsh','headcoach'); print(c.build_turn_context(w._table(),'e
 # Roll back: merge `LIVE = False` and deploy the same two functions. The record and its rows are untouched either way.
 ```
 
+## The research findings store (#6208)
+
+**Live on merge:** the owner-only research findings store (`USER#matthew#SOURCE#research_findings`,
+`lambdas/research/findings.py`) and its one door, the MCP tool `manage_research_finding`. No schedule, no ingestion, no
+coach prompt, page or email reads it. The Lambda makes no network call: each source is verified on the laptop first.
+
+```bash
+# 1. Verify a source (read-only GETs to PubMed / Crossref, or to an allow-listed guideline host) and copy what it prints:
+python3 scripts/research_finding_verify.py --pmid <PMID> --title "<title as read>" --authors "<Surname AB>" --year <YYYY> \
+  --design meta_analysis --review-depth abstract_only
+python3 scripts/research_finding_verify.py --guideline-url https://www.nice.org.uk/guidance/<id> --title "<title>" \
+  --design clinical_guideline --review-depth full_text
+# 2. In a Claude session: manage_research_finding action=record ... sources=[<the printed objects>]
+# 3. The dead-man is a count the owner reads, not an alarm: manage_research_finding action=list status=stale
+```
+
+The rules it enforces (each refused with the reason): an unverified or off-list source; `strong` evidence on abstracts
+only; a second finding while one with the same `dedupe_key` is live (the refusal names it and its coach); a risk tier below
+what the finding touches, or tier >= 3 touching an intake target, electrolytes, supplements or medication without
+`clinical_review_required`; a tier-5 finding moved to `approved_for_experiment` (that belongs to the treating clinician);
+rejected / declined / superseded without a reason. History is append-only: the head row is never rewritten, a correction is
+an event. Adding a guideline host is a reviewed PR to `config/evidence_source_allowlist.json` AND to
+`research.findings.GUIDELINE_HOSTS` (the test holds them equal).
+
 ## Owner outbound trial — the switchboard (#6176)
 
 The owner's two-week outbound-mail trial (ruling 2026-11-22 §9) is ONE committed module,

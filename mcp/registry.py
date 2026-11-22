@@ -197,6 +197,7 @@ from mcp.tools_reading import (
     tool_get_reading_track_record,
     tool_manage_reading,
 )
+from mcp.tools_research_findings import MANAGE_FINDING_DESCRIPTION, MANAGE_FINDING_INPUT, tool_manage_research_finding  # #6208
 from mcp.tools_sick_days import tool_manage_sick_days
 from mcp.tools_social import tool_get_social_dashboard
 from mcp.tools_social_connection import tool_get_social_connection_trend  # lifted out of tools_lifestyle by #2221
@@ -1524,6 +1525,10 @@ TOOLS = {
     "manage_coach_recommendation": {  # #6158: the ONE recommendation record — owner-only, every write his explicit act
         "fn": tool_manage_coach_recommendation,
         "schema": {"name": "manage_coach_recommendation", "description": MANAGE_REC_DESCRIPTION, "inputSchema": MANAGE_REC_INPUT},
+    },
+    "manage_research_finding": {  # #6208: the research findings store — owner-only, every write his explicit act
+        "fn": tool_manage_research_finding,
+        "schema": {"name": "manage_research_finding", "description": MANAGE_FINDING_DESCRIPTION, "inputSchema": MANAGE_FINDING_INPUT},
     },
     "get_advice_link_queue": {  # read-only: the coaches' recent asks beside what Matthew recorded; writes nothing
         "fn": tool_get_advice_link_queue,

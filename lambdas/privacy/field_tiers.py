@@ -357,6 +357,12 @@ SOURCE_TIERS: dict[str, int] = {
     # tool `manage_coach_recommendation` and the coach-context pilot (his Telegram coach thread, the coach session
     # packet); `tests/test_recommendation_record_6158.py` holds that no public-pipeline module can reach it.
     "coach_recommendations": TIER_OWNER_ONLY,
+    # #6208: the research findings store — the questions he is researching, the sources he read, how far they apply
+    # to him, their risk tier (supplements, medication), his decisions in his words and his personal results. Private,
+    # so owner-only with no public projection and no aggregate carve-out. Declared before the first row exists
+    # (ADR-154's ordering). Reader and writer: the owner's MCP tool `manage_research_finding` only; no coach prompt,
+    # page or email reads it — `tests/test_research_findings_6208.py` holds the publication boundary.
+    "research_findings": TIER_OWNER_ONLY,
     # ── internal: never published, but inside owner-facing tooling and AI context ──
     # ADR-155 amendment (2026-10-12, owner ruling): the owner clinical record
     # (`scripts/load_clinical_record.py`, data kept off-repo) may enter the AI coaches'

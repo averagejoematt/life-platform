@@ -5008,6 +5008,35 @@ STRUCTURAL_HAND_PROOFS["structural::test_recommendation_record_6158.py"] = {
     "proved_on": "2026-11-22",
 }
 
+# #6208 — the research findings store (owner rulings 2026-11-22, epic #6206): verified sources only, strong evidence
+# needs a full text, a live dedupe key blocks a second finding, a tier-5 finding never reaches approved_for_experiment,
+# simulated rows stay out of the default list, a personal result never moves evidence_strength, one writer and no
+# public or coach reader.
+STRUCTURAL_HAND_PROOFS["structural::test_research_findings_6208.py"] = {
+    "gate_name": "test_research_findings_6208.py",
+    "command": "python3 -m pytest tests/test_research_findings_6208.py -q -p no:randomly -p no:warnings   # baseline 73 passed",
+    "mutation": (
+        "Seven plants, ONE AT A TIME, each restored from a copy: M1 research.findings.check_rules' strong-needs-full_text "
+        "condition made False; M2 refuse_live_duplicate's match made False; M3 the tier-5 approved_for_experiment refusal "
+        "made False; M4 list_view's simulated exclusion made False; M5 validate_source's resolved_title/verified_on check "
+        "made False; M6 the personal_result evidence_strength refusal made False; M7 `from research import findings` "
+        "appended to lambdas/web/site_api_status.py."
+    ),
+    "observed": (
+        "2026-11-22, #6208 lane. BASELINE 73 passed. M1 2 failed (strong refused on abstracts; the correction path); M2 1 "
+        "failed (live dedupe named); M3 1 failed (tier 5 to the clinician); M4 1 failed (simulated out of every default "
+        "list); M5 2 failed (unverified source, x2); M6 2 failed (tool + pure builder); M7 2 failed (naming allowlist + "
+        "the public/coach import closure). REVERTED 73 passed."
+    ),
+    "scope": (
+        "Every tracked .py outside tests/ for finding constructors and runtime modules naming the store; the static import "
+        "graph (module-level and lazy) of lambdas/web, content, emails, coach, ai, intelligence and compute; the six rules, "
+        "the fold and the list view on fixtures through the real tool; the laptop verifier with stubbed resolvers. NOT "
+        "SEEN: a dynamic import by string; a reader that queries the partition by a pk it builds without naming the source."
+    ),
+    "proved_on": "2026-11-22",
+}
+
 # #6178 — the narrator named on every byline: the chapter page, the home card and the story index read one definition
 # (www/src/lib/narrator.js), the RSS channel and the subscribe page carry it verbatim, the owner's first-person lines
 # stay byte-identical, and no rendered byline under www/src still says "the platform's narrator".

@@ -4324,6 +4324,13 @@
     {
       "direction": "unknown",
       "lambda": null,
+      "module": "lambdas/research/findings.py",
+      "partition": "research_findings",
+      "via": "pk"
+    },
+    {
+      "direction": "unknown",
+      "lambda": null,
       "module": "lambdas/training/block_design_review.py",
       "partition": "training_constraints",
       "via": "pk"
@@ -8400,14 +8407,14 @@
       "contracts_enrolled": 16,
       "contracts_known": 15,
       "contracts_ratchet": 16,
-      "edges": 802,
+      "edges": 803,
       "lambdas": 107,
-      "mcp_tool_modules": 44,
-      "mcp_tools": 95,
-      "partitions": 127,
+      "mcp_tool_modules": 45,
+      "mcp_tools": 96,
+      "partitions": 128,
       "privacy_fields_owner_only": 69,
       "privacy_fields_owner_published": 11,
-      "privacy_sources_owner_only": 26,
+      "privacy_sources_owner_only": 27,
       "privacy_sources_owner_published": 3,
       "scheduled_lambdas": 80,
       "schedules": 97
@@ -8415,8 +8422,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 389,
-        "sites_resolved": 1008,
-        "sites_total": 1397
+        "sites_resolved": 1009,
+        "sites_total": 1398
       },
       "schedule_resolution": {
         "dynamic": 0,
@@ -9025,6 +9032,11 @@
       "ingestion": false,
       "privacy_tier": "public"
     },
+    "research_findings": {
+      "class": "cross_phase",
+      "ingestion": false,
+      "privacy_tier": "owner_only"
+    },
     "rewards": {
       "class": "experiment_scoped",
       "ingestion": false,
@@ -9356,6 +9368,7 @@
       "private_intake": "owner_only",
       "progress_photos": "owner_only",
       "reading": "owner_only",
+      "research_findings": "owner_only",
       "sick_days": "owner_only",
       "state_of_mind": "owner_only",
       "strava": "owner_only",
