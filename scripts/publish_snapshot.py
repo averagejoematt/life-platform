@@ -96,6 +96,7 @@ from publish_snapshot_contract import (  # noqa: E402,F401 — re-exported: the 
     SCHEMA,
     UTILITY,
     VISIBILITIES,
+    WEEK_STATE_TEXT,
     SchemaError,
     _check,
     _dump,
@@ -328,22 +329,10 @@ def _chapter_body(ctx: LiveContext, url: str | None) -> str | None:
         return None
 
 
-# The one line each state without a chapter shows (#6178). Never a title, a teaser or a reason a held draft carries.
-WEEK_STATE_TEXT = {
-    "held": "Drafted, not approved. No chapter for this week yet.",
-    "retired": "A draft was written for this week and Matthew decided not to publish it. The days are still on the record.",
-    "skipped": "No chapter was published for this week.",
-    "pending": "No chapter yet for this week.",
-}
-
-
 def _live_week_states(ctx: LiveContext) -> None:
-    """Program weeks with no published chapter: `held` (drafted, not approved: one neutral line, never "waiting for
-    approval" or "sent back" — the stored statuses do not say which, #6161/#6178), `retired` (a draft existed and the
-    owner decided not to publish it, #6178), `skipped` (a later week published, this one never was) or `pending` (the
-    current or most recent week, not yet written). A status this exporter does not know is shown as `held` — never
-    dropped, never `skipped`. From `/api/chapters` when it is served; otherwise derived from the published weeks and the
-    edition's day count — never a title or a body for any of them."""
+    """Weeks with no published chapter, each with its one WEEK_STATE_TEXT line (#6178): held (one neutral line, never
+    "waiting"/"sent back"), retired (owner decided not to publish), skipped, pending; an unknown state is held. From
+    `/api/chapters`, else derived from the published weeks and the edition's day count — never a title or a body."""
     published = {c["week"] for c in ctx.objs["chapter"] if isinstance(c.get("week"), int)}
     weeks_api = (ctx.fetched.get("chapters") or {}).get("weeks") or []
     states: dict[int, dict] = {}
