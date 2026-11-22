@@ -331,7 +331,16 @@ def check_story_season(
     # ── (d) the Monday questions — needs no season rows, so it is graded first ──
     slot = last_questions_send(now)
     owed = week_containing(slot.date().isoformat()) if slot.date().isoformat() >= QUESTIONS_FIRST_SEND else None
-    if owed is None:
+    from common import outbound_trial
+
+    if outbound_trial.is_on(outbound_trial.STORY_QUESTIONS_PAUSED):
+        # #6176 item 4: the sender reads this same committed switch and logs '[outbound-trial] ... suppressed' instead of
+        # sending, so a paused Monday is the recognised state, not a miss.
+        questions_c.ok(
+            f"Monday story questions paused by the outbound trial ({outbound_trial.TRIAL_ISSUE}, #6174) — "
+            f"no send owed for {slot.date().isoformat()}; the sender logs its suppression"
+        )
+    elif owed is None:
         questions_c.ok(
             f"no questions send owed for {slot.date().isoformat()} (first live send {QUESTIONS_FIRST_SEND}; "
             "a Monday outside every season week sends nothing)"

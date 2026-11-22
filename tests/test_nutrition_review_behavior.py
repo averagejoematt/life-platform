@@ -1563,6 +1563,33 @@ def test_the_happy_path_sends_exactly_one_email_to_the_configured_recipient(hand
     assert sent["Destination"]["ToAddresses"] == [m.RECIPIENT]
 
 
+def test_outbound_trial_off_the_review_is_unchanged_and_carries_no_plate_section_6176(handler_env):
+    """#6176 item 2, OFF (the committed default): today's email, one send, no folded Plate section."""
+    from common import outbound_trial
+
+    assert outbound_trial.TRIAL[outbound_trial.PLATE_INTO_NUTRITION_REVIEW] is False
+    m.lambda_handler({}, None)
+    assert len(handler_env["ses"].sent) == 1
+    assert "From the Weekly Plate" not in _sent_html(handler_env)
+
+
+def test_outbound_trial_on_folds_the_plate_into_the_one_review_6176(handler_env):
+    """#6176 item 2, ON: still ONE Saturday email to the same recipient, now carrying the Plate's code-built section —
+    the most-logged foods over the two weeks the Review read — and no calorie target in that section."""
+    from common import outbound_trial
+
+    handler_env["monkeypatch"].setitem(outbound_trial.TRIAL, outbound_trial.PLATE_INTO_NUTRITION_REVIEW, True)
+    handler_env["monkeypatch"].setattr(outbound_trial, "TRIAL_ENDS_ON", None)
+    m.lambda_handler({}, None)
+    assert len(handler_env["ses"].sent) == 1
+    assert handler_env["ses"].sent[0]["Destination"]["ToAddresses"] == [m.RECIPIENT]
+    html = _sent_html(handler_env)
+    section = html[html.index("From the Weekly Plate") :]
+    assert "Greek yogurt" in section and "Chicken teriyaki" in section
+    assert "The calorie target is under review, so this section states none." in section
+    assert "kcal" not in section[: section.index("</ul></div>")]
+
+
 def test_the_subject_line_carries_the_week_and_its_headline_averages(handler_env):
     m.lambda_handler({}, None)
     subject = _sent_subject(handler_env)

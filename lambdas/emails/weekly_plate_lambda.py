@@ -29,6 +29,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from common import (
     digest_utils,  # shared query_range implementations (#970)
+    outbound_trial,  # #6176: the outbound trial's switchboard
     send_ledger,  # #3113 / DIL-025: the durable replay guard
 )
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, PLAN_DAILY_PROTEIN_MIN_G  # ADR-058
@@ -656,6 +657,12 @@ def record_email_send(table, lambda_name, period_key):
 
 def lambda_handler(event, context):
     dry_run = is_dry_run(event)
+
+    # #6176 item 2 (outbound trial): the Plate folds into Saturday's Nutrition Review. Checked first: no data read,
+    # no model call, no plate memory written — and one log line, so a quiet Friday is never mistaken for a failure.
+    if outbound_trial.is_on(outbound_trial.PLATE_INTO_NUTRITION_REVIEW):
+        rec = outbound_trial.suppressed(outbound_trial.PLATE_INTO_NUTRITION_REVIEW, "weekly-plate", log=logger.info)
+        return {"statusCode": 200, "body": json.dumps({"suppressed": True, **rec})}
 
     # DIL-025 / #3113 replay guard — before the gather and before the Bedrock
     # call, not merely before the send. A redrive carries the original payload.

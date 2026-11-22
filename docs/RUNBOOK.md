@@ -740,6 +740,50 @@ Retiring a week is the owner's decision and a DynamoDB write the owner approves:
 never selects the row, and the publish audit refuses it. The Story page shows the retired line only once
 `CHAPTERS_RETIRED_STATE=on`.
 
+## The coach-context pilot and the recommendation record (#6158)
+
+**Live on merge (Part A):** the owner-only recommendation record (`USER#matthew#SOURCE#coach_recommendations`,
+`lambdas/coach/recommendation_record.py`) and its one door, the MCP tool `manage_coach_recommendation`. Nothing reads it
+on a live coaching path until the switch below is on; nothing ever writes it but that tool.
+
+**Dark (Part B):** `lambdas/coach/coach_context_pilot.py` — the coach's context in the owner's priority order (his recorded
+decisions and platform memory first, today's planned session, the recommendations on record with his answers, the chat
+thread and notes with repeated themes left out, his corrections, what the coach can and cannot remember), and the lead's
+one due follow-up. It is gated by ONE committed switch, `coach_context_pilot.LIVE` (ships `False`). Off, the Telegram worker
+and `get_coach_session_packet` behave exactly as before.
+
+```bash
+# Preview the pilot context for one coach on one day — reads only, writes and sends nothing (the private harness's call):
+python3 -c "import sys; sys.path[:0]=['lambdas']; from coach import coach_context_pilot as c, telegram_worker_lambda as w; \
+a=w._assemble('eli_marsh','headcoach'); print(c.build_turn_context(w._table(),'eli_marsh','2026-11-23',memory=a['memory'],thread=a['thread'])['memory'])"
+# Turn it on (owner, after the blind re-evaluation): merge `LIVE = True`, then deploy the worker and the MCP server
+#   bash deploy/deploy_fleet.sh          # telegram-coach-worker + life-platform-mcp (or the CI deploy on merge)
+# Roll back: merge `LIVE = False` and deploy the same two functions. The record and its rows are untouched either way.
+```
+
+## Owner outbound trial — the switchboard (#6176)
+
+The owner's two-week outbound-mail trial (ruling 2026-11-22 §9) is ONE committed module,
+`lambdas/common/outbound_trial.py`. Each item is one line in its `TRIAL` dict and ships `False` (today's behaviour).
+Start an item, or roll one back alone, by flipping its line in a PR and deploying the fleet (`bash deploy/deploy_fleet.sh`);
+the status page wording needs the site-api deploy too (`bash deploy/deploy_site_api.sh`). `TRIAL_ENDS_ON` (a Pacific
+`YYYY-MM-DD`) turns every item off by itself from that day.
+
+| Item | On | Rollback |
+|---|---|---|
+| `sunday_what_changed` | the Sunday weekly-digest slot sends "what changed and what matters"; Monday Compass is held | flip to `False` |
+| `plate_into_nutrition_review` | Friday Plate held; its most-logged-foods section rides Saturday's Nutrition Review | flip to `False` |
+| `review_pack_not_emailed` | the AI Review Pack is built and logged (`[ai-review-pack] pack_record`), not emailed | flip to `False` |
+| `story_questions_paused` | Monday story questions + Tuesday owner-words question held before generation (#6174) | flip to `False` |
+| `evening_one_channel` | Telegram 20:00 prompt held (EVAL# still stamped); the nudge drops items unlogged 14+ days | flip to `False` |
+| `ops_dlq_summary` | the DLQ SES summary is held when its SNS escalation went out | flip to `False` |
+| `ops_canary_alarmed` | a canary failure a declared alarm already carries is not also emailed | flip to `False` |
+| `ops_monday_pack` | the Monday ops pack is logged (`[traffic-digest] ops_pack_record`), not emailed | flip to `False` |
+
+Every held send logs ONE `[outbound-trial] {"event": "suppressed", ...}` line in its own log group, so a held send
+is never a silent failure. Volume before and after: `python3 scripts/owner_outbound_volume.py --weeks 2` (read-only;
+log groups keep 30 days, so run it within 30 days of the window).
+
 ## Common Issues
 
 ### Whoop/Withings/Strava: "Token expired" error
