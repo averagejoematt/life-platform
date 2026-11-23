@@ -4,9 +4,19 @@
 // line, "Day N · …" (`filed`) — and the dek the header already shows is not printed twice — as a signature line, or as
 // the first plain paragraph (#6161: Week 6 printed its dek, then the same sentence as paragraph one). No word changes.
 
+// Words only, for COMPARING a line with the dek — never emitted. Tags are stripped until none is left (a single pass can
+// leave a tag behind in crafted input; the comparison must not depend on that).
+const untagged = (h) => {
+  let prev;
+  let out = String(h);
+  do {
+    prev = out;
+    out = out.replace(/<[^>]*>/g, "");
+  } while (out !== prev);
+  return out;
+};
 const plain = (h) =>
-  h
-    .replace(/<[^>]+>/g, "")
+  untagged(h)
     .replace(/&#39;|&#x27;/g, "'")
     .replace(/&amp;/g, "&")
     .replace(/\s+/g, " ")
