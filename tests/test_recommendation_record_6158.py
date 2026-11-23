@@ -319,17 +319,29 @@ def _tracked_py() -> list[str]:
 
 
 WRITER_MODULE = "mcp/tools_coach_recommendations.py"
+#: The Morning Brief pilot's intake (#6158, dark): the brief's OFFER and his button answers, and nothing else.
+BRIEF_INTAKE = "lambdas/coach/brief_rec_intake.py"
+REGISTRY = "lambdas/coach/recommendation_record.py"
+#: Every row constructor -> the ONE module allowed to call it (the registry composes its own, which is not a write).
+CONSTRUCTOR_CALLERS = {
+    "build_head": {WRITER_MODULE},
+    "build_event": {WRITER_MODULE},
+    "build_offered_head": {BRIEF_INTAKE},
+    "build_button_response": {BRIEF_INTAKE},
+}
 #: Every module allowed to NAME the record (its source string or its module). A new reader is a decision made here.
 ALLOWED_TO_NAME = frozenset(
     {
         "lambdas/coach/recommendation_record.py",  # the registry
         "lambdas/coach/coach_context_pilot.py",  # the pilot context (reads)
-        WRITER_MODULE,  # the one writer
+        WRITER_MODULE,  # the owner's writer
+        BRIEF_INTAKE,  # the brief pilot's writer (offers + his button answers only), dark
         "lambdas/coach/telegram_worker_lambda.py",  # imports the pilot seam (owner's private chat)
         "mcp/tools_coach_packet.py",  # imports the pilot seam (owner's MCP packet)
         "mcp/registry.py",  # registers the tool
         "lambdas/privacy/field_tiers.py",  # TIER_OWNER_ONLY
         "lambdas/experiment/phase_taxonomy.py",  # CROSS_PHASE
+        "cdk/stacks/role_policies_email.py",  # #6158 pilot: the daily-brief role's append-only Deny names the partition
     }
 )
 
@@ -343,7 +355,10 @@ def _names_the_record(src: str) -> bool:
 
 
 def test_only_the_owner_tool_constructs_or_writes_a_record():
-    constructing, naming = set(), set()
+    """Each constructor has exactly its one caller: the owner tool builds what he records, the brief intake builds
+    only an offer and his button answer — never an outcome, a follow-up or a correction link."""
+    constructing: dict = {name: set() for name in CONSTRUCTOR_CALLERS}
+    naming = set()
     for rel in _tracked_py():
         src = (ROOT / rel).read_text(encoding="utf-8", errors="replace")
         if _names_the_record(src) and rel.startswith(RUNTIME_TREES):
@@ -354,9 +369,10 @@ def test_only_the_owner_tool_constructs_or_writes_a_record():
             continue
         for call in (n for n in ast.walk(tree) if isinstance(n, ast.Call)):
             f = call.func
-            if (f.attr if isinstance(f, ast.Attribute) else getattr(f, "id", None)) in ("build_head", "build_event"):
-                constructing.add(rel)
-    assert constructing == {WRITER_MODULE}, f"record constructors outside the owner tool: {sorted(constructing)}"
+            name = f.attr if isinstance(f, ast.Attribute) else getattr(f, "id", None)
+            if name in constructing and rel != REGISTRY:
+                constructing[name].add(rel)
+    assert constructing == CONSTRUCTOR_CALLERS, f"record constructors outside their one caller: {constructing}"
     assert naming <= ALLOWED_TO_NAME, f"modules naming the recommendation record outside the allowlist: {sorted(naming - ALLOWED_TO_NAME)}"
     assert naming == ALLOWED_TO_NAME, f"an allowed module stopped naming the record (vacuous guard?): {sorted(ALLOWED_TO_NAME - naming)}"
 
@@ -413,16 +429,25 @@ RECORD_MODULES = frozenset({"coach.recommendation_record", "coach.coach_context_
 #: `group_turn` only; `content.recap_deliver` imports telegram_group for `first_private_chat_id` and never calls the
 #: group turn. That one lazy edge is cut here and the module-level closure below proves it is never loaded at import.
 OWNER_CHAT_MODULE = "coach.telegram_worker_lambda"
+#: The Morning Brief pilot's intake (#6158, dark). The daily brief is sent to the owner alone, and the pilot is where
+#: the record gets its first operational intake, so `emails.brief_trial` reaches the record through this ONE module —
+#: lazily, inside the two pilot functions, only while `CANONICAL_INTAKE_LIVE` is True. That edge is cut here; the
+#: tests below hold that it is the only public-root edge into the record, that it is never loaded at import, and that
+#: the only record text it hands the brief is a follow-up on a recommendation a BRIEF offered (never a chat's).
+BRIEF_INTAKE_MODULE = "coach.brief_rec_intake"
 
 
 def test_the_publication_boundary_cannot_reach_the_record():
     lazy = _import_graph(module_level_only=False)
     roots = [m for m in lazy if m.startswith(PUBLIC_ROOT_PACKAGES)]
     assert len(roots) > 50, "the public roots were not found — vacuous guard"
-    reached = _closure(lazy, roots, stop=frozenset({OWNER_CHAT_MODULE}))
+    reached = _closure(lazy, roots, stop=frozenset({OWNER_CHAT_MODULE, BRIEF_INTAKE_MODULE}))
     assert not reached & RECORD_MODULES, f"a public-pipeline module can import the record: {sorted(reached & RECORD_MODULES)}"
     eager = _closure(_import_graph(module_level_only=True), roots)
     assert OWNER_CHAT_MODULE not in eager, "a public module loads the Telegram worker at import time"
+    assert BRIEF_INTAKE_MODULE not in eager, "a public module loads the brief intake at import time"
+    importers = {m for m in roots if BRIEF_INTAKE_MODULE in lazy.get(m, ())}
+    assert importers == {"emails.brief_trial"}, f"the brief intake is reached from a public root other than the trial: {importers}"
     assert not eager & RECORD_MODULES
 
 

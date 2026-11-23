@@ -168,8 +168,24 @@ def email_daily_brief() -> list[iam.PolicyStatement]:
                     f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-quality-gate",
                 ],
             ),
+            # #6158 Morning Brief pilot (OWNER-REQUIRED — presented for review, not yet acknowledged). NO new Allow:
+            # the `DynamoDB` statement above already lets this role PutItem/UpdateItem the whole table, the
+            # recommendation record included. This Deny NARROWS that for the record's ONE partition: the brief may
+            # only PutItem there (its code puts conditionally — an offered head and his button answers, both
+            # append-only, `coach.brief_rec_intake`) and can never update, delete or batch-write a record row.
+            iam.PolicyStatement(
+                sid="RecommendationRecordAppendOnly",
+                effect=iam.Effect.DENY,
+                actions=["dynamodb:UpdateItem", "dynamodb:DeleteItem", "dynamodb:BatchWriteItem"],
+                resources=[TABLE_ARN],
+                conditions={"ForAnyValue:StringEquals": {"dynamodb:LeadingKeys": [RECOMMENDATION_RECORD_PK]}},
+            ),
         ],
     )
+
+
+#: The recommendation record's one partition (`coach.recommendation_record.pk("matthew")`; a test holds them equal).
+RECOMMENDATION_RECORD_PK = "USER#matthew#SOURCE#coach_recommendations"
 
 
 def email_weekly_digest() -> list[iam.PolicyStatement]:

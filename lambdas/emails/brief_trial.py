@@ -14,6 +14,9 @@ ONE switch, a DynamoDB item (no new IAM: the daily-brief role already reads and 
 Same send time, schedule, recipient and sender: this module never sends, and the switch changes no
 EventBridge schedule or permission.
 
+#6158 pilot (dark: `coach.brief_recommendations.CANONICAL_INTAKE_LIVE`): `_pilot_plan` / `_pilot_record` hand the
+brief's one linked recommendation to `coach.brief_rec_intake` — imported only there, only while the switch is on.
+
 Every function is fail-soft: a trial failure costs the trial, never the brief (the handler falls back
 to the current render). Writes happen only when the handler's `_persist` gate is open (a dry run or a
 demo writes nothing, and its response link is shown un-armed).
@@ -63,6 +66,9 @@ class Trial:
     token: str | None = None
     token_row: dict | None = None
     measurement: dict = field(default_factory=dict)
+    pilot: dict | None = None  # #6158 (dark): set only while rr.CANONICAL_INTAKE_LIVE
+    follow_token: str | None = None
+    follow_token_row: dict | None = None
 
 
 # ── reads ────────────────────────────────────────────────────────────────────────────────────────
@@ -313,6 +319,8 @@ def prepare(
             }
             view.respond_url = rr.response_url(site_url, token)
             view.respond_rec = respond
+        if variant == SWITCH_HYBRID and rr.CANONICAL_INTAKE_LIVE:  # #6158 pilot, dark: off = this line is the whole cost
+            trial.pilot = _pilot_plan(table, user_prefix, trial, respond, site_url, recipient, logger)
         if variant == SWITCH_HYBRID:
             trial.block_html = brief_hybrid.render_html(view)
             trial.text = brief_hybrid.render_text(view)
@@ -416,9 +424,77 @@ def _ddb(item: dict) -> dict:
     return floats_to_decimal({k: v for k, v in item.items() if v is not None})
 
 
-def record(table, user_prefix: str, trial: Trial | None, html_chars: int, persist: bool, logger) -> None:
+def _pilot_plan(table, user_prefix, trial: Trial, respond, site_url, recipient, logger) -> dict:
+    """#6158 pilot, BEFORE the send (reads only): plan the offer, stamp the link's token with its canonical id,
+    and attach the one due brief follow-up. Record unreadable -> the brief goes out as the trial's, and nothing
+    is stamped, so nothing from this send can ever reach the record."""
+    from coach import brief_rec_intake as intake
+
+    try:
+        offer, why = intake.plan_offer(table, respond, trial.data_day)
+        fu = intake.due_follow_up(table, rr.trial_pk(user_prefix), intake.brief_day(trial.data_day))
+    except Exception as e:  # noqa: BLE001 — the record's absence never costs the brief
+        logger.warning("[brief_rec_pilot] record unavailable; the brief goes out, nothing will be recorded: %s", type(e).__name__)
+        return {"state": "record_unavailable"}
+    if offer and trial.token_row:
+        trial.token_row["canonical_rec_id"] = offer.canonical_rec_id  # the activation marker
+    if fu and not (offer and fu["rec_id"] == offer.canonical_rec_id) and trial.view is not None:
+        trial.follow_token = rr.new_token()
+        trial.follow_token_row = {
+            "rec_id": "follow_up#" + fu["rec_id"],
+            "rec_key": "follow_up",
+            "send_day": shift_day_key(fu["date"], -1),  # the data day of the brief that OFFERED it: the page names that brief
+            "recipient_hash": rr.recipient_hash(recipient),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "expires_at": int(time.time()) + rr.TOKEN_TTL_SECONDS,
+            "canonical_rec_id": fu["rec_id"],
+        }
+        trial.view.follow_up = fu
+        trial.view.follow_up_url = rr.response_url(site_url, trial.follow_token)
+    return {"state": "planned", "offer": offer, "skip": why, "follow_up_rec_id": fu["rec_id"] if fu else None}
+
+
+def _pilot_record(table, pk: str, trial: Trial, sent, logger) -> dict:
+    """#6158 pilot, AFTER the send: the SEND# row's pilot fields. The offer is written only with SES's MessageId."""
+    from coach import brief_rec_intake as intake
+
+    p = trial.pilot or {}
+    out: dict = {"rec_pilot_state": p.get("state")}
+    if p.get("state") != "planned":
+        return out
+    msg = sent.get("MessageId") if isinstance(sent, dict) else None
+    out["ses_message_id"] = msg
+    offer = p.get("offer")
+    if offer is None:
+        out.update(rec_offer="not_eligible", rec_offer_reason=p.get("skip"))
+    else:
+        out["canonical_rec_id"] = offer.canonical_rec_id
+        try:
+            out["rec_offer"] = intake.write_offer(table, offer, ses_message_id=msg, offered_at=datetime.now(timezone.utc).isoformat())
+        except Exception as e:  # noqa: BLE001 — logged, never reconstructed later
+            logger.warning("[brief_rec_pilot] offer not recorded rec=%s: %s", offer.canonical_rec_id, type(e).__name__)
+            out["rec_offer"] = "write_failed"
+    if msg and p.get("follow_up_rec_id"):
+        out["follow_up_rec_id"] = p["follow_up_rec_id"]  # asked once: this row is the proof it was asked
+        if trial.follow_token and trial.follow_token_row:
+            try:
+                table.put_item(
+                    Item=_ddb({"pk": pk, "sk": "TOKEN#" + rr.token_hash(trial.follow_token), **trial.follow_token_row}),
+                    ConditionExpression="attribute_not_exists(sk)",
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.warning("[brief_rec_pilot] follow-up token write failed: %s", type(e).__name__)
+    try:
+        out["rec_answers"] = intake.carry_responses(table, pk)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[brief_rec_pilot] answers not carried this run (they stay on their token rows): %s", type(e).__name__)
+        out["rec_answers"] = "read_failed"
+    return out
+
+
+def record(table, user_prefix: str, trial: Trial | None, html_chars: int, persist: bool, logger, sent=None) -> None:
     """After the send: the token row (so the link works) and the SEND# measurement row. Fail-soft.
-    `persist` False (dry run / demo) writes nothing."""
+    `persist` False (dry run / demo) writes nothing. `sent` is SES's reply to the send (#6158 pilot only)."""
     if trial is None or not persist:
         return
     pk = rr.trial_pk(user_prefix)
@@ -434,6 +510,8 @@ def record(table, user_prefix: str, trial: Trial | None, html_chars: int, persis
         m = dict(trial.measurement)
         m["total_html_chars"] = int(html_chars)  # the whole sent email's length (the handler hands `len(html)`, never the html)
         m["sent_at"] = datetime.now(timezone.utc).isoformat()
+        if trial.pilot is not None:
+            m.update(_pilot_record(table, pk, trial, sent, logger))
         table.put_item(Item=_ddb({"pk": pk, "sk": "SEND#" + trial.data_day, "date": trial.data_day, **m}))
     except Exception as e:  # noqa: BLE001
         logger.warning("brief trial measurement write failed (non-fatal): %s", e)

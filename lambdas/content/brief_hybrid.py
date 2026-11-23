@@ -168,6 +168,8 @@ class View:
     respond_url: str | None = None
     respond_rec: Rec | None = None
     notes: list = field(default_factory=list)
+    follow_up: dict | None = None  # #6158 pilot (dark): the ONE due follow-up he agreed to, on a recommendation a brief offered
+    follow_up_url: str | None = None
 
 
 def label_recs(recs: list, data_day: str, history: dict) -> list:
@@ -449,6 +451,10 @@ def render_text(view: View) -> str:
         out += ["", "Recommendations"]
         for r in rest:
             out += ["• " + _rec_lines(r)[0]] + ["  " + x for x in _rec_lines(r)[1:]]
+    if view.follow_up:
+        out += ["", "FOLLOW-UP DUE", _follow_up_sentence(view.follow_up)]
+        if view.follow_up_url:
+            out.append("Your answer (optional): " + view.follow_up_url)
     if view.held_back:
         out += ["", _held_back_sentence(view.held_back)]
     if view.unknown:
@@ -457,6 +463,18 @@ def render_text(view: View) -> str:
         out += ["", "Your answer on “" + view.respond_rec.text + "” (optional): " + view.respond_url]
     out += ["", "———", "Full detail: the complete brief, below."]
     return "\n".join(out)
+
+
+def _follow_up_sentence(fu: dict) -> str:
+    return (
+        "You agreed to check back on "
+        + day_in_words(str(fu.get("follow_up_on") or ""))
+        + " about “"
+        + str(fu.get("text") or "")
+        + "” (from the brief of "
+        + day_in_words(str(fu.get("date") or ""), weekday=False)
+        + "). Asked once; what happened is yours to record."
+    )
 
 
 def _held_back_sentence(n: int) -> str:
@@ -514,6 +532,12 @@ def render_html(view: View) -> str:
         out += '<p style="' + _S["h"] + '">RECOMMENDATIONS</p>'
         for r in rest:
             out += _rec_html(r, _S["rec"])
+    if view.follow_up:
+        out += (
+            '<p style="' + _S["h"] + '">FOLLOW-UP DUE</p><p style="' + _S["rec"] + '">' + esc(_follow_up_sentence(view.follow_up)) + "</p>"
+        )
+        if view.follow_up_url:
+            out += '<a style="' + _S["btn"] + '" href="' + esc(view.follow_up_url) + '">Answer: done / not doing it / still deciding</a>'
     if view.held_back:
         out += '<p style="' + _S["small"] + 'margin-top:8px;">' + esc(_held_back_sentence(view.held_back)) + "</p>"
     if view.unknown:

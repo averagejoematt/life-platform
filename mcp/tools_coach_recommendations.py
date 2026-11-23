@@ -218,7 +218,7 @@ def _list(args: dict[str, Any]) -> dict[str, Any]:
     if status != "all" and not rec_id:
         views = [v for v in views if v["status"] == status or (status == "active" and v["status"] == "due")]
     if status == "due":
-        views = rr.due_follow_ups(views, today)
+        views = rr.due_follow_ups(views, today, surface=None)  # the owner's list: every due one, whichever channel asks it
     return _d2f(
         {
             "status_filter": status,
