@@ -252,15 +252,17 @@ def _edition_rows(chapter_id: str | None = None) -> list:
 
 
 def _tainted():
-    """``web.narrative_publication.is_tainted`` over the complete withheld-call record, read now — or None when that record
-    cannot be read (the gates then refuse: nothing is proposed or approved unchecked)."""
+    """``web.narrative_publication.is_tainted`` over the complete withheld-call record, read now, OR'd with the words of
+    every coach output row the provenance policy withholds (``web.withheld_outputs``, #6193) — or None when either cannot
+    be read (the gates then refuse: nothing is proposed or approved unchecked)."""
     try:
-        from web import narrative_publication as NPub, publication_snapshot as PS  # noqa: PLC0415
+        from web import narrative_publication as NPub, publication_snapshot as PS, withheld_outputs as WO  # noqa: PLC0415
 
         NPub.begin_request()
         PS.begin_request(_table_ref)
         PS.complete()
-        return NPub.is_tainted
+        WO.load(_table_ref)
+        return WO.with_outputs(NPub.is_tainted, _table_ref)
     except Exception as exc:  # noqa: BLE001
         logger.warning(f"[#6193] publication record unreadable: {type(exc).__name__}")
         return None

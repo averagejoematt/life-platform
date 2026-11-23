@@ -68,12 +68,14 @@ def preview_records(chapter_id: str, text: str, first_published: str, archival: 
 def _tainted_or_none():
     try:
         import boto3  # noqa: PLC0415
-        from web import narrative_publication as NPub, publication_snapshot as PS  # noqa: PLC0415
+        from web import narrative_publication as NPub, publication_snapshot as PS, withheld_outputs as WO  # noqa: PLC0415
 
+        raw = boto3.resource("dynamodb", region_name="us-west-2").Table("life-platform")
         NPub.begin_request()
-        PS.begin_request(boto3.resource("dynamodb", region_name="us-west-2").Table("life-platform"))
+        PS.begin_request(raw)
         PS.complete()
-        return NPub.is_tainted
+        WO.load(raw)  # #6193: a withheld coach output's words are refused too
+        return WO.with_outputs(NPub.is_tainted, raw)
     except Exception as exc:  # noqa: BLE001
         print(f"  (the private-call record could not be opened read-only: {type(exc).__name__}; that gate is reported as unchecked)")
         return None
