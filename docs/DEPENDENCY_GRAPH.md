@@ -118,7 +118,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-804 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+806 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -169,7 +169,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `evening_checkin` | evening_checkin.py | evening_checkin.py |
 | `evening_ritual` | — | site_api_fulfillment.py |
 | `experiment_suggestions` | site_api_social_experiments.py | — |
-| `experiments` | tools_lifestyle.py | ai_expert_analyzer_lambda.py, chronicle_data.py, coach_nudge_lambda.py, daily_insight_compute_lambda.py, site_api_discovery.py, site_api_protocols.py, site_api_rollups.py, tools_lifestyle.py |
+| `experiments` | experiment_close.py, tools_lifestyle.py | ai_expert_analyzer_lambda.py, chronicle_data.py, coach_nudge_lambda.py, daily_insight_compute_lambda.py, experiment_close.py, site_api_discovery.py, site_api_protocols.py, site_api_rollups.py, tools_lifestyle.py |
 | `exposures` | — | — |
 | `eyeball_estimate` | — | — |
 | `felt_probe` | — | site_api_fulfillment.py |
@@ -599,7 +599,7 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1399 total · 1010 resolved · 389 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1401 total · 1011 resolved · 390 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 80 resolved · 0 dynamic of 80 scheduled lambdas (107 lambdas total)
 - Alarms: 152 literal-named declarations across three idioms, 4 composite; routing digest 108 · digest+paging 2 · digest+urgent 10 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 27 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only

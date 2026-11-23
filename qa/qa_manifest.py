@@ -1394,6 +1394,13 @@ _API_SWEEP_OVERRIDES = {
         "the lead's approved reads; every coach answers 404 while the switch is off, and the expectation follows the "
         "committed switch.",
     },
+    "/api/brief_response": {
+        "expect": "404",
+        "reason": "#6175 token-only owner door (lambdas/web/site_api_brief_response.py): without a valid one-use token it "
+        "answers 404 and records nothing — by design, so a stranger learns nothing. The sweep proves the REFUSAL "
+        "(measured live 2026-11-23: 404 bare); a 200 here would mean the door opened without a token. Never probed with "
+        "a real token (one-use, owner-only). tests/api_schemas/_exemptions.json carries it as auth-gated.",
+    },
     "/api/verify_subscriber": {
         "expect": "400",
         "reason": "param-gated (valid ?email= + token required): the validator's structured 400 is the "

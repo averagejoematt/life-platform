@@ -26,6 +26,10 @@ const line = (o: any): string => {
   if (o.type === "prediction") return o.verdict_text ? clip(o.verdict_text, 110) : callOutcome(o.status);
   return o.summary || "";
 };
+// #6193: the site's DAILY edition (the dated front page) is not a chapter's second edition — on a chapter's rail the
+// word "edition" read as one. The rail names it for what it is; the link is unchanged.
+const kind = (t: string): string => (t === "edition" ? "daily front page" : t);
+const railTitle = (o: any): string => (o.type === "edition" ? String(o.title || "").replace(/^The edition of /, "Daily front page of ") : o.title);
 const tail = (o: any): string => {
   switch (o.type) {
     case "prediction":
@@ -53,9 +57,9 @@ const tail = (o: any): string => {
       <div class="conn">
         {rail.items.map((e) => (
           <a href={href(pathOf(e.type, e.id, e.object))}>
-            <span class="k">{e.type}</span>
+            <span class="k">{kind(e.type)}</span>
             <span>
-              <b>{e.type === "prediction" && !e.object.claim_withheld ? <Quote text={clip(e.object.claim, 120)} said={e.object.logged_date} /> : e.type === "prediction" ? `${e.object.coach_name ? `${e.object.coach_name} · ` : ""}${heldCallWords(e.object) || e.object.title}` : e.object.title}</b>
+              <b>{e.type === "prediction" && !e.object.claim_withheld ? <Quote text={clip(e.object.claim, 120)} said={e.object.logged_date} /> : e.type === "prediction" ? `${e.object.coach_name ? `${e.object.coach_name} · ` : ""}${heldCallWords(e.object) || e.object.title}` : railTitle(e.object)}</b>
               {line(e.object) && (
                 <>
                   <br />

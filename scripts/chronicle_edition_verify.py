@@ -113,8 +113,13 @@ def verify(get: Callable[[str], str], chapter_id: str, sha256: str, *, archival_
             if f'<link rel="canonical" href="{base}/story/{chapter_id}/">' not in arch:
                 problems.append(f"/story/{chapter_id}/first-edition/: not canonical to the chapter's address")
     feed = get(f"{base}/rss.xml")
+    # a retired or skipped week is served with "url": null (and "title": null) — a present key whose value is None
     url = next(
-        (w.get("url") for w in chapters.get("weeks") or [] if isinstance(w, dict) and w.get("url", "").rstrip("/").endswith(chapter_id)),
+        (
+            w.get("url")
+            for w in chapters.get("weeks") or []
+            if isinstance(w, dict) and (w.get("url") or "").rstrip("/").endswith(chapter_id)
+        ),
         None,
     )
     if url:
