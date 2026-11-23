@@ -344,7 +344,8 @@ REPLAY_SEMANTICS: dict[str, tuple[str, str]] = {
         DETERMINISTIC_KEY,
         "propose puts CHAPTER_CORRECTION#<chapter>#<id> under attribute_not_exists(sk), so a replay is refused and writes nothing; "
         "approve appends the approval only while size(approvals) = 0, so a replayed approve is refused; #6193 the edition and "
-        "archival actions follow the same two rules on CHAPTER_EDITION#<chapter>#… rows",
+        "archival actions follow the same two rules on CHAPTER_EDITION#<chapter>#… rows, and a withdrawal is put once under "
+        "attribute_not_exists(sk) on <target>#withdrawn, so a replayed withdraw is refused",
     ),
     # ── #4401: read-verb tools reclassified as writes (mcp/audit.py WRITE_TOOLS_BEHIND_READ_VERB) ──
     "get_exercise_notes": (

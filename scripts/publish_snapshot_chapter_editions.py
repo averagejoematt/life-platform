@@ -15,7 +15,10 @@ schema error (exit 2). Each ENTRY is then checked on its own and HELD (logged, l
 edition) when it fails: a chapter that is not a published chapter of this snapshot, a first-published day that disagrees
 with the chapter's served one, a carried correction that is not approved, text bytes that do not hash to the approved
 SHA-256, a body that is not exactly the chronicle renderer's output for that text, an emptied body, or a body the truth
-checks refuse. One held edition never blocks an unrelated verified one (owner ruling 2026-11-22, final approval §12).
+checks refuse — and (#6193 B4) a title line that is not the chapter's published title or a summary that is not the
+text's own summary line, and (B9) a text that points at its first-edition address when no archival rendering of that
+chapter is served (the edition and its archival page ship together, or neither does). One held edition never blocks an
+unrelated verified one (owner ruling 2026-11-22, final approval §12).
 """
 
 from __future__ import annotations
@@ -84,13 +87,25 @@ def _day(value: Any) -> Optional[str]:
     return str(value)[:10] if isinstance(value, str) and CE.ISO_DAY.match(str(value)[:10]) else None
 
 
-def _check_text(cid: str, what: str, block: dict) -> None:
-    """The served bytes are the approved bytes: the text hashes to the SHA-256 the approval is bound to, and the body is
-    exactly the chronicle renderer's output for that text — so nothing between approval and page can change the prose."""
+def _check_text(cid: str, what: str, block: dict, title: Optional[str] = None) -> None:
+    """The served bytes are the approved bytes: the text hashes to the SHA-256 the approval is bound to, its presentation
+    fields are the text's own title and summary lines, and the body is exactly the chronicle renderer's output for the
+    rest of the text — so nothing between approval and page can change the prose or move a word out of its slot."""
     text, body = block.get("text"), block.get("body_html")
     if not isinstance(text, str) or CE.text_sha256(text) != block.get("text_sha256"):
         raise ValueError(f"chapter_editions.json: {cid}: the {what} text does not hash to its approved SHA-256")
-    if not isinstance(body, str) or body != CE.render_html(text):
+    try:
+        p = CE.presentation(text, edition=what == "edition")
+    except CE.EditionError as exc:
+        raise ValueError(f"chapter_editions.json: {cid}: {exc}") from exc
+    if block.get("title") != p["title"] or (what == "edition" and block.get("summary") != p["summary"]):
+        raise ValueError(f"chapter_editions.json: {cid}: the {what}'s title and summary are not its own title and summary lines")
+    if p["title"] is not None and " ".join(p["title"].split()) != " ".join(str(title or "").split()):
+        raise ValueError(
+            f"chapter_editions.json: {cid}: the {what}'s title line {p['title']!r} is not the chapter's published title {title!r} "
+            "(an edition never retitles a chapter)"
+        )
+    if not isinstance(body, str) or body != CE.render_html(p["body"]):
         raise ValueError(f"chapter_editions.json: {cid}: the {what} body is not the rendering of its approved text")
     plain = CE.plain_text(body)
     if len(plain.strip()) < CE.MIN_TEXT:
@@ -121,15 +136,19 @@ def _check_edition(e: dict, chapters: dict, approved: set) -> None:
     missing = [c for c in e["carries"] or [] if (cid, c) not in approved]
     if missing:
         raise ValueError(f"chapter_editions.json: {cid}: carries corrections that are not approved and served: {missing}")
-    _check_text(cid, "edition", e)
+    _check_text(cid, "edition", e, chapters[cid].get("title"))
 
 
-def _check_archival(cid: str, e: dict, a: Any) -> None:
+def _check_archival(cid: str, e: dict, a: Any, title: Optional[str]) -> None:
     if not isinstance(a, dict) or set(a) != set(CE.PUBLIC_ARCHIVAL_FIELDS):
         raise ValueError(f"chapter_editions.json: {cid}: an archival rendering is exactly {sorted(CE.PUBLIC_ARCHIVAL_FIELDS)}")
-    if a["note"] != CE.archival_note(e["first_published"], e["revised_on"]) or a["signature"] != CE.archival_signature(a["approved_on"]):
+    as_of = a.get("as_of")
+    if as_of is not None and not (CE.ISO_DAY.match(str(as_of)) and e["first_published"] <= str(as_of) <= e["revised_on"]):
+        raise ValueError(f"chapter_editions.json: {cid}: the archival as_of day is not between first publication and this revision")
+    note = CE.archival_note(e["first_published"], e["revised_on"], as_of)
+    if a["note"] != note or a["signature"] != CE.archival_signature(a["approved_on"]):
         raise ValueError(f"chapter_editions.json: {cid}: the archival note and signature are the platform's fixed words only")
-    _check_text(cid, "archival", a)
+    _check_text(cid, "archival", a, title)
 
 
 def validate(doc: Any, public: dict, corrections: Optional[dict], log: Callable[[str], None] = print, held: Optional[list] = None) -> dict:
@@ -157,11 +176,18 @@ def validate(doc: Any, public: dict, corrections: Optional[dict], log: Callable[
             continue
         if e["archival"] is not None:
             try:
-                _check_archival(cid, e, e["archival"])
+                _check_archival(cid, e, e["archival"], chapters[cid].get("title"))
             except (ValueError, KeyError, TypeError) as exc:
                 held.append(f"{cid}#archival")
-                log(f"  ✗ HELD archival rendering {cid}: {exc} — no first-edition page; the edition itself is unaffected")
+                log(f"  ✗ HELD archival rendering {cid}: {exc} — no first-edition page")
                 e = {**e, "archival": None}
+        if e["archival"] is None and CE.references_archive(e.get("text"), cid):
+            held.append(cid)
+            log(
+                f"  ✗ HELD edition {cid}: its text points readers at {CE.archive_path(cid)}, and no approved archival rendering is "
+                "served — release the edition and its archival rendering together; its page keeps the first edition"
+            )
+            continue
         kept.append(e)
     return {**doc, "editions": kept}
 

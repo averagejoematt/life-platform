@@ -1,6 +1,6 @@
 {
   "_README": "The training charter (#5068, epic #5067): the ONE source of every training target the engine, the critics, the coaches and the skills read. HAND-OWNED (deploy/config_ownership_audit.py); any change needs an owner ruling and a change_log entry. This file is PUBLIC. The owner-only twin (body/appearance targets) is never committed — see config/training_charter.private.example.json and lambdas/training/training_charter.py. Published surfaces read ONLY training_charter.public_view() (the PUBLISHED_WHITELIST); the target date and the rate band are not on it (owner ruling 2026-10-18: no May countdown or May target on the site). ADR-164.",
-  "version": "1.52.0",
+  "version": "1.53.0",
   "change_log": [
     {
       "version": "1.0.0",
@@ -357,6 +357,13 @@
       "date": "2026-11-16",
       "by": "owner ruling 2026-11-16 on #6090 (remove the private habit identifier from the current public repository; no rewrite of historical computed records, no history rewrite)",
       "what": "One core-12 habit's id is now the neutral alias core_h10, marked id_alias (habits.core and disruption.whole_day.paused_habits). The id its rows are stored under is owner data: the registry entries flagged for it carry the stored id as `core` and this alias as `core_alias` (PROFILE#v1), and health.core_habits.resolve_spec swaps the alias for the stored id before grading, so every historical and new row keeps the same key and every score is unchanged. A missing mapping grades the habit unknown (never a miss) and logs a WARNING. No number, basis, weight or prescription changes.",
+      "rule": "any change needs an owner ruling; bump `version` and add a line here"
+    },
+    {
+      "version": "1.53.0",
+      "date": "2026-11-23",
+      "by": "owner ruling 2026-11-23 on #5067 (tape-measurement and progress-photo cadence)",
+      "what": "calibration.tape_and_photos.every_weeks 2 -> 4: a tape measurement and a progress-photo set are due every four weeks. Owner's reasons: a monthly cadence is more sustainable, still gives useful longitudinal body-size and visual observations, frequent tape and photo readings carry substantial measurement variability, and neither method establishes a change in skeletal muscle or lean tissue. dead_man_missed_cycles stays 2, so the dead-man is two missed four-week cycles. Nothing is backdated and no cycle is marked done: the last-logged dates are the stored rows' own, the missed history stays as it was, and the calibration-deadman alarm clears only when a real entry is logged. Progress photos stay private. The DEXA cadence (calibration.dexa) is separate and unchanged; tape and photos do not substitute for a scan.",
       "rule": "any change needs an owner ruling; bump `version` and add a line here"
     }
   ],
@@ -1359,7 +1366,7 @@
   },
   "calibration": {
     "tape_and_photos": {
-      "every_weeks": 2,
+      "every_weeks": 4,
       "dead_man_missed_cycles": 2
     },
     "dexa": {

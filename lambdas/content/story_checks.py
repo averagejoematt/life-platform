@@ -173,12 +173,41 @@ def _is_a_legitimate_number(text: str, m: "re.Match[str]") -> bool:
     return False
 
 
+# THE ONE NARROW EXCEPTION (owner ruling 2026-11-22, final approval §7: "Relax Elena's no-attempt-count restriction
+# narrowly to permit my own explicitly approved statement. Do not infer a lifetime number of attempts."). His approved
+# statement may carry its count ONLY as an exact quotation — these words, character for character, inside quotation
+# marks. The same words are the `beginning` pin of www/src/lib/own_words.js (tests pin the two equal); a paraphrase, a
+# changed character, the words without quotation marks, or any count outside the quotation is refused exactly as before.
+OWN_WORDS_COUNT_QUOTES = ("By my own count the 15th or 16th reset in a few months.",)
+_OPEN_QUOTE = '"“'
+_CLOSE_QUOTE = '"”'
+
+
+def own_quote_spans(text: str) -> List[tuple]:
+    """``[(start, end)]`` of every exact, quoted occurrence of a pinned own-words statement in ``text``."""
+    spans = []
+    for q in OWN_WORDS_COUNT_QUOTES:
+        at = 0
+        while (i := (text or "").find(q, at)) >= 0:
+            j = i + len(q)
+            if i > 0 and text[i - 1] in _OPEN_QUOTE and j < len(text) and text[j] in _CLOSE_QUOTE:
+                spans.append((i, j))
+            at = j
+    return spans
+
+
+def _inside(m: "re.Match[str]", spans: List[tuple]) -> bool:
+    return any(a <= m.start() and m.end() <= b for a, b in spans)
+
+
 def _count_findings(text: str) -> List[str]:
-    """Every cycle/reset/attempt count in ``text`` — the count half of ``reader_surface``, one finding per phrase."""
+    """Every cycle/reset/attempt count in ``text`` — the count half of ``reader_surface``, one finding per phrase. A count
+    inside an exact quotation of his pinned statement (``OWN_WORDS_COUNT_QUOTES``) is his words, not the writer's."""
     seen: Set[str] = set()
+    spans = own_quote_spans(text or "")
     for pat in _COUNT_PATTERNS:
         for m in pat.finditer(text or ""):
-            if not _is_a_legitimate_number(text, m):
+            if not _is_a_legitimate_number(text, m) and not _inside(m, spans):
                 seen.add(m.group(0))
     return [
         f"story-door: a cycle/attempt count is not reader copy (owner ruling 2026-09-26): {p!r}"
@@ -219,8 +248,11 @@ _REFERENCE_PATTERNS = [
 
 def _reference_findings(text: str) -> List[str]:
     seen: List[str] = []
+    spans = own_quote_spans(text or "")
     for pat in _REFERENCE_PATTERNS:
         for m in pat.finditer(text or ""):
+            if _inside(m, spans):
+                continue
             noun = (m.groupdict().get("noun") or "").lower()
             if noun.startswith(("attempt", "tries")) and _LIFT_AFTER.match(text[m.end() :]):
                 continue  # "his previous attempt at 225"
@@ -418,16 +450,54 @@ _ATTRIBUTION = re.compile(
 )
 
 
+# Words that never tie a sentence to a statement of his: the attribution's own verbs and glue. A sentence is tied to a
+# recorded line only through the content words it shares with it.
+_ATTR_STOP = frozenset(
+    "said says told tell tells written wrote admitted insisted put puts words word account that this with have been were "
+    "what they them then than from there about would could should really just very much more some into over also "
+    "when where which while still even only like long week weeks".split()
+)
+
+ATTRIBUTION_UNAVAILABLE = (
+    "source: attribution evidence unavailable — the first-person attribution check could not run, because this gate path "
+    "was given no record of his words ({quoted} attributes words to him); pass the week's owner_lines, or take the attribution out"
+)
+
+
+def _content_stems(s: str) -> set:
+    return {w[:5] for w in re.findall(r"[a-z][a-z'’]{3,}", (s or "").lower()) if w not in _ATTR_STOP}
+
+
+def _sentence_around(text: str, start: int, end: int) -> str:
+    lo = max((text.rfind(c, 0, start) for c in ".!?\n"), default=-1) + 1
+    cuts = [k for k in (text.find(c, end) for c in ".!?\n") if k != -1]
+    return text[lo : (min(cuts) if cuts else len(text))]
+
+
 def attribution_findings(text: str, owner_lines: Optional[Iterable[str]]) -> List[str]:
-    """``source:`` findings (blocking) for a first-person attribution to him when no words of his are on record this week.
-    ``owner_lines=None`` (a caller that does not pass the record) skips the check."""
-    if owner_lines is None or any(str(x or "").strip() for x in owner_lines):
+    """``source:`` findings (blocking) for a first-person attribution to him that no recorded word of his supports.
+    Three outcomes, all visible: ``owner_lines=None`` (a gate path that could not supply the record) returns
+    ``ATTRIBUTION_UNAVAILABLE`` for each attribution — never silence (#6216); no recorded words at all, or none that the
+    attributed sentence shares a content word with, return the unsourced finding; a sentence that shares a content word
+    with a recorded line of his is sourced. A text with no attribution has nothing to check and returns []."""
+    text = text or ""
+    hits = list(_ATTRIBUTION.finditer(text))
+    if not hits:
         return []
-    return [
-        f"source: {m.group(0)!r} attributes words to him, and no words of his are on record this week — report what the "
-        "record shows, never a statement he did not make"
-        for m in _ATTRIBUTION.finditer(text or "")
-    ]
+    if owner_lines is None:
+        return [ATTRIBUTION_UNAVAILABLE.format(quoted=repr(m.group(0))) for m in hits]
+    lines = [str(x or "") for x in owner_lines if str(x or "").strip()]
+    recorded = [_content_stems(x) for x in lines]
+    out: List[str] = []
+    for m in hits:
+        stems = _content_stems(_sentence_around(text, m.start(), m.end()).replace(m.group(0), " "))
+        if any(stems & r for r in recorded):
+            continue
+        why = "no words of his are on record this week" if not lines else "none of his recorded words this week is about that"
+        out.append(
+            f"source: {m.group(0)!r} attributes words to him, and {why} — report what the record shows, never a statement he did not make"
+        )
+    return out
 
 
 # ── an activity word the stored sport type contradicts (#6199) ───────────────

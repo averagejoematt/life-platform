@@ -1,7 +1,7 @@
 """training/calibration_cadence.py — when the tape, the progress photos and the DEXA are due (#5061, epic #5067).
 
 The charter's `calibration` block names the cadences (`charter_value`): tape + photos every
-`every_weeks` (2) weeks with a dead-man after `dead_man_missed_cycles` (2) missed cycles, and a DEXA about
+`every_weeks` weeks (4 since charter 1.53.0; 2 before) with a dead-man after `dead_man_missed_cycles` (2) missed cycles, and a DEXA about
 every `every_weeks_approx` (12) weeks. This module is the ONE place that turns those numbers and the dates a
 thing was last logged into a state and a prompt. Pure: the readers are INJECTED (a callable returning the
 dates logged, or raising), the clock is the `today` argument, and nothing here touches AWS.
