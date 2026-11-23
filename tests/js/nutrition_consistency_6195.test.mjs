@@ -72,3 +72,28 @@ test("F7 ON: the loss-rate line drops the 'defensible' verdict and the bench att
   assert.match(html, /this page does not rate the pace as safe or unsafe/);
   assert.match(html, /right now that floor's missed most days/);
 });
+
+test("F1 ON: the badge names what it counts and cannot disagree with the verdict sentence in any state", () => {
+  const ch = (status, direction) => ({ name: "C", status, direction, delta_pct: 0 });
+  const on = { ...DS_OFF, honesty: "These five channels are recovery signals only.", as_of: "2026-05-10" };
+  const badge = (html) => (html.match(/<span class="dsx-count mono">([^<]*)<\/span>/) || [])[1];
+  const states = {
+    // live 2026-11-22: 4 held steady (one of them drifting counted out by the sentence), nothing in strain
+    holding: { channels: [ch("stable", "stable"), ch("stable", "stable"), ch("stable", "stable"), ch("stable", "stable"), ch("stable", "declining")], degraded_count: 0, severity: "channels_holding", verdict: "4 of 5 recovery channels held steady from Nov 9 to Nov 22; 1 drifted down without crossing its strain line.", want: "0 of 5 in strain" },
+    warning: { channels: [ch("degraded", "declining"), ch("degraded", "declining"), ch("stable", "stable"), ch("stable", "stable"), ch("stable", "stable")], degraded_count: 2, severity: "warning", verdict: "2 of 5 channels degraded.", want: "2 of 5 in strain" },
+    critical: { channels: [ch("degraded", "declining"), ch("degraded", "declining"), ch("degraded", "declining"), ch("stable", "stable"), ch("stable", "stable")], degraded_count: 3, severity: "critical", verdict: "3 of 5 channels degraded.", want: "3 of 5 in strain" },
+    too_few: { channels: [ch("stable", "insufficient_data"), ch("stable", "insufficient_data"), ch("stable", "stable"), ch("stable", "stable"), ch("stable", "stable")], degraded_count: 0, severity: "channels_holding", verdict: "3 of 5 recovery channels held steady.", want: "0 of 5 in strain" },
+  };
+  for (const [name, { want, ...rest }] of Object.entries(states)) {
+    const html = nutritionDeficitSustainability({ ...on, ...rest });
+    assert.equal(badge(html), want, name);
+    assert.doesNotMatch(html, /dsx-count mono">\d\/5</, name); // never the bare, unlabelled fraction
+    // the number the badge states is the number of rows the same read renders as strain
+    assert.equal((html.match(/dsx-row dsx-strain/g) || []).length, rest.degraded_count, name);
+  }
+  // absent count: no badge at all rather than "undefined/5"; refused read keeps its heading and its badge
+  assert.doesNotMatch(nutritionDeficitSustainability({ ...on, degraded_count: undefined, channels: [] }), /dsx-count/);
+  assert.match(nutritionDeficitSustainability({ ...on, degraded_count: 0, channels: [] }), /0 of 5 in strain/);
+  // unavailable: no badge in either mode
+  assert.doesNotMatch(nutritionDeficitSustainability({ available: false, honesty: "x" }), /dsx-count/);
+});

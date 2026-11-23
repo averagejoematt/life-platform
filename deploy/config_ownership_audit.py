@@ -208,9 +208,11 @@ RULINGS: tuple[Ruling, ...] = (
         "config/evidence_source_allowlist.json",
         HAND_OWNED,
         "#5778: the allow-listed source set for the exercise library's per-block evidence review (channels, study designs "
-        "and the tiers each may back, named evidence-based reviewers, denied social/blog hosts). Hand-authored; read only "
-        "by scripts/library_evidence_review.py from the repo tree. No writer anywhere and no Lambda reader; a change is a "
-        "reviewed PR. Public content, so a twin upload is harmless.",
+        "and the tiers each may back, named evidence-based reviewers, denied social/blog hosts; since #6208 also the "
+        "official guideline hosts the research findings store accepts). Hand-authored; read only by "
+        "scripts/library_evidence_review.py and scripts/research_finding_verify.py from the repo tree. No writer anywhere "
+        "and no Lambda reader (lambdas/research/findings.py carries a test-held copy); a change is a reviewed PR. Public "
+        "content, so a twin upload is harmless.",
     ),
     Ruling(
         "config/action_detection_rules.json",

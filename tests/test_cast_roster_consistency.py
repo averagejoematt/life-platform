@@ -480,7 +480,7 @@ def test_prompt_guard_does_not_flag_the_live_cast():
     for fine in (
         "Marcus Webb is blunt and practical",
         "Reyes is precise",
-        "Elena Voss, embedded journalist",
+        "Elena Voss, the series' AI narrator",
         "The Chair synthesises",
     ):
         hits = [rx.pattern for rx in patterns if rx.search(fine)]

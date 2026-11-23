@@ -161,7 +161,59 @@ def home_card(snapshot: str, out: str) -> str | None:
     return save(img, out, "home")
 
 
-def chapter_card(c: dict, out: str) -> str | None:
+PLATFORM_SIGNATURE = "Average Joe Matt editorial record"  # = content.chapter_corrections.PLATFORM_SIGNATURE
+HEADER_REVISIONS = os.path.join(ROOT, "www", "src", "lib", "chapter_header_revisions.json")
+
+
+def _served_edition(editions: dict | None, chapter_id: str) -> dict | None:
+    """The snapshot's served edition of a chapter, by the rule www/src/lib/chapter_editions.js editionFor applies."""
+    if not isinstance(editions, dict) or editions.get("state") != "ok" or not isinstance(editions.get("editions"), list):
+        return None
+    for e in editions["editions"]:
+        if (
+            isinstance(e, dict)
+            and e.get("chapter_id") == chapter_id
+            and isinstance(e.get("body_html"), str)
+            and e["body_html"].strip()
+            and isinstance(e.get("edition_line"), str)
+            and str(e.get("signature") or "").endswith(f"— {PLATFORM_SIGNATURE}")
+            and isinstance(e.get("title"), str)
+            and isinstance(e.get("summary"), str)
+            and e["summary"].strip()
+            and isinstance(e.get("approvals"), list)
+            and e["approvals"]
+        ):
+            return e
+    return None
+
+
+def card_text(c: dict, editions: dict | None, truth_live: bool | None = None, table: dict | None = None) -> str:
+    """The summary a chapter's card prints — THE one summary rule (www/src/lib/chapter_truth.js applyChapterSummaries,
+    #6193 B4): a served later edition's own summary; else, with CHAPTER_TRUTH_LIVE, the owner-approved replacement while
+    the served summary still begins with the words it replaces; else the served summary. The snapshot's chapter object
+    carries the FIRST edition's excerpt (the rule is applied at build time), so the card applies it here."""
+    e = _served_edition(editions, str(c.get("id") or ""))
+    if e:
+        return " ".join(e["summary"].split())
+    served = str(c.get("excerpt") or c.get("summary") or "")
+    if truth_live is None:
+        sys.path.insert(0, os.path.join(ROOT, "scripts"))
+        from www_launch_switch import chapter_truth_live  # noqa: PLC0415
+
+        truth_live = chapter_truth_live()
+    if truth_live and c.get("status") == "published":
+        if table is None:
+            try:
+                table = json.load(open(HEADER_REVISIONS, encoding="utf-8"))
+            except (OSError, ValueError):
+                table = {}
+        h = ((table or {}).get("headers") or {}).get(c.get("id"))
+        if isinstance(h, dict) and h.get("replaces") and isinstance(h.get("text"), str) and served.startswith(h["replaces"]):
+            return h["text"]
+    return served
+
+
+def chapter_card(c: dict, out: str, editions: dict | None = None) -> str | None:
     from PIL import Image, ImageDraw
 
     if c.get("status") != "published" or c.get("visibility") != "public" or not c.get("title"):
@@ -189,7 +241,7 @@ def chapter_card(c: dict, out: str) -> str | None:
         y += 76
     dek = font("newsreader-latin.woff2", 30)
     y = max(y + 18, 330)
-    for ln in wrap(dr, c.get("excerpt") or c.get("summary") or "", dek, W - 128, 5):
+    for ln in wrap(dr, card_text(c, editions), dek, W - 128, 5):
         dr.text((64, y), ln, font=dek, fill=MUTED)
         y += 40
     return save(img, out, c["id"])
@@ -212,8 +264,9 @@ def main() -> int:
     made = []
     if home_card(args.snapshot, args.out):
         made.append("home")
+    editions = load(args.snapshot, "chapter_editions.json")  # written only while editions are live; absent = none
     for c in load(args.snapshot, "chapters.json") or []:
-        if isinstance(c, dict) and chapter_card(c, args.out):
+        if isinstance(c, dict) and chapter_card(c, args.out, editions):
             made.append(c["id"])
     print(f"v9_og_images: {len(made)} cards → {os.path.relpath(args.out, ROOT)} ({', '.join(made)})")
     return 0

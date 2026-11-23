@@ -4842,7 +4842,12 @@ GUARD_PROOFS["guard::scripts/check_public_copies.py"] = {
         "rule-E size test `> limit:` → `> limit and False:` in the real tracked file, restored from a byte copy (md5 "
         "2f262a63… before and after) — tests/test_retired_legacy_installments_6148.py + tests/test_check_public_copies_6083.py "
         "4 failed / 23 passed; restored 27 passed (6083 file now 18). M7 filler appended to the committed "
-        "site/legacy/chronicle/posts/week-04/index.html — the repo test 2 failed / 5 passed; restored 7 passed."
+        "site/legacy/chronicle/posts/week-04/index.html — the repo test 2 failed / 5 passed; restored 7 passed. #6193 added "
+        "rule G (a chapter serving an edition whose legacy page, posts.json excerpt, share kit or archived page still "
+        "carries the first edition): LIVE read-only `--check` with a copied live snapshot whose chapter_editions.json "
+        "names week-12 as served — exit 1, four rule-G violations (page, posts.json, kit, archive); the unmodified snapshot "
+        "exit 0. FIXTURES: rule G's page test → `if False:` 2 failed / 22 passed; the guard's copy_issues call fed an "
+        "empty plan 1 failed / 23 passed; restored 24 passed (tests/test_legacy_chapter_addresses_6193.py)."
     ),
     "proved_on": "2026-11-16",
 }
@@ -5008,6 +5013,74 @@ STRUCTURAL_HAND_PROOFS["structural::test_recommendation_record_6158.py"] = {
     "proved_on": "2026-11-22",
 }
 
+# #6208 — the research findings store (owner rulings 2026-11-22, epic #6206): verified sources only, strong evidence
+# needs a full text, a live dedupe key blocks a second finding, a tier-5 finding never reaches approved_for_experiment,
+# simulated rows stay out of the default list, a personal result never moves evidence_strength, one writer and no
+# public or coach reader.
+STRUCTURAL_HAND_PROOFS["structural::test_research_findings_6208.py"] = {
+    "gate_name": "test_research_findings_6208.py",
+    "command": "python3 -m pytest tests/test_research_findings_6208.py -q -p no:randomly -p no:warnings   # baseline 148 passed",
+    "mutation": (
+        "Seven plants, ONE AT A TIME, each restored from a copy: M1 research.findings.check_rules' strong-needs-full_text "
+        "condition made False; M2 refuse_live_duplicate's match made False; M3 the tier-5 approved_for_experiment refusal "
+        "made False; M4 list_view's simulated exclusion made False; M5 validate_source's resolved_title/verified_on check "
+        "made False; M6 the personal_result evidence_strength refusal made False; M7 `from research import findings` "
+        "appended to lambdas/web/site_api_status.py. Audit addition: M8 the verification stamp recomputation dropped; M9 "
+        "the verifier's subject-overlap tripwire made False (after the coordinator's correction the overlap check is ADVISORY: M9 "
+        "is now its low-overlap warning made False); M10 publishable()'s retrospective branch made False; M11 "
+        "claim_supported_by's requirement made False. Review follow-up: M12 the lifecycle TRANSITIONS check made False; M13 "
+        "the correction tighten-only check removed; M14 fold applying stored rows without replaying them; M15 the verifier's "
+        "redirect refusal made False; M16 the observation_planned guard made False; M17 the tier-5 link_experiment refusal "
+        "made False; M18 the risk tripwire's refusal made False. Finish line: M19 the observation invariant on correction off; "
+        "M20 the tier-5 evaluation refusal off; M21 clinician_hold back to experiment states only; M22 evaluation-equals-verdict "
+        "off; M23 results/decisions from before the current state counted; M24 duplicate touches allowed."
+    ),
+    "observed": (
+        "2026-11-22, #6208 lane. BASELINE 73 passed. M1 2 failed (strong refused on abstracts; the correction path); M2 1 "
+        "failed (live dedupe named); M3 1 failed (tier 5 to the clinician); M4 1 failed (simulated out of every default "
+        "list); M5 2 failed (unverified source, x2); M6 2 failed (tool + pure builder); M7 2 failed (naming allowlist + "
+        "the public/coach import closure). REVERTED 73 passed. Re-run after the audit addition: BASELINE 88 passed; M1-M7 "
+        "as before; M8 2 failed (edited title refused; verifier stamp); M9 1 failed (unrelated paper refused; re-run on the advisory version, the warning disabled: 1 failed, 88 passed, "
+        "the advisory test; BASELINE 89 passed); M10 2 failed "
+        "(publishable pure + via his decision); M11 2 failed (support asserted by a reader). REVERTED 88 passed. Review follow-up (2026-11-22): BASELINE 134 passed; M12 6 "
+        "failed (the probe's transition bypasses); M13 2 failed (tighten-only, the tier-5 -> tier-1 walk); M14 1 failed (forged "
+        "rows skipped); M15 1 failed (redirect off the list); M16 5 failed (observation guards); M17 1 failed (tier 5 never "
+        "reaches an experiment); M18 18 failed (the wider tripwire). REVERTED 134 passed. Finish line (2026-11-23): BASELINE "
+        "148 passed; M19 2 failed; M20 1 failed; M21 2 failed; M22 3 failed; M23 2 failed; M24 1 failed. REVERTED 148 passed. "
+        "(M5/M8/M11 now plant in lambdas/research/finding_sources.py, where validate_source moved.)"
+    ),
+    "scope": (
+        "Every tracked .py outside tests/ for finding constructors and runtime modules naming the store; the static import "
+        "graph (module-level and lazy) of lambdas/web, content, emails, coach, ai, intelligence and compute; the six rules, "
+        "the fold and the list view on fixtures through the real tool; the laptop verifier with stubbed resolvers. NOT "
+        "SEEN: a dynamic import by string; a reader that queries the partition by a pk it builds without naming the source."
+    ),
+    "proved_on": "2026-11-22",
+}
+
+# #6216 — two guards that covered the listed sources, not the set: every story_checks.all_findings caller passes
+# owner_lines (the fallback writer's gate skipped the attribution check), and no prompt source under lambdas/ or scripts/
+# states the narrator with a retired phrase (the identity renders from content/elena_canon.py).
+STRUCTURAL_HAND_PROOFS["structural::test_narrator_gate_and_identity_sets_6216.py"] = {
+    "gate_name": "test_narrator_gate_and_identity_sets_6216.py",
+    "command": "python3 -m pytest tests/test_narrator_gate_and_identity_sets_6216.py tests/test_story_checks_regressions_6199.py -q -p no:warnings   # baseline 19 passed",
+    "mutation": (
+        "Four plants, ONE AT A TIME, each restored from a copy: M1 story_pipeline's fallback call passes owner_lines=None; "
+        "M3 elena_state_updater's system prompt restated as 'Elena Voss, a veteran reporter who'; M4 attribution_findings "
+        "clears an attribution whenever ANY owner line exists; M5 attribution_findings returns [] for owner_lines=None "
+        "(silence instead of the distinguishable finding)."
+    ),
+    "observed": "2026-11-22, #6216 lane. BASELINE 19 passed. M1 3 failed; M3 1 failed; M4 1 failed; M5 2 failed. REVERTED 19 passed.",
+    "scope": (
+        "Every .py under lambdas/, mcp/ and scripts/ parsed for all_findings call sites (a literal owner_lines=None counts as "
+        "missing; **kwargs passes); every non-docstring string or f-string under lambdas/ and scripts/ that states who Elena is "
+        "must render the canon (elena_canon names inside the f-string) or sit on a reasoned allowlist that still discloses AI "
+        "and asserts no human career; three human-career phrases denied. NOT SEEN: a prompt built from a file read at run "
+        "time; an identity stated without the name 'Elena'; config/ and the S3 board config (test_elena_config_twins_6196)."
+    ),
+    "proved_on": "2026-11-22",
+}
+
 # #6178 — the narrator named on every byline: the chapter page, the home card and the story index read one definition
 # (www/src/lib/narrator.js), the RSS channel and the subscribe page carry it verbatim, the owner's first-person lines
 # stay byte-identical, and no rendered byline under www/src still says "the platform's narrator".
@@ -5105,4 +5178,56 @@ STRUCTURAL_HAND_PROOFS["structural::test_nutrition_consistency_6195.py"] = {
         "day_food_6195.test.mjs holds the row text)."
     ),
     "proved_on": "2026-11-22",
+}
+
+STRUCTURAL_HAND_PROOFS["structural::test_chapter_reads_withdrawn_6199.py"] = {
+    "gate_name": "test_chapter_reads_withdrawn_6199.py",
+    "command": "python3 -m pytest tests/test_chapter_reads_withdrawn_6199.py -q -p no:warnings   # baseline 13 passed",
+    "mutation": (
+        "Four plants, ONE AT A TIME, each restored with `git checkout --` (M3 by deleting the planted file): M1 "
+        "chronicle_recap._published_installments' chapter_reads.writer_may_read call reverted to the pre-#6199 "
+        "status/unlisted check; M2 whole_life_context.fetch_full_installment_archive reads resp Items unfiltered; M3 a new "
+        "module lambdas/emails/zz_new_reader_6199_mutation.py that returns a chapter row's text field with no predicate; "
+        "M4 panelcast_desk.season_ledger returns the raw ledger instead of story_ledger.public_view(...); M5 (after #6193 landed) "
+        "site_api_chapters.editions_field calls chapter_editions.public_view without private_calls=; M6 the MCP edition gate "
+        "passes chapter_editions.PRIVATE_CALLS_NOT_WIRED (both re-run on the final injected-callable shape)."
+    ),
+    "observed": (
+        "2026-11-22, #6199 lane. BASELINE 12 passed (M1-M4), 13 after the edition section (M5-M6). M1 2 failed (the set sweep + the recap reader); M2 2 failed (the "
+        "set sweep + the archive reader); M3 1 failed (the set sweep names the new module); M4 1 failed (the ledger-door "
+        "sweep); M5 1 failed and M6 1 failed (the edition publish-path sweep names the call site). REVERTED 13 passed."
+    ),
+    "scope": (
+        "Every .py under lambdas/ and scripts/ (archive/ and __pycache__ excluded) that mentions the chapter text field must call "
+        "content.chapter_reads (writer_may_read / readable / is_withdrawn) or be registered in NOT_A_WRITER_READ with a "
+        "reason; every module that mentions ledger_json must call story_ledger.public_view or be registered in "
+        "LEDGER_NOT_A_WRITER_READ; every call of chapter_editions.gate_findings/public_view under lambdas/, mcp/, scripts/ passes "
+        "private_calls= and only the registered rendering/fixture callers pass NOT_WIRED. NOT SEEN: deploy/ one-off scripts; a "
+        "reader that reaches the text under another key name; an edition gate called through another alias."
+    ),
+    "proved_on": "2026-11-22",
+}
+
+# #6193 §4 (owner ruling 2026-11-22, final edition rehearsal): the read-only verifier that a chapter's legacy address
+# follows its served edition — every hop to /story/<id>/, no loop, canonical/og, the other legacy copies, feeds, archive.
+GUARD_PROOFS["guard::scripts/verify_legacy_chapter_redirects.py"] = {
+    "gate_name": "scripts/verify_legacy_chapter_redirects.py",
+    "command": "python3 -m pytest tests/test_legacy_chapter_addresses_6193.py -q -p no:warnings   # baseline 26 passed",
+    "mutation": (
+        "Three plants in the real tracked file, ONE AT A TIME, each restored from a byte copy (md5 885560cb… before and "
+        "after): V1 walk()'s loop test `if url in seen:` → `if False:`; V2 the direct check's final FAIL → PASS; V3 the "
+        "share-kit check `ok = …` → `ok = True or …`."
+    ),
+    "observed": (
+        "2026-11-23, this lane. V1 1 failed / 25 passed; V2 1 failed / 25 passed; V3 1 failed / 25 passed. RESTORED 26 "
+        "passed. LIVE read-only run against production: no chapter serves an edition yet — 'nothing to verify', exit 0."
+    ),
+    "scope": (
+        "Per chapter the live snapshot serves an edition of: /story/<id>/ shows it; three legacy URL forms walked hop by "
+        "hop (loop, >5 hops, wrong end); canonical, og:url, og:description; the bucket URL of the page and the old site/ "
+        "copies of the same page id; posts.json and the share kit; both feeds' item (guid once, link) and, with a baseline, "
+        "every item's guid/title/pubDate; the archive member; optional rollback copies and an off-repo term scan. NOT SEEN: "
+        "image content (share cards), third-party caches (search engines, feed readers' stored copies)."
+    ),
+    "proved_on": "2026-11-23",
 }

@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-Last updated: 2026-11-22 (v8.6.0 — 95 MCP tools, 99-module package, 107 Lambdas, 20 data sources)
+Last updated: 2026-11-23 (v8.6.0 — 96 MCP tools, 101-module package, 107 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
 - Lambda functions defined (CDK): 107 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
@@ -732,30 +732,107 @@ The owner's steps, in order (the MCP door is `manage_chapter_corrections`; `chap
 not the program week):
 
 1. `action=propose_edition`, `chapter_id`, `edition` (2-9), `text` (the full chapter, markdown), `first_published`
-   (the original YYYY-MM-DD), optional `carries` (approved correction ids the edition makes). The gates run first; the
-   reply carries the stored text's `sha256` — it must equal the hash he approved.
+   (the original YYYY-MM-DD), optional `carries` (approved correction ids the edition makes). The text must open with
+   its title line and its summary line (below); a title line that is not the chapter's published title — read off the
+   chapter's own public page — is refused (an edition never retitles a chapter). The gates run first; the reply carries
+   the stored text's `sha256` — it must equal the hash he approved.
 2. Render it on the real site, locally, before anything is public (reads the public site only; writes no record):
    ```bash
-   python3 scripts/chronicle_edition_preview.py --chapter week-NN --text-file <private>.md [--archival-file <private>.md] --out <private dir>
+   python3 scripts/chronicle_edition_preview.py --chapter week-NN --text-file <private>.md [--archival-file <private>.md [--archival-as-of YYYY-MM-DD]] --out <private dir>
    ```
    Screenshots at 390 px and 1280 px; `www/dist` is then a preview build — never deploy it.
 3. Keep the first edition privately (owner-attended S3 + DynamoDB write):
    ```bash
    python3 scripts/chronicle_edition_backup.py --chapter week-NN --row-sk DATE#YYYY-MM-DD          # dry run: reads only
-   python3 scripts/chronicle_edition_backup.py --chapter week-NN --row-sk DATE#YYYY-MM-DD --apply  # write-once copy + pointer
+   python3 scripts/chronicle_edition_backup.py --chapter week-NN --row-sk DATE#YYYY-MM-DD --apply  # write-once copy + pointer + restore rehearsal
+   python3 scripts/chronicle_edition_backup.py --chapter week-NN --verify-restore                 # re-run the rehearsal, read-only
+   python3 scripts/chronicle_edition_backup.py --chapter week-NN --verify-restore --apply         # record it, if --apply above did not
    ```
+   A row written before `draft_journal_post_key` existed (the prologue, Weeks 1-4) has its journal page derived from the
+   page id, `generated/journal/posts/<week-NN>/index.html`, accepted only when that object exists and its `<title>` is
+   the row's title. The dry run already rebuilds the row in memory from its captured DynamoDB JSON. **The restore
+   rehearsal** reads every backup object back, matches each to the sha256 the pointer recorded, rebuilds the row item and
+   proves it re-serialises to the captured bytes, prints the exact restore commands (never runs them), and records
+   `…#01#restore`; `approve_edition` refuses, and the public view withholds, any edition of a chapter without it.
 4. `action=approve_edition`, `chapter_id`, `edition`, `approved=true`, `sha256` (the approved hash; refused unless it is
    the stored text's) — only after he approved THIS text.
 5. Optional, per chapter: `action=propose_archival` (`archival_id`, a privacy-safe rendering of the first edition —
-   never the raw original), then `action=approve_archival` (`approved=true`, `sha256`). Without it there is no
-   first-edition page.
+   never the raw original; `as_of` YYYY-MM-DD when the text it renders is a later rewrite, so the page says "as it stood
+   on <day>, before the <day> edition" and never "first edition"), then `action=approve_archival` (`approved=true`,
+   `sha256`). Without it there is no first-edition page — and an edition whose text points at
+   `/story/<week-NN>/first-edition/` is HELD (API and build) until an archival rendering of that chapter is served: ship
+   the two together, or remove the pointer (a prose change, his ruling). The archival page is labelled historical and
+   superseded, prints its body as the chapter page does, carries the persona disclosure beside a legacy editor's note,
+   and shows the chapter's approved corrections above the text in the platform's signed voice.
 6. `action=list_editions` shows what would render and why not.
 7. After the deploy, prove the deployed prose is the approved bytes (read-only):
    ```bash
    python3 scripts/chronicle_edition_verify.py --chapter week-NN --sha256 <approved> [--archival-sha256 <approved>]
    ```
    Permitted presentation (never inside a sentence): evidence figures and call cards between paragraphs, the dated record
-   note, a dek printed once in the header, a signature line's class — `content.chapter_editions.PERMITTED_PRESENTATION`.
+   note, a dek printed once in the header, a signature line's class, the title line as the page heading and the summary
+   line as the header summary — `content.chapter_editions.PERMITTED_PRESENTATION`. A withdrawn edition is reported as
+   withdrawn.
+
+**The presentation transformation (owner rulings 2026-11-22, rehearsal §2).** An edition's approved text is, exactly:
+
+```
+"<title>"            ← line 1: the chapter's published title in straight quotation marks
+                     ← one blank line
+*<summary>*          ← one italic line, single-spaced, no other asterisks
+                     ← one blank line
+<body>               ← everything else, unchanged
+```
+
+`content.chapter_editions.presentation(text)` splits it into `title`, `summary`, `body`; `compose_text(title, summary,
+body)` is its exact inverse, and a text not in this form is refused at proposal (so every stored edition rebuilds
+byte-for-byte). The SHA-256 approval stays on the WHOLE text. When served: the title is the page heading (h1), the
+summary is the chapter's summary everywhere one is shown (header, `/story/` row, Moments card — cited as "<title>,
+<ordinal> edition, revised <day>" — description and og metadata, the feed item's description; never its title, link,
+guid or pubDate, and no new item), and the body is the article; neither the title line nor the summary is repeated in
+the body. The one rule for which summary a surface shows is `www/src/lib/chapter_truth.js::applyChapterSummaries`
+(edition summary → #6177 replacement when `CHAPTER_TRUTH_LIVE` → the served summary); `scripts/v4_build_rss.py` applies
+the same order. `chronicle_edition_verify.py` rebuilds the text from the DEPLOYED heading, header summary and the served
+body, checks its SHA-256 against the approved hash, and checks the page's body prose block for block.
+
+**The archival page's words (owner ruling 2026-11-22, final chronicle publication §5).** The label is "Historical edition —
+privacy-safe rendering"; the note is "This page preserves the historical edition with limited removals for privacy or
+source verification. The original version is retained privately.", followed by the recorded dates (first edition and
+first publication, or the day an `as_of` text stood, and the edition that superseded it). Both are fixed platform words
+(`content.chapter_editions.ARCHIVAL_LABEL` / `archival_note`); nothing on the page says what was removed or how much.
+
+**Withholding a replaced correction's text (#6193).** When a SUPERSEDED correction's own statement restates material
+the policy withholds, on his explicit word: `action=withhold_correction_text`, `chapter_id`, `correction_id`,
+`approved=true`. It appends `CHAPTER_CORRECTION#<id>#<correction>#text-withheld`; the correction record is never edited
+or deleted. From the next Site API read and site build the replaced correction shows only its signature, its date and
+"A correction dated <day> was replaced by the correction above." Refused for a correction that is not superseded. A new
+correction's proposal is refused if its text restates a withheld call or coach output (fail closed).
+
+**A correction beside its passage (rehearsal §4).** On his word, `action=propose_anchor` (`chapter_id`, `correction_id`
+of an APPROVED correction, `passage` = the exact opening words of the passage in the chapter's archival rendering), then
+`action=approve_anchor` (`approved=true`; refused unless the correction is approved and an archival rendering carries
+the passage exactly once). The archival page prints that correction, in the platform's signed block, directly after the
+paragraph that carries the passage, with "This correction concerns the passage above, beginning “…”"; corrections with
+no anchor stay above the text. The correction record and the live corrections API are unchanged.
+
+**Withheld coach outputs (#6193).** The edition gate also refuses a text that is, or carries a six-word run of, a coach
+output row (`COACH#…`/`OUTPUT#…`) the narrative-provenance policy withholds (`lambdas/web/withheld_outputs.py`; read whole,
+cached 15 min, fail closed). The Site API's wire scrub is unchanged.
+
+**Rehearse the whole release first (rehearsal §9).** Read-only; one table, PASS or BLOCKED with the reason per check
+(gates, title, hash, backup + restore path, build holds, verify, summary surfaces, feed items, archive, withdrawal):
+```bash
+python3 scripts/chronicle_edition_rehearsal.py --manifest <private>/editions.json --out <private dir>
+```
+The manifest lists `{chapter, row_sk, text_file, sha256 (the stored text's), carries, archival_file?, archival_as_of?}`.
+`www/dist` is then a rehearsal build — never deploy it.
+
+**Withdrawing one edition (rehearsal §6, B7).** The global switch stays; it is no longer the only rollback. Only on his
+explicit word: `action=withdraw_edition`, `chapter_id`, `edition`, `approved=true` (or `withdraw_archival`, `archival_id`)
+appends a dated `…#NN#withdrawn` record. From the next Site API read and site build that chapter serves its first edition
+(or a later approved edition), its archival page goes with it if it pointed there, other chapters are untouched, and an
+earlier edition is never revived. A re-approval is a new edition number. `/api/chapters` lists `edition_withdrawals`
+(chapter, kind, number, day — never the note).
 
 An edition that fails a check at build time is HELD on its own (its page keeps the first edition; the build log names
 it); other editions publish. When the body of an edition carries his approved own-words line word for word, the page
@@ -827,6 +904,48 @@ a=w._assemble('eli_marsh','headcoach'); print(c.build_turn_context(w._table(),'e
 #   bash deploy/deploy_fleet.sh          # telegram-coach-worker + life-platform-mcp (or the CI deploy on merge)
 # Roll back: merge `LIVE = False` and deploy the same two functions. The record and its rows are untouched either way.
 ```
+
+## The research findings store (#6208)
+
+**Live on merge:** the owner-only research findings store (`USER#matthew#SOURCE#research_findings`,
+`lambdas/research/findings.py`) and its one door, the MCP tool `manage_research_finding`. No schedule, no ingestion, no
+coach prompt, page or email reads it. The Lambda makes no network call: each source is verified on the laptop first.
+
+```bash
+# 1. Verify a source (read-only GETs to PubMed / Crossref, or to an allow-listed guideline host) and copy what it prints:
+python3 scripts/research_finding_verify.py --pmid <PMID> --title "<title as read>" --authors "<Surname AB>" --year <YYYY> \
+  --design meta_analysis --review-depth abstract_only --claim "<the finding's question>" \
+  --supported-by abstract_read --supports-note "<what in it supports the finding>"
+python3 scripts/research_finding_verify.py --guideline-url https://www.nice.org.uk/guidance/<id> --title "<title>" \
+  --design clinical_guideline --review-depth full_text --claim "..." --supported-by full_text_read --supports-note "..."
+# Paste the printed object UNEDITED: its verification.stamp covers id, title and fetch time, and an edited title is
+# refused. The stamp proves the object came unedited from the script, not that the Lambda verified anything (it has no
+# network). Low subject overlap between --claim and the title (+abstract) prints an ADVISORY warning and is recorded as
+# verification.subject_overlap.low; the object is always emitted. A review prompt with a known high false-alarm rate on
+# titles alone, not a refusal and not a check that the paper supports the claim.
+# 2. In a Claude session: manage_research_finding action=record ... sources=[<the printed objects>]
+# 3. The dead-man is a count the owner reads, not an alarm: manage_research_finding action=list status=stale
+```
+
+The rules it enforces (each refused with the reason): an unverified or off-list source; `strong` evidence on abstracts
+only; a second finding while one with the same `dedupe_key` is live (the refusal names it and its coach); a risk tier below
+what the finding touches, or tier >= 3 touching an intake target, electrolytes, supplements or medication without
+`clinical_review_required`; a tier-5 finding moved to `approved_for_experiment` (that belongs to the treating clinician);
+rejected / declined / superseded without a reason; a move outside `research.findings.TRANSITIONS` (closed states are
+terminal); a correction that lowers risk (raise the tier, add a touch or switch clinical review on — never the reverse:
+a lower-risk reading is a new finding). An approved observational measurement goes `observation_planned` (only for an
+observation-only, tier <= 2 finding, after his `decide` with `authorizes=observation`) -> `observation_recorded` ->
+evaluated only after his `decide` with `authorizes=verdict` carrying the verdict; nothing computes a verdict. A finding
+in an observation state stays observation-only (touches exactly ["observation"], tier <= 2): a correction adding risk is
+refused. An evaluation EQUALS its verdict (the experiment's copied result recorded after it started, or his). A tier-5
+finding is held for the clinician in every state (`clinician_hold`) and is never evaluated here: its exits are declined,
+rejected or superseded. A `decide` says whose words
+it stores (`words_are`) and where they came from (`provenance`).
+
+**IAM note:** the MCP role already has table-wide Get/Query/Put/Update with no leading-key condition, so this tool's
+restriction to its partition is enforced in code (conditional puts, no update or delete), not by IAM. History is append-only: the head row is never rewritten, a correction is
+an event. Adding a guideline host is a reviewed PR to `config/evidence_source_allowlist.json` AND to
+`research.findings.GUIDELINE_HOSTS` (the test holds them equal).
 
 ## Owner outbound trial — the switchboard (#6176)
 

@@ -179,8 +179,12 @@ def craft_hold_blocking(item: Dict[str, Any]) -> List[str]:
     return [f"craft hold (approve from the preview to publish): {f}" for f in craft] or ["craft hold (approve from the preview to publish)"]
 
 
-def blocking_items(item: Dict[str, Any]) -> List[str]:
-    """Every reason the sweep may NOT publish this unapproved draft. Empty means the deterministic audit passed."""
+def blocking_items(item: Dict[str, Any], *, private_calls: Any = None, check_private_calls: bool = False) -> List[str]:
+    """Every reason the sweep may NOT publish this unapproved draft. Empty means the deterministic audit passed.
+
+    #6199 P: with ``check_private_calls`` (the approve click and the stale-draft sweep always set it), the stored text is
+    checked against the calls the publication policy keeps private; ``private_calls=None`` there means they could not
+    be read, which blocks (fail closed)."""
     text = "\n".join(str(item.get(k) or "") for k in ("title", "stats_line", "content_markdown"))
     if str(item.get("status") or "").strip().lower() == RETIRED_STATUS:
         return ["retired by the owner: this draft is never published"]  # #6178: first, and on its own — nothing answers it
@@ -194,4 +198,8 @@ def blocking_items(item: Dict[str, Any]) -> List[str]:
     if prediction_publication.words_name_private_activity(text):
         # Owner ruling 2026-11-06: a draft that names private activity waits for him; it never publishes itself.
         out.append("names private activity (journal, a self-report or an unnamed logging gap)")
+    if check_private_calls:
+        from content import private_call_check
+
+        out += private_call_check.findings(text, private_calls)
     return out

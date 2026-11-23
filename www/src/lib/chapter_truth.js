@@ -24,7 +24,9 @@ import { dayInWords } from "./format.js";
 import HEADER_REVISIONS from "./chapter_header_revisions.json" with { type: "json" };
 
 /** THE SWITCH — keep it one line: `export const CHAPTER_TRUTH_LIVE = true|false;` (read as text by Python). */
-export const CHAPTER_TRUTH_LIVE = false;
+// #6177 activation (owner approval 2026-11-22: the proposed factual corrections to Moments, Story index entries, deks and
+// RSS descriptions). ROLLBACK: set back to false (one line), rebuild the site and the RSS feed.
+export const CHAPTER_TRUTH_LIVE = true;
 
 /** The byline of a chapter published after his recorded approval. */
 export const BYLINE_APPROVAL = `${NARRATOR_BYLINE} Published after Matthew's recorded approval.`;
@@ -131,6 +133,12 @@ export function quotesThreshold(text) {
  *  or the chapter as it now reads (the snapshot's excerpt is read off today's text). */
 export function cardQuote(quote, live = CHAPTER_TRUTH_LIVE, chapter = null) {
   if (!quote || !quote.text) return null;
+  // #6193 B4: a chapter serving a later edition is quoted in that edition's own summary, and the card says so (its own
+  // switch: chapter_editions.LIVE; nothing is set while it is off). Never "as published" for words a revision wrote.
+  if (chapter && chapter.edition_summary_of && quote.text === chapter.excerpt) {
+    const ed = chapter.edition_summary_of;
+    return { ...quote, citeWords: `${quote.cite}, ${String(ed.ordinal || "later").toLowerCase()} edition, revised ${dayInWords(ed.revised_on)}` };
+  }
   if (!live) return { ...quote, citeWords: `${quote.cite}, as published` };
   if (quotesThreshold(quote.text)) return null;
   if (chapter && chapter.header_revised_on && quote.text === chapter.excerpt) {
@@ -166,6 +174,29 @@ export function applyHeaderRevisions(chapters, live = CHAPTER_TRUTH_LIVE, table 
     done.push(c.id);
   }
   return done;
+}
+
+/** THE one rule for which summary a surface shows (#6193 B4 with #6177): every surface that prints a chapter's summary
+ *  (its header, the description and og metadata, the /story/ row, the front page, a Moments card, a Connected line)
+ *  reads `excerpt`/`summary`, and this function decides them, in order:
+ *    1. a served later edition's OWN summary (its approved text's summary line; lib/chapter_editions.js editionFor) —
+ *       behind chapter_editions.LIVE, which is the only way a served edition exists;
+ *    2. else, with CHAPTER_TRUTH_LIVE, the owner-approved replacement summary (applyHeaderRevisions);
+ *    3. else the chapter's served summary, untouched.
+ *  The served line is kept as `excerpt_first` (the chapter page still recognises it at the top of a first-edition body).
+ *  scripts/v4_build_rss.py applies the same order to the feed description. Returns the ids changed. */
+export function applyChapterSummaries(chapters, editionOf = () => null, live = CHAPTER_TRUTH_LIVE, table = HEADER_REVISIONS, ordinalOf = () => null) {
+  const done = [];
+  for (const c of chapters || []) {
+    const e = c && c.status === "published" ? editionOf(c.id) : null;
+    if (!e || typeof e.summary !== "string" || !e.summary.trim()) continue;
+    c.excerpt_first = c.excerpt;
+    c.excerpt = e.summary;
+    c.summary = e.summary;
+    c.edition_summary_of = { ordinal: ordinalOf(e), revised_on: e.revised_on };
+    done.push(c.id);
+  }
+  return done.concat(applyHeaderRevisions(chapters, live, table, (id) => Boolean(editionOf(id))));
 }
 
 /** The muted line under a revised summary on the chapter page: "Summary revised on 22 November 2026." (on only). */

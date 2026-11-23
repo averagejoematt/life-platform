@@ -552,6 +552,7 @@ def _predictions(table, wk: Dict[str, Any], roster: Dict[str, str]) -> Dict[str,
     record: Dict[str, Dict[str, int]] = {}
     prereg: List[Dict[str, Any]] = []
     prereg_status: Dict[str, str] = {}
+    prereg_public: set = set()
     for cid in _operational():
         kw: Dict[str, Any] = {"KeyConditionExpression": Key("pk").eq(f"COACH#{cid}") & Key("sk").begins_with("PREDICTION#")}
         items: List[dict] = []
@@ -567,6 +568,8 @@ def _predictions(table, wk: Dict[str, Any], roster: Dict[str, str]) -> Dict[str,
             if not prediction_publication.row_is_public(f"COACH#{cid}", it):
                 continue  # owner rulings 2026-11-05/06: a private call reaches no public writer — claim, record or count
             created = str(it.get("created_date") or "")
+            if created == GENESIS:
+                prereg_public.add(_norm(it.get("claim_natural")))  # #6199 G3: the sealed entries a writer may see
             if not created or created < GENESIS or created > wk["end"]:
                 continue
             claim = str(it.get("claim_natural") or "")[:220]
@@ -597,8 +600,12 @@ def _predictions(table, wk: Dict[str, Any], roster: Dict[str, str]) -> Dict[str,
                 res = status if (status in ("confirmed", "refuted") and od and od <= wk["end"]) else "pending"
                 prereg_status[_norm(it.get("claim_natural"))] = {"confirmed": "right", "refuted": "wrong"}.get(res, "not yet graded")
     sealed = load_prereg()
+    sealed_total = 0
     for cid, block in (sealed.get("coaches") or {}).items():
         for p in block.get("predictions", []):
+            sealed_total += 1
+            if _norm(p.get("claim_natural")) not in prereg_public:
+                continue  # #6199 G3: a sealed entry passes the publication policy through its live call row; unmatched = withheld
             prereg.append(
                 {
                     "filed_by": display_name(block.get("coach_name")),
@@ -608,6 +615,7 @@ def _predictions(table, wk: Dict[str, Any], roster: Dict[str, str]) -> Dict[str,
                     "status_at_week_end": prereg_status.get(_norm(p.get("claim_natural")), "not in the graded ledger"),
                 }
             )
+    withdrawn = _withdrawn_counts(sealed_total, len(prereg))
     return {
         "graded_this_week": graded[:14],
         "graded_this_week_count": len(graded),
@@ -615,16 +623,24 @@ def _predictions(table, wk: Dict[str, Any], roster: Dict[str, str]) -> Dict[str,
         "record_to_date_by_coach": {roster.get(k, k): v for k, v in record.items()},
         "records_through": wk["end"],
         "pre_registered": prereg,
-        # counts are facts, not something a model should count from a list (a fact read miscounted 16 as 15)
-        "pre_registered_count": len(prereg),
+        # counts are facts, not something a model should count from a list (a fact read miscounted 16 as 15). #6199 G3: the
+        # count is the HISTORICAL total of the sealed file; the entries withheld by the publication policy are counted
+        # separately (only when there are any), so no writer recounts the list and states a new total.
+        "pre_registered_count": sealed_total,
+        **withdrawn,
         "pre_registered_filer_names": sorted({p["filed_by"] for p in prereg}),
         "pre_registered_filer_count": len({p["filed_by"] for p in prereg}),
         "pre_registered_status_counts": {
             k: sum(1 for p in prereg if p["status_at_week_end"] == k) for k in sorted({p["status_at_week_end"] for p in prereg})
         },
-        "grading_caveat": "the evaluator grades directional calls by trend slope; a count claim ('5 of 7 nights') graded by slope is not a count (#4541); "
+        "grading_caveat": "the evaluator grades directional calls by trend slope; a count claim (a number of days past a line) graded by slope is not a count (#4541); "
         "steps-based calls are graded on phone-only step counts that undercount, so a steps miss may be the instrument; state a record as 'through <records_through>'",
     }
+
+
+def _withdrawn_counts(total: int, kept: int) -> Dict[str, int]:
+    """``{"pre_registered_withdrawn_count": n}`` when the policy withheld n sealed entries, else {} (#6199 G3)."""
+    return {"pre_registered_withdrawn_count": total - kept} if total > kept else {}
 
 
 PREREG_URL = "https://averagejoematt.com/experiments/prereg/genesis-2026-09-06.json"

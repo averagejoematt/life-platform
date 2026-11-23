@@ -34,6 +34,15 @@ THE RULES
      The build's correctness members (label contract, chapter agreement, dates in words) are NOT re-run on a copy: the
      build gated them pre-sync, and against a later snapshot they move with the daily data, not with a publication.
   D  every URL in the sitemaps and feeds resolves to an object that is served and is not a rule-A orphan.
+  F  audio is a public copy too (#6199): under generated/panelcast/ and generated/podcast/, every audio object larger
+     than the restart tombstone (``common.media_tombstone.TOMBSTONE_MAX_BYTES``) is the ``url`` of an episode in the
+     nearest ``episodes.json`` above it. Anything else — a stale alternate format, an older cut, a held week's
+     audio — is a violation. Sizes and keys only; the audio is never fetched.
+  G  a chapter's legacy address follows its served edition (#6193, owner ruling 2026-11-22 §4): for every chapter the
+     fresh snapshot serves an edition of, its journal page is the redirect document to /story/<id>/, its posts.json
+     excerpt and its share kit carry the edition's summary, and the nightly archive (once built after the redirect)
+     archives the redirect, not the first edition. No served edition (the switch off, or none approved) = nothing to
+     check. Keys and chapter ids only — content.legacy_chapter_addresses.copy_issues.
   E  a retired legacy installment stays retired (#6148): at every slug in RETIRED_INSTALLMENTS the served object, the
      archive member and the committed file under site/ are each no larger than the "no longer available" stub. Three
      full pages sat at such slugs until their quarantine on 2026-11-22, and site/ syncs legacy/ with no exclusion, so a
@@ -75,6 +84,7 @@ for _p in (REPO, os.path.join(REPO, "scripts"), os.path.join(REPO, "lambdas")):
         sys.path.insert(0, _p)
 
 import check_www_build  # noqa: E402 — the build scan's publication members
+from content import legacy_chapter_addresses as legacy_addresses  # noqa: E402 — rule G, #6193
 from operational import public_archive_registry as reg  # noqa: E402 — the archive's admission rule
 
 from deploy import www_owned_paths  # noqa: E402 — the one reader of www/owned_paths.json
@@ -111,7 +121,9 @@ COPIES = {
     "preview": (PREVIEW_PREFIX, "/next/v9/", "A B C"),
     "legacy": ("site/ (not the v9 build's)", "/", "C D E"),
     "retired": ("site/{_v9_previous,chronicle,evidence,now}/", "(none: must be empty)", "B"),
-    "archive": (reg.ARCHIVE_TARBALL_KEY, reg.ARCHIVE_PUBLIC_PATH, "A B C E"),
+    "audio": ("generated/{panelcast,podcast}/", "/panelcast/, /podcast/", "F"),
+    "archive": (reg.ARCHIVE_TARBALL_KEY, reg.ARCHIVE_PUBLIC_PATH, "A B C E G"),
+    "chapters": ("generated/journal/posts/<page>/ + kit", "/journal/posts/<page>/", "G"),
 }
 PRIVATE = {
     "www-previous/": "the previous green root builds (the rollback source) — no anonymous read in deploy/bucket_policy.json",
@@ -123,16 +135,16 @@ NOT_A_COPY = "a Lambda-written artefact served once at its own path, not a copy 
 PUBLIC_RESOURCES = {
     "site/*": "copies: root, preview, legacy, retired",
     "generated/archive/*": "copy: archive",
-    "generated/podcast/*": "audio — " + NOT_A_COPY,
-    "generated/panelcast/*": "audio — " + NOT_A_COPY,
+    "generated/podcast/*": "audio — rule F: every audio object over the tombstone size is an episode its index lists (#6199)",
+    "generated/panelcast/*": "audio — rule F: every audio object over the tombstone size is an episode its index lists (#6199)",
     "generated/moments/*": NOT_A_COPY + " (rule D resolves the feeds that link it)",
     "generated/board_answers/*": NOT_A_COPY,
     "generated/experiments/prereg/*": NOT_A_COPY,
     "generated/public_stats.json": NOT_A_COPY,
     "generated/pulse.json": NOT_A_COPY,
     "generated/data/character_stats.json": NOT_A_COPY,
-    "generated/journal/posts.json": NOT_A_COPY,
-    "generated/journal/posts/week-*": NOT_A_COPY + " (rule D resolves the feeds that link it)",
+    "generated/journal/posts.json": NOT_A_COPY + " (rule G: a served edition's excerpt, #6193)",
+    "generated/journal/posts/week-*": NOT_A_COPY + " (rule D resolves the feeds that link it; rule G: a served edition's redirect)",
     "generated/assets/images/og-*": "share-card images, redrawn daily from current data — " + NOT_A_COPY,
     "generated/assets/images/editorial/*": "illustration — " + NOT_A_COPY,
     "generated/covers/*": "book covers — " + NOT_A_COPY,
@@ -314,6 +326,71 @@ def retired_installment_issues(
         path = os.path.join(site_dir, rel) if site_dir else ""
         if path and os.path.isfile(path) and os.path.getsize(path) > limit:
             out.append(("legacy", "E", f"site/{rel} — committed at {os.path.getsize(path)} bytes, larger than the {limit}-byte stub"))
+    return out
+
+
+# ── rule F: audio ─────────────────────────────────────────────────────────────────────────────────────────────────────
+AUDIO_PREFIXES = ("generated/panelcast/", "generated/podcast/")
+AUDIO_SUFFIXES = (".mp3", ".wav", ".m4a", ".aac", ".ogg", ".opus", ".flac")
+AUDIO_INDEX = "episodes.json"
+
+
+def _tombstone_max() -> int:
+    from common import media_tombstone  # noqa: PLC0415 — the one tombstone size, shared with its writer
+
+    return media_tombstone.TOMBSTONE_MAX_BYTES
+
+
+def _index_for(key: str, indexes: dict[str, set[str]]) -> str | None:
+    """The deepest ``episodes.json`` whose directory holds ``key`` (a prefix's own index governs its subfolders)."""
+    best = None
+    for idx in indexes:
+        d = idx[: -len(AUDIO_INDEX)]
+        if key.startswith(d) and (best is None or len(d) > len(best[: -len(AUDIO_INDEX)])):
+            best = idx
+    return best
+
+
+def _indexed_keys(index_key: str, doc) -> set[str]:
+    """The object keys an index's episodes point at (``url``, any audio-format alternates). The site serves
+    ``/<prefix>/…`` from ``generated/<prefix>/…``, so a URL path under the index's own public path maps to that key;
+    any other URL maps to its file name under the index's prefix."""
+    base = index_key[: -len(AUDIO_INDEX)]
+    public = "/" + base[len("generated/") :]
+    out: set[str] = set()
+    for ep in (doc or {}).get("episodes") or [] if isinstance(doc, dict) else []:
+        if not isinstance(ep, dict):
+            continue
+        for k in ("url", "audio_url", "mp3_url", "wav_url"):
+            path = urllib.parse.unquote(urllib.parse.urlparse(str(ep.get(k) or "")).path)
+            if path:
+                out.add("generated" + path if path.startswith(public) else base + path.rsplit("/", 1)[-1])
+    return out
+
+
+def audio_issues(listing: list[dict], read_index, limit: int | None = None) -> list[tuple[str, str, str]]:
+    """Rule F over the audio prefixes. ``read_index(key)`` returns an index's parsed JSON (raises when unreadable — an
+    unreadable index makes every audio object under it unlisted, never listed)."""
+    limit = _tombstone_max() if limit is None else limit
+    objs = [o for o in listing if o["Key"].startswith(AUDIO_PREFIXES)]
+    indexes: dict[str, set[str]] = {}
+    unreadable: list[str] = []
+    for o in objs:
+        if o["Key"].endswith("/" + AUDIO_INDEX):
+            try:
+                indexes[o["Key"]] = _indexed_keys(o["Key"], read_index(o["Key"]))
+            except (urllib.error.URLError, OSError, ValueError):
+                indexes[o["Key"]] = set()
+                unreadable.append(o["Key"])
+    out = [("audio", "F", f"{k} could not be read — every audio object under it counts as unlisted") for k in unreadable]
+    for o in sorted(objs, key=lambda o: o["Key"]):
+        key, size = o["Key"], int(o.get("Size") or 0)
+        if not key.lower().endswith(AUDIO_SUFFIXES) or size <= limit:
+            continue
+        idx = _index_for(key, indexes)
+        if idx is None or key not in indexes[idx]:
+            where = f"not an episode in {idx}" if idx else "no episodes.json above it"
+            out.append(("audio", "F", f"{key} — {size} bytes, anonymously readable, and {where}"))
     return out
 
 
@@ -534,17 +611,21 @@ def fresh_snapshot(dest: str) -> str:
 
 
 # ── the run ───────────────────────────────────────────────────────────────────────────────────────────────────────────
-def evaluate(listing, archive_blob, snapshot_dir, mode, now, fetch_key=None, live_get=live_json, owned=None, site_dir=SITE_DIR):
+def evaluate(
+    listing, archive_blob, snapshot_dir, mode, now, fetch_key=None, live_get=live_json, owned=None, site_dir=SITE_DIR, read_index=None
+):
     """Every rule over every copy. Pure apart from the injected readers; returns (violations, facts)."""
     owned = owned if owned is not None else www_owned_paths.load()
     copies = classify(listing, owned, site_dir)
     violations, facts = bucket_rules(copies, listing)
     violations += location_issues(copies, owned, site_dir)
     violations += retired_installment_issues(listing, None, site_dir)
+    violations += audio_issues(listing, read_index or (lambda k: json.loads(fetch_key(k) if fetch_key else http_get(s3_object_url(k)))))
     keys = {o["Key"] for o in listing}
     orphan_keys = {k for ks in facts["orphans"].values() for k in ks}
     fetch_key = fetch_key or (lambda k: http_get(s3_object_url(k)))
     facts["counts"] = {name: sum(1 for o in objs if is_doc(o["Key"])) for name, objs in copies.items()}
+    facts["counts"]["audio"] = sum(1 for o in listing if o["Key"].startswith(AUDIO_PREFIXES) and o["Key"].lower().endswith(AUDIO_SUFFIXES))
     with tempfile.TemporaryDirectory(prefix="public-copies-") as tmp:
         for name, strip in (("preview", PREVIEW_PREFIX), ("site", "site/")):
             docs = [o["Key"] for o in (copies["preview"] if name == "preview" else copies["root"] + copies["legacy"]) if is_doc(o["Key"])]
@@ -576,7 +657,43 @@ def evaluate(listing, archive_blob, snapshot_dir, mode, now, fetch_key=None, liv
                 if os.path.isdir(tree):
                     violations += [("archive", "C", f"{pre}{i}") for i in policy_issues(tree, snapshot_dir)]
             violations += archive_api_issues(members, live_get, facts)
+        violations += legacy_chapter_issues(snapshot_dir, listing, fetch_key, members if archive_blob is not None else None, facts)
     return violations, facts
+
+
+# ── rule G: a chapter's legacy address follows its served edition (#6193) ─────────────────────────────────────────────
+def _snapshot_list(snapshot_dir: str, name: str, field: str | None) -> list:
+    try:
+        with open(os.path.join(snapshot_dir, name), encoding="utf-8") as fh:
+            doc = json.load(fh)
+    except (OSError, ValueError):
+        return []
+    doc = doc.get(field) if field and isinstance(doc, dict) else doc
+    return doc if isinstance(doc, list) else []
+
+
+def legacy_chapter_issues(snapshot_dir, listing, fetch_key, members, facts) -> list[tuple[str, str, str]]:
+    """Rule G. The plan is the snapshot's served editions (none while the switch is off or nothing is approved)."""
+    p = legacy_addresses.plan(
+        _snapshot_list(snapshot_dir, "chapter_editions.json", "editions"), _snapshot_list(snapshot_dir, "chapters.json", None)
+    )
+    facts["counts"]["chapters"] = len(p["chapters"])
+    out = [("chapters", "G", f"{cid}: a served edition whose legacy address cannot be planned — {why}") for cid, why in p["refused"]]
+    if not p["chapters"]:
+        return out
+    modified = {o["Key"]: o["LastModified"] for o in listing}
+
+    def read(key: str):
+        return fetch_key(key) if key in modified else None
+
+    posts = read(legacy_addresses.POSTS_KEY)
+    built = None
+    if facts.get("archive_built"):
+        try:
+            built = datetime.fromisoformat(str(facts["archive_built"]).replace("Z", "+00:00"))
+        except ValueError:
+            built = None
+    return out + legacy_addresses.copy_issues(p["chapters"], read, json.loads(posts) if posts else None, members, built, modified)
 
 
 def _iso(t) -> str:
@@ -633,6 +750,13 @@ def remediation_commands(violations, facts) -> str:
             "  python3 scripts/check_public_copies.py --check --orphans-out /tmp/orphans-6083.txt",
             "  bash deploy/quarantine_public_copy.sh --keys /tmp/orphans-6083.txt [--apply]",
         ]
+    audio = [d.split(" — ", 1)[0] for c, r, d in violations if c == "audio" and r == "F" and " — " in d]
+    if audio:
+        out += [
+            f"  # {len(audio)} unlisted audio object(s). generated/* is delete-protected: for each key, copy it to",
+            f"  # s3://{BUCKET}/backups/quarantine/public-copies/<UTC stamp>/<key>, verify size and ETag, overwrite the public",
+            "  # key with the restart tombstone (common.media_tombstone.tombstone_body), then invalidate its /panelcast|/podcast path:",
+        ] + [f"  #   {k}" for k in audio]
     if "archive" in copies or "preview" in copies or orphan:
         out += [
             "  # the archive, AFTER the copies above are clean (it packages what site/ holds)",

@@ -11,11 +11,13 @@
  *  (scripts/check_www_build.py::own_words_scope refuses a built page that shows a line outside them); `frame` is how
  *  the page must label it. */
 export const OWN_WORDS = {
+  // + the prologue's page (owner ruling 2026-11-22, final approval §7: the exact statement, in the prologue); the truth
+  // gate permits its count only inside this exact quotation (lambdas/content/story_checks.py OWN_WORDS_COUNT_QUOTES)
   beginning: {
     date: "2026-09-06",
     text: "By my own count the 15th or 16th reset in a few months.",
     sk: "QUOTE#2026-09-06#a615c2f556",
-    scope: ["/story/moments/"],
+    scope: ["/story/moments/", "/story/week-01/"],
   },
   content: {
     date: "2026-11-08",

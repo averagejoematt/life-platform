@@ -35,12 +35,12 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WWW = os.path.join(REPO, "www")
 SNAPSHOT = os.path.join(WWW, "content", "snapshot")
 sys.path.insert(0, os.path.join(REPO, "lambdas"))
-from content import chapter_editions as CE  # noqa: E402
+from content import chapter_editions as CE, private_call_check  # noqa: E402
 
 WIDTHS = {"phone": (390, 844), "desktop": (1280, 900)}
 
 
-def preview_records(chapter_id: str, text: str, first_published: str, archival: str | None, today: str) -> list:
+def preview_records(chapter_id: str, text: str, first_published: str, archival: str | None, today: str, as_of: str | None = None) -> list:
     """In-memory records shaped as approved, for rendering ONLY (never written anywhere)."""
     now = f"{today}T00:00:00Z"
     original = CE.original_record(
@@ -57,9 +57,9 @@ def preview_records(chapter_id: str, text: str, first_published: str, archival: 
         revised_on=today,
         signature=CE.signature(2, today),
     )
-    rows = [original, ed]
+    rows = [original, CE.restore_record(original=original, verified_at="2000-01-01T00:00:00Z"), ed]
     if archival:
-        a = CE.new_archival(chapter_id=chapter_id, archival_id=1, text=archival, proposed_at=now)
+        a = CE.new_archival(chapter_id=chapter_id, archival_id=1, text=archival, proposed_at=now, as_of=as_of)
         a.update(approvals=[CE.approval(at=now, dated_on=today, sha256=a["text_sha256"])], approved_at=now, approved_on=today)
         rows.append(a)
     return rows
@@ -68,14 +68,27 @@ def preview_records(chapter_id: str, text: str, first_published: str, archival: 
 def _tainted_or_none():
     try:
         import boto3  # noqa: PLC0415
-        from web import narrative_publication as NPub, publication_snapshot as PS  # noqa: PLC0415
+        from web import narrative_publication as NPub, publication_snapshot as PS, withheld_outputs as WO  # noqa: PLC0415
 
+        raw = boto3.resource("dynamodb", region_name="us-west-2").Table("life-platform")
         NPub.begin_request()
-        PS.begin_request(boto3.resource("dynamodb", region_name="us-west-2").Table("life-platform"))
+        PS.begin_request(raw)
         PS.complete()
-        return NPub.is_tainted
+        WO.load(raw)  # #6193: a withheld coach output's words are refused too
+        return WO.with_outputs(NPub.is_tainted, raw)
     except Exception as exc:  # noqa: BLE001
         print(f"  (the private-call record could not be opened read-only: {type(exc).__name__}; that gate is reported as unchecked)")
+        return None
+
+
+def _private_calls_or_none():
+    """#6199: the calls the publication policy classifies, read-only; None (reported as a refusal) when unreadable."""
+    try:
+        import boto3  # noqa: PLC0415
+
+        return private_call_check.load(boto3.resource("dynamodb", region_name="us-west-2").Table("life-platform"))
+    except Exception as exc:  # noqa: BLE001
+        print(f"  (the coach calls could not be read: {type(exc).__name__}; the private-call check refuses)")
         return None
 
 
@@ -84,6 +97,7 @@ def main(argv=None) -> int:
     ap.add_argument("--chapter", required=True)
     ap.add_argument("--text-file", required=True)
     ap.add_argument("--archival-file")
+    ap.add_argument("--archival-as-of", default=None, help="the day the archival text stood (a chapter rewritten after publication)")
     ap.add_argument("--out", default=None, help="screenshot directory (default: a temp dir); keep it outside the repo")
     ap.add_argument("--base-url", default="https://averagejoematt.com")
     args = ap.parse_args(argv)
@@ -91,11 +105,14 @@ def main(argv=None) -> int:
     archival = open(args.archival_file, encoding="utf-8").read() if args.archival_file else None
     print(f"edition text sha256 {CE.text_sha256(text.replace(chr(13) + chr(10), chr(10)).strip())}")
     tainted = _tainted_or_none()
+    calls = _private_calls_or_none()
     for what, t in (("edition", text), ("archival", archival)):
         if t is not None:
             from privacy import privacy_guard  # noqa: PLC0415 — the real content filter (local channel or read-only S3)
 
-            findings = CE.gate_findings(t, tainted=tainted, filter_hits=privacy_guard.find_violations)
+            findings = CE.gate_findings(
+                t, tainted=tainted, private_calls=private_call_check.for_text(calls), filter_hits=privacy_guard.find_violations
+            )
             print(f"gates on the {what}: {'clean' if not findings else ''}")
             for f in findings:
                 print(f"  - {f}")
@@ -127,13 +144,25 @@ def main(argv=None) -> int:
         first = str(chapter.get("published_at") or "")[:10]
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         try:
-            rows = preview_records(args.chapter, text, first, archival, today)
+            rows = preview_records(args.chapter, text, first, archival, today, args.archival_as_of)
         except CE.EditionError as exc:
             print(f"bad input: {exc}", file=sys.stderr)
             return 2
-        view = CE.public_view(rows, tainted=lambda _t: False, filter_hits=lambda _t: [])  # rendering only; the gates ran above
+        # rendering only; the gates (the private-call check included) ran above
+        view = CE.public_view(
+            rows, tainted=lambda _t: False, private_calls=CE.PRIVATE_CALLS_NOT_WIRED, filter_hits=lambda _t: [], log=print
+        )
+        # the build's own per-edition holds (B4 title/summary, B9 archive address, as_of), exactly as a release would apply them
+        sys.path.insert(0, os.path.join(REPO, "scripts"))
+        import publish_snapshot_chapter_editions as exporter  # noqa: PLC0415
+
+        try:
+            corrections = json.load(open(os.path.join(SNAPSHOT, "chapter_corrections.json"), encoding="utf-8"))
+        except (OSError, ValueError):
+            corrections = None
+        doc = exporter.validate({"state": "ok", "source": ["/api/chapters"], "editions": view}, {"chapter": chapters}, corrections)
         with open(os.path.join(SNAPSHOT, "chapter_editions.json"), "w", encoding="utf-8") as fh:
-            json.dump({"state": "ok", "source": ["/api/chapters"], "editions": view}, fh)
+            json.dump(doc, fh)
         cp = subprocess.run(["npm", "run", "build", "--silent"], cwd=WWW, capture_output=True, text=True)
         if cp.returncode != 0:
             print(cp.stderr[-2000:], file=sys.stderr)

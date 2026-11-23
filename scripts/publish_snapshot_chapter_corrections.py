@@ -83,15 +83,19 @@ def validate(doc: Any, public: dict) -> dict:
     kept, seen = [], set()
     personas = CC.persona_names()
     for c in doc["corrections"]:
-        if not isinstance(c, dict) or set(c) != set(CC.PUBLIC_FIELDS):
-            raise ValueError(f"chapter_corrections.json: a correction is exactly {sorted(CC.PUBLIC_FIELDS)}")
+        withheld = isinstance(c, dict) and c.get("text_withheld") is True
+        want = (set(CC.PUBLIC_FIELDS) - set(CC.STATEMENT_TEXT_FIELDS)) | {"text_withheld"} if withheld else set(CC.PUBLIC_FIELDS)
+        if not isinstance(c, dict) or set(c) != want:
+            raise ValueError(f"chapter_corrections.json: a correction is exactly {sorted(want)}")
+        if withheld and not c.get("superseded_by"):
+            raise ValueError(f"chapter_corrections.json: {c['id']}: only a superseded correction's text is withheld")
         if not CC.CHAPTER_ID.match(str(c["chapter_id"])) or not CC.CORRECTION_ID.match(str(c["id"])) or c["kind"] not in CC.KINDS:
             raise ValueError(f"chapter_corrections.json: malformed ids or kind on {c.get('id')!r}")
         if not CC.ISO_DAY.match(str(c["dated_on"])) or c["signature"] != CC.signature(c["kind"], c["dated_on"]):
             raise ValueError(f"chapter_corrections.json: {c['id']} is not signed by the platform ({c['signature']!r})")
         if any(n in c["signature"] for n in personas):
             raise ValueError(f"chapter_corrections.json: {c['id']} is signed with a persona name")
-        for f in ("published_said", "record_shows", "evidence"):
+        for f in () if withheld else ("published_said", "record_shows", "evidence"):
             if not isinstance(c[f], str) or not c[f].strip():
                 raise ValueError(f"chapter_corrections.json: {c['id']}.{f} is empty (a withheld or unread text never renders as blank)")
         if not isinstance(c["approvals"], list) or not c["approvals"]:

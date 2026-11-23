@@ -161,10 +161,6 @@ jobs:
       - name: Kit page gate (height budget, overflow, axe)
         run: python3 tests/kit_page_gate.py --out qa-render-gate/kit
 
-      - name: Upload render-gate capture
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: pr-render-gate-capture
-          path: qa-render-gate/
-          retention-days: 14
+      # #6223 (owner ruling 2026-11-23): the render-gate capture is NOT uploaded as an artifact. On a public repo any
+      # signed-in account can download an artifact, and this job renders unmerged branches; nothing downloaded it. The
+      # gate's findings are in the step logs above; to see the capture, run qa/pr_render_gate.py --keep locally.

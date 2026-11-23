@@ -127,6 +127,42 @@ def revised_excerpt(url: str | None, excerpt: str, live: bool | None = None, tab
     return f"{lead.group(1)} {h['text']}" if lead else h["text"]
 
 
+def edition_summaries_by_url(chapters) -> dict[str, str]:
+    """#6193 B4: ``{post url: the served edition's own summary}`` from /api/chapters' ``editions`` (present only while
+    ``content.chapter_editions.LIVE`` is on). The SAME rule the site applies (www/src/lib/chapter_truth.js
+    applyChapterSummaries): a served later edition's summary first, then #6177's replacement, then the stored excerpt.
+    Only the description changes here: the item's title, guid and pubDate — and the item count — never do, so a revision
+    is never announced as a new chapter (its ``<link>`` moves to the canonical chapter: ``edition_links_by_url``)."""
+    if not isinstance(chapters, dict) or not isinstance(chapters.get("editions"), list):
+        return {}
+    out: dict[str, str] = {}
+    for e in chapters["editions"]:
+        if isinstance(e, dict) and chapter_corrections.CHAPTER_ID.match(str(e.get("chapter_id") or "")) and e.get("summary"):
+            out[f"/journal/posts/{e['chapter_id']}/"] = str(e["summary"])
+    return out
+
+
+def edition_links_by_url(chapters, urls) -> dict[str, str]:
+    """#6193 (owner ruling 2026-11-22 §4): ``{post url: the canonical chapter URL}`` for each post whose chapter serves a
+    later edition (/api/chapters' ``editions``, present only while ``content.chapter_editions.LIVE`` is on). The chapter
+    id comes from the post's own url through the snapshot producer's rule (``publish_snapshot_chapters.week_id``), never
+    from a week number. Only the item's ``<link>`` moves: its ``<guid>`` stays the bare legacy permalink, byte for byte,
+    so no reader sees a new item; the legacy permalink itself redirects to the same chapter
+    (``content.legacy_chapter_addresses``)."""
+    if not isinstance(chapters, dict) or not isinstance(chapters.get("editions"), list):
+        return {}
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from publish_snapshot_chapters import week_id  # noqa: PLC0415 — the producer's url → chapter id rule, one copy
+
+    served = {str(e.get("chapter_id")) for e in chapters["editions"] if isinstance(e, dict) and e.get("chapter_id")}
+    out: dict[str, str] = {}
+    for url in urls:
+        cid = week_id(url) if url and url.startswith("/journal/posts/") else None
+        if cid and cid in served and chapter_corrections.CHAPTER_ID.match(cid):
+            out[url] = f"{BASE}/story/{cid}/"
+    return out
+
+
 def rfc822(date_str: str) -> str:
     dt = datetime.strptime(date_str, "%Y-%m-%d").replace(hour=12, tzinfo=timezone.utc)
     return format_datetime(dt)
@@ -342,6 +378,8 @@ def main() -> int:
         chapters = json.load(r)
     published = published_at_by_url(chapters)
     corrections = corrections_by_url(chapters)  # #6177: approved platform corrections, keyed by the post url
+    edition_summary = edition_summaries_by_url(chapters)  # #6193 B4: a served edition's own summary (switch on only)
+    edition_link = edition_links_by_url(chapters, [p.get("url") for p in posts])  # #6193 §4: link → the canonical chapter
     for p in posts:  # chronicle items only: an essay's `date` (blog.json) is its publication day
         p["_pub"] = rfc822_instant(published[p["url"]]) if p.get("url") in published else None
 
@@ -363,13 +401,14 @@ def main() -> int:
         # BARE canonical deliberately — guid is a feed reader's identity key, so
         # tagging it would change every historical item's identity and re-notify
         # every subscriber of every past post on the next build.
-        tagged_link = with_utm(link, source="rss", medium="feed", campaign="chronicle")
+        # #6193 §4: a chapter serving a later edition links to its canonical page; the guid below does not move.
+        tagged_link = with_utm(edition_link.get(post_url) or link, source="rss", medium="feed", campaign="chronicle")
         # #4191: the manifest excerpts written before the fix open on the quoted title and
         # the bracketed stat line; the feed description is the BODY, same derivation as the writer.
         excerpt = " ".join(chronicle_schema.body_markdown(p.get("excerpt") or "", p.get("title") or "").split())
         # Word-boundary truncation (#1224 helper) — never a mid-word slice (#1261); #6177: an approved correction leads,
         # a Margaret-signed editor's note is followed by the persona disclosure, and neither is cut.
-        excerpt = revised_excerpt(p.get("url"), excerpt)  # #6177: the owner-approved replacement summary, behind the switch
+        excerpt = edition_summary.get(p.get("url") or "") or revised_excerpt(p.get("url"), excerpt)  # #6193, then #6177
         excerpt = item_description(excerpt, corrections.get(p.get("url") or ""), 360)
         pub = p["_pub"] if "_pub" in p else rfc822(p["date"])  # #5946: chronicle = published_at; essay = its date
         items.append(

@@ -6,14 +6,19 @@ except for explicitly permitted presentation metadata". This is that check, read
 
   1. ``/api/chapters`` serves the chapter's edition, and its text hashes to the SHA-256 given on the command line (the
      hash the owner approved — the approval record is bound to the same hash);
-  2. ``/story/<chapter>/`` carries, inside ``data-published-body``, exactly that text's prose, block for block and word
-     for word, after removing ONLY ``content.chapter_editions.PERMITTED_PRESENTATION`` (evidence figures and call cards
-     between paragraphs, the dated record note, a dek printed once in the header, a signature line's class). Outside the
-     body nothing is compared: the edition line, dates, addresses, corrections and approval metadata are presentation;
+  2. ``/story/<chapter>/`` carries every approved word in its slot (#6193 B4): the text's title line is the page heading,
+     its summary line is the header summary, and inside ``data-published-body`` the BODY's prose, block for block and
+     word for word, after removing ONLY ``content.chapter_editions.PERMITTED_PRESENTATION`` (evidence figures and call
+     cards between paragraphs, the dated record note, a dek printed once in the header, a signature line's class, the
+     title line as the heading, the summary line as the header summary). Nothing else outside the body is compared: the
+     edition line, dates, addresses, corrections and approval metadata are presentation;
   3. the page's edition line is the platform's words for the served dates;
   4. with ``--archival-sha256``: ``/story/<chapter>/first-edition/`` carries the approved archival text's prose exactly, is
      ``noindex`` and canonical to the chapter's address;
   5. the feed (``/rss.xml``) still lists the chapter ONCE, under its original guid — an edition is not a new item.
+
+A WITHDRAWN edition (#6193 B7) is reported as such — "withdrawn on <day>; the chapter serves its first edition" — and
+the page is checked to carry no edition line (exit 1: the approved text is not what is deployed, by the owner's act).
 
     python3 scripts/chronicle_edition_verify.py --chapter week-04 --sha256 <approved hash>
     python3 scripts/chronicle_edition_verify.py --chapter week-04 --sha256 <hash> --archival-sha256 <hash>
@@ -49,17 +54,38 @@ def _dek(page: str) -> Optional[str]:
     return CE._norm(m.group(1)) if m else None
 
 
+def _h1(page: str) -> Optional[str]:
+    m = re.search(r"<h1[^>]*>([\s\S]*?)</h1>", page or "")
+    return CE._norm(m.group(1)) if m else None
+
+
+def _withdrawn(chapters: dict, chapter_id: str, get: Callable[[str], str], base: str) -> list:
+    gone = [w for w in chapters.get("edition_withdrawals") or [] if isinstance(w, dict) and w.get("chapter_id") == chapter_id]
+    if not gone:
+        return []
+    out = [
+        f"{chapter_id}: {w.get('kind')} {w.get('number')} was WITHDRAWN by the owner on {w.get('withdrawn_on')}"
+        + ("; the chapter serves its first edition" if w.get("kind") == "edition" else "; its archival page is not served")
+        for w in gone
+    ]
+    if any(w.get("kind") == "edition" for w in gone) and "data-edition-line" in get(f"{base}/story/{chapter_id}/"):
+        out.append(f"/story/{chapter_id}/ still prints an edition line after the withdrawal (rebuild the site)")
+    return out
+
+
 def verify(get: Callable[[str], str], chapter_id: str, sha256: str, *, archival_sha256: Optional[str] = None, base: str = BASE_URL) -> list:
     """Every difference between the deployed chapter and the approved bytes; ``[]`` = verified."""
     problems: list = []
     chapters = json.loads(get(f"{base}/api/chapters"))
     served = next((e for e in chapters.get("editions") or [] if isinstance(e, dict) and e.get("chapter_id") == chapter_id), None)
     if served is None:
-        return [f"/api/chapters serves no edition of {chapter_id} (switch off, not approved, or withheld by a gate)"]
+        return _withdrawn(chapters, chapter_id, get, base) or [
+            f"/api/chapters serves no edition of {chapter_id} (switch off, not approved, or withheld by a gate)"
+        ]
     if served.get("text_sha256") != sha256 or CE.text_sha256(str(served.get("text") or "")) != sha256:
         problems.append(f"the served edition is not the approved text (served {served.get('text_sha256')}, approved {sha256})")
     page = get(f"{base}/story/{chapter_id}/")
-    problems += [f"/story/{chapter_id}/: {p}" for p in CE.verify_page(page, served.get("text") or "", sha256, dek=_dek(page))]
+    problems += [f"/story/{chapter_id}/: {p}" for p in CE.verify_page(page, served.get("text") or "", sha256, dek=_dek(page), h1=_h1(page))]
     line = re.search(r"data-edition-line><b[^>]*>([^<]*)</b>", page)
     try:
         want_line = CE.edition_line(served["edition"], served["revised_on"], served["first_published"])
@@ -76,16 +102,24 @@ def verify(get: Callable[[str], str], chapter_id: str, sha256: str, *, archival_
             if a.get("text_sha256") != archival_sha256 or CE.text_sha256(str(a.get("text") or "")) != archival_sha256:
                 problems.append("the served archival rendering is not the approved text")
             arch = get(f"{base}/story/{chapter_id}/first-edition/")
-            body = re.search(r"<div data-archival-body>([\s\S]*?)</div>\s*</article>", arch)
-            if not body or CE.prose_blocks(body.group(1)) != CE.prose_blocks(CE.render_html(a.get("text") or "")):
-                problems.append(f"/story/{chapter_id}/first-edition/: the prose is not the approved archival text")
+            for p in CE.verify_archival_page(arch, a.get("text") or "", h1=_h1(arch)):
+                problems.append(f"/story/{chapter_id}/first-edition/: {p}")
+            if a.get("note") and CE._norm(a["note"]) not in CE._norm(arch):
+                problems.append(f"/story/{chapter_id}/first-edition/: the platform's archival note is missing")
+            if CE.ARCHIVAL_LABEL not in CE._norm(arch):  # the owner's label (final chronicle publication §5)
+                problems.append(f"/story/{chapter_id}/first-edition/: the label {CE.ARCHIVAL_LABEL!r} is missing")
             if not re.search(r'<meta name="robots" content="noindex', arch):
                 problems.append(f"/story/{chapter_id}/first-edition/: not noindex")
             if f'<link rel="canonical" href="{base}/story/{chapter_id}/">' not in arch:
                 problems.append(f"/story/{chapter_id}/first-edition/: not canonical to the chapter's address")
     feed = get(f"{base}/rss.xml")
+    # a retired or skipped week is served with "url": null (and "title": null) — a present key whose value is None
     url = next(
-        (w.get("url") for w in chapters.get("weeks") or [] if isinstance(w, dict) and w.get("url", "").rstrip("/").endswith(chapter_id)),
+        (
+            w.get("url")
+            for w in chapters.get("weeks") or []
+            if isinstance(w, dict) and (w.get("url") or "").rstrip("/").endswith(chapter_id)
+        ),
         None,
     )
     if url:

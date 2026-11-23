@@ -39,6 +39,7 @@ from datetime import datetime, timezone
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from content import chapter_reads, elena_canon  # #6199 G1; #6216 the narrator's identity is the canon's
 from experiment.phase_filter import singleton_visible  # #946: hide reset-tombstoned persona state
 
 try:
@@ -137,8 +138,8 @@ def _slugify(text, max_len=40):
 # ══════════════════════════════════════════════════════════════════════════════
 
 EXTRACTION_SYSTEM_PROMPT = (
-    "You maintain the persistent memory of Elena Voss, the embedded journalist who "
-    "writes 'The Measured Life' — a weekly chronicle of Matthew's real N=1 health "
+    f"You maintain the persistent memory of {elena_canon.NAME}, the AI narrator who "  # #6216: identity from the canon
+    f"writes '{elena_canon.SERIES}' — a weekly chronicle of Matthew's real N=1 health "
     "experiment. After each published installment you update her notebook: narrative "
     "threads, promises made to readers (callbacks), running motifs, and her editorial "
     "stance toward the experiment's claims.\n\n"
@@ -502,8 +503,9 @@ def lambda_handler(event, context):
         installment = _get_item(CHRONICLE_PK, f"DATE#{date_str}", consistent=True)
         if not installment:
             return {"statusCode": 404, "error": f"no chronicle record for {date_str}"}
-        if installment.get("status") != "published":
-            # Never learn from a draft — a rejected draft must not poison memory.
+        if not chapter_reads.writer_may_read(installment):
+            # Never learn from a draft — a rejected draft must not poison memory; nor from a withdrawn, unlisted or
+            # tombstoned chapter (#6199 G1: the one predicate every writer-side chapter read uses).
             return {"statusCode": 200, "skipped": f"status={installment.get('status')}"}
 
         content_md = installment.get("content_markdown") or ""

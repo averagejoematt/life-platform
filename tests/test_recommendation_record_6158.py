@@ -330,6 +330,8 @@ ALLOWED_TO_NAME = frozenset(
         "mcp/registry.py",  # registers the tool
         "lambdas/privacy/field_tiers.py",  # TIER_OWNER_ONLY
         "lambdas/experiment/phase_taxonomy.py",  # CROSS_PHASE
+        "lambdas/research/findings.py",  # #6208: reads the rec_id shape (valid_rec_id) to validate a finding's link
+        "mcp/tools_research_findings.py",  # #6208: reads that a linked recommendation exists (a get_item, never a write)
     }
 )
 
@@ -1091,3 +1093,12 @@ def test_record_and_list_expose_the_link_when_present(table):
         {"action": "record", "coach_id": "eli_marsh", "channel": "claude_chat", "text": GOOD, "finding_id": "nope"}
     )
     assert "error" in bad
+
+
+def test_the_local_finding_id_pattern_equals_the_findings_stores():
+    """#6211: the head keeps its OWN pattern (no dependency on the findings package at runtime); this pins it to the store's."""
+    from research import findings
+
+    assert rr.FINDING_ID.pattern == findings._FINDING_ID.pattern
+    assert rr.FINDING_ID.flags == findings._FINDING_ID.flags
+    assert rr.FINDING_ID.fullmatch(findings.finding_id_for("2026-11-22", "a-dedupe-key"))

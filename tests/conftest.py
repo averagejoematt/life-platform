@@ -585,6 +585,34 @@ def _publication_snapshot_hermetic(monkeypatch):
     _snap.reset()
 
 
+# #6199: the publish paths read every coach call to check text against the private ones, and fail CLOSED when they cannot
+# (every text held). A unit test that drives a publish path still holds the module's REAL boto3 table; with the suite's
+# fake credentials that read fails and every draft would hold. Same rule as the snapshot above: in the unit suite a REAL
+# boto3 table reads as holding no calls; a fake table is read for real (tests/test_private_call_check_6199.py), and a
+# test that wants the fail-closed path makes the read raise.
+@pytest.fixture(autouse=True)
+def _private_call_reads_hermetic_6199(monkeypatch):
+    try:
+        import boto3.resources.base as _b3res
+        from content import private_call_check as _pcc
+    except Exception:  # a test tree without the lambdas layer on its path
+        yield
+        return
+    real = _pcc._read_rows
+
+    def _read(table, pk, prefix):
+        return [] if isinstance(table, _b3res.ServiceResource) else real(table, pk, prefix)
+
+    monkeypatch.setattr(_pcc, "_read_rows", _read)
+    # The Panel arms the check per run (emails.panelcast_desk.arm_private_calls); a run in one test must not leave it
+    # armed — possibly with an unreadable fake table — for the next.
+    for _name in ("emails.panelcast_desk", "panelcast_desk"):
+        _mod = sys.modules.get(_name)
+        if _mod is not None and hasattr(_mod, "_PRIVATE_CALLS"):
+            monkeypatch.setattr(_mod, "_PRIVATE_CALLS", {"armed": False, "calls": None})
+    yield
+
+
 # #6176: the owner's two-week outbound-mail trial is committed ON until common.outbound_trial.TRIAL_ENDS_ON, after which
 # the BASELINE behaviour returns by itself. The rest of the suite pins that baseline, so every test starts with the
 # switchboard OFF (monkeypatch: restored after). The trial's own tests opt in explicitly (tests/test_outbound_trial_6176.py
@@ -614,6 +642,21 @@ def _nutrition_consistency_baseline_off_6195(monkeypatch):
         return
     for _item in list(_nc.SWITCHES):
         monkeypatch.setitem(_nc.SWITCHES, _item, False)
+    yield
+
+
+# #6193: second editions of published chapters are committed LIVE (owner ruling 2026-11-22; nothing renders until an
+# edition is approved by hash). The rest of the suite pins the pre-#6193 baseline, so every test starts with the switch
+# OFF (monkeypatch: restored after). tests/test_chapter_editions_6193.py opts in explicitly and pins the committed value
+# from a capture at its import.
+@pytest.fixture(autouse=True)
+def _chapter_editions_baseline_off_6193(monkeypatch):
+    try:
+        from content import chapter_editions as _ce
+    except Exception:  # a test tree without the lambdas layer on its path
+        yield
+        return
+    monkeypatch.setattr(_ce, "LIVE", False)
     yield
 
 

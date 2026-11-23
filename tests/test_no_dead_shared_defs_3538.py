@@ -93,6 +93,9 @@ LIVE_DIRS = ("lambdas", "mcp", "deploy", "scripts", "cdk")
 # request_validator.validate_source (deploy/dedup_source_records.py). That they ride in
 # the bundle unused at RUNTIME is a packaging question (#781), not a dead-code one.
 ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
+    "lambdas/content/private_call_check.py:ledger_findings": (
+        "#6199 G2 (owner ruling 2026-11-22 §1): the live invariant tying the ledger's withheld_paths annotation to the private-call detector, run read-only by the driver after the annotation data step (no Lambda calls it until the qa-smoke dead-man leg the PROPORTIONALITY row names); pinned by tests/test_story_ledger_public_view_6199.py. Delete this entry when that leg calls it."
+    ),
     "lambdas/content/elena_canon.py:verify_anchors": (
         "#6178 (owner ruling 2026-11-22 §7, 'only eligible, verified voice examples'): the voice-anchor re-verification, run by hand against the live site whenever VOICE_ANCHORS changes (its fetch is injected, so no Lambda calls it); pinned by tests/test_elena_canon_refinements_6178.py. Delete this entry if the check moves into a script."
     ),

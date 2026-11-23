@@ -441,7 +441,12 @@ def build_chronicle_card(payload):
             else:
                 cap, val = "", seg
             px = MARGIN + i * col_w
-            draw.text((px, row_y), val or "—", fill=TEXT, font=font(FONT_DISPLAY, 44))
+            # #6193: a long value ("292.6 lbs (-5.2 this week)") ran past its column and off the card's right edge — the
+            # value's size steps down until it fits its column (never below 22 px; the words are never cut)
+            size = 44
+            while size > 22 and draw.textlength(val or "—", font=font(FONT_DISPLAY, size)) > col_w - 16:
+                size -= 2
+            draw.text((px, row_y), val or "—", fill=TEXT, font=font(FONT_DISPLAY, size))
             if cap:
                 draw.text((px, row_y + 48), cap.upper(), fill=MUTED, font=font(FONT_MONO, 11))
 

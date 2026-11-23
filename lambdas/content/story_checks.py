@@ -173,12 +173,41 @@ def _is_a_legitimate_number(text: str, m: "re.Match[str]") -> bool:
     return False
 
 
+# THE ONE NARROW EXCEPTION (owner ruling 2026-11-22, final approval §7: "Relax Elena's no-attempt-count restriction
+# narrowly to permit my own explicitly approved statement. Do not infer a lifetime number of attempts."). His approved
+# statement may carry its count ONLY as an exact quotation — these words, character for character, inside quotation
+# marks. The same words are the `beginning` pin of www/src/lib/own_words.js (tests pin the two equal); a paraphrase, a
+# changed character, the words without quotation marks, or any count outside the quotation is refused exactly as before.
+OWN_WORDS_COUNT_QUOTES = ("By my own count the 15th or 16th reset in a few months.",)
+_OPEN_QUOTE = '"“'
+_CLOSE_QUOTE = '"”'
+
+
+def own_quote_spans(text: str) -> List[tuple]:
+    """``[(start, end)]`` of every exact, quoted occurrence of a pinned own-words statement in ``text``."""
+    spans = []
+    for q in OWN_WORDS_COUNT_QUOTES:
+        at = 0
+        while (i := (text or "").find(q, at)) >= 0:
+            j = i + len(q)
+            if i > 0 and text[i - 1] in _OPEN_QUOTE and j < len(text) and text[j] in _CLOSE_QUOTE:
+                spans.append((i, j))
+            at = j
+    return spans
+
+
+def _inside(m: "re.Match[str]", spans: List[tuple]) -> bool:
+    return any(a <= m.start() and m.end() <= b for a, b in spans)
+
+
 def _count_findings(text: str) -> List[str]:
-    """Every cycle/reset/attempt count in ``text`` — the count half of ``reader_surface``, one finding per phrase."""
+    """Every cycle/reset/attempt count in ``text`` — the count half of ``reader_surface``, one finding per phrase. A count
+    inside an exact quotation of his pinned statement (``OWN_WORDS_COUNT_QUOTES``) is his words, not the writer's."""
     seen: Set[str] = set()
+    spans = own_quote_spans(text or "")
     for pat in _COUNT_PATTERNS:
         for m in pat.finditer(text or ""):
-            if not _is_a_legitimate_number(text, m):
+            if not _is_a_legitimate_number(text, m) and not _inside(m, spans):
                 seen.add(m.group(0))
     return [
         f"story-door: a cycle/attempt count is not reader copy (owner ruling 2026-09-26): {p!r}"
@@ -219,8 +248,11 @@ _REFERENCE_PATTERNS = [
 
 def _reference_findings(text: str) -> List[str]:
     seen: List[str] = []
+    spans = own_quote_spans(text or "")
     for pat in _REFERENCE_PATTERNS:
         for m in pat.finditer(text or ""):
+            if _inside(m, spans):
+                continue
             noun = (m.groupdict().get("noun") or "").lower()
             if noun.startswith(("attempt", "tries")) and _LIFT_AFTER.match(text[m.end() :]):
                 continue  # "his previous attempt at 225"
@@ -406,6 +438,112 @@ def staged_encounter_findings(text: str) -> List[str]:
     return out
 
 
+# ── his words, claimed without a record of them (#6199) ──────────────────────
+# The 2026-11-21 review: a chapter attributed a statement to him ("he has said …") in a week when no words of his were on
+# record. A writer may report what he SAID only from the words the platform holds (the dossier's owner_voice answers);
+# with none on record, a perfect-tense attribution claims a statement nobody can produce. Keyed on the attribution
+# itself, never on what follows: "he said he'd walk" (a narrated past) is not one, "he has said" / "in his own words" is.
+_ATTRIBUTION = re.compile(
+    r"\b(?:he|matt(?:hew)?)\s+(?:has|had|['’]s)\s+(?:said|told\s+(?:us|me|readers|the\s+\w+)|written|admitted|insisted|put\s+it)\b"
+    r"|\bin\s+his\s+own\s+words\b|\bas\s+he\s+(?:has\s+)?(?:put|puts)\s+it\b|\bby\s+his\s+own\s+account\b",
+    re.IGNORECASE,
+)
+
+
+# Words that never tie a sentence to a statement of his: the attribution's own verbs and glue. A sentence is tied to a
+# recorded line only through the content words it shares with it.
+_ATTR_STOP = frozenset(
+    "said says told tell tells written wrote admitted insisted put puts words word account that this with have been were "
+    "what they them then than from there about would could should really just very much more some into over also "
+    "when where which while still even only like long week weeks".split()
+)
+
+ATTRIBUTION_UNAVAILABLE = (
+    "source: attribution evidence unavailable — the first-person attribution check could not run, because this gate path "
+    "was given no record of his words ({quoted} attributes words to him); pass the week's owner_lines, or take the attribution out"
+)
+
+
+def _content_stems(s: str) -> set:
+    return {w[:5] for w in re.findall(r"[a-z][a-z'’]{3,}", (s or "").lower()) if w not in _ATTR_STOP}
+
+
+def _sentence_around(text: str, start: int, end: int) -> str:
+    lo = max((text.rfind(c, 0, start) for c in ".!?\n"), default=-1) + 1
+    cuts = [k for k in (text.find(c, end) for c in ".!?\n") if k != -1]
+    return text[lo : (min(cuts) if cuts else len(text))]
+
+
+def attribution_findings(text: str, owner_lines: Optional[Iterable[str]]) -> List[str]:
+    """``source:`` findings (blocking) for a first-person attribution to him that no recorded word of his supports.
+    Three outcomes, all visible: ``owner_lines=None`` (a gate path that could not supply the record) returns
+    ``ATTRIBUTION_UNAVAILABLE`` for each attribution — never silence (#6216); no recorded words at all, or none that the
+    attributed sentence shares a content word with, return the unsourced finding; a sentence that shares a content word
+    with a recorded line of his is sourced. A text with no attribution has nothing to check and returns []."""
+    text = text or ""
+    hits = list(_ATTRIBUTION.finditer(text))
+    if not hits:
+        return []
+    if owner_lines is None:
+        return [ATTRIBUTION_UNAVAILABLE.format(quoted=repr(m.group(0))) for m in hits]
+    lines = [str(x or "") for x in owner_lines if str(x or "").strip()]
+    recorded = [_content_stems(x) for x in lines]
+    out: List[str] = []
+    for m in hits:
+        stems = _content_stems(_sentence_around(text, m.start(), m.end()).replace(m.group(0), " "))
+        if any(stems & r for r in recorded):
+            continue
+        why = "no words of his are on record this week" if not lines else "none of his recorded words this week is about that"
+        out.append(
+            f"source: {m.group(0)!r} attributes words to him, and {why} — report what the record shows, never a statement he did not make"
+        )
+    return out
+
+
+# ── an activity word the stored sport type contradicts (#6199) ───────────────
+# The review: a walk told as a "hike". The dossier names each session's stored label (the training block's Whoop cardio
+# ``sport`` and the Strava walks). A word for an activity family the week's stored labels never name is a note for the
+# editor and the owner's preview (``craft:`` — advisory, never a hold): a label can be coarse (a Strava walk list does not
+# keep the walk/hike split), so it is not precise enough to block. Pre-#4629 Whoop rows carry the table label "Hiking"
+# for the vendor's walking (``story_dossier``'s own note), so a capitalised "Hiking" label counts as a walk.
+_ACTIVITY_WORDS = {
+    "hike": re.compile(r"\bhik(?:e|es|ed|ing)\b", re.IGNORECASE),
+    "run": re.compile(r"\b(?:jog(?:s|ged|ging)?|went (?:for )?a run|went running)\b", re.IGNORECASE),
+    "ride": re.compile(r"\b(?:bike rides?|cycl(?:ed|ing)|biked|rode (?:his|a) bike)\b", re.IGNORECASE),
+    "swim": re.compile(r"\b(?:swim(?:s|ming)?|swam)\b", re.IGNORECASE),
+}
+_LABEL_FAMILY = (("hike", ("hik", "ruck")), ("run", ("run", "jog")), ("ride", ("cycl", "bik", "ride", "spin")), ("swim", ("swim",)))
+
+
+def _activity_families(dossier: Any) -> Set[str]:
+    training = (dossier or {}).get("training") or {}
+    labels = [str(c.get("sport") or "") for c in training.get("cardio_and_walks_whoop") or [] if isinstance(c, dict)]
+    fams: Set[str] = {"walk"} if training.get("strava_walks") else set()
+    for label in labels:
+        low = label.lower()
+        if label == "Hiking":
+            fams.add("walk")  # the pre-#4629 table label for the vendor's walking
+            continue
+        fams.update(f for f, stems in _LABEL_FAMILY if any(x in low for x in stems))
+        if "walk" in low:
+            fams.add("walk")
+    return fams
+
+
+def activity_word_findings(text: str, dossier: Any) -> List[str]:
+    """``craft:`` notes for an activity word no stored session label of the week supports ("hike" for a walk)."""
+    have = _activity_families(dossier)
+    out: List[str] = []
+    for fam, rx in _ACTIVITY_WORDS.items():
+        m = rx.search(text or "")
+        if m and fam not in have:
+            out.append(
+                f"craft: {m.group(0)!r} — no stored session this week is a {fam}; name the activity as the record labels it "
+                f"({', '.join(sorted(have)) or 'no cardio sessions stored'})"
+            )
+    return out
+
+
 # ── number grounding ─────────────────────────────────────────────────────────
 
 _NUM = re.compile(r"(?<![\w.])(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?(?![\w])")
@@ -479,11 +617,14 @@ def all_findings(
     allowed: Set[str],
     not_yet_exported: Iterable[str] = (),
     footer_pattern: Optional[str] = None,
+    owner_lines: Optional[Iterable[str]] = None,
 ) -> List[str]:
-    """The full gate a staged installment must pass."""
+    """The full gate a staged installment must pass. ``owner_lines`` (his words on record this week) arms the
+    attribution check (#6199); a caller without the record leaves it None."""
     return (
         completeness(text, stop_reason=stop_reason, footer_pattern=footer_pattern)
         + story_door(text, not_yet_exported=not_yet_exported)
         + ungrounded_numbers(text, allowed)
         + staged_encounter_findings(text)
+        + attribution_findings(text, owner_lines)
     )

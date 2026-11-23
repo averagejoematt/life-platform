@@ -56,7 +56,8 @@ THE EDITIONS (#6193), only while ``content.chapter_editions.LIVE`` is True. Off,
 is never in the response — byte-identical to the response before #6193. On, ``editions`` lists, per chapter, the latest
 APPROVED second (or later) edition that passes every publication gate at serve time (``chapter_editions.public_view``
 with this request's ``narrative_publication.is_tainted``), with its approved archival rendering of the first edition when
-one passes too; a failed read is ``null`` + ``editions_error``, never ``[]``. The weeks, their dates and their urls are
+one passes too, and ``edition_withdrawals`` lists the owner's dated withdrawals (#6193 B7); a failed read is ``null`` +
+``editions_error``, never ``[]``. The weeks, their dates and their urls are
 never changed by an edition: the chapter keeps its first-published date, and nothing here reaches a feed or a sender.
 
 The prologue (manifest ``week`` 0, dated before genesis) is not a program week and is not
@@ -77,7 +78,7 @@ from datetime import timedelta
 from typing import Any, Callable
 
 from common.pacific_time import pacific_today, parse_day_key
-from content import chapter_corrections, chapter_editions
+from content import chapter_corrections, chapter_editions, private_call_check
 
 from web.site_api_common import EXPERIMENT_START, USER_ID, _error, _load_s3_json, _ok, _query_source, logger, table
 
@@ -313,12 +314,39 @@ def _read_editions() -> list:
 
 
 def _is_tainted(text: str) -> bool:
-    from web import narrative_publication  # noqa: PLC0415 — the request's complete withheld-call record (#6111)
+    """The withheld graded record (#6111) OR a withheld coach output's words (#6193, ``web.withheld_outputs``); raises when
+    either cannot be read, and the edition gate then withholds (fail closed)."""
+    from web import narrative_publication, withheld_outputs  # noqa: PLC0415
 
-    return narrative_publication.is_tainted(text)
+    return narrative_publication.is_tainted(text) or withheld_outputs.matcher(withheld_outputs.load(table))(text)
 
 
-def editions_field(read_editions: Callable[[], list], tainted: Callable[[str], bool] = _is_tainted) -> dict:
+_CALLS_CACHE: dict = {"at": None, "calls": None}
+_CALLS_TTL_S = 900  # = publication_snapshot.TTL_S: the two publication reads age together
+
+
+def _private_calls() -> Any:
+    """#6199: the calls the publication policy classifies, read from the RAW table (cached ``_CALLS_TTL_S``); None when
+    they cannot be read — every edition is then withheld (fail closed)."""
+    import time  # noqa: PLC0415
+
+    now = time.monotonic()
+    if _CALLS_CACHE["at"] is not None and now - _CALLS_CACHE["at"] < _CALLS_TTL_S and _CALLS_CACHE["calls"] is not None:
+        return _CALLS_CACHE["calls"]
+    try:
+        calls = private_call_check.load(table)
+    except Exception as e:  # noqa: BLE001
+        logger.error(
+            f"[chapters] #6199 private-call check: the coach calls could not be read ({type(e).__name__}: {e}) — editions withheld"
+        )
+        return None
+    _CALLS_CACHE.update(at=now, calls=calls)
+    return calls
+
+
+def editions_field(
+    read_editions: Callable[[], list], tainted: Callable[[str], bool] = _is_tainted, private_calls: Callable[[], Any] = _private_calls
+) -> dict:
     """``{}`` while the switch is off (the reader is never called); else ``{"editions": [...]}`` — or ``{"editions": None,
     "editions_error": ...}`` when the rows cannot be read."""
     if not chapter_editions.LIVE:
@@ -326,8 +354,18 @@ def editions_field(read_editions: Callable[[], list], tainted: Callable[[str], b
     try:
         from privacy import privacy_guard  # noqa: PLC0415 — the chronicle's publish gate (fail-closed on no vocabulary)
 
-        view = chapter_editions.public_view(read_editions(), tainted=tainted, filter_hits=privacy_guard.find_violations, log=logger.warning)
-        return {"editions": view}
+        rows = read_editions()
+        view = chapter_editions.public_view(
+            rows,
+            tainted=tainted,
+            private_calls=private_call_check.for_text(private_calls()),
+            filter_hits=privacy_guard.find_violations,
+            log=logger.warning,
+        )
+        # #6193 B7: the owner's withdrawals (chapter, what, number, day — never a note), so a verifier can say "withdrawn";
+        # the key is present only when there is one, so with none the response is exactly the one before it
+        gone = chapter_editions.public_withdrawals(rows)
+        return {"editions": view, **({"edition_withdrawals": gone} if gone else {})}
     except Exception as e:  # noqa: BLE001 — a failed read is said, never served as "no editions"
         logger.error(f"[chapters] editions read failed: {type(e).__name__}: {e}")
         return {"editions": None, "editions_error": "the editions could not be read for this response"}

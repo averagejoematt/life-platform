@@ -5,7 +5,7 @@ wednesday_chronicle_lambda.py (#1654). Facade state via the `_g` hand-off."""
 from datetime import datetime, timezone
 
 from common.constants import EXPERIMENT_START_DATE
-from content import elena_canon
+from content import chapter_reads, elena_canon
 
 # ══════════════════════════════════════════════════════════════════════════════
 # "PREVIOUSLY ON" RECAP (backend serial phase 3) — Elena's cold-open catch-up
@@ -110,8 +110,9 @@ def _published_installments(data):
     A draft that hasn't cleared the approve gate is NOT yet part of the public story."""
     out = []
     for inst in data.get("prev_installments", []) or []:
-        # #4537: an unlisted installment (a superseded earlier-launch lead-in) is off the reading list and off the recap
-        if (inst.get("status") or "published") == "published" and not inst.get("unlisted"):
+        # #4537: an unlisted installment (a superseded earlier-launch lead-in) is off the reading list and off the recap;
+        # #6199 G1: so is a withdrawn, tombstoned or unpublished one — the one predicate every writer-side read uses
+        if chapter_reads.writer_may_read(inst):
             out.append(inst)
     out.sort(key=lambda i: i.get("date", ""), reverse=True)
     return out

@@ -10,8 +10,12 @@
 // rendering was approved, and is noindex, out of the sitemap, and canonical to the chapter's own address.
 
 import { PLATFORM_SIGNATURE } from "./chapter_corrections.js";
+import { dayInWords } from "./format.js";
 
 export const ARCHIVE_SEGMENT = "first-edition";
+/** The archival page's label — the owner's exact words (ruling 2026-11-22, final chronicle publication §5); pinned equal
+ *  to lambdas/content/chapter_editions.py ARCHIVAL_LABEL. */
+export const ARCHIVAL_LABEL = "Historical edition — privacy-safe rendering";
 
 const ok = (e) =>
   e &&
@@ -21,6 +25,9 @@ const ok = (e) =>
   typeof e.edition_line === "string" &&
   typeof e.signature === "string" &&
   e.signature.endsWith(`— ${PLATFORM_SIGNATURE}`) &&
+  typeof e.title === "string" &&
+  typeof e.summary === "string" &&
+  e.summary.trim() !== "" &&
   Array.isArray(e.approvals) &&
   e.approvals.length > 0;
 
@@ -37,6 +44,17 @@ export function archivalFor(doc, chapterId) {
   const a = e && e.archival;
   if (!a || typeof a.body_html !== "string" || !a.body_html.trim() || typeof a.note !== "string" || !String(a.signature || "").endsWith(`— ${PLATFORM_SIGNATURE}`)) return null;
   return a;
+}
+
+/** "Second" from "Second edition, revised …" — the ordinal word of the served edition line (the platform's words). */
+export function editionOrdinal(e) {
+  const m = /^(\w+) edition\b/.exec(String((e && e.edition_line) || ""));
+  return m ? m[1] : null;
+}
+
+/** The archival page's words for what it renders: the first edition, or (as_of) the chapter as it stood on a later day. */
+export function archivalWhat(a) {
+  return a && a.as_of ? `as it stood on ${dayInWords(a.as_of)}` : "first edition";
 }
 
 /** Every chapter id with an archival page to build. */

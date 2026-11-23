@@ -100,9 +100,9 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 2. DynamoDB Partitions (ADR-077 census)
 
-### cross_phase (25)
+### cross_phase (26)
 
-`benchmarks`, `calibration`, `checkin_intake_pairs`, `chronicling`, `clinical`, `coach_corrections`, `coach_recommendations`, `coach_vision`, `dexa`, `effect_fits`, `eyeball_estimate`, `fitness_tests`, `genome`, `labs`, `may_tracker`, `milestones`, `nutrition_titration`, `progress_photos`, `public_corrections`, `recall_embeddings`, `subscribers`, `supplements`, `training_constraints`, `training_reference`, `weight_episodes`
+`benchmarks`, `calibration`, `checkin_intake_pairs`, `chronicling`, `clinical`, `coach_corrections`, `coach_recommendations`, `coach_vision`, `dexa`, `effect_fits`, `eyeball_estimate`, `fitness_tests`, `genome`, `labs`, `may_tracker`, `milestones`, `nutrition_titration`, `progress_photos`, `public_corrections`, `recall_embeddings`, `research_findings`, `subscribers`, `supplements`, `training_constraints`, `training_reference`, `weight_episodes`
 
 ### experiment_scoped (38)
 
@@ -118,7 +118,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-802 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+806 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -169,7 +169,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `evening_checkin` | evening_checkin.py | evening_checkin.py |
 | `evening_ritual` | — | site_api_fulfillment.py |
 | `experiment_suggestions` | site_api_social_experiments.py | — |
-| `experiments` | tools_lifestyle.py | ai_expert_analyzer_lambda.py, chronicle_data.py, coach_nudge_lambda.py, daily_insight_compute_lambda.py, site_api_discovery.py, site_api_protocols.py, site_api_rollups.py, tools_lifestyle.py |
+| `experiments` | experiment_close.py, tools_lifestyle.py | ai_expert_analyzer_lambda.py, chronicle_data.py, coach_nudge_lambda.py, daily_insight_compute_lambda.py, experiment_close.py, site_api_discovery.py, site_api_protocols.py, site_api_rollups.py, tools_lifestyle.py |
 | `exposures` | — | — |
 | `eyeball_estimate` | — | — |
 | `felt_probe` | — | site_api_fulfillment.py |
@@ -222,6 +222,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `reader_feedback` | site_api_social_engage.py | — |
 | `recall_embeddings` | — | — |
 | `recap_cards` | recap_card_lambda.py | recap_card_lambda.py |
+| `research_findings` | — | — |
 | `rewards` | — | — |
 | `routine_index` | routine_repo.py | routine_repo.py, routine_title.py, site_api_protocols.py |
 | `ruck_log` | — | — |
@@ -248,7 +249,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 
 ## 4. MCP Layer
 
-**95 tools across 44 modules** (AST-counted from `mcp/registry.py`;
+**96 tools across 45 modules** (AST-counted from `mcp/registry.py`;
 the same counter `deploy/sync_doc_metadata.py` uses). MCP modules appear in §3 as
 readers under the `life-platform-mcp` lambda.
 
@@ -497,6 +498,7 @@ Default: public — an unlisted source/field is TIER_PUBLIC by omission (field_t
 | `private_intake` | owner_only |
 | `progress_photos` | owner_only |
 | `reading` | owner_only |
+| `research_findings` | owner_only |
 | `sick_days` | owner_only |
 | `state_of_mind` | owner_only |
 | `strava` | owner_only |
@@ -597,10 +599,10 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1397 total · 1008 resolved · 389 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1401 total · 1011 resolved · 390 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 80 resolved · 0 dynamic of 80 scheduled lambdas (107 lambdas total)
 - Alarms: 152 literal-named declarations across three idioms, 4 composite; routing digest 108 · digest+paging 2 · digest+urgent 10 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
-- Privacy: 26 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only
+- Privacy: 27 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only
 - Schedules: 97 (lambda, cron) rows; UTC clock on fixed rows, zone + wall-clock if zoned (#4284)
 - Record families referenced in code but outside the SOURCE_CLASS census (7): `brief_trial`, `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
 - Scope cuts: field-level edges wait on the #2797 per-field wiring registry · privacy tiers list only the registry's NON-default entries — an unlisted source/field is public by field_tiers.py's stated omission rule; field-level rows exist only where the registry declares them (withings today)

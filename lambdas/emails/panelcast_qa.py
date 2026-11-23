@@ -10,7 +10,7 @@ import os
 import re
 
 from ai.model_routing import model_for  # #4770: the one model registry
-from content import body_numbers  # #5949: the ONE spoken-weight rule and detector, shared with the story desk
+from content import body_numbers, elena_canon  # #5949: the ONE spoken-weight rule and detector; #6216 narrator canon
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -216,8 +216,11 @@ def _qa_review(turns: list, rubric: str, ground_truth: str = "") -> tuple:
 # _QA_MAX_CONSECUTIVE_INTRO (1, strict alternation after the solo hook) — so the judge is
 # instructed to fail exactly what the deterministic check fails; a calibration test asserts
 # each constant and its rubric text agree (tests/test_panelcast_repair.py).
+# #6216: who Elena is, as the canon says it (host_summary minus its leading name) — never restated here.
+_ELENA_HOST = elena_canon.host_summary().removeprefix(f"{elena_canon.NAME}, ")
+
 _INTRO_RUBRIC = (
-    "The two speakers are ELENA VOSS (the host — an embedded journalist) and ELI MARSH (the guest — the head "
+    f"The two speakers are ELENA VOSS ({_ELENA_HOST}) and ELI MARSH (the guest — the head "
     "coach MATT cast to lead the coaching staff; MATT himself designed and built the experiment and the platform). "
     "MATT is the third-person SUBJECT of the experiment; he is NOT "
     "in the room and does NOT speak. These three are ESTABLISHED show personas — never treat Elena or Eli as invented.\n"
@@ -250,7 +253,7 @@ _INTRO_RUBRIC = (
 
 
 _WEEKLY_RUBRIC = (
-    "Two speakers: ELENA VOSS (host, embedded journalist) and the GUEST COACH (an AI coach, named in the script). "
+    f"Two speakers: ELENA VOSS ({_ELENA_HOST}) and the GUEST COACH (an AI coach, named in the script). "
     "MATT is the third-person SUBJECT of the experiment — he is NOT in the room and does NOT speak. Elena and the "
     "coaches are ESTABLISHED show personas (never flag them as invented). Judge it as a real podcast a human would "
     "believe is human-made and would recommend to a friend. (#1180: the CRAFT items — Turing test, "

@@ -227,6 +227,14 @@ ROW_MAP: list[dict] = [
         "requirements": [("source", "coach_recommendations", OO)],
         "claims": [],
     },
+    # #6208: the research findings store — his research questions, sources, decisions and personal results.
+    # Owner-only, declared before the first row exists. No `claims`: no public projection at all.
+    {
+        "key": "research_findings",
+        "pattern": r"^Research findings store",
+        "requirements": [("source", "research_findings", OO)],
+        "claims": [],
+    },
     # ADR-155 amendment (2026-10-12): the owner clinical record. Owner-only in THIS document's
     # sense (never on a public surface) but registry tier TIER_INTERNAL, because the owner
     # ruled it may enter AI coach context. No `claims`: no public projection at all.

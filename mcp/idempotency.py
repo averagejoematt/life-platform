@@ -316,6 +316,13 @@ REPLAY_SEMANTICS: dict[str, tuple[str, str]] = {
         "#6158: record writes REC#<rec_id>, rec_id = sha256(coach, day, exact words), under attribute_not_exists; the other "
         "writes append REC#<rec_id>#EV#<ts>#<kind> but read the newest event of that kind first — an identical replay writes nothing",
     ),
+    "manage_research_finding": (
+        READ_BEFORE_WRITE,
+        "#6208: record writes FINDING#<finding_id>, finding_id = day + sha256(dedupe_key), under attribute_not_exists, after "
+        "refusing a live finding with the same key; the other writes append FINDING#<id>#EV#<ts>#<kind> — a repeated state, "
+        "source, link or no-op correction is refused by its rule, and a decision or personal result reads the newest event "
+        "of its kind first, so an identical replay writes nothing",
+    ),
     "update_decision_outcome": (DETERMINISTIC_KEY, "updates the caller-supplied DECISION# sk in place; no new row is ever created"),
     "update_insight_outcome": (DETERMINISTIC_KEY, "updates the caller-supplied INSIGHT# sk in place; no new row is ever created"),
     "write_platform_memory": (
@@ -344,7 +351,8 @@ REPLAY_SEMANTICS: dict[str, tuple[str, str]] = {
         DETERMINISTIC_KEY,
         "propose puts CHAPTER_CORRECTION#<chapter>#<id> under attribute_not_exists(sk), so a replay is refused and writes nothing; "
         "approve appends the approval only while size(approvals) = 0, so a replayed approve is refused; #6193 the edition and "
-        "archival actions follow the same two rules on CHAPTER_EDITION#<chapter>#… rows",
+        "archival actions follow the same two rules on CHAPTER_EDITION#<chapter>#… rows, and a withdrawal is put once under "
+        "attribute_not_exists(sk) on <target>#withdrawn, so a replayed withdraw is refused",
     ),
     # ── #4401: read-verb tools reclassified as writes (mcp/audit.py WRITE_TOOLS_BEHIND_READ_VERB) ──
     "get_exercise_notes": (

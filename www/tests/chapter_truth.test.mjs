@@ -46,8 +46,8 @@ const ch = (extra = {}) => ({
   ...extra,
 });
 
-test("the switch is committed OFF, as one line the Python reader can parse", () => {
-  assert.equal(CHAPTER_TRUTH_LIVE, false);
+test("the switch is committed ON (owner approval 2026-11-22; rollback: set the line back to false), as one line the Python reader can parse", () => {
+  assert.equal(CHAPTER_TRUTH_LIVE, true);
   const src = readFileSync(join(HERE, "..", "src", "lib", "chapter_truth.js"), "utf8");
   assert.equal((src.match(/^export const CHAPTER_TRUTH_LIVE = (true|false);$/gm) || []).length, 1);
 });
@@ -140,7 +140,7 @@ test("off: no summary is replaced, and the note keeps its sentence", () => {
   assert.equal(list[0].excerpt, "Old words, as served.");
   assert.equal(headerRevisedLine({ header_revised_on: "2030-02-02" }, false), null);
   assert.equal(footLine(false), "The chapter's text below is unchanged; it reads as first published.");
-  assert.match(correctionHtml({ id: "x", kind: "correction", signature: "s", published_said: "a", record_shows: "b", evidence: "c", approvals: [] }), /it reads as first published\.<\/p>/);
+  assert.match(correctionHtml({ id: "x", kind: "correction", signature: "s", published_said: "a", record_shows: "b", evidence: "c", approvals: [] }), /This note does not change the chapter's text\.<\/p>/); // the committed (on) sentence; the off sentence is footLine(false) above
 });
 
 test("on: the approved summary replaces the served one only while the served one begins with the words it replaces", () => {

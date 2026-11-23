@@ -33,7 +33,7 @@ from common import journal_silence, media_tombstone  # #4365: a tombstone is not
 from common.constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from common.unsubscribe_token import unsub_url_or_fallback  # #3044 — signed unsub link, never plaintext email
-from content import body_numbers  # #4993: ONE body-number detector with the story desk
+from content import body_numbers, chapter_reads, elena_canon  # #4993: ONE body-number detector; #6199 G1; #6216 narrator canon
 from experiment import er03_gate
 from experiment.phase_filter import with_phase_filter
 
@@ -91,8 +91,8 @@ def _chronicle_md(date_str: str) -> str | None:
     base = datetime.strptime(date_str, "%Y-%m-%d")
     for off in (0, 1, -1, 2, -2, 3, -3):
         d = (base + _td(days=off)).strftime("%Y-%m-%d")
-        r = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#chronicle", "sk": f"DATE#{d}"})
-        md = (r.get("Item") or {}).get("content_markdown")
+        it = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#chronicle", "sk": f"DATE#{d}"}).get("Item") or {}
+        md = it.get("content_markdown") if chapter_reads.writer_may_read(it) else None  # #6199 G1
         if md:
             return md
     return None
@@ -198,7 +198,7 @@ def _build_script(week, title, chronicle_text, coach_id, coach_out, coach_name) 
         elena_block = f"\n{elena_block}"
     system = (
         "You write a short two-host podcast script reviewing one week of a public health experiment. "
-        f"HOST is Elena Voss (embedded journalist). CO-HOST is {coach_name}, an AI coach. "
+        f"HOST is {elena_canon.host_summary()} CO-HOST is {coach_name}, an AI coach. "
         'Output ONLY a JSON array of turns: [{"speaker":"elena"|"coach","line":"..."}]. '
         "8–14 turns, conversational and warm, Elena frames topics and asks, the coach reviews findings. "
         "If Elena's own editorial read or story threads are provided, let her voice them naturally — "
@@ -294,7 +294,7 @@ def _safety_gate(text: str) -> list:
         reasons.append("report-card-tone")
     if _CAUSAL_RE.search(t):
         reasons.append("causal-claim")
-    return reasons + _panel_desk().door_reasons(t)  # #4538: the shared story door — no cycle/attempt counts, off-record stays off
+    return reasons + _panel_desk().door_reasons(t) + _panel_desk().private_call_reasons(t)  # #4538 story door; #6199 private calls
 
 
 # ── synthesis + publish ──────────────────────────────────────────────────────
@@ -782,7 +782,7 @@ def _run_intro(dry_run: bool = False) -> dict:
         "MATT — the experiment's SUBJECT, the ONLY person whose biographical facts are constrained:\n"
         + _chars.get("matthew", "")
         + "\n\nESTABLISHED show personas (NOT Matt, NOT inventions — never flag their names/roles): "
-        "Elena Voss (host, embedded journalist); Eli Marsh (guest, the head coach Matt cast to lead the AI coach "
+        f"{elena_canon.NAME} ({elena_canon.host_summary().removeprefix(elena_canon.NAME + ', ')}); Eli Marsh (guest, the head coach Matt cast to lead the AI coach "
         "team — Matt himself designed and built the experiment and the platform)."
     )
 
@@ -1860,10 +1860,10 @@ def lambda_handler(event, context):
             return {"skipped": True, "tier": tier}
     except Exception:
         pass
+    _panel_desk().arm_private_calls(table)  # #6199 P: every voiced line is checked against the private calls this run
 
-    # Test-first subscriber notify: email ONLY the given address, using the latest
-    # published episode, without publishing anything. Verify before flipping
-    # PANELCAST_NOTIFY_SUBSCRIBERS=true. Usage: {"notify_test": "you@example.com"}.
+    # Test-first subscriber notify: email ONLY the given address, using the latest published episode, without
+    # publishing anything. Verify before flipping PANELCAST_NOTIFY_SUBSCRIBERS=true. Usage: {"notify_test": "you@example.com"}.
     if event.get("notify_test"):
         try:
             eps = json.loads(s3.get_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/episodes.json")["Body"].read()).get("episodes", [])

@@ -1,6 +1,6 @@
 {
  "_README": "The allow-listed source set for the exercise library's per-block evidence review (#5778, scripts/library_evidence_review.py). A proposed library change is admitted only when its citation came through an allow-listed channel, is a peer-reviewed record with a DOI or PMID, and resolves LIVE (Crossref for a DOI, PubMed E-utilities for a PMID) with a matching title, first author and year. Social media, blogs, podcasts, video and any bare URL are never a source. Adding a channel, a design or a reviewer is a reviewed PR to this file, never a runtime edit. Doc: docs/coaching/EXERCISE_LIBRARY.md (Evidence review).",
- "version": "2.0.0",
+ "version": "2.1.0",
  "channels": {
   "pubmed": "a PubMed record found by search or read directly (identifier: PMID, verified via E-utilities esummary)",
   "crossref": "a DOI-registered journal article (identifier: DOI, verified via api.crossref.org/works)",
@@ -68,6 +68,17 @@
   "strongerbyscience.com",
   "t-nation.com"
  ],
+ "guideline_hosts": {
+  "_rule": "#6208: official bodies whose published clinical guidelines and position statements the research findings store (lambdas/research/findings.py, scripts/research_finding_verify.py) accepts by URL when the guideline has no DOI or PMID. A host here (or a subdomain of it) admits only a guideline_url source of that research store; it never admits a URL into the exercise library's evidence review, which still requires a DOI or PMID. Additive: no existing rule above is relaxed.",
+  "hosts": [
+   "nice.org.uk",
+   "who.int",
+   "heart.org",
+   "ahajournals.org",
+   "escardio.org",
+   "acsm.org"
+  ]
+ },
  "allowed_hosts": [
   "doi.org",
   "dx.doi.org",
