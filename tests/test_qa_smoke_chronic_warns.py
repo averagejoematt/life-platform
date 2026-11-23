@@ -610,6 +610,6 @@ def test_qa_smoke_warnings_alarm_window_untouched():
             values = [a.value for a in node.args if isinstance(a, ast.Constant)]
             assert 86400 in values, "qa-smoke-warnings lost its 86400s period — the 24h Maximum window is load-bearing"
             assert "Maximum" in values, "qa-smoke-warnings lost its Maximum statistic"
-            assert "WarnCount" in values, "qa-smoke-warnings no longer watches WarnCount"
+            assert "PersistentWarnCount" in values, "qa-smoke-warnings no longer watches PersistentWarnCount (#5928)"
             return
     pytest.fail("qa-smoke-warnings _alarm call not found in monitoring_stack.py")

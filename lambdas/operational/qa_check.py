@@ -314,6 +314,93 @@ def split_warns(checks):
     return [c for c in warned if not c.chronic], [c for c in warned if c.chronic]
 
 
+# ── #5928: PERSISTENCE — the alarm fires on a warning that will not go away, not on any warning ──────────────
+# Owner ruling 2026-11-23: `qa-smoke-warnings` fired on WarnCount >= 1 and was red on 27 of 30 days (13 distinct
+# ids, most of them one- or two-day visitors), so its state carried no information. It now watches
+# PersistentWarnCount: the alarmed warning ids seen on each of the last PERSISTENT_WARN_DAYS Pacific days.
+# Replayed over those 30 days the rule is red on 15, and every red day names its cause (two reader-truth ids and
+# the public brief's liveness). WarnCount is still emitted and still in the logs and the QA email — a one-day
+# warning is visible, it just does not page the digest until it persists.
+PERSISTENT_WARN_DAYS = 3
+
+# A warning that reports the OWNER not doing something (a check-in not answered) is a product-engagement
+# condition, not a platform fault (owner ruling 2026-11-23). It is counted on its own metric, kept out of the
+# persistence count, and read by the weekly Experience Health report rather than by an infrastructure alarm.
+# Closed set, by check id; extending it needs the same ruling.
+OWNER_ENGAGEMENT_WARNS = frozenset({"morning_checkin:weekday_liveness"})
+
+# SEVERITY: a warning that alarms on its FIRST day, without waiting for persistence. `reader_truth:confirm` is a HIGH
+# reader-truth finding that did not confirm on the second pass (qa_check_reader_truth: "flaky is not the same as
+# absent"); a confirmed high is a FAIL and has its own alarm. A one-day unconfirmed high must not go quiet. Closed set.
+IMMEDIATE_WARNS = frozenset({"reader_truth:confirm"})
+
+
+def split_owner_engagement(warns_alarmed):
+    """(platform warns, owner-engagement warns) from the alarmed side of split_warns()."""
+    return (
+        [c for c in warns_alarmed if c.name not in OWNER_ENGAGEMENT_WARNS],
+        [c for c in warns_alarmed if c.name in OWNER_ENGAGEMENT_WARNS],
+    )
+
+
+def advance_warn_streaks(prev, today: str, yesterday: str, ids):
+    """Pure. (new state, persistent ids) for one run.
+
+    `prev` is the stored state row (or None/{}). `ids` are this run's platform warning ids. A day's ids are the
+    UNION over that day's runs (the job runs after deploys as well as on its schedule), so the state keeps the
+    streaks as of the day before (`base`) and rebuilds today's from them on every re-run — a re-run never
+    double-counts a day. A day with no run breaks every streak.
+
+    state = {"day", "base": {id: consecutive days up to yesterday}, "today_ids": [...], "streaks": {id: n}}
+    persistent = ids whose streak has reached PERSISTENT_WARN_DAYS, plus any IMMEDIATE_WARNS id seen today.
+    """
+    prev = prev or {}
+    day = str(prev.get("day") or "")
+    if day == today:
+        base = {str(k): int(v) for k, v in (prev.get("base") or {}).items()}
+        today_ids = set(str(i) for i in (prev.get("today_ids") or [])) | set(ids)
+    elif day == yesterday:
+        base = {str(k): int(v) for k, v in (prev.get("streaks") or {}).items()}
+        today_ids = set(ids)
+    else:
+        base, today_ids = {}, set(ids)
+    streaks = {i: base.get(i, 0) + 1 for i in sorted(today_ids)}
+    state = {"day": today, "base": base, "today_ids": sorted(today_ids), "streaks": streaks}
+    return state, sorted(i for i, n in streaks.items() if n >= PERSISTENT_WARN_DAYS or i in IMMEDIATE_WARNS)
+
+
+WARN_STREAKS_SK = "STATE#warn_streaks"  # beside STATE#predict_dark in the same partition, so no new pk family
+
+
+def store_warn_streaks(table, pk: str, now, ids, persist=True):
+    """Read + advance the per-id warning streaks for this run and return the persistent ids. `now` is the run's
+    Pacific datetime; the day is its date.
+
+    FAILS CLOSED: if the state cannot be read, persistence cannot be judged, so every platform warning of this
+    run is returned — the old any-warning trigger — and the reason is printed. A state that silently read as
+    empty would turn a storage fault into a green alarm. `persist=False` (a dry run) computes from the stored
+    state and writes nothing.
+    """
+    from datetime import timedelta
+
+    ids = sorted(set(ids))
+    today_s = now.strftime("%Y-%m-%d")
+    yesterday_s = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+    key = {"pk": pk, "sk": WARN_STREAKS_SK}
+    try:
+        prev = table.get_item(Key=key).get("Item") or {}
+    except Exception as e:  # noqa: BLE001 — the sweep must finish; the alarm falls back to any-warning
+        print(f"[QA] warn-streak state unreadable ({str(e)[:120]}) — persistence unknown, counting every platform warning this run")
+        return ids
+    state, persistent = advance_warn_streaks(prev, today_s, yesterday_s, ids)
+    if persist:
+        try:
+            table.put_item(Item={**key, **state, "updated_at": now.isoformat()})
+        except Exception as e:  # noqa: BLE001 — a failed write only delays persistence by a run
+            print(f"[QA] warn-streak state write failed (fail-soft; today's ids are recounted next run): {str(e)[:120]}")
+    return persistent
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # #3501 — CAUSE IDENTITY: which check ids a run is red on, in the LOG, every run
 # ══════════════════════════════════════════════════════════════════════════════
@@ -412,6 +499,8 @@ def emf_summary_line(
     failed_deploy_health: int = 0,
     failed_content_truth: int = 0,
     warned_chronic: int = 0,
+    warned_persistent: int = 0,
+    warned_owner_engagement: int = 0,
 ) -> str:
     """Build the EMF log line CloudWatch extracts to LifePlatform/QaSmoke metrics.
 
@@ -443,6 +532,8 @@ def emf_summary_line(
                         {"Name": "DeployHealthFailCount"},
                         {"Name": "ContentTruthFailCount"},
                         {"Name": "ChronicWarnCount"},
+                        {"Name": "PersistentWarnCount"},
+                        {"Name": "OwnerEngagementWarnCount"},
                     ],
                 }
             ],
@@ -455,5 +546,9 @@ def emf_summary_line(
         "DeployHealthFailCount": int(failed_deploy_health),
         "ContentTruthFailCount": int(failed_content_truth),
         "ChronicWarnCount": int(warned_chronic),
+        # #5928: what qa-smoke-warnings fires on — platform warning ids present PERSISTENT_WARN_DAYS days running.
+        "PersistentWarnCount": int(warned_persistent),
+        # #5928: owner-engagement warnings (a check-in not answered). No infrastructure alarm watches this.
+        "OwnerEngagementWarnCount": int(warned_owner_engagement),
     }
     return json.dumps(doc)
