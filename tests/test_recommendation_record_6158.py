@@ -330,6 +330,8 @@ ALLOWED_TO_NAME = frozenset(
         "mcp/registry.py",  # registers the tool
         "lambdas/privacy/field_tiers.py",  # TIER_OWNER_ONLY
         "lambdas/experiment/phase_taxonomy.py",  # CROSS_PHASE
+        "lambdas/research/findings.py",  # #6208: reads the rec_id shape (valid_rec_id) to validate a finding's link
+        "mcp/tools_research_findings.py",  # #6208: reads that a linked recommendation exists (a get_item, never a write)
     }
 )
 

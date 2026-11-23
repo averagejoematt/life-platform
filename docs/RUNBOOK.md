@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-10-17
 
-Last updated: 2026-11-23 (v8.6.0 — 95 MCP tools, 100-module package, 107 Lambdas, 20 data sources)
+Last updated: 2026-11-23 (v8.6.0 — 96 MCP tools, 101-module package, 107 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
 - Lambda functions defined (CDK): 107 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
@@ -904,6 +904,48 @@ a=w._assemble('eli_marsh','headcoach'); print(c.build_turn_context(w._table(),'e
 #   bash deploy/deploy_fleet.sh          # telegram-coach-worker + life-platform-mcp (or the CI deploy on merge)
 # Roll back: merge `LIVE = False` and deploy the same two functions. The record and its rows are untouched either way.
 ```
+
+## The research findings store (#6208)
+
+**Live on merge:** the owner-only research findings store (`USER#matthew#SOURCE#research_findings`,
+`lambdas/research/findings.py`) and its one door, the MCP tool `manage_research_finding`. No schedule, no ingestion, no
+coach prompt, page or email reads it. The Lambda makes no network call: each source is verified on the laptop first.
+
+```bash
+# 1. Verify a source (read-only GETs to PubMed / Crossref, or to an allow-listed guideline host) and copy what it prints:
+python3 scripts/research_finding_verify.py --pmid <PMID> --title "<title as read>" --authors "<Surname AB>" --year <YYYY> \
+  --design meta_analysis --review-depth abstract_only --claim "<the finding's question>" \
+  --supported-by abstract_read --supports-note "<what in it supports the finding>"
+python3 scripts/research_finding_verify.py --guideline-url https://www.nice.org.uk/guidance/<id> --title "<title>" \
+  --design clinical_guideline --review-depth full_text --claim "..." --supported-by full_text_read --supports-note "..."
+# Paste the printed object UNEDITED: its verification.stamp covers id, title and fetch time, and an edited title is
+# refused. The stamp proves the object came unedited from the script, not that the Lambda verified anything (it has no
+# network). Low subject overlap between --claim and the title (+abstract) prints an ADVISORY warning and is recorded as
+# verification.subject_overlap.low; the object is always emitted. A review prompt with a known high false-alarm rate on
+# titles alone, not a refusal and not a check that the paper supports the claim.
+# 2. In a Claude session: manage_research_finding action=record ... sources=[<the printed objects>]
+# 3. The dead-man is a count the owner reads, not an alarm: manage_research_finding action=list status=stale
+```
+
+The rules it enforces (each refused with the reason): an unverified or off-list source; `strong` evidence on abstracts
+only; a second finding while one with the same `dedupe_key` is live (the refusal names it and its coach); a risk tier below
+what the finding touches, or tier >= 3 touching an intake target, electrolytes, supplements or medication without
+`clinical_review_required`; a tier-5 finding moved to `approved_for_experiment` (that belongs to the treating clinician);
+rejected / declined / superseded without a reason; a move outside `research.findings.TRANSITIONS` (closed states are
+terminal); a correction that lowers risk (raise the tier, add a touch or switch clinical review on — never the reverse:
+a lower-risk reading is a new finding). An approved observational measurement goes `observation_planned` (only for an
+observation-only, tier <= 2 finding, after his `decide` with `authorizes=observation`) -> `observation_recorded` ->
+evaluated only after his `decide` with `authorizes=verdict` carrying the verdict; nothing computes a verdict. A finding
+in an observation state stays observation-only (touches exactly ["observation"], tier <= 2): a correction adding risk is
+refused. An evaluation EQUALS its verdict (the experiment's copied result recorded after it started, or his). A tier-5
+finding is held for the clinician in every state (`clinician_hold`) and is never evaluated here: its exits are declined,
+rejected or superseded. A `decide` says whose words
+it stores (`words_are`) and where they came from (`provenance`).
+
+**IAM note:** the MCP role already has table-wide Get/Query/Put/Update with no leading-key condition, so this tool's
+restriction to its partition is enforced in code (conditional puts, no update or delete), not by IAM. History is append-only: the head row is never rewritten, a correction is
+an event. Adding a guideline host is a reviewed PR to `config/evidence_source_allowlist.json` AND to
+`research.findings.GUIDELINE_HOSTS` (the test holds them equal).
 
 ## Owner outbound trial — the switchboard (#6176)
 
