@@ -5103,28 +5103,34 @@ STRUCTURAL_HAND_PROOFS["structural::test_narrator_byline_6178.py"] = {
     "proved_on": "2026-11-21",
 }
 
-# #6176 — the owner's outbound trial: every switchboard item ships OFF, only the owner-facing senders read it (no
-# subscriber sender, Morning Brief or chronicle preview), and each held send is a recognised state.
+# #6176 — the owner's outbound trial: only the owner-facing senders read the switchboard (no subscriber sender, Morning
+# Brief or chronicle preview), and each held send is a recognised state. #6243 — the consolidation is STANDING: every
+# item ON, no end date, every fail-safe resolves to consolidated, rollback is per item; plus the urgent-escalation set.
 STRUCTURAL_HAND_PROOFS["structural::test_outbound_trial_6176.py"] = {
     "gate_name": "test_outbound_trial_6176.py",
-    "command": "python3 -m pytest tests/test_outbound_trial_6176.py -q -p no:cacheprovider   # baseline 34 passed",
+    "command": "python3 -m pytest tests/test_outbound_trial_6176.py -q -p no:cacheprovider   # baseline 57 passed",
     "mutation": (
-        "Five plants, ONE AT A TIME, each restored from a scratch copy: M1 monday_compass_lambda's trial gate → `if False:`; "
-        "M2 story_season_qa's pause branch → `if False:`; M3 `from common import outbound_trial` appended to "
-        "lambdas/compute/weekly_signal_lambda.py (a subscriber sender reading the switchboard); M4 evening_nudge_lambda's "
-        "quiet-rule gate → `if False:`; M5 outbound_trial.TRIAL[OPS_MONDAY_PACK] shipped True."
+        "#6176 (2026-11-21), ONE AT A TIME, each restored from a scratch copy: M1 monday_compass_lambda's trial gate → "
+        "`if False:`; M2 story_season_qa's pause branch → `if False:`; M3 `from common import outbound_trial` appended to "
+        "lambdas/compute/weekly_signal_lambda.py; M4 evening_nudge_lambda's quiet-rule gate → `if False:`; M5 "
+        "outbound_trial.TRIAL[OPS_MONDAY_PACK] shipped flipped. #6243 (2026-11-23), run with "
+        "tests/test_qa_smoke_partition.py + tests/test_evening_ritual_nudge_links.py: M6 is_on → "
+        "`return bool(TRIAL.get(item, False))` (the old fail-open direction); M7 a 2026-12-07 pacific_today() lapse "
+        "re-added inside is_on; M8 TRIAL[SUNDAY_WHAT_CHANGED] committed False; M9 evening_checkin passes `day` to is_on."
     ),
     "observed": (
-        "2026-11-21, #6176 lane. BASELINE 34 passed. M1 1 failed (compass held); M2 1 failed (dead-man reads the pause); "
-        "M3 1 failed (the reader-set sweep); M4 2 failed (stale items dropped / nothing sent); M5 1 failed (every item "
-        "ships off). REVERTED 34 passed."
+        "2026-11-21: BASELINE 34 passed; M1-M5 each 1-2 failed; REVERTED 34 passed. 2026-11-23 (#6243 lane, the three "
+        "files together, BASELINE 81 passed): M6 9 failed; M7 3 failed; M8 10 failed; M9 2 failed; REVERTED 81 passed."
     ),
     "scope": (
-        "Every .py under lambdas/ that imports common.outbound_trial (AST), the committed TRIAL defaults, and each gated "
-        "sender's on/off path through fakes. NOT SEEN: a sender that reads the switchboard by another import spelling "
-        "(importlib, a re-export); the deployed fleet's flag state."
+        "Every .py under lambdas/ that imports common.outbound_trial (AST) and every outbound_trial.is_on(...) call site "
+        "(AST: one known item constant, nothing else), the committed TRIAL values, the fail-safe reads (dropped line, "
+        "non-False values, empty switchboard, later days), per-item rollback, the Weekly Report's slot under each of "
+        "those, the ADR-143 paged set and ADR-170 owner actions, and each gated sender's on/off path through fakes. NOT "
+        "SEEN: a sender that reads the switchboard by another import spelling (importlib, a re-export); the deployed "
+        "fleet's code version."
     ),
-    "proved_on": "2026-11-21",
+    "proved_on": "2026-11-23",
 }
 
 # #6177 — dated public chapter corrections: the platform signs (never a persona), nothing is public before the owner's
