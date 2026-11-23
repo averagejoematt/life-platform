@@ -359,7 +359,12 @@ def legacy_gate_findings(g: _Gates, md: str, ledger: Dict[str, Any], *, fact_che
         (
             "source, privacy and figure checks",
             lambda: story_checks.all_findings(
-                gmd, stop_reason=None, allowed=g.allowed, not_yet_exported=g.nye, footer_pattern=story_writers.CHRONICLE_FOOTER
+                gmd,
+                stop_reason=None,
+                allowed=g.allowed,
+                not_yet_exported=g.nye,
+                footer_pattern=story_writers.CHRONICLE_FOOTER,
+                owner_lines=g.owner_lines,  # #6216: the attribution check runs on the fallback gate too
             ),
         ),
         ("quote, callback, craft and repeat checks", lambda: g.craft_post(gmd)),

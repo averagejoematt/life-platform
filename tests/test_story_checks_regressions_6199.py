@@ -28,13 +28,14 @@ def test_an_attribution_with_no_words_on_record_blocks():
 def test_an_attribution_with_his_words_on_record_or_a_narrated_past_passes():
     assert C.attribution_findings("As he has said, the walk is the point.", ["I walk because it clears my head."]) == []
     assert C.attribution_findings("He said he would walk after dinner, and he did.", []) == []
-    assert C.attribution_findings("As he has said, the walk is the point.", None) == [], "a caller without the record skips it"
+    assert C.attribution_findings("A clean week, told plainly.", None) == [], "no attribution, nothing to check"
 
 
-def test_all_findings_arms_the_attribution_check_only_with_the_record():
+def test_all_findings_never_skips_the_attribution_check_silently():
     md = "As he has said, the walk is the point."
     assert any(f.startswith("source:") for f in C.all_findings(md, stop_reason="end_turn", allowed=set(), owner_lines=[]))
-    assert not any("attributes words" in f for f in C.all_findings(md, stop_reason="end_turn", allowed=set()))
+    # #6216: a caller that does not pass the record gets the distinguishable finding, not silence
+    assert any("attribution evidence unavailable" in f for f in C.all_findings(md, stop_reason="end_turn", allowed=set()))
 
 
 def test_a_hike_for_a_walk_is_an_advisory_note():
