@@ -255,7 +255,11 @@ BASELINE = {
     # log_coach_checkin's and log_coach_calibration's input tables beside their tools in mcp/tools_coach_checkin.py
     # (~42 logical lines out, the split import's +5 in); measured 2051, 8 of the ~42 (a fifth, #2610) banked, the
     # rest handed back.
-    "mcp/registry.py": 2059,
+    # 2026-11-22 (#6208): 2059 -> 2043. manage_research_finding's entry and import (+5) were paid by moving
+    # manage_sick_days' input table beside its tool in mcp/tools_sick_days.py (22 logical lines out, 0 import lines in:
+    # the name joined the existing import line); measured 2039 (main 2056), 4 of the 22 (a fifth, #2610) banked, the
+    # rest handed back. docs/MCP_TOOL_CATALOG.md is byte-identical after the move.
+    "mcp/registry.py": 2043,
     # 2026-08-23 (#3082): 2396 → 2290. This file was at 2396/2396 — zero headroom — and the
     # cost of that was measurable, not theoretical: #3081 fixed the #2893 retry re-bill in
     # common/retry_utils.py and could NOT fix the identical defect here, leaving a strict

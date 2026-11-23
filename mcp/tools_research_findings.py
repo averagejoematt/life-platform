@@ -41,150 +41,145 @@ LIST_MAX = 40
 #: source or link already present, a correction that changes nothing).
 REPLAYABLE_KINDS = (rf.EVENT_DECISION, rf.EVENT_PERSONAL_RESULT)
 
-# ONE literal schema dict (scripts/generate_mcp_tool_catalog.py reads it by ast.literal_eval; mcp/registry.py is at its
-# #1665 size ceiling, so the whole schema lives here and the registry entry is one line). Its enums are held EQUAL to
-# the registries in research.findings by tests/test_research_findings_6208.py.
-MANAGE_FINDING_SCHEMA = {
-    "name": "manage_research_finding",
-    "description": (
-        "OWNER-ONLY. The research findings store (#6208): a finding's question, its VERIFIED sources, the evidence and its "
-        "limits, and an append-only history. action='record': question, dedupe_key (lowercase slug), sources (1-12 objects "
-        "printed by scripts/research_finding_verify.py, paste them UNEDITED — a stamp refuses an edited title; each carries "
-        "claim_supported_by abstract_read|full_text_read and supports_note), evidence_summary, evidence_strength strong|moderate|weak|"
-        "insufficient ('strong' needs a full_text source), applicability {text, population_match direct|partial|poor}, "
-        "limitations, risk_tier 1-5 (1 observational, 2 reversible behavioural, 3 training/nutrition, 4 supplement/electrolyte, "
-        "5 medication), touches, clinical_review_required, responsible_coach (persona id), review_by, origin prospective|"
-        "retrospective|simulated, surfaced_by, date. A live finding with the same dedupe_key is refused and named. "
-        "action='add_source' (finding_id, source). action='set_state' (finding_id, state, reason; superseded_by). "
-        "action='link' (finding_id, link_kind recommendation + rec_id | experiment + experiment_id | personal_result + "
-        "experiment_id: the verdict is COPIED from that experiment's analysis; simulated=true + verdict for a rehearsal). "
-        "action='decide' (finding_id, words — his words verbatim; optional publication_eligible). action='correct' (finding_id, field, value, reason). "
-        "action='list' (status live|stale|closed|all, state, finding_id, responsible_coach, include_simulated). "
-        "Never set a state or a decision he did not state. Never quoted on the site, in an email or in a coach prompt."
-    ),
-    "inputSchema": {
-        "type": "object",
-        "properties": {
-            "action": {
-                "type": "string",
-                "enum": ["record", "add_source", "set_state", "link", "decide", "correct", "list"],
-                "description": "record | add_source | set_state | link | decide | correct | list.",
-            },
-            "finding_id": {"type": "string", "description": "The finding id (rf_<YYYYMMDD>_<hash>). Every action but record and list."},
-            "question": {"type": "string", "description": "record: the research question, 20-500 characters."},
-            "dedupe_key": {"type": "string", "description": "record: a lowercase slug naming the question (dedupe key)."},
-            "sources": {
-                "type": "array",
-                "items": {"type": "object"},
-                "description": "record: 1-12 verified source objects, exactly as scripts/research_finding_verify.py prints them.",
-            },
-            "source": {"type": "object", "description": "add_source: one verified source object."},
-            "evidence_summary": {"type": "string", "description": "record: what the evidence says."},
-            "evidence_strength": {
-                "type": "string",
-                "enum": ["strong", "moderate", "weak", "insufficient"],
-                "description": "record: how strong the external evidence is.",
-            },
-            "applicability": {
-                "type": "object",
-                "description": "record: {text, population_match: direct | partial | poor} — how far it applies to him.",
-            },
-            "limitations": {"type": "string", "description": "record: the limitations (required)."},
-            "risk_tier": {"type": "integer", "description": "record: 1-5 (see the tool description)."},
-            "touches": {
-                "type": "array",
-                "items": {
-                    "type": "string",
-                    "enum": ["observation", "behaviour", "sleep", "training", "intake_target", "electrolytes", "supplements", "medication"],
-                },
-                "description": "record: what the finding touches; sets the lowest risk tier it may carry.",
-            },
-            "clinical_review_required": {"type": "boolean", "description": "record: true when a clinician must review it first."},
-            "responsible_coach": {"type": "string", "description": "record: the persona id responsible. list: optional filter."},
-            "review_by": {"type": "string", "description": "record: YYYY-MM-DD, 1-365 days after date."},
-            "origin": {
-                "type": "string",
-                "enum": ["prospective", "retrospective", "simulated"],
-                "description": "record: prospective (found now) | retrospective (recorded after the fact) | simulated (a rehearsal).",
-            },
-            "surfaced_by": {
-                "type": "string",
-                "description": "record: who or what surfaced it (e.g. owner, a coach id, a research session).",
-            },
-            "date": {"type": "string", "description": "record: the finding's day, YYYY-MM-DD (default today, Pacific)."},
-            "state": {
-                "type": "string",
-                "enum": [
-                    "newly_discovered",
-                    "under_review",
-                    "relevant_not_actionable",
-                    "rejected",
-                    "superseded",
-                    "discussed",
-                    "approved_for_experiment",
-                    "declined",
-                    "experiment_in_progress",
-                    "evaluated_supported",
-                    "evaluated_not_supported",
-                    "evaluated_inconclusive",
-                ],
-                "description": "set_state: the new state. list: optional exact-state filter.",
-            },
-            "reason": {
-                "type": "string",
-                "description": "set_state / correct: why (required for rejected, declined, superseded, and every correction).",
-            },
-            "superseded_by": {
-                "type": "string",
-                "description": "set_state superseded: a finding id or a source reference (pmid:<id> | doi:<id>).",
-            },
-            "link_kind": {
-                "type": "string",
-                "enum": ["recommendation", "experiment", "personal_result"],
-                "description": "link: what is linked.",
-            },
-            "rec_id": {"type": "string", "description": "link recommendation: the recommendation-record id."},
-            "experiment_id": {"type": "string", "description": "link experiment / personal_result: the experiment id."},
-            "verdict": {
-                "type": "string",
-                "enum": ["supported", "contradicted", "inconclusive"],
-                "description": "link personal_result: only for simulated=true; a real result is copied from the analysis.",
-            },
-            "simulated": {"type": "boolean", "description": "link personal_result: true for a rehearsal (default false)."},
-            "words": {"type": "string", "description": "decide: his words, verbatim. Other writes: an optional note."},
-            "field": {
-                "type": "string",
-                "enum": [
-                    "question",
-                    "evidence_summary",
-                    "evidence_strength",
-                    "applicability",
-                    "limitations",
-                    "risk_tier",
-                    "touches",
-                    "clinical_review_required",
-                    "responsible_coach",
-                    "review_by",
-                ],
-                "description": "correct: the head field restated.",
-            },
-            "value": {"description": "correct: the corrected value (its type follows the field)."},
-            "status": {
-                "type": "string",
-                "enum": ["live", "stale", "closed", "all"],
-                "description": "list: live (default) | stale | closed | all.",
-            },
-            "publication_eligible": {
-                "type": "boolean",
-                "description": "decide: his explicit ruling whether this finding may ever be published (nothing publishes yet).",
-            },
-            "include_simulated": {"type": "boolean", "description": "list: include simulated findings and results (default false)."},
+# Two LITERALS (scripts/generate_mcp_tool_catalog.py reads them by ast.literal_eval and resolves them by name from
+# mcp/registry.py); the enums are held EQUAL to the registries in research.findings by tests/test_research_findings_6208.py.
+MANAGE_FINDING_DESCRIPTION = (
+    "OWNER-ONLY. The research findings store (#6208): a finding's question, its VERIFIED sources, the evidence and its "
+    "limits, and an append-only history. action='record': question, dedupe_key (lowercase slug), sources (1-12 objects "
+    "printed by scripts/research_finding_verify.py, paste them UNEDITED — a stamp refuses an edited title; each carries "
+    "claim_supported_by abstract_read|full_text_read and supports_note), evidence_summary, evidence_strength strong|moderate|weak|"
+    "insufficient ('strong' needs a full_text source), applicability {text, population_match direct|partial|poor}, "
+    "limitations, risk_tier 1-5 (1 observational, 2 reversible behavioural, 3 training/nutrition, 4 supplement/electrolyte, "
+    "5 medication), touches, clinical_review_required, responsible_coach (persona id), review_by, origin prospective|"
+    "retrospective|simulated, surfaced_by, date. A live finding with the same dedupe_key is refused and named. "
+    "action='add_source' (finding_id, source). action='set_state' (finding_id, state, reason; superseded_by). "
+    "action='link' (finding_id, link_kind recommendation + rec_id | experiment + experiment_id | personal_result + "
+    "experiment_id: the verdict is COPIED from that experiment's analysis; simulated=true + verdict for a rehearsal). "
+    "action='decide' (finding_id, words — his words verbatim; optional publication_eligible). action='correct' (finding_id, field, value, reason). "
+    "action='list' (status live|stale|closed|all, state, finding_id, responsible_coach, include_simulated). "
+    "Never set a state or a decision he did not state. Never quoted on the site, in an email or in a coach prompt."
+)
+
+MANAGE_FINDING_INPUT = {
+    "type": "object",
+    "properties": {
+        "action": {
+            "type": "string",
+            "enum": ["record", "add_source", "set_state", "link", "decide", "correct", "list"],
+            "description": "record | add_source | set_state | link | decide | correct | list.",
         },
-        "required": ["action"],
+        "finding_id": {"type": "string", "description": "The finding id (rf_<YYYYMMDD>_<hash>). Every action but record and list."},
+        "question": {"type": "string", "description": "record: the research question, 20-500 characters."},
+        "dedupe_key": {"type": "string", "description": "record: a lowercase slug naming the question (dedupe key)."},
+        "sources": {
+            "type": "array",
+            "items": {"type": "object"},
+            "description": "record: 1-12 verified source objects, exactly as scripts/research_finding_verify.py prints them.",
+        },
+        "source": {"type": "object", "description": "add_source: one verified source object."},
+        "evidence_summary": {"type": "string", "description": "record: what the evidence says."},
+        "evidence_strength": {
+            "type": "string",
+            "enum": ["strong", "moderate", "weak", "insufficient"],
+            "description": "record: how strong the external evidence is.",
+        },
+        "applicability": {
+            "type": "object",
+            "description": "record: {text, population_match: direct | partial | poor} — how far it applies to him.",
+        },
+        "limitations": {"type": "string", "description": "record: the limitations (required)."},
+        "risk_tier": {"type": "integer", "description": "record: 1-5 (see the tool description)."},
+        "touches": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "enum": ["observation", "behaviour", "sleep", "training", "intake_target", "electrolytes", "supplements", "medication"],
+            },
+            "description": "record: what the finding touches; sets the lowest risk tier it may carry.",
+        },
+        "clinical_review_required": {"type": "boolean", "description": "record: true when a clinician must review it first."},
+        "responsible_coach": {"type": "string", "description": "record: the persona id responsible. list: optional filter."},
+        "review_by": {"type": "string", "description": "record: YYYY-MM-DD, 1-365 days after date."},
+        "origin": {
+            "type": "string",
+            "enum": ["prospective", "retrospective", "simulated"],
+            "description": "record: prospective (found now) | retrospective (recorded after the fact) | simulated (a rehearsal).",
+        },
+        "surfaced_by": {
+            "type": "string",
+            "description": "record: who or what surfaced it (e.g. owner, a coach id, a research session).",
+        },
+        "date": {"type": "string", "description": "record: the finding's day, YYYY-MM-DD (default today, Pacific)."},
+        "state": {
+            "type": "string",
+            "enum": [
+                "newly_discovered",
+                "under_review",
+                "relevant_not_actionable",
+                "rejected",
+                "superseded",
+                "discussed",
+                "approved_for_experiment",
+                "declined",
+                "experiment_in_progress",
+                "evaluated_supported",
+                "evaluated_not_supported",
+                "evaluated_inconclusive",
+            ],
+            "description": "set_state: the new state. list: optional exact-state filter.",
+        },
+        "reason": {
+            "type": "string",
+            "description": "set_state / correct: why (required for rejected, declined, superseded, and every correction).",
+        },
+        "superseded_by": {
+            "type": "string",
+            "description": "set_state superseded: a finding id or a source reference (pmid:<id> | doi:<id>).",
+        },
+        "link_kind": {
+            "type": "string",
+            "enum": ["recommendation", "experiment", "personal_result"],
+            "description": "link: what is linked.",
+        },
+        "rec_id": {"type": "string", "description": "link recommendation: the recommendation-record id."},
+        "experiment_id": {"type": "string", "description": "link experiment / personal_result: the experiment id."},
+        "verdict": {
+            "type": "string",
+            "enum": ["supported", "contradicted", "inconclusive"],
+            "description": "link personal_result: only for simulated=true; a real result is copied from the analysis.",
+        },
+        "simulated": {"type": "boolean", "description": "link personal_result: true for a rehearsal (default false)."},
+        "words": {"type": "string", "description": "decide: his words, verbatim. Other writes: an optional note."},
+        "field": {
+            "type": "string",
+            "enum": [
+                "question",
+                "evidence_summary",
+                "evidence_strength",
+                "applicability",
+                "limitations",
+                "risk_tier",
+                "touches",
+                "clinical_review_required",
+                "responsible_coach",
+                "review_by",
+            ],
+            "description": "correct: the head field restated.",
+        },
+        "value": {"description": "correct: the corrected value (its type follows the field)."},
+        "status": {
+            "type": "string",
+            "enum": ["live", "stale", "closed", "all"],
+            "description": "list: live (default) | stale | closed | all.",
+        },
+        "publication_eligible": {
+            "type": "boolean",
+            "description": "decide: his explicit ruling whether this finding may ever be published (nothing publishes yet).",
+        },
+        "include_simulated": {"type": "boolean", "description": "list: include simulated findings and results (default false)."},
     },
+    "required": ["action"],
 }
-MANAGE_FINDING_DESCRIPTION = MANAGE_FINDING_SCHEMA["description"]
-MANAGE_FINDING_INPUT: dict[str, Any] = MANAGE_FINDING_SCHEMA["inputSchema"]
 
 
 def _err(message: str) -> dict[str, Any]:

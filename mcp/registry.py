@@ -197,8 +197,8 @@ from mcp.tools_reading import (
     tool_get_reading_track_record,
     tool_manage_reading,
 )
-from mcp.tools_research_findings import MANAGE_FINDING_SCHEMA, tool_manage_research_finding  # #6208
-from mcp.tools_sick_days import tool_manage_sick_days
+from mcp.tools_research_findings import MANAGE_FINDING_DESCRIPTION, MANAGE_FINDING_INPUT, tool_manage_research_finding  # #6208
+from mcp.tools_sick_days import MANAGE_SICK_DAYS_INPUT, tool_manage_sick_days  # #6208: input table beside its tool
 from mcp.tools_social import tool_get_social_dashboard
 from mcp.tools_social_connection import tool_get_social_connection_trend  # lifted out of tools_lifestyle by #2221
 from mcp.tools_strength import tool_get_exercise_history, tool_get_muscle_volume
@@ -1143,29 +1143,7 @@ TOOLS = {
     # ── Life Event Tagging (#40) ──
     "manage_sick_days": {
         "fn": tool_manage_sick_days,
-        "schema": {
-            "name": "manage_sick_days",
-            "description": MANAGE_SICK_DAYS_DESCRIPTION,
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "action": {
-                        "type": "string",
-                        "description": "list (default), log, or clear.",
-                        "enum": ["list", "log", "clear"],
-                    },
-                    "date": {"type": "string", "description": "[log/clear] Date YYYY-MM-DD."},
-                    "dates": {"type": "array", "items": {"type": "string"}, "description": "[log] List of dates to flag at once."},
-                    "reason": {
-                        "type": "string",
-                        "description": "[log] Optional reason (e.g. 'flu', 'rest day', 'travel'). [clear] Optional note on why it was cleared.",
-                    },
-                    "start_date": {"type": "string", "description": "[list] Start of range (default: 30 days ago)."},
-                    "end_date": {"type": "string", "description": "[list] End of range (default: today)."},
-                },
-                "required": [],
-            },
-        },
+        "schema": {"name": "manage_sick_days", "description": MANAGE_SICK_DAYS_DESCRIPTION, "inputSchema": MANAGE_SICK_DAYS_INPUT},
     },
     # ── Contact Frequency Tracking (#42) ──
     "get_social_dashboard": {
@@ -1526,7 +1504,10 @@ TOOLS = {
         "fn": tool_manage_coach_recommendation,
         "schema": {"name": "manage_coach_recommendation", "description": MANAGE_REC_DESCRIPTION, "inputSchema": MANAGE_REC_INPUT},
     },
-    "manage_research_finding": {"fn": tool_manage_research_finding, "schema": MANAGE_FINDING_SCHEMA},  # #6208 owner-only findings
+    "manage_research_finding": {  # #6208: the research findings store — owner-only, every write his explicit act
+        "fn": tool_manage_research_finding,
+        "schema": {"name": "manage_research_finding", "description": MANAGE_FINDING_DESCRIPTION, "inputSchema": MANAGE_FINDING_INPUT},
+    },
     "get_advice_link_queue": {  # read-only: the coaches' recent asks beside what Matthew recorded; writes nothing
         "fn": tool_get_advice_link_queue,
         "schema": {"name": "get_advice_link_queue", "description": ADVICE_QUEUE_DESCRIPTION, "inputSchema": ADVICE_QUEUE_INPUT},
