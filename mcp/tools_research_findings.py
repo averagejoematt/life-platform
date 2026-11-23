@@ -59,11 +59,14 @@ MANAGE_FINDING_DESCRIPTION = (
     "action='set_state' (finding_id, state, reason; superseded_by; observed_on + observation_note for "
     "observation_recorded): transitions follow a fixed lifecycle, closed states are terminal, a tier-5 finding never "
     "reaches an experiment, an observation (observation_planned) is only for an observation-only tier<=2 finding after his "
-    "decide authorizes='observation', and an observation is evaluated only after his decide authorizes='verdict'. "
+    "decide authorizes='observation' and stays observation-only (no correction may add intervention risk); an evaluation "
+    "must EQUAL its verdict (the experiment's copied result recorded after the experiment started, or his decide "
+    "authorizes='verdict' on an observation); a tier-5 finding is never evaluated here (clinician_hold) — its exits are "
+    "declined, rejected or superseded. "
     "action='link' (finding_id, link_kind recommendation + rec_id | experiment + experiment_id | personal_result + "
     "experiment_id: the verdict is COPIED from that experiment's analysis; simulated=true + verdict for a rehearsal). "
     "action='decide' (finding_id, words, words_are owner_verbatim|owner_adopted_text|session_summary, provenance, "
-    "optional authorizes observation|verdict, optional publication_eligible). action='correct' (finding_id, field, value, "
+    "optional authorizes observation|verdict — a verdict decision carries verdict supported|contradicted|inconclusive — optional publication_eligible). action='correct' (finding_id, field, value, "
     "reason). action='list' (status live|stale|closed|all, state, finding_id, responsible_coach, include_simulated). "
     "Never set a state or a decision he did not state, and never store generated wording as owner_verbatim. Never quoted "
     "on the site, in an email or in a coach prompt."
@@ -157,7 +160,10 @@ MANAGE_FINDING_INPUT = {
         "verdict": {
             "type": "string",
             "enum": ["supported", "contradicted", "inconclusive"],
-            "description": "link personal_result: only for simulated=true; a real result is copied from the analysis.",
+            "description": (
+                "decide authorizes=verdict: HIS verdict on an observation (the evaluated state must equal it). link "
+                "personal_result: only for simulated=true; a real result is copied from the analysis."
+            ),
         },
         "simulated": {"type": "boolean", "description": "link personal_result: true for a rehearsal (default false)."},
         "words": {"type": "string", "description": "decide: his words, verbatim. Other writes: an optional note."},
@@ -298,6 +304,7 @@ def _event_fields(args: dict[str, Any], action: str) -> tuple[str, dict[str, Any
             "words_are": args.get("words_are"),
             "provenance": args.get("provenance"),
             "authorizes": args.get("authorizes"),
+            "verdict": args.get("verdict"),
             "publication_eligible": args.get("publication_eligible"),
         }
     if action == "correct":

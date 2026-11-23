@@ -922,7 +922,11 @@ rejected / declined / superseded without a reason; a move outside `research.find
 terminal); a correction that lowers risk (raise the tier, add a touch or switch clinical review on — never the reverse:
 a lower-risk reading is a new finding). An approved observational measurement goes `observation_planned` (only for an
 observation-only, tier <= 2 finding, after his `decide` with `authorizes=observation`) -> `observation_recorded` ->
-evaluated only after his `decide` with `authorizes=verdict`; nothing computes a verdict. A `decide` says whose words
+evaluated only after his `decide` with `authorizes=verdict` carrying the verdict; nothing computes a verdict. A finding
+in an observation state stays observation-only (touches exactly ["observation"], tier <= 2): a correction adding risk is
+refused. An evaluation EQUALS its verdict (the experiment's copied result recorded after it started, or his). A tier-5
+finding is held for the clinician in every state (`clinician_hold`) and is never evaluated here: its exits are declined,
+rejected or superseded. A `decide` says whose words
 it stores (`words_are`) and where they came from (`provenance`).
 
 **IAM note:** the MCP role already has table-wide Get/Query/Put/Update with no leading-key condition, so this tool's

@@ -429,7 +429,7 @@ def test_the_lifecycle_table_is_complete_and_closed_states_are_terminal():
     ],
 )
 def test_the_probe_s_transition_bypasses_are_refused(frm, to, needle):
-    view = {**rf.fold([rf.build_finding_head(**_head_kwargs())])[0], "state": frm}
+    view = {**rf.fold([rf.build_finding_head(**{**_head_kwargs(), "touches": ["observation"], "risk_tier": 1})])[0], "state": frm}
     with pytest.raises(rf.FindingError, match=re.escape(needle)):
         rf.build_finding_event(user_id="u", view=view, kind="state_change", recorded_at=NOW(), today=TODAY, state=to, reason="r")
 
@@ -675,6 +675,8 @@ REGISTRY_MODULE = "lambdas/research/findings.py"  # builds rows only inside fold
 ALLOWED_TO_NAME = frozenset(
     {
         "lambdas/research/__init__.py",  # the package (its docstring names the import)
+        "lambdas/research/finding_risk.py",  # the risk vocabulary + rules, split out of the registry (no I/O, builds no row)
+        "lambdas/research/finding_sources.py",  # the source vocabulary + admission check, split out (no I/O, builds no row)
         "lambdas/research/findings.py",  # the registry
         WRITER_MODULE,  # the one writer and reader
         "mcp/registry.py",  # registers the tool
@@ -762,7 +764,7 @@ def _closure(graph: dict[str, set[str]], roots: list[str]) -> set[str]:
 #: The public publishing pipeline and every coach-facing package: the site API, the content generators, the email
 #: lambdas, and the coach package (no coach prompt reads the store). None may reach it, module-level or lazily.
 NO_READ_PACKAGES = ("web.", "content.", "emails.", "coach.", "ai.", "intelligence.", "compute.")
-STORE_MODULES = frozenset({"research.findings", "mcp.tools_research_findings"})
+STORE_MODULES = frozenset({"research.findings", "research.finding_risk", "research.finding_sources", "mcp.tools_research_findings"})
 
 
 def test_no_public_or_coach_module_can_reach_the_store():
@@ -1063,13 +1065,17 @@ def test_clean_observation_path_record_review_discuss_plan_record_and_his_verdic
     )
     assert res["finding"]["observations"][0]["observed_on"] == "2026-11-22" and res["finding"]["state"] == "observation_recorded"
     _refused(_do("set_state", fid, state="evaluated_inconclusive"), "authorizes='verdict'")
-    _do("decide", fid, words="Call it inconclusive.", authorizes="verdict", **DECIDE)
+    _refused(_do("decide", fid, words="Call it.", authorizes="verdict", **DECIDE), "verdict one of")
+    _do("decide", fid, words="Call it inconclusive.", authorizes="verdict", verdict="inconclusive", **DECIDE)
+    _refused(_do("set_state", fid, state="evaluated_supported"), "the evaluation is evaluated_inconclusive")
     assert _do("set_state", fid, state="evaluated_inconclusive")["finding"]["state"] == "evaluated_inconclusive"
 
 
 def test_an_old_authorization_does_not_carry_into_a_later_state(table):
     fid = _record(table, risk_tier=1, touches=["observation"])
-    _do("decide", fid, words="Watch it.", authorizes="verdict", **DECIDE)  # a verdict decided before anything was observed
+    _do(
+        "decide", fid, words="Watch it.", authorizes="verdict", verdict="supported", **DECIDE
+    )  # a verdict decided before anything was observed
     _do("decide", fid, words="Watch it.", authorizes="observation", **DECIDE)
     _do("set_state", fid, state="observation_planned")
     _do("set_state", fid, state="observation_recorded", observed_on="2026-11-22", observation_note="Synthetic: seven nights logged.")
@@ -1283,3 +1289,198 @@ def test_two_acts_in_one_millisecond_replay_in_the_order_they_were_made(table, m
     res = _do("correct", fid, field="evidence_strength", value="strong", reason="the full trial was read")
     assert res["finding"]["evidence_strength"] == "strong" and res["finding"]["invalid_events"]["count"] == 0
     assert rf.next_instant(["2026-11-22T10:00:00.999Z"], now="2026-11-22T10:00:00.000Z") == "2026-11-22T10:00:01.000Z"
+
+
+# ── finish line (re-probe of 9a3d19906): (a) observation leak, (b) clinician hold, (c) evaluation = verdict,
+# (d) lenient instants, (e) duplicate touches ─────────────────────────────────────────────────────────────
+
+
+def _planned_observation(table):
+    fid = _record(table, risk_tier=1, touches=["observation"], dedupe_key="obs-leak")
+    _do("decide", fid, words="Watch it.", authorizes="observation", **DECIDE)
+    assert _do("set_state", fid, state="observation_planned")["status"] == "recorded"
+    return fid
+
+
+def test_a_an_observation_cannot_take_on_intervention_risk(table):
+    fid = _planned_observation(table)
+    leak = "cannot take on intervention risk; close it and record a new finding"
+    assert _do("correct", fid, field="clinical_review_required", value=True, reason="ask first")["status"] == "recorded"
+    _refused(_do("correct", fid, field="risk_tier", value=5, reason="x"), leak)
+    _refused(_do("correct", fid, field="risk_tier", value=3, reason="x"), leak)
+    _refused(_do("correct", fid, field="touches", value=["observation", "medication", "supplements"], reason="x"), leak)
+    _refused(
+        _do("correct", fid, field="question", value="Does metoprolol at night lower resting heart rate?", reason="x"),
+        "declare 'medication'",
+    )
+    view = trf.tool_manage_research_finding({"action": "list"})["findings"][0]
+    assert (view["state"], view["touches"], view["risk_tier"], view["clinician_hold"]) == ("observation_planned", ["observation"], 1, False)
+
+
+def test_a_a_forged_leak_row_is_skipped_at_fold(table):
+    fid = _planned_observation(table)
+    forged = {
+        "pk": PK,
+        "sk": rf.event_sk(fid, "2099-01-01T00:00:00.000Z", "correction"),
+        "record_type": "research_finding_event",
+        "finding_id": fid,
+        "kind": "correction",
+        "recorded_by": "owner",
+        "recorded_at": "2099-01-01T00:00:00.000Z",
+        "field": "risk_tier",
+        "value": 2,
+        "reason": "forged",
+    }
+    forged_touch = {**forged, "sk": forged["sk"] + "x", "field": "touches", "value": ["behaviour", "observation"]}
+    view = rf.fold(_stored_rows(table) + [forged, forged_touch])[0]
+    assert view["touches"] == ["observation"] and view["invalid_events"]["count"] == 1  # tier 2 keeps the invariant; a 2nd touch does not
+    assert view["risk_tier"] == 2
+
+
+def test_a_the_tripwire_runs_on_every_question_correction_in_every_state(table):
+    fid = _record(table)
+    _do("set_state", fid, state="under_review")
+    _refused(
+        _do("correct", fid, field="question", value="Does melatonin at night improve sleep consistency?", reason="x"),
+        "declare 'supplements'",
+    )
+    _refused(
+        _do("correct", fid, field="evidence_summary", value="Synthetic: trials of caffeine timing show an effect.", reason="x"),
+        "declare 'intake_target'",
+    )
+
+
+def _tier5_in_experiment(table):
+    fid = _record(table, risk_tier=3, touches=["training"], dedupe_key="raise-five")
+    for st in ("under_review", "approved_for_experiment"):
+        _do("set_state", fid, state=st)
+    _do("link", fid, link_kind="experiment", experiment_id="morning-walk_2026-10-01")
+    _do("set_state", fid, state="experiment_in_progress")
+    for field, value in (("clinical_review_required", True), ("risk_tier", 5), ("touches", ["medication", "training"])):
+        assert _do("correct", fid, field=field, value=value, reason="it is prescribed").get("status") == "recorded", field
+    return fid
+
+
+def test_b_a_tier_5_finding_is_held_in_every_state_and_never_evaluated_here(table):
+    fid = _tier5_in_experiment(table)
+    _do("link", fid, link_kind="personal_result", experiment_id="morning-walk_2026-10-01")
+    for state in ("evaluated_supported", "evaluated_inconclusive", "evaluated_not_supported"):
+        _refused(_do("set_state", fid, state=state), "only exits are declined, rejected or superseded")
+    assert trf.tool_manage_research_finding({"action": "list"})["findings"][0]["clinician_hold"] is True
+    res = _do("set_state", fid, state="declined", reason="the clinician decides this one")
+    assert res["finding"]["state"] == "declined" and res["finding"]["clinician_hold"] is True  # closed, still held
+    held = _record(table, risk_tier=5, touches=["medication"], clinical_review_required=True, dedupe_key="born-five")
+    assert (
+        next(v for v in trf.tool_manage_research_finding({"action": "list"})["findings"] if v["finding_id"] == held)["clinician_hold"]
+        is True
+    )
+
+
+def test_b_a_tier_5_experiment_may_be_rejected(table):
+    fid = _tier5_in_experiment(table)
+    assert _do("set_state", fid, state="rejected", reason="not for this tool")["finding"]["clinician_hold"] is True
+
+
+def _in_progress(table, key):
+    fid = _record(table, risk_tier=3, touches=["training"], dedupe_key=key)
+    for st in ("under_review", "approved_for_experiment"):
+        _do("set_state", fid, state=st)
+    _do("link", fid, link_kind="experiment", experiment_id="morning-walk_2026-10-01")
+    return fid
+
+
+def test_c_an_evaluation_equals_the_copied_result(table):
+    fid = _in_progress(table, "verdict-match")
+    _do("set_state", fid, state="experiment_in_progress")
+    _do("link", fid, link_kind="personal_result", experiment_id="morning-walk_2026-10-01")  # the analysis says inconclusive
+    _refused(_do("set_state", fid, state="evaluated_supported"), "the evaluation is evaluated_inconclusive")
+    _refused(_do("set_state", fid, state="evaluated_not_supported"), "the evaluation is evaluated_inconclusive")
+    assert _do("set_state", fid, state="evaluated_inconclusive")["status"] == "recorded"
+
+
+def test_c_a_result_recorded_before_the_experiment_started_does_not_count(table):
+    fid = _in_progress(table, "pre-start")
+    assert _do("link", fid, link_kind="personal_result", experiment_id="morning-walk_2026-10-01")["status"] == "recorded"
+    _do("set_state", fid, state="experiment_in_progress")
+    _refused(_do("set_state", fid, state="evaluated_inconclusive"), "recorded after the experiment started")
+
+
+def test_c_an_observation_evaluation_equals_his_verdict(table):
+    fid = _planned_observation(table)
+    _do("set_state", fid, state="observation_recorded", observed_on="2026-11-22", observation_note="Synthetic: seven nights logged.")
+    _do("decide", fid, words="It held up.", authorizes="verdict", verdict="supported", **DECIDE)
+    _refused(_do("set_state", fid, state="evaluated_inconclusive"), "the evaluation is evaluated_supported")
+    assert _do("set_state", fid, state="evaluated_supported")["status"] == "recorded"
+
+
+def test_c_the_verdict_map_covers_the_personal_verdicts():
+    assert set(rf.VERDICT_STATE) == set(rf.PERSONAL_VERDICTS) and set(rf.VERDICT_STATE.values()) == rf.EVALUATED_STATES
+
+
+def test_d_instants_parse_with_or_without_fractional_seconds():
+    assert rf.next_instant(["2026-11-22T12:00:05Z"], now="2026-11-22T12:00:00.000Z") == "2026-11-22T12:00:05.001Z"
+    assert rf.next_instant(["garbage", None, "2026-11-22T12:00:05Z"], now="2026-11-22T13:00:00Z") == "2026-11-22T13:00:00.000Z"
+    assert rf.parse_instant("2026-11-22T12:00:05Z") < rf.parse_instant("2026-11-22T12:00:05.500Z")
+    assert rf.parse_instant("not an instant") is None
+
+
+def test_d_a_stored_row_without_milliseconds_blocks_nothing_and_a_garbled_one_is_reported(table, monkeypatch):
+    fid = _record(table)
+    no_ms = rf.build_finding_event(
+        user_id="matthew",
+        view=rf.fold(_stored_rows(table))[0],
+        kind="state_change",
+        recorded_at="2026-11-22T12:00:05Z",
+        today=TODAY,
+        state="under_review",
+    )
+    table.store[(PK, no_ms["sk"])] = no_ms
+    garbled = {
+        **no_ms,
+        "sk": rf.event_sk(fid, "garbled", "decision"),
+        "kind": "decision",
+        "recorded_at": "yesterday-ish",
+        "words": "x",
+        **DECIDE,
+    }
+    table.store[(PK, garbled["sk"])] = garbled
+    monkeypatch.setattr(rf, "now_instant", lambda: "2026-11-22T12:00:05.000Z")  # same second as the stored row
+    res = _do("set_state", fid, state="discussed")
+    assert res["status"] == "recorded" and res["finding"]["state"] == "discussed"
+    assert res["finding"]["invalid_events"] == {"count": 1, "sks": [garbled["sk"]]}
+
+
+def test_d_replay_orders_by_time_not_by_sort_key_text(table):
+    _record(table)
+    first = rf.build_finding_event(
+        user_id="matthew",
+        view=rf.fold(_stored_rows(table))[0],
+        kind="state_change",
+        recorded_at="2026-11-22T12:00:05Z",
+        today=TODAY,
+        state="under_review",
+    )
+    view = rf.fold(_stored_rows(table) + [first])[0]
+    second = rf.build_finding_event(
+        user_id="matthew", view=view, kind="state_change", recorded_at="2026-11-22T12:00:05.500Z", today=TODAY, state="discussed"
+    )
+    assert first["sk"] > second["sk"]  # the text order is the wrong order
+    view = rf.fold(_stored_rows(table) + [second, first])[0]
+    assert view["state"] == "discussed" and view["invalid_events"]["count"] == 0
+
+
+def test_e_touches_are_unique_and_sorted(table):
+    _refused(_call(touches=["sleep", "sleep"]), "twice")
+    fid = _record(table, risk_tier=3, touches=["training", "sleep"])
+    assert table.store[(PK, rf.head_sk(fid))]["touches"] == ["sleep", "training"]
+    _refused(_do("correct", fid, field="touches", value=["training", "sleep", "sleep"], reason="x"), "twice")
+    _refused(_do("correct", fid, field="touches", value=["training", "sleep"], reason="x"), "already says")
+
+
+def test_e_the_split_modules_are_pure_and_re_exported():
+    from research import finding_risk, finding_sources
+
+    for mod in (finding_risk, finding_sources):
+        src = Path(mod.__file__).read_text(encoding="utf-8")
+        assert "boto3" not in src and "urllib.request" not in src and "build_finding" not in src
+    assert rf.FindingError is finding_risk.FindingError and rf.validate_source is finding_sources.validate_source

@@ -23,7 +23,7 @@ IDENTITY, NOT SUPPORT. A verified source means the identifier resolves to this r
 from the verifier. It does NOT show that the source supports the finding: that is the reader's own assertion
 (`claim_supported_by`, `supports_note`).
 
-THE RISK TRIPWIRE HAS KNOWN GAPS. `_TOUCH_WORDS` refuses a finding whose text names a drug, supplement, electrolyte
+THE RISK TRIPWIRE HAS KNOWN GAPS. `TOUCH_WORDS` (in `research.finding_risk`) refuses a finding whose text names a drug, supplement, electrolyte
 or intake term its declared `touches` do not cover. It is a tripwire, not a classifier: the owner's declared
 `touches`, `risk_tier` and the required `risk_rationale` are the record, and a risk field can only be TIGHTENED by a
 correction (a lower-risk reading is a new finding).
@@ -41,7 +41,6 @@ from __future__ import annotations
 
 import hashlib
 import re
-import urllib.parse
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -89,6 +88,13 @@ STATES: tuple[str, ...] = (
     OBSERVATION_RECORDED,
 )
 EVALUATED_STATES: frozenset[str] = frozenset({EVALUATED_SUPPORTED, EVALUATED_NOT_SUPPORTED, EVALUATED_INCONCLUSIVE})
+OBSERVATION_STATES: frozenset[str] = frozenset({OBSERVATION_PLANNED, OBSERVATION_RECORDED})
+#: An evaluation EQUALS the verdict it rests on: the experiment analysis's (copied into a personal result) or his own.
+VERDICT_STATE: dict[str, str] = {
+    "supported": EVALUATED_SUPPORTED,
+    "contradicted": EVALUATED_NOT_SUPPORTED,
+    "inconclusive": EVALUATED_INCONCLUSIVE,
+}
 _OPEN_REVIEW = (REJECTED, SUPERSEDED, DECLINED)
 #: The lifecycle. Anything not listed is refused with the allowed next states named. Closed states are TERMINAL:
 #: a changed view is a NEW finding (which may name the old id in its question or a source note). An approved
@@ -98,8 +104,8 @@ TRANSITIONS: dict[str, tuple[str, ...]] = {
     UNDER_REVIEW: (RELEVANT_NOT_ACTIONABLE, DISCUSSED, APPROVED_FOR_EXPERIMENT, OBSERVATION_PLANNED, *_OPEN_REVIEW),
     RELEVANT_NOT_ACTIONABLE: (UNDER_REVIEW, DISCUSSED, OBSERVATION_PLANNED, *_OPEN_REVIEW),
     DISCUSSED: (UNDER_REVIEW, RELEVANT_NOT_ACTIONABLE, APPROVED_FOR_EXPERIMENT, OBSERVATION_PLANNED, *_OPEN_REVIEW),
-    APPROVED_FOR_EXPERIMENT: (EXPERIMENT_IN_PROGRESS, DISCUSSED, DECLINED, SUPERSEDED),
-    EXPERIMENT_IN_PROGRESS: (EVALUATED_SUPPORTED, EVALUATED_NOT_SUPPORTED, EVALUATED_INCONCLUSIVE, DECLINED, SUPERSEDED),
+    APPROVED_FOR_EXPERIMENT: (EXPERIMENT_IN_PROGRESS, DISCUSSED, DECLINED, REJECTED, SUPERSEDED),
+    EXPERIMENT_IN_PROGRESS: (EVALUATED_SUPPORTED, EVALUATED_NOT_SUPPORTED, EVALUATED_INCONCLUSIVE, DECLINED, REJECTED, SUPERSEDED),
     OBSERVATION_PLANNED: (OBSERVATION_RECORDED, DISCUSSED, DECLINED, SUPERSEDED),
     OBSERVATION_RECORDED: (EVALUATED_SUPPORTED, EVALUATED_NOT_SUPPORTED, EVALUATED_INCONCLUSIVE, OBSERVATION_PLANNED, SUPERSEDED),
     REJECTED: (),
@@ -122,96 +128,47 @@ POPULATION_MATCHES: tuple[str, ...] = ("direct", "partial", "poor")
 ORIGINS: tuple[str, ...] = ("prospective", "retrospective", "simulated")
 ORIGIN_SIMULATED = "simulated"
 
-ID_KINDS: tuple[str, ...] = ("pmid", "doi", "guideline_url")
-REVIEW_DEPTHS: tuple[str, ...] = ("abstract_only", "full_text")
-FULL_TEXT = "full_text"
-#: `config/evidence_source_allowlist.json` "designs" keys, plus a clinical guideline (a finding may rest on one).
-DESIGNS: tuple[str, ...] = (
-    "randomized_trial",
-    "controlled_trial",
-    "meta_analysis",
-    "systematic_review",
-    "narrative_review",
-    "position_stand",
-    "clinical_guideline",
-)
-#: Copies of the allowlist's lists (held equal by the test). A guideline URL must be on an official body's host.
-GUIDELINE_HOSTS: tuple[str, ...] = ("nice.org.uk", "who.int", "heart.org", "ahajournals.org", "escardio.org", "acsm.org")
-DENIED_HOSTS: tuple[str, ...] = (
-    "twitter.com",
-    "x.com",
-    "instagram.com",
-    "facebook.com",
-    "tiktok.com",
-    "youtube.com",
-    "youtu.be",
-    "reddit.com",
-    "threads.net",
-    "linkedin.com",
-    "medium.com",
-    "substack.com",
-    "blogspot.com",
-    "wordpress.com",
-    "tumblr.com",
-    "patreon.com",
-    "strongerbyscience.com",
-    "t-nation.com",
-)
-REJECTED_PUBTYPES: tuple[str, ...] = (
-    "Retracted Publication",
-    "Retraction of Publication",
-    "Published Erratum",
-    "Comment",
-    "Editorial",
-    "Letter",
-    "News",
-    "Preprint",
-)
 
-# ── risk ───────────────────────────────────────────────────────────────────────────────────────
-RISK_TIERS: dict[int, str] = {
-    1: "observational",
-    2: "reversible behavioural",
-    3: "training or nutrition modification",
-    4: "supplement or electrolyte",
-    5: "medication or medical management",
-}
-#: What a finding touches, and the lowest risk tier that touch can carry. Declared, never inferred — but a
-#: question or summary that names a supplement, an electrolyte or a medication must declare that touch.
-TOUCH_MIN_TIER: dict[str, int] = {
-    "observation": 1,
-    "behaviour": 2,
-    "sleep": 2,
-    "training": 3,
-    "intake_target": 3,
-    "electrolytes": 4,
-    "supplements": 4,
-    "medication": 5,
-}
-TOUCHES: tuple[str, ...] = tuple(TOUCH_MIN_TIER)
-#: At tier >= 3 a finding touching one of these needs clinical review before anything is tried.
-CLINICAL_TOUCHES: frozenset[str] = frozenset({"intake_target", "electrolytes", "supplements", "medication"})
-CLINICAL_REVIEW_TIER = 3
-CLINICIAN_ONLY_TIER = 5
-#: A TRIPWIRE with known gaps, not a classifier (see the module docstring). "dose-response" (a training term) is
-#: deliberately not a medication word.
-_TOUCH_WORDS: dict[str, re.Pattern] = {
-    "supplements": re.compile(
-        r"\bsupplement(?:s|ation|ing|ed)?\b|\bcreatine\b|\bvitamins?\b|\bfish[- ]oil\b|\bomega[- ]?3s?\b|\bmelatonin\b|"
-        r"\bashwagandha\b|\bzinc\b",
-        re.IGNORECASE,
-    ),
-    "electrolytes": re.compile(r"\belectrolytes?\b|\bsodium\b|\bpotassium\b|\bmagnesium\b|\bsalt(?:s|y|ed)?\b", re.IGNORECASE),
-    "medication": re.compile(
-        r"\bmedications?\b|\bprescri(?:be|bed|ption)s?\b|\bmetoprolol\b|\bbeta[- ]?blockers?\b|\bstatins?\b|\bnsaids?\b|"
-        r"\bibuprofen\b|\banticoagul\w*|\bdos(?:e|es|age|ages)\b(?!-response)|\bdrugs?\b|\bmedicines?\b",
-        re.IGNORECASE,
-    ),
-    "intake_target": re.compile(
-        r"\bkcal\b|\bcalori\w*|\bfasting\b|\bprotein (?:target|floor)s?\b|\bcaffeine\b|\balcohol\b",
-        re.IGNORECASE,
-    ),
-}
+# ── sources: the vocabulary and the admission check live in research.finding_sources (split under the ceiling) ──
+# ── risk: the vocabulary and rules live in research.finding_risk (split under the module-size ceiling) ─────────
+from research.finding_risk import (  # noqa: E402,F401 — re-exported: this module stays the one registry to import
+    CLINICAL_REVIEW_TIER,
+    CLINICAL_TOUCHES,
+    CLINICIAN_ONLY_TIER,
+    LOWER_RISK,
+    OBSERVATION_LEAK,
+    RISK_TIERS,
+    TOUCH_MIN_TIER,
+    TOUCH_WORDS,
+    TOUCHES,
+    FindingError,
+    check_risk,
+    normalize_touches,
+    observation_only,
+    tighten_only,
+)
+from research.finding_sources import (  # noqa: E402,F401 — re-exported: this module stays the one registry to import
+    _INSTANT,
+    CLAIM_SUPPORT,
+    DENIED_HOSTS,
+    DESIGNS,
+    FULL_TEXT,
+    GUIDELINE_HOSTS,
+    ID_KINDS,
+    REJECTED_PUBTYPES,
+    RESOLVERS,
+    REVIEW_DEPTHS,
+    SUPPORTS_NOTE_MAX,
+    SUPPORTS_NOTE_MIN,
+    TEXT_MAX,
+    _day,
+    _denied_hosts_in,
+    _is_source_ref,
+    _text,
+    source_key,
+    validate_source,
+    verification_stamp,
+)
 
 # ── events ─────────────────────────────────────────────────────────────────────────────────────
 EVENT_STATE_CHANGE = "state_change"
@@ -259,58 +216,15 @@ OBSERVATION_NOTE_MIN = 20
 
 QUESTION_MIN, QUESTION_MAX = 20, 500
 SUMMARY_MIN, SUMMARY_MAX = 20, 2000
-TEXT_MAX = 1000
 WORDS_MAX = 2000
 REASON_MAX = 500
 SURFACED_BY_MAX = 120
 SOURCES_MIN, SOURCES_MAX = 1, 12
 REVIEW_BY_MIN_DAYS, REVIEW_BY_MAX_DAYS = 1, 365
 
-_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _FINDING_ID = re.compile(r"^rf_\d{8}_[0-9a-f]{8}$")
 _DEDUPE_KEY = re.compile(r"^[a-z0-9]+(?:[-_][a-z0-9]+)*$")
-_PMID = re.compile(r"^[1-9]\d{0,8}$")
-_DOI = re.compile(r"^10\.\d{4,9}/\S+$")
 _EXPERIMENT_ID = re.compile(r"^[a-z0-9-]{1,40}_\d{4}-\d{2}-\d{2}$")  # mcp/tools_lifestyle create_experiment: <slug>_<start>
-_URL = re.compile(r"https?://([^/\s\"'<>]+)", re.IGNORECASE)
-_SOURCE_KEYS = frozenset(
-    {
-        "id_kind",
-        "id",
-        "design",
-        "review_depth",
-        "resolved_title",
-        "verified_on",
-        "pubtypes",
-        "claim_supported_by",
-        "supports_note",
-        "verification",
-    }
-)
-#: How the recorder says the source supports the finding — asserted by a reader, never implied by a resolving id.
-CLAIM_SUPPORT: tuple[str, ...] = ("abstract_read", "full_text_read")
-SUPPORTS_NOTE_MIN, SUPPORTS_NOTE_MAX = 20, 400
-#: The resolvers `scripts/research_finding_verify.py` fetches from, named in its verification block.
-RESOLVERS: tuple[str, ...] = ("pubmed", "crossref", "guideline_page")
-_VERIFICATION_KEYS = frozenset(
-    {
-        "resolver",
-        "resolved_title",
-        "first_author",
-        "year",
-        "fetched_at",
-        "abstract_sha256",
-        "stamp",
-        "subject_overlap",
-    }
-)
-_STAMP = re.compile(r"^[0-9a-f]{16}$")
-_SHA256 = re.compile(r"^[0-9a-f]{64}$")
-_INSTANT = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
-
-
-class FindingError(ValueError):
-    """A finding or event the ruling forbids — refused at write, never stored."""
 
 
 # ── keys, ids, dates ───────────────────────────────────────────────────────────────────────────
@@ -340,15 +254,30 @@ def event_sk(finding_id: str, recorded_at: str, kind: str, revision: int = 1) ->
     return f"{HEAD_PREFIX}{finding_id}{EVENT_INFIX}{recorded_at}#{kind}#{revision:03d}"
 
 
+def parse_instant(value: Any) -> Optional[datetime]:
+    """A stored UTC instant, with or without fractional seconds; None when it is not one (never an exception)."""
+    v = str(value or "")
+    if not _INSTANT.match(v):
+        return None
+    try:
+        return datetime.fromisoformat(v[:-1] + "+00:00")
+    except ValueError:
+        return None
+
+
+def _format_instant(at: datetime) -> str:
+    return at.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+
 def next_instant(previous: list[str], now: Optional[str] = None) -> str:
-    """A recorded_at strictly after every earlier event of the finding. Events are replayed in sort-key order, so two acts
-    in the same millisecond must not sort by their kind's name (a correction would replay before the source it needs)."""
-    at = now or now_instant()
-    latest = max((p for p in previous if _INSTANT.match(str(p or ""))), default="")
-    if at > latest:
-        return at
-    bumped = datetime.strptime(latest[:23] + "000", "%Y-%m-%dT%H:%M:%S.%f").replace(tzinfo=timezone.utc) + timedelta(milliseconds=1)
-    return bumped.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    """A recorded_at strictly after every earlier event of the finding. Events replay in time order, so two acts in the
+    same millisecond must not tie. A stored instant that does not parse is skipped here (fold reports its row as
+    invalid) — it never blocks a write."""
+    at = parse_instant(now or now_instant()) or datetime.now(timezone.utc)
+    latest = max((p for p in (parse_instant(x) for x in previous) if p is not None), default=None)
+    if latest is not None and at <= latest:
+        at = latest + timedelta(milliseconds=1)
+    return _format_instant(at)
 
 
 def utc_today() -> str:
@@ -360,157 +289,11 @@ def now_instant() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
 
-def _day(value: Any, name: str) -> str:
-    v = str(value or "").strip()
-    if not _DAY.match(v) or parse_day_key(v) is None:
-        raise FindingError(f"{name} must be a real YYYY-MM-DD day")
-    return v
-
-
 def _days_between(a: str, b: str) -> int:
     return (parse_day_key(b) - parse_day_key(a)).days
 
 
-def _text(value: Any, name: str, lo: int, hi: int) -> str:
-    t = str(value or "").strip()
-    if len(t) < lo or len(t) > hi:
-        raise FindingError(f"{name} must be {lo}-{hi} characters")
-    return t
-
-
 # ── sources ────────────────────────────────────────────────────────────────────────────────────
-
-
-def _host_matches(host: str, domains: tuple[str, ...]) -> bool:
-    return any(host == d or host.endswith("." + d) for d in domains)
-
-
-def _denied_hosts_in(*texts: Any) -> list[str]:
-    hosts = []
-    for t in texts:
-        for h in _URL.findall(str(t or "")):
-            h = h.lower().split(":")[0]
-            if _host_matches(h, DENIED_HOSTS):
-                hosts.append(h)
-    return hosts
-
-
-def source_key(src: dict[str, Any]) -> str:
-    return f"{src.get('id_kind')}:{src.get('id')}"
-
-
-def verification_stamp(id_kind: str, ident: str, resolved_title: str, fetched_at: str) -> str:
-    """The stamp `scripts/research_finding_verify.py` writes and this module recomputes. It proves the four fields
-    came unedited from the script's own fetch — it does NOT mean the Lambda verified anything (the Lambda makes no
-    network call). A title typed or edited by hand after the fact no longer matches its stamp and is refused."""
-    return hashlib.sha256(f"{id_kind}|{ident}|{resolved_title}|{fetched_at}".encode("utf-8")).hexdigest()[:16]
-
-
-def _verification(v: Any, kind: str, ident: str, title: str) -> dict[str, Any]:
-    if not isinstance(v, dict):
-        raise FindingError(
-            f"source {kind}:{ident} has no verification block — run scripts/research_finding_verify.py and paste what it prints"
-        )
-    extra = sorted(set(v) - _VERIFICATION_KEYS)
-    if extra:
-        raise FindingError(f"unknown verification fields {extra}")
-    if v.get("resolver") not in RESOLVERS:
-        raise FindingError(f"verification.resolver must be one of {list(RESOLVERS)}")
-    fetched_at = str(v.get("fetched_at") or "")
-    if not _INSTANT.match(fetched_at):
-        raise FindingError("verification.fetched_at must be a UTC instant (YYYY-MM-DDTHH:MM:SSZ)")
-    if v.get("resolved_title") != title:
-        raise FindingError("the source's resolved_title is not the title the verifier fetched — it was edited after verification")
-    if not _STAMP.match(str(v.get("stamp") or "")) or v["stamp"] != verification_stamp(kind, ident, title, fetched_at):
-        raise FindingError(
-            f"source {kind}:{ident}: the verification stamp does not match its id, title and fetch time — the object was edited "
-            "after scripts/research_finding_verify.py printed it (re-run the script)"
-        )
-    if v.get("abstract_sha256") is not None and not _SHA256.match(str(v["abstract_sha256"])):
-        raise FindingError("verification.abstract_sha256 must be a sha256 hex digest")
-    year = v.get("year")
-    if year is not None and (not isinstance(year, int) or isinstance(year, bool)):
-        raise FindingError("verification.year must be an integer or null")
-    overlap = v.get("subject_overlap")
-    if overlap is not None and not isinstance(overlap, dict):
-        raise FindingError("verification.subject_overlap must be an object")  # ADVISORY: its `low` flag never refuses
-    out = {k: v[k] for k in sorted(_VERIFICATION_KEYS) if k in v and v[k] is not None}
-    out["first_author"] = str(v.get("first_author") or "")
-    return out
-
-
-def validate_source(src: Any, *, today: str) -> dict[str, Any]:
-    """One verified source, normalized. Refused, with the reason, unless it is identified, verified and allow-listed."""
-    if not isinstance(src, dict):
-        raise FindingError("a source must be an object (run scripts/research_finding_verify.py and paste what it prints)")
-    extra = sorted(set(src) - _SOURCE_KEYS)
-    if extra:
-        raise FindingError(f"unknown source fields {extra}; a source carries {sorted(_SOURCE_KEYS)}")
-    kind = src.get("id_kind")
-    if kind not in ID_KINDS:
-        raise FindingError(f"source id_kind must be one of {list(ID_KINDS)}")
-    ident = str(src.get("id") or "").strip()
-    if kind == "pmid" and not _PMID.match(ident):
-        raise FindingError(f"PMID {ident!r} is malformed")
-    if kind == "doi":
-        ident = ident.lower()
-        if not _DOI.match(ident):
-            raise FindingError(f"DOI {ident!r} is malformed (10.<registrant>/<suffix>)")
-    if kind == "guideline_url":
-        parsed = urllib.parse.urlparse(ident)
-        host = (parsed.hostname or "").lower()
-        if parsed.scheme != "https" or not host:
-            raise FindingError("a guideline_url must be an https URL")
-        if _host_matches(host, DENIED_HOSTS):
-            raise FindingError(f"source host {host} is social media / a blog — never a source")
-        if not _host_matches(host, GUIDELINE_HOSTS):
-            raise FindingError(f"guideline host {host} is not an allow-listed official body ({', '.join(GUIDELINE_HOSTS)})")
-    if src.get("design") not in DESIGNS:
-        raise FindingError(f"source design must be one of {list(DESIGNS)}")
-    if src.get("review_depth") not in REVIEW_DEPTHS:
-        raise FindingError(f"source review_depth must be one of {list(REVIEW_DEPTHS)}")
-    title = str(src.get("resolved_title") or "")
-    if not title.strip() or not str(src.get("verified_on") or "").strip():
-        raise FindingError(
-            f"source {kind}:{ident} is unverified — it needs resolved_title and verified_on from scripts/research_finding_verify.py"
-        )
-    if title != " ".join(title.split()) or len(title) > TEXT_MAX:
-        raise FindingError("resolved_title must be exactly as the verifier printed it (single-spaced, at most 1000 characters)")
-    verified_on = _day(src.get("verified_on"), "source verified_on")
-    if verified_on > today:
-        raise FindingError("source verified_on cannot be in the future")
-    verification = _verification(src.get("verification"), kind, ident, title)
-    if verification["fetched_at"][:10] != verified_on:
-        raise FindingError("verified_on must be the day of verification.fetched_at")
-    supported_by = src.get("claim_supported_by")
-    if supported_by not in CLAIM_SUPPORT:
-        raise FindingError(f"claim_supported_by must be one of {list(CLAIM_SUPPORT)} — say how you know the source supports the finding")
-    if supported_by == "full_text_read" and src.get("review_depth") != FULL_TEXT:
-        raise FindingError("claim_supported_by full_text_read needs review_depth full_text")
-    note = _text(src.get("supports_note"), "supports_note", SUPPORTS_NOTE_MIN, SUPPORTS_NOTE_MAX)
-    pubtypes = src.get("pubtypes") or []
-    if not isinstance(pubtypes, list):
-        raise FindingError("source pubtypes must be a list")
-    bad = sorted(set(map(str, pubtypes)) & set(REJECTED_PUBTYPES))
-    if bad:
-        raise FindingError(f"source {kind}:{ident} is a rejected publication type: {', '.join(bad)}")
-    denied = _denied_hosts_in(ident, title, note)
-    if denied:
-        raise FindingError(f"source names a denied host: {', '.join(sorted(set(denied)))}")
-    out: dict[str, Any] = {
-        "id_kind": kind,
-        "id": ident,
-        "design": src["design"],
-        "review_depth": src["review_depth"],
-        "resolved_title": title,
-        "verified_on": verified_on,
-        "claim_supported_by": supported_by,
-        "supports_note": note,
-        "verification": verification,
-    }
-    if pubtypes:
-        out["pubtypes"] = [str(p) for p in pubtypes]
-    return out
 
 
 # ── the cross-field rules (run on a head, and again on the view a correction would produce) ────────
@@ -525,32 +308,7 @@ def check_rules(f: dict[str, Any], sources: list[dict[str, Any]]) -> None:
         raise FindingError(
             "evidence_strength 'strong' needs at least one source read in full_text — an abstract cannot back strong evidence"
         )
-    tier = f.get("risk_tier")
-    if not isinstance(tier, int) or isinstance(tier, bool) or tier not in RISK_TIERS:
-        raise FindingError("risk_tier must be an integer 1-5: " + "; ".join(f"{k} {v}" for k, v in RISK_TIERS.items()))
-    touches = f.get("touches")
-    if not isinstance(touches, list) or not touches or any(t not in TOUCH_MIN_TIER for t in touches):
-        raise FindingError(f"touches must be a non-empty list drawn from {list(TOUCHES)}")
-    text = (
-        " ".join(str(f.get(k) or "") for k in ("question", "evidence_summary"))
-        + " "
-        + str((f.get("applicability") or {}).get("text") or "")
-    )
-    for touch, pattern in _TOUCH_WORDS.items():
-        m = pattern.search(text)
-        if m and touch not in touches:
-            raise FindingError(f"the finding names {m.group(0)!r} — declare '{touch}' in touches")
-    floor = max(TOUCH_MIN_TIER[t] for t in touches)
-    if tier < floor:
-        raise FindingError(f"risk_tier {tier} is below what it touches: {sorted(touches)} needs tier >= {floor} ({RISK_TIERS[floor]})")
-    clinical = f.get("clinical_review_required")
-    if not isinstance(clinical, bool):
-        raise FindingError("clinical_review_required must be true or false")
-    if not clinical and (tier > CLINICAL_REVIEW_TIER or (tier == CLINICAL_REVIEW_TIER and set(touches) & CLINICAL_TOUCHES)):
-        raise FindingError(
-            "clinical_review_required must be true: a tier >= 3 finding touching an intake target, electrolytes, supplements "
-            "or medication needs clinical review"
-        )
+    check_risk(f)
 
 
 def _applicability(value: Any) -> dict[str, str]:
@@ -632,7 +390,7 @@ def build_finding_head(
         "applicability": _applicability(applicability),
         "limitations": _text(limitations, "limitations", 1, TEXT_MAX),
         "risk_tier": risk_tier,
-        "touches": list(touches) if isinstance(touches, list) else touches,
+        "touches": normalize_touches(touches),
         "clinical_review_required": clinical_review_required,
         "risk_rationale": _text(risk_rationale, "risk_rationale (why this risk tier)", RATIONALE_MIN, RATIONALE_MAX),
         "responsible_coach": _coach(responsible_coach),
@@ -763,6 +521,10 @@ def _decision(row: dict[str, Any], fields: dict[str, Any]) -> None:
         if authorizes not in AUTHORIZES:
             raise FindingError(f"authorizes must be one of {list(AUTHORIZES)}")
         row["authorizes"] = authorizes
+        if authorizes == "verdict":
+            if fields.get("verdict") not in VERDICT_STATE:
+                raise FindingError(f"a decision that authorizes a verdict says which: verdict one of {list(VERDICT_STATE)}")
+            row["verdict"] = fields["verdict"]
     eligible = fields.get("publication_eligible")
     if eligible is not None:
         if not isinstance(eligible, bool):
@@ -770,10 +532,49 @@ def _decision(row: dict[str, Any], fields: dict[str, Any]) -> None:
         row["publication_eligible"] = eligible  # his explicit ruling; only publishable() reads it
 
 
-def _authorized_since(view: dict[str, Any], what: str) -> bool:
-    """An owner decision authorizing `what`, recorded since the finding entered its current state."""
-    since = str(view.get("state_changed_at") or "")
-    return any(d.get("authorizes") == what and str(d.get("recorded_at") or "") >= since for d in view.get("decisions") or [])
+def _since_state(view: dict[str, Any], items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The items recorded at or after the moment the finding entered its current state (instants compared as times)."""
+    since = parse_instant(view.get("state_changed_at"))
+    out = []
+    for item in items:
+        at = parse_instant(item.get("recorded_at"))
+        if at is not None and (since is None or at >= since):
+            out.append(item)
+    return out
+
+
+def _authorization(view: dict[str, Any], what: str) -> Optional[dict[str, Any]]:
+    """His newest decision authorizing `what`, recorded since the finding entered its current state."""
+    decisions = [d for d in view.get("decisions") or [] if d.get("authorizes") == what]
+    recent = _since_state(view, decisions)
+    return recent[-1] if recent else None
+
+
+def _evaluation_check(to: str, frm: str, view: dict[str, Any]) -> None:
+    """An evaluation EQUALS the verdict it rests on, and a tier-5 finding is never evaluated here."""
+    if _tier_of(view) == CLINICIAN_ONLY_TIER:
+        raise FindingError(
+            "a tier-5 finding is never evaluated here — its only exits are declined, rejected or superseded, with a reason; "
+            "the evaluation belongs to the treating clinician"
+        )
+    if frm == EXPERIMENT_IN_PROGRESS:
+        results = _since_state(view, list(view.get("personal_results") or []))
+        if not view.get("simulated"):
+            results = [r for r in results if not r.get("simulated") and r.get("experiment_id")]
+        if not results:
+            raise FindingError(
+                "an evaluation needs a real personal result, copied from the linked experiment's analysis and recorded after the "
+                "experiment started (a simulated result counts only on a simulated finding)"
+            )
+        verdict = results[-1].get("verdict")
+    else:  # from observation_recorded: never computed, only his call
+        decision = _authorization(view, "verdict")
+        if not decision:
+            raise FindingError("evaluating an observation needs his explicit decide event with authorizes='verdict' — nothing computes it")
+        verdict = decision.get("verdict")
+    expected = VERDICT_STATE.get(str(verdict))
+    if to != expected:
+        raise FindingError(f"the verdict on record is {verdict!r}, so the evaluation is {expected} — not {to}")
 
 
 def _state_change(row: dict[str, Any], view: dict[str, Any], fields: dict[str, Any], today: str) -> None:
@@ -791,19 +592,21 @@ def _state_change(row: dict[str, Any], view: dict[str, Any], fields: dict[str, A
             )
         raise FindingError(f"{frm} -> {to} is not allowed; from {frm} the next states are: {', '.join(allowed)}")
     tier = _tier_of(view)
+    if frm in OBSERVATION_STATES and to not in (DISCUSSED, DECLINED, SUPERSEDED) and not observation_only(view.get("touches"), tier):
+        raise FindingError(OBSERVATION_LEAK)
     if to in (APPROVED_FOR_EXPERIMENT, EXPERIMENT_IN_PROGRESS) and tier == CLINICIAN_ONLY_TIER:
         raise FindingError(_CLINICIAN_ONLY)
     if to == EXPERIMENT_IN_PROGRESS and not view.get("experiments"):
         raise FindingError("experiment_in_progress needs a linked experiment (action='link', link_kind='experiment') first")
     if to == OBSERVATION_PLANNED:
-        if list(view.get("touches") or []) != ["observation"] or not isinstance(tier, int) or tier > 2:
+        if not observation_only(view.get("touches"), tier):
             raise FindingError(
                 "an observation is only for a finding whose touches are exactly ['observation'] at risk tier <= 2 — anything "
                 "else goes through approved_for_experiment (or a clinician)"
             )
         if view.get("experiments"):
             raise FindingError("an observation takes no experiment link — this finding already has one")
-        if not _authorized_since(view, "observation"):
+        if not _authorization(view, "observation"):
             raise FindingError(
                 "observation_planned needs his authorization first: a decide event with authorizes='observation' and its provenance"
             )
@@ -814,16 +617,7 @@ def _state_change(row: dict[str, Any], view: dict[str, Any], fields: dict[str, A
         row["observed_on"] = observed_on
         row["observation_note"] = _text(fields.get("observation_note"), "observation_note", OBSERVATION_NOTE_MIN, TEXT_MAX)
     if to in EVALUATED_STATES:
-        if frm == EXPERIMENT_IN_PROGRESS:
-            results = view.get("personal_results") or []
-            usable = results if view.get("simulated") else [r for r in results if not r.get("simulated") and r.get("experiment_id")]
-            if not usable:
-                raise FindingError(
-                    "an evaluation needs a real personal result copied from the linked experiment's analysis (a simulated "
-                    "result counts only on a simulated finding)"
-                )
-        elif not _authorized_since(view, "verdict"):  # from observation_recorded: never computed, only his call
-            raise FindingError("evaluating an observation needs his explicit decide event with authorizes='verdict' — nothing computes it")
+        _evaluation_check(to, frm, view)
     reason = " ".join(str(fields.get("reason") or "").split())
     if to in REASON_REQUIRED_STATES and not reason:
         raise FindingError(f"{to} needs a reason")
@@ -843,33 +637,6 @@ def _state_change(row: dict[str, Any], view: dict[str, Any], fields: dict[str, A
         raise FindingError("superseded_by belongs to a change to superseded only")
     row["from_state"] = frm
     row["to_state"] = to
-
-
-def _is_source_ref(ref: str) -> bool:
-    kind, _, ident = ref.partition(":")
-    if kind == "pmid":
-        return bool(_PMID.match(ident))
-    if kind == "doi":
-        return bool(_DOI.match(ident.lower()))
-    if kind == "guideline_url":
-        host = (urllib.parse.urlparse(ident).hostname or "").lower()
-        return ident.startswith("https://") and _host_matches(host, GUIDELINE_HOSTS)
-    return False
-
-
-_LOWER_RISK = "a correction can only tighten risk — a lower-risk reading needs a new finding"
-
-
-def _tighten_only(field: str, value: Any, current: Any) -> None:
-    if field == "risk_tier":
-        if isinstance(value, int) and not isinstance(value, bool) and isinstance(current, int) and value < current:
-            raise FindingError(f"risk_tier {current} -> {value}: {_LOWER_RISK}")
-    elif field == "touches":
-        if isinstance(value, list) and not set(current or []) <= set(value):
-            raise FindingError(f"removing {sorted(set(current or []) - set(value))} from touches: {_LOWER_RISK}")
-    elif field == "clinical_review_required":
-        if current is True and value is not True:
-            raise FindingError(f"clearing clinical_review_required: {_LOWER_RISK}")
 
 
 def _correction(row: dict[str, Any], view: dict[str, Any], fields: dict[str, Any]) -> None:
@@ -895,14 +662,16 @@ def _correction(row: dict[str, Any], view: dict[str, Any], fields: dict[str, Any
     elif field == "review_by":
         value = _review_by(value, str(view.get("day")))
     elif field == "touches":
-        value = list(value) if isinstance(value, list) else value
+        value = normalize_touches(value)
     if value == view.get(field):
         raise FindingError(f"{field} already says exactly that")
     if field in RISK_FIELDS:
-        _tighten_only(field, value, view.get(field))
+        tighten_only(field, value, view.get(field))
     after = {k: view.get(k) for k in CORRECTABLE_FIELDS}
     after[field] = value
-    check_rules(after, list(view.get("sources") or []))
+    if view.get("state") in OBSERVATION_STATES and not observation_only(after.get("touches"), after.get("risk_tier")):
+        raise FindingError(OBSERVATION_LEAK)
+    check_rules(after, list(view.get("sources") or []))  # the tripwire runs on every question/summary correction, in every state
     row.update({"field": field, "value": value, "previous": view.get(field), "reason": reason[:REASON_MAX]})
 
 
@@ -978,7 +747,7 @@ _REPLAY_FIELDS: dict[str, tuple[str, ...]] = {
     EVENT_CORRECTION: ("field", "value", "reason", "words"),
     EVENT_LINK_RECOMMENDATION: ("rec_id", "words"),
     EVENT_LINK_EXPERIMENT: ("experiment_id", "words"),
-    EVENT_DECISION: ("words", "words_are", "provenance", "authorizes", "publication_eligible"),
+    EVENT_DECISION: ("words", "words_are", "provenance", "authorizes", "verdict", "publication_eligible"),
     EVENT_PERSONAL_RESULT: ("verdict", "simulated", "experiment_id", "words"),
 }
 
@@ -1035,12 +804,24 @@ def _apply(view: dict[str, Any], row: dict[str, Any]) -> None:
         view["experiments"].append(row["experiment_id"])
     elif kind == EVENT_DECISION:
         view["decisions"].append(
-            {k: row[k] for k in ("words", "words_are", "provenance", "authorizes", "publication_eligible", "recorded_at") if k in row}
+            {
+                k: row[k]
+                for k in ("words", "words_are", "provenance", "authorizes", "verdict", "publication_eligible", "recorded_at")
+                if k in row
+            }
         )
         if isinstance(row.get("publication_eligible"), bool):
             view["publication_eligible"] = row["publication_eligible"]
     else:
         view["personal_results"].append({k: row[k] for k in ("verdict", "simulated", "experiment_id", "words", "recorded_at") if k in row})
+
+
+_NEVER = datetime.max.replace(tzinfo=timezone.utc)
+
+
+def _replay_order(e: dict[str, Any]) -> tuple:
+    """Time order, then sort key. An unparseable recorded_at sorts last and is refused (reported) by the replay."""
+    return (parse_instant(e.get("recorded_at")) or _NEVER, str(e.get("sk")))
 
 
 def fold(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1059,7 +840,7 @@ def fold(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             events.setdefault(fid, []).append(_plain(r))
     views = []
     for fid, head in heads.items():
-        evs = sorted(events.get(fid) or [], key=lambda e: str(e.get("sk")))
+        evs = sorted(events.get(fid) or [], key=_replay_order)
         view: dict[str, Any] = {
             k: head.get(k) for k in ("finding_id", "dedupe_key", "origin", "surfaced_by", "day", "recorded_at", *CORRECTABLE_FIELDS)
         }
@@ -1091,10 +872,7 @@ def fold(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             _apply(view, row)
             applied.append(row)
         view["live"] = view["state"] not in CLOSED_STATES
-        view["clinician_hold"] = view["risk_tier"] == CLINICIAN_ONLY_TIER and view["state"] in (
-            APPROVED_FOR_EXPERIMENT,
-            EXPERIMENT_IN_PROGRESS,
-        )
+        view["clinician_hold"] = view["risk_tier"] == CLINICIAN_ONLY_TIER  # from the tier alone, in every state
         view["invalid_events"] = {"count": len(invalid), "sks": invalid}
         view["history"] = [{k: e[k] for k in _HISTORY_KEYS if k in e} for e in applied]
         views.append(view)
