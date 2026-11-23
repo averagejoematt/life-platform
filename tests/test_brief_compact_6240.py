@@ -164,6 +164,13 @@ def test_the_email_is_inline_styled_tables_with_a_plain_text_part():
     assert text.strip() and "Morning Brief" in text and bb.words(text) <= bc.WORD_CEILING
 
 
+def test_the_detail_link_is_a_short_label_in_html_and_the_full_url_in_text():
+    view = _view()
+    html, text = _render(view)
+    assert ">See Sunday, November 8 in full on averagejoematt.com</a>" in html and "break-all" not in html
+    assert "https://averagejoematt.com/data/day/" + DAY + "/" in text
+
+
 def test_no_legacy_section_marker_appears_in_the_compact_email():
     html, _ = _render(_view())
     for marker in bb.LEGACY_MARKERS:
@@ -746,7 +753,8 @@ def test_the_compact_email_fits_a_phone_and_a_desktop_without_horizontal_scroll(
                         page.route("**/*", lambda r: r.abort())  # offline: the email loads nothing
                         page.set_content(html, wait_until="domcontentloaded")
                         out[(name, width)] = page.evaluate(
-                            "({h: document.documentElement.scrollHeight, sw: document.documentElement.scrollWidth, w: window.innerWidth})"
+                            "({h: document.documentElement.scrollHeight, sw: document.documentElement.scrollWidth, w: window.innerWidth,"
+                            " link: document.querySelector('[data-detail-link]').getClientRects().length})"
                         )
                         page.close()
             finally:
@@ -755,6 +763,7 @@ def test_the_compact_email_fits_a_phone_and_a_desktop_without_horizontal_scroll(
         pytest.skip(f"chromium unavailable: {e}")
     for (name, width), m in out.items():
         assert m["sw"] <= m["w"], f"{name} at {width}px scrolls sideways: {m}"
+        assert m["link"] <= 2, f"{name} at {width}px: the detail link wraps onto {m['link']} lines"
     assert out[("busy", 390)]["h"] <= bb.HEIGHT_BUDGET_PX, out[("busy", 390)]
     assert out[("quiet", 390)]["h"] <= bb.PHONE_SCREEN_PX, out[("quiet", 390)]
     assert out[("busy", 1280)]["h"] <= out[("busy", 390)]["h"]
