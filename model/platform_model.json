@@ -4273,6 +4273,13 @@
       "via": "pk"
     },
     {
+      "direction": "unknown",
+      "lambda": "life-platform-qa-smoke",
+      "module": "lambdas/operational/qa_smoke_lambda.py",
+      "partition": "qa_predict_dark",
+      "via": "pk"
+    },
+    {
       "direction": "write",
       "lambda": "life-platform-qa-smoke",
       "module": "lambdas/operational/qa_smoke_lambda.py",
