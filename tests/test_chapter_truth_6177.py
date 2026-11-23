@@ -101,8 +101,9 @@ def test_both_schema_halves_declare_published_via():
 
 
 def test_the_switch_is_committed_off_and_reads_fail_closed(tmp_path):
-    assert SW.read_flag(SW.CHAPTER_TRUTH_JS, "CHAPTER_TRUTH_LIVE") is False
-    assert SW.chapter_truth_live() is False
+    # Committed ON (owner approval 2026-11-22); the name is historical. ROLLBACK: set the JS line back to false + rebuild.
+    assert SW.read_flag(SW.CHAPTER_TRUTH_JS, "CHAPTER_TRUTH_LIVE") is True
+    assert SW.chapter_truth_live() is True
     assert SW.chapter_truth_live(str(tmp_path / "missing.js")) is False
     on = tmp_path / "on.js"
     on.write_text("export const CHAPTER_TRUTH_LIVE = true;\n", encoding="utf-8")
@@ -118,7 +119,7 @@ def test_the_rss_channel_line_reads_the_switch_and_is_unchanged_while_off():
     spec = importlib.util.spec_from_file_location("v4_build_rss_6177_truth", os.path.join(_REPO, "scripts", "v4_build_rss.py"))
     rss = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(rss)
-    assert rss.channel_desc() == rss.DESC  # the committed switch is off
+    assert rss.channel_desc() == rss.DESC_TRUE  # the committed switch is on (#6177 activation)
     assert rss.channel_desc(False) == rss.DESC
     on = rss.channel_desc(True)
     assert on == rss.DESC_TRUE and "approves each chapter before it publishes" not in on
