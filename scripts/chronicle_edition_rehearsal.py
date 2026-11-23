@@ -227,6 +227,52 @@ def _screens(paths: list, out: str) -> None:
         srv.shutdown()
 
 
+def live_verify(results: dict, served: dict, out: str, base_url: str, fetch: Optional[Callable[[str], str]] = None) -> None:
+    """The deployed-page verifier itself (``chronicle_edition_verify.verify``), over the LIVE ``/api/chapters`` response —
+    its real shape, retired and skipped weeks with ``"url": null`` included — with the rehearsed editions placed in it,
+    the rehearsal's own built pages and its own feed. The snapshot the build reads is the exporter's view of that
+    response, not the response, so a verifier that crashes on the live shape was invisible to every other check here
+    (#6193: Week 10's first verify exited 3 on a null url)."""
+    import chronicle_edition_verify as V  # noqa: PLC0415
+
+    fetch = fetch or V.http_get
+    try:
+        live = json.loads(fetch(f"{base_url}/api/chapters"))
+    except Exception as exc:  # noqa: BLE001
+        for cid in served:
+            results[cid]["verify"] = f"the live /api/chapters could not be read ({type(exc).__name__})"
+        return
+    live["editions"] = list(served.values())
+
+    def get(url: str) -> str:
+        path = url[len(base_url) :] if url.startswith(base_url) else url
+        if path == "/api/chapters":
+            return json.dumps(live)
+        if path == "/rss.xml":
+            return open(os.path.join(out, "rss.xml"), encoding="utf-8").read()
+        return open(os.path.join(DIST, path.strip("/"), "index.html"), encoding="utf-8").read()
+
+    for cid, e in served.items():
+        a = e.get("archival") or {}
+        try:
+            problems = V.verify(get, cid, e["text_sha256"], archival_sha256=a.get("text_sha256"), base=base_url)
+        except Exception as exc:  # noqa: BLE001 — exactly what the CLI would print as UNREADABLE
+            problems = [f"the verifier crashed on the live response shape ({type(exc).__name__}: {exc})"]
+        if problems:
+            prior = results[cid].get("verify")
+            results[cid]["verify"] = "; ".join(([prior] if prior else []) + problems)
+
+
+def og_card_text(chapter: dict, editions_doc: dict) -> str:
+    """The summary scripts/v9_og_images.py would draw on the chapter's og:image card from this snapshot."""
+    import importlib.util  # noqa: PLC0415
+
+    spec = importlib.util.spec_from_file_location("v9_og_images", os.path.join(REPO, "scripts", "v9_og_images.py"))
+    og = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+    spec.loader.exec_module(og)  # type: ignore[union-attr]
+    return og.card_text(chapter, editions_doc)
+
+
 def rehearse(manifest: list, out: str, base_url: str, log: Callable[[str], None] = print) -> dict:
     import publish_snapshot_chapter_editions as exporter  # noqa: PLC0415
     from chronicle_edition_verify import _dek, _h1  # noqa: PLC0415
@@ -306,6 +352,11 @@ def rehearse(manifest: list, out: str, base_url: str, log: Callable[[str], None]
         problems = CE.verify_page(page, e["text"], e["text_sha256"], dek=_dek(page), h1=_h1(page))
         res["verify"] = "; ".join(problems) or None
         res["surfaces"] = surfaces(DIST, cid, e["summary"], (by_id.get(cid) or {}).get("excerpt"))
+        card = og_card_text(by_id.get(cid) or {}, doc)  # the link-preview image's text, by the same rule (#6193)
+        if card != e["summary"]:
+            res["surfaces"] = "; ".join(
+                x for x in (res["surfaces"], "the og:image card would print another summary than the edition's") if x
+            )
         paths.append(f"/story/{cid}/")
         if e.get("archival"):
             arch_path = os.path.join(DIST, "story", cid, "first-edition", "index.html")
@@ -329,6 +380,7 @@ def rehearse(manifest: list, out: str, base_url: str, log: Callable[[str], None]
         why = f"the feed could not be built ({type(exc).__name__})"
     for res in results.values():
         res["feed"] = why
+    live_verify(results, served, out, base_url)
     try:
         _screens(paths, out)
     except Exception as exc:  # noqa: BLE001
