@@ -325,3 +325,100 @@ def test_the_withdrawal_and_restore_records_never_reach_a_sender():
         for forbidden in ("send_email", "sesv2", ".invoke(", "delivered_at", "delete_item", "delete_object"):
             assert forbidden not in src, f"{path}: {forbidden}"
     assert re.search(r"--verify-restore", open(os.path.join(_REPO, "scripts", "chronicle_edition_backup.py"), encoding="utf-8").read())
+
+
+# ── rehearsal ruling §4: a correction beside the passage it concerns ──────────────────────────
+
+ARCH_TEXT = "A synthetic archive. Day 9 was a sample day of the test, with words.\n\nA second paragraph of the archive, for layout only."
+
+
+def _anchor(correction_id="walk", passage="Day 9 was a sample day", approved=True):
+    a = CE.new_anchor(chapter_id="week-04", correction_id=correction_id, passage=passage, proposed_at="2026-11-22T20:00:00Z")
+    if approved:
+        a["approvals"] = [{"by": CE.APPROVER, "at": "2026-11-22T20:05:00Z", "on": "2026-11-22", "via": "x", "note": ""}]
+    return a
+
+
+def test_an_approved_anchor_rides_on_the_archival_rendering_only_when_its_passage_is_there_once():
+    rows = [_original(), _edition(2), _archival(text=ARCH_TEXT)]
+    (e,) = _view(
+        rows + [_anchor(), _anchor("other", "not anywhere in the archive", True), _anchor("unapproved", "A second paragraph", False)]
+    )
+    assert e["archival"]["anchors"] == [{"correction_id": "walk", "passage": "Day 9 was a sample day"}]
+    with pytest.raises(CE.EditionError):
+        _anchor(passage="short")
+    # the verifier ignores a correction block placed between paragraphs (permitted presentation)
+    page = (
+        "<article><div data-archival-body><div data-published-body><p>A synthetic archive. Day 9 was a sample day of the test, "
+        'with words.</p><aside class="chapter-correction" data-correction="walk"><p>Correction</p></aside>'
+        "<p>A second paragraph of the archive, for layout only.</p></div></div></article>"
+    )
+    assert CE.verify_archival_page(page, ARCH_TEXT) == []
+    assert "correction-beside-passage" in dict(CE.PERMITTED_PRESENTATION)
+
+
+def test_the_build_drops_an_anchor_whose_correction_is_not_approved():
+    import publish_snapshot_chapter_editions as SE
+
+    view = _view([_original(), _edition(2), _archival(text=ARCH_TEXT), _anchor()])
+    pub = {"chapter": [{"id": "week-04", "status": "published", "published_at": "2026-09-11T18:00:00+00:00", "title": TITLE}]}
+    keep = SE.validate(SE.compose({"editions": view}), pub, {"corrections": [{"chapter_id": "week-04", "id": "walk"}]}, log=lambda m: None)
+    assert keep["editions"][0]["archival"]["anchors"][0]["correction_id"] == "walk"
+    drop = SE.validate(SE.compose({"editions": view}), pub, {"corrections": []}, log=lambda m: None)
+    assert drop["editions"][0]["archival"]["anchors"] == []  # the archival page stays; only the placement goes
+
+
+def test_the_tool_places_an_anchor_only_on_his_word_for_an_approved_correction_in_the_archive(tool, monkeypatch):
+    t, table = tool
+    r = _call(t, action="propose_anchor", chapter_id="week-04", correction_id="walk", passage="Day 9 was a sample day")
+    assert r["stored"] and r["approved"] is False
+    assert "exactly true" in _call(t, action="approve_anchor", chapter_id="week-04", correction_id="walk", approved="yes")["error"]
+    monkeypatch.setattr(t.CC, "public_view", lambda rows: [])
+    assert (
+        "not an approved correction"
+        in _call(t, action="approve_anchor", chapter_id="week-04", correction_id="walk", approved=True)["error"]
+    )
+    monkeypatch.setattr(t.CC, "public_view", lambda rows: [{"chapter_id": "week-04", "id": "walk"}])
+    assert "carries this passage" in _call(t, action="approve_anchor", chapter_id="week-04", correction_id="walk", approved=True)["error"]
+    table.put_item(Item=_archival(text=ARCH_TEXT, approved_at=None))
+    ok = _call(t, action="approve_anchor", chapter_id="week-04", correction_id="walk", approved=True)
+    assert ok["approved"] is True
+    assert "already approved" in _call(t, action="approve_anchor", chapter_id="week-04", correction_id="walk", approved=True)["error"]
+
+
+# ── rehearsal ruling §9: the rehearsal's own checks ───────────────────────────────────────────
+
+
+def test_the_rehearsal_withdrawal_simulation_and_table():
+    import chronicle_edition_rehearsal as R
+
+    rows = {
+        "week-04": R.records({"chapter": "week-04", "carries": []}, TEXT, None, "2026-09-11", "2026-11-23"),
+        "week-05": R.records({"chapter": "week-05", "carries": []}, TEXT, None, "2026-09-18", "2026-11-23"),
+    }
+    assert R.simulate_withdrawal(rows, "week-04", "2026-11-23") is None  # withdrawn alone, others kept, re-approval serves
+    assert "not served" in R.simulate_withdrawal(
+        {"week-04": [r for r in rows["week-04"] if r["record_type"] != CE.RESTORE_TYPE]}, "week-04", "2026-11-23"
+    )
+    t = R.table(
+        {"week-04": {**{c: None for c in R.CHECKS}, "archive": "n/a"}, "week-05": {**{c: None for c in R.CHECKS}, "title": "renamed"}}
+    )
+    assert "| week-04 | PASS |" in t and "| week-05 | BLOCKED |" in t and "BLOCKED: renamed" in t
+    src = open(os.path.join(_REPO, "scripts", "chronicle_edition_rehearsal.py"), encoding="utf-8").read()
+    for forbidden in ("put_item", "update_item", "put_object", "safe_sync", "create_invalidation", "--apply"):
+        assert forbidden not in src, forbidden
+
+
+def test_the_rehearsal_surface_check_finds_a_first_edition_summary_left_behind(tmp_path):
+    import chronicle_edition_rehearsal as R
+
+    (tmp_path / "story" / "week-04").mkdir(parents=True)
+    (tmp_path / "story" / "index.html").write_text("<p>The edition's own summary line.</p>")
+    page = '<meta property="og:description" content="The edition\'s own summary line."><p class="dek">The edition\'s own summary line.</p>'
+    (tmp_path / "story" / "week-04" / "index.html").write_text(page)
+    assert R.surfaces(str(tmp_path), "week-04", "The edition's own summary line.", "An older summary of the first edition.") is None
+    (tmp_path / "story" / "moments").mkdir()
+    (tmp_path / "story" / "moments" / "index.html").write_text("<p>An older summary of the first edition.</p>")
+    assert "still shows the first edition's summary" in R.surfaces(
+        str(tmp_path), "week-04", "The edition's own summary line.", "An older summary of the first edition."
+    )

@@ -314,9 +314,11 @@ def _read_editions() -> list:
 
 
 def _is_tainted(text: str) -> bool:
-    from web import narrative_publication  # noqa: PLC0415 — the request's complete withheld-call record (#6111)
+    """The withheld graded record (#6111) OR a withheld coach output's words (#6193, ``web.withheld_outputs``); raises when
+    either cannot be read, and the edition gate then withholds (fail closed)."""
+    from web import narrative_publication, withheld_outputs  # noqa: PLC0415
 
-    return narrative_publication.is_tainted(text)
+    return narrative_publication.is_tainted(text) or withheld_outputs.matcher(withheld_outputs.load(table))(text)
 
 
 _CALLS_CACHE: dict = {"at": None, "calls": None}

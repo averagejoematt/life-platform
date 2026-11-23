@@ -35,6 +35,12 @@ sk family ``CHAPTER_EDITION#<chapter_id>#…`` (``chapter_id`` = the v9 id, ``we
                           ``first-edition`` page for that chapter. An optional ``as_of`` day says when the text it renders
                           stood (a chapter rewritten after it was first published), so the fixed note never calls a later
                           rewrite "the first edition".
+  ``…#anchor#<correction>`` an ANCHOR (``record_type: chapter_edition_anchor``): the owner-approved passage of the
+                          archival text an approved correction concerns (its exact opening words). The archival page
+                          prints that correction beside the passage instead of only above the text (rehearsal ruling §4:
+                          "displayed beside or directly linked to the erroneous passage"). A separate record, so the
+                          approved correction and the live corrections API are never changed; served only inside an
+                          archival rendering whose text carries the passage exactly once.
   ``<target>#withdrawn``  a WITHDRAWAL (``record_type: chapter_edition_withdrawal``) of one approved edition or one
                           approved archival rendering: the owner's dated act, appended, never inferred. From then on that
                           record — and every earlier one of its kind for the chapter — never serves: the chapter serves its
@@ -111,7 +117,20 @@ PUBLIC_FIELDS = (
     "body_html",
     "archival",
 )
-PUBLIC_ARCHIVAL_FIELDS = ("archival_id", "approved_on", "as_of", "title", "note", "signature", "text_sha256", "text", "body_html")
+PUBLIC_ARCHIVAL_FIELDS = (
+    "archival_id",
+    "approved_on",
+    "as_of",
+    "title",
+    "note",
+    "signature",
+    "text_sha256",
+    "text",
+    "body_html",
+    "anchors",
+)
+ANCHOR_TYPE = "chapter_edition_anchor"
+MIN_PASSAGE, MAX_PASSAGE = 12, 400
 WITHDRAWAL_TYPE = "chapter_edition_withdrawal"
 RESTORE_TYPE = "chapter_edition_restore_check"
 WITHDRAWAL_KINDS = ("edition", "archival")
@@ -125,6 +144,11 @@ PERMITTED_PRESENTATION = (
     ("data-record-as-published", "the dated coach-record note placed between paragraphs (www/src/lib/record_note.js)"),
     ("dek-duplicate", "a first signature line or first paragraph identical to the header dek, printed once in the header"),
     ("signature-class", "the `note` / `filed` class on an emphasised signature line (a class, not a word)"),
+    (
+        "correction-beside-passage",
+        "on the archival page, an approved correction (the platform's signed block, data-correction) placed between paragraphs, "
+        "directly after the paragraph that carries the passage its owner-approved anchor names",
+    ),
     (
         "title-line",
         "the text's first line, the chapter's title in quotation marks, printed once as the page heading (h1) — never in the "
@@ -191,24 +215,32 @@ def archival_signature(approved_on: str) -> str:
     return f"Archival rendering, approved {CC.day_words(approved_on)} — {PLATFORM_SIGNATURE}"
 
 
-def archival_note(first_published: str, revised_on: str, as_of: Optional[str] = None) -> str:
-    """The archival page's one note. It says what the page is and where the current text is — and nothing about what the
-    rendering leaves out: no count, no wording, no identity (owner ruling 2026-11-22 §3). One fixed sentence set, so no
-    proposal can carry a description of a removed passage onto the page. With ``as_of`` (the rendering's text is the
-    chapter as it stood on a later day — a rewrite) it names that day and never calls the text "the first edition"; every
-    date in it is a recorded one."""
+#: The archival page's label and its short note — the owner's exact words (owner ruling 2026-11-22, final chronicle
+#: publication §5); www/src/lib/chapter_editions.js ARCHIVAL_LABEL is pinned equal. The note says that limited removals
+#: exist and never what was removed or how much.
+ARCHIVAL_LABEL = "Historical edition — privacy-safe rendering"
+ARCHIVAL_NOTE = (
+    "This page preserves the historical edition with limited removals for privacy or source verification. "
+    "The original version is retained privately."
+)
+
+
+def archival_dates(first_published: str, revised_on: str, as_of: Optional[str] = None) -> str:
+    """The archival page's date line, from recorded dates only ("Keep the true historical date and edition identity"): the
+    first edition and its first-publication day — or (``as_of``) the text as it stood on a later day — and the edition
+    that superseded it."""
     if as_of:
         return (
-            f"This is an archival rendering of the text of this chapter as it stood on {CC.day_words(as_of)}, before the "
-            f"{CC.day_words(revised_on)} edition. The chapter was first published {CC.day_words(first_published)}. It is kept "
-            "for the historical record and is not the current text. It was prepared for public reading and may not reproduce "
-            "that text in full. The current edition is at the chapter's own address."
+            f"The text of this chapter as it stood on {CC.day_words(as_of)}; the chapter was first published "
+            f"{CC.day_words(first_published)}. Superseded by the edition of {CC.day_words(revised_on)}."
         )
-    return (
-        f"This is an archival rendering of the chapter's first edition, first published {CC.day_words(first_published)}. "
-        "It is kept for the historical record and is not the current text. It was prepared for public reading and may not "
-        f"reproduce the first edition in full. The current edition, revised {CC.day_words(revised_on)}, is at the chapter's own address."
-    )
+    return f"The first edition, first published {CC.day_words(first_published)}. Superseded by the edition of {CC.day_words(revised_on)}."
+
+
+def archival_note(first_published: str, revised_on: str, as_of: Optional[str] = None) -> str:
+    """The archival page's one fixed note: the owner's words, then the recorded dates (``archival_dates``). No proposal
+    can carry a description of a removed passage onto the page — the note takes no free text from any record."""
+    return f"{ARCHIVAL_NOTE} {archival_dates(first_published, revised_on, as_of)}"
 
 
 def archive_path(chapter_id: str) -> str:
@@ -688,7 +720,62 @@ def _public_approvals(item: dict) -> list:
     return [{"by": a["by"], "on": a.get("on") or str(a["at"])[:10], "via": a.get("via") or CC.APPROVED_VIA} for a in item["approvals"]]
 
 
-def _archival_out(a: dict, served: dict) -> dict:
+# ── anchors (rehearsal ruling §4): a correction beside the passage it concerns ────────────────
+
+
+def sk_anchor(chapter_id: str, correction_id: str) -> str:
+    return f"{SK_PREFIX}{chapter_id}#anchor#{correction_id}"
+
+
+def _passage(value: Any) -> str:
+    v = " ".join(str(value or "").split())
+    if not MIN_PASSAGE <= len(v) <= MAX_PASSAGE or "<" in v:
+        raise EditionError(f"passage: the exact opening words of the passage, {MIN_PASSAGE} to {MAX_PASSAGE} characters, no markup")
+    return v
+
+
+def new_anchor(*, chapter_id: str, correction_id: str, passage: str, proposed_at: str, user_id: str = CC.USER_ID_DEFAULT) -> dict:
+    """An anchor, unapproved: which passage of the chapter's archival text an approved correction concerns."""
+    chapter_id = _chapter(chapter_id)
+    if not CC.CORRECTION_ID.match(str(correction_id or "")):
+        raise EditionError("correction_id must be an approved correction's id")
+    if not ISO_INSTANT.match(str(proposed_at or "")):
+        raise EditionError("proposed_at must be an ISO-8601 instant")
+    item = _base(chapter_id, sk_anchor(chapter_id, correction_id), ANCHOR_TYPE, user_id)
+    item.update(correction_id=correction_id, passage=_passage(passage), proposed_at=proposed_at, proposed_via=PROPOSED_VIA, approvals=[])
+    return item
+
+
+def validate_anchor(item: Any) -> dict:
+    if not isinstance(item, dict) or item.get("record_type") != ANCHOR_TYPE:
+        raise EditionError("not an anchor record")
+    cid = _chapter(item.get("chapter_id"))
+    if item.get("sk") != sk_anchor(cid, str(item.get("correction_id"))):
+        raise EditionError("ids do not match the record's key")
+    _passage(item.get("passage"))
+    a = item.get("approvals")
+    if not isinstance(a, list) or not a or any(not isinstance(x, dict) or x.get("by") != APPROVER for x in a):
+        raise EditionError("not approved: an anchor is placed only on the owner's approval")
+    return item
+
+
+def _words(text: str) -> str:
+    t = str(text or "").replace("’", "'").replace("‘", "'").replace("“", '"').replace("”", '"')
+    return " ".join(t.split())
+
+
+def placed_anchors(anchors: Iterable[dict], body_text: str) -> list:
+    """The anchors whose passage the rendered archival body carries EXACTLY once (a missing or repeated passage could
+    put a correction beside the wrong words: it is left at the top of the page instead)."""
+    plain = _words(plain_text(render_html(body_text)))
+    out = []
+    for a in sorted(anchors, key=lambda a: str(a.get("correction_id"))):
+        if plain.count(_words(a["passage"])) == 1:
+            out.append({"correction_id": a["correction_id"], "passage": " ".join(str(a["passage"]).split())})
+    return out
+
+
+def _archival_out(a: dict, served: dict, anchors: Iterable[dict] = ()) -> dict:
     p = presentation(a["text"], edition=False)
     return {
         "archival_id": a["archival_id"],
@@ -700,10 +787,11 @@ def _archival_out(a: dict, served: dict) -> dict:
         "text_sha256": a["text_sha256"],
         "text": a["text"],
         "body_html": render_html(p["body"]),
+        "anchors": placed_anchors(anchors, p["body"]),
     }
 
 
-def _edition_out(served: dict, archival: Optional[dict]) -> dict:
+def _edition_out(served: dict, archival: Optional[dict], anchors: Iterable[dict] = ()) -> dict:
     p = presentation(served["text"])
     return {
         "chapter_id": served["chapter_id"],
@@ -720,7 +808,7 @@ def _edition_out(served: dict, archival: Optional[dict]) -> dict:
         "text_sha256": served["text_sha256"],
         "text": served["text"],
         "body_html": render_html(p["body"]),
-        "archival": None if archival is None else _archival_out(archival, served),
+        "archival": None if archival is None else _archival_out(archival, served, anchors),
     }
 
 
@@ -729,6 +817,7 @@ def _sorted_records(items: Iterable[Any], say: Callable[[str], None]) -> tuple:
     editions: dict = {}
     archivals: dict = {}
     restores: dict = {}
+    anchors: dict = {}
     for it in items or []:
         if not isinstance(it, dict) or not str(it.get("sk") or "").startswith(SK_PREFIX):
             continue
@@ -744,6 +833,9 @@ def _sorted_records(items: Iterable[Any], say: Callable[[str], None]) -> tuple:
             elif kind == ARCHIVAL_TYPE and it.get("approvals"):
                 a = validate_archival(it)
                 archivals.setdefault(a["chapter_id"], []).append(a)
+            elif kind == ANCHOR_TYPE and it.get("approvals"):
+                x = validate_anchor(it)
+                anchors.setdefault(x["chapter_id"], []).append(x)
         except (EditionError, KeyError, TypeError, ValueError) as exc:
             say(f"[chapter-editions] {it.get('sk')} withheld: {exc}")
     for cid, original in list(originals.items()):
@@ -752,7 +844,7 @@ def _sorted_records(items: Iterable[Any], say: Callable[[str], None]) -> tuple:
         except (EditionError, KeyError, TypeError) as exc:
             say(f"[chapter-editions] {cid}: {exc} — every edition withheld")
             del originals[cid]
-    return originals, editions, archivals
+    return originals, editions, archivals, anchors
 
 
 def public_view(
@@ -773,7 +865,7 @@ def public_view(
     chapter's first publication and the edition's revision is held."""
     say = log or (lambda _m: None)
     item_list = list(items or [])
-    originals, editions, archivals = _sorted_records(item_list, say)
+    originals, editions, archivals, anchors = _sorted_records(item_list, say)
     gone = withdrawals(item_list, say)
     gate = lambda t: gate_findings(t, tainted=tainted, private_calls=private_calls, filter_hits=filter_hits)  # noqa: E731
     out = []
@@ -809,7 +901,7 @@ def public_view(
             if not fits and references_archive(e["text"], cid):
                 say(f"[chapter-editions] {e['sk']} held: its text points at {archive_path(cid)} and no archival rendering is served")
                 continue
-            out.append(_edition_out(e, fits[0] if fits else None))
+            out.append(_edition_out(e, fits[0] if fits else None, anchors.get(cid, [])))
             break
     return out
 
@@ -830,7 +922,7 @@ def prose_blocks(body_html: str) -> list:
     """The prose of a rendered body, block by block (each ``<p>`` / ``<blockquote>``), words normalised. A block inside a
     permitted presentation element (``data-evidence``, ``data-record-as-published``) is not prose and is dropped."""
     h = str(body_html or "")
-    for marker in ("data-evidence", "data-record-as-published"):
+    for marker in ("data-evidence", "data-record-as-published", "data-correction"):
         while True:
             m = re.search(r"<(figure|aside|p)\b[^>]*\b" + marker + r"\b[^>]*>", h)
             if not m:

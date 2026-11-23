@@ -67,8 +67,20 @@ function textBelow(c, edition) {
   return carried ? "The text below is a later edition, and it makes this correction." : "It was made to the first edition; the text below is a later edition.";
 }
 
-/** One correction as an HTML block, every value escaped. A replaced one says what replaced it. */
+/** One correction as an HTML block, every value escaped. A replaced one says what replaced it. #6193: a replaced one whose
+ *  statement text the owner withheld (`text_withheld`) keeps its signature and date and says only that it was replaced. */
 export function correctionHtml(c, all = [], edition = null) {
+  if (c && c.text_withheld === true && c.superseded_by) {
+    const word = c.kind === "qualification" ? "qualification" : "correction";
+    const by = all.find((x) => x.id === c.superseded_by);
+    return (
+      `<aside class="chapter-correction replaced" data-correction="${esc(c.id)}" data-kind="${esc(c.kind)}" data-text-withheld>` +
+      `<p class="label correction-signature">${esc(c.signature)}</p>` +
+      `<p class="correction-replaced" data-correction-replaced>A ${word} dated ${esc(dayInWords(c.dated_on))} was replaced by the ${esc(by ? by.kind : "correction")} above.</p>` +
+      `<p class="correction-foot">${esc(approvalWords(c))}</p>` +
+      `</aside>`
+    );
+  }
   const by = c.superseded_by ? all.find((x) => x.id === c.superseded_by) : null;
   const replaced = c.superseded_by
     ? `<p class="correction-replaced" data-correction-replaced>Replaced by the ${esc(by ? by.kind : "correction")}${by ? ` of ${esc(dayInWords(by.dated_on))}` : ""}. Kept here as it was published.</p>`
@@ -88,4 +100,44 @@ export function correctionHtml(c, all = [], edition = null) {
  *  served later edition, if any — only the foot's last sentence changes. */
 export function correctionsHtml(corrections, edition = null) {
   return (corrections || []).map((c) => correctionHtml(c, corrections, edition)).join("");
+}
+
+// For COMPARING only (never emitted): tags stripped until none is left.
+const untag = (x) => {
+  let prev;
+  let out = String(x ?? "");
+  do {
+    prev = out;
+    out = out.replace(/<[^>]*>/g, " ");
+  } while (out !== prev);
+  return out;
+};
+const words = (x) =>
+  untag(x)
+    .replace(/&#39;|&#x27;|&rsquo;|&lsquo;|[’‘]/g, "'")
+    .replace(/&quot;|&ldquo;|&rdquo;|[“”]/g, '"')
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** #6193 (rehearsal ruling §4): on the archival page, each correction with an owner-approved anchor is printed directly
+ *  after the paragraph that carries its passage (the platform's signed block, as above the text — never mistakable for a
+ *  note of the time), with one line saying which passage it concerns. Returns `{ html, placed }`: the body with the blocks
+ *  placed, and the ids placed (the page prints the rest above the text). A passage not found in exactly one paragraph is
+ *  not placed. */
+export function placeBeside(bodyHtml, anchors, corrections, edition = ARCHIVAL_PAGE) {
+  let html = String(bodyHtml || "");
+  const placed = [];
+  for (const a of anchors || []) {
+    const c = (corrections || []).find((x) => x.id === a.correction_id);
+    if (!c) continue;
+    const blocks = [...html.matchAll(/<(p|blockquote)\b[^>]*>[\s\S]*?<\/\1>/g)].filter((m) => words(m[0]).includes(words(a.passage)));
+    if (blocks.length !== 1) continue;
+    const end = blocks[0].index + blocks[0][0].length;
+    const lead = `<p class="correction-foot" data-correction-anchor>This ${c.kind === "qualification" ? "qualification" : "correction"} concerns the passage above, beginning “${esc(a.passage)}”</p>`;
+    const block = correctionHtml(c, corrections, edition).replace(/^<aside class="chapter-correction/, '<aside style="margin:18px 0" data-anchored class="chapter-correction').replace(/<\/aside>$/, `${lead}</aside>`);
+    html = html.slice(0, end) + block + html.slice(end);
+    placed.push(c.id);
+  }
+  return { html, placed };
 }

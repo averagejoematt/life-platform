@@ -76,7 +76,12 @@ MCC_DESCRIPTION = (
     "approved=true (or 'withdraw_archival' chapter_id, archival_id, approved=true) — ONLY after Matthew explicitly asked to "
     "withdraw it: that chapter serves its first edition again, others untouched, a re-approval is a new number. Every text "
     "passes the publication gates (content filter, private calls, truth checks) at proposal and approval. No feed item, no "
-    "new date, no mail."
+    "new date, no mail. 'propose_anchor' chapter_id, correction_id (an approved correction), passage (the exact opening "
+    "words of the passage in the chapter's archival rendering), then 'approve_anchor' chapter_id, correction_id, approved=true: "
+    "the archival page prints that correction beside the passage; the correction itself is unchanged. "
+    "'withhold_correction_text' chapter_id, correction_id, approved=true — ONLY on Matthew's explicit word, and only for a "
+    "SUPERSEDED correction: its statement text stops being shown (signature, date and 'replaced' stay); nothing is edited "
+    "or deleted. A new correction's text is refused if it restates a call or coach output the policy keeps private."
 )
 
 MCC_INPUT = {
@@ -95,11 +100,17 @@ MCC_INPUT = {
                 "approve_archival",
                 "withdraw_edition",
                 "withdraw_archival",
+                "propose_anchor",
+                "approve_anchor",
+                "withhold_correction_text",
             ],
             "description": "Corrections: list, propose, approve. Second editions (#6193): list_editions, propose/approve/withdraw_edition, propose/approve/withdraw_archival.",
         },
         "chapter_id": {"type": "string", "description": "The chapter's v9 id (week-NN, as in /story/week-NN/)."},
-        "correction_id": {"type": "string", "description": "propose/approve: the correction's id (lowercase letters, digits, hyphens)."},
+        "correction_id": {
+            "type": "string",
+            "description": "propose/approve (and propose/approve_anchor): the correction's id (lowercase letters, digits, hyphens).",
+        },
         "kind": {"type": "string", "enum": ["correction", "qualification"], "description": "propose: correction or qualification."},
         "published_said": {"type": "string", "description": "propose: what the chapter published, in one or two sentences."},
         "record_shows": {"type": "string", "description": "propose: what the record shows, in one or two sentences."},
@@ -115,6 +126,10 @@ MCC_INPUT = {
             "description": "propose_edition/approve_edition: the edition number, 2-9 (the published chapter is the first).",
         },
         "archival_id": {"type": "integer", "description": "propose/approve/withdraw_archival: the rendering's number, 1-99."},
+        "passage": {
+            "type": "string",
+            "description": "propose_anchor: the exact opening words of the archival text's passage an approved correction concerns.",
+        },
         "as_of": {
             "type": "string",
             "description": "propose_archival: optional YYYY-MM-DD the rendered text stood, when it is not the first edition (a rewrite).",
@@ -152,6 +167,8 @@ def _listing(rows: list) -> dict:
     items = []
     for r in sorted(rows, key=lambda r: str(r.get("sk"))):
         key = (r.get("chapter_id"), r.get("correction_id"))
+        if r.get("record_type") == CC.TEXT_WITHHELD_TYPE:  # #6193: shown on its correction, not as a row of its own
+            continue
         items.append(
             {
                 "chapter_id": r.get("chapter_id"),
@@ -167,6 +184,7 @@ def _listing(rows: list) -> dict:
                 "signature": r.get("signature"),
                 "renders": key in public,
                 "superseded_by": (public.get(key) or {}).get("superseded_by"),
+                "text_withheld": bool((public.get(key) or {}).get("text_withheld")),
             }
         )
     return {"corrections": items, "count": len(items), "rendering": len(public)}
@@ -187,6 +205,12 @@ def _propose(args: dict) -> dict:
         )
     except CC.CorrectionError as exc:
         return {"error": f"{exc}. Nothing was stored."}
+    withheld = _withheld_words(item)
+    if withheld:
+        return {
+            "error": "the correction's text carries words the publication policy keeps private. Nothing was stored.",
+            "findings": withheld,
+        }
     if item["supersedes"]:
         prior = _table_ref.get_item(Key={"pk": item["pk"], "sk": CC.sk(item["chapter_id"], item["supersedes"])}).get("Item")
         if not prior:
@@ -201,6 +225,61 @@ def _propose(args: dict) -> dict:
         logger.warning(f"[#6177] correction proposal write failed: {type(exc).__name__}")
         return {"error": f"the proposal could not be stored ({type(exc).__name__}). Nothing was stored."}
     return {"stored": True, "approved": False, "renders": False, "chapter_id": item["chapter_id"], "correction_id": item["correction_id"]}
+
+
+def _withheld_words(item: dict) -> list:
+    """#6193: a correction's own statement never restates a withheld call or a withheld coach output — the same two checks
+    the edition gate runs (the withheld graded record OR withheld outputs, and the private-call policy). Fail closed: an
+    unreadable record refuses the proposal."""
+    tainted, calls = _tainted(), _private_calls()
+    out: list = []
+    if tainted is None:
+        out.append("private-call: the publication record could not be opened — nothing is proposed unchecked")
+    for f in CC.STATEMENT_TEXT_FIELDS:
+        text = str(item.get(f) or "")
+        try:
+            if tainted is not None and (tainted(text) or any(tainted(p) for p in text.split(". ") if p.strip())):
+                out.append(f"{f}: carries the words of a call or coach output that is not public")
+        except Exception as exc:  # noqa: BLE001
+            out.append(f"{f}: the publication record could not be read ({type(exc).__name__})")
+        out += [f"{f}: {x}" for x in private_call_check.findings(text, calls)]
+    return out
+
+
+def _withhold_text(args: dict) -> dict:
+    """#6193: Matthew's appended record that a SUPERSEDED correction's statement is not shown publicly (its audit trail
+    stays: the record is never edited or deleted). ``approved`` exactly true; refused for a correction not superseded."""
+    if args.get("approved") is not True:
+        return {
+            "error": "approved must be exactly true, given only after Matthew explicitly asked to withhold this text. Nothing was stored."
+        }
+    chapter_id, correction_id = str(args.get("chapter_id") or "").strip(), str(args.get("correction_id") or "").strip()
+    try:
+        item = CC.new_text_withheld(
+            chapter_id=chapter_id, correction_id=correction_id, at=_now(), dated_on=pacific_today(), note=str(args.get("note") or "")
+        )
+    except CC.CorrectionError as exc:
+        return {"error": f"{exc}. Nothing was stored."}
+    public = {c["id"]: c for c in CC.public_view(_rows(chapter_id)) if c["chapter_id"] == chapter_id}
+    if correction_id not in public:
+        return {"error": f"{correction_id} is not an approved correction of {chapter_id}. Nothing was stored."}
+    if not public[correction_id].get("superseded_by"):
+        return {"error": f"{correction_id} is not superseded; only a replaced correction's text can be withheld. Nothing was stored."}
+    try:
+        _table_ref.put_item(Item=item, ConditionExpression="attribute_not_exists(sk)")
+    except Exception as exc:  # noqa: BLE001
+        if "ConditionalCheckFailed" in str(exc) or "ConditionalCheckFailed" in type(exc).__name__:
+            return {"error": f"the text of {correction_id} is already withheld; records are append-only. Nothing was stored."}
+        logger.warning(f"[#6193] text-withheld write failed: {type(exc).__name__}")
+        return {"error": f"the record could not be stored ({type(exc).__name__}). Nothing was stored."}
+    return {
+        "stored": True,
+        "chapter_id": chapter_id,
+        "correction_id": correction_id,
+        "withheld_on": item["withheld_on"],
+        "superseded_by": public[correction_id]["superseded_by"],
+        "note": "from the next Site API read and site build the replaced correction shows only its signature, date and that it was replaced",
+    }
 
 
 def _approve(args: dict) -> dict:
@@ -252,15 +331,17 @@ def _edition_rows(chapter_id: str | None = None) -> list:
 
 
 def _tainted():
-    """``web.narrative_publication.is_tainted`` over the complete withheld-call record, read now — or None when that record
-    cannot be read (the gates then refuse: nothing is proposed or approved unchecked)."""
+    """``web.narrative_publication.is_tainted`` over the complete withheld-call record, read now, OR'd with the words of
+    every coach output row the provenance policy withholds (``web.withheld_outputs``, #6193) — or None when either cannot
+    be read (the gates then refuse: nothing is proposed or approved unchecked)."""
     try:
-        from web import narrative_publication as NPub, publication_snapshot as PS  # noqa: PLC0415
+        from web import narrative_publication as NPub, publication_snapshot as PS, withheld_outputs as WO  # noqa: PLC0415
 
         NPub.begin_request()
         PS.begin_request(_table_ref)
         PS.complete()
-        return NPub.is_tainted
+        WO.load(_table_ref)
+        return WO.with_outputs(NPub.is_tainted, _table_ref)
     except Exception as exc:  # noqa: BLE001
         logger.warning(f"[#6193] publication record unreadable: {type(exc).__name__}")
         return None
@@ -581,6 +662,7 @@ def _list_editions(chapter_id: str | None) -> dict:
                     CE.ORIGINAL_TYPE: "first-edition evidence",
                     CE.WITHDRAWAL_TYPE: f"withdrawal of {r.get('kind')}",
                     CE.RESTORE_TYPE: "restore rehearsal (passed)",
+                    CE.ANCHOR_TYPE: f"anchor of {r.get('correction_id')}",
                 }.get(kind, kind),
                 "number": n,
                 "first_published": r.get("first_published"),
@@ -599,6 +681,56 @@ def _list_editions(chapter_id: str | None) -> dict:
     return {"switch_live": CE.LIVE, "records": items, "count": len(items), "chapters_with_an_edition": sorted(served)}
 
 
+def _propose_anchor(args: dict) -> dict:
+    """Rehearsal ruling §4: which passage of the archival text an approved correction concerns — a separate record."""
+    try:
+        item = CE.new_anchor(
+            chapter_id=str(args.get("chapter_id") or "").strip(),
+            correction_id=str(args.get("correction_id") or "").strip(),
+            passage=args.get("passage"),
+            proposed_at=_now(),
+            user_id=USER_ID,
+        )
+    except CE.EditionError as exc:
+        return {"error": f"{exc}. Nothing was stored."}
+    err = _put_once(item, f"the anchor of {item['correction_id']} on {item['chapter_id']}")
+    if err:
+        return err
+    return {
+        "stored": True,
+        "approved": False,
+        "chapter_id": item["chapter_id"],
+        "correction_id": item["correction_id"],
+        "passage": item["passage"],
+    }
+
+
+def _approve_anchor(args: dict) -> dict:
+    if args.get("approved") is not True:
+        return {"error": "approved must be exactly true, given only after Matthew explicitly approved this placement. Nothing was stored."}
+    chapter_id, correction_id = str(args.get("chapter_id") or "").strip(), str(args.get("correction_id") or "").strip()
+    if not CE.CHAPTER_ID.match(chapter_id) or not CC.CORRECTION_ID.match(correction_id):
+        return {"error": "chapter_id (week-NN) and correction_id are required. Nothing was stored."}
+    key = {"pk": CE.pk(USER_ID), "sk": CE.sk_anchor(chapter_id, correction_id)}
+    item = _table_ref.get_item(Key=key, ConsistentRead=True).get("Item")
+    if not item or item.get("record_type") != CE.ANCHOR_TYPE:
+        return {"error": f"no proposed anchor of {correction_id} on {chapter_id}. Nothing was stored."}
+    if item.get("approvals"):
+        return {"error": f"the anchor of {correction_id} on {chapter_id} is already approved. Nothing was stored."}
+    if correction_id not in {c["id"] for c in CC.public_view(_rows(chapter_id)) if c["chapter_id"] == chapter_id}:
+        return {"error": f"{correction_id} is not an approved correction of {chapter_id}. Nothing was stored."}
+    texts = [r.get("text") for r in _edition_rows(chapter_id) if r.get("record_type") == CE.ARCHIVAL_TYPE]
+    if not any(CE.placed_anchors([item], CE.presentation(t, edition=False)["body"]) for t in texts if isinstance(t, str)):
+        return {"error": f"no archival rendering of {chapter_id} carries this passage exactly once. Nothing was stored."}
+    entry = CC.approval(at=_now(), dated_on=pacific_today(), note=str(args.get("note") or ""))
+    err = _approve_once(
+        key, "approved_at = :at, approved_on = :d", {":a": [entry], ":at": entry["at"], ":d": entry["on"]}, f"the anchor of {correction_id}"
+    )
+    if err:
+        return err
+    return {"stored": True, "approved": True, "chapter_id": chapter_id, "correction_id": correction_id, "renders": CE.LIVE}
+
+
 def tool_manage_chapter_corrections(args):
     """List, propose or approve a dated public correction to a published chapter — or (#6193) a second edition of one."""
     args = args or {}
@@ -610,6 +742,9 @@ def tool_manage_chapter_corrections(args):
         "approve_archival": _approve_archival,
         "withdraw_edition": lambda a: _withdraw(a, "edition"),
         "withdraw_archival": lambda a: _withdraw(a, "archival"),
+        "withhold_correction_text": _withhold_text,
+        "propose_anchor": _propose_anchor,
+        "approve_anchor": _approve_anchor,
     }
     if action in editions:
         return editions[action](args)
@@ -628,5 +763,5 @@ def tool_manage_chapter_corrections(args):
     if action == "approve":
         return _approve(args)
     return {
-        "error": f"unknown action {action!r}: list, propose, approve, list_editions, propose_edition, approve_edition, withdraw_edition, propose_archival, approve_archival or withdraw_archival."
+        "error": f"unknown action {action!r}: list, propose, approve, list_editions, propose_edition, approve_edition, withdraw_edition, propose_archival, approve_archival, withdraw_archival, propose_anchor, approve_anchor or withhold_correction_text."
     }

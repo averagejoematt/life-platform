@@ -795,6 +795,38 @@ the body. The one rule for which summary a surface shows is `www/src/lib/chapter
 the same order. `chronicle_edition_verify.py` rebuilds the text from the DEPLOYED heading, header summary and the served
 body, checks its SHA-256 against the approved hash, and checks the page's body prose block for block.
 
+**The archival page's words (owner ruling 2026-11-22, final chronicle publication §5).** The label is "Historical edition —
+privacy-safe rendering"; the note is "This page preserves the historical edition with limited removals for privacy or
+source verification. The original version is retained privately.", followed by the recorded dates (first edition and
+first publication, or the day an `as_of` text stood, and the edition that superseded it). Both are fixed platform words
+(`content.chapter_editions.ARCHIVAL_LABEL` / `archival_note`); nothing on the page says what was removed or how much.
+
+**Withholding a replaced correction's text (#6193).** When a SUPERSEDED correction's own statement restates material
+the policy withholds, on his explicit word: `action=withhold_correction_text`, `chapter_id`, `correction_id`,
+`approved=true`. It appends `CHAPTER_CORRECTION#<id>#<correction>#text-withheld`; the correction record is never edited
+or deleted. From the next Site API read and site build the replaced correction shows only its signature, its date and
+"A correction dated <day> was replaced by the correction above." Refused for a correction that is not superseded. A new
+correction's proposal is refused if its text restates a withheld call or coach output (fail closed).
+
+**A correction beside its passage (rehearsal §4).** On his word, `action=propose_anchor` (`chapter_id`, `correction_id`
+of an APPROVED correction, `passage` = the exact opening words of the passage in the chapter's archival rendering), then
+`action=approve_anchor` (`approved=true`; refused unless the correction is approved and an archival rendering carries
+the passage exactly once). The archival page prints that correction, in the platform's signed block, directly after the
+paragraph that carries the passage, with "This correction concerns the passage above, beginning “…”"; corrections with
+no anchor stay above the text. The correction record and the live corrections API are unchanged.
+
+**Withheld coach outputs (#6193).** The edition gate also refuses a text that is, or carries a six-word run of, a coach
+output row (`COACH#…`/`OUTPUT#…`) the narrative-provenance policy withholds (`lambdas/web/withheld_outputs.py`; read whole,
+cached 15 min, fail closed). The Site API's wire scrub is unchanged.
+
+**Rehearse the whole release first (rehearsal §9).** Read-only; one table, PASS or BLOCKED with the reason per check
+(gates, title, hash, backup + restore path, build holds, verify, summary surfaces, feed items, archive, withdrawal):
+```bash
+python3 scripts/chronicle_edition_rehearsal.py --manifest <private>/editions.json --out <private dir>
+```
+The manifest lists `{chapter, row_sk, text_file, sha256 (the stored text's), carries, archival_file?, archival_as_of?}`.
+`www/dist` is then a rehearsal build — never deploy it.
+
 **Withdrawing one edition (rehearsal §6, B7).** The global switch stays; it is no longer the only rollback. Only on his
 explicit word: `action=withdraw_edition`, `chapter_id`, `edition`, `approved=true` (or `withdraw_archival`, `archival_id`)
 appends a dated `…#NN#withdrawn` record. From the next Site API read and site build that chapter serves its first edition

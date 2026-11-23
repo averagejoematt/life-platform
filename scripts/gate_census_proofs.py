@@ -4842,7 +4842,12 @@ GUARD_PROOFS["guard::scripts/check_public_copies.py"] = {
         "rule-E size test `> limit:` → `> limit and False:` in the real tracked file, restored from a byte copy (md5 "
         "2f262a63… before and after) — tests/test_retired_legacy_installments_6148.py + tests/test_check_public_copies_6083.py "
         "4 failed / 23 passed; restored 27 passed (6083 file now 18). M7 filler appended to the committed "
-        "site/legacy/chronicle/posts/week-04/index.html — the repo test 2 failed / 5 passed; restored 7 passed."
+        "site/legacy/chronicle/posts/week-04/index.html — the repo test 2 failed / 5 passed; restored 7 passed. #6193 added "
+        "rule G (a chapter serving an edition whose legacy page, posts.json excerpt, share kit or archived page still "
+        "carries the first edition): LIVE read-only `--check` with a copied live snapshot whose chapter_editions.json "
+        "names week-12 as served — exit 1, four rule-G violations (page, posts.json, kit, archive); the unmodified snapshot "
+        "exit 0. FIXTURES: rule G's page test → `if False:` 2 failed / 22 passed; the guard's copy_issues call fed an "
+        "empty plan 1 failed / 23 passed; restored 24 passed (tests/test_legacy_chapter_addresses_6193.py)."
     ),
     "proved_on": "2026-11-16",
 }
@@ -5156,4 +5161,28 @@ STRUCTURAL_HAND_PROOFS["structural::test_chapter_reads_withdrawn_6199.py"] = {
         "reader that reaches the text under another key name; an edition gate called through another alias."
     ),
     "proved_on": "2026-11-22",
+}
+
+# #6193 §4 (owner ruling 2026-11-22, final edition rehearsal): the read-only verifier that a chapter's legacy address
+# follows its served edition — every hop to /story/<id>/, no loop, canonical/og, the other legacy copies, feeds, archive.
+GUARD_PROOFS["guard::scripts/verify_legacy_chapter_redirects.py"] = {
+    "gate_name": "scripts/verify_legacy_chapter_redirects.py",
+    "command": "python3 -m pytest tests/test_legacy_chapter_addresses_6193.py -q -p no:warnings   # baseline 26 passed",
+    "mutation": (
+        "Three plants in the real tracked file, ONE AT A TIME, each restored from a byte copy (md5 885560cb… before and "
+        "after): V1 walk()'s loop test `if url in seen:` → `if False:`; V2 the direct check's final FAIL → PASS; V3 the "
+        "share-kit check `ok = …` → `ok = True or …`."
+    ),
+    "observed": (
+        "2026-11-23, this lane. V1 1 failed / 25 passed; V2 1 failed / 25 passed; V3 1 failed / 25 passed. RESTORED 26 "
+        "passed. LIVE read-only run against production: no chapter serves an edition yet — 'nothing to verify', exit 0."
+    ),
+    "scope": (
+        "Per chapter the live snapshot serves an edition of: /story/<id>/ shows it; three legacy URL forms walked hop by "
+        "hop (loop, >5 hops, wrong end); canonical, og:url, og:description; the bucket URL of the page and the old site/ "
+        "copies of the same page id; posts.json and the share kit; both feeds' item (guid once, link) and, with a baseline, "
+        "every item's guid/title/pubDate; the archive member; optional rollback copies and an off-repo term scan. NOT SEEN: "
+        "image content (share cards), third-party caches (search engines, feed readers' stored copies)."
+    ),
+    "proved_on": "2026-11-23",
 }
