@@ -42,7 +42,7 @@ Covers:
   EMF LifePlatform/QaSmoke summary on EVERY run, including all-green:
       qa-smoke-heartbeat   RunCompleted SampleCount < 1, 2 consecutive days, BREACHING (digest)
       qa-smoke-failures    FailCount Max >= 1, 86400s (digest)
-      qa-smoke-warnings    WarnCount Max >= 1, 86400s (digest) — a warnings-only
+      qa-smoke-warnings    PersistentWarnCount Max >= 1, 86400s (digest; #5928: an id on 3 straight days) — a warnings-only
                             run is visible in the digest. #3317 review 2026-08-30: docs/reviews/ALARM_REVIEW_QA_SMOKE_2026-08-30.md
 
   #1455 (heartbeat completeness, 2026-07-19): the compute-output check's gauge is
@@ -582,11 +582,22 @@ class MonitoringStack(Stack):
             GTE,
             to_digest=True,
         )
+        # #5928 (owner ruling 2026-11-23): this alarm watches PersistentWarnCount, not WarnCount. WarnCount >= 1 was
+        # red on 27 of 30 days across 13 ids, most of them one- or two-day visitors, so the state said nothing.
+        # PersistentWarnCount is the platform warning ids present on each of the last 3 Pacific days
+        # (qa_check.advance_warn_streaks; the state row sits beside STATE#predict_dark), plus an unconfirmed HIGH
+        # reader-truth finding on its first day (qa_check.IMMEDIATE_WARNS). Replayed over 30 days of real runs it is
+        # red on fewer than half the days the old trigger was, each naming its cause. The window is unchanged — 86400s Maximum, one period — so the
+        # #2912 sliding-window note above still describes its state behaviour. WarnCount is still emitted and still
+        # in the logs and the QA email. Owner-engagement warnings (a check-in not answered) are on
+        # OwnerEngagementWarnCount, which no alarm here watches: that is a product condition, read weekly.
+        # If the streak state cannot be read the job counts every platform warning, i.e. this alarm falls back to
+        # the old trigger rather than going quiet.
         _alarm(
             "QaSmokeWarnings",
             "qa-smoke-warnings",
             "LifePlatform/QaSmoke",
-            "WarnCount",
+            "PersistentWarnCount",
             86400,
             "Maximum",
             1,
