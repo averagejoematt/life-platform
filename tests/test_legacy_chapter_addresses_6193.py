@@ -383,3 +383,68 @@ def test_feed_links_follow_the_producers_url_to_id_rule():
     }  # week-03 is a withdrawn installment (publish_snapshot_chapters.WITHDRAWN_CHAPTER_URLS): never a chapter
     assert v4_build_rss.edition_links_by_url({"weeks": []}, urls) == {}
     assert v4_build_rss.edition_links_by_url({"editions": []}, urls) == {}
+
+
+# ── the read-only verifier (scripts/verify_legacy_chapter_redirects.py) over a synthetic site ───────────────────────────
+def _site(x, legacy=None):
+    """url → (status, headers, body): a chapter whose edition is served and whose legacy address 301s to it."""
+    import verify_legacy_chapter_redirects as V
+
+    story = (
+        f'<html><head><link rel="canonical" href="{x["story_url"]}"><meta property="og:url" content="{x["story_url"]}">'
+        f'<meta property="og:description" content="{SUMMARY}"></head><body><p data-edition-line>Second edition</p></body></html>'
+    ).encode()
+    feed = (
+        f'<rss><channel><item><title>A week</title><link>{x["story_url"]}?utm_source=rss</link>'
+        f'<guid isPermaLink="true">{LA.ORIGIN}{x["legacy_path"]}</guid><pubDate>Fri, 11 Sep 2026 18:00:44 +0000</pubDate></item>'
+        "</channel></rss>"
+    ).encode()
+    kit = json.dumps({"excerpt": SUMMARY, "canonical_url": x["story_url"]}).encode()
+    posts, _ = LA.manifest_update(POSTS, [x], {}, "t")
+    hop = legacy or (301, {"Location": x["story_path"]}, b"")
+    site = {
+        x["story_url"]: (200, {}, story),
+        LA.ORIGIN + x["legacy_path"]: hop,
+        LA.ORIGIN + x["legacy_path"].rstrip("/"): (301, {"Location": x["legacy_path"]}, b""),
+        LA.ORIGIN + x["legacy_path"] + "index.html": hop,
+        f"{V.S3_REST}/{x['legacy_key']}": (200, {}, LA.redirect_page(x).encode()),
+        LA.ORIGIN + "/journal/posts.json": (200, {}, json.dumps(posts).encode()),
+        f"{LA.ORIGIN}/moments/share-kits/{LA.page_id(x['legacy_path'])}/kit.json": (200, {}, kit),
+        LA.ORIGIN + "/rss.xml": (200, {}, feed),
+        LA.ORIGIN + "/feed.xml": (200, {}, feed),
+    }
+    return lambda url: site.get(url, (404, {}, b""))
+
+
+def _verify(monkeypatch, x, fetch):
+    import verify_legacy_chapter_redirects as V
+
+    monkeypatch.setattr(V, "fetch", fetch)
+    seen = []
+
+    class _Args:
+        feed_baseline, rollback = None, False
+
+    V.verify(x, _Args(), [], None, lambda verdict, section, msg: seen.append((verdict, section, msg)))
+    return seen
+
+
+def test_the_verifier_passes_a_chapter_whose_every_copy_follows_its_edition(monkeypatch):
+    (x,) = _plan([_ed("week-06")])["chapters"]
+    seen = _verify(monkeypatch, x, _site(x))
+    assert [s for s in seen if s[0] == "FAIL"] == [], seen
+    sections = {s[1] for s in seen if s[0] == "PASS"}
+    assert sections >= {"served", "direct", "metadata", "copies", "feeds"}
+
+
+def test_the_verifier_fails_a_loop_a_first_edition_page_and_a_stale_kit(monkeypatch):
+    (x,) = _plan([_ed("week-06")])["chapters"]
+    loop = (301, {"Location": x["legacy_path"]}, b"")  # the legacy address redirecting to itself
+    assert any(v == "FAIL" and "loop" in m for v, s, m in _verify(monkeypatch, x, _site(x, legacy=loop)))
+    first = (200, {}, b"<html>" + b"first edition prose " * 300 + b"</html>")
+    assert any(v == "FAIL" and s == "direct" for v, s, m in _verify(monkeypatch, x, _site(x, legacy=first)))
+    base = _site(x)
+    stale = json.dumps({"excerpt": "First-edition excerpt.", "canonical_url": LA.ORIGIN + x["legacy_path"]}).encode()
+    kit_url = f"{LA.ORIGIN}/moments/share-kits/{LA.page_id(x['legacy_path'])}/kit.json"
+    fails = _verify(monkeypatch, x, lambda u: (200, {}, stale) if u == kit_url else base(u))
+    assert [s for v, s, m in fails if v == "FAIL"] == ["copies"]
