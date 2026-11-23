@@ -624,6 +624,13 @@ def _find_hypothesis(hyp_id):
     return None
 
 
+def _lift_baseline_on_create(item):
+    """#6209: capture a due lift baseline snapshot (write-once) and return the advisory fields; {} for any other design."""
+    from mcp import experiment_close
+
+    return experiment_close.on_create(item, query_source=query_source, table=table, now=datetime.now(timezone.utc), today=pacific_today())
+
+
 def tool_create_experiment(args):
     """Create a new N=1 experiment.
 
@@ -722,8 +729,7 @@ def tool_create_experiment(args):
         start_draw["drawn_at"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
         logger.info(f"create_experiment: randomized start drawn — {start_date} from {randomized_start} (SCED #1413)")
 
-    if not start_date:
-        start_date = pacific_today()
+    start_date = start_date or pacific_today()
 
     # Generate a slug-style ID
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:40]
@@ -856,9 +862,6 @@ def tool_create_experiment(args):
     clean_item = {k: v for k, v in item.items() if v is not None}
     table.put_item(Item=clean_item)
     logger.info(f"create_experiment: created {exp_id} (iteration {iteration})")
-    from mcp import experiment_close  # #6209: a lift criterion's write-once baseline snapshot + advisory note
-
-    lift_extra = experiment_close.on_create(clean_item, query_source=query_source, table=table, now=now, today=pacific_today())
 
     return {
         "created": True,
@@ -887,7 +890,7 @@ def tool_create_experiment(args):
         # #1569: echo the verbatim note so the caller sees it landed (only when set).
         **({"matthew_note": matthew_note[:500]} if matthew_note else {}),
         **({"pre_registration_warning": prereg_warning} if prereg_warning else {}),
-        **lift_extra,
+        **_lift_baseline_on_create(clean_item),  # #6209: a lift criterion's write-once baseline snapshot + advisory note
         "board_of_directors": {
             "Huberman": "One variable at a time. Track for at least 2 weeks before drawing conclusions. Control for confounders: sleep timing, stress, travel.",
             "Attia": "Define your primary endpoint now. What number would convince you this worked? Statistical noise requires \u226514 days of data.",
@@ -1016,9 +1019,6 @@ def tool_get_experiment_results(args):
     item = table.get_item(Key={"pk": EXPERIMENTS_PK, "sk": sk}).get("Item")
     if not item:
         raise ValueError(f"No experiment found with id={exp_id}")
-    from mcp.experiment_close import ensure_baseline_snapshot  # #6209: an analysis-path read captures a due lift baseline
-
-    ensure_baseline_snapshot(item, query_source=query_source, table=table, now=datetime.now(timezone.utc), today=pacific_today())
 
     start_date = item.get("start_date", "")
     end_date = item.get("end_date") or pacific_today()
