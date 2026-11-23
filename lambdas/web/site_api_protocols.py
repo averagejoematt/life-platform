@@ -50,6 +50,42 @@ def _public_note(text):
 
 
 # S3-config container caches for the protocols/domains passthroughs.
+# #6209 PRIVACY: the public projection of an experiment's close-path `analysis` is an ALLOWLIST. These are exactly the
+# keys the #539 close path wrote before #6209 (windows, the stats_core result, the #1413 randomization and #1410
+# counterfactual blocks, the summary and its stamp), so every existing public payload is byte-identical. Everything else —
+# a lift criterion's `observations` (per-session dates, workout ids, adherence, exercise names, kg), the private
+# `reason`, and any key a future writer adds — stays out by default. `baseline_snapshot` is a separate row field this
+# handler never reads.
+PUBLIC_ANALYSIS_KEYS = (
+    "windows",
+    "metric",
+    "n_baseline",
+    "n_window",
+    "mean_baseline",
+    "mean_window",
+    "effect_size",
+    "ci95_low",
+    "ci95_high",
+    "cohens_d",
+    "verdict",
+    "randomization",
+    "counterfactual",
+    "summary",
+    "analyzed_at",
+    "engine",
+    # #6209: the late-capture disclosure (captured_at, captured_after_start, capture_lag_days) — no personal measurement,
+    # and the caveat matters to a reader; present only when a lift baseline was captured after the start.
+    "baseline_capture",
+)
+
+
+def public_analysis(analysis):
+    """The served `analysis`: the allowlisted keys in their stored order; a non-dict (None on an open experiment) as-is."""
+    if not isinstance(analysis, dict):
+        return analysis
+    return {k: v for k, v in analysis.items() if k in PUBLIC_ANALYSIS_KEYS}
+
+
 _protocols_cache = None
 _domains_cache = None
 
@@ -169,7 +205,7 @@ def experiments(*, _g) -> dict:
                 # #728: the public timestamped artifact frozen at creation —
                 # the page renders this as the before-the-results proof link.
                 "pre_registration_url": item.get("prereg_url"),
-                "analysis": item.get("analysis"),
+                "analysis": public_analysis(item.get("analysis")),  # #6209: an allowlist, never the stored dict
                 # #1117: the justification contract — why now (with its provenance:
                 # explicit | hypothesis | library), priority, hoped outcome, the
                 # measurement plan, evidence links. Legacy/unannotated records simply

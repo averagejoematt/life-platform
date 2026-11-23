@@ -48,15 +48,30 @@ def _num(v: object) -> float:
         return 0.0
 
 
+def set_number(v: object) -> float:
+    """A stored set field (``weight_kg`` / ``reps`` / ``rpe`` / distance) as a float, 0.0 when absent or unreadable. Pure.
+    DynamoDB hands numbers back as ``Decimal``; this is the one coercion every reader of a stored set shares (#6209)."""
+    return _num(v)
+
+
+def set_type_of(s: object) -> str:
+    """The normalized Hevy set type (``normal`` / ``warmup`` / ``dropset`` / ``failure`` …), lowercased, ``normal`` when the
+    row carries none. Reads the stored ``type`` and the wire's ``set_type`` alike. Pure (#6209)."""
+    if not isinstance(s, dict):
+        return "normal"
+    return str(s.get("set_type") or s.get("type") or "normal").strip().lower()
+
+
+def is_warmup_set(s: object) -> bool:
+    """True for a warm-up set under any of the spellings Hevy has used. Pure (#6209)."""
+    return set_type_of(s) in _WARMUP_TYPES
+
+
 def loaded_distance_shape(sets: object) -> bool:
     """#5373: True when an exercise's sets have the shape of `STEP_COUNT_HEVY_TYPES` — a working set carrying a load AND a
     distance, and no set carrying reps. Pure. That shape is the type: on such an exercise the distance field is a step count,
     never metres. (A timed cardio block has a distance but no load; a rep set has reps.)"""
-    work = [
-        s
-        for s in (sets if isinstance(sets, (list, tuple)) else [])
-        if isinstance(s, dict) and str(s.get("set_type") or s.get("type") or "normal").strip().lower() not in _WARMUP_TYPES
-    ]
+    work = [s for s in (sets if isinstance(sets, (list, tuple)) else []) if isinstance(s, dict) and not is_warmup_set(s)]
     if not work or any(_num(s.get("reps")) > 0 for s in work):
         return False
     return any(

@@ -255,7 +255,11 @@ BASELINE = {
     # log_coach_checkin's and log_coach_calibration's input tables beside their tools in mcp/tools_coach_checkin.py
     # (~42 logical lines out, the split import's +5 in); measured 2051, 8 of the ~42 (a fifth, #2610) banked, the
     # rest handed back.
-    "mcp/registry.py": 2059,
+    # 2026-11-22 (#6208): 2059 -> 2043. manage_research_finding's entry and import (+5) were paid by moving
+    # manage_sick_days' input table beside its tool in mcp/tools_sick_days.py (22 logical lines out, 0 import lines in:
+    # the name joined the existing import line); measured 2039 (main 2056), 4 of the 22 (a fifth, #2610) banked, the
+    # rest handed back. docs/MCP_TOOL_CATALOG.md is byte-identical after the move.
+    "mcp/registry.py": 2043,
     # 2026-08-23 (#3082): 2396 → 2290. This file was at 2396/2396 — zero headroom — and the
     # cost of that was measurable, not theoretical: #3081 fixed the #2893 retry re-bill in
     # common/retry_utils.py and could NOT fix the identical defect here, leaving a strict
@@ -306,7 +310,7 @@ BASELINE = {
     # mcp/tools_social_connection.py (257 lines, under the ceiling), which paid for the
     # honest-numbers fixes that stayed behind (get_insights pagination + corpus counts)
     # and still handed back 160 lines. The ratchet tightening.
-    "mcp/tools_lifestyle.py": 1463,  # #4630: 1477 -> 1455 measured after the experiment_metrics split; 8 of ~40 extracted lines banked
+    "mcp/tools_lifestyle.py": 1416,  # #6209: 1461 -> 1405 measured after the experiment_close split; 11 of 56 extracted lines banked. #4630: 1477 -> 1455 (experiment_metrics split), 8 banked
     "lambdas/emails/coach_panel_podcast_lambda.py": 1508,
     # site_api_coach.py (2664 by the time the slice ran) drained to a ~440-line facade by
     # #1654 — the handler logic now lives in cohesive web/site_api_coach_{profile,stance,

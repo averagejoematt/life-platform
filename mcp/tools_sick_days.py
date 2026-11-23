@@ -27,6 +27,28 @@ from mcp.config import USER_ID, logger, table
 
 SICK_DAYS_PK = f"USER#{USER_ID}#SOURCE#sick_days"
 
+# The input table, beside its tool (moved out of mcp/registry.py by #6208 to pay for that PR's new tool entry under
+# the #1665 size ceiling — the #3713 / #5575 precedent). A LITERAL dict: scripts/generate_mcp_tool_catalog.py reads it.
+MANAGE_SICK_DAYS_INPUT = {
+    "type": "object",
+    "properties": {
+        "action": {
+            "type": "string",
+            "description": "list (default), log, or clear.",
+            "enum": ["list", "log", "clear"],
+        },
+        "date": {"type": "string", "description": "[log/clear] Date YYYY-MM-DD."},
+        "dates": {"type": "array", "items": {"type": "string"}, "description": "[log] List of dates to flag at once."},
+        "reason": {
+            "type": "string",
+            "description": "[log] Optional reason (e.g. 'flu', 'rest day', 'travel'). [clear] Optional note on why it was cleared.",
+        },
+        "start_date": {"type": "string", "description": "[list] Start of range (default: 30 days ago)."},
+        "end_date": {"type": "string", "description": "[list] End of range (default: today)."},
+    },
+    "required": [],
+}
+
 
 from common.digest_utils import d2f as _d2f  # shared bundled helpers (#970)
 from common.pacific_time import pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days

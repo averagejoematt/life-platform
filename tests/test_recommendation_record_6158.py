@@ -347,6 +347,8 @@ ALLOWED_TO_NAME = frozenset(
         "lambdas/experiment/phase_taxonomy.py",  # CROSS_PHASE
         "cdk/stacks/email_stack.py",  # #6158 pilot: the daily-brief role's no-write Deny names the partition
         "cdk/stacks/role_policies_compute.py",  # #6158 pilot: the writer's PutItem-only LeadingKeys scope names it
+        "lambdas/research/findings.py",  # #6208: reads the rec_id shape (valid_rec_id) to validate a finding's link
+        "mcp/tools_research_findings.py",  # #6208: reads that a linked recommendation exists (a get_item, never a write)
     }
 )
 

@@ -360,6 +360,10 @@ SOURCE_CLASS: dict[str, str] = {
     # record of what he was told and what came of it is the learning — it must outlive any cycle. Never tagged,
     # never wiped, never phase-filtered. (Under the 2026-09-21 no-further-resets ruling there is no wipe to join.)
     "coach_recommendations": CROSS_PHASE,
+    # #6208: the research findings store (FINDING#<id> + its FINDING#<id>#EV# events, `research/findings.py`).
+    # CROSS_PHASE: external evidence and what he decided about it do not belong to a cycle — a finding read in one
+    # cycle still answers its question in the next. Never tagged, never wiped, never phase-filtered.
+    "research_findings": CROSS_PHASE,
     "coach_corrections": CROSS_PHASE,  # #1689 (epic #1687 "The Coach Correction Loop"): Matthew's
     # class-tagged corrections to weekly AI-review-pack items (`lambdas/coach_corrections.py`,
     # pk USER#matthew#SOURCE#coach_corrections / sk CORRECTION#<date>#<id8>). Same rationale as

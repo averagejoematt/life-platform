@@ -54,6 +54,7 @@ CLEAN_DIRS = [
     "lambdas/operational",
     "lambdas/privacy",
     "lambdas/reading",
+    "lambdas/research",  # #6208: the research findings store
     "lambdas/training",
     "lambdas/web",
     "mcp",
