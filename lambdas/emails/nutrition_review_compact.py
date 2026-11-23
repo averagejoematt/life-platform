@@ -35,6 +35,7 @@ PURE apart from ``read_format`` (one GetItem): no clock, no model, no write.
 from __future__ import annotations
 
 import html as _html
+import json
 import re
 from html.parser import HTMLParser
 from typing import Any, Mapping, Optional
@@ -406,6 +407,32 @@ def build(
         '<div style="color:#6b7280;font-size:10px;border-top:1px solid #2a2d4a;padding-top:10px;">'
         "Personal health tracking only &mdash; not medical advice.</div></div>"
     )
+
+
+def render(data, days, summary, ai_content, titration_html, *, is_panel, state_words, last_arrival, logger) -> Optional[str]:
+    """The whole compact email from the handler's own values, or None when it cannot be built — the handler then sends
+    the long format (today's email) and the log says so. Logs ONE size line per build."""
+    try:
+        if is_panel:
+            priorities = panel_priorities(ai_content)
+            panel_state = "ok" if priorities else "missing"
+        else:
+            priorities, panel_state = [], "unavailable"
+        menu_html = menu_section(data.get("menu_ahead"), data.get("menu_feed") or {})
+        html = build(
+            week_text=week_line(days, summary, data["dates"], state_words, last_arrival),
+            titration_html=titration_html,
+            menu_html=menu_html,
+            priorities=priorities,
+            panel_state=panel_state,
+            dates=data["dates"],
+        )
+    except Exception as e:  # noqa: BLE001 — the review still ships, in the long format
+        logger.error(f"[nutrition-review-format] compact build failed, sending the long format: {type(e).__name__}: {e}")
+        return None
+    size = measure(html, menu_html)
+    logger.info(f"[nutrition-review-format] {json.dumps(dict(size, format='compact', panel=panel_state), sort_keys=True)}")
+    return html
 
 
 def measure(html: str, menu_html: str) -> dict:
