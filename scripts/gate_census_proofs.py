@@ -5014,19 +5014,23 @@ STRUCTURAL_HAND_PROOFS["structural::test_recommendation_record_6158.py"] = {
 # public or coach reader.
 STRUCTURAL_HAND_PROOFS["structural::test_research_findings_6208.py"] = {
     "gate_name": "test_research_findings_6208.py",
-    "command": "python3 -m pytest tests/test_research_findings_6208.py -q -p no:randomly -p no:warnings   # baseline 73 passed",
+    "command": "python3 -m pytest tests/test_research_findings_6208.py -q -p no:randomly -p no:warnings   # baseline 88 passed",
     "mutation": (
         "Seven plants, ONE AT A TIME, each restored from a copy: M1 research.findings.check_rules' strong-needs-full_text "
         "condition made False; M2 refuse_live_duplicate's match made False; M3 the tier-5 approved_for_experiment refusal "
         "made False; M4 list_view's simulated exclusion made False; M5 validate_source's resolved_title/verified_on check "
         "made False; M6 the personal_result evidence_strength refusal made False; M7 `from research import findings` "
-        "appended to lambdas/web/site_api_status.py."
+        "appended to lambdas/web/site_api_status.py. Audit addition: M8 the verification stamp recomputation dropped; M9 "
+        "the verifier's subject-overlap tripwire made False; M10 publishable()'s retrospective branch made False; M11 "
+        "claim_supported_by's requirement made False."
     ),
     "observed": (
         "2026-11-22, #6208 lane. BASELINE 73 passed. M1 2 failed (strong refused on abstracts; the correction path); M2 1 "
         "failed (live dedupe named); M3 1 failed (tier 5 to the clinician); M4 1 failed (simulated out of every default "
         "list); M5 2 failed (unverified source, x2); M6 2 failed (tool + pure builder); M7 2 failed (naming allowlist + "
-        "the public/coach import closure). REVERTED 73 passed."
+        "the public/coach import closure). REVERTED 73 passed. Re-run after the audit addition: BASELINE 88 passed; M1-M7 "
+        "as before; M8 2 failed (edited title refused; verifier stamp); M9 1 failed (unrelated paper refused); M10 2 failed "
+        "(publishable pure + via his decision); M11 2 failed (support asserted by a reader). REVERTED 88 passed."
     ),
     "scope": (
         "Every tracked .py outside tests/ for finding constructors and runtime modules naming the store; the static import "

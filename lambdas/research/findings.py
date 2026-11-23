@@ -215,7 +215,42 @@ _PMID = re.compile(r"^[1-9]\d{0,8}$")
 _DOI = re.compile(r"^10\.\d{4,9}/\S+$")
 _EXPERIMENT_ID = re.compile(r"^[a-z0-9-]{1,40}_\d{4}-\d{2}-\d{2}$")  # mcp/tools_lifestyle create_experiment: <slug>_<start>
 _URL = re.compile(r"https?://([^/\s\"'<>]+)", re.IGNORECASE)
-_SOURCE_KEYS = frozenset({"id_kind", "id", "design", "review_depth", "resolved_title", "verified_on", "pubtypes"})
+_SOURCE_KEYS = frozenset(
+    {
+        "id_kind",
+        "id",
+        "design",
+        "review_depth",
+        "resolved_title",
+        "verified_on",
+        "pubtypes",
+        "claim_supported_by",
+        "supports_note",
+        "verification",
+    }
+)
+#: How the recorder says the source supports the finding — asserted by a reader, never implied by a resolving id.
+CLAIM_SUPPORT: tuple[str, ...] = ("abstract_read", "full_text_read")
+SUPPORTS_NOTE_MIN, SUPPORTS_NOTE_MAX = 20, 400
+#: The resolvers `scripts/research_finding_verify.py` fetches from, named in its verification block.
+RESOLVERS: tuple[str, ...] = ("pubmed", "crossref", "guideline_page")
+_VERIFICATION_KEYS = frozenset(
+    {
+        "resolver",
+        "resolved_title",
+        "first_author",
+        "year",
+        "fetched_at",
+        "abstract_sha256",
+        "stamp",
+        "overlap_terms",
+        "overlap_count",
+        "override_reason",
+    }
+)
+_STAMP = re.compile(r"^[0-9a-f]{16}$")
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_INSTANT = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
 
 
 class FindingError(ValueError):
@@ -292,6 +327,46 @@ def source_key(src: dict[str, Any]) -> str:
     return f"{src.get('id_kind')}:{src.get('id')}"
 
 
+def verification_stamp(id_kind: str, ident: str, resolved_title: str, fetched_at: str) -> str:
+    """The stamp `scripts/research_finding_verify.py` writes and this module recomputes. It proves the four fields
+    came unedited from the script's own fetch — it does NOT mean the Lambda verified anything (the Lambda makes no
+    network call). A title typed or edited by hand after the fact no longer matches its stamp and is refused."""
+    return hashlib.sha256(f"{id_kind}|{ident}|{resolved_title}|{fetched_at}".encode("utf-8")).hexdigest()[:16]
+
+
+def _verification(v: Any, kind: str, ident: str, title: str) -> dict[str, Any]:
+    if not isinstance(v, dict):
+        raise FindingError(
+            f"source {kind}:{ident} has no verification block — run scripts/research_finding_verify.py and paste what it prints"
+        )
+    extra = sorted(set(v) - _VERIFICATION_KEYS)
+    if extra:
+        raise FindingError(f"unknown verification fields {extra}")
+    if v.get("resolver") not in RESOLVERS:
+        raise FindingError(f"verification.resolver must be one of {list(RESOLVERS)}")
+    fetched_at = str(v.get("fetched_at") or "")
+    if not _INSTANT.match(fetched_at):
+        raise FindingError("verification.fetched_at must be a UTC instant (YYYY-MM-DDTHH:MM:SSZ)")
+    if v.get("resolved_title") != title:
+        raise FindingError("the source's resolved_title is not the title the verifier fetched — it was edited after verification")
+    if not _STAMP.match(str(v.get("stamp") or "")) or v["stamp"] != verification_stamp(kind, ident, title, fetched_at):
+        raise FindingError(
+            f"source {kind}:{ident}: the verification stamp does not match its id, title and fetch time — the object was edited "
+            "after scripts/research_finding_verify.py printed it (re-run the script)"
+        )
+    if v.get("abstract_sha256") is not None and not _SHA256.match(str(v["abstract_sha256"])):
+        raise FindingError("verification.abstract_sha256 must be a sha256 hex digest")
+    year = v.get("year")
+    if year is not None and (not isinstance(year, int) or isinstance(year, bool)):
+        raise FindingError("verification.year must be an integer or null")
+    count = v.get("overlap_count")
+    if not isinstance(count, int) or isinstance(count, bool) or not isinstance(v.get("overlap_terms"), list):
+        raise FindingError("verification carries overlap_terms and overlap_count (the subject-overlap tripwire)")
+    out = {k: v[k] for k in sorted(_VERIFICATION_KEYS) if k in v and v[k] is not None}
+    out["first_author"] = str(v.get("first_author") or "")
+    return out
+
+
 def validate_source(src: Any, *, today: str) -> dict[str, Any]:
     """One verified source, normalized. Refused, with the reason, unless it is identified, verified and allow-listed."""
     if not isinstance(src, dict):
@@ -322,21 +397,32 @@ def validate_source(src: Any, *, today: str) -> dict[str, Any]:
         raise FindingError(f"source design must be one of {list(DESIGNS)}")
     if src.get("review_depth") not in REVIEW_DEPTHS:
         raise FindingError(f"source review_depth must be one of {list(REVIEW_DEPTHS)}")
-    title = " ".join(str(src.get("resolved_title") or "").split())
-    if not title or not str(src.get("verified_on") or "").strip():
+    title = str(src.get("resolved_title") or "")
+    if not title.strip() or not str(src.get("verified_on") or "").strip():
         raise FindingError(
             f"source {kind}:{ident} is unverified — it needs resolved_title and verified_on from scripts/research_finding_verify.py"
         )
+    if title != " ".join(title.split()) or len(title) > TEXT_MAX:
+        raise FindingError("resolved_title must be exactly as the verifier printed it (single-spaced, at most 1000 characters)")
     verified_on = _day(src.get("verified_on"), "source verified_on")
     if verified_on > today:
         raise FindingError("source verified_on cannot be in the future")
+    verification = _verification(src.get("verification"), kind, ident, title)
+    if verification["fetched_at"][:10] != verified_on:
+        raise FindingError("verified_on must be the day of verification.fetched_at")
+    supported_by = src.get("claim_supported_by")
+    if supported_by not in CLAIM_SUPPORT:
+        raise FindingError(f"claim_supported_by must be one of {list(CLAIM_SUPPORT)} — say how you know the source supports the finding")
+    if supported_by == "full_text_read" and src.get("review_depth") != FULL_TEXT:
+        raise FindingError("claim_supported_by full_text_read needs review_depth full_text")
+    note = _text(src.get("supports_note"), "supports_note", SUPPORTS_NOTE_MIN, SUPPORTS_NOTE_MAX)
     pubtypes = src.get("pubtypes") or []
     if not isinstance(pubtypes, list):
         raise FindingError("source pubtypes must be a list")
     bad = sorted(set(map(str, pubtypes)) & set(REJECTED_PUBTYPES))
     if bad:
         raise FindingError(f"source {kind}:{ident} is a rejected publication type: {', '.join(bad)}")
-    denied = _denied_hosts_in(ident, title)
+    denied = _denied_hosts_in(ident, title, note)
     if denied:
         raise FindingError(f"source names a denied host: {', '.join(sorted(set(denied)))}")
     out: dict[str, Any] = {
@@ -344,8 +430,11 @@ def validate_source(src: Any, *, today: str) -> dict[str, Any]:
         "id": ident,
         "design": src["design"],
         "review_depth": src["review_depth"],
-        "resolved_title": title[:TEXT_MAX],
+        "resolved_title": title,
         "verified_on": verified_on,
+        "claim_supported_by": supported_by,
+        "supports_note": note,
+        "verification": verification,
     }
     if pubtypes:
         out["pubtypes"] = [str(p) for p in pubtypes]
@@ -535,6 +624,11 @@ def build_finding_event(
         if len(words) > WORDS_MAX:
             raise FindingError(f"a decision is at most {WORDS_MAX} characters")
         row["words"] = words  # verbatim: never collapsed, never paraphrased
+        eligible = fields.get("publication_eligible")
+        if eligible is not None:
+            if not isinstance(eligible, bool):
+                raise FindingError("publication_eligible must be true or false")
+            row["publication_eligible"] = eligible  # his explicit ruling; only publishable() reads it
         return row
     words = " ".join(str(fields.get("words") or "").split())[:WORDS_MAX]
     if words:
@@ -701,6 +795,7 @@ _HISTORY_KEYS = (
     "words",
     "verdict",
     "simulated",
+    "publication_eligible",
 )
 
 
@@ -732,6 +827,7 @@ def fold(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "recommendations": [],
                 "experiments": [],
                 "decisions": [],
+                "publication_eligible": None,
                 "personal_results": [],
                 "corrections": [],
             }
@@ -751,7 +847,9 @@ def fold(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             elif kind == EVENT_LINK_EXPERIMENT and e.get("experiment_id"):
                 view["experiments"].append(e["experiment_id"])
             elif kind == EVENT_DECISION and e.get("words"):
-                view["decisions"].append({"words": e["words"], "recorded_at": e.get("recorded_at")})
+                view["decisions"].append({k: e[k] for k in ("words", "publication_eligible", "recorded_at") if k in e})
+                if isinstance(e.get("publication_eligible"), bool):
+                    view["publication_eligible"] = e["publication_eligible"]
             elif kind == EVENT_PERSONAL_RESULT and e.get("verdict") in PERSONAL_VERDICTS:
                 view["personal_results"].append(
                     {k: e[k] for k in ("verdict", "simulated", "experiment_id", "words", "recorded_at") if k in e}
@@ -765,6 +863,27 @@ def fold(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         views.append(view)
     views.sort(key=lambda v: (str(v.get("day")), str(v.get("finding_id"))), reverse=True)
     return views
+
+
+ORIGIN_RETROSPECTIVE = "retrospective"
+
+
+def publishable(view: dict[str, Any]) -> tuple[bool, list[str]]:
+    """Whether a finding's ORIGIN could ever allow it out of the owner-only store, and why not.
+
+    Nothing calls this yet — no publish path exists and the partition is owner-only. It is here so a future publish
+    path has ONE function to call. It answers the origin question only (a caller still owes the privacy tier and
+    every other gate): a missing origin and a simulated finding are never publishable; a retrospective one only after
+    his explicit `publication_eligible=true` decision event."""
+    origin = view.get("origin")
+    reasons: list[str] = []
+    if origin not in ORIGINS:
+        reasons.append("origin is missing or unknown")
+    elif origin == ORIGIN_SIMULATED:
+        reasons.append("a simulated finding is a rehearsal and is never published")
+    elif origin == ORIGIN_RETROSPECTIVE and view.get("publication_eligible") is not True:
+        reasons.append("a retrospective finding needs an explicit publication_eligible decision from the owner")
+    return (not reasons, reasons)
 
 
 def is_stale(view: dict[str, Any], today: str) -> bool:

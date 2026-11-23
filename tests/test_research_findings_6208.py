@@ -50,6 +50,8 @@ REC_ID = "rec_20261120_sleep_coach_0a1b2c3d"
 
 
 def _src(**kw):
+    """A source as the verifier prints it: stamped over whatever id, title and day the case sets (pass
+    verification=... to plant a hand-made block instead)."""
     s = {
         "id_kind": "pmid",
         "id": "12345678",
@@ -57,12 +59,29 @@ def _src(**kw):
         "review_depth": "abstract_only",
         "resolved_title": "A synthetic meta-analysis title used only in tests",
         "verified_on": "2026-11-20",
+        "claim_supported_by": "abstract_read",
+        "supports_note": "Synthetic note: the pooled estimate favours the intervention.",
     }
     s.update(kw)
+    if "verification" not in kw:
+        day = s["verified_on"] if isinstance(s.get("verified_on"), str) else "2026-11-20"
+        fetched_at = f"{day}T12:00:00Z"
+        s["verification"] = {
+            "resolver": "pubmed",
+            "resolved_title": s.get("resolved_title"),
+            "first_author": "Doe J",
+            "year": 2021,
+            "fetched_at": fetched_at,
+            "overlap_terms": ["synthetic", "wake"],
+            "overlap_count": 2,
+            "stamp": rf.verification_stamp(str(s.get("id_kind")), str(s.get("id")), str(s.get("resolved_title")), fetched_at),
+        }
     return s
 
 
-FULL = _src(id_kind="doi", id="10.1000/synthetic.2026.001", design="randomized_trial", review_depth="full_text")
+FULL = _src(
+    id_kind="doi", id="10.1000/synthetic.2026.001", design="randomized_trial", review_depth="full_text", claim_supported_by="full_text_read"
+)
 
 
 # ── a small DynamoDB double: conditional puts and get/query only — it has NO update or delete, so any rewrite fails ──
@@ -671,7 +690,100 @@ def test_no_schedule_and_no_ingestion_path_names_the_store():
     assert not hits, f"a schedule, workflow or ingestion module names the research findings store: {hits}"
 
 
+# ── the verification stamp and the reader's support assertion (audit addition) ──────────────────────
+
+
+def test_a_title_edited_after_verification_is_refused(table):
+    edited = _src()
+    edited["resolved_title"] = "A different paper the recorder typed by hand"
+    _refused(_call(sources=[edited]), "edited after verification")
+    both = _src()
+    both["resolved_title"] = both["verification"]["resolved_title"] = "A different paper the recorder typed by hand"
+    _refused(_call(sources=[both]), "stamp does not match")
+    moved = _src()
+    moved["id"] = "87654321"  # a real-looking PMID swapped in after the fetch
+    _refused(_call(sources=[moved]), "stamp does not match")
+    assert not table.puts
+
+
+@pytest.mark.parametrize(
+    "kw, needle",
+    [
+        ({"verification": None}, "no verification block"),
+        ({"verification": {"resolver": "pubmed"}}, "fetched_at"),
+        ({"claim_supported_by": None}, "claim_supported_by"),
+        ({"claim_supported_by": "skimmed"}, "claim_supported_by"),
+        ({"claim_supported_by": "full_text_read"}, "needs review_depth full_text"),
+        ({"supports_note": "too short"}, "supports_note"),
+        ({"supports_note": "x" * 401}, "supports_note"),
+    ],
+)
+def test_support_is_asserted_by_a_reader_and_the_block_is_required(table, kw, needle):
+    _refused(_call(sources=[_src(**kw)]), needle)
+
+
+def test_the_stamp_is_the_documented_hash():
+    import hashlib
+
+    want = hashlib.sha256("pmid|1|T|2026-11-20T12:00:00Z".encode()).hexdigest()[:16]
+    assert rf.verification_stamp("pmid", "1", "T", "2026-11-20T12:00:00Z") == want
+
+
+# ── origin on every row, and the publishable() helper (audit addition) ──────────────────────────
+
+
+def test_origin_is_on_every_list_row(table):
+    _record(table)
+    _record(table, origin="retrospective", dedupe_key="older-one", date="2026-06-01", review_by="2026-09-01")
+    _record(table, origin="simulated", dedupe_key="rehearsal-one")
+    for status in trf.LIST_STATUSES:
+        for inc in (False, True):
+            rows = trf.tool_manage_research_finding({"action": "list", "status": status, "include_simulated": inc})["findings"]
+            assert all(r.get("origin") in rf.ORIGINS for r in rows), (status, inc)
+
+
+def test_publishable_by_origin():
+    assert rf.publishable({"origin": "prospective"}) == (True, [])
+    for view, needle in (
+        ({}, "missing"),
+        ({"origin": "invented"}, "missing"),
+        ({"origin": "simulated", "publication_eligible": True}, "rehearsal"),
+        ({"origin": "retrospective"}, "explicit publication_eligible"),
+        ({"origin": "retrospective", "publication_eligible": False}, "explicit publication_eligible"),
+    ):
+        ok, reasons = rf.publishable(view)
+        assert not ok and any(needle in r for r in reasons), view
+    assert rf.publishable({"origin": "retrospective", "publication_eligible": True}) == (True, [])
+
+
+def test_a_retrospective_finding_becomes_publishable_only_by_his_decision(table):
+    fid = _record(table, origin="retrospective", date="2026-06-01", review_by="2027-01-01")
+    view = trf.tool_manage_research_finding({"action": "list"})["findings"][0]
+    assert rf.publishable(view)[0] is False
+    _refused(_do("decide", fid, words="Fine to share.", publication_eligible="yes"), "true or false")
+    res = _do("decide", fid, words="Fine to share one day.", publication_eligible=True)
+    assert res["finding"]["publication_eligible"] is True and rf.publishable(res["finding"]) == (True, [])
+    res = _do("decide", fid, words="Changed my mind.", publication_eligible=False)
+    assert rf.publishable(res["finding"])[0] is False
+
+
+def test_nothing_calls_publishable_yet():
+    callers = []
+    for rel in _tracked("*.py"):
+        if rel == "lambdas/research/findings.py":
+            continue
+        if "publishable(" in (ROOT / rel).read_text(encoding="utf-8", errors="replace") and "rf.publishable" in (ROOT / rel).read_text(
+            encoding="utf-8", errors="replace"
+        ):
+            callers.append(rel)
+    assert not callers, f"a publish path now calls research.findings.publishable — review it on its own PR: {callers}"
+
+
 # ── the laptop verifier, offline ───────────────────────────────────────────────────────────
+
+CLAIM = "Does evening light exposure delay sleep onset in adults?"
+LIGHT_TITLE = "A synthetic randomized trial of evening light exposure and sleep onset"
+ABSTRACT_XML = "<PubmedArticle><Abstract><AbstractText>Evening light exposure delayed melatonin and sleep onset.</AbstractText></Abstract></PubmedArticle>"
 
 
 def _verifier():
@@ -703,100 +815,110 @@ def _stub(responses):
     return http
 
 
-def test_verifier_prints_a_source_the_tool_accepts_for_a_pmid():
+def _pmid_args(claim=CLAIM, title=LIGHT_TITLE, *extra):
+    return [
+        "--pmid", "23456789", "--title", title, "--authors", "Doe J", "--year", "2021", "--design", "randomized_trial",
+        "--review-depth", "abstract_only", "--claim", claim, "--supported-by", "abstract_read",
+        "--supports-note", "Synthetic: the trial reports later sleep onset after evening light.", *extra,
+    ]  # fmt: skip
+
+
+NOW = lambda: "2026-11-22T09:30:00Z"  # noqa: E731
+
+
+def test_verifier_fetches_and_emits_a_stamped_source_the_tool_accepts():
     rfv = _verifier()
-    title = "A synthetic randomized trial of evening light exposure"
-    http = _stub({"esummary": (200, _pubmed("23456789", title, "Doe J", 2021))})
-    code, out = rfv.run(
-        [
-            "--pmid",
-            "23456789",
-            "--title",
-            title,
-            "--authors",
-            "Doe J",
-            "--year",
-            "2021",
-            "--design",
-            "randomized_trial",
-            "--review-depth",
-            "abstract_only",
-        ],
-        http=http,
-        today=TODAY,
-    )
+    http = _stub({"esummary": (200, _pubmed("23456789", LIGHT_TITLE, "Doe J", 2021))})
+    text = lambda url: (200, ABSTRACT_XML)  # noqa: E731
+    code, out = rfv.run(_pmid_args(), http=http, text=text, now=NOW)
     assert code == 0, out
     src = json.loads(out)
-    assert src == rf.validate_source(src, today=TODAY) and src["resolved_title"] == title and src["verified_on"] == TODAY
+    v = src["verification"]
+    assert src == rf.validate_source(src, today=TODAY) and src["resolved_title"] == LIGHT_TITLE and src["verified_on"] == TODAY
+    assert v["resolver"] == "pubmed" and v["first_author"] == "Doe J" and v["year"] == 2021 and v["fetched_at"] == NOW()
+    assert v["stamp"] == rf.verification_stamp("pmid", "23456789", LIGHT_TITLE, NOW())
+    import hashlib
+
+    assert v["abstract_sha256"] == hashlib.sha256(b"Evening light exposure delayed melatonin and sleep onset.").hexdigest()
+    assert {"evening", "light", "exposure", "sleep", "onset"} <= set(v["overlap_terms"]) and v["overlap_count"] >= 2
+    assert "override_reason" not in v
     assert all("eutils.ncbi.nlm.nih.gov" in u for u in http.calls)
+    src["resolved_title"] = src["verification"]["resolved_title"] = "Edited by hand"
+    with pytest.raises(rf.FindingError, match="stamp does not match"):
+        rf.validate_source(src, today=TODAY)
+
+
+def test_the_overlap_tripwire_refuses_an_unrelated_paper_unless_overridden():
+    rfv = _verifier()
+    unrelated = "A synthetic trial of rotator cuff repair techniques"
+    http = _stub({"esummary": (200, _pubmed("23456789", unrelated, "Doe J", 2021))})
+    text = lambda url: (200, "")  # noqa: E731
+    code, out = rfv.run(_pmid_args(CLAIM, unrelated), http=http, text=text, now=NOW)
+    assert code == 1 and "NOT EMITTED" in out and "0 shared content word" in out and "not a check of support" in out
+    code, out = rfv.run(
+        [*_pmid_args(CLAIM, unrelated), "--override", "the trial's control arm is the relevant part"], http=http, text=text, now=NOW
+    )
+    assert code == 0, out
+    v = json.loads(out)["verification"]
+    assert v["override_reason"] == "the trial's control arm is the relevant part" and v["overlap_count"] == 0 and "abstract_sha256" not in v
+
+
+def test_overlap_counts_shared_content_words_not_stop_words():
+    rfv = _verifier()
+    assert rfv.subject_overlap("Does the effect of a trial in adults improve?", "The effect of a trial in adults", "") == []
+    assert rfv.subject_overlap("Evening light delays sleep", "Evening lights and sleep", "") == ["evening", "light", "sleep"]
 
 
 def test_verifier_resolves_a_doi_through_crossref():
     rfv = _verifier()
-    title = "A synthetic meta-analysis of resistance training volume"
+    title = "A synthetic meta-analysis of evening light exposure"
     body = {
         "message": {
             "title": [title],
-            "author": [{"family": "Roe", "sequence": "first"}],
+            "author": [{"family": "Roe", "given": "A", "sequence": "first"}],
             "issued": {"date-parts": [[2022]]},
             "type": "journal-article",
+            "abstract": "<jats:p>Evening light and sleep onset.</jats:p>",
         }
     }
-    code, out = rfv.run(
-        [
-            "--doi",
-            "10.1000/synth.22",
-            "--title",
-            title,
-            "--authors",
-            "Roe A",
-            "--year",
-            "2022",
-            "--design",
-            "meta_analysis",
-            "--review-depth",
-            "full_text",
-        ],
-        http=_stub({"crossref": (200, body)}),
-        today=TODAY,
-    )
+    args = ["--doi", "10.1000/SYNTH.22", "--title", title, "--authors", "Roe A", "--year", "2022", "--design", "meta_analysis",
+            "--review-depth", "full_text", "--claim", CLAIM, "--supported-by", "full_text_read",
+            "--supports-note", "Synthetic: the pooled effect on sleep onset is reported."]  # fmt: skip
+    code, out = rfv.run(args, http=_stub({"crossref": (200, body)}), text=lambda u: (404, ""), now=NOW)
     assert code == 0, out
-    assert json.loads(out)["id_kind"] == "doi"
+    src = json.loads(out)
+    assert src["id"] == "10.1000/synth.22" and src["verification"]["resolver"] == "crossref" and src["verification"]["year"] == 2022
+    assert "abstract_sha256" in src["verification"]
 
 
 @pytest.mark.parametrize(
     "body, needle",
     [
         (_pubmed("23456789", "Something else entirely", "Doe J", 2021), "does not match"),
-        (
-            _pubmed("23456789", "A synthetic randomized trial of evening light exposure", "Doe J", 2021, ("Retracted Publication",)),
-            "rejected",
-        ),
+        (_pubmed("23456789", LIGHT_TITLE, "Doe J", 2021, ("Retracted Publication",)), "rejected"),
         ({"result": {"uids": []}}, "not_found"),
     ],
 )
 def test_verifier_refuses_a_mismatch_a_retraction_or_a_missing_record(body, needle):
     rfv = _verifier()
-    code, out = rfv.run(
-        ["--pmid", "23456789", "--title", "A synthetic randomized trial of evening light exposure", "--authors", "Doe J", "--year", "2021",
-         "--design", "randomized_trial", "--review-depth", "abstract_only"],
-        http=_stub({"esummary": (200, body)}),
-        today=TODAY,
-    )  # fmt: skip
+    code, out = rfv.run(_pmid_args(), http=_stub({"esummary": (200, body)}), text=lambda u: (200, ""), now=NOW)
     assert code == 1 and needle in out, out
 
 
 def test_verifier_checks_a_guideline_page_title_and_refuses_an_off_list_host():
     rfv = _verifier()
-    page = lambda url: (200, "<html><head><title>Synthetic guideline on sleep hygiene | NICE</title></head></html>")  # noqa: E731
-    ok_args = ["--guideline-url", "https://www.nice.org.uk/guidance/ng000", "--title", "Synthetic guideline on sleep hygiene",
-               "--design", "clinical_guideline", "--review-depth", "full_text"]  # fmt: skip
-    code, out = rfv.run(ok_args, page=page, today=TODAY)
+    page = '<html><head><title>Evening light and sleep onset guideline | NICE</title><meta name="description" content="Evening light advice."></head></html>'
+    text = lambda url: (200, page)  # noqa: E731
+    ok_args = ["--guideline-url", "https://www.nice.org.uk/guidance/ng000", "--title", "Evening light and sleep onset guideline",
+               "--design", "clinical_guideline", "--review-depth", "full_text", "--claim", CLAIM, "--supported-by", "full_text_read",
+               "--supports-note", "Synthetic: the guideline's evening light section."]  # fmt: skip
+    code, out = rfv.run(ok_args, text=text, now=NOW)
     assert code == 0, out
-    assert json.loads(out)["id_kind"] == "guideline_url"
-    code, out = rfv.run([*ok_args[:1], "https://example.org/guide", *ok_args[2:]], page=page, today=TODAY)
+    v = json.loads(out)["verification"]
+    assert v["resolver"] == "guideline_page" and v["first_author"] == "www.nice.org.uk" and "abstract_sha256" in v
+    code, out = rfv.run([*ok_args[:1], "https://example.org/guide", *ok_args[2:]], text=text, now=NOW)
     assert code == 1 and "not an allow-listed guideline host" in out
-    code, out = rfv.run([*ok_args[:3], "A different guideline", *ok_args[4:]], page=page, today=TODAY)
+    code, out = rfv.run([*ok_args[:3], "A different guideline", *ok_args[4:]], text=text, now=NOW)
     assert code == 1 and "does not carry" in out
 
 
@@ -805,3 +927,4 @@ def test_verifier_imports_the_existing_resolvers_rather_than_copying_them():
     assert "import library_evidence_review as ler" in src and "ler.verify_citation(" in src
     for fn in ("def verify_pmid", "def verify_doi", "def verify_citation", "def titles_match"):
         assert fn not in src
+    assert "does NOT prove the Lambda verified anything" in src and "not a check that the paper SUPPORTS" in src

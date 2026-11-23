@@ -837,9 +837,14 @@ coach prompt, page or email reads it. The Lambda makes no network call: each sou
 ```bash
 # 1. Verify a source (read-only GETs to PubMed / Crossref, or to an allow-listed guideline host) and copy what it prints:
 python3 scripts/research_finding_verify.py --pmid <PMID> --title "<title as read>" --authors "<Surname AB>" --year <YYYY> \
-  --design meta_analysis --review-depth abstract_only
+  --design meta_analysis --review-depth abstract_only --claim "<the finding's question>" \
+  --supported-by abstract_read --supports-note "<what in it supports the finding>"
 python3 scripts/research_finding_verify.py --guideline-url https://www.nice.org.uk/guidance/<id> --title "<title>" \
-  --design clinical_guideline --review-depth full_text
+  --design clinical_guideline --review-depth full_text --claim "..." --supported-by full_text_read --supports-note "..."
+# Paste the printed object UNEDITED: its verification.stamp covers id, title and fetch time, and an edited title is
+# refused. The stamp proves the object came unedited from the script, not that the Lambda verified anything (it has no
+# network). Low subject overlap between --claim and the title+abstract refuses to emit unless --override "<reason>"
+# (a tripwire for an unrelated paper, not a check that the paper supports the claim).
 # 2. In a Claude session: manage_research_finding action=record ... sources=[<the printed objects>]
 # 3. The dead-man is a count the owner reads, not an alarm: manage_research_finding action=list status=stale
 ```
