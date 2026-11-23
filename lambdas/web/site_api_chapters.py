@@ -56,7 +56,8 @@ THE EDITIONS (#6193), only while ``content.chapter_editions.LIVE`` is True. Off,
 is never in the response — byte-identical to the response before #6193. On, ``editions`` lists, per chapter, the latest
 APPROVED second (or later) edition that passes every publication gate at serve time (``chapter_editions.public_view``
 with this request's ``narrative_publication.is_tainted``), with its approved archival rendering of the first edition when
-one passes too; a failed read is ``null`` + ``editions_error``, never ``[]``. The weeks, their dates and their urls are
+one passes too, and ``edition_withdrawals`` lists the owner's dated withdrawals (#6193 B7); a failed read is ``null`` +
+``editions_error``, never ``[]``. The weeks, their dates and their urls are
 never changed by an edition: the chapter keeps its first-published date, and nothing here reaches a feed or a sender.
 
 The prologue (manifest ``week`` 0, dated before genesis) is not a program week and is not
@@ -351,14 +352,18 @@ def editions_field(
     try:
         from privacy import privacy_guard  # noqa: PLC0415 — the chronicle's publish gate (fail-closed on no vocabulary)
 
+        rows = read_editions()
         view = chapter_editions.public_view(
-            read_editions(),
+            rows,
             tainted=tainted,
             private_calls=private_call_check.for_text(private_calls()),
             filter_hits=privacy_guard.find_violations,
             log=logger.warning,
         )
-        return {"editions": view}
+        # #6193 B7: the owner's withdrawals (chapter, what, number, day — never a note), so a verifier can say "withdrawn";
+        # the key is present only when there is one, so with none the response is exactly the one before it
+        gone = chapter_editions.public_withdrawals(rows)
+        return {"editions": view, **({"edition_withdrawals": gone} if gone else {})}
     except Exception as e:  # noqa: BLE001 — a failed read is said, never served as "no editions"
         logger.error(f"[chapters] editions read failed: {type(e).__name__}: {e}")
         return {"editions": None, "editions_error": "the editions could not be read for this response"}

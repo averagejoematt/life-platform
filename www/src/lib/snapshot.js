@@ -5,8 +5,8 @@ import { getCollection } from "astro:content";
 
 import { buildIndex, COLLECTION_OF, connected } from "./edges.js";
 import { hasPage } from "./url.js";
-import { applyDerivedCovers, applyHeaderRevisions } from "./chapter_truth.js";
-import { editionFor } from "./chapter_editions.js";
+import { applyChapterSummaries, applyDerivedCovers } from "./chapter_truth.js";
+import { editionFor, editionOrdinal } from "./chapter_editions.js";
 
 let _cache = null;
 
@@ -36,9 +36,10 @@ export async function loadAll() {
   // #6177 (behind lib/chapter_truth.js CHAPTER_TRUTH_LIVE; a no-op while it is off): a published chapter with no stored
   // covered days reads the days the platform's rule gives every other chapter, so every page names one span for it.
   applyDerivedCovers(byType.chapter || []);
-  // the owner-approved replacement summaries (owner ruling 2026-11-22 §10) — never on a chapter serving a later edition
+  // the ONE summary rule (chapter_truth.js applyChapterSummaries): a served edition's own summary (#6193 B4), else the
+  // owner-approved replacement (owner ruling 2026-11-22 §10, behind CHAPTER_TRUTH_LIVE), else the served one
   const editionDoc = await loadChapterEditions();
-  applyHeaderRevisions(byType.chapter || [], undefined, undefined, (id) => Boolean(editionFor(editionDoc, id)));
+  applyChapterSummaries(byType.chapter || [], (id) => editionFor(editionDoc, id), undefined, undefined, editionOrdinal);
   const index = buildIndex(objects);
   const lookup = new Map(objects.map((o) => [`${o.type}:${o.id}`, o]));
   _cache = { byType, objects, index, get: (type, id) => lookup.get(`${type}:${id}`) || null };

@@ -23,6 +23,8 @@ export function footLine(live = CHAPTER_TRUTH_LIVE) {
 export const PERSONA_DISCLOSURE = "Margaret Calloway is an AI editorial persona of the platform, not a person.";
 export const LEGACY_SIGNER = "Margaret Calloway";
 export const PLATFORM_SIGNATURE = "Average Joe Matt editorial record";
+/** #6193: pass as `edition` to correctionsHtml on the archival first-edition page. */
+export const ARCHIVAL_PAGE = Object.freeze({ archival: true });
 
 const esc = (x) => String(x ?? "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
 
@@ -59,6 +61,8 @@ function approvalWords(c) {
  *  sentence #6177 shipped, unchanged; with one, it says whether the edition makes the correction. */
 function textBelow(c, edition) {
   if (!edition) return footLine(); // #6177: off = "The chapter's text below is unchanged; it reads as first published."
+  // #6193 B6: on the archival page the text below is the historical rendering the correction concerns, not the current one
+  if (edition === ARCHIVAL_PAGE) return "It concerns the chapter as published; the text below is an archival rendering of it, superseded by the current edition.";
   const carried = Array.isArray(edition.carries) && edition.carries.includes(c.id);
   return carried ? "The text below is a later edition, and it makes this correction." : "It was made to the first edition; the text below is a later edition.";
 }

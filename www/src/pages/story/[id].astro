@@ -18,7 +18,8 @@ import { placeRecordNote } from "../../lib/record_note.js";
 import { PERSONA_DISCLOSURE, correctionsFor, correctionsHtml, namesLegacyPersona } from "../../lib/chapter_corrections.js"; // #6177
 import { loadChapterCorrections } from "../../lib/snapshot.js";
 import { CHAPTER_TRUTH_LIVE, chapterByline, headerRevisedLine, recordAsOf } from "../../lib/chapter_truth.js"; // #6177: byline, record date, covered days
-import { ARCHIVE_SEGMENT, archivalFor, editionFor, editionReading } from "../../lib/chapter_editions.js"; // #6193
+import { ARCHIVE_SEGMENT, archivalFor, archivalWhat, editionFor, editionReading } from "../../lib/chapter_editions.js"; // #6193
+import { bodyForPage } from "../../lib/chapter_body.js";
 import { loadChapterEditions } from "../../lib/snapshot.js";
 
 export async function getStaticPaths() {
@@ -90,27 +91,7 @@ const publishedWords = chapterPublished(c, { lower: true });
 const legacyNo = /^week-(\d+)$/.exec(c.id);
 // #6161: the numbering notes are plain sentences at the foot of the chapter, never before its prose; the prologue has none.
 const idNote = legacyNo && c.week >= 1 && Number(legacyNo[1]) !== c.week ? "This page keeps the address it was first published at." : null;
-// The body as published, with two presentation-only touches (2026-11-14): the narrator's opening "signature" lines are
-// told apart — an editor's note (`note`) and the filed stat line, "Day N · …" (`filed`) — and the dek the header
-// already shows is not printed twice — as a signature line, or as the first plain paragraph (#6161: Week 6 printed its
-// dek, then the same sentence as paragraph one). No word of the text changes.
-const plain = (h: string) => h.replace(/<[^>]+>/g, "").replace(/&#39;|&#x27;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
-function bodyForPage(html: string | null | undefined, dek: string | null | undefined): string | null {
-  if (!html) return null;
-  let dropped = false;
-  const out = html.replace(/<p class="signature">([\s\S]*?)<\/p>/g, (whole, inner) => {
-    const t = plain(inner);
-    if (!dropped && dek && t === dek.trim()) {
-      dropped = true;
-      return "";
-    }
-    if (/^editor[’']s note/i.test(t)) return `<p class="signature note">${inner}</p>`;
-    if (/^Day \d+\s*·/.test(t)) return `<p class="signature filed">${inner}</p>`;
-    return whole;
-  });
-  if (dropped || !dek) return out;
-  return out.replace(/<p>([\s\S]*?)<\/p>/, (whole, inner) => (plain(inner) === dek.trim() ? "" : whole));
-}
+// The body as published, with two presentation-only touches (lib/chapter_body.js, shared with the archival page).
 // #6193: an approved later edition is the text at the canonical address (chapter_editions.json exists only while the
 // switch is on); the chronicle row and its first edition are never changed, and the header says which edition this is.
 const editionDoc = await loadChapterEditions();
@@ -118,8 +99,9 @@ const chapterEdition = c.status === "published" ? editionFor(editionDoc, c.id) :
 const archival = chapterEdition ? archivalFor(editionDoc, c.id) : null;
 const bodySource = chapterEdition ? chapterEdition.body_html : c.body_html;
 const reading = chapterEdition ? editionReading(chapterEdition) : { word_count: c.word_count, read_minutes: c.read_minutes };
-// #6177: the served summary, even when an approved replacement is shown in the header (never with an edition)
-const rawBody = bodyForPage(bodySource, c.excerpt_first || c.excerpt);
+// #6177: the served summary, even when an approved replacement is shown in the header. #6193 B4: an edition's body never
+// carries its title or summary lines (they are the heading and the header summary), so nothing is matched against it.
+const rawBody = bodyForPage(bodySource, chapterEdition ? null : c.excerpt_first || c.excerpt);
 const revisedLine = headerRevisedLine(c);
 // #6177: approved, platform-signed corrections sit BESIDE the text (above it), never in it; a body that carries a note
 // signed by the legacy editor persona gets the one disclosure line above it. Neither touches the body's bytes.
@@ -253,7 +235,7 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
           {reading.word_count && <span>{num(reading.word_count)} words</span>}
           {episode && episode.duration_sec && <span>Listen · {mins(episode.duration_sec)}</span>}
           {c.status === "published" && <span class="muted" data-byline>{chapterByline(c)}</span>}
-        </div>{/* #6193: nothing (not even whitespace) is emitted here without an edition */ chapterEdition && <p class="muted" style="font-size:14px;line-height:1.5;margin:0;font-family:var(--sans)" data-edition-line><b style="color:var(--ink)">{chapterEdition.edition_line}</b> <span>Signed: {chapterEdition.signature.split(" — ").slice(-1)[0]}.</span>{archival && <> <a href={href(`/story/${c.id}/${ARCHIVE_SEGMENT}/`)} data-first-edition-link>The first edition, as archived →</a></>}</p>}
+        </div>{/* #6193: nothing (not even whitespace) is emitted here without an edition */ chapterEdition && <p class="muted" style="font-size:14px;line-height:1.5;margin:0;font-family:var(--sans)" data-edition-line><b style="color:var(--ink)">{chapterEdition.edition_line}</b> <span>Signed: {chapterEdition.signature.split(" — ").slice(-1)[0]}.</span>{archival && <> <a href={href(`/story/${c.id}/${ARCHIVE_SEGMENT}/`)} data-first-edition-link>{archival.as_of ? `The text ${archivalWhat(archival)}, archived →` : "The first edition, as archived →"}</a></>}</p>}
       </div>
     </div>
   </section>

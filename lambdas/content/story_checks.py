@@ -173,12 +173,41 @@ def _is_a_legitimate_number(text: str, m: "re.Match[str]") -> bool:
     return False
 
 
+# THE ONE NARROW EXCEPTION (owner ruling 2026-11-22, final approval §7: "Relax Elena's no-attempt-count restriction
+# narrowly to permit my own explicitly approved statement. Do not infer a lifetime number of attempts."). His approved
+# statement may carry its count ONLY as an exact quotation — these words, character for character, inside quotation
+# marks. The same words are the `beginning` pin of www/src/lib/own_words.js (tests pin the two equal); a paraphrase, a
+# changed character, the words without quotation marks, or any count outside the quotation is refused exactly as before.
+OWN_WORDS_COUNT_QUOTES = ("By my own count the 15th or 16th reset in a few months.",)
+_OPEN_QUOTE = '"“'
+_CLOSE_QUOTE = '"”'
+
+
+def own_quote_spans(text: str) -> List[tuple]:
+    """``[(start, end)]`` of every exact, quoted occurrence of a pinned own-words statement in ``text``."""
+    spans = []
+    for q in OWN_WORDS_COUNT_QUOTES:
+        at = 0
+        while (i := (text or "").find(q, at)) >= 0:
+            j = i + len(q)
+            if i > 0 and text[i - 1] in _OPEN_QUOTE and j < len(text) and text[j] in _CLOSE_QUOTE:
+                spans.append((i, j))
+            at = j
+    return spans
+
+
+def _inside(m: "re.Match[str]", spans: List[tuple]) -> bool:
+    return any(a <= m.start() and m.end() <= b for a, b in spans)
+
+
 def _count_findings(text: str) -> List[str]:
-    """Every cycle/reset/attempt count in ``text`` — the count half of ``reader_surface``, one finding per phrase."""
+    """Every cycle/reset/attempt count in ``text`` — the count half of ``reader_surface``, one finding per phrase. A count
+    inside an exact quotation of his pinned statement (``OWN_WORDS_COUNT_QUOTES``) is his words, not the writer's."""
     seen: Set[str] = set()
+    spans = own_quote_spans(text or "")
     for pat in _COUNT_PATTERNS:
         for m in pat.finditer(text or ""):
-            if not _is_a_legitimate_number(text, m):
+            if not _is_a_legitimate_number(text, m) and not _inside(m, spans):
                 seen.add(m.group(0))
     return [
         f"story-door: a cycle/attempt count is not reader copy (owner ruling 2026-09-26): {p!r}"
@@ -219,8 +248,11 @@ _REFERENCE_PATTERNS = [
 
 def _reference_findings(text: str) -> List[str]:
     seen: List[str] = []
+    spans = own_quote_spans(text or "")
     for pat in _REFERENCE_PATTERNS:
         for m in pat.finditer(text or ""):
+            if _inside(m, spans):
+                continue
             noun = (m.groupdict().get("noun") or "").lower()
             if noun.startswith(("attempt", "tries")) and _LIFT_AFTER.match(text[m.end() :]):
                 continue  # "his previous attempt at 225"
