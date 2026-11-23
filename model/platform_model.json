@@ -444,6 +444,12 @@
       "stack": "monitoring_stack",
       "via": "factory:_heartbeat_alarm"
     },
+    "ingestion-error-coach-recommendation-writer": {
+      "kind": "metric",
+      "routing": "digest",
+      "stack": "compute_stack",
+      "via": "constructor:create_platform_lambda"
+    },
     "ingestion-error-inbound-auth-gate": {
       "kind": "metric",
       "routing": "digest",
@@ -1130,7 +1136,7 @@
   ],
   "cost_surface": {
     "ai_features": 30,
-    "alarms": 152,
+    "alarms": 153,
     "emf_namespaces": 34,
     "schedules": 97,
     "secrets": 31
@@ -7137,6 +7143,15 @@
       "stack": "compute_stack",
       "timeout_seconds": 30
     },
+    "coach-recommendation-writer": {
+      "declared_alarm": null,
+      "handler": "coach.recommendation_writer_lambda.lambda_handler",
+      "memory_mb": 256,
+      "module": "lambdas/coach/recommendation_writer_lambda.py",
+      "schedules": [],
+      "stack": "compute_stack",
+      "timeout_seconds": 30
+    },
     "coach-state-updater": {
       "declared_alarm": null,
       "handler": "coach.coach_state_updater.lambda_handler",
@@ -8414,9 +8429,9 @@
       "schedules": "the lambdas plane's schedule= declarations, flattened one row per (lambda, cron); utc = HH:MM only for a fixed-time UTC cron; a zoned row (#4284) carries tz + local instead"
     },
     "counts": {
-      "alarms": 152,
+      "alarms": 153,
       "alarms_by_routing": {
-        "digest": 108,
+        "digest": 109,
         "digest+paging": 2,
         "digest+urgent": 10,
         "paging": 2,
@@ -8429,7 +8444,7 @@
       "contracts_known": 15,
       "contracts_ratchet": 16,
       "edges": 806,
-      "lambdas": 107,
+      "lambdas": 108,
       "mcp_tool_modules": 45,
       "mcp_tools": 96,
       "partitions": 128,
@@ -8442,9 +8457,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 390,
+        "sites_dynamic": 392,
         "sites_resolved": 1011,
-        "sites_total": 1401
+        "sites_total": 1403
       },
       "schedule_resolution": {
         "dynamic": 0,

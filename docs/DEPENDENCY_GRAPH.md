@@ -96,7 +96,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 | `whoop-data-ingestion` | ingestion_stack | `cron(0 5,9,13,17,21 * * ? *)` (America/Los_Angeles, not UTC) + `cron(20 11 * * ? *)` (America/Los_Angeles, not UTC) + `cron(30 10 * * ? *)` (America/Los_Angeles, not UTC) | table, table, table |
 | `withings-data-ingestion` | ingestion_stack | `cron(5 7,10,14,17 * * ? *)` (America/Los_Angeles, not UTC) | table |
 
-**Unscheduled lambdas (27)** — webhook/S3-trigger/invoked-on-demand: `bluesky-social-ingestion`, `chronicle-podcast`, `coach-computation-engine`, `coach-ensemble-digest`, `coach-narrative-orchestrator`, `coach-observatory-renderer`, `coach-quality-gate`, `coach-state-updater`, `elena-state-updater`, `email-subscriber`, `food-delivery-ingestion`, `health-auto-export-webhook`, `inbound-auth-gate`, `insight-email-parser`, `life-platform-data-export`, `life-platform-key-rotator`, `life-platform-og-image`, `life-platform-remediation-dispatcher`, `life-platform-site-api`, `life-platform-site-api-ai`, `macrofactor-data-ingestion`, `mastodon-social-ingestion`, `measurements-ingestion`, `progress-viewer`, `reading-cover-pipeline`, `telegram-webhook`, `youtube-social-ingestion`
+**Unscheduled lambdas (28)** — webhook/S3-trigger/invoked-on-demand: `bluesky-social-ingestion`, `chronicle-podcast`, `coach-computation-engine`, `coach-ensemble-digest`, `coach-narrative-orchestrator`, `coach-observatory-renderer`, `coach-quality-gate`, `coach-recommendation-writer`, `coach-state-updater`, `elena-state-updater`, `email-subscriber`, `food-delivery-ingestion`, `health-auto-export-webhook`, `inbound-auth-gate`, `insight-email-parser`, `life-platform-data-export`, `life-platform-key-rotator`, `life-platform-og-image`, `life-platform-remediation-dispatcher`, `life-platform-site-api`, `life-platform-site-api-ai`, `macrofactor-data-ingestion`, `mastodon-social-ingestion`, `measurements-ingestion`, `progress-viewer`, `reading-cover-pipeline`, `telegram-webhook`, `youtube-social-ingestion`
 
 ## 2. DynamoDB Partitions (ADR-077 census)
 
@@ -290,7 +290,7 @@ traced through the stack, the factory body under that call's own arguments, or t
 helper the alarm variable is handed to. `via-composite` = the member routes nowhere
 itself; its composite does. `unresolved` is stated, never guessed.
 
-Routing: digest 108 · digest+paging 2 · digest+urgent 10 · paging 2 · urgent 27 · via-composite 3 — of 152 alarms (4 composite)
+Routing: digest 109 · digest+paging 2 · digest+urgent 10 · paging 2 · urgent 27 · via-composite 3 — of 153 alarms (4 composite)
 
 | Alarm | Stack | Kind | Routing | Via | Audience |
 |-------|-------|------|---------|-----|----------|
@@ -363,6 +363,7 @@ Routing: digest 108 · digest+paging 2 · digest+urgent 10 · paging 2 · urgent
 | `ingest-reconciliation-strava-heartbeat` | monitoring_stack | metric | digest | factory:_heartbeat_alarm |  |
 | `ingest-reconciliation-whoop` | monitoring_stack | metric | digest | factory:_alarm |  |
 | `ingest-reconciliation-whoop-heartbeat` | monitoring_stack | metric | digest | factory:_heartbeat_alarm |  |
+| `ingestion-error-coach-recommendation-writer` | compute_stack | metric | digest | constructor:create_platform_lambda |  |
 | `ingestion-error-inbound-auth-gate` | operational_stack | metric | digest | constructor:create_platform_lambda |  |
 | `ingestion-error-insight-email-parser` | operational_stack | metric | digest | constructor:create_platform_lambda |  |
 | `ingestion-error-og-image-generator` | operational_stack | metric | digest | constructor:create_platform_lambda |  |
@@ -599,9 +600,9 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1401 total · 1011 resolved · 390 dynamic (unresolvable at AST time, tagged — never guessed)
-- Schedules: 80 resolved · 0 dynamic of 80 scheduled lambdas (107 lambdas total)
-- Alarms: 152 literal-named declarations across three idioms, 4 composite; routing digest 108 · digest+paging 2 · digest+urgent 10 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
+- Edge sites: 1403 total · 1011 resolved · 392 dynamic (unresolvable at AST time, tagged — never guessed)
+- Schedules: 80 resolved · 0 dynamic of 80 scheduled lambdas (108 lambdas total)
+- Alarms: 153 literal-named declarations across three idioms, 4 composite; routing digest 109 · digest+paging 2 · digest+urgent 10 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 27 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only
 - Schedules: 97 (lambda, cron) rows; UTC clock on fixed rows, zone + wall-clock if zoned (#4284)
 - Record families referenced in code but outside the SOURCE_CLASS census (7): `brief_trial`, `coach_credibility`, `coach_thread`, `intelligence_quality`, `journal`, `platform_memory`, `zone2_efficiency` — special-cased in `phase_taxonomy` (category-split `platform_memory`, predicate-classified sk-families) or not yet live; `classify()` raises loudly for a genuinely unknown source by design
@@ -618,7 +619,7 @@ baseline in the same diff, so a new cost-bearing surface cannot appear silently.
 | Surface | Count | Registry |
 |---------|-------|----------|
 | ai_features | 30 | `lambdas/ai/budget_guard.py::_FEATURE_CUTOFF` |
-| alarms | 152 | this model's alarms plane (CDK AST) |
+| alarms | 153 | this model's alarms plane (CDK AST) |
 | emf_namespaces | 34 | `deploy/emf_namespace_ledger.py::LEDGER` |
 | schedules | 97 | this model's schedules plane (CDK AST) |
 | secrets | 31 | `tests/test_secret_references.py::KNOWN_SECRETS` |
