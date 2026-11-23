@@ -337,7 +337,7 @@ def check_story_season(
         # #6176 item 4: the sender reads this same committed switch and logs '[outbound-trial] ... suppressed' instead of
         # sending, so a paused Monday is the recognised state, not a miss.
         questions_c.ok(
-            f"Monday story questions paused by the outbound trial ({outbound_trial.TRIAL_ISSUE}, #6174) — "
+            f"Monday story questions paused by the owner's email consolidation ({outbound_trial.TRIAL_ISSUE}, #6174) — "
             f"no send owed for {slot.date().isoformat()}; the sender logs its suppression"
         )
     elif owed is None:

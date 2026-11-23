@@ -85,12 +85,9 @@ def test_nudge_probe_reprompts_only_whats_missing(monkeypatch):
     assert nudge._missing_felt_probe("2026-07-19") == ["felt_connection", "felt_time"]
 
 
-def test_nudge_has_labels_and_titles_for_every_probe_metric():
-    from emails import evening_nudge_lambda as nudge
-
-    for m in ritual_link.WEEKLY_PROBE_METRICS:
-        assert len(nudge.RITUAL_LABELS[m]) == 5
-        assert nudge.RITUAL_METRIC_TITLES[m]
+# #6243 (owner ruling 2026-11-23): the nudge's one-tap section — and with it the probe's labels and titles — left the
+# email (tests/test_evening_ritual_nudge_links.py pins the rendered absence). The probe's signed rail and its ledger
+# below are unchanged.
 
 
 # ── the calibration endpoint ──────────────────────────────────────────────────
