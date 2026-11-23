@@ -5008,6 +5008,27 @@ STRUCTURAL_HAND_PROOFS["structural::test_recommendation_record_6158.py"] = {
     "proved_on": "2026-11-22",
 }
 
+# #6216 — two guards that covered the listed sources, not the set: every story_checks.all_findings caller passes
+# owner_lines (the fallback writer's gate skipped the attribution check), and no prompt source under lambdas/ or scripts/
+# states the narrator with a retired phrase (the identity renders from content/elena_canon.py).
+STRUCTURAL_HAND_PROOFS["structural::test_narrator_gate_and_identity_sets_6216.py"] = {
+    "gate_name": "test_narrator_gate_and_identity_sets_6216.py",
+    "command": "python3 -m pytest tests/test_narrator_gate_and_identity_sets_6216.py -q -p no:warnings   # baseline 6 passed",
+    "mutation": (
+        "Three plants, ONE AT A TIME, each restored from a copy: M1 the owner_lines= keyword deleted from "
+        "story_pipeline.legacy_gate_findings' all_findings call; M2 elena_state_updater's system prompt put back to "
+        "'the embedded journalist who'; M3 panelcast_repair's revision prompt put back to 'ELENA VOSS (embedded journalist)'."
+    ),
+    "observed": "2026-11-22, #6216 lane. BASELINE 6 passed. M1 2 failed; M2 2 failed; M3 1 failed. REVERTED 6 passed.",
+    "scope": (
+        "Every .py under lambdas/, mcp/ and scripts/ parsed for all_findings call sites (a call spelled through **kwargs "
+        "passes); string literals (adjacent literals joined, comments excluded) under lambdas/ and scripts/ for four retired "
+        "phrases, with the two spoken intro lines allowlisted. NOT SEEN: a prompt built from a file read at run time; "
+        "config/ and the S3 board config (test_elena_config_twins_6196 owns those); phrasings such as 'literary journalist'."
+    ),
+    "proved_on": "2026-11-22",
+}
+
 # #6178 — the narrator named on every byline: the chapter page, the home card and the story index read one definition
 # (www/src/lib/narrator.js), the RSS channel and the subscribe page carry it verbatim, the owner's first-person lines
 # stay byte-identical, and no rendered byline under www/src still says "the platform's narrator".
