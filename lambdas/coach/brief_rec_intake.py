@@ -138,6 +138,23 @@ def offer_payload(offer: Offer, *, send_day: str, token_hash: str, ses_message_i
     }
 
 
+class WriterFailed(RuntimeError):
+    """The writer ran and failed (its own exception); `error_type` is the class it reported."""
+
+    def __init__(self, error_type: str):
+        super().__init__("recommendation writer failed: " + error_type)
+        self.error_type = error_type
+
+
+def failure_class(e: Exception) -> str:
+    """The class name the SEND# row records for a failed invoke: the writer's own exception, the Lambda service's
+    error code (TooManyRequestsException = throttled), or the client's (ReadTimeoutError = timed out)."""
+    if isinstance(e, WriterFailed):
+        return e.error_type
+    code = (getattr(e, "response", None) or {}).get("Error", {}).get("Code")
+    return str(code or type(e).__name__)
+
+
 def invoke_writer(payload: dict[str, Any], client=None) -> dict[str, Any]:
     """Synchronous invoke of `coach-recommendation-writer`. Raises when the writer failed (the caller logs and goes on)."""
     if client is None:
@@ -147,7 +164,7 @@ def invoke_writer(payload: dict[str, Any], client=None) -> dict[str, Any]:
     resp = client.invoke(FunctionName=os.environ.get("REC_WRITER_FUNCTION", WRITER_FUNCTION), Payload=json.dumps(payload, default=str))
     body = json.loads(resp["Payload"].read() or b"{}")
     if resp.get("FunctionError"):
-        raise RuntimeError("recommendation writer failed: " + str((body or {}).get("errorType") or "error"))
+        raise WriterFailed(str((body or {}).get("errorType") or "error"))
     return body
 
 

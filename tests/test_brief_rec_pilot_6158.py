@@ -478,7 +478,7 @@ def test_a_real_outcome_closes_the_loop(live, table, monkeypatch):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# the writer: the only brief-side principal, create-only
+# the writer: the brief's dedicated writer, create-only
 # ══════════════════════════════════════════════════════════════════════════════
 
 WRITER = ROOT / "lambdas/coach/recommendation_writer_lambda.py"

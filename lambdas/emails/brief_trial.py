@@ -494,9 +494,10 @@ def _pilot_record(table, pk: str, trial: Trial, sent, logger) -> dict:
             out["rec_offer"] = res.get("state")
             if res.get("reason"):
                 out["rec_offer_reason"] = res["reason"]
-        except Exception as e:  # noqa: BLE001 — logged, never reconstructed later
-            logger.warning("[brief_rec_pilot] offer not recorded rec=%s: %s", offer.canonical_rec_id, type(e).__name__)
-            out["rec_offer"] = "writer_failed"
+                logger.warning("[brief_rec_pilot] offer refused by the writer rec=%s: %s", offer.canonical_rec_id, res["reason"])
+        except Exception as e:  # noqa: BLE001 — logged + on the SEND# row; never retried, never reconstructed later
+            out["rec_offer"], out["rec_offer_error"] = "writer_failed", intake.failure_class(e)
+            logger.warning("[brief_rec_pilot] offer not recorded rec=%s: %s", offer.canonical_rec_id, out["rec_offer_error"])
     if msg and p.get("follow_up_rec_id"):
         out["follow_up_rec_id"] = p["follow_up_rec_id"]  # asked once: this row is the proof it was asked
         if trial.follow_token and trial.follow_token_row:
@@ -513,8 +514,8 @@ def _pilot_record(table, pk: str, trial: Trial, sent, logger) -> dict:
     try:
         out["rec_answers"] = (intake.invoke_writer({"action": "carry"}) or {}).get("counts") or "writer_failed"
     except Exception as e:  # noqa: BLE001
-        logger.warning("[brief_rec_pilot] answers not carried this run (they stay on their token rows): %s", type(e).__name__)
-        out["rec_answers"] = "writer_failed"
+        out["rec_answers"], out["rec_answers_error"] = "writer_failed", intake.failure_class(e)
+        logger.warning("[brief_rec_pilot] answers not carried this run (they stay on their token rows): %s", out["rec_answers_error"])
     return out
 
 

@@ -401,8 +401,9 @@ class ComputeStack(Stack):
         )
         coach_vision_absent.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
-        # #6158 Morning Brief pilot (OWNER-REQUIRED, dark): `coach-recommendation-writer`, the ONE function that writes
-        # the canonical recommendation record for the brief. PutItem-only, LeadingKeys-scoped to the record partition
+        # #6158 Morning Brief pilot (OWNER-REQUIRED, dark): `coach-recommendation-writer`, the dedicated function that
+        # writes the brief's recommendations into the canonical record (not the partition's only possible writer: older
+        # table-wide grants on other roles remain, #6237). PutItem-only, LeadingKeys-scoped to the record partition
         # (`rp.compute_recommendation_writer`); invoked synchronously by daily-brief and by nothing else — no schedule,
         # no URL, no event source. No absence heartbeat: it is invoked only while `CANONICAL_INTAKE_LIVE` is True, so an
         # absence alarm would breach every day the pilot is dark; while live, the daily SEND# row's `rec_offer` /

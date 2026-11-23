@@ -339,7 +339,7 @@ ALLOWED_TO_NAME = frozenset(
         "lambdas/coach/coach_context_pilot.py",  # the pilot context (reads)
         WRITER_MODULE,  # the owner's writer
         BRIEF_INTAKE,  # the brief pilot's planner (reads only), dark
-        BRIEF_WRITER,  # the brief pilot's ONE writer (offers, exposures, his button answers), dark
+        BRIEF_WRITER,  # the brief pilot's dedicated writer (offers, exposures, his button answers), dark
         "lambdas/coach/telegram_worker_lambda.py",  # imports the pilot seam (owner's private chat)
         "mcp/tools_coach_packet.py",  # imports the pilot seam (owner's MCP packet)
         "mcp/registry.py",  # registers the tool

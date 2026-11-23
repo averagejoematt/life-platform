@@ -404,9 +404,11 @@ def compute_coach_vision() -> list[iam.PolicyStatement]:
 
 
 def compute_recommendation_writer() -> list[iam.PolicyStatement]:
-    """#6158 Morning Brief pilot — `coach-recommendation-writer`, the ONE function that writes the canonical
-    recommendation record for the brief (owner feedback 2026-11-22 on #6232: "a small dedicated internal writer with
-    narrowly scoped IAM permissions … the permission actually restricts the DynamoDB keys the function can write").
+    """#6158 Morning Brief pilot — `coach-recommendation-writer`, the dedicated function that writes the brief's
+    recommendations into the canonical record. It is NOT the only principal that can write that partition: other
+    roles keep older table-wide grants, a separate remediation (#6237). (Owner feedback 2026-11-22 on #6232: "a small
+    dedicated internal writer with narrowly scoped IAM permissions … the permission actually restricts the DynamoDB
+    keys the function can write".)
     OWNER-REQUIRED; presented for review, not yet acknowledged.
 
     Deliberately NOT `_compute_base()` (table-wide PutItem/UpdateItem). Each statement is the minimum:
@@ -414,8 +416,8 @@ def compute_recommendation_writer() -> list[iam.PolicyStatement]:
       * **PutItem ONLY, LeadingKeys `USER#matthew#SOURCE#coach_recommendations`** — an offered head, an exposure,
         his button answer. No UpdateItem, DeleteItem or BatchWriteItem anywhere: nothing it holds can modify or
         remove a row. IAM cannot require a condition expression on PutItem; the no-overwrite guarantee is the
-        module's create-only put (`attribute_not_exists(sk)`), held by an AST test, and this being the only
-        brief-side principal that can put there.
+        module's create-only put (`attribute_not_exists(sk)`), held by an AST test, for every row the brief's
+        pilot writes. Other roles' older table-wide grants are outside that guarantee (#6237).
       * **GetItem/Query, LeadingKeys = the record partition and the brief's trial partition** — the idempotence
         reads, the stamped token that binds an offer to its send, and the spent tokens it carries.
       * **KMS** — the table's customer-managed key (reads and writes need it).

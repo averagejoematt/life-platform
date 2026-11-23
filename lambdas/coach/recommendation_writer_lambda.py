@@ -1,4 +1,4 @@
-"""coach/recommendation_writer_lambda.py — `coach-recommendation-writer`, the Morning Brief pilot's ONE writer (#6158).
+"""coach/recommendation_writer_lambda.py — `coach-recommendation-writer`, the Morning Brief pilot's dedicated writer (#6158).
 
 Owner feedback 2026-11-22 on #6232: "avoid reusing the Morning Brief function's broadly privileged role for canonical
 recommendation writes … approve a small dedicated internal writer with narrowly scoped IAM permissions. Make sure the
@@ -8,7 +8,9 @@ overwrite an existing record."
 THE PRINCIPAL. This function's role (`role_policies_compute.compute_recommendation_writer`) may PutItem ONLY under the
 partition key `USER#matthew#SOURCE#coach_recommendations` (`dynamodb:LeadingKeys`), may read only that partition and
 the brief's trial partition, and has no UpdateItem, DeleteItem or batch write anywhere. The daily-brief function
-invokes it synchronously and holds an explicit Deny on every write to the record partition. It runs on nothing else:
+invokes it synchronously and holds an explicit Deny on every write to the record partition. (Other functions' older
+table-wide grants still reach the partition; that is a separate remediation, #6237 — this is the brief's path, not the
+partition's only possible writer.) It runs on nothing else:
 no schedule, no URL, no event source. DARK: nothing invokes it while `brief_recommendations.CANONICAL_INTAKE_LIVE`
 is False.
 
@@ -100,7 +102,9 @@ def _instant(iso: str) -> str:
 def _bound_token(table, p: dict[str, Any]) -> Optional[str]:
     """Why the payload is NOT the brief's own stamped send, or None when it is."""
     th = str(p.get("token_hash") or "")
-    tok = table.get_item(Key={"pk": TRIAL_PK, "sk": TOKEN_PREFIX + th}).get("Item") if th else None
+    # ConsistentRead: the brief put this row milliseconds before invoking us (brief_trial.record writes the stamped
+    # token, THEN invokes the writer); an eventually consistent read could miss it and refuse a genuine offer.
+    tok = table.get_item(Key={"pk": TRIAL_PK, "sk": TOKEN_PREFIX + th}, ConsistentRead=True).get("Item") if th else None
     if not tok:
         return "no stamped token row for this send"
     if tok.get("canonical_rec_id") != p.get("canonical_rec_id") or str(tok.get("send_day")) != str(p.get("send_day")):
@@ -117,7 +121,7 @@ def offer(table, p: dict[str, Any]) -> dict[str, Any]:
     if why:
         return {"state": "refused", "reason": why}
     rid = str(p["canonical_rec_id"])
-    head = table.get_item(Key={"pk": rr.pk(USER_ID), "sk": rr.head_sk(rid)}).get("Item")
+    head = table.get_item(Key={"pk": rr.pk(USER_ID), "sk": rr.head_sk(rid)}, ConsistentRead=True).get("Item")
     if head is None:
         if not p.get("new"):
             return {"state": "refused", "reason": "a repeat of a recommendation the record does not hold"}
