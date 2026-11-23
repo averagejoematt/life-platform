@@ -127,6 +127,21 @@ def revised_excerpt(url: str | None, excerpt: str, live: bool | None = None, tab
     return f"{lead.group(1)} {h['text']}" if lead else h["text"]
 
 
+def edition_summaries_by_url(chapters) -> dict[str, str]:
+    """#6193 B4: ``{post url: the served edition's own summary}`` from /api/chapters' ``editions`` (present only while
+    ``content.chapter_editions.LIVE`` is on). The SAME rule the site applies (www/src/lib/chapter_truth.js
+    applyChapterSummaries): a served later edition's summary first, then #6177's replacement, then the stored excerpt.
+    Only the description changes: the item's title, link, guid and pubDate — and the item count — never do, so a revision
+    is never announced as a new chapter."""
+    if not isinstance(chapters, dict) or not isinstance(chapters.get("editions"), list):
+        return {}
+    out: dict[str, str] = {}
+    for e in chapters["editions"]:
+        if isinstance(e, dict) and chapter_corrections.CHAPTER_ID.match(str(e.get("chapter_id") or "")) and e.get("summary"):
+            out[f"/journal/posts/{e['chapter_id']}/"] = str(e["summary"])
+    return out
+
+
 def rfc822(date_str: str) -> str:
     dt = datetime.strptime(date_str, "%Y-%m-%d").replace(hour=12, tzinfo=timezone.utc)
     return format_datetime(dt)
@@ -342,6 +357,7 @@ def main() -> int:
         chapters = json.load(r)
     published = published_at_by_url(chapters)
     corrections = corrections_by_url(chapters)  # #6177: approved platform corrections, keyed by the post url
+    edition_summary = edition_summaries_by_url(chapters)  # #6193 B4: a served edition's own summary (switch on only)
     for p in posts:  # chronicle items only: an essay's `date` (blog.json) is its publication day
         p["_pub"] = rfc822_instant(published[p["url"]]) if p.get("url") in published else None
 
@@ -369,7 +385,7 @@ def main() -> int:
         excerpt = " ".join(chronicle_schema.body_markdown(p.get("excerpt") or "", p.get("title") or "").split())
         # Word-boundary truncation (#1224 helper) — never a mid-word slice (#1261); #6177: an approved correction leads,
         # a Margaret-signed editor's note is followed by the persona disclosure, and neither is cut.
-        excerpt = revised_excerpt(p.get("url"), excerpt)  # #6177: the owner-approved replacement summary, behind the switch
+        excerpt = edition_summary.get(p.get("url") or "") or revised_excerpt(p.get("url"), excerpt)  # #6193, then #6177
         excerpt = item_description(excerpt, corrections.get(p.get("url") or ""), 360)
         pub = p["_pub"] if "_pub" in p else rfc822(p["date"])  # #5946: chronicle = published_at; essay = its date
         items.append(

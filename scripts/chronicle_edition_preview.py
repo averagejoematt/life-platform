@@ -40,7 +40,7 @@ from content import chapter_editions as CE, private_call_check  # noqa: E402
 WIDTHS = {"phone": (390, 844), "desktop": (1280, 900)}
 
 
-def preview_records(chapter_id: str, text: str, first_published: str, archival: str | None, today: str) -> list:
+def preview_records(chapter_id: str, text: str, first_published: str, archival: str | None, today: str, as_of: str | None = None) -> list:
     """In-memory records shaped as approved, for rendering ONLY (never written anywhere)."""
     now = f"{today}T00:00:00Z"
     original = CE.original_record(
@@ -57,9 +57,9 @@ def preview_records(chapter_id: str, text: str, first_published: str, archival: 
         revised_on=today,
         signature=CE.signature(2, today),
     )
-    rows = [original, ed]
+    rows = [original, CE.restore_record(original=original, verified_at="2000-01-01T00:00:00Z"), ed]
     if archival:
-        a = CE.new_archival(chapter_id=chapter_id, archival_id=1, text=archival, proposed_at=now)
+        a = CE.new_archival(chapter_id=chapter_id, archival_id=1, text=archival, proposed_at=now, as_of=as_of)
         a.update(approvals=[CE.approval(at=now, dated_on=today, sha256=a["text_sha256"])], approved_at=now, approved_on=today)
         rows.append(a)
     return rows
@@ -95,6 +95,7 @@ def main(argv=None) -> int:
     ap.add_argument("--chapter", required=True)
     ap.add_argument("--text-file", required=True)
     ap.add_argument("--archival-file")
+    ap.add_argument("--archival-as-of", default=None, help="the day the archival text stood (a chapter rewritten after publication)")
     ap.add_argument("--out", default=None, help="screenshot directory (default: a temp dir); keep it outside the repo")
     ap.add_argument("--base-url", default="https://averagejoematt.com")
     args = ap.parse_args(argv)
@@ -141,14 +142,25 @@ def main(argv=None) -> int:
         first = str(chapter.get("published_at") or "")[:10]
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         try:
-            rows = preview_records(args.chapter, text, first, archival, today)
+            rows = preview_records(args.chapter, text, first, archival, today, args.archival_as_of)
         except CE.EditionError as exc:
             print(f"bad input: {exc}", file=sys.stderr)
             return 2
         # rendering only; the gates (the private-call check included) ran above
-        view = CE.public_view(rows, tainted=lambda _t: False, private_calls=CE.PRIVATE_CALLS_NOT_WIRED, filter_hits=lambda _t: [])
+        view = CE.public_view(
+            rows, tainted=lambda _t: False, private_calls=CE.PRIVATE_CALLS_NOT_WIRED, filter_hits=lambda _t: [], log=print
+        )
+        # the build's own per-edition holds (B4 title/summary, B9 archive address, as_of), exactly as a release would apply them
+        sys.path.insert(0, os.path.join(REPO, "scripts"))
+        import publish_snapshot_chapter_editions as exporter  # noqa: PLC0415
+
+        try:
+            corrections = json.load(open(os.path.join(SNAPSHOT, "chapter_corrections.json"), encoding="utf-8"))
+        except (OSError, ValueError):
+            corrections = None
+        doc = exporter.validate({"state": "ok", "source": ["/api/chapters"], "editions": view}, {"chapter": chapters}, corrections)
         with open(os.path.join(SNAPSHOT, "chapter_editions.json"), "w", encoding="utf-8") as fh:
-            json.dump({"state": "ok", "source": ["/api/chapters"], "editions": view}, fh)
+            json.dump(doc, fh)
         cp = subprocess.run(["npm", "run", "build", "--silent"], cwd=WWW, capture_output=True, text=True)
         if cp.returncode != 0:
             print(cp.stderr[-2000:], file=sys.stderr)

@@ -23,6 +23,11 @@ source finding in the draft audit, ``story_checks.staged_encounter_findings``); 
 without the owner's explicit authorisation (``JOURNAL_IN_EDITORIAL_PROMPTS``); only ELIGIBLE, verified voice anchors
 (``anchor_eligibility``, ``verify_anchors``); coach quotation marks only around the coach's approved original wording.
 
+1.2.0 (#6193, owner ruling 2026-11-22, final approval §7): "Relax Elena's no-attempt-count restriction narrowly to permit
+my own explicitly approved statement. Do not infer a lifetime number of attempts." The count rule keeps every count of
+her own out; his approved statement may carry its count only as an exact quotation (``story_checks.OWN_WORDS_COUNT_QUOTES``,
+pinned equal to the site's own-words pin).
+
 Rules for editing this file:
   * It is prompt text in a PUBLIC repository. It carries no personal detail about the owner (no age, job, employer,
     relationship, family, address) and no real person's name — ``tests/test_elena_canon_6155.py`` fails on either.
@@ -38,7 +43,7 @@ from __future__ import annotations
 import re
 from typing import Callable, Dict, List, Tuple
 
-ELENA_CANON_VERSION = "1.1.0"
+ELENA_CANON_VERSION = "1.2.0"
 
 NAME = "Elena Voss"
 SERIES = "The Measured Life"
@@ -115,7 +120,8 @@ NEVER = (
     "relationship, partner or family member",
     "never quote or narrate from his journal: it is off the record, and you do not read it",
     "never infer a feeling he did not state",
-    "never name a vice or a substance; never a cycle, reset, restart or attempt count; never a genome identifier",
+    "never name a vice or a substance; never a cycle, reset, restart or attempt count of your own: the one count a page "
+    "may carry is his own approved statement, quoted exactly, and never a total inferred from it; never a genome identifier",
     "never give advice, and never use a report-card tone",
     "never describe how an installment is produced or checked",
     "never use transformation clichés, emoji, or the AI-essay tics: the 'it isn't X, it's Y' pivot, a triad for rhythm, "
