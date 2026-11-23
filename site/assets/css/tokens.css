@@ -910,6 +910,9 @@ td .evb .evb-tip { left: auto; right: 0; }
    not 'large text'); pulled 25% toward --ink in both themes: still ember-toned, >=5:1. */
 .dsx-count { font-size: var(--fs-h3); color: color-mix(in oklch, var(--ember) 75%, var(--ink)); white-space: nowrap; }
 .dsx-vtext { color: var(--ink); }
+/* #6195 — the labelled badge ("0 of 5 in strain") is longer than "0/5": let it wrap above the sentence on a phone. */
+.dsx-verdict.dsx-labelled { flex-wrap: wrap; }
+.dsx-labelled .dsx-vtext { flex: 1 1 16em; }
 .dsx-rows { display: flex; flex-direction: column; gap: 1px; margin: var(--sp-3) 0; }
 .dsx-row { display: grid; grid-template-columns: 1fr auto 7em; align-items: baseline; gap: var(--sp-3); padding: var(--sp-2) 0; border-bottom: 1px solid var(--rule); }
 .dsx-name { font-weight: var(--weight-med); }

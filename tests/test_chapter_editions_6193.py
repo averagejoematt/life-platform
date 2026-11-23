@@ -714,10 +714,15 @@ def test_an_approved_edition_changes_no_feed_item_date_or_guid(monkeypatch, tmp_
     weeks = {"weeks": [{"url": "/journal/posts/week-04/", "published_at": "2026-09-11T18:00:44+00:00"}], "corrections": []}
     before = _feed(monkeypatch, tmp_path, weeks)
     with_edition = _feed(monkeypatch, tmp_path, {**weeks, "editions": _view([_original(), _edition(2), _archival()])})
-    # #6193 B4: ONLY the item's description changes — to the edition's own summary; title, link, guid, pubDate, count stay
-    desc = re.compile(r"<description>[^<]*</description>")
-    assert desc.sub("", with_edition) == desc.sub("", before)
+    # #6193 B4: the item's description changes — to the edition's own summary — and (§4, owner ruling 2026-11-22) its
+    # <link> moves to the canonical chapter; title, guid, pubDate and the item count stay byte for byte
+    moved = re.compile(
+        r"<description>[^<]*</description>|<link>[^<]*/journal/posts/week-04/[^<]*</link>|<link>[^<]*/story/week-04/[^<]*</link>"
+    )
+    assert moved.sub("", with_edition) == moved.sub("", before)
     assert "<description>A sample summary line for a test, for layout only.</description>" in with_edition
+    assert "<link>https://averagejoematt.com/story/week-04/?utm_source=rss" in with_edition
+    assert '<guid isPermaLink="true">https://averagejoematt.com/journal/posts/week-04/</guid>' in with_edition
     assert before.count("<item>") == 1 and "Fri, 11 Sep 2026 18:00:44 +0000" in before
 
 
