@@ -102,8 +102,27 @@ def tree_hash(root: str) -> str:
     return h.hexdigest()
 
 
+#: The fixture export with the second-edition switch held OFF in the child (#6193): the committed switch is now ON, and the
+#: gate's default fixture snapshot is the no-edition baseline every other check (and the editions mutation's "off" half)
+#: compares against. The module's own constant is set in the child process; nothing in production reads this.
+_EXPORT_EDITIONS_OFF = (
+    "import runpy, sys\n"
+    "sys.path[:0] = [{lam!r}, {scr!r}]\n"
+    "from content import chapter_editions as CE\n"
+    "CE.LIVE = False\n"
+    "sys.argv = ['publish_snapshot.py', '--mode', 'fixture', '--out', {out!r}]\n"
+    "runpy.run_path({script!r}, run_name='__main__')\n"
+)
+
+
 def export_fixture_snapshot() -> None:
-    cp = run([sys.executable, os.path.join(REPO, "scripts", "publish_snapshot.py"), "--mode", "fixture", "--out", SNAPSHOT], cwd=REPO)
+    code = _EXPORT_EDITIONS_OFF.format(
+        lam=os.path.join(REPO, "lambdas"),
+        scr=os.path.join(REPO, "scripts"),
+        out=SNAPSHOT,
+        script=os.path.join(REPO, "scripts", "publish_snapshot.py"),
+    )
+    cp = run([sys.executable, "-c", code], cwd=REPO)
     if cp.returncode != 0:
         raise SystemExit(f"fixture export failed (exit {cp.returncode}):\n{cp.stderr[-2000:]}")
 
@@ -235,6 +254,27 @@ def file_hashes(root: str) -> dict[str, str]:
     return out
 
 
+def _edition_summary_issues(served: list, pages: dict, archives: dict, changed: set, on: dict, first_summary: dict) -> list:
+    """#6193 B4: with an edition on, every surface that shows its chapter's summary shows the EDITION's (the header, the
+    /story/ row, Moments, the front page, metadata) — no built page outside the archival page still carries the first
+    edition's summary, and every other page the edition changed changed because it now carries the edition's summary."""
+    issues = []
+    olds = {e["chapter_id"]: first_summary.get(e["chapter_id"]) for e in served}
+    for p in sorted(x for x in on if x.endswith(".html") and x not in archives):
+        text = html_lib.unescape(open(os.path.join(DIST, p), encoding="utf-8", errors="replace").read())
+        for cid, old in olds.items():
+            if old and len(old) >= 20 and old not in (e["summary"] for e in served) and old in text:
+                issues.append(f"{p}: still shows {cid}'s first-edition summary while its edition is served")
+    for p in sorted(changed - set(pages)):
+        if not p.endswith(".html"):
+            issues.append(f"{p}: the edition changed a file that is not a page")
+            continue
+        text = html_lib.unescape(open(os.path.join(DIST, p), encoding="utf-8", errors="replace").read())
+        if not any(e["summary"] in text for e in served):
+            issues.append(f"{p}: the edition changed it, but it carries no edition's summary")
+    return issues
+
+
 def check_editions_mutation() -> int:
     """#6193: a second edition is dark by default and, when on, changes exactly what it should. Production base (no
     global noindex, a sitemap), so the archival page's own noindex and its absence from the sitemap are visible.
@@ -267,6 +307,8 @@ def check_editions_mutation() -> int:
             return 1
         with open(ed_file, encoding="utf-8") as fh:
             served = json.load(fh)["editions"]
+        with open(os.path.join(SNAPSHOT, "chapters.json"), encoding="utf-8") as fh:
+            first_summary = {c.get("id"): c.get("excerpt") for c in json.load(fh) if isinstance(c, dict)}
         cp = build(False)
         if cp.returncode != 0:
             log(f"  ✗ the editions production build failed:\n{cp.stderr[-1500:]}")
@@ -286,8 +328,7 @@ def check_editions_mutation() -> int:
     for p in [p for p in on if os.path.basename(p).startswith("sitemap")]:
         with open(os.path.join(DIST, p), encoding="utf-8") as fh:
             sitemap += fh.read()
-    if changed != set(pages):
-        issues.append(f"the edition changed pages other than its chapter's: {sorted(changed ^ set(pages))}")
+    issues += _edition_summary_issues(served, pages, archives, changed, on, first_summary)
     if added != set(archives) or removed:
         issues.append(f"pages added/removed beyond the approved archival pages: +{sorted(added ^ set(archives))} -{sorted(removed)}")
     for p, e in pages.items():
@@ -299,6 +340,11 @@ def check_editions_mutation() -> int:
         first = re.search(r"<p>([^<]{20,})", e["body_html"])
         if not body or not first or first.group(1)[:60] not in body.group(1):
             issues.append(f"{p}: the canonical address does not serve the edition's text")
+        dek = re.search(r'<p class="dek">([\s\S]*?)</p>', page)
+        if not dek or html_lib.unescape(dek.group(1)) != e["summary"]:
+            issues.append(f"{p}: the header summary is not the edition's own summary (B4)")
+        if body and (e["summary"] in html_lib.unescape(body.group(1)) or f'"{e["title"]}"' in html_lib.unescape(body.group(1))):
+            issues.append(f"{p}: the body repeats the edition's title line or summary (B4)")
     for p, e in archives.items():
         page = open(os.path.join(DIST, p), encoding="utf-8").read() if p in on else ""
         if not NOINDEX.search(page):
@@ -318,8 +364,9 @@ def check_editions_mutation() -> int:
     if issues:
         return 1
     log(
-        f"  ✓ switch off: no edition, no first-edition page; on: {len(pages)} chapter page(s) serve their edition, "
-        f"{len(archives)} archival page(s) noindex + canonical + out of the sitemap, nothing else changed"
+        f"  ✓ switch off: no edition, no first-edition page; on: {len(pages)} chapter page(s) serve their edition with its own "
+        f"title and summary, every summary surface carries the edition's, {len(archives)} archival page(s) noindex + canonical + "
+        "out of the sitemap, nothing else changed"
     )
     return 0
 

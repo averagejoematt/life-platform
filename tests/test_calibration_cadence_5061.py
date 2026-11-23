@@ -60,7 +60,7 @@ def row(today, logged, kind="tape"):
 
 # ── the cycle ────────────────────────────────────────────────────────────────────
 def test_the_cadence_is_the_charters():
-    assert (CYCLE, DEAD) == (14, 2)
+    assert (CYCLE, DEAD) == (28, 2)  # four weeks since charter 1.53.0 (owner ruling 2026-11-23, #5067); two weeks before
 
 
 def test_ok_due_overdue_missed_2():

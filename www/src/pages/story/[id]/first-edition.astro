@@ -4,10 +4,17 @@
 // publication gate (lib/chapter_editions.js; no snapshot file while the switch is off = no page at all). The text is
 // the separately approved rendering — never the first edition's raw text. The page says what it is in the platform's one
 // fixed note (never what it leaves out), is noindex, is not in the sitemap, and is canonical to the chapter's address.
+// #6193 B6 (rehearsal rulings §4, §6): it is labelled as historical, superseded material; its body is printed exactly as
+// the chapter page prints a body (lib/chapter_body.js, the same .article column and spacing); a note signed by the
+// legacy editor persona carries the same disclosure; the chapter's approved corrections stand above it, in the
+// platform's signed machine voice — never mistakable for a contemporary note; and a rendering of a later rewrite names
+// the day its text stood (`as_of`), never "the first edition".
 import Base from "../../../layouts/Base.astro";
 import { dayInWords } from "../../../lib/format.js";
-import { loadAll, loadChapterEditions } from "../../../lib/snapshot.js";
-import { archivalChapterIds, archivalFor, editionFor } from "../../../lib/chapter_editions.js";
+import { loadAll, loadChapterCorrections, loadChapterEditions } from "../../../lib/snapshot.js";
+import { archivalChapterIds, archivalFor, archivalWhat, editionFor } from "../../../lib/chapter_editions.js";
+import { ARCHIVAL_PAGE, PERSONA_DISCLOSURE, correctionsFor, correctionsHtml, namesLegacyPersona, placeBeside } from "../../../lib/chapter_corrections.js";
+import { bodyForPage } from "../../../lib/chapter_body.js";
 import { hasPage, href } from "../../../lib/url.js";
 
 export async function getStaticPaths() {
@@ -21,28 +28,43 @@ const doc = await loadChapterEditions();
 const e = editionFor(doc, c.id)!;
 const a = archivalFor(doc, c.id)!;
 const current = `/story/${c.id}/`;
+const what = archivalWhat(a);
+const corrections = correctionsFor(await loadChapterCorrections(), c.id);
+// rehearsal ruling §4: a correction with an approved anchor stands beside its passage; the rest stand above the text
+const beside = placeBeside(bodyForPage(a.body_html, null), a.anchors || [], corrections, ARCHIVAL_PAGE);
+const body = beside.html;
+const above = corrections.filter((x) => !beside.placed.includes(x.id));
+const disclose = namesLegacyPersona(a.body_html);
 ---
 
-<Base title={`${c.title} · first edition, archived`} top="story" description={a.note} status={dayInWords(e.first_published)} noindex canonicalPath={current}>
+<Base title={`${c.title} · ${what}, archived`} top="story" description={a.note} status={dayInWords(a.as_of || e.first_published)} noindex canonicalPath={current}>
   <section class="section" style="padding-bottom:24px" data-chapter={c.id} data-archival-edition>
-    <div class="wrap" style="display:flex;flex-direction:column;gap:14px;max-width:760px">
-      <p class="label">Chapter · {c.week_label} · first edition, archived</p>
-      <h1>{c.title}</h1>
-      <aside style="border:1px solid var(--ink);padding:14px 16px;font-family:var(--sans);font-size:14px;line-height:1.5" data-archival-note>
-        <p class="label" style="margin-bottom:6px">{a.signature}</p>
-        <p>{a.note}</p>
-        <p style="margin-top:8px">
-          <a href={href(current)} style="font-weight:700;color:var(--ink)" data-current-edition-link>
-            Read the current edition →
-          </a>
-        </p>
-      </aside>
+    <div class="wrap" style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-end">
+      <div style="flex:0 0 150px">
+        <p class="label">Historical</p>
+        <b style="font-family:var(--sans);font-size:20px;display:block;color:var(--muted)" data-superseded>Superseded</b>
+      </div>
+      <div style="flex:1 1 520px;min-width:0;display:flex;flex-direction:column;gap:14px">
+        <p class="label">Chapter · {c.week_label} · {what}, archived</p>
+        <h1>{c.title}</h1>
+        <aside style="border:1px solid var(--ink);padding:14px 16px;font-family:var(--sans);font-size:14px;line-height:1.5" data-archival-note>
+          <p class="label" style="margin-bottom:6px">{a.signature}</p>
+          <p>{a.note}</p>
+          <p style="margin-top:8px">
+            <a href={href(current)} style="font-weight:700;color:var(--ink)" data-current-edition-link>
+              Read the current edition →
+            </a>
+          </p>
+        </aside>
+      </div>
     </div>
   </section>
   <section class="section hair">
-    <div class="wrap">
-      <article class="article" style="max-width:760px">
-        <div data-archival-body set:html={a.body_html} />
+    <div class="wrap" style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start">
+      <article class="article" style="flex:1 1 600px;min-width:0">
+        {above.length > 0 && <div class="chapter-corrections" data-chapter-corrections set:html={correctionsHtml(above, ARCHIVAL_PAGE)} />}
+        {disclose && <p class="persona-disclosure" data-persona-disclosure>{PERSONA_DISCLOSURE}</p>}
+        <div data-archival-body><div data-published-body set:html={body} /></div>
       </article>
     </div>
   </section>

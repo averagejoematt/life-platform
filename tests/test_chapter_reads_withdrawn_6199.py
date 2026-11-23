@@ -229,6 +229,7 @@ def test_every_ledger_reader_returns_the_public_view():
 EDITION_NOT_WIRED = {
     "scripts/publish_snapshot_chapter_editions.py": "fixture mode only: synthetic records, no call record exists; live mode carries the Site API's gated view",
     "scripts/chronicle_edition_preview.py": "the rendering pass after its gates (which ran the check on the real calls) — publishes nothing",
+    "scripts/chronicle_edition_rehearsal.py": "#6193 rehearsal: its in-memory rendering and withdrawal simulation, after its gates (which ran the check on the real calls) — publishes nothing",
 }
 
 

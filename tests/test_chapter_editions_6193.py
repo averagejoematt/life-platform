@@ -47,7 +47,10 @@ for _p in (_REPO, os.path.join(_REPO, "lambdas"), os.path.join(_REPO, "scripts")
 
 from content import chapter_corrections as CC, chapter_editions as CE, private_call_check  # noqa: E402
 
+COMMITTED_LIVE = CE.LIVE  # captured at import, before the conftest baseline fixture touches it
+
 TEXT = (
+    '"A Sample Chapter"\n\n*A sample summary line for a test, for layout only.*\n\n'
     "Sample edition text for a test, for layout only. The week's figures are counted from the log as it stands.\n\n"
     "A second paragraph says what the record holds, and nothing more."
 )
@@ -97,9 +100,20 @@ def _archival(n=1, chapter="week-04", approved_at="2026-11-23T19:00:00Z", text=A
     return item
 
 
+def _with_restores(rows):
+    """#6193 rehearsal §6: every evidence record here is given its passed restore rehearsal (tests of its ABSENCE live in
+    tests/test_edition_publication_6193.py)."""
+    rows = list(rows)
+    have = {r.get("chapter_id") for r in rows if r.get("record_type") == CE.RESTORE_TYPE}
+    for r in list(rows):
+        if r.get("record_type") == CE.ORIGINAL_TYPE and r["chapter_id"] not in have:
+            rows.append(CE.restore_record(original=r, verified_at=r["backed_up_at"]))
+    return rows
+
+
 def _view(rows, tainted=NEVER, hits=NO_FILTER_HITS):
     return CE.public_view(
-        rows, tainted=tainted, private_calls=private_call_check.for_text(private_call_check.CallSet()), filter_hits=hits
+        _with_restores(rows), tainted=tainted, private_calls=private_call_check.for_text(private_call_check.CallSet()), filter_hits=hits
     )  # #6199: no private calls
 
 
@@ -107,7 +121,8 @@ def _view(rows, tainted=NEVER, hits=NO_FILTER_HITS):
 
 
 def test_the_switch_is_committed_off():
-    assert CE.LIVE is False
+    # Committed LIVE (owner ruling 2026-11-22); the name is historical. ROLLBACK: LIVE = False + site rebuild.
+    assert COMMITTED_LIVE is True
 
 
 def test_the_words_are_the_platforms_and_dated_in_words():
@@ -127,7 +142,11 @@ def test_the_archival_note_says_what_the_page_is_and_nothing_about_what_it_leave
     assert re.sub(r"\d{1,2} \w+ 20\d\d", "", note).strip() and not re.search(r"\d", re.sub(r"\d{1,2} \w+ 20\d\d", "", note))
     for word in ("removed", "redacted", "passage", "private", "restricted", "call"):
         assert word not in note.lower()
-    assert CE.archival_note.__code__.co_argcount == 2
+    assert CE.archival_note.__code__.co_argcount == 3  # #6193 B6: the two days, and the recorded as_of day
+    later = CE.archival_note("2026-09-11", "2026-11-23", "2026-10-25")
+    assert "as it stood on 25 October 2026" in later and "first edition" not in later
+    for word in ("removed", "redacted", "passage", "private", "restricted", "call"):
+        assert word not in later.lower()
 
 
 def test_a_proposal_is_unapproved_unsigned_and_refuses_what_is_malformed():
@@ -271,7 +290,15 @@ def tool(monkeypatch):
     monkeypatch.setattr(t, "_table_ref", table)
     monkeypatch.setattr(t, "pacific_today", lambda: "2026-11-23")
     monkeypatch.setattr(t, "_tainted", lambda: NEVER)
+    monkeypatch.setattr(t, "_published_title", lambda _cid: "A Sample Chapter")  # #6193 B4: the chapter's public heading
     return t, table
+
+
+def _backed_up(table, chapter="week-04"):
+    """The first edition's backup pointer AND its passed restore rehearsal (rehearsal ruling §6)."""
+    o = _original(chapter)
+    table.put_item(Item=o)
+    table.put_item(Item=CE.restore_record(original=o, verified_at="2026-11-22T17:05:00Z"))
 
 
 def _call(t, **kw):
@@ -295,6 +322,9 @@ def test_propose_backup_approve_is_append_only_and_never_inferred(tool):
     refused = _call(t, action="approve_edition", chapter_id="week-04", edition=2, approved=True, sha256=_sha(TEXT))
     assert "no private backup" in refused["error"]  # the first edition is kept before anything changes
     table.put_item(Item=_original())
+    unrehearsed = _call(t, action="approve_edition", chapter_id="week-04", edition=2, approved=True, sha256=_sha(TEXT))
+    assert "restore rehearsal" in unrehearsed["error"]  # the restore path verified, not merely the files present
+    table.put_item(Item=CE.restore_record(original=_original(), verified_at="2026-11-22T17:05:00Z"))
     ok = _call(t, action="approve_edition", chapter_id="week-04", edition=2, approved=True, sha256=_sha(TEXT))
     assert ok["approved"] and ok["revised_on"] == "2026-11-23" and ok["renders"] is False  # the switch is off
     assert ok["signature"] == "Second edition, revised 23 November 2026 — Average Joe Matt editorial record"
@@ -305,7 +335,7 @@ def test_propose_backup_approve_is_append_only_and_never_inferred(tool):
     assert stored["text"] == TEXT and stored["first_published"] == "2026-09-11"
     listing = _call(t, action="list_editions", chapter_id="week-04")
     assert listing["switch_live"] is False and listing["chapters_with_an_edition"] == ["week-04"]
-    assert {r["kind"] for r in listing["records"]} == {"edition", "first-edition evidence"}
+    assert {r["kind"] for r in listing["records"]} == {"edition", "first-edition evidence", "restore rehearsal (passed)"}
     assert all(r["renders"] is False for r in listing["records"])
     assert all(kind in ("put", "update") for kind, _ in table.calls)
 
@@ -320,7 +350,7 @@ def test_the_gates_refuse_at_proposal_and_carried_corrections_must_be_approved(t
         t, action="propose_edition", chapter_id="week-04", edition=2, text=TEXT, first_published="2026-09-11", carries=["walk-distance"]
     )
     assert r["stored"]
-    table.put_item(Item=_original())
+    _backed_up(table)
     r = _call(t, action="approve_edition", chapter_id="week-04", edition=2, approved=True, sha256=_sha(TEXT))
     assert "not approved" in r["error"]
 
@@ -333,7 +363,7 @@ def test_the_archival_rendering_needs_an_approved_edition_and_its_own_approval(t
         "no approved second edition"
         in _call(t, action="approve_archival", chapter_id="week-04", archival_id=1, approved=True, sha256=_sha(ARCHIVAL))["error"]
     )
-    table.put_item(Item=_original())
+    _backed_up(table)
     _call(t, action="propose_edition", chapter_id="week-04", edition=2, text=TEXT, first_published="2026-09-11")
     _call(t, action="approve_edition", chapter_id="week-04", edition=2, approved=True, sha256=_sha(TEXT))
     assert (
@@ -400,7 +430,7 @@ def test_switch_on_the_route_serves_approved_editions_and_says_when_it_cannot_re
     from web import site_api_chapters as chapters
 
     monkeypatch.setattr(CE, "LIVE", True)
-    rows = [_original(), _edition(2)]
+    rows = _with_restores([_original(), _edition(2)])
     # the real gates, the suite's neutral content-filter vocabulary (tests/conftest.py)
     assert [e["edition"] for e in chapters.editions_field(lambda: rows, tainted=NEVER)["editions"]] == [2]
     assert chapters.editions_field(lambda: rows, tainted=lambda t: True)["editions"] == []  # a private-call echo withholds
@@ -411,9 +441,50 @@ def test_switch_on_the_route_serves_approved_editions_and_says_when_it_cannot_re
     failed = chapters.editions_field(down, tainted=NEVER)
     assert failed["editions"] is None and failed["editions_error"]
 
+    # LIVE on with NO approved edition (#6193 activation): the response differs from LIVE off by exactly one additive
+    # key, "editions": [] (and one extra read per request) — nothing else moves.
+    def same_instant(resp):
+        return re.sub(r'"(generated_at|served_at)": "[^"]*"', r'"\1": "T"', resp["body"])
+
+    # (#6199: the route also reads the private-call record from the raw table, cached 900 s — one more read, no body change)
+    monkeypatch.setattr(chapters.private_call_check, "load", lambda _table: private_call_check.CallSet())
+    chapters._CALLS_CACHE.update(at=None, calls=None)
+    on_empty = json.loads(same_instant(_handle(chapters, lambda: [])))
+    monkeypatch.setattr(CE, "LIVE", False)
+    off = json.loads(same_instant(_handle(chapters, lambda: [])))
+    assert on_empty.pop("editions") == [] and on_empty == off
+    monkeypatch.setattr(CE, "LIVE", True)
+
+    # Failure modes of the two reads, as served: an unreadable editions read -> "editions": null + editions_error; an
+    # unreadable private-call read -> every edition withheld ("editions": [], 200) and a logged error, never served.
+    rows = _with_restores([_original(), _edition(2)])
+    assert [e["edition"] for e in chapters.editions_field(lambda: rows, tainted=NEVER)["editions"]] == [2]
+
+    def calls_down(_table):
+        raise RuntimeError("throttled")
+
+    monkeypatch.setattr(chapters.private_call_check, "load", calls_down)
+    chapters._CALLS_CACHE.update(at=None, calls=None)
+    assert chapters.editions_field(lambda: rows, tainted=NEVER)["editions"] == []
+
+    # The documented failure mode (not changed here): with the switch on, an unreadable editions read is a schema error
+    # in the snapshot exporter, so that build exits non-zero instead of building without editions.
+    import publish_snapshot_chapter_editions as SE
+
+    monkeypatch.setattr(CE, "LIVE", True)
+    with pytest.raises(ValueError):
+        SE.live(lambda path: failed, lambda m: None)
+    with pytest.raises(ValueError):
+        SE.live(lambda path: (_ for _ in ()).throw(OSError("503")), lambda m: None)
+
 
 def _public(published_at="2026-09-11T18:00:44+00:00"):
-    return {"chapter": [{"id": "week-04", "status": "published", "published_at": published_at}, {"id": "week-10", "status": "held"}]}
+    return {
+        "chapter": [
+            {"id": "week-04", "status": "published", "published_at": published_at, "title": "A Sample Chapter"},
+            {"id": "week-10", "status": "held"},
+        ]
+    }
 
 
 def test_the_exporter_writes_nothing_while_the_switch_is_off(monkeypatch):
@@ -430,22 +501,27 @@ def test_the_exporter_writes_nothing_while_the_switch_is_off(monkeypatch):
         fixtures,
         lambda p: served,
         print,
-        {"chapter": [{"id": "week-06", "status": "published", "published_at": "2026-10-17"}]},
+        {"chapter": [{"id": "week-06", "status": "published", "published_at": "2026-10-17", "title": "The protein argument"}]},
         {"corrections": [{"chapter_id": "week-06", "id": "sample-walk-distance-2"}]},
     )
     assert [e["chapter_id"] for e in doc["editions"]] == ["week-06"] and "SENTINEL" not in json.dumps(doc)
 
 
 def test_the_fixture_export_with_the_switch_off_writes_no_editions_file(tmp_path):
+    # LIVE is committed True (owner ruling 2026-11-22), and a subprocess does not see the conftest monkeypatch. The child
+    # sets the module's switch OFF itself, then runs the real exporter script: no production override is involved.
     env = {k: v for k, v in os.environ.items() if k != "WEB_EDITIONS"}
-    cp = subprocess.run(
-        [sys.executable, os.path.join(_REPO, "scripts", "publish_snapshot.py"), "--mode", "fixture", "--out", str(tmp_path / "snap")],
-        cwd=_REPO,
-        env=env,
-        capture_output=True,
-        text=True,
+    child = (
+        "import runpy, sys\n"
+        f"sys.path[:0] = [{os.path.join(_REPO, 'lambdas')!r}, {os.path.join(_REPO, 'scripts')!r}]\n"
+        "from content import chapter_editions as CE\n"
+        "CE.LIVE = False\n"
+        f"sys.argv = ['publish_snapshot.py', '--mode', 'fixture', '--out', {str(tmp_path / 'snap')!r}]\n"
+        f"runpy.run_path({os.path.join(_REPO, 'scripts', 'publish_snapshot.py')!r}, run_name='__main__')\n"
     )
+    cp = subprocess.run([sys.executable, "-c", child], cwd=_REPO, env=env, capture_output=True, text=True)
     assert cp.returncode == 0, cp.stderr[-1500:]
+    assert (tmp_path / "snap" / "manifest.json").exists()  # the export really ran
     assert not (tmp_path / "snap" / "chapter_editions.json").exists()
     assert "chapter_editions" not in (tmp_path / "snap" / "manifest.json").read_text()
 
@@ -478,7 +554,10 @@ def test_the_snapshot_validation_holds_each_failing_edition_on_its_own():
         bad = json.loads(json.dumps(view))
         mutate(bad[0])
         other = dict(json.loads(json.dumps(view))[0], chapter_id="week-05", carries=[])
-        pub = {"chapter": public["chapter"] + [{"id": "week-05", "status": "published", "published_at": "2026-09-11T00:00:00+00:00"}]}
+        pub = {
+            "chapter": public["chapter"]
+            + [{"id": "week-05", "status": "published", "published_at": "2026-09-11T00:00:00+00:00", "title": "A Sample Chapter"}]
+        }
         held: list = []
         out = SE.validate(SE.compose({"editions": [bad[0], other]}), pub, corr, log=lambda m: None, held=held)
         assert [e["chapter_id"] for e in out["editions"]] == ["week-05"], "one held edition never blocks an unrelated verified one"
@@ -493,19 +572,22 @@ def test_the_snapshot_validation_holds_each_failing_edition_on_its_own():
 def test_a_deployed_page_verifies_against_the_approved_bytes_and_permitted_presentation_only():
     import chronicle_edition_verify as V
 
-    body = CE.render_html(TEXT)
+    body = CE.render_html(CE.presentation(TEXT)["body"])  # #6193 B4: the body without the title and summary lines
     figure = '<figure class="evidence" data-evidence="weight"><figcaption>Evidence</figcaption><p>A chart note.</p></figure>'
     placed = body.replace("</p>\n<p>", "</p>" + figure + "<p>", 1)
 
     def page(b, line=CE.edition_line(2, "2026-11-23", "2026-09-11")):
         return (
-            f'<p class="dek">A dek.</p><p data-edition-line><b>{line}</b></p>'
+            f'<h1>A Sample Chapter</h1><p class="dek">A sample summary line for a test, for layout only.</p>'
+            f"<p data-edition-line><b>{line}</b></p>"
             f'<article><div data-published-body>{b}</div></article><link rel="canonical" href="x">'
         )
 
-    assert CE.verify_page(page(placed), TEXT, _sha(TEXT)) == []  # an evidence figure between paragraphs is permitted
-    assert CE.verify_page(page(placed.replace("nothing more", "nothing else")), TEXT, _sha(TEXT))  # one word changed
-    assert CE.verify_page(page(placed), TEXT, _sha(TEXT + "x"))  # not the approved hash
+    slots = {"dek": "A sample summary line for a test, for layout only.", "h1": "A Sample Chapter"}
+    assert CE.verify_page(page(placed), TEXT, _sha(TEXT), **slots) == []  # an evidence figure between paragraphs is permitted
+    assert CE.verify_page(page(placed.replace("nothing more", "nothing else")), TEXT, _sha(TEXT), **slots)  # one word changed
+    assert CE.verify_page(page(placed), TEXT, _sha(TEXT + "x"), **slots)  # not the approved hash
+    assert CE.verify_page(page(placed), TEXT, _sha(TEXT), dek="A different summary.", h1=slots["h1"])  # #6193 B4: wrong slot
     view = _view([_original(), _edition(2)])
     rss = '<guid isPermaLink="true">https://s/journal/posts/week-04/</guid>'
     site = {
@@ -632,7 +714,10 @@ def test_an_approved_edition_changes_no_feed_item_date_or_guid(monkeypatch, tmp_
     weeks = {"weeks": [{"url": "/journal/posts/week-04/", "published_at": "2026-09-11T18:00:44+00:00"}], "corrections": []}
     before = _feed(monkeypatch, tmp_path, weeks)
     with_edition = _feed(monkeypatch, tmp_path, {**weeks, "editions": _view([_original(), _edition(2), _archival()])})
-    assert with_edition == before
+    # #6193 B4: ONLY the item's description changes — to the edition's own summary; title, link, guid, pubDate, count stay
+    desc = re.compile(r"<description>[^<]*</description>")
+    assert desc.sub("", with_edition) == desc.sub("", before)
+    assert "<description>A sample summary line for a test, for layout only.</description>" in with_edition
     assert before.count("<item>") == 1 and "Fri, 11 Sep 2026 18:00:44 +0000" in before
 
 

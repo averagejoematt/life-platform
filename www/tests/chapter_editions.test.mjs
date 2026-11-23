@@ -14,6 +14,9 @@ const edition = (extra = {}) => ({
   signature: `Second edition, revised 23 November 2026 — ${SIG}`,
   approvals: [{ by: "owner", on: "2026-11-23", via: "x" }],
   carries: ["walk"],
+  title: "A Sample Chapter",
+  summary: "The edition's own summary.",
+  revised_on: "2026-11-23",
   word_count: 460,
   body_html: "<p>The later text.</p>",
   archival: null,
@@ -47,7 +50,7 @@ test("the sitemap never lists an archival page; the reading time follows the ser
 
 test("a correction's foot is #6177's sentence without an edition, and says where the edition stands with one", () => {
   const c = { id: "walk", chapter_id: "week-04", kind: "correction", dated_on: "2026-11-20", signature: `Correction, 20 November 2026 — ${SIG}`, published_said: "a", record_shows: "b", evidence: "c", approvals: [{ by: "owner", on: "2026-11-20" }], superseded_by: null };
-  assert.match(correctionHtml(c), /The chapter's text below is unchanged; it reads as first published\./);
+  assert.match(correctionHtml(c), /This note does not change the chapter's text\./); // committed ON (#6177 activation; off = footLine(false))
   assert.match(correctionHtml(c, [c], edition()), /a later edition, and it makes this correction\./);
   assert.match(correctionHtml({ ...c, id: "other" }, [c], edition()), /made to the first edition; the text below is a later edition\./);
 });
@@ -59,4 +62,71 @@ test("an approved quotation the body already carries is not placed beside it aga
   assert.equal(bodyCarriesQuote(`<p>He wrote: <em>A sample approved line,</em> for a test, about the pace.</p>`, quote), true);
   assert.equal(bodyCarriesQuote(`<p>A sample approved line, for a test, about the speed.</p>`, quote), false); // not word for word
   assert.equal(bodyCarriesQuote(`<p>Anything.</p>`, ""), false);
+});
+
+test("#6193 B4: an edition without its own title and summary is not served at all", () => {
+  assert.equal(editionFor({ state: "ok", editions: [edition({ summary: "" })] }, "week-04"), null);
+  assert.equal(editionFor({ state: "ok", editions: [edition({ title: undefined })] }, "week-04"), null);
+});
+
+test("#6193 B4: ONE rule for which summary every surface shows — the edition's, then #6177's, then the served one", async () => {
+  const { applyChapterSummaries, cardQuote } = await import("../src/lib/chapter_truth.js");
+  const { editionOrdinal } = await import("../src/lib/chapter_editions.js");
+  const doc = { state: "ok", editions: [edition()] };
+  const table = { revised_on: "2026-11-22", headers: { "week-04": { replaces: "First", text: "A replacement." }, "week-05": { replaces: "First", text: "A replacement." } } };
+  const chapters = [
+    { id: "week-04", status: "published", excerpt: "First edition summary.", title: "A Sample Chapter" },
+    { id: "week-05", status: "published", excerpt: "First edition summary.", title: "Another" },
+    { id: "week-06", status: "published", excerpt: "Untouched.", title: "Third" },
+  ];
+  const done = applyChapterSummaries(chapters, (id) => editionFor(doc, id), true, table, editionOrdinal);
+  assert.deepEqual(done.sort(), ["week-04", "week-05"]);
+  assert.equal(chapters[0].excerpt, "The edition's own summary.");
+  assert.equal(chapters[0].summary, "The edition's own summary.");
+  assert.equal(chapters[0].excerpt_first, "First edition summary.");
+  assert.equal(chapters[0].header_revised_on, undefined); // never the replacement over an edition
+  assert.equal(chapters[1].excerpt, "A replacement.");
+  assert.equal(chapters[2].excerpt, "Untouched.");
+  // switch-off identity: no edition file and #6177 off = nothing changes
+  const off = [{ id: "week-04", status: "published", excerpt: "First edition summary." }];
+  assert.deepEqual(applyChapterSummaries(off, () => null, false, table, editionOrdinal), []);
+  assert.deepEqual(off, [{ id: "week-04", status: "published", excerpt: "First edition summary." }]);
+  // a Moments card quoting it says which edition, never "as published"
+  const q = cardQuote({ text: chapters[0].excerpt, cite: "A Sample Chapter" }, false, chapters[0]);
+  assert.equal(q.citeWords, "A Sample Chapter, second edition, revised 23 November 2026");
+});
+
+test("#6193 B6: the archival page's correction foot says the text below is the superseded rendering", async () => {
+  const { ARCHIVAL_PAGE } = await import("../src/lib/chapter_corrections.js");
+  const c = { id: "walk", chapter_id: "week-04", kind: "correction", dated_on: "2026-11-20", signature: `Correction, 20 November 2026 — ${SIG}`, published_said: "a", record_shows: "b", evidence: "c", approvals: [{ by: "owner", on: "2026-11-20" }], superseded_by: null };
+  assert.match(correctionHtml(c, [c], ARCHIVAL_PAGE), /an archival rendering of it, superseded by the current edition\./);
+  assert.match(correctionHtml(c, [c], ARCHIVAL_PAGE), /correction-signature">Correction, 20 November 2026 — Average Joe Matt editorial record/);
+});
+
+test("#6193 B6: the archival page names a later rewrite's day, never 'first edition'", async () => {
+  const { archivalWhat } = await import("../src/lib/chapter_editions.js");
+  assert.equal(archivalWhat({ as_of: "2026-10-25" }), "as it stood on 25 October 2026");
+  assert.equal(archivalWhat({ as_of: null }), "first edition");
+});
+
+test("the body printer is shared by the chapter and archival pages, unchanged", async () => {
+  const { bodyForPage } = await import("../src/lib/chapter_body.js");
+  const html = `<p class="signature"><em>Editor's note, October 2026 — x</em></p>\n<p class="signature"><em>Day 3 · 1 lb</em></p>\n<p>Prose.</p>`;
+  assert.equal(bodyForPage(html, null), `<p class="signature note"><em>Editor's note, October 2026 — x</em></p>\n<p class="signature filed"><em>Day 3 · 1 lb</em></p>\n<p>Prose.</p>`);
+  assert.equal(bodyForPage("<p>The dek.</p>\n<p>Prose.</p>", "The dek."), "\n<p>Prose.</p>");
+});
+
+test("#6193 rehearsal §4: an anchored correction stands directly after its passage, signed by the platform; the rest stay above", async () => {
+  const { ARCHIVAL_PAGE, placeBeside } = await import("../src/lib/chapter_corrections.js");
+  const c = (id) => ({ id, chapter_id: "week-04", kind: "correction", dated_on: "2026-11-22", signature: `Correction, 22 November 2026 — ${SIG}`, published_said: "a", record_shows: "b", evidence: "c", approvals: [{ by: "owner", on: "2026-11-22" }], superseded_by: null });
+  const body = "<p>A first paragraph of a synthetic archive.</p>\n<p>Day 9 was a sample day of the test. More words.</p>\n<p>A last paragraph.</p>";
+  const out = placeBeside(body, [{ correction_id: "one", passage: "Day 9 was a sample day" }, { correction_id: "two", passage: "not in the text anywhere" }], [c("one"), c("two")], ARCHIVAL_PAGE);
+  assert.deepEqual(out.placed, ["one"]);
+  const at = out.html.indexOf("data-anchored");
+  assert.ok(at > out.html.indexOf("More words.</p>") && at < out.html.indexOf("A last paragraph"));
+  assert.match(out.html, /correction-signature">Correction, 22 November 2026 — Average Joe Matt editorial record/);
+  assert.match(out.html, /concerns the passage above, beginning “Day 9 was a sample day”/);
+  // a passage in two paragraphs is ambiguous: not placed
+  const twice = placeBeside(body + "\n<p>Day 9 was a sample day again.</p>", [{ correction_id: "one", passage: "Day 9 was a sample day" }], [c("one")]);
+  assert.deepEqual(twice.placed, []);
 });
