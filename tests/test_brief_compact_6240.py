@@ -239,11 +239,15 @@ def test_the_site_api_serves_the_pending_days_additively():
         "EXPERIMENT_START": "2026-11-01",
         "table": _T(),
     }
-    body = json.loads(sn.nutrition_overview(_g=g, window=("2026-11-01", TODAY))["body"])
+    body = json.loads(
+        sn.with_food_log(sn.nutrition_overview(_g=g, window=("2026-11-01", TODAY)), _g=g, window=("2026-11-01", TODAY))["body"]
+    )
     assert body["food_log"]["arrival_known"] is True
     assert body["food_log"]["pending_days"] == ["2026-11-07", "2026-11-08", TODAY]
     g["table"] = None  # an unreadable source claims nothing either way
-    body = json.loads(sn.nutrition_overview(_g=g, window=("2026-11-01", TODAY))["body"])
+    body = json.loads(
+        sn.with_food_log(sn.nutrition_overview(_g=g, window=("2026-11-01", TODAY)), _g=g, window=("2026-11-01", TODAY))["body"]
+    )
     assert body["food_log"] == {"pending_days": [], "arrival_known": False}
 
 

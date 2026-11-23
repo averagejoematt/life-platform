@@ -9,6 +9,7 @@ import the facade — no import cycle. All other shared helpers come straight fr
 site_api_common (identical binding semantics to the pre-split facade).
 """
 
+import json
 import os
 from datetime import datetime, timedelta
 
@@ -372,6 +373,20 @@ def _overview_bounds(_g, window: tuple[str, str] | None) -> tuple[str, str, str,
     return end, start, max(start, shift_day_key(end, -6)), max(_g["EXPERIMENT_START"], shift_day_key(end, -59))
 
 
+def with_food_log(resp: dict, *, _g, window: tuple[str, str] | None = None) -> dict:
+    """#6240 (additive): `food_log` on a 200 — the window's days whose food export has not ARRIVED yet (pending data,
+    never "not logged"), by common.food_log_state, the determination the Morning Brief reads too. The day page reads it
+    (scripts/publish_snapshot_day.py), so the email and its detail link cannot disagree about one day. The intake days
+    are the served `nutrition_trend` rows with calories — the payload's own, so no second partition read."""
+    if resp.get("statusCode") != 200:
+        return resp
+    body = json.loads(resp["body"])
+    today, d30, _d7, _d60 = _overview_bounds(_g, window)
+    intake = [str(r.get("date")) for r in body.get("nutrition_trend") or [] if isinstance(r, dict) and r.get("calories") is not None]
+    body["food_log"] = food_log_state.served_block(_g.get("table"), USER_PREFIX, d30, today, intake)
+    return {**resp, "body": json.dumps(body)}
+
+
 def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
     """
     GET /api/nutrition_overview
@@ -394,11 +409,6 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
     protein_target = protein_floor = float(PLAN_DAILY_PROTEIN_MIN_G)
 
     items = _query_source("macrofactor", d30, today)
-    # #6240 (additive): the window's days whose food export has not ARRIVED yet — pending data, never "not logged". The
-    # day page reads it (scripts/publish_snapshot_day.py) so it and the Morning Brief cannot disagree about one day.
-    food_log = food_log_state.served_block(
-        _g.get("table"), USER_PREFIX, d30, today, [_trend_row(i)["date"] for i in items if _mf(i, "calories") is not None]
-    )
     if not items:
         # Genesis week / no logging yet — return a shaped-but-empty 200 so the
         # site renders an honest empty state instead of a console 503.
@@ -467,7 +477,6 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
                     "latest_protein_g": None,
                 },
                 "nutrition_trend": [],
-                "food_log": food_log,  # #6240
                 # #2221 — SHAPE PARITY. The front-end binds one payload shape; this
                 # branch used to omit nine top-level keys the populated branch
                 # publishes, so `data.loss_rate.protein_hit_pct` threw for the whole
@@ -1024,7 +1033,6 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
                 ),
             },
             "nutrition_trend": trend,
-            "food_log": food_log,  # #6240: pending days (export not arrived) — pending data, not a missed log
             "loss_rate": loss_rate,
             "meal_rhythm": meal_rhythm,
             "electrolytes": electrolytes,
