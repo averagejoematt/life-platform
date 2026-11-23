@@ -22,6 +22,7 @@ import json
 import os
 import subprocess
 import sys
+import urllib.parse
 from pathlib import Path
 
 import pytest
@@ -842,7 +843,7 @@ def test_verifier_fetches_and_emits_a_stamped_source_the_tool_accepts():
     assert v["abstract_sha256"] == hashlib.sha256(b"Evening light exposure delayed melatonin and sleep onset.").hexdigest()
     assert {"evening", "light", "exposure", "sleep", "onset"} <= set(v["overlap_terms"]) and v["overlap_count"] >= 2
     assert "override_reason" not in v
-    assert all("eutils.ncbi.nlm.nih.gov" in u for u in http.calls)
+    assert {urllib.parse.urlparse(u).hostname for u in http.calls} == {"eutils.ncbi.nlm.nih.gov"}
     src["resolved_title"] = src["verification"]["resolved_title"] = "Edited by hand"
     with pytest.raises(rf.FindingError, match="stamp does not match"):
         rf.validate_source(src, today=TODAY)
