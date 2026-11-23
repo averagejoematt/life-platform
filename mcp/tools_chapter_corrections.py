@@ -78,7 +78,10 @@ MCC_DESCRIPTION = (
     "passes the publication gates (content filter, private calls, truth checks) at proposal and approval. No feed item, no "
     "new date, no mail. 'propose_anchor' chapter_id, correction_id (an approved correction), passage (the exact opening "
     "words of the passage in the chapter's archival rendering), then 'approve_anchor' chapter_id, correction_id, approved=true: "
-    "the archival page prints that correction beside the passage; the correction itself is unchanged."
+    "the archival page prints that correction beside the passage; the correction itself is unchanged. "
+    "'withhold_correction_text' chapter_id, correction_id, approved=true — ONLY on Matthew's explicit word, and only for a "
+    "SUPERSEDED correction: its statement text stops being shown (signature, date and 'replaced' stay); nothing is edited "
+    "or deleted. A new correction's text is refused if it restates a call or coach output the policy keeps private."
 )
 
 MCC_INPUT = {
@@ -99,6 +102,7 @@ MCC_INPUT = {
                 "withdraw_archival",
                 "propose_anchor",
                 "approve_anchor",
+                "withhold_correction_text",
             ],
             "description": "Corrections: list, propose, approve. Second editions (#6193): list_editions, propose/approve/withdraw_edition, propose/approve/withdraw_archival.",
         },
@@ -163,6 +167,8 @@ def _listing(rows: list) -> dict:
     items = []
     for r in sorted(rows, key=lambda r: str(r.get("sk"))):
         key = (r.get("chapter_id"), r.get("correction_id"))
+        if r.get("record_type") == CC.TEXT_WITHHELD_TYPE:  # #6193: shown on its correction, not as a row of its own
+            continue
         items.append(
             {
                 "chapter_id": r.get("chapter_id"),
@@ -178,6 +184,7 @@ def _listing(rows: list) -> dict:
                 "signature": r.get("signature"),
                 "renders": key in public,
                 "superseded_by": (public.get(key) or {}).get("superseded_by"),
+                "text_withheld": bool((public.get(key) or {}).get("text_withheld")),
             }
         )
     return {"corrections": items, "count": len(items), "rendering": len(public)}
@@ -198,6 +205,12 @@ def _propose(args: dict) -> dict:
         )
     except CC.CorrectionError as exc:
         return {"error": f"{exc}. Nothing was stored."}
+    withheld = _withheld_words(item)
+    if withheld:
+        return {
+            "error": "the correction's text carries words the publication policy keeps private. Nothing was stored.",
+            "findings": withheld,
+        }
     if item["supersedes"]:
         prior = _table_ref.get_item(Key={"pk": item["pk"], "sk": CC.sk(item["chapter_id"], item["supersedes"])}).get("Item")
         if not prior:
@@ -212,6 +225,61 @@ def _propose(args: dict) -> dict:
         logger.warning(f"[#6177] correction proposal write failed: {type(exc).__name__}")
         return {"error": f"the proposal could not be stored ({type(exc).__name__}). Nothing was stored."}
     return {"stored": True, "approved": False, "renders": False, "chapter_id": item["chapter_id"], "correction_id": item["correction_id"]}
+
+
+def _withheld_words(item: dict) -> list:
+    """#6193: a correction's own statement never restates a withheld call or a withheld coach output — the same two checks
+    the edition gate runs (the withheld graded record OR withheld outputs, and the private-call policy). Fail closed: an
+    unreadable record refuses the proposal."""
+    tainted, calls = _tainted(), _private_calls()
+    out: list = []
+    if tainted is None:
+        out.append("private-call: the publication record could not be opened — nothing is proposed unchecked")
+    for f in CC.STATEMENT_TEXT_FIELDS:
+        text = str(item.get(f) or "")
+        try:
+            if tainted is not None and (tainted(text) or any(tainted(p) for p in text.split(". ") if p.strip())):
+                out.append(f"{f}: carries the words of a call or coach output that is not public")
+        except Exception as exc:  # noqa: BLE001
+            out.append(f"{f}: the publication record could not be read ({type(exc).__name__})")
+        out += [f"{f}: {x}" for x in private_call_check.findings(text, calls)]
+    return out
+
+
+def _withhold_text(args: dict) -> dict:
+    """#6193: Matthew's appended record that a SUPERSEDED correction's statement is not shown publicly (its audit trail
+    stays: the record is never edited or deleted). ``approved`` exactly true; refused for a correction not superseded."""
+    if args.get("approved") is not True:
+        return {
+            "error": "approved must be exactly true, given only after Matthew explicitly asked to withhold this text. Nothing was stored."
+        }
+    chapter_id, correction_id = str(args.get("chapter_id") or "").strip(), str(args.get("correction_id") or "").strip()
+    try:
+        item = CC.new_text_withheld(
+            chapter_id=chapter_id, correction_id=correction_id, at=_now(), dated_on=pacific_today(), note=str(args.get("note") or "")
+        )
+    except CC.CorrectionError as exc:
+        return {"error": f"{exc}. Nothing was stored."}
+    public = {c["id"]: c for c in CC.public_view(_rows(chapter_id)) if c["chapter_id"] == chapter_id}
+    if correction_id not in public:
+        return {"error": f"{correction_id} is not an approved correction of {chapter_id}. Nothing was stored."}
+    if not public[correction_id].get("superseded_by"):
+        return {"error": f"{correction_id} is not superseded; only a replaced correction's text can be withheld. Nothing was stored."}
+    try:
+        _table_ref.put_item(Item=item, ConditionExpression="attribute_not_exists(sk)")
+    except Exception as exc:  # noqa: BLE001
+        if "ConditionalCheckFailed" in str(exc) or "ConditionalCheckFailed" in type(exc).__name__:
+            return {"error": f"the text of {correction_id} is already withheld; records are append-only. Nothing was stored."}
+        logger.warning(f"[#6193] text-withheld write failed: {type(exc).__name__}")
+        return {"error": f"the record could not be stored ({type(exc).__name__}). Nothing was stored."}
+    return {
+        "stored": True,
+        "chapter_id": chapter_id,
+        "correction_id": correction_id,
+        "withheld_on": item["withheld_on"],
+        "superseded_by": public[correction_id]["superseded_by"],
+        "note": "from the next Site API read and site build the replaced correction shows only its signature, date and that it was replaced",
+    }
 
 
 def _approve(args: dict) -> dict:
@@ -674,6 +742,7 @@ def tool_manage_chapter_corrections(args):
         "approve_archival": _approve_archival,
         "withdraw_edition": lambda a: _withdraw(a, "edition"),
         "withdraw_archival": lambda a: _withdraw(a, "archival"),
+        "withhold_correction_text": _withhold_text,
         "propose_anchor": _propose_anchor,
         "approve_anchor": _approve_anchor,
     }
@@ -694,5 +763,5 @@ def tool_manage_chapter_corrections(args):
     if action == "approve":
         return _approve(args)
     return {
-        "error": f"unknown action {action!r}: list, propose, approve, list_editions, propose_edition, approve_edition, withdraw_edition, propose_archival, approve_archival, withdraw_archival, propose_anchor or approve_anchor."
+        "error": f"unknown action {action!r}: list, propose, approve, list_editions, propose_edition, approve_edition, withdraw_edition, propose_archival, approve_archival, withdraw_archival, propose_anchor, approve_anchor or withhold_correction_text."
     }

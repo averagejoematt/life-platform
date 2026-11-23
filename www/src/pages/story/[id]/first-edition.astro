@@ -12,7 +12,7 @@
 import Base from "../../../layouts/Base.astro";
 import { dayInWords } from "../../../lib/format.js";
 import { loadAll, loadChapterCorrections, loadChapterEditions } from "../../../lib/snapshot.js";
-import { archivalChapterIds, archivalFor, archivalWhat, editionFor } from "../../../lib/chapter_editions.js";
+import { ARCHIVAL_LABEL, archivalChapterIds, archivalFor, archivalWhat, editionFor } from "../../../lib/chapter_editions.js";
 import { ARCHIVAL_PAGE, PERSONA_DISCLOSURE, correctionsFor, correctionsHtml, namesLegacyPersona, placeBeside } from "../../../lib/chapter_corrections.js";
 import { bodyForPage } from "../../../lib/chapter_body.js";
 import { hasPage, href } from "../../../lib/url.js";
@@ -37,7 +37,7 @@ const above = corrections.filter((x) => !beside.placed.includes(x.id));
 const disclose = namesLegacyPersona(a.body_html);
 ---
 
-<Base title={`${c.title} · ${what}, archived`} top="story" description={a.note} status={dayInWords(a.as_of || e.first_published)} noindex canonicalPath={current}>
+<Base title={`${c.title} · ${ARCHIVAL_LABEL}`} top="story" description={a.note} status={dayInWords(a.as_of || e.first_published)} noindex canonicalPath={current}>
   <section class="section" style="padding-bottom:24px" data-chapter={c.id} data-archival-edition>
     <div class="wrap" style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-end">
       <div style="flex:0 0 150px">
@@ -45,7 +45,7 @@ const disclose = namesLegacyPersona(a.body_html);
         <b style="font-family:var(--sans);font-size:20px;display:block;color:var(--muted)" data-superseded>Superseded</b>
       </div>
       <div style="flex:1 1 520px;min-width:0;display:flex;flex-direction:column;gap:14px">
-        <p class="label">Chapter · {c.week_label} · {what}, archived</p>
+        <p class="label" data-archival-label>{ARCHIVAL_LABEL} · {c.week_label} · {what}</p>
         <h1>{c.title}</h1>
         <aside style="border:1px solid var(--ink);padding:14px 16px;font-family:var(--sans);font-size:14px;line-height:1.5" data-archival-note>
           <p class="label" style="margin-bottom:6px">{a.signature}</p>

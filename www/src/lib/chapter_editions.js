@@ -13,6 +13,9 @@ import { PLATFORM_SIGNATURE } from "./chapter_corrections.js";
 import { dayInWords } from "./format.js";
 
 export const ARCHIVE_SEGMENT = "first-edition";
+/** The archival page's label — the owner's exact words (ruling 2026-11-22, final chronicle publication §5); pinned equal
+ *  to lambdas/content/chapter_editions.py ARCHIVAL_LABEL. */
+export const ARCHIVAL_LABEL = "Historical edition — privacy-safe rendering";
 
 const ok = (e) =>
   e &&
