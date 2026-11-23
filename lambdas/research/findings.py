@@ -46,7 +46,7 @@ from typing import Any, Optional
 
 from coach.persona_registry import CHAT_COACH_IDS, OPERATIONAL_COACH_IDS
 from coach.recommendation_record import valid_rec_id  # read-only: the rec_id shape lives in the record's own registry
-from common.pacific_time import parse_day_key
+from common.pacific_time import parse_day_key, parse_iso_utc
 
 SOURCE = "research_findings"
 HEAD_PREFIX = "FINDING#"
@@ -257,12 +257,7 @@ def event_sk(finding_id: str, recorded_at: str, kind: str, revision: int = 1) ->
 def parse_instant(value: Any) -> Optional[datetime]:
     """A stored UTC instant, with or without fractional seconds; None when it is not one (never an exception)."""
     v = str(value or "")
-    if not _INSTANT.match(v):
-        return None
-    try:
-        return datetime.fromisoformat(v[:-1] + "+00:00")
-    except ValueError:
-        return None
+    return parse_iso_utc(v) if _INSTANT.match(v) else None  # the platform's one ISO parser (#1964 / #3609)
 
 
 def _format_instant(at: datetime) -> str:
