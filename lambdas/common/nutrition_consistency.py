@@ -61,14 +61,16 @@ DAY_PAGE_PARTIAL_LABELLED = "day_page_partial_labelled"
 #: F13. The Board intro states the charter's rate band instead of the profile row's February phase targets.
 BOD_INTRO_CHARTER_RATE = "bod_intro_charter_rate"
 
+# #6195 activation (owner ruling 2026-11-22, verified factual-labelling corrections): GROUP 1 (LABELLING) ON, GROUP 2
+# (COMPUTED) stays OFF until its before/after numbers are read. ROLLBACK: set an item back to False + fleet, site API and MCP deploys.
 SWITCHES: dict[str, bool] = {
-    PUBLIC_VERDICT_NOT_CLEARANCE: False,
-    MAINTENANCE_LABELLED: False,
-    RATE_LINE_WORDING: False,
-    MCP_SUSTAINABILITY_WORDING: False,
-    OWNER_TARGET_LAYERS: False,
-    BRIEF_TILE_LAYERS: False,
-    OVERSHOOT_OPTION_LAYERS: False,
+    PUBLIC_VERDICT_NOT_CLEARANCE: True,
+    MAINTENANCE_LABELLED: True,
+    RATE_LINE_WORDING: True,
+    MCP_SUSTAINABILITY_WORDING: True,
+    OWNER_TARGET_LAYERS: True,
+    BRIEF_TILE_LAYERS: True,
+    OVERSHOOT_OPTION_LAYERS: True,
     PARTIAL_EXPORT_EXCLUDED: False,
     DAY_PAGE_MAINTENANCE_DATED: False,
     DAY_PAGE_PARTIAL_LABELLED: False,
