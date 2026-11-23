@@ -227,6 +227,42 @@ def _screens(paths: list, out: str) -> None:
         srv.shutdown()
 
 
+def live_verify(results: dict, served: dict, out: str, base_url: str, fetch: Optional[Callable[[str], str]] = None) -> None:
+    """The deployed-page verifier itself (``chronicle_edition_verify.verify``), over the LIVE ``/api/chapters`` response —
+    its real shape, retired and skipped weeks with ``"url": null`` included — with the rehearsed editions placed in it,
+    the rehearsal's own built pages and its own feed. The snapshot the build reads is the exporter's view of that
+    response, not the response, so a verifier that crashes on the live shape was invisible to every other check here
+    (#6193: Week 10's first verify exited 3 on a null url)."""
+    import chronicle_edition_verify as V  # noqa: PLC0415
+
+    fetch = fetch or V.http_get
+    try:
+        live = json.loads(fetch(f"{base_url}/api/chapters"))
+    except Exception as exc:  # noqa: BLE001
+        for cid in served:
+            results[cid]["verify"] = f"the live /api/chapters could not be read ({type(exc).__name__})"
+        return
+    live["editions"] = list(served.values())
+
+    def get(url: str) -> str:
+        path = url[len(base_url) :] if url.startswith(base_url) else url
+        if path == "/api/chapters":
+            return json.dumps(live)
+        if path == "/rss.xml":
+            return open(os.path.join(out, "rss.xml"), encoding="utf-8").read()
+        return open(os.path.join(DIST, path.strip("/"), "index.html"), encoding="utf-8").read()
+
+    for cid, e in served.items():
+        a = e.get("archival") or {}
+        try:
+            problems = V.verify(get, cid, e["text_sha256"], archival_sha256=a.get("text_sha256"), base=base_url)
+        except Exception as exc:  # noqa: BLE001 — exactly what the CLI would print as UNREADABLE
+            problems = [f"the verifier crashed on the live response shape ({type(exc).__name__}: {exc})"]
+        if problems:
+            prior = results[cid].get("verify")
+            results[cid]["verify"] = "; ".join(([prior] if prior else []) + problems)
+
+
 def rehearse(manifest: list, out: str, base_url: str, log: Callable[[str], None] = print) -> dict:
     import publish_snapshot_chapter_editions as exporter  # noqa: PLC0415
     from chronicle_edition_verify import _dek, _h1  # noqa: PLC0415
@@ -329,6 +365,7 @@ def rehearse(manifest: list, out: str, base_url: str, log: Callable[[str], None]
         why = f"the feed could not be built ({type(exc).__name__})"
     for res in results.values():
         res["feed"] = why
+    live_verify(results, served, out, base_url)
     try:
         _screens(paths, out)
     except Exception as exc:  # noqa: BLE001
