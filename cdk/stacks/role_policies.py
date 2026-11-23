@@ -76,6 +76,7 @@ from stacks.role_policies_compute import (  # noqa: F401  (re-export)
     compute_forecast_engine,
     compute_hypothesis_engine,
     compute_personal_baselines,
+    compute_recommendation_writer,
     compute_scenario_explorer,
     compute_state_of_matthew,
     compute_voice_fidelity_harness,

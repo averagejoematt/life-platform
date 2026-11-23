@@ -10,9 +10,9 @@ THE RULING (owner, 2026-11-22, "Recommendation record — APPROVED FOR PILOT"):
 THIS MODULE IS THE REGISTRY for that record: the response vocabulary and its map from the seven older
 "did the advice land" vocabularies, the deterministic admission rule, the row shapes, the fold that turns
 rows into one current view, and the reads. It holds no switch and decides nothing about prompts — the
-coach-context pilot (`coach.coach_context_pilot`) reads it. The ONLY writer is the owner's MCP tool
-`manage_coach_recommendation` (`mcp/tools_coach_recommendations.py`); `tests/test_recommendation_record_6158.py`
-holds that by an AST sweep, and holds the publication boundary (no public-pipeline module can reach this one).
+coach-context pilot (`coach.coach_context_pilot`) reads it. The writers are the owner's MCP tool
+`manage_coach_recommendation` (`mcp/tools_coach_recommendations.py`) and, for the brief's offers and his button
+answers only, the dedicated `coach-recommendation-writer` (`coach.recommendation_writer_lambda`); `tests/test_recommendation_record_6158.py` holds that by an AST sweep, and holds the publication boundary (no public-pipeline module can reach this one).
 
 WHERE IT LIVES, AND WHY NOT IN AN EXISTING FAMILY. Its own owner-only partition:
     pk = USER#<user>#SOURCE#coach_recommendations
@@ -35,7 +35,11 @@ is added once the first row exists (that test refuses an exemption for a partiti
 writes them), a pointer to a DECISION# row, and pointers to CORRECTION# rows in the corrections ledger.
 
 ABSENCE IS "NOT RECORDED". No response row = `not_recorded`. Nothing ever writes a response except the
-owner's explicit report through the tool; there is no backfill, no inference, and no machine writer.
+owner's explicit report — through the tool, or (the Morning Brief pilot, `coach.recommendation_writer_lambda`, dark behind
+`brief_recommendations.CANONICAL_INTAKE_LIVE`) his own button press on the brief's response page, carried here
+by the brief's writer. There is no backfill and no inference. The pilot's other rows are the OFFER (`build_offered_head`):
+a recommendation in a send the mail service ACCEPTED (not proof of inbox delivery or reading) — and the EXPOSURE of a
+repeat (`build_exposure_event`), which asks no new decision.
 """
 
 from __future__ import annotations
@@ -131,6 +135,33 @@ EVENT_CORRECTION_LINK = "correction_link"
 EVENT_KINDS: tuple[str, ...] = (EVENT_RESPONSE, EVENT_FOLLOW_UP, EVENT_OUTCOME, EVENT_CORRECTION_LINK)
 
 RECORDED_BY_OWNER = "owner"
+#: The Morning Brief pilot (#6158 intake, written by `coach.recommendation_writer_lambda`): the brief records that it OFFERED a
+#: recommendation (the head, an offer — never an answer). His button answer stays `recorded_by: owner`.
+RECORDED_BY_BRIEF = "daily_brief"
+
+#: WHO asks a due follow-up. A head the brief intake wrote is asked in the brief, and ONLY there; every other
+#: recommendation is asked in conversation (the lead, once). The two sets are disjoint by construction.
+SURFACE_CONVERSATION = "conversation"
+SURFACE_BRIEF = "coach_brief"
+FOLLOW_UP_SURFACES: tuple[str, ...] = (SURFACE_CONVERSATION, SURFACE_BRIEF)
+
+#: A brief head's lifecycle words (owner feedback 2026-11-22: "accurate lifecycle labels"). The mail service accepting
+#: a message is a send attempt ACCEPTED FOR DELIVERY — never proof of inbox delivery, reading or comprehension.
+LIFECYCLE_OFFERED = "offered"
+DELIVERY_ACCEPTED = "accepted_by_mail_service"
+
+#: A REPEAT: the brief showed a recommendation it had already offered. Recorded by the brief (it is a send, not his
+#: act), it asks no new decision and never touches the response. Not an owner event kind.
+EVENT_EXPOSURE = "exposure"
+
+#: Who the brief's recommendation came FROM, kept apart from who is ACCOUNTABLE for it (owner feedback 2026-11-22:
+#: "distinguish the accountable lead from the originating domain coach or recommendation source"). The accountable
+#: coach is the lead; the origin is never defaulted to the lead — an unknown source is recorded as unknown.
+ORIGIN_COACH = "coach"
+ORIGIN_SYSTEM = "system"
+ORIGIN_RULE = "platform_rule"
+ORIGIN_UNKNOWN = "unknown"
+ORIGIN_KINDS: tuple[str, ...] = (ORIGIN_COACH, ORIGIN_SYSTEM, ORIGIN_RULE, ORIGIN_UNKNOWN)
 
 TEXT_MIN = 20
 TEXT_MAX = 1000
@@ -375,6 +406,108 @@ def build_event(*, user_id: str, rec: dict[str, Any], kind: str, recorded_at: st
     return row
 
 
+# ── the Morning Brief pilot's constructors (#6158; their ONLY caller is `coach.recommendation_writer_lambda`) ──
+
+
+def build_offered_head(
+    *,
+    user_id: str,
+    coach_id: str,
+    origin_kind: str,
+    origin_id: Optional[str],
+    text: str,
+    day: str,
+    send_day: str,
+    accepted_at: str,
+    ses_message_id: str,
+    brief_rec_id: str,
+    source: str,
+    evidence: Optional[list] = None,
+    context: Optional[str] = None,
+    recorded_at: str,
+) -> dict[str, Any]:
+    """A recommendation the Morning Brief OFFERED in a send the mail service accepted (a MessageId came back).
+
+    The same admission rule and id as `build_head`. `coach_id` is the ACCOUNTABLE coach (the lead); `origin_kind` /
+    `origin_id` say where the words came from — a coach, a system, a platform rule, or unknown — and are never the lead
+    by default. Recorded by the brief, never by the owner; its due follow-up is asked in the brief only."""
+    if not str(ses_message_id or "").strip():
+        raise RecommendationError("an offered head needs the mail-service message id — no accepted send, no record")
+    if not str(brief_rec_id or "").strip():
+        raise RecommendationError("an offered head needs the brief's recommendation id")
+    if origin_kind not in ORIGIN_KINDS:
+        raise RecommendationError(f"origin_kind must be one of {list(ORIGIN_KINDS)}")
+    if origin_kind == ORIGIN_UNKNOWN and origin_id:
+        raise RecommendationError("an unknown origin carries no origin_id")
+    if origin_kind != ORIGIN_UNKNOWN and not str(origin_id or "").strip():
+        raise RecommendationError("a known origin names its source (origin_id)")
+    if origin_kind == ORIGIN_COACH and origin_id not in KNOWN_COACH_IDS:
+        raise RecommendationError("a coach origin must be a persona id from the registry")
+    row = build_head(
+        user_id=user_id,
+        coach_id=coach_id,
+        channel="coach_brief",
+        text=text,
+        day=day,
+        evidence=evidence,
+        context=context,
+        recorded_at=recorded_at,
+    )
+    row.update(
+        recorded_by=RECORDED_BY_BRIEF,
+        lifecycle_state=LIFECYCLE_OFFERED,
+        delivery_state=DELIVERY_ACCEPTED,
+        accepted_by_mail_service_at=str(accepted_at),
+        ses_message_id=str(ses_message_id),
+        first_send_day=_day(send_day, "send_day"),
+        brief_rec_id=str(brief_rec_id),
+        brief_source=str(source),
+        accountable_coach_id=coach_id,
+        origin_kind=origin_kind,
+        follow_up_surface=SURFACE_BRIEF,
+    )
+    if origin_kind != ORIGIN_UNKNOWN:
+        row["origin_id"] = str(origin_id)
+    return row
+
+
+def build_exposure_event(*, user_id: str, rec: dict[str, Any], send_day: str, accepted_at: str, ses_message_id: str, brief_rec_id: str):
+    """A REPEAT shown again in a later accepted send: the exposure, on the existing head. It asks no decision, carries no
+    answer and changes no state the fold derives; `recorded_by` is the brief (it is a send, not his act)."""
+    rid = rec.get("rec_id")
+    if not valid_rec_id(rid) or rec.get("recorded_by") != RECORDED_BY_BRIEF:
+        raise RecommendationError("an exposure belongs on a head the brief offered")
+    if not str(ses_message_id or "").strip():
+        raise RecommendationError("an exposure needs the mail-service message id")
+    return {
+        "pk": pk(user_id),
+        "sk": event_sk(rid, accepted_at, EVENT_EXPOSURE, 1),
+        "record_type": "recommendation_event",
+        "rec_id": rid,
+        "kind": EVENT_EXPOSURE,
+        "recorded_at": accepted_at,
+        "recorded_by": RECORDED_BY_BRIEF,
+        "send_day": _day(send_day, "send_day"),
+        "delivery_state": DELIVERY_ACCEPTED,
+        "ses_message_id": str(ses_message_id),
+        "brief_rec_id": str(brief_rec_id),
+    }
+
+
+def build_button_response(*, user_id: str, rec: dict[str, Any], response: str, answered_at: str, token_hash: str, send_day: str, word: str):
+    """HIS explicit button answer from the brief's response page, carried to the record by the brief.
+
+    `recorded_at` is the instant he pressed the button (the token row's `used_at`), so the event's key is fixed
+    by the token: the same token can only ever make the same row (a conditional put then refuses the replay)."""
+    if response not in RESPONSES:
+        raise RecommendationError(f"a button answer must map to one of {list(RESPONSES)}")
+    if not re.fullmatch(r"[0-9a-f]{64}", str(token_hash or "")):
+        raise RecommendationError("a button answer needs the spent token's hash")
+    row = build_event(user_id=user_id, rec=rec, kind=EVENT_RESPONSE, recorded_at=answered_at, revision=1, response=response, words=word)
+    row.update(via="brief_response_button", token_hash=str(token_hash), send_day=_day(send_day, "send_day"), carried_by=RECORDED_BY_BRIEF)
+    return row
+
+
 # ── reads (fail-loud here; callers decide whether a context block degrades) ─────────────────────
 
 
@@ -403,6 +536,7 @@ def fold(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     The newest event of each kind wins; a `withdrawn` response reads `not_recorded`. History is kept whole."""
     heads: dict[str, dict[str, Any]] = {}
     events: dict[str, list[dict[str, Any]]] = {}
+    exposures: dict[str, list[dict[str, Any]]] = {}
     for r in rows or []:
         rid = str(r.get("rec_id") or "")
         if not valid_rec_id(rid) or r.get("tombstone"):
@@ -411,6 +545,10 @@ def fold(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             heads[rid] = r
         elif r.get("record_type") == "recommendation_event" and r.get("recorded_by") == RECORDED_BY_OWNER:
             events.setdefault(rid, []).append(r)
+        elif (
+            r.get("record_type") == "recommendation_event" and r.get("recorded_by") == RECORDED_BY_BRIEF and r.get("kind") == EVENT_EXPOSURE
+        ):
+            exposures.setdefault(rid, []).append(r)  # a send, never an answer: it changes nothing the fold derives
     views = []
     for rid, head in heads.items():
         evs = sorted(events.get(rid) or [], key=lambda e: str(e.get("sk")))
@@ -432,6 +570,19 @@ def fold(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "evidence": list(head.get("evidence") or []),
                 "context": head.get("context"),
                 "decision_sk": head.get("decision_sk"),
+                "recorded_by": head.get("recorded_by"),
+                "accepted_by_mail_service_at": head.get("accepted_by_mail_service_at"),
+                "brief_rec_id": head.get("brief_rec_id"),
+                "follow_up_surface": head.get("follow_up_surface") or SURFACE_CONVERSATION,
+                "accountable_coach_id": head.get("accountable_coach_id") or head.get("coach_id"),
+                "origin_kind": head.get("origin_kind"),
+                "origin_id": head.get("origin_id"),
+                "lifecycle_state": head.get("lifecycle_state"),
+                "delivery_state": head.get("delivery_state"),
+                "exposures": [
+                    {"send_day": e.get("send_day"), "accepted_at": e.get("recorded_at")}
+                    for e in sorted(exposures.get(rid) or [], key=lambda e: str(e.get("sk")))
+                ],
                 "response": answer,
                 "response_label": RESPONSE_LABELS[answer],
                 "response_words": (resp or {}).get("words") if answer != NOT_RECORDED else None,
@@ -480,7 +631,10 @@ def status_of(view: dict[str, Any], today: str) -> str:
     return "due" if is_due(view, today) else "active"
 
 
-def due_follow_ups(views: list[dict[str, Any]], today: str) -> list[dict[str, Any]]:
-    """Due recommendations, the longest-overdue first (the order the lead asks them in, ONE at a time)."""
-    due = [v for v in views if is_due(v, today)]
+def due_follow_ups(views: list[dict[str, Any]], today: str, surface: Optional[str] = SURFACE_CONVERSATION) -> list[dict[str, Any]]:
+    """Due recommendations, the longest-overdue first (the order the lead asks them in, ONE at a time).
+
+    `surface` names who is asking: the conversation (default — the lead) or the brief; each sees only the
+    follow-ups it owns, so one follow-up is never asked in two channels. None = every due one (the owner's list)."""
+    due = [v for v in views if is_due(v, today) and (surface is None or (v.get("follow_up_surface") or SURFACE_CONVERSATION) == surface)]
     return sorted(due, key=lambda v: (str(v.get("follow_up_on")), str(v.get("rec_id"))))

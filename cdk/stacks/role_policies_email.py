@@ -166,6 +166,9 @@ def email_daily_brief() -> list[iam.PolicyStatement]:
                     # coach call logs an AccessDeniedException (non-blocking,
                     # but flooding CloudWatch with errors).
                     f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-quality-gate",
+                    # #6158 Morning Brief pilot (OWNER-REQUIRED, dark): the brief may not write the recommendation
+                    # record (email_stack.py's Deny); it asks the dedicated writer to, synchronously.
+                    f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-recommendation-writer",
                 ],
             ),
         ],

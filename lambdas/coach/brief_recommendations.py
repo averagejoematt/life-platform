@@ -11,8 +11,12 @@ own private partition, and nothing else reads them:
     carries) and, from the first trial send on, the keys the trial itself recorded per send.
   * THE EXPLICITLY REPORTED RESPONSE: the one-use response token, and the answer recorded against it.
 
-When #6158 lands, `shown_history` and the response write re-point to its reader/writer; the callers
-(`emails.brief_trial`, `web.site_api_social_brief`) do not change.
+#6158 has landed; its pilot (`coach.brief_rec_intake`, dark behind CANONICAL_INTAKE_LIVE below) does NOT re-point
+this partition: the trial stays the brief's send and interface telemetry, and the canonical record is written by the
+dedicated `coach-recommendation-writer`, which the daily brief invokes — the offer after the mail service accepts a
+send, his spent answers on the next run. The public
+answer door keeps writing only this partition (owner ruling 2026-11-22 §4: the trial record must not become a
+competing authoritative lifecycle).
 
 PARTITION `USER#matthew#SOURCE#brief_trial` (private; never read by a public route or a generator):
   SWITCH#format          {value: off | hybrid | measure}      — the trial switch (absent = off)
@@ -33,6 +37,14 @@ import hashlib
 import json
 import re
 import secrets
+
+#: THE #6158 PILOT SWITCH — the Morning Brief as the canonical recommendation record's first intake
+#: (`coach.brief_rec_intake`). Committed False: the trial runs exactly as before (the intake module is never even
+#: imported) and nothing reaches the canonical record. True = the brief asks the dedicated writer to record an OFFER
+#: after the mail service accepts a hybrid send (or an EXPOSURE of a repeat), carries his spent button answers into the
+#: record on its next run, and asks a due brief follow-up once.
+#: Turning it on needs the owner's review of the IAM delta and a daily-brief deploy; rollback = False + deploy.
+CANONICAL_INTAKE_LIVE = False
 
 TRIAL_SOURCE = "brief_trial"
 SWITCH_SK = "SWITCH#format"

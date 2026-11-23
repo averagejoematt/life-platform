@@ -44,6 +44,12 @@
       "note": "#3759: Monday coach-vision read over the progress photos (one Haiku vision call). Writes USER#matthew#SOURCE#coach_vision, owner-only.",
       "stack": "LifePlatformCompute"
     },
+    "lambdas/coach/recommendation_writer_lambda.py": {
+      "function": "coach-recommendation-writer",
+      "handler": "coach.recommendation_writer_lambda.lambda_handler",
+      "note": "#6158: the Morning Brief pilot's dedicated recommendation-record writer (dark). PutItem-only on USER#matthew#SOURCE#coach_recommendations; invoked synchronously by daily-brief.",
+      "stack": "LifePlatformCompute"
+    },
     "lambdas/coach/inter_coach_dialogue_lambda.py": {
       "function": "inter-coach-dialogue",
       "handler": "coach.inter_coach_dialogue_lambda.lambda_handler",

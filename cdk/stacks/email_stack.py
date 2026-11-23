@@ -25,6 +25,7 @@ from aws_cdk import (
     aws_cloudwatch as cloudwatch,
     aws_cloudwatch_actions as cw_actions,
     aws_dynamodb as dynamodb,
+    aws_iam as iam,
     aws_lambda as _lambda,
     aws_s3 as s3,
     aws_sns as sns,
@@ -49,6 +50,31 @@ LIFE_PLATFORM_TABLE = TABLE_NAME
 LIFE_PLATFORM_BUCKET = "matthew-life-platform"
 ALERTS_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
 DIGEST_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"
+
+#: The recommendation record's one partition (`coach.recommendation_record.pk("matthew")`; a test holds them equal).
+RECOMMENDATION_RECORD_PK = "USER#matthew#SOURCE#coach_recommendations"
+#: EVERY item write the daily-brief role may not use on that partition (a test reads this tuple from source).
+RECOMMENDATION_RECORD_DENIED_ACTIONS = ("dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem", "dynamodb:BatchWriteItem")
+
+
+def recommendation_record_no_write() -> iam.PolicyStatement:
+    """#6158 Morning Brief pilot (OWNER-REQUIRED — presented for review, not yet acknowledged).
+
+    The daily-brief role's `DynamoDB` statement (`role_policies._email_base`) lets it PutItem and UpdateItem the whole
+    table, the recommendation record included. This Deny removes EVERY item write on the record's one partition: the
+    brief cannot create, replace, update, delete or batch-write a record row. Its writes go through the dedicated
+    `coach-recommendation-writer` (PutItem-only, LeadingKeys-scoped; `role_policies_compute.compute_recommendation_writer`).
+    PartiQL writes are not granted to this role at all.
+
+    It lives here, not in `role_policies_email`, because it is the platform's first Deny and the role-policy test estate
+    models every statement as a grant; it is applied straight to the role at synth."""
+    return iam.PolicyStatement(
+        sid="RecommendationRecordNoWrite",
+        effect=iam.Effect.DENY,
+        actions=list(RECOMMENDATION_RECORD_DENIED_ACTIONS),
+        resources=[f"arn:aws:dynamodb:{REGION}:{ACCT}:table/{TABLE_NAME}"],
+        conditions={"ForAnyValue:StringEquals": {"dynamodb:LeadingKeys": [RECOMMENDATION_RECORD_PK]}},
+    )
 
 
 class EmailStack(Stack):
@@ -103,7 +129,7 @@ class EmailStack(Stack):
         # disable — calls actually completed but blew past the 300s budget. 900s
         # gives ample headroom; daily-brief typically completes in 4-5 min when
         # Anthropic is healthy. Memory bumped 512→768 MB for some headroom too.
-        create_platform_lambda(
+        _daily_brief = create_platform_lambda(
             self,
             "DailyBrief",
             function_name="daily-brief",
@@ -118,6 +144,9 @@ class EmailStack(Stack):
             custom_policies=rp.email_daily_brief(),
             **{**shared, "alerts_topic": None},
         )
+        # #6158 Morning Brief pilot (OWNER-REQUIRED — presented for review): this role cannot write the recommendation
+        # record at all; the dedicated writer does. See `recommendation_record_no_write` above.
+        _daily_brief.role.add_to_principal_policy(recommendation_record_no_write())
 
         create_platform_lambda(
             self,

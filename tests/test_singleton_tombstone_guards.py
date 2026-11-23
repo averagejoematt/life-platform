@@ -949,6 +949,17 @@ _GENERATION_PACKAGES = ("intelligence", "coach")
 
 _GENERATION_GET_ITEM_EXEMPT: dict = {
     (
+        "coach/recommendation_writer_lambda.py",
+        "rr.head_sk(rid)",
+    ): "#6158 recommendation record head — coach_recommendations is CROSS_PHASE (his answers outlive any cycle) and is "
+    "never tombstoned; the read is the writer's create-only IDEMPOTENCE check (head exists -> record an exposure, "
+    "never a second head), so a visibility filter could only make it write a duplicate",
+    (
+        "coach/recommendation_writer_lambda.py",
+        "TOKEN_PREFIX + th",
+    ): "#6158 the brief trial's TOKEN# row (system state: the phase machinery ignores the partition, nothing tombstones "
+    "it) — read to bind an offer to the send that stamped it; it feeds no generation",
+    (
         "coach/coach_chat_summary.py",
         "summary_sk(target)",
     ): "CHAT#summary — CROSS_PHASE since ADR-153 (the texting relationship survives resets); never tombstoned",

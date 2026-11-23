@@ -2239,7 +2239,7 @@ def lambda_handler(event, context):
     if event.get("_dry_run_resolved"):
         logger.info(f"[DRY_RUN] would have sent: {subject} ({len(html)} bytes)")
     else:
-        ses.send_email(
+        _ses_sent = ses.send_email(  # #6158 pilot: the accepted send's MessageId is the delivery evidence for an offered record
             FromEmailAddress=SENDER,
             Destination={"ToAddresses": [RECIPIENT]},
             Content={
@@ -2257,7 +2257,8 @@ def lambda_handler(event, context):
         # DLQ redrive (6h later, long past the #2860 lease) free to send it again.
         record_email_send(table, "daily_brief", yesterday)
         logger.info("Sent: " + subject)
-    brief_trial.record(table, USER_PREFIX, _trial, len(html), _persist, logger)  # #6175: no-op when off, dry run or demo
+    # #6175: no-op when off, dry run or demo. #6158: `sent` is SES's reply — bound ONLY when SES accepted the send.
+    brief_trial.record(table, USER_PREFIX, _trial, len(html), _persist, logger, sent=locals().get("_ses_sent"))
 
     if _persist:  # #2255: demo_mode OR dry_run
         output_writers.write_dashboard_json(

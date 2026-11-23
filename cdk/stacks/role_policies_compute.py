@@ -403,6 +403,49 @@ def compute_coach_vision() -> list[iam.PolicyStatement]:
     ]
 
 
+def compute_recommendation_writer() -> list[iam.PolicyStatement]:
+    """#6158 Morning Brief pilot — `coach-recommendation-writer`, the dedicated function that writes the brief's
+    recommendations into the canonical record. It is NOT the only principal that can write that partition: other
+    roles keep older table-wide grants, a separate remediation (#6237). (Owner feedback 2026-11-22 on #6232: "a small
+    dedicated internal writer with narrowly scoped IAM permissions … the permission actually restricts the DynamoDB
+    keys the function can write".)
+    OWNER-REQUIRED; presented for review, not yet acknowledged.
+
+    Deliberately NOT `_compute_base()` (table-wide PutItem/UpdateItem). Each statement is the minimum:
+
+      * **PutItem ONLY, LeadingKeys `USER#matthew#SOURCE#coach_recommendations`** — an offered head, an exposure,
+        his button answer. No UpdateItem, DeleteItem or BatchWriteItem anywhere: nothing it holds can modify or
+        remove a row. IAM cannot require a condition expression on PutItem; the no-overwrite guarantee is the
+        module's create-only put (`attribute_not_exists(sk)`), held by an AST test, for every row the brief's
+        pilot writes. Other roles' older table-wide grants are outside that guarantee (#6237).
+      * **GetItem/Query, LeadingKeys = the record partition and the brief's trial partition** — the idempotence
+        reads, the stamped token that binds an offer to its send, and the spent tokens it carries.
+      * **KMS** — the table's customer-managed key (reads and writes need it).
+      * Logs come from the helper's basic-execution policy. No S3, no secrets, no Bedrock, no metrics, no DLQ
+        (it is invoked synchronously by the daily brief and by nothing else).
+    """
+    rec_pk = "USER#matthew#SOURCE#coach_recommendations"
+    return [
+        iam.PolicyStatement(
+            sid="RecommendationRecordCreateOnly",
+            actions=["dynamodb:PutItem"],
+            resources=[TABLE_ARN],
+            conditions={"ForAllValues:StringEquals": {"dynamodb:LeadingKeys": [rec_pk]}},
+        ),
+        iam.PolicyStatement(
+            sid="RecordAndTrialRead",
+            actions=["dynamodb:GetItem", "dynamodb:Query"],
+            resources=[TABLE_ARN],
+            conditions={"ForAllValues:StringEquals": {"dynamodb:LeadingKeys": [rec_pk, "USER#matthew#SOURCE#brief_trial"]}},
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+    ]
+
+
 # ingestion_google_calendar() removed v3.7.46 — ADR-030 (integration retired)
 
 

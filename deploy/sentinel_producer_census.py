@@ -171,6 +171,12 @@ ON_DEMAND: dict[str, dict] = {
         "since": "2026-09-23",
         "reason": "its EventBridge rule ships enabled=False (ADR-066); invoked manually — last 2026-08-25.",
     },
+    "coach-recommendation-writer": {
+        "since": "2026-11-22",
+        "reason": "#6158 Morning Brief pilot writer, DARK: invoked only by daily-brief, and only while "
+        "brief_recommendations.CANONICAL_INTAKE_LIVE is True, so its silence carries no information until activation. "
+        "The switch PR moves it to EVENT_WINDOWS (window_days 3, gap_h 24, triggered by the daily brief).",
+    },
 }
 
 VERDICT_OK = "ok"

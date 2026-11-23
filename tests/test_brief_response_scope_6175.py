@@ -185,8 +185,10 @@ def test_expired_reused_and_malformed_tokens_record_nothing(door):
 
 
 def test_nothing_in_the_trial_path_imports_or_writes_the_canonical_recommendation_record():
-    """No code path folds a brief answer into coach_recommendations: neither the door, the seam, the hybrid
-    renderer nor the trial recorder references the record module or its partition."""
+    """The public door, the seam and the hybrid renderer never reference the record module or its partition. The
+    trial recorder reaches it ONLY through the #6158 pilot's intake (`coach.brief_rec_intake`), lazily, inside the
+    two pilot functions, behind `CANONICAL_INTAKE_LIVE` — the daily-brief function, never the site API."""
+    import ast
     from pathlib import Path
 
     import web.site_api_brief_response as door_mod
@@ -198,3 +200,43 @@ def test_nothing_in_the_trial_path_imports_or_writes_the_canonical_recommendatio
         src = Path(mod.__file__).read_text()
         assert "recommendation_record" not in src, mod.__name__
         assert "SOURCE#coach_recommendations" not in src, mod.__name__
+    assert "brief_rec_intake" not in Path(door_mod.__file__).read_text()
+    tree = ast.parse(Path(trial.__file__).read_text())
+    owners = {
+        f.name
+        for f in ast.walk(tree)
+        if isinstance(f, ast.FunctionDef)
+        for n in ast.walk(f)
+        if isinstance(n, ast.ImportFrom) and any(a.name == "brief_rec_intake" for a in n.names)
+    }
+    top = [n for n in tree.body if isinstance(n, ast.ImportFrom) and any(a.name == "brief_rec_intake" for a in n.names)]
+    assert owners == {"_pilot_plan", "_pilot_record"} and not top
+    assert seam.CANONICAL_INTAKE_LIVE is False
+
+
+def test_the_site_api_role_cannot_write_the_canonical_recommendation_record():
+    """#6158 pilot: the IAM half of the same boundary, read from source (aws_cdk is not installed in the unit suite).
+    Every write statement in the public site API's two roles is LeadingKeys-scoped and no pattern in it matches the
+    record's partition — so a public caller cannot modify a canonical recommendation even if the code tried."""
+    import ast
+    import fnmatch
+    from pathlib import Path
+
+    rec_pk = "USER#matthew#SOURCE#coach_recommendations"
+    write_actions = {"dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem", "dynamodb:BatchWriteItem", "dynamodb:*"}
+    tree = ast.parse((Path(__file__).resolve().parent.parent / "cdk/stacks/role_policies_serve.py").read_text())
+    fns = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in ("site_api", "site_api_ai")]
+    assert len(fns) == 2
+    writes = 0
+    for fn in fns:
+        for call in (n for n in ast.walk(fn) if isinstance(n, ast.Call) and getattr(n.func, "attr", "") == "PolicyStatement"):
+            kw = {k.arg: k.value for k in call.keywords}
+            acts = ast.literal_eval(kw["actions"]) if "actions" in kw else []
+            if not write_actions & set(acts):
+                continue
+            writes += 1
+            cond = ast.literal_eval(kw["conditions"])  # a non-literal scope would raise here: fail closed
+            keys = cond["ForAllValues:StringLike"]["dynamodb:LeadingKeys"]
+            keys = keys if isinstance(keys, list) else [keys]
+            assert not any(fnmatch.fnmatchcase(rec_pk, k) for k in keys), f"{fn.name}: a write pattern matches the record"
+    assert writes >= 2, "the site-api write statements were not found — vacuous guard"
