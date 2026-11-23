@@ -856,6 +856,9 @@ def tool_create_experiment(args):
     clean_item = {k: v for k, v in item.items() if v is not None}
     table.put_item(Item=clean_item)
     logger.info(f"create_experiment: created {exp_id} (iteration {iteration})")
+    from mcp import experiment_close  # #6209: a lift criterion's write-once baseline snapshot + advisory note
+
+    lift_extra = experiment_close.on_create(clean_item, query_source=query_source, table=table, now=now, today=pacific_today())
 
     return {
         "created": True,
@@ -884,6 +887,7 @@ def tool_create_experiment(args):
         # #1569: echo the verbatim note so the caller sees it landed (only when set).
         **({"matthew_note": matthew_note[:500]} if matthew_note else {}),
         **({"pre_registration_warning": prereg_warning} if prereg_warning else {}),
+        **lift_extra,
         "board_of_directors": {
             "Huberman": "One variable at a time. Track for at least 2 weeks before drawing conclusions. Control for confounders: sleep timing, stress, travel.",
             "Attia": "Define your primary endpoint now. What number would convince you this worked? Statistical noise requires \u226514 days of data.",
@@ -1012,6 +1016,9 @@ def tool_get_experiment_results(args):
     item = table.get_item(Key={"pk": EXPERIMENTS_PK, "sk": sk}).get("Item")
     if not item:
         raise ValueError(f"No experiment found with id={exp_id}")
+    from mcp.experiment_close import ensure_baseline_snapshot  # #6209: an analysis-path read captures a due lift baseline
+
+    ensure_baseline_snapshot(item, query_source=query_source, table=table, now=datetime.now(timezone.utc), today=pacific_today())
 
     start_date = item.get("start_date", "")
     end_date = item.get("end_date") or pacific_today()
@@ -1306,88 +1313,12 @@ def tool_end_experiment(args):
 
 
 def _run_design_analysis(existing, design, end_date):
-    """#539: the deterministic close-path analysis for a pre-registered design.
+    """#539 close path — the body lives in mcp/experiment_close.py (#6209 split); this module's reads are injected HERE,
+    at call time, so a test that patches this module's query_source / table / datetime reaches it."""
+    from mcp import experiment_close
 
-    Fetches the criterion metric's daily series for the baseline window and the
-    washout-trimmed intervention window, then evaluates against the frozen
-    criterion via experiment_design (stats_core underneath). Returns the analysis
-    dict (windows + stats + verdict + summary sentence), or None when the washout
-    consumed the whole experiment."""
-    from experiment import experiment_design, lift_outcomes
-
-    design_f = json.loads(json.dumps(design, default=float))  # Decimals → floats for math
-    windows = experiment_design.design_windows(existing.get("start_date", ""), end_date, design_f)
-    if windows is None:
-        return {
-            "verdict": "inconclusive",
-            "summary": "Washout consumed the whole experiment window — no analysis possible.",
-            "windows": None,
-        }
-    metric = (design_f.get("criterion") or {}).get("metric", "")
-    source, field, _label = experiment_design.DESIGN_METRICS[metric]
-
-    def _dated_values(start, end, metric_source=None, metric_field=None):
-        """date → value over [start, end] (last record wins on a duplicate date).
-        Defaults to the criterion metric; #1410's control series pass their own
-        source/field (from DESIGN_METRICS) through the same fetch path."""
-        src = metric_source or source
-        fld = metric_field or field
-        if lift_outcomes.is_lift_metric(fld):  # #6209: derived from logged sets, against the FROZEN baseline window
-            return lift_outcomes.read_series(query_source, src, fld, windows, start, end)
-        items = _query_metric_source(src, start, end)
-        if src == "whoop":
-            items = [normalize_whoop_sleep(i) for i in items]
-        out = {}
-        for it in items:
-            v = _extract_metric(it, fld)
-            date = str(it.get("sk", ""))[5:15]  # sk = "DATE#YYYY-MM-DD..."
-            if v is not None and len(date) == 10:
-                out[date] = v
-        return out
-
-    baseline_vals = [v for _d, v in sorted(_dated_values(windows["baseline_start"], windows["baseline_end"]).items())]
-    window_vals = [v for _d, v in sorted(_dated_values(windows["analysis_start"], windows["analysis_end"]).items())]
-    stats = experiment_design.evaluate_design(design_f, baseline_vals, window_vals)
-    lift_outcomes.attach_observations(stats, query_source, source, field, windows)  # #6209: raw observations beside a lift series
-
-    # #1413 SCED: a randomized-start design ALSO closes with the start-point
-    # randomization test — the observed pre/post difference ranked against every
-    # start the pre-declared window could have produced (exact under the draw
-    # actually performed, valid under autocorrelation). Reported alongside the
-    # effect+CI, with provenance; the frozen #539 verdict rule is unchanged.
-    if design_f.get("randomized_start"):
-        series_start = experiment_design.randomization_series_start(design_f)
-        if series_start:
-            dated = _dated_values(series_start, end_date)
-            rand = experiment_design.randomization_test(design_f, dated, existing.get("start_date", ""), end_date)
-            if rand is not None:
-                stats["randomization"] = rand
-
-    # #1410: a design that froze a counterfactual spec closes with the ghost —
-    # observed vs the BSTS-lite forecast of "had the experiment never started",
-    # or a stated refusal (bad pre-fit / thin data). The spec comes from the
-    # frozen design; every number from experiment_design/bsts_lite — the LLM
-    # narration layer only ever reads the precomputed block (ADR-062/105).
-    if design_f.get("counterfactual") is not None:
-        cf_start_date = existing.get("start_date", "")
-        cf_series_start = experiment_design.counterfactual_series_start(design_f, cf_start_date)
-        dated_criterion = _dated_values(cf_series_start, end_date)
-        dated_controls = {}
-        for cm in design_f["counterfactual"].get("controls") or []:
-            c_src, c_field, _cl = experiment_design.DESIGN_METRICS[cm]
-            dated_controls[cm] = _dated_values(cf_series_start, end_date, metric_source=c_src, metric_field=c_field)
-        stats["counterfactual"] = experiment_design.counterfactual_analysis(
-            design_f, dated_criterion, dated_controls, cf_start_date, end_date
-        )
-
-    return {
-        "windows": windows,
-        "metric": metric,
-        **stats,
-        "summary": experiment_design.analysis_summary(design_f, stats),
-        "analyzed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
-        "engine": "n1-design-v1",
-    }
+    reads = {"query_source": query_source, "metric_query": _query_metric_source, "table": table}
+    return experiment_close.run_design_analysis(existing, design, end_date, **reads, now=datetime.now(timezone.utc), today=pacific_today())
 
 
 # \u2500\u2500 Ruck Logging (v2.49.0) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
