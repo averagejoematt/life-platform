@@ -329,6 +329,11 @@ PERSISTENT_WARN_DAYS = 3
 # Closed set, by check id; extending it needs the same ruling.
 OWNER_ENGAGEMENT_WARNS = frozenset({"morning_checkin:weekday_liveness"})
 
+# SEVERITY: a warning that alarms on its FIRST day, without waiting for persistence. `reader_truth:confirm` is a HIGH
+# reader-truth finding that did not confirm on the second pass (qa_check_reader_truth: "flaky is not the same as
+# absent"); a confirmed high is a FAIL and has its own alarm. A one-day unconfirmed high must not go quiet. Closed set.
+IMMEDIATE_WARNS = frozenset({"reader_truth:confirm"})
+
 
 def split_owner_engagement(warns_alarmed):
     """(platform warns, owner-engagement warns) from the alarmed side of split_warns()."""
@@ -347,7 +352,7 @@ def advance_warn_streaks(prev, today: str, yesterday: str, ids):
     double-counts a day. A day with no run breaks every streak.
 
     state = {"day", "base": {id: consecutive days up to yesterday}, "today_ids": [...], "streaks": {id: n}}
-    persistent = ids whose streak has reached PERSISTENT_WARN_DAYS.
+    persistent = ids whose streak has reached PERSISTENT_WARN_DAYS, plus any IMMEDIATE_WARNS id seen today.
     """
     prev = prev or {}
     day = str(prev.get("day") or "")
@@ -361,7 +366,7 @@ def advance_warn_streaks(prev, today: str, yesterday: str, ids):
         base, today_ids = {}, set(ids)
     streaks = {i: base.get(i, 0) + 1 for i in sorted(today_ids)}
     state = {"day": today, "base": base, "today_ids": sorted(today_ids), "streaks": streaks}
-    return state, sorted(i for i, n in streaks.items() if n >= PERSISTENT_WARN_DAYS)
+    return state, sorted(i for i, n in streaks.items() if n >= PERSISTENT_WARN_DAYS or i in IMMEDIATE_WARNS)
 
 
 WARN_STREAKS_SK = "STATE#warn_streaks"  # beside STATE#predict_dark in the same partition, so no new pk family

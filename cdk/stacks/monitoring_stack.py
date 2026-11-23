@@ -585,8 +585,9 @@ class MonitoringStack(Stack):
         # #5928 (owner ruling 2026-11-23): this alarm watches PersistentWarnCount, not WarnCount. WarnCount >= 1 was
         # red on 27 of 30 days across 13 ids, most of them one- or two-day visitors, so the state said nothing.
         # PersistentWarnCount is the platform warning ids present on each of the last 3 Pacific days
-        # (qa_check.advance_warn_streaks; the state row sits beside STATE#predict_dark). Replayed over the same 30
-        # days it is red on 15, each naming its cause. The window is unchanged — 86400s Maximum, one period — so the
+        # (qa_check.advance_warn_streaks; the state row sits beside STATE#predict_dark), plus an unconfirmed HIGH
+        # reader-truth finding on its first day (qa_check.IMMEDIATE_WARNS). Replayed over 30 days of real runs it is
+        # red on fewer than half the days the old trigger was, each naming its cause. The window is unchanged — 86400s Maximum, one period — so the
         # #2912 sliding-window note above still describes its state behaviour. WarnCount is still emitted and still
         # in the logs and the QA email. Owner-engagement warnings (a check-in not answered) are on
         # OwnerEngagementWarnCount, which no alarm here watches: that is a product condition, read weekly.

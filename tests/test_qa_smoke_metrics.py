@@ -382,6 +382,17 @@ def test_a_warning_on_three_consecutive_days_is_persistent_and_a_visitor_is_not(
     assert _run_days([[["a"]], [["a"]], [[]], [["a"]], [["a"]]]) == [[], [], [], [], []]
 
 
+def test_an_unconfirmed_high_reader_truth_finding_alarms_on_its_first_day():
+    # SEVERITY: a high finding that failed its confirmation pass is a warning, and must not wait three days.
+    assert _run_days([[["reader_truth:confirm"]], [[]], [["reader_truth:confirm", "a"]]]) == [
+        ["reader_truth:confirm"],
+        [],
+        ["reader_truth:confirm"],
+    ]
+    # an ordinary reader-truth verdict warning (low or medium findings) still needs to persist
+    assert _run_days([[["reader_truth:verdict"]], [["reader_truth:verdict"]]]) == [[], []]
+
+
 def test_reruns_on_one_day_do_not_double_count_and_a_days_ids_are_the_union():
     # Six runs in a day (schedule plus post-deploy) are one day, however many of them saw the warning.
     assert _run_days([[["a"]] * 6, [["a"]] * 6]) == [[], []]
