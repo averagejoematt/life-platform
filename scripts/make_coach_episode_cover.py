@@ -2,7 +2,7 @@
 """make_coach_episode_cover.py — per-episode Panel cover art with coach portraits (#593).
 
 Successor to make_panelcast_cover.py (which draws only the show-level cover). Each Panel
-episode pairs the embedded journalist (host: Elena Voss) with a rotating AI coach (guest);
+episode pairs the AI narrator (host: Elena Voss) with a rotating AI coach (guest);
 this composes BOTH engraved portraits into the instrument frame from the SAME signed recipes
 the site renders (web.portrait_raster) — the faces travel to the podcast art from one source
 of truth (ADR-106). Credited on the card: "illustration: commissioned, AI-assisted."
