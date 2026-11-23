@@ -149,6 +149,7 @@ Generated from `ci/lambda_map.json` by `deploy/sync_deploy_doc_map.py` (#2005);
 - coach-observatory-renderer → `lambdas/coach/coach_observatory_renderer.py`
 - coach-prediction-evaluator → `lambdas/coach/coach_prediction_evaluator.py`
 - coach-quality-gate → `lambdas/coach/coach_quality_gate.py`
+- coach-recommendation-writer → `lambdas/coach/recommendation_writer_lambda.py`
 - coach-state-updater → `lambdas/coach/coach_state_updater.py`
 - coach-vision → `lambdas/coach/coach_vision_lambda.py`
 - inter-coach-dialogue → `lambdas/coach/inter_coach_dialogue_lambda.py` (cdk_only†)
