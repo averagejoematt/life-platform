@@ -38,6 +38,11 @@ THE RULES
      than the restart tombstone (``common.media_tombstone.TOMBSTONE_MAX_BYTES``) is the ``url`` of an episode in the
      nearest ``episodes.json`` above it. Anything else — a stale alternate format, an older cut, a held week's
      audio — is a violation. Sizes and keys only; the audio is never fetched.
+  G  a chapter's legacy address follows its served edition (#6193, owner ruling 2026-11-22 §4): for every chapter the
+     fresh snapshot serves an edition of, its journal page is the redirect document to /story/<id>/, its posts.json
+     excerpt and its share kit carry the edition's summary, and the nightly archive (once built after the redirect)
+     archives the redirect, not the first edition. No served edition (the switch off, or none approved) = nothing to
+     check. Keys and chapter ids only — content.legacy_chapter_addresses.copy_issues.
   E  a retired legacy installment stays retired (#6148): at every slug in RETIRED_INSTALLMENTS the served object, the
      archive member and the committed file under site/ are each no larger than the "no longer available" stub. Three
      full pages sat at such slugs until their quarantine on 2026-11-22, and site/ syncs legacy/ with no exclusion, so a
@@ -79,6 +84,7 @@ for _p in (REPO, os.path.join(REPO, "scripts"), os.path.join(REPO, "lambdas")):
         sys.path.insert(0, _p)
 
 import check_www_build  # noqa: E402 — the build scan's publication members
+from content import legacy_chapter_addresses as legacy_addresses  # noqa: E402 — rule G, #6193
 from operational import public_archive_registry as reg  # noqa: E402 — the archive's admission rule
 
 from deploy import www_owned_paths  # noqa: E402 — the one reader of www/owned_paths.json
@@ -116,7 +122,8 @@ COPIES = {
     "legacy": ("site/ (not the v9 build's)", "/", "C D E"),
     "retired": ("site/{_v9_previous,chronicle,evidence,now}/", "(none: must be empty)", "B"),
     "audio": ("generated/{panelcast,podcast}/", "/panelcast/, /podcast/", "F"),
-    "archive": (reg.ARCHIVE_TARBALL_KEY, reg.ARCHIVE_PUBLIC_PATH, "A B C E"),
+    "archive": (reg.ARCHIVE_TARBALL_KEY, reg.ARCHIVE_PUBLIC_PATH, "A B C E G"),
+    "chapters": ("generated/journal/posts/<page>/ + kit", "/journal/posts/<page>/", "G"),
 }
 PRIVATE = {
     "www-previous/": "the previous green root builds (the rollback source) — no anonymous read in deploy/bucket_policy.json",
@@ -136,8 +143,8 @@ PUBLIC_RESOURCES = {
     "generated/public_stats.json": NOT_A_COPY,
     "generated/pulse.json": NOT_A_COPY,
     "generated/data/character_stats.json": NOT_A_COPY,
-    "generated/journal/posts.json": NOT_A_COPY,
-    "generated/journal/posts/week-*": NOT_A_COPY + " (rule D resolves the feeds that link it)",
+    "generated/journal/posts.json": NOT_A_COPY + " (rule G: a served edition's excerpt, #6193)",
+    "generated/journal/posts/week-*": NOT_A_COPY + " (rule D resolves the feeds that link it; rule G: a served edition's redirect)",
     "generated/assets/images/og-*": "share-card images, redrawn daily from current data — " + NOT_A_COPY,
     "generated/assets/images/editorial/*": "illustration — " + NOT_A_COPY,
     "generated/covers/*": "book covers — " + NOT_A_COPY,
@@ -650,7 +657,43 @@ def evaluate(
                 if os.path.isdir(tree):
                     violations += [("archive", "C", f"{pre}{i}") for i in policy_issues(tree, snapshot_dir)]
             violations += archive_api_issues(members, live_get, facts)
+        violations += legacy_chapter_issues(snapshot_dir, listing, fetch_key, members if archive_blob is not None else None, facts)
     return violations, facts
+
+
+# ── rule G: a chapter's legacy address follows its served edition (#6193) ─────────────────────────────────────────────
+def _snapshot_list(snapshot_dir: str, name: str, field: str | None) -> list:
+    try:
+        with open(os.path.join(snapshot_dir, name), encoding="utf-8") as fh:
+            doc = json.load(fh)
+    except (OSError, ValueError):
+        return []
+    doc = doc.get(field) if field and isinstance(doc, dict) else doc
+    return doc if isinstance(doc, list) else []
+
+
+def legacy_chapter_issues(snapshot_dir, listing, fetch_key, members, facts) -> list[tuple[str, str, str]]:
+    """Rule G. The plan is the snapshot's served editions (none while the switch is off or nothing is approved)."""
+    p = legacy_addresses.plan(
+        _snapshot_list(snapshot_dir, "chapter_editions.json", "editions"), _snapshot_list(snapshot_dir, "chapters.json", None)
+    )
+    facts["counts"]["chapters"] = len(p["chapters"])
+    out = [("chapters", "G", f"{cid}: a served edition whose legacy address cannot be planned — {why}") for cid, why in p["refused"]]
+    if not p["chapters"]:
+        return out
+    modified = {o["Key"]: o["LastModified"] for o in listing}
+
+    def read(key: str):
+        return fetch_key(key) if key in modified else None
+
+    posts = read(legacy_addresses.POSTS_KEY)
+    built = None
+    if facts.get("archive_built"):
+        try:
+            built = datetime.fromisoformat(str(facts["archive_built"]).replace("Z", "+00:00"))
+        except ValueError:
+            built = None
+    return out + legacy_addresses.copy_issues(p["chapters"], read, json.loads(posts) if posts else None, members, built, modified)
 
 
 def _iso(t) -> str:

@@ -21,6 +21,11 @@ THE RULES THIS MODULE HOLDS (pure; the MCP tool is the only writer, the Site API
     by naming it; the earlier one is still served, marked superseded, so it is never silently removed.
   * The signature is the platform's (``PLATFORM_SIGNATURE``), computed here, never supplied. A record whose stored
     signature is anything else — a persona's name in particular — fails ``validate`` and is never served.
+  * #6193: a SUPERSEDED correction whose own statement restates material the policy withholds can have its statement
+    text withheld from public view by an appended, owner-approved record (``…#<correction_id>#text-withheld``). The stored
+    correction is never edited or deleted (its audit trail stays); the public view keeps its id, kind, date, signature
+    and approvals, drops ``published_said`` / ``record_shows`` / ``evidence`` and says ``text_withheld``; a page then
+    prints only that a correction of that date was replaced. Refused for a correction that is not superseded.
   * The October 2026 editor's notes signed "Margaret Calloway" stay exactly as published (their audit trail). Every
     surface that renders one carries ``PERSONA_DISCLOSURE``, the one plain line that says what she is.
 """
@@ -33,6 +38,9 @@ from typing import Any, Iterable, Optional
 USER_ID_DEFAULT = "matthew"
 SK_PREFIX = "CHAPTER_CORRECTION#"
 RECORD_TYPE = "chapter_correction"
+TEXT_WITHHELD_TYPE = "chapter_correction_text_withheld"
+#: The statement fields a text-withheld superseded correction does not serve (#6193).
+STATEMENT_TEXT_FIELDS = ("published_said", "record_shows", "evidence")
 KINDS = ("correction", "qualification")
 PLATFORM_SIGNATURE = "Average Joe Matt editorial record"
 APPROVER = "owner"
@@ -269,13 +277,61 @@ def _public(item: dict) -> dict:
     }
 
 
+def sk_text_withheld(chapter_id: str, correction_id: str) -> str:
+    return f"{sk(chapter_id, correction_id)}#text-withheld"
+
+
+def new_text_withheld(
+    *, chapter_id: str, correction_id: str, at: str, dated_on: str, note: str = "", user_id: str = USER_ID_DEFAULT
+) -> dict:
+    """#6193: the owner's appended record that a SUPERSEDED correction's statement text is not shown publicly. Written
+    once; the correction record itself is never touched. The caller checks that the correction is superseded."""
+    if not CHAPTER_ID.match(str(chapter_id or "")) or not CORRECTION_ID.match(str(correction_id or "")):
+        raise CorrectionError("chapter_id (week-NN) and correction_id are required")
+    entry = approval(at=at, dated_on=dated_on, note=note)
+    return {
+        "pk": pk(user_id),
+        "sk": sk_text_withheld(chapter_id, correction_id),
+        "record_type": TEXT_WITHHELD_TYPE,
+        "phase": "experiment",
+        "chapter_id": chapter_id,
+        "correction_id": correction_id,
+        "withheld_at": at,
+        "withheld_on": dated_on,
+        "approvals": [entry],
+    }
+
+
+def _text_withheld(items: Iterable[Any]) -> set:
+    """``{(chapter_id, correction_id)}`` with a valid owner-approved text-withheld record."""
+    out = set()
+    for it in items or []:
+        if not isinstance(it, dict) or it.get("record_type") != TEXT_WITHHELD_TYPE:
+            continue
+        cid, corr = str(it.get("chapter_id") or ""), str(it.get("correction_id") or "")
+        a = it.get("approvals")
+        if (
+            it.get("sk") == sk_text_withheld(cid, corr)
+            and isinstance(a, list)
+            and a
+            and all(isinstance(x, dict) and x.get("by") == APPROVER for x in a)
+        ):
+            out.add((cid, corr))
+    return out
+
+
 def public_view(items: Iterable[Any], log=None) -> list:
     """Every APPROVED correction, as the public may read it, oldest first per chapter. An unapproved or malformed record
     is left out (and logged); an approved record superseded by another APPROVED record of the same chapter stays in the
-    list with ``superseded_by`` set — superseded, never removed."""
+    list with ``superseded_by`` set — superseded, never removed. A superseded one the owner withheld the text of
+    (``TEXT_WITHHELD_TYPE``) is served without its statement fields and with ``text_withheld: True``."""
     approved: list = []
-    for it in items or []:
+    items = list(items or [])
+    withheld = _text_withheld(items)
+    for it in items:
         if not isinstance(it, dict) or not str(it.get("sk") or "").startswith(SK_PREFIX):
+            continue
+        if it.get("record_type") == TEXT_WITHHELD_TYPE:
             continue
         try:
             approved.append(_public(validate(it)))
@@ -287,6 +343,11 @@ def public_view(items: Iterable[Any], log=None) -> list:
     for c in sorted(approved, key=lambda c: (c["dated_on"], c["id"])):
         if c["supersedes"] and (c["chapter_id"], c["supersedes"]) in by_id:
             by_id[(c["chapter_id"], c["supersedes"])]["superseded_by"] = c["id"]
+    for key, c in by_id.items():
+        if key in withheld and c["superseded_by"]:  # only a superseded correction's text is ever withheld
+            for f in STATEMENT_TEXT_FIELDS:
+                del c[f]
+            c["text_withheld"] = True
     return sorted(approved, key=lambda c: (c["chapter_id"], c["dated_on"], c["id"]))
 
 

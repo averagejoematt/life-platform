@@ -67,8 +67,20 @@ function textBelow(c, edition) {
   return carried ? "The text below is a later edition, and it makes this correction." : "It was made to the first edition; the text below is a later edition.";
 }
 
-/** One correction as an HTML block, every value escaped. A replaced one says what replaced it. */
+/** One correction as an HTML block, every value escaped. A replaced one says what replaced it. #6193: a replaced one whose
+ *  statement text the owner withheld (`text_withheld`) keeps its signature and date and says only that it was replaced. */
 export function correctionHtml(c, all = [], edition = null) {
+  if (c && c.text_withheld === true && c.superseded_by) {
+    const word = c.kind === "qualification" ? "qualification" : "correction";
+    const by = all.find((x) => x.id === c.superseded_by);
+    return (
+      `<aside class="chapter-correction replaced" data-correction="${esc(c.id)}" data-kind="${esc(c.kind)}" data-text-withheld>` +
+      `<p class="label correction-signature">${esc(c.signature)}</p>` +
+      `<p class="correction-replaced" data-correction-replaced>A ${word} dated ${esc(dayInWords(c.dated_on))} was replaced by the ${esc(by ? by.kind : "correction")} above.</p>` +
+      `<p class="correction-foot">${esc(approvalWords(c))}</p>` +
+      `</aside>`
+    );
+  }
   const by = c.superseded_by ? all.find((x) => x.id === c.superseded_by) : null;
   const replaced = c.superseded_by
     ? `<p class="correction-replaced" data-correction-replaced>Replaced by the ${esc(by ? by.kind : "correction")}${by ? ` of ${esc(dayInWords(by.dated_on))}` : ""}. Kept here as it was published.</p>`

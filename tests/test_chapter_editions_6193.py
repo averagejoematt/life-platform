@@ -135,18 +135,30 @@ def test_the_words_are_the_platforms_and_dated_in_words():
 
 
 def test_the_archival_note_says_what_the_page_is_and_nothing_about_what_it_leaves_out():
+    # the owner's exact label and note (final chronicle publication §5), then recorded dates only
+    assert CE.ARCHIVAL_LABEL == "Historical edition — privacy-safe rendering"
+    assert CE.ARCHIVAL_NOTE == (
+        "This page preserves the historical edition with limited removals for privacy or source verification. "
+        "The original version is retained privately."
+    )
+    js = open(os.path.join(_REPO, "www", "src", "lib", "chapter_editions.js"), encoding="utf-8").read()
+    assert f'export const ARCHIVAL_LABEL = "{CE.ARCHIVAL_LABEL}";' in js  # one label, pinned equal
     note = CE.archival_note("2026-09-11", "2026-11-23")
-    assert "first published 11 September 2026" in note and "revised 23 November 2026" in note
-    # no count, no wording, no identity of anything removed: the only digits are the two dates, and the note takes no
-    # free text from any record (its only inputs are the two days)
-    assert re.sub(r"\d{1,2} \w+ 20\d\d", "", note).strip() and not re.search(r"\d", re.sub(r"\d{1,2} \w+ 20\d\d", "", note))
-    for word in ("removed", "redacted", "passage", "private", "restricted", "call"):
-        assert word not in note.lower()
-    assert CE.archival_note.__code__.co_argcount == 3  # #6193 B6: the two days, and the recorded as_of day
-    later = CE.archival_note("2026-09-11", "2026-11-23", "2026-10-25")
-    assert "as it stood on 25 October 2026" in later and "first edition" not in later
-    for word in ("removed", "redacted", "passage", "private", "restricted", "call"):
-        assert word not in later.lower()
+    assert note.startswith(CE.ARCHIVAL_NOTE)
+    dates = note[len(CE.ARCHIVAL_NOTE) :]
+    assert dates == " The first edition, first published 11 September 2026. Superseded by the edition of 23 November 2026."
+    later = CE.archival_note("2026-09-11", "2026-11-23", "2026-10-25")[len(CE.ARCHIVAL_NOTE) :]
+    assert (
+        "as it stood on 25 October 2026" in later
+        and "first edition" not in later
+        and "Superseded by the edition of 23 November 2026" in later
+    )
+    # beyond the owner's sentence: no count, no wording, no identity of anything removed — only the recorded dates
+    for d in (dates, later):
+        assert not re.search(r"\d", re.sub(r"\d{1,2} \w+ 20\d\d", "", d))
+        for word in ("removed", "redacted", "passage", "private", "restricted", "call", "untouched", "unaltered"):
+            assert word not in d.lower()
+    assert CE.archival_note.__code__.co_argcount == 3  # the two days and the recorded as_of day; no free text
 
 
 def test_a_proposal_is_unapproved_unsigned_and_refuses_what_is_malformed():
@@ -714,10 +726,15 @@ def test_an_approved_edition_changes_no_feed_item_date_or_guid(monkeypatch, tmp_
     weeks = {"weeks": [{"url": "/journal/posts/week-04/", "published_at": "2026-09-11T18:00:44+00:00"}], "corrections": []}
     before = _feed(monkeypatch, tmp_path, weeks)
     with_edition = _feed(monkeypatch, tmp_path, {**weeks, "editions": _view([_original(), _edition(2), _archival()])})
-    # #6193 B4: ONLY the item's description changes — to the edition's own summary; title, link, guid, pubDate, count stay
-    desc = re.compile(r"<description>[^<]*</description>")
-    assert desc.sub("", with_edition) == desc.sub("", before)
+    # #6193 B4: the item's description changes — to the edition's own summary — and (§4, owner ruling 2026-11-22) its
+    # <link> moves to the canonical chapter; title, guid, pubDate and the item count stay byte for byte
+    moved = re.compile(
+        r"<description>[^<]*</description>|<link>[^<]*/journal/posts/week-04/[^<]*</link>|<link>[^<]*/story/week-04/[^<]*</link>"
+    )
+    assert moved.sub("", with_edition) == moved.sub("", before)
     assert "<description>A sample summary line for a test, for layout only.</description>" in with_edition
+    assert "<link>https://averagejoematt.com/story/week-04/?utm_source=rss" in with_edition
+    assert '<guid isPermaLink="true">https://averagejoematt.com/journal/posts/week-04/</guid>' in with_edition
     assert before.count("<item>") == 1 and "Fri, 11 Sep 2026 18:00:44 +0000" in before
 
 

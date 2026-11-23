@@ -795,6 +795,19 @@ the body. The one rule for which summary a surface shows is `www/src/lib/chapter
 the same order. `chronicle_edition_verify.py` rebuilds the text from the DEPLOYED heading, header summary and the served
 body, checks its SHA-256 against the approved hash, and checks the page's body prose block for block.
 
+**The archival page's words (owner ruling 2026-11-22, final chronicle publication §5).** The label is "Historical edition —
+privacy-safe rendering"; the note is "This page preserves the historical edition with limited removals for privacy or
+source verification. The original version is retained privately.", followed by the recorded dates (first edition and
+first publication, or the day an `as_of` text stood, and the edition that superseded it). Both are fixed platform words
+(`content.chapter_editions.ARCHIVAL_LABEL` / `archival_note`); nothing on the page says what was removed or how much.
+
+**Withholding a replaced correction's text (#6193).** When a SUPERSEDED correction's own statement restates material
+the policy withholds, on his explicit word: `action=withhold_correction_text`, `chapter_id`, `correction_id`,
+`approved=true`. It appends `CHAPTER_CORRECTION#<id>#<correction>#text-withheld`; the correction record is never edited
+or deleted. From the next Site API read and site build the replaced correction shows only its signature, its date and
+"A correction dated <day> was replaced by the correction above." Refused for a correction that is not superseded. A new
+correction's proposal is refused if its text restates a withheld call or coach output (fail closed).
+
 **A correction beside its passage (rehearsal §4).** On his word, `action=propose_anchor` (`chapter_id`, `correction_id`
 of an APPROVED correction, `passage` = the exact opening words of the passage in the chapter's archival rendering), then
 `action=approve_anchor` (`approved=true`; refused unless the correction is approved and an archival rendering carries
