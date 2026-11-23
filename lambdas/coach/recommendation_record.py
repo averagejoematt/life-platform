@@ -145,6 +145,10 @@ EFFECTIVENESS_RANGE = (1, 5)  # update_decision_outcome's scale: 1 bad, 3 neutra
 
 _DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _REC_ID = re.compile(r"^rec_\d{8}_[a-z_]{2,40}_[0-9a-f]{8}$")
+# The research-findings store's id shape (#6208, epic #6206) — defined HERE, not imported, so this module does not depend on a
+# package that is not on main yet. An optional pointer on the head to the finding that motivated it; it never says the owner
+# responded to or followed anything, and rec_id_for() does not read it.
+FINDING_ID = re.compile(r"^rf_\d{8}_[0-9a-f]{8}$")
 
 
 class RecommendationError(ValueError):
@@ -264,6 +268,7 @@ def build_head(
     context: Optional[str] = None,
     window_end: Optional[str] = None,
     decision_sk: Optional[str] = None,
+    finding_id: Optional[str] = None,
     recorded_at: str,
 ) -> dict[str, Any]:
     """One recommendation, admitted by the rule, its words stored exactly as given."""
@@ -281,6 +286,8 @@ def build_head(
         raise RecommendationError(f"decide_by must fall 0..{WINDOW_MAX_DAYS} days after the recommendation's date")
     if decision_sk and not str(decision_sk).startswith("DECISION#"):
         raise RecommendationError("decision_sk must start with DECISION#")
+    if finding_id is not None and not FINDING_ID.fullmatch(str(finding_id)):
+        raise RecommendationError("finding_id must look like rf_YYYYMMDD_<8 hex> (a research-findings id)")
     items = [" ".join(str(e).split())[:EVIDENCE_ITEM_MAX] for e in (evidence or []) if str(e or "").strip()]
     if len(items) > EVIDENCE_ITEMS_MAX:
         raise RecommendationError(f"at most {EVIDENCE_ITEMS_MAX} evidence items")
@@ -306,6 +313,8 @@ def build_head(
         row["context"] = str(context).strip()[:CONTEXT_MAX]
     if decision_sk:
         row["decision_sk"] = str(decision_sk)
+    if finding_id is not None:
+        row["finding_id"] = str(finding_id)
     return row
 
 
@@ -447,6 +456,8 @@ def fold(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 ],
             }
         )
+        if head.get("finding_id"):  # optional and absent by default — a view without a link carries no key
+            views[-1]["finding_id"] = head["finding_id"]
     views.sort(key=lambda v: (str(v.get("date")), str(v.get("rec_id"))), reverse=True)
     return views
 
