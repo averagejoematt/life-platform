@@ -235,7 +235,7 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
           {reading.word_count && <span>{num(reading.word_count)} words</span>}
           {episode && episode.duration_sec && <span>Listen · {mins(episode.duration_sec)}</span>}
           {c.status === "published" && <span class="muted" data-byline>{chapterByline(c)}</span>}
-        </div>{/* #6193: nothing (not even whitespace) is emitted here without an edition */ chapterEdition && <p class="muted" style="font-size:14px;line-height:1.5;margin:0;font-family:var(--sans)" data-edition-line><b style="color:var(--ink)">{chapterEdition.edition_line}</b> <span>Signed: {chapterEdition.signature.split(" — ").slice(-1)[0]}.</span>{archival && <> <a href={href(`/story/${c.id}/${ARCHIVE_SEGMENT}/`)} data-first-edition-link>{archival.as_of ? `The text ${archivalWhat(archival)}, archived →` : "The first edition, as archived →"}</a></>}</p>}
+        </div>{/* #6193: nothing (not even whitespace) is emitted here without an edition */ chapterEdition && <p class="muted" style="font-size:14px;line-height:1.5;margin:0;font-family:var(--sans)" data-edition-line><b style="color:var(--ink)">{chapterEdition.edition_line}</b> <span>Signed: {chapterEdition.signature.split(" — ").slice(-1)[0]}.</span>{archival && <> <a href={href(`/story/${c.id}/${ARCHIVE_SEGMENT}/`)} data-first-edition-link>{`The historical edition (${archivalWhat(archival)}), a privacy-safe rendering →`}</a></>}</p>}
       </div>
     </div>
   </section>
