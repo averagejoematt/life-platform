@@ -763,7 +763,7 @@ def tool_create_experiment(args):
         "experiment_type": experiment_type or None,
         "planned_duration_days": int(planned_duration_days) if planned_duration_days else None,
         "iteration": iteration,
-        **experiment_overlap.row_fields(intervention_kind, overlap_acknowledged),
+        **experiment_overlap.row_fields(intervention_kind, overlap_acknowledged, overlap),
         # #539: the frozen n-of-1 design + its public pre-registration stamp.
         # Floats → Decimal for DDB (min_effect is commonly fractional).
         "design": json.loads(json.dumps(design), parse_float=Decimal) if design else None,

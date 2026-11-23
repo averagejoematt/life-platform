@@ -131,7 +131,9 @@ def assess_overlap(new_experiment, active_experiments):
     """Classify the overlap of a NEW experiment against the ACTIVE ones.
 
     new_experiment: dict with start_date, design (or None), intervention_kind, library_id, tags.
-    Returns {"level": "none"|"note"|"warning", "conflicts": [...], "reason": str}.
+    Returns {"level": "none"|"note"|"warning", "check_status": "checked", "conflicts": [...], "reason": str}.
+    A check that could not be completed is NEVER produced here — see `indeterminate()`; the
+    caller turns any exception from this function into that state, never into "none".
     """
     new_metric = _metric(new_experiment)
     new_family = family_of(new_metric)
@@ -192,6 +194,7 @@ def assess_overlap(new_experiment, active_experiments):
     if warnings:
         return {
             "level": "warning",
+            "check_status": "checked",
             "conflicts": warnings + notes,
             "reason": (
                 "a behavioural experiment already running measures the same outcome or is still in washout; "
@@ -201,10 +204,30 @@ def assess_overlap(new_experiment, active_experiments):
     if notes:
         return {
             "level": "note",
+            "check_status": "checked",
             "conflicts": notes,
             "reason": "overlaps an active experiment only loosely (observational, same outcome family, or no design) — allowed; read the caveat when it closes.",
         }
-    return {"level": "none", "conflicts": [], "reason": "no active experiment shares a metric or outcome family."}
+    return {
+        "level": "none",
+        "check_status": "checked",
+        "conflicts": [],
+        "reason": "no active experiment shares a metric or outcome family.",
+    }
+
+
+def indeterminate(exc):
+    """State 3 of the owner's three-state result: the check could not be completed.
+
+    Names the error CLASS only (no message — it can carry table names or request ids)."""
+    cls = type(exc).__name__
+    return {
+        "level": "indeterminate",
+        "check_status": "indeterminate",
+        "conflicts": [],
+        "error_class": cls,
+        "reason": f"overlap check could not be completed: {cls}",
+    }
 
 
 def acknowledgement_record(reason, assessment, acknowledged_at):
@@ -249,23 +272,41 @@ def _all_rows(table, pk):
     return table.query(KeyConditionExpression=Key("pk").eq(pk) & Key("sk").begins_with("EXP#")).get("Items", [])
 
 
-def row_fields(intervention_kind, overlap_acknowledged):
-    """Fields stored on the experiment row (None values are dropped by the caller's clean pass)."""
-    return {"intervention_kind": intervention_kind, "overlap_acknowledged": overlap_acknowledged}
+def row_fields(intervention_kind, overlap_acknowledged, overlap=None):
+    """Fields stored on the experiment row (None values are dropped by the caller's clean pass).
+
+    An indeterminate check is stored as `overlap` {check_status, reason} so the row is never read
+    later as cleared; a checked result is not stored (the acknowledgement carries the conflicts)."""
+    stored = (
+        {k: overlap[k] for k in ("check_status", "reason", "error_class") if k in overlap}
+        if overlap and overlap.get("check_status") == "indeterminate"
+        else None
+    )
+    return {"intervention_kind": intervention_kind, "overlap_acknowledged": overlap_acknowledged, "overlap": stored}
 
 
 def response_fields(intervention_kind, overlap, overlap_acknowledged):
     """Fields echoed in the create_experiment response."""
+    warn = (
+        {"overlap_warning": overlap["reason"] + " — this experiment was created WITHOUT overlap clearance."}
+        if overlap.get("check_status") == "indeterminate"
+        else {}
+    )
     return {
         "intervention_kind": intervention_kind,
         "overlap": overlap,
+        **warn,
         **({"overlap_acknowledged": overlap_acknowledged} if overlap_acknowledged else {}),
     }
 
 
 def check_creation(table, pk, start_date, design, intervention_kind, library_id, tags, acknowledge_reason, now):
-    """Assess + enforce. Returns (overlap, overlap_acknowledged|None); raises ValueError on an
-    unacknowledged warning. A read failure fails open to level none (advisory infrastructure)."""
+    """Assess + enforce. Returns (overlap, overlap_acknowledged|None); raises ValueError when refused.
+
+    Three states (owner ruling 2026-11-22): checked/overlap, checked/no overlap, and indeterminate.
+    A failed read, or a malformed row that breaks the assessment, is the third state and is never
+    folded into "none": observational proceeds with a warning, behavioural is refused unless
+    `acknowledge_overlap` is given (stored with check_status "indeterminate", never as cleared)."""
     new_experiment = {
         "start_date": start_date,
         "design": design,
@@ -274,10 +315,16 @@ def check_creation(table, pk, start_date, design, intervention_kind, library_id,
         "tags": tags,
     }
     try:
-        rows = _all_rows(table, pk)
-    except Exception:  # noqa: BLE001
-        rows = []
-    overlap = assess_overlap(new_experiment, [r for r in rows if r.get("status") == "active"])
+        overlap = assess_overlap(new_experiment, [r for r in _all_rows(table, pk) if r.get("status") == "active"])
+    except Exception as exc:  # noqa: BLE001 — becomes the explicit indeterminate state, not "none"
+        overlap = indeterminate(exc)
+    stamp = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    if overlap["check_status"] == "indeterminate":
+        if intervention_kind == "observational":
+            return overlap, None
+        if not acknowledge_reason:
+            raise ValueError(f"{overlap['reason']}; retry, or pass acknowledge_overlap with your reason to proceed without clearance")
+        return overlap, {**acknowledgement_record(acknowledge_reason, overlap, stamp), "check_status": "indeterminate"}
     if overlap["level"] != "warning":
         return overlap, None
     if not acknowledge_reason:
@@ -290,17 +337,24 @@ def check_creation(table, pk, start_date, design, intervention_kind, library_id,
             f"overlap refused (#6210): {why}. Re-run with acknowledge_overlap=<your reason, 20-300 chars> to proceed, "
             "or intervention_kind='observational' if this changes no behaviour."
         )
-    return overlap, acknowledgement_record(acknowledge_reason, overlap, now.strftime("%Y-%m-%dT%H:%M:%SZ"))
+    return overlap, {**acknowledgement_record(acknowledge_reason, overlap, stamp), "check_status": "checked"}
 
 
 def attach_closing_caveat(table, pk, existing, analysis):
-    """Append the one-line overlap caveat to a closing analysis in place; verdict untouched, fail-soft."""
+    """Append the one-line overlap caveat to a closing analysis in place; verdict untouched.
+
+    Fail-soft for the CLOSE (an error never blocks ending an experiment) but never silent: the
+    analysis records `overlap_caveat_check` = "checked" or "not_run: <ErrorClass>", so a missing
+    caveat is distinguishable from "no overlap"."""
     if analysis is None:
         return
     try:
         caveat = closing_caveat(existing, _all_rows(table, pk))
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        analysis["overlap_caveat_check"] = f"not_run: {type(exc).__name__}"
+        analysis["summary"] = f"{analysis.get('summary', '')} (Overlap caveat check did not run.)".strip()
         return
+    analysis["overlap_caveat_check"] = "checked"
     if caveat:
         analysis["overlap_caveat"] = caveat
         analysis["summary"] = f"{analysis.get('summary', '')} {caveat}".strip()
@@ -308,7 +362,9 @@ def attach_closing_caveat(table, pk, existing, analysis):
 
 def iteration_count(table, pk, library_id, slug):
     """EL-F5: 1 + the past runs sharing this library_id or slug (moved here from create_experiment,
-    which shares the one experiment-row read). Fail-soft: a read error leaves iteration at 1."""
+    which shares the one experiment-row read). Fail-soft exactly as before the move: a read error
+    leaves iteration at 1. This is a label counter, not an overlap verdict — it never feeds the
+    none/note/warning/indeterminate result, which reads the rows independently."""
     import re
 
     iteration = 1

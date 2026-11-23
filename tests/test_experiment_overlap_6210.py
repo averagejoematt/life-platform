@@ -213,3 +213,89 @@ def test_end_experiment_summary_carries_caveat_verdict_untouched(monkeypatch):
     # and the earlier experiment's close names the later one
     out_a = tl.tool_end_experiment({"experiment_id": "a", "outcome": "done", "end_date": "2026-12-14"})
     assert "Magnesium" in out_a["analysis"]["summary"]
+
+
+# ── three-state result: a failed check is never "no overlap" (owner ruling 2026-11-22) ─────────
+
+
+def _broken_read(monkeypatch, *rows):
+    table = _seed(monkeypatch, *rows)
+
+    def _boom(t, **kw):
+        raise ConnectionError("secret-table-name should not leak")
+
+    table._query_hook = _boom
+    return table
+
+
+def test_read_failure_observational_proceeds_warned_and_stored_indeterminate(monkeypatch):
+    table = _broken_read(monkeypatch)
+    resp = _create(intervention_kind="observational")
+    assert resp["created"] and resp["overlap"]["check_status"] == "indeterminate" and resp["overlap"]["level"] == "indeterminate"
+    assert "WITHOUT overlap clearance" in resp["overlap_warning"]
+    stored = _stored(table, resp)["overlap"]
+    assert stored["check_status"] == "indeterminate" and stored["error_class"] == "ConnectionError"
+    assert "secret-table-name" not in str(resp) and "secret-table-name" not in str(stored)
+
+
+def test_read_failure_behavioral_refused_with_distinguishable_error(monkeypatch):
+    table = _broken_read(monkeypatch)
+    with pytest.raises(ValueError, match="overlap check could not be completed: ConnectionError; retry, or pass acknowledge_overlap"):
+        _create()
+    assert not [i for i in table.store.values() if i.get("name") == "Magnesium"]
+
+
+def test_read_failure_behavioral_acknowledged_stores_indeterminate_not_cleared(monkeypatch):
+    table = _broken_read(monkeypatch)
+    resp = _create(acknowledge_overlap=REASON)
+    assert resp["created"] and resp["overlap"]["check_status"] == "indeterminate"
+    row = _stored(table, resp)
+    assert row["overlap_acknowledged"]["check_status"] == "indeterminate"
+    assert row["overlap_acknowledged"]["reason"] == REASON and row["overlap_acknowledged"]["conflicts"] == []
+    assert row["overlap"]["check_status"] == "indeterminate"
+
+
+def test_malformed_existing_row_is_indeterminate_not_none(monkeypatch):
+    bad = _active("bad", "deep_pct")
+    bad["design"] = {"criterion": "not-a-dict", "washout_days": 3}
+    _seed(monkeypatch, bad)
+    with pytest.raises(ValueError, match="could not be completed: AttributeError"):
+        _create()
+    _seed(monkeypatch, bad)
+    assert _create(intervention_kind="observational")["overlap"]["check_status"] == "indeterminate"
+
+
+def test_healthy_read_never_reports_indeterminate(monkeypatch):
+    _seed(monkeypatch)
+    assert _create()["overlap"] == {
+        "level": "none",
+        "check_status": "checked",
+        "conflicts": [],
+        "reason": "no active experiment shares a metric or outcome family.",
+    }
+    for active, expect in (
+        (_active("a", "sleep_score", start="2026-10-01"), "note"),
+        (_active("b", "deep_pct"), "warning"),
+    ):
+        r = eo.assess_overlap(_new("deep_pct"), [active])
+        assert r["level"] == expect and r["check_status"] == "checked"
+    table = _seed(monkeypatch, _active("a", "deep_pct"))
+    resp = _create(acknowledge_overlap=REASON)
+    assert _stored(table, resp)["overlap_acknowledged"]["check_status"] == "checked" and "overlap" not in _stored(table, resp)
+    assert "overlap_warning" not in resp
+
+
+def test_closing_caveat_read_failure_is_recorded_not_implied_clean(monkeypatch):
+    table = _seed(monkeypatch)
+    table._query_hook = lambda t, **kw: (_ for _ in ()).throw(TimeoutError("x"))
+    analysis = {"verdict": "supported", "summary": "Result."}
+    eo.attach_closing_caveat(table, tl.EXPERIMENTS_PK, {"experiment_id": "z"}, analysis)
+    assert analysis["overlap_caveat_check"] == "not_run: TimeoutError" and "did not run" in analysis["summary"]
+    assert analysis["verdict"] == "supported" and "overlap_caveat" not in analysis
+
+
+def test_closing_caveat_healthy_marks_checked(monkeypatch):
+    table = _seed(monkeypatch)
+    analysis = {"verdict": "supported", "summary": "Result."}
+    eo.attach_closing_caveat(table, tl.EXPERIMENTS_PK, {"experiment_id": "z"}, analysis)
+    assert analysis["overlap_caveat_check"] == "checked" and analysis["summary"] == "Result."
