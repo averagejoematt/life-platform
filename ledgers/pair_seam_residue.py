@@ -366,6 +366,18 @@ REASON_5387_HEVY = (
 )
 
 PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
+    "experiments::mcp/experiment_close.py::read": (
+        "2026-11-23",
+        "#6209: mcp/experiment_close.py is the close-path body split out of mcp/tools_lifestyle.py (the module-size ceiling); the two are one writer of the experiments row split across two files. experiment_close reads only fields tools_lifestyle.tool_create_experiment writes (sk, start_date, design, baseline_snapshot) and writes exactly one field, `baseline_snapshot`, write-once under attribute_not_exists, which no other module reads: every public reader projects named fields and site_api_protocols allowlists `analysis` keys. tools_lifestyle now reads the row after experiment_close has written to it, through the same wrapper. The create -> capture -> close round trip across both files is pinned by tests/test_lift_outcomes_6209.py.",
+    ),
+    "experiments::mcp/experiment_close.py::write": (
+        "2026-11-23",
+        "#6209: mcp/experiment_close.py is the close-path body split out of mcp/tools_lifestyle.py (the module-size ceiling); the two are one writer of the experiments row split across two files. experiment_close reads only fields tools_lifestyle.tool_create_experiment writes (sk, start_date, design, baseline_snapshot) and writes exactly one field, `baseline_snapshot`, write-once under attribute_not_exists, which no other module reads: every public reader projects named fields and site_api_protocols allowlists `analysis` keys. tools_lifestyle now reads the row after experiment_close has written to it, through the same wrapper. The create -> capture -> close round trip across both files is pinned by tests/test_lift_outcomes_6209.py.",
+    ),
+    "experiments::mcp/tools_lifestyle.py::read": (
+        "2026-11-23",
+        "#6209: mcp/experiment_close.py is the close-path body split out of mcp/tools_lifestyle.py (the module-size ceiling); the two are one writer of the experiments row split across two files. experiment_close reads only fields tools_lifestyle.tool_create_experiment writes (sk, start_date, design, baseline_snapshot) and writes exactly one field, `baseline_snapshot`, write-once under attribute_not_exists, which no other module reads: every public reader projects named fields and site_api_protocols allowlists `analysis` keys. tools_lifestyle now reads the row after experiment_close has written to it, through the same wrapper. The create -> capture -> close round trip across both files is pinned by tests/test_lift_outcomes_6209.py.",
+    ),
     "training_constraints::lambdas/training/note_requests.py::read": (
         "2026-11-08",
         "training_constraints is sk-family partitioned: training.note_requests reads ONLY sk begins_with REQUEST# (read_rows), and the only writers of that family are note_requests.raise_requests (write-once) and note_requests.resolve (the chat's answer, reached from mcp/tools_training_notes.py's answer_request/decline_request actions). variant_rotation writes ROTATION#, tools_training_notes writes DISMISSAL#/DELOAD#/MODE#disruption# families — none starts with REQUEST#, so no other writer's shape can reach this reader; the round trip is one module's own shape, pinned by tests/test_note_requests_5573.py (#5573).",

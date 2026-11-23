@@ -37,7 +37,7 @@ read and the write.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import datetime
 from typing import Any, Callable, Iterable
 
 from common.hevy_schema import is_warmup_set, set_number, set_type_of
@@ -333,7 +333,7 @@ def capture_baseline(rows: Iterable[Any], window_start: str, window_end: str, *,
         recs = [_session_record(r, metric, refs) for r in sessions]
         arms[metric] = _arm(recs, window_start, window_end)
         values[metric] = _day_values(recs)
-    lag = (date.fromisoformat(today) - date.fromisoformat(start_date)).days
+    lag = (datetime.strptime(today, "%Y-%m-%d") - datetime.strptime(start_date, "%Y-%m-%d")).days
     return {
         "engine": ENGINE,
         "captured_at": captured_at,
