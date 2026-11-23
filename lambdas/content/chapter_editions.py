@@ -215,24 +215,32 @@ def archival_signature(approved_on: str) -> str:
     return f"Archival rendering, approved {CC.day_words(approved_on)} — {PLATFORM_SIGNATURE}"
 
 
-def archival_note(first_published: str, revised_on: str, as_of: Optional[str] = None) -> str:
-    """The archival page's one note. It says what the page is and where the current text is — and nothing about what the
-    rendering leaves out: no count, no wording, no identity (owner ruling 2026-11-22 §3). One fixed sentence set, so no
-    proposal can carry a description of a removed passage onto the page. With ``as_of`` (the rendering's text is the
-    chapter as it stood on a later day — a rewrite) it names that day and never calls the text "the first edition"; every
-    date in it is a recorded one."""
+#: The archival page's label and its short note — the owner's exact words (owner ruling 2026-11-22, final chronicle
+#: publication §5); www/src/lib/chapter_editions.js ARCHIVAL_LABEL is pinned equal. The note says that limited removals
+#: exist and never what was removed or how much.
+ARCHIVAL_LABEL = "Historical edition — privacy-safe rendering"
+ARCHIVAL_NOTE = (
+    "This page preserves the historical edition with limited removals for privacy or source verification. "
+    "The original version is retained privately."
+)
+
+
+def archival_dates(first_published: str, revised_on: str, as_of: Optional[str] = None) -> str:
+    """The archival page's date line, from recorded dates only ("Keep the true historical date and edition identity"): the
+    first edition and its first-publication day — or (``as_of``) the text as it stood on a later day — and the edition
+    that superseded it."""
     if as_of:
         return (
-            f"This is an archival rendering of the text of this chapter as it stood on {CC.day_words(as_of)}, before the "
-            f"{CC.day_words(revised_on)} edition. The chapter was first published {CC.day_words(first_published)}. It is kept "
-            "for the historical record and is not the current text. It was prepared for public reading and may not reproduce "
-            "that text in full. The current edition is at the chapter's own address."
+            f"The text of this chapter as it stood on {CC.day_words(as_of)}; the chapter was first published "
+            f"{CC.day_words(first_published)}. Superseded by the edition of {CC.day_words(revised_on)}."
         )
-    return (
-        f"This is an archival rendering of the chapter's first edition, first published {CC.day_words(first_published)}. "
-        "It is kept for the historical record and is not the current text. It was prepared for public reading and may not "
-        f"reproduce the first edition in full. The current edition, revised {CC.day_words(revised_on)}, is at the chapter's own address."
-    )
+    return f"The first edition, first published {CC.day_words(first_published)}. Superseded by the edition of {CC.day_words(revised_on)}."
+
+
+def archival_note(first_published: str, revised_on: str, as_of: Optional[str] = None) -> str:
+    """The archival page's one fixed note: the owner's words, then the recorded dates (``archival_dates``). No proposal
+    can carry a description of a removed passage onto the page — the note takes no free text from any record."""
+    return f"{ARCHIVAL_NOTE} {archival_dates(first_published, revised_on, as_of)}"
 
 
 def archive_path(chapter_id: str) -> str:

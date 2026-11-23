@@ -106,6 +106,8 @@ def verify(get: Callable[[str], str], chapter_id: str, sha256: str, *, archival_
                 problems.append(f"/story/{chapter_id}/first-edition/: {p}")
             if a.get("note") and CE._norm(a["note"]) not in CE._norm(arch):
                 problems.append(f"/story/{chapter_id}/first-edition/: the platform's archival note is missing")
+            if CE.ARCHIVAL_LABEL not in CE._norm(arch):  # the owner's label (final chronicle publication §5)
+                problems.append(f"/story/{chapter_id}/first-edition/: the label {CE.ARCHIVAL_LABEL!r} is missing")
             if not re.search(r'<meta name="robots" content="noindex', arch):
                 problems.append(f"/story/{chapter_id}/first-edition/: not noindex")
             if f'<link rel="canonical" href="{base}/story/{chapter_id}/">' not in arch:
