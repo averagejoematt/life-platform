@@ -115,3 +115,18 @@ test("the body printer is shared by the chapter and archival pages, unchanged", 
   assert.equal(bodyForPage(html, null), `<p class="signature note"><em>Editor's note, October 2026 — x</em></p>\n<p class="signature filed"><em>Day 3 · 1 lb</em></p>\n<p>Prose.</p>`);
   assert.equal(bodyForPage("<p>The dek.</p>\n<p>Prose.</p>", "The dek."), "\n<p>Prose.</p>");
 });
+
+test("#6193 rehearsal §4: an anchored correction stands directly after its passage, signed by the platform; the rest stay above", async () => {
+  const { ARCHIVAL_PAGE, placeBeside } = await import("../src/lib/chapter_corrections.js");
+  const c = (id) => ({ id, chapter_id: "week-04", kind: "correction", dated_on: "2026-11-22", signature: `Correction, 22 November 2026 — ${SIG}`, published_said: "a", record_shows: "b", evidence: "c", approvals: [{ by: "owner", on: "2026-11-22" }], superseded_by: null });
+  const body = "<p>A first paragraph of a synthetic archive.</p>\n<p>Day 9 was a sample day of the test. More words.</p>\n<p>A last paragraph.</p>";
+  const out = placeBeside(body, [{ correction_id: "one", passage: "Day 9 was a sample day" }, { correction_id: "two", passage: "not in the text anywhere" }], [c("one"), c("two")], ARCHIVAL_PAGE);
+  assert.deepEqual(out.placed, ["one"]);
+  const at = out.html.indexOf("data-anchored");
+  assert.ok(at > out.html.indexOf("More words.</p>") && at < out.html.indexOf("A last paragraph"));
+  assert.match(out.html, /correction-signature">Correction, 22 November 2026 — Average Joe Matt editorial record/);
+  assert.match(out.html, /concerns the passage above, beginning “Day 9 was a sample day”/);
+  // a passage in two paragraphs is ambiguous: not placed
+  const twice = placeBeside(body + "\n<p>Day 9 was a sample day again.</p>", [{ correction_id: "one", passage: "Day 9 was a sample day" }], [c("one")]);
+  assert.deepEqual(twice.placed, []);
+});

@@ -89,3 +89,43 @@ export function correctionHtml(c, all = [], edition = null) {
 export function correctionsHtml(corrections, edition = null) {
   return (corrections || []).map((c) => correctionHtml(c, corrections, edition)).join("");
 }
+
+// For COMPARING only (never emitted): tags stripped until none is left.
+const untag = (x) => {
+  let prev;
+  let out = String(x ?? "");
+  do {
+    prev = out;
+    out = out.replace(/<[^>]*>/g, " ");
+  } while (out !== prev);
+  return out;
+};
+const words = (x) =>
+  untag(x)
+    .replace(/&#39;|&#x27;|&rsquo;|&lsquo;|[’‘]/g, "'")
+    .replace(/&quot;|&ldquo;|&rdquo;|[“”]/g, '"')
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** #6193 (rehearsal ruling §4): on the archival page, each correction with an owner-approved anchor is printed directly
+ *  after the paragraph that carries its passage (the platform's signed block, as above the text — never mistakable for a
+ *  note of the time), with one line saying which passage it concerns. Returns `{ html, placed }`: the body with the blocks
+ *  placed, and the ids placed (the page prints the rest above the text). A passage not found in exactly one paragraph is
+ *  not placed. */
+export function placeBeside(bodyHtml, anchors, corrections, edition = ARCHIVAL_PAGE) {
+  let html = String(bodyHtml || "");
+  const placed = [];
+  for (const a of anchors || []) {
+    const c = (corrections || []).find((x) => x.id === a.correction_id);
+    if (!c) continue;
+    const blocks = [...html.matchAll(/<(p|blockquote)\b[^>]*>[\s\S]*?<\/\1>/g)].filter((m) => words(m[0]).includes(words(a.passage)));
+    if (blocks.length !== 1) continue;
+    const end = blocks[0].index + blocks[0][0].length;
+    const lead = `<p class="correction-foot" data-correction-anchor>This ${c.kind === "qualification" ? "qualification" : "correction"} concerns the passage above, beginning “${esc(a.passage)}”</p>`;
+    const block = correctionHtml(c, corrections, edition).replace(/^<aside class="chapter-correction/, '<aside style="margin:18px 0" data-anchored class="chapter-correction').replace(/<\/aside>$/, `${lead}</aside>`);
+    html = html.slice(0, end) + block + html.slice(end);
+    placed.push(c.id);
+  }
+  return { html, placed };
+}
