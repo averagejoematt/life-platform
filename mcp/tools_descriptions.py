@@ -543,6 +543,31 @@ CREATE_EXPERIMENT_DESCRIPTION = (
     "'create experiment for cold plunge protocol', 'I want to test if X improves Y'."
 )
 
+CREATE_EXPERIMENT_TYPE_PROPS = {
+    "experiment_type": {
+        "type": "string",
+        "description": "'measurable' (has biomarker endpoint) or 'behavioral' (compliance tracking).",
+    },
+    "planned_duration_days": {"type": "integer", "description": "Target duration in days."},
+    "intervention_kind": {
+        "type": "string",
+        "enum": ["observational", "behavioral"],
+        "description": (
+            "#6210: 'behavioral' (default) changes what Matthew does; 'observational' only measures. "
+            "An observational experiment is never refused for overlap."
+        ),
+    },
+    "acknowledge_overlap": {
+        "type": "string",
+        "description": (
+            "#6210: required (20-300 chars, the owner's reason in his words) only when a behavioural "
+            "experiment shares its criterion metric with an active behavioural one, or starts inside "
+            "its washout. Stored on the row as overlap_acknowledged and echoed as a caveat when "
+            "either experiment closes."
+        ),
+    },
+}
+
 LIST_EXPERIMENTS_DESCRIPTION = (
     "List all N=1 experiments with their status, duration, and whether minimum "
     "data threshold (14 days) has been met. Filter by status. "

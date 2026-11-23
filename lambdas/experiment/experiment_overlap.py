@@ -15,7 +15,9 @@ proportion (owner ruling 2026-11-22), not a blanket prohibition:
 Pure functions only; the caller does the DynamoDB read and the write.
 """
 
-from datetime import date, timedelta
+from datetime import timedelta
+
+from common.pacific_time import parse_day_key
 
 INTERVENTION_KINDS = ("observational", "behavioral")
 DEFAULT_INTERVENTION_KIND = "behavioral"
@@ -92,10 +94,8 @@ def _kind(exp):
 
 
 def _day(value):
-    try:
-        return date.fromisoformat(str(value)[:10])
-    except (TypeError, ValueError):
-        return None
+    """Calendar-day parse through the sanctioned parser (#3741); tolerates a longer stamp."""
+    return parse_day_key(str(value)[:10]) if value else None
 
 
 def _washout_end(exp):
@@ -233,3 +233,90 @@ def closing_caveat(exp, all_experiments):
         return None
     listed = "; ".join(sorted(str(n) for n in names.values()))
     return f"Caveat: ran alongside {listed} with an acknowledged overlap, so the effect may not be attributable to this protocol alone."
+
+
+# ── call-site helpers (keep mcp/tools_lifestyle.py under its module/function ceilings) ─────────
+
+
+def parse_args(args):
+    """(intervention_kind, acknowledge_reason|None) from the tool args; ValueError on bad input."""
+    return normalize_kind(args.get("intervention_kind")), validate_acknowledgement(args.get("acknowledge_overlap"))
+
+
+def _all_rows(table, pk):
+    from boto3.dynamodb.conditions import Key
+
+    return table.query(KeyConditionExpression=Key("pk").eq(pk) & Key("sk").begins_with("EXP#")).get("Items", [])
+
+
+def row_fields(intervention_kind, overlap_acknowledged):
+    """Fields stored on the experiment row (None values are dropped by the caller's clean pass)."""
+    return {"intervention_kind": intervention_kind, "overlap_acknowledged": overlap_acknowledged}
+
+
+def response_fields(intervention_kind, overlap, overlap_acknowledged):
+    """Fields echoed in the create_experiment response."""
+    return {
+        "intervention_kind": intervention_kind,
+        "overlap": overlap,
+        **({"overlap_acknowledged": overlap_acknowledged} if overlap_acknowledged else {}),
+    }
+
+
+def check_creation(table, pk, start_date, design, intervention_kind, library_id, tags, acknowledge_reason, now):
+    """Assess + enforce. Returns (overlap, overlap_acknowledged|None); raises ValueError on an
+    unacknowledged warning. A read failure fails open to level none (advisory infrastructure)."""
+    new_experiment = {
+        "start_date": start_date,
+        "design": design,
+        "intervention_kind": intervention_kind,
+        "library_id": library_id or None,
+        "tags": tags,
+    }
+    try:
+        rows = _all_rows(table, pk)
+    except Exception:  # noqa: BLE001
+        rows = []
+    overlap = assess_overlap(new_experiment, [r for r in rows if r.get("status") == "active"])
+    if overlap["level"] != "warning":
+        return overlap, None
+    if not acknowledge_reason:
+        why = "; ".join(
+            f"{c['name'] or c['experiment_id']} ({c['kind']}: {c['detail']})"
+            for c in overlap["conflicts"]
+            if c["kind"] in ("metric", "washout")
+        )
+        raise ValueError(
+            f"overlap refused (#6210): {why}. Re-run with acknowledge_overlap=<your reason, 20-300 chars> to proceed, "
+            "or intervention_kind='observational' if this changes no behaviour."
+        )
+    return overlap, acknowledgement_record(acknowledge_reason, overlap, now.strftime("%Y-%m-%dT%H:%M:%SZ"))
+
+
+def attach_closing_caveat(table, pk, existing, analysis):
+    """Append the one-line overlap caveat to a closing analysis in place; verdict untouched, fail-soft."""
+    if analysis is None:
+        return
+    try:
+        caveat = closing_caveat(existing, _all_rows(table, pk))
+    except Exception:  # noqa: BLE001
+        return
+    if caveat:
+        analysis["overlap_caveat"] = caveat
+        analysis["summary"] = f"{analysis.get('summary', '')} {caveat}".strip()
+
+
+def iteration_count(table, pk, library_id, slug):
+    """EL-F5: 1 + the past runs sharing this library_id or slug (moved here from create_experiment,
+    which shares the one experiment-row read). Fail-soft: a read error leaves iteration at 1."""
+    import re
+
+    iteration = 1
+    try:
+        for past in _all_rows(table, pk):
+            past_slug = re.sub(r"[^a-z0-9]+", "-", past.get("name", "").lower()).strip("-")[:40]
+            if (library_id and (past.get("library_id") or "") == library_id) or past_slug == slug:
+                iteration += 1
+    except Exception:  # noqa: BLE001
+        pass
+    return iteration
