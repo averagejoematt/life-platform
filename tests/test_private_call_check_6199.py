@@ -358,3 +358,29 @@ def test_the_mcp_edition_actions_and_the_site_api_field_pass_the_calls(monkeypat
     monkeypatch.setattr(chapters, "_CALLS_CACHE", {"at": None, "calls": None})
     assert chapters._private_calls() is None, "the Site API withholds every edition when the calls cannot be read"
     assert "private_calls=private_call_check.for_text(private_calls())" in inspect.getsource(chapters.editions_field)
+
+
+# ── #6193: wording a PUBLIC call also uses is not an echo of a private one ───────────────────
+
+TEMPLATE = "Recovery score will be 70% tomorrow morning after a quiet rest day"
+
+
+def test_shared_template_wording_with_a_public_call_is_not_an_echo():
+    private = {**_private_call(), "claim_natural": f"{TEMPLATE}, the subject noted while logging the evening walk."}
+    public = {**_public_call(pid="pred_20261201_synthetic_recovery_line"), "claim_natural": TEMPLATE.replace("70", "65") + "."}
+    calls = P.build([(ALPHA, private), (ALPHA, public)], NAMES)
+    assert PP.classify_call(ALPHA, private)[0] == PP.PRIVATE and PP.classify_call(ALPHA, public)[0] == PP.PUBLIC
+    # a page showing only the public call (figures differ, normalised alike): no finding
+    assert P.findings(f"The test: {TEMPLATE.replace('70', '61')}.", calls) == []
+    # the text reproduces a run only the private call has: still an echo
+    assert any("(echo," in f for f in P.findings("the subject noted while logging the evening walk", calls))
+
+
+def test_a_private_call_whose_every_run_is_shared_is_still_caught_by_its_id():
+    private = {**_private_call(), "claim_natural": TEMPLATE + "."}
+    public = {**_public_call(pid="pred_20261201_synthetic_recovery_line"), "claim_natural": TEMPLATE + "."}
+    calls = P.build([(ALPHA, private), (ALPHA, public)], NAMES)
+    (c,) = calls.private
+    assert c.runs == frozenset()  # every run shared with the public call
+    assert P.findings(TEMPLATE, calls) == []
+    assert any("(id," in f for f in P.findings(f"see {PRIVATE_ID}", calls))
