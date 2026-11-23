@@ -691,7 +691,10 @@ def _sweep_chronicles(s3, plan=None):
         slug = _post_slug(url)
         plan_key = f"chronicle/{slug}"
         action, digest = (
-            plan.decide(plan_key, [title, p.get("label") or "", (p.get("stats_line") or "").strip(), p.get("date") or ""])
+            # "chronicle-card/2": the template's version (#6193 fit-to-column), so every card is redrawn once with it
+            plan.decide(
+                plan_key, ["chronicle-card/2", title, p.get("label") or "", (p.get("stats_line") or "").strip(), p.get("date") or ""]
+            )
             if plan
             else (RENDER, None)
         )

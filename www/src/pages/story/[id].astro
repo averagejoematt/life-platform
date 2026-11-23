@@ -357,7 +357,8 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
   </section>
 
   <section class="section hair">
-    <div class="wrap grid cols2" style="gap:0;border:1px solid var(--ink)">
+    {/* #6193: the bordered box sits INSIDE the page gutter — on a 390 px phone its right border met the viewport edge */}
+    <div class="wrap"><div class="grid cols2" style="gap:0;border:1px solid var(--ink)">
       {
         prev ? (
           <a href={href(`/story/${prev.id}/`)} style="display:flex;flex-direction:column;gap:6px;padding:22px;border-right:1px solid var(--ink);text-decoration:none">
@@ -384,7 +385,7 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
           </span>
         )
       }
-    </div>
+    </div></div>
     {/* coming back (2026-11-15): the end of a chapter is where a reader decides whether to follow */}
     <div class="wrap" style="margin-top:18px">
       <p class="muted" style="font-size:14px;display:flex;flex-wrap:wrap;gap:6px 24px;align-items:baseline">
