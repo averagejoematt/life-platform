@@ -529,7 +529,8 @@ _C = {
     "h": "font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.6px;margin:16px 0 6px;",
     "alert": "font-size:15px;line-height:1.5;margin:0 0 12px;padding:10px 12px;background:#fef2f2;border-left:3px solid #dc2626;color:#7f1d1d;",
     "small": "font-size:13px;line-height:1.45;color:#4b5563;margin:0 0 6px;",
-    "link": "color:#1d4ed8;text-decoration:underline;word-break:break-all;",
+    # a short label, never a raw URL, so a phone never breaks it mid-date (the text part keeps the full URL)
+    "link": "color:#1d4ed8;text-decoration:underline;",
 }
 
 
@@ -591,16 +592,21 @@ def render_html(view: CompactView, today_short: str) -> str:
     body += (
         '<p style="'
         + _C["p"]
-        + 'margin-top:14px;">The day in full: <a data-detail-link="" style="'
+        + 'margin-top:14px;"><a data-detail-link="" style="'
         + _C["link"]
         + '" href="'
         + esc(view.detail_url)
         + '">'
-        + esc(view.detail_url.split("://", 1)[-1])
+        + esc(link_label(view.data_day))
         + "</a></p>"
     )
     body += '<p style="' + _C["small"] + 'margin-top:10px;">' + NOT_MEDICAL + "</p>"
     return _frame(body)
+
+
+def link_label(data_day: str) -> str:
+    """The detail link's words: the day, on the site — short enough to wrap only at spaces on a 390 px phone."""
+    return "See " + day_in_words(data_day) + " in full on averagejoematt.com"
 
 
 def _rec_attrs(r: CompactRec) -> str:
@@ -671,12 +677,12 @@ def fallback_html(data_day: str, alerts: Optional[list], detail_url: str, today_
     body += (
         '<p style="'
         + _C["p"]
-        + '">The day\'s data: <a data-detail-link="" style="'
+        + '"><a data-detail-link="" style="'
         + _C["link"]
         + '" href="'
         + esc(detail_url)
         + '">'
-        + esc(detail_url.split("://", 1)[-1])
+        + esc(link_label(data_day))
         + "</a></p>"
     )
     body += '<p style="' + _C["small"] + '">The failure is recorded for the platform to fix.</p>'
