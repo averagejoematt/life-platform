@@ -36,6 +36,7 @@ from decimal import Decimal
 
 import boto3
 from common import (  # #6176: the outbound trial; #3113 / DIL-025: the durable replay guard
+    food_log_state,  # #6245: THE arrival determination the Morning Brief and the day page read (#6240)
     nutrition_consistency as _nc,  # #6195: the target-neutral consistency switchboard
     outbound_trial,
     send_ledger,
@@ -50,6 +51,7 @@ from health import (  # #4244: THE food + supplements micronutrient join (shared
     calorie_target,
     maintenance_week,  # #5107: the planned maintenance week's line on the titration card
     nutrient_intake,
+    nutrition_logging,  # #6245: THE stub / partial-export predicates (#5607, #5954)
     protein_engine,
     titration,  # #5096: the weekly calorie titration decision (owner-only; this email is an owner surface)
     weekly_menu_feed,  # #5103 box 4: the code-built menu ahead, printed by code and written around
@@ -122,6 +124,8 @@ from common.strava_read_seam import strava_read_seam  # #4419: multi-device stra
 from health import eating_window  # #5099: THE eating window, read through public_view
 from training.training_charter import public_view  # #5214 (a published surface reads the whitelist only, #5087)
 
+from emails import nutrition_review_compact as nr_compact  # #6245: the three-minute format, behind its switch
+
 
 def query_range(source, start_date, end_date):
     """Batch query all records for a source in a date range, as a {date: record} dict.
@@ -156,6 +160,16 @@ def fetch_profile():
 # ══════════════════════════════════════════════════════════════════════════════
 # DATA GATHERING
 # ══════════════════════════════════════════════════════════════════════════════
+
+
+def read_food_freshness():
+    """#6245: `food_log_state.read_freshness` — the newest-rows read the Morning Brief makes — fail-soft: an unreadable
+    source returns None, and an unknown arrival claims nothing either way (the rows' own flags still apply)."""
+    try:
+        return food_log_state.read_freshness(table, USER_PREFIX)
+    except Exception as e:  # noqa: BLE001 — the review ships; completeness falls back to the rows' own flags
+        logger.warning(f"food freshness read failed (non-fatal): {type(e).__name__}")
+        return None
 
 
 def gather_nutrition_data():
@@ -230,6 +244,7 @@ def gather_nutrition_data():
         logger.warning(f"No previous review: {e}")
 
     return {
+        "food_freshness": read_food_freshness(),  # #6245: when the newest MacroFactor export landed (None = unknown)
         "macrofactor_this": mf_this,
         "macrofactor_prior": mf_prior,
         "withings": withings,
@@ -251,7 +266,32 @@ def gather_nutrition_data():
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def extract_daily_nutrition(mf_data, supplements=None, habitify=None):
+# #6245: whether a day's row is a whole day's food log. Owner ruling 2026-11-23: a partly imported or not-yet-arrived
+# day is never averaged in as a full day's intake (the 2026-11-22 subject averaged an 80 kcal Saturday in as intake).
+DAY_COMPLETE = "complete"
+#: Part of a day: the row was exported while its day was still being logged (`partial_at_export`, #5954), or no export
+#: has landed since the day ended (`food_log_state.arrival` == not_arrived, the Morning Brief's own determination).
+DAY_PARTIAL = "partial"
+#: A summary-only row with no diary entries (#5607): a missing day, never intake.
+DAY_NO_ENTRIES = "no_entries"
+
+
+def day_completeness(date_str, rec, last_arrival_day):
+    """`complete`, `partial` or `no_entries` for one MacroFactor row (#6245). An unknown arrival (no stamp, failed
+    read) claims nothing: the row's own flags decide."""
+    if nutrition_logging.is_stub(rec):
+        return DAY_NO_ENTRIES
+    if nutrition_logging.is_partial_export(rec) or food_log_state.arrival(date_str, last_arrival_day) == food_log_state.NOT_ARRIVED:
+        return DAY_PARTIAL
+    return DAY_COMPLETE
+
+
+def last_arrival_of(data):
+    """The Pacific day the newest MacroFactor export landed, from the gathered data (None = unknown)."""
+    return ((data or {}).get("food_freshness") or {}).get("last_arrival_day")
+
+
+def extract_daily_nutrition(mf_data, supplements=None, habitify=None, last_arrival_day=None):
     """One day row per MacroFactor day. `supplements` is the {date: row} map from the
     supplements partition (#4244): the micronutrient figures below are the food +
     supplements JOIN (health.nutrient_intake), not the stored food-only number — the
@@ -333,6 +373,8 @@ def extract_daily_nutrition(mf_data, supplements=None, habitify=None):
             "supplements_counted": intake["counted"],
             "supplements_unconverted": intake["unconverted"],
             "foods": foods,
+            # #6245: a partial or entry-less day is shown as what it is and never averaged as a day's intake
+            "completeness": day_completeness(date_str, rec, last_arrival_day),
         }
         days.append(day)
     return days
@@ -459,16 +501,21 @@ def extract_dexa_context(dexa):
 
 
 def compute_weekly_summary(days):
+    """The week's averages — over COMPLETE days only (#6245): a partly imported, not-yet-arrived or entry-less day
+    is not a day's intake. `days_logged` stays the row count; `complete_days` is what every average covers. A day
+    with no `completeness` key (a caller that predates #6245) counts as complete, as it always did."""
     if not days:
         return {}
     n = len(days)
+    whole = [d for d in days if d.get("completeness", DAY_COMPLETE) == DAY_COMPLETE]
 
     def avg_field(field):
-        vals = [d.get(field) for d in days if d.get(field) is not None]
+        vals = [d.get(field) for d in whole if d.get(field) is not None]
         return round(sum(vals) / len(vals), 1) if vals else None
 
     return {
         "days_logged": n,
+        "complete_days": len(whole),
         "avg_calories": avg_field("total_calories"),
         "avg_protein_g": avg_field("total_protein_g"),
         "avg_carbs_g": avg_field("total_carbs_g"),
@@ -727,9 +774,17 @@ Write clean HTML with inline styles. Design:
 )
 
 
+AVERAGES_BASIS = (
+    "summary averages count complete days only (complete_days); a day whose completeness is 'partial' was exported "
+    "while still being logged or its export has not arrived, and 'no_entries' is a row with no diary entries: neither "
+    "is a day's intake, and missing food data is never a missed meal"
+)
+
+
 def build_user_message(data):
-    days_this = extract_daily_nutrition(data["macrofactor_this"], data.get("supplements"), data.get("habitify"))
-    days_prior = extract_daily_nutrition(data["macrofactor_prior"], data.get("supplements"), data.get("habitify"))
+    arrived = last_arrival_of(data)
+    days_this = extract_daily_nutrition(data["macrofactor_this"], data.get("supplements"), data.get("habitify"), arrived)
+    days_prior = extract_daily_nutrition(data["macrofactor_prior"], data.get("supplements"), data.get("habitify"), arrived)
     summary_this = compute_weekly_summary(days_this)
     summary_prior = compute_weekly_summary(days_prior)
 
@@ -740,6 +795,8 @@ def build_user_message(data):
             # #4244: the label rides with the numbers — what every micronutrient figure counted.
             "micronutrient_intake_channels": list(nutrient_intake.INTAKE_CHANNELS),
             "micronutrient_avg_pct_basis": nutrient_intake.AVG_PCT_BASIS,
+            # #6245: the label rides with the averages — which days they counted
+            "averages_basis": AVERAGES_BASIS,
         },
         "prior_week_summary": summary_prior,
         "weight": extract_weight_trend(data["withings"]),
@@ -835,6 +892,10 @@ def _micro_column_scope(days):
     return "food only", "logged food (no supplement record this week)"
 
 
+#: #6245: how an incomplete day is named wherever it is shown — the log's state, never a behaviour.
+DAY_STATE_WORDS = {DAY_PARTIAL: "partly imported", DAY_NO_ENTRIES: "no entries"}
+
+
 def build_summary_table(days, profile):
     if not days:
         return ""
@@ -872,15 +933,22 @@ def build_summary_table(days, profile):
     avg_keys = ["avg_calories", "avg_protein_g", "avg_carbs_g", "avg_fat_g", "avg_fiber_g", "avg_micronutrient_pct"]
     weights = ["600", "600", "400", "400", "400", "400"]
 
+    def _ungraded(_v):
+        return _ABSENT_COLOR
+
     rows = ""
     for d in days:
         try:
             day_name = datetime.strptime(d["date"], "%Y-%m-%d").strftime("%a %m/%d")
         except Exception:
             day_name = d["date"]
+        # #6245: a partial or entry-less day is printed as what it is, in grey, and never graded or averaged
+        whole = d.get("completeness", DAY_COMPLETE) == DAY_COMPLETE
+        if not whole:
+            day_name = f"{day_name} ({DAY_STATE_WORDS.get(d.get('completeness'), 'incomplete')})"
         cell_html = ""
         for key, (fmt, color), weight in zip(day_keys, columns, weights):
-            c, t = _graded_cell(d.get(key), color, fmt)
+            c, t = _graded_cell(d.get(key), color if whole else _ungraded, fmt)
             cell_html += f'<td style="padding:8px;color:{c};font-size:13px;text-align:center;font-weight:{weight};">{t}</td>'
         rows += f"""<tr style="border-bottom:1px solid #2a2d4a;">
             <td style="padding:8px;color:#e0e0e0;font-size:13px;">{day_name}</td>{cell_html}
@@ -900,6 +968,13 @@ def build_summary_table(days, profile):
         <td style="padding:8px;color:#4cc9f0;font-size:13px;font-weight:700;">AVG</td>{avg_html}
     </tr>"""
 
+    excluded = len(days) - (summary.get("complete_days") or 0)
+    avg_basis = (
+        f" | AVG = {summary.get('complete_days') or 0} complete day{'s' if summary.get('complete_days') != 1 else ''}; "
+        f"{excluded} incomplete day{'s' if excluded != 1 else ''} shown, not averaged"
+        if excluded
+        else ""
+    )
     micro_scope, micro_basis = _micro_column_scope(days)
     fiber_target = nutrient_intake.MICRONUTRIENT_TARGETS["fiber_g"]["target"]
     fiber_txt = f"{fiber_target:g}g" if fiber_target else "—"  # ADR-104: an unknown floor reads unknown, never 0
@@ -915,7 +990,7 @@ def build_summary_table(days, profile):
         </tr>
         {rows}
         <tr><td colspan="7" style="padding:4px 8px;color:#6b7280;font-size:10px;">
-            Targets: {cal_target or "—"} kcal | {int(protein_target)}g protein | {fiber_txt} fiber | Micro = avg sufficiency % of {micro_basis}{_unconverted_note(days)}
+            Targets: {cal_target or "—"} kcal | {int(protein_target)}g protein | {fiber_txt} fiber | Micro = avg sufficiency % of {micro_basis}{_unconverted_note(days)}{avg_basis}
         </td></tr>
     </table>"""
 
@@ -1056,6 +1131,29 @@ def is_panel_edition(ai_content):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+#: The days a review covers (today-7 .. today-1).
+WEEK_DAYS = 7
+
+
+def review_subject(dates, summary):
+    """The subject — both formats (#6245 is a bug fix, not a format). Its averages are `compute_weekly_summary`'s, over
+    COMPLETE days only, and the count is said whenever the week has fewer than seven ("(5 complete days)"); a week with
+    none says so instead of stating an intake.
+
+    #2221: a week of records that carry no totals (the partial-record case, and the shape a stalled MacroFactor feed
+    produces) leaves the averages None. `int(None)` raised here, BEFORE ses.send_email — losing the entire review rather
+    than degrading. ADR-104: say the number is absent, never substitute a 0."""
+    n = summary.get("complete_days")
+    if n == 0:
+        return f"Nutrition Review - {dates['this_end']} - no complete day of food data yet"
+    avg_cal = summary.get("avg_calories")
+    avg_pro = summary.get("avg_protein_g")
+    cal_part = f"{int(avg_cal)} kcal" if avg_cal is not None else "calories not logged"
+    pro_part = f"{int(avg_pro)}g protein" if avg_pro is not None else "protein not logged"
+    count = f" ({n} complete day{'s' if n != 1 else ''})" if isinstance(n, int) and n < WEEK_DAYS else ""
+    return f"Nutrition Review - {dates['this_end']} - {cal_part} - {pro_part}{count}"
+
+
 #: The `email_log#` partition this sender's completion rows live in (#3113).
 LEDGER_NAME = "nutrition_review"
 
@@ -1100,6 +1198,32 @@ def plate_fold_section(data):
     return plate_fold.html_section(plate_fold.top_foods(rows), menu_built=menu_built)
 
 
+def compact_email_html(data, days_this, summary, ai_content, titration_html):
+    """#6245: the three-minute email (`emails.nutrition_review_compact`), or None when it cannot be built — the caller
+    then sends the long format, which is today's email, and the log says so. Logs ONE size line per build."""
+    try:
+        if is_panel_edition(ai_content):
+            priorities = nr_compact.panel_priorities(ai_content)
+            panel_state = "ok" if priorities else "missing"
+        else:
+            priorities, panel_state = [], "unavailable"
+        menu_html = nr_compact.menu_section(data.get("menu_ahead"), data.get("menu_feed") or {})
+        html = nr_compact.build(
+            week_text=nr_compact.week_line(days_this, summary, data["dates"], DAY_STATE_WORDS, last_arrival_of(data)),
+            titration_html=titration_html,
+            menu_html=menu_html,
+            priorities=priorities,
+            panel_state=panel_state,
+            dates=data["dates"],
+        )
+    except Exception as e:  # noqa: BLE001 — the review still ships, in the long format
+        logger.error(f"[nutrition-review-format] compact build failed, sending the long format: {type(e).__name__}: {e}")
+        return None
+    size = nr_compact.measure(html, menu_html)
+    logger.info(f"[nutrition-review-format] {json.dumps(dict(size, format='compact', panel=panel_state), sort_keys=True)}")
+    return html
+
+
 def lambda_handler(event, context):
     # #2216: {"dry_run": true} builds the whole review — data, prompt, panel call,
     # validation, HTML — and returns it without calling SES or writing any durable
@@ -1122,7 +1246,7 @@ def lambda_handler(event, context):
     dates = data["dates"]
     profile = data["profile"]
 
-    days_this = extract_daily_nutrition(data["macrofactor_this"], data.get("supplements"), data.get("habitify"))
+    days_this = extract_daily_nutrition(data["macrofactor_this"], data.get("supplements"), data.get("habitify"), last_arrival_of(data))
     if not days_this:
         logger.error("No MacroFactor data this week")
         return {"statusCode": 500, "body": "No nutrition data"}
@@ -1141,7 +1265,8 @@ def lambda_handler(event, context):
     summary_table = build_summary_table(days_this, profile)
     # #5103 box 4: the code-built menu for every planned day after today (the coming week). Read once; the same
     # feed goes to the prompt (prose around it) and to the page (the block, by code). Never raises.
-    data["menu_feed"] = weekly_menu_feed.feed(weekly_menu_feed.menus_ahead(table=table, today=pacific_now().date().isoformat()))
+    data["menu_ahead"] = weekly_menu_feed.menus_ahead(table=table, today=pacific_now().date().isoformat())
+    data["menu_feed"] = weekly_menu_feed.feed(data["menu_ahead"])
     logger.info(
         f"menu ahead: built={data['menu_feed']['built']} days={len(data['menu_feed']['days'])} reason={data['menu_feed']['reason']}"
     )
@@ -1222,26 +1347,16 @@ def lambda_handler(event, context):
         elif _val.warnings:
             logger.warning(f"[AI-3] Nutrition review warnings: {_val.warnings}")
 
-    weight_info = extract_weight_trend(data["withings"])
-    html = build_email_html(
-        summary_table,
-        ai_content,
-        dates,
-        weight_info,
-        build_titration_html(pacific_now().date().isoformat()),
-        menu_html_with_fold(data),
-    )
-
     summary = compute_weekly_summary(days_this)
-    # #2221: a week of records that carry no totals (the partial-record case, and
-    # the shape a stalled MacroFactor feed produces) leaves these None. `int(None)`
-    # raised here, BEFORE ses.send_email — losing the entire review rather than
-    # degrading. ADR-104: say the number is absent, never substitute a 0.
-    avg_cal = summary.get("avg_calories")
-    avg_pro = summary.get("avg_protein_g")
-    cal_part = f"{int(avg_cal)} kcal" if avg_cal is not None else "calories not logged"
-    pro_part = f"{int(avg_pro)}g protein" if avg_pro is not None else "protein not logged"
-    subject = f"Nutrition Review - {dates['this_end']} - {cal_part} - {pro_part}"
+    subject = review_subject(dates, summary)
+    titration_html = build_titration_html(pacific_now().date().isoformat())
+    email_format = nr_compact.read_format(table, USER_PREFIX, logger)  # #6245: absent/invalid = long, today's email
+    html = None
+    if email_format == nr_compact.FORMAT_COMPACT:
+        html = compact_email_html(data, days_this, summary, ai_content, titration_html)
+    if html is None:
+        weight_info = extract_weight_trend(data["withings"])
+        html = build_email_html(summary_table, ai_content, dates, weight_info, titration_html, menu_html_with_fold(data))
 
     if dry_run:
         logger.info(f"[dry-run] Nutrition review built, NOT sent: {subject}")
@@ -1255,6 +1370,8 @@ def lambda_handler(event, context):
             "prompt_source": prompt_source,
             "prompt_micro_scoped": MICRONUTRIENT_SCOPE_NOTE in system and not _FOOD_ONLY_MICRO_RULE.search(system),
             "plate_folded": outbound_trial.is_on(outbound_trial.PLATE_INTO_NUTRITION_REVIEW),  # #6176 item 2
+            "format": email_format,  # #6245: the switch as read (compact only on the exact word)
+            "complete_days": summary.get("complete_days"),
             "body": f"Nutrition review DRY RUN (not sent): {subject}",
         }
 
