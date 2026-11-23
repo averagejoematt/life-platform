@@ -12,7 +12,10 @@ WHAT IT TESTS — classification, never word sensitivity. ``calls`` is every coa
 non-sensitive personal detail, and any call the policy publishes, pass untouched. Three rules, each a blocking finding:
 
   1. ECHO — the text shares a ``SHINGLE``-word run with a private call's or ask's own words (the normalisation and the
-     run test ``web.narrative_publication.is_tainted`` uses: digits normalised, a run needs four real words).
+     run test ``web.narrative_publication.is_tainted`` uses: digits normalised, a run needs four real words). A run that
+     a PUBLIC call or ask also uses is not an echo of the private one (#6193: the platform's standard forecast wording,
+     "<metric> will be N% tomorrow", is shared by private and published calls alike; with figures normalised, a page
+     showing the public call matched the private one). Those shared runs are subtracted from every private call's runs.
   2. ID — the text carries a private call's id, in its stored or slug form (``pred_…`` / ``pred-…``).
   3. DESCRIBED — one sentence names the call's coach (display name or surname) AND a term of the call's topic family
      (``FAMILIES``: from its graded metrics, else from its own words when they name at most ``MAX_WORD_FAMILIES``) AND
@@ -32,7 +35,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Dict, FrozenSet, Iterable, List, Mapping, Optional, Tuple
 
 from common import prediction_publication as PP
@@ -152,6 +155,7 @@ def build(rows: Iterable[Tuple[str, Mapping]], names: Optional[Mapping[str, Iter
     """Pure: classify ``(pk, row)`` pairs (``PREDICTION#`` calls and ``COMMITMENT#`` asks) into a ``CallSet``."""
     private: List[PrivateCall] = []
     public_pairs: set = set()
+    public_runs: set = set()  # every run a PUBLIC call or ask uses: shared wording is not an echo of a private one
     classes: Dict[tuple, str] = {}
     for pk, row in rows:
         kind = PP.kind_of(pk, row.get("sk"))
@@ -170,10 +174,12 @@ def build(rows: Iterable[Tuple[str, Mapping]], names: Optional[Mapping[str, Iter
         fams = frozenset(metric_fams) or _diffuse(_words_family(text))
         if cls == PP.PUBLIC:
             public_pairs.update((coach, f, cycle) for f in fams)
+            public_runs.update(_runs(text))
             continue
         ids = {_id_form(key)} | ({_id_form(row.get("prediction_id"))} if row.get("prediction_id") else set())
         ids = {i for i in ids if len(i) >= 12}  # an id shorter than this is not a distinctive token
         private.append(PrivateCall(_ref(str(pk), key), coach, cycle, frozenset(ids), _runs(text), fams))
+    private = [replace(c, runs=c.runs - public_runs) for c in private]  # the id and described rules are unchanged
     return CallSet(tuple(private), frozenset(public_pairs), classes, {k: tuple(v) for k, v in (names or {}).items()})
 
 
