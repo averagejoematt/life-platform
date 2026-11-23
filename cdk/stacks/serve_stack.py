@@ -121,6 +121,8 @@ class ServeStack(Stack):
                 "S3_REGION": "us-west-2",
                 "CORS_ORIGIN": "https://averagejoematt.com",
                 "SITE_API_ORIGIN_SECRET": site_api_origin_secret,  # #815 R22-SEC-03
+                # #6194 (owner ruling 2026-11-22): weeks 8, 9 and 11 are retired; serve the retired state (#6178).
+                "CHAPTERS_RETIRED_STATE": "on",
             },
             # #794: CDK owns this function's definition (role, env, alarms); the
             # code asset is the shared staged full-tree bundle (build_bundle.py

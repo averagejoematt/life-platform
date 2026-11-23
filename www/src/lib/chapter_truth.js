@@ -24,7 +24,9 @@ import { dayInWords } from "./format.js";
 import HEADER_REVISIONS from "./chapter_header_revisions.json" with { type: "json" };
 
 /** THE SWITCH — keep it one line: `export const CHAPTER_TRUTH_LIVE = true|false;` (read as text by Python). */
-export const CHAPTER_TRUTH_LIVE = false;
+// #6177 activation (owner approval 2026-11-22: the proposed factual corrections to Moments, Story index entries, deks and
+// RSS descriptions). ROLLBACK: set back to false (one line), rebuild the site and the RSS feed.
+export const CHAPTER_TRUTH_LIVE = true;
 
 /** The byline of a chapter published after his recorded approval. */
 export const BYLINE_APPROVAL = `${NARRATOR_BYLINE} Published after Matthew's recorded approval.`;
