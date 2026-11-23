@@ -263,6 +263,16 @@ def live_verify(results: dict, served: dict, out: str, base_url: str, fetch: Opt
             results[cid]["verify"] = "; ".join(([prior] if prior else []) + problems)
 
 
+def og_card_text(chapter: dict, editions_doc: dict) -> str:
+    """The summary scripts/v9_og_images.py would draw on the chapter's og:image card from this snapshot."""
+    import importlib.util  # noqa: PLC0415
+
+    spec = importlib.util.spec_from_file_location("v9_og_images", os.path.join(REPO, "scripts", "v9_og_images.py"))
+    og = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+    spec.loader.exec_module(og)  # type: ignore[union-attr]
+    return og.card_text(chapter, editions_doc)
+
+
 def rehearse(manifest: list, out: str, base_url: str, log: Callable[[str], None] = print) -> dict:
     import publish_snapshot_chapter_editions as exporter  # noqa: PLC0415
     from chronicle_edition_verify import _dek, _h1  # noqa: PLC0415
@@ -342,6 +352,11 @@ def rehearse(manifest: list, out: str, base_url: str, log: Callable[[str], None]
         problems = CE.verify_page(page, e["text"], e["text_sha256"], dek=_dek(page), h1=_h1(page))
         res["verify"] = "; ".join(problems) or None
         res["surfaces"] = surfaces(DIST, cid, e["summary"], (by_id.get(cid) or {}).get("excerpt"))
+        card = og_card_text(by_id.get(cid) or {}, doc)  # the link-preview image's text, by the same rule (#6193)
+        if card != e["summary"]:
+            res["surfaces"] = "; ".join(
+                x for x in (res["surfaces"], "the og:image card would print another summary than the edition's") if x
+            )
         paths.append(f"/story/{cid}/")
         if e.get("archival"):
             arch_path = os.path.join(DIST, "story", cid, "first-edition", "index.html")

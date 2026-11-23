@@ -123,3 +123,12 @@ def test_a_token_only_door_is_swept_for_its_refusal():
     assert rec["expect"] == "404"
     assert S.verdict(rec, 404, b"", set())[0] == "PASS"
     assert S.verdict(rec, 200, b"<html>open</html>", set())[0] == "FAIL"  # a door that opened without a token fails
+
+
+def test_the_rehearsal_checks_the_og_card_text_with_the_one_rule():
+    import chronicle_edition_rehearsal as R
+
+    (e,) = _view([_original(), _edition(2)])
+    chapter = {"id": "week-04", "status": "published", "excerpt": "The first edition's summary, withdrawn later."}
+    assert R.og_card_text(chapter, {"state": "ok", "editions": [e]}) == e["summary"]
+    assert R.og_card_text(chapter, {"state": "absent", "editions": []}) != e["summary"]  # no edition: not the edition's
