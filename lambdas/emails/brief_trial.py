@@ -2,14 +2,22 @@
 
 ONE switch, a DynamoDB item (no new IAM: the daily-brief role already reads and writes the table):
 
-    USER#matthew#SOURCE#brief_trial / SWITCH#format   {"value": "off" | "hybrid" | "measure"}
+    USER#matthew#SOURCE#brief_trial / SWITCH#format   {"value": "off" | "hybrid" | "measure" | "compact"}
 
   * absent, unreadable, or any other value -> OFF: `daily_brief_lambda` does exactly what it did before
     this module existed — this module's `read_switch` is the only call it makes, and it is a read.
+    Compact is never a default: only the exact word selects it (#6240, owner ruling 2026-11-23 §3).
   * "hybrid"  -> the hybrid block (`content.brief_hybrid`) above the full current brief, its subject, and
     one SEND# measurement row per send (+ one response token when a recommendation is shown).
   * "measure" -> the current brief, byte for byte, plus the SEND# measurement row: the comparison arm,
     so a before/after can be read from rows rather than reconstructed.
+  * "compact" -> (#6240) the compact brief (`content.brief_compact`) REPLACES the whole email — html, a plain-text
+    part and the subject; the legacy render is still built (so the coach pipeline and its model calls are unchanged)
+    but not sent. Checked by `content.brief_budget` before the send. A render failure or a HARD budget violation
+    sends a short failure notice instead — never the legacy report — keeps the verified alerts in it, records
+    `fallback` on the SEND# row, logs `COMPACT_FALLBACK_TOKEN`, and the handler raises AFTER the send and every
+    post-send write, so the daily-brief Errors alarms see it (`life-platform-daily-brief-errors`,
+    `slo-daily-brief-delivery`). A DIL-025 replay refuses the retry, so it is never a second email.
 
 Same send time, schedule, recipient and sender: this module never sends, and the switch changes no
 EventBridge schedule or permission.
@@ -35,8 +43,8 @@ from common.digest_utils import safe_float
 from common.habit_registry import habit_tier
 from common.numeric import floats_to_decimal
 from common.pacific_time import day_in_words, shift_day_key
-from content import brief_editorial, brief_hybrid
-from content.brief_hybrid import SWITCH_HYBRID, SWITCH_MEASURE, SWITCH_OFF, SWITCH_VALUES
+from content import brief_budget, brief_compact, brief_editorial, brief_hybrid
+from content.brief_hybrid import SWITCH_COMPACT, SWITCH_HYBRID, SWITCH_MEASURE, SWITCH_OFF, SWITCH_VALUES
 
 HISTORY_DAYS = 30
 SENDS_LOOKBACK = 40
@@ -59,7 +67,7 @@ def read_switch(table, user_prefix: str, logger=None) -> str:
 class Trial:
     variant: str
     data_day: str
-    view: brief_hybrid.View | None = None
+    view: brief_hybrid.View | brief_compact.CompactView | None = None
     block_html: str = ""
     text: str = ""
     subject: str | None = None
@@ -69,6 +77,10 @@ class Trial:
     pilot: dict | None = None  # #6158 (dark): set only while rr.CANONICAL_INTAKE_LIVE
     follow_token: str | None = None
     follow_token_row: dict | None = None
+    document: str = ""  # #6240 compact: the WHOLE email's html (the handler sends it instead of the legacy render)
+    document_text: str = ""  # #6240 compact: the plain-text part
+    fallback: bool = False  # #6240: the compact render failed and the short failure notice is what goes out
+    fallback_reason: str | None = None
 
 
 # ── reads ────────────────────────────────────────────────────────────────────────────────────────
@@ -363,6 +375,9 @@ HANDLER_NAMES = (
     "tldr_guidance",
     "today_short",
     "demo_mode",
+    # #6240: the owner-only heart-rhythm lines the handler already computed for this email (demo excluded) — read
+    # ONLY by `content.brief_compact.critical_alerts`, into the compact email to the owner; never data, a log or a row.
+    "_rhythm_lines",
 )
 
 
@@ -386,6 +401,9 @@ def run(g: dict, handler_locals: dict, subject: str) -> tuple:
     except Exception as e:  # noqa: BLE001
         logger.warning("brief trial: editorial inputs failed: %s", e)
         editorial = {}
+    if variant == SWITCH_COMPACT:  # #6240: never returns None — a failure is the short notice, never the legacy report
+        trial = compact_trial(g, v, editorial)
+        return trial, "", (trial.subject or subject)
     trial = prepare(
         variant=variant,
         table=table,
@@ -542,3 +560,207 @@ def record(table, user_prefix: str, trial: Trial | None, html_chars: int, persis
         table.put_item(Item=_ddb({"pk": pk, "sk": "SEND#" + trial.data_day, "date": trial.data_day, **m}))
     except Exception as e:  # noqa: BLE001
         logger.warning("brief trial measurement write failed (non-fatal): %s", e)
+
+
+# ── #6240: the compact brief ─────────────────────────────────────────────────────────────────────────────────────
+
+# The literal the fallback logs (ERROR level), for a future MetricFilter; the alarm that sees it TODAY is the Lambda's
+# own Errors metric, from `raise_if_fallback`.
+COMPACT_FALLBACK_TOKEN = "MORNING-BRIEF-COMPACT-FALLBACK"  # noqa: S105 — a log token, not a secret
+_PREV_WEIGHT_DAYS = 14
+
+
+class CompactBriefFallback(RuntimeError):
+    """Raised by the handler's last statement after a compact failure notice went out (never before the send)."""
+
+
+def _previous_weight(fetch_range, day: str, as_of) -> tuple | None:
+    """(day, lb) of the weigh-in before the newest one, from the brief's own Withings read shape."""
+    rows = fetch_range("withings", shift_day_key(day, -_PREV_WEIGHT_DAYS), day) or []
+    weighed = sorted((str(r.get("sk", ""))[5:15], safe_float(r, "weight_lbs")) for r in rows if safe_float(r, "weight_lbs") is not None)
+    before = [(d, w) for d, w in weighed if as_of and d < str(as_of)]
+    return before[-1] if before else None
+
+
+def _previous_acwr(fetch_range, day: str):
+    prev = shift_day_key(day, -1)
+    rows = fetch_range("computed_metrics", prev, prev) or []
+    return safe_float(rows[0], "acwr") if rows else None
+
+
+def compact_view(*, data, status, guidance_items, history, alerts, previous_weight, previous_acwr, site_url, persona):
+    """Pure: the hybrid's own recommendation rules (one per action class, food asks held back while the export is
+    pending, NEW/REPEAT from the shown history), then `brief_compact.build`. The tests drive this directly."""
+    day = data.get("date")
+    arrival = brief_editorial.nutrition_arrival(data)
+    no_intake = status.get("kcal") is None
+    recs, _held = brief_hybrid.guidance_recs(guidance_items, day, arrival == "not_arrived" and no_intake)
+    brief_hybrid.label_recs(recs, day, history)
+    view = brief_compact.build(
+        data=data,
+        status=status,
+        recs=recs,
+        alerts=alerts,
+        food_pending=arrival == "not_arrived" and no_intake,
+        food_unknown=arrival is None and no_intake,
+        previous_weight=previous_weight,
+        previous_acwr=previous_acwr,
+        site_url=site_url,
+        persona=persona,
+    )
+    origin = {r.rec_id: r for r in recs}
+    for c in view.recs:
+        c.origin = origin.get(c.rec_id)  # the hybrid Rec, for the response token and the (dark) #6158 pilot
+    return view
+
+
+def _compact_prepare(trial: Trial, g: dict, v: dict, data: dict, alerts: list, site_url: str, persona: tuple) -> None:
+    table, logger, fetch_range, user_prefix = g["table"], g["logger"], g["fetch_range"], g["USER_PREFIX"]
+    day = trial.data_day
+    try:
+        sends = _recent_sends(table, user_prefix, day)
+    except Exception as e:  # noqa: BLE001 — no history: every recommendation reads as NEW, none is suppressed by mistake
+        logger.warning("compact brief: send history read failed: %s", type(e).__name__)
+        sends = []
+    status = status_inputs(
+        data, data.get("computed_metrics"), v["component_details"], v["profile"], v["readiness_score"], v["readiness_colour"],
+        v["mvp_streak"], v["day_grade_score"], v["grade"], [],
+    )  # fmt: skip
+    wr = data.get("weight_recency") or {}
+    view = compact_view(
+        data=data,
+        status=status,
+        guidance_items=list((v["tldr_guidance"] or {}).get("guidance") or []),
+        history=rr.shown_history(fetch_range, sends, shift_day_key(day, -HISTORY_DAYS), shift_day_key(day, -1)),
+        alerts=alerts,
+        previous_weight=_previous_weight(fetch_range, day, wr.get("current_weight_as_of")),
+        previous_acwr=_previous_acwr(fetch_range, day),
+        site_url=site_url,
+        persona=persona,
+    )
+    trial.view = view  # carries the same respond/follow-up fields as brief_hybrid.View, for the #6158 pilot hook
+    respond = getattr(view.recs[0], "origin", None) if view.recs else None
+    if respond is not None:  # the response mechanism, reused (owner ruling §8): one link, on the shown recommendation
+        trial.token = rr.new_token()
+        trial.token_row = {
+            "rec_id": respond.rec_id,
+            "rec_key": respond.key,
+            "send_day": day,
+            "recipient_hash": rr.recipient_hash(g.get("RECIPIENT", "")),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "expires_at": int(time.time()) + rr.TOKEN_TTL_SECONDS,
+        }
+        view.respond_url, view.respond_rec = rr.response_url(site_url, trial.token), respond
+    if rr.CANONICAL_INTAKE_LIVE:  # #6158 pilot, dark: off = this line is the whole cost
+        trial.pilot = _pilot_plan(table, user_prefix, trial, respond, site_url, g.get("RECIPIENT", ""), logger)
+    _fit_follow_up(view)
+    today_short = v["today_short"] or ""
+    html, text, violations = _render_checked(view, today_short, persona)
+    # A long model-written recommendation must not turn a good brief into a failure notice: past the word ceiling the
+    # LAST recommendation is dropped (counted), down to the one that leads. Alerts and metrics are never trimmed here.
+    while len(view.recs) > 1 and {x.code for x in violations if x.hard} and {x.code for x in violations if x.hard} <= _LENGTH_CODES:
+        view.recs = view.recs[:-1]
+        view.dropped_for_length += 1
+        html, text, violations = _render_checked(view, today_short, persona)
+    trial.measurement = {
+        "variant": SWITCH_COMPACT,
+        "format_version": brief_compact.FORMAT_VERSION,
+        **brief_budget.measure(html, text),
+        "lead_kind": view.lead_kind,
+        "recs": [{"id": r.rec_id, "key": r.key, "status": r.status, "changed_because": bool(r.changed_because)} for r in view.recs],
+        "n_new": sum(1 for r in view.recs if r.status == "NEW"),
+        "n_repeat": sum(1 for r in view.recs if r.status == "REPEAT"),
+        "repeats_suppressed": view.repeats_suppressed,
+        "dropped_voice": view.dropped_voice,
+        "dropped_clearance": view.dropped_clearance,
+        "dropped_for_length": view.dropped_for_length,
+        "pending_inputs": list(view.pending_inputs),
+        "food_pending": "food" in view.pending_inputs,
+        "grade_provisional": bool(status["grade_provisional"]),
+        "budget_violations": sorted({x.code for x in violations}),
+        "fallback": False,
+        "respond_rec_id": trial.token_row["rec_id"] if trial.token_row else None,
+        "response": rr.NOT_RECORDED,
+    }
+    hard = sorted({x.code for x in violations if x.hard})
+    if hard:
+        raise ValueError("budget:" + ",".join(hard))
+    trial.document, trial.document_text, trial.subject = html, text, brief_compact.subject(view, today_short)
+
+
+_LENGTH_CODES = frozenset({"words_over", "text_words_over"})
+
+
+def _render_checked(view, today_short: str, persona: tuple) -> tuple:
+    html, text = brief_compact.render_html(view, today_short), brief_compact.render_text(view, today_short)
+    return html, text, brief_budget.check(html, text, persona_names=persona, pending_inputs=tuple(view.pending_inputs))
+
+
+def _fit_follow_up(view) -> None:
+    """A due follow-up (the #6158 pilot's, dark) is a recommendation slot: with one, at most REC_CEILING - 1 others."""
+    if view.follow_up:
+        view.recs = view.recs[: brief_compact.REC_CEILING - 1]
+
+
+def _compact_fallback(trial: Trial, alerts, site_url: str, today_short: str, reason: str, logger) -> None:
+    """The short failure notice (owner ruling §4): says the brief could not be prepared, keeps the verified alerts
+    (or says the alert check could not run), links the day, and is recorded. Never the legacy report."""
+    day = trial.data_day
+    url = site_url.rstrip("/") + "/data/day/" + day + "/"
+    trial.token = trial.token_row = trial.pilot = None  # no recommendation is shown, so no answer link is armed
+    try:
+        trial.document = brief_compact.fallback_html(day, alerts, url, today_short)
+        trial.document_text = brief_compact.fallback_text(day, alerts, url, today_short)
+    except Exception:  # noqa: BLE001 — the last resort is a constant: it still says the brief failed
+        trial.document = "<!DOCTYPE html><html><body><p>" + brief_compact.FALLBACK_LEAD + "</p></body></html>"
+        trial.document_text = brief_compact.FALLBACK_LEAD
+    trial.subject = brief_compact.fallback_subject(today_short)
+    trial.fallback, trial.fallback_reason = True, reason
+    trial.measurement = {
+        **(trial.measurement or {}),
+        "variant": SWITCH_COMPACT,
+        "format_version": brief_compact.FORMAT_VERSION,
+        "fallback": True,
+        "fallback_reason": reason,
+        "alert_check": "failed" if alerts is None else "ok",
+        "n_critical_alerts": len(alerts or []),
+        "fallback_words": brief_budget.words(trial.document_text),
+        "response": rr.NOT_RECORDED,
+    }
+    logger.error("%s data_day=%s reason=%s", COMPACT_FALLBACK_TOKEN, day, reason)
+
+
+def compact_trial(g: dict, v: dict, editorial: dict) -> Trial:
+    """The compact email for the handler. Never raises and never returns None: any failure -> the failure notice."""
+    logger = g["logger"]
+    data = {**(v["data"] or {}), "brief_editorial": editorial or {}}
+    trial = Trial(variant=SWITCH_COMPACT, data_day=str(data.get("date") or ""))
+    site_url = os.environ.get("SITE_URL", "https://averagejoematt.com")
+    today_short = v["today_short"] or ""
+    try:
+        alerts = brief_compact.critical_alerts(data, v.get("_rhythm_lines"))
+    except Exception as e:  # noqa: BLE001 — an alert check that cannot run must not let a brief claim there is none
+        _compact_fallback(trial, None, site_url, today_short, "alert_check:" + type(e).__name__, logger)
+        return trial
+    try:
+        _compact_prepare(trial, g, v, data, alerts, site_url, brief_compact.persona_names())
+    except Exception as e:  # noqa: BLE001 — the notice, never the legacy report
+        reason = str(e) if str(e).startswith("budget:") else "render:" + type(e).__name__
+        _compact_fallback(trial, alerts, site_url, today_short, reason, logger)
+    return trial
+
+
+def text_part(trial: Trial | None) -> dict:
+    """The SES Body's plain-text entry for a compact send; {} otherwise (so the legacy Body is byte for byte today's)."""
+    if trial is None or not trial.document_text:
+        return {}
+    return {"Text": {"Data": trial.document_text, "Charset": "UTF-8"}}
+
+
+def raise_if_fallback(trial: Trial | None, dry_run: bool) -> None:
+    """The handler's last statement: a compact failure that SENT its notice becomes a Lambda error, so the existing
+    daily-brief Errors alarms record it (owner ruling §4 — observable, never disguised as a normal brief)."""
+    if trial is not None and trial.fallback and not dry_run:
+        raise CompactBriefFallback(
+            COMPACT_FALLBACK_TOKEN + ": the compact brief failed (" + str(trial.fallback_reason) + "); the notice was sent"
+        )

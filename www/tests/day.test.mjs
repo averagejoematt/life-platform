@@ -138,3 +138,10 @@ test("the nearest graded day before, and every unavailable state has its own sen
     assert.ok(!unservedText(b, s, "X").startsWith("Not readable"), `${b}/${s}`);
   }
 });
+
+test("#6240: a food day whose export has not arrived is pending data, never a missed log", () => {
+  const t = unservedText("food", "pending", "Sunday 22 November");
+  assert.match(t, /has not arrived yet/);
+  assert.match(t, /not a missed day/);
+  assert.doesNotMatch(t, /Nothing was logged|not logged|skipped|missed (a|the) log/i);
+});

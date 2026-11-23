@@ -199,6 +199,10 @@ _BRIEF_DOORS = {
     "lambdas/emails/brief_lines.py": "the daily brief's owner-only section helper (the email to the owner alone)",
     "lambdas/emails/daily_brief_lambda.py": "computes the section (demo brief excluded) and hands it to build_html only",
     "lambdas/content/html_builder.py": "renders the section into the owner's email, escaped, inside S:rhythm markers",
+    # #6240 (reviewed): the compact format REPLACES the email, so the same owner-only lines reach the owner through it.
+    # brief_trial reads the handler's already-computed `_rhythm_lines` (HANDLER_NAMES) into
+    # content.brief_compact.critical_alerts and nothing else — pinned in tests/test_rhythm_owner_4972.py.
+    "lambdas/emails/brief_trial.py": "hands the handler's rhythm lines to the compact email's verified-alert block only",
 }
 PERMITTED_MENTIONS = {
     "rhythm_owner": {"lambdas/emails/brief_lines.py": _BRIEF_DOORS["lambdas/emails/brief_lines.py"]},

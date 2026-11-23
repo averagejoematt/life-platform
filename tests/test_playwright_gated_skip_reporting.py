@@ -58,6 +58,7 @@ def test_the_known_five_are_all_present_today():
     names = set(mod.discover())
     expected = {
         "test_a11y_light_theme.py",
+        "test_brief_compact_6240.py",  # #6240: the compact email's 390/1280 px layout (one test; the rest run everywhere)
         "test_constellation_edge_cpts_1215.py",
         "test_pre_start_render.py",
         "test_sleep_device_disclosure_3451.py",

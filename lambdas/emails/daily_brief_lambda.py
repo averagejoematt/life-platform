@@ -2227,9 +2227,10 @@ def lambda_handler(event, context):
     except Exception as _be:
         logger.warning(f"WR-48 banner failed (non-fatal): {_be}")
 
-    # #6175 hybrid trial: ONE switch (emails/brief_trial.py); off = one read, an empty block, today's brief byte for byte
+    # #6175 hybrid trial: ONE switch (emails/brief_trial.py); off = one read, an empty block, today's brief byte for byte.
+    # #6240 compact: the switch's exact word "compact" REPLACES the whole email (its document, or the short failure notice).
     _trial, _block, subject = brief_trial.run(globals(), locals(), subject)
-    html = _re.sub(r"(<body[^>]*>)", lambda m: m.group(1) + _block, html, count=1, flags=_re.IGNORECASE)
+    html = (_trial and _trial.document) or _re.sub(r"(<body[^>]*>)", lambda m: m.group(1) + _block, html, count=1, flags=_re.IGNORECASE)
     if demo_mode:
         html = output_writers.sanitize_for_demo(html, data, profile)
         prefix = (profile.get("demo_mode_rules") or {}).get("subject_prefix", "[DEMO]")
@@ -2245,7 +2246,7 @@ def lambda_handler(event, context):
             Content={
                 "Simple": {
                     "Subject": {"Data": subject, "Charset": "UTF-8"},
-                    "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
+                    "Body": {"Html": {"Data": html, "Charset": "UTF-8"}, **brief_trial.text_part(_trial)},  # #6240: compact only
                 }
             },
             ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking
@@ -2669,4 +2670,5 @@ def lambda_handler(event, context):
     # (see the send site above), not here. #2255's rule is unchanged and is
     # enforced at that site: a dry run never reaches the send branch, so it
     # still writes no row the status page would read as proof it mailed.
+    brief_trial.raise_if_fallback(_trial, _dry_run)  # #6240: a compact failure notice is a Lambda error AFTER every write
     return {"statusCode": 200, "body": ("Daily brief v2.77.0 " + ("generated (DRY_RUN, not sent): " if _dry_run else "sent: ") + subject)}

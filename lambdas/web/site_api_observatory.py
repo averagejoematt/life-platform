@@ -78,7 +78,9 @@ def handle_nutrition_overview(qs: dict | None = None) -> dict:
     window, err = day_window.parse(qs, floor=EXPERIMENT_START)
     if err:
         return err
-    return day_window.attach(_nutrition.nutrition_overview(_g=globals(), window=window), window)
+    # #6240: + the additive `food_log` block (pending days), outside the ceiling-held nutrition_overview body
+    resp = _nutrition.with_food_log(_nutrition.nutrition_overview(_g=globals(), window=window), _g=globals(), window=window)
+    return day_window.attach(resp, window)
 
 
 def edition_nutrition() -> dict:

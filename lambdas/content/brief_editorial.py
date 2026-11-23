@@ -27,6 +27,7 @@ Pure module: no AWS, no clock, no I/O.
 
 from __future__ import annotations
 
+from common import food_log_state
 from common.digest_utils import safe_float
 from common.pacific_time import day_in_words, shift_day_key
 
@@ -51,11 +52,9 @@ def nutrition_arrival(data) -> str | None:
     "last_intake_day": newest day carrying intake} — the source's own freshness, read from its
     newest DATE# rows the way `get_freshness_status` reads it."""
     nut = _editorial(data).get("nutrition") or {}
-    arrival = nut.get("last_arrival_day")
-    day = (data or {}).get("date")
-    if not arrival or not day:
-        return None
-    return "arrived" if arrival > day else "not_arrived"
+    # #6240: the ONE determination the public day page also reads (common.food_log_state), so the email and its
+    # detail link cannot disagree about the same day.
+    return food_log_state.arrival((data or {}).get("date"), nut.get("last_arrival_day"))
 
 
 def nutrition_absent_html(data) -> str:

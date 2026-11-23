@@ -332,6 +332,23 @@ def test_in_the_daily_brief_the_lines_reach_the_email_renderer_alone_and_never_a
     assert len(calls) == 1
 
 
+def test_the_compact_door_reads_the_lines_into_the_alert_block_alone():
+    """#6240: the compact email (owner ruling 2026-11-23) reaches the same owner through `brief_trial.run`, which reads
+    the handler's `_rhythm_lines` by name (HANDLER_NAMES) — and hands it to `brief_compact.critical_alerts` only: never
+    a log line, a measurement row, a token row or a model."""
+    src = (ROOT / "lambdas" / "emails" / "brief_trial.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    from emails import brief_trial
+
+    assert "_rhythm_lines" in brief_trial.HANDLER_NAMES
+    reads = [n for n in ast.walk(tree) if isinstance(n, ast.Constant) and n.value == "_rhythm_lines"]
+    assert len(reads) == 2, "one HANDLER_NAMES entry and one read"
+    parents = _parents(tree)
+    read = next(n for n in reads if isinstance(parents[n], ast.Call))
+    call = parents[parents[read]] if isinstance(parents[parents[read]], ast.Call) else None
+    assert call is not None and ast.unparse(call.func) == "brief_compact.critical_alerts", ast.unparse(parents[read])
+
+
 def test_the_email_html_goes_to_ses_alone_addressed_to_the_one_recipient():
     """The rendered HTML (which carries the section) is read only to sanitise, banner, measure and SEND — never
     by a writer, a generated file or a prompt; every send goes To the one recipient with no Cc/Bcc."""

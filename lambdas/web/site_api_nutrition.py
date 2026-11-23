@@ -9,10 +9,14 @@ import the facade — no import cycle. All other shared helpers come straight fr
 site_api_common (identical binding semantics to the pre-split facade).
 """
 
+import json
 import os
 from datetime import datetime, timedelta
 
-from common import nutrition_consistency as nc  # #6195: the target-neutral consistency switchboard (all OFF = today)
+from common import (
+    food_log_state,  # #6240: pending vs not logged — the ONE determination the Morning Brief reads too
+    nutrition_consistency as nc,  # #6195: the target-neutral consistency switchboard (all OFF = today)
+)
 from common.constants import PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's targets, never the profile row
 from common.pacific_time import shift_day_key  # #5584: the window's sub-bounds
 from health import (
@@ -31,6 +35,7 @@ from web.nutrition_recovery_overlay import (  # noqa: F401 — moved out for the
 )
 from web.site_api_common import (
     PT,
+    USER_PREFIX,
     _get_profile,
     _ok,
     _window_span,
@@ -366,6 +371,20 @@ def _overview_bounds(_g, window: tuple[str, str] | None) -> tuple[str, str, str,
         return today, _experiment_date(30), _experiment_date(7), _experiment_date(60)
     start, end = window
     return end, start, max(start, shift_day_key(end, -6)), max(_g["EXPERIMENT_START"], shift_day_key(end, -59))
+
+
+def with_food_log(resp: dict, *, _g, window: tuple[str, str] | None = None) -> dict:
+    """#6240 (additive): `food_log` on a 200 — the window's days whose food export has not ARRIVED yet (pending data,
+    never "not logged"), by common.food_log_state, the determination the Morning Brief reads too. The day page reads it
+    (scripts/publish_snapshot_day.py), so the email and its detail link cannot disagree about one day. The intake days
+    are the served `nutrition_trend` rows with calories — the payload's own, so no second partition read."""
+    if resp.get("statusCode") != 200:
+        return resp
+    body = json.loads(resp["body"])
+    today, d30, _d7, _d60 = _overview_bounds(_g, window)
+    intake = [str(r.get("date")) for r in body.get("nutrition_trend") or [] if isinstance(r, dict) and r.get("calories") is not None]
+    body["food_log"] = food_log_state.served_block(_g.get("table"), USER_PREFIX, d30, today, intake)
+    return {**resp, "body": json.dumps(body)}
 
 
 def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
