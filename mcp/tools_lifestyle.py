@@ -11,6 +11,7 @@ from boto3.dynamodb.conditions import Key
 from common.metric_truth import STEPS, resolve_by_date, resolved_metric, resolved_rows, sources_for, steps_sources  # #4630
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
+from experiment import experiment_overlap  # #6210
 from experiment.phase_taxonomy import experiment_stamp_for  # #3513: the class-gated, date-derived write-time stamp
 from ingestion.source_registry import raw_date_key  # bundled shared module: the X-9 raw/ layout facts (#2278)
 from training.training_charter import charter_value  # #5056
@@ -633,7 +634,7 @@ def tool_create_experiment(args):
     when you call get_experiment_results.
 
     Board of Directors rules:
-      - One variable at a time (Huberman)
+      - One variable at a time (Huberman) — enforced proportionally (#6210, experiment_overlap)
       - Minimum 14 days for meaningful signal (Attia)
       - Define success criteria upfront (Ferriss)
     """
@@ -660,6 +661,7 @@ def tool_create_experiment(args):
     # machine's read. Opt-in per experiment; absent = the field simply isn't written
     # and the card renders nothing for it (no nag state).
     matthew_note = (args.get("matthew_note") or "").strip()
+    intervention_kind, acknowledge_reason = experiment_overlap.parse_args(args)
 
     if not name:
         raise ValueError("name is required (e.g. 'Creatine 5g daily', 'No caffeine after 10am')")
@@ -735,20 +737,12 @@ def tool_create_experiment(args):
     if existing:
         raise ValueError(f"Experiment '{exp_id}' already exists. Choose a different name or start date.")
 
+    overlap, overlap_acknowledged = experiment_overlap.check_creation(
+        table, EXPERIMENTS_PK, start_date, design, intervention_kind, library_id, tags, acknowledge_reason, now
+    )
+
     # EL-F5: Auto-detect iteration count from past experiments with same library_id or slug
-    iteration = 1
-    try:
-        past_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(EXPERIMENTS_PK) & Key("sk").begins_with("EXP#"),
-            ScanIndexForward=False,
-        )
-        for past in past_resp.get("Items", []):
-            past_lib = past.get("library_id", "")
-            past_slug = re.sub(r"[^a-z0-9]+", "-", past.get("name", "").lower()).strip("-")[:40]
-            if (library_id and past_lib == library_id) or past_slug == slug:
-                iteration += 1
-    except Exception:
-        pass
+    iteration = experiment_overlap.iteration_count(table, EXPERIMENTS_PK, library_id, slug)
 
     item = {
         "pk": EXPERIMENTS_PK,
@@ -769,6 +763,7 @@ def tool_create_experiment(args):
         "experiment_type": experiment_type or None,
         "planned_duration_days": int(planned_duration_days) if planned_duration_days else None,
         "iteration": iteration,
+        **experiment_overlap.row_fields(intervention_kind, overlap_acknowledged, overlap),
         # #539: the frozen n-of-1 design + its public pre-registration stamp.
         # Floats → Decimal for DDB (min_effect is commonly fractional).
         "design": json.loads(json.dumps(design), parse_float=Decimal) if design else None,
@@ -869,6 +864,7 @@ def tool_create_experiment(args):
         "duration_tier": duration_tier or None,
         "experiment_type": experiment_type or None,
         "iteration": iteration,
+        **experiment_overlap.response_fields(intervention_kind, overlap, overlap_acknowledged),
         "design": design,
         "pre_registered_at": item.get("pre_registered_at"),
         "pre_registration_url": prereg_url,
@@ -1269,6 +1265,7 @@ def tool_end_experiment(args):
             analysis = _run_design_analysis(existing, design, end_date)
         except Exception as e:
             logger.warning(f"end_experiment: design analysis failed for {exp_id}: {e}")
+    experiment_overlap.attach_closing_caveat(table, EXPERIMENTS_PK, existing, analysis)
     if analysis is not None:
         update_expr += ", analysis = :an"
         expr_values[":an"] = json.loads(json.dumps(analysis), parse_float=Decimal)

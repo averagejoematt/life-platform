@@ -139,7 +139,13 @@ def _render_str(node: ast.AST, consts: dict) -> str:
 def _eval_schema(node: ast.AST, consts: dict):
     """ast.literal_eval that also tolerates f-strings referencing config constants."""
     if isinstance(node, ast.Dict):
-        return {_eval_schema(k, consts): _eval_schema(v, consts) for k, v in zip(node.keys, node.values)}
+        out: dict = {}
+        for k, v in zip(node.keys, node.values):
+            if k is None:  # `**CONST` splat of an extracted parameter table (#6210)
+                out.update(_eval_schema(v, consts))
+            else:
+                out[_eval_schema(k, consts)] = _eval_schema(v, consts)
+        return out
     if isinstance(node, (ast.List, ast.Tuple)):
         return [_eval_schema(e, consts) for e in node.elts]
     if isinstance(node, (ast.JoinedStr,)) or (isinstance(node, ast.Constant) and isinstance(node.value, str)):

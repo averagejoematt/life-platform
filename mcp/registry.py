@@ -62,6 +62,7 @@ from mcp.tools_descriptions import (
     AUDIT_COACH_DOSSIER_DESCRIPTION,
     CLOSE_TODOIST_TASK_DESCRIPTION,
     CREATE_EXPERIMENT_DESCRIPTION,
+    CREATE_EXPERIMENT_TYPE_PROPS,
     CREATE_TODOIST_TASK_DESCRIPTION,
     CURATE_HORIZON_DESCRIPTION,
     DELETE_PLATFORM_MEMORY_DESCRIPTION,
@@ -902,11 +903,7 @@ TOOLS = {
                     "notes": {"type": "string", "description": "Additional context or protocol details."},
                     "library_id": {"type": "string", "description": "ID from experiment_library.json to link this run to a library entry."},
                     "duration_tier": {"type": "string", "description": "'7-day sprint', '30-day trial', or '60-day deep dive'."},
-                    "experiment_type": {
-                        "type": "string",
-                        "description": "'measurable' (has biomarker endpoint) or 'behavioral' (compliance tracking).",
-                    },
-                    "planned_duration_days": {"type": "integer", "description": "Target duration in days."},
+                    **CREATE_EXPERIMENT_TYPE_PROPS,  # #6210: type/duration/overlap args live in tools_descriptions
                     "why_now": {
                         "type": "string",
                         "description": (

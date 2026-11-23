@@ -535,11 +535,38 @@ CREATE_EXPERIMENT_DESCRIPTION = (
     "Start tracking a new N=1 experiment. An experiment is a specific protocol change "
     "(supplement, diet shift, sleep hygiene tweak, training adjustment) with a hypothesis "
     "and start date. The system will automatically compare before/after metrics when you "
-    "call get_experiment_results. Board rules: one variable at a time, minimum 14 days, "
-    "define success criteria upfront. "
+    "call get_experiment_results. Board rules: minimum 14 days, define success criteria upfront; "
+    "one variable at a time is enforced proportionally (#6210): a behavioural experiment on the same criterion "
+    "metric as an active behavioural one (or inside its washout) is refused unless acknowledge_overlap carries a "
+    "20-300 char reason; observational or same-outcome-family overlap is only a note. "
     "Use for: 'I'm starting creatine today', 'track my no-caffeine-after-10am experiment', "
     "'create experiment for cold plunge protocol', 'I want to test if X improves Y'."
 )
+
+CREATE_EXPERIMENT_TYPE_PROPS = {
+    "experiment_type": {
+        "type": "string",
+        "description": "'measurable' (has biomarker endpoint) or 'behavioral' (compliance tracking).",
+    },
+    "planned_duration_days": {"type": "integer", "description": "Target duration in days."},
+    "intervention_kind": {
+        "type": "string",
+        "enum": ["observational", "behavioral"],
+        "description": (
+            "#6210: 'behavioral' (default) changes what Matthew does; 'observational' only measures. "
+            "An observational experiment is never refused for overlap."
+        ),
+    },
+    "acknowledge_overlap": {
+        "type": "string",
+        "description": (
+            "#6210: required (20-300 chars, the owner's reason in his words) only when a behavioural "
+            "experiment shares its criterion metric with an active behavioural one, or starts inside "
+            "its washout. Stored on the row as overlap_acknowledged and echoed as a caveat when "
+            "either experiment closes."
+        ),
+    },
+}
 
 LIST_EXPERIMENTS_DESCRIPTION = (
     "List all N=1 experiments with their status, duration, and whether minimum "
