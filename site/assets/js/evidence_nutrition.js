@@ -257,6 +257,17 @@ export function cgmEmptyState(opts = {}) {
     `<p class="rd-archive">When a CGM sensor is active, this marries each meal to its glucose response — the peak, the rise, the return to baseline, with the meal markers above. <strong>Sensor not active — fills in when you wear one.</strong> <span class="confidence conf-low">no sensor yet</span></p></div>`);
 }
 
+// #6195 (owner ruling 2026-11-22): the badge beside the verdict counts channels IN STRAIN (`degraded_count`), while the
+// verdict sentence counts channels that HELD STEADY, so a bare "0/5" beside "4 of 5 held steady" read as a contradiction.
+// With `honesty` (the switch on) the badge names what it counts, from the same channels the sentence is built from.
+// Without it the badge is the bare "N/5", byte-for-byte as before.
+function _strainBadge(ds) {
+  if (!ds.honesty) return `<span class="dsx-count mono">${ds.degraded_count}/5</span>`;
+  if (!Number.isFinite(Number(ds.degraded_count)) || ds.degraded_count === null) return "";
+  const total = Array.isArray(ds.channels) && ds.channels.length ? ds.channels.length : 5;
+  return `<span class="dsx-count mono">${_int(ds.degraded_count)} of ${total} in strain</span>`;
+}
+
 // RQA-05 — "is the cut costing you?" the five-channel deficit-sustainability read (ported from
 // the MCP get_deficit_sustainability). A degraded channel reads ember (the thing to look at),
 // a holding one muted ink — never red. Honest empty state until ≥7 logged days.
@@ -291,7 +302,7 @@ export function nutritionDeficitSustainability(ds) {
   // #6195 F2: with `honesty` the heading stops asking a yes/no question the read cannot answer, and the read carries its
   // own limits and date. Without it (the switch off, or a cached older body) the section is byte-for-byte as before.
   return sec(ds.honesty ? "Recovery channels during the cut — the five-channel read" : "Is the cut costing you? — the five-channel read",
-    `<div class="dsx-verdict ${sevTone}"><span class="dsx-count mono">${ds.degraded_count}/5</span><span class="dsx-vtext">${esc(ds.verdict || "")}</span></div>` +
+    `<div class="dsx-verdict ${sevTone}${ds.honesty ? " dsx-labelled" : ""}">${_strainBadge(ds)}<span class="dsx-vtext">${esc(ds.verdict || "")}</span></div>` +
     (ds.honesty ? `<p class="rd-meta label dsx-honesty">${esc(ds.honesty)}${Array.isArray(ds.not_based_on) && ds.not_based_on.length ? ` Not based on: ${esc(ds.not_based_on.join(", "))}.` : ""}${ds.as_of ? ` As of ${esc(fmtShort(ds.as_of))}.` : ""}</p>` : "") +
     `<div class="dsx-rows">${rows}</div>` +
     (ds.honesty
