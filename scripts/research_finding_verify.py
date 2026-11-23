@@ -13,6 +13,10 @@ emits the whole object. You never type the title.
     (`config/evidence_source_allowlist.json` "guideline_hosts"). Its page `<title>` must carry the claimed title,
     and its meta description stands in for the abstract.
 
+REDIRECTS. Every GET goes through an opener that refuses a redirect whose target is not an allow-listed host
+(Crossref, E-utilities, or a guideline host), and re-checks the final URL, so a redirect off the list can never
+supply the title.
+
 THE VERIFICATION BLOCK. Every printed source carries `verification`: resolver, resolved_title, first_author,
 year, fetched_at, abstract_sha256 (when an abstract exists), the overlap result, and
 `stamp = sha256(id_kind|id|resolved_title|fetched_at)[:16]`. The store recomputes the stamp and refuses a
@@ -93,14 +97,55 @@ def _host_in(host: str, domains) -> bool:
     return any(host == d or host.endswith("." + d) for d in domains)
 
 
-def text_get(url: str, timeout: float = 20.0) -> tuple[int, str]:
-    """GET one text page: PubMed efetch, or a guideline page on an allow-listed official body's host. Nothing else."""
-    host = (urllib.parse.urlparse(url).hostname or "").lower()
-    if not url.startswith("https://") or not (host == "eutils.ncbi.nlm.nih.gov" or _host_in(host, guideline_hosts(ler.load_allowlist()))):
-        raise ValueError(f"refusing to contact {host}: not PubMed E-utilities or an allow-listed guideline host")
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+RESOLVER_HOSTS = ("api.crossref.org", "eutils.ncbi.nlm.nih.gov")
+
+
+def allowed_host(host: str) -> bool:
+    """Crossref, PubMed E-utilities, or an allow-listed guideline host — the only places this script may read from."""
+    host = (host or "").lower()
+    return host in RESOLVER_HOSTS or _host_in(host, guideline_hosts(ler.load_allowlist()))
+
+
+class RefuseOffListRedirect(urllib.request.HTTPRedirectHandler):
+    """A redirect from an allow-listed host to any other host must not supply the title: refuse it."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        target = urllib.parse.urlparse(newurl)
+        if target.scheme != "https" or not allowed_host(target.hostname or ""):
+            raise urllib.error.HTTPError(
+                newurl, code, f"refused redirect to a host that is not allow-listed: {target.hostname}", headers, fp
+            )
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def _open(url: str, accept: str, timeout: float):
+    if not url.startswith("https://") or not allowed_host(urllib.parse.urlparse(url).hostname or ""):
+        raise ValueError(f"refusing to contact {urllib.parse.urlparse(url).hostname}: not an allow-listed host")
+    opener = urllib.request.build_opener(RefuseOffListRedirect)
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": accept})
+    resp = opener.open(req, timeout=timeout)  # nosec B310 — https, host allow-listed, redirects re-checked
+    final = urllib.parse.urlparse(resp.geturl())
+    if final.scheme != "https" or not allowed_host(final.hostname or ""):  # belt and braces over the handler
+        resp.close()
+        raise urllib.error.URLError(f"response came from a host that is not allow-listed: {final.hostname}")
+    return resp
+
+
+def json_get(url: str, timeout: float = 20.0) -> tuple[int, Optional[dict[str, Any]]]:
+    """The resolvers' HttpGet, through the redirect-refusing opener (replaces library_evidence_review.urllib_get here)."""
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310 — https, host allow-listed above
+        with _open(url, "application/json", timeout) as resp:
+            return resp.status, json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        return e.code, None
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+        return 0, None
+
+
+def text_get(url: str, timeout: float = 20.0) -> tuple[int, str]:
+    """GET one text page (PubMed efetch, or a guideline page), through the redirect-refusing opener."""
+    try:
+        with _open(url, "text/html, application/xml", timeout) as resp:
             return resp.status, resp.read(2_000_000).decode("utf-8", "replace")
     except urllib.error.HTTPError as e:
         return e.code, ""
@@ -211,7 +256,7 @@ def _stderr(message: str) -> None:
 def run(
     argv: list[str],
     *,
-    http: ler.HttpGet = ler.urllib_get,
+    http: ler.HttpGet = json_get,
     text: TextGet = text_get,
     now: Optional[Callable[[], str]] = None,
     warn: Optional[Callable[[str], None]] = None,

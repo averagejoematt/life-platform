@@ -5014,7 +5014,7 @@ STRUCTURAL_HAND_PROOFS["structural::test_recommendation_record_6158.py"] = {
 # public or coach reader.
 STRUCTURAL_HAND_PROOFS["structural::test_research_findings_6208.py"] = {
     "gate_name": "test_research_findings_6208.py",
-    "command": "python3 -m pytest tests/test_research_findings_6208.py -q -p no:randomly -p no:warnings   # baseline 88 passed",
+    "command": "python3 -m pytest tests/test_research_findings_6208.py -q -p no:randomly -p no:warnings   # baseline 134 passed",
     "mutation": (
         "Seven plants, ONE AT A TIME, each restored from a copy: M1 research.findings.check_rules' strong-needs-full_text "
         "condition made False; M2 refuse_live_duplicate's match made False; M3 the tier-5 approved_for_experiment refusal "
@@ -5023,7 +5023,10 @@ STRUCTURAL_HAND_PROOFS["structural::test_research_findings_6208.py"] = {
         "appended to lambdas/web/site_api_status.py. Audit addition: M8 the verification stamp recomputation dropped; M9 "
         "the verifier's subject-overlap tripwire made False (after the coordinator's correction the overlap check is ADVISORY: M9 "
         "is now its low-overlap warning made False); M10 publishable()'s retrospective branch made False; M11 "
-        "claim_supported_by's requirement made False."
+        "claim_supported_by's requirement made False. Review follow-up: M12 the lifecycle TRANSITIONS check made False; M13 "
+        "the correction tighten-only check removed; M14 fold applying stored rows without replaying them; M15 the verifier's "
+        "redirect refusal made False; M16 the observation_planned guard made False; M17 the tier-5 link_experiment refusal "
+        "made False; M18 the risk tripwire's refusal made False."
     ),
     "observed": (
         "2026-11-22, #6208 lane. BASELINE 73 passed. M1 2 failed (strong refused on abstracts; the correction path); M2 1 "
@@ -5032,7 +5035,10 @@ STRUCTURAL_HAND_PROOFS["structural::test_research_findings_6208.py"] = {
         "the public/coach import closure). REVERTED 73 passed. Re-run after the audit addition: BASELINE 88 passed; M1-M7 "
         "as before; M8 2 failed (edited title refused; verifier stamp); M9 1 failed (unrelated paper refused; re-run on the advisory version, the warning disabled: 1 failed, 88 passed, "
         "the advisory test; BASELINE 89 passed); M10 2 failed "
-        "(publishable pure + via his decision); M11 2 failed (support asserted by a reader). REVERTED 88 passed."
+        "(publishable pure + via his decision); M11 2 failed (support asserted by a reader). REVERTED 88 passed. Review follow-up (2026-11-22): BASELINE 134 passed; M12 6 "
+        "failed (the probe's transition bypasses); M13 2 failed (tighten-only, the tier-5 -> tier-1 walk); M14 1 failed (forged "
+        "rows skipped); M15 1 failed (redirect off the list); M16 5 failed (observation guards); M17 1 failed (tier 5 never "
+        "reaches an experiment); M18 18 failed (the wider tripwire). REVERTED 134 passed."
     ),
     "scope": (
         "Every tracked .py outside tests/ for finding constructors and runtime modules naming the store; the static import "

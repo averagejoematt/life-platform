@@ -854,7 +854,15 @@ The rules it enforces (each refused with the reason): an unverified or off-list 
 only; a second finding while one with the same `dedupe_key` is live (the refusal names it and its coach); a risk tier below
 what the finding touches, or tier >= 3 touching an intake target, electrolytes, supplements or medication without
 `clinical_review_required`; a tier-5 finding moved to `approved_for_experiment` (that belongs to the treating clinician);
-rejected / declined / superseded without a reason. History is append-only: the head row is never rewritten, a correction is
+rejected / declined / superseded without a reason; a move outside `research.findings.TRANSITIONS` (closed states are
+terminal); a correction that lowers risk (raise the tier, add a touch or switch clinical review on — never the reverse:
+a lower-risk reading is a new finding). An approved observational measurement goes `observation_planned` (only for an
+observation-only, tier <= 2 finding, after his `decide` with `authorizes=observation`) -> `observation_recorded` ->
+evaluated only after his `decide` with `authorizes=verdict`; nothing computes a verdict. A `decide` says whose words
+it stores (`words_are`) and where they came from (`provenance`).
+
+**IAM note:** the MCP role already has table-wide Get/Query/Put/Update with no leading-key condition, so this tool's
+restriction to its partition is enforced in code (conditional puts, no update or delete), not by IAM. History is append-only: the head row is never rewritten, a correction is
 an event. Adding a guideline host is a reviewed PR to `config/evidence_source_allowlist.json` AND to
 `research.findings.GUIDELINE_HOSTS` (the test holds them equal).
 

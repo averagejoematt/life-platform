@@ -44,20 +44,29 @@ REPLAYABLE_KINDS = (rf.EVENT_DECISION, rf.EVENT_PERSONAL_RESULT)
 # Two LITERALS (scripts/generate_mcp_tool_catalog.py reads them by ast.literal_eval and resolves them by name from
 # mcp/registry.py); the enums are held EQUAL to the registries in research.findings by tests/test_research_findings_6208.py.
 MANAGE_FINDING_DESCRIPTION = (
-    "OWNER-ONLY. The research findings store (#6208): a finding's question, its VERIFIED sources, the evidence and its "
-    "limits, and an append-only history. action='record': question, dedupe_key (lowercase slug), sources (1-12 objects "
-    "printed by scripts/research_finding_verify.py, paste them UNEDITED — a stamp refuses an edited title; each carries "
-    "claim_supported_by abstract_read|full_text_read and supports_note), evidence_summary, evidence_strength strong|moderate|weak|"
-    "insufficient ('strong' needs a full_text source), applicability {text, population_match direct|partial|poor}, "
-    "limitations, risk_tier 1-5 (1 observational, 2 reversible behavioural, 3 training/nutrition, 4 supplement/electrolyte, "
-    "5 medication), touches, clinical_review_required, responsible_coach (persona id), review_by, origin prospective|"
-    "retrospective|simulated, surfaced_by, date. A live finding with the same dedupe_key is refused and named. "
-    "action='add_source' (finding_id, source). action='set_state' (finding_id, state, reason; superseded_by). "
+    "OWNER-ONLY. The research findings store (#6208): a finding's question, its identity-verified sources (the identifier "
+    "resolves to this record; this does not show the source supports the finding), the evidence and its limits, and an "
+    "append-only history. action='record': question, dedupe_key (lowercase slug), sources (1-12 objects printed by "
+    "scripts/research_finding_verify.py, pasted UNEDITED — a stamp refuses an edited title; each carries claim_supported_by "
+    "abstract_read|full_text_read and supports_note, the reader's own assertion of support), evidence_summary, "
+    "evidence_strength strong|moderate|weak|insufficient ('strong' needs a full_text source), applicability {text, "
+    "population_match direct|partial|poor}, limitations, risk_tier 1-5 (1 observational, 2 reversible behavioural, 3 "
+    "training/nutrition, 4 supplement/electrolyte, 5 medication), touches, clinical_review_required, risk_rationale (why "
+    "this tier, 20-400 chars), responsible_coach (persona id), review_by, origin prospective|retrospective|simulated, "
+    "surfaced_by, date. A word tripwire (drugs, supplements, electrolytes, intake terms) refuses undeclared touches; it has "
+    "known gaps and is not a classifier — the declared touches and rationale are the record, and a correction can only "
+    "tighten risk. A live finding with the same dedupe_key is refused and named. action='add_source' (finding_id, source). "
+    "action='set_state' (finding_id, state, reason; superseded_by; observed_on + observation_note for "
+    "observation_recorded): transitions follow a fixed lifecycle, closed states are terminal, a tier-5 finding never "
+    "reaches an experiment, an observation (observation_planned) is only for an observation-only tier<=2 finding after his "
+    "decide authorizes='observation', and an observation is evaluated only after his decide authorizes='verdict'. "
     "action='link' (finding_id, link_kind recommendation + rec_id | experiment + experiment_id | personal_result + "
     "experiment_id: the verdict is COPIED from that experiment's analysis; simulated=true + verdict for a rehearsal). "
-    "action='decide' (finding_id, words — his words verbatim; optional publication_eligible). action='correct' (finding_id, field, value, reason). "
-    "action='list' (status live|stale|closed|all, state, finding_id, responsible_coach, include_simulated). "
-    "Never set a state or a decision he did not state. Never quoted on the site, in an email or in a coach prompt."
+    "action='decide' (finding_id, words, words_are owner_verbatim|owner_adopted_text|session_summary, provenance, "
+    "optional authorizes observation|verdict, optional publication_eligible). action='correct' (finding_id, field, value, "
+    "reason). action='list' (status live|stale|closed|all, state, finding_id, responsible_coach, include_simulated). "
+    "Never set a state or a decision he did not state, and never store generated wording as owner_verbatim. Never quoted "
+    "on the site, in an email or in a coach prompt."
 )
 
 MANAGE_FINDING_INPUT = {
@@ -125,6 +134,8 @@ MANAGE_FINDING_INPUT = {
                 "evaluated_supported",
                 "evaluated_not_supported",
                 "evaluated_inconclusive",
+                "observation_planned",
+                "observation_recorded",
             ],
             "description": "set_state: the new state. list: optional exact-state filter.",
         },
@@ -163,6 +174,7 @@ MANAGE_FINDING_INPUT = {
                 "clinical_review_required",
                 "responsible_coach",
                 "review_by",
+                "risk_rationale",
             ],
             "description": "correct: the head field restated.",
         },
@@ -176,6 +188,20 @@ MANAGE_FINDING_INPUT = {
             "type": "boolean",
             "description": "decide: his explicit ruling whether this finding may ever be published (nothing publishes yet).",
         },
+        "risk_rationale": {"type": "string", "description": "record: why this risk tier, in the recorder's words (20-400 chars)."},
+        "words_are": {
+            "type": "string",
+            "enum": ["owner_verbatim", "owner_adopted_text", "session_summary"],
+            "description": "decide: whose words these are (generated wording is never owner_verbatim).",
+        },
+        "provenance": {"type": "string", "description": "decide: where the decision was made (e.g. 'owner ruling document, <date>')."},
+        "authorizes": {
+            "type": "string",
+            "enum": ["observation", "verdict"],
+            "description": "decide: the lifecycle step this decision authorizes (an observation, or the verdict on one).",
+        },
+        "observed_on": {"type": "string", "description": "set_state observation_recorded: the day observed, YYYY-MM-DD."},
+        "observation_note": {"type": "string", "description": "set_state observation_recorded: what was observed (20-1000 chars)."},
         "include_simulated": {"type": "boolean", "description": "list: include simulated findings and results (default false)."},
     },
     "required": ["action"],
@@ -218,6 +244,8 @@ def _record(args: dict[str, Any]) -> dict[str, Any]:
         applicability=args.get("applicability"),
         limitations=args.get("limitations"),
         risk_tier=args.get("risk_tier"),
+        risk_rationale=args.get("risk_rationale"),
+        source_today=rf.utc_today(),
         touches=args.get("touches"),
         clinical_review_required=args.get("clinical_review_required"),
         responsible_coach=args.get("responsible_coach"),
@@ -259,11 +287,19 @@ def _event_fields(args: dict[str, Any], action: str) -> tuple[str, dict[str, Any
         return rf.EVENT_STATE_CHANGE, {
             "state": args.get("state"),
             "reason": args.get("reason"),
+            "observed_on": args.get("observed_on"),
+            "observation_note": args.get("observation_note"),
             "superseded_by": args.get("superseded_by"),
             "words": words,
         }
     if action == "decide":
-        return rf.EVENT_DECISION, {"words": words, "publication_eligible": args.get("publication_eligible")}
+        return rf.EVENT_DECISION, {
+            "words": words,
+            "words_are": args.get("words_are"),
+            "provenance": args.get("provenance"),
+            "authorizes": args.get("authorizes"),
+            "publication_eligible": args.get("publication_eligible"),
+        }
     if action == "correct":
         return rf.EVENT_CORRECTION, {"field": args.get("field"), "value": args.get("value"), "reason": args.get("reason"), "words": words}
     link_kind = args.get("link_kind")
@@ -307,17 +343,15 @@ def _event(args: dict[str, Any], action: str) -> dict[str, Any]:
     if isinstance(resolved, dict):
         return resolved
     kind, fields = resolved
-    same_kind = [
-        r
-        for r in rf.read_rows(_table_ref, _user_id_ref, finding_id)
-        if r.get("record_type") == "research_finding_event" and r.get("kind") == kind
-    ]
+    events = [r for r in rf.read_rows(_table_ref, _user_id_ref, finding_id) if r.get("record_type") == "research_finding_event"]
+    same_kind = [r for r in events if r.get("kind") == kind]
     row = rf.build_finding_event(
         user_id=_user_id_ref,
         view=view,
         kind=kind,
-        recorded_at=rf.now_instant(),
+        recorded_at=rf.next_instant([str(r.get("recorded_at") or "") for r in events]),
         today=pacific_today(),
+        source_today=rf.utc_today(),
         revision=len(same_kind) + 1,
         **fields,
     )

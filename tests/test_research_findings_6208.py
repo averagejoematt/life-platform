@@ -20,9 +20,12 @@ from __future__ import annotations
 import ast
 import json
 import os
+import re
 import subprocess
 import sys
+import urllib.error
 import urllib.parse
+import urllib.request
 from pathlib import Path
 
 import pytest
@@ -48,6 +51,7 @@ PK = rf.pk("matthew")
 TODAY = "2026-11-22"
 EXP_PK = "USER#matthew#SOURCE#experiments"
 REC_ID = "rec_20261120_sleep_coach_0a1b2c3d"
+DECIDE = {"words_are": "owner_verbatim", "provenance": "owner ruling document, 2026-11-22"}
 
 
 def _src(**kw):
@@ -158,6 +162,7 @@ def _args(**kw):
         "risk_tier": 2,
         "touches": ["sleep"],
         "clinical_review_required": False,
+        "risk_rationale": "Synthetic: a reversible change to a routine, nothing ingested or prescribed.",
         "responsible_coach": "sleep_coach",
         "review_by": "2027-02-20",
         "origin": "prospective",
@@ -315,18 +320,59 @@ def test_a_tier_3_training_change_needs_no_clinical_review_but_an_intake_target_
     assert _call(risk_tier=3, touches=["intake_target"], clinical_review_required=True, dedupe_key="intake-a")["status"] == "recorded"
 
 
-def test_a_tier_5_finding_can_never_be_approved_for_experiment(table):
+def test_a_tier_5_finding_never_reaches_an_experiment(table):
     fid = _record(table, risk_tier=5, touches=["medication"], clinical_review_required=True)
-    res = _do("set_state", fid, state="approved_for_experiment")
-    _refused(res, "treating clinician")
     assert _do("set_state", fid, state="discussed")["status"] == "recorded"
     _refused(_do("set_state", fid, state="approved_for_experiment"), "treating clinician")
+    _refused(_do("link", fid, link_kind="experiment", experiment_id="morning-walk_2026-10-01"), "treating clinician")
+    view = {**trf.tool_manage_research_finding({"action": "list"})["findings"][0], "state": rf.APPROVED_FOR_EXPERIMENT}
+    with pytest.raises(rf.FindingError, match="treating clinician"):  # even a view already past approval
+        rf.build_finding_event(
+            user_id="u",
+            view={**view, "experiments": ["x_2026-01-01"]},
+            kind="state_change",
+            recorded_at=NOW(),
+            today=TODAY,
+            state="experiment_in_progress",
+        )
+    with pytest.raises(rf.FindingError, match="treating clinician"):  # a tier read back as a string is still tier 5
+        rf.build_finding_event(
+            user_id="u",
+            view={**view, "state": "discussed", "risk_tier": "5"},
+            kind="state_change",
+            recorded_at=NOW(),
+            today=TODAY,
+            state="approved_for_experiment",
+        )
 
 
-def test_a_correction_cannot_slip_a_tier_under_its_rule(table):
+def test_a_correction_can_only_tighten_risk(table):
     fid = _record(table, risk_tier=4, touches=["supplements"], clinical_review_required=True)
-    _refused(_do("correct", fid, field="clinical_review_required", value=False, reason="x"), "clinical_review_required must be true")
-    _refused(_do("correct", fid, field="risk_tier", value=2, reason="x"), "below what it touches")
+    _refused(_do("correct", fid, field="clinical_review_required", value=False, reason="x"), "lower-risk reading needs a new finding")
+    _refused(_do("correct", fid, field="risk_tier", value=2, reason="x"), "lower-risk reading needs a new finding")
+    _refused(_do("correct", fid, field="touches", value=["observation"], reason="x"), "lower-risk reading needs a new finding")
+    assert (
+        _do("correct", fid, field="touches", value=["supplements", "medication"], reason="it is prescribed").get("status") != "recorded"
+    )  # tier 4 < 5
+    assert _do("correct", fid, field="risk_tier", value=5, reason="prescribed")["status"] == "recorded"
+    assert _do("correct", fid, field="touches", value=["supplements", "medication"], reason="it is prescribed")["status"] == "recorded"
+    low = _record(table, dedupe_key="low-one")
+    assert _do("correct", low, field="clinical_review_required", value=True, reason="ask first")["status"] == "recorded"
+
+
+def test_the_probe_s_tier_5_to_tier_1_walk_is_refused_at_every_step(table):
+    fid = _record(
+        table,
+        risk_tier=5,
+        touches=["medication"],
+        clinical_review_required=True,
+        question="Would a beta blocker change resting heart rate trends?",
+    )
+    _refused(_do("correct", fid, field="touches", value=["observation"], reason="x"), "lower-risk reading needs a new finding")
+    _refused(_do("correct", fid, field="risk_tier", value=1, reason="x"), "lower-risk reading needs a new finding")
+    _refused(_do("correct", fid, field="clinical_review_required", value=False, reason="x"), "lower-risk reading needs a new finding")
+    view = trf.tool_manage_research_finding({"action": "list"})["findings"][0]
+    assert (view["risk_tier"], view["touches"], view["clinical_review_required"]) == (5, ["medication"], True)
 
 
 # ── rule 4: states, reasons, superseded ─────────────────────────────────────────────────────
@@ -350,13 +396,48 @@ def test_superseded_needs_superseded_by_and_keeps_the_original_sources(table):
     assert view["sources"] == [rf.validate_source(_src(), today=TODAY)] and not view["live"]
 
 
-def test_every_state_is_reachable_and_a_repeat_is_refused(table):
+def test_the_lifecycle_table_is_complete_and_closed_states_are_terminal():
+    assert set(rf.TRANSITIONS) == set(rf.STATES)
+    assert all(set(nxt) <= set(rf.STATES) for nxt in rf.TRANSITIONS.values())
+    assert all(rf.TRANSITIONS[s] == () for s in rf.CLOSED_STATES)
+    assert {s for s, nxt in rf.TRANSITIONS.items() if set(nxt) & rf.EVALUATED_STATES} == {
+        rf.EXPERIMENT_IN_PROGRESS,
+        rf.OBSERVATION_RECORDED,
+    }
+    assert {s for s, nxt in rf.TRANSITIONS.items() if rf.EXPERIMENT_IN_PROGRESS in nxt} == {rf.APPROVED_FOR_EXPERIMENT}
+    assert {s for s, nxt in rf.TRANSITIONS.items() if rf.OBSERVATION_RECORDED in nxt} == {rf.OBSERVATION_PLANNED}
+    reach, todo = {rf.NEWLY_DISCOVERED}, [rf.NEWLY_DISCOVERED]
+    while todo:
+        for nxt in rf.TRANSITIONS[todo.pop()]:
+            if nxt not in reach:
+                reach.add(nxt)
+                todo.append(nxt)
+    assert reach == set(rf.STATES)
+
+
+@pytest.mark.parametrize(
+    "frm, to, needle",
+    [
+        ("rejected", "approved_for_experiment", "terminal"),
+        ("evaluated_supported", "newly_discovered", "terminal"),
+        ("newly_discovered", "evaluated_supported", "next states are"),
+        ("newly_discovered", "approved_for_experiment", "next states are"),
+        ("under_review", "experiment_in_progress", "next states are"),
+        ("approved_for_experiment", "experiment_in_progress", "needs a linked experiment"),
+        ("experiment_in_progress", "evaluated_supported", "real personal result"),
+        ("observation_recorded", "evaluated_inconclusive", "authorizes='verdict'"),
+    ],
+)
+def test_the_probe_s_transition_bypasses_are_refused(frm, to, needle):
+    view = {**rf.fold([rf.build_finding_head(**_head_kwargs())])[0], "state": frm}
+    with pytest.raises(rf.FindingError, match=re.escape(needle)):
+        rf.build_finding_event(user_id="u", view=view, kind="state_change", recorded_at=NOW(), today=TODAY, state=to, reason="r")
+
+
+def test_a_repeat_state_is_refused(table):
     fid = _record(table)
-    for state in rf.STATES:
-        if state in (rf.NEWLY_DISCOVERED, rf.SUPERSEDED):
-            continue
-        assert _do("set_state", fid, state=state, reason="synthetic")["status"] == "recorded", state
-    _refused(_do("set_state", fid, state=rf.STATES[-1], reason="again"), "already")
+    _do("set_state", fid, state="under_review")
+    _refused(_do("set_state", fid, state="under_review"), "already")
 
 
 # ── rule 5: the event kinds ─────────────────────────────────────────────────────────────────
@@ -409,13 +490,19 @@ def test_the_pure_builder_refuses_a_personal_result_that_restates_strength():
         )  # fmt: skip
 
 
-def test_a_decision_is_his_words_verbatim(table):
+def test_a_decision_is_his_words_with_whose_words_and_provenance(table):
     fid = _record(table)
-    _refused(_do("decide", fid, words="   "), "verbatim")
+    _refused(_do("decide", fid, words="   ", **DECIDE), "verbatim")
+    _refused(_do("decide", fid, words="Not now."), "words_are")
+    _refused(_do("decide", fid, words="Not now.", words_are="owner_verbatim"), "provenance")
+    _refused(_do("decide", fid, words="Not now.", words_are="the model", provenance="session"), "words_are")
     words = "Not now.\n  I'll  revisit after the holidays."
-    res = _do("decide", fid, words=words)
-    assert res["finding"]["decisions"][0]["words"] == words
-    assert _do("decide", fid, words=words)["status"] == "duplicate"
+    res = _do("decide", fid, words=words, **DECIDE)
+    d = res["finding"]["decisions"][0]
+    assert d["words"] == words and d["words_are"] == "owner_verbatim" and d["provenance"] == DECIDE["provenance"]
+    assert _do("decide", fid, words=words, **DECIDE)["status"] == "duplicate"
+    summary = _do("decide", fid, words="He wants to wait until January.", words_are="session_summary", provenance="chat, 2026-11-22")
+    assert summary["finding"]["decisions"][-1]["words_are"] == "session_summary"
 
 
 def test_a_correction_needs_a_reason_and_a_correctable_field(table):
@@ -435,7 +522,7 @@ def test_history_rows_are_never_rewritten(table):
     _do("add_source", fid, source=FULL)
     _do("correct", fid, field="limitations", value="Short trials only.", reason="tightened")
     _do("set_state", fid, state="under_review")
-    _do("decide", fid, words="Read it properly first.")
+    _do("decide", fid, words="Read it properly first.", **DECIDE)
     rows = [r for (p, s), r in table.store.items() if p == PK]
     assert table.store[(PK, rf.head_sk(fid))] == head_before, "the head was rewritten"
     assert len({p["sk"] for p in table.puts}) == len(table.puts) == len(rows), "a key was written twice"
@@ -453,9 +540,11 @@ def test_the_tool_never_updates_or_deletes():
 
 
 def test_only_owner_events_count():
-    head = rf.build_finding_head(**{**_head_kwargs(), "recorded_at": "2026-11-21T00:00:00.000Z"})
+    head = rf.build_finding_head(**_head_kwargs())
     stray = {
-        **rf.build_finding_event(user_id="matthew", view=rf.fold([head])[0], kind="decision", recorded_at="t1", today=TODAY, words="x")
+        **rf.build_finding_event(
+            user_id="matthew", view=rf.fold([head])[0], kind="decision", recorded_at=NOW(), today=TODAY, words="x", **DECIDE
+        )
     }
     stray["recorded_by"] = "machine"
     assert rf.fold([head, stray])[0]["decisions"] == []
@@ -467,6 +556,7 @@ def _head_kwargs():
         "user_id": "matthew",
         "day": a.pop("date"),
         "today": TODAY,
+        "recorded_at": "2026-11-21T00:00:00.000Z",
         **{k: v for k, v in a.items() if k != "action"},
     }
 
@@ -580,6 +670,7 @@ def _tracked(*patterns: str) -> list[str]:
 
 
 WRITER_MODULE = "mcp/tools_research_findings.py"
+REGISTRY_MODULE = "lambdas/research/findings.py"  # builds rows only inside fold's _replay, to re-validate; never writes
 #: Every runtime module allowed to NAME the store. A new reader is a decision made here, on its PR.
 ALLOWED_TO_NAME = frozenset(
     {
@@ -614,7 +705,16 @@ def test_only_the_owner_tool_constructs_a_row_and_only_registered_modules_name_t
             f = call.func
             if (f.attr if isinstance(f, ast.Attribute) else getattr(f, "id", None)) in ("build_finding_head", "build_finding_event"):
                 constructing.add(rel)
-    assert constructing == {WRITER_MODULE}, f"finding constructors outside the owner tool: {sorted(constructing)}"
+    assert constructing == {WRITER_MODULE, REGISTRY_MODULE}, f"finding constructors outside the owner tool: {sorted(constructing)}"
+    tree = ast.parse((ROOT / REGISTRY_MODULE).read_text(encoding="utf-8"))
+    in_registry = {
+        f.name
+        for f in tree.body
+        if isinstance(f, ast.FunctionDef)
+        for n in ast.walk(f)
+        if isinstance(n, ast.Call) and getattr(n.func, "id", None) in ("build_finding_head", "build_finding_event")
+    }
+    assert in_registry == {"_replay"}, f"the registry builds rows outside fold's replay (which writes nothing): {in_registry}"
     assert (
         naming <= ALLOWED_TO_NAME
     ), f"modules naming the research findings store outside the allowlist: {sorted(naming - ALLOWED_TO_NAME)}"
@@ -760,10 +860,10 @@ def test_a_retrospective_finding_becomes_publishable_only_by_his_decision(table)
     fid = _record(table, origin="retrospective", date="2026-06-01", review_by="2027-01-01")
     view = trf.tool_manage_research_finding({"action": "list"})["findings"][0]
     assert rf.publishable(view)[0] is False
-    _refused(_do("decide", fid, words="Fine to share.", publication_eligible="yes"), "true or false")
-    res = _do("decide", fid, words="Fine to share one day.", publication_eligible=True)
+    _refused(_do("decide", fid, words="Fine to share.", publication_eligible="yes", **DECIDE), "true or false")
+    res = _do("decide", fid, words="Fine to share one day.", publication_eligible=True, **DECIDE)
     assert res["finding"]["publication_eligible"] is True and rf.publishable(res["finding"]) == (True, [])
-    res = _do("decide", fid, words="Changed my mind.", publication_eligible=False)
+    res = _do("decide", fid, words="Changed my mind.", publication_eligible=False, **DECIDE)
     assert rf.publishable(res["finding"])[0] is False
 
 
@@ -939,3 +1039,247 @@ def test_verifier_imports_the_existing_resolvers_rather_than_copying_them():
         assert fn not in src
     assert "does NOT prove the Lambda verified anything" in src and "not a check that the paper SUPPORTS" in src
     assert "known high false-alarm rate on titles alone" in src
+
+
+# ── follow-up review: observations, clean paths, risk rationale, the wider tripwire, fold replay, redirects, clock ──
+
+
+def test_clean_observation_path_record_review_discuss_plan_record_and_his_verdict(table):
+    fid = _record(table, risk_tier=1, touches=["observation"])
+    for state in ("under_review", "discussed"):
+        assert _do("set_state", fid, state=state)["status"] == "recorded", state
+    _refused(_do("set_state", fid, state="observation_planned"), "authorizes='observation'")
+    _do("decide", fid, words="Yes, watch it for two weeks.", authorizes="observation", **DECIDE)
+    assert _do("set_state", fid, state="observation_planned")["finding"]["state"] == "observation_planned"
+    _refused(_do("link", fid, link_kind="experiment", experiment_id="morning-walk_2026-10-01"), "takes no experiment link")
+    _refused(_do("set_state", fid, state="observation_recorded", observed_on="2026-11-22", observation_note="short"), "observation_note")
+    _refused(_do("set_state", fid, state="observation_recorded", observed_on="2026-11-30", observation_note="x" * 30), "observed_on")
+    res = _do(
+        "set_state",
+        fid,
+        state="observation_recorded",
+        observed_on="2026-11-22",
+        observation_note="Synthetic: seven nights logged, no change seen.",
+    )
+    assert res["finding"]["observations"][0]["observed_on"] == "2026-11-22" and res["finding"]["state"] == "observation_recorded"
+    _refused(_do("set_state", fid, state="evaluated_inconclusive"), "authorizes='verdict'")
+    _do("decide", fid, words="Call it inconclusive.", authorizes="verdict", **DECIDE)
+    assert _do("set_state", fid, state="evaluated_inconclusive")["finding"]["state"] == "evaluated_inconclusive"
+
+
+def test_an_old_authorization_does_not_carry_into_a_later_state(table):
+    fid = _record(table, risk_tier=1, touches=["observation"])
+    _do("decide", fid, words="Watch it.", authorizes="verdict", **DECIDE)  # a verdict decided before anything was observed
+    _do("decide", fid, words="Watch it.", authorizes="observation", **DECIDE)
+    _do("set_state", fid, state="observation_planned")
+    _do("set_state", fid, state="observation_recorded", observed_on="2026-11-22", observation_note="Synthetic: seven nights logged.")
+    _refused(_do("set_state", fid, state="evaluated_supported"), "authorizes='verdict'")
+
+
+@pytest.mark.parametrize(
+    "kw",
+    [
+        {"risk_tier": 3, "touches": ["training"]},
+        {"risk_tier": 2, "touches": ["observation", "behaviour"]},
+        {"risk_tier": 3, "touches": ["observation"]},
+    ],
+)
+def test_an_observation_is_only_for_an_observation_only_low_tier_finding(table, kw):
+    fid = _record(table, **kw)
+    _do("decide", fid, words="Watch it.", authorizes="observation", **DECIDE)
+    _refused(_do("set_state", fid, state="observation_planned"), "exactly ['observation']")
+
+
+def test_an_observation_finding_with_an_experiment_link_cannot_be_planned(table):
+    fid = _record(table, risk_tier=1, touches=["observation"])
+    _do("link", fid, link_kind="experiment", experiment_id="morning-walk_2026-10-01")
+    _do("decide", fid, words="Watch it.", authorizes="observation", **DECIDE)
+    _refused(_do("set_state", fid, state="observation_planned"), "no experiment link")
+
+
+def test_clean_experiment_path_and_its_evaluation_needs_a_real_result(table):
+    fid = _record(table, risk_tier=3, touches=["training"])
+    _do("set_state", fid, state="under_review")
+    assert _do("set_state", fid, state="approved_for_experiment")["status"] == "recorded"
+    _refused(_do("set_state", fid, state="experiment_in_progress"), "needs a linked experiment")
+    _do("link", fid, link_kind="experiment", experiment_id="morning-walk_2026-10-01")
+    assert _do("set_state", fid, state="experiment_in_progress")["status"] == "recorded"
+    _do("link", fid, link_kind="personal_result", simulated=True, verdict="supported")
+    _refused(_do("set_state", fid, state="evaluated_supported"), "real personal result")
+    _do("link", fid, link_kind="personal_result", experiment_id="morning-walk_2026-10-01")
+    assert _do("set_state", fid, state="evaluated_inconclusive")["finding"]["state"] == "evaluated_inconclusive"
+    _refused(_do("set_state", fid, state="under_review"), "terminal")
+
+
+def test_a_simulated_finding_may_be_evaluated_on_a_simulated_result(table):
+    fid = _record(table, risk_tier=3, touches=["training"], origin="simulated")
+    for st in ("under_review", "approved_for_experiment"):
+        _do("set_state", fid, state=st)
+    _do("link", fid, link_kind="experiment", experiment_id="morning-walk_2026-10-01")
+    _do("set_state", fid, state="experiment_in_progress")
+    _do("link", fid, link_kind="personal_result", simulated=True, verdict="supported")
+    assert _do("set_state", fid, state="evaluated_supported")["status"] == "recorded"
+
+
+def test_risk_rationale_is_required_and_shown(table):
+    _refused(_call(risk_rationale=None), "risk_rationale")
+    _refused(_call(risk_rationale="too short"), "risk_rationale")
+    fid = _record(table)
+    view = trf.tool_manage_research_finding({"action": "list"})["findings"][0]
+    assert view["finding_id"] == fid and view["risk_rationale"].startswith("Synthetic")
+
+
+@pytest.mark.parametrize(
+    "question, touch",
+    [
+        ("Would a beta blocker change my resting heart rate trends?", "medication"),
+        ("Does metoprolol blunt heart rate variability readings?", "medication"),
+        ("Does a statin change exercise recovery markers over time?", "medication"),
+        ("Is the dose of the drug affecting resting heart rate?", "medication"),
+        ("Do NSAIDs like ibuprofen blunt strength gains over time?", "medication"),
+        ("Do anticoagulants change bruising after heavy training?", "medication"),
+        ("Should the kcal target drop by 200 on rest days?", "intake_target"),
+        ("Does a larger calorie deficit slow weight loss over time?", "intake_target"),
+        ("Does a protein target of 1.6 g/kg preserve lean mass?", "intake_target"),
+        ("Does intermittent fasting improve fasting glucose?", "intake_target"),
+        ("Does caffeine after noon reduce deep sleep duration?", "intake_target"),
+        ("Does alcohol at dinner reduce overnight HRV readings?", "intake_target"),
+        ("Does vitamin D3 in winter improve mood scores?", "supplements"),
+        ("Does fish oil (omega-3) lower triglycerides over time?", "supplements"),
+        ("Does melatonin at night improve sleep onset time?", "supplements"),
+        ("Does ashwagandha reduce evening cortisol levels?", "supplements"),
+        ("Does salt loading before training raise HRV readings?", "electrolytes"),
+    ],
+)
+def test_the_wider_tripwire_refuses_an_undeclared_touch(table, question, touch):
+    _refused(_call(question=question), f"declare '{touch}'")
+
+
+def test_dose_response_is_not_a_medication_word(table):
+    assert (
+        _call(question="What is the dose-response of weekly sets on hypertrophy?", risk_tier=3, touches=["training"])["status"]
+        == "recorded"
+    )
+
+
+def test_the_tripwire_is_documented_as_a_tripwire_with_gaps():
+    assert "known gaps" in (rf.__doc__ or "").lower() and "not a classifier" in (rf.__doc__ or "")
+    assert "known gaps and is not a classifier" in trf.MANAGE_FINDING_DESCRIPTION
+
+
+def test_the_tool_says_identity_not_support():
+    desc = trf.MANAGE_FINDING_DESCRIPTION
+    assert "identity-verified sources (the identifier resolves to this record; this does not show the source supports the finding)" in desc
+    assert "VERIFIED sources" not in desc
+
+
+def _stored_rows(table):
+    return [r for (p, _s), r in table.store.items() if p == PK]
+
+
+def test_fold_replays_events_and_skips_a_forged_row(table):
+    fid = _record(table)
+    forged = {
+        "pk": PK,
+        "sk": rf.event_sk(fid, "2026-11-22T11:00:00.000Z", "correction"),
+        "record_type": "research_finding_event",
+        "finding_id": fid,
+        "kind": "correction",
+        "recorded_by": "owner",
+        "recorded_at": "2026-11-22T11:00:00.000Z",
+        "field": "risk_tier",
+        "value": 1,
+        "reason": "forged",
+    }
+    jump = {
+        **forged,
+        "sk": rf.event_sk(fid, "2026-11-22T11:00:01.000Z", "state_change"),
+        "kind": "state_change",
+        "to_state": "evaluated_supported",
+        "recorded_at": "2026-11-22T11:00:01.000Z",
+    }
+    junk = {
+        **forged,
+        "sk": rf.event_sk(fid, "2026-11-22T11:00:02.000Z", "nonsense"),
+        "kind": "nonsense",
+        "recorded_at": "2026-11-22T11:00:02.000Z",
+    }
+    view = rf.fold(_stored_rows(table) + [forged, jump, junk])[0]
+    assert view["risk_tier"] == 2 and view["state"] == "newly_discovered"
+    assert view["invalid_events"] == {"count": 3, "sks": sorted([forged["sk"], jump["sk"], junk["sk"]])}
+    assert view["history"] == []
+
+
+def test_fold_reads_dynamodb_decimals(table):
+    from decimal import Decimal
+
+    fid = _record(table, risk_tier=3, touches=["training"])
+    _do("correct", fid, field="clinical_review_required", value=True, reason="tightened")
+    assert _do("correct", fid, field="risk_tier", value=4, reason="tightened")["status"] == "recorded"
+    rows = [{k: (Decimal(v) if isinstance(v, int) and not isinstance(v, bool) else v) for k, v in r.items()} for r in _stored_rows(table)]
+    view = rf.fold(rows)[0]
+    assert view["risk_tier"] == 4 and view["invalid_events"]["count"] == 0
+
+
+def test_an_evening_pacific_verification_is_not_a_future_date(table, monkeypatch):
+    """17:00 PT on 2026-11-22 is 01:00Z on 2026-11-23: the verifier writes verified_on 2026-11-23 (UTC)."""
+    monkeypatch.setattr(rf, "utc_today", lambda: "2026-11-23")
+    evening = _src(verified_on="2026-11-23")
+    assert evening["verification"]["fetched_at"].startswith("2026-11-23")
+    fid = _record(table, sources=[evening])
+    assert _do("add_source", fid, source=_src(id="23456789", verified_on="2026-11-23"))["status"] == "recorded"
+    assert rf.fold(_stored_rows(table))[0]["invalid_events"]["count"] == 0
+    monkeypatch.setattr(rf, "utc_today", lambda: "2026-11-22")
+    _refused(_call(sources=[_src(verified_on="2026-11-24")], dedupe_key="later-one"), "future")
+
+
+def test_the_verifier_refuses_a_redirect_off_the_allow_list():
+    rfv = _verifier()
+    handler = rfv.RefuseOffListRedirect()
+    req = urllib.request.Request("https://www.nice.org.uk/guidance/ng000")
+    with pytest.raises(urllib.error.HTTPError, match="not allow-listed"):
+        handler.redirect_request(req, None, 302, "Found", {}, "https://evil.example.com/fake-guideline")
+    with pytest.raises(urllib.error.HTTPError, match="not allow-listed"):
+        handler.redirect_request(req, None, 302, "Found", {}, "http://www.nice.org.uk/guidance/ng000")
+    ok = handler.redirect_request(req, None, 301, "Moved", {}, "https://www.nice.org.uk/guidance/ng000/chapter/1")
+    assert ok is not None and urllib.parse.urlparse(ok.full_url).hostname == "www.nice.org.uk"
+    assert rfv.allowed_host("api.crossref.org") and not rfv.allowed_host("evil-nice.org.uk")
+
+
+def test_the_verifier_drops_a_response_whose_final_host_is_off_list(monkeypatch):
+    rfv = _verifier()
+
+    class _Resp:
+        status = 200
+
+        def geturl(self):
+            return "https://evil.example.com/landing"
+
+        def read(self, *a):
+            return b"<title>Evening light and sleep onset guideline</title>"
+
+        def close(self):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    class _Opener:
+        def open(self, req, timeout=None):
+            return _Resp()
+
+    monkeypatch.setattr(rfv.urllib.request, "build_opener", lambda *handlers: _Opener())
+    assert rfv.text_get("https://www.nice.org.uk/guidance/ng000") == (0, "")
+    assert rfv.json_get("https://api.crossref.org/works/10.1000/x") == (0, None)
+
+
+def test_two_acts_in_one_millisecond_replay_in_the_order_they_were_made(table, monkeypatch):
+    monkeypatch.setattr(rf, "now_instant", lambda: "2026-11-22T10:00:00.000Z")  # a frozen clock: every act in one millisecond
+    fid = _record(table)
+    assert _do("add_source", fid, source=FULL)["status"] == "recorded"
+    res = _do("correct", fid, field="evidence_strength", value="strong", reason="the full trial was read")
+    assert res["finding"]["evidence_strength"] == "strong" and res["finding"]["invalid_events"]["count"] == 0
+    assert rf.next_instant(["2026-11-22T10:00:00.999Z"], now="2026-11-22T10:00:00.000Z") == "2026-11-22T10:00:01.000Z"
