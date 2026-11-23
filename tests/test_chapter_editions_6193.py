@@ -457,7 +457,7 @@ def test_switch_on_the_route_serves_approved_editions_and_says_when_it_cannot_re
 
     # Failure modes of the two reads, as served: an unreadable editions read -> "editions": null + editions_error; an
     # unreadable private-call read -> every edition withheld ("editions": [], 200) and a logged error, never served.
-    rows = [_original(), _edition(2)]
+    rows = _with_restores([_original(), _edition(2)])
     assert [e["edition"] for e in chapters.editions_field(lambda: rows, tainted=NEVER)["editions"]] == [2]
 
     def calls_down(_table):

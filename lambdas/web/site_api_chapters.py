@@ -360,8 +360,10 @@ def editions_field(
             filter_hits=privacy_guard.find_violations,
             log=logger.warning,
         )
-        # #6193 B7: the owner's withdrawals (chapter, what, number, day — never a note), so a verifier can say "withdrawn"
-        return {"editions": view, "edition_withdrawals": chapter_editions.public_withdrawals(rows)}
+        # #6193 B7: the owner's withdrawals (chapter, what, number, day — never a note), so a verifier can say "withdrawn";
+        # the key is present only when there is one, so with none the response is exactly the one before it
+        gone = chapter_editions.public_withdrawals(rows)
+        return {"editions": view, **({"edition_withdrawals": gone} if gone else {})}
     except Exception as e:  # noqa: BLE001 — a failed read is said, never served as "no editions"
         logger.error(f"[chapters] editions read failed: {type(e).__name__}: {e}")
         return {"editions": None, "editions_error": "the editions could not be read for this response"}
