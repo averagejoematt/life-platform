@@ -1072,3 +1072,18 @@ GET_PLATFORM_STATE_DESCRIPTION = (
     "generator could not compute this run arrives as an error with null data rather than "
     "a stale value, so a gap is reported as a gap."
 )
+
+
+# #6209: create_experiment's criterion.metric — the slug list a design may name. A LITERAL (the catalog generator resolves
+# constants with ast.literal_eval), pinned to experiment_design.DESIGN_METRICS in order and to lift_outcomes.LIFT_METRICS'
+# caveats by tests/test_lift_outcomes_6209.py, so the tool cannot offer a slug validate_design refuses or hide one it accepts.
+DESIGN_METRIC_DESCRIPTION = (
+    "One of: sleep_score, sleep_efficiency_pct, deep_pct, rem_pct, sleep_duration_hours, sleep_onset_latency_min, "
+    "recovery_score, hrv_rmssd, resting_heart_rate, garmin_stress, body_battery_high, weight_lbs, calories, protein_g, "
+    "steps, cgm_mean_glucose, cgm_time_in_range_pct, lift_session_rpe, lift_e1rm_index, lift_effort_adjusted_e1rm_index. "
+    "The lift_* outcomes are per-session series derived from logged Hevy sets; a day with no session is absent. "
+    "lift_session_rpe: mean RPE of rated working sets (raw self-report; 3+ rated sets). "
+    "lift_e1rm_index: mean over exercises of the session-best Epley e1RM as % of the frozen baseline window's mean; it "
+    "confounds programmed load with performance. lift_effort_adjusted_e1rm_index: the same with reps in reserve "
+    "(10 - RPE) added, rated sets only; it depends on self-reported effort."
+)
