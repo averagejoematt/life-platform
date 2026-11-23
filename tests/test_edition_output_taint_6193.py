@@ -135,3 +135,21 @@ def test_the_site_wire_scrub_is_unchanged():
     src = open(os.path.join(_REPO, "lambdas", "web", "narrative_publication.py"), encoding="utf-8").read()
     assert "withheld_outputs" not in src
     assert NPub.COUNTED_SK_PREFIXES == ("PREDICTION#", "COMMITMENT#", "LEARNING#", "CALIB#", "OPEN#", "RESOLVED#")
+
+
+def test_an_unreadable_outputs_read_withholds_editions_and_never_fails_the_chapters_route(monkeypatch):
+    """LIVE is committed on: a throttled OUTPUT read must leave /api/chapters serving (200) with every edition withheld."""
+    from content import private_call_check
+    from test_chapter_editions_6193 import _edition, _original, _with_restores
+    from web import narrative_publication as NPub, site_api_chapters as chapters
+
+    monkeypatch.setattr(CE, "LIVE", True)
+    monkeypatch.setattr(NPub, "is_tainted", lambda _t: False)
+    monkeypatch.setattr(chapters.private_call_check, "load", lambda _table: private_call_check.CallSet())
+    chapters._CALLS_CACHE.update(at=None, calls=None)
+    rows = _with_restores([_original(), _edition(2)])
+    monkeypatch.setattr(chapters, "table", _Table(ROWS))
+    assert [e["edition"] for e in chapters.editions_field(lambda: rows)["editions"]] == [2]
+    WO.reset()
+    monkeypatch.setattr(chapters, "table", _Table(ROWS, fail=True))
+    assert chapters.editions_field(lambda: rows) == {"editions": []}  # withheld, the field still served, no error key
