@@ -401,6 +401,31 @@ class ComputeStack(Stack):
         )
         coach_vision_absent.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
+        # #6158 Morning Brief pilot (OWNER-REQUIRED, dark): `coach-recommendation-writer`, the ONE function that writes
+        # the canonical recommendation record for the brief. PutItem-only, LeadingKeys-scoped to the record partition
+        # (`rp.compute_recommendation_writer`); invoked synchronously by daily-brief and by nothing else — no schedule,
+        # no URL, no event source. No absence heartbeat: it is invoked only while `CANONICAL_INTAKE_LIVE` is True, so an
+        # absence alarm would breach every day the pilot is dark; while live, the daily SEND# row's `rec_offer` /
+        # `rec_answers` fields are the absence evidence the acceptance reads check.
+        create_platform_lambda(
+            self,
+            "CoachRecommendationWriter",
+            function_name="coach-recommendation-writer",
+            handler="coach.recommendation_writer_lambda.lambda_handler",
+            source_file="lambdas/coach/recommendation_writer_lambda.py",
+            timeout_seconds=30,
+            memory_mb=256,
+            custom_policies=rp.compute_recommendation_writer(),
+            # Its alarm story: the constructor's per-Lambda Errors alarm, on the existing digest topic (no new path).
+            # No DLQ: it is only ever invoked synchronously, so a failure returns to the brief, which logs it.
+            table=local_table,
+            bucket=local_bucket,
+            alerts_topic=local_alerts_topic,
+            digest_topic=local_digest_topic,
+            digest=True,
+            error_alarm=True,
+        )
+
         create_platform_lambda(
             self,
             "WeeklyCorrelationCompute",

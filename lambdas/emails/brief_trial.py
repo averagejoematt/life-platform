@@ -436,8 +436,17 @@ def _pilot_plan(table, user_prefix, trial: Trial, respond, site_url, recipient, 
     except Exception as e:  # noqa: BLE001 — the record's absence never costs the brief
         logger.warning("[brief_rec_pilot] record unavailable; the brief goes out, nothing will be recorded: %s", type(e).__name__)
         return {"state": "record_unavailable"}
+    shown = True
     if offer and trial.token_row:
         trial.token_row["canonical_rec_id"] = offer.canonical_rec_id  # the activation marker
+        if offer.settled and trial.view is not None:  # a repeat he already answered: show his answer, ask nothing new
+            shown = False
+            trial.view.respond_url = None
+            trial.view.respond_note = (
+                "You answered “" + offer.answer_label + "”" + (" on " + str(offer.answered_at)[:10] if offer.answered_at else "") + "."
+            )
+        elif not offer.new and offer.answer != "not_recorded" and trial.view is not None:
+            trial.view.respond_note = "Your last answer: “" + offer.answer_label + "”. A new answer replaces it."
     if fu and not (offer and fu["rec_id"] == offer.canonical_rec_id) and trial.view is not None:
         trial.follow_token = rr.new_token()
         trial.follow_token_row = {
@@ -451,11 +460,12 @@ def _pilot_plan(table, user_prefix, trial: Trial, respond, site_url, recipient, 
         }
         trial.view.follow_up = fu
         trial.view.follow_up_url = rr.response_url(site_url, trial.follow_token)
-    return {"state": "planned", "offer": offer, "skip": why, "follow_up_rec_id": fu["rec_id"] if fu else None}
+    return {"state": "planned", "offer": offer, "skip": why, "follow_up_rec_id": fu["rec_id"] if fu else None, "link_shown": shown}
 
 
 def _pilot_record(table, pk: str, trial: Trial, sent, logger) -> dict:
-    """#6158 pilot, AFTER the send: the SEND# row's pilot fields. The offer is written only with SES's MessageId."""
+    """#6158 pilot, AFTER the send: invoke the recommendation writer (the brief's role cannot write the record), then
+    the SEND# row's pilot fields. The offer is sent to the writer only with the mail service's MessageId."""
     from coach import brief_rec_intake as intake
 
     p = trial.pilot or {}
@@ -464,16 +474,29 @@ def _pilot_record(table, pk: str, trial: Trial, sent, logger) -> dict:
         return out
     msg = sent.get("MessageId") if isinstance(sent, dict) else None
     out["ses_message_id"] = msg
+    out["delivery_state"] = "accepted_by_mail_service" if msg else "not_accepted_by_mail_service"
     offer = p.get("offer")
+    tokens: dict = {}  # hash -> canonical id: the tokens THIS send minted, so the writer can bind a press to its send
     if offer is None:
         out.update(rec_offer="not_eligible", rec_offer_reason=p.get("skip"))
+    elif not msg:
+        out.update(canonical_rec_id=offer.canonical_rec_id, rec_offer="not_accepted_by_mail_service")
     else:
         out["canonical_rec_id"] = offer.canonical_rec_id
+        th = rr.token_hash(trial.token) if trial.token else ""
+        if th and p.get("link_shown"):
+            tokens[th] = offer.canonical_rec_id
+        payload = intake.offer_payload(
+            offer, send_day=trial.data_day, token_hash=th, ses_message_id=msg, accepted_at=datetime.now(timezone.utc).isoformat()
+        )
         try:
-            out["rec_offer"] = intake.write_offer(table, offer, ses_message_id=msg, offered_at=datetime.now(timezone.utc).isoformat())
+            res = intake.invoke_writer(payload)
+            out["rec_offer"] = res.get("state")
+            if res.get("reason"):
+                out["rec_offer_reason"] = res["reason"]
         except Exception as e:  # noqa: BLE001 — logged, never reconstructed later
             logger.warning("[brief_rec_pilot] offer not recorded rec=%s: %s", offer.canonical_rec_id, type(e).__name__)
-            out["rec_offer"] = "write_failed"
+            out["rec_offer"] = "writer_failed"
     if msg and p.get("follow_up_rec_id"):
         out["follow_up_rec_id"] = p["follow_up_rec_id"]  # asked once: this row is the proof it was asked
         if trial.follow_token and trial.follow_token_row:
@@ -482,13 +505,16 @@ def _pilot_record(table, pk: str, trial: Trial, sent, logger) -> dict:
                     Item=_ddb({"pk": pk, "sk": "TOKEN#" + rr.token_hash(trial.follow_token), **trial.follow_token_row}),
                     ConditionExpression="attribute_not_exists(sk)",
                 )
+                tokens[rr.token_hash(trial.follow_token)] = p["follow_up_rec_id"]
             except Exception as e:  # noqa: BLE001
                 logger.warning("[brief_rec_pilot] follow-up token write failed: %s", type(e).__name__)
+    if tokens:
+        out["pilot_tokens"] = tokens
     try:
-        out["rec_answers"] = intake.carry_responses(table, pk)
+        out["rec_answers"] = (intake.invoke_writer({"action": "carry"}) or {}).get("counts") or "writer_failed"
     except Exception as e:  # noqa: BLE001
         logger.warning("[brief_rec_pilot] answers not carried this run (they stay on their token rows): %s", type(e).__name__)
-        out["rec_answers"] = "read_failed"
+        out["rec_answers"] = "writer_failed"
     return out
 
 

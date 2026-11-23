@@ -319,15 +319,18 @@ def _tracked_py() -> list[str]:
 
 
 WRITER_MODULE = "mcp/tools_coach_recommendations.py"
-#: The Morning Brief pilot's intake (#6158, dark): the brief's OFFER and his button answers, and nothing else.
+#: The Morning Brief pilot (#6158, dark): the brief's planner reads; its dedicated writer makes the brief's OFFER, the
+#: EXPOSURE of a repeat and his button answers, and nothing else.
 BRIEF_INTAKE = "lambdas/coach/brief_rec_intake.py"
+BRIEF_WRITER = "lambdas/coach/recommendation_writer_lambda.py"
 REGISTRY = "lambdas/coach/recommendation_record.py"
 #: Every row constructor -> the ONE module allowed to call it (the registry composes its own, which is not a write).
 CONSTRUCTOR_CALLERS = {
     "build_head": {WRITER_MODULE},
     "build_event": {WRITER_MODULE},
-    "build_offered_head": {BRIEF_INTAKE},
-    "build_button_response": {BRIEF_INTAKE},
+    "build_offered_head": {BRIEF_WRITER},
+    "build_exposure_event": {BRIEF_WRITER},
+    "build_button_response": {BRIEF_WRITER},
 }
 #: Every module allowed to NAME the record (its source string or its module). A new reader is a decision made here.
 ALLOWED_TO_NAME = frozenset(
@@ -335,13 +338,15 @@ ALLOWED_TO_NAME = frozenset(
         "lambdas/coach/recommendation_record.py",  # the registry
         "lambdas/coach/coach_context_pilot.py",  # the pilot context (reads)
         WRITER_MODULE,  # the owner's writer
-        BRIEF_INTAKE,  # the brief pilot's writer (offers + his button answers only), dark
+        BRIEF_INTAKE,  # the brief pilot's planner (reads only), dark
+        BRIEF_WRITER,  # the brief pilot's ONE writer (offers, exposures, his button answers), dark
         "lambdas/coach/telegram_worker_lambda.py",  # imports the pilot seam (owner's private chat)
         "mcp/tools_coach_packet.py",  # imports the pilot seam (owner's MCP packet)
         "mcp/registry.py",  # registers the tool
         "lambdas/privacy/field_tiers.py",  # TIER_OWNER_ONLY
         "lambdas/experiment/phase_taxonomy.py",  # CROSS_PHASE
-        "cdk/stacks/email_stack.py",  # #6158 pilot: the daily-brief role's append-only Deny names the partition
+        "cdk/stacks/email_stack.py",  # #6158 pilot: the daily-brief role's no-write Deny names the partition
+        "cdk/stacks/role_policies_compute.py",  # #6158 pilot: the writer's PutItem-only LeadingKeys scope names it
     }
 )
 

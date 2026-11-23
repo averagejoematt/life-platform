@@ -1,60 +1,58 @@
-"""coach/brief_rec_intake.py — the Morning Brief as the recommendation record's first intake (#6158 pilot).
+"""coach/brief_rec_intake.py — the Morning Brief's side of the recommendation-record pilot (#6158). READS ONLY.
 
-Owner rulings 2026-11-22 ("Morning Brief recommendation pilot — APPROVED IN PRINCIPLE") and 2026-11-23 (#6226).
-DARK: nothing here runs unless `coach.brief_recommendations.CANONICAL_INTAKE_LIVE` is True; while it is False
-`emails.brief_trial` never imports this module.
+Owner rulings 2026-11-22 ("Morning Brief recommendation pilot — APPROVED IN PRINCIPLE", and his feedback on #6232) and
+2026-11-23 (#6226). DARK: nothing here runs unless `coach.brief_recommendations.CANONICAL_INTAKE_LIVE` is True; while
+it is False `emails.brief_trial` never imports this module.
 
-WHAT IT DOES, and the only things it does (the daily-brief function is the caller, owner-side):
+This module never writes the record. The daily-brief function's role holds an explicit Deny on every write to the
+record partition; every write goes through the dedicated writer, `coach-recommendation-writer`
+(`coach.recommendation_writer_lambda`), which this module invokes synchronously (`invoke_writer`).
 
-  1. PLAN (before the send, reads only). The brief's one linked recommendation is ELIGIBLE when it is a coaching
-     recommendation from the brief's AI guidance and the record's own admission rule admits its words (a
-     readiness colour is a fixed-weight score, not a coach's advice; housekeeping is never one). If a head the
-     brief wrote already carries this run's brief id (a REPEAT of an offered recommendation), the send is LINKED
-     to it; otherwise its id is `rec_id_for(lead, brief day, exact words)`. The link's token row is stamped with
-     that canonical id — the ACTIVATION MARKER: only a token minted while the pilot is live carries one, and only
-     a stamped token is ever carried into the record.
-  2. OFFER (after the send). Only when SES ACCEPTED the send (a MessageId came back): one conditional put of the
-     head (`build_offered_head`), recorded by the brief, never by the owner. A retry or a duplicate send of the same
-     day's words makes the same id and the put refuses it; a reworded REPEAT links to the existing head. No send,
-     no head. A failed write is logged and left: there is NO reconciliation path that writes a head later.
-  3. CARRY HIS ANSWERS (the next run). A spent token stamped with a canonical id whose head exists becomes ONE
-     response event (`build_button_response`): `recorded_by: owner` (the press is his), its instant his press,
-     its key fixed by the token so a replay refuses. Unspent / expired = nothing: silence is not an answer.
-  4. ONE DUE FOLLOW-UP. A follow-up date exists only when he agreed one (the owner tool's `follow_up` action). For
-     a head the brief wrote, the brief is the one channel that asks it (`rr.due_follow_ups(surface=brief)`; the
-     conversation's default surface excludes it), once: the SEND# row that asked it carries its id.
-
-Never: an outcome, a follow-up date, or any answer from sensor, training or nutrition data — this module reads the
-recommendation partition and the brief's own trial partition and nothing else (tests/test_brief_rec_pilot_6158.py).
+  1. PLAN (before the send). The brief's one linked recommendation is ELIGIBLE when it is a coaching recommendation
+     from the brief's AI guidance and the record's own admission rule admits its words (a readiness colour is a
+     fixed-weight score; housekeeping is never one). If the brief already offered it (a REPEAT of this run), the send
+     links to that head and will be recorded as an EXPOSURE — and if he has already given a settled answer, the
+     brief shows that answer instead of asking again. Otherwise its id is `rec_id_for(lead, brief day, exact words)`.
+     The link's token row carries that canonical id: the ACTIVATION MARKER.
+  2. ATTRIBUTION. The lead (`rr.LEAD_COACH_ID`) is ACCOUNTABLE for every brief recommendation; the ORIGIN is where the
+     words came from (`ORIGIN_BY_SOURCE`) — the brief's AI guidance call, a platform rule, a named coach — and an
+     unrecognised source is recorded as unknown, never as the lead.
+  3. ONE DUE FOLLOW-UP he agreed to, on a head the brief offered (`rr.due_follow_ups(surface=brief)`), asked once.
 """
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 from dataclasses import dataclass
-from datetime import timezone
 from typing import Any, Optional
 
 from boto3.dynamodb.conditions import Key
-from common.pacific_time import parse_iso_utc, shift_day_key
+from common.pacific_time import shift_day_key
 
-from coach import brief_recommendations as seam, recommendation_record as rr
+from coach import recommendation_record as rr
 
 logger = logging.getLogger("brief-rec-intake")
 
 USER_ID = "matthew"
-#: The brief's guidance is not written in a persona's voice; the owner named the lead as the pilot's coordinating
-#: coach (ruling 2026-11-22 §1), so the record attributes it to the lead and says how (`ATTRIBUTION`).
-COACH_ID = rr.LEAD_COACH_ID
-ATTRIBUTION = "Morning Brief guidance, attributed to the coordinating lead"
+COACH_ID = rr.LEAD_COACH_ID  # ACCOUNTABLE (owner feedback 2026-11-22: "Approve Eli Marsh as the accountable lead")
+WRITER_FUNCTION = "coach-recommendation-writer"
 ELIGIBLE_SOURCES = frozenset({"ai_guidance"})
-#: The response page's button -> the record's vocabulary (the page's keys are `seam.RESPONSES`; a test holds them equal).
-BUTTON_RESPONSES: dict[str, str] = {"done": rr.ACCEPTED, "not_doing": rr.DECLINED, "still_deciding": rr.STILL_DECIDING}
-TOKEN_PREFIX = "TOKEN#"  # noqa: S105 — a sort-key prefix, not a secret
+#: The brief's recommendation sources (`content.brief_hybrid.Rec.source`) -> (origin_kind, origin_id). The AI guidance
+#: is ONE model call with no persona (`ai.ai_calls.call_tldr_and_guidance`), so its origin is that system — not a coach.
+ORIGIN_BY_SOURCE: dict[str, tuple[str, Optional[str]]] = {
+    "ai_guidance": (rr.ORIGIN_SYSTEM, "ai_calls.call_tldr_and_guidance"),
+    "readiness": (rr.ORIGIN_RULE, "readiness_score"),
+    "food_export": (rr.ORIGIN_RULE, "food_export_check"),
+}
+#: Answers that settle a recommendation: a repeat after one of these shows his answer and asks nothing new.
+SETTLED = frozenset({rr.ACCEPTED, rr.DECLINED, rr.PARTIALLY_FOLLOWED})
 
 
-def _conditional_failed(e: Exception) -> bool:
-    return "ConditionalCheckFailed" in type(e).__name__ or "ConditionalCheckFailed" in str(e)
+def origin_of(source: Any) -> tuple[str, Optional[str]]:
+    """Never the lead by default: a source this table does not know is `unknown`, with no id."""
+    return ORIGIN_BY_SOURCE.get(str(source), (rr.ORIGIN_UNKNOWN, None))
 
 
 def brief_day(data_day: str) -> str:
@@ -80,11 +78,16 @@ class Offer:
     source: str
     evidence: list
     context: str
-    new: bool  # False = a REPEAT linked to the head the brief already wrote
+    new: bool  # False = a REPEAT: an exposure on the head the brief already wrote
+    origin_kind: str = rr.ORIGIN_UNKNOWN
+    origin_id: Optional[str] = None
+    answer: str = rr.NOT_RECORDED  # his current answer on the existing head (repeats only)
+    answer_label: str = ""
+    answered_at: Optional[str] = None
 
-
-def _brief_heads(rows: list) -> list:
-    return [r for r in rows if r.get("record_type") == "recommendation" and r.get("recorded_by") == rr.RECORDED_BY_BRIEF]
+    @property
+    def settled(self) -> bool:
+        return (not self.new) and self.answer in SETTLED
 
 
 def plan_offer(table, rec: Any, data_day: str) -> tuple[Optional[Offer], str]:
@@ -93,98 +96,59 @@ def plan_offer(table, rec: Any, data_day: str) -> tuple[Optional[Offer], str]:
     if not ok:
         return None, why
     day = brief_day(data_day)
-    existing = next((h for h in _brief_heads(rr.read_rows(table, USER_ID)) if h.get("brief_rec_id") == rec.rec_id), None)
+    views = rr.fold(rr.read_rows(table, USER_ID))
+    existing = next((v for v in views if v.get("recorded_by") == rr.RECORDED_BY_BRIEF and v.get("brief_rec_id") == rec.rec_id), None)
     status = "NEW" if rec.day_n <= 1 else f"REPEAT, day {rec.day_n} of a run that began {rec.first_seen}"
-    return (
-        Offer(
-            canonical_rec_id=existing["rec_id"] if existing else rr.rec_id_for(COACH_ID, day, rec.text),
-            brief_rec_id=rec.rec_id,
-            day=day,
-            text=rec.text,
-            source=rec.source,
-            evidence=[e for e in (rec.evidence, "Confidence " + str(rec.confidence) + ". " + str(rec.basis)) if e],
-            context=f"Morning Brief for {day} ({status}). {ATTRIBUTION}.",
-            new=existing is None,
-        ),
-        "",
+    kind, oid = origin_of(rec.source)
+    o = Offer(
+        canonical_rec_id=existing["rec_id"] if existing else rr.rec_id_for(COACH_ID, day, rec.text),
+        brief_rec_id=rec.rec_id,
+        day=day,
+        text=rec.text,
+        source=rec.source,
+        evidence=[e for e in (rec.evidence, "Confidence " + str(rec.confidence) + ". " + str(rec.basis)) if e],
+        context=f"Morning Brief for {day} ({status}). Accountable: the lead coach. Origin: {kind}" + (f" ({oid})." if oid else "."),
+        new=existing is None,
+        origin_kind=kind,
+        origin_id=oid,
     )
+    if existing:
+        o.answer, o.answer_label, o.answered_at = existing["response"], existing["response_label"], existing.get("response_recorded_at")
+    return o, ""
 
 
-def write_offer(table, offer: Offer, *, ses_message_id: Optional[str], offered_at: str) -> str:
-    """After the send. Returns the state for the SEND# row: recorded | duplicate | linked | not_delivered.
-    Raises on any other write failure (the caller logs it; nothing is retried or reconstructed later)."""
-    if not ses_message_id:
-        return "not_delivered"
-    if not offer.new:
-        return "linked"
-    head = rr.build_offered_head(
-        user_id=USER_ID,
-        coach_id=COACH_ID,
-        text=offer.text,
-        day=offer.day,
-        offered_at=offered_at,
-        ses_message_id=ses_message_id,
-        brief_rec_id=offer.brief_rec_id,
-        source=offer.source,
-        evidence=offer.evidence,
-        context=offer.context,
-        recorded_at=rr.now_instant(),
-    )
-    if head["rec_id"] != offer.canonical_rec_id:  # the id stamped on the link must be the id written
-        raise rr.RecommendationError("planned and written recommendation ids differ")
-    try:
-        table.put_item(Item=head, ConditionExpression="attribute_not_exists(sk)")
-    except Exception as e:  # noqa: BLE001 — only a conditional failure is a duplicate
-        if not _conditional_failed(e):
-            raise
-        return "duplicate"
-    return "recorded"
+def offer_payload(offer: Offer, *, send_day: str, token_hash: str, ses_message_id: Optional[str], accepted_at: str) -> dict[str, Any]:
+    """The writer's `offer` event: the brief's own recommendation and its accepted send — nothing it did not offer."""
+    return {
+        "action": "offer",
+        "new": offer.new,
+        "canonical_rec_id": offer.canonical_rec_id,
+        "brief_rec_id": offer.brief_rec_id,
+        "brief_day": offer.day,
+        "send_day": send_day,
+        "text": offer.text,
+        "source": offer.source,
+        "evidence": offer.evidence,
+        "context": offer.context,
+        "origin_kind": offer.origin_kind,
+        "origin_id": offer.origin_id,
+        "token_hash": token_hash,
+        "ses_message_id": ses_message_id,
+        "accepted_at": accepted_at,
+    }
 
 
-def _instant(iso: str) -> str:
-    """The token row's `used_at` (isoformat, UTC) in the record's instant format."""
-    dt = parse_iso_utc(iso)
-    if dt is None:
-        raise rr.RecommendationError("the token's used_at is not an ISO instant")
-    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+def invoke_writer(payload: dict[str, Any], client=None) -> dict[str, Any]:
+    """Synchronous invoke of `coach-recommendation-writer`. Raises when the writer failed (the caller logs and goes on)."""
+    if client is None:
+        import boto3
 
-
-def carry_responses(table, trial_pk: str) -> dict[str, int]:
-    """Spent, pilot-stamped tokens -> one response event each, exactly once. Counts by outcome (never raises
-    for one bad row; a read failure raises to the caller)."""
-    tokens = rr._query_all(table, Key("pk").eq(trial_pk) & Key("sk").begins_with(TOKEN_PREFIX))
-    rows = rr.read_rows(table, USER_ID)
-    heads = {r["rec_id"]: r for r in rows if r.get("record_type") == "recommendation" and r.get("sk") == rr.head_sk(r.get("rec_id", ""))}
-    carried = {r.get("token_hash") for r in rows if r.get("record_type") == "recommendation_event" and r.get("token_hash")}
-    n = {"carried": 0, "already": 0, "unanswered": 0, "pre_activation": 0, "no_head": 0, "refused": 0}
-    for tok in tokens:
-        rid, th = tok.get("canonical_rec_id"), str(tok.get("sk", ""))[len(TOKEN_PREFIX) :]
-        if not rid:
-            n["pre_activation"] += 1  # minted before the pilot (or while the record was unreadable): never folded
-        elif not tok.get("used_at"):
-            n["unanswered"] += 1
-        elif th in carried:
-            n["already"] += 1
-        elif rid not in heads or str(tok.get("send_day") or "") < str(shift_day_key(heads[rid].get("date"), -1)):
-            n["no_head"] += 1  # the offer was never recorded: his answer stays on the trial row only
-        else:
-            try:
-                ev = rr.build_button_response(
-                    user_id=USER_ID,
-                    rec=heads[rid],
-                    response=BUTTON_RESPONSES.get(str(tok.get("response"))),
-                    answered_at=_instant(tok["used_at"]),
-                    token_hash=th,
-                    send_day=str(tok.get("send_day")),
-                    word=seam.RESPONSE_WORDS.get(str(tok.get("response")), ""),
-                )
-                table.put_item(Item=ev, ConditionExpression="attribute_not_exists(sk)")
-                n["carried"] += 1
-            except Exception as e:  # noqa: BLE001 — one bad row never costs the others
-                n["already" if _conditional_failed(e) else "refused"] += 1
-                if not _conditional_failed(e):
-                    logger.warning("[brief_rec_pilot] answer not carried rec=%s: %s", rid, type(e).__name__)
-    return n
+        client = boto3.client("lambda", region_name=os.environ.get("AWS_REGION", "us-west-2"))
+    resp = client.invoke(FunctionName=os.environ.get("REC_WRITER_FUNCTION", WRITER_FUNCTION), Payload=json.dumps(payload, default=str))
+    body = json.loads(resp["Payload"].read() or b"{}")
+    if resp.get("FunctionError"):
+        raise RuntimeError("recommendation writer failed: " + str((body or {}).get("errorType") or "error"))
+    return body
 
 
 def due_follow_up(table, trial_pk: str, day: str) -> Optional[dict[str, Any]]:

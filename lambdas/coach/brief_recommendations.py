@@ -12,8 +12,9 @@ own private partition, and nothing else reads them:
   * THE EXPLICITLY REPORTED RESPONSE: the one-use response token, and the answer recorded against it.
 
 #6158 has landed; its pilot (`coach.brief_rec_intake`, dark behind CANONICAL_INTAKE_LIVE below) does NOT re-point
-this partition: the trial stays the brief's delivery and interface telemetry, and the canonical record is written
-from the daily-brief function — the offer after SES accepts a send, his spent answers on the next run. The public
+this partition: the trial stays the brief's send and interface telemetry, and the canonical record is written by the
+dedicated `coach-recommendation-writer`, which the daily brief invokes — the offer after the mail service accepts a
+send, his spent answers on the next run. The public
 answer door keeps writing only this partition (owner ruling 2026-11-22 §4: the trial record must not become a
 competing authoritative lifecycle).
 
@@ -39,8 +40,9 @@ import secrets
 
 #: THE #6158 PILOT SWITCH — the Morning Brief as the canonical recommendation record's first intake
 #: (`coach.brief_rec_intake`). Committed False: the trial runs exactly as before (the intake module is never even
-#: imported) and nothing reaches the canonical record. True = the brief records an OFFER after SES accepts a hybrid
-#: send, carries his spent button answers into the record on its next run, and asks a due brief follow-up once.
+#: imported) and nothing reaches the canonical record. True = the brief asks the dedicated writer to record an OFFER
+#: after the mail service accepts a hybrid send (or an EXPOSURE of a repeat), carries his spent button answers into the
+#: record on its next run, and asks a due brief follow-up once.
 #: Turning it on needs the owner's review of the IAM delta and a daily-brief deploy; rollback = False + deploy.
 CANONICAL_INTAKE_LIVE = False
 

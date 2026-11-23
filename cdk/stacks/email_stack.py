@@ -53,22 +53,23 @@ DIGEST_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"
 
 #: The recommendation record's one partition (`coach.recommendation_record.pk("matthew")`; a test holds them equal).
 RECOMMENDATION_RECORD_PK = "USER#matthew#SOURCE#coach_recommendations"
-#: Write actions the daily-brief role may NOT use on that partition (a test reads this tuple from source).
-RECOMMENDATION_RECORD_DENIED_ACTIONS = ("dynamodb:UpdateItem", "dynamodb:DeleteItem", "dynamodb:BatchWriteItem")
+#: EVERY item write the daily-brief role may not use on that partition (a test reads this tuple from source).
+RECOMMENDATION_RECORD_DENIED_ACTIONS = ("dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem", "dynamodb:BatchWriteItem")
 
 
-def recommendation_record_append_only() -> iam.PolicyStatement:
+def recommendation_record_no_write() -> iam.PolicyStatement:
     """#6158 Morning Brief pilot (OWNER-REQUIRED — presented for review, not yet acknowledged).
 
-    NO new Allow: the daily-brief role's `DynamoDB` statement (`role_policies._email_base`) already lets it PutItem and
-    UpdateItem the whole table, the recommendation record included. This Deny NARROWS that for the record's ONE
-    partition: the brief may only PutItem there (its code puts conditionally — an offered head and his button answers,
-    both append-only, `coach.brief_rec_intake`) and can never update, delete or batch-write a record row.
+    The daily-brief role's `DynamoDB` statement (`role_policies._email_base`) lets it PutItem and UpdateItem the whole
+    table, the recommendation record included. This Deny removes EVERY item write on the record's one partition: the
+    brief cannot create, replace, update, delete or batch-write a record row. Its writes go through the dedicated
+    `coach-recommendation-writer` (PutItem-only, LeadingKeys-scoped; `role_policies_compute.compute_recommendation_writer`).
+    PartiQL writes are not granted to this role at all.
 
     It lives here, not in `role_policies_email`, because it is the platform's first Deny and the role-policy test estate
     models every statement as a grant; it is applied straight to the role at synth."""
     return iam.PolicyStatement(
-        sid="RecommendationRecordAppendOnly",
+        sid="RecommendationRecordNoWrite",
         effect=iam.Effect.DENY,
         actions=list(RECOMMENDATION_RECORD_DENIED_ACTIONS),
         resources=[f"arn:aws:dynamodb:{REGION}:{ACCT}:table/{TABLE_NAME}"],
@@ -143,9 +144,9 @@ class EmailStack(Stack):
             custom_policies=rp.email_daily_brief(),
             **{**shared, "alerts_topic": None},
         )
-        # #6158 Morning Brief pilot (OWNER-REQUIRED — presented for review): the record partition is append-only for
-        # this role. See `recommendation_record_append_only` below.
-        _daily_brief.role.add_to_principal_policy(recommendation_record_append_only())
+        # #6158 Morning Brief pilot (OWNER-REQUIRED — presented for review): this role cannot write the recommendation
+        # record at all; the dedicated writer does. See `recommendation_record_no_write` above.
+        _daily_brief.role.add_to_principal_policy(recommendation_record_no_write())
 
         create_platform_lambda(
             self,

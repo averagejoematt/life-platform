@@ -170,6 +170,7 @@ class View:
     notes: list = field(default_factory=list)
     follow_up: dict | None = None  # #6158 pilot (dark): the ONE due follow-up he agreed to, on a recommendation a brief offered
     follow_up_url: str | None = None
+    respond_note: str | None = None  # #6158 pilot (dark): his recorded answer on a repeat ("You answered …")
 
 
 def label_recs(recs: list, data_day: str, history: dict) -> list:
@@ -459,6 +460,8 @@ def render_text(view: View) -> str:
         out += ["", _held_back_sentence(view.held_back)]
     if view.unknown:
         out += ["", "Unknown"] + ["• " + u for u in view.unknown]
+    if view.respond_note:
+        out += ["", view.respond_note]
     if view.respond_url and view.respond_rec is not None:
         out += ["", "Your answer on “" + view.respond_rec.text + "” (optional): " + view.respond_url]
     out += ["", "———", "Full detail: the complete brief, below."]
@@ -544,6 +547,8 @@ def render_html(view: View) -> str:
         out += '<p style="' + _S["h"] + '">UNKNOWN</p>'
         for u in view.unknown:
             out += '<p style="' + _S["small"] + '">• ' + esc(u) + "</p>"
+    if view.respond_note:
+        out += '<p style="' + _S["small"] + 'margin-top:12px;">' + esc(view.respond_note) + "</p>"
     if view.respond_url and view.respond_rec is not None:
         out += (
             '<p style="'
