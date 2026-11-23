@@ -17,6 +17,7 @@ No clock is read: every day is passed in. PRIVACY: the plan items carry dates an
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import os
 import pathlib
@@ -169,7 +170,8 @@ def test_a_missed_battery_rides_the_dead_man_once_per_due_week_naming_the_day_it
 def test_the_tape_dead_man_names_the_day_it_lapsed():
     b = cc.compute(TODAY, {"tape": lambda: ["2026-09-06"], "photos": lambda: ["2026-11-10"]}, anchor="2026-09-06")
     text = cc.deadman_alert(b["kinds"]["tape"])
-    assert text.startswith("tape has gone") and "lapsed on 2026-09-20" in text and "2026-09-06" in text
+    first_due = (dt.date(2026, 9, 6) + dt.timedelta(weeks=tc.charter_value("calibration.tape_and_photos.every_weeks"))).isoformat()
+    assert text.startswith("tape has gone") and f"lapsed on {first_due}" in text and "2026-09-06" in text
 
 
 # ── 2. the daily plan names each due measurement until it is logged ───────────────────────
@@ -185,7 +187,10 @@ def test_a_due_tape_is_an_item_in_the_plan_through_the_dead_man_and_leaves_once_
     (item,) = lapsed["items"]
     assert item["kind"] == "tape" and item["state"] == cc.MISSED_2 and item["text"].startswith("Tape due")
     assert lapsed["read_failed"] == [] and lapsed["tier"] == "owner_only" and lapsed["instruction"]
-    due_today = _plan(monkeypatch, ["2026-10-28"], ok_battery)  # 14 days ago: due today
+    one_cycle_ago = (
+        dt.date.fromisoformat(TODAY) - dt.timedelta(weeks=tc.charter_value("calibration.tape_and_photos.every_weeks"))
+    ).isoformat()
+    due_today = _plan(monkeypatch, [one_cycle_ago], ok_battery)  # one charter cycle ago: due today
     assert [(i["kind"], i["state"]) for i in due_today["items"]] == [("tape", cc.DUE)]
     assert _plan(monkeypatch, ["2026-11-05"], ok_battery)["items"] == []  # logged this cycle: gone
 
