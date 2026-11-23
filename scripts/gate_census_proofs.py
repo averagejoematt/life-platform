@@ -5013,18 +5013,20 @@ STRUCTURAL_HAND_PROOFS["structural::test_recommendation_record_6158.py"] = {
 # states the narrator with a retired phrase (the identity renders from content/elena_canon.py).
 STRUCTURAL_HAND_PROOFS["structural::test_narrator_gate_and_identity_sets_6216.py"] = {
     "gate_name": "test_narrator_gate_and_identity_sets_6216.py",
-    "command": "python3 -m pytest tests/test_narrator_gate_and_identity_sets_6216.py -q -p no:warnings   # baseline 6 passed",
+    "command": "python3 -m pytest tests/test_narrator_gate_and_identity_sets_6216.py tests/test_story_checks_regressions_6199.py -q -p no:warnings   # baseline 19 passed",
     "mutation": (
-        "Three plants, ONE AT A TIME, each restored from a copy: M1 the owner_lines= keyword deleted from "
-        "story_pipeline.legacy_gate_findings' all_findings call; M2 elena_state_updater's system prompt put back to "
-        "'the embedded journalist who'; M3 panelcast_repair's revision prompt put back to 'ELENA VOSS (embedded journalist)'."
+        "Four plants, ONE AT A TIME, each restored from a copy: M1 story_pipeline's fallback call passes owner_lines=None; "
+        "M3 elena_state_updater's system prompt restated as 'Elena Voss, a veteran reporter who'; M4 attribution_findings "
+        "clears an attribution whenever ANY owner line exists; M5 attribution_findings returns [] for owner_lines=None "
+        "(silence instead of the distinguishable finding)."
     ),
-    "observed": "2026-11-22, #6216 lane. BASELINE 6 passed. M1 2 failed; M2 2 failed; M3 1 failed. REVERTED 6 passed.",
+    "observed": "2026-11-22, #6216 lane. BASELINE 19 passed. M1 3 failed; M3 1 failed; M4 1 failed; M5 2 failed. REVERTED 19 passed.",
     "scope": (
-        "Every .py under lambdas/, mcp/ and scripts/ parsed for all_findings call sites (a call spelled through **kwargs "
-        "passes); string literals (adjacent literals joined, comments excluded) under lambdas/ and scripts/ for four retired "
-        "phrases, with the two spoken intro lines allowlisted. NOT SEEN: a prompt built from a file read at run time; "
-        "config/ and the S3 board config (test_elena_config_twins_6196 owns those); phrasings such as 'literary journalist'."
+        "Every .py under lambdas/, mcp/ and scripts/ parsed for all_findings call sites (a literal owner_lines=None counts as "
+        "missing; **kwargs passes); every non-docstring string or f-string under lambdas/ and scripts/ that states who Elena is "
+        "must render the canon (elena_canon names inside the f-string) or sit on a reasoned allowlist that still discloses AI "
+        "and asserts no human career; three human-career phrases denied. NOT SEEN: a prompt built from a file read at run "
+        "time; an identity stated without the name 'Elena'; config/ and the S3 board config (test_elena_config_twins_6196)."
     ),
     "proved_on": "2026-11-22",
 }
