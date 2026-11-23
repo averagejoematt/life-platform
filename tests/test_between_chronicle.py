@@ -11,6 +11,7 @@ import json
 import os
 import sys
 
+import pytest
 import schedule_rows  # noqa: E402 - tests/ is on sys.path; #4284 the schedule table
 
 os.environ.setdefault("TABLE_NAME", "life-platform")
@@ -25,10 +26,35 @@ import between_chronicle_lambda as bc  # noqa: E402
 SRC = open(os.path.join(_REPO, "lambdas/emails/between_chronicle_lambda.py")).read()
 
 
+#: #6244: a fixed Pacific day — every dated fixture below is relative to it, and the handler's clock seam is pinned to it.
+TODAY = "2026-11-29"
+
+
 def _digest(**over):
     d = {"deltas": [], "unlocked": [], "decided": [], "stance_shifts": []}
     d.update(over)
     return d
+
+
+def _call(**over):
+    c = {
+        "coach": "training",
+        "claim": "Recovery holds above 60",
+        "status": "confirmed",
+        "reason": "Morning recovery score came in at 64 against a call of 60 — within its usual day-to-day range",
+        "decided_at": "2026-11-25",
+    }
+    c.update(over)
+    return c
+
+
+@pytest.fixture(autouse=True)
+def _pinned_day(monkeypatch):
+    monkeypatch.setattr(bc, "_today", lambda: TODAY)
+
+
+def _released(monkeypatch):
+    monkeypatch.setattr(bc, "OWNER_RELEASE", {"by": "owner", "released_on": "2026-11-28", "reviewed_render": "fixture"})
 
 
 def test_zero_new_inference():
@@ -44,15 +70,26 @@ def test_empty_period_sends_nothing(monkeypatch):
     assert out["sent"] == 0 and out["skipped"] == "empty_period"
 
 
-def test_unchanged_digest_sends_nothing(monkeypatch):
+def test_averages_alone_are_a_quiet_week(monkeypatch):
+    """#6244: the month's rolling averages move every week — on their own they are not news, and nothing is sent."""
     d = _digest(
-        deltas=[{"label": "Recovery", "this_month_avg": 62.1, "prior_month_avg": 58.4, "delta": 3.7, "unit": "%", "direction": "improved"}]
+        deltas=[{"label": "Recovery", "this_month_avg": 62.1, "prior_month_avg": 58.4, "delta": 3.7, "unit": "%"}],
+        window_start="2026-10-29",
+        window_end="2026-11-27",
     )
     monkeypatch.setattr(bc, "gather_digest", lambda: d)
+    out = bc.lambda_handler({}, None)
+    assert out["sent"] == 0 and out["skipped"] == "empty_period"
+
+
+def test_unchanged_digest_sends_nothing(monkeypatch):
+    d = _digest(decided=[_call()])
+    monkeypatch.setattr(bc, "gather_digest", lambda: d)
+    curated = bc.curate(d, TODAY)
 
     class _T:
         def get_item(self, Key):
-            return {"Item": {"content_hash": bc.digest_hash(d)}}
+            return {"Item": {"content_hash": bc.digest_hash({k: v for k, v in curated.items() if k != "today"})}}
 
     monkeypatch.setattr(bc, "table", _T())
     out = bc.lambda_handler({}, None)
@@ -60,8 +97,8 @@ def test_unchanged_digest_sends_nothing(monkeypatch):
 
 
 def test_kill_switch_honored(monkeypatch):
-    d = _digest(decided=[{"coach": "training", "claim": "c", "status": "confirmed", "notes": "", "decided_at": "2026-07-01"}])
-    monkeypatch.setattr(bc, "gather_digest", lambda: d)
+    _released(monkeypatch)
+    monkeypatch.setattr(bc, "gather_digest", lambda: _digest(decided=[_call()]))
 
     class _T:
         def get_item(self, Key):
@@ -73,23 +110,22 @@ def test_kill_switch_honored(monkeypatch):
     assert out["sent"] == 0 and out["skipped"] == "external_emails_disabled"
 
 
-def test_email_numbers_match_the_record_and_no_tracking():
+def test_email_numbers_are_the_records_rounded_and_no_tracking():
     d = _digest(
-        deltas=[{"label": "Recovery", "this_month_avg": 62.1, "prior_month_avg": 58.4, "delta": 3.7, "unit": "%", "direction": "improved"}],
-        decided=[
-            {
-                "coach": "training",
-                "claim": "Recovery holds above 60",
-                "status": "confirmed",
-                "notes": "held at 64",
-                "decided_at": "2026-07-01",
-            }
+        deltas=[{"label": "Recovery", "this_month_avg": 62.1, "prior_month_avg": 58.4, "delta": 3.7, "unit": "%"}],
+        window_start="2026-10-29",
+        window_end="2026-11-27",
+        decided=[_call()],
+        stance_shifts=[
+            {"coach": "sleep", "shift": "The short nights matter more than I first read.", "stage": "Foundation", "as_of": "2026-11-27"}
         ],
-        stance_shifts=[{"coach": "sleep", "shift": "The short nights matter more than I first read.", "stage": "Foundation"}],
     )
-    subject, html = bc.build_email(d, "reader@example.com")
-    # Numbers verbatim from the record — the same values /api/what_changed serves.
-    assert "62.1" in html and "58.4" in html and "held at 64" in html
+    subject, html = bc.build_email(d, "reader@example.com", TODAY)
+    text = bc.visible_text(html)
+    # #6244: the record's numbers at reading precision, with the window they cover.
+    assert "Recovery: 62%, up from 58%" in text
+    assert "October 29 to November 27" in text
+    assert "graded November 25" in text and "on November 27" in text
     # No open tracking: no image at all (the classic pixel vector), no campaign
     # params, no per-link redirect wrappers.
     for tracker in ("<img", "utm_", "open.gif", "1x1", "/r/?", "redirect?url="):
@@ -97,11 +133,11 @@ def test_email_numbers_match_the_record_and_no_tracking():
     assert "No open tracking on this email" in html
     assert "unsubscribe" in html
     assert "N=1" in html
-    assert "3 things the machine found" in subject
+    assert "2 things the machine found" in subject
 
 
-def test_dry_run_builds_without_sending(monkeypatch):
-    d = _digest(unlocked=[{"interpretation": "Sleep duration tracks with recovery", "r": 0.61}])
+def test_dry_run_builds_without_sending_while_held(monkeypatch):
+    d = _digest(decided=[_call()])
     monkeypatch.setattr(bc, "gather_digest", lambda: d)
 
     class _T:
@@ -115,7 +151,8 @@ def test_dry_run_builds_without_sending(monkeypatch):
 
     monkeypatch.setattr(bc.ses, "send_email", _no_send)
     out = bc.lambda_handler({"dry_run": True}, None)
-    assert out["dry_run"] is True and "Sleep duration tracks with recovery" in json.dumps(out["digest"])
+    assert out["dry_run"] is True and out["held"] is True
+    assert "Recovery holds above 60" in json.dumps(out["digest"])
 
 
 def test_cdk_wiring_exists():

@@ -81,6 +81,10 @@ os.environ.setdefault("AI_VALIDATOR_AUTOLOAD", "off")
 # Tests that exercise the fetch itself set PANELCAST_ZEITGEIST=on and mock urlopen.
 os.environ.setdefault("PANELCAST_ZEITGEIST", "off")
 
+# #6244: keep the unit suite hermetic — the Weekly Signal reads the public /api/chapters route at send time.
+# Tests that exercise the read set WEEKLY_SIGNAL_CHAPTERS_FETCH=on and stub urlopen.
+os.environ.setdefault("WEEKLY_SIGNAL_CHAPTERS_FETCH", "off")
+
 # #3044: keep the unit suite hermetic — signed-unsubscribe-link minting resolves its
 # HMAC key env-first (common.unsubscribe_token.get_unsub_secret). Without this, every
 # sender test that builds a subscriber email would attempt a real Secrets Manager
