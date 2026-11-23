@@ -1,5 +1,5 @@
 {
- "_comment": "#6193 fixture: sample CHAPTER_EDITION# records as the chronicle partition holds them — the first edition's evidence pointer (#01) and its passed restore rehearsal (#01#restore), an approved second edition, an unapproved third, an approved archival rendering and an unapproved one. Read ONLY when the switch is on (content.chapter_editions.LIVE) or WEB_EDITIONS=1, so the default fixture build is unchanged; the unapproved records carry sentinels the build scan must never find on a page. Sample content, for layout only.",
+ "_comment": "#6193 fixture: sample CHAPTER_EDITION# records as the chronicle partition holds them — the first edition's evidence pointer (#01) and its passed restore rehearsal (#01#restore), an approved second edition, an unapproved third, an approved archival rendering and an unapproved one. Read ONLY when the switch is on (content.chapter_editions.LIVE) or WEB_EDITIONS=1, so the default fixture build is unchanged; the unapproved records carry sentinels the build scan must never find on a page. Sample content, for layout only. An approved anchor places the carried correction beside its passage on the archival page.",
  "records": [
   {
    "pk": "USER#matthew#SOURCE#chronicle",
@@ -130,6 +130,27 @@
    "approved_at": null,
    "revised_on": null,
    "signature": null
+  },
+  {
+   "pk": "USER#matthew#SOURCE#chronicle",
+   "sk": "CHAPTER_EDITION#week-06#anchor#sample-walk-distance-2",
+   "record_type": "chapter_edition_anchor",
+   "phase": "experiment",
+   "chapter_id": "week-06",
+   "correction_id": "sample-walk-distance-2",
+   "passage": "Sample content, for layout only. This is the fixture's archival rendering",
+   "proposed_at": "2026-11-21T19:30:00Z",
+   "proposed_via": "MCP manage_chapter_corrections",
+   "approvals": [
+    {
+     "by": "owner",
+     "at": "2026-11-21T19:40:00Z",
+     "on": "2026-11-21",
+     "via": "MCP manage_chapter_corrections (owner-only)",
+     "note": ""
+    }
+   ],
+   "approved_at": "2026-11-21T19:40:00Z"
   }
  ]
 }

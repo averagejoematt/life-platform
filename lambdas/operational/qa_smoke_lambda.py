@@ -93,13 +93,16 @@ from operational.qa_check import (  # noqa: E402,F401
     CONTENT_TRUTH,
     DEPLOY_HEALTH,
     PARTITIONS,
+    PERSISTENT_WARN_DAYS,  # #5928
     QA_SMOKE_EMF_NAMESPACE,
     Check,
     cause_line,  # #3501: the machine-readable "which check ids is this run red on" line
     detail_log_lines,  # #2620: the overflow log lines for a check that had to truncate
     emf_summary_line,
     run_isolated,
+    split_owner_engagement,  # #5928
     split_warns,
+    store_warn_streaks,  # #5928
     summarize_findings,
 )
 
@@ -1370,6 +1373,11 @@ def lambda_handler(event, context):
         # timing set) stay fully visible here, in the email, and in their own
         # ChronicWarnCount metric, but can no longer hold the alarm red.
         warns_alarmed, warns_chronic = split_warns(all_checks)
+        # #5928: persistence. Owner-engagement warnings leave the platform side; the rest advance their streaks.
+        warns_platform, warns_engagement = split_owner_engagement(warns_alarmed)
+        persistent_ids = store_warn_streaks(
+            table, USER_PREFIX + "qa_predict_dark", run_time, {c.name for c in warns_platform}, persist=not dry_run
+        )
 
         # #1610: itemize every fail/warn to the LOG, not just the failure email.
         # The specific failing check used to appear ONLY in the emailed report, so a
@@ -1421,6 +1429,8 @@ def lambda_handler(event, context):
         # WarnCount (#1958) — nothing alarms on them.
         print(cause_line("fail", fails))
         print(cause_line("warn", warns_alarmed))
+        # #5928: what the alarm now fires on, by id — `-` when nothing has persisted.
+        print(f"[QA] PERSISTENT warn {PERSISTENT_WARN_DAYS}d {','.join(persistent_ids) if persistent_ids else '-'}")
 
         # #1445: emit the EMF summary on EVERY run — including all-green — so
         # the nightly QA layer has a heartbeat and its warnings/failures are
@@ -1436,6 +1446,8 @@ def lambda_handler(event, context):
                 failed_deploy_health=len(fails_deploy),
                 failed_content_truth=len(fails_content),
                 warned_chronic=len(warns_chronic),
+                warned_persistent=len(persistent_ids),
+                warned_owner_engagement=len(warns_engagement),
             )
         )
 

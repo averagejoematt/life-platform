@@ -13,7 +13,7 @@ import Base from "../../../layouts/Base.astro";
 import { dayInWords } from "../../../lib/format.js";
 import { loadAll, loadChapterCorrections, loadChapterEditions } from "../../../lib/snapshot.js";
 import { archivalChapterIds, archivalFor, archivalWhat, editionFor } from "../../../lib/chapter_editions.js";
-import { ARCHIVAL_PAGE, PERSONA_DISCLOSURE, correctionsFor, correctionsHtml, namesLegacyPersona } from "../../../lib/chapter_corrections.js";
+import { ARCHIVAL_PAGE, PERSONA_DISCLOSURE, correctionsFor, correctionsHtml, namesLegacyPersona, placeBeside } from "../../../lib/chapter_corrections.js";
 import { bodyForPage } from "../../../lib/chapter_body.js";
 import { hasPage, href } from "../../../lib/url.js";
 
@@ -29,8 +29,11 @@ const e = editionFor(doc, c.id)!;
 const a = archivalFor(doc, c.id)!;
 const current = `/story/${c.id}/`;
 const what = archivalWhat(a);
-const body = bodyForPage(a.body_html, null);
 const corrections = correctionsFor(await loadChapterCorrections(), c.id);
+// rehearsal ruling §4: a correction with an approved anchor stands beside its passage; the rest stand above the text
+const beside = placeBeside(bodyForPage(a.body_html, null), a.anchors || [], corrections, ARCHIVAL_PAGE);
+const body = beside.html;
+const above = corrections.filter((x) => !beside.placed.includes(x.id));
 const disclose = namesLegacyPersona(a.body_html);
 ---
 
@@ -59,7 +62,7 @@ const disclose = namesLegacyPersona(a.body_html);
   <section class="section hair">
     <div class="wrap" style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start">
       <article class="article" style="flex:1 1 600px;min-width:0">
-        {corrections.length > 0 && <div class="chapter-corrections" data-chapter-corrections set:html={correctionsHtml(corrections, ARCHIVAL_PAGE)} />}
+        {above.length > 0 && <div class="chapter-corrections" data-chapter-corrections set:html={correctionsHtml(above, ARCHIVAL_PAGE)} />}
         {disclose && <p class="persona-disclosure" data-persona-disclosure>{PERSONA_DISCLOSURE}</p>}
         <div data-archival-body><div data-published-body set:html={body} /></div>
       </article>

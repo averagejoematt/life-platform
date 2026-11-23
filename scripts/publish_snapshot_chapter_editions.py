@@ -151,6 +151,22 @@ def _check_archival(cid: str, e: dict, a: Any, title: Optional[str]) -> None:
     _check_text(cid, "archival", a, title)
 
 
+def _anchored(cid: str, a: dict, approved: set, log: Callable[[str], None]) -> dict:
+    """#6193 (rehearsal ruling §4): an anchor stays only when it names an APPROVED, served correction of this chapter and
+    its passage is in the rendering exactly once; any other anchor is dropped (its correction stays at the top)."""
+    body = CE.presentation(a["text"], edition=False)["body"]
+    keep = []
+    for x in a.get("anchors") or []:
+        ok = isinstance(x, dict) and (cid, x.get("correction_id")) in approved and CE.placed_anchors([x], body) == [x]
+        if ok:
+            keep.append(x)
+        else:
+            log(
+                f"  ✗ anchor dropped on {cid}: {x.get('correction_id') if isinstance(x, dict) else x!r} (not an approved correction, or its passage is not in the text once)"
+            )
+    return {**a, "anchors": keep}
+
+
 def validate(doc: Any, public: dict, corrections: Optional[dict], log: Callable[[str], None] = print, held: Optional[list] = None) -> dict:
     """Exact shape (a malformed FILE stops the build); then every entry re-derived and re-checked ON ITS OWN. An entry
     that fails is withheld — its chapter serves the first edition — and named loudly, and the others go on: one held
@@ -181,6 +197,8 @@ def validate(doc: Any, public: dict, corrections: Optional[dict], log: Callable[
                 held.append(f"{cid}#archival")
                 log(f"  ✗ HELD archival rendering {cid}: {exc} — no first-edition page")
                 e = {**e, "archival": None}
+        if e["archival"] is not None:
+            e = {**e, "archival": _anchored(cid, e["archival"], approved, log)}
         if e["archival"] is None and CE.references_archive(e.get("text"), cid):
             held.append(cid)
             log(
