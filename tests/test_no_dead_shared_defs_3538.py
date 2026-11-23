@@ -93,6 +93,9 @@ LIVE_DIRS = ("lambdas", "mcp", "deploy", "scripts", "cdk")
 # request_validator.validate_source (deploy/dedup_source_records.py). That they ride in
 # the bundle unused at RUNTIME is a packaging question (#781), not a dead-code one.
 ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
+    "lambdas/health/grounded_intake_facts.py:build_facts": (
+        "#6212 (epic #6206, owner rulings 2026-11-22): the grounded nutrition and body-composition facts, deliberately UNWIRED - tests/test_grounded_intake_facts_6212.py fails if anything under lambdas/ or mcp/ imports the module. #6149 owns the wiring behind its own context switch (off). Delete this entry when #6149 wires build_facts."
+    ),
     "lambdas/content/private_call_check.py:ledger_findings": (
         "#6199 G2 (owner ruling 2026-11-22 §1): the live invariant tying the ledger's withheld_paths annotation to the private-call detector, run read-only by the driver after the annotation data step (no Lambda calls it until the qa-smoke dead-man leg the PROPORTIONALITY row names); pinned by tests/test_story_ledger_public_view_6199.py. Delete this entry when that leg calls it."
     ),

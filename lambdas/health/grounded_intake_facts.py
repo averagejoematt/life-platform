@@ -42,6 +42,8 @@ import logging
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
+from common.pacific_time import parse_day_key
+
 logger = logging.getLogger(__name__)
 
 # ── named constants (the only numeric literals of any size in this module) ─────────────────────────
@@ -105,10 +107,7 @@ def _day(v: Any) -> Optional[date]:
     if isinstance(v, date):
         return v
     if isinstance(v, str) and len(v) >= 10:
-        try:
-            return date.fromisoformat(v[:10])
-        except ValueError:
-            return None
+        return parse_day_key(v[:10])  # THE calendar-day parse (#3741)
     return None
 
 
@@ -157,7 +156,7 @@ def _slope_per_day(points: Sequence[Tuple[date, float]]) -> Optional[float]:
 def default_complete_log_kcal() -> Optional[float]:
     """The platform's ONE complete-log line: the titration rule's ``complete_log_kcal`` (the redlines' dark-day kcal).
 
-    The same value ``health.early_warning`` and ``health.checkin_intake_pairs`` read. None when unreadable, and
+    The same value the relapse food-log-gap signal and ``health.checkin_intake_pairs`` read. None when unreadable, and
     Fact 1 is then not built (no second threshold is invented here)."""
     try:
         from health import titration  # noqa: PLC0415 — lazy: keeps this module import-safe offline
