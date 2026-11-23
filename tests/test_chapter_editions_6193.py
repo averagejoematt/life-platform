@@ -47,6 +47,8 @@ for _p in (_REPO, os.path.join(_REPO, "lambdas"), os.path.join(_REPO, "scripts")
 
 from content import chapter_corrections as CC, chapter_editions as CE, private_call_check  # noqa: E402
 
+COMMITTED_LIVE = CE.LIVE  # captured at import, before the conftest baseline fixture touches it
+
 TEXT = (
     "Sample edition text for a test, for layout only. The week's figures are counted from the log as it stands.\n\n"
     "A second paragraph says what the record holds, and nothing more."
@@ -107,7 +109,8 @@ def _view(rows, tainted=NEVER, hits=NO_FILTER_HITS):
 
 
 def test_the_switch_is_committed_off():
-    assert CE.LIVE is False
+    # Committed LIVE (owner ruling 2026-11-22); the name is historical. ROLLBACK: LIVE = False + site rebuild.
+    assert COMMITTED_LIVE is True
 
 
 def test_the_words_are_the_platforms_and_dated_in_words():
@@ -411,6 +414,42 @@ def test_switch_on_the_route_serves_approved_editions_and_says_when_it_cannot_re
     failed = chapters.editions_field(down, tainted=NEVER)
     assert failed["editions"] is None and failed["editions_error"]
 
+    # LIVE on with NO approved edition (#6193 activation): the response differs from LIVE off by exactly one additive
+    # key, "editions": [] (and one extra read per request) — nothing else moves.
+    def same_instant(resp):
+        return re.sub(r'"(generated_at|served_at)": "[^"]*"', r'"\1": "T"', resp["body"])
+
+    # (#6199: the route also reads the private-call record from the raw table, cached 900 s — one more read, no body change)
+    monkeypatch.setattr(chapters.private_call_check, "load", lambda _table: private_call_check.CallSet())
+    chapters._CALLS_CACHE.update(at=None, calls=None)
+    on_empty = json.loads(same_instant(_handle(chapters, lambda: [])))
+    monkeypatch.setattr(CE, "LIVE", False)
+    off = json.loads(same_instant(_handle(chapters, lambda: [])))
+    assert on_empty.pop("editions") == [] and on_empty == off
+    monkeypatch.setattr(CE, "LIVE", True)
+
+    # Failure modes of the two reads, as served: an unreadable editions read -> "editions": null + editions_error; an
+    # unreadable private-call read -> every edition withheld ("editions": [], 200) and a logged error, never served.
+    rows = [_original(), _edition(2)]
+    assert [e["edition"] for e in chapters.editions_field(lambda: rows, tainted=NEVER)["editions"]] == [2]
+
+    def calls_down(_table):
+        raise RuntimeError("throttled")
+
+    monkeypatch.setattr(chapters.private_call_check, "load", calls_down)
+    chapters._CALLS_CACHE.update(at=None, calls=None)
+    assert chapters.editions_field(lambda: rows, tainted=NEVER)["editions"] == []
+
+    # The documented failure mode (not changed here): with the switch on, an unreadable editions read is a schema error
+    # in the snapshot exporter, so that build exits non-zero instead of building without editions.
+    import publish_snapshot_chapter_editions as SE
+
+    monkeypatch.setattr(CE, "LIVE", True)
+    with pytest.raises(ValueError):
+        SE.live(lambda path: failed, lambda m: None)
+    with pytest.raises(ValueError):
+        SE.live(lambda path: (_ for _ in ()).throw(OSError("503")), lambda m: None)
+
 
 def _public(published_at="2026-09-11T18:00:44+00:00"):
     return {"chapter": [{"id": "week-04", "status": "published", "published_at": published_at}, {"id": "week-10", "status": "held"}]}
@@ -437,15 +476,20 @@ def test_the_exporter_writes_nothing_while_the_switch_is_off(monkeypatch):
 
 
 def test_the_fixture_export_with_the_switch_off_writes_no_editions_file(tmp_path):
+    # LIVE is committed True (owner ruling 2026-11-22), and a subprocess does not see the conftest monkeypatch. The child
+    # sets the module's switch OFF itself, then runs the real exporter script: no production override is involved.
     env = {k: v for k, v in os.environ.items() if k != "WEB_EDITIONS"}
-    cp = subprocess.run(
-        [sys.executable, os.path.join(_REPO, "scripts", "publish_snapshot.py"), "--mode", "fixture", "--out", str(tmp_path / "snap")],
-        cwd=_REPO,
-        env=env,
-        capture_output=True,
-        text=True,
+    child = (
+        "import runpy, sys\n"
+        f"sys.path[:0] = [{os.path.join(_REPO, 'lambdas')!r}, {os.path.join(_REPO, 'scripts')!r}]\n"
+        "from content import chapter_editions as CE\n"
+        "CE.LIVE = False\n"
+        f"sys.argv = ['publish_snapshot.py', '--mode', 'fixture', '--out', {str(tmp_path / 'snap')!r}]\n"
+        f"runpy.run_path({os.path.join(_REPO, 'scripts', 'publish_snapshot.py')!r}, run_name='__main__')\n"
     )
+    cp = subprocess.run([sys.executable, "-c", child], cwd=_REPO, env=env, capture_output=True, text=True)
     assert cp.returncode == 0, cp.stderr[-1500:]
+    assert (tmp_path / "snap" / "manifest.json").exists()  # the export really ran
     assert not (tmp_path / "snap" / "chapter_editions.json").exists()
     assert "chapter_editions" not in (tmp_path / "snap" / "manifest.json").read_text()
 

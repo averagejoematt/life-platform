@@ -47,7 +47,7 @@ test("the sitemap never lists an archival page; the reading time follows the ser
 
 test("a correction's foot is #6177's sentence without an edition, and says where the edition stands with one", () => {
   const c = { id: "walk", chapter_id: "week-04", kind: "correction", dated_on: "2026-11-20", signature: `Correction, 20 November 2026 — ${SIG}`, published_said: "a", record_shows: "b", evidence: "c", approvals: [{ by: "owner", on: "2026-11-20" }], superseded_by: null };
-  assert.match(correctionHtml(c), /The chapter's text below is unchanged; it reads as first published\./);
+  assert.match(correctionHtml(c), /This note does not change the chapter's text\./); // committed ON (#6177 activation; off = footLine(false))
   assert.match(correctionHtml(c, [c], edition()), /a later edition, and it makes this correction\./);
   assert.match(correctionHtml({ ...c, id: "other" }, [c], edition()), /made to the first edition; the text below is a later edition\./);
 });

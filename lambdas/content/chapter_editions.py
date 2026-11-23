@@ -53,7 +53,9 @@ from typing import Any, Callable, Iterable, Optional
 from content import chapter_corrections as CC
 
 #: THE switch (#6193). False = no edition and no archival page renders anywhere; the records may still be written.
-LIVE = False
+# #6193 activation (owner ruling 2026-11-22): ON publishes nothing by itself; an edition is served only once approved by hash.
+# ROLLBACK: set back to False and rebuild the site.
+LIVE = True
 
 SK_PREFIX = "CHAPTER_EDITION#"
 ORIGINAL_TYPE = "chapter_edition_original"
