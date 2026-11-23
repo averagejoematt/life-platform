@@ -32,6 +32,7 @@ from typing import Any, Optional
 from common.digest_utils import safe_float
 from common.pacific_time import day_in_words, shift_day_key
 
+from content import brief_rec_screen, brief_trends
 from content.brief_format import esc
 
 FORMAT_VERSION = "compact-v1"
@@ -91,15 +92,13 @@ RHYTHM_EVENTS_PREFIX = "Events in the "  # the owner-only renderer's dated-episo
 
 QUIET_LEAD = "Nothing important changed, and nothing needs you today."
 NO_CHANGE = "Nothing changed beyond normal day-to-day variation."
+DAY_ONLY_NO_CHANGE = "Day to day, no change is beyond normal variation; the longer view is below."  # #6241 §3
+DAY_ONLY_NO_CHANGE_POINTER = "Day to day, no change is beyond normal variation."
 NO_CHANGE_SO_FAR = "In the data that has arrived, no change is beyond normal day-to-day variation."  # never categorical
 NOT_MEDICAL = "Personal tracking, not medical advice."
 
 # Wording the compact brief never sends: a recovery score or load ratio read as clearance (owner ruling §5).
-CLEARANCE_RE = re.compile(
-    r"\b(cleared|clearance|safe to|safe zone|green light|all clear|good to go|fine to train|nothing to worry"
-    r"|ready (?:for|to) (?:train|push|go hard)|hard training (?:or [a-z -]+ )?is fine)\b",
-    re.I,
-)
+CLEARANCE_RE = brief_rec_screen.CLAIM_CLASSES[0][1]  # the screen's clearance class (one pattern, two readers)
 # Absence worded as behaviour — never about an input that is still pending (owner ruling §2).
 MISSED_RE = re.compile(
     r"\b(missed|skipped|not logged|nothing (?:was )?logged|zero (?:nutrition|food|calories|intake)|failed to log)\b", re.I
@@ -152,6 +151,10 @@ class CompactView:
     dropped_voice: int = 0
     dropped_clearance: int = 0
     dropped_for_length: int = 0
+    held_recs: list = field(default_factory=list)
+    trends: list = field(
+        default_factory=list
+    )  # #6241 §3: brief_trends.TrendItem, cadence applied  # #6241 §2: held high-stakes recommendations (private send row only)
     respond_url: Optional[str] = None
     respond_rec: Any = None
     respond_note: Optional[str] = None
@@ -334,7 +337,8 @@ def critical_alerts(data: dict, owner_rhythm=None) -> list:
     cm = (data or {}).get("computed_metrics") or {}
     acwr = _f(cm.get("acwr"))
     if cm.get("acwr_alert") and str(cm.get("acwr_zone") or "") in LOAD_ALERT_ZONES and acwr is not None:
-        word = "very high" if str(cm.get("acwr_zone")) == "danger" else "elevated"
+        danger = str(cm.get("acwr_zone")) == "danger"  # acwr_compute_lambda._classify_acwr: > 1.5 danger, > 1.3 caution
+        word, line = ("very high", 1.5) if danger else ("elevated", LOAD_BAND[1])
         out.append(
             Alert(
                 "training_load",
@@ -344,7 +348,7 @@ def critical_alerts(data: dict, owner_rhythm=None) -> list:
                     + " is "
                     + _n(acwr, 2)
                     + ", above the "
-                    + _n(LOAD_BAND[1], 1)
+                    + _n(line, 1)
                     + " the platform's rule treats as "
                     + word
                     + " injury risk."
@@ -385,15 +389,18 @@ def select_recs(recs: list, changed_metrics: dict, persona: tuple) -> tuple[list
     """(shown, counts) from the hybrid's labelled recs (brief_hybrid.Rec). Coaching recs only (food-export housekeeping
     becomes a Not-known-yet line). A NEW rec is shown; a REPEAT only when its evidence metric changed today (§6);
     a rec naming a persona or reading a score as clearance is dropped. Capped at REC_CEILING, NEW first."""
-    shown, counts = [], {"repeats_suppressed": 0, "dropped_voice": 0, "dropped_clearance": 0}
+    shown: list = []
+    counts: dict = {"repeats_suppressed": 0, "dropped_voice": 0, "dropped_clearance": 0, "held_recs": []}
     for r in recs:
         if getattr(r, "kind", "") != "coaching" or getattr(r, "source", "") == "readiness":
             continue
         if names_a_persona(r.text, persona):
             counts["dropped_voice"] += 1
             continue
-        if CLEARANCE_RE.search(r.text):
-            counts["dropped_clearance"] += 1
+        ok, classes = brief_rec_screen.screen(r.text, getattr(r, "source", ""))  # #6241 §2: high-stakes claims are held
+        if not ok:
+            counts["dropped_clearance"] += int("clearance" in classes)
+            counts["held_recs"].append({"key": r.key, "classes": classes, "text": r.text})  # private SEND# row only
             continue
         because = None
         if r.status == "REPEAT":
@@ -423,6 +430,7 @@ def build(
     previous_acwr: Optional[float],
     site_url: str,
     persona: tuple,
+    trends: tuple = (),
 ) -> CompactView:
     """Pure assembly from already-read inputs (the tests drive this directly)."""
     day = data.get("date") or ""
@@ -457,13 +465,27 @@ def build(
     elif decision is not None:
         lead, kind = decision.text, "decision"
         shown = [decision] + [r for r in shown if r is not decision]  # the decision leads; it is not repeated below
+    elif trends:  # #6241 §3: the lead never sits silent over an open multi-week item — one qualified clause
+        clause = brief_trends.lead_clause(list(trends))
+        if brief_trends.all_pointers(list(trends)):  # a standing pointer: no repeated warning, a few words in the lead
+            lead = "No decision is needed " + ("from the data in hand" if unknown else "today") + ". Still open: " + clause + "."
+        elif unknown:
+            lead = "No decision is needed from the data in hand, but " + clause + "; some data is not known yet."
+        else:
+            lead = "No decision is needed today, but " + clause + "."
+        kind = "trend"
     elif unknown:
         lead, kind = "No decision is needed from the data in hand; some of it is not known yet.", "unknown"
     elif first_change:
         lead, kind = "No decision is needed today.", "plain"
     else:
         lead, kind = QUIET_LEAD, "quiet"
-    changed = first_change or (NO_CHANGE if not unknown else NO_CHANGE_SO_FAR)
+    if first_change:
+        changed = first_change
+    elif trends:
+        changed = DAY_ONLY_NO_CHANGE if not brief_trends.all_pointers(list(trends)) else DAY_ONLY_NO_CHANGE_POINTER
+    else:
+        changed = NO_CHANGE if not unknown else NO_CHANGE_SO_FAR
     return CompactView(
         data_day=day,
         lead=lead,
@@ -476,6 +498,7 @@ def build(
         unknown=unknown,
         detail_url=site_url.rstrip("/") + "/data/day/" + day + "/",
         pending_inputs=pending,
+        trends=list(trends),
         **counts,
     )
 
@@ -491,6 +514,8 @@ def subject(view: CompactView, today_short: str) -> str:
         tail = "1 decision"
     elif view.quiet:
         tail = "Nothing changed, nothing needed"
+    elif view.lead_kind == "trend":
+        tail = "No decision · a multi-week trend to note"
     elif view.unknown:
         tail = "No decision · some data not in yet"
     else:
@@ -507,6 +532,9 @@ def render_text(view: CompactView, today_short: str) -> str:
     out += [view.lead] + (["Shown again because: " + lead_rec.changed_because] if lead_rec and lead_rec.changed_because else [])
     out += [""] if view.quiet else ["", "What changed: " + view.changed, ""]
     out += ["• " + m.text for m in view.metrics]
+    shown = _block_trends(view)  # pointers ride the lead when the lead is about them
+    if shown:
+        out += ["", "Over the past weeks:"] + ["• " + (t.full if t.mode == "full" else t.pointer.capitalize() + ".") for t in shown]
     for r in [x for x in view.recs if x is not lead_rec]:
         out += ["", "Recommendation: " + r.text] + (["Shown again because: " + r.changed_because] if r.changed_because else [])
     if view.follow_up:
@@ -540,7 +568,16 @@ def render_html(view: CompactView, today_short: str) -> str:
     for a in view.alerts:
         body += '<div data-alert="' + esc(a.kind) + '" style="' + _C["alert"] + '">' + "<br>".join(esc(x) for x in a.lines) + "</div>"
     lead_rec = view.recs[0] if view.lead_kind == "decision" and view.recs else None
-    body += '<p data-lead="' + view.lead_kind + '"' + (_rec_attrs(lead_rec) if lead_rec else "") + ' style="' + _C["lead"] + '">'
+    body += (
+        '<p data-lead="'
+        + view.lead_kind
+        + '"'
+        + (_rec_attrs(lead_rec) if lead_rec else "")
+        + _pointer_attrs(view)
+        + ' style="'
+        + _C["lead"]
+        + '">'
+    )
     body += esc(view.lead) + (_because(lead_rec) if lead_rec else "") + "</p>"
     if not view.quiet:  # on a quiet day the lead already says nothing changed; once is enough
         changed_attr = ' data-changed="1"' if view.has_change else ""
@@ -567,6 +604,12 @@ def render_html(view: CompactView, today_short: str) -> str:
             + esc(m.text)
             + "</p>"
         )
+    shown = _block_trends(view)  # #6241 §3: the full sentence on its cadence days; a pointer rides the lead
+    if shown:
+        body += '<p style="' + _C["h"] + '">Over the past weeks</p>'
+    for t in shown:
+        body += '<p data-trend="' + t.kind + '" data-trend-mode="' + t.mode + '" data-trend-key="' + esc(t.key) + '" style="'
+        body += _C["p"] + '">' + esc(t.full if t.mode == "full" else t.pointer.capitalize() + ".") + "</p>"
     rest = [r for r in view.recs if r is not lead_rec]
     if rest:
         body += '<p style="' + _C["h"] + '">' + ("Also worth doing" if lead_rec else "Recommendation") + "</p>"
@@ -607,6 +650,20 @@ def render_html(view: CompactView, today_short: str) -> str:
 def link_label(data_day: str) -> str:
     """The detail link's words: the day, on the site — short enough to wrap only at spaces on a 390 px phone."""
     return "See " + day_in_words(data_day) + " in full on averagejoematt.com"
+
+
+def _block_trends(view: CompactView) -> list:
+    """Full items always; pointer items only when the lead is not already carrying them (an alert or decision leads)."""
+    return [t for t in view.trends if t.mode == "full" or view.lead_kind != "trend"]
+
+
+def _pointer_attrs(view: CompactView) -> str:
+    """The open items a pointer day folds into the lead, marked on it, so the checker still sees them (#6241 §3)."""
+    pointers = [t for t in view.trends if t.mode == "pointer"]
+    if not pointers or view.lead_kind != "trend":
+        return ""
+    worst = sorted(pointers, key=lambda t: ("concern", "trend", "unknown").index(t.kind))[0]
+    return ' data-trend="' + worst.kind + '" data-trend-mode="pointer"'
 
 
 def _rec_attrs(r: CompactRec) -> str:
