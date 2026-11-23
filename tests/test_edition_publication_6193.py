@@ -384,3 +384,41 @@ def test_the_tool_places_an_anchor_only_on_his_word_for_an_approved_correction_i
     ok = _call(t, action="approve_anchor", chapter_id="week-04", correction_id="walk", approved=True)
     assert ok["approved"] is True
     assert "already approved" in _call(t, action="approve_anchor", chapter_id="week-04", correction_id="walk", approved=True)["error"]
+
+
+# ── rehearsal ruling §9: the rehearsal's own checks ───────────────────────────────────────────
+
+
+def test_the_rehearsal_withdrawal_simulation_and_table():
+    import chronicle_edition_rehearsal as R
+
+    rows = {
+        "week-04": R.records({"chapter": "week-04", "carries": []}, TEXT, None, "2026-09-11", "2026-11-23"),
+        "week-05": R.records({"chapter": "week-05", "carries": []}, TEXT, None, "2026-09-18", "2026-11-23"),
+    }
+    assert R.simulate_withdrawal(rows, "week-04", "2026-11-23") is None  # withdrawn alone, others kept, re-approval serves
+    assert "not served" in R.simulate_withdrawal(
+        {"week-04": [r for r in rows["week-04"] if r["record_type"] != CE.RESTORE_TYPE]}, "week-04", "2026-11-23"
+    )
+    t = R.table(
+        {"week-04": {**{c: None for c in R.CHECKS}, "archive": "n/a"}, "week-05": {**{c: None for c in R.CHECKS}, "title": "renamed"}}
+    )
+    assert "| week-04 | PASS |" in t and "| week-05 | BLOCKED |" in t and "BLOCKED: renamed" in t
+    src = open(os.path.join(_REPO, "scripts", "chronicle_edition_rehearsal.py"), encoding="utf-8").read()
+    for forbidden in ("put_item", "update_item", "put_object", "safe_sync", "create_invalidation", "--apply"):
+        assert forbidden not in src, forbidden
+
+
+def test_the_rehearsal_surface_check_finds_a_first_edition_summary_left_behind(tmp_path):
+    import chronicle_edition_rehearsal as R
+
+    (tmp_path / "story" / "week-04").mkdir(parents=True)
+    (tmp_path / "story" / "index.html").write_text("<p>The edition's own summary line.</p>")
+    page = '<meta property="og:description" content="The edition\'s own summary line."><p class="dek">The edition\'s own summary line.</p>'
+    (tmp_path / "story" / "week-04" / "index.html").write_text(page)
+    assert R.surfaces(str(tmp_path), "week-04", "The edition's own summary line.", "An older summary of the first edition.") is None
+    (tmp_path / "story" / "moments").mkdir()
+    (tmp_path / "story" / "moments" / "index.html").write_text("<p>An older summary of the first edition.</p>")
+    assert "still shows the first edition's summary" in R.surfaces(
+        str(tmp_path), "week-04", "The edition's own summary line.", "An older summary of the first edition."
+    )
