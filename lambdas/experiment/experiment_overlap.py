@@ -344,8 +344,8 @@ def attach_closing_caveat(table, pk, existing, analysis):
     """Append the one-line overlap caveat to a closing analysis in place; verdict untouched.
 
     Fail-soft for the CLOSE (an error never blocks ending an experiment) but never silent: the
-    analysis records `overlap_caveat_check` = "checked" or "not_run: <ErrorClass>", so a missing
-    caveat is distinguishable from "no overlap"."""
+    analysis records `overlap_caveat_check` = "not_run: <ErrorClass>" when the check could not run
+    (absent = it ran), so a missing caveat is distinguishable from "no overlap"."""
     if analysis is None:
         return
     try:
@@ -354,7 +354,6 @@ def attach_closing_caveat(table, pk, existing, analysis):
         analysis["overlap_caveat_check"] = f"not_run: {type(exc).__name__}"
         analysis["summary"] = f"{analysis.get('summary', '')} (Overlap caveat check did not run.)".strip()
         return
-    analysis["overlap_caveat_check"] = "checked"
     if caveat:
         analysis["overlap_caveat"] = caveat
         analysis["summary"] = f"{analysis.get('summary', '')} {caveat}".strip()

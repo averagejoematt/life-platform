@@ -294,8 +294,8 @@ def test_closing_caveat_read_failure_is_recorded_not_implied_clean(monkeypatch):
     assert analysis["verdict"] == "supported" and "overlap_caveat" not in analysis
 
 
-def test_closing_caveat_healthy_marks_checked(monkeypatch):
+def test_closing_caveat_healthy_leaves_analysis_unchanged(monkeypatch):
     table = _seed(monkeypatch)
     analysis = {"verdict": "supported", "summary": "Result."}
     eo.attach_closing_caveat(table, tl.EXPERIMENTS_PK, {"experiment_id": "z"}, analysis)
-    assert analysis["overlap_caveat_check"] == "checked" and analysis["summary"] == "Result."
+    assert "overlap_caveat_check" not in analysis and analysis["summary"] == "Result."
