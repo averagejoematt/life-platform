@@ -9,7 +9,7 @@ Model: chronicle_email_sender_lambda.py (same subscriber query, SES pattern, rat
 
 Sections:
   1. The Numbers — weight, sleep, recovery, character
-  2. Chronicle Preview — latest Elena Voss headline
+  2. The Latest Chapter — the newest PUBLISHED chapter, dated, in its served summary (#6244)
   3. What Worked This Week — the newest computed insight, ONLY when the public narrative gate
      (web.narrative_publication, the Site API's own chokepoint) passes its row; omitted otherwise
   4. Observatory Spotlight — rotating page highlight
@@ -17,13 +17,30 @@ Sections:
 #6151: "The Board Says" is gone. It printed one fixed sentence and attributed it to a different
 board member each week — words nobody on the board said (ADR-104). Nothing replaces it.
 Every send carries a text part, a preheader and List-Unsubscribe (common.reader_email).
+
+#6244 (owner ruling 2026-11-23). Two display defects:
+  * "Level 22.0 · None" — the character level is shown as a whole number and the tier only when it is a real word;
+    a level that is not a number drops the row.
+  * The chapter section ("Chronicle Preview") was undated and read the first post of ``generated/journal/posts.json``,
+    re-joining its excerpt at ". " and appending a period (a summary that already ended in one read "flag.."). Two
+    weeks after the last chapter it still looked like this week's preview. It now reads ``/api/chapters`` — the route
+    that knows a published week from a held, retired or skipped one (those serve ``url: null`` and are never
+    shown) — takes the newest PUBLISHED week, dates it ("Week 10 · published November 14, 2026") and shows its
+    summary by the site's one-summary rule (www/src/lib/chapter_truth.js): the served later edition's own summary
+    (the ``editions`` list, already through every publication gate at serve time), whole. With no served edition
+    there is no summary line (the owner-approved header revisions live only in the site build, so the manifest
+    excerpt could be the very words a revision replaced) — the title, the date and the link stand alone. A failed
+    read omits the section; nothing stale is shown in its place.
 """
 
 import html as _html
 import json
 import logging
+import math
 import os
+import re
 import time
+import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import boto3
@@ -49,6 +66,10 @@ USER_ID = os.environ.get("USER_ID", "matthew")
 SENDER = os.environ.get("EMAIL_SENDER", SIGNAL_SENDER)
 SITE_URL = os.environ.get("SITE_URL", "https://averagejoematt.com")
 SEND_RATE = float(os.environ.get("SEND_RATE_PER_SEC", "1.0"))
+#: #6244: the public chapters route — the one reader of which weeks are published. "off" skips the read (the unit
+#: suite sets it, tests/conftest.py; the section is then omitted, exactly as on a failed read).
+CHAPTERS_FETCH = os.environ.get("WEEKLY_SIGNAL_CHAPTERS_FETCH", "on")
+CHAPTERS_TIMEOUT_S = 10
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
@@ -225,18 +246,19 @@ def _build_numbers(stats):
     # covering a Whoop outage's handful of nights.
     sleep_n = vitals.get("sleep_hours_30d_n")
     recovery = vitals.get("recovery_pct")
-    level = char.get("level", "?")
-    tier = char.get("tier", "")
-
+    character = character_words(char)
     rows = []
     if weight is not None:
         arrow = "↓" if delta and delta < 0 else "↑" if delta and delta > 0 else ""
         delta_str = f" ({arrow}{abs(delta):.1f} lbs {delta_window}d)" if delta and delta_window else ""
-        rows.append(
-            f'<tr><td style="color:#8b949e;padding:4px 12px 4px 0;">Weight</td><td style="color:#c9d1d9;font-weight:600;">{weight} lbs{delta_str}</td></tr>'
-        )
+        weight_n = _finite(weight)
+        if weight_n is not None:
+            rows.append(
+                f'<tr><td style="color:#8b949e;padding:4px 12px 4px 0;">Weight</td><td style="color:#c9d1d9;font-weight:600;">{weight_n:.1f} lbs{delta_str}</td></tr>'
+            )
     if sleep:
-        window_str = f" ({sleep_n}n · 30d)" if sleep_n else ""
+        sleep_n_int = _finite(sleep_n)
+        window_str = f" ({int(sleep_n_int)}n · 30d)" if sleep_n_int else ""
         rows.append(
             f'<tr><td style="color:#8b949e;padding:4px 12px 4px 0;">Avg Sleep</td><td style="color:#c9d1d9;font-weight:600;">{sleep:.1f} hrs{window_str}</td></tr>'
         )
@@ -244,29 +266,126 @@ def _build_numbers(stats):
         rows.append(
             f'<tr><td style="color:#8b949e;padding:4px 12px 4px 0;">Recovery</td><td style="color:#c9d1d9;font-weight:600;">{recovery:.0f}%</td></tr>'
         )
-    rows.append(
-        f'<tr><td style="color:#8b949e;padding:4px 12px 4px 0;">Character</td><td style="color:#c9d1d9;font-weight:600;">Level {level} · {tier}</td></tr>'
-    )
+    if character:
+        rows.append(
+            f'<tr><td style="color:#8b949e;padding:4px 12px 4px 0;">Character</td><td style="color:#c9d1d9;font-weight:600;">{_html.escape(character)}</td></tr>'
+        )
 
     return _sec("The Numbers", f'<table style="font-size:14px;line-height:1.8;">{"".join(rows)}</table>')
 
 
-def _build_chronicle(posts_data):
-    posts = posts_data.get("posts", []) if isinstance(posts_data, dict) else posts_data
-    if not posts:
+def _finite(value):
+    """A finite float from a wire value (Decimal, int, float, numeric string); None otherwise (bools included)."""
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        f = float(value)
+    except (TypeError, ValueError, ArithmeticError):
+        return None
+    return f if math.isfinite(f) else None
+
+
+#: Words that are not a tier name — a serialized null or an empty marker never reaches a reader.
+_NOT_A_WORD = {"", "none", "null", "nan", "undefined", "?"}
+
+
+def character_words(char):
+    """#6244: "Level 26 · Momentum" — the level as a whole number, the tier only when it is a real word; None when the
+    level is not a number (the row is then omitted, never "Level ?")."""
+    if not isinstance(char, dict):
+        return None
+    level = _finite(char.get("level"))
+    if level is None or level < 0:
+        return None
+    tier = str(char.get("tier") or "").strip()
+    words = f"Level {int(round(level))}"
+    return f"{words} · {tier}" if tier.lower() not in _NOT_A_WORD else words
+
+
+_CHAPTER_ID_RE = re.compile(r"/week-(\d+)/?$")
+_DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _chapter_id(url):
+    """The chapter id of a journal permalink ("/journal/posts/week-12/" -> "week-12") — the derivation the snapshot
+    producer uses (scripts/publish_snapshot_chapters.week_id); None when the url names no week page."""
+    m = _CHAPTER_ID_RE.search(str(url or ""))
+    return f"week-{int(m.group(1)):02d}" if m else None
+
+
+def _day_words(day):
+    try:
+        d = datetime.strptime(str(day or "")[:10], "%Y-%m-%d")
+    except ValueError:
+        return None
+    return f"{d.strftime('%B')} {d.day}, {d.year}"
+
+
+def latest_published_chapter(doc):
+    """#6244: the newest PUBLISHED chapter of an ``/api/chapters`` document, ready to render — pure.
+
+    ``{"label", "title", "url", "published_on", "summary"}`` or None. Only a week served as ``published`` with a title
+    and a url is a candidate: a held, retired, skipped or pending week (``url: null``) never is. ``summary`` follows the
+    one-summary rule: the served edition's own summary for that chapter, else None — never a manifest excerpt."""
+    if not isinstance(doc, dict):
+        return None
+    weeks = [
+        w
+        for w in (doc.get("weeks") or [])
+        if isinstance(w, dict) and w.get("status") == "published" and w.get("url") and w.get("title") and isinstance(w.get("week"), int)
+    ]
+    if not weeks:
+        return None
+    w = max(weeks, key=lambda x: x["week"])
+    cid = _chapter_id(w["url"])
+    if cid is None:
+        return None
+    summary = None
+    for e in doc.get("editions") or []:
+        if isinstance(e, dict) and e.get("chapter_id") == cid and str(e.get("title") or "") == str(w["title"]):
+            text = " ".join(str(e.get("summary") or "").split())
+            summary = text or None
+            break
+    published = str(w.get("published_at") or "")[:10]
+    on = _day_words(published) if _DAY_RE.match(published) else None
+    return {
+        "label": str(w.get("label") or f"Week {w['week']}"),
+        "title": str(w["title"]),
+        "url": f"/story/{cid}/",
+        "published_on": on,
+        "summary": summary,
+    }
+
+
+def _fetch_chapters():
+    """GET {SITE_URL}/api/chapters (the public route; no AWS read). None when off, unreachable or not JSON."""
+    if str(CHAPTERS_FETCH).strip().lower() != "on":
+        return None
+    try:
+        req = urllib.request.Request(f"{SITE_URL}/api/chapters", headers={"User-Agent": "weekly-signal"})
+        with urllib.request.urlopen(req, timeout=CHAPTERS_TIMEOUT_S) as resp:  # noqa: S310 — our own https site
+            return json.loads(resp.read().decode("utf-8"))
+    except Exception as e:  # noqa: BLE001 — a failed read omits the section
+        logger.warning("chapters read failed (%s) — the chapter section is omitted", type(e).__name__)
+        return None
+
+
+def _build_chronicle(chapter):
+    """The latest published chapter (``latest_published_chapter``), dated; "" when there is none."""
+    if not isinstance(chapter, dict) or not chapter.get("title") or not chapter.get("url"):
         return ""
-    latest = posts[0]
-    title = latest.get("title", "")
-    excerpt = latest.get("excerpt", "")
-    url = latest.get("url", "/chronicle/")
-    # Truncate excerpt to ~2 sentences
-    sentences = excerpt.split(". ")
-    preview = ". ".join(sentences[:2]) + ("." if len(sentences) > 1 else "")
+    label = _html.escape(chapter.get("label") or "")
+    dated = f" · published {_html.escape(chapter['published_on'])}" if chapter.get("published_on") else ""
+    summary = (
+        f'<p style="font-size:13px;color:#8b949e;line-height:1.6;margin:0 0 12px;">{_html.escape(chapter["summary"])}</p>'
+        if chapter.get("summary")
+        else ""
+    )
     return _sec(
-        "Chronicle Preview",
-        f"""<p style="font-size:16px;color:#c9d1d9;font-weight:600;margin:0 0 8px;">{title}</p>
-  <p style="font-size:13px;color:#8b949e;line-height:1.6;margin:0 0 12px;">{preview}</p>
-  <a href="{SITE_URL}{url}" style="font-family:'Courier New',monospace;font-size:11px;letter-spacing:1px;color:#3db88a;text-decoration:none;">Read more →</a>""",
+        "The Latest Chapter",
+        f"""<p style="font-size:11px;color:#8b949e;margin:0 0 6px;">{label}{dated}</p>
+  <p style="font-size:16px;color:#c9d1d9;font-weight:600;margin:0 0 8px;">{_html.escape(chapter["title"])}</p>
+  {summary}<a href="{SITE_URL}{chapter["url"]}" style="font-family:'Courier New',monospace;font-size:11px;letter-spacing:1px;color:#3db88a;text-decoration:none;">Read the chapter →</a>""",
     )
 
 
@@ -288,12 +407,12 @@ def _build_spotlight(week_num):
     )
 
 
-def _build_email(stats, posts_data, insight_text, week_num, unsub_url, week_label):
+def _build_email(stats, chapter, insight_text, week_num, unsub_url, week_label):
     now = datetime.now(timezone.utc)
     display_date = now.strftime("%B %d, %Y")
 
     s1 = _build_numbers(stats) if stats else ""
-    s2 = _build_chronicle(posts_data) if posts_data else ""
+    s2 = _build_chronicle(chapter) if chapter else ""
     s3 = _build_worked(insight_text)
     s4 = _build_spotlight(week_num)
 
@@ -365,7 +484,7 @@ def lambda_handler(event, context):
 
         # Load data (graceful degradation: missing data = skip section, not crash)
         stats = _s3_json("generated/public_stats.json")
-        posts_data = _s3_json("generated/journal/posts.json")
+        chapter = latest_published_chapter(_fetch_chapters())  # #6244: the newest PUBLISHED week, never a held/retired one
         insight_text = _get_weekly_insight()
 
         # #3564: ONE week numbering across the subscriber-facing senders. `%W` is the
@@ -383,7 +502,7 @@ def lambda_handler(event, context):
         if dry_run:
             preview_email = (subscribers[0].get("email") if subscribers else "") or "preview@example.com"
             unsub_url = unsub_url_or_fallback(preview_email, SITE_URL)  # #3044
-            subject, html = _build_email(stats, posts_data, insight_text, week_num, unsub_url, week_label)
+            subject, html = _build_email(stats, chapter, insight_text, week_num, unsub_url, week_label)
             logger.info(
                 "[DRY_RUN] Weekly Signal week %d would send to %d subscriber(s) — sending nothing",
                 week_num,
@@ -417,7 +536,7 @@ def lambda_handler(event, context):
                 continue
 
             unsub_url = unsub_url_or_fallback(email, SITE_URL)  # #3044
-            subject, html = _build_email(stats, posts_data, insight_text, week_num, unsub_url, week_label)
+            subject, html = _build_email(stats, chapter, insight_text, week_num, unsub_url, week_label)
 
             try:
                 ses.send_email(

@@ -219,7 +219,15 @@ def test_chronicle_installment_template():
 def test_between_chronicle_send_carries_text_and_headers(monkeypatch):
     from emails import between_chronicle_lambda as bc
 
-    d = {"deltas": [], "unlocked": [{"interpretation": "Fixture correlation", "r": 0.5}], "decided": [], "stance_shifts": []}
+    # #6244: a correlation is shown only with both measures named, its days and the week it first held — dated in the window
+    d = {
+        "deltas": [],
+        "unlocked": [{"metric_a": "sleep_duration", "metric_b": "recovery_score", "r": 0.5, "n": 60, "first_seen": "2026-11-22"}],
+        "decided": [],
+        "stance_shifts": [],
+    }
+    monkeypatch.setattr(bc, "_today", lambda: "2026-11-29")
+    monkeypatch.setattr(bc, "OWNER_RELEASE", {"by": "owner", "released_on": "2026-11-28", "reviewed_render": "fixture"})
     monkeypatch.setenv("EXTERNAL_EMAILS_ENABLED", "true")
     monkeypatch.setattr(bc, "gather_digest", lambda: d)
     monkeypatch.setattr(bc.send_ledger, "should_skip_replay", lambda *a, **k: False)
@@ -242,7 +250,7 @@ def test_between_chronicle_send_carries_text_and_headers(monkeypatch):
     assert bc.lambda_handler({}, None)["sent"] == 1
     simple = sent[0]["Content"]["Simple"]
     _assert_template(simple["Body"]["Html"]["Data"])
-    assert "Fixture correlation" in simple["Body"]["Text"]["Data"]
+    assert "Sleep time and morning recovery score rose and fell together" in simple["Body"]["Text"]["Data"]
     assert {h["Name"] for h in simple["Headers"]} == {"List-Unsubscribe", "List-Unsubscribe-Post"}
 
 
