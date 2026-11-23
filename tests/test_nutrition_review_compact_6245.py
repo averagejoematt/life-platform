@@ -125,18 +125,18 @@ def _row(day, cal, protein, **extra):
     return rec
 
 
-# Six complete days (Sat 06-06 .. Thu 06-11) and Friday 06-12 exported while it was still being logged (80 kcal).
+# Six complete days (Sat 06-06 .. Thu 06-11) and Friday 06-12 exported while it was still being logged (95 kcal).
 COMPLETE = {"2026-06-06": (1500, 160), "2026-06-07": (1300, 150), "2026-06-08": (1400, 170), "2026-06-09": (1200, 140),
             "2026-06-10": (1600, 180), "2026-06-11": (1100, 120)}  # fmt: skip
 PARTIAL_DAY = "2026-06-12"
 AVG_KCAL = int(sum(c for c, _ in COMPLETE.values()) / len(COMPLETE))  # 1350
 AVG_PRO = int(sum(p for _, p in COMPLETE.values()) / len(COMPLETE))  # 153
-OLD_AVG_KCAL = int((sum(c for c, _ in COMPLETE.values()) + 80) / 7)  # 1168: the partial day averaged in (the defect)
+OLD_AVG_KCAL = int((sum(c for c, _ in COMPLETE.values()) + 95) / 7)  # the partial day averaged in (the defect)
 
 
 def _week_rows():
     rows = {d: _row(d, c, p) for d, (c, p) in COMPLETE.items()}
-    rows[PARTIAL_DAY] = _row(PARTIAL_DAY, 80, 15, partial_at_export=True, entries_count=Decimal("1"))
+    rows[PARTIAL_DAY] = _row(PARTIAL_DAY, 95, 15, partial_at_export=True, entries_count=Decimal("1"))
     return rows
 
 
@@ -434,7 +434,7 @@ def test_the_long_subject_and_table_average_complete_days_only_and_say_how_many(
     text = _text(html)
     assert f"AVG {AVG_KCAL} {AVG_PRO}g" in text
     assert "Fri 06/12 (partly imported)" in text and "AVG = 6 complete days; 1 incomplete day shown, not averaged" in text
-    # the 80 kcal day is shown in grey, never graded green as a deficit day
+    # the partial day is shown in grey, never graded green as a deficit day
     row = re.search(r"Fri 06/12 \(partly imported\)</td>(.*?)</tr>", html, re.S).group(1)
     assert "#10b981" not in row and "#6b7280" in row
 
@@ -464,12 +464,12 @@ def test_a_day_whose_export_has_not_arrived_is_pending_never_averaged_or_missed(
 
 
 def test_no_complete_day_states_no_average(env):
-    rows = {PARTIAL_DAY: _row(PARTIAL_DAY, 80, 15, partial_at_export=True)}
+    rows = {PARTIAL_DAY: _row(PARTIAL_DAY, 95, 15, partial_at_export=True)}
     data = dict(_gathered(), macrofactor_this=rows)
     env["mp"].setattr(m, "gather_nutrition_data", lambda: data)
     subject, html = _send(env, "compact")
     assert subject == f"Nutrition Review - {W1_END} - no complete day of food data yet"
-    assert "no average is stated" in _text(html) and "80 kcal" not in _text(html)
+    assert "no average is stated" in _text(html) and "95 kcal" not in _text(html)
 
 
 def test_a_future_menu_is_never_labelled_missed_in_either_format(env):
@@ -495,7 +495,7 @@ def test_mutation_proofs_the_acceptance_check_catches_each_regression(env):
         if not any(f.startswith(prefix) for f in compact_offenders(subject, html)):
             survived.append(name)
 
-    with pytest.MonkeyPatch.context() as mm:  # M1: the partial day averaged back in (the 2026-11-22 subject)
+    with pytest.MonkeyPatch.context() as mm:  # M1: the partial day averaged back in (the defect)
         mm.setattr(m, "day_completeness", lambda *a, **k: m.DAY_COMPLETE)
         expect("M1 partial day averaged", "partial:")
     with pytest.MonkeyPatch.context() as mm:  # M2: every panel block printed (all voices, no cap)

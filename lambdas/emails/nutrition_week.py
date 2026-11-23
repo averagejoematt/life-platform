@@ -16,7 +16,7 @@ from common.constants import PLAN_DAILY_PROTEIN_MIN_G
 from health import calorie_target, nutrient_intake, nutrition_logging
 
 # #6245: whether a day's row is a whole day's food log. Owner ruling 2026-11-23: a partly imported or not-yet-arrived
-# day is never averaged in as a full day's intake (the 2026-11-22 subject averaged an 80 kcal Saturday in as intake).
+# day is never averaged in as a full day's intake.
 DAY_COMPLETE = "complete"
 #: Part of a day: the row was exported while its day was still being logged (`partial_at_export`, #5954), or no export
 #: has landed since the day ended (`food_log_state.arrival` == not_arrived, the Morning Brief's own determination).
