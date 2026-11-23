@@ -341,7 +341,7 @@ ALLOWED_TO_NAME = frozenset(
         "mcp/registry.py",  # registers the tool
         "lambdas/privacy/field_tiers.py",  # TIER_OWNER_ONLY
         "lambdas/experiment/phase_taxonomy.py",  # CROSS_PHASE
-        "cdk/stacks/role_policies_email.py",  # #6158 pilot: the daily-brief role's append-only Deny names the partition
+        "cdk/stacks/email_stack.py",  # #6158 pilot: the daily-brief role's append-only Deny names the partition
     }
 )
 

@@ -32,11 +32,11 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import timezone
 from typing import Any, Optional
 
 from boto3.dynamodb.conditions import Key
-from common.pacific_time import shift_day_key
+from common.pacific_time import parse_iso_utc, shift_day_key
 
 from coach import brief_recommendations as seam, recommendation_record as rr
 
@@ -143,8 +143,10 @@ def write_offer(table, offer: Offer, *, ses_message_id: Optional[str], offered_a
 
 def _instant(iso: str) -> str:
     """The token row's `used_at` (isoformat, UTC) in the record's instant format."""
-    dt = datetime.fromisoformat(str(iso).replace("Z", "+00:00")).astimezone(timezone.utc)
-    return dt.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    dt = parse_iso_utc(iso)
+    if dt is None:
+        raise rr.RecommendationError("the token's used_at is not an ISO instant")
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
 
 def carry_responses(table, trial_pk: str) -> dict[str, int]:

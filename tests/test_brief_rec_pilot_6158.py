@@ -524,17 +524,31 @@ def test_the_handler_hands_record_the_ses_reply_only_for_an_accepted_send():
 
 
 def test_the_daily_brief_role_is_append_only_on_the_record_partition():
-    sys.path.insert(0, str(ROOT / "cdk"))
-    from stacks import role_policies_email as rpe
-
-    stmts = [s.to_statement_json() for s in rpe.email_daily_brief()]
-    deny = [s for s in stmts if s.get("Effect") == "Deny"]
-    assert len(deny) == 1 and deny[0]["Sid"] == "RecommendationRecordAppendOnly"
-    assert sorted(deny[0]["Action"]) == ["dynamodb:BatchWriteItem", "dynamodb:DeleteItem", "dynamodb:UpdateItem"]
-    assert deny[0]["Condition"] == {"ForAnyValue:StringEquals": {"dynamodb:LeadingKeys": [rr.pk("matthew")]}}
-    assert rpe.RECOMMENDATION_RECORD_PK == rr.pk("matthew")
-    allows = [s for s in stmts if s.get("Effect", "Allow") == "Allow"]
-    assert not any("coach_recommendations" in str(s) for s in allows)  # no new Allow names the record
+    """Read from source (aws_cdk is not installed in the unit suite): the stack applies one Deny to the daily-brief
+    role, on exactly the record's partition, and denies every record write but PutItem. No Allow names the record."""
+    src = (ROOT / "cdk/stacks/email_stack.py").read_text()
+    tree = ast.parse(src)
+    consts = {
+        t.id: ast.literal_eval(n.value)
+        for n in tree.body
+        if isinstance(n, ast.Assign)
+        for t in n.targets
+        if isinstance(t, ast.Name) and t.id.startswith("RECOMMENDATION_RECORD_")
+    }
+    assert consts["RECOMMENDATION_RECORD_PK"] == rr.pk("matthew")
+    assert sorted(consts["RECOMMENDATION_RECORD_DENIED_ACTIONS"]) == [
+        "dynamodb:BatchWriteItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:UpdateItem",
+    ]
+    (fn,) = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "recommendation_record_append_only"]
+    body = ast.unparse(fn)
+    assert "effect=iam.Effect.DENY" in body and "sid='RecommendationRecordAppendOnly'" in body
+    assert "{'ForAnyValue:StringEquals': {'dynamodb:LeadingKeys': [RECOMMENDATION_RECORD_PK]}}" in body
+    assert src.count("_daily_brief.role.add_to_principal_policy(recommendation_record_append_only())") == 1
+    assert src.count("recommendation_record_append_only()") == 2  # applied to the daily-brief role only
+    for rel in ("cdk/stacks/role_policies_email.py", "cdk/stacks/role_policies_base.py"):
+        assert "coach_recommendations" not in (ROOT / rel).read_text(), rel  # no Allow names the record
 
 
 def test_a_due_follow_up_is_asked_even_on_a_brief_with_no_recommendation_of_its_own(live, table, monkeypatch):
