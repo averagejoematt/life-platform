@@ -18,6 +18,7 @@ name (``pred_<YYYYMMDD>_forecast_<rule>``), never words, and are served under ``
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any, Callable, Optional
 
 from boto3.dynamodb.conditions import Key
@@ -64,6 +65,22 @@ def _num(v: Any) -> Optional[float]:
     return f if f == f and f not in (float("inf"), float("-inf")) else None
 
 
+def _int(v: Any) -> Optional[int]:
+    """A count or a version as a JSON integer, or None. DynamoDB hands every number back as ``Decimal``, which
+    ``json.dumps`` refuses (the 500 of 2026-11-23, the first live row); a whole number only, never a rounded one."""
+    if isinstance(v, bool) or not isinstance(v, (int, float, Decimal)):
+        return None
+    try:
+        return int(v) if v == int(v) else None
+    except (ValueError, OverflowError, ArithmeticError):  # NaN / Infinity
+        return None
+
+
+def _text(v: Any) -> Optional[str]:
+    """A stored string as it is, or None: nothing that is not a string leaves through a string field."""
+    return v if isinstance(v, str) else None
+
+
 def served(row: dict, genesis: Optional[str]) -> Optional[dict]:
     """One forecast row in its public shape, or None when it is not a forecast this route serves."""
     from web.prediction_reason import _notes, metric_unit, metric_words
@@ -93,27 +110,27 @@ def served(row: dict, genesis: Optional[str]) -> Optional[dict]:
         "call": f"{FPOL.READER_SHORT}:{pid}",
         "label": FPOL.LABEL,
         "author_words": FPOL.AUTHOR_WORDS,
-        "rule": {"id": str(model.get("id") or ""), "version": model.get("version"), "words": str(model.get("words") or "")},
-        "metric": spec.get("metric"),
+        "rule": {"id": str(model.get("id") or ""), "version": _int(model.get("version")), "words": str(model.get("words") or "")},
+        "metric": _text(spec.get("metric")),
         "measure": metric_words(spec.get("metric")),
         "unit": metric_unit(spec.get("metric")),
         "claim": str(row.get("claim_natural") or ""),
         "made": made,
-        "target_date": spec.get("target_date"),
+        "target_date": _text(spec.get("target_date")),
         "reader_calls_close": R.open_until(spec, made, eff, due),
         "result_due": due,
         "status": status,
         "evaluation_rule": str(row.get("evaluation_rule") or ""),
-        "scoring": {"rule": spec.get("scoring"), "version": spec.get("scoring_version"), "words": FPOL.SCORING_WORDS},
+        "scoring": {"rule": _text(spec.get("scoring")), "version": _int(spec.get("scoring_version")), "words": FPOL.SCORING_WORDS},
         "forecast": _num(spec.get("threshold")),
-        "guess": {"value": _num(spec.get("baseline_value")), "on": spec.get("baseline_on"), "words": "a guess that nothing changes"},
+        "guess": {"value": _num(spec.get("baseline_value")), "on": _text(spec.get("baseline_on")), "words": "a guess that nothing changes"},
         "inputs": {
-            "route": lin.get("route"),
-            "url": lin.get("url"),
-            "from": window.get("from"),
-            "to": window.get("to"),
-            "n": lin.get("n"),
-            "sha256": lin.get("sha256"),
+            "route": _text(lin.get("route")),
+            "url": _text(lin.get("url")),
+            "from": _text(window.get("from")),
+            "to": _text(window.get("to")),
+            "n": _int(lin.get("n")),
+            "sha256": _text(lin.get("sha256")),
         },
         "graded": (
             {
