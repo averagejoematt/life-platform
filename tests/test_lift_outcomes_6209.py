@@ -91,6 +91,17 @@ def test_registry_entries_state_the_two_confounds():
     assert "self-report" in lo.LIFT_METRICS[lo.LIFT_SESSION_RPE]["caveat"]
 
 
+def test_the_mcp_metric_description_enumerates_exactly_the_design_metrics():
+    """The tool's criterion.metric prose is a literal (the catalog generator reads it with ast.literal_eval), so this pins
+    it to the registry: every slug validate_design accepts, in registry order, and nothing else; plus both confounds."""
+    from mcp.tools_descriptions import DESIGN_METRIC_DESCRIPTION
+
+    listed = DESIGN_METRIC_DESCRIPTION.split("One of: ", 1)[1].split(". ", 1)[0].split(", ")
+    assert listed == list(ed.DESIGN_METRICS)
+    assert "confounds programmed load with performance" in DESIGN_METRIC_DESCRIPTION
+    assert "self-reported effort" in DESIGN_METRIC_DESCRIPTION
+
+
 # ── lift_session_rpe ─────────────────────────────────────────────────────────
 
 

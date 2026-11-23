@@ -6,18 +6,6 @@ data + one pure helper, re-exported by tools_lifestyle so every caller keeps its
 """
 
 from common.metric_truth import resolved_source_id
-from experiment.experiment_design import DESIGN_METRICS
-from experiment.lift_outcomes import LIFT_METRICS
-
-# create_experiment's criterion.metric description, DERIVED from the slug registry so the tool can never offer a slug
-# validate_design refuses or hide one it accepts (#6209). The lift_* caveats come from their registry entries.
-DESIGN_METRIC_DESCRIPTION = (
-    "One of: "
-    + ", ".join(DESIGN_METRICS)
-    + ". #6209 the lift_* outcomes are per-session series derived from logged Hevy sets (a day with no session is absent; "
-    + " ".join(f"{slug}: {entry['definition']} {entry['caveat']}" for slug, entry in LIFT_METRICS.items())
-    + ")"
-)
 
 # ── Experiment metrics ──
 
