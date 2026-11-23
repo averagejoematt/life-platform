@@ -102,8 +102,27 @@ def tree_hash(root: str) -> str:
     return h.hexdigest()
 
 
+#: The fixture export with the second-edition switch held OFF in the child (#6193): the committed switch is now ON, and the
+#: gate's default fixture snapshot is the no-edition baseline every other check (and the editions mutation's "off" half)
+#: compares against. The module's own constant is set in the child process; nothing in production reads this.
+_EXPORT_EDITIONS_OFF = (
+    "import runpy, sys\n"
+    "sys.path[:0] = [{lam!r}, {scr!r}]\n"
+    "from content import chapter_editions as CE\n"
+    "CE.LIVE = False\n"
+    "sys.argv = ['publish_snapshot.py', '--mode', 'fixture', '--out', {out!r}]\n"
+    "runpy.run_path({script!r}, run_name='__main__')\n"
+)
+
+
 def export_fixture_snapshot() -> None:
-    cp = run([sys.executable, os.path.join(REPO, "scripts", "publish_snapshot.py"), "--mode", "fixture", "--out", SNAPSHOT], cwd=REPO)
+    code = _EXPORT_EDITIONS_OFF.format(
+        lam=os.path.join(REPO, "lambdas"),
+        scr=os.path.join(REPO, "scripts"),
+        out=SNAPSHOT,
+        script=os.path.join(REPO, "scripts", "publish_snapshot.py"),
+    )
+    cp = run([sys.executable, "-c", code], cwd=REPO)
     if cp.returncode != 0:
         raise SystemExit(f"fixture export failed (exit {cp.returncode}):\n{cp.stderr[-2000:]}")
 

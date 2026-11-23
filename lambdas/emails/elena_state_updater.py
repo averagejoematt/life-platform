@@ -39,6 +39,7 @@ from datetime import datetime, timezone
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from content import chapter_reads  # #6199 G1
 from experiment.phase_filter import singleton_visible  # #946: hide reset-tombstoned persona state
 
 try:
@@ -502,8 +503,9 @@ def lambda_handler(event, context):
         installment = _get_item(CHRONICLE_PK, f"DATE#{date_str}", consistent=True)
         if not installment:
             return {"statusCode": 404, "error": f"no chronicle record for {date_str}"}
-        if installment.get("status") != "published":
-            # Never learn from a draft — a rejected draft must not poison memory.
+        if not chapter_reads.writer_may_read(installment):
+            # Never learn from a draft — a rejected draft must not poison memory; nor from a withdrawn, unlisted or
+            # tombstoned chapter (#6199 G1: the one predicate every writer-side chapter read uses).
             return {"statusCode": 200, "skipped": f"status={installment.get('status')}"}
 
         content_md = installment.get("content_markdown") or ""

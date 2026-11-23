@@ -60,7 +60,11 @@ def off_render():
 
 # ── the switchboard itself ───────────────────────────────────────────────────────────────────────────────────────────
 def test_every_item_ships_off():
-    assert COMMITTED and all(v is False for v in COMMITTED.values()), COMMITTED
+    # Committed state (owner ruling 2026-11-22): GROUP 1 (LABELLING) ON, GROUP 2 (COMPUTED) OFF. The name is historical.
+    # ROLLBACK: set the item back to False in common/nutrition_consistency.py, then fleet + site API + MCP deploys.
+    assert COMMITTED == {k: (k in nc.LABELLING) for k in nc.SWITCHES}, COMMITTED
+    assert COMMITTED and all(COMMITTED[k] is True for k in nc.LABELLING)
+    assert all(COMMITTED[k] is False for k in nc.COMPUTED)
 
 
 def test_the_two_activation_groups_partition_the_switchboard():

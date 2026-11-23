@@ -77,7 +77,7 @@ from datetime import timedelta
 from typing import Any, Callable
 
 from common.pacific_time import pacific_today, parse_day_key
-from content import chapter_corrections, chapter_editions
+from content import chapter_corrections, chapter_editions, private_call_check
 
 from web.site_api_common import EXPERIMENT_START, USER_ID, _error, _load_s3_json, _ok, _query_source, logger, table
 
@@ -318,7 +318,32 @@ def _is_tainted(text: str) -> bool:
     return narrative_publication.is_tainted(text)
 
 
-def editions_field(read_editions: Callable[[], list], tainted: Callable[[str], bool] = _is_tainted) -> dict:
+_CALLS_CACHE: dict = {"at": None, "calls": None}
+_CALLS_TTL_S = 900  # = publication_snapshot.TTL_S: the two publication reads age together
+
+
+def _private_calls() -> Any:
+    """#6199: the calls the publication policy classifies, read from the RAW table (cached ``_CALLS_TTL_S``); None when
+    they cannot be read — every edition is then withheld (fail closed)."""
+    import time  # noqa: PLC0415
+
+    now = time.monotonic()
+    if _CALLS_CACHE["at"] is not None and now - _CALLS_CACHE["at"] < _CALLS_TTL_S and _CALLS_CACHE["calls"] is not None:
+        return _CALLS_CACHE["calls"]
+    try:
+        calls = private_call_check.load(table)
+    except Exception as e:  # noqa: BLE001
+        logger.error(
+            f"[chapters] #6199 private-call check: the coach calls could not be read ({type(e).__name__}: {e}) — editions withheld"
+        )
+        return None
+    _CALLS_CACHE.update(at=now, calls=calls)
+    return calls
+
+
+def editions_field(
+    read_editions: Callable[[], list], tainted: Callable[[str], bool] = _is_tainted, private_calls: Callable[[], Any] = _private_calls
+) -> dict:
     """``{}`` while the switch is off (the reader is never called); else ``{"editions": [...]}`` — or ``{"editions": None,
     "editions_error": ...}`` when the rows cannot be read."""
     if not chapter_editions.LIVE:
@@ -326,7 +351,13 @@ def editions_field(read_editions: Callable[[], list], tainted: Callable[[str], b
     try:
         from privacy import privacy_guard  # noqa: PLC0415 — the chronicle's publish gate (fail-closed on no vocabulary)
 
-        view = chapter_editions.public_view(read_editions(), tainted=tainted, filter_hits=privacy_guard.find_violations, log=logger.warning)
+        view = chapter_editions.public_view(
+            read_editions(),
+            tainted=tainted,
+            private_calls=private_call_check.for_text(private_calls()),
+            filter_hits=privacy_guard.find_violations,
+            log=logger.warning,
+        )
         return {"editions": view}
     except Exception as e:  # noqa: BLE001 — a failed read is said, never served as "no editions"
         logger.error(f"[chapters] editions read failed: {type(e).__name__}: {e}")
