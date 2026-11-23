@@ -330,7 +330,7 @@ SCHEMA: dict[str, dict[str, tuple[str, bool]]] = {
         "night": ("obj", True),
         "night_state": ("enum:served|none recorded|older than the served window|not served", False),
         "food": ("obj", True),
-        "food_state": ("enum:served|not logged|older than the served window|not served", False),
+        "food_state": ("enum:served|not logged|pending|older than the served window|not served", False),
         "engine": ("obj", True),
         "coach_lines": ("list[obj]", False),
         "calls_settled": ("list[obj]", False),

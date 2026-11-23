@@ -288,6 +288,8 @@ export function unservedText(block, state, when) {
     },
     food: {
       "not logged": `Nothing was logged on ${when}. The platform treats a day with no entries as missing, not as eaten: no intake is shown, and none is assumed.`,
+      // #6240: no row AND the food export has not arrived since the day ended — the Morning Brief's own determination.
+      pending: `The food log for ${when} has not arrived yet. It reaches the platform by a manual export, and no export has landed since the day ended, so this is data on its way, not a missed day. No intake is shown, and none is assumed.`,
       "older than the served window": `${when} is older than the window the nutrition endpoint served for this snapshot; the log is not readable here.`,
       "not served": `The nutrition endpoint did not answer for this snapshot, so the food log is not readable here. No intake is assumed.`,
     },

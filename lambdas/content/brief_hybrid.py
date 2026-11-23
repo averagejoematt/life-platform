@@ -43,7 +43,9 @@ from content.brief_format import esc
 SWITCH_OFF = "off"
 SWITCH_HYBRID = "hybrid"  # render the hybrid block above the current brief, and record the send
 SWITCH_MEASURE = "measure"  # current render, unchanged; record the send only (the comparison arm)
-SWITCH_VALUES = (SWITCH_OFF, SWITCH_HYBRID, SWITCH_MEASURE)
+SWITCH_COMPACT = "compact"  # #6240: the compact brief REPLACES the whole email (content.brief_compact); explicit only
+SWITCH_VALUES = (SWITCH_OFF, SWITCH_HYBRID, SWITCH_MEASURE, SWITCH_COMPACT)
+LINKED_VARIANTS = (SWITCH_HYBRID, SWITCH_COMPACT)  # the formats that show recommendations, so carry the response link
 
 NOTHING_NEW = "Nothing new needs you today."
 RUN_GAP_DAYS = 2

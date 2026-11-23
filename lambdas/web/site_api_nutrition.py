@@ -12,7 +12,10 @@ site_api_common (identical binding semantics to the pre-split facade).
 import os
 from datetime import datetime, timedelta
 
-from common import nutrition_consistency as nc  # #6195: the target-neutral consistency switchboard (all OFF = today)
+from common import (
+    food_log_state,  # #6240: pending vs not logged — the ONE determination the Morning Brief reads too
+    nutrition_consistency as nc,  # #6195: the target-neutral consistency switchboard (all OFF = today)
+)
 from common.constants import PLAN_DAILY_PROTEIN_MIN_G  # #4540: the plan's targets, never the profile row
 from common.pacific_time import shift_day_key  # #5584: the window's sub-bounds
 from health import (
@@ -31,6 +34,7 @@ from web.nutrition_recovery_overlay import (  # noqa: F401 — moved out for the
 )
 from web.site_api_common import (
     PT,
+    USER_PREFIX,
     _get_profile,
     _ok,
     _window_span,
@@ -390,6 +394,11 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
     protein_target = protein_floor = float(PLAN_DAILY_PROTEIN_MIN_G)
 
     items = _query_source("macrofactor", d30, today)
+    # #6240 (additive): the window's days whose food export has not ARRIVED yet — pending data, never "not logged". The
+    # day page reads it (scripts/publish_snapshot_day.py) so it and the Morning Brief cannot disagree about one day.
+    food_log = food_log_state.served_block(
+        _g.get("table"), USER_PREFIX, d30, today, [_trend_row(i)["date"] for i in items if _mf(i, "calories") is not None]
+    )
     if not items:
         # Genesis week / no logging yet — return a shaped-but-empty 200 so the
         # site renders an honest empty state instead of a console 503.
@@ -458,6 +467,7 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
                     "latest_protein_g": None,
                 },
                 "nutrition_trend": [],
+                "food_log": food_log,  # #6240
                 # #2221 — SHAPE PARITY. The front-end binds one payload shape; this
                 # branch used to omit nine top-level keys the populated branch
                 # publishes, so `data.loss_rate.protein_hit_pct` threw for the whole
@@ -1014,6 +1024,7 @@ def nutrition_overview(*, _g, window: tuple[str, str] | None = None) -> dict:
                 ),
             },
             "nutrition_trend": trend,
+            "food_log": food_log,  # #6240: pending days (export not arrived) — pending data, not a missed log
             "loss_rate": loss_rate,
             "meal_rhythm": meal_rhythm,
             "electrolytes": electrolytes,

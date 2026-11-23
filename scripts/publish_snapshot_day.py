@@ -70,7 +70,9 @@ WEEK_LENGTH = 7
 WINDOW_MAX_DAYS = 92  # lambdas/web/day_window.py: the most days one ?from=&to= request may span
 WORKOUT_STATES = ("served", "none logged", "older than the served window", "not served")
 NIGHT_STATES = ("served", "none recorded", "older than the served window", "not served")
-FOOD_STATES = ("served", "not logged", "older than the served window", "not served")
+# #6240: "pending" — no row AND the food export has not arrived since the day ended (the API's `food_log.pending_days`,
+# common.food_log_state — the determination the Morning Brief reads). Data on its way, never a missed log.
+FOOD_STATES = ("served", "not logged", "pending", "older than the served window", "not served")
 GRADED = ("confirmed", "refuted", "inconclusive")  # a settled call with a verdict (expired is not a grade)
 OPEN_CAP = 6  # open calls listed per day, nearest settle date first; the count says how many in all
 # The night's hours target the recovery decomposition reads against: the platform's own default
@@ -436,9 +438,11 @@ def day_detail(
     coach_moves: Any = None,
     predictions: list[dict] | None = None,
     coach_ids: set[str] | None = None,
+    pending_food: set[str] | None = None,
 ) -> dict:
     """One day's M4 fields (pure). `covered[k]` is the set of days endpoint k was asked for and answered
-    (None: not served at all), so a day outside it is "older than the served window", never "none"."""
+    (None: not served at all), so a day outside it is "older than the served window", never "none".
+    `pending_food` (#6240): the days the API says have no food row because the export has not arrived — "pending"."""
 
     def state(k: str, value: Any, none_word: str) -> str:
         if value is not None:
@@ -468,7 +472,7 @@ def day_detail(
         "night": night,
         "night_state": state("sleep", night, "none recorded"),
         "food": food,
-        "food_state": state("nutrition", food, "not logged"),
+        "food_state": state("nutrition", food, "pending" if day in (pending_food or set()) else "not logged"),
         "engine": engine_of(character, day),
         "coach_lines": lines,
         "calls_settled": settled,
@@ -610,12 +614,22 @@ WINDOWED = {
 }
 
 
+def pending_of(payload: Any) -> set[str]:
+    """#6240: the days a nutrition_overview payload serves as pending (`food_log.pending_days`); empty when the API
+    predates the field or does not know the export's arrival (`arrival_known` false) — the page then says what it said."""
+    fl = payload.get("food_log") if isinstance(payload, dict) else None
+    if not isinstance(fl, dict) or fl.get("arrival_known") is not True:
+        return set()
+    return {d for d in fl.get("pending_days") or [] if isinstance(d, str) and ISO_DAY.match(d)}
+
+
 def fetch_windowed(get: Callable[[str], Any], first: str, last: str, fallback: dict[str, Any]) -> tuple[dict, dict, dict]:
     """One call per endpoint per ≤ 92-day window. Returns (rows by endpoint, days covered by covered-key,
     nutrition context by day). A window the endpoint did not answer is not covered; an endpoint that
-    answered no window falls back to its default (undated) payload, covering only the dates it served."""
+    answered no window falls back to its default (undated) payload, covering only the dates it served.
+    #6240: the nutrition payloads' pending days ride in `covered["food_pending"]` (not a window key)."""
     rows: dict[str, list[dict]] = {k: [] for k in WINDOWED}
-    covered: dict[str, set[str] | None] = {}
+    covered: dict[str, set[str] | None] = {"food_pending": set()}
     food_ctx: dict[str, tuple[Any, Any, Any]] = {}
     for key, (path, field, ck) in WINDOWED.items():
         got: set[str] = set()
@@ -636,6 +650,7 @@ def fetch_windowed(get: Callable[[str], Any], first: str, last: str, fallback: d
                 got |= _days(wa, wb)
             rows[key] += [r for r in payload.get(field) or [] if isinstance(r, dict)]
             if key == "nutrition_overview":
+                covered["food_pending"] |= pending_of(payload)  # type: ignore[operator]
                 nut = payload.get("nutrition") if isinstance(payload.get("nutrition"), dict) else {}
                 for d in _days(wa, wb):
                     food_ctx[d] = (nut.get("protein_floor_g"), nut.get("tdee"), nut.get("tdee_as_of"))
@@ -646,6 +661,7 @@ def fetch_windowed(get: Callable[[str], Any], first: str, last: str, fallback: d
                 rows[key] = [r for r in fb.get(field) or [] if isinstance(r, dict)]
                 got = _days(*span)
                 if key == "nutrition_overview":
+                    covered["food_pending"] |= pending_of(fb)  # type: ignore[operator]
                     nut = fb.get("nutrition") if isinstance(fb.get("nutrition"), dict) else {}
                     for d in got:
                         food_ctx[d] = (nut.get("protein_floor_g"), nut.get("tdee"), nut.get("tdee_as_of"))
@@ -706,6 +722,7 @@ def layers_for(ctx: Any, get: Callable[[str], Any], rows: list[dict]) -> dict[st
             coach_moves=per["coach_moves"],
             predictions=preds,
             coach_ids=coach_ids,
+            pending_food=covered.get("food_pending") or set(),
         )
     return out
 

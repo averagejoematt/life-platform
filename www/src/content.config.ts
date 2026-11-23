@@ -453,7 +453,7 @@ const days = defineCollection({
     night: night.nullable(),
     night_state: z.enum(["served", "none recorded", ...UNSERVED]),
     food: food.nullable(),
-    food_state: z.enum(["served", "not logged", ...UNSERVED]),
+    food_state: z.enum(["served", "not logged", "pending", ...UNSERVED]),
     engine: engine.nullable(),
     coach_lines: z.array(coachLine),
     calls_settled: z.array(callSettled),
