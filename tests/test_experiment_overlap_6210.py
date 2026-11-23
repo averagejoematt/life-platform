@@ -416,3 +416,12 @@ def test_close_of_checked_and_pre_pr_rows_is_unchanged(monkeypatch):
     assert _stored(table, resp)["overlap"] == {"check_status": "checked"}
     out = tl.tool_end_experiment({"experiment_id": resp["experiment_id"], "outcome": "done", "end_date": "2026-12-14"})
     assert out["analysis"] == {"verdict": "supported", "summary": "Result."}
+
+
+def test_foreign_partition_rows_are_ignored_but_non_dict_and_skless_rows_are_not():
+    foreign = {"pk": "x", "sk": "HYPOTHESIS#h1", "status": "confirmed"}
+    assert _check(_Pages([[foreign]]))[0]["level"] == "none"
+    o, _ = _check(_Pages([["junk"]]), kind="observational")
+    assert o["check_status"] == "indeterminate"
+    o, _ = _check(_Pages([[{"experiment_id": "nosk"}]]), kind="observational")
+    assert o["check_status"] == "indeterminate" and "row nosk, field status" in o["reason"]

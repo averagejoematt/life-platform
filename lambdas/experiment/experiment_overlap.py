@@ -335,7 +335,10 @@ def _all_rows(table, pk):
         if start_key:
             kwargs["ExclusiveStartKey"] = start_key
         resp = table.query(**kwargs)
-        rows.extend(resp.get("Items", []))
+        # The key condition already restricts to EXP#; a dict row whose sk names another family can only
+        # come from a looser backend (a test double) and is not an experiment. A non-dict item or an
+        # item with NO sk is kept, so assess_overlap flags it as malformed rather than losing it.
+        rows.extend(r for r in resp.get("Items", []) if not (isinstance(r, dict) and "sk" in r and not str(r["sk"]).startswith("EXP#")))
         start_key = resp.get("LastEvaluatedKey")
         if not start_key:
             return rows
