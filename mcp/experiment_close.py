@@ -8,8 +8,10 @@ THE BASELINE SNAPSHOT (owner condition 2026-11-23: "baseline strength values are
 snapshots"). A design whose criterion is a lift metric gets ``baseline_snapshot`` on its experiment row:
 
 * captured at ``create_experiment`` when the baseline window is already complete (start today or earlier);
-* otherwise (a future or randomized start) captured at the first analysis-path read on or after the start, and marked
-  ``captured_after_start`` with ``capture_lag_days``;
+* otherwise (a future or randomized start) captured at the first read on or after the start — ``list_experiments``,
+  ``get_experiment_results`` (``capture_due``, fail-soft for the read) or ``end_experiment`` — and marked
+  ``captured_after_start`` with ``capture_lag_days``; the closing analysis then carries ``baseline_capture`` and one plain
+  summary sentence saying so (``late_capture``);
 * written with ``attribute_not_exists(baseline_snapshot)`` — it can never be overwritten; a second capture is a no-op
   that returns the stored one;
 * READ by the close path, which never recomputes a reference. A lift experiment that reaches close with no snapshot
@@ -97,6 +99,36 @@ def ensure_baseline_snapshot(existing: dict, *, query_source: Callable, table: A
         return _plain(again) if again else None
     existing["baseline_snapshot"] = snap
     return snap
+
+
+def capture_due(items: Any, *, query_source: Callable, table: Any, now: datetime, today: str) -> Any:
+    """The read-path capture (list_experiments, get_experiment_results): for each ACTIVE experiment whose lift baseline
+    is due (start on or before today) and not yet captured, capture it write-once. Returns ``items`` unchanged.
+
+    Fail-soft for the read: any error is logged and swallowed, so a failed capture never breaks the read. It can never
+    leave a partial snapshot: the whole snapshot is built in memory first and stored by ONE conditional write, so a
+    failure before or during that write stores nothing."""
+    for item in items if isinstance(items, list) else [items]:
+        if not isinstance(item, dict) or item.get("baseline_snapshot") or str(item.get("status") or "active") != "active":
+            continue
+        if lift_metric_of(_plain(item.get("design") or {})) is None:
+            continue
+        try:
+            ensure_baseline_snapshot(item, query_source=query_source, table=table, now=now, today=today)
+        except Exception as e:  # noqa: BLE001 — a read must never fail on a capture
+            logger.warning(f"baseline snapshot capture on read failed for {item.get('sk')}: {e}")
+    return items
+
+
+def late_capture(snapshot: dict | None) -> tuple[dict | None, str]:
+    """#6209: a snapshot taken after the start is disclosed — the analysis's ``baseline_capture`` block and one plain
+    summary sentence, both from stored values only. A capture at create (lag 0) discloses nothing."""
+    if not snapshot or not snapshot.get("captured_after_start"):
+        return None, ""
+    lag = int(snapshot.get("capture_lag_days") or 0)
+    block = {"captured_at": snapshot.get("captured_at"), "captured_after_start": True, "capture_lag_days": lag}
+    day_word = "day" if lag == 1 else "days"
+    return block, (f" Baseline was captured {lag} {day_word} after the start, so baseline sessions could have been edited before capture.")
 
 
 def on_create(item: dict, *, query_source: Callable, table: Any, now: datetime, today: str) -> dict:
@@ -202,11 +234,14 @@ def run_design_analysis(
             design_f, dated_criterion, dated_controls, cf_start_date, end_date
         )
 
+    capture, caveat = late_capture(snapshot)  # #6209: a late baseline capture is visible, never silent
+    if capture is not None:
+        stats["baseline_capture"] = capture
     return {
         "windows": windows,
         "metric": metric,
         **stats,
-        "summary": experiment_design.analysis_summary(design_f, stats),
+        "summary": experiment_design.analysis_summary(design_f, stats) + caveat,
         "analyzed_at": analyzed_at,
         "engine": ANALYSIS_ENGINE,
     }

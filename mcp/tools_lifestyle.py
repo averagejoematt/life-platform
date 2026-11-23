@@ -631,6 +631,15 @@ def _lift_baseline_on_create(item):
     return experiment_close.on_create(item, query_source=query_source, table=table, now=datetime.now(timezone.utc), today=pacific_today())
 
 
+def _capture_due_baselines(items):
+    """#6209: the read-path lift-baseline capture (write-once, fail-soft); returns its argument unchanged."""
+    from mcp import experiment_close
+
+    return experiment_close.capture_due(
+        items, query_source=query_source, table=table, now=datetime.now(timezone.utc), today=pacific_today()
+    )
+
+
 def tool_create_experiment(args):
     """Create a new N=1 experiment.
 
@@ -916,7 +925,7 @@ def tool_list_experiments(args):
             }
         )
     )
-    items = resp.get("Items", [])
+    items = _capture_due_baselines(resp.get("Items", []))  # #6209: a due lift baseline is captured on the first read
 
     results = []
     for item in items:
@@ -1016,7 +1025,7 @@ def tool_get_experiment_results(args):
         raise ValueError("experiment_id is required")
 
     sk = f"EXP#{exp_id}"
-    item = table.get_item(Key={"pk": EXPERIMENTS_PK, "sk": sk}).get("Item")
+    item = _capture_due_baselines(table.get_item(Key={"pk": EXPERIMENTS_PK, "sk": sk}).get("Item"))  # #6209: first read captures
     if not item:
         raise ValueError(f"No experiment found with id={exp_id}")
 

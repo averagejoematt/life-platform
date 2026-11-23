@@ -73,6 +73,9 @@ PUBLIC_ANALYSIS_KEYS = (
     "summary",
     "analyzed_at",
     "engine",
+    # #6209: the late-capture disclosure (captured_at, captured_after_start, capture_lag_days) — no personal measurement,
+    # and the caveat matters to a reader; present only when a lift baseline was captured after the start.
+    "baseline_capture",
 )
 
 

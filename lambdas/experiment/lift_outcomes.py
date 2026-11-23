@@ -484,8 +484,10 @@ def baseline_note(snapshot: dict | None, metric: str, start_date: str) -> str | 
     """#6209 (d): the advisory a creation returns — never a refusal."""
     if not snapshot_is_usable(snapshot):
         return (
-            f"Baseline not captured yet: the start {start_date} is in the future, so the baseline window is incomplete. It is "
-            "captured write-once at the first analysis read on or after the start, and marked captured_after_start."
+            f"Baseline not captured yet: the start {start_date} is after today, so the baseline window is not complete. It "
+            f"will be captured write-once at the first list_experiments, get_experiment_results or end_experiment call on or "
+            f"after {start_date}, marked captured_after_start with the lag in days; baseline sessions edited before that "
+            "capture shape it, and a late capture is stated in the closing analysis."
         )
     assert snapshot is not None
     n = len(snapshot["baseline_values"].get(metric) or {})

@@ -405,7 +405,8 @@ def _wire(monkeypatch, rows, table, today="2050-03-01"):
     """Point tools_lifestyle's reads at `rows` and `table`, and pin its clock."""
 
     def fake_query_source(source, start, stop, **kw):
-        assert source == "hevy"
+        if source != "hevy":  # get_experiment_results also reads the daily sources; none hold rows here
+            return []
         return [copy.deepcopy(r) for r in rows if start <= r["sk"][5:15] <= stop]
 
     monkeypatch.setattr(tl, "query_source", fake_query_source)
@@ -575,14 +576,84 @@ def test_create_with_a_full_baseline_has_no_note(monkeypatch):
     assert "baseline_note" not in out and out["baseline_snapshot_captured_at"]
 
 
-def test_a_future_start_defers_the_capture_and_the_first_read_after_it_marks_the_lag(monkeypatch):
+def _future_create(monkeypatch):
+    """Created 2050-01-10 for a 2050-01-15 start: the baseline window is not complete, so nothing is captured yet."""
     out, table = _create(monkeypatch, _block(1, 7, 2, 1.0, "b"), "2050-01-10", _design(lo.LIFT_E1RM_INDEX))
     assert "baseline_snapshot" not in table.items[EXP_SK] and out["baseline_snapshot_captured_at"] is None
-    assert "in the future" in out["baseline_note"]
+    return out, table
+
+
+def test_a_future_start_captures_nothing_at_create_and_says_exactly_what_happens(monkeypatch):
+    out, _table = _future_create(monkeypatch)
+    note = out["baseline_note"]
+    assert "the start 2050-01-15 is after today" in note
+    assert "first list_experiments, get_experiment_results or end_experiment call on or after 2050-01-15" in note
+    assert "captured_after_start" in note and "stated in the closing analysis" in note
+
+
+def test_the_first_list_on_or_after_the_start_captures_and_a_later_end_reads_it(monkeypatch):
+    _out, table = _future_create(monkeypatch)
     rows = _block(1, 7, 2, 1.0, "b") + _block(15, 7, 2, 1.1, "w")
+    _wire(monkeypatch, rows, table, today="2050-01-14")  # the day before the start: still not due
+    tl.tool_list_experiments({})
+    assert "baseline_snapshot" not in table.items[EXP_SK]
     _wire(monkeypatch, rows, table, today="2050-01-18")
-    snap = ec.ensure_baseline_snapshot(table.items[EXP_SK], query_source=tl.query_source, table=table, now=_NOW, today="2050-01-18")
-    assert snap["captured_after_start"] is True and snap["capture_lag_days"] == 3
+    tl.tool_list_experiments({})
+    snap = json.loads(json.dumps(table.items[EXP_SK]["baseline_snapshot"], default=float))
+    assert snap["captured_after_start"] is True and snap["capture_lag_days"] == 3  # 2050-01-18 - 2050-01-15
+    # the close, ten days later, with a baseline row edited in between, reads THAT snapshot
+    edited = copy.deepcopy(rows)
+    edited[0]["exercises"][0]["sets"] = [_set(140, 5, 8)]
+    out = _close(monkeypatch, edited, lo.LIFT_E1RM_INDEX, table=table, today="2050-01-28")
+    assert out["observations"]["snapshot"]["captured_at"] == snap["captured_at"]
+    assert out["observations"]["snapshot"]["capture_lag_days"] == 3
+    assert table.updates.count("SET baseline_snapshot = :b") == 1
+    # item 2: the late capture is visible — the block and one plain sentence, from stored values only
+    assert out["baseline_capture"] == {"captured_at": snap["captured_at"], "captured_after_start": True, "capture_lag_days": 3}
+    assert out["summary"].endswith(
+        "Baseline was captured 3 days after the start, so baseline sessions could have been edited before capture."
+    )
+
+
+def test_the_first_get_on_or_after_the_start_captures(monkeypatch):
+    _out, table = _future_create(monkeypatch)
+    _wire(monkeypatch, _block(1, 7, 2, 1.0, "b") + _block(15, 3, 2, 1.1, "w"), table, today="2050-01-20")
+    tl.tool_get_experiment_results({"experiment_id": EXP_SK[4:]})
+    snap = table.items[EXP_SK]["baseline_snapshot"]
+    assert snap["captured_after_start"] is True and int(snap["capture_lag_days"]) == 5
+
+
+def test_a_failed_capture_on_a_read_leaves_the_response_unchanged_and_stores_nothing(monkeypatch):
+    _out, table = _future_create(monkeypatch)
+    rows = _block(1, 7, 2, 1.0, "b")
+    _wire(monkeypatch, rows, table, today="2050-01-18")
+    monkeypatch.setattr(ec, "capture_due", lambda items, **kw: items)  # the read with no capture at all
+    expected_list = tl.tool_list_experiments({})
+    expected_get = tl.tool_get_experiment_results({"experiment_id": EXP_SK[4:]})
+    monkeypatch.undo()
+    for failure in ("query", "write"):
+        _wire(monkeypatch, rows, table, today="2050-01-18")
+        if failure == "query":
+
+            def boom(*a, **k):
+                raise RuntimeError("hevy read failed")
+
+            monkeypatch.setattr(tl, "query_source", boom)
+            monkeypatch.setattr(tl, "_query_metric_source", lambda *a, **k: [])
+        else:
+            table.fail_writes = True
+        assert tl.tool_list_experiments({}) == expected_list
+        assert tl.tool_get_experiment_results({"experiment_id": EXP_SK[4:]}) == expected_get
+        assert "baseline_snapshot" not in table.items[EXP_SK]
+        table.fail_writes = False
+
+
+def test_a_capture_at_create_adds_no_disclosure(monkeypatch):
+    rows = _block(1, 7, 2, 1.0, "b") + _block(15, 7, 2, 1.1, "w")
+    _out, table = _create(monkeypatch, rows, START, _design(lo.LIFT_E1RM_INDEX))
+    out = _close(monkeypatch, rows, lo.LIFT_E1RM_INDEX, table=table, today="2050-01-28")
+    assert out["observations"]["snapshot"]["captured_after_start"] is False
+    assert "baseline_capture" not in out and "Baseline was captured" not in out["summary"]
 
 
 def test_a_non_lift_create_gets_no_snapshot(monkeypatch):
@@ -607,6 +678,8 @@ def _public(monkeypatch, analysis):
 
 
 def test_an_unknown_or_private_analysis_key_never_reaches_the_public_payload(monkeypatch):
+    served = _public(monkeypatch, {"verdict": "supported", "baseline_capture": {"captured_after_start": True, "capture_lag_days": 3}})
+    assert served["analysis"]["baseline_capture"] == {"captured_after_start": True, "capture_lag_days": 3}
     analysis = {"verdict": "supported", "observations": {"arms": {"baseline": {"sessions": [{"workout_id": "w1"}]}}}}
     analysis.update({"reason": "x", "some_future_key": {"kg": 1}})
     served = _public(monkeypatch, analysis)
