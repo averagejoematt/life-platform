@@ -16,6 +16,7 @@ Pure functions only; the caller does the DynamoDB read and the write.
 """
 
 from datetime import timedelta
+from decimal import Decimal
 
 from common.pacific_time import parse_day_key
 
@@ -127,11 +128,59 @@ def _conflict(active, kind, detail, **extra):
     }
 
 
+class OverlapCheckIncomplete(Exception):
+    """The check could not be completed; carries WHICH row and field (never values)."""
+
+    def __init__(self, message, row_id=None, field=None):
+        super().__init__(message)
+        self.row_id = row_id
+        self.field = field
+
+
+MAX_PAGES = 50  # a sane cap: the experiments partition is tens of rows, one page in practice
+_INACTIVE_STATUSES = ("completed", "abandoned")
+
+
+def _row_id(row):
+    if not isinstance(row, dict):
+        return "?"
+    return str(row.get("experiment_id") or str(row.get("sk", ""))[4:] or "?")[:80]
+
+
+def _bad(row, field):
+    return OverlapCheckIncomplete(f"unassessable row field {field}", _row_id(row), field)
+
+
+def _validate_active(row):
+    """Raise OverlapCheckIncomplete unless an ACTIVE row is assessable. A row with NO design is the
+    documented legacy case (note at most) and passes; a design that is present but malformed does not."""
+    design = row.get("design")
+    if design is None:
+        return
+    if not isinstance(design, dict):
+        raise _bad(row, "design")
+    criterion = design.get("criterion")
+    if not isinstance(criterion, dict):
+        raise _bad(row, "design.criterion")
+    metric = criterion.get("metric")
+    if not isinstance(metric, str) or not metric.strip():
+        raise _bad(row, "design.criterion.metric")
+    washout = design.get("washout_days")
+    if washout is not None:
+        ok = not isinstance(washout, bool) and isinstance(washout, (int, float, Decimal)) and washout == int(washout) and washout >= 0
+        if not ok:
+            raise _bad(row, "design.washout_days")
+    if _day(row.get("start_date")) is None:
+        raise _bad(row, "start_date")
+
+
 def assess_overlap(new_experiment, active_experiments):
     """Classify the overlap of a NEW experiment against the ACTIVE ones.
 
     new_experiment: dict with start_date, design (or None), intervention_kind, library_id, tags.
     Returns {"level": "none"|"note"|"warning", "check_status": "checked", "conflicts": [...], "reason": str}.
+    Pass ALL experiment rows: completed/abandoned rows are skipped; any other row that is not a
+    well-formed active row raises OverlapCheckIncomplete (state 3), never a silent skip.
     A check that could not be completed is NEVER produced here — see `indeterminate()`; the
     caller turns any exception from this function into that state, never into "none".
     """
@@ -143,8 +192,14 @@ def assess_overlap(new_experiment, active_experiments):
 
     warnings, notes = [], []
     for active in active_experiments or []:
-        if active.get("status", "active") != "active":
+        if not isinstance(active, dict):
+            raise _bad(active, "row")
+        status = str(active.get("status") or "").strip().lower()
+        if status in _INACTIVE_STATUSES:
             continue
+        if status != "active":
+            raise _bad(active, "status")  # cannot be classified as inactive, so it must be assessed
+        _validate_active(active)
         act_metric = _metric(active)
         act_kind = _kind(active)
         both_designed = bool(new_metric and act_metric)
@@ -221,12 +276,15 @@ def indeterminate(exc):
 
     Names the error CLASS only (no message — it can carry table names or request ids)."""
     cls = type(exc).__name__
+    where = ""
+    if isinstance(exc, OverlapCheckIncomplete) and exc.field:
+        where = f" (row {exc.row_id}, field {exc.field})"
     return {
         "level": "indeterminate",
         "check_status": "indeterminate",
         "conflicts": [],
         "error_class": cls,
-        "reason": f"overlap check could not be completed: {cls}",
+        "reason": f"overlap check could not be completed: {cls}{where}",
     }
 
 
@@ -267,21 +325,33 @@ def parse_args(args):
 
 
 def _all_rows(table, pk):
+    """Every EXP# row, paginated to completion. A page cap hit or an error mid-way raises: a partial
+    read must never be reported as a checked result."""
     from boto3.dynamodb.conditions import Key
 
-    return table.query(KeyConditionExpression=Key("pk").eq(pk) & Key("sk").begins_with("EXP#")).get("Items", [])
+    rows, start_key = [], None
+    for _ in range(MAX_PAGES):
+        kwargs = {"KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with("EXP#")}
+        if start_key:
+            kwargs["ExclusiveStartKey"] = start_key
+        resp = table.query(**kwargs)
+        rows.extend(resp.get("Items", []))
+        start_key = resp.get("LastEvaluatedKey")
+        if not start_key:
+            return rows
+    raise OverlapCheckIncomplete(f"pagination did not complete within {MAX_PAGES} pages", None, "pagination")
 
 
 def row_fields(intervention_kind, overlap_acknowledged, overlap=None):
     """Fields stored on the experiment row (None values are dropped by the caller's clean pass).
 
-    An indeterminate check is stored as `overlap` {check_status, reason} so the row is never read
-    later as cleared; a checked result is not stored (the acknowledgement carries the conflicts)."""
-    stored = (
-        {k: overlap[k] for k in ("check_status", "reason", "error_class") if k in overlap}
-        if overlap and overlap.get("check_status") == "indeterminate"
-        else None
-    )
+    Every NEW row carries `overlap.check_status` ("checked" or "indeterminate") so a cleared row is
+    distinguishable from a pre-PR row, and an uncleared one is never read later as cleared. An
+    indeterminate result also stores its reason and error class (class only, no values)."""
+    stored = None
+    if overlap:
+        keys = ("check_status", "reason", "error_class") if overlap.get("check_status") == "indeterminate" else ("check_status",)
+        stored = {k: overlap[k] for k in keys if k in overlap}
     return {"intervention_kind": intervention_kind, "overlap_acknowledged": overlap_acknowledged, "overlap": stored}
 
 
@@ -315,7 +385,7 @@ def check_creation(table, pk, start_date, design, intervention_kind, library_id,
         "tags": tags,
     }
     try:
-        overlap = assess_overlap(new_experiment, [r for r in _all_rows(table, pk) if r.get("status") == "active"])
+        overlap = assess_overlap(new_experiment, _all_rows(table, pk))
     except Exception as exc:  # noqa: BLE001 — becomes the explicit indeterminate state, not "none"
         overlap = indeterminate(exc)
     stamp = now.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -340,6 +410,18 @@ def check_creation(table, pk, start_date, design, intervention_kind, library_id,
     return overlap, {**acknowledgement_record(acknowledge_reason, overlap, stamp), "check_status": "checked"}
 
 
+NOT_VERIFIED_CAVEAT = "overlap not verified at creation"
+
+
+def _stored_status(exp):
+    """The stored creation-time check status, or None for a pre-PR row (no overlap block)."""
+    for key in ("overlap", "overlap_acknowledged"):
+        block = exp.get(key)
+        if isinstance(block, dict) and block.get("check_status") == "indeterminate":
+            return "indeterminate"
+    return None
+
+
 def attach_closing_caveat(table, pk, existing, analysis):
     """Append the one-line overlap caveat to a closing analysis in place; verdict untouched.
 
@@ -347,6 +429,11 @@ def attach_closing_caveat(table, pk, existing, analysis):
     analysis records `overlap_caveat_check` = "not_run: <ErrorClass>" when the check could not run
     (absent = it ran), so a missing caveat is distinguishable from "no overlap"."""
     if analysis is None:
+        return
+    if _stored_status(existing) == "indeterminate":
+        # Created without overlap clearance: say so on the close; verdict untouched.
+        analysis["overlap_caveat"] = NOT_VERIFIED_CAVEAT
+        analysis["summary"] = f"{analysis.get('summary', '')} {NOT_VERIFIED_CAVEAT}.".strip()
         return
     try:
         caveat = closing_caveat(existing, _all_rows(table, pk))

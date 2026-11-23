@@ -259,7 +259,7 @@ def test_malformed_existing_row_is_indeterminate_not_none(monkeypatch):
     bad = _active("bad", "deep_pct")
     bad["design"] = {"criterion": "not-a-dict", "washout_days": 3}
     _seed(monkeypatch, bad)
-    with pytest.raises(ValueError, match="could not be completed: AttributeError"):
+    with pytest.raises(ValueError, match=r"OverlapCheckIncomplete \(row bad, field design.criterion\)"):
         _create()
     _seed(monkeypatch, bad)
     assert _create(intervention_kind="observational")["overlap"]["check_status"] == "indeterminate"
@@ -281,7 +281,9 @@ def test_healthy_read_never_reports_indeterminate(monkeypatch):
         assert r["level"] == expect and r["check_status"] == "checked"
     table = _seed(monkeypatch, _active("a", "deep_pct"))
     resp = _create(acknowledge_overlap=REASON)
-    assert _stored(table, resp)["overlap_acknowledged"]["check_status"] == "checked" and "overlap" not in _stored(table, resp)
+    assert _stored(table, resp)["overlap_acknowledged"]["check_status"] == "checked" and _stored(table, resp)["overlap"] == {
+        "check_status": "checked"
+    }
     assert "overlap_warning" not in resp
 
 
@@ -299,3 +301,118 @@ def test_closing_caveat_healthy_leaves_analysis_unchanged(monkeypatch):
     analysis = {"verdict": "supported", "summary": "Result."}
     eo.attach_closing_caveat(table, tl.EXPERIMENTS_PK, {"experiment_id": "z"}, analysis)
     assert "overlap_caveat_check" not in analysis and analysis["summary"] == "Result."
+
+
+# ── pagination, malformed active rows, close of an uncleared experiment ───────────────────────
+
+
+class _Pages:
+    """Table double returning pages; `pages` is a list of item lists, LEK set on all but the last."""
+
+    def __init__(self, pages, fail_at=None, endless=False):
+        self.pages, self.fail_at, self.endless, self.calls = pages, fail_at, endless, 0
+
+    def query(self, **kw):
+        i = self.calls
+        self.calls += 1
+        if self.fail_at is not None and i == self.fail_at:
+            raise TimeoutError("mid-way")
+        if self.endless:
+            return {"Items": [], "LastEvaluatedKey": {"pk": "p", "sk": str(i)}}
+        resp = {"Items": self.pages[i]}
+        if i < len(self.pages) - 1:
+            resp["LastEvaluatedKey"] = {"pk": "p", "sk": str(i)}
+        return resp
+
+
+NOW = __import__("datetime").datetime(2026, 11, 22, 12)
+
+
+def _check(table, design=None, kind="behavioral", ack=None):
+    return eo.check_creation(table, "pk", "2026-11-22", design or _design("deep_pct"), kind, None, [], ack, NOW)
+
+
+def test_pagination_conflict_on_page_two_is_found():
+    t = _Pages([[], [_active("a", "deep_pct")]])
+    with pytest.raises(ValueError, match="overlap refused"):
+        _check(t)
+    assert t.calls == 2
+
+
+def test_pagination_midway_error_is_indeterminate_not_partial_checked():
+    t = _Pages([[], [_active("a", "deep_pct")]], fail_at=1)
+    o, _ = _check(t, kind="observational")
+    assert o["check_status"] == "indeterminate" and o["error_class"] == "TimeoutError"
+
+
+def test_pagination_cap_is_indeterminate():
+    t = _Pages([], endless=True)
+    o, _ = _check(t, kind="observational")
+    assert o["check_status"] == "indeterminate" and "pagination" in o["reason"] and t.calls == eo.MAX_PAGES
+
+
+def test_pagination_complete_empty_is_checked_none():
+    o, _ = _check(_Pages([[], []]))
+    assert o["level"] == "none" and o["check_status"] == "checked"
+
+
+@pytest.mark.parametrize(
+    "mutate,field",
+    [
+        (lambda r: r.update(design="garbage"), "design"),
+        (lambda r: r.update(design={"criterion": "x"}), "design.criterion"),
+        (lambda r: r["design"].update(washout_days="abc"), "design.washout_days"),
+        (lambda r: r["design"].update(washout_days=True), "design.washout_days"),
+        (lambda r: r.pop("start_date"), "start_date"),
+        (lambda r: r.update(start_date="not-a-date"), "start_date"),
+        (lambda r: r.pop("status"), "status"),
+        (lambda r: r.update(status="paused"), "status"),
+    ],
+)
+def test_malformed_active_row_is_indeterminate_naming_row_and_field(mutate, field):
+    row = _active("bad", "steps", start="2026-10-01")
+    mutate(row)
+    o, _ = _check(_Pages([[row]]), kind="observational")
+    assert o["check_status"] == "indeterminate" and f"row bad, field {field}" in o["reason"]
+    with pytest.raises(ValueError, match=f"row bad, field {field}"):
+        _check(_Pages([[row]]))
+
+
+def test_status_is_case_insensitive_and_only_canonical_inactive_skipped():
+    done = _active("d", "deep_pct", status="Completed ")
+    gone = _active("g", "deep_pct", status="ABANDONED")
+    assert _check(_Pages([[done, gone]]))[0]["level"] == "none"
+    live = _active("l", "deep_pct", status=" Active")
+    with pytest.raises(ValueError, match="overlap refused"):
+        _check(_Pages([[live]]))
+
+
+def test_legacy_active_row_without_design_stays_note_at_most():
+    legacy = {"experiment_id": "old", "status": "active", "tags": ["sleep"]}
+    o, _ = eo.check_creation(_Pages([[legacy]]), "pk", "2026-11-22", _design("deep_pct"), "behavioral", None, ["sleep"], None, NOW)
+    assert o["level"] == "note" and o["check_status"] == "checked"
+
+
+def test_close_of_uncleared_experiment_carries_not_verified_caveat(monkeypatch):
+    table = _broken_read(monkeypatch)
+    resp = _create(acknowledge_overlap=REASON)
+    table._query_hook = lambda t, **kw: {"Items": [i for i in t.store.values() if str(i.get("sk", "")).startswith("EXP#")]}
+    monkeypatch.setattr(tl, "_run_design_analysis", lambda *a, **k: {"verdict": "supported", "summary": "Result."})
+    out = tl.tool_end_experiment({"experiment_id": resp["experiment_id"], "outcome": "done", "end_date": "2026-12-14"})
+    a = out["analysis"]
+    assert a["verdict"] == "supported" and a["overlap_caveat"] == "overlap not verified at creation"
+    assert a["summary"] == "Result. overlap not verified at creation."
+    assert REASON not in str(a)  # the owner's words never ride the public analysis
+
+
+def test_close_of_checked_and_pre_pr_rows_is_unchanged(monkeypatch):
+    table = _seed(
+        monkeypatch, {"experiment_id": "pre", "name": "pre", "status": "active", "start_date": "2026-11-01", "design": _design("steps")}
+    )
+    monkeypatch.setattr(tl, "_run_design_analysis", lambda *a, **k: {"verdict": "supported", "summary": "Result."})
+    out = tl.tool_end_experiment({"experiment_id": "pre", "outcome": "done", "end_date": "2026-12-14"})
+    assert out["analysis"] == {"verdict": "supported", "summary": "Result."}
+    resp = _create()
+    assert _stored(table, resp)["overlap"] == {"check_status": "checked"}
+    out = tl.tool_end_experiment({"experiment_id": resp["experiment_id"], "outcome": "done", "end_date": "2026-12-14"})
+    assert out["analysis"] == {"verdict": "supported", "summary": "Result."}
