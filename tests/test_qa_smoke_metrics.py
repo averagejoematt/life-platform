@@ -251,7 +251,7 @@ def test_qa_smoke_failures_and_warnings_alarms_declared():
     assert "qa-smoke-warnings" in alarms, "qa-smoke-warnings alarm missing — warnings-only runs must surface in the digest (#1445 AC4)"
     warns = alarms["qa-smoke-warnings"]
     assert warns["namespace"] == "LifePlatform/QaSmoke"
-    assert warns["metric_name"] == "WarnCount"
+    assert warns["metric_name"] == "PersistentWarnCount"  # #5928: an id present 3 Pacific days running, not any warn
     # Digest, not urgent: matches remediation_dispatcher_lambda.py's own
     # philosophy that routine QA findings are the daily-sweep's job, and
     # means a warnings-only run appears in the digest, not a full alert.
@@ -344,7 +344,7 @@ def test_lambda_handler_emits_both_cause_lines_before_the_fail_gate():
 
 
 def test_the_warn_cause_line_uses_the_alarmed_warns_not_every_warn():
-    """`qa-smoke-warnings` fires on WarnCount, which is the ALARMED warns only (#1958).
+    """The warn cause line names the ALARMED warns only (#1958; since #5928 the alarm fires on the subset of them that persist).
     A cause line built from every warn would name chronic ids no alarm watches."""
     src = inspect.getsource(qa.lambda_handler)
     for node in ast.walk(ast.parse(src)):
@@ -356,3 +356,90 @@ def test_the_warn_cause_line_uses_the_alarmed_warns_not_every_warn():
                 )
                 return
     raise AssertionError("no cause_line('warn', ...) call found in lambda_handler")
+
+
+# ── #5928: persistence — the alarm fires on a warning that will not go away ─────────────────────────────────
+def _run_days(days):
+    """Replay day-by-day lists of runs (each run a list of ids) through the pure streak function."""
+    from operational import qa_check as qc
+
+    state, out = {}, []
+    for n, runs in enumerate(days):
+        today, yesterday = f"2026-11-{n + 2:02d}", f"2026-11-{n + 1:02d}"
+        persistent = []
+        for ids in runs:
+            state, persistent = qc.advance_warn_streaks(state, today, yesterday, ids)
+        out.append(persistent)
+    return out
+
+
+def test_a_warning_on_three_consecutive_days_is_persistent_and_a_visitor_is_not():
+    # TRIGGERING CASE: the same id three days running fires on the third day and keeps firing.
+    assert _run_days([[["reader_truth:verdict"]]] * 4) == [[], [], ["reader_truth:verdict"], ["reader_truth:verdict"]]
+    # CLEAN CASE: one- and two-day visitors, and different ids on successive days, never fire.
+    assert _run_days([[["a"]], [["a"]], [["b"]], [["c"], ["d"]], [[]]]) == [[], [], [], [], []]
+    # A clean day breaks the streak: two days, a gap, two more is not three.
+    assert _run_days([[["a"]], [["a"]], [[]], [["a"]], [["a"]]]) == [[], [], [], [], []]
+
+
+def test_reruns_on_one_day_do_not_double_count_and_a_days_ids_are_the_union():
+    # Six runs in a day (schedule plus post-deploy) are one day, however many of them saw the warning.
+    assert _run_days([[["a"]] * 6, [["a"]] * 6]) == [[], []]
+    # Seen by only one of a day's runs still counts for that day.
+    assert _run_days([[["a"], []], [[], ["a"]], [["a"], []]]) == [[], [], ["a"]]
+
+
+def test_a_missed_day_breaks_every_streak():
+    from operational import qa_check as qc
+
+    state, _ = qc.advance_warn_streaks({}, "2026-11-02", "2026-11-01", ["a"])
+    state, _ = qc.advance_warn_streaks(state, "2026-11-03", "2026-11-02", ["a"])
+    _, persistent = qc.advance_warn_streaks(state, "2026-11-05", "2026-11-04", ["a"])  # no run on the 4th
+    assert persistent == []
+
+
+def test_owner_engagement_warnings_are_counted_apart_and_never_persist_the_alarm():
+    from operational import qa_check as qc
+
+    class C:
+        def __init__(self, name):
+            self.name = name
+
+    platform, engagement = qc.split_owner_engagement([C("morning_checkin:weekday_liveness"), C("reader_truth:verdict")])
+    assert [c.name for c in platform] == ["reader_truth:verdict"] and [c.name for c in engagement] == ["morning_checkin:weekday_liveness"]
+    doc = json.loads(
+        qa.emf_summary_line(passed=1, warned=2, failed=0, paused=0, timestamp_ms=1, warned_persistent=1, warned_owner_engagement=1)
+    )
+    names = {m["Name"] for m in doc["_aws"]["CloudWatchMetrics"][0]["Metrics"]}
+    assert {"PersistentWarnCount", "OwnerEngagementWarnCount", "WarnCount"} <= names
+    assert (doc["PersistentWarnCount"], doc["OwnerEngagementWarnCount"], doc["WarnCount"]) == (1, 1, 2)
+    # nothing in the monitoring stack alarms the engagement metric: it is a product condition, not an infrastructure one
+    stack = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cdk", "stacks", "monitoring_stack.py")).read()
+    assert '"OwnerEngagementWarnCount"' not in stack
+
+
+def test_an_unreadable_streak_state_falls_back_to_every_warning_and_a_dry_run_writes_nothing():
+    import datetime as dt
+
+    class Broken:
+        def get_item(self, **kw):
+            raise RuntimeError("AccessDenied")
+
+    class Store:
+        def __init__(self):
+            self.puts = 0
+
+        def get_item(self, **kw):
+            return {}
+
+        def put_item(self, **kw):
+            self.puts += 1
+
+    from operational import qa_check as qc
+
+    now = dt.datetime(2026, 11, 23, 10, 30)
+    # FAILS CLOSED: persistence unknown -> the old any-warning trigger, never a quiet zero
+    assert qc.store_warn_streaks(Broken(), "pk", now, ["b", "a"]) == ["a", "b"]
+    store = Store()
+    assert qc.store_warn_streaks(store, "pk", now, ["a"], persist=False) == [] and store.puts == 0
+    assert qc.store_warn_streaks(store, "pk", now, ["a"], persist=True) == [] and store.puts == 1
