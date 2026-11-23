@@ -18,6 +18,7 @@ proved here on the real door over the governed ``PublicationTable``:
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 
 import pytest
 from coach import coach_record, public_forecast as F
@@ -60,9 +61,15 @@ def _payload(end, n=30):
 def _forecast_row(filed=FILED, **extra):
     row, why = F.build("weight_trend", filed, _payload(F._day(filed, -1)), "https://example.invalid/api/series", filed, phase_stamp=False)
     assert why is None, why
-    row = json.loads(json.dumps(row, default=float))  # as DynamoDB hands it back (no Decimals in the fake)
+    row = json.loads(json.dumps(row, default=float))  # plain numbers: the copy the assertions do arithmetic on
     row.update(extra)
     return row
+
+
+def _wire(row):
+    """The row as boto3's resource API hands it back: EVERY number a ``Decimal`` (never an int or a float). The table
+    the routes read holds this form — a plain-number fixture is what let the first live row 500 the list (2026-11-23)."""
+    return json.loads(json.dumps(row), parse_float=Decimal, parse_int=Decimal)
 
 
 ROW = _forecast_row()
@@ -87,7 +94,7 @@ def _live(monkeypatch):
 def _tables(*extra):
     from reader_call_support import ALL_ROWS
 
-    return _table(rows=(*ALL_ROWS, ROW, GRADED, *extra))
+    return _table(rows=(*ALL_ROWS, _wire(ROW), _wire(GRADED), *(_wire(r) for r in extra)))
 
 
 # ── the target and its label ───────────────────────────────────────────────────────────────────────────
@@ -122,7 +129,7 @@ def test_an_open_forecast_asks_its_own_question_in_the_machine_voice():
     resp = _tap(raw, table, CALL, "forecast")
     assert resp["statusCode"] == 200 and _body(resp)["your_call"] == "forecast"
     assert _tally(raw) == {"forecast": 1}
-    assert raw.store[(ROW["pk"], ROW["sk"])] == ROW, "a reader's call never touches the forecast row"
+    assert raw.store[(ROW["pk"], ROW["sk"])] == _wire(ROW), "a reader's call never touches the forecast row"
 
 
 def test_a_coach_calls_view_is_unchanged_by_the_forecast_target():
@@ -285,6 +292,45 @@ def test_the_route_serves_each_forecast_labelled_with_its_guess_and_never_a_coac
     assert got[GRADED["prediction_id"]]["graded"]["reading_side"] == "forecast"
     assert "coach" not in json.dumps(body).lower()
     assert raw.writes == [] and {pk for _op, pk in raw.reads} == {FP.FORECAST_PK}, "one partition, read only"
+
+
+def _decimals(v, path=""):
+    if isinstance(v, dict):
+        return [p for k, x in v.items() for p in _decimals(x, f"{path}.{k}")]
+    if isinstance(v, list):
+        return [p for i, x in enumerate(v) for p in _decimals(x, f"{path}[{i}]")]
+    return [path] if isinstance(v, Decimal) else []
+
+
+def test_a_row_typed_as_dynamodb_returns_it_is_served_as_json_with_whole_numbers_whole():
+    """Regression, 2026-11-23: the first live forecast row made the route answer 500 ("Object of type Decimal is not
+    JSON serializable") — ``rule.version``, ``scoring.version`` and ``inputs.n`` left as the row's own ``Decimal``.
+    Mutation run: with ``_int`` returning its argument unchanged this test fails at ``json.dumps``."""
+    from web.site_api_platform_forecasts import served
+
+    graded = _wire(dict(GRADED, outcome_notes={"actual_value": ROW["evaluation"]["threshold"] - 30.0}))  # notes as a map
+    wire = _wire(ROW)
+    for path in (".model.version", ".evaluation.scoring_version", ".lineage.n", ".evaluation.threshold", ".evaluation.baseline_value"):
+        assert path in _decimals(wire), f"the fixture is not the wire: {path} is not a Decimal"
+    for row in (wire, graded):
+        f = served(row, GENESIS)
+        assert f is not None and _decimals(f) == []
+        assert json.loads(json.dumps(f)) == f, "the served shape is plain JSON"
+        for whole in (f["rule"]["version"], f["scoring"]["version"], f["inputs"]["n"]):
+            assert type(whole) is int, "a version or a count is a JSON integer (the page prints it as written)"
+        for measured in (f["forecast"], f["guess"]["value"]):
+            assert type(measured) is float
+    f = served(wire, GENESIS)
+    assert (f["rule"]["version"], f["scoring"]["version"], f["inputs"]["n"]) == (
+        ROW["model"]["version"],
+        ROW["evaluation"]["scoring_version"],
+        ROW["lineage"]["n"],
+    )
+    assert f == served(ROW, GENESIS), "the same row in plain numbers serves the same shape"
+    g = served(graded, GENESIS)["graded"]
+    assert type(g["actual"]) is float and g["reading_side"] == "forecast"
+    for bad in (Decimal("1.5"), Decimal("NaN"), True, "1", None):
+        assert served(dict(wire, lineage=dict(wire["lineage"], n=bad)), GENESIS)["inputs"]["n"] is None, "never a rounded count"
 
 
 def test_the_route_never_serves_a_coach_partition_row_or_a_row_that_is_not_the_forecasts_own():
