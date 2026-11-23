@@ -41,13 +41,20 @@ from training.training_charter import charter_value  # noqa: E402
 
 CYCLE = int(charter_value("calibration.tape_and_photos.every_weeks")) * 7
 GENESIS = "2026-09-06"
-LAST = "2026-10-05"
 MORNING = datetime(2026, 11, 16, 9, 0, tzinfo=PACIFIC)  # a Monday, 09:00 PT — outside quiet hours
 NIGHT = datetime(2026, 11, 16, 22, 30, tzinfo=PACIFIC)
 
 
 def plus(d: str, n: int) -> str:
     return (date.fromisoformat(d) + timedelta(days=n)).isoformat()
+
+
+# The last tape log, two missed cycles (and two weeks) before MORNING at whatever cadence the charter states — so the
+# fixture stays at the dead-man when the cadence changes (2 -> 4 weeks, charter 1.53.0, #5067), instead of a fixed date.
+LAST = plus(MORNING.strftime("%Y-%m-%d"), -(2 * CYCLE + 14))
+# Never logged since this anchor, three cycles missed on LIVE_DAY (at the two-week cadence of that day this is the
+# experiment start, 2026-09-06).
+LIVE_ANCHOR = plus("2026-10-24", -(3 * CYCLE + 6))
 
 
 def dead_block(today: str) -> dict:
@@ -192,7 +199,7 @@ LIVE_DAY = datetime(2026, 10, 24, 9, 0, tzinfo=PACIFIC)  # the silent run: 16:00
 
 def live_block() -> dict:
     """The shape of the live 16:00Z read: tape and photos never logged since genesis, three cycles missed."""
-    return cc.compute(LIVE_DAY.strftime("%Y-%m-%d"), {"tape": lambda: [], "photos": lambda: [], "dexa": lambda: []}, anchor=GENESIS)
+    return cc.compute(LIVE_DAY.strftime("%Y-%m-%d"), {"tape": lambda: [], "photos": lambda: [], "dexa": lambda: []}, anchor=LIVE_ANCHOR)
 
 
 def test_the_logger_reaches_the_wire_not_a_root_that_drops_info():
@@ -220,9 +227,9 @@ def test_the_live_run_shape_logs_one_sent_line_per_kind_through_the_worker(monke
     with _wire() as lines:
         out = worker.lambda_handler({"kind": "event_outbound"}, None)
     assert out["calibration_deadman"]["sent"] == ["tape", "photos"]
-    assert set(ledger.rows) == {f"EVENT#CALIB_DEADMAN#tape#{GENESIS}", f"EVENT#CALIB_DEADMAN#photos#{GENESIS}"}
-    assert f"[calib-deadman] sent kind=tape event=CALIB_DEADMAN#tape#{GENESIS}" in lines
-    assert f"[calib-deadman] sent kind=photos event=CALIB_DEADMAN#photos#{GENESIS}" in lines
+    assert set(ledger.rows) == {f"EVENT#CALIB_DEADMAN#tape#{LIVE_ANCHOR}", f"EVENT#CALIB_DEADMAN#photos#{LIVE_ANCHOR}"}
+    assert f"[calib-deadman] sent kind=tape event=CALIB_DEADMAN#tape#{LIVE_ANCHOR}" in lines
+    assert f"[calib-deadman] sent kind=photos event=CALIB_DEADMAN#photos#{LIVE_ANCHOR}" in lines
     assert _summaries(lines) == ["[calib-deadman] reason=sent due=[tape,photos] tape=sent photos=sent"]
     done = [x for x in lines if x.startswith("[telegram] event sweep done")]
     assert done == ["[telegram] event sweep done (reason=None candidates=2 deadman=sent)"]
