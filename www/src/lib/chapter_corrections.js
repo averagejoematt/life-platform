@@ -23,6 +23,8 @@ export function footLine(live = CHAPTER_TRUTH_LIVE) {
 export const PERSONA_DISCLOSURE = "Margaret Calloway is an AI editorial persona of the platform, not a person.";
 export const LEGACY_SIGNER = "Margaret Calloway";
 export const PLATFORM_SIGNATURE = "Average Joe Matt editorial record";
+/** #6193: pass as `edition` to correctionsHtml on the archival first-edition page. */
+export const ARCHIVAL_PAGE = Object.freeze({ archival: true });
 
 const esc = (x) => String(x ?? "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
 
@@ -59,6 +61,8 @@ function approvalWords(c) {
  *  sentence #6177 shipped, unchanged; with one, it says whether the edition makes the correction. */
 function textBelow(c, edition) {
   if (!edition) return footLine(); // #6177: off = "The chapter's text below is unchanged; it reads as first published."
+  // #6193 B6: on the archival page the text below is the historical rendering the correction concerns, not the current one
+  if (edition === ARCHIVAL_PAGE) return "It concerns the chapter as published; the text below is an archival rendering of it, superseded by the current edition.";
   const carried = Array.isArray(edition.carries) && edition.carries.includes(c.id);
   return carried ? "The text below is a later edition, and it makes this correction." : "It was made to the first edition; the text below is a later edition.";
 }
@@ -84,4 +88,44 @@ export function correctionHtml(c, all = [], edition = null) {
  *  served later edition, if any — only the foot's last sentence changes. */
 export function correctionsHtml(corrections, edition = null) {
   return (corrections || []).map((c) => correctionHtml(c, corrections, edition)).join("");
+}
+
+// For COMPARING only (never emitted): tags stripped until none is left.
+const untag = (x) => {
+  let prev;
+  let out = String(x ?? "");
+  do {
+    prev = out;
+    out = out.replace(/<[^>]*>/g, " ");
+  } while (out !== prev);
+  return out;
+};
+const words = (x) =>
+  untag(x)
+    .replace(/&#39;|&#x27;|&rsquo;|&lsquo;|[’‘]/g, "'")
+    .replace(/&quot;|&ldquo;|&rdquo;|[“”]/g, '"')
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** #6193 (rehearsal ruling §4): on the archival page, each correction with an owner-approved anchor is printed directly
+ *  after the paragraph that carries its passage (the platform's signed block, as above the text — never mistakable for a
+ *  note of the time), with one line saying which passage it concerns. Returns `{ html, placed }`: the body with the blocks
+ *  placed, and the ids placed (the page prints the rest above the text). A passage not found in exactly one paragraph is
+ *  not placed. */
+export function placeBeside(bodyHtml, anchors, corrections, edition = ARCHIVAL_PAGE) {
+  let html = String(bodyHtml || "");
+  const placed = [];
+  for (const a of anchors || []) {
+    const c = (corrections || []).find((x) => x.id === a.correction_id);
+    if (!c) continue;
+    const blocks = [...html.matchAll(/<(p|blockquote)\b[^>]*>[\s\S]*?<\/\1>/g)].filter((m) => words(m[0]).includes(words(a.passage)));
+    if (blocks.length !== 1) continue;
+    const end = blocks[0].index + blocks[0][0].length;
+    const lead = `<p class="correction-foot" data-correction-anchor>This ${c.kind === "qualification" ? "qualification" : "correction"} concerns the passage above, beginning “${esc(a.passage)}”</p>`;
+    const block = correctionHtml(c, corrections, edition).replace(/^<aside class="chapter-correction/, '<aside style="margin:18px 0" data-anchored class="chapter-correction').replace(/<\/aside>$/, `${lead}</aside>`);
+    html = html.slice(0, end) + block + html.slice(end);
+    placed.push(c.id);
+  }
+  return { html, placed };
 }

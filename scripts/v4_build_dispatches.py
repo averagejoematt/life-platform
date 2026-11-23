@@ -27,8 +27,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lambdas"))  # #6216: the narrator's name comes from the canon
 import v4_apply_chrome as _apply_chrome  # noqa: E402 — the post-build chrome normalizer (#3721)
 import v4_chrome  # noqa: E402 — the ONE source for chrome, incl. the #3615 syndication gate
+from content import elena_canon  # noqa: E402
 from v4_kit import loop_ribbon  # noqa: E402  — shared .loop-ribbon (#578)
 from v4_proof import (  # noqa: E402  — #730/#803 static proof + #1395 data-driven OG + #1972 cadence
     chronicle_list_html,
@@ -45,7 +47,7 @@ OUT = Path("site/story")
 # assets/js/dispatches.js — the two must carry the same keys (a shell whose key the JS
 # doesn't know renders the default section).
 SECTIONS = [
-    ("chronicle", "The weekly write-up", "The weekly write-up, by Elena Voss, the site's AI journalist."),
+    ("chronicle", "The weekly write-up", f"The weekly write-up, by {elena_canon.NAME}, the series' AI narrator."),
     # "The Coaches" + "AI lab notes" moved to their own door /coaching/ (2026-06-20).
     ("panel", "The podcast", "A weekly two-host show — Elena and a rotating coach review the week."),
     ("journal", "In his own words", "Matthew's own writing, first-person."),
@@ -211,7 +213,7 @@ def _section_proof(key: str, chronicle_proof: str) -> str:
 # is", everything else is the door's own promise.
 DOOR_KICKER = "the story · the weekly write-up, and who he is"
 KICKER_BY_SECTION = {"about": "the story · who he is"}
-DOOR_PROMISE = "An AI journalist writes up each week; Matthew writes in his own words."
+DOOR_PROMISE = "An AI narrator writes up each week; Matthew writes in his own words."
 # About is the site's one first-person page — the promise names whose words they are.
 PROMISE_BY_SECTION = {"about": "Matthew, in his own words."}
 
@@ -227,7 +229,7 @@ def _write_hub(chronicle_proof: str, hub_og: dict) -> None:
         OUT / "index.html",
         SHELL.format(
             title="The Story — averagejoematt",
-            desc="An AI journalist writes up each week; Matthew writes in his own words.",
+            desc=DOOR_PROMISE,
             canon="",
             robots=v4_chrome.robots_meta("/story/"),  # #4604: "" unless the path is held until ruled
             start="chronicle",

@@ -1,5 +1,5 @@
 {
- "_comment": "#6193 fixture: sample CHAPTER_EDITION# records as the chronicle partition holds them — the first edition's evidence pointer (#01), an approved second edition, an unapproved third, an approved archival rendering and an unapproved one. Read ONLY when the switch is on (content.chapter_editions.LIVE) or WEB_EDITIONS=1, so the default fixture build is unchanged; the unapproved records carry sentinels the build scan must never find on a page. Sample content, for layout only.",
+ "_comment": "#6193 fixture: sample CHAPTER_EDITION# records as the chronicle partition holds them — the first edition's evidence pointer (#01) and its passed restore rehearsal (#01#restore), an approved second edition, an unapproved third, an approved archival rendering and an unapproved one. Read ONLY when the switch is on (content.chapter_editions.LIVE) or WEB_EDITIONS=1, so the default fixture build is unchanged; the unapproved records carry sentinels the build scan must never find on a page. Sample content, for layout only. An approved anchor places the carried correction beside its passage on the archival page.",
  "records": [
   {
    "pk": "USER#matthew#SOURCE#chronicle",
@@ -26,13 +26,33 @@
   },
   {
    "pk": "USER#matthew#SOURCE#chronicle",
+   "sk": "CHAPTER_EDITION#week-06#01#restore",
+   "record_type": "chapter_edition_restore_check",
+   "phase": "experiment",
+   "chapter_id": "week-06",
+   "backup_prefix": "backups/chronicle-editions/week-06/20261120T170000Z/",
+   "objects": [
+    {
+     "backup_key": "backups/chronicle-editions/week-06/20261120T170000Z/ddb/row.json",
+     "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+     "backup_key": "backups/chronicle-editions/week-06/20261120T170000Z/s3/generated/journal/posts/week-06/index.html",
+     "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+   ],
+   "row_rebuilt": true,
+   "verified_at": "2026-11-20T17:05:00Z"
+  },
+  {
+   "pk": "USER#matthew#SOURCE#chronicle",
    "sk": "CHAPTER_EDITION#week-06#01#archival#01",
    "record_type": "chapter_edition_archival",
    "phase": "experiment",
    "chapter_id": "week-06",
    "archival_id": 1,
-   "text": "Sample content, for layout only. This is the fixture's archival rendering of the first edition, prepared for public reading and approved separately from the second edition.\n\nIt stands at the first-edition address with the platform's archival note above it.",
-   "text_sha256": "94c0bdc4f3bab3829194f2418d178963247cfd2b2c0d2c2ca50e01f159bf6164",
+   "text": "\"The protein argument\"\n\n*Editor's note, October 2026 — Margaret Calloway: sample content, for layout only; a note signed by the legacy persona.*\n\nSample content, for layout only. This is the fixture's archival rendering of the chapter as it stood on a later day, prepared for public reading and approved separately from the second edition.\n\nIt stands at the first-edition address with the platform's archival note above it, and its paragraphs are spaced as the chapter page spaces them.",
+   "text_sha256": "8c1bcf4a36df09287efdadbf6a00f1f248611c1b39638269a202ce0d4f4f1f5c",
    "proposed_at": "2026-11-20T18:00:00Z",
    "proposed_via": "MCP manage_chapter_corrections",
    "approvals": [
@@ -42,11 +62,12 @@
      "on": "2026-11-21",
      "via": "MCP manage_chapter_corrections (owner-only)",
      "note": "",
-     "sha256": "94c0bdc4f3bab3829194f2418d178963247cfd2b2c0d2c2ca50e01f159bf6164"
+     "sha256": "8c1bcf4a36df09287efdadbf6a00f1f248611c1b39638269a202ce0d4f4f1f5c"
     }
    ],
    "approved_at": "2026-11-21T18:00:00Z",
-   "approved_on": "2026-11-21"
+   "approved_on": "2026-11-21",
+   "as_of": "2026-10-25"
   },
   {
    "pk": "USER#matthew#SOURCE#chronicle",
@@ -70,8 +91,8 @@
    "phase": "experiment",
    "chapter_id": "week-06",
    "edition": 2,
-   "text": "Sample content, for layout only. This is the fixture's second edition of the protein chapter, written to exercise the edition line, the carried correction and the page that serves a later text at the same address.\n\nThe week's protein days are counted from the log as it stands, and the walk is described in the distance the record holds.\n\n> A quoted line from the plan, attributed to the plan, renders as a block quotation.\n\n*Week 6 of the sample chronicle, second edition*",
-   "text_sha256": "650324abf597465f42094db4d1cfa50cdca0de52a069a4c59210f37d6d2257ea",
+   "text": "\"The protein argument\"\n\n*Sample content, for layout only: the fixture second edition's own summary, shown in the header and on every summary surface.*\n\nSample content, for layout only. This is the fixture's second edition of the protein chapter, written to exercise the edition line, the carried correction and the page that serves a later text at the same address.\n\nThe week's protein days are counted from the log as it stands, and the walk is described in the distance the record holds.\n\n> A quoted line from the plan, attributed to the plan, renders as a block quotation.\n\n*Week 6 of the sample chronicle, second edition. An archival rendering of the earlier text is at /story/week-06/first-edition/.*",
+   "text_sha256": "676445569256363d35768aeda5ed8c82d9c367825ad1a62d3f0f857f8db236b7",
    "first_published": "2026-10-17",
    "carries": [
     "sample-walk-distance-2"
@@ -85,7 +106,7 @@
      "on": "2026-11-21",
      "via": "MCP manage_chapter_corrections (owner-only)",
      "note": "",
-     "sha256": "650324abf597465f42094db4d1cfa50cdca0de52a069a4c59210f37d6d2257ea"
+     "sha256": "676445569256363d35768aeda5ed8c82d9c367825ad1a62d3f0f857f8db236b7"
     }
    ],
    "approved_at": "2026-11-21T17:30:00Z",
@@ -109,6 +130,27 @@
    "approved_at": null,
    "revised_on": null,
    "signature": null
+  },
+  {
+   "pk": "USER#matthew#SOURCE#chronicle",
+   "sk": "CHAPTER_EDITION#week-06#anchor#sample-walk-distance-2",
+   "record_type": "chapter_edition_anchor",
+   "phase": "experiment",
+   "chapter_id": "week-06",
+   "correction_id": "sample-walk-distance-2",
+   "passage": "Sample content, for layout only. This is the fixture's archival rendering",
+   "proposed_at": "2026-11-21T19:30:00Z",
+   "proposed_via": "MCP manage_chapter_corrections",
+   "approvals": [
+    {
+     "by": "owner",
+     "at": "2026-11-21T19:40:00Z",
+     "on": "2026-11-21",
+     "via": "MCP manage_chapter_corrections (owner-only)",
+     "note": ""
+    }
+   ],
+   "approved_at": "2026-11-21T19:40:00Z"
   }
  ]
 }

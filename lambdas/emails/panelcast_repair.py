@@ -29,10 +29,10 @@ import os
 from typing import TYPE_CHECKING
 
 try:
-    from emails.panelcast_qa import _QA_HOOK_MAX_WORDS, _QA_MAX_CONSECUTIVE, _QA_MAX_WORDS_PER_TURN, structural_seams
+    from emails.panelcast_qa import _ELENA_HOST, _QA_HOOK_MAX_WORDS, _QA_MAX_CONSECUTIVE, _QA_MAX_WORDS_PER_TURN, structural_seams
 except ImportError:  # bundle stages lambdas/ at the zip root
     if not TYPE_CHECKING:  # one canonical module name for mypy; runtime unchanged (#1656)
-        from panelcast_qa import _QA_HOOK_MAX_WORDS, _QA_MAX_CONSECUTIVE, _QA_MAX_WORDS_PER_TURN, structural_seams
+        from panelcast_qa import _ELENA_HOST, _QA_HOOK_MAX_WORDS, _QA_MAX_CONSECUTIVE, _QA_MAX_WORDS_PER_TURN, structural_seams
 
 # #1172: the fixed attempt budget — panelcast_qa._QA_MAX_ATTEMPTS generations, each with
 # up to MAX_REVISIONS judge-feedback revisions. Exhaustion escalates; never a silent miss.
@@ -173,8 +173,8 @@ def revise_intro(turns, fails, invoke, model, extract_json, logger):
     caller re-gates them through the SAME intro line gates as a fresh generation."""
     script_text = "\n".join(f"{t.get('speaker')}: {t.get('line')}" for t in turns)
     system = (
-        'You are the head writer revising a draft of "The Measured Life" Episode 0 — host ELENA VOSS (embedded '
-        "journalist), guest ELI MARSH (the Principal Investigator); MATT is the third-person subject and never "
+        'You are the head writer revising a draft of "The Measured Life" Episode 0 — host ELENA VOSS ('
+        f"{_ELENA_HOST}), guest ELI MARSH (the Principal Investigator); MATT is the third-person subject and never "
         "speaks. Fix EVERY issue listed below and keep everything that already works. Invent nothing about Matt (no "
         "events, losses, dates, numbers, or any weight — no body-weight figure from any year, bare or in words); turns STRICTLY ALTERNATE — never two consecutive turns from "
         "the same speaker; every question or challenge is answered substantively by the OTHER speaker in the very "
