@@ -73,8 +73,7 @@ def _src(**kw):
             "first_author": "Doe J",
             "year": 2021,
             "fetched_at": fetched_at,
-            "overlap_terms": ["synthetic", "wake"],
-            "overlap_count": 2,
+            "subject_overlap": {"shared_terms": ["synthetic", "wake"], "count": 2, "basis": "title", "low": False},
             "stamp": rf.verification_stamp(str(s.get("id_kind")), str(s.get("id")), str(s.get("resolved_title")), fetched_at),
         }
     return s
@@ -841,27 +840,37 @@ def test_verifier_fetches_and_emits_a_stamped_source_the_tool_accepts():
     import hashlib
 
     assert v["abstract_sha256"] == hashlib.sha256(b"Evening light exposure delayed melatonin and sleep onset.").hexdigest()
-    assert {"evening", "light", "exposure", "sleep", "onset"} <= set(v["overlap_terms"]) and v["overlap_count"] >= 2
-    assert "override_reason" not in v
+    ov = v["subject_overlap"]
+    assert {"evening", "light", "exposure", "sleep", "onset"} <= set(ov["shared_terms"]) and ov["count"] >= 2
+    assert ov["basis"] == "title+abstract" and ov["low"] is False
     assert {urllib.parse.urlparse(u).hostname for u in http.calls} == {"eutils.ncbi.nlm.nih.gov"}
     src["resolved_title"] = src["verification"]["resolved_title"] = "Edited by hand"
     with pytest.raises(rf.FindingError, match="stamp does not match"):
         rf.validate_source(src, today=TODAY)
 
 
-def test_the_overlap_tripwire_refuses_an_unrelated_paper_unless_overridden():
+def test_low_subject_overlap_is_advisory_it_warns_and_still_emits():
     rfv = _verifier()
     unrelated = "A synthetic trial of rotator cuff repair techniques"
     http = _stub({"esummary": (200, _pubmed("23456789", unrelated, "Doe J", 2021))})
-    text = lambda url: (200, "")  # noqa: E731
-    code, out = rfv.run(_pmid_args(CLAIM, unrelated), http=http, text=text, now=NOW)
-    assert code == 1 and "NOT EMITTED" in out and "0 shared content word" in out and "not a check of support" in out
-    code, out = rfv.run(
-        [*_pmid_args(CLAIM, unrelated), "--override", "the trial's control arm is the relevant part"], http=http, text=text, now=NOW
-    )
+    warnings: list = []
+    code, out = rfv.run(_pmid_args(CLAIM, unrelated), http=http, text=lambda url: (200, ""), now=NOW, warn=warnings.append)
     assert code == 0, out
-    v = json.loads(out)["verification"]
-    assert v["override_reason"] == "the trial's control arm is the relevant part" and v["overlap_count"] == 0 and "abstract_sha256" not in v
+    src = json.loads(out)
+    assert src["verification"]["subject_overlap"] == {"shared_terms": [], "count": 0, "basis": "title", "low": True}
+    assert len(warnings) == 1 and "WARNING (advisory)" in warnings[0] and "not a check of support" in warnings[0]
+    assert rf.validate_source(src, today=TODAY)["verification"]["subject_overlap"]["low"] is True  # the store never refuses on it
+    assert "override_reason" not in src["verification"]
+    with pytest.raises(SystemExit):  # there is no --override flag to give
+        rfv.run([*_pmid_args(CLAIM, unrelated), "--override", "x"], http=http, text=lambda url: (200, ""), now=NOW)
+
+
+def test_a_related_paper_raises_no_warning():
+    rfv = _verifier()
+    warnings: list = []
+    http = _stub({"esummary": (200, _pubmed("23456789", LIGHT_TITLE, "Doe J", 2021))})
+    code, _ = rfv.run(_pmid_args(), http=http, text=lambda url: (200, ""), now=NOW, warn=warnings.append)
+    assert code == 0 and warnings == []
 
 
 def test_overlap_counts_shared_content_words_not_stop_words():
@@ -929,3 +938,4 @@ def test_verifier_imports_the_existing_resolvers_rather_than_copying_them():
     for fn in ("def verify_pmid", "def verify_doi", "def verify_citation", "def titles_match"):
         assert fn not in src
     assert "does NOT prove the Lambda verified anything" in src and "not a check that the paper SUPPORTS" in src
+    assert "known high false-alarm rate on titles alone" in src

@@ -843,8 +843,9 @@ python3 scripts/research_finding_verify.py --guideline-url https://www.nice.org.
   --design clinical_guideline --review-depth full_text --claim "..." --supported-by full_text_read --supports-note "..."
 # Paste the printed object UNEDITED: its verification.stamp covers id, title and fetch time, and an edited title is
 # refused. The stamp proves the object came unedited from the script, not that the Lambda verified anything (it has no
-# network). Low subject overlap between --claim and the title+abstract refuses to emit unless --override "<reason>"
-# (a tripwire for an unrelated paper, not a check that the paper supports the claim).
+# network). Low subject overlap between --claim and the title (+abstract) prints an ADVISORY warning and is recorded as
+# verification.subject_overlap.low; the object is always emitted. A review prompt with a known high false-alarm rate on
+# titles alone, not a refusal and not a check that the paper supports the claim.
 # 2. In a Claude session: manage_research_finding action=record ... sources=[<the printed objects>]
 # 3. The dead-man is a count the owner reads, not an alarm: manage_research_finding action=list status=stale
 ```

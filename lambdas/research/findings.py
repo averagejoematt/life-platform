@@ -243,9 +243,7 @@ _VERIFICATION_KEYS = frozenset(
         "fetched_at",
         "abstract_sha256",
         "stamp",
-        "overlap_terms",
-        "overlap_count",
-        "override_reason",
+        "subject_overlap",
     }
 )
 _STAMP = re.compile(r"^[0-9a-f]{16}$")
@@ -359,9 +357,9 @@ def _verification(v: Any, kind: str, ident: str, title: str) -> dict[str, Any]:
     year = v.get("year")
     if year is not None and (not isinstance(year, int) or isinstance(year, bool)):
         raise FindingError("verification.year must be an integer or null")
-    count = v.get("overlap_count")
-    if not isinstance(count, int) or isinstance(count, bool) or not isinstance(v.get("overlap_terms"), list):
-        raise FindingError("verification carries overlap_terms and overlap_count (the subject-overlap tripwire)")
+    overlap = v.get("subject_overlap")
+    if overlap is not None and not isinstance(overlap, dict):
+        raise FindingError("verification.subject_overlap must be an object")  # ADVISORY: its `low` flag never refuses
     out = {k: v[k] for k in sorted(_VERIFICATION_KEYS) if k in v and v[k] is not None}
     out["first_author"] = str(v.get("first_author") or "")
     return out

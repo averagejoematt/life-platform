@@ -21,12 +21,14 @@ by hand afterwards. It does NOT prove the Lambda verified anything (there is no 
 a stamp is not a signature: someone who runs the hash by hand could forge one. It defends against a hand-pasted
 title, not against deliberate forgery.
 
-THE SUBJECT-OVERLAP TRIPWIRE. `--claim` takes the finding's question or claim text. The script prints the content
-words that the claim and the title+abstract share (after stop-word removal), and the count. Below
-`OVERLAP_MIN` it refuses to emit unless `--override "<reason>"` is given, and the reason is carried in the
-verification block. This catches a real PMID attached to an unrelated claim. It is a tripwire for an unrelated
-paper. It is not a check that the paper SUPPORTS the claim: that is `claim_supported_by` + `supports_note`, which
-you assert as the reader.
+THE SUBJECT-OVERLAP PROMPT (ADVISORY). `--claim` takes the finding's question or claim text. The script records
+`subject_overlap: {shared_terms, count, basis: "title" | "title+abstract", low}` inside the verification block: the
+content words the claim shares with the title (and the abstract when there is one), after stop-word removal. When
+`low` is true it prints a visible WARNING on stderr. It ALWAYS emits the source object: no override is needed, and
+neither the script nor the store refuses on it. It is a review prompt for an unrelated paper, with a known high
+false-alarm rate on titles alone (crude stemming: in a run over 47 stored citations it flagged 17, about 12 of them
+false alarms). It is not a check that the paper SUPPORTS the claim: that is `claim_supported_by` + `supports_note`,
+which you assert as the reader.
 
     python3 scripts/research_finding_verify.py --pmid 12345678 --title "..." --authors "Surname AB" --year 2020 \\
         --design meta_analysis --review-depth abstract_only --claim "<the finding's question>" \\
@@ -65,7 +67,7 @@ from research import findings as rf  # noqa: E402
 
 USER_AGENT = "life-platform-research-finding-verify/1.0 (scripts/research_finding_verify.py; read-only)"
 EFETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&retmode=xml&id={pmid}"
-#: Shared content words below which the script refuses to emit without --override (a tripwire, not a support check).
+#: Shared content words below which the advisory subject-overlap prompt reads `low` and warns. It never refuses.
 OVERLAP_MIN = 2
 TextGet = Callable[[str], "tuple[int, str]"]
 _TITLE_TAG = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
@@ -120,7 +122,7 @@ def content_words(text: str) -> set[str]:
 
 
 def subject_overlap(claim: str, title: str, abstract: str) -> list[str]:
-    """The content words shared by the claim and the title+abstract. A tripwire for an unrelated paper, nothing more."""
+    """The content words shared by the claim and the title+abstract. An advisory review prompt, never a refusal."""
     return sorted(content_words(claim) & content_words(f"{title} {abstract}"))
 
 
@@ -202,8 +204,17 @@ def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _stderr(message: str) -> None:
+    print(message, file=sys.stderr)
+
+
 def run(
-    argv: list[str], *, http: ler.HttpGet = ler.urllib_get, text: TextGet = text_get, now: Optional[Callable[[], str]] = None
+    argv: list[str],
+    *,
+    http: ler.HttpGet = ler.urllib_get,
+    text: TextGet = text_get,
+    now: Optional[Callable[[], str]] = None,
+    warn: Optional[Callable[[str], None]] = None,
 ) -> tuple[int, str]:
     """(exit code, output). The http/text fetchers and the clock are injected in tests; the real ones by default."""
     ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n\n")[0])
@@ -216,10 +227,9 @@ def run(
     ap.add_argument("--year", type=int, help="publication year (PMID / DOI)")
     ap.add_argument("--design", required=True, choices=rf.DESIGNS)
     ap.add_argument("--review-depth", required=True, choices=rf.REVIEW_DEPTHS)
-    ap.add_argument("--claim", required=True, help="the finding's question or claim (for the subject-overlap tripwire)")
+    ap.add_argument("--claim", required=True, help="the finding's question or claim (for the advisory subject-overlap prompt)")
     ap.add_argument("--supported-by", required=True, choices=rf.CLAIM_SUPPORT)
     ap.add_argument("--supports-note", required=True, help="what in the source supports the finding, in your words (20-400 chars)")
-    ap.add_argument("--override", help="emit despite low subject overlap; the reason is carried in the verification block")
     args = ap.parse_args(argv)
     allow = ler.load_allowlist()
     if args.guideline_url:
@@ -231,12 +241,17 @@ def run(
     if not got:
         return 1, "NOT VERIFIED — " + "; ".join(problems)
     shared = subject_overlap(args.claim, got["resolved_title"], got["abstract"])
-    report = f"subject overlap: {len(shared)} shared content word(s): {', '.join(shared) or '(none)'}"
-    override = " ".join(str(args.override or "").split())
-    if len(shared) < OVERLAP_MIN and not override:
-        return 1, (
-            f"NOT EMITTED — {report}. Below {OVERLAP_MIN}, the record may be an unrelated paper. Check the id; if it is right, "
-            're-run with --override "<reason>". (This is a tripwire for an unrelated paper, not a check of support.)'
+    overlap = {
+        "shared_terms": shared,
+        "count": len(shared),
+        "basis": "title+abstract" if got["abstract"] else "title",
+        "low": len(shared) < OVERLAP_MIN,
+    }
+    if overlap["low"]:
+        (warn or _stderr)(
+            f"WARNING (advisory): low subject overlap between --claim and the {overlap['basis']} — {len(shared)} shared content "
+            f"word(s): {', '.join(shared) or '(none)'}. Check the id is the paper you meant. Emitted anyway: this prompt has a "
+            "known high false-alarm rate on titles alone and is not a check of support."
         )
     fetched_at = (now or _now)()
     verification: dict[str, Any] = {
@@ -245,14 +260,11 @@ def run(
         "first_author": got["first_author"],
         "year": got["year"],
         "fetched_at": fetched_at,
-        "overlap_terms": shared,
-        "overlap_count": len(shared),
+        "subject_overlap": overlap,
         "stamp": rf.verification_stamp(got["id_kind"], got["id"], got["resolved_title"], fetched_at),
     }
     if got["abstract"]:
         verification["abstract_sha256"] = hashlib.sha256(got["abstract"].encode("utf-8")).hexdigest()
-    if override and len(shared) < OVERLAP_MIN:
-        verification["override_reason"] = override
     source: dict[str, Any] = {
         "id_kind": got["id_kind"],
         "id": got["id"],

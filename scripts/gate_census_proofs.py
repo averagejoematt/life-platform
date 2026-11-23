@@ -5021,7 +5021,8 @@ STRUCTURAL_HAND_PROOFS["structural::test_research_findings_6208.py"] = {
         "made False; M4 list_view's simulated exclusion made False; M5 validate_source's resolved_title/verified_on check "
         "made False; M6 the personal_result evidence_strength refusal made False; M7 `from research import findings` "
         "appended to lambdas/web/site_api_status.py. Audit addition: M8 the verification stamp recomputation dropped; M9 "
-        "the verifier's subject-overlap tripwire made False; M10 publishable()'s retrospective branch made False; M11 "
+        "the verifier's subject-overlap tripwire made False (after the coordinator's correction the overlap check is ADVISORY: M9 "
+        "is now its low-overlap warning made False); M10 publishable()'s retrospective branch made False; M11 "
         "claim_supported_by's requirement made False."
     ),
     "observed": (
@@ -5029,7 +5030,8 @@ STRUCTURAL_HAND_PROOFS["structural::test_research_findings_6208.py"] = {
         "failed (live dedupe named); M3 1 failed (tier 5 to the clinician); M4 1 failed (simulated out of every default "
         "list); M5 2 failed (unverified source, x2); M6 2 failed (tool + pure builder); M7 2 failed (naming allowlist + "
         "the public/coach import closure). REVERTED 73 passed. Re-run after the audit addition: BASELINE 88 passed; M1-M7 "
-        "as before; M8 2 failed (edited title refused; verifier stamp); M9 1 failed (unrelated paper refused); M10 2 failed "
+        "as before; M8 2 failed (edited title refused; verifier stamp); M9 1 failed (unrelated paper refused; re-run on the advisory version, the warning disabled: 1 failed, 88 passed, "
+        "the advisory test; BASELINE 89 passed); M10 2 failed "
         "(publishable pure + via his decision); M11 2 failed (support asserted by a reader). REVERTED 88 passed."
     ),
     "scope": (
