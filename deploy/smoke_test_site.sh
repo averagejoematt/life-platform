@@ -367,6 +367,35 @@ else
 fi
 echo ""
 
+# ── The retired /next/ previews (#6223) — every address 301s to its successor ──
+# The v7 and v8 preview pages left the repo; each address a reader may still hold
+# is a 301 in redirects.map (scripts/v4_migration_inventory.py NEXT_PREVIEW_REDIRECTS),
+# so the list below is READ from the map — a retired address added there is probed
+# here with no second list to keep in step. Same publish window as #1108 above: the
+# repo change ships first and the owner publishes the edge function second. Until
+# /next/v8/ answers 301 the block WARNs and skips; after that every entry is asserted.
+SMOKE_SURFACE="infra"  # the same CloudFront function as the legacy 301s (#3395)
+echo "── Retired /next/ previews (expect 301 → successor, one hop) ──"
+CURRENT_CHECK="/next/v8/ redirect probe"
+NEXT_REDIRECTS_MAP="$(dirname "$0")/../redirects.map"
+NEXT_STATUS=$(smoke_curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$BASE/next/v8/")
+if [[ ! -f "$NEXT_REDIRECTS_MAP" ]]; then
+  echo "  ⚠ redirects.map not found beside this script's repo — /next/ redirect assertions SKIPPED."
+  WARN=$((WARN + 1))
+elif [[ "$NEXT_STATUS" == "301" ]]; then
+  while IFS=$'\t' read -r _old _new; do
+    case "$_old" in
+      /next/*) check_redirect "$_old → $_new" "$BASE$_old" "$_new" ;;
+    esac
+  done < "$NEXT_REDIRECTS_MAP"
+else
+  echo "  ⚠ /next/v8/ returned $NEXT_STATUS (not 301) — the CloudFront v4-redirects function"
+  echo "    is not yet published for #6223. /next/ redirect assertions SKIPPED."
+  echo "    PUBLISH deploy/generated/v4_redirects_function.js, then re-run this smoke."
+  WARN=$((WARN + 1))
+fi
+echo ""
+
 # ── Bare door URLs → live door, no /site/* hop (#1209) ─────────────────────────
 # A slash-stripped shared link (Reddit comments + many autolinkers drop trailing
 # slashes) for a bare door must land on the door, not a dead page. Before the fix

@@ -79,9 +79,11 @@ def test_no_days_coach_lines_name_a_bet_the_docket_does_not_carry():
 
 
 def test_every_call_and_day_the_gate_opens_is_in_the_capture():
+    """#6223: the gate opened call and day pages only under /next/v8/, and those pages are retired — so today it names
+    no call and no day, and both checks below pass on empty sets. They stand for any gate page that names one again."""
     ids = {c["id"] for c in FX["calls.json"]["calls"]}
     named = {m.group(1) for path in gate.KIT_PAGES for m in [re.search(r"[?&]id=([^&]+)", path)] if m}
-    assert UNKNOWN_CALL in named and UNKNOWN_CALL not in ids
+    assert UNKNOWN_CALL not in ids
     assert named - {UNKNOWN_CALL} <= ids, f"the gate opens calls the capture does not carry: {sorted(named - {UNKNOWN_CALL} - ids)}"
     for day in cap.gate_days():
         assert cap.moves_file(day) in FX, f"the gate opens {day} but no {cap.moves_file(day)} was captured"

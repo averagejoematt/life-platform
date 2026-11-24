@@ -14,7 +14,8 @@ tests/test_check_public_copies_6083.py fails on one that is not classified — g
   preview   site/next/v9/                                  (rules A B C)
   legacy    site/ documents the v9 build does not own      (rules C D E; the location check)
   retired   site/_v9_previous/ — the old public rollback copy, retired 2026-11-14; site/chronicle/, site/evidence/ and
-            site/now/ — the pre-v9 legacy locations, retired 2026-11-16 (#6115)   (rule B: must hold nothing)
+            site/now/ — the pre-v9 legacy locations, retired 2026-11-16 (#6115); site/next/ outside the v9 preview —
+            the v7 and v8 preview pages, retired 2026-11-23 (#6223)   (rule B: must hold nothing)
   archive   /archive/latest.tar.gz (generated/archive/)    (rules A B C E)
   private, not in scope: www-previous/ (the rollback copies since 2026-11-14), backups/, and prior object versions —
   no anonymous s3:GetObject / s3:GetObjectVersion is granted on them (deploy/bucket_policy.json; GET answers 403).
@@ -109,6 +110,11 @@ RETIRED_PREFIXES = {
     "site/chronicle/": "the pre-v9 chronicle (pilot and cycle-17 copies, tombstones), retired 2026-11-16 (#6115)",
     "site/evidence/": "the v4 evidence pages (written 2026-06-24), retired 2026-11-16 (#6115); /evidence/* 301s to each page's home",
     "site/now/": "the v4 /now/ page (written 2026-07-12), retired 2026-11-16 (#6115); /now/ 301s to /cockpit/",
+    # #6223 (owner authorisation 2026-11-23): the 21 v7 and v8 preview pages. They were COMMITTED under site/next/, so
+    # every site deploy re-published them; the retirement is the repo change (pages and generators removed, each address
+    # 301'd to its successor in redirects.map), and this entry is what holds the prefix empty afterwards. The v9
+    # rehearsal preview is carved out by `classify` (PREVIEW_PREFIX is tested first) and keeps its own rules A B C.
+    "site/next/": "the v7 and v8 preview pages (everything under site/next/ except the v9 rehearsal preview), retired 2026-11-23 (#6223)",
 }
 #: #6148: every legacy chronicle installment is retired to the same stub (week-01..04 since the v4 move; interview,
 #: issue-05 and week-00 quarantined 2026-11-22T00:29Z, per docs/audits/AUDIT_2026-11-16_legacy_locations.md). Rule E.
@@ -124,7 +130,7 @@ COPIES = {
     "root": ("site/ (the v9 build's paths)", "/", "A C D"),
     "preview": (PREVIEW_PREFIX, "/next/v9/", "A B C"),
     "legacy": ("site/ (not the v9 build's)", "/", "C D E"),
-    "retired": ("site/{_v9_previous,chronicle,evidence,now}/", "(none: must be empty)", "B"),
+    "retired": ("site/{_v9_previous,chronicle,evidence,now,next}/", "(none: must be empty)", "B"),  # next/: all but next/v9/
     "audio": ("generated/{panelcast,podcast}/", "/panelcast/, /podcast/", "F"),
     "archive": (reg.ARCHIVE_TARBALL_KEY, reg.ARCHIVE_PUBLIC_PATH, "A B C E G"),
     "chapters": ("generated/journal/posts/<page>/ + kit", "/journal/posts/<page>/", "G"),
@@ -804,6 +810,14 @@ def remediation_commands(violations, facts) -> str:
             f"  # {len(orphan)} orphan(s): copy to a private prefix, verify, then remove the public object",
             "  python3 scripts/check_public_copies.py --check --orphans-out /tmp/orphans-6083.txt",
             "  bash deploy/quarantine_public_copy.sh --keys /tmp/orphans-6083.txt [--apply]",
+        ]
+    held = sorted({p for c, _r, d in violations if c == "retired" for p in RETIRED_PREFIXES if d.startswith(p)})
+    for prefix in held:
+        # site/next/ also holds the v9 rehearsal preview; a prefix quarantine there empties that too (the default state)
+        out += [
+            f"  # a retired location holds public objects: move every object under {prefix} to the private backup",
+            f"  bash deploy/quarantine_public_copy.sh --prefix {prefix}            # dry run: prints every step",
+            f"  bash deploy/quarantine_public_copy.sh --prefix {prefix} --apply",
         ]
     audio = [d.split(" — ", 1)[0] for c, r, d in violations if c == "audio" and r == "F" and " — " in d]
     if audio:

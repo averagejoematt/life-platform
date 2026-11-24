@@ -33,7 +33,7 @@ be re-dated to that manifest in the same change — tests/test_kit_fixtures_fres
 — and the two derived files regenerated: ``python3 tests/test_edition_page_contract_4582.py >
 tests/fixtures/edition_contract_4582/editions.json`` and the scorecard fixture the JS test reads.
 FROZEN 2026-11-13 (owner ruling 2026-11-13, ADR-166). Both directories are historical evidence now: the v8
-kit pages they describe were superseded by the v9 build and are served only at /next/v8/ (noindex), and their
+kit pages they describe were superseded by the v9 build (the /next/v8/ pages were retired in #6223; four live placements remain), and their
 tests pin the 2026-10-18 site's behaviour, which a recapture of today's site cannot exercise (the 11-06
 publication gate empties every coach line on the live wire). Each ``_capture.json`` carries a ``frozen`` block
 (the date, the reason, a sha256 per file); tests/test_kit_fixtures_fresh_4839.py holds every file to its lock

@@ -5,7 +5,7 @@ The kit page gate and the kit JS tests render committed captures of the site's r
 tests compose the edition's wire (tests/fixtures/edition_wire_4582/) captured in the same pass.
 
 Until 2026-11-13 both had to be no more than 30 days old. The owner then froze them as historical evidence
-(ADR-166: the v8 kit they describe was superseded by the v9 build and survives only at /next/v8/, noindex).
+(ADR-166: the v8 kit they describe was superseded by the v9 build; its /next/v8/ pages were retired in #6223).
 A frozen directory's ``_capture.json`` carries a ``frozen`` block — the day, the reason and a sha256 per file —
 and the holds are now:
 

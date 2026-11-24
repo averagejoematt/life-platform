@@ -150,6 +150,45 @@ V5_DOOR: dict[str, str] = {
 SCAN_SKIP_URLS = {"/data/", "/protocols/", "/mind/", "/start/", "/coaches/"}
 
 
+# #6223 (owner authorisation 2026-11-23): the /next/ preview subtree is retired — the nine v7 pages built beside the
+# live site in September and the twelve v8 kit pages of October. Nothing under site/next/ is committed any more, and
+# every address a reader may still hold lands on the page that carries its job today. Each destination is a page the
+# site serves now (tests/test_next_previews_retired_6223.py holds that, and that this table is the retired set exactly):
+#   * a v7 page previewed the page at the same path without /next (plan D2: "they keep their existing URLs"), so it
+#     goes there — `/`, /data/ and /story/ are the v9 build's pages, the rest are still served from site/;
+#   * the four v8 doors go to their live placements (the #4588 cut-over table in docs/SITE_MAP_AND_INTENT.md);
+#   * a v8 deep page had no live placement; it goes to the v9 page that took its job, or to `/` where the job moved
+#     onto the front page (the week at a glance, the portrait that replaced the character sheet).
+# /next/v9/ is NOT here: it is the v9 build's rehearsal prefix (deploy/www_preview_sync.sh), empty outside a rehearsal.
+# The edge function matches the path only, so a query (?d=, ?id=, ?c=, ?m=) is dropped and the reader lands on the index.
+NEXT_PREVIEW_REDIRECTS: dict[str, str] = {
+    # v7 (scripts/v7_build.py --base /next/, retired)
+    "/next/": "/",
+    "/next/cockpit/": "/cockpit/",
+    "/next/coaching/": "/coaching/",
+    "/next/data/": "/data/",
+    "/next/method/": "/method/",
+    "/next/protocols/": "/protocols/",
+    "/next/story/": "/story/",
+    "/next/story/about/": "/story/about/",
+    "/next/subscribe/": "/subscribe/",
+    # v8 — the four doors, at their live placements
+    "/next/v8/": "/",
+    "/next/v8/start/": "/start/",
+    "/next/v8/story/": "/story/",
+    "/next/v8/coaches/": "/coaches/",
+    # v8 — the deep pages, at their v9 successors
+    "/next/v8/appendix/": "/system/everything-else/",
+    "/next/v8/built/": "/system/",
+    "/next/v8/call/": "/system/forecasts/",
+    "/next/v8/coach/": "/system/",
+    "/next/v8/day/": "/data/",
+    "/next/v8/sheet/": "/",
+    "/next/v8/trend/": "/data/",
+    "/next/v8/week/": "/",
+}
+
+
 def original_url(html_path: Path) -> str:
     """Map site/legacy/<path>/index.html back to the OLD url /<path>/."""
     rel = html_path.relative_to(LEGACY_DIR)
@@ -265,6 +304,9 @@ def main() -> int:
     # other /chronicle/, /evidence/ and /now/ address either already 301s to its own re-homed page or has
     # no successor and 404s honestly (tests/test_legacy_locations_redirects_6115.py).
     redirects.append(("/chronicle/posts/week-00/", "/story/week-01/"))
+
+    # 2026-11-23 (#6223): the retired /next/ preview pages — see NEXT_PREVIEW_REDIRECTS.
+    redirects.extend(NEXT_PREVIEW_REDIRECTS.items())
 
     print(f"\nv4 migration inventory - {len(pages)} preserved page(s) under {LEGACY_DIR}/\n")
     for d in DEST_ORDER:

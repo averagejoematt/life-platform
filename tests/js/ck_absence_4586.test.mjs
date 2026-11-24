@@ -1,8 +1,10 @@
 // tests/js/ck_absence_4586.test.mjs — #4586 acceptance box 2: every block has an absence state.
 //
-// Scope: the /next/v8/ preview's front page, This week page (week/) and trend page (trend/).
-// The page code is MOUNTED, not just its builders: the real shell (site/next/v8/**/index.html)
-// supplies the element ids and their static text, a fake document records what mount() writes
+// Scope: the kit's front page. The This week and trend scenarios left with their pages when the
+// /next/v8/ preview was retired (#6223): a mount test needs the page's real shell, and those two
+// shells are no longer in the repo.
+// The page code is MOUNTED, not just its builders: the real shell (site/index.html, the kit
+// front page at its live path) supplies the element ids and their static text, a fake document records what mount() writes
 // or removes, and fetch serves the committed captures (tests/fixtures/kit_pages_4586/) except
 // where a scenario takes the data a block binds to away. Then every slot must end as a
 // sentence, or be removed together with its label — never a blank, never a dangling label,
@@ -16,7 +18,7 @@ import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIX = join(HERE, "..", "fixtures", "kit_pages_4586");
-const SHELL = (page) => readFileSync(join(HERE, "..", "..", "site", "next", "v8", page, "index.html"), "utf8");
+const SHELL = (page) => readFileSync(join(HERE, "..", "..", "site", page, "index.html"), "utf8");
 const load = (name) => JSON.parse(readFileSync(join(FIX, `${name}.json`), "utf8"));
 const EDITION = load("edition");
 const ROUTES = { "/api/pulse_history": "pulse_history", "/api/workouts": "workouts", "/api/training_overview": "training_overview", "/api/nutrition_overview": "nutrition_overview", "/api/frequent_meals": "frequent_meals" };
@@ -60,7 +62,6 @@ function check(where, { say = [], gone = [], pairs = [], oneOf = [], sections = 
 const BLOCKS = Object.keys(EDITION.blocks);
 const without = (key, state) => ({ ...EDITION, blocks: { ...EDITION.blocks, [key]: { state, as_of: null, source: null, absent_text: `The ${key} is not here.`, data: null } } });
 const FRONT = { say: ["ck-record", "ck-mark", "ck-mark-caption", "ck-argue-label", "ck-argue-heading", "ck-call", "ck-miss-heading", "ck-today-label", "ck-today", "ck-week-span", "ck-sheet-span", "ck-chapter-row", "ck-follow-line"], gone: ["ck-bet", "ck-coach-lines"], pairs: [["ck-coach-lines-label", "ck-coach-lines"]], oneOf: [["ck-words", "ck-words-absent"]] };
-const WEEK = { say: ["ck-week-label", "ck-week", "ck-sheet-line", "ck-quotes"], pairs: [["ck-lead-section", "ck-lead-read"]], oneOf: [["ck-words", "ck-words-absent"]] };
 const ALL_GONE = { ...EDITION, blocks: {} };
 
 async function run(pageKey, page, edition, search = "") {
@@ -69,7 +70,7 @@ async function run(pageKey, page, edition, search = "") {
   await (await import("../../site/assets/js/ck_pages.js")).mount();
 }
 
-for (const [pageKey, page, rules] of [["", "front", FRONT], ["week", "week", WEEK]]) {
+for (const [pageKey, page, rules] of [["", "front", FRONT]]) {
   test(`${page}: the served capture is the control (every slot already says something)`, async () => {
     await run(pageKey, page, EDITION);
     check(`${page} as served`, rules);
@@ -100,34 +101,4 @@ test("front: the weight picture says so when it has nothing to draw, and the day
   empty.blocks.week.data.weight_series = [];
   await run("", "front", empty);
   assert.equal(seen("ck-mark"), "No weigh-in since the start.");
-});
-
-// ── the trend page: the series it binds to, removed ──
-const TREND = { say: ["ck-label", "ck-title", "ck-chart"], sections: [["ck-recent-section", "ck-recent"], ["ck-extra-section", "ck-extra"], ["ck-related-section", "ck-related"]] };
-async function trend(search, overrides) {
-  mountShell(SHELL("trend"), "trend", search);
-  globalThis.fetch = served(overrides);
-  await (await import("../../site/assets/js/ck_depth.js")).mount();
-}
-const EMPTY = { "/api/pulse_history": { pulse_history: [] }, "/api/workouts": { workouts: [] }, "/api/training_overview": { daily_modality_minutes_30d: [] }, "/api/nutrition_overview": { nutrition: {}, nutrition_trend: [] }, "/api/frequent_meals": { meals: [] } };
-const DOWN = Object.fromEntries(Object.keys(EMPTY).map((k) => [k, null]));
-for (const m of ["weight", "sleep", "recovery", "steps", "training", "protein", "calories", "carbs", "fat"]) {
-  test(`trend ${m}: the served capture, then an empty series, then the route down, each leave a sentence`, async () => {
-    for (const [name, overrides] of [["as served", {}], ["empty", EMPTY], ["route down", DOWN]]) {
-      await trend(`?m=${m}`, overrides);
-      check(`trend ${m} ${name}`, TREND);
-      if (name !== "as served") {
-        assert.equal(seen("ck-chart"), "Nothing has been recorded for this yet.", `trend ${m} ${name}`);
-        assert.equal(seen("ck-recent-section"), null, `trend ${m} ${name}: the empty day-by-day section leaves with its heading`);
-      }
-    }
-  });
-}
-test("trend: a lift with no sessions, the index, and an unknown measure each say what they are", async () => {
-  await trend("?m=lift&x=Nothing%20Lifted", EMPTY);
-  check("trend lift with no sessions", TREND);
-  await trend("", EMPTY);
-  check("trend index", { say: ["ck-title", "ck-chart"] });
-  await trend("?m=bogus", EMPTY);
-  assert.match(seen("ck-about"), /does not name a measure/);
 });

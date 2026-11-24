@@ -5246,3 +5246,34 @@ GUARD_PROOFS["guard::scripts/verify_legacy_chapter_redirects.py"] = {
     ),
     "proved_on": "2026-11-23",
 }
+
+# #6223 — the /next/ preview pages (nine v7, twelve v8) are retired: nothing committed under site/next/, the two
+# generators that wrote there removed, every retired address a one-hop 301 to a page the site serves, the public-copies
+# guard holding the prefix RETIRED (the v9 rehearsal preview carved out), and the post-deploy smoke reading the map.
+STRUCTURAL_HAND_PROOFS["structural::test_next_previews_retired_6223.py"] = {
+    "gate_name": "test_next_previews_retired_6223.py",
+    "command": "python3 -m pytest tests/test_next_previews_retired_6223.py tests/test_check_public_copies_6083.py -q -p no:warnings   # baseline 29 passed",
+    "mutation": (
+        "Three plants, ONE AT A TIME, each reverted: M1 a page re-committed at site/next/v8/index.html; M2 the "
+        "/next/v8/day/ line removed from redirects.map; M3 the `site/next/` entry removed from "
+        "scripts/check_public_copies.py RETIRED_PREFIXES."
+    ),
+    "observed": (
+        "2026-11-23, #6223 lane. BASELINE 29 passed. M1 1 failed "
+        "(test_nothing_is_committed_under_the_preview_prefix_and_its_generators_are_gone; the same plant also reds "
+        "test_v4_redirects_function.py::test_every_existing_url_still_resolves_4588 — a page behind a 301 — and "
+        "test_site_nav_reach_ratchet.py::test_reach_census_is_not_vacuous). M2 1 failed "
+        "(test_every_retired_address_redirects_in_one_hop_to_a_page_the_site_serves). M3 2 failed "
+        "(test_the_guard_and_the_smoke_both_know_the_retirement, and "
+        "test_check_public_copies_6083.py::test_a_retired_preview_page_that_reappears_is_caught_6223). REVERTED 29 passed."
+    ),
+    "scope": (
+        "The repo tree under site/next/; the four retired generator paths; redirects.map and the generated edge function "
+        "against the generator's table and the 21 retired addresses; each destination against site/ and the v9 build's "
+        "static routes; the guard's classification on a synthetic listing; the smoke script's text. NOT SEEN: the live "
+        "bucket (the 21 served objects stay until a human runs deploy/quarantine_public_copy.sh — rule B of the live "
+        "guard reports them), whether the owner has published the edge function (the smoke WARNs until /next/v8/ "
+        "answers 301), and a redirect's query string (the function matches the path only)."
+    ),
+    "proved_on": "2026-11-23",
+}

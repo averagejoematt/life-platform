@@ -477,9 +477,15 @@ def loop_forward(current_door: str | None, self_path: str | None = None) -> str:
 # `EDITION` is the ONE switch between the live v4 chrome above and the v7 chrome below.
 # The default is "v4": nothing on the live pages changes until the cut-over PR flips it and
 # re-pours every chrome-bearing page through `v4_apply_chrome.py`. `scripts/v7_build.py`
-# sets EDITION = "v7" (and `V7_BASE`) for its own process only, so the preview shells at
-# `site/next/**` are poured from the same `doors_nav()` / `site_footer()` call sites the
+# set EDITION = "v7" (and `V7_BASE`) for its own process only, so the preview shells at
+# `site/next/**` were poured from the same `doors_nav()` / `site_footer()` call sites the
 # live pages use — the cut-over is a flag flip, not a second chrome.
+#
+# RETIRED 2026-11-23 (#6223): the v7 cut-over never happened (the v8 kit, then the v9 build,
+# took the root), the v7 builder and its nine preview shells under `site/next/` are removed,
+# and each `/next/<page>/` address 301s to its successor (redirects.map). Nothing sets
+# EDITION = "v7" any more; the branch below is kept only because tests/test_site_chrome.py
+# still pins the two call sites' v7 output, and goes with the v7 assets when those are removed.
 #
 # `V7_BASE` is the viewer prefix the nine v7 pages are served under: "/" once live,
 # "/next/" for the preview subtree (plan §1b). Page links carry it; asset and API paths
