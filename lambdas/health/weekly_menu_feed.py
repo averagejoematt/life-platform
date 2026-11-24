@@ -132,6 +132,17 @@ def _day_lines(menu: Mapping[str, Any], days: list[dict[str, Any]]) -> list[str]
     return out[: len(days)]
 
 
+#: #6245: a menu's food-quality report grades a PLAN — days that have not happened — so a shortfall is the plan falling
+#: short, never a "missed" behaviour. `weekly_menu.lines` keeps its wording for the session tool; the emails read this.
+_PLAN_MISSED = "Food quality: MISSED: "
+PLAN_SHORT = "Food quality: the planned menu falls short: "
+
+
+def plan_quality_line(line: str) -> str:
+    """The quality line as an email states it: a plan's shortfall, never 'MISSED' (#6245)."""
+    return PLAN_SHORT + line[len(_PLAN_MISSED) :] if line.startswith(_PLAN_MISSED) else line
+
+
 def feed(ahead: Mapping[str, Any]) -> dict[str, Any]:
     """The prompt payload: `built` (any week built), one line per planned day ahead, the coming week's grocery lines,
     the quality line per built week, and each unbuilt week's reason. Templates over the code's numbers, no model."""
@@ -150,7 +161,7 @@ def feed(ahead: Mapping[str, Any]) -> dict[str, Any]:
         if w.get("shop"):
             grocery.extend(weekly_menu.grocery_lines(menu))
         q = [ln for ln in (menu.get("lines") or []) if ln.startswith("Food quality:")]
-        quality.extend(f"week of {w.get('week_start')} — {ln}" for ln in q)
+        quality.extend(f"week of {w.get('week_start')} — {plan_quality_line(ln)}" for ln in q)
     return {
         "version": VERSION,
         "built": built,

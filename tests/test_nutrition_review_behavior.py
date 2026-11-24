@@ -1362,7 +1362,8 @@ def test_gather_reads_the_seven_days_ending_yesterday(monkeypatch, frozen_clock)
     monkeypatch.setattr(m, "fetch_profile", lambda: dict(PROFILE))
     data = m.gather_nutrition_data()
     assert data["dates"] == DATES
-    mf = [q for q in table.queries if q["ExpressionAttributeValues"][":pk"].endswith("macrofactor")]
+    # #6245: the freshness read (food_log_state.read_freshness, a Key-condition query) is not a window read
+    mf = [q for q in table.queries if "ExpressionAttributeValues" in q and q["ExpressionAttributeValues"][":pk"].endswith("macrofactor")]
     assert mf[0]["ExpressionAttributeValues"][":s"] == f"DATE#{W1_START}"
     assert mf[0]["ExpressionAttributeValues"][":e"] == f"DATE#{W1_END}~"  # #4129: end day closed
     assert mf[1]["ExpressionAttributeValues"][":s"] == f"DATE#{W2_START}"
@@ -1374,7 +1375,7 @@ def test_gather_reads_thirty_days_of_weight(monkeypatch, frozen_clock):
     monkeypatch.setattr(m, "table", table)
     monkeypatch.setattr(m, "fetch_profile", lambda: dict(PROFILE))
     m.gather_nutrition_data()
-    wq = [q for q in table.queries if q["ExpressionAttributeValues"][":pk"].endswith("withings")][0]
+    wq = [q for q in table.queries if "ExpressionAttributeValues" in q and q["ExpressionAttributeValues"][":pk"].endswith("withings")][0]
     assert wq["ExpressionAttributeValues"][":s"] == f"DATE#{WEIGHT_START}"
 
 
@@ -1820,7 +1821,8 @@ def test_a_dry_run_really_builds_the_review_it_declines_to_send(handler_env):
     the assertion above while proving nothing."""
     resp = m.lambda_handler({"dry_run": True}, None)
     assert resp["dry_run"] is True
-    assert resp["subject"] == "Nutrition Review - 2026-06-12 - 1800 kcal - 190g protein"
+    # #6245: the fixture week has two complete days of seven, and the subject now says how many its averages cover
+    assert resp["subject"] == "Nutrition Review - 2026-06-12 - 1800 kcal - 190g protein (2 complete days)"
     assert resp["html_bytes"] > 1_000
     assert len(handler_env["calls"]["anthropic"]) == 1  # the panel really ran
 
