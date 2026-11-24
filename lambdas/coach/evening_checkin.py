@@ -232,7 +232,7 @@ def decide(table, day: str, now_pt: datetime, seat: Callable[[str], tuple]) -> t
     # #6176 item 5 (outbound trial): the 20:00 check-in has ONE channel, the evening-nudge email (1 Telegram reply in
     # 28 evenings). The verdict is still stamped as EVAL#<day> by run_prompt, so the dead-man sees a run, not a gap.
     # A /checkin he sends himself is unaffected: only the scheduled prompt is held.
-    if outbound_trial.is_on(outbound_trial.EVENING_ONE_CHANNEL, day):
+    if outbound_trial.is_on(outbound_trial.EVENING_ONE_CHANNEL):
         outbound_trial.suppressed(outbound_trial.EVENING_ONE_CHANNEL, "telegram-coach-worker#TelegramEveningCheckin", log=logger.info)
         return OUTBOUND_TRIAL_REASON, None
     if in_quiet_hours(now_pt):

@@ -1,14 +1,14 @@
 """tests/test_evening_ritual_nudge_links.py — #769 (ADR-124): the evening-nudge
-lambda's one-tap ritual links (lambdas/emails/evening_nudge_lambda.py).
+lambda's evening-ritual row (lambdas/emails/evening_nudge_lambda.py).
 
 Covers:
   * _check_evening_ritual correctly detects fully-logged / partially-logged /
     not-logged-at-all for the day
-  * minted links verify against ritual_link.verify_ritual_token (mint/verify agree)
-  * the tap-link section is fail-soft: an unavailable signing secret must not
-    crash the whole nudge email, it just omits the section
-  * the section is only built for the metrics still missing (partial-completion
-    doesn't re-prompt an already-logged metric)
+  * #6243 (owner ruling 2026-11-23): the one-tap ritual section is GONE from the
+    nudge (0 taps in 4 weeks). Pinned on the rendered email of the REAL handler,
+    with the signing secret available — so the section's absence is the builder's,
+    not a fail-soft skip — under the committed consolidation AND its rollback; the
+    ritual row, the morning-note link and the 14-day stale rule are unchanged.
 """
 
 import os
@@ -20,7 +20,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 os.environ.setdefault("EMAIL_RECIPIENT", "test@example.com")
 os.environ.setdefault("EMAIL_SENDER", "test@example.com")
 
-from content.ritual_link import verify_ritual_token  # noqa: E402
 from emails import evening_nudge_lambda as nudge  # noqa: E402
 from fakes import FakeDdbTable  # noqa: E402
 
@@ -65,7 +64,7 @@ def test_partially_logged_only_flags_the_missing_metric(monkeypatch):
     today = _set_ritual_record(monkeypatch, connection=3, intake_count=0)
     missing, detail = nudge._check_evening_ritual(today)
     assert missing == ["mood_valence"]
-    assert "1 tap left" in detail.lower()
+    assert "1 left" in detail.lower() and "tap" not in detail.lower()
 
 
 def test_fully_logged_reports_both_values(monkeypatch):
@@ -84,43 +83,54 @@ def test_sunday_adds_the_felt_probe_metrics(monkeypatch):
     today = _set_ritual_record(monkeypatch, connection=3, mood_valence=1, intake_count=2, date=SUNDAY)
     missing, detail = nudge._check_evening_ritual(today)
     assert missing == sorted(["felt_vitality", "felt_rest", "felt_connection", "felt_time"])
-    assert "4 taps left" in detail.lower()
+    assert "4 left" in detail.lower() and "tap" not in detail.lower()
 
 
-# ── link minting agrees with the site-api verifier ──────────────────────────
+# ── #6243: the tap section is gone; the rest of the email is not ─────────────
 
 
-def test_minted_link_token_verifies(monkeypatch):
-    monkeypatch.setattr(nudge, "_get_ritual_secret", lambda: SECRET)
-    today = nudge.pacific_today()
-    url = nudge._ritual_link(SECRET, today, "connection", 2)
-    assert f"date={today}" in url
-    assert "metric=connection" in url
-    assert "value=2" in url
-    token = url.split("token=")[1]
-    assert verify_ritual_token(SECRET, today, "connection", 2, token)
-    # a different value must NOT verify against this token
-    assert not verify_ritual_token(SECRET, today, "connection", 3, token)
+def _render(monkeypatch, consolidated: bool):
+    """Drive the REAL lambda_handler for a Saturday; return the one sent email's subject and HTML."""
+    from common import outbound_trial
+
+    for item in outbound_trial.ITEMS:  # conftest starts every item rolled back; set the state under test
+        monkeypatch.setitem(outbound_trial.TRIAL, item, consolidated)
+    sent = []
+    monkeypatch.setattr(nudge, "pacific_today", lambda: SATURDAY)
+    monkeypatch.setattr(nudge, "_run_named_human_contact_leg", lambda *a: None)
+    monkeypatch.setattr(nudge.send_ledger, "should_skip_replay", lambda *a, **k: False)
+    monkeypatch.setattr(nudge.send_ledger, "record_sent", lambda *a, **k: None)
+    monkeypatch.setattr(nudge, "guarded_send_email", lambda ses, dry, **kw: sent.append(kw))
+    monkeypatch.setattr(nudge, "manual_capture_sources", lambda: {})
+    monkeypatch.setattr(nudge, "_get_ritual_secret", lambda: SECRET)  # available: an absent section is the builder's
+    # Everything logged yesterday, nothing yet today: no item is stale, so the 14-day rule keeps all four rows.
+    monkeypatch.setattr(nudge, "_check_supplements", lambda d: (d != SATURDAY, ""))
+    monkeypatch.setattr(nudge, "_check_journal", lambda d: (d != SATURDAY, "No journal entries"))
+    monkeypatch.setattr(nudge, "_check_how_we_feel", lambda d: (d != SATURDAY, ""))
+    monkeypatch.setattr(
+        nudge,
+        "_check_evening_ritual",
+        lambda d: (["connection", "mood_valence", "intake_count"], "Not logged yet") if d == SATURDAY else ([], "done"),
+    )
+    nudge.lambda_handler({}, None)
+    assert len(sent) == 1, sent
+    simple = sent[0]["Content"]["Simple"]
+    return simple["Subject"]["Data"], simple["Body"]["Html"]["Data"]
 
 
-# ── fail-soft section building ───────────────────────────────────────────────
+def test_the_rendered_nudge_carries_no_ritual_tap_section(monkeypatch):
+    for consolidated in (True, False):  # the committed state, and the evening_one_channel rollback
+        subject, html = _render(monkeypatch, consolidated)
+        assert "one tap each" not in html and "/api/ritual_log" not in html and "token=" not in html.split("#note=")[0]
+        for title in ("Felt connected today?", "Mood today?", "Drinks this evening?"):
+            assert title not in html, title
+        # unchanged: the four rows, the subject count, the morning-note link
+        assert subject == "Evening nudge · 4 thing(s) to log before bed", subject
+        for row in ("Supplements", "Journal", "How We Feel", "Evening Ritual"):
+            assert row in html, row
+        assert "Open the morning note" in html
 
 
-def test_section_empty_when_nothing_missing(monkeypatch):
-    monkeypatch.setattr(nudge, "_get_ritual_secret", lambda: SECRET)
-    assert nudge._build_ritual_section(nudge.pacific_today(), []) == ""
-
-
-def test_section_omitted_when_secret_unavailable(monkeypatch):
-    monkeypatch.setattr(nudge, "_get_ritual_secret", lambda: None)
-    html = nudge._build_ritual_section(nudge.pacific_today(), ["connection", "mood_valence"])
-    assert html == ""
-
-
-def test_section_only_covers_missing_metrics(monkeypatch):
-    monkeypatch.setattr(nudge, "_get_ritual_secret", lambda: SECRET)
-    today = nudge.pacific_today()
-    html = nudge._build_ritual_section(today, ["mood_valence"])
-    assert "Mood today?" in html
-    assert "Felt connected today?" not in html
-    assert "metric=mood_valence" in html
+def test_the_ritual_section_builders_are_gone():
+    for name in ("_build_ritual_section", "_ritual_metric_block", "_ritual_link", "RITUAL_LABELS", "RITUAL_METRIC_TITLES"):
+        assert not hasattr(nudge, name), name

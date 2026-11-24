@@ -51,10 +51,15 @@ def _real_digest(with_plant: bool = False) -> dict:
             {"label": "Recovery", "this_month_avg": 62.1, "prior_month_avg": 58.4, "delta": 3.7, "unit": "%", "direction": "improved"}
         ],
         "unlocked": [],
-        "decided": [{"coach": "training", "claim": "deload week lands", "status": "confirmed", "notes": ""}],
+        # #6244: dated inside the window (the handler's clock is pinned to TODAY below), so it renders and sends
+        "decided": [{"coach": "training", "claim": "deload week lands", "status": "confirmed", "decided_at": "2026-11-25"}],
         "stance_shifts": [],
         "elena_note": note,
+        "elena_as_of": "2026-11-27",
     }
+
+
+TODAY = "2026-11-29"
 
 
 def _break_every_channel(monkeypatch):
@@ -86,7 +91,8 @@ class _SesSpy:
 
 
 @pytest.fixture(autouse=True)
-def _fresh_caches():
+def _fresh_caches(monkeypatch):
+    monkeypatch.setattr(bc, "_today", lambda: TODAY)  # #6244: the fixtures are dated relative to a pinned day
     yield
     channel.reset_cache()
     privacy_guard.reset_vocabulary_cache()
@@ -109,6 +115,8 @@ def test_broken_loader_aborts_send_nothing_reaches_ses(monkeypatch):
     monkeypatch.setattr(bc, "table", _T())
     monkeypatch.setattr(bc, "_get_confirmed_subscribers", lambda: [{"email": "friend@example.com"}])
     monkeypatch.delenv("EXTERNAL_EMAILS_ENABLED", raising=False)
+    # #6244: released, so the run reaches the render — the scrub, not the hold, is what stops it here
+    monkeypatch.setattr(bc, "OWNER_RELEASE", {"by": "owner", "released_on": "2026-11-28", "reviewed_render": "fixture"})
 
     with pytest.raises(Exception):
         bc.lambda_handler({}, None)
@@ -174,6 +182,6 @@ def test_planted_token_scrubbed_end_to_end(monkeypatch):
     a planted blocked term must come out redacted everywhere it was planted."""
     _arm_env_channel(monkeypatch)
     digest = _real_digest(with_plant=True)
-    subject, html = bc.build_email(digest, "friend@example.com")
+    subject, html = bc.build_email(digest, "friend@example.com", TODAY)
     assert _PLANT not in subject and _PLANT not in html, "planted token must never survive into the email"
     assert "[redacted]" in html

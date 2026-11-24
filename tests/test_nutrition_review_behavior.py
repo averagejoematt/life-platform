@@ -1580,7 +1580,6 @@ def test_outbound_trial_on_folds_the_plate_into_the_one_review_6176(handler_env)
     from common import outbound_trial
 
     handler_env["monkeypatch"].setitem(outbound_trial.TRIAL, outbound_trial.PLATE_INTO_NUTRITION_REVIEW, True)
-    handler_env["monkeypatch"].setattr(outbound_trial, "TRIAL_ENDS_ON", None)
     m.lambda_handler({}, None)
     assert len(handler_env["ses"].sent) == 1
     assert handler_env["ses"].sent[0]["Destination"]["ToAddresses"] == [m.RECIPIENT]

@@ -255,7 +255,10 @@ def test_between_chronicle_reads_her_stance():
     assert '"PERSONA#elena"' in BETWEEN_SRC
     assert "elena_note" in BETWEEN_SRC
     # garnish, never content — it must not count toward has_real_content
-    hrc = BETWEEN_SRC[BETWEEN_SRC.index("def has_real_content") : BETWEEN_SRC.index("def build_email")]
+    # #6244: the function body only (curation now sits between it and build_email and does read elena_note)
+    start = BETWEEN_SRC.index("def has_real_content")
+    hrc = BETWEEN_SRC[start : BETWEEN_SRC.index("\ndef ", start + 1)]
+    assert "return" in hrc
     assert "elena_note" not in hrc
 
 

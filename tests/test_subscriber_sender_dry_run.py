@@ -99,10 +99,12 @@ def _rig_between_chronicle(monkeypatch):
             }
         ],
         "unlocked": [],
-        "decided": [],
+        # #6244: a dated graded call inside the window (the clock seam is pinned below) — averages alone send nothing
+        "decided": [{"coach": "training", "claim": "Recovery holds above 60", "status": "confirmed", "decided_at": "2026-11-25"}],
         "stance_shifts": [],
     }
     monkeypatch.setattr(m, "gather_digest", lambda: digest)
+    monkeypatch.setattr(m, "_today", lambda: "2026-11-29")
 
     class _T:
         def get_item(self, Key):
