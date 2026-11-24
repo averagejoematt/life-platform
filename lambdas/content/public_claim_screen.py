@@ -98,14 +98,14 @@ def screen_public_lines(
 ):
     """(elena_hero_line, brief_excerpt, group_narratives) — the daily brief's AI lines as public_stats.json and pulse.json
     carry them — with every unit this module withholds set to None (a withheld ``group_narratives`` entry is dropped).
-    Each field is one unit. The log carries the field name and the reasons only, never the words."""
+    Each field is one unit. The log carries the field name and a rule count only — never the words or their classes."""
 
     def one(name: str, text: Any) -> Any:
         if not isinstance(text, str) or not text.strip():
             return text
         reasons = withheld_reasons(text, data_day=data_day, last_arrival_day=last_arrival_day)
         if reasons:
-            logger.warning("[public_claim_screen] public line withheld: field=%s reasons=%s", name, ",".join(reasons))
+            logger.warning("[public_claim_screen] public line withheld: field=%s rules=%d", name, len(reasons))
             return None
         return text
 

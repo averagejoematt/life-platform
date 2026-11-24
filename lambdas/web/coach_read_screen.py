@@ -12,8 +12,8 @@ page's existing empty state renders (an empty read is dropped, an empty dispute 
 Ids, names, titles, numbers, dates and engine copy (correction explanations, method sentences, persona bios) are not
 coach reads and are never touched. The stored rows are never changed; the owner's tools read them directly.
 
-The words are never rewritten: the whole value is withheld or served as stored. The log carries the route, the key and
-the classes, never the words.
+The words are never rewritten: the whole value is withheld or served as stored. The log carries the route and a count,
+never the words or their classes.
 """
 
 from __future__ import annotations
@@ -87,5 +87,5 @@ def screen_response(path: Any, response: Any) -> Any:
     screened, hits = screen_payload(parsed, str(path))
     if not hits:
         return response
-    logger.info("[coach_read_screen] %s withheld %d coach read(s): %s", path, len(hits), sorted({f"{k}:{'+'.join(c)}" for k, c in hits}))
+    logger.info("[coach_read_screen] %s withheld %d coach read(s)", path, len(hits))
     return {**response, "body": json.dumps(screened, default=str)}
