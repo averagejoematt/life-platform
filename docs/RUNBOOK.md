@@ -695,6 +695,36 @@ Same send time, schedule, recipient and sender. The answer door (`/api/brief_res
 `USER#matthew#SOURCE#brief_trial` LeadingKey (`cdk/stacks/role_policies_serve.py`, `LifePlatformServe`) — without it a
 POST answers 503 and records nothing; the brief itself is unaffected.
 
+### The compact brief (#6240, owner rulings 2026-11-23) — same switch, owner-approved write only
+
+`compact` REPLACES the whole email (html + a plain-text part + the subject): ≤ 250 words outside verified critical
+alerts, ≤ 3 metrics, ≤ 2 recommendations (ceilings, not quotas), one link to the public `/data/day/<data day>/`.
+Only the exact word selects it; an absent, unreadable or malformed switch stays off (today's brief, byte for byte).
+Deploy order before activating: site-api (the additive `food_log` on `/api/nutrition_overview`), then the
+daily-brief Lambda, then the www rebuild (the day page then says "Pending" for an export that has not arrived).
+
+```bash
+# ACTIVATE (owner approval required — the only write):
+aws dynamodb put-item --table-name life-platform --item '{"pk":{"S":"USER#matthew#SOURCE#brief_trial"},"sk":{"S":"SWITCH#format"},"value":{"S":"compact"}}'
+# ROLLBACK, no deploy, from the next send: "hybrid" (the trial format) or "off" (today's brief) — the commands above.
+# Read the compact sends (words, metrics, recs, held recommendations, trend state, fallback):
+aws dynamodb query --table-name life-platform --key-condition-expression "pk = :p AND begins_with(sk, :s)" \
+  --expression-attribute-values '{":p":{"S":"USER#matthew#SOURCE#brief_trial"},":s":{"S":"SEND#"}}'
+```
+
+Safeguards (#6248): a model-written recommendation in a high-stakes claim class (clearance, disease, diagnosis,
+medication, genomic, physiological threshold, lab, body mechanism) is held — its text is kept on the private SEND#
+row (`held_recs`), the log carries counts and class names only. A multi-week state (the 4-week weight rate against
+the plan band, the anomaly detector's sustained physiological flags, or an unreadable/provisional input) is named in
+the lead in one qualified line; the full sentence appears when it opens, changes, and weekly, a short pointer
+otherwise. Nothing changes a target.
+
+Failure: a compact render failure or a HARD budget violation sends a short failure notice ("Not prepared today"),
+never the legacy report, keeping the verified alerts. The SEND# row carries `fallback: true` + `fallback_reason`;
+the log carries `MORNING-BRIEF-COMPACT-FALLBACK`; the Lambda raises after every write, so
+`life-platform-daily-brief-errors` / `slo-daily-brief-delivery` record it, and the DIL-025 replay guard refuses the
+async retry (no second email).
+
 ## The public forecast stream — its two switches (#6156)
 
 The rules-based platform forecast (`lambdas/coach/public_forecast.py`) files ONE number call a week in the pilot (weight;
@@ -947,24 +977,32 @@ restriction to its partition is enforced in code (conditional puts, no update or
 an event. Adding a guideline host is a reviewed PR to `config/evidence_source_allowlist.json` AND to
 `research.findings.GUIDELINE_HOSTS` (the test holds them equal).
 
-## Owner outbound trial — the switchboard (#6176)
+## Owner outbound consolidation — the switchboard (#6176, standing since #6243)
 
-The owner's two-week outbound-mail trial (ruling 2026-11-22 §9) is ONE committed module,
-`lambdas/common/outbound_trial.py`. Each item is one line in its `TRIAL` dict and ships `False` (today's behaviour).
-Start an item, or roll one back alone, by flipping its line in a PR and deploying the fleet (`bash deploy/deploy_fleet.sh`);
-the status page wording needs the site-api deploy too (`bash deploy/deploy_site_api.sh`). `TRIAL_ENDS_ON` (a Pacific
-`YYYY-MM-DD`) turns every item off by itself from that day.
+The owner's outbound-mail consolidation (trial ruling 2026-11-22 §9; made permanent 2026-11-23, #6243) is ONE
+committed module, `lambdas/common/outbound_trial.py`. Each item is one line in its `TRIAL` dict and ships `True`
+(consolidated). There is no end date, and nothing in the module reads a clock, SSM or the environment.
+
+**Fail-safe:** an item reads OFF (its old send returns) only when its line is exactly `False`. A dropped line, `None`,
+`0`, `""`, `"false"` or an empty `TRIAL` all read consolidated.
+
+**Rollback, one item:** set that item's line to `False` in a PR, merge, then `bash deploy/deploy_fleet.sh` (and
+`bash deploy/deploy_site_api.sh` for the status page wording). The other items stay consolidated.
 
 | Item | On | Rollback |
 |---|---|---|
-| `sunday_what_changed` | the Sunday weekly-digest slot sends "what changed and what matters"; Monday Compass is held | flip to `False` |
-| `plate_into_nutrition_review` | Friday Plate held; its most-logged-foods section rides Saturday's Nutrition Review | flip to `False` |
-| `review_pack_not_emailed` | the AI Review Pack is built and logged (`[ai-review-pack] pack_record`), not emailed | flip to `False` |
-| `story_questions_paused` | Monday story questions + Tuesday owner-words question held before generation (#6174) | flip to `False` |
-| `evening_one_channel` | Telegram 20:00 prompt held (EVAL# still stamped); the nudge drops items unlogged 14+ days | flip to `False` |
-| `ops_dlq_summary` | the DLQ SES summary is held when its SNS escalation went out | flip to `False` |
-| `ops_canary_alarmed` | a canary failure a declared alarm already carries is not also emailed | flip to `False` |
-| `ops_monday_pack` | the Monday ops pack is logged (`[traffic-digest] ops_pack_record`), not emailed | flip to `False` |
+| `sunday_what_changed` | the Sunday weekly-digest slot sends "what changed and what matters"; Monday Compass is held (the Weekly Report prints stored owner notes — only this exact rollback brings it back) | set to `False` |
+| `plate_into_nutrition_review` | Friday Plate held; its most-logged-foods section rides Saturday's Nutrition Review | set to `False` |
+| `review_pack_not_emailed` | the AI Review Pack is built and logged (`[ai-review-pack] pack_record`), not emailed | set to `False` |
+| `story_questions_paused` | Monday story questions + Tuesday owner-words question held before generation (#6174) | set to `False` |
+| `evening_one_channel` | Telegram 20:00 prompt held (EVAL# still stamped); the nudge drops items unlogged 14+ days | set to `False` |
+| `ops_dlq_summary` | the DLQ SES summary is held when its SNS escalation went out | set to `False` |
+| `ops_canary_alarmed` | a canary failure a declared alarm already carries is not also emailed | set to `False` |
+| `ops_monday_pack` | the Monday ops pack is logged (`[traffic-digest] ops_pack_record`), not emailed | set to `False` |
+
+QA smoke (#6243): every failing run, deploy-health included, is one line in the daily digest (`qa-smoke: deploy-health
+failures` / `qa-smoke: content-truth failures`); it emails only if the digest publish fails. The CI rollback reads the
+response body and the `qa-smoke-failures` alarm reads the EMF FailCount, so neither depends on the email.
 
 Every held send logs ONE `[outbound-trial] {"event": "suppressed", ...}` line in its own log group, so a held send
 is never a silent failure. Volume before and after: `python3 scripts/owner_outbound_volume.py --weeks 2` (read-only;
@@ -983,17 +1021,17 @@ no deploy either way: it renders the new fields only when the API sends them.
 
 | Item | Group | On | Rollback |
 |---|---|---|---|
-| `public_verdict_not_clearance` | labelling | /api/deficit_sustainability's no-strain verdict says what held, what drifted, its dates and that it is not a clearance; adds `as_of`, `based_on`, `not_based_on`, `honesty` | flip to `False` |
-| `maintenance_labelled` | labelling | maintenance carries `tdee_as_of`; the page names its source and date; the calorie chart says "estimated maintenance", not "goal" | flip to `False` |
-| `rate_line_wording` | labelling | the loss-rate line drops "defensible early at this size" | flip to `False` |
-| `mcp_sustainability_wording` | labelling | MCP get_deficit_sustainability's all-holding line is not a clearance; description re-routed | flip to `False` |
-| `owner_target_layers` | labelling | brief, Board intro, Nutrition Review and Weekly Plate prompts name rest/lifting minimums and the base | flip to `False` |
-| `brief_tile_layers` | labelling | the Morning Brief calorie tile label shows the served band (grading unchanged) | flip to `False` |
-| `overshoot_option_layers` | labelling | the critics' overshoot option says what the step moves on each layer | flip to `False` |
-| `partial_export_excluded` | computed | a partial export is not a day eaten in the public five-channel mean, the MCP mean and the critics' series | flip to `False` |
+| `public_verdict_not_clearance` | labelling | /api/deficit_sustainability's no-strain verdict says what held, what drifted, its dates and that it is not a clearance; adds `as_of`, `based_on`, `not_based_on`, `honesty` | set to `False` |
+| `maintenance_labelled` | labelling | maintenance carries `tdee_as_of`; the page names its source and date; the calorie chart says "estimated maintenance", not "goal" | set to `False` |
+| `rate_line_wording` | labelling | the loss-rate line drops "defensible early at this size" | set to `False` |
+| `mcp_sustainability_wording` | labelling | MCP get_deficit_sustainability's all-holding line is not a clearance; description re-routed | set to `False` |
+| `owner_target_layers` | labelling | brief, Board intro, Nutrition Review and Weekly Plate prompts name rest/lifting minimums and the base | set to `False` |
+| `brief_tile_layers` | labelling | the Morning Brief calorie tile label shows the served band (grading unchanged) | set to `False` |
+| `overshoot_option_layers` | labelling | the critics' overshoot option says what the step moves on each layer | set to `False` |
+| `partial_export_excluded` | computed | a partial export is not a day eaten in the public five-channel mean, the MCP mean and the critics' series | set to `False` |
 | `day_page_maintenance_dated` | computed | day pages print maintenance only from its as-of date (needs `maintenance_labelled`) | flip to `False`, rebuild |
 | `day_page_partial_labelled` | computed | a partial-export day page is labelled and not graded against the protein floor | flip to `False`, rebuild |
-| `bod_intro_charter_rate` | computed | the Board intro states the charter's rate band, not `PROFILE#v1` phases | flip to `False` |
+| `bod_intro_charter_rate` | computed | the Board intro states the charter's rate band, not `PROFILE#v1` phases | set to `False` |
 
 Activate the labelling group first; read the before/after numbers before the computed group.
 
