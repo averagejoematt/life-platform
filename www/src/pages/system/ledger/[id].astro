@@ -8,7 +8,7 @@ import ReaderCall from "../../../components/ReaderCall.astro";
 import StatusTag from "../../../components/StatusTag.astro";
 import { correctionRows, ruleText } from "../../../lib/corrections.js";
 import { isDisputed } from "../../../lib/disputed.js";
-import { dayInWords } from "../../../lib/format.js";
+import { dayInWords, gradingHow } from "../../../lib/format.js";
 import { loadAll } from "../../../lib/snapshot.js";
 import { href, pathOf } from "../../../lib/url.js";
 
@@ -74,7 +74,7 @@ const FLAG_TEXT: Record<string, string> = {
         {note && note.kind === "scope" && <OwnerNote note={note} label={NOTE_LABEL[note.kind]} />}
         <div>
           <p class="label" style="margin-bottom:8px">How it was graded</p>
-          <pre class="code">{p.grading?.how || (p.status === "pending" ? "Window open — graded by code when it closes." : "No grading record served.")}{p.grading?.outcome_notes ? `\n\nevaluator: ${p.grading.outcome_notes}` : ""}{p.grading?.actual_text ? `\nactual: ${p.grading.actual_text}` : ""}{p.grading?.tolerance_text ? `\ntolerance: ${p.grading.tolerance_text}` : ""}</pre>
+          <pre class="code">{gradingHow(p) || (p.status === "pending" ? "Window open — graded by code when it closes." : "No grading record served.")}{p.grading?.outcome_notes ? `\n\nevaluator: ${p.grading.outcome_notes}` : ""}{p.grading?.actual_text ? `\nactual: ${p.grading.actual_text}` : ""}{p.grading?.tolerance_text ? `\ntolerance: ${p.grading.tolerance_text}` : ""}</pre>
           {methods.length > 0 && <p class="muted" style="margin-top:8px;font-size:13px">Method: {methods.map((m) => <a href={href(pathOf("method", m.id))}>{m.name}</a>)}</p>}
         </div>
         {
@@ -114,7 +114,7 @@ const FLAG_TEXT: Record<string, string> = {
               <p class="label" style="margin-bottom:8px">
                 Beside a simple guess
               </p>
-              <p style="font-size:14px;line-height:1.55">{p.simple_guess.text || (p.simple_guess.state === "scored" ? (p.simple_guess.right ? "The simple guess was also right." : "The simple guess was wrong.") : "Not yet scored against a guess.")}</p>
+              <p style="font-size:14px;line-height:1.55">{p.simple_guess.text || (p.simple_guess.state === "scored" ? (p.simple_guess.right ? "The simple guess was also right." : "The simple guess was wrong.") : p.simple_guess.state === "unscorable" ? "The simple guess could not be checked on this call." : "Not yet scored against a guess.")}</p>
             </div>
           )
         }<ReaderCall prediction={p} />

@@ -14,8 +14,8 @@
   // incoming reading, check = confirmed, flatline = signal lost.
   var p = new URLSearchParams(location.search);
   var states = {
-    "confirmed:true":      ["check", "You're in.", 'Subscription confirmed. At most three emails a week: the Weekly Signal every Sunday, the Chronicle installment on Wednesday, and an occasional between-chronicle note on Sunday when there is something new.<br><br><a href="/story/chronicle/">Read the chronicle while you wait →</a>', "confirmed", "ok"],
-    "confirmed:already":   ["check", "Already confirmed.", 'You were already on the list — nothing more to do.<br><br><a href="/story/chronicle/">Read the chronicle →</a>', "confirmed", "ok"],
+    "confirmed:true":      ["check", "You're in.", 'Subscription confirmed. At most two emails a week: the Weekly Signal every Sunday, and a Chronicle chapter on a Wednesday after a new chapter is approved.<br><br><a href="/story/">Read the chapters while you wait →</a>', "confirmed", "ok"],
+    "confirmed:already":   ["check", "Already confirmed.", 'You were already on the list — nothing more to do.<br><br><a href="/story/">Read the chapters →</a>', "confirmed", "ok"],
     "error:invalid_token": ["flatline", "That link didn't check out.", 'The confirmation link is invalid — it may have been clipped by your email client.<br><br><a href="/subscribe/">Subscribe again →</a>', "invalid link", "err"],
     "error:token_expired": ["flatline", "That link expired.", 'Confirmation links are time-limited. Re-subscribe and a fresh one will land in your inbox.<br><br><a href="/subscribe/">Subscribe again →</a>', "link expired", "err"],
     "error:server_error":  ["flatline", "Something went wrong on our side.", 'Not you — us. Try the link again in a minute, or re-subscribe.<br><br><a href="/subscribe/">Back to subscribe →</a>', "server error", "err"],

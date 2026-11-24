@@ -271,3 +271,17 @@ def test_the_served_contract_carries_the_reproducibility_fields(field, monkeypat
     geneses, engaged = _all_censored_short_record()
     body = _survival_with_engagement(geneses, engaged, monkeypatch)
     assert field in body
+
+
+class TestLiveCycleDay6224:
+    """#6224 (public review 2026-11-23): /story/attempts/ read "live — day 70" and "still running (day 70)" on day 79.
+    A 70-day window cap clipped only the live cycle; its day is the real day since genesis."""
+
+    def test_a_live_cycle_past_day_70_reports_its_real_day(self, monkeypatch):
+        today = _today_pt()
+        geneses = {1: (today - timedelta(days=120)).isoformat(), 2: (today - timedelta(days=78)).isoformat()}
+        engaged = {1: set(range(10)), 2: set(range(79))}
+        body = _survival_with_engagement(geneses, engaged, monkeypatch)
+        live = next(c for c in body["cycles"] if c["is_current"])
+        assert live["window_days"] == 79 and len(live["strip"]) == 79 and live["engaged_days"] == 79
+        assert "(day 79)" in body["in_progress_note"]

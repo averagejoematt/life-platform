@@ -185,8 +185,10 @@ def test_the_pin_reds_when_a_fourth_sender_is_added(monkeypatch):
     extra = sc.SUBSCRIBER_SENDERS + (
         sc.SubscriberSender("saturday-extra", "SaturdayExtra", "cron(0 17 ? * SAT *)", "and a note on {weekday}", True),
     )
+    before = sc.max_weekly_emails()
     monkeypatch.setattr(sc, "SUBSCRIBER_SENDERS", extra)
-    assert sc.promise_sentence().startswith("At most four emails a week:")
+    assert sc.max_weekly_emails() == before + 1
+    assert sc.promise_sentence().startswith(f"At most {sc.weekly_count_word()} emails a week:")
     assert _surfaces_missing(sc.promise_sentence())
 
 
@@ -316,3 +318,40 @@ def test_onboarding_bridge_window_is_measured_to_the_signal_day():
     assert sc.days_until_next(sc.signal_weekday(), date(2026, 9, 7)) == 6  # Monday
     assert sc.days_until_next(sc.signal_weekday(), date(2026, 9, 11)) == 2  # Friday
     assert sc.days_until_next(sc.signal_weekday(), date(2026, 9, 13)) == 7  # the Sunday itself
+
+
+# ── #6224: a HELD sender is never promised ───────────────────────────────────
+
+
+def test_the_hold_mirror_matches_the_between_chronicle_owner_release():
+    """MIRROR for the hold. `held` on the between-chronicle entry must equal the sender's own hold
+    (`OWNER_RELEASE` is None). Releasing the note reds this until the promise names it again — and holding
+    it again reds it until the promise stops naming it. A promise of an email that never arrives is #3564."""
+    os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
+    from emails import between_chronicle_lambda as bc
+
+    released = not bc.release_problems(bc.OWNER_RELEASE)
+    assert sc.sender("between-chronicle").held is (not released)
+
+
+def test_a_held_sender_leaves_the_promise_and_the_count():
+    promise = sc.promise_sentence()
+    held = [s for s in sc.SUBSCRIBER_SENDERS if s.held]
+    for s in held:
+        assert s.blurb.split(" {weekday}")[0].split(" on")[0] not in promise, f"{s.function_name} is held but promised"
+    assert sc.max_weekly_emails() == len(sc.SUBSCRIBER_SENDERS) - len(held)
+
+
+def test_releasing_the_held_sender_puts_it_back_in_the_promise(monkeypatch):
+    """NEGATIVE CONTROL: the derivation, not a literal, removes the held clause."""
+    unheld = tuple(sc.SubscriberSender(s.function_name, s.construct_id, s.cron, s.blurb, s.conditional) for s in sc.SUBSCRIBER_SENDERS)
+    monkeypatch.setattr(sc, "SUBSCRIBER_SENDERS", unheld)
+    assert "between-chronicle note" in sc.promise_sentence()
+    assert sc.promise_sentence().startswith("At most three emails a week:")
+
+
+def test_the_chapter_clause_promises_no_weekly_chapter():
+    """Chapters are not weekly (#6224): the promise says a chapter comes after one is approved."""
+    promise = sc.promise_sentence()
+    assert "after a new chapter is approved" in promise
+    assert "installment on Wednesday" not in promise and "every Wednesday" not in promise

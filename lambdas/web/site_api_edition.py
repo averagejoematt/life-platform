@@ -864,7 +864,8 @@ def _catch_up(journal: dict | None, today: str) -> dict:
 def _follow(cadence: dict | None, now: datetime, today: str) -> dict:
     src = ["common.subscriber_cadence", SOURCES["cadence"]]
     sends = [
-        {"sender": s.function_name, "next_date": next_send_date(s.cron, now), "conditional": s.conditional} for s in sc.SUBSCRIBER_SENDERS
+        {"sender": s.function_name, "next_date": next_send_date(s.cron, now), "conditional": s.conditional}
+        for s in sc.promised_senders()  # #6224: a held sender sends nothing
     ]
     ch = (cadence or {}).get("chronicle") or {}
     data = {

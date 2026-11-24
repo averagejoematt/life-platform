@@ -125,7 +125,7 @@ var R = {
 "/recap/": "/story/timeline/",
 "/results/": "/method/results/",
 "/sleep/": "/data/sleep/",
-"/stack/": "/data/stack/",
+"/stack/": "/protocols/supplements/",
 "/status/": "/cockpit/",
 "/story/coaches/": "/coaching/coaches/",
 "/story/lab-notes/": "/coaching/lab-notes/",

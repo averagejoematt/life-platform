@@ -25,7 +25,7 @@ if (action === 'confirmed') {
   sb.style.display = 'block';
   stateIcon(sb, 'check');
   sb.querySelector('.st').textContent = "You're in.";
-  sb.querySelector('.sb').innerHTML = "Subscription confirmed. At most three emails a week: the Weekly Signal every Sunday, the Chronicle installment on Wednesday, and an occasional between-chronicle note on Sunday when there is something new.<br><br><a href=\"/story/\">Read the latest write-up while you wait →</a>";
+  sb.querySelector('.sb').innerHTML = "Subscription confirmed. At most two emails a week: the Weekly Signal every Sunday, and a Chronicle chapter on a Wednesday after a new chapter is approved.<br><br><a href=\"/story/\">Read the latest write-up while you wait →</a>";
 }
 if (action === 'unsubscribed') {
   document.getElementById('form-block').style.display = 'none';
@@ -96,18 +96,5 @@ document.getElementById('email').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('submit-btn').click();
 });
 
-// #4182 — the subscriber count, honest and in words, never hidden: "One subscriber so
-// far", "No subscribers yet — you'd be the first." The old rule hid any count under 10
-// behind "Be one of the first", which read as a crowd that wasn't there. That line stays
-// only as the fallback when the count can't be read (unavailable, or the request failed).
-var SUB_WORDS = ["No", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
-function subCountText(n) {
-  if (n === 0) return "No subscribers yet \u2014 you'd be the first.";
-  var w = n <= 10 ? SUB_WORDS[n] : n.toLocaleString("en-US");
-  return w + " subscriber" + (n === 1 ? "" : "s") + " so far.";
-}
-fetch('/api/sub_count').then(r => r.ok ? r.json() : null).then(d => {
-  const line = document.getElementById('sub-count-line');
-  const n = d && d.available !== false && Number.isInteger(d.count) && d.count >= 0 ? d.count : null;
-  if (line && n != null) line.textContent = subCountText(n);
-}).catch(() => {});
+// #6224 (owner ruling 2026-11-23): the page no longer prints the subscriber count. The line under the form names the one
+// unconditional weekly send (the Weekly Signal); the static copy in index.html is it.

@@ -300,10 +300,72 @@ export function readableTest(how) {
  * 2026-11-06). Null when the test is not served, so the caller falls back to the sentence. ISO dates become words.
  */
 export function heldCallWords(p, max = 90) {
-  const how = p && p.grading && typeof p.grading.how === "string" ? p.grading.how.trim() : "";
+  const how = gradingHow(p);
   if (!how) return null;
   const t = readableTest(how).replace(/\d{4}-\d{2}-\d{2}/g, (iso) => dayInWords(iso, { short: true }) || iso);
   // An observation is never graded, so it has no test: its line reads as itself ("…: an observation, not graded").
   const observation = p.status === "observation" || p.kind === "observation" || /observation, not graded/.test(t);
-  return observation ? clip(t, max) : `the test: ${clip(t, max)}`;
+  // #6224: a graded yes-or-no bet has no numeric test to quote either; its line names what it is.
+  return observation || betWithoutTest(p) ? clip(t, max) : `the test: ${clip(t, max)}`;
+}
+
+const GRADED = new Set(["confirmed", "refuted"]);
+const NOT_GRADED_FALLBACK = /:?\s*an observation, not graded\s*$/;
+
+/** #6224: a call that HAS a grade but whose served grading line is the export's no-spec fallback ("an observation, not
+ *  graded" — a disagreement-docket bet carries no numeric evaluation spec, so the export cannot describe one). */
+function betWithoutTest(p) {
+  const how = p && p.grading && typeof p.grading.how === "string" ? p.grading.how.trim() : "";
+  return !!p && GRADED.has(p.status) && NOT_GRADED_FALLBACK.test(how);
+}
+
+/**
+ * How a call was graded, in words that never contradict its grade (#6224, public review 2026-11-23). The ledger export
+ * describes a call with no numeric spec as "an observation, not graded"; for a call that WAS graded right or wrong (a
+ * yes-or-no bet) that put "not graded" beside "wrong" on the chapter pages and the call's own page. Such a call reads as
+ * what it is; every other served line is returned unchanged. "" when nothing is served.
+ */
+export function gradingHow(p) {
+  const how = p && p.grading && typeof p.grading.how === "string" ? p.grading.how.trim() : "";
+  if (!how || !betWithoutTest(p)) return how;
+  const lead = how.replace(NOT_GRADED_FALLBACK, "").trim();
+  const what = p.kind === "yes_no" ? "a yes-or-no bet, graded right or wrong on its question" : "graded on a test this page does not state";
+  return lead ? `${lead}: ${what}` : what;
+}
+
+/**
+ * A call's grade history when its grade has CHANGED (#6224): the first grade and its day, and the grade it was changed
+ * to and the day that was recorded. Read from the corrections the ledger serves (the original grade is always kept);
+ * null when the call was graded once and never changed — then the grade shown is the only grade it ever had.
+ */
+export function gradeHistory(p) {
+  const changed = ((p && p.corrections) || []).filter((c) => c && c.original_status && c.corrected_status && c.original_status !== c.corrected_status);
+  if (!changed.length) return null;
+  const first = changed[0];
+  const last = changed[changed.length - 1];
+  return {
+    first: first.original_status,
+    firstOn: first.original_outcome_date ? String(first.original_outcome_date).slice(0, 10) : null,
+    now: last.corrected_status,
+    changedOn: last.corrected_at ? String(last.corrected_at).slice(0, 10) : null,
+  };
+}
+
+/**
+ * The time line a graded-call card carries beside a chapter (#6224): a chapter describes grades as they stood when it was
+ * written, the card shows the grade as it stands today. When the grade changed after the chapter was first published, the
+ * card says both, each with its date — a current grade is never presented as one the chapter's author could have known.
+ * `publishedOn` is the chapter's first publication day; `asOf` the build's record day. null when the grade never changed.
+ */
+export function gradeTimeLine(p, publishedOn, asOf) {
+  const h = gradeHistory(p);
+  if (!h) return null;
+  const firstWord = callOutcome(h.first);
+  const nowWord = callOutcome(h.now);
+  const firstOn = h.firstOn ? ` on ${dayInWords(h.firstOn)}` : "";
+  const before = publishedOn && h.changedOn && h.changedOn > publishedOn;
+  const stood = before ? `, the grade that stood when this chapter was first published on ${dayInWords(publishedOn)}` : "";
+  const again = h.changedOn ? `Graded again on ${dayInWords(h.changedOn)}: ${nowWord}` : `Graded again later: ${nowWord}`;
+  const today = asOf ? `, as it stands today (${dayInWords(asOf)})` : "";
+  return `First graded ${firstWord}${firstOn}${stood}. ${again}${today}.`;
 }

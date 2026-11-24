@@ -17,7 +17,10 @@ const { essay: e } = Astro.props;
     <div class="wrap" style="display:flex;flex-direction:column;gap:16px;max-width:900px">
       <div class="row"><span class="label">In my own words</span><Provenance object={e} /></div>
       <h1>{e.title}</h1>
-      {e.summary && <p class="dek">{e.summary}</p>}
+      {/* #6224: an essay's summary is an excerpt of its own opening, so above the body it printed the opening twice — and,
+          while the excerpt lagged a correction, two versions of it side by side. It stands in for the text only when no
+          body is served; the summary still describes the page to search and to feeds (Base `description`). */}
+      {e.summary && !e.body_html && <p class="dek">{e.summary}</p>}
     </div>
   </section>
   <section class="section hair">

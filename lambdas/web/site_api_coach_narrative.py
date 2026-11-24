@@ -24,6 +24,8 @@ delegators; the logic lives here. Handlers receive the facade's ``globals()`` as
 This module does NOT import the facade; no import cycle.
 """
 
+import hashlib
+
 from boto3.dynamodb.conditions import Key
 from coach import (
     audience_guard,  # #2972 — the public-audience frame (public_read)
@@ -123,6 +125,19 @@ def handle_experiment_synthesis(*, _g):
     )
 
 
+# #6224 (owner ruling 2026-11-23 §4: no manufactured emotional interpretations): recap beats withheld from the public
+# route, by the SHA-256 of the stored beat's exact text. The stored RECAP#latest row is untouched (the owner-side record
+# keeps it); a regenerated recap with different words is not matched, so nothing new is ever hidden by this table.
+#   2026-10-13 (Week 6): "… and the quiet realization that the 275-pound Month 2 waypoint is no longer a comfortable
+#   abstraction." — a feeling the narrator attributed to Matthew; the record holds only the walk and the weigh-in.
+RECAP_BEATS_WITHHELD = frozenset({"793a81387affed92f99841a97ab23bcaf942c9610f870de16b5e39a9e302f6d1"})
+
+
+def _beat_withheld(beat) -> bool:
+    text = beat.get("beat") if isinstance(beat, dict) else None
+    return isinstance(text, str) and hashlib.sha256(text.encode("utf-8")).hexdigest() in RECAP_BEATS_WITHHELD
+
+
 def handle_recap(*, _g):
     """GET /api/recap — Elena's "previously on" cold-open (backend serial phase 3).
 
@@ -153,7 +168,7 @@ def handle_recap(*, _g):
         {
             "recap": {
                 "story_so_far": item.get("story_so_far"),
-                "recent_beats": item.get("recent_beats", []),
+                "recent_beats": [b for b in (item.get("recent_beats") or []) if not _beat_withheld(b)],  # #6224
                 "where_we_are_now": item.get("where_we_are_now"),
                 "threads_to_watch": item.get("threads_to_watch", []),
                 "as_of": item.get("as_of"),

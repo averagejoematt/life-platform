@@ -907,7 +907,9 @@ def survival(*, _g) -> dict:
         for idx, (n, genesis) in enumerate(geneses):
             g = datetime.strptime(genesis, "%Y-%m-%d").date()
             next_g = datetime.strptime(geneses[idx + 1][1], "%Y-%m-%d").date() if idx + 1 < len(geneses) else None
-            last = min((next_g - timedelta(days=1)) if next_g else today, g + timedelta(days=69))
+            # #6224: no 70-day cap. Every closed cycle ended well short of it, so it only ever clipped the LIVE cycle —
+            # /story/attempts/ read "live — day 70" and "still running (day 70)" from day 70 on (day 79 on 23 November).
+            last = (next_g - timedelta(days=1)) if next_g else today
             window = (last - g).days + 1
             if window < 1:
                 continue

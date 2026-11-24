@@ -74,6 +74,10 @@ class SubscriberSender:
     cron: str
     blurb: str
     conditional: bool
+    #: #6224: the sender is HELD — it sends nothing to a subscriber, so no surface promises it. Mirrors the sender's own
+    #: hold (between-chronicle: ``emails.between_chronicle_lambda.OWNER_RELEASE`` is None) and is pinned to it by
+    #: tests/test_subscriber_cadence_promise_3564.py, so releasing the sender reds until its promise comes back.
+    held: bool = False
 
 
 # The three senders `qa_check_subscriber_promise.SUBSCRIBER_FACING_SENDERS` names
@@ -92,15 +96,17 @@ SUBSCRIBER_SENDERS = (
         function_name="chronicle-email-sender",
         construct_id="ChronicleEmailSender",
         cron="cron(10 8 ? * WED *)",
-        blurb="the Chronicle installment on {weekday}",
+        # #6224: chapters are not weekly (a week with no approved chapter sends nothing), so the clause says when one comes.
+        blurb="a Chronicle chapter on a {weekday} after a new chapter is approved",
         conditional=True,
     ),
     SubscriberSender(
         function_name="between-chronicle",
         construct_id="BetweenChronicle",
         cron="cron(0 10 ? * SUN *)",
-        blurb="and an occasional between-chronicle note on {weekday} when there is something new",
+        blurb="an occasional between-chronicle note on {weekday} when there is something new",
         conditional=True,
+        held=True,  # #6244: held until the owner releases it (between_chronicle_lambda.OWNER_RELEASE)
     ),
 )
 
@@ -159,10 +165,16 @@ def sender(function_name: str) -> SubscriberSender:
     raise KeyError(function_name)
 
 
+def promised_senders() -> tuple:
+    """The senders a subscriber is promised — every subscriber-facing sender that is not HELD (#6224). A held sender
+    sends nothing, so a surface that named it would advertise an email that never arrives."""
+    return tuple(s for s in SUBSCRIBER_SENDERS if not s.held)
+
+
 def max_weekly_emails() -> int:
-    """The most a subscriber can receive in one week — one per subscriber-facing
-    sender. Conditional senders make the typical week smaller, never larger."""
-    return len(SUBSCRIBER_SENDERS)
+    """The most a subscriber can receive in one week — one per promised sender.
+    Conditional senders make the typical week smaller, never larger."""
+    return len(promised_senders())
 
 
 def weekly_count_word() -> str:
@@ -179,7 +191,7 @@ def signal_weekday() -> int:
 
 def delivery_weekdays() -> set:
     """Every weekday a subscriber can hear from the platform on."""
-    return {required_weekday(s.cron) for s in SUBSCRIBER_SENDERS}
+    return {required_weekday(s.cron) for s in promised_senders()}
 
 
 def promise_sentence() -> str:
@@ -192,14 +204,9 @@ def promise_sentence() -> str:
     escaping games (a promise that has to be re-typed per surface is a promise
     that drifts per surface — that is the #3564 defect).
     """
-    clauses = []
-    for s in SUBSCRIBER_SENDERS:
-        clauses.append(
-            s.blurb.format(
-                weekday=weekday_name(required_weekday(s.cron)),
-            )
-        )
-    return f"At most {weekly_count_word()} emails a week: " + ", ".join(clauses) + "."
+    clauses = [s.blurb.format(weekday=weekday_name(required_weekday(s.cron))) for s in promised_senders()]
+    listed = clauses[0] if len(clauses) == 1 else ", ".join(clauses[:-1]) + ", and " + clauses[-1]
+    return f"At most {weekly_count_word()} emails a week: " + listed + "."
 
 
 def confirmation_cadence_phrase() -> str:
