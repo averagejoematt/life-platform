@@ -43,7 +43,7 @@ from common.digest_utils import safe_float
 from common.habit_registry import habit_tier
 from common.numeric import floats_to_decimal
 from common.pacific_time import day_in_words, shift_day_key
-from content import brief_budget, brief_compact, brief_editorial, brief_hybrid
+from content import brief_budget, brief_compact, brief_editorial, brief_hybrid, brief_trends
 from content.brief_hybrid import SWITCH_COMPACT, SWITCH_HYBRID, SWITCH_MEASURE, SWITCH_OFF, SWITCH_VALUES
 
 HISTORY_DAYS = 30
@@ -588,7 +588,7 @@ def _previous_acwr(fetch_range, day: str):
     return safe_float(rows[0], "acwr") if rows else None
 
 
-def compact_view(*, data, status, guidance_items, history, alerts, previous_weight, previous_acwr, site_url, persona):
+def compact_view(*, data, status, guidance_items, history, alerts, previous_weight, previous_acwr, site_url, persona, trends=()):
     """Pure: the hybrid's own recommendation rules (one per action class, food asks held back while the export is
     pending, NEW/REPEAT from the shown history), then `brief_compact.build`. The tests drive this directly."""
     day = data.get("date")
@@ -607,6 +607,7 @@ def compact_view(*, data, status, guidance_items, history, alerts, previous_weig
         previous_acwr=previous_acwr,
         site_url=site_url,
         persona=persona,
+        trends=trends,
     )
     origin = {r.rec_id: r for r in recs}
     for c in view.recs:
@@ -627,6 +628,7 @@ def _compact_prepare(trial: Trial, g: dict, v: dict, data: dict, alerts: list, s
         v["mvp_streak"], v["day_grade_score"], v["grade"], [],
     )  # fmt: skip
     wr = data.get("weight_recency") or {}
+    trends = brief_trends.apply_cadence(_trend_items(table, data, status, logger), sends, day)
     view = compact_view(
         data=data,
         status=status,
@@ -637,6 +639,7 @@ def _compact_prepare(trial: Trial, g: dict, v: dict, data: dict, alerts: list, s
         previous_acwr=_previous_acwr(fetch_range, day),
         site_url=site_url,
         persona=persona,
+        trends=tuple(trends),
     )
     trial.view = view  # carries the same respond/follow-up fields as brief_hybrid.View, for the #6158 pilot hook
     respond = getattr(view.recs[0], "origin", None) if view.recs else None
@@ -674,6 +677,12 @@ def _compact_prepare(trial: Trial, g: dict, v: dict, data: dict, alerts: list, s
         "dropped_voice": view.dropped_voice,
         "dropped_clearance": view.dropped_clearance,
         "dropped_for_length": view.dropped_for_length,
+        # #6241 §2: a held high-stakes recommendation keeps its ORIGINAL text here, on this private row, for
+        # investigation — never in a log line (the log carries the count only)
+        "held_recs": list(view.held_recs),
+        "n_held_medical": len(view.held_recs),
+        "context_state": brief_trends.state(view.trends),
+        "trend_notes": brief_trends.notes(view.trends),  # tomorrow's cadence reads this (no new store)
         "pending_inputs": list(view.pending_inputs),
         "food_pending": "food" in view.pending_inputs,
         "grade_provisional": bool(status["grade_provisional"]),
@@ -682,6 +691,9 @@ def _compact_prepare(trial: Trial, g: dict, v: dict, data: dict, alerts: list, s
         "respond_rec_id": trial.token_row["rec_id"] if trial.token_row else None,
         "response": rr.NOT_RECORDED,
     }
+    if view.held_recs:  # counts and classes only — the text stays on the private SEND# row (#6241 §2)
+        classes = sorted({c for h in view.held_recs for c in h["classes"]})
+        logger.info("compact brief: held %d high-stakes recommendation(s), classes=%s", len(view.held_recs), ",".join(classes))
     hard = sorted({x.code for x in violations if x.hard})
     if hard:
         raise ValueError("budget:" + ",".join(hard))
@@ -694,6 +706,30 @@ _LENGTH_CODES = frozenset({"words_over", "text_words_over"})
 def _render_checked(view, today_short: str, persona: tuple) -> tuple:
     html, text = brief_compact.render_html(view, today_short), brief_compact.render_text(view, today_short)
     return html, text, brief_budget.check(html, text, persona_names=persona, pending_inputs=tuple(view.pending_inputs))
+
+
+def _trend_items(table, data: dict, status: dict, logger) -> list:
+    """#6241 §3: the open multi-week items from verdicts the platform already computes (content.brief_trends)."""
+    from training import rate_band
+
+    band_error, cap = False, None
+    try:
+        cap = rate_band.guidance_cap_for(table)
+    except rate_band.GuidanceReadError:
+        band_error = True  # logged by class inside rate_band; never the record
+    weight, rate = status.get("weight_lbs"), status.get("weekly_rate_lbs")
+    band = None
+    try:
+        band = rate_band.band_view(float(weight), -float(rate), cap) if weight is not None and rate is not None else None
+    except Exception as e:  # noqa: BLE001 — the item then says the band could not be read
+        logger.warning("compact brief: rate band unreadable: %s", type(e).__name__)
+    items = []
+    if band is None or band.get("governs") is not False:  # below the landing weight his schedule, not the band, governs
+        item = brief_trends.weight_rate_item(status, band, band_error)
+        if item:
+            items.append(item)
+    items += brief_trends.sustained_items(data.get("anomaly") or {}, brief_compact.ANOMALY_PHYSIOLOGICAL_FIELDS)
+    return items
 
 
 def _fit_follow_up(view) -> None:

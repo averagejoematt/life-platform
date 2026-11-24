@@ -53,6 +53,7 @@ HARD = frozenset(
         "contradiction",
         "attribution",
         "unchanged_repeat",
+        "trend_dismissed",
     }
 )
 
@@ -192,7 +193,8 @@ def check(html: str, text: str, *, persona_names: tuple = (), pending_inputs: tu
         v("missed_wording", "absence worded as missed behaviour while " + ",".join(pending_inputs) + " is pending")
     leads = _els(r, "data-lead")
     unknowns = _els(r, "data-unknown")
-    if (pending_inputs or unknowns or _els(r, "data-alert")) and CATEGORICAL_RE.search(visible):
+    trends = _els(r, "data-trend")
+    if (pending_inputs or unknowns or _els(r, "data-alert") or trends) and CATEGORICAL_RE.search(visible):
         v("categorical_with_unknowns", "a categorical 'nothing' while data is unknown or an alert stands")
     clear = bc.CLEARANCE_RE.search(visible + "\n" + (text or ""))
     if clear:
@@ -206,9 +208,14 @@ def check(html: str, text: str, *, persona_names: tuple = (), pending_inputs: tu
     if (
         leads
         and leads[0][1].get("data-lead") == "quiet"
-        and (_els(r, "data-changed") or _els(r, "data-rec") or unknowns or _els(r, "data-alert"))
+        and (_els(r, "data-changed") or _els(r, "data-rec") or unknowns or _els(r, "data-alert") or trends)
     ):
         v("contradiction", "the quiet lead sits above a change, a recommendation, an unknown or an alert")
+    # #6241 §3: an open multi-week trend or concern may not sit under a headline that ignores it
+    open_items = [el for el in trends if el[1].get("data-trend") in ("trend", "concern")]
+    lead_kind = leads[0][1].get("data-lead") if leads else ""
+    if open_items and lead_kind not in ("alert", "decision", "trend"):
+        v("trend_dismissed", "an open multi-week item under a '" + str(lead_kind) + "' lead")
     for el in _els(r, "data-metric"):
         src, as_of = el[1].get("data-source", ""), el[1].get("data-as-of", "")
         if not src or not as_of or src.split(" and ")[0] not in _text_of(el):

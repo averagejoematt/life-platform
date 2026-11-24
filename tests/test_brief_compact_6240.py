@@ -361,6 +361,7 @@ def test_verified_critical_alerts_are_kept_even_past_the_word_ceiling():
     assert m["words"] + m["alert_words"] > bc.WORD_CEILING, "the fixture must push the whole email past 250 words"
     assert m["words"] <= bc.WORD_CEILING and not [v for v in _check(view) if v.hard]  # it still sends, alerts intact
     assert "1.62" in html and "Resting heart rate" in html and "irregular rhythm notification" in html
+    assert "above the 1.5 the platform's rule treats as very high" in html  # the danger line, not the caution one
     assert view.lead_kind == "alert" and not bb.CATEGORICAL_RE.search(html)
 
 
@@ -504,6 +505,7 @@ MUTATIONS = {
     ),
     "attribution": lambda h, t: (h.replace('data-source="Withings"', 'data-source=""'), t),
     "unchanged_repeat": lambda h, t: (h + '<p data-rec="r" data-rec-key="movement" data-status="REPEAT">walk</p>', t),
+    "trend_dismissed": lambda h, t: (h.replace('data-lead="decision"', 'data-lead="plain"') + '<p data-trend="trend">x</p>', t),
 }
 
 
