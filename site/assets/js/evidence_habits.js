@@ -261,9 +261,8 @@ export async function renderHabits(d) {
   const reg = await tryJSON("/api/habit_registry");
   const habits = (reg && reg.habits) || [];
   const groups = (reg && reg.groups) || [];
-  // #5948: restraint habits outside the two nameable categories (alcohol, food delivery) are not in the
-  // registry list or in per_habit — the API serves them as counts only (`restraints_unnamed`: no name,
-  // id or slug), so this page counts them and has no name to print.
+  // #5948/#6224: restraint habits are not in the registry list or in per_habit, and since #6224 the API
+  // serves no `restraints_unnamed` count either — `_unN` is 0 and nothing about them renders.
   const _unBy = (reg && reg.restraints_unnamed && reg.restraints_unnamed.by_group) || {};
   const _unN = Object.values(_unBy).reduce((s, n) => s + (Number(n) || 0), 0);
   const _unAgg = d.restraints_unnamed || {};
@@ -287,7 +286,7 @@ export async function renderHabits(d) {
     // (sec() below), so an h4 here skipped a level (heading-order, moderate).
     const body = order.map((g) => { const hs = habits.filter((h) => (h.group || "Other") === g); const more = Number(_unBy[g]) || 0; if (!hs.length && !more) return ""; return `<h3 class="hb-group label">${esc(g)} <span class="rd-unit">${hs.length + more}</span></h3><table class="rd-tbl"><tbody>${hs.map((h) => `<tr><td class="rd-name">${esc(h.name)}${habitTaxonomyChips(h.taxonomy)}${habitFrictionChip((_perBy[h.name] || {}).adherence_pct)}</td><td class="hb-dotcell">${habitDotStrip((_perBy[h.name] || {}).days)}</td><td class="num rd-range">${esc(h.frequency || "daily")}</td></tr>`).join("")}${more ? `<tr><td class="rd-name" colspan="3">${more} more, counted and named privately</td></tr>` : ""}</tbody></table>`; }).join("");
     const _unNote = _unN
-      ? ` ${_unN} restraint habit${_unN === 1 ? " is" : "s are"} counted here and not named — only the alcohol and takeout ones are listed${_unAgg.adherence_pct != null ? `; together ${_unN === 1 ? "it was" : "they were"} kept ${fmt(_unAgg.adherence_pct)}% of the days ${_unN === 1 ? "it was" : "they were"} due` : ""}.`
+      ? ` ${_unN} restraint habit${_unN === 1 ? " is" : "s are"} counted here and not named${_unAgg.adherence_pct != null ? `; together ${_unN === 1 ? "it was" : "they were"} kept ${fmt(_unAgg.adherence_pct)}% of the days ${_unN === 1 ? "it was" : "they were"} due` : ""}.`
       : "";
     const _dw = d.days_window || {};
     const _stripNote = _dw.n_days

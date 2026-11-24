@@ -265,6 +265,9 @@ def load_coaching_read() -> dict:
             snap = _snapshot().get("coaching_read", {})
             if snap:
                 return snap
+            lead = d.get("lead_daily") if isinstance(d.get("lead_daily"), dict) else {}
+            if str(lead.get("text") or "").strip():
+                return {"as_of": _today(), "source": "live-lead-only", "lead_read": True}  # #6224
             return {"as_of": _today(), "source": "live-empty"}
         # honest stamp: the newest content date the block carries (#4703)
         as_of = _coaching_as_of(d, wp, rendered)
@@ -539,6 +542,18 @@ def coaching_read_block_html(read: dict) -> str:
     wp = read.get("weekly_priority") or {}
     priority = str(wp.get("text") or "").strip()
     coaches = read.get("coaches") or []
+    if not priority and not coaches and read.get("lead_read"):
+        # #6224: the board HAS published (the lead read is on the API), but none of its words are in this
+        # static copy (they are withheld from the bake, or load only with the page's script). Saying "hasn't
+        # published its first read" here contradicted the read the same page shows a second later.
+        return (
+            '<noscript><section class="proof-static dx-prose" aria-label="The coaching — the reads load with the page">'
+            f'<p class="label">The coaching — as of {_esc(read.get("as_of", ""))}</p>'
+            "<p>The board's latest reads load with the page's script; this plain copy does not carry their words.</p>"
+            '<p>Meanwhile: <a href="/coaching/by-coach/">who the coaches are</a> · '
+            '<a href="/coaching/scorecard/">how their calls get graded</a>.</p>'
+            "</section></noscript>"
+        )
     if not priority and not coaches:
         # Day-1 / early-cycle window (found by #1528's live sweep): the experiment
         # is running but the board hasn't published its first read of this run yet

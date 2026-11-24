@@ -81,21 +81,30 @@ def _clean_filter(monkeypatch) -> None:
 # ── 1. the policy ──────────────────────────────────────────────────────────────────────────
 
 
-def test_exactly_the_two_governance_categories_are_nameable():
-    assert sorted(set(RP.NAMED_CATEGORIES.values())) == ["alcohol", "food_delivery"]
-    assert len(RP.NAMED_CATEGORIES) == 2, "a third nameable habit is an owner ruling plus a DATA_GOVERNANCE edit, not a refactor"
-    assert RP.category(ALCOHOL) == "alcohol" and RP.category(TAKEOUT) == "food_delivery"
+# The two categories nameable until #6224. The naming MECHANISM is still tested under them (``former_two``), so
+# the day an owner ruling names a category again the machinery is known to work; the LIVE policy names none.
+FORMER_TWO = {"no alcohol": "alcohol", "no solo takeout": "food_delivery"}
 
 
-def test_the_policy_and_the_governance_doc_name_the_same_two_categories():
+@pytest.fixture
+def former_two(monkeypatch):
+    monkeypatch.setattr(RP, "NAMED_CATEGORIES", dict(FORMER_TWO))
+
+
+def test_no_category_is_nameable_6224():
+    """#6224 (owner ruling 2026-11-23): no explicit owner approval to name any restraint category was found."""
+    assert RP.NAMED_CATEGORIES == {}, "naming a restraint category is an owner ruling plus a DATA_GOVERNANCE edit, not a refactor"
+    assert RP.category(ALCOHOL) is None and RP.category(TAKEOUT) is None
+    assert RP.RESTRAINT_DATA_PUBLISHED is False
+
+
+def test_the_policy_and_the_governance_doc_agree():
     """The must-agree pair: the doc is the rule, the module is its only enforcement. Widening the doc
     without the module (or the reverse) reds here, on the PR that does it."""
     doc = (ROOT / "docs" / "DATA_GOVERNANCE.md").read_text(encoding="utf-8")
-    m = re.search(r"\*\*Vices:\*\* only (.+?) categories are ever named publicly", doc)
+    m = re.search(r"\*\*Vices:\*\* no restraint category is ever named publicly, and no restraint figure is published", doc)
     assert m, "the Vices guardrail sentence moved or was reworded — re-point this test at it, do not delete it"
-    in_doc = {c.strip().strip("*").replace("-", "_") for c in re.split(r",|\band\b", m.group(1)) if c.strip()}
-    assert in_doc == set(RP.NAMED_CATEGORIES.values()), (in_doc, RP.NAMED_CATEGORIES)
-    assert "aggregate-only" in doc[m.end() : m.end() + 200]
+    assert RP.NAMED_CATEGORIES == {} and RP.RESTRAINT_DATA_PUBLISHED is False
     assert "restraint_publication" in doc, "the guardrail no longer points at the module that enforces it"
 
 
@@ -115,7 +124,7 @@ def test_anything_that_is_not_an_exact_nameable_name_is_aggregate_only(name):
     assert RP.category(name) is None and not RP.may_name(name)
 
 
-def test_a_nameable_name_matches_whatever_its_case_or_spacing():
+def test_a_nameable_name_matches_whatever_its_case_or_spacing(former_two):
     assert RP.may_name("NO ALCOHOL") and RP.may_name("  no   solo  takeout ")
 
 
@@ -127,7 +136,7 @@ def test_a_restraint_habit_is_recognised_by_any_one_of_its_three_signals():
     assert got == {"A", "C", "E"}
 
 
-def test_an_unknown_restraint_set_serves_only_nameable_names():
+def test_an_unknown_restraint_set_serves_only_nameable_names(former_two):
     """Fail closed: when the set of restraint habits could not be read, nothing but a nameable name is
     served — an ordinary habit is over-hidden rather than a restraint habit let through."""
     assert RP.nameable_names([ORDINARY, ALCOHOL, UNNAMED[0], TAKEOUT], None) == [ALCOHOL, TAKEOUT]
@@ -141,28 +150,6 @@ def test_a_failed_read_is_unknown_not_empty():
             raise RuntimeError("throttled")
 
     assert RP.load_restraint_names(_Broken(), f"USER#{USER}#SOURCE#", USER) is None
-
-
-def test_the_unlabelled_shapes_carry_no_name():
-    rows = [
-        {"name": ALCOHOL, "current_streak": 9, "best_streak": 12, "relapses_90d": 1, "holding": True},
-        {"name": UNNAMED[0], "current_streak": 30, "best_streak": 41, "relapses_90d": 2, "holding": True},
-        {"name": UNNAMED[1], "current_streak": 0, "best_streak": 5, "relapses_90d": 4, "holding": False},
-    ]
-    out = RP.streak_portfolio(rows)
-    assert [r["name"] for r in out["named"]] == [ALCOHOL] and out["named"][0]["category"] == "alcohol"
-    assert out["unnamed"] == {"tracked": 2, "held": 1, "longest_streak": 30, "best_streak": 41, "relapses_90d": 6}
-    assert RP.streak_portfolio([])["unnamed"] == {"tracked": 0, "held": 0, "longest_streak": 0, "best_streak": 0, "relapses_90d": 0}
-    nameless = RP.nameless_streaks({UNNAMED[0]: 3, ALCOHOL: 9, UNNAMED[1]: 0})
-    assert nameless == [
-        {"current_streak": 9, "holding": True},
-        {"current_streak": 3, "holding": True},
-        {"current_streak": 0, "holding": False},
-    ]
-    agg = RP.adherence_aggregate([{"scheduled": 10, "completed": 7}, {"scheduled": 10, "completed": 8}])
-    assert agg == {"count": 2, "scheduled_days": 20, "completed_days": 15, "adherence_pct": 75}
-    assert RP.adherence_aggregate([])["adherence_pct"] is None
-    assert not _leaks([out["unnamed"], nameless, agg])
 
 
 # ── 2a. /api/vice_streaks ──────────────────────────────────────────────────────────────────
@@ -194,35 +181,24 @@ def _vice_streaks_body() -> dict:
     return json.loads(habits_mod.vice_streaks(_g=g)["body"])
 
 
-def test_vice_streaks_serves_the_non_nameable_habits_as_one_unlabelled_aggregate(monkeypatch):
+def test_vice_streaks_serves_only_that_the_section_is_not_published(monkeypatch):
+    """#6224: no name, streak, count or total — not even with every restraint habit in the table."""
     _clean_filter(monkeypatch)
     body = _vice_streaks_body()
-    assert _leaks(body) == [], "a non-nameable restraint habit is identifiable in /api/vice_streaks"
-    assert {v["name"]: v["category"] for v in body["vices"]} == {ALCOHOL: "alcohol", TAKEOUT: "food_delivery"}
-    assert set(body["vices"][0]) == {"name", "category", "current_streak", "best_streak", "relapses_90d", "holding"}
-    # Aggregate, not anonymised rows: one object of sums and maxima, the same keys whatever it holds.
-    assert body["unnamed"] == {"tracked": 3, "held": 2, "longest_streak": 22, "best_streak": 22, "relapses_90d": 1}
-    assert all(isinstance(v, int) for v in body["unnamed"].values())
-    assert body["total_tracked"] == 5 and body["total_held"] == 4
-    assert set(body) - {"_meta"} == {"as_of_date", "vices", "unnamed", "total_held", "total_tracked"}
+    assert _leaks(body, names=UNNAMED + (ALCOHOL, TAKEOUT)) == []
+    assert {k: v for k, v in body.items() if k != "_meta"} == {"published": False}
 
 
-def test_vice_streaks_with_nothing_tracked_keeps_the_same_keys(monkeypatch):
+def test_must_fail_control_vice_streaks_goes_red_when_the_old_portfolio_is_served(monkeypatch):
+    """The control: serve the pre-#6224 portfolio and the assertion above fails."""
     _clean_filter(monkeypatch)
-    g = {"table": FakeDdbTable(rows=[]), "_experiment_date": lambda days_back=30: "2020-01-01"}
-    body = json.loads(habits_mod.vice_streaks(_g=g)["body"])
-    assert body["vices"] == [] and body["unnamed"]["tracked"] == 0 and body["total_tracked"] == 0
-
-
-def test_must_fail_control_vice_streaks_goes_red_when_a_label_is_reintroduced(monkeypatch):
-    """The control: let ONE synthetic label back through the policy and the assertion above fails. A
-    test that stays green here would be a green light wired to nothing."""
-    _clean_filter(monkeypatch)
-    monkeypatch.setitem(RP.NAMED_CATEGORIES, UNNAMED[0].lower(), "reintroduced")
+    monkeypatch.setattr(RP, "NAMED_CATEGORIES", dict(FORMER_TWO))
+    monkeypatch.setattr(
+        RP, "unpublished_vice_portfolio", lambda: {"vices": [{"name": ALCOHOL, "category": "alcohol", "current_streak": 3}]}
+    )
     body = _vice_streaks_body()
-    assert _leaks(body) == [UNNAMED[0].lower()]
     with pytest.raises(AssertionError):
-        assert _leaks(body) == [], "a non-nameable restraint habit is identifiable in /api/vice_streaks"
+        assert _leaks(body, names=UNNAMED + (ALCOHOL, TAKEOUT)) == []
 
 
 # ── 2b. /api/habits (per_habit) ────────────────────────────────────────────────────────────
@@ -318,18 +294,14 @@ def _habits_body() -> dict:
     return json.loads(habits_mod.habits(_g=g)["body"])
 
 
-def test_habits_per_habit_lists_no_non_nameable_restraint_habit(monkeypatch):
+def test_habits_per_habit_lists_no_restraint_habit(monkeypatch):
     _clean_filter(monkeypatch)
     body = _habits_body()
-    assert _leaks(body, ids=_UNNAMED_IDS) == [], "a non-nameable restraint habit is identifiable in /api/habits"
-    assert {h["name"] for h in body["per_habit"]} == {ORDINARY, ALCOHOL, TAKEOUT}
-    # All three were counted — one per signal — into one figure with no row, strip or note of its own.
-    agg = body["restraints_unnamed"]
-    assert set(agg) == {"count", "scheduled_days", "completed_days", "adherence_pct"}
-    assert agg["count"] == 3 and agg["scheduled_days"] == 12 and 0 < agg["completed_days"] < 12
-    assert agg["adherence_pct"] == round(agg["completed_days"] / 12 * 100)
-    # The group share is an aggregate and stays: the restraint group's rate is public, its members' names are not.
-    assert "Vice" in body["history"][-1]["groups"]
+    assert _leaks(body, names=UNNAMED + (ALCOHOL, TAKEOUT), ids=_UNNAMED_IDS) == [], "a restraint habit is identifiable in /api/habits"
+    assert {h["name"] for h in body["per_habit"]} == {ORDINARY}
+    # #6224: no restraint aggregate and no restraint group share — the Vice group held only restraints.
+    assert "restraints_unnamed" not in body
+    assert all("Vice" not in (d.get("groups") or {}) for d in body["history"])
 
 
 def test_must_fail_control_habits_goes_red_when_a_label_is_reintroduced(monkeypatch):
@@ -352,9 +324,9 @@ def test_habit_registry_counts_the_non_nameable_habits_and_lists_none(monkeypatc
     g = {"table": _table(rows, _registry()), "_habits_from_habitify": lambda: [dict(h) for h in listed]}
     body = json.loads(habits_mod.habit_registry(_g=g)["body"])
     assert _leaks(body, ids=_UNNAMED_IDS) == []
-    assert {h["name"] for h in body["habits"]} == {ORDINARY, ALCOHOL, TAKEOUT} and body["count"] == 3
-    assert body["restraints_unnamed"] == {"count": 3, "by_group": {"Core": 1, "Optimize": 1, "Vice": 1}}
-    assert set(body["groups"]) == {"Mind", "Vice", "Core", "Optimize"}  # a group of unnamed habits only still shows
+    assert {h["name"] for h in body["habits"]} == {ORDINARY} and body["count"] == 1
+    assert "restraints_unnamed" not in body  # #6224: not counted either
+    assert set(body["groups"]) == {"Mind"}  # a group of restraint habits only does not show
 
 
 def test_habit_registry_is_not_served_when_the_restraint_set_cannot_be_read(monkeypatch):
@@ -376,11 +348,8 @@ def test_mind_overview_rows_are_nameless_and_the_timeline_has_no_name_keyed_map(
     }
     body = json.loads(mind_mod.mind_overview(_g=g)["body"])
     assert _leaks(body, names=UNNAMED + (ALCOHOL, TAKEOUT)) == [], "the Mind page names no restraint habit at all"
-    assert body["vice_streaks"] and all(set(r) == {"current_streak", "holding"} for r in body["vice_streaks"])
-    assert [r["current_streak"] for r in body["vice_streaks"]] == sorted((r["current_streak"] for r in body["vice_streaks"]), reverse=True)
-    assert len(body["vice_streaks"]) == 5
-    for day in body["vice_timeline"]:
-        assert set(day) == {"date", "held", "total"}
+    # #6224: no restraint streak and no daily held/total (the stored total counted the never-public ones too).
+    assert body["vice_streaks"] == [] and body["vice_timeline"] == []
 
 
 def test_a_configs_habit_names_are_screened_on_both_routes(monkeypatch):
@@ -393,11 +362,11 @@ def test_a_configs_habit_names_are_screened_on_both_routes(monkeypatch):
     dom = json.loads(protocols_mod.domains(_g={"table": table})["body"])
     pro = json.loads(protocols_mod.protocols(_g={"table": table})["body"])
     assert _leaks([dom, pro]) == []
-    assert dom["domains"][0]["habit_names"] == [ORDINARY, ALCOHOL, TAKEOUT]
-    assert pro["protocols"][0]["related_habits"] == [ORDINARY, ALCOHOL, TAKEOUT]
+    assert dom["domains"][0]["habit_names"] == [ORDINARY]
+    assert pro["protocols"][0]["related_habits"] == [ORDINARY]
     # No table (the restraint set is unknown): served closed, and flagged so it is not cached for the hour.
     closed = protocols_mod.domains()
-    assert json.loads(closed["body"])["domains"][0]["habit_names"] == [ALCOHOL, TAKEOUT]
+    assert json.loads(closed["body"])["domains"][0]["habit_names"] == []
     assert "max-age=300" in json.dumps(closed["headers"])
 
 
@@ -428,7 +397,8 @@ def ungated() -> dict:
 
 # The routes that read a restraint habit's name through the policy. The ungated control must find the
 # canaries on exactly these; a route added to (or dropped from) the set is a decision made in this file.
-GOVERNED = {"/api/vice_streaks", "/api/habits", "/api/habit_registry", "/api/domains", "/api/protocols"}
+# /api/vice_streaks left the set at #6224: it reads no restraint row at all, so even an ungated policy has nothing to leak.
+GOVERNED = {"/api/habits", "/api/habit_registry", "/api/domains", "/api/protocols"}
 
 
 def test_the_walk_reaches_every_route(walk):
@@ -445,16 +415,13 @@ def test_the_walk_is_not_vacuous(walk):
     """The canaries really are in front of the handlers: each is COUNTED where counts are served, the two
     nameable habits are served by name, and each of the four restraint signals put a canary in the count."""
     b = walk["bodies"]
-    vs = b["/api/vice_streaks"]
-    assert {v["name"] for v in vs["vices"]} == {ALCOHOL, TAKEOUT}
-    assert vs["unnamed"]["tracked"] == 2 and vs["total_tracked"] == 4
+    assert {k: v for k, v in b["/api/vice_streaks"].items() if k != "_meta"} == {"published": False}
     habits = b["/api/habits"]
-    assert {ALCOHOL, TAKEOUT} <= {h["name"] for h in habits["per_habit"]}
-    assert habits["restraints_unnamed"]["count"] == 4 and habits["restraints_unnamed"]["scheduled_days"] > 0
-    assert b["/api/habit_registry"]["restraints_unnamed"]["count"] == 4
-    assert len(b["/api/mind_overview"]["vice_streaks"]) == 4
-    assert b["/api/domains"]["domains"][0]["habit_names"] == ["Synthetic Habit 1", ALCOHOL, TAKEOUT]
-    assert b["/api/protocols"]["protocols"][0]["related_habits"] == ["Synthetic Habit 1", ALCOHOL, TAKEOUT]
+    assert "Synthetic Habit 1" in {h["name"] for h in habits["per_habit"]}  # the ordinary habit IS served
+    assert "restraints_unnamed" not in habits and "restraints_unnamed" not in b["/api/habit_registry"]
+    assert b["/api/mind_overview"]["vice_streaks"] == [] and b["/api/mind_overview"]["vice_timeline"] == []
+    assert b["/api/domains"]["domains"][0]["habit_names"] == ["Synthetic Habit 1"]
+    assert b["/api/protocols"]["protocols"][0]["related_habits"] == ["Synthetic Habit 1"]
 
 
 def test_must_fail_control_the_walk_finds_the_canaries_when_the_policy_lets_go(ungated):
@@ -472,15 +439,16 @@ def test_the_public_restraint_domain_names_only_nameable_habits():
     screen does not cover it: the domain that groups the restraint habits lists only nameable ones."""
     cfg = json.loads((ROOT / "site" / "config" / "domains.json").read_text(encoding="utf-8"))
     discipline = next(d for d in cfg["domains"] if d["id"] == "discipline")
-    assert discipline["habit_names"], "the restraint domain lost its habit list — this test is not exercising anything"
-    assert [n for n in discipline["habit_names"] if not RP.may_name(n)] == []
+    # #6224: no restraint habit is nameable, so the restraint domain lists none.
+    assert discipline["habit_names"] == []
 
 
 def test_the_vices_renderer_has_no_per_habit_name_to_print_for_the_aggregate():
     """Not the fix (the fix is the payload) — a pin that the renderer reads the aggregate, and that the
     page's copy says what the payload does."""
     js = (ROOT / "site" / "assets" / "js" / "evidence_sleep.js").read_text(encoding="utf-8")
-    card = js[js.index("export function vicesUnnamedCard") : js.index("export function renderVices")]
+    card = js[js.index("export function vicesUnnamedCard") : js.index("export const VICES_NOT_PUBLISHED")]
     assert "u.tracked" in card and ".name" not in card.replace("vice-name", "")
-    assert "d.unnamed" in js[js.index("export function renderVices") :]
+    render = js[js.index("export function renderVices") :]
+    assert "d.unnamed" in render and "d.published === false" in render  # #6224: the withheld state renders first
     assert 'note("Shown honestly — held and broken both. Named privately.")' not in js

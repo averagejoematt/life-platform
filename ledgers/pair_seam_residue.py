@@ -204,7 +204,6 @@ PAIR_SEAM_RESIDUE: dict[str, str] = {
     "habit_scores::lambdas/emails/monday_compass_lambda.py::read": SEED_DATE,
     "habit_scores::lambdas/web/site_api_ai_context.py::read": SEED_DATE,
     "habit_scores::lambdas/web/site_api_habits.py::read": SEED_DATE,
-    "habit_scores::lambdas/web/site_api_mind.py::read": SEED_DATE,
     "health_check::lambdas/operational/pipeline_health_check_lambda.py::write": SEED_DATE,
     "health_check::lambdas/web/site_api_status.py::read": SEED_DATE,
     "hevy::lambdas/compute/daily_metrics_compute_lambda.py::read": SEED_DATE,

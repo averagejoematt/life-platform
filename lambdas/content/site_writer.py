@@ -37,6 +37,8 @@ from decimal import Decimal
 from common.journal_silence import public_body  # #5131: the one public-surface guard
 from common.pacific_time import pacific_day_n, pacific_today
 
+from content.public_claim_screen import last_food_arrival_day, screen_public_lines  # #6224: the public-line screen
+
 logger = logging.getLogger(__name__)
 
 S3_BUCKET = "matthew-life-platform"
@@ -299,6 +301,7 @@ def write_public_stats(
     elena_hero_line: str = None,
     elena_hero_line_as_of: str = None,
     character: dict = None,
+    brief_data_day: str = None,
 ) -> bool:
     """
     Write public_stats.json to S3 from daily-brief-lambda data.
@@ -344,12 +347,27 @@ def write_public_stats(
                       { level, tier, tier_emoji, xp_total, composite_score,
                         next_level_xp, xp_to_next, days_active }
                       Populated from character_sheet_compute output.
+        brief_data_day: the day the brief's AI lines describe (#6224) — the food-arrival rule's
+                      day; defaults to elena_hero_line_as_of (the daily brief's own data day).
+
+    #6224: the brief's AI lines (elena_hero_line, brief_excerpt, group_narratives) pass
+    ``screen_public_lines`` before they are written — a line with an unsupported medical claim, or
+    a food-log claim about a day whose export has not arrived, is withheld (None), never rewritten.
 
     Returns:
         True on success, False on failure (non-fatal — never raise)
     """
     try:
         hero = _compute_hero(vitals, journey)
+        elena_hero_line, brief_excerpt, group_narratives = screen_public_lines(
+            elena_hero_line,
+            brief_excerpt,
+            group_narratives,
+            data_day=brief_data_day or elena_hero_line_as_of,
+            last_arrival_day=last_food_arrival_day(table_client, user_id),
+        )
+        if not elena_hero_line:
+            elena_hero_line_as_of = None  # the stamp dates the line; no line, no stamp
 
         # #949 pre-start: the incoming journey/brief/hero-line still describe the
         # WIPED prior cycle until Day 1's weigh-in re-anchors them — publish the
@@ -707,9 +725,17 @@ def write_pulse_json(
     brief_excerpt: str = None,
     table_client=None,
     user_id: str = "matthew",
+    brief_data_day: str = None,
 ) -> bool:
-    """PULSE-A2/A3: Write pulse.json to S3 + DynamoDB for /api/pulse."""
+    """PULSE-A2/A3: Write pulse.json to S3 + DynamoDB for /api/pulse.
+
+    #6224: the brief excerpt is the pulse's narrative when present, so it passes the same public-line screen as
+    public_stats.json; a withheld excerpt leaves the pulse's own computed narrative in its place. With no
+    ``brief_data_day`` a food-log claim cannot be checked against its export, so it is withheld (fail closed)."""
     try:
+        _, brief_excerpt, _ = screen_public_lines(
+            None, brief_excerpt, None, data_day=brief_data_day, last_arrival_day=last_food_arrival_day(table_client, user_id)
+        )
         pulse = _compute_pulse(
             vitals=vitals,
             journey=journey,

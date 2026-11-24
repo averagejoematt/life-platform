@@ -5,8 +5,8 @@ in a fresh interpreter, so no handler cache carries the fixture into (or out of)
 
     python3 tests/restraint_route_walk.py [--ungated]
 
-THE RULE (docs/DATA_GOVERNANCE.md): only the alcohol and food-delivery categories are ever named in
-public; every other restraint category is aggregate-only. So plant restraint habits with names nobody
+THE RULE (docs/DATA_GOVERNANCE.md): since #6224 no restraint category is named in public and no restraint
+figure is published (before it, the alcohol and food-delivery categories were named and the rest aggregated). So plant restraint habits with names nobody
 has ruled on — "Restraint Canary Alpha" … "Delta", each marked a restraint through a DIFFERENT signal,
 so the walk proves the union and not one of its members — beside the two nameable ones, and read every
 public response for a canary's name, slug or tracker id.
@@ -72,10 +72,11 @@ def _ids() -> dict:
 
 
 def tokens() -> list:
-    """What must not reach any public body: each canary's name, its slugs and its tracker id."""
+    """What must not reach any public body: each canary's name, its slugs and its tracker id — and, since #6224
+    (no restraint category is nameable: no explicit owner approval was found), the two formerly nameable ones too."""
     out = []
     ids = _ids()
-    for name in CANARIES:
+    for name in CANARIES + NAMEABLE:
         out += [name.lower(), name.lower().replace(" ", "-"), name.lower().replace(" ", "_"), ids[name].lower()]
     return out
 
@@ -157,7 +158,7 @@ def walk(ungated: bool = False) -> dict:
     P._domains_cache = json.loads(json.dumps(DOMAINS_CONFIG))
 
     toks = tokens()
-    out = {"routes": 0, "answered": 0, "raised": {}, "leaks": {}, "bodies": {}}
+    out = {"routes": 0, "answered": 0, "raised": {}, "leaks": {}, "figures": {}, "bodies": {}}
     for path in rw.route_paths(L):
         out["routes"] += 1
         event = {
@@ -182,11 +183,43 @@ def walk(ungated: bool = False) -> dict:
         hits = sorted({t for t in toks if t in blob.lower()})
         if hits:
             out["leaks"][path] = hits
+        figs = restraint_figures(resp.get("body"))
+        if figs:
+            out["figures"][path] = figs
         if path in KEEP_BODIES:
             body = resp.get("body")
             out["bodies"][path] = json.loads(body) if isinstance(body, str) else body
     out["unparsed_queries"] = rw.STATS["unparsed_queries"]
     return out
+
+
+# #6224: the keys that carried a restraint FIGURE (a count of the private categories, a held/tracked total, a
+# streak or relapse aggregate) before no restraint figure was published. A non-empty restraint list counts too.
+FIGURE_KEYS = frozenset({"restraints_unnamed", "unnamed", "total_tracked", "total_held", "vices_held", "vices_total", "relapses_90d"})
+FIGURE_LISTS = frozenset({"vice_streaks", "vice_timeline", "vices"})
+
+
+def restraint_figures(body) -> list:
+    """Every restraint-figure key (or non-empty restraint list) anywhere in a served body, as sorted key paths."""
+    if isinstance(body, str):
+        try:
+            body = json.loads(body)
+        except ValueError:
+            return []
+    found: set = set()
+
+    def walk_(node, path):
+        if isinstance(node, dict):
+            for k, v in node.items():
+                if k in FIGURE_KEYS or (k in FIGURE_LISTS and isinstance(v, list) and v):
+                    found.add(f"{path}.{k}")
+                walk_(v, f"{path}.{k}")
+        elif isinstance(node, list):
+            for v in node:
+                walk_(v, f"{path}[]")
+
+    walk_(body, "")
+    return sorted(found)
 
 
 # The routes whose bodies the test reads for the non-vacuity and wire-shape assertions.

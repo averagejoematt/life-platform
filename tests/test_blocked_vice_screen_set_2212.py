@@ -220,7 +220,6 @@ def test_blocked_vice_call_sites_derivation_is_non_vacuous():
         "site_api_habits.py",
         "site_api_journey.py",
         "site_api_ledger.py",
-        "site_api_mind.py",
         "site_api_protocols.py",
         "site_api_rollups.py",
         # #2515 split site_api_social.py into a facade + cohesive siblings. The facade
@@ -234,7 +233,8 @@ def test_blocked_vice_call_sites_derivation_is_non_vacuous():
         # #4189: the morning-note door is its own sibling (the engage module sits under the
         # #1665 line ceiling); it carries ONE screen over the owner's four words.
         "site_api_social_note.py",
-    }, f"expected _is_blocked_vice call sites in exactly these 12 modules, got {found_files}"
+        # site_api_mind.py left at #6224: mind_overview reads no restraint row at all now.
+    }, f"expected _is_blocked_vice call sites in exactly these 11 modules, got {found_files}"
     # 26 -> 27 by #4182: `_handle_page_feedback` screens its one free-text field
     # (`looking_for`) at the door with an immediate `return _error(400, ...)`;
     # behaviourally mutation-proved in tests/test_page_feedback_4182.py
@@ -251,9 +251,13 @@ def test_blocked_vice_call_sites_derivation_is_non_vacuous():
     # all, so the write-door screen went with the field it screened. The read-door screen (`_screened_note`)
     # stays for rows stored before; the note's absence is pinned by
     # tests/test_site_api_social_behavior.py::test_a_reader_checkin_note_is_never_stored.
-    assert len(sites) == 26, (
-        f"expected 26 distinct _is_blocked_vice call sites (11 from #2212 + 2 from #2238 + 11 from #2240 + 2 from #2221 "
-        f"+ 1 from #4182 + 1 from #4189 - 1 from #5948 - 1 from #6087), "
+    # 26 -> 23 by #6224 (owner ruling 2026-11-23): /api/vice_streaks and /api/mind_overview's restraint fields read
+    # no restraint row at all (no restraint figure is published without his explicit approval), so vice_streaks' two
+    # screens and mind_overview's one went with the reads they screened. The absence of any restraint figure is
+    # pinned below and by tests/test_restraint_labels_5948.py + tests/test_restraint_withheld_6224.py.
+    assert len(sites) == 23, (
+        f"expected 23 distinct _is_blocked_vice call sites (11 from #2212 + 2 from #2238 + 11 from #2240 + 2 from #2221 "
+        f"+ 1 from #4182 + 1 from #4189 - 1 from #5948 - 1 from #6087 - 3 from #6224), "
         f"got {len(sites)} — a call site was added or removed; update this pin AND give the changed "
         f"site the same mutation-proof treatment as the rest of this file"
     )
@@ -315,10 +319,9 @@ def _vice_streaks_g(items):
     return {"table": table, "_experiment_date": lambda days_back=30: "2020-01-01"}
 
 
-def test_vice_streaks_excludes_a_blocked_vice_name(monkeypatch):
-    """Kills :227 (the vice_history builder). Removing ONLY :227 makes the
-    blocked name appear in `vices` regardless of :241 (see AC4 above and the
-    PR body's three-way transcript)."""
+def test_vice_streaks_serves_nothing_from_a_blocked_or_a_clean_vice(monkeypatch):
+    """#6224: the route reads no restraint row, so neither a blocked nor a clean vice reaches it — the screen
+    that used to sit in it has nothing left to screen."""
     _pin_content_filter(monkeypatch)
     blocked = _name_with_blocked_keyword("Quit")
     items = [
@@ -329,28 +332,9 @@ def test_vice_streaks_excludes_a_blocked_vice_name(monkeypatch):
             "vice_streaks": {_NAMEABLE: 5, blocked: 3},
         }
     ]
-    resp = habits_mod.vice_streaks(_g=_vice_streaks_g(items))
-    body = json.loads(resp["body"])
-    names = {v["name"] for v in body["vices"]}
-    assert names == {_NAMEABLE}, f"blocked vice name leaked into /api/vice_streaks: {names}"
-    # #5948: a habit that is not nameable is COUNTED in the unlabelled aggregate, so the blocked
-    # screen is what keeps a never-public category out of the counts too — not just out of `vices`.
-    assert body["total_tracked"] == 1 and body["unnamed"]["tracked"] == 0
-
-
-def test_vice_streaks_keeps_a_clean_vice_name(monkeypatch):
-    _pin_content_filter(monkeypatch)
-    items = [
-        {
-            "pk": f"USER#{USER_ID}#SOURCE#habit_scores",
-            "sk": "DATE#2026-06-01",
-            "date": "2026-06-01",
-            "vice_streaks": {_NAMEABLE: 5},
-        }
-    ]
-    resp = habits_mod.vice_streaks(_g=_vice_streaks_g(items))
-    body = json.loads(resp["body"])
-    assert {v["name"] for v in body["vices"]} == {_NAMEABLE}
+    body = json.loads(habits_mod.vice_streaks(_g=_vice_streaks_g(items))["body"])
+    assert {k: v for k, v in body.items() if k != "_meta"} == {"published": False}
+    assert blocked not in json.dumps(body) and _NAMEABLE not in json.dumps(body)
 
 
 # ── site_api_habits.py:325 — habits() per-habit aggregation (/api/habits) ────
@@ -571,8 +555,9 @@ def _mind_overview_g(hs_item):
     }
 
 
-def test_mind_overview_vice_streaks_excludes_a_blocked_vice(monkeypatch):
-    """Kills :182."""
+def test_mind_overview_serves_no_restraint_figure(monkeypatch):
+    """#6224: mind_overview's restraint fields are always empty — no nameless streak rows (they let a reader count
+    the private categories) and no daily held/total (the stored total counted the never-public categories too)."""
     _pin_content_filter(monkeypatch)
     blocked = _name_with_blocked_keyword("Habit:")
     hs_item = {
@@ -584,29 +569,7 @@ def test_mind_overview_vice_streaks_excludes_a_blocked_vice(monkeypatch):
         "vices_total": 2,
     }
     body = json.loads(mind_mod.mind_overview(_g=_mind_overview_g(hs_item))["body"])
-    # #5948: the rows are nameless (a streak count and held/not), so the blocked category is proven
-    # absent by the COUNT — with the screen removed there are two rows here, not one.
-    assert body["vice_streaks"] == [{"current_streak": 4, "holding": True}], body["vice_streaks"]
-    assert blocked not in json.dumps(body)
-
-
-def test_mind_overview_vice_timeline_carries_no_name_keyed_map(monkeypatch):
-    """#5948: the per-day `streaks` map (keyed by habit name) is gone from the timeline, and with it the
-    screen that used to sit at :300. A day is its date and two counts; no habit name, blocked or not."""
-    _pin_content_filter(monkeypatch)
-    blocked = _name_with_blocked_keyword("Habit:")
-    hs_item = {
-        "pk": f"USER#{USER_ID}#SOURCE#habit_scores",
-        "sk": "DATE#2026-06-01",
-        "date": "2026-06-01",
-        "vice_streaks": {"Screen-free evenings": 4, blocked: 2},
-        "vices_held": 2,
-        "vices_total": 2,
-    }
-    body = json.loads(mind_mod.mind_overview(_g=_mind_overview_g(hs_item))["body"])
-    assert body["vice_timeline"], "fixture produced no vice_timeline day — test is not exercising the code under test"
-    for day in body["vice_timeline"]:
-        assert set(day) == {"date", "held", "total"}, f"/api/mind_overview vice_timeline grew a key: {sorted(day)}"
+    assert body["vice_streaks"] == [] and body["vice_timeline"] == []
     assert blocked not in json.dumps(body) and "Screen-free evenings" not in json.dumps(body)
 
 

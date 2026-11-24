@@ -280,6 +280,7 @@ If any of these become relevant (e.g., onboarding a second user from CA, sale of
 | 2026-08-31 | #3368 (fin-diligence): `deploys/` noncurrent-version expiry tightened 7d → 1d (keep-newest-1 retained). ~72GB of noncurrent deploy bundles measured under the 7d window (one-bundle fleet sweeps mint ~1.7GB each; 14 sweeps on 08-31 alone) and nothing reads them — the scripted rollback (`rollback_lambda.sh`, CI auto-rollback, `deploy_fleet.sh::seed_artifacts`) reads only the CURRENT `deploys/<fn>/previous.zip`; repo sweep found zero `list-object-versions`/VersionId S3 reads. Trade-off accepted: the MANUAL deep-rollback window (older versions via S3 versioning) shrinks to ~1 day + the 1 kept newest noncurrent generation; beyond that, re-deploy from a git ref | #3368 |
 | 2026-11-14 | #5948: the Vices guardrail below was enforced by one renderer on one page (2026-06-23) while five public payloads (`/api/vice_streaks`, `/api/habits` `per_habit`, `/api/mind_overview`, `/api/habit_registry`, `/api/domains`) and the static `config/domains.json` + `config/protocols.json` served every restraint label. Enforcement moved to the serving side (`lambdas/common/restraint_publication.py`, exact-name allowlist of the two permitted categories, fail closed); the non-permitted categories now reach the wire as unlabelled aggregates only; the names were removed from the two static config files, a test fixture and three shape snapshots; guard `tests/test_restraint_labels_5948.py` (handler-level + a walk of every public GET route, each with a must-fail control). No new data class; no owner ruling relaxed or widened | #5948 |
 | 2026-11-22 | #6162 re-verification against code: tier registry (`field_tiers.py` four tiers incl. `TIER_OWNER_PUBLISHED`), ADR-155 date, security-tier log functions and 30-day default, every referenced test/script path and the source census re-checked; corrected the stale data-export lambda path and the source census count (105 non-`SYSTEM_STATE` of 125) | #6162 |
+| 2026-11-23 | #6224 (owner ruling 2026-11-23): restraint data checked against explicit owner approvals — none found for naming the two categories, their streaks, or the unlabelled aggregates of the private categories. All withheld at the API: `/api/vice_streaks` serves `{"published": false}`; `/api/mind_overview` `vice_streaks`/`vice_timeline` empty (the timeline's stored daily total also counted the never-public categories); `/api/habits` `restraints_unnamed` and restraint group shares removed; `/api/habit_registry` `restraints_unnamed` and restraint-only groups removed; restraint names leave `/api/domains` and `/api/protocols` habit lists. The `/data/vices/` page says plainly the section is not published | #6224 |
 
 ---
 
@@ -292,13 +293,21 @@ Migrated from the frozen BACKLOG archive (2026-07-10 — a live guardrail was bu
 deprecated doc). On ANY public surface (site, OG images, RSS, podcasts, build beats):
 
 - No employer / role / industry. Partner is never named.
-- **Vices:** only *alcohol* and *food-delivery* categories are ever named publicly; all
-  other vice categories are aggregate-only (streak counts, no labels). See
+- **Vices:** no restraint category is ever named publicly, and no restraint figure is published — no
+  streak, relapse count, held/tracked total, adherence aggregate, or count of private categories (#6224,
+  owner ruling 2026-11-23: "Check those disclosures against my explicit public-content approvals ... Where
+  authorization is absent, withhold the data rather than silently grandfathering it into the public site").
+  No explicit owner approval was found for naming alcohol or food delivery, for their streaks, or for the
+  unlabelled aggregates of the other categories (the earlier wording of this line LIMITED naming to those two;
+  it was an editorial guardrail from a 2026-06-07 review, not an approval). Publishing any of it again needs
+  his explicit ruling recorded here. See
   `feedback_sensitive_content` policy — the two never-public vice categories (vocabulary in the ER-06 non-committed channel, #2370) must never be public.
-  **Enforced on the serving side (#5948):** `lambdas/common/restraint_publication.py` is the one place that decides
-  whether a restraint habit may be named (by exact name; anything else, and anything new, is aggregate-only), and
-  `tests/test_restraint_labels_5948.py` holds this sentence equal to that module's two categories and walks every
-  public GET route for a planted label. Naming a third category means editing this sentence AND that module, in one change.
+  **Enforced on the serving side (#5948, #6224):** `lambdas/common/restraint_publication.py` is the one place that
+  decides (`NAMED_CATEGORIES` empty, `RESTRAINT_DATA_PUBLISHED` False); `/api/vice_streaks` serves only
+  `{"published": false}`, `/api/mind_overview` serves its restraint fields empty, `/api/habits` and
+  `/api/habit_registry` carry no restraint row, count or group share. `tests/test_restraint_withheld_6224.py` and
+  `tests/test_restraint_labels_5948.py` hold this sentence equal to that module and walk every public GET route
+  for a planted restraint. Publishing anything here means editing this sentence AND that module, in one change.
 - Bereavement content is opt-in only.
 - Correlative framing always ("associated with", never "caused").
 - Down-weeks are always visible — absence of bad data is a lie of omission (ADR-104).

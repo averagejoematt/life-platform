@@ -22,61 +22,8 @@
         },
         "type": "object"
       },
-      "as_of_date": {
-        "type": "string"
-      },
-      "total_held": {
-        "type": "integer"
-      },
-      "total_tracked": {
-        "type": "integer"
-      },
-      "unnamed": {
-        "keys": {
-          "best_streak": {
-            "type": "integer"
-          },
-          "held": {
-            "type": "integer"
-          },
-          "longest_streak": {
-            "type": "integer"
-          },
-          "relapses_90d": {
-            "type": "integer"
-          },
-          "tracked": {
-            "type": "integer"
-          }
-        },
-        "type": "object"
-      },
-      "vices": {
-        "items": {
-          "keys": {
-            "best_streak": {
-              "type": "integer"
-            },
-            "category": {
-              "type": "string"
-            },
-            "current_streak": {
-              "type": "integer"
-            },
-            "holding": {
-              "type": "boolean"
-            },
-            "name": {
-              "type": "string"
-            },
-            "relapses_90d": {
-              "type": "integer"
-            }
-          },
-          "type": "object"
-        },
-        "length_sample": 2,
-        "type": "array"
+      "published": {
+        "type": "boolean"
       }
     },
     "type": "object"

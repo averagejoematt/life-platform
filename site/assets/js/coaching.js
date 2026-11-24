@@ -459,11 +459,17 @@ function tensionsHTML(d, opts = {}) {
   // #540 — THE DISPUTE: a real exchange, not a summary. Coach B answered coach A's
   // specific recorded claim (gated turns); shown verbatim from the persisted thread.
   const dp = d.dispute;
-  if (dp && Array.isArray(dp.turns) && dp.turns.length >= 2) {
+  // #6224: a turn whose words the publication gate (or the medical screen) withheld arrives as "". The labels
+  // never print over an empty line: an exchange with fewer than two published turns says so plainly instead.
+  const spoken = dp && Array.isArray(dp.turns) ? dp.turns.filter((t) => String((t && t.line) || "").trim()) : [];
+  if (dp && Array.isArray(dp.turns) && dp.turns.length >= 2 && spoken.length < 2) {
+    h += `<div class="tt-dispute"><p class="dx-kicker label">the dispute · an actual exchange${isoWeekRange(dp.week) ? ` · week of ${esc(isoWeekRange(dp.week))}` : ""}</p>` +
+      `<p class="dx-prose">The words of this week's exchange are not published.</p></div>`;
+  } else if (dp && spoken.length >= 2) {
     const kindLabel = { position: "the claim", reply: "the reply", rejoinder: "the rejoinder" };
     h += `<div class="tt-dispute"><p class="dx-kicker label">the dispute · an actual exchange${isoWeekRange(dp.week) ? ` · week of ${esc(isoWeekRange(dp.week))}` : ""}</p>` +
       `<p class="tt-topic">${esc(dp.topic || "")}</p>` +
-      dp.turns.map((t) =>
+      spoken.map((t) =>
         `<div class="ttd-turn ttd-${esc(t.kind || "turn")}"><span class="ttd-who label">${esc(t.name || t.speaker || "")}` +
         `<span class="ttd-kind"> · ${esc(kindLabel[t.kind] || t.kind || "")}</span></span><p class="ttd-line">${esc(t.line || "")}</p></div>`).join("") +
       `<p class="ttd-note label">Generated in each coach's own voice from their recorded positions — grounded, no invented numbers. AI characters arguing over real data.</p></div>`;

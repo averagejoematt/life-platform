@@ -385,10 +385,8 @@ export async function renderMind(d) {
   return parts.join("") || empty("The inner-life view fills in as restraint, mood, and reflection accrue.");
 }
 
-// /data/vices/ — `d` = /api/vice_streaks. #5948: only the two categories the governance rule allows to
-// be named (alcohol, food delivery) arrive as rows in `d.vices`. Every other restraint arrives as ONE
-// unlabelled aggregate, `d.unnamed` — no name, id or slug is in the payload — and renders as one card.
-// The fix is on the wire, not here: this function has no name to print for them.
+// /data/vices/ — `d` = /api/vice_streaks. Since #6224 the route serves `{published: false}` only; the
+// row/aggregate renderers below stay for the day an owner ruling publishes a restraint figure again.
 export function vicesUnnamedCard(u) {
   const n = Number(u && u.tracked) || 0;
   if (!n) return "";
@@ -404,7 +402,12 @@ export function vicesUnnamedCard(u) {
   );
 }
 
+// #6224 (owner ruling 2026-11-23): no restraint figure is published without his explicit approval, and none
+// was found — the API serves `{published: false}` and nothing else, and the page says so plainly.
+export const VICES_NOT_PUBLISHED = "This section is not published. The restraint habits he tracks — their names, streaks and counts — stay private.";
+
 export function renderVices(d) {
+  if (!d || d.published === false) return `<p class="dx-prose">${VICES_NOT_PUBLISHED}</p>`;
   const v = d.vices || [];
   const u = d.unnamed || {};
   const un = Number(u.tracked) || 0;
@@ -428,7 +431,7 @@ export function renderVices(d) {
     figs([fig(d.total_held ?? 0, "holding"), fig(d.total_tracked ?? v.length + un, "tracked")]) +
     `<div class="vice-grid">${v.map(card).join("")}${vicesUnnamedCard(u)}</div>` +
     note(un
-      ? `Shown honestly — held and broken both. Only the alcohol and takeout ones are named here; the other ${un} ${un === 1 ? "is" : "are"} counted, and named privately.`
+      ? `Shown honestly — held and broken both. The named ones are listed; the other ${un} ${un === 1 ? "is" : "are"} counted, and named privately.`
       : "Shown honestly — held and broken both.")
   );
 }
