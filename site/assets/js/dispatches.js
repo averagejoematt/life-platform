@@ -450,7 +450,7 @@ async function renderRead(s, id) {
     if (!items.length) {
       read.innerHTML =
         head +
-        `<p class="dx-prose">Nothing published here yet — cleared posts land in this feed as they're made. Follow along via <a href="/story/broadcast/rss.xml">RSS</a> or <a href="/subscribe/">email</a>.</p>`;
+        `<p class="dx-prose">No posts are published here at the moment. If one is, it appears in this feed and in its <a href="/story/broadcast/rss.xml">RSS</a>.</p>`;
       return;
     }
     const cards = items
@@ -896,6 +896,15 @@ async function injectJournalQuotes(listEl) {
   listEl.insertAdjacentHTML("afterbegin", `<li class="jq-rail">${html}</li>`);
 }
 
+// #6224: the empty-state lines, per section — [rail line, reading-pane line]. No date is promised for anything not scheduled.
+const EMPTY_COPY = {
+  panel: [
+    "No episodes are published at the moment.",
+    "Audio episodes are not currently published. No date is set for the next one; the written chapters are on <a href=\"/story/\">the story page</a>.",
+  ],
+  _default: ["Nothing is published here at the moment.", "Nothing is published here at the moment."],
+};
+
 function selectEntry(s, id, silent) {
   document.querySelectorAll(".dx-item").forEach((b) => b.classList.toggle("is-active", String(b.dataset.id) === String(id)));
   if (!silent) { try { history.replaceState({ sec: s.key, id }, "", `/story/${s.key}/#${id}`); } catch (e) {} }
@@ -916,7 +925,16 @@ async function selectSection(key, preId, push = true) {
   listEl.innerHTML = `<li class="dx-empty"><span class="shimmer">Loading…</span></li>`;
   const data = await secFetch(s);
   const entries = entriesFor(s, data);
-  if (!entries.length) { listEl.innerHTML = `<li class="dx-empty">Nothing published here yet — it fills as the experiment runs.</li>`; $("[data-dx-read]").innerHTML = `<p class="dx-empty">Nothing to read yet. The first entries land once the experiment is underway — check back after Day 1.</p>`; if (s.key === "journal") injectJournalQuotes(listEl); return; }
+  // #6224: an empty section says why it is empty today. The "check back after Day 1" line was written for the days before
+  // genesis and still showed on the podcast tab on day 79. The podcast is empty because no episode is published (episodes
+  // are held or retired), and the page promises no date for the next one.
+  if (!entries.length) {
+    const empty = EMPTY_COPY[s.key] || EMPTY_COPY._default;
+    listEl.innerHTML = `<li class="dx-empty">${empty[0]}</li>`;
+    $("[data-dx-read]").innerHTML = `<p class="dx-empty">${empty[1]}</p>`;
+    if (s.key === "journal") injectJournalQuotes(listEl);
+    return;
+  }
   const noteHTML = (s.key === "chronicle" || s.key === "panel") ? await cadenceNoteHTML(s.key, data, entries) : "";
   listEl.innerHTML = noteHTML + entries.map((e) => `<li><button class="dx-item" data-id="${esc(e.id)}"><span class="dx-item-t">${esc(e.title)}${isNewSince(e.date) ? ` <span class="dx-new label">new</span>` : ""}</span><span class="dx-item-d label">${esc(dayInWords(e.date, { weekday: false }) || e.date || "")}</span></button></li>`).join("");
   listEl.querySelectorAll(".dx-item").forEach((b) => b.addEventListener("click", () => selectEntry(s, b.dataset.id)));

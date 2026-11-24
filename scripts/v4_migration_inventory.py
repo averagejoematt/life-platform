@@ -224,7 +224,9 @@ def new_url(url: str, dest: str) -> str:
         }
         return deep.get(seg_of(url), "/")  # narrative URLs land on their native Story sub-page
     if dest == "evidence":
-        remap = {"coaches": "board", "accountability": "vices", "live": "vitals"}
+        # #6224: /stack/ was the supplement stack (its preserved page redirects "to Supplements"); its v5 slot
+        # /data/stack/ was never built and 404s, so the old address lands on the page that carries the job today.
+        remap = {"coaches": "board", "accountability": "vices", "live": "vitals", "stack": "supplements"}
         seg = remap.get(seg_of(url), seg_of(url))
         return f"/{V5_DOOR[seg]}/{seg}/"  # collapse subpaths; remap rehomed slugs; land on the v5 door
     if dest == "legacy":

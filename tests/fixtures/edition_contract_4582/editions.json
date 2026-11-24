@@ -1014,7 +1014,7 @@
     ],
     "absent_text": "The email schedule is not served right now.",
     "data": {
-     "promise": "At most three emails a week: the Weekly Signal every Sunday, the Chronicle installment on Wednesday, and an occasional between-chronicle note on Sunday when there is something new.",
+     "promise": "At most two emails a week: the Weekly Signal every Sunday, and a Chronicle chapter on a Wednesday after a new chapter is approved.",
      "sends": [
       {
        "sender": "weekly-signal",
@@ -1024,11 +1024,6 @@
       {
        "sender": "chronicle-email-sender",
        "next_date": "2026-10-21",
-       "conditional": true
-      },
-      {
-       "sender": "between-chronicle",
-       "next_date": "2026-10-18",
        "conditional": true
       }
      ],
@@ -3361,7 +3356,7 @@
      ],
      "absent_text": "The email schedule is not served right now.",
      "data": {
-      "promise": "At most three emails a week: the Weekly Signal every Sunday, the Chronicle installment on Wednesday, and an occasional between-chronicle note on Sunday when there is something new.",
+      "promise": "At most two emails a week: the Weekly Signal every Sunday, and a Chronicle chapter on a Wednesday after a new chapter is approved.",
       "sends": [
        {
         "sender": "weekly-signal",
@@ -3371,11 +3366,6 @@
        {
         "sender": "chronicle-email-sender",
         "next_date": "2026-10-21",
-        "conditional": true
-       },
-       {
-        "sender": "between-chronicle",
-        "next_date": "2026-10-18",
         "conditional": true
        }
       ],
@@ -3525,7 +3515,7 @@
      ],
      "absent_text": "The email schedule is not served right now.",
      "data": {
-      "promise": "At most three emails a week: the Weekly Signal every Sunday, the Chronicle installment on Wednesday, and an occasional between-chronicle note on Sunday when there is something new.",
+      "promise": "At most two emails a week: the Weekly Signal every Sunday, and a Chronicle chapter on a Wednesday after a new chapter is approved.",
       "sends": [
        {
         "sender": "weekly-signal",
@@ -3535,11 +3525,6 @@
        {
         "sender": "chronicle-email-sender",
         "next_date": "2026-10-21",
-        "conditional": true
-       },
-       {
-        "sender": "between-chronicle",
-        "next_date": "2026-10-18",
         "conditional": true
        }
       ],

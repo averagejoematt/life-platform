@@ -115,8 +115,8 @@ CUTOVER_PATHS = ("/", "/start/", "/story/", "/coaches/")
 
 #: Paths that resolve somewhere other than site/, or were already unresolved before #4588.
 #: Exact-match: an entry that starts resolving must be removed (the set only shrinks).
-KNOWN_UNRESOLVED_4588 = {
-    "/stack/": "pre-existing before #4588: its 301 target /data/stack/ has no page under site/",
+KNOWN_UNRESOLVED_4588: dict = {
+    # "/stack/" left this set in #6224: it now 301s to /protocols/supplements/, a page under site/.
 }
 
 #: URL prefixes another origin serves (never site/): the weekly chapters under /journal/posts/week-NN/

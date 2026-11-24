@@ -56,7 +56,8 @@ def test_render_produces_a_complete_v5_page():
 def test_canonical_and_title_track_the_entry():
     p = _first_post()
     html = j.render(p)
-    assert f'<link rel="canonical" href="https://averagejoematt.com{p["url"]}">' in html
+    # #6224: the essay's canonical address is its v9 page; the legacy permalink names it.
+    assert f'<link rel="canonical" href="https://averagejoematt.com/story/essays/{p["id"]}/">' in html
     assert f"<title>{p['title']} — averagejoematt</title>" in html
 
 

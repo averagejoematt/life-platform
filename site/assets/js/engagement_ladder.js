@@ -118,7 +118,7 @@ const RUNGS = [
   {
     key: "subscriber",
     name: "Subscriber",
-    blurb: "At most three emails a week: the Weekly Signal every Sunday, the Chronicle installment on Wednesday, and an occasional between-chronicle note on Sunday when there is something new. Double opt-in, unsubscribe anytime.",
+    blurb: "At most two emails a week: the Weekly Signal every Sunday, and a Chronicle chapter on a Wednesday after a new chapter is approved. Double opt-in, unsubscribe anytime.",
     cta: { href: "#main", label: "Follow by email ↑" },
   },
   {
@@ -149,7 +149,20 @@ function el(tag, cls, html) {
   return n;
 }
 
+// #6224 (owner ruling 2026-11-23): the Subscriber rung shows what a subscriber receives, not how many there are.
+const UNCOUNTED = new Set(["subscriber"]);
+
+// #6224: how each public count is made, in plain words. The API's provenance block names its storage (a table key, a
+// bucket path); those identifiers are for the engine, never for the reader, so the page says what is counted instead.
+const COUNT_WORDS = {
+  reader: "Not counted. Reading the site stores nothing about you.",
+  predictor: "People who made a call on the week's prediction. Only the current prediction window is counted; a call drops out of the count eight days after it is made.",
+  replicator: "Readers who said they ran a Replication Kit. Self-reported: no proof is asked for or stored.",
+  contributor: "Reader findings that were checked and published. Credit is named only when the reader asks for it.",
+};
+
 function countLabel(rung, data) {
+  if (UNCOUNTED.has(rung.key)) return null;
   if (!data || !data.rungs) return null;
   const r = data.rungs[rung.key];
   if (!r || r.countable === false || r.count == null) return null;
@@ -239,14 +252,14 @@ function render(mount, data) {
   // Provenance disclosure — the counts are derived from data, and we show how.
   if (data && data.rungs) {
     const det = el("details", "ladder-prov");
-    det.appendChild(el("summary", null, "How these counts are derived"));
+    det.appendChild(el("summary", null, "How these counts are made"));
     const dl = el("dl", "ladder-prov-list");
     order.forEach((k) => {
-      const r = data.rungs[k];
-      if (!r || !r.provenance) return;
-      dl.appendChild(el("dt", null, r.label || k));
-      const p = r.provenance;
-      dl.appendChild(el("dd", null, `${p.method || ""}${p.source && p.source !== "none" ? ` — <code>${p.source}</code>` : ""}. ${p.note || ""}`));
+      if (!COUNT_WORDS[k] || !data.rungs[k]) return;
+      dl.appendChild(el("dt", null, RUNGS.find((r) => r.key === k).name));
+      const dd = el("dd");
+      dd.textContent = COUNT_WORDS[k];
+      dl.appendChild(dd);
     });
     det.appendChild(dl);
     mount.appendChild(det);

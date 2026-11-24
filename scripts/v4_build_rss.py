@@ -253,6 +253,21 @@ def _blog_posts() -> list[dict]:
     return [p for p in (data.get("posts") or []) if p.get("date") and p.get("title") and p.get("url")]
 
 
+# #6224: the essay's canonical page is the v9 one (/story/essays/<id>/); the generated legacy permalink names it as its
+# canonical. The feed item's <link> goes there; its <guid> stays the bare legacy permalink, so no reader is re-notified.
+ESSAY_CANONICAL = "/story/essays/{id}/"
+# #6224: the channel's home is the v9 Story page, which lists every chapter; /story/chronicle/ is the old-template page.
+CHANNEL_HOME = "/story/"
+
+
+def essay_canonical_link(post: dict) -> str | None:
+    """The canonical address of a blog-manifest essay, or None for anything else (a chronicle post)."""
+    pid = str(post.get("id") or "").strip()
+    if not pid or not str(post.get("url") or "").startswith("/journal/essays/"):
+        return None
+    return f"{BASE}{ESSAY_CANONICAL.format(id=pid)}"
+
+
 def build_broadcast_feed() -> int:
     """#1672 — write the /story/broadcast/ RSS feed from the live /api/broadcast.
 
@@ -402,7 +417,9 @@ def main() -> int:
         # tagging it would change every historical item's identity and re-notify
         # every subscriber of every past post on the next build.
         # #6193 §4: a chapter serving a later edition links to its canonical page; the guid below does not move.
-        tagged_link = with_utm(edition_link.get(post_url) or link, source="rss", medium="feed", campaign="chronicle")
+        tagged_link = with_utm(
+            edition_link.get(post_url) or essay_canonical_link(p) or link, source="rss", medium="feed", campaign="chronicle"
+        )
         # #4191: the manifest excerpts written before the fix open on the quoted title and
         # the bracketed stat line; the feed description is the BODY, same derivation as the writer.
         excerpt = " ".join(chronicle_schema.body_markdown(p.get("excerpt") or "", p.get("title") or "").split())
@@ -424,7 +441,7 @@ def main() -> int:
         '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">\n'
         "  <channel>\n"
         f"    <title>{esc(TITLE)}</title>\n"
-        f"    <link>{BASE}/story/chronicle/</link>\n"
+        f"    <link>{BASE}{CHANNEL_HOME}</link>\n"
         f"    <description>{esc(channel_desc())}</description>\n"
         "    <language>en-us</language>\n"
         f"    <lastBuildDate>{now}</lastBuildDate>\n"
@@ -432,7 +449,7 @@ def main() -> int:
         "    <image>\n"
         f"      <url>{BASE}/assets/images/og-image.png</url>\n"
         f"      <title>{esc(TITLE)}</title>\n"
-        f"      <link>{BASE}/story/chronicle/</link>\n"
+        f"      <link>{BASE}{CHANNEL_HOME}</link>\n"
         "    </image>\n" + "\n".join(items) + "\n"
         "  </channel>\n"
         "</rss>\n"

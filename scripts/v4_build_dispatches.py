@@ -49,7 +49,7 @@ OUT = Path("site/story")
 SECTIONS = [
     ("chronicle", "The weekly write-up", f"The weekly write-up, by {elena_canon.NAME}, the series' AI narrator."),
     # "The Coaches" + "AI lab notes" moved to their own door /coaching/ (2026-06-20).
-    ("panel", "The podcast", "A weekly two-host show — Elena and a rotating coach review the week."),
+    ("panel", "The podcast", "A two-host audio show — Elena and a rotating coach. No episodes are published at the moment."),  # #6224
     ("journal", "In his own words", "Matthew's own writing, first-person."),
     ("timeline", "Timeline", "Level-ups and milestones — the journey so far."),
     # #1672 (The Social Membrane, epic #1668): the Broadcast feed — Matthew's own

@@ -5,7 +5,7 @@
       "label": "Essay",
       "title": "The Org Chart of One Human and N Agents",
       "date": "2026-07-08",
-      "excerpt": "At 07:45 every morning, an AI agent wakes up, reads my infrastructure's overnight alarms, diagnoses what broke, and — for a narrow class of provably-safe problems — fixes it and merges the fix before I've had coffee. The interesting part is not the agent. The interesting part is the sentence at the top of the merge gate's source file.",
+      "excerpt": "At 07:45 three mornings a week — plus whenever an urgent alarm demands it — an AI agent wakes up, reads my infrastructure's overnight alarms, diagnoses what broke, and — for a narrow class of provably-safe problems — writes the fix and opens it as a pull request before I've had coffee. The interesting part is not the agent. The interesting part is the sentence at the top of the merge gate's source file.",
       "url": "/journal/essays/org-chart-of-one/",
       "word_count": 1672,
       "read_minutes": 8,

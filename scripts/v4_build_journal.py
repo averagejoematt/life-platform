@@ -110,10 +110,10 @@ PAGE = """<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>{title} — averagejoematt</title>
   <meta name="description" content="{meta_desc}">
-{robots}  <link rel="canonical" href="https://averagejoematt.com{url}">
+{robots}  <link rel="canonical" href="https://averagejoematt.com{canonical}">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="averagejoematt">
-  <meta property="og:url" content="https://averagejoematt.com{url}">
+  <meta property="og:url" content="https://averagejoematt.com{canonical}">
   <meta property="og:title" content="{og_title}">
   <meta property="og:description" content="{og_desc}">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/{og_image}">
@@ -318,11 +318,24 @@ def _ld_json(post: dict, url: str, title: str, read_desc: str) -> str:
             "url": "https://averagejoematt.com",
             "logo": {"@type": "ImageObject", "url": "https://averagejoematt.com/apple-touch-icon.png"},
         },
-        "mainEntityOfPage": {"@type": "WebPage", "@id": f"https://averagejoematt.com{url}"},
+        "mainEntityOfPage": {"@type": "WebPage", "@id": f"https://averagejoematt.com{canonical_path(post, url)}"},
         "articleSection": post.get("article_section") or "Essays",
         "isPartOf": {"@type": "Blog", "name": "In My Own Words", "url": "https://averagejoematt.com/story/journal/"},
     }
     return json.dumps(ld, indent=2, ensure_ascii=False).replace("\n", "\n  ")
+
+
+# #6224: an essay is served at two addresses — this generated legacy permalink and the v9 page the site's own
+# links use (/story/essays/<id>/). The v9 page is the canonical one; this page names it. It is NOT a 301: the v9
+# build reads the essay's body from this page (scripts/publish_snapshot.py `_live_essays`), so a redirect here would
+# feed the v9 page its own previous copy and freeze the essay. This page stays served, noindex (#4604), canonical v9.
+ESSAY_CANONICAL = "/story/essays/{id}/"
+
+
+def canonical_path(post: dict, url: str) -> str:
+    """The canonical address of an essay: its v9 page, by the id the v9 build gives it (blog.json `id`, else the slug)."""
+    pid = (post.get("id") or "").strip() or slug_for(post)
+    return ESSAY_CANONICAL.format(id=pid) if pid else url
 
 
 def render(post: dict) -> str:
@@ -377,6 +390,7 @@ def render(post: dict) -> str:
         meta_desc=_esc(meta_desc),
         robots=v4_chrome.robots_meta(url),  # #4604: "" unless the essay is held until ruled
         url=url,
+        canonical=canonical_path(post, url),
         og_title=_esc(og_title),
         og_desc=_esc(og_desc),
         twitter_desc=_esc(twitter_desc),

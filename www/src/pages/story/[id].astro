@@ -8,7 +8,7 @@ import Provenance from "../../components/Provenance.astro";
 import StatusTag from "../../components/StatusTag.astro";
 import Quote from "../../components/Quote.astro";
 import { isDisputed } from "../../lib/disputed.js";
-import { CALL_OUTCOME, chapterMeta, chapterPublished, chapterWindow, clip, dayInWords, gapWords, heldCallWords, num } from "../../lib/format.js";
+import { CALL_OUTCOME, chapterMeta, chapterPublished, chapterWindow, clip, dayInWords, gapWords, gradeHistory, gradeTimeLine, heldCallWords, num } from "../../lib/format.js";
 import { latestEdition, loadAll, loadOwnWords, loadSeries } from "../../lib/snapshot.js";
 import { bodyCarriesQuote, ownWords, withinDays } from "../../lib/own_words.js";
 import { dailyBars, placeEvidence, windowValues } from "../../lib/evidence.js";
@@ -72,6 +72,10 @@ const weekCalls =
         .sort((a, b) => (a.settled_date < b.settled_date ? -1 : 1))
     : [];
 const callWords = (p: any) => heldCallWords(p) || p.claim;
+// #6224: the record day the grades below are read on — a chapter describes grades as they stood when it was written, the
+// cards and the rail show them as they stand on this day, and say so wherever a grade has changed since.
+const asOf: string | null = c.as_of ? String(c.as_of).slice(0, 10) : null;
+const regraded = weekCalls.filter((p: any) => gradeHistory(p)).length;
 const stateCopy: Record<string, string> = {
   held: "Held.",
   retired: "Retired.",
@@ -170,7 +174,11 @@ if (ev && c.status === "published" && rawBody) {
     if (!name || figures.some((f) => f.key === `call:${name}`)) continue;
     const words = p.claim_withheld ? heldCallWords(p) || "" : `“${clip(p.claim, 140)}”`;
     const outcome = CALL_OUTCOME[p.status] || p.status;
-    const html = `<aside class="evidence callcard" data-evidence="call"><p class="label">A graded call · ${esc(name)}</p><p class="callcard-test">${esc(words)}</p>${p.grading?.outcome_notes ? `<p class="callcard-what">${esc(p.grading.outcome_notes)}.</p>` : ""}<p class="callcard-foot"><span class="status ${p.status === "confirmed" ? "confirmed" : "refuted"}">${esc(outcome)}</span> <a href="${href(pathOf("prediction", p.id))}">The call and its grade →</a></p></aside>`;
+    // #6224: the card is one dated call (made · graded), so it never reads as the call the paragraph beside it describes;
+    // a grade that changed after the chapter was first published says both grades with their dates (gradeTimeLine).
+    const dated = [p.logged_date && `made ${dayInWords(p.logged_date, { short: true })}`, p.settled_date && `graded ${dayInWords(p.settled_date.slice(0, 10), { short: true })}`].filter(Boolean).join(", ");
+    const timeLine = gradeTimeLine(p, c.published_at ? String(c.published_at).slice(0, 10) : null, asOf);
+    const html = `<aside class="evidence callcard" data-evidence="call"><p class="label">A graded call · ${esc(name)}${dated ? ` · ${esc(dated)}` : ""}</p><p class="callcard-test">${esc(words)}</p>${p.grading?.outcome_notes ? `<p class="callcard-what">${esc(p.grading.outcome_notes)}.</p>` : ""}${timeLine ? `<p class="callcard-what" data-grade-history>${esc(timeLine)}</p>` : ""}<p class="callcard-foot"><span class="status ${p.status === "confirmed" ? "confirmed" : "refuted"}">${esc(outcome)}</span>${timeLine && asOf ? ` <span class="muted">as graded today</span>` : ""} <a href="${href(pathOf("prediction", p.id))}">The call and its grade →</a></p></aside>`;
     figures.push({ key: `call:${name}`, match: new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), html });
   }
 }
@@ -334,6 +342,11 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
             <section aria-label="Calls graded this week" style="margin-bottom:28px" data-week-calls>
               {/* #5950: the snapshot lists only the ledger records served with an id, so this is "listed", never "all" */}
               <p class="label" style="margin-bottom:8px">Graded calls listed for these days · {weekCalls.length}</p>
+              {weekCalls.length > 0 && asOf && (
+                <p class="muted" style="font-size:13px;line-height:1.45;margin:0 0 8px" data-grades-as-of>
+                  Grades as they stand on {dayInWords(asOf)}{regraded > 0 ? `; ${regraded === 1 ? "one call was" : `${regraded} calls were`} graded again after the first grade, shown with both` : ""}.
+                </p>
+              )}
               {weekCalls.length ? (
                 <div class="rows">
                   {weekCalls.map((p) => (
@@ -341,7 +354,10 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
                       <span style="font-size:14px;line-height:1.35;min-width:0">
                         <b>{p.coach_name}</b> · {p.claim_withheld ? callWords(p) : <Quote text={clip(p.claim, 110)} said={p.logged_date} />}
                       </span>
-                      <StatusTag status={p.status} call disputed={isDisputed(p)} />
+                      <span style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
+                        <StatusTag status={p.status} call disputed={isDisputed(p)} />
+                        {gradeHistory(p) && <span class="muted" style="font-size:12px;white-space:nowrap" data-first-grade>first graded {CALL_OUTCOME[gradeHistory(p)!.first] || gradeHistory(p)!.first}</span>}
+                      </span>
                     </a>
                   ))}
                 </div>
@@ -389,7 +405,7 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
     {/* coming back (2026-11-15): the end of a chapter is where a reader decides whether to follow */}
     <div class="wrap" style="margin-top:18px">
       <p class="muted" style="font-size:14px;display:flex;flex-wrap:wrap;gap:6px 24px;align-items:baseline">
-        <span>A new chapter is published most weeks, once Matthew has approved it.</span>
+        <span>A new chapter is published only when Matthew has approved one, so there is no fixed weekly schedule.</span>
         <a href="https://averagejoematt.com/subscribe/" style="font-weight:700;color:var(--ink)">Get the next one by email →</a>
         <a href={href("/story/")} style="font-weight:700;color:var(--ink)">Every chapter →</a>
       </p>
