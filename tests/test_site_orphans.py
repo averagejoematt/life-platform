@@ -27,6 +27,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SITE = ROOT / "site"
 
 sys.path.insert(0, str(ROOT / "scripts"))
+import publish_snapshot_contract  # noqa: E402
 import v4_build_dispatches  # noqa: E402
 import v4_build_evidence  # noqa: E402
 import v4_chrome  # noqa: E402
@@ -39,10 +40,11 @@ UNLISTED_PAGES = {
     "/subscribe/confirm/": "email-flow landing — reached from the confirmation email, never from menus",
     "/kit/": "v8 kit specimen (#4581) — a build reference reached by direct URL only; noindex, in no menu and no sitemap",
     # #5534: the two v8 kit pages with no v9 twin. Served at their URLs (nothing deleted, no 301s), noindex, canonical to
-    # their v9 successor (`/`, /system/) — so the self-canonical that used to count as their link is gone by design. The
-    # front page still reaches them at runtime through the kit's data-ck-base rewrite (static href /next/v8/<page>/).
-    "/start/": "v8 kit page with no v9 twin (#5534): served, noindex, canonical → /; reached from / via the kit's data-ck-base rewrite",
-    "/coaches/": "v8 kit page with no v9 twin (#5534): served, noindex, canonical → /system/; reached from / via the kit's data-ck-base rewrite",
+    # their v9 successor (`/`, /system/) — so the self-canonical that used to count as their link is gone by design.
+    # #6223: the /next/v8/ originals that linked them are retired; a /next/v8/start/ or /next/v8/coaches/ address now
+    # 301s to these two at the edge (redirects.map), which is the one path left to them besides the reference copies.
+    "/start/": "v8 kit page with no v9 twin (#5534): served, noindex, canonical → /; the successor of /next/v8/start/ (301, #6223)",
+    "/coaches/": "v8 kit page with no v9 twin (#5534): served, noindex, canonical → /system/; the successor of /next/v8/coaches/ (301, #6223)",
 }
 
 HREF = re.compile(r'href=\\?"([^"\\]+)\\?"')  # plain hrefs + hrefs escaped in embedded JSON
@@ -86,6 +88,10 @@ def _linked_and_flagged() -> tuple[set[str], set[str]]:
             (flagged if e.get("unlisted") else linked).add(f"{pillar['base']}{e['slug']}/")
     for key, _label, _desc in v4_build_dispatches.SECTIONS:
         linked.add(f"/story/{key}/")
+    # #6223: the kept copies of replaced layouts are listed by the v9 appendix (/system/everything-else/), which is
+    # built from this same function (scripts/publish_snapshot_contract.py). Until the /next/ preview was retired the v8
+    # appendix under site/ was their static link; the v9 page is not under site/, so its list is read at the source.
+    linked.update(row["path"] for row in publish_snapshot_contract.reference_copies())
     return linked, flagged
 
 

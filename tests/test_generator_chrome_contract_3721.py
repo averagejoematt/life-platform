@@ -79,8 +79,8 @@ NON_PAGE_GENERATORS = {
 
 
 def _generators():
-    # #4182: the v7 builder is a page generator too (plan D3) — same contract, same guard.
-    return sorted(SCRIPTS.glob("v4_build_*.py")) + sorted(SCRIPTS.glob("v7_build*.py"))
+    # #4182 swept the v7 builder too (plan D3); it was retired with the /next/ preview in #6223.
+    return sorted(SCRIPTS.glob("v4_build_*.py"))
 
 
 def _html_page_names(src: str, tree: ast.AST) -> set:

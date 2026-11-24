@@ -208,146 +208,15 @@ def test_v7_edition_pours_the_bar_and_the_footer_tier_from_the_same_call_sites(m
     assert '<a href="/next/method/">Under the hood</a>' in foot
 
 
-def test_v7_build_emits_nine_noindex_shells_with_root_absolute_assets(tmp_path):
-    """The generator writes the nine shells under `<out>/`; every one carries the noindex
-    meta, the bar, the footer tier, and NO asset reference under the base (plan D4: the
-    hasher would rewrite `/next/assets/…` to a hash that does not exist there)."""
-    out = tmp_path / "site" / "next"
-    proc = subprocess.run(
-        [sys.executable, str(ROOT / "scripts" / "v7_build.py"), "--base", "/next/", "--out", str(out)],
-        capture_output=True,
-        text=True,
-    )
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    shells = sorted(out.rglob("index.html"))
-    assert len(shells) == 9, [str(p.relative_to(out)) for p in shells]
-    for shell in shells:
-        html = shell.read_text(encoding="utf-8")
-        rel = shell.relative_to(out)
-        assert '<meta name="robots" content="noindex,nofollow">' in html, f"{rel}: preview shell without noindex"
-        assert '<nav class="v7-bar"' in html and '<footer class="v7-foot"' in html, f"{rel}: missing the v7 chrome"
-        assert '<nav class="doors"' not in html and '<footer class="site-foot"' not in html, f"{rel}: v4 chrome leaked in"
-        assert "/next/assets/" not in html, f"{rel}: an asset referenced under the base"
-        assert 'href="/assets/css/v7.css"' in html and 'src="/assets/js/v7_shell.js"' in html, f"{rel}: v7 assets not root-absolute"
-        assert "preview — the live site is at" in html, f"{rel}: preview notice missing"
-    assert (SITE / "assets" / "css" / "v7.css").exists() and (SITE / "assets" / "js" / "v7_shell.js").exists()
-
-
-def test_v7_committed_preview_shells_match_a_fresh_build():
-    """The committed `site/next/**` is generator output — `v7_build.py --check` is the
-    drift guard, the same shape as `v4_apply_chrome.py --check`."""
-    proc = subprocess.run(
-        [sys.executable, str(ROOT / "scripts" / "v7_build.py"), "--base", "/next/", "--check"],
-        capture_output=True,
-        text=True,
-    )
-    assert proc.returncode == 0, f"v7 shells drifted — run scripts/v7_build.py --base /next/ and commit:\n{proc.stdout}\n{proc.stderr}"
-
-
-def test_v7_hood_shell_is_the_receipts_page_and_carries_no_served_number_or_ruled_word():
-    """#4182 — the v7 Under the hood (scripts/v7/hood.py) is the receipts a sceptic checks:
-    the five dated entries in the design order, the repo link in the masthead, the gear rows
-    derived from the source registry (one row per catalogue entry, the id only in a data
-    attribute — never printed) folded under a plain-words key, NO affiliate disclosure (the
-    rows carry no links, so the live gear page's FTC line would describe links this page does
-    not have — R6 class 1's shape: never a claim the page cannot back), the engine's-score
-    explainer absorbed as one collapsed paragraph, one <noscript> line and no static absence
-    sentence (R6 class 9), the page's own sheet and module — and none of the owner-ruled
-    words (no earlier starts, attempts, cycles or resets). The served numbers are poured at
-    runtime; the static figures allowed are the registry's row count and a figure inside a
-    registry `metrics` string (registry facts, not served counts)."""
-    sys.path.insert(0, str(ROOT / "lambdas"))
-    sys.path.insert(0, str(ROOT / "scripts"))
-    from ingestion.source_registry import catalog_entries  # noqa: E402
-    from v4_build_gear import DISCLOSURE  # noqa: E402
-
-    html = (SITE / "next" / "method" / "index.html").read_text(encoding="utf-8")
-    slots = ["hd-how", "hd-corrections", "hd-log", "hd-gear", "hd-return"]
-    for slot in slots:
-        assert f'id="{slot}"' in html, f"hood shell missing the {slot} entry"
-    order = [html.index(f'id="{s}"') for s in slots]
-    assert order == sorted(order), "the entries are out of the design order"
-    assert 'href="/assets/css/v7_hood.css"' in html and 'src="/assets/js/v7_hood.js"' in html
-    assert 'class="v7-repo" href="https://github.com/averagejoematt/life-platform"' in html, "the repo link belongs in the masthead"
-    assert DISCLOSURE not in html and "affiliate" not in html, "no affiliate links on this page, so no affiliate disclosure"
-    gear_at = html.index('id="hd-gear"')
-    assert 'id="hd-gear-list"' in html and html.index("<details", gear_at) < html.index('<table class="hd-gear"'), "the gear table folds"
-    assert 'id="hd-score"' in html and "<details" in html.split('id="hd-score"')[0][-40:], "the score explainer is collapsed"
-    assert "<noscript>" in html and 'id="hd-through"' in html, "one <noscript> line and the one Data-through slot"
-    assert not re.search(r"No (call|build note|write-up)[^<]*\.", html), "the static shell asserts no absence fact (R6 class 9)"
-    rows = re.findall(r'<tr data-source="([a-z_]+)">', html)
-    assert rows == [e["id"] for e in catalog_entries()], "the gear rows are the registry's catalogue, in its order"
-    text = re.sub(r"<[^>]+>", " ", html.split('<main id="main"')[1].split("</main>")[0])
-    for rid in rows:
-        assert (
-            not re.search(rf"(?<![A-Za-z]){re.escape(rid)}(?![A-Za-z])", text) or "_" not in rid
-        ), f"a registry id printed on the screen: {rid}"
-    assert not re.search(r"\b(cycle|cycles|reset|resets|attempt|attempts|seventeenth|as of)\b", text, re.I)
-    machine = r"\b(pipeline|registry|pillar|pillars|chronicle|calibration|EWMA|gate)\b"
-    assert not re.search(machine, text), "no machine word in the shell's own copy"
-    assert (SITE / "assets" / "css" / "v7_hood.css").exists() and (SITE / "assets" / "js" / "v7_hood.js").exists()
-
-
-def test_v7_numbers_shell_is_the_logbook_and_carries_no_number_or_ruled_word():
-    """#4182 — the v7 His numbers page (scripts/v7/numbers.py) is Prototype C's screen IV: the
-    six dated entries in the design order (weight · sleep · eating · training · blood tests ·
-    the absence strip), the engine's score folded under a <details>, the page's own sheet and
-    module — and NO number in the static HTML (every figure is poured from a served field at
-    runtime, so the shell can never go stale) and none of the owner-ruled words."""
-    sys.path.insert(0, str(ROOT / "tests"))
-    import site_text  # noqa: E402
-
-    html = (SITE / "next" / "data" / "index.html").read_text(encoding="utf-8")
-    slots = ["nm-weight", "nm-sleep", "nm-eating", "nm-training", "nm-labs", "nm-absent", "nm-engine"]
-    for slot in slots:
-        assert f'id="{slot}"' in html, f"His numbers shell missing the {slot} entry"
-    order = [html.index(f'id="{s}"') for s in slots]
-    assert order == sorted(order), "the entries are out of the design order"
-    assert 'href="/assets/css/v7_numbers.css"' in html and 'src="/assets/js/v7_numbers.js"' in html
-    assert '<details class="nm-engine"' in html
-    text = site_text.main_text("site/next/data/index.html")
-    assert not re.search(r"\d", text), f"a number in the static His numbers shell: {text[:200]!r}"
-    assert not re.search(r"\b(cycle|cycles|reset|resets|attempt|attempts|as of|went dark)\b", text, re.I)
-    assert (SITE / "assets" / "css" / "v7_numbers.css").exists() and (SITE / "assets" / "js" / "v7_numbers.js").exists()
-
-
-def test_v7_home_shell_is_the_log_and_carries_no_number_or_ruled_word():
-    """#4182 — the v7 Home (scripts/v7/home.py) is Prototype C's screen I: the eight dated
-    entries in the design order, the clothed gym photograph (#3761), the page's own sheet and module,
-    the cut-over proof anchor — and NO number in the static HTML (every figure is poured
-    from a served field at runtime, so the shell can never go stale) and none of the
-    owner-ruled words (no earlier starts, attempts, cycles or resets)."""
-    sys.path.insert(0, str(ROOT / "tests"))
-    import site_text  # noqa: E402
-
-    html = (SITE / "next" / "index.html").read_text(encoding="utf-8")
-    for slot in ["v7h-fold", "v7h-weighins", "v7h-words", "v7h-okay", "v7h-record", "v7h-how", "v7h-next", "v7h-follow"]:
-        assert f'id="{slot}"' in html, f"Home shell missing the {slot} entry"
-    order = [
-        html.index(f'id="{s}"')
-        for s in ["v7h-fold", "v7h-weighins", "v7h-words", "v7h-okay", "v7h-record", "v7h-how", "v7h-next", "v7h-follow"]
-    ]
-    assert order == sorted(order), "the entries are out of the design order"
-    assert 'href="/assets/css/v7_home.css"' in html and 'src="/assets/js/v7_home.js"' in html
-    assert "<!-- home-proof:start -->" in html and "<!-- home-proof:end -->" in html
-    # #3761: the frame holds the clothed gym photograph (two widths, alt text), no longer the empty state
-    assert 'src="/assets/images/photo-2026-09-24-gym-sm.jpg"' in html and "/assets/images/photo-2026-09-24-gym.jpg 900w" in html
-    assert 'alt="Matthew in the gym on Thursday September 24, a mirror photo"' in html
-    assert "No photo yet." not in html
-    text = site_text.main_text("site/next/index.html")
-    assert not re.search(r"\d", text), f"a number in the static Home shell: {text[:200]!r}"
-    assert not re.search(r"\b(cycle|cycles|reset|resets|attempt|attempts|seventeenth|as of)\b", text, re.I)
-    assert (SITE / "assets" / "css" / "v7_home.css").exists() and (SITE / "assets" / "js" / "v7_home.js").exists()
-
-
 def test_the_shirtless_day_one_photograph_is_on_no_reader_surface():
     """OWNER RULING 2026-10-03 (#3761): no shirtless photograph on any reader surface. The
     day-1 photograph is the one that was published; it is deleted from `site/` and nothing
-    under `site/` — a shell, a module, a sheet, a manifest, the sitemap — may name it again,
-    and neither v7 generator may pour it. One sweep, every offender reported."""
+    under `site/` — a shell, a module, a sheet, a manifest, the sitemap — may name it again.
+    (The v7 generators that could pour it were retired with the /next/ preview, #6223.)
+    One sweep, every offender reported."""
     stem = "photo-2026-09-06-day1"
     offenders = [f"file exists: {p.relative_to(ROOT)}" for p in sorted(SITE.rglob(f"{stem}*"))]
-    for p in sorted([*SITE.rglob("*"), *(ROOT / "scripts" / "v7").glob("*.py")]):
+    for p in sorted(SITE.rglob("*")):
         if not p.is_file() or p.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp", ".gif", ".ico", ".woff", ".woff2", ".mp4", ".pdf"}:
             continue
         if stem.encode() in p.read_bytes():

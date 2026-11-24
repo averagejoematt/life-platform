@@ -297,5 +297,5 @@ def test_state_of_mind_is_not_named_in_the_public_catalogue():
     rows = ds.build()["sources"]
     assert "state_of_mind" not in {r["id"] for r in rows}
     assert not any(re.search(r"state.of.mind", json.dumps(r), re.I) for r in rows)
-    for rel in ("site/data/data_sources.json", "site/data/stack.json", "site/gear/index.html", "site/next/method/index.html"):
+    for rel in ("site/data/data_sources.json", "site/data/stack.json", "site/gear/index.html"):
         assert not re.search(r"state.of.mind", (ROOT / rel).read_text(), re.I), rel

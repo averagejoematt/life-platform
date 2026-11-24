@@ -227,8 +227,10 @@ test("Front, no bet and no exchange: the newest quotable line keeps the coaches'
 });
 
 // ── site-to-A round 1, lane A: the front page and Start here (#4580, #4590) ──────────────────
-const V8 = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "site", "next", "v8");
-const shell = (page) => readFileSync(join(V8, page, "index.html"), "utf8");
+// The shells are the kit pages at their live paths (site/, site/start/, site/story/, site/coaches/). The
+// /next/v8/ originals and the deep pages (week, day, trend, sheet, built, call, coach, appendix) were retired
+// in #6223, and the assertions that read those shells left with them; their builders are still tested below.
+const shell = (page) => readFileSync(join(SITE, page, "index.html"), "utf8");
 
 test("item 1: the two premise sentences are his approved copy (#4590), unmarked", () => {
   const front = shell("");
@@ -297,9 +299,12 @@ test("item 5: a settled miss is headed by the week it was checked in; the words 
 
 test("item 6: Start carries the Follow block, the same markup as the front page, with the feeds beside the button", () => {
   const block = (html) => /<section class="ck-section ck-follow" id="follow">[\s\S]*?<\/section>/.exec(html)[0];
+  // The same markup; the static fallback sentence in #ck-follow-line is each page's own (mount() rewrites it from the
+  // served cadence, and /start/'s fallback was reworded in #5885 after the kit front page left the root).
+  const line = (html) => html.replace(/(<p class="ck-soft" id="ck-follow-line">)[^<]*(<\/p>)/, "$1$2");
   const front = block(shell(""));
   const start = block(shell("start"));
-  assert.equal(start, front);
+  assert.equal(line(start), line(front));
   assert.match(start, /<a class="ck-btn" href="\/subscribe\/">Follow by email<\/a>/);
   assert.match(start, /href="\/rss\.xml">RSS<\/a>/);
   assert.match(start, /href="\/panelcast\/feed\.xml">the podcast feed<\/a>/);
@@ -681,7 +686,6 @@ test("Day D3: a 'call' with no date and no number in it is labelled a note", () 
 
 // ── site-to-A round 1, lane D (2026-10-18): the sheet, how it's built, the appendix, a call, a coach ──
 const BU = await import("../../site/assets/js/ck_built.js");
-const page = (name) => readFileSync(join(SITE, "next", "v8", name, "index.html"), "utf8");
 const textOf = (html) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 
 test("Sheet: each area is the kit's record row — name, level at the right, one plain sentence — not a four-bucket formula", () => {
@@ -723,21 +727,9 @@ test("Sheet (round 2, item 7): which areas count is ONE statement in one place, 
   const metabolic = character.pillars.find((p) => p.name === "metabolic");
   assert.match(areas, new RegExp(`Metabolic health</span><span class="ck-coach__job">Score ${metabolic.raw_score.toFixed(1)} of 100, [a-z0-9. ]+</span>`), "the thin area's score is printed, like every other row");
   assert.equal(typeof S.compositeNote, "undefined", "the separate note under the level is gone");
-  assert.doesNotMatch(page("sheet"), /ck-sheet-note/, "and so is its hook in the shell");
   assert.equal(S.countsNote({ pillars: character.pillars.filter((p) => !p.coverage_hold && !p.not_instrumented) }), "", "every area measured and counted: no note");
   assert.equal(S.countsNote({ pillars: [{ name: "metabolic", coverage_hold: true }, { name: "mind", coverage_hold: true }] }), "Metabolic health and Mind are measured thinly and still count.");
   assert.match(S.levelHTML({ character: { level: 12, composite_pillar_count: 7, composite_pillar_total: 7 }, pillars: [] }), /Worked out from 7 of 7 areas\.<\/p>/);
-});
-
-test("Sheet: one sentence before the areas; the rule a level moves by sits one tap deeper", () => {
-  const html = page("sheet");
-  const areas = html.slice(html.indexOf("The seven areas"), html.indexOf('id="ck-areas"'));
-  const intro = [...areas.matchAll(/<p class="ck-soft">([^<]*)<\/p>/g)].map((m) => m[1]);
-  assert.equal(intro.length, 1);
-  assert.equal((intro[0].match(/\./g) || []).length, 1, "one sentence");
-  assert.match(html, /<details>\s*<summary>How a level moves<\/summary>/);
-  assert.match(html, /<h1>The whole of it, so far\.<\/h1>/);
-  assert.ok(html.includes('id="ck-sheet-late"') && html.indexOf('id="ck-sheet-late"') > html.indexOf('id="ck-areas"'), "the late-sources caveat sits under the areas, not stacked under the level");
 });
 
 test("Built: one dated fold fact at the top; a section carries at most one 'as of'", () => {
@@ -749,7 +741,6 @@ test("Built: one dated fold fact at the top; a section carries at most one 'as o
   assert.match(numbers, /Counted [A-Z][a-z]+ \d+, from the code\./);
   assert.match(numbers, /Checked to [A-Z][a-z]+ \d+\. Code does the grading/);
   assert.equal((textOf(BU.costHTML(src.receipts)).match(/As of /g) || []).length, 1);
-  assert.match(page("built"), /<span class="ck-header__day" id="ck-day"><\/span>/);
 });
 
 test("Built: the tier is defined in plain words where it is first named, with spend and forecast side by side and dated", () => {
@@ -759,79 +750,6 @@ test("Built: the tier is defined in plain words where it is first named, with sp
   assert.doesNotMatch(open, /at their pace/, "the forecast's arithmetic stays one tap deeper");
   for (const [tier, words] of Object.entries(BU.TIER_WORDS)) assert.match(BU.costHTML({ ...rc, tier: Number(tier) }), new RegExp(`The system is at tier ${tier}: ${words.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.`));
   assert.match(BU.costHTML({ ...rc, tier: 0 }), /Nothing is paused\./);
-  const text = textOf(page("built"));
-  assert.ok(text.indexOf("sets a tier from the forecast’s share of the ceiling") < text.indexOf("Tier 1 From about 73%"));
-});
-
-test("Built: what runs is the kit's numbered row list in pipeline order, not a hand-drawn picture; prose is full width; incidents closed", () => {
-  const html = page("built");
-  assert.doesNotMatch(html, /<svg/);
-  const steps = /<ul class="ck-rows ck-rows--steps">(.*?)<\/ul>/s.exec(html);
-  assert.ok(steps, "the numbered steps");
-  const rows = [...steps[1].matchAll(/<li><span>([^<]*)<\/span><\/li>/g)].map((m) => m[1]);
-  assert.equal(rows.length, 5);
-  assert.match(rows[0], /^Devices and apps/);
-  assert.match(rows[1], /^One store/);
-  assert.match(rows[2], /^AI coaches/);
-  assert.match(rows[3], /checker/);
-  assert.match(rows[4], /^The site/);
-  for (const r of rows) assert.ok(r.split(" ").length <= 10, r);
-  const who = /Who decides<\/p>(.*?)<\/section>/s.exec(html)[1];
-  assert.doesNotMatch(who, /ck-rows/, "the four paragraphs are full width, not a narrow value column");
-  assert.equal((who.match(/<p>/g) || []).length, 4);
-  assert.doesNotMatch(html, /<details open>/);
-  const broke = /What broke<\/p>(.*?)<\/section>/s.exec(html)[1];
-  assert.doesNotMatch(broke, /ck-rows__key/, "an incident's body is full width under its summary");
-  assert.equal((broke.match(/<details>/g) || []).length, 4);
-  assert.equal((broke.match(/before day one/g) || []).length, 3, "the three failures before 2026-09-06 are labelled");
-  assert.doesNotMatch(broke, /\b(Sept|Oct|Aug)\b/, "full month names, the one date rule");
-});
-
-test("Built: the first-person draft sits under the fold with one draft mark, and the approval rule is said twice, not three times", () => {
-  const html = page("built");
-  const text = textOf(html);
-  assert.ok(html.indexOf('id="ck-draft"') < html.indexOf("The numbers</p>"), "the draft is above the numbers");
-  assert.equal((text.match(/Draft wording\. Matthew has not rewritten this yet\./g) || []).length, 1);
-  assert.match(html, /<p class="ck-small">Preview\.<\/p>\s*<\/div>/, "the footer is the short preview mark");
-  assert.equal((text.match(/permitted to do/g) || []).length, 2, text.match(/[^.]*permitted to do[^.]*\./g));
-  const draft = /<section class="ck-section" id="ck-draft">(.*?)<\/section>/s.exec(html)[1];
-  const body = /<p>([^<]+)<\/p>/.exec(draft)[1];
-  assert.equal((body.match(/[.!?](\s|$)/g) || []).length, 2, "the draft is two sentences, not three paragraphs");
-});
-
-test("Appendix: a jump list of plain links reaches each kind, Tools first, and the replaced-layouts group lists the reference copies", () => {
-  const html = page("appendix");
-  const jump = /<p class="ck-soft">((?:<a class="ck-link" href="#kind-[a-z]+">[^<]+<\/a>(?: · )?)+)<\/p>/.exec(html);
-  assert.ok(jump, "the jump list is one paragraph of kit links");
-  const targets = [...jump[1].matchAll(/href="#(kind-[a-z]+)"/g)].map((m) => m[1]);
-  assert.equal(targets[0], "kind-tools");
-  for (const id of targets) assert.ok(html.includes(`<section class="ck-section" id="${id}">`), id);
-  const sections = [...html.matchAll(/<section class="ck-section" id="(kind-[a-z]+)">/g)].map((m) => m[1]);
-  assert.deepEqual(sections, targets, "the links are in the sections' order");
-  // #4588 (owner ruling 2026-10-18): the cut-over keeps each replaced layout as a served, noindex
-  // reference page under /reference/<date>-<slug>/ and lists it here; the group's empty sentence
-  // is gone with the first copies (tests/test_v8_appendix_4586.py proves the sentence on a render
-  // without them).
-  const replaced = /<section class="ck-section" id="kind-replaced">(.*?)<\/section>/s.exec(html)[1];
-  assert.match(replaced, /<p class="ck-label">Replaced layouts<\/p>/);
-  assert.match(replaced, /href="\/reference\/2026-10-22-home-v5\/">The front page, before 22 October 2026<\/a>/);
-  assert.match(replaced, /href="\/reference\/2026-10-22-story-v5\/">The story hub, before 22 October 2026<\/a>/);
-  assert.doesNotMatch(replaced, /Nothing is here yet/);
-  assert.doesNotMatch(html, /<a class="ck-link" href="\/next\/v8\/">Back<\/a>/, "no second back link under the list");
-});
-
-test("Appendix: an earlier version of a v8 page says so, and a codename is small print under a plain title", () => {
-  const html = page("appendix");
-  const rows = [...html.matchAll(/<li><a class="ck-coach__name ck-link" href="([^"]+)">([^<]+)<\/a><span class="ck-coach__job">([^<]+)<\/span><\/li>/g)].map((m) => ({ url: m[1], title: m[2], line: m[3] }));
-  const row = (url) => rows.find((r) => r.url === url);
-  assert.match(row("/data/character/").line, /Earlier version of “The whole of it”, superseded\.$/);
-  assert.match(row("/method/build/").line, /Earlier version of “How it’s built”, superseded\.$/);
-  assert.match(row("/coaching/team/").line, /Earlier version of “The AI coaches”, superseded\.$/);
-  for (const [url, title, codename] of [["/story/membrane/", "Posts and replies", "Membrane"], ["/method/wrong/", "Every time the AI was wrong", "Wrong page"], ["/data/horizons/", "A weekly pick to read or watch", "Horizons"], ["/method/explorer/", "The raw record, as a table", "Explorer"]]) {
-    assert.equal(row(url).title, title, url);
-    assert.ok(row(url).line.endsWith(`Called “${codename}” on the page.`), row(url).line);
-  }
-  for (const r of rows) assert.doesNotMatch(r.title, /^(Membrane|Theme river|Horizons|Wrong page|Explorer|Mirror|Broadcast)$/, "no codename as a title");
 });
 
 test("Call: a bet's short sentence carries the unit its long sentence names; a short sentence with no unit in the long one is left alone", () => {
@@ -844,29 +762,9 @@ test("Call: a bet's short sentence carries the unit its long sentence names; a s
   assert.equal(C.calledShortWithUnit({ called_short: "at or above 190 g on October 16.", called: "(in grams) at or above 190 g" }), "at or above 190 g on October 16.", "a unit already there is not doubled");
   assert.equal(C.calledShortWithUnit({ called_short: "below 305 by October 20.", called: "his weight (in pounds) below 305" }), "below 305 lb by October 20.");
   assert.equal(C.calledShortWithUnit(null), "");
-  assert.match(page("call"), /<h1 id="ck-title">[^<]+<\/h1>\s*<p class="ck-soft">Average Joe Matt is one man’s public health experiment/, "the frame sentence under the h1 stays");
-});
-
-test("Coach: the footer is the short preview mark, and the page says what a coach page is in both states", () => {
-  const html = page("coach");
-  assert.match(html, /<p class="ck-small">Preview\.<\/p>\s*<\/div>/);
-  assert.doesNotMatch(html, /first-person line/);
-  assert.match(html, /<h1 id="ck-title">An AI coach<\/h1>\s*<p class="ck-soft">One of the AI coaches reading Matthew’s numbers in public: who it is, its checked calls and what it is watching\.<\/p>\s*<div class="ck-section ck-section--tight" id="ck-who">/, "static, so the not-found state keeps it");
 });
 
 // ── site-to-A round 2 (2026-10-18, the fresh graders G9/G10) ──────────────────
-test("round 2 (built, item 1): the page says what Matthew approves by hand in the same terms as the front, Start, Story and Week — chapters and podcast episodes too", () => {
-  const html = page("built");
-  const text = textOf(html);
-  const rule = "Matthew approves two things by hand: a change to what the programs are permitted to do, and each chapter and podcast episode before it publishes. Everything else, code and pages alike, goes live when the automated checks pass.";
-  assert.ok(text.includes(rule), text.match(/[^.]*by hand[^.]*\./g));
-  assert.doesNotMatch(text, /approves one thing|The one thing I approve/, "the one-thing claim is gone from both places");
-  assert.match(text, /I approve two things by hand, a change to what the programs are permitted to do and each chapter and podcast episode before it publishes;/, "the draft says the same");
-  // The four pages it contradicted still say the chapter waits on him.
-  assert.match(shell("story"), /each once Matthew approves it/);
-  assert.match(P.nextChapterLine(B.next), /^The next draft is due [A-Z][a-z]+day, [A-Z][a-z]+ \d+; it publishes once Matthew approves it\.$/);
-});
-
 test("round 2 (week, item 4): 'faster than planned' takes the hollow dot and its own word; the legend and the dot agree", () => {
   const sc = B.scorecard;
   const fast = sc.data.order.filter((k) => sc.data.rows[k].data.verdict === "faster_than_planned");
@@ -997,7 +895,7 @@ test("round 3 A-11: an old-format stats line is never printed as a 'Label:' frag
 test("round 3 A-15/A-27: Story's frame is the owner-approved premise word for word; the draft footers stay", () => {
   const premise = /<p class="ck-premise">([^<]+)<\/p>/.exec(shell(""))[1];
   assert.equal(P.STORY_FRAME, premise);
-  for (const page of ["story", "coaches", "week", "day", "trend"]) assert.match(shell(page), /A first-person line with no date on it is draft wording/, `${page}: the footer is his decision`);
+  for (const page of ["story", "coaches"]) assert.match(shell(page), /A first-person line with no date on it is draft wording/, `${page}: the footer is his decision`);
 });
 
 test("round 3 copy: the podcast line, the coaches' door, Claude on the front, the start's record words, the chart's lines", () => {
@@ -1025,5 +923,4 @@ test("round 3 B-26/B-28: the tier's one-step cap is said beside a forecast past 
   assert.match(html, new RegExp(`The forecast is past tier 2’s line of \\$${t2.toFixed(2).replace(".", "\\.")}, and the tier is still 1: a forecast can raise the tier only one step above what has actually been spent\\. Tier 2 needs \\$${t1.toFixed(2).replace(".", "\\.")} actually spent; \\$136\\.96 is spent so far\\.`));
   assert.doesNotMatch(BU.costHTML({ ...rc, month_to_date_usd: t1 + 1, tier: 2 }), /and the tier is still/, "the tier the forecast implies: no cap sentence");
   assert.match(html, /days like it come to \$[\d,.]+, (under|above) the ceiling; that is not a forecast\./);
-  assert.match(shell("built"), /A forecast can raise the tier only one step above what has actually been spent\./);
 });

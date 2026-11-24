@@ -757,8 +757,8 @@ def status(*, _g) -> dict:
         # harness's `_module_literal` AST-reads this table as a pure constant (it
         # cannot see a function call), so the real cadence-derived label
         # (`_chronicle_send_label()`) is substituted onto this ONE row at render
-        # time, in the loop below. `exp_dow=2` still matches
-        # `subscriber_cadence.chronicle_weekday()` (Wednesday) — a real drift
+        # time, in the loop below. `exp_dow=2` still matches the weekday of the
+        # chronicle sender's cron in `subscriber_cadence` (Wednesday) — a real drift
         # between this literal and the registry is caught by
         # tests/test_subscriber_cadence_promise_3564.py's own cron-mirror guard.
         ("wednesday_chronicle", "Wednesday chronicle", "Wednesday · Elena Voss", 2, 200, 400),

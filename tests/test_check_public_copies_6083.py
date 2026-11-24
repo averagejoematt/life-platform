@@ -150,6 +150,24 @@ def test_a_retired_legacy_location_must_hold_nothing_6115(snapshot, site_dir):
         assert rules(v) == [("retired", "B")] and key in v[0][2], (key, v)
 
 
+def test_a_retired_preview_page_that_reappears_is_caught_6223(snapshot, site_dir):
+    """#6223: the v7 and v8 preview pages under site/next/ are retired. One that comes back fails rule B whether a stray
+    sync put it there or it was COMMITTED again (a committed page used to read as the repo's own kept page, which is how
+    21 of them were re-published by every deploy). The v9 rehearsal preview under site/next/v9/ keeps its own rules."""
+    for key in ("site/next/index.html", "site/next/cockpit/index.html", "site/next/v8/index.html", "site/next/v8/day/index.html"):
+        v, _ = run(clean_bucket() + [obj(key)], clean_archive(), snapshot, site_dir)
+        assert rules(v) == [("retired", "B")] and key in v[0][2], (key, v)
+    recommitted = os.path.join(site_dir, "next", "v8")
+    os.makedirs(recommitted)
+    with open(os.path.join(recommitted, "index.html"), "w", encoding="utf-8") as fh:
+        fh.write(PAGE)
+    v, facts = run(clean_bucket() + [obj("site/next/v8/index.html")], clean_archive(), snapshot, site_dir)
+    assert rules(v) == [("retired", "B")], v  # in the repo's tree again, and still not the repo's kept page
+    assert "bash deploy/quarantine_public_copy.sh --prefix site/next/ --apply" in G.remediation_commands(v, facts)
+    rehearsal = clean_bucket() + [obj("site/next/v9/index.html"), obj("site/next/v9/story/week-01/index.html")]
+    assert run(rehearsal, clean_archive(), snapshot, site_dir)[0] == []  # a fresh rehearsal is the preview, not a retired page
+
+
 def test_an_archive_older_than_the_deploy_fails_remediation_and_an_old_one_fails_check(snapshot, site_dir):
     before = clean_archive()  # built 03:50, after the 03:47 build
     assert run(clean_bucket(), before, snapshot, site_dir, mode="remediation")[0] == []

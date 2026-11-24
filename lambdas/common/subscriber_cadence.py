@@ -177,10 +177,6 @@ def signal_weekday() -> int:
     return required_weekday(sender("weekly-signal").cron)
 
 
-def chronicle_weekday() -> int:
-    return required_weekday(sender("chronicle-email-sender").cron)
-
-
 def delivery_weekdays() -> set:
     """Every weekday a subscriber can hear from the platform on."""
     return {required_weekday(s.cron) for s in SUBSCRIBER_SENDERS}

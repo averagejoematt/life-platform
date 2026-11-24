@@ -383,7 +383,7 @@ _CURATED = [
         # #4588 cut-over: the kit page from /next/v8/ placed at its live path (epic #4580).
         # Hand-authored, rendered by ck_pages.js from /api/edition; no v4 static core (the v4
         # generators leave a kit page alone, scripts/v4_apply_chrome.py::is_kit_page). Its height
-        # and axe budget is tests/kit_page_gate.py on the /next/v8/ original.
+        # and axe budget is tests/kit_page_gate.py (the /next/v8/ original was retired in #6223).
         "name": "Home (the dated edition)",
         "intent": (
             "The front door: a dated daily edition of one man's public weight-loss experiment — this week's "
@@ -406,7 +406,7 @@ _CURATED = [
         # #4588 cut-over: the kit page from /next/v8/start/ placed at its live path (epic #4580).
         # Hand-authored, rendered by ck_pages.js from /api/edition; no v4 static core (the v4
         # generators leave a kit page alone, scripts/v4_apply_chrome.py::is_kit_page). Its height
-        # and axe budget is tests/kit_page_gate.py on the /next/v8/ original.
+        # and axe budget is tests/kit_page_gate.py (the /next/v8/ original was retired in #6223).
         "name": "Start here",
         "intent": ("The story in two minutes: who Matthew is, what has happened so far in the experiment, " "and what is open now."),
         "tier": 2,  # a page one tap from the front door, not a door (tier 1 is the six doors)
@@ -461,7 +461,7 @@ _CURATED = [
         # #4588 cut-over: the kit page from /next/v8/story/ placed at its live path (epic #4580).
         # Hand-authored, rendered by ck_pages.js from /api/edition; no v4 static core (the v4
         # generators leave a kit page alone, scripts/v4_apply_chrome.py::is_kit_page). Its height
-        # and axe budget is tests/kit_page_gate.py on the /next/v8/ original.
+        # and axe budget is tests/kit_page_gate.py (the /next/v8/ original was retired in #6223).
         "name": "Story (the chapters)",
         "intent": ("The narration: the latest weekly chapter and its podcast, then every chapter in order."),
         "tier": 1,
@@ -480,7 +480,7 @@ _CURATED = [
         # #4588 cut-over: the kit page from /next/v8/coaches/ placed at its live path (epic #4580).
         # Hand-authored, rendered by ck_pages.js from /api/edition; no v4 static core (the v4
         # generators leave a kit page alone, scripts/v4_apply_chrome.py::is_kit_page). Its height
-        # and axe budget is tests/kit_page_gate.py on the /next/v8/ original.
+        # and axe budget is tests/kit_page_gate.py (the /next/v8/ original was retired in #6223).
         "name": "The AI coaches",
         "intent": (
             "The AI coaches: their graded record beside what a simple guess would have scored, the team, "
@@ -1146,9 +1146,10 @@ def private_rows():
 EXEMPT = {
     "/legacy/": "verbatim pre-v4 archive, private rollback surface — never QA-swept by policy (ADR-071)",
     "/next/": (
-        "preview subtree (#4182, plan §1b): v7/v8 previews under site/next/, and the v9 build at /next/v9/ (S3 only, not under site/; "
-        "#5530) — noindex + unlinked from the live pages; the v9 rows arrive at `/` through _v9_rows() once www/owned_paths.json "
-        "says live_at_root (#5534)"
+        "preview subtree: the v9 build's rehearsal at /next/v9/ (S3 only, never under site/; #5530) — noindex, unlinked, empty "
+        "outside a rehearsal; the v9 rows arrive at `/` through _v9_rows() (#5534). The v7 and v8 preview pages that were "
+        "committed under site/next/ are retired (#6223): each address 301s to its successor (redirects.map), and "
+        "tests/test_next_previews_retired_6223.py holds the prefix empty in the repo"
     ),
     "/kit/": "v8 kit specimen (#4581): the twelve components on one unlisted, noindex page — a build reference, not a reader page; scripts/check_css_tokens.py holds it to the kit rules",
     "/index.html": "the '/' entry covers it (directory index)",
