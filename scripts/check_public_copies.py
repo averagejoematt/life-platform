@@ -33,6 +33,10 @@ THE RULES
      archive's api/ members; and no archived api/ record carries words for a record the live route serves without.
      The build's correctness members (label contract, chapter agreement, dates in words) are NOT re-run on a copy: the
      build gated them pre-sync, and against a later snapshot they move with the daily data, not with a publication.
+     The words comparison reads EMPTINESS as withholding, because the publication gate leaves no other mark (it empties
+     a string to "" and serves no flag — owner ruling 2026-11-06). One declared exception (#6223, `VOLATILE_FIELDS`): a
+     field of an operational route whose own code clears it to JSON null as the system's state moves is not compared
+     when the live value is null. The same field served "" — the gate's signature — is still a violation.
   D  every URL in the sitemaps and feeds resolves to an object that is served and is not a rule-A orphan.
   F  audio is a public copy too (#6199): under generated/panelcast/ and generated/podcast/, every audio object larger
      than the restart tombstone (``common.media_tombstone.TOMBSTONE_MAX_BYTES``) is the ``url`` of an episode in the
@@ -161,6 +165,29 @@ ORIGIN_PATHS = {
 #: Empty since #6115: the three it held (chronicle, evidence, now) were audited page by page and moved to
 #: RETIRED_PREFIXES. A location the owner decides to RETAIN is declared here, with its reason, and stays under C and D.
 LEGACY_LOCATIONS: dict[str, str] = {}
+#: #6223 — rule C's declared time-varying fields. The archive is a point-in-time copy, and `/api/status` reports the
+#: system's state at the minute it is read: a component's `comment` is a sentence the status code builds while there is
+#: something to say ("Last computed: 2d ago …") and sets to None once the component is plainly healthy. An archive built
+#: while the sentence stood therefore "carries words the live route serves empty" a few hours later, with nothing
+#: withheld — it failed every root build on 2026-11-23. Such a field is not compared WHEN THE LIVE VALUE IS NULL.
+#:
+#: What keeps this from becoming a hole in a privacy rule:
+#:   * it is keyed on (route, field shape), never a whole route — every other string of the route is still compared;
+#:   * the route must be in OPERATIONAL_ROUTES — system state only, no narrative, coach, call, ledger or health words;
+#:   * only JSON null is excused. The publication gate empties a string to "" (`narrative_publication.scrub_payload`)
+#:     and the status code never writes "" to this field, so a gate withholding here still reds the run;
+#:   * tests/test_check_public_copies_6083.py holds the set: the same archived/live pair on EVERY other archived route
+#:     is a violation, and an entry outside OPERATIONAL_ROUTES or naming a words-bearing field fails the suite.
+OPERATIONAL_ROUTES: dict[str, str] = {
+    "/api/status": "the status board: per-component freshness and alarm state, rebuilt on every read (60 s cache)",
+}
+VOLATILE_FIELDS: dict[tuple[str, str], str] = {
+    ("/api/status", "groups[].components[].comment"): (
+        "a status sentence built by lambdas/web/site_api_status.py from sync ages and alarm state; None when the "
+        "component has nothing to report, so it clears and returns through the day"
+    ),
+}
+_RECORD_SELECTOR = re.compile(r"\[[^\]]*\]")
 _ID_KEYS = ("id", "item_id", "prediction_id", "topic_slug")
 _COMPOSITE = ("coach_id", "date", "metric", "due_date", "eval_type")
 
@@ -459,24 +486,44 @@ def archive_admission(members: dict[str, bytes], listing_keys: set[str]) -> list
     return out
 
 
-def withheld_words(archived, live, path: str = "") -> list[str]:
+def field_shape(path: str) -> str:
+    """A compared path with its record selectors emptied: ``groups[id=compute].components[id=x].comment`` →
+    ``groups[].components[].comment`` — the form VOLATILE_FIELDS declares."""
+    return _RECORD_SELECTOR.sub("[]", path)
+
+
+def volatile_fields(route: str) -> frozenset[str]:
+    """The field shapes of ``route`` declared time-varying — empty for every route outside OPERATIONAL_ROUTES."""
+    if route not in OPERATIONAL_ROUTES:
+        return frozenset()
+    return frozenset(shape for (r, shape) in VOLATILE_FIELDS if r == route)
+
+
+def withheld_words(archived, live, path: str = "", volatile: frozenset[str] = frozenset(), skipped: list | None = None) -> list[str]:
     """Paths where the archived copy carries WORDS (a string of three words or more) and the live route serves the same
     record with none ("" or null). Lists align on a record id; a list without one is not compared. Paths only — the
-    words are never printed (the CI log is public)."""
+    words are never printed (the CI log is public).
+
+    ``volatile`` (#6223) is the route's declared time-varying field shapes: such a field served as JSON null is state
+    that moved, not a withholding, and its path goes to ``skipped`` instead. Served "" it is reported like any other."""
     out: list[str] = []
     if isinstance(archived, dict) and isinstance(live, dict):
         for k, v in archived.items():
             if k in live and k != "_meta":
-                out += withheld_words(v, live[k], f"{path}.{k}" if path else k)
+                out += withheld_words(v, live[k], f"{path}.{k}" if path else k, volatile, skipped)
     elif isinstance(archived, list) and isinstance(live, list):
         n_live, n_arch = Counter(_record_id(x) for x in live), Counter(_record_id(x) for x in archived)
         live_by = {_record_id(x): x for x in live}
         for x in archived:
             rid = _record_id(x)
             if rid and n_live[rid] == 1 and n_arch[rid] == 1:  # an id two records share cannot align: skipped, never guessed
-                out += withheld_words(x, live_by[rid], f"{path}[{rid}]")
+                out += withheld_words(x, live_by[rid], f"{path}[{rid}]", volatile, skipped)
     elif isinstance(archived, str) and len(archived.split()) >= 3 and live in ("", None):
-        out.append(path)
+        if live is None and field_shape(path) in volatile:
+            if skipped is not None:
+                skipped.append(path)
+        else:
+            out.append(path)
     return out
 
 
@@ -512,15 +559,18 @@ def archive_api_issues(members: dict[str, bytes], live_get, facts: dict | None =
     compared = sorted(r for r, doc in api.items() if _has_records(doc))
     if facts is not None:
         facts["api_compared"] = len(compared)
+    moved: list[str] = []
     for route in compared:
         try:
             live = live_get(route)
         except (urllib.error.URLError, OSError, ValueError) as exc:
             out.append(("archive", "C", f"{route}: the live route could not be read to compare ({type(exc).__name__})"))
             continue
-        paths = withheld_words(api[route], live)
+        paths = withheld_words(api[route], live, volatile=volatile_fields(route), skipped=moved)
         if paths:
             out.append(("archive", "C", f"{route}: {len(paths)} archived string(s) of words the live route serves empty, e.g. {paths[0]}"))
+    if facts is not None:
+        facts["api_volatile_null"] = len(moved)
     return out
 
 
@@ -724,6 +774,11 @@ def report(violations, facts, mode: str) -> str:
         lines.append(
             f"archive api/: the age-inversion attack ran; {facts['api_compared']} record-bearing route(s) compared with the live route"
         )
+        if facts.get("api_volatile_null"):
+            lines.append(
+                f"archive api/: {facts['api_volatile_null']} declared time-varying status field(s) the live route now serves null — "
+                "state that moved, not a withholding (VOLATILE_FIELDS, #6223)"
+            )
     lines.append("")
     if not violations:
         lines.append("✅ no violation: no orphan, no stale copy, the publication policy holds on every copy")
