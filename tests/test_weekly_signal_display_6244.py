@@ -28,11 +28,23 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas", "compute"))
 
 wsl = importlib.import_module("weekly_signal_lambda")
 
+import pytest  # noqa: E402
+
 SITE = "https://averagejoematt.com"
 _SUMMARY = (
     "Between two Monday weigh-ins the scale fell 5.2 pounds and the platform's rate flag was lit. "
     "He lifted the heaviest weight of the experiment and wrote one sentence that disagrees with the flag."
 )
+
+
+@pytest.fixture(autouse=True)
+def _pinned_site(monkeypatch):
+    """The module reads SITE_URL from the environment ONCE, at import. Under xdist --dist loadfile a worker can import it
+    after another module set a different SITE_URL at collection (tests/test_send_replay_guard_dil025.py sets
+    https://averagejoematt.invalid), so this file pins the module's own value instead of inheriting the worker's
+    (main went red on exactly that order, 2026-11-24). The fetch is pinned off the same way, never left to ambient env."""
+    monkeypatch.setattr(wsl, "SITE_URL", SITE)
+    monkeypatch.setattr(wsl, "CHAPTERS_FETCH", "off")
 
 
 def _chapters_doc(**over) -> dict:
@@ -262,3 +274,12 @@ def test_fetch_chapters_is_off_in_the_unit_suite_and_reads_the_public_route_when
 
     monkeypatch.setattr(wsl.urllib.request, "urlopen", lambda *a, **k: (_ for _ in ()).throw(OSError("down")))
     assert wsl._fetch_chapters() is None  # a failed read omits the section, never raises into the send
+
+
+def test_rendered_links_follow_the_module_site_url_not_the_import_time_environment(monkeypatch):
+    """Regression for the 2026-11-24 red main: the module was imported under another test's SITE_URL. Whatever host the
+    module holds is the one every link names — the chapter link is never a different host from the footer's."""
+    monkeypatch.setattr(wsl, "SITE_URL", "https://averagejoematt.invalid")
+    html = _email(chapter=wsl.latest_published_chapter(_chapters_doc()))
+    assert 'href="https://averagejoematt.invalid/story/week-12/"' in html
+    assert f'href="{SITE}/story/' not in html
