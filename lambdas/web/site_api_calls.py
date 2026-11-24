@@ -399,6 +399,30 @@ def record_block(name: str, record: dict | None, decided: list | None = None) ->
     }
 
 
+#: #6254 — why the simple guess could not be checked on a call, in FIXED words per reason code
+#: (``coach_baseline.UNSCORABLE_CODES``). The sentence used to end with the row's STORED reason string; a withheld
+#: row keeps a frozen copy of its stamp under ``original_grade.baseline``, the publication gate
+#: (``narrative_publication.is_tainted``) reads that copy as the row's text, and every sentence ending in the same
+#: words was served empty. These carry no stored words: none shares a six-word run with any stored reason. Each says
+#: only that NO comparison was made and why — never how one came out (ADR-104).
+UNSCORABLE_LEAD = "The simple guess, that nothing changes, could not be checked on this call"
+UNSCORABLE_WORDS = {
+    "no_filed_reading": "it starts from the last reading before the call, and there was none on record",
+    "no_graded_reading": "the grade recorded no measured value to set the guess against",
+    "no_rule": "the guess has nothing to say about a call of this kind",
+    "not_graded": "this call got no right-or-wrong grade, so there was nothing to set the guess against",
+    "incomplete_spec": "the stored test for this call is missing a part the guess needs",
+}
+#: A stored reason with no code: the fixed lead alone — never the stored string.
+UNSCORABLE_GENERIC = f"{UNSCORABLE_LEAD}."
+
+
+def unscorable_text(baseline: Any) -> str:
+    """The one sentence for an unscorable stamp, chosen by reason code; the stamp's stored words are never served."""
+    why = UNSCORABLE_WORDS.get(coach_baseline.unscorable_code(baseline) or "")
+    return f"{UNSCORABLE_LEAD}: {why}." if why else UNSCORABLE_GENERIC
+
+
 def simple_guess(baseline: Any, kind: str | None, *, coach_right: bool, metric: Any = None) -> dict:
     """What the "nothing changes" rule said on ONE call, from the verdict frozen on its row.
 
@@ -412,13 +436,7 @@ def simple_guess(baseline: Any, kind: str | None, *, coach_right: bool, metric: 
             "short": "not checked on this call yet",
         }
     if baseline.get("right") is None:
-        why = str(baseline.get("unscorable") or coach_baseline.NO_RULE)
-        return {
-            "state": "unscorable",
-            "right": None,
-            "text": f"The simple guess, that nothing changes, could not be checked on this call: {why}.",
-            "short": "could not be checked on this call",
-        }
+        return {"state": "unscorable", "right": None, "text": unscorable_text(baseline), "short": "could not be checked on this call"}
     right = bool(baseline["right"])
     filed = _said(baseline.get("filed_value"), metric)
     if kind == "direction":
