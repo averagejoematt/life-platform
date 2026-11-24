@@ -272,9 +272,11 @@ def test_paused_checks_are_reported_by_name():
 # ---------------------------------------------------------------------------
 # 6. #5821 (owner ruling 2026-11-15): a content-truth-only failure is a digest line
 # ---------------------------------------------------------------------------
-# THE URGENCY BOUNDARY is this file's own partition: a deploy_health failure is the rollback
-# class (the site/API is broken now) and still emails at once; a run whose failures are all
-# content_truth becomes one line in the daily LP digest and sends no email of its own.
+# #6243 (owner ruling 2026-11-23): routine QA AND deploy-health information goes to the same
+# daily digest — every failing run is one digest line and no email of its own. The rollback is
+# NOT the email: ci-cd's smoke oracle reads `failed_deploy_health` from the response body, and
+# the qa-smoke-failures alarm (the session pre-flight's view) reads FailCount from the EMF line.
+# Both are pinned below on the REAL handler, so routing the mail cannot hide the failure.
 
 
 class _FakeSES:
@@ -325,13 +327,39 @@ def test_content_truth_only_failures_are_a_digest_line_not_an_email(monkeypatch)
     assert body["emailed"] is False and body["digested"] is True
 
 
-def test_a_deploy_health_failure_still_emails_at_once(monkeypatch):
-    """The urgent case: any deploy_health failure (alone or mixed) is the red email, no digest line."""
+def test_a_deploy_health_failure_is_a_digest_line_and_still_gates_the_deploy(monkeypatch, capsys):
+    """#6243: deploy-health (alone or mixed) is one digest line, no email — and the failure stays fully visible.
+
+    Visible where it matters: the response body still carries failed_deploy_health (and the real smoke oracle still
+    reads it as FAIL — the rollback), the EMF line still carries FailCount/DeployHealthFailCount (qa-smoke-failures, the
+    session pre-flight), the [QA] FAIL line names the check, and the digest line names it with its partition.
+    """
     for partitions in ([qa.DEPLOY_HEALTH], [qa.DEPLOY_HEALTH, qa.CONTENT_TRUTH]):
+        capsys.readouterr()
         body, ses, sns = _run_handler(monkeypatch, partitions)
-        assert len(ses.sent) == 1 and ses.sent[0].startswith("🔴 QA:"), partitions
-        assert sns.lines == [], f"{partitions}: an urgent run also queued a digest line"
-        assert body["emailed"] is True and body["failed_deploy_health"] == 1
+        out = capsys.readouterr().out
+        assert ses.sent == [], f"{partitions}: a deploy-health run emailed on its own: {ses.sent}"
+        assert len(sns.lines) == 1, sns.lines
+        line = sns.lines[0]
+        assert line["AlarmName"] == "qa-smoke: deploy-health failures" and line["NewStateValue"] == "FAIL"
+        assert "Stub/stub:0" in line["NewStateReason"] and line["NewStateReason"].startswith("1 deploy-health")
+        assert body["emailed"] is False and body["digested"] is True and body["failed_deploy_health"] == 1
+        # the rollback input, through the REAL oracle
+        with tempfile.TemporaryDirectory() as d:
+            path = pathlib.Path(d) / "smoke.json"
+            path.write_text(json.dumps({"statusCode": 200, "body": json.dumps(body)}))
+            assert sod.decide(str(path))[0] == "FAIL"
+        # the alarm / pre-flight input, and the log line
+        emf = [json.loads(ln) for ln in out.splitlines() if ln.startswith("{") and '"_aws"' in ln]
+        assert emf and emf[-1]["FailCount"] == len(partitions) and emf[-1]["DeployHealthFailCount"] == 1, emf
+        assert "[QA] FAIL [deploy_health] Stub / stub:0" in out
+
+
+def test_a_failed_digest_publish_falls_back_to_the_email_for_deploy_health_too(monkeypatch):
+    """Fail towards delivery (#6243): a deploy-health failure whose digest publish fails is the red email, as before."""
+    body, ses, sns = _run_handler(monkeypatch, [qa.DEPLOY_HEALTH], sns=_FakeSNS(fail=True))
+    assert len(ses.sent) == 1 and ses.sent[0].startswith("🔴 QA:") and "1 deploy-health" in ses.sent[0]
+    assert body["emailed"] is True and body["digested"] is False
 
 
 def test_a_failed_digest_publish_falls_back_to_the_email(monkeypatch):

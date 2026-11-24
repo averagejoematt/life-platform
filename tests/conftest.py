@@ -617,10 +617,10 @@ def _private_call_reads_hermetic_6199(monkeypatch):
     yield
 
 
-# #6176: the owner's two-week outbound-mail trial is committed ON until common.outbound_trial.TRIAL_ENDS_ON, after which
-# the BASELINE behaviour returns by itself. The rest of the suite pins that baseline, so every test starts with the
-# switchboard OFF (monkeypatch: restored after). The trial's own tests opt in explicitly (tests/test_outbound_trial_6176.py
-# `trial_on`, and its pin reads the committed values captured at its import).
+# #6176/#6243: the owner's outbound consolidation is committed ON and standing (no end date). The rest of the suite
+# pins each sender's pre-consolidation path, so every test starts with every item explicitly re-enabled — set to
+# exactly False, the documented per-item rollback (monkeypatch: restored after). The consolidation's own tests opt in
+# explicitly (tests/test_outbound_trial_6176.py `trial_on`, and its pin reads the committed values captured at import).
 @pytest.fixture(autouse=True)
 def _outbound_trial_baseline_off_6176(monkeypatch):
     try:
@@ -630,7 +630,6 @@ def _outbound_trial_baseline_off_6176(monkeypatch):
         return
     for _item in list(_ot.TRIAL):
         monkeypatch.setitem(_ot.TRIAL, _item, False)
-    monkeypatch.setattr(_ot, "TRIAL_ENDS_ON", None)
     yield
 
 

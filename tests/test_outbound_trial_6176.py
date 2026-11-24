@@ -1,7 +1,11 @@
-"""tests/test_outbound_trial_6176.py — the owner's two-week outbound-mail trial (#6176, owner ruling 2026-11-22 §9).
+"""tests/test_outbound_trial_6176.py — the owner's outbound-mail consolidation (#6176 ruling 2026-11-22 §9, made
+standing by #6243, ruling 2026-11-23).
 
 Held here, for every item of ``common/outbound_trial.py``:
-  * the switchboard ships with every item OFF, and OFF is today's behaviour: each gated sender takes its old path;
+  * the switchboard ships with every item ON and no end date; ON is the consolidated state and every fail-safe
+    resolves to it: a missing line, a non-False value or a far-future day keeps the suppressed mail suppressed, and only
+    an item's line set to exactly ``False`` restores that ONE item (the per-item rollback) — the Weekly Report above all;
+  * OFF (the rollback) is the pre-#6176 behaviour: each gated sender takes its old path;
   * ON does what the ruling asked, and a suppressed send logs ONE ``[outbound-trial]`` line (a recognised state):
       1. the Sunday slot sends the "what changed" email (text + HTML, same recipient, no model call); Compass is held;
       2. the Plate is held and its code-built section rides the Nutrition Review (tested in
@@ -13,7 +17,7 @@ Held here, for every item of ``common/outbound_trial.py``:
          drops items unlogged for 14+ days and sends nothing when none remain;
       6. the DLQ summary is held only when its SNS escalation went out; a canary failure is held only when a DECLARED
          alarm carries it; the Monday ops pack is logged, not emailed;
-  * the trial's end date turns every item off by itself;
+  * every reader passes a known item constant (a typo would raise in a sender, not read as anything);
   * the set of modules allowed to read the switchboard — no subscriber sender, no Morning Brief, no chronicle preview.
 
 No test here reaches AWS or a real clock for an asserted value (#4848): every client is a fake and every day is passed in.
@@ -51,18 +55,16 @@ from common import outbound_trial as ot  # noqa: E402
 ITEMS = tuple(ot.TRIAL)
 # The committed state, captured at import BEFORE any fixture touches it (the pin below reads these).
 COMMITTED_TRIAL = dict(ot.TRIAL)
-COMMITTED_ENDS_ON = ot.TRIAL_ENDS_ON
 
 
 @pytest.fixture(autouse=True)
 def trial_off(monkeypatch):
-    """The trial is committed ON (owner switched it on 2026-11-22), so every test starts from an explicit OFF.
+    """The consolidation is committed ON, so every test starts from an explicit OFF (every line exactly ``False``).
 
-    OFF is the pre-trial behaviour; a test that wants an item on says so through ``trial_on``.
+    OFF is the pre-#6176 behaviour; a test that wants an item on says so through ``trial_on`` (or ``committed``).
     """
     for item in ot.TRIAL:
         monkeypatch.setitem(ot.TRIAL, item, False)
-    monkeypatch.setattr(ot, "TRIAL_ENDS_ON", None)
 
 
 @pytest.fixture
@@ -73,8 +75,14 @@ def trial_on(monkeypatch):
         for item in items:
             monkeypatch.setitem(ot.TRIAL, item, True)
 
-    monkeypatch.setattr(ot, "TRIAL_ENDS_ON", None)
     return _on
+
+
+@pytest.fixture
+def committed(monkeypatch):
+    """The switchboard exactly as committed (captured at import, before any fixture touched it)."""
+    monkeypatch.setattr(ot, "TRIAL", dict(COMMITTED_TRIAL))
+    return ot.TRIAL
 
 
 def _trial_lines(caplog_or_list):
@@ -84,41 +92,123 @@ def _trial_lines(caplog_or_list):
 # ── the switchboard ────────────────────────────────────────────────────────────────────────────
 
 
-def test_the_committed_trial_state_is_pinned_exactly_and_every_item_has_a_description():
-    """The trial is ON by a deliberate, reviewed change (owner ruling 2026-11-22, #6176).
+def test_the_committed_state_is_consolidated_standing_and_every_item_has_a_description():
+    """#6243 (owner ruling 2026-11-23): the consolidation is permanent — every item ON, and NO end date.
 
-    ROLLBACK: set the eight items to False in common/outbound_trial.py (then deploy_fleet.sh and deploy_site_api.sh).
-    The end date also turns everything off by itself.
+    ROLLBACK, per item: set that ONE line to exactly ``False`` in common/outbound_trial.py, then deploy_fleet.sh (and
+    deploy_site_api.sh for the status page). See test_rolling_back_one_item_leaves_every_other_item_consolidated.
     """
     assert len(COMMITTED_TRIAL) == 8 and all(v is True for v in COMMITTED_TRIAL.values()), COMMITTED_TRIAL
-    assert COMMITTED_ENDS_ON == "2026-12-07"
-    assert set(ot.DESCRIPTIONS) == set(COMMITTED_TRIAL)
+    assert set(ot.ITEMS) == set(COMMITTED_TRIAL) == set(ot.DESCRIPTIONS) and len(ot.ITEMS) == 8
+    # no expiry of any spelling: the 2026-12-07 lapse that would have restored the old mail is gone
+    assert not hasattr(ot, "TRIAL_ENDS_ON") and not hasattr(ot, "trial_ended")
+    src = (ROOT / "lambdas" / "common" / "outbound_trial.py").read_text(encoding="utf-8")
+    for clock in ("pacific_today", "pacific_now", "datetime", "date.today", "time.time", "os.environ", "ssm"):
+        assert clock not in src, f"outbound_trial reads {clock!r}: a clock or runtime setting could turn an item off"
+    assert list(inspect_params(ot.is_on)) == ["item"], "is_on must take no day: no date may turn an item off"
 
 
-def test_with_every_item_set_off_nothing_is_paused():
-    """OFF is the pre-trial behaviour: the autouse fixture sets it explicitly, and is_on agrees."""
-    assert all(not ot.is_on(i, "2026-11-22") for i in ITEMS)
+def inspect_params(fn):
+    import inspect
+
+    return inspect.signature(fn).parameters
 
 
-def test_the_real_committed_end_date_turns_everything_off_by_itself(monkeypatch):
-    for item in ITEMS:
-        monkeypatch.setitem(ot.TRIAL, item, True)
-    monkeypatch.setattr(ot, "TRIAL_ENDS_ON", COMMITTED_ENDS_ON)
-    assert all(ot.is_on(i, "2026-12-06") for i in ITEMS)  # the last Sunday of the trial is still inside it
-    assert not any(ot.is_on(i, "2026-12-07") for i in ITEMS)
-    assert not any(ot.is_on(i, "2026-12-08") for i in ITEMS)
+def test_the_committed_state_holds_on_any_day(committed, monkeypatch):
+    """The 12-07 lapse cannot come back by another route: with the Pacific clock moved past it, nothing turns off."""
+    import common.pacific_time as pt
+
+    for day in ("2026-12-06", "2026-12-07", "2026-12-08", "2027-06-01", "2099-01-01"):
+        monkeypatch.setattr(pt, "pacific_today", lambda d=day: d)
+        assert all(ot.is_on(i) for i in ot.ITEMS), day
 
 
-def test_an_unknown_item_raises_instead_of_reading_off():
+@pytest.mark.parametrize("bad", ["<missing>", None, 0, "", "false", "False", "off", "no", [], {}, 0.0])
+def test_a_missing_or_malformed_line_reads_consolidated_never_the_old_volume(committed, bad):
+    """FAIL-SAFE (#6243): only an exact ``False`` restores an item; anything else — a dropped line, None, 0, an empty
+    string, a 'false' typed as a string — keeps the suppressed mail suppressed. Mutation: `return bool(TRIAL[item])`."""
+    for item in ot.ITEMS:
+        if bad == "<missing>":
+            del committed[item]
+        else:
+            committed[item] = bad
+        assert ot.is_on(item) is True, f"{item}={bad!r} restored the old mail"
+        committed[item] = True
+
+
+def test_an_empty_or_replaced_switchboard_reads_consolidated(monkeypatch):
+    monkeypatch.setattr(ot, "TRIAL", {})
+    assert all(ot.is_on(i) for i in ot.ITEMS)
+
+
+@pytest.mark.parametrize("item", ITEMS)
+def test_rolling_back_one_item_leaves_every_other_item_consolidated(committed, item):
+    """ROLLBACK is per item and explicit: that line set to exactly False — and only that item returns."""
+    committed[item] = False
+    assert ot.is_on(item) is False
+    assert all(ot.is_on(other) for other in ot.ITEMS if other != item)
+
+
+def test_an_unknown_item_raises_instead_of_reading_anything():
     with pytest.raises(KeyError):
-        ot.is_on("sunday_what_chnaged", "2026-11-22")
+        ot.is_on("sunday_what_chnaged")
 
 
-def test_the_end_date_turns_every_item_off_by_itself(trial_on, monkeypatch):
-    trial_on(*ITEMS)
-    monkeypatch.setattr(ot, "TRIAL_ENDS_ON", "2026-12-06")
-    assert all(ot.is_on(i, "2026-12-05") for i in ITEMS)
-    assert not any(ot.is_on(i, "2026-12-06") for i in ITEMS)
+# premerge-gate: 6243: an rglob sweep of lambdas/ for every outbound_trial.is_on(...) call — a reader that passes a misspelt name, a literal string or a day would raise or bypass the switchboard in a sender, so it must red BEFORE merge.
+def test_every_reader_asks_about_a_known_item_constant_and_nothing_else():
+    """The switchboard's only runtime failure is an unknown name (KeyError). Every call site in lambdas/ passes exactly
+    one argument, ``outbound_trial.<CONST>`` (or ``ot.<CONST>``), naming an item in ITEMS — so no sender can raise."""
+    const_to_item = {name: getattr(ot, name) for name in dir(ot) if name.isupper() and getattr(ot, name) in ot.ITEMS}
+    seen = 0
+    for path in (ROOT / "lambdas").rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "is_on"):
+                continue
+            if not (isinstance(node.func.value, ast.Name) and node.func.value.id == "outbound_trial"):
+                continue
+            seen += 1
+            where = f"{path.relative_to(ROOT)}:{node.lineno}"
+            assert len(node.args) == 1 and not node.keywords, f"{where}: is_on takes the item only"
+            arg = node.args[0]
+            assert isinstance(arg, ast.Attribute) and arg.attr in const_to_item, f"{where}: not a known item constant"
+    assert seen >= 13, f"only {seen} is_on call sites found — the sweep lost its readers"
+
+
+def test_nothing_short_of_an_explicit_rollback_sends_the_weekly_report(digest, monkeypatch):
+    """The Weekly Report prints stored owner notes, stale and private ones included (#6243). Under the committed
+    state, an empty switchboard, a dropped line, a malformed value, a far-future day or every OTHER item rolled back,
+    the Sunday slot sends the "what changed" email and never gathers the report. Only SUNDAY_WHAT_CHANGED = False does."""
+    import common.pacific_time as pt
+    from emails import weekly_what_changed_send as wws
+
+    wd, _sent, _ = digest
+    took = []
+    monkeypatch.setattr(wws, "send", lambda *a, **k: took.append("what_changed") or {"statusCode": 200})
+    monkeypatch.setattr(wd, "gather_all", lambda: took.append("weekly_report") or None)
+
+    def run(trial):
+        took.clear()
+        monkeypatch.setattr(ot, "TRIAL", trial)
+        wd.lambda_handler({}, None)
+        return list(took)
+
+    base = dict(COMMITTED_TRIAL)
+    others_off = {i: (i == ot.SUNDAY_WHAT_CHANGED) for i in ot.ITEMS}
+    cases = {
+        "committed": base,
+        "empty": {},
+        "line dropped": {k: v for k, v in base.items() if k != ot.SUNDAY_WHAT_CHANGED},
+        "None": {**base, ot.SUNDAY_WHAT_CHANGED: None},
+        "0": {**base, ot.SUNDAY_WHAT_CHANGED: 0},
+        "'false'": {**base, ot.SUNDAY_WHAT_CHANGED: "false"},
+        "every other item rolled back": others_off,
+    }
+    for label, trial in cases.items():
+        assert run(dict(trial)) == ["what_changed"], f"{label}: the Weekly Report path was taken"
+    monkeypatch.setattr(pt, "pacific_today", lambda: "2027-01-03")
+    assert run(dict(base)) == ["what_changed"], "a later day brought the Weekly Report back"
+    assert run({**base, ot.SUNDAY_WHAT_CHANGED: False}) == ["weekly_report"], "the explicit rollback must still work"
 
 
 def test_a_suppression_is_one_parseable_line():
@@ -130,12 +220,13 @@ def test_a_suppression_is_one_parseable_line():
 
 
 def test_status_page_reads_a_paused_sender_as_paused_only_when_on(trial_on):
-    assert ot.status_page_note("weekly_plate", "2026-11-22") is None
+    assert ot.status_page_note("weekly_plate") is None
     trial_on(ot.PLATE_INTO_NUTRITION_REVIEW, ot.SUNDAY_WHAT_CHANGED)
-    assert "folded into the Saturday Nutrition Review" in ot.status_page_note("weekly_plate", "2026-11-22")
-    assert ot.status_page_note("monday_compass", "2026-11-22").startswith("Paused during a two-week email trial")
-    assert ot.status_page_note("nutrition_review", "2026-11-22") is None  # the Review keeps its weekly cadence
-    assert ot.status_page_note("weekly_digest", "2026-11-22") is None  # its slot still sends (the new email)
+    assert "folded into the Saturday Nutrition Review" in ot.status_page_note("weekly_plate")
+    note = ot.status_page_note("monday_compass")
+    assert note.startswith("Paused by the owner's email consolidation") and "trial" not in note  # #6243: no longer a trial
+    assert ot.status_page_note("nutrition_review") is None  # the Review keeps its weekly cadence
+    assert ot.status_page_note("weekly_digest") is None  # its slot still sends (the new email)
 
 
 # ── who may read the switchboard ───────────────────────────────────────────────────────────────
@@ -193,6 +284,46 @@ def test_only_the_owner_facing_senders_read_the_switchboard():
     for path in NEVER_READERS:
         assert (ROOT / path).exists(), f"{path} moved — re-point this guard"
         assert path not in readers
+
+
+# ── #6243: what still escalates at once (owner ruling 2026-11-23, Priority 3) ──────────────────
+
+#: The immediate-escalation set the consolidation and the qa-smoke routing leave untouched. Each is pinned below to the
+#: thing that delivers it, so a later "noise" change that drops one reds here as well as in its own test.
+URGENT_PAGED = {  # ADR-143 SMS — production outage / spend hard stop (tests/test_paging_alarms_1333.py owns the wiring)
+    "paging-budget-tier-3",
+    "paging-pipeline-dead",
+    "life-platform-canary-ddb-failure",
+    "life-platform-canary-s3-failure",
+}
+URGENT_OWNER_ACTIONS = {  # ADR-170 `Do:` email — publication holds, a dead login, the tier-3 decision
+    "chronicle-autopublish-held": "approve or hold the chronicle draft",
+    "panelcast-autopublish-held": "approve or drop the held Panel episode",
+    "ingest-auth-unhealthy-whoop": "reconnect a data source",
+    "paging-budget-tier-3": "decide on AI spend (paused at the ceiling)",
+}
+
+
+def test_the_urgent_escalation_set_still_escalates():
+    """Production, publication and spend incidents still reach a human at once; none reads this switchboard."""
+    import importlib.util
+
+    from operational import owner_actions
+
+    spec = importlib.util.spec_from_file_location("paging_1333", ROOT / "tests" / "test_paging_alarms_1333.py")
+    paging = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(paging)
+    assert paging.PAGED_P1_SET == URGENT_PAGED, "the ADR-143 paged set changed — amend ADR-143 and this list together"
+    stacks = (ROOT / "cdk" / "stacks" / "monitoring_stack.py").read_text() + (ROOT / "cdk" / "stacks" / "operational_stack.py").read_text()
+    for name in URGENT_PAGED:
+        assert f'"{name}"' in stacks, f"{name} is no longer declared"
+    for alarm, short in URGENT_OWNER_ACTIONS.items():
+        hit = owner_actions.owner_action_for(alarm)
+        assert hit is not None and hit.short == short, f"{alarm} no longer mails the owner a `Do:` step"
+    # the urgent topic's real-time triage (ADR-170 §5) is still subscribed
+    assert "local_alerts_topic.add_subscription(sns_subs.LambdaSubscription(dispatcher_lambda))" in stacks
+    # a routine qa-smoke line is NOT an owner action (it is a digest record + the qa-smoke-failures alarm), by design
+    assert owner_actions.owner_action_for("qa-smoke: deploy-health failures") is None
 
 
 # ── item 1: the Sunday email; Compass held ─────────────────────────────────────────────────────
@@ -465,7 +596,7 @@ def test_story_season_dead_man_reads_the_pause_as_recognised(trial_on, monkeypat
     assert _questions_check(now).passed is False  # OFF: a missing marker is a miss, exactly as today
     trial_on(ot.STORY_QUESTIONS_PAUSED)
     c = _questions_check(now)
-    assert c.passed is True and "paused by the outbound trial" in c.message
+    assert c.passed is True and "paused by the owner's email consolidation" in c.message
 
 
 # ── item 5: one channel at 20:00, and the quiet rule ───────────────────────────────────────────
@@ -515,7 +646,6 @@ def nudge(monkeypatch):
     monkeypatch.setattr(en.send_ledger, "record_sent", lambda *a, **k: None)
     monkeypatch.setattr(en, "guarded_send_email", lambda ses, dry, **kw: sent.append(kw))
     monkeypatch.setattr(en, "manual_capture_sources", lambda: {})
-    monkeypatch.setattr(en, "_build_ritual_section", lambda d, m: "<ritual/>")
     monkeypatch.setattr(en, "_build_morning_note_section", lambda d: "")
     # Supplements were last logged 3 days ago; journal, How We Feel and the ritual not in the window.
     monkeypatch.setattr(en, "_check_supplements", lambda d: (d == "2026-11-18", ""))
@@ -542,7 +672,7 @@ def test_nudge_on_drops_stale_items(nudge, trial_on):
     en.lambda_handler({}, None)
     assert _subject(sent[0]) == "Evening nudge · 1 thing(s) to log before bed"
     html = sent[0]["Content"]["Simple"]["Body"]["Html"]["Data"]
-    assert "<ritual/>" not in html  # the dropped ritual's tap block goes with it
+    assert "one tap each" not in html and "/api/ritual_log" not in html  # #6243: the tap section is gone
 
 
 def test_nudge_on_sends_nothing_when_every_item_is_stale(nudge, trial_on, monkeypatch):

@@ -1,29 +1,36 @@
-"""common/outbound_trial.py — the owner's two-week outbound-mail trial: ONE switchboard, every item OFF (#6176).
+"""common/outbound_trial.py — the owner's outbound-mail consolidation: ONE switchboard, every item ON and STANDING.
 
-THE RULING (owner, 2026-11-22, section 9, "approved for trial"). Replace the Sunday Weekly Report and the Monday
-Compass with one Sunday "what changed and what matters" email; fold the Friday Weekly Plate into the Saturday
+THE RULINGS. Owner, 2026-11-22 (section 9, "approved for trial", #6176): replace the Sunday Weekly Report and the
+Monday Compass with one Sunday "what changed and what matters" email; fold the Friday Weekly Plate into the Saturday
 Nutrition Review; stop emailing the AI Review Pack; pause the story-question and owner-words emails until their reply
 path demonstrably works (#6174); stop the duplicate 20:00 email/Telegram check-in and suppress stale repetitive
 prompts; route ordinary operational action mail toward the owner-actions registry (ADR-170) where that is safe.
-Preserve urgent alerts and every subscriber commitment. Keep the trial reversible.
+Owner, 2026-11-23 (#6243): make the trial's changes permanent; do not let an expiry restore the suppressed mail; a
+missing or invalid setting must not silently reactivate it; keep a safe rollback.
 
-THE SWITCHBOARD. ``TRIAL`` is the one place each item is turned on or off, one reviewed line per item. Every item
-defaults OFF, and OFF is today's behaviour exactly (``tests/test_outbound_trial_6176.py`` pins both). Turning an
-item on, or rolling one back alone, is one line here plus the fleet deploy (and the site-api deploy for the status
-page's wording). Nothing here is read at runtime from SSM: a committed switch is reviewed, diffable and the same in
-every Lambda of one deploy, which is what lets the sender and its dead-man agree.
+THE SWITCHBOARD. ``TRIAL`` is the one place each item is set, one reviewed line per item, and every item is ON (the
+consolidated state). There is NO end date: nothing here reads a clock, so no day can turn an item off.
 
-``TRIAL_ENDS_ON`` (optional, a Pacific ``YYYY-MM-DD``): from that day every item reads OFF again with no further
-change, so a trial nobody remembers to end ends itself and the inbox returns to today's behaviour.
+FAIL-SAFE DIRECTION: CONSOLIDATED. ``is_on`` reads an item as OFF (the old, louder behaviour) ONLY when its line is
+exactly ``False``. A missing line, ``None``, ``0``, ``""``, ``"false"`` or any other value reads ON, so a typo or a
+dropped line keeps the suppressed mail suppressed. The set of items is ``ITEMS`` (fixed here, not derived from
+``TRIAL``), and asking about a name outside it raises: a misspelt item must never read as anything silently.
+
+ROLLBACK, PER ITEM. Set that one item's line to ``False`` in a reviewed PR, then ``bash deploy/deploy_fleet.sh`` (and
+``bash deploy/deploy_site_api.sh`` for the status page's wording). Only that item returns to its pre-#6176 behaviour;
+the others stay consolidated (``tests/test_outbound_trial_6176.py`` pins both). Nothing here is read at runtime from
+SSM or the environment: a committed switch is reviewed, diffable and the same in every Lambda of one deploy, which is
+what lets a sender and its dead-man agree.
 
 NOTHING IS DELETED. No schedule, function or CDK resource is touched. A sender whose send is suppressed still runs
 on its own schedule and logs ONE line, ``[outbound-trial] {...}``, naming the item, the function and why — so a
 suppressed send is a recognised state, never a silent failure, and ``scripts/owner_outbound_volume.py`` counts it.
+(The module, item and log-tag names keep the word "trial": callers, tests and that script read them.)
 
 WHAT IT NEVER TOUCHES. Subscriber mail (the Weekly Signal, chronicle installments, between-chronicle notes,
 confirmation and onboarding), the Morning Brief, the chronicle preview/approval mail, the paging SMS, the
-continuity switch and the ADR-170 owner-action digest. ``tests/test_outbound_trial_6176.py`` holds the set of
-modules allowed to import this file.
+continuity switch, QA smoke and the ADR-170 owner-action digest. ``tests/test_outbound_trial_6176.py`` holds the set
+of modules allowed to import this file.
 """
 
 from __future__ import annotations
@@ -53,6 +60,20 @@ OPS_CANARY_ALARMED = "ops_canary_alarmed"
 #: 6c. The Monday ops pack is written to its log group as a record, not emailed.
 OPS_MONDAY_PACK = "ops_monday_pack"
 
+#: Every item, fixed here — NOT derived from ``TRIAL``, so a line dropped from ``TRIAL`` still names a known item (and
+#: reads ON, below) instead of raising in a sender.
+ITEMS: tuple[str, ...] = (
+    SUNDAY_WHAT_CHANGED,
+    PLATE_INTO_NUTRITION_REVIEW,
+    REVIEW_PACK_NOT_EMAILED,
+    STORY_QUESTIONS_PAUSED,
+    EVENING_ONE_CHANNEL,
+    OPS_DLQ_SUMMARY,
+    OPS_CANARY_ALARMED,
+    OPS_MONDAY_PACK,
+)
+
+#: ON = consolidated (standing since #6243). Rollback of ONE item: that line → exactly ``False``.
 TRIAL: dict[str, bool] = {
     SUNDAY_WHAT_CHANGED: True,
     PLATE_INTO_NUTRITION_REVIEW: True,
@@ -63,9 +84,6 @@ TRIAL: dict[str, bool] = {
     OPS_CANARY_ALARMED: True,
     OPS_MONDAY_PACK: True,
 }
-
-#: The first Pacific day on which every item reads OFF again (None = no end date).
-TRIAL_ENDS_ON: Optional[str] = "2026-12-07"
 
 #: Plain-language description per item — the status page note and the suppression log both use it.
 DESCRIPTIONS: dict[str, str] = {
@@ -90,38 +108,25 @@ LOG_TAG = "[outbound-trial]"
 _log = logging.getLogger("outbound-trial")
 
 
-def _today_pt() -> str:
-    from common.pacific_time import pacific_today
+def is_on(item: str) -> bool:
+    """Whether ``item`` is consolidated (its old send held). ON unless its line is exactly ``False`` — see the docstring.
 
-    return pacific_today()
-
-
-def trial_ended(today: Optional[str] = None) -> bool:
-    """True once ``TRIAL_ENDS_ON`` is set and today (Pacific) is on or after it."""
-    if not TRIAL_ENDS_ON:
-        return False
-    return (today or _today_pt()) >= TRIAL_ENDS_ON
+    An unknown item raises: a typo must never read as anything silently."""
+    if item not in ITEMS:
+        raise KeyError(f"unknown outbound-trial item {item!r}; known: {sorted(ITEMS)}")
+    return TRIAL.get(item, True) is not False
 
 
-def is_on(item: str, today: Optional[str] = None) -> bool:
-    """Whether trial ``item`` is in force. An unknown item raises: a typo must never read as 'off' silently."""
-    if item not in TRIAL:
-        raise KeyError(f"unknown outbound-trial item {item!r}; known: {sorted(TRIAL)}")
-    if not TRIAL[item]:
-        return False
-    return not trial_ended(today)
-
-
-def status_page_note(sender_id: str, today: Optional[str] = None) -> Optional[str]:
-    """The status page's comment for a sender the trial has paused, or None when it should be graded as usual."""
+def status_page_note(sender_id: str) -> Optional[str]:
+    """The status page's comment for a sender the consolidation has paused, or None when it should be graded as usual."""
     item = STATUS_PAGE_PAUSED.get(sender_id)
-    if item is None or not is_on(item, today):
+    if item is None or not is_on(item):
         return None
-    return f"Paused during a two-week email trial ({TRIAL_ISSUE}): {DESCRIPTIONS[item]}"
+    return f"Paused by the owner's email consolidation ({TRIAL_ISSUE}): {DESCRIPTIONS[item]}"
 
 
 def suppressed(item: str, function: str, reason: str = "", *, log: Optional[Callable[[str], Any]] = None, **detail: Any) -> dict:
-    """Log ONE line saying a send was suppressed by the trial, and why. Returns the record (callers return it).
+    """Log ONE line saying a send was suppressed by the consolidation, and why. Returns the record (callers return it).
 
     The line is ``[outbound-trial] {json}`` with ``event: suppressed`` — the shape the measurement script counts.
     """
@@ -140,7 +145,7 @@ def suppressed(item: str, function: str, reason: str = "", *, log: Optional[Call
 
 
 def sent(item: str, function: str, *, log: Optional[Callable[[str], Any]] = None, **detail: Any) -> dict:
-    """Log ONE line for a send the trial itself makes (the Sunday email, a trimmed nudge) — counted beside the rest."""
+    """Log ONE line for a send the consolidation itself makes (the Sunday email, a trimmed nudge) — counted beside the rest."""
     record = {"event": "sent", "item": item, "function": function, "issue": TRIAL_ISSUE}
     for k, v in detail.items():
         record[k] = v

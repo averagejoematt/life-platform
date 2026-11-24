@@ -5,8 +5,8 @@ Runs daily at 18:30 UTC — 11:30 AM PDT / 10:30 AM PST (the cron is fixed UTC;
 a single hand-typed "PT" label here was the #2818 drift class), after the
 morning compute + brief pipeline completes. Checks data freshness, score
 sanity, link integrity, and key output files. A clean run sends nothing; a
-deploy_health failure sends the red email at once; a run whose failures are all
-content_truth is one line in the daily LP digest instead (#5821).
+failing run is one line in the daily LP digest (content_truth since #5821,
+deploy_health too since #6243) and emails only when that digest publish fails.
 
 Trigger: EventBridge cron(30 18 ? * * *)
 Handler: qa_smoke_lambda.lambda_handler
@@ -1486,29 +1486,39 @@ def lambda_handler(event, context):
             )
             return {"statusCode": 200, "body": _body(False)}
 
-        # #5821 (owner ruling 2026-11-15): the failure email folds into the daily LP digest.
-        # THE URGENCY BOUNDARY is #1921's partition split. A deploy_health failure is the class
-        # that gates ci-cd's smoke job and fires the rollback (smoke_oracle_decision reads
-        # failed_deploy_health): the site or API is broken now, so it still mails at once. A run
-        # whose failures are ALL content_truth — stale data, a dead-man, a wrong number — cannot
-        # be fixed by a revert and reverts nothing; it becomes one digest line. The
-        # qa-smoke-failures alarm still digests its own transition; this line names the checks.
+        # #5821 (owner ruling 2026-11-15) + #6243 (owner ruling 2026-11-23, "route routine QA and deploy-health
+        # information into the existing daily operational digest"): EVERY failing run is one digest line, named by
+        # its worst partition so the digest groups the two apart. Nothing about the failure is hidden or softened:
+        #   * the rollback is not this email — ci-cd's smoke job reads `failed_deploy_health` from the response body
+        #     below (deploy/lib/smoke_oracle_decision.py), unchanged;
+        #   * FailCount / DeployHealthFailCount still ride the EMF line above, so qa-smoke-failures still goes red and
+        #     the session pre-flight (scripts/boot_brief.py, describe_alarms ALARM) still shows it;
+        #   * every [QA] FAIL line is still in /aws/lambda/life-platform-qa-smoke.
+        # Immediate escalation for a production outage is the ADR-143 paging set (canary DDB/S3 legs, pipeline dead,
+        # tier 3) and the urgent topic's real-time dispatcher — neither reads this email. No qa-smoke check is a
+        # security, privacy or publication incident (every DEPLOY_HEALTH check is an MCP / receipt / schema /
+        # secret-reference / sweep-integrity probe).
         # If the digest publish fails, the email goes out as before (fail towards delivery).
-        if not fails_deploy:
-            ids = ", ".join(f"{c.category}/{c.name}" for c in fails_content)
-            digested = enqueue_digest_line(
-                sns,
-                "qa-smoke: content-truth failures",
-                f"{len(fails_content)} content-truth failure(s) {run_time.strftime('%b %-d')}: {ids}. "
-                "Per-check detail: the [QA] FAIL lines in /aws/lambda/life-platform-qa-smoke.",
-                state="FAIL",
-                dry_run=dry_run,
+        ids = ", ".join(f"{c.category}/{c.name}" for c in (fails_deploy + fails_content))
+        if fails_deploy:
+            digest_name = "qa-smoke: deploy-health failures"
+            digest_reason = (
+                f"{len(fails_deploy)} deploy-health + {len(fails_content)} content-truth failure(s) "
+                f"{run_time.strftime('%b %-d')}: {ids}. Per-check detail: the [QA] FAIL lines in /aws/lambda/life-platform-qa-smoke."
             )
-            if digested:
-                print(
-                    f"[QA] Done — {len(fails_content)} content_truth failure(s), {len(warns)} warnings, digest line queued (no email, #5821)"
-                )
-                return {"statusCode": 200, "body": _body(False, digested=True)}
+        else:
+            digest_name = "qa-smoke: content-truth failures"
+            digest_reason = (
+                f"{len(fails_content)} content-truth failure(s) {run_time.strftime('%b %-d')}: {ids}. "
+                "Per-check detail: the [QA] FAIL lines in /aws/lambda/life-platform-qa-smoke."
+            )
+        digested = enqueue_digest_line(sns, digest_name, digest_reason, state="FAIL", dry_run=dry_run)
+        if digested:
+            print(
+                f"[QA] Done — {len(fails)} failures ({len(fails_deploy)} deploy_health, {len(fails_content)} content_truth), "
+                f"{len(warns)} warnings, digest line queued (no email, #5821/#6243)"
+            )
+            return {"statusCode": 200, "body": _body(False, digested=True)}
 
         subject = (
             f"🔴 QA: {len(fails)} failure{'s' if len(fails) > 1 else ''} "
