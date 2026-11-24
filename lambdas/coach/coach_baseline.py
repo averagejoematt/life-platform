@@ -100,6 +100,26 @@ NO_RULE = "no rule for this kind of call"
 NOT_GRADED = "the call was not graded right or wrong"
 INCOMPLETE_SPEC = "the call's spec is incomplete"
 
+#: The reason CODE behind each stored reason string (#6254). The string is what a stamp stores (and what a frozen
+#: copy of a stamp keeps, e.g. ``original_grade.baseline``); the code is what a reader-facing sentence is chosen by,
+#: so no served sentence has to carry the stored words. A new reason above needs a code here
+#: (``tests/test_unscorable_sentence_6254.py`` holds the two sets equal).
+UNSCORABLE_CODES = {
+    NO_FILED_READING: "no_filed_reading",
+    NO_GRADED_READING: "no_graded_reading",
+    NO_RULE: "no_rule",
+    NOT_GRADED: "not_graded",
+    INCOMPLETE_SPEC: "incomplete_spec",
+}
+
+
+def unscorable_code(baseline: Any) -> str | None:
+    """The reason code of an unscorable stamp, or None for a stored reason this module does not name."""
+    if not isinstance(baseline, dict):
+        return None
+    return UNSCORABLE_CODES.get(str(baseline.get("unscorable") or NO_RULE).strip())
+
+
 _AGGREGATE_SUFFIXES = (("_30day_avg", 30), ("_14day_avg", 14), ("_7day_avg", 7))
 
 

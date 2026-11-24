@@ -261,7 +261,9 @@ def test_the_simple_guess_is_read_off_the_rows_frozen_verdict():
     assert calls.simple_guess({**direction, "right": True}, "direction", coach_right=True)["short"] == "also right"
     unscorable = {"rule": "nothing_changes", "version": 1, "unscorable": "no reading before the call was filed"}
     got = calls.simple_guess(unscorable, "number", coach_right=True)
-    assert got["state"] == "unscorable" and got["right"] is None and "no reading before the call was filed" in got["text"]
+    # #6254: fixed words chosen by the reason's code — the stored reason string itself is never served
+    assert got["state"] == "unscorable" and got["right"] is None and "no reading before the call was filed" not in got["text"]
+    assert got["text"] == f"{calls.UNSCORABLE_LEAD}: {calls.UNSCORABLE_WORDS['no_filed_reading']}."
     assert calls.simple_guess({"rule": "some_other_rule", "right": True}, "number", coach_right=True)["state"] == "not_yet_scored"
 
 
