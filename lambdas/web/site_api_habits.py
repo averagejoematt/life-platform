@@ -194,108 +194,19 @@ def habit_streaks(*, _g) -> dict:
     )
 
 
-def _empty_vice_portfolio(today: str) -> dict:
-    """/api/vice_streaks with nothing tracked — the same keys as a full response."""
-    return {"vices": [], "unnamed": RP.streak_portfolio([])["unnamed"], "total_held": 0, "total_tracked": 0, "as_of_date": today}
-
-
 def vice_streaks(*, _g) -> dict:
     """
-    GET /api/vice_streaks
-    Returns content-filtered vice streak portfolio from habit_scores.vice_streaks.
-    Computes current streak, 90-day best, and relapse count per vice.
-    Blocked vices (per content_filter.json) are excluded from the response.
+    GET /api/vice_streaks — NOT PUBLISHED (#6224, owner ruling 2026-11-23).
 
-    #5948: only the categories docs/DATA_GOVERNANCE.md allows to be named are served as rows
-    (``vices``, each with its ``category``); every other restraint habit reaches the wire as ONE
-    unlabelled aggregate (``unnamed``), decided by ``common.restraint_publication``. The totals
-    count both. No name, id or slug of an unnamed habit is in the response.
+    The owner: "Check those disclosures against my explicit public-content approvals ... Where authorization is
+    absent, withhold the data rather than silently grandfathering it into the public site." No explicit owner
+    approval was found for naming any restraint category, for any restraint streak or relapse count, or for the
+    count of the private categories (``common.restraint_publication``, RESTRAINT_DATA_PUBLISHED). So the route
+    reads nothing and serves one fact: the section is not published. No name, streak, count or total — nothing
+    from which the number of private categories or their behaviour can be derived.
     Cache: 3600s (1 hr).
     """
-    # Facade state injected via `_g` (the delegator's globals()) — same module the test patched.
-    _experiment_date = _g["_experiment_date"]
-    table = _g["table"]
-    today = datetime.now(PT).strftime("%Y-%m-%d")  # #2414: the reader's "today" is the Pacific day
-    ninety_days_ago = _experiment_date(90)
-
-    # Stage0 Fix 1 (2026-05-30): _is_blocked_vice catches both blocked_vices
-    # (exact full names) AND blocked_vice_keywords (substring match). Previously
-    # only the former was filtered here, while the client shipped the keyword
-    # list to do the substring check itself — leaking the keywords in JS.
-    pk = f"{USER_PREFIX}habit_scores"
-    resp = table.query(
-        **with_phase_filter(
-            {  # ADR-058: hide pilot habit scores
-                "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{ninety_days_ago}", f"DATE#{today}"),
-                "ScanIndexForward": True,
-            }
-        )
-    )
-    items = _decimal_to_float(resp.get("Items", []))
-
-    if not items:
-        return _ok(_empty_vice_portfolio(today), cache_seconds=3600)
-
-    # Gather per-vice streak history (chronological)
-    vice_history: dict = {}
-    for item in items:
-        vs = item.get("vice_streaks") or {}
-        if not isinstance(vs, dict):
-            continue
-        for vice_name, streak_val in vs.items():
-            if _is_blocked_vice(vice_name):
-                continue
-            if vice_name not in vice_history:
-                vice_history[vice_name] = []
-            vice_history[vice_name].append(int(streak_val or 0))
-
-    if not vice_history:
-        return _ok(_empty_vice_portfolio(today), cache_seconds=3600)
-
-    # Current state from latest record
-    latest = items[-1]
-    latest_vs = {}
-    raw_vs = latest.get("vice_streaks") or {}
-    if isinstance(raw_vs, dict):
-        latest_vs = {k: int(v or 0) for k, v in raw_vs.items() if not _is_blocked_vice(k)}
-
-    vices = []
-    for vice_name, history in vice_history.items():
-        current_streak = latest_vs.get(vice_name, history[-1] if history else 0)
-        best_streak = max(history) if history else 0
-        # Relapse = streak dropped from >0 to 0
-        relapses = sum(1 for i in range(1, len(history)) if history[i - 1] > 0 and history[i] == 0)
-        vices.append(
-            {
-                "name": vice_name,
-                "current_streak": current_streak,
-                "best_streak": best_streak,
-                "relapses_90d": relapses,
-                "holding": current_streak > 0,
-            }
-        )
-
-    # Sort: holding first, then by streak descending
-    vices.sort(key=lambda v: (-int(v["holding"]), -v["current_streak"]))
-
-    # Count actual holding vices, not the stored `vices_held` aggregate — that field read 7
-    # against 6 tracked (more held than exist), a visible lie on the marquee stat. Derive it.
-    total_held = sum(1 for v in vices if v["holding"])
-    total_tracked = len(vices)
-
-    # #5948: the name leaves only for a category the governance doc allows to be named.
-    portfolio = RP.streak_portfolio(vices)
-
-    return _ok(
-        {
-            "as_of_date": latest.get("date", today),
-            "vices": portfolio["named"],
-            "unnamed": portfolio["unnamed"],
-            "total_held": total_held,
-            "total_tracked": total_tracked,
-        },
-        cache_seconds=3600,
-    )
+    return _ok(RP.unpublished_vice_portfolio(), cache_seconds=3600)
 
 
 def _history_day(item: dict, habitify_by_date: dict, public_by_date: dict, registry: dict, tier0_private: bool) -> dict:
@@ -370,10 +281,9 @@ def habits(*, _g) -> dict:
     # public number — a group share, a keystone, a correlation, a count — moves with it.
     registry = _habit_registry(_g)
     public_by_date: dict = {}  # date -> that day's PUBLIC habit_statuses (the tier-0 recompute reads it)
-    # #5948: a restraint habit outside the nameable categories is counted, never listed. It feeds ONE
-    # unlabelled adherence aggregate and no per-habit row, dot strip or causality entry.
+    # #5948/#6224: a restraint habit that may not be named (since #6224: every one) is neither listed nor
+    # counted — no per-habit row, dot strip, causality entry, group share or aggregate.
     streak_names = _streak_names(items)
-    _unnamed_agg: dict = {}  # name -> {scheduled, completed}; the names never leave this function
     for hi in _decimal_to_float(hab_resp.get("Items", [])):
         date_key = hi.get("date") or hi.get("sk", "").replace("DATE#", "")
         by_group = hi.get("by_group", {})
@@ -389,15 +299,23 @@ def habits(*, _g) -> dict:
                 if isinstance(by_group, dict) and by_group
                 else {(st or {}).get("group") or "Other" for st in statuses.values()}
             )
-            habitify_by_date[date_key] = AP.public_group_pcts(statuses, groups, registry)
+            # #6224: no restraint habit counts toward a group share (no restraint figure is published).
+            habitify_by_date[date_key] = AP.public_group_pcts(
+                {
+                    n: st
+                    for n, st in statuses.items()
+                    if not _is_unnamed_restraint(n, st if isinstance(st, dict) else {}, registry, streak_names)
+                },
+                groups,
+                registry,
+            )
         # Aggregate per-habit completed/scheduled across the window (state taxonomy).
         for hname, st in public_statuses.items():
             if _is_blocked_vice(hname):
                 continue
             st = st if isinstance(st, dict) else {}
             if _is_unnamed_restraint(hname, st, registry, streak_names):
-                _count_unnamed(_unnamed_agg, hname, st)
-                continue
+                continue  # #6224: a restraint habit is neither listed nor counted
             a = _habit_agg.setdefault(hname, {"scheduled": 0, "completed": 0, "group": st.get("group") or "Other", "last_completed": None})
             # #1107: per-date status for the dot strip — done / missed / off (not scheduled).
             # A date with no habitify entry at all stays "absent" (honest absence, ADR-104).
@@ -649,8 +567,6 @@ def habits(*, _g) -> dict:
             "days_tracked": len(history),
             "current_streak": latest_streak,
             "per_habit": per_habit,
-            # #5948: the restraint habits that may not be named, as one unlabelled figure.
-            "restraints_unnamed": RP.adherence_aggregate(_unnamed_agg.values()),
             # #1107: the dot-strip window served explicitly so the front-end can say
             # WHY a strip is short (genesis-clamped) instead of padding it.
             "days_window": {"start": strip_start, "end": today, "n_days": len(strip_dates)},
@@ -681,15 +597,6 @@ def _streak_names(habit_score_rows) -> set:
         if isinstance(vs, dict):
             out.update(str(k) for k in vs)
     return out
-
-
-def _count_unnamed(agg: dict, name, status: dict) -> None:
-    """One day of one unnamed restraint habit into the aggregate's counters (keyed by name only so each
-    habit is counted once in ``count``; the keys never leave ``habits()``)."""
-    u = agg.setdefault(name, {"scheduled": 0, "completed": 0})
-    if status.get("scheduled_today", True):
-        u["scheduled"] += 1
-        u["completed"] += 1 if status.get("status") == "completed" else 0
 
 
 def _pearson(pairs):
@@ -791,11 +698,7 @@ def habit_registry(*, _g) -> dict:
         if known is None:
             raise RuntimeError("restraint set unavailable")
         known |= {str(h.get("name")) for h in habits if RP.is_restraint({"group": h.get("group")})}
-        unnamed_by_group: dict = {}
-        for h in habits:
-            if RP.is_unnamed(h.get("name"), known):
-                g = h.get("group") or "Other"
-                unnamed_by_group[g] = unnamed_by_group.get(g, 0) + 1
+        # #6224: a restraint habit that may not be named is not listed and not counted (no count, no group).
         habits = [h for h in habits if not RP.is_unnamed(h.get("name"), known)]
 
         # Stable group ordering: known P40-ish groups first, then alpha, "Other" last.
@@ -805,7 +708,6 @@ def habit_registry(*, _g) -> dict:
             if g not in seen:
                 seen.add(g)
                 groups.append(g)
-        groups += [g for g in sorted(unnamed_by_group) if g not in seen]  # #5948: a group of unnamed restraints only
         groups.sort(key=lambda g: (g == "Other", g.lower()))
         habits.sort(key=lambda x: ((x.get("group") or "Other") == "Other", (x.get("group") or "Other").lower(), x.get("name", "").lower()))
         # P1.1 — auto-derived taxonomy (time-of-day / type / logical group), labeled derived.
@@ -816,7 +718,6 @@ def habit_registry(*, _g) -> dict:
                 "habits": habits,
                 "groups": groups,
                 "count": len(habits),
-                "restraints_unnamed": {"count": sum(unnamed_by_group.values()), "by_group": dict(sorted(unnamed_by_group.items()))},
                 "source": source,
                 "taxonomy_derived": True,
             },

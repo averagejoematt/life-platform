@@ -23,6 +23,7 @@ from common.constants import EXPERIMENT_START_DATE  # ADR-058
 from common.journal_silence import public_body  # #5131: the one public-surface guard
 from common.pacific_time import PACIFIC as PT  # #2414: reader-facing days anchor in the Pacific frame
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
+from content.public_claim_screen import last_food_arrival_day, screen_public_lines  # #6224: the public-line screen
 from health import character_privacy  # owner ruling 2026-11-05: the published level is the public variant's
 from health.sensor_absence import carry_forward_ok  # #3204: may a value be republished as current?
 
@@ -345,6 +346,23 @@ def lambda_handler(event, context):
             "days_in": max(1, (datetime.now(PT).date() - exp_start).days + 1) if datetime.now(PT).date() >= exp_start else 0,
         },
     }
+
+    # ── 6b. #6224: the preserved AI lines pass the public-line screen on every refresh ─────
+    # The morning brief screens them when it writes; re-screening here means a line written before the
+    # screen existed (or before its export arrived) leaves the live file at the next refresh, without a
+    # manual write. A withheld line is dropped, never rewritten.
+    hero_line, excerpt, narratives = screen_public_lines(
+        payload.get("elena_hero_line"),
+        payload.get("brief_excerpt"),
+        payload.get("group_narratives"),
+        data_day=payload.get("elena_hero_line_as_of"),
+        last_arrival_day=last_food_arrival_day(table, USER_ID),
+    )
+    payload["elena_hero_line"], payload["brief_excerpt"] = hero_line, excerpt
+    if narratives is not None:
+        payload["group_narratives"] = narratives
+    if not hero_line:
+        payload["elena_hero_line_as_of"] = None
 
     # ── 7. Write back ─────────────────────────────────────────────────────────
     _s3.put_object(

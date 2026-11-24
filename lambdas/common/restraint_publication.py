@@ -1,8 +1,12 @@
 """Publication policy for RESTRAINT habits — which of them may be NAMED on a public surface (#5948).
 
-THE RULE (docs/DATA_GOVERNANCE.md, "Editorial guardrails (public surfaces)"): only the *alcohol* and
-*food-delivery* categories are ever named publicly; every other restraint category is aggregate-only
-— streak counts, no labels. This module is the ONE place that rule is decided. A public serializer
+THE RULE (docs/DATA_GOVERNANCE.md, "Editorial guardrails (public surfaces)"): since #6224 (owner ruling
+2026-11-23) NO restraint category is named publicly and NO restraint figure — streak, relapse count,
+held/tracked total, adherence aggregate, the number of private categories — is published, because no
+explicit owner approval for any of them was found (``NAMED_CATEGORIES`` is empty and
+``RESTRAINT_DATA_PUBLISHED`` is False). Until then the alcohol and food-delivery categories were named and
+every other restraint category was served as unlabelled aggregates. This module is the ONE place the rule
+is decided. A public serializer
 that holds a restraint habit's name asks here before the name reaches a payload, and serves whatever
 is not nameable through the unlabelled shapes below.
 
@@ -41,12 +45,20 @@ from typing import Any, Iterable, Mapping, Optional
 logger = logging.getLogger(__name__)
 
 # The whole canonical name (lower-cased, whitespace collapsed) of each habit that may be named, and the
-# governance category it stands for. Two categories, by docs/DATA_GOVERNANCE.md. Adding a line here
-# publishes a label: it needs the owner's ruling and an edit to that document, in the same change.
-NAMED_CATEGORIES: dict[str, str] = {
-    "no alcohol": "alcohol",
-    "no solo takeout": "food_delivery",
-}
+# governance category it stands for. EMPTY since #6224 (owner ruling 2026-11-23: "Check those disclosures
+# against my explicit public-content approvals ... Where authorization is absent, withhold the data rather
+# than silently grandfathering it"). The two categories named here until then came from an editorial
+# guardrail that LIMITED naming (docs/DATA_GOVERNANCE.md, migrated from a 2026-06-07 review), not from an
+# owner approval to name them, and no such approval was found. Adding a line here publishes a label: it
+# needs the owner's explicit ruling, recorded in docs/DATA_GOVERNANCE.md, in the same change.
+NAMED_CATEGORIES: dict[str, str] = {}
+
+# #6224: is ANY restraint figure published — a streak, a relapse count, a held/tracked total, an adherence
+# aggregate, the number of private categories? False: no explicit owner approval was found for any of them,
+# and the unlabelled aggregates let a reader count the private categories and read their behaviour by
+# inference (the owner's boundary covers "paraphrases and inferences"). Flipping it is an owner ruling plus a
+# docs/DATA_GOVERNANCE.md edit, never a refactor; tests/test_restraint_withheld_6224.py pins it.
+RESTRAINT_DATA_PUBLISHED = False
 
 RESTRAINT_GROUPS: frozenset = frozenset({"vice"})  # the tracker area the owner files restraint habits under
 REGISTRY_FLAG = "vice"  # PROFILE#v1.habit_registry[name][REGISTRY_FLAG] is truthy for a restraint habit
@@ -106,66 +118,16 @@ def nameable_names(names: Any, restraints: Optional[Iterable[Any]]) -> list:
     return [n for n in (names or []) if not is_unnamed(n, known)]
 
 
-# ── the unlabelled shapes ──────────────────────────────────────────────────────────────────
+# ── the unpublished shape ──────────────────────────────────────────────────────────────────
 #
-# Each takes rows that still carry their names (the serializer's working set) and returns only what
-# may leave. Nothing returned for an unnamed habit carries a name, an id, a slug or a position that
-# says which habit it was: aggregates are sums and maxima, and nameless rows are sorted by value.
+# #6224: the unlabelled aggregates that stood here (a streak portfolio, nameless streak rows, an adherence
+# figure) went when no restraint figure was published; they let a reader count the private categories.
 
 
-def streak_portfolio(rows: Any) -> dict:
-    """Split per-habit streak rows into the rows that may be named and one aggregate for the rest.
-
-    ``rows``: ``[{name, current_streak, best_streak, relapses_90d, holding}]``. Returns
-    ``{"named": [row + category, ...], "unnamed": {tracked, held, longest_streak, best_streak,
-    relapses_90d}}`` — the aggregate always present (zeros when nothing is unnamed), so the shape
-    never says how many categories exist by its own absence."""
-    named: list = []
-    rest: list = []
-    for row in rows or []:
-        if not isinstance(row, Mapping):
-            continue
-        cat = category(row.get("name"))
-        if cat is None:
-            rest.append(row)
-        else:
-            named.append({**row, "category": cat})
-    return {
-        "named": named,
-        "unnamed": {
-            "tracked": len(rest),
-            "held": sum(1 for r in rest if r.get("holding")),
-            "longest_streak": max((int(r.get("current_streak") or 0) for r in rest), default=0),
-            "best_streak": max((int(r.get("best_streak") or 0) for r in rest), default=0),
-            "relapses_90d": sum(int(r.get("relapses_90d") or 0) for r in rest),
-        },
-    }
-
-
-def nameless_streaks(streaks: Any) -> list:
-    """``{name: streak_days}`` as nameless rows ``[{current_streak, holding}]``, longest first.
-
-    For a surface that names no restraint at all (the Mind page): every habit is served the same way,
-    the nameable ones included, and the order is the value's, so a row's position carries no identity."""
-    vals = sorted((int(v or 0) for v in (streaks or {}).values()), reverse=True) if isinstance(streaks, Mapping) else []
-    return [{"current_streak": v, "holding": v > 0} for v in vals]
-
-
-def adherence_aggregate(rows: Any) -> dict:
-    """One adherence figure over the habits that may not be named.
-
-    ``rows``: an iterable of ``{scheduled, completed}`` counters (one per habit). Returns ``{count,
-    scheduled_days, completed_days, adherence_pct}``; ``adherence_pct`` is None when nothing was
-    scheduled (an absence, not a zero)."""
-    rows = [r for r in (rows or []) if isinstance(r, Mapping)]
-    sched = sum(int(r.get("scheduled") or 0) for r in rows)
-    comp = sum(int(r.get("completed") or 0) for r in rows)
-    return {
-        "count": len(rows),
-        "scheduled_days": sched,
-        "completed_days": comp,
-        "adherence_pct": round(comp / sched * 100) if sched else None,
-    }
+def unpublished_vice_portfolio() -> dict:
+    """The whole /api/vice_streaks body while ``RESTRAINT_DATA_PUBLISHED`` is False (#6224): the one fact that the
+    section is not published. No name, streak, count or total — nothing to subtract a private count from."""
+    return {"published": False}
 
 
 # ── the known restraint set, for a serializer that holds names and nothing else ────────────

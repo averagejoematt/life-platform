@@ -90,36 +90,13 @@
         "type": "object"
       },
       "vice_streaks": {
-        "items": {
-          "keys": {
-            "current_streak": {
-              "type": "integer"
-            },
-            "holding": {
-              "type": "boolean"
-            }
-          },
-          "type": "object"
-        },
-        "length_sample": 6,
+        "items": null,
+        "length_sample": 0,
         "type": "array"
       },
       "vice_timeline": {
-        "items": {
-          "keys": {
-            "date": {
-              "type": "string"
-            },
-            "held": {
-              "type": "integer"
-            },
-            "total": {
-              "type": "integer"
-            }
-          },
-          "type": "object"
-        },
-        "length_sample": 29,
+        "items": null,
+        "length_sample": 0,
         "type": "array"
       }
     },

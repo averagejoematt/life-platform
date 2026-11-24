@@ -52,7 +52,7 @@
       "name": "Discipline & Vice Gates",
       "icon": "\u25a5",
       "protocols": [],
-      "habit_names": ["No alcohol", "No solo takeout"],
+      "habit_names": [],
       "supplement_names": [],
       "data_sources": ["Habitify"],
       "experiment_tags": ["discipline"],

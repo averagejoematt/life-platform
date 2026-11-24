@@ -12,7 +12,6 @@ site_api_common (identical binding semantics to the pre-split facade).
 from datetime import datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
-from common import restraint_publication as RP  # #5948: restraint habits are served nameless here
 from experiment.phase_filter import with_phase_filter  # ADR-058
 from health import character_privacy  # owner ruling 2026-11-05: the Mind pillar served is the public variant
 
@@ -20,7 +19,6 @@ from web.site_api_common import (
     PT,
     USER_PREFIX,
     _decimal_to_float,
-    _is_blocked_vice,
     _ok,
 )
 
@@ -95,30 +93,11 @@ def mind_overview(*, _g) -> dict:
     #    ruling 2026-11-05: its entries, average and count are omitted, common.activity_publication's
     #    STATE_OF_MIND_FIELDS); the owner's own tools read the rows directly. Not read here.
 
-    # ── 3. Vice streaks from habit_scores ──
-    # Stage0 Fix 1 (2026-05-30): use _is_blocked_vice (matches both
-    # blocked_vices full names AND blocked_vice_keywords substrings) so the
-    # client doesn't have to ship a keyword list to filter what we missed.
-    hs_pk = f"{USER_PREFIX}habit_scores"
-    hs_resp = table.query(
-        **with_phase_filter(
-            {  # ADR-058: hide pilot habit scores
-                "KeyConditionExpression": Key("pk").eq(hs_pk),
-                "ScanIndexForward": False,
-                "Limit": 1,
-            }
-        )
-    )
-    hs_items = _decimal_to_float(hs_resp.get("Items", []))
-    # #5948: this page names no restraint habit, so the rows are nameless — a streak count and
-    # held/not, longest first (common.restraint_publication). The never-public categories are still
-    # screened out first: they are not counted here at all.
-    vice_data = []
-    if hs_items:
-        latest_hs = hs_items[0]
-        raw_vs = latest_hs.get("vice_streaks") or {}
-        if isinstance(raw_vs, dict):
-            vice_data = RP.nameless_streaks({name: val for name, val in raw_vs.items() if not _is_blocked_vice(name)})
+    # ── 3. (withheld) Restraint streaks — #6224, owner ruling 2026-11-23: no restraint streak, count or held/total
+    #    is published without his explicit approval, and none was found. The nameless rows let a reader count the
+    #    private categories and read their behaviour, and the stored daily held/total counted the never-public
+    #    categories too. Both fields stay in the payload, always empty; nothing is read for them.
+    vice_data: list = []
 
     # ── 4. Social connection quality (interactions) ──
     int_pk = f"{USER_PREFIX}interactions"
@@ -196,22 +175,8 @@ def mind_overview(*, _g) -> dict:
         "daily": meditation_sessions,
     }
 
-    # ── 8. Vice streak timeline (30-day daily history) ──
-    hs_30d_resp = table.query(
-        **with_phase_filter(
-            {  # ADR-058: hide pilot habit scores
-                "KeyConditionExpression": Key("pk").eq(hs_pk) & Key("sk").between(f"DATE#{d30}", f"DATE#{today}"),
-                "ScanIndexForward": True,
-            }
-        )
-    )
-    hs_30d_items = _decimal_to_float(hs_30d_resp.get("Items", []))
-    vice_timeline = []
-    for hs_day in hs_30d_items:
-        day_date = hs_day.get("date") or hs_day.get("sk", "").replace("DATE#", "")
-        # #5948: the day's counts only. The per-day ``streaks`` map this row used to carry was keyed
-        # by habit NAME (and no page read it); a restraint habit's label never rides the timeline.
-        vice_timeline.append({"date": day_date, "held": int(hs_day.get("vices_held", 0)), "total": int(hs_day.get("vices_total", 0))})
+    # ── 8. (withheld) The restraint timeline — #6224, see section 3. Always empty.
+    vice_timeline: list = []
 
     # ── 9. (retired) The energy level read from the journal analysis — journal-derived, private
     #    (owner ruling 2026-11-03); not read.

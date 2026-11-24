@@ -57,6 +57,7 @@ from common.metric_namespaces import SITE_API_METRIC_NAMESPACE  # #3002 — ONE 
 from experiment.phase_filter import with_phase_filter  # noqa: F401 — used by handlers below
 
 from web import (
+    coach_read_screen,  # #6224: the brief's medical screen on the coaching routes' coach reads
     day_window,  # #5584 — the optional ?date= / ?from=&to= window on three read routes
     derived_summary_freshness as _cd_fresh,  # owner ruling 2026-11-03: a read a correction overtook is not current
     narrative_publication,  # owner ruling 2026-11-03: the narrative publication chokepoint
@@ -1364,6 +1365,8 @@ def publication_wire(path, result):
     # (web.public_call_id) — before the taint guard, so an id is never mistaken for withheld words again.
     try:
         result = public_call_id.publicize_response(result)
+        # #6224 (owner ruling 2026-11-23): a coach read with an unsupported medical claim is withheld on the coaching routes
+        result = coach_read_screen.screen_response(path, result)
         return guard_api_response(_in_cr2_scope(path, lambda: narrative_publication.annotate(result)), logger)
     except publication_snapshot.SnapshotUnavailable as e:  # fail closed: no complete record, no response
         logger.error(f"[site_api] {path} refused at the wire: {e}")

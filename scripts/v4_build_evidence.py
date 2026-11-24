@@ -180,7 +180,7 @@ REGISTRY = [
     (
         "vices",
         "Vice streaks",
-        "Days held across the tracked vices, shown honestly. Only the alcohol and takeout ones are named; the rest are counted.",
+        "Not published: the restraint habits he tracks stay private — no names, streaks or counts.",
         "Mind & accountability",
         "data",
         "/api/vice_streaks",
