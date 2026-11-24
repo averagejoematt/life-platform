@@ -9,7 +9,7 @@ serve of site/ with the data routes mocked by committed fixtures
 time in _capture.json; never fetched here):
 
   1. HEIGHT. A page taller than its phone-screen budget fails: six screens for the front
-     page, four elsewhere (the appendix, a reference list, carries its own). The owner approved "about three and a half phone screens, one
+     page, four elsewhere. The owner approved "about three and a half phone screens, one
      idea per section"; a page that grows past its budget has stopped being that page.
   2. No horizontal overflow at 390 px.
   3. No JS error, and the page reaches its ready mark (`data-ck-ready`).
@@ -69,17 +69,12 @@ _RUN_AXE_JS = """async () => {
 
 #: path -> phone-screen budget. Adding a kit page means adding it here.
 KIT_PAGES = {
-    # #4588: after the cut-over the four doors are served at their live paths too, as copies of the
-    # /next/v8/ originals (canonical, noindex and og:url edited; data-ck-base still /next/v8/). The
-    # same budgets hold the copies: a copy that drifts from its original is caught here.
+    # The four kit pages at their live paths (#4588). Their /next/v8/ originals and the kit's deep pages (week, day,
+    # trend, sheet, built, coach, call, appendix) were retired with the /next/ preview in #6223, and their budgets
+    # left this table with them: a page that is not in site/ cannot be rendered from it.
     "/": 6,
     "/start/": 4,
     "/story/": 4,
-    "/coaches/": 4.25,
-    "/next/v8/": 6,
-    "/next/v8/week/": 4,  # round 8: the week band moved here whole from the front page
-    "/next/v8/start/": 4,
-    "/next/v8/story/": 4,
     # #4808/#4809 (ruling 2026-10-11): four screens stand — the bet's reasons are the front
     # card's, and this page's bet card carries a door to them instead of printing both.
     # #4839: 4.25. The live record block now serves #4617's `counted_text` (what the big count
@@ -87,42 +82,7 @@ KIT_PAGES = {
     # which the fixtures lacked until the recapture. That is +0.17 screens (3.83 -> 4.0 locally,
     # 4.06 on the Linux CI renderer). The sentence is the point of #4617, so the budget gives
     # it a quarter screen rather than the sentence being cut.
-    "/next/v8/coaches/": 4.25,
-    "/next/v8/day/": 4,
-    # The longest a day page gets: eight lifts, three coach lines (the most a day holds) and two
-    # settled calls (#4648). What was said and settled is a fifth part of the day, so this one
-    # worst case has five screens; every other day keeps four.
-    "/next/v8/day/?d=2026-10-07": 5,
-    "/next/v8/day/?d=2026-10-01": 4,  # a day with no coach line and no settled call: nothing extra
-    "/next/v8/day/?d=2026-09-24": 4,  # four calls settled: two shown, two folded
-    "/next/v8/trend/": 4,  # the index of every trend
-    "/next/v8/trend/?m=weight": 4,
-    "/next/v8/trend/?m=protein": 4,  # a food trend carries the frequent-meals list too
-    "/next/v8/sheet/": 4,  # the character sheet, plainly: one level, seven areas, the earned badges
-    "/next/v8/built/": 7,  # how it's built: eight sections, the incident list closed
-    # One page per AI coach, one template: the record first, then what settles next, the
-    # bets, the watch list, the longer view, the character and the terms — six screens at most.
-    # #4864: 6.25. The recapture's record sentence is now one clause per kind of call (number, direction,
-    # yes/no, sealed - "on the 23 a guess could also be checked against, the coaches were right 13 times ..."),
-    # not the one-line "Across N checked calls" it was: +0.07 screens here (6.0 -> 6.07 locally). The owner may
-    # rule the sentence shorter on a coach's own page instead; until then the budget carries it.
-    "/next/v8/coach/?c=sleep_coach": 6.25,  # the stage's watch list, a read that changed, one open bet and two settled
-    "/next/v8/coach/?c=physical_coach": 6,  # a stage ladder: the coach has a longer view
-    "/next/v8/coach/?c=glucose_coach": 6,  # sitting out, and the loser of the settled bet
-    "/next/v8/coach/?c=eli_marsh": 6,  # the lead: no calls, no record, no bets
-    "/next/v8/coach/": 4,  # no coach named: one sentence and the way back
-    # The appendix is a reference list, not a reading page: one two-line row per live page that
-    # is off the usual path (69 rows, 9.3 screens on 2026-10-04). Its budget is that list plus
-    # room for a few more rows, so a list that doubles still fails here.
-    "/next/v8/appendix/": 11,
-    # #4864: 5.5. The newest settled call is now a bet (two coaches), and its "The record" block prints each
-    # coach's per-kind comparison sentence in full (four clauses each, see the coach page above): 5.33 screens
-    # locally against 4 when the newest call was a single number call. The same owner question as the coach
-    # page - a shorter record sentence on a page that lists calls - is open; the budget carries it until then.
-    "/next/v8/call/": 5.5,  # the newest settled call above the list of all of them
-    "/next/v8/call/?id=sleep-20260907-8436f03290": 4,  # one number call
-    "/next/v8/call/?id=bet-20260930-994b3d89f6": 4,  # a bet: both sides' words, the longest a call page gets
-    "/next/v8/call/?id=sleep-20260907-0000000000": 4,  # an address that names no call: one sentence and the list
+    "/coaches/": 4.25,
 }
 
 #: route glob -> fixture file. Every route the kit pages' modules read.
@@ -291,11 +251,11 @@ def main():
     try:
         with sync_playwright() as pw:
             browser = pw.chromium.launch()
-            control = measure(browser, base_url, _over_long(fixtures), {"/next/v8/": KIT_PAGES["/next/v8/"]}, axe=False)
-            if not any("phone screens tall" in f for f in control["/next/v8/"]["findings"]):
-                print(f"kit_page_gate: BLIND — the over-long control page passed the height check ({control['/next/v8/']})")
+            control = measure(browser, base_url, _over_long(fixtures), {"/": KIT_PAGES["/"]}, axe=False)
+            if not any("phone screens tall" in f for f in control["/"]["findings"]):
+                print(f"kit_page_gate: BLIND — the over-long control page passed the height check ({control['/']})")
                 return 2
-            print(f"control: an over-long front page ({control['/next/v8/']['screens']} screens) fails, as it must")
+            print(f"control: an over-long front page ({control['/']['screens']} screens) fails, as it must")
             results = measure(browser, base_url, fixtures, KIT_PAGES, out_dir=args.out)
             browser.close()
     finally:

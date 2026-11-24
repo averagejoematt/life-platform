@@ -18,7 +18,6 @@ the static HTML but survives in a renderer is still on the page.
 from __future__ import annotations
 
 import glob
-import json
 import os
 from collections import deque
 from html.parser import HTMLParser
@@ -128,28 +127,11 @@ def _local_page(href: str, current_rel: str, pages: set[str]) -> str | None:
     return cand if cand in pages else None
 
 
-APPENDIX_PAGES_JSON = os.path.join(REPO, "scripts", "v8_appendix_pages.json")
-APPENDIX_NODE = "site/next/v8/appendix/index.html"
-
-
-def appendix_sinks() -> set[str]:
-    """The footnote appendix and every page it lists, as repo-relative paths (#4588).
-
-    Owner ruling 2026-10-18 on #4588: the appendix link in the kit footer is a footnote, not
-    navigation, so the pages the appendix lists are not counted against NAV_REACH_CEILING. A
-    sink is neither counted nor walked. Only the LISTED rows are sinks: a page the appendix
-    holds back (`held`, e.g. the v5 doors that open on the same view as a listed page) is a
-    real page a reader can still meet through the v5 chrome, so it counts.
-    """
-    with open(APPENDIX_PAGES_JSON, encoding="utf-8") as f:
-        data = json.load(f)
-    return {APPENDIX_NODE} | {"site" + row["url"] + "index.html" for row in data["pages"]}
-
-
 def static_reach(start: str = "site/index.html", sinks: set[str] | None = None) -> set[str]:
     """Every reader page reachable from `start` by static <a href> links (any depth).
 
-    A page in `sinks` is not counted and not walked (the appendix rule, `appendix_sinks`)."""
+    A page in `sinks` is not counted and not walked. (The v8 footnote appendix was the one sink set; it was
+    retired with the /next/ preview in #6223, and the v9 appendix is a sink in the build's own census, www/reach.json.)"""
     pages = set(reader_pages())
     sinks = sinks or set()
     seen = {start}

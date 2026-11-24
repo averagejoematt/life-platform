@@ -11,15 +11,11 @@ their URLs — served-but-unlinked is the sanctioned state (/method/state/ alrea
 Static reach only (see tests/site_text.py's stated limit): links evidence.js injects at
 runtime are not counted, so this ratchet is a floor on the nav, not a census of every path.
 
-#4588 (the front-page cut-over, owner ruling 2026-10-18): the kit footer links the footnote
-appendix, which lists every off-path page. The appendix is a footnote, not navigation, so the
-walk treats the appendix and the pages it lists as sinks (`site_text.appendix_sinks`): not
-counted, not walked. What is still counted through them is honest reach — `/subscribe/` keeps
-its v5 chrome, so its menu walks the v5 doors (`/cockpit/`, `/data/`, `/coaching/`,
-`/protocols/`, `/method/`, `/story/build/`) and those count: 17 on the rebuilt rehearsal, 18 on
-the 2026-10-23 refresh (main pointed the v8 coaches page at the kit call list), the
-new ceiling. Re-pouring `/subscribe/` on the kit would take that to ~10, but it is a new screen
-and the epic's rule 4 builds nothing beneath a screen the owner has not seen.
+#4588 (the front-page cut-over, owner ruling 2026-10-18) made the v8 footnote appendix and the pages it
+listed sinks of the walk. #6223 retired the /next/ preview — the appendix and the kit's deep pages with
+it — so the v8 walk has no sinks left and reaches only what site/index.html still links to a page in the
+repo. Since the v9 cut-over (#5534) the ratcheted measure is the v9 build's own census, www/reach.json,
+where the v9 appendix (/system/everything-else/) is the sink.
 """
 
 from __future__ import annotations
@@ -53,7 +49,7 @@ def test_static_reach_only_ratchets_down():
             f"A new link must come off the front page or the ceiling be lowered elsewhere first. Linked: {reach['depth1']}"
         )
         return
-    reach = site_text.static_reach(sinks=site_text.appendix_sinks())
+    reach = site_text.static_reach()
     assert len(reach) <= NAV_REACH_CEILING, (
         f"{len(reach)} reader pages are now reachable from / by static links (ceiling {NAV_REACH_CEILING}). "
         f"A new page must be unlisted (served, not linked) or the ceiling lowered elsewhere first. "
@@ -77,25 +73,10 @@ def test_v9_reach_census_is_committed_and_under_its_ceiling():
 
 
 def test_reach_census_is_not_vacuous():
-    # #4588: the kit front page's own static links are the preview paths (data-ck-base="/next/v8/"),
-    # so the doors a reader reaches from / are the four kit doors there plus the follow page.
-    reach = site_text.static_reach(sinks=site_text.appendix_sinks())
-    assert "site/index.html" in reach
-    assert len(reach) >= 6, "home + the kit doors must at least be reachable — the crawler is blind"
-    for door in (
-        "site/next/v8/start/index.html",
-        "site/next/v8/story/index.html",
-        "site/next/v8/coaches/index.html",
-        "site/next/v8/built/index.html",
-        "site/subscribe/index.html",
-    ):
-        assert door in reach, door
-    assert "site/next/v8/appendix/index.html" not in reach, "the appendix is a footnote, not navigation (ruling 2026-10-18)"
-
-
-def test_the_appendix_sinks_are_real_and_change_the_count():
-    """The control: the sinks are served pages, and taking them out of the walk is what the
-    ruling does — a walk without them reaches far more (the appendix lists every off-path page)."""
-    sinks = site_text.appendix_sinks()
-    assert site_text.APPENDIX_NODE in sinks and len(sinks) > 50
-    assert len(site_text.static_reach()) > len(site_text.static_reach(sinks=sinks)) + 50
+    """The walk from the v8 kit front page still sees a page: its follow door. The kit doors it used to reach were the
+    /next/v8/ pages, retired in #6223 — a static link to one of them now resolves to no page in the repo (the edge 301s
+    it to its successor), so the walk must not count any, and no reader page may live under site/next/ again."""
+    reach = site_text.static_reach()
+    assert "site/index.html" in reach and "site/subscribe/index.html" in reach, sorted(reach)
+    back = sorted(p for p in site_text.reader_pages() if p.startswith("site/next/"))
+    assert not back, f"a page is back under the retired preview prefix: {back}"

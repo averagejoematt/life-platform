@@ -154,7 +154,15 @@ def _resolves(path: str, table: dict, pages: set) -> bool:
         if not dst:
             break
         path = dst
-    return path in pages or (SITE / path.lstrip("/")).is_file() or path in KNOWN_V9_DESTINATIONS_6115
+    return path in pages or (SITE / path.lstrip("/")).is_file() or path in KNOWN_V9_DESTINATIONS_6115 or path in _v9_static_routes()
+
+
+def _v9_static_routes() -> set:
+    """The v9 build's fixed pages (www/owned_paths.json `static_routes`) once the build owns the root. #6223: a retired
+    /next/v8/ deep page 301s to the v9 page that took its job (/system/, /system/forecasts/, …), and those pages are
+    written by the build, never under site/. Exact paths only — the data-built routes stay in KNOWN_V9_DESTINATIONS_6115."""
+    owned = json.loads((ROOT / "www" / "owned_paths.json").read_text(encoding="utf-8"))
+    return set(owned["static_routes"]) if owned.get("live_at_root") else set()
 
 
 def _existing_urls(table: dict, pages: set) -> set:

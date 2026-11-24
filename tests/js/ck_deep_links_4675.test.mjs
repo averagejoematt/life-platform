@@ -114,13 +114,3 @@ test("the links into a deep page carry from=, so the page they open can return",
   const day = DEPTH.daySettledHTML("2026-09-24", BODY, BASE);
   assert.ok(hrefs(day).length > 0 && hrefs(day).every((h) => h.endsWith("&from=2026-09-24")));
 });
-
-// The shells: every deep page's back link has the id the mount points, and its static
-// fallback (what a reader sees before scripts run, or without from=) is the front page.
-test("every deep page shell's back link starts at the front page, ready to be pointed", () => {
-  const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "site", "next", "v8");
-  for (const page of ["coach", "call", "day", "trend"]) {
-    const html = readFileSync(join(root, page, "index.html"), "utf8");
-    assert.match(html, /<a class="ck-header__back" id="ck-back" href="\/next\/v8\/">← Average Joe Matt<\/a>/, page);
-  }
-});
