@@ -186,6 +186,81 @@ def test_records_sharing_an_id_are_skipped_never_guessed():
     assert G.withheld_words(archived, [{"id": "x", "t": ""}]) == []
 
 
+# ── rule C's declared time-varying fields (#6223) ─────────────────────────────────────────────────────────────────────
+def _status(comment, description="a synthetic component description"):
+    return {"groups": [{"id": "compute", "components": [{"id": "sheet", "description": description, "comment": comment}]}]}
+
+
+def _api_run(route, archived, live_doc, snapshot, site_dir):
+    member = "api/" + route[len("/api/") :].replace("/", "__") + ".json"
+    return run(clean_bucket(), clean_archive(**{member: json.dumps(archived)}), snapshot, site_dir, live={route: live_doc})
+
+
+def test_a_status_comment_that_cleared_is_not_a_withholding_and_a_withheld_narrative_string_still_is_6223(snapshot, site_dir):
+    """The 2026-11-23 failure: the archive caught a status sentence the board has since cleared to null. Nothing was
+    withheld. Beside it, in the same run, a call's words the live route withholds are still a violation."""
+    archived = _status("Last computed: 2d ago and runs daily")
+    v, facts = _api_run("/api/status", archived, _status(None), snapshot, site_dir)
+    assert v == [] and facts["api_volatile_null"] == 1
+    assert "1 declared time-varying status field(s)" in G.report(v, facts, "check")
+    calls = {"calls": [{"id": "c1", "claim": "a synthetic call worded in full"}]}
+    blob = clean_archive(**{"api/status.json": json.dumps(archived), "api/calls.json": json.dumps(calls)})
+    live = {"/api/status": _status(None), "/api/calls": {"calls": [{"id": "c1", "claim": None}]}}
+    v, _ = run(clean_bucket(), blob, snapshot, site_dir, live=live)
+    assert [(c, r) for c, r, _d in v] == [("archive", "C")] and "/api/calls" in v[0][2] and "calls[id=c1].claim" in v[0][2]
+
+
+def test_a_status_string_the_gate_emptied_and_every_undeclared_status_field_still_red_6223(snapshot, site_dir):
+    """Only JSON null on the declared field is excused. "" is what the publication gate leaves behind
+    (narrative_publication.scrub_payload), and the status code never writes it — so "" stays a violation, as does any
+    other string of the same route going empty."""
+    archived = _status("Last computed: 2d ago and runs daily")
+    v, facts = _api_run("/api/status", archived, _status(""), snapshot, site_dir)
+    assert rules(v) == [("archive", "C")] and "components[id=sheet].comment" in v[0][2] and facts["api_volatile_null"] == 0
+    v, _ = _api_run("/api/status", archived, _status("Last computed: 2d ago and runs daily", description=None), snapshot, site_dir)
+    assert rules(v) == [("archive", "C")] and "components[id=sheet].description" in v[0][2]
+    src = open(os.path.join(REPO, "lambdas", "web", "site_api_status.py"), encoding="utf-8").read()
+    for form in ('comment = ""', '"comment": ""', "comment = ''", "\"comment\": ''"):
+        assert form not in src, f"the status code must clear a comment to None, never to an empty string ({form!r})"
+
+
+def test_the_volatile_allowlist_holds_operational_fields_only_6223(snapshot, site_dir, monkeypatch):
+    """Guard the set: the exception cannot reach a route that carries anyone's words. Every archived route outside
+    OPERATIONAL_ROUTES is shown still red on the exact archived/live pair the status route is excused for, and a
+    declaration outside the operational routes is ignored by the code and refused here."""
+    from operational import public_archive_registry as reg
+
+    words = ("chapter", "coach", "call", "predict", "ledger", "journal", "diary", "narrat", "story", "note", "word", "quote")
+    leaves = {"claim", "text", "body", "summary", "narrative", "quote", "note", "reason", "title", "excerpt", "statement", "short"}
+    assert set(G.OPERATIONAL_ROUTES) == {"/api/status"}, (
+        "a new operational route is a privacy decision: show its handler serves system state only (no row's words), " "then pin it here"
+    )
+    assert set(G.OPERATIONAL_ROUTES) <= set(reg.ARCHIVE_ROUTES)
+    for route in G.OPERATIONAL_ROUTES:
+        assert not [w for w in words if w in route], route
+    for (route, shape), why in G.VOLATILE_FIELDS.items():
+        assert route in G.OPERATIONAL_ROUTES, f"{route} is not an operational route — its fields cannot be declared volatile"
+        assert shape.rsplit(".", 1)[-1] not in leaves and "=" not in shape and len(why.split()) >= 8, (route, shape)
+    archived, live_doc = _status("Last computed: 2d ago and runs daily"), _status(None)
+    not_red = []
+    for route in sorted(set(reg.ARCHIVE_ROUTES) - set(G.OPERATIONAL_ROUTES)):
+        assert G.volatile_fields(route) == frozenset()
+        if G.withheld_words(archived, live_doc, volatile=G.volatile_fields(route)) != ["groups[id=compute].components[id=sheet].comment"]:
+            not_red.append(route)
+    assert not_red == [], f"routes where a string served null is no longer a violation: {not_red}"
+    # a declaration on a words-bearing route does nothing: the code reads VOLATILE_FIELDS only through OPERATIONAL_ROUTES
+    monkeypatch.setitem(G.VOLATILE_FIELDS, ("/api/ledger_export", "items[].simple_guess.text"), "a planted entry, eight words or more long")
+    ledger = {"items": [{"item_id": "sleep:1", "simple_guess": {"text": "a synthetic guess sentence here"}}]}
+    v, _ = _api_run("/api/ledger_export", ledger, {"items": [{"item_id": "sleep:1", "simple_guess": {"text": None}}]}, snapshot, site_dir)
+    assert rules(v) == [("archive", "C")] and "items[item_id=sleep:1].simple_guess.text" in v[0][2]
+
+
+def test_a_field_shape_keeps_the_field_and_drops_only_the_record_selectors_6223():
+    assert G.field_shape("groups[id=compute].components[id=apple_health:glucose].comment") == "groups[].components[].comment"
+    assert G.field_shape("items[item_id=sleep:1].simple_guess.text") == "items[].simple_guess.text"
+    assert G.field_shape("comment") == "comment"
+
+
 def test_a_sentinel_on_a_preview_page_is_caught(snapshot, site_dir):
     bucket = clean_bucket() + [obj("site/next/v9/index.html", body=PAGE.replace("synthetic", "DO-NOT-PUBLISH"))]
     v, _ = run(bucket, clean_archive(), snapshot, site_dir)

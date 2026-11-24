@@ -4847,7 +4847,16 @@ GUARD_PROOFS["guard::scripts/check_public_copies.py"] = {
         "carries the first edition): LIVE read-only `--check` with a copied live snapshot whose chapter_editions.json "
         "names week-12 as served — exit 1, four rule-G violations (page, posts.json, kit, archive); the unmodified snapshot "
         "exit 0. FIXTURES: rule G's page test → `if False:` 2 failed / 22 passed; the guard's copy_issues call fed an "
-        "empty plan 1 failed / 23 passed; restored 24 passed (tests/test_legacy_chapter_addresses_6193.py)."
+        "empty plan 1 failed / 23 passed; restored 24 passed (tests/test_legacy_chapter_addresses_6193.py). #6223 "
+        "(2026-11-23) taught rule C's words comparison one declared exception — VOLATILE_FIELDS, a field of an "
+        "OPERATIONAL_ROUTES route served as JSON null (the /api/status component comment) — after it failed every root "
+        "build of the day on status sentences that had simply cleared. Five plants in the real tracked file, ONE AT A "
+        "TIME, restored from a byte copy (md5 c4793532… before and after), tests/test_check_public_copies_6083.py: the "
+        "exemption → `if False:` 1 failed / 23 passed (the cleared comment reds again); the `live is None and` test "
+        'dropped 1 failed / 23 (a string the gate emptied to "" would pass); volatile_fields\' OPERATIONAL_ROUTES '
+        "check dropped 1 failed / 23 (a planted /api/ledger_export entry is honoured); the field-shape match → "
+        "`volatile` alone 1 failed / 23 (the whole route excused); the words test → False 4 failed / 20. Restored 24 "
+        "passed. LIVE read-only `--check` after the change: see the PR."
     ),
     "proved_on": "2026-11-16",
 }
