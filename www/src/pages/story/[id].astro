@@ -21,6 +21,9 @@ import { CHAPTER_TRUTH_LIVE, chapterByline, headerRevisedLine, recordAsOf } from
 import { ARCHIVE_SEGMENT, archivalFor, archivalWhat, editionFor, editionReading } from "../../lib/chapter_editions.js"; // #6193
 import { bodyForPage } from "../../lib/chapter_body.js";
 import { loadChapterEditions } from "../../lib/snapshot.js";
+import FeaturedNext from "../../components/FeaturedNext.astro";
+import { PATH, PATH_CHAPTERS } from "../../lib/editorial.js"; // the editorial release: the featured path, in this page's chrome only
+import { FEATURE_LIST } from "../../lib/feature.js";
 
 export async function getStaticPaths() {
   const all = await loadAll();
@@ -212,6 +215,16 @@ const recordNote = recordLead
   : null;
 const body = placedBody ? placeRecordNote(placedBody, recordNote).html : placedBody;
 // the read-along's text as spoken, without the voice tool's pause marks ("Voss — — an AI" reads "Voss — an AI")
+// The featured path and the features beside a chapter (owner, review 14) live in the page chrome below the walk, never in
+// the chapter's approved text: the next step on the path for the two chapters it frames, and "Revisited" for a chapter an
+// editorial retrospective sits beside.
+const pathNext =
+  c.status === "published" && c.id === PATH_CHAPTERS["rate-flag"]
+    ? { label: "Next on the featured path · 2 of 3", to: PATH[1].to, words: "How it started: the night before day one →" }
+    : c.status === "published" && c.id === PATH_CHAPTERS.prologue
+      ? { label: "Next on the featured path · 3 of 3", to: PATH[2].to, words: "Where the AI got it wrong: Park's Blind Spot, revisited →" }
+      : null;
+const revisits = c.status === "published" ? FEATURE_LIST.filter((f: any) => f.chapter_id === c.id) : [];
 const spoken = (line: string) => String(line || "").replace(/—\s*—/g, "—");
 const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
 ---
@@ -402,6 +415,18 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
         )
       }
     </div></div>
+    {
+      (pathNext || revisits.length > 0) && (
+        <div class="wrap" style="margin-top:18px" data-chapter-chrome-links>
+          <div class="ed-narrow">
+            {revisits.map((f: any) => (
+              <FeaturedNext label="Revisited" to={f.path} words={`An editorial retrospective, ${dayInWords(f.dated)} →`} />
+            ))}
+            {pathNext && <FeaturedNext label={pathNext.label} to={pathNext.to} words={pathNext.words} />}
+          </div>
+        </div>
+      )
+    }
     {/* coming back (2026-11-15): the end of a chapter is where a reader decides whether to follow */}
     <div class="wrap" style="margin-top:18px">
       <p class="muted" style="font-size:14px;display:flex;flex-wrap:wrap;gap:6px 24px;align-items:baseline">

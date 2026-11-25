@@ -6,6 +6,7 @@ import { getCollection } from "astro:content";
 import { buildIndex, COLLECTION_OF, connected } from "./edges.js";
 import { hasPage } from "./url.js";
 import { applyChapterSummaries, applyDerivedCovers } from "./chapter_truth.js";
+import { applyChapterNumbers } from "./format.js";
 import { editionFor, editionOrdinal } from "./chapter_editions.js";
 
 let _cache = null;
@@ -36,6 +37,8 @@ export async function loadAll() {
   // #6177 (behind lib/chapter_truth.js CHAPTER_TRUTH_LIVE; a no-op while it is off): a published chapter with no stored
   // covered days reads the days the platform's rule gives every other chapter, so every page names one span for it.
   applyDerivedCovers(byType.chapter || []);
+  // the editorial release (owner, review 14): chapters numbered date-first, one number on every page (format.js)
+  applyChapterNumbers(byType.chapter || []);
   // the ONE summary rule (chapter_truth.js applyChapterSummaries): a served edition's own summary (#6193 B4), else the
   // owner-approved replacement (owner ruling 2026-11-22 §10, behind CHAPTER_TRUTH_LIVE), else the served one
   const editionDoc = await loadChapterEditions();

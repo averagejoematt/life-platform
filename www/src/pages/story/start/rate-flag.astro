@@ -1,0 +1,53 @@
+---
+// Start here · 1 of 3: The Rate Flag, framed (the featured path, owner review 12). The chapter itself is unchanged; this
+// card's summary is the approved framing copy (review 14), its numbers and dates are the chapter's own (chapterMeta).
+import Base from "../../../layouts/Base.astro";
+import FeaturedPath from "../../../components/FeaturedPath.astro";
+import FeaturedNext from "../../../components/FeaturedNext.astro";
+import { PATH, PATH_CHAPTERS, dashRange, dayNo } from "../../../lib/editorial.js";
+import { dayInWords } from "../../../lib/format.js";
+import { loadAll, loadChapterEditions } from "../../../lib/snapshot.js";
+import { editionFor, editionReading } from "../../../lib/chapter_editions.js";
+import { loadEditorial } from "../../../lib/editorial_data.js";
+import { hasPage, href, pathOf } from "../../../lib/url.js";
+
+const all = await loadAll();
+const ed = await loadEditorial();
+const c = all.get("chapter", PATH_CHAPTERS["rate-flag"]);
+const live = c && c.status === "published" && hasPage("chapter", c) ? c : null;
+const e = live ? editionFor(await loadChapterEditions(), live.id) : null;
+const minutes = e ? editionReading(e).read_minutes : live?.read_minutes;
+const start = ed.inputs.startDate;
+const meta = live
+  ? [
+      `Chapter ${live.chapter_no ?? live.week}`,
+      dashRange(live.covers_start, live.covers_end, { year: true }),
+      live.covers_start ? `days ${dayNo(live.covers_start, start)}–${dayNo(live.covers_end, start)}` : null,
+      live.published_at ? `published ${dayInWords(live.published_at)}` : null,
+      minutes ? `Read · ${minutes} min` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ")
+  : null;
+const status = ed.edition ? [ed.edition.day_n != null ? `Day ${ed.edition.day_n}` : null, dayInWords(ed.edition.as_of)].filter(Boolean).join(" · ") : null;
+---
+
+<Base title="Start here: The Rate Flag" top="story" status={status}>
+  <section class="section">
+    <div class="wrap">
+      <FeaturedPath on="rate-flag" />
+      <div class="ed-narrow">
+        <p class="ed-kicker">Start here · 1 of 3</p>
+        <div class="ed-card" data-path-card="rate-flag">
+          {meta && <p class="ed-meta">{meta}</p>}
+          <h1>The Rate Flag</h1>
+          <p class="ed-dek">
+            One ordinary week in November. The platform's flag said he was losing weight faster than it would like; in a sentence he approved for publication, he wrote that it wasn't fast enough. He also benched the heaviest weight of the experiment so far, and nothing that week could say whether the pace was costing muscle.
+          </p>
+          {live && <a class="ed-btn" href={href(pathOf("chapter", live.id))}>Read the chapter →</a>}
+        </div>
+        <FeaturedNext label="Next · 2 of 3" to={PATH[1].to} words="How it started: the night before day one →" />
+      </div>
+    </div>
+  </section>
+</Base>

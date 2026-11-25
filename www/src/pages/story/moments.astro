@@ -114,7 +114,8 @@ const lineSvg = lineData ? theLine({ ...lineData, aria: lineAria }) : null;
                 {m.chapter ? (
                   // #6081: a chapter's moment names it as the chapter page does — its week, its days, its publication
                   <p class="label">
-                    <span data-ch-week>{m.kicker}</span>
+                    {/* date-first numbering (owner, review 14): the chapter's number as its page prints it, then the week, the historical identifier */}
+                    {(m.chapter.week ?? 0) >= 1 && chMeta(m.chapter).number !== "—" ? <><span data-ch-no>{chMeta(m.chapter).name}</span> · {m.kicker}</> : <span data-ch-week>{m.kicker}</span>}
                     {chMeta(m.chapter).window && <> · <span data-ch-window>{chMeta(m.chapter).window}</span></>}
                     {chMeta(m.chapter).published && <> · <span data-published>{chMeta(m.chapter).published}</span></>}
                   </p>

@@ -1,0 +1,58 @@
+---
+// An editorial feature at its own, permanent address (owner authorisation, review 14, 2026-11-24): a separately dated
+// retrospective beside a chapter, never a rewrite of it. The text is src/features/<text_file>, published byte for byte;
+// the build refuses a text that does not hash to its pinned SHA-256 (features.json), and
+// scripts/check_www_build.py::feature_fingerprint rebuilds the bytes from this page on every build and deploy scan.
+// The page adds chrome only, outside the text: the path, the step, and the day it was first published.
+import { createHash } from "node:crypto";
+import Base from "../../../layouts/Base.astro";
+import FeaturedPath from "../../../components/FeaturedPath.astro";
+import FeaturedNext from "../../../components/FeaturedNext.astro";
+import { FEATURE_LIST, featureHead, renderFeature } from "../../../lib/feature.js";
+import { PATH } from "../../../lib/editorial.js";
+import { dayInWords } from "../../../lib/format.js";
+import { loadAll, loadChapterEditions } from "../../../lib/snapshot.js";
+import { archivalFor } from "../../../lib/chapter_editions.js";
+import { hasPage, href } from "../../../lib/url.js";
+
+const TEXTS = import.meta.glob("../../../features/*.txt", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
+
+export async function getStaticPaths() {
+  return FEATURE_LIST.map((f: any) => ({ params: { id: f.id }, props: { feature: f } }));
+}
+const { feature: f } = Astro.props as { feature: any };
+const text = TEXTS[`../../../features/${f.text_file}`];
+if (typeof text !== "string") throw new Error(`feature ${f.id}: no text file ${f.text_file}`);
+const got = createHash("sha256").update(text, "utf8").digest("hex");
+if (got !== f.sha256) throw new Error(`feature ${f.id}: the text hashes to ${got}, not the approved ${f.sha256} — publish only the approved bytes`);
+if (`/story/features/${f.id}/` !== f.path) throw new Error(`feature ${f.id}: path ${f.path} is not its address`);
+
+const all = await loadAll();
+const editions = await loadChapterEditions();
+// a site address in the text becomes a link only when this build has the page (else the address stays plain text)
+const linkFor = (path: string): string | null => {
+  let m;
+  if ((m = /^\/story\/([^/]+)\/first-edition\/$/.exec(path))) return archivalFor(editions, m[1]) ? href(path) : null;
+  if ((m = /^\/story\/([^/]+)\/$/.exec(path))) return hasPage("chapter", all.get("chapter", m[1])) && all.get("chapter", m[1]) ? href(path) : null;
+  if ((m = /^\/data\/day\/([^/]+)\/$/.exec(path))) return all.get("day", m[1]) ? href(path) : null;
+  if ((m = /^\/system\/ledger\/([^/]+)\/$/.exec(path))) return all.get("prediction", m[1]) ? href(path) : null;
+  if ((m = /^\/system\/coaches\/([^/]+)\/$/.exec(path))) return all.get("coach", m[1]) ? href(path) : null;
+  return null;
+};
+const head = featureHead(text);
+const body = renderFeature(text, linkFor, f.links || {});
+---
+
+<Base title={head.title} top="story" status={dayInWords(f.first_published)} description={head.dek} ogType="article">
+  <section class="section">
+    <div class="wrap">
+      <FeaturedPath on="feature" />
+      <div class="ed-narrow">
+        <p class="ed-kicker">Start here · 3 of 3</p>
+        <p class="ed-meta" data-first-published>First published {dayInWords(f.first_published)}</p>
+        <article class="fx" data-feature={f.id}><div data-published-body data-feature-text={f.id} set:html={body} /></article>
+        <FeaturedNext label="Next" to={PATH[3].to} words="What happens next →" />
+      </div>
+    </div>
+  </section>
+</Base>

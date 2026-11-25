@@ -2349,3 +2349,496 @@ figure.moment-own {
   border-left-color: var(--rule);
   color: var(--muted);
 }
+
+/* ── The editorial release (owner authorisation, review 14, 2026-11-24): the homepage's first screen, the featured path
+   (Start here), the feature, the coaches' introduction and "What happens next" — drawn as the approved preview drew them,
+   in the site's tokens. Every class is ed-/fx- prefixed so nothing above changes. */
+.ed-kicker {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 12px;
+}
+.ed-narrow {
+  max-width: 680px;
+}
+.ed-wide {
+  max-width: 920px;
+}
+.ed-h1 {
+  font-family: var(--sans);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.02;
+  font-size: 42px;
+  margin: 0 0 16px;
+}
+.ed-dek {
+  font-family: var(--serif);
+  font-size: 20px;
+  line-height: 1.45;
+  color: var(--muted);
+  margin: 0 0 16px;
+}
+.ed-meta {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--faint);
+  line-height: 1.6;
+  margin: 0 0 6px;
+}
+.ed-btn {
+  display: inline-block;
+  background: var(--ink);
+  color: var(--paper);
+  text-decoration: none;
+  font-weight: 700;
+  padding: 14px 18px;
+  font-size: 16px;
+  min-height: 44px;
+  line-height: 1.3;
+  border-radius: 2px;
+}
+.ed-btn:hover {
+  background: var(--ink);
+  color: var(--paper);
+  text-decoration: underline;
+}
+.ed-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  margin: 14px 0 0;
+  font-weight: 700;
+}
+.ed-links a {
+  text-decoration: none;
+  border-bottom: 2px solid currentColor;
+  padding: 6px 0;
+}
+.ed-opening {
+  font-family: var(--serif);
+  font-size: 20px;
+  line-height: 1.5;
+  margin: 0 0 8px;
+  text-wrap: pretty;
+}
+.ed-dataline {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 20px;
+  line-height: 1.5;
+}
+.ed-tagline {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 15px;
+  color: var(--faint);
+  margin: 18px 0 0;
+}
+.ed-how {
+  border-top: 1px solid var(--rule);
+  margin-top: 26px;
+  padding-top: 12px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.ed-how b,
+.ed-lbl {
+  font-family: var(--mono);
+  font-size: var(--fs-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--muted);
+}
+.ed-how p {
+  margin: 4px 0 10px;
+}
+.ed-hero h1 {
+  font-size: 42px;
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  margin: 0 0 16px;
+}
+.ed-path {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 22px;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+.ed-path li a {
+  display: block;
+  border: 1px solid var(--rule);
+  padding: 4px 8px;
+  border-radius: 2px;
+  color: var(--muted);
+  text-decoration: none;
+}
+.ed-path li.on a {
+  border-color: var(--ink);
+  color: var(--ink);
+  font-weight: 700;
+}
+.ed-card {
+  border: 1px solid var(--ink);
+  padding: 18px 16px;
+  margin: 8px 0 22px;
+}
+.ed-card h1 {
+  font-size: 34px;
+}
+.ed-card .ed-btn {
+  margin-top: 4px;
+}
+.ed-next {
+  border-top: 2px solid var(--ink);
+  margin-top: 34px;
+  padding-top: 14px;
+}
+.ed-next a {
+  font-weight: 800;
+  font-size: 18px;
+  text-decoration: none;
+}
+.ed-next .ed-lbl {
+  display: block;
+  margin-bottom: 4px;
+}
+.ed-q {
+  border-top: 2px solid var(--ink);
+  padding-top: 12px;
+  margin-top: 24px;
+}
+.ed-q .n {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+.ed-q h2,
+.ed-coach h2 {
+  font-family: var(--sans);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-size: 24px;
+  line-height: 1.15;
+  margin: 2px 0 8px;
+}
+.ed-q p {
+  font-family: var(--serif);
+  font-size: 19px;
+  line-height: 1.5;
+  margin: 0;
+}
+.ed-sub {
+  border: 1px solid var(--ink);
+  padding: 16px;
+  margin-top: 30px;
+}
+.ed-sub h2 {
+  font-family: var(--sans);
+  font-weight: 800;
+  font-size: 24px;
+  margin: 0 0 6px;
+}
+.ed-sub p {
+  font-family: var(--serif);
+  font-size: 18px;
+  margin: 0 0 12px;
+}
+.ed-coach {
+  border-top: 2px solid var(--ink);
+  padding-top: 12px;
+  margin-top: 26px;
+}
+.ed-coach .role {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+.ed-coach p.c {
+  font-family: var(--serif);
+  font-size: 18px;
+  line-height: 1.5;
+  margin: 0 0 10px;
+}
+.ed-details,
+.fx details {
+  border-top: 1px solid var(--rule);
+  padding: 10px 0;
+}
+.ed-details.last,
+.fx details.last {
+  border-bottom: 1px solid var(--rule);
+}
+.ed-details summary,
+.fx summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 15px;
+  min-height: 32px;
+  font-family: var(--sans);
+}
+.ed-details .body,
+.fx .fx-body {
+  font-size: 14px;
+  line-height: 1.55;
+  padding: 6px 0 4px;
+  font-family: var(--sans);
+}
+.ed-details .body li,
+.fx .fx-body li {
+  margin-bottom: 6px;
+}
+.ed-details ul,
+.fx .fx-body ul,
+.fx .fx-body ol {
+  padding-left: 18px;
+  margin: 6px 0;
+}
+.fx .fx-body p {
+  margin: 0 0 10px;
+}
+.ed-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 2px solid var(--ink);
+}
+.ed-rows li {
+  border-bottom: 1px solid var(--rule);
+  padding: 12px 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2px;
+}
+.ed-rows .d {
+  font-weight: 800;
+  font-size: 16px;
+}
+.ed-rows .s {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+.ed-rows .t a {
+  font-family: var(--serif);
+  font-size: 19px;
+  text-decoration: none;
+}
+.ed-rows li.gap {
+  background: var(--rule2);
+  padding: 12px 10px;
+}
+.ed-rows li.gap .t {
+  font-family: var(--serif);
+  font-size: 16px;
+  color: var(--muted);
+}
+.ed-rows .extra {
+  font-size: 14px;
+  margin-top: 2px;
+}
+/* the feature: the approved text, placed (lib/feature.js) */
+.fx [data-feature-text] {
+  display: block;
+}
+.fx .fx-head {
+  display: flex;
+  flex-direction: column;
+}
+.fx .fx-head h1 {
+  font-family: var(--sans);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.02;
+  font-size: 42px;
+  margin: 0 0 16px;
+}
+.fx .fx-dateline {
+  order: -1;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--faint);
+  line-height: 1.6;
+  margin: 0 0 6px;
+}
+.fx .fx-dek {
+  font-family: var(--serif);
+  font-size: 20px;
+  line-height: 1.45;
+  color: var(--muted);
+  margin: 0 0 16px;
+}
+.fx .fx-byline {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0 0 6px;
+  line-height: 1.5;
+  font-family: var(--sans);
+}
+.fx .fx-story {
+  border-top: 2px solid var(--ink);
+  margin-top: 18px;
+  padding-top: 6px;
+}
+.fx .fx-story h2 {
+  font-family: var(--sans);
+  font-weight: 800;
+  font-size: 19px;
+  margin: 28px 0 6px;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--ink);
+}
+.fx .fx-story p {
+  font-family: var(--serif);
+  font-size: 19px;
+  line-height: 1.55;
+  margin: 0 0 16px;
+}
+.fx .fx-story li {
+  font-family: var(--serif);
+  font-size: 18px;
+  line-height: 1.5;
+  margin: 0 0 8px;
+}
+.fx h2.fx-evidence {
+  font-family: var(--sans);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-size: 24px;
+  line-height: 1.15;
+  margin: 36px 0 10px;
+}
+.fx .fx-ev-intro {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--faint);
+  line-height: 1.6;
+  margin: 0 0 6px;
+}
+.fx a,
+.ed-rows a,
+.ed-q a,
+.ed-coach a {
+  overflow-wrap: anywhere;
+}
+@media (min-width: 900px) {
+  .ed-h1,
+  .ed-hero h1,
+  .fx .fx-head h1 {
+    font-size: 64px;
+  }
+  .ed-card h1 {
+    font-size: 44px;
+  }
+  .fx .fx-story p {
+    font-size: 20px;
+  }
+  .ed-hero-grid {
+    display: grid;
+    grid-template-columns: 1.05fr 1fr;
+    gap: 56px;
+    align-items: start;
+  }
+  .ed-rows li {
+    grid-template-columns: 250px 190px 1fr;
+    align-items: baseline;
+    gap: 16px;
+  }
+}
+.ed-q h3.ed-q-h {
+  font-family: var(--sans);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-size: 24px;
+  line-height: 1.15;
+  margin: 2px 0 8px;
+}
+/* the preview's link colour on the editorial pages: links are cobalt */
+.ed-links a,
+.ed-next a,
+.ed-rows a,
+.ed-how a,
+.ed-q a,
+.ed-narrow p a,
+.ed-dek a,
+.ed-coach a,
+.ed-meta a,
+.fx a {
+  color: var(--cobalt);
+}
+.ed-qd {
+  padding-top: 10px;
+  margin-top: 14px;
+}
+.ed-qd summary {
+  cursor: pointer;
+  min-height: 44px;
+  list-style-position: outside;
+}
+.ed-qd summary .ed-q-h {
+  font-family: var(--sans);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-size: 20px;
+  line-height: 1.2;
+}
+.ed-qd p {
+  margin-top: 8px;
+}
+/* the front page's phone-height budget (tests/web_preview_gate.py FRONT_PAGE_SCREENS = 7.5): tighter spacing on a phone,
+   no word removed */
+@media (max-width: 860px) {
+  .ed-how {
+    margin-top: 16px;
+    line-height: 1.45;
+  }
+  .ed-opening {
+    font-size: 19px;
+    line-height: 1.4;
+  }
+  .ed-how p {
+    font-size: 13px;
+  }
+  #what-happens-next.section {
+    padding-top: 24px;
+    padding-bottom: 24px;
+  }
+  .ed-hero h1 {
+    margin-bottom: 12px;
+  }
+  #what-happens-next .ed-kicker {
+    margin-bottom: 6px;
+  }
+  .ed-tagline {
+    margin-top: 12px;
+  }
+  .ed-dataline {
+    margin-bottom: 14px;
+  }
+  .ed-links {
+    margin-top: 10px;
+  }
+  #what-happens-next .ed-h1 {
+    font-size: 28px !important;
+    margin-bottom: 8px;
+  }
+  .ed-qd {
+    margin-top: 6px;
+    padding-top: 6px;
+  }
+  .ed-qd summary .ed-q-h {
+    font-size: 17px;
+  }
+}

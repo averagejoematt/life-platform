@@ -715,6 +715,7 @@ def _feed(monkeypatch, tmp_path, chapters):
         v4_build_rss, "urlopen", lambda url, timeout=0: _Resp(json.dumps(chapters if url == v4_build_rss.CHAPTERS_SRC else posts).encode())
     )
     monkeypatch.setattr(v4_build_rss, "_blog_posts", lambda: [])
+    monkeypatch.setattr(v4_build_rss, "_feature_posts", lambda: [])  # #6258: the feature's own item is held by its own test
     out = tmp_path / f"rss-{len(list(tmp_path.iterdir()))}.xml"
     monkeypatch.setattr(v4_build_rss, "OUT", out)
     monkeypatch.setattr(v4_build_rss, "OUT_ALIAS", tmp_path / "feed.xml")

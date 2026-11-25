@@ -73,4 +73,9 @@ NAV_REACH_CEILING = 18
 # is on the front page by his ruling, and a measured dimension's tile links to its page (two in the
 # fixture build, three live). Not padding: every new depth-1 link is one of the portrait's measured
 # dimensions. The ceiling is the fixture census this tree measures (reach.json), as before.
-NAV_REACH_CEILING_V9 = 12
+# 2026-11-24: 12 → 15 by the owner's ruling on PR #6263 (decision 2A, the editorial release, #6258): "Raise the
+# homepage destination limit from 12 to 15 for this design … Do not use the higher limit as an invitation to add more
+# links." The approved first screen adds four doors (the path's two framing cards, /system/coaches/, the grading method
+# /system/calibration/) and the old "Start here: the moments" button is retired with it — one primary entry, secondary
+# routes lower. The fixture build measures 15. For this design only; shrink-only from here, as before.
+NAV_REACH_CEILING_V9 = 15

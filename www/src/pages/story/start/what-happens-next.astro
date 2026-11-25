@@ -1,0 +1,21 @@
+---
+// The featured path's fourth step: "What happens next" (owner, review 11; approved as supplied, review 14), then the
+// invitation to follow. The same component, over the same computation, as the homepage's block.
+import Base from "../../../layouts/Base.astro";
+import FeaturedPath from "../../../components/FeaturedPath.astro";
+import WhatHappensNext from "../../../components/WhatHappensNext.astro";
+import { dayInWords } from "../../../lib/format.js";
+import { loadEditorial } from "../../../lib/editorial_data.js";
+
+const ed = await loadEditorial();
+const status = ed.edition ? [ed.edition.day_n != null ? `Day ${ed.edition.day_n}` : null, dayInWords(ed.edition.as_of)].filter(Boolean).join(" · ") : null;
+---
+
+<Base title="What happens next" top="start" status={status}>
+  <section class="section">
+    <div class="wrap">
+      <FeaturedPath on="next" />
+      <WhatHappensNext page follow quote />
+    </div>
+  </section>
+</Base>

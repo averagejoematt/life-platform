@@ -1,0 +1,58 @@
+---
+// "What happens next" (owner, review 11 §What happens next; the three questions approved as supplied, review 14). On the
+// homepage it replaces "What nobody knows yet"; on /story/start/what-happens-next/ it is the path's fourth step. Both read
+// lib/editorial_data.js loadEditorial(), the computation the homepage's data line reads (data-progress-* marks, checked
+// across pages by scripts/check_www_build.py::progress_agreement).
+import { dayInWords } from "../lib/format.js";
+import { whatHappensNext } from "../lib/editorial.js";
+import { loadEditorial } from "../lib/editorial_data.js";
+import { href } from "../lib/url.js";
+
+interface Props {
+  /** the page's own heading (the path page) or a section heading (the homepage) */
+  page?: boolean;
+  follow?: boolean;
+  /** his dated 8 November 2026 sentence about the coaches — the path's page only, never the homepage (owner, PR #6263) */
+  quote?: boolean;
+}
+const { page = false, follow = false, quote = false } = Astro.props as Props;
+const ed = await loadEditorial();
+const qs = whatHappensNext({ p: ed.p, checked: ed.checked, own: { ...ed.own, coaches_changed: quote ? ed.own.coaches_changed : null } });
+// a date is kept on one line at 390 px (non-breaking spaces; the words are unchanged)
+const asOf = ed.edition?.as_of ? dayInWords(ed.edition.as_of)!.replace(/ /g, "\u00a0") : null;
+---
+
+<div class="ed-narrow" data-what-happens-next data-progress-below={ed.p ? ed.p.below : undefined} data-progress-day={ed.p?.day ?? undefined}>
+  <p class="ed-kicker">What happens next{asOf && ` · as of ${asOf}`}</p>
+  {page ? <h1 class="ed-h1">What nobody knows yet</h1> : <h2 class="ed-h1" style="font-size:34px">What nobody knows yet</h2>}
+  {
+    qs.map((x) =>
+      page ? (
+        <section class="ed-q">
+          <span class="n">{x.n}</span>
+          <h2>{x.q}</h2>
+          <p>{x.text}</p>
+        </section>
+      ) : (
+        /* the homepage carries the same three questions, each closed until a reader opens it: the front page keeps
+           its phone-height budget (tests/web_preview_gate.py FRONT_PAGE_SCREENS) with every word of the block on it */
+        <details class="ed-q ed-qd">
+          <summary>
+            <span class="n">{x.n}</span> <span class="ed-q-h">{x.q}</span>
+          </summary>
+          <p>{x.text}</p>
+        </details>
+      ),
+    )
+  }
+  <p style={`margin-top:${page ? 26 : 10}px;font-weight:700`}><a href={href("/system/ledger/")}>The open predictions, with their dates →</a></p>
+  {
+    follow && (
+      <div class="ed-sub" id="follow">
+        <h2>Follow along</h2>
+        <p>The numbers every Sunday; a Chronicle chapter whenever a new one is approved.</p>
+        <a class="ed-btn" href="https://averagejoematt.com/subscribe/">Follow by email →</a>
+      </div>
+    )
+  }
+</div>

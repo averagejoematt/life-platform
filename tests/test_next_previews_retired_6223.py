@@ -132,7 +132,7 @@ def test_the_redirect_check_can_fail():
     assert any("/next/v8/day/: retired, with no redirect" in f for f in redirect_findings(missing))
     assert any("never-linked" in f for f in redirect_findings({**good, "/next/v8/": "/legacy/"}))
     assert any("second hop" in f for f in redirect_findings({**good, "/next/v8/built/": "/now/"}))
-    assert any("no page the site serves" in f for f in redirect_findings({**good, "/next/v8/coach/": "/system/coaches/"}))
+    assert any("no page the site serves" in f for f in redirect_findings({**good, "/next/v8/coach/": "/system/no-such-page/"}))
     assert any("rehearsal prefix" in f for f in redirect_findings({**good, "/next/v9/": "/"}))
 
 

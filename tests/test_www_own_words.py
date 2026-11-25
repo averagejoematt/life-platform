@@ -26,7 +26,8 @@ APPROVED = {
     "beginning": ["/story/moments/", "/story/week-01/"],  # #6193: + the prologue (owner ruling 2026-11-22, final approval §7)
     "content": ["/"],
     "ai_verdict": ["/system/"],
-    "coaches_changed": ["/system/calibration/"],
+    # + the path's "What happens next" page only, dated — never the homepage (owner decision on PR #6263, 2026-11-24)
+    "coaches_changed": ["/system/calibration/", "/story/start/what-happens-next/"],
     "pace": ["/story/*/", "/story/moments/"],
 }
 
