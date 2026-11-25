@@ -287,7 +287,7 @@ const standing: Standing[] = [
         <div>
           <p class="ed-opening" data-first-person>I’m Matt. British, in Seattle. On 6 September 2026 I weighed 327.3 pounds and started again, by my own count ‘the 15th or 16th reset in a few months’. This time a team of AI coaches is part of it. I can’t yet say whether the coaches are helping.</p>
           {dataLine && <p class="ed-dataline" data-progress-line data-progress-below={ed.p.below}>{dataLine}</p>}
-          <a class="ed-btn" href={href(PATH[0].to)}>Start with one week: The Rate Flag{rateFlagMin ? ` · ${rateFlagMin} min` : ""} →</a>
+          <a class="ed-btn" href={href(PATH[0].to)}>Start with one week: The Rate Flag{rateFlagMin ? ` · ${rateFlagMin} min` : ""}{"\u00a0→"}</a>
           <div class="ed-links"><a href={href(PATH[1].to)}>How it started</a><a href={href("/system/coaches/")}>Meet the coaches</a></div>
           <p class="ed-tagline">Can an ordinary person engineer an extraordinary life?</p>
           <div class="ed-how" data-how-checked>
