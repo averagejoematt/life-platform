@@ -73,15 +73,20 @@ def _region(page: str, fid: str) -> str | None:
     return m.group(1) if m else None
 
 
-def _unlink(region: str) -> tuple[str, list[str]]:
-    """The region with each permitted link unwrapped (its words kept), and a problem for any other link."""
+def _unlink(region: str, phrases: dict | None = None) -> tuple[str, list[str]]:
+    """The region with each permitted link unwrapped (its words kept), and a problem for any other link. Permitted: an
+    address linking to itself, or a phrase features.json declares under `links` linking to its declared page."""
     problems = []
+    phrases = phrases or {}
 
     def one(m: re.Match) -> str:
         words = html_lib.unescape(m.group(2))
         href = _HREF.search(m.group(1))
-        if "<" in m.group(2) or not _ADDRESS.match(words) or not href or not html_lib.unescape(href.group(1)).endswith(words):
-            problems.append(f"a link inside the text is not an address linking to itself: {words[:60]!r}")
+        target = html_lib.unescape(href.group(1)) if href else ""
+        to_self = _ADDRESS.match(words) and target.endswith(words)
+        declared = words in phrases and target.endswith(phrases[words])
+        if "<" in m.group(2) or not href or not (to_self or declared):
+            problems.append(f"a link inside the text is neither an address linking to itself nor a declared phrase: {words[:60]!r}")
         return m.group(2)
 
     return _ANCHOR.sub(one, region), problems
@@ -143,9 +148,9 @@ class _Blocks(HTMLParser):
             self.cur[1] += f"&#{name};"
 
 
-def rebuild(region: str) -> tuple[str | None, list[str], list[str]]:
+def rebuild(region: str, phrases: dict | None = None) -> tuple[str | None, list[str], list[str]]:
     """(the rebuilt text, its blocks one per line as the verifier models them, problems) from a page's feature region."""
-    plain, problems = _unlink(region)
+    plain, problems = _unlink(region, phrases)
     p = _Blocks()
     p.feed(plain)
     if p.nested:
@@ -182,7 +187,7 @@ def feature_fingerprint(dist: str, features: list[dict] | None = None, features_
         if region is None:
             out.append(f"{rel}: no feature text region")
             continue
-        text, lines, problems = rebuild(region)
+        text, lines, problems = rebuild(region, f.get("links") or {})
         out += [f"{rel}: {x}" for x in problems]
         want = CE.prose_blocks(CE.render_html(approved))
         out += [f"{rel}: {x}" for x in CE._blocks_problems(lines, want, None)]
@@ -284,15 +289,22 @@ def self_test() -> list[str]:
     import tempfile
 
     missed = []
-    text = "# A title\n\nA dateline · dated 1 January 2026\n\nThe summary of it.\n\nBy someone.\n\n## A section\n\nA paragraph naming /story/week-08/ here.\n\n- one\n- two\n\n## The evidence\n\nOpen these.\n\n### Sources\n\n1. first\n2. second"
-    f = {"id": "t", "path": "/story/features/t/", "text_file": "t.txt", "sha256": CE.text_sha256(text), "first_published": "2026-01-02"}
+    text = "# A title\n\nA dateline · dated 1 January 2026\n\nThe summary of it.\n\nBy someone.\n\n## A section\n\nA paragraph naming /story/week-08/ here and her coach page too.\n\n- one\n- two\n\n## The evidence\n\nOpen these.\n\n### Sources\n\n1. first\n2. second"
+    f = {
+        "id": "t",
+        "path": "/story/features/t/",
+        "text_file": "t.txt",
+        "sha256": CE.text_sha256(text),
+        "first_published": "2026-01-02",
+        "links": {"her coach page": "/system/coaches/sleep_coach/"},
+    }
 
     def page(body: str, first: str = "2 January 2026") -> str:
         return f'<p class="ed-meta" data-first-published>First published {first}</p><article class="fx" data-feature="t"><div data-published-body data-feature-text="t">{body}</div></article>'
 
     good = (
         '<header class="fx-head"><h1>A title</h1><p class="fx-dateline">A dateline · dated 1 January 2026</p><p class="fx-dek">The summary of it.</p>'
-        '<p class="fx-byline">By someone.</p></header><div class="fx-story"><h2>A section</h2><p>A paragraph naming <a href="/story/week-08/">/story/week-08/</a> here.</p>'
+        '<p class="fx-byline">By someone.</p></header><div class="fx-story"><h2>A section</h2><p>A paragraph naming <a href="/story/week-08/">/story/week-08/</a> here and <a href="/system/coaches/sleep_coach/">her coach page</a> too.</p>'
         '<ul><li>one</li><li>two</li></ul></div><h2 class="fx-evidence">The evidence</h2><p class="fx-ev-intro">Open these.</p>'
         '<details class="last"><summary>Sources</summary><div class="fx-body"><ol><li>first</li><li>second</li></ol></div></details>'
     )
@@ -316,6 +328,11 @@ def self_test() -> list[str]:
             ("a heading level changed", good.replace("<h2>A section</h2>", "<p>A section</p>")),
             ("a link whose words are not its address", good.replace('">/story/week-08/</a>', '">chapter five</a>')),
             ("an added word inside the text", good.replace("<li>one</li>", "<li>one <b>new</b></li>")),
+            ("a declared phrase linking elsewhere", good.replace('href="/system/coaches/sleep_coach/"', 'href="/system/coaches/webb/"')),
+            (
+                "an undeclared phrase link",
+                good.replace("<p>A paragraph naming", '<p><a href="/story/">A paragraph</a> naming'),
+            ),
         ):
             if not run(bad):
                 missed.append(f"feature_fingerprint missed {name}")

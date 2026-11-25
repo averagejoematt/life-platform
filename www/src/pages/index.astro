@@ -57,7 +57,6 @@ if (roomPublic()) {
 const chapters = [...all.byType.chapter].sort((a, b) => (a.date < b.date ? 1 : -1));
 const published = chapters.filter((c) => c.status === "published");
 const latestChapter = published[0] || null;
-const firstChapter = published[published.length - 1] || null;
 const latestEpisode = latestChapter?.episode_id ? all.get("episode", latestChapter.episode_id) : null;
 // 2026-11-14: the story door said "each with audio" while 2 of 8 published chapters had an episode (the rest are
 // held or never recorded). The count is read, never assumed.
@@ -345,8 +344,8 @@ const standing: Standing[] = [
         )
       }
       <div class="row" style="margin-top:20px">
-        {/* sprint III: a stranger starts with the moments that explain it (each links its chapter); chapter one is a click on */}
-        {firstChapter && <a class="btn" href={href("/story/moments/")}>Start here: the moments that explain it</a>}
+        {/* owner decision 2A on PR #6263 (2026-11-24): the old "Start here: the moments" button is retired; it competed with
+            the first screen's one primary entry into the story (the featured path). /story/moments/ stays reachable from /story/. */}
         {latestChapter && <a class="btn ghost" href="#week">Latest published chapter ↓</a>}
       </div>
     </div>

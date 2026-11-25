@@ -6,7 +6,6 @@
     "/data/journey/",
     "/privacy/",
     "/story/",
-    "/story/moments/",
     "/story/start/prologue/",
     "/story/start/rate-flag/",
     "/story/week-06/",
@@ -18,7 +17,7 @@
     "/system/ledger/disagreements/protein-deep-sleep-2026-10-29/",
     "/system/ledger/sleep-20261005-deepsleep01/"
   ],
-  "depth1_count": 16,
+  "depth1_count": 15,
   "sinks": [
     "/system/everything-else/"
   ],
@@ -60,7 +59,6 @@
     "/privacy/policy/",
     "/story/",
     "/story/features/parks-blind-spot-revisited/",
-    "/story/moments/",
     "/story/program-week-09/",
     "/story/so-far/",
     "/story/start/prologue/",
@@ -104,5 +102,5 @@
     "/system/sources/whoop/",
     "/system/sources/withings/"
   ],
-  "transitive_count": 79
+  "transitive_count": 78
 }

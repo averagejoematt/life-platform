@@ -1,8 +1,8 @@
 """test_editorial_release_6258.py — the editorial release (owner authorisation, review 14, 2026-11-24). Refs #6258.
 
 What the owner authorised, held here:
-  * "Park's Blind Spot, revisited" publishes exactly the approved text — ONE file bound to ONE SHA-256 (f550bac9…, the
-    corrected attribution "Elena's bets. Elena lost her bet …"); the deploy-time check rebuilds the bytes from the built
+  * "Park's Blind Spot, revisited" publishes exactly the approved text — ONE file bound to ONE SHA-256 (68406186…, with
+    "Elena's bets. Elena lost her bet …" and Park's record named as "her coach page", owner decisions on PR #6263); the deploy-time check rebuilds the bytes from the built
     page with the Chronicle edition verifier's own pieces (scripts/www_editorial_checks.py, run by check_www_build.scan).
   * the homepage headline and first-person opening are his words, static, hashed — never a variable or a computation.
   * ONE RSS item for the feature (guid = its permanent address, pubDate = its actual first publication); every existing
@@ -28,7 +28,7 @@ sys.path.insert(0, str(REPO / "lambdas"))
 import v4_build_rss  # noqa: E402
 import www_editorial_checks as W  # noqa: E402
 
-APPROVED_SHA256 = "f550bac9bed6a8f6af841f86bd395163f6c31d8c7aa251a2731481d337d27f87"
+APPROVED_SHA256 = "68406186f91e76fe4b5faa08ed04ce584d20e7befc6ed13e4570a40ad717ed5b"
 FEATURE_PATH = "/story/features/parks-blind-spot-revisited/"
 HEADLINE = "I lost 115 pounds once. I regained it all, and more."
 OPENING = (
@@ -51,6 +51,9 @@ def test_the_feature_text_is_the_approved_bytes_and_one_pin_binds_it():
     text = raw.decode("utf-8")
     assert "- Elena's bets. Elena lost her bet that Thursday 1 October's recovery would come in below 60 (it read 62)" in text
     assert "My bets." not in text and "Matt's bets." not in text
+    # owner decision 1A on PR #6263: the coach page is named in words and linked, never shown as its raw address
+    assert "her record, on her coach page (direction calls" in text and "sleep_coach" not in text
+    assert f["links"] == {"her coach page": "/system/coaches/sleep_coach/"}
     assert f["path"] == FEATURE_PATH and f["dated"] == "2026-11-24"
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", f["first_published"])
 

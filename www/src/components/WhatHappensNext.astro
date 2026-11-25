@@ -12,10 +12,12 @@ interface Props {
   /** the page's own heading (the path page) or a section heading (the homepage) */
   page?: boolean;
   follow?: boolean;
+  /** his dated 8 November 2026 sentence about the coaches — the path's page only, never the homepage (owner, PR #6263) */
+  quote?: boolean;
 }
-const { page = false, follow = false } = Astro.props as Props;
+const { page = false, follow = false, quote = false } = Astro.props as Props;
 const ed = await loadEditorial();
-const qs = whatHappensNext({ p: ed.p, checked: ed.checked, own: ed.own });
+const qs = whatHappensNext({ p: ed.p, checked: ed.checked, own: { ...ed.own, coaches_changed: quote ? ed.own.coaches_changed : null } });
 // a date is kept on one line at 390 px (non-breaking spaces; the words are unchanged)
 const asOf = ed.edition?.as_of ? dayInWords(ed.edition.as_of)!.replace(/ /g, "\u00a0") : null;
 ---

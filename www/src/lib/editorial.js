@@ -97,7 +97,9 @@ export function coachesChecked(calFile, lead, steps) {
 // ── "What happens next": the three questions (owner, review 11 §What happens next; approved as supplied, review 14) ──
 
 /** The three questions with their live figures. `own` maps an own-words key to the served line or null; a sentence
- *  quoting his words is shown only when the platform serves the line (lib/own_words.js). */
+ *  quoting his words is shown only when the platform serves the line (lib/own_words.js). His 8 November sentence about
+ *  the coaches is a dated, historical statement: placed only where `own.coaches_changed` is passed (the path's page,
+ *  never the homepage — owner decision on PR #6263), and always with its full date. */
 export function whatHappensNext({ p, checked, own = {} }) {
   const q1 = p
     ? `It's day ${p.day}. He is ${p.below} pounds ${p.lighter ? "lighter" : "heavier"} and has weighed in on ${p.body.readings} of the ${p.body.days} mornings. He counted this start as “the 15th or 16th reset in a few months”. Only the weeks ahead can answer it.`
@@ -108,7 +110,7 @@ export function whatHappensNext({ p, checked, own = {} }) {
       ? `So far the coaches' predictions are level with a guess that nothing changes: ${checked.k} to ${checked.baseline}, on the ${checked.n} of ${checked.eligible} graded calls that could be checked fairly.`
       : `So far, on the ${checked.n} of ${checked.eligible} graded calls that could be checked fairly, the coaches have ${checked.k} right and a guess that nothing changes ${checked.baseline}: ${checked.words}.`
     : "The coaches' checked record is not served in this build.";
-  const q2b = own.coaches_changed ? ` On 8 November Matt wrote: “${own.coaches_changed}”` : "";
+  const q2b = own.coaches_changed ? ` On 8 November 2026 Matt wrote: “${own.coaches_changed}”` : "";
   const q3b = own.content ? " On 8 November he wrote one sentence: “I feel more content overall.”" : "";
   return [
     { n: "01", q: "Will this attempt last?", text: q1 },

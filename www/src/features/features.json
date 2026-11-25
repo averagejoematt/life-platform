@@ -1,14 +1,17 @@
 {
-  "about": "Editorial features (owner authorisation, review 14, 2026-11-24): a separately dated editorial retrospective beside a chapter, never a rewrite of one. Each feature's text is ONE file in this directory, published byte for byte, and bound to ONE SHA-256 here: the build refuses a text that does not hash to it (www/src/lib/feature.js) and scripts/check_www_build.py rebuilds the text from the built page and checks the hash on every build and every deploy scan. Swapping an approved text is two lines: the file and its sha256. `dated` is the editorial writing date inside the text; `first_published` is the actual first-publication day, shown in the page chrome (outside the text) and used as the RSS item's pubDate (scripts/v4_build_rss.py). `path` never changes once published; it is also the RSS item's guid.",
+  "about": "Editorial features (owner authorisation, review 14, 2026-11-24): a separately dated editorial retrospective beside a chapter, never a rewrite of one. Each feature's text is ONE file in this directory, published byte for byte, and bound to ONE SHA-256 here: the build refuses a text that does not hash to it (www/src/lib/feature.js) and scripts/check_www_build.py rebuilds the text from the built page and checks the hash on every build and every deploy scan. Swapping an approved text is two lines: the file and its sha256. `dated` is the editorial writing date inside the text; `first_published` is the actual first-publication day, shown in the page chrome (outside the text) and used as the RSS item's pubDate (scripts/v4_build_rss.py). `path` never changes once published; it is also the RSS item's guid. `links` names the phrases in the text that link to a page (owner decision on PR #6263: \"her coach page\" links to the coach record); the words stay exactly as approved, and a site address written in the text links to itself.",
   "features": [
     {
       "id": "parks-blind-spot-revisited",
       "path": "/story/features/parks-blind-spot-revisited/",
       "text_file": "parks-blind-spot-revisited.txt",
-      "sha256": "f550bac9bed6a8f6af841f86bd395163f6c31d8c7aa251a2731481d337d27f87",
+      "sha256": "68406186f91e76fe4b5faa08ed04ce584d20e7befc6ed13e4570a40ad717ed5b",
       "dated": "2026-11-24",
       "first_published": "2026-11-25",
-      "chapter_id": "week-08"
+      "chapter_id": "week-08",
+      "links": {
+        "her coach page": "/system/coaches/sleep_coach/"
+      }
     }
   ]
 }

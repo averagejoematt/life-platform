@@ -40,7 +40,7 @@ const linkFor = (path: string): string | null => {
   return null;
 };
 const head = featureHead(text);
-const body = renderFeature(text, linkFor);
+const body = renderFeature(text, linkFor, f.links || {});
 ---
 
 <Base title={head.title} top="story" status={dayInWords(f.first_published)} description={head.dek} ogType="article">

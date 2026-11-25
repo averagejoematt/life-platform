@@ -9,6 +9,8 @@
 //     a reader opens (<details><summary>), "- " / "1. " list items; every other block is one paragraph;
 //   * a site address written in the text ("/story/week-08/") becomes a link whose words are that address, unchanged,
 //     and only when the build has the page (else it stays plain text);
+//   * a phrase features.json names under `links` ("her coach page") becomes a link to its declared page, its words
+//     unchanged (owner decision on PR #6263), again only when the build has the page;
 //   * the dateline, the second block, is drawn above the heading (CSS order; the document order is the text's).
 // Nothing else: no word is added inside the text, and the chrome (the path, the first-publication day) sits outside it.
 
@@ -68,18 +70,29 @@ const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 // a site address as written in the text: /story/…/, /data/…/, /system/…/
 const ADDRESS = /\/(?:story|data|system)\/[A-Za-z0-9_\-/]*?\/(?=[\s);,.:]|$)/g;
 
-/** One line of text as HTML: escaped, and each site address the build has (linkFor(path) → href | null) as a link whose
- *  words are the address itself. */
-export function inline(text, linkFor = () => null) {
+/** One line of text as HTML: escaped, each site address the build has (linkFor(path) → href | null) as a link whose
+ *  words are the address itself, and each declared phrase (`phrases`: words → path) as a link to its page. */
+export function inline(text, linkFor = () => null, phrases = {}) {
+  const t = String(text);
+  const hits = [...t.matchAll(ADDRESS)].map((m) => ({ at: m.index, words: m[0], path: m[0] }));
+  for (const [words, path] of Object.entries(phrases || {})) {
+    let i = t.indexOf(words);
+    while (i >= 0) {
+      hits.push({ at: i, words, path });
+      i = t.indexOf(words, i + words.length);
+    }
+  }
+  hits.sort((a, b) => a.at - b.at);
   let out = "";
   let at = 0;
-  for (const m of String(text).matchAll(ADDRESS)) {
-    const to = linkFor(m[0]);
+  for (const h of hits) {
+    if (h.at < at) continue;
+    const to = linkFor(h.path);
     if (!to) continue;
-    out += esc(text.slice(at, m.index)) + `<a href="${esc(to)}">${esc(m[0])}</a>`;
-    at = m.index + m[0].length;
+    out += esc(t.slice(at, h.at)) + `<a href="${esc(to)}">${esc(h.words)}</a>`;
+    at = h.at + h.words.length;
   }
-  return out + esc(String(text).slice(at));
+  return out + esc(t.slice(at));
 }
 
 /** Every site address the text names, in order, once each (the page's link check reads this). */
@@ -87,15 +100,15 @@ export function featureAddresses(text) {
   return [...new Set([...String(text).matchAll(ADDRESS)].map((m) => m[0]))];
 }
 
-const blockHtml = (b, linkFor) => {
-  if (b.kind === "ul" || b.kind === "ol") return `<${b.kind}>${b.items.map((x) => `<li>${inline(x, linkFor)}</li>`).join("")}</${b.kind}>`;
-  if (b.kind === "p") return `<p>${inline(b.text, linkFor)}</p>`;
-  return `<${b.kind}>${inline(b.text, linkFor)}</${b.kind}>`;
+const blockHtml = (b, linkFor, phrases) => {
+  if (b.kind === "ul" || b.kind === "ol") return `<${b.kind}>${b.items.map((x) => `<li>${inline(x, linkFor, phrases)}</li>`).join("")}</${b.kind}>`;
+  if (b.kind === "p") return `<p>${inline(b.text, linkFor, phrases)}</p>`;
+  return `<${b.kind}>${inline(b.text, linkFor, phrases)}</${b.kind}>`;
 };
 
 /** The approved text as the page's HTML: the head; the story; "## The evidence" (the last "## ") with its one-line
  *  introduction and its "### " sections, each closed until a reader opens it. */
-export function renderFeature(text, linkFor = () => null) {
+export function renderFeature(text, linkFor = () => null, phrases = {}) {
   const b = featureBlocks(text);
   featureHead(text);
   const [h, dateline, dek, byline, ...rest] = b;
@@ -112,10 +125,10 @@ export function renderFeature(text, linkFor = () => null) {
   }
   return [
     `<header class="fx-head"><h1>${inline(h.text, linkFor)}</h1><p class="fx-dateline">${inline(dateline.text, linkFor)}</p><p class="fx-dek">${inline(dek.text, linkFor)}</p><p class="fx-byline">${inline(byline.text, linkFor)}</p></header>`,
-    `<div class="fx-story">${story.map((x) => blockHtml(x, linkFor)).join("")}</div>`,
+    `<div class="fx-story">${story.map((x) => blockHtml(x, linkFor, phrases)).join("")}</div>`,
     `<h2 class="fx-evidence">${inline(rest[ev].text, linkFor)}</h2><p class="fx-ev-intro">${inline(rest[ev + 1].text, linkFor)}</p>`,
     sections
-      .map((s, i) => `<details${i === sections.length - 1 ? ' class="last"' : ""}><summary>${inline(s.title, linkFor)}</summary><div class="fx-body">${s.blocks.map((x) => blockHtml(x, linkFor)).join("")}</div></details>`)
+      .map((s, i) => `<details${i === sections.length - 1 ? ' class="last"' : ""}><summary>${inline(s.title, linkFor)}</summary><div class="fx-body">${s.blocks.map((x) => blockHtml(x, linkFor, phrases)).join("")}</div></details>`)
       .join(""),
   ].join("");
 }

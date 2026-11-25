@@ -31,11 +31,13 @@ if (roomPublic()) {
     room = null;
   }
 }
+// the ask tallies' own date: the publication snapshot's day, which the coach records were read for
+const roomAsOf: string | null = room && ed.edition?.as_of ? dayInWords(ed.edition.as_of) : null;
 const asOf = ed.checked ? dayInWords(ed.checked.asOf).replace(/ \d{4}$/, "") : null;
 const coach = (id: string) => all.get("coach", id);
 const kinds = (id: string) => coach(id)?.versus_guess?.kinds || [];
 const lead = (id: string) => (cal ? coachLead(cal, id) : null);
-const asks = (id: string) => askTally(room?.[id]?.asks?.commitment_counts);
+const asks = (id: string) => (roomAsOf ? askTally(room?.[id]?.asks?.commitment_counts) : null);
 const week: any = ed.edition?.blocks?.week?.state === "ok" ? ed.edition.blocks.week.data : null;
 const floor = floorDays(week?.measures?.food);
 const weekEnd = week?.days?.length ? week.days[week.days.length - 1] : null;
@@ -60,7 +62,7 @@ const webb = coachRecordWords(lead("nutrition_coach"), { short: true });
           <h2>Lisa Park</h2>
           <p class="role">Sleep</p>
           <p class="c">
-            Lisa Park watches his sleep: how long he sleeps, how deep it goes, and how he recovers the next morning. She has one idea she keeps coming back to, in her own words: deep sleep “will rise as Zone 2 training volume builds”. So far his deep sleep hasn't done that in any window that was graded. That says the prediction missed, not that her reasoning is wrong. Her forecasts of how long he will sleep have done better.
+            Lisa Park watches his sleep: how long he sleeps, how deep it goes, and how he recovers the next morning. She has one idea she keeps coming back to, in her own words: deep sleep “will rise as Zone 2 training volume builds”. As of 24 November 2026, his deep sleep hadn't done that in any window that was graded. That says the prediction missed, not that her reasoning is wrong. Her forecasts of how long he will sleep had done better.
           </p>
           <p class="c">What Matt did with her advice is not recorded. <a href={href(feature.path)}>Park's Blind Spot, revisited →</a></p>
           <details class="ed-details last">
@@ -68,10 +70,10 @@ const webb = coachRecordWords(lead("nutrition_coach"), { short: true });
             <div class="body">
               <ul>
                 <li>What she reads, per her page: “sleep architecture, timing, and recovery”.</li>
-                <li>Deep-sleep calls graded wrong on 3, 8, 9 and 26 October 2026, none right. Her 2 November call was due on 23 November and was still ungraded on 24 November.</li>
-                <li>Since 15 November her 17 September call carries a platform note: the grade tests the direction, not the mechanism.</li>
+                <li>Deep-sleep calls graded wrong on 3, 8, 9 and 26 October 2026; none graded right as of 24 November 2026. Her 2 November call was due on 23 November and was still ungraded on 24 November.</li>
+                <li>As of 24 November 2026, her 17 September call carries a platform note, added on 15 November: the grade tests the direction, not the mechanism.</li>
                 {park.rec && <li data-coach-record>As of {asOf}: {park.rec}.{park.dir && park.num && ` Direction calls ${park.dir}; number calls ${park.num}.`}</li>}
-                {asks("sleep_coach") && <li>Asks: {asks("sleep_coach")}; what Matt did: not recorded.</li>}
+                {asks("sleep_coach") && <li>Asks, as of {roomAsOf}: {asks("sleep_coach")}; what Matt did: not recorded.</li>}
               </ul>
             </div>
           </details>
@@ -80,7 +82,7 @@ const webb = coachRecordWords(lead("nutrition_coach"), { short: true });
           <h2>Max Reyes</h2>
           <p class="role">Training</p>
           <p class="c">
-            Max Reyes watches training, cardio, mobility and body composition. Before day one he said the weight would come down over the first fortnight, and it did. In late September he put his view plainly: “Weight will continue to decline, but body composition question remains open.” The first half has held. The second is still open: nothing has measured his body composition directly since a scan in March. Lately his advice has been about protein.
+            Max Reyes watches training, cardio, mobility and body composition. Before day one he said the weight would come down over the first fortnight, and it did. In late September he put his view plainly: “Weight will continue to decline, but body composition question remains open.” As of 24 November 2026, the first half has held. The second was still open on that date: nothing had measured his body composition directly since a scan in March. In the weeks to 24 November 2026, his advice was about protein.
           </p>
           <p class="c">What Matt did with it is not recorded.</p>
           <details class="ed-details last">
@@ -90,8 +92,8 @@ const webb = coachRecordWords(lead("nutrition_coach"), { short: true });
                 <li>What he reads, per his page: “training, cardio, mobility, and body composition”.</li>
                 <li>Sealed weight call of 5 September: first graded wrong on 4 October, graded right under a corrected rule (correction recorded 12 October 2026).</li>
                 <li>His words of 25 September: graded right (weight 313.1 lb on 25 September to 306.1 lb on 9 October).</li>
-                <li>Only DEXA scan on the record: 30 March 2026.</li>
-                <li>Protein asks: graded not met on 16 and 19 November; due 26 and 30 November.{asks("physical_coach") && ` Asks overall: ${asks("physical_coach")}; what Matt did: not recorded.`}</li>
+                <li>Only DEXA scan on the record as of 24 November 2026: 30 March 2026.</li>
+                <li>Protein asks, as of 24 November 2026: graded not met on 16 and 19 November; due 26 and 30 November.{asks("physical_coach") && ` Asks overall, as of ${roomAsOf}: ${asks("physical_coach")}; what Matt did: not recorded.`}</li>
                 {reyes && <li data-coach-record>As of {asOf}: {reyes}.</li>}
               </ul>
             </div>
@@ -101,7 +103,7 @@ const webb = coachRecordWords(lead("nutrition_coach"), { short: true });
           <h2>Marcus Webb</h2>
           <p class="role">Nutrition</p>
           <p class="c">
-            Marcus Webb watches food: protein, how consistently it's logged, and the size of the deficit. Early on he expected protein to slide over the second half of September, and it did, with three days under 100 grams near the end. Since then his advice has kept coming back to eating more protein. In the most recent week on the record, the 170-gram floor wasn't reached on any of the four days logged.
+            Marcus Webb watches food: protein, how consistently it's logged, and the size of the deficit. Early on he expected protein to slide over the second half of September, and it did, with three days under 100 grams near the end. Through 24 November 2026, his advice kept coming back to eating more protein. In the week to 24 November 2026, the 170-gram floor wasn't reached on any of the four days logged.
           </p>
           <p class="c">What Matt did with the advice is not recorded.</p>
           <details class="ed-details last">
@@ -110,7 +112,7 @@ const webb = coachRecordWords(lead("nutrition_coach"), { short: true });
               <ul>
                 <li>What he reads, per his page: “Protein, adherence, and sustainable deficits”.</li>
                 <li>Call of 16 September, protein to trend down over 14 days: 215 g on 16 September to 141 g on 30 September; first graded wrong on 30 September, then right on 9 November (a corrected grade; the original is kept).</li>
-                <li>Protein asks graded not met when they fell due on 19 and 23 November 2026.{asks("nutrition_coach") && ` Asks overall: ${asks("nutrition_coach")}; what Matt did: not recorded.`}</li>
+                <li>Protein asks graded not met when they fell due on 19 and 23 November 2026.{asks("nutrition_coach") && ` Asks overall, as of ${roomAsOf}: ${asks("nutrition_coach")}; what Matt did: not recorded.`}</li>
                 {floor && weekEnd && <li>Protein floor met on {floor.met} of {floor.logged} logged days in the seven days to {dayInWords(weekEnd).replace(/ \d{4}$/, "")} (homepage).</li>}
                 {webb && <li data-coach-record>As of {asOf}: {webb}.</li>}
               </ul>

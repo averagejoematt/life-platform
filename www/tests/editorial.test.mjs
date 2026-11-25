@@ -80,7 +80,7 @@ test("ONE progress computation: the homepage's data line and What happens next s
   assert.ok(qs[0].text.includes(`${p.below} pounds`), "What happens next reads the homepage's figure");
   assert.equal(
     qs[1].text,
-    "So far the coaches' predictions are level with a guess that nothing changes: 37 to 39, on the 72 of 209 graded calls that could be checked fairly. On 8 November Matt wrote: “None of the coaches has really changed what I do.” More graded calls could move this, and so could a day he records acting on a coach's advice.",
+    "So far the coaches' predictions are level with a guess that nothing changes: 37 to 39, on the 72 of 209 graded calls that could be checked fairly. On 8 November 2026 Matt wrote: “None of the coaches has really changed what I do.” More graded calls could move this, and so could a day he records acting on a coach's advice.",
   );
   // his words appear only while the platform serves them
   assert.ok(!whatHappensNext({ p, checked: null, own: {} })[1].text.includes("Matt wrote"));
@@ -97,6 +97,14 @@ test("the homepage and both What-happens-next placements read loadEditorial(), a
   assert.match(whn, /whatHappensNext\(\{ p: ed\.p/);
 });
 
+test("his dated 8 November 2026 sentence about the coaches is on the path's page only, never the homepage (owner, PR #6263)", () => {
+  const home = readFileSync(url("../src/pages/index.astro"), "utf8");
+  const page = readFileSync(url("../src/pages/story/start/what-happens-next.astro"), "utf8");
+  assert.ok(home.includes("<WhatHappensNext />") && !/<WhatHappensNext[^>]*quote/.test(home));
+  assert.ok(page.includes("<WhatHappensNext page follow quote />"));
+  assert.ok(!home.includes("href(\"/story/moments/\")"), "the old 'Start here: the moments' button is retired (decision 2A)");
+});
+
 test("the owner's first-person opening is static text in the page, never an expression", () => {
   const home = readFileSync(url("../src/pages/index.astro"), "utf8");
   const opening = "I’m Matt. British, in Seattle. On 6 September 2026 I weighed 327.3 pounds and started again, by my own count ‘the 15th or 16th reset in a few months’. This time a team of AI coaches is part of it. I can’t yet say whether the coaches are helping.";
@@ -107,11 +115,13 @@ test("the owner's first-person opening is static text in the page, never an expr
 test("the feature's approved text round-trips through its blocks, byte for byte, and hashes to its pin", () => {
   const f = featureMeta("parks-blind-spot-revisited");
   const text = readFileSync(url(`../src/features/${f.text_file}`), "utf8");
-  assert.equal(createHash("sha256").update(text, "utf8").digest("hex"), "f550bac9bed6a8f6af841f86bd395163f6c31d8c7aa251a2731481d337d27f87");
-  assert.equal(f.sha256, "f550bac9bed6a8f6af841f86bd395163f6c31d8c7aa251a2731481d337d27f87");
+  assert.equal(createHash("sha256").update(text, "utf8").digest("hex"), "68406186f91e76fe4b5faa08ed04ce584d20e7befc6ed13e4570a40ad717ed5b");
+  assert.equal(f.sha256, "68406186f91e76fe4b5faa08ed04ce584d20e7befc6ed13e4570a40ad717ed5b");
   assert.equal(featureText(featureBlocks(text)), text);
   assert.equal(featureHead(text).title, "Park's Blind Spot, revisited");
-  assert.equal(featureAddresses(text).length, 13);
+  assert.equal(featureAddresses(text).length, 12);
+  assert.ok(text.includes("her record, on her coach page (direction calls"), "the coach page is named in words, never by its raw address (owner, PR #6263)");
+  assert.ok(!text.includes("sleep_coach"));
   assert.ok(text.includes("- Elena's bets. Elena lost her bet that Thursday 1 October's recovery would come in below 60"));
   const html = renderFeature(text, (p) => p);
   assert.equal((html.match(/<details/g) || []).length, 4, "four evidence sections a reader opens");

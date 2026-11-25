@@ -53,7 +53,7 @@ Everything the main text leaves out is here, in four sections a reader opens.
 - 3 October: /data/day/2026-10-03/ shows no session logged and 24,816 steps; the 12-mile walk is in Chapter 5. The other day without weights was Monday 5 October (a 4.0-mile walk).
 - The four 98s and 308.9 lb: Chapter 5 and its day-by-day list (98 on 2–5 October; 308.9 lb on 6 October).
 - The next week: Chapter 6 (/story/week-09/): lifted Wednesday, Friday, Sunday and Tuesday; walked between; “No day was missing an activity”; bench 225 lb for three.
-- Park: her words and the 15 November note, /system/ledger/sleep-20260917-s5mq86c/ (“The grade neither establishes nor refutes that mechanism.”); her record, /system/coaches/sleep_coach/ (direction calls 0 of 5 against the guess's 5 of 5, “too few to tell”; sleep-length calls right on 30 September and 2 October); the open call, /system/ledger/sleep-20261102-tu2mjns/ (open on 24 November).
+- Park: her words and the 15 November note, /system/ledger/sleep-20260917-s5mq86c/ (“The grade neither establishes nor refutes that mechanism.”); her record, on her coach page (direction calls 0 of 5 against the guess's 5 of 5, “too few to tell”; sleep-length calls right on 30 September and 2 October); the open call, /system/ledger/sleep-20261102-tu2mjns/ (open on 24 November).
 - The weight calls: /system/ledger/physical-20260906-3om4dtu/ (Reyes; stated confidence 0.85; first graded wrong on 4 October; correction recorded 12 October 2026, 16:52 UTC) and Webb's /system/ledger/nutrition-20260906-3om4dsp/; Chapter 6 for the re-grade. 312.1 lb on 4 October: Chapter 5's day-by-day list.
 - Later low mornings: Chapter 6 (9 and 10 October); Chapter 7, The Rate Flag (/story/week-12/; 7 and 10 November).
 

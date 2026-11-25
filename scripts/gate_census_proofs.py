@@ -5287,7 +5287,7 @@ STRUCTURAL_HAND_PROOFS["structural::test_editorial_release_6258.py"] = {
     "command": "python3 -m pytest tests/test_editorial_release_6258.py -q -p no:warnings   # baseline 8 passed",
     "mutation": (
         "Four plants, ONE AT A TIME, each reverted: M1 a module lambdas/emails/zz_plant_6258.py naming '/story/features/'; "
-        "M2 features.json's sha256 f550bac9… → f550bac8…; M3 www_editorial_checks.FIRST_PERSON_SHA256['opening'] "
+        "M2 features.json's sha256 f550bac9… → f550bac8… (the pin then in force; since 68406186…, owner decision 1A on PR #6263); M3 www_editorial_checks.FIRST_PERSON_SHA256['opening'] "
         "af2d603b… → af2d603c…; M4 v4_build_rss.main adding the feature posts twice."
     ),
     "observed": (
