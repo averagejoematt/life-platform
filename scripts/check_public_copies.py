@@ -121,6 +121,10 @@ RETIRED_PREFIXES = {
 RETIRED_INSTALLMENT_DIR = "legacy/chronicle/posts/"
 RETIRED_INSTALLMENTS = ("interview", "issue-05", "week-00", "week-01", "week-02", "week-03", "week-04")
 RETIRED_INSTALLMENT_STUB = os.path.join(SITE_DIR, RETIRED_INSTALLMENT_DIR, "week-01", "index.html")
+#: Owner ruling 2026-11-24: two more legacy pages are quarantined (private copies under
+#: backups/quarantine/public-copies/20261125T063912Z/) and held to the same rule E — no larger than the stub, served,
+#: archived or committed. Paths relative to site/.
+RETIRED_LEGACY_PAGES = ("legacy/story/index.html", "legacy/archive/v1/supplements_protocol/index.html")
 SYNC_WINDOW = timedelta(minutes=15)  # a v9 sync writes ~1,300 objects in seconds (measured 2026-11-16: 3 s and 6 s)
 PREVIEW_MAX_LAG = timedelta(hours=24)  # a rehearsal lives one root cycle (the daily 15:30 UTC rebuild); then empty it
 ARCHIVE_MAX_AGE = timedelta(hours=26)  # the nightly cadence plus two hours of slack
@@ -347,7 +351,7 @@ def retired_installment_issues(
     ``site_dir=None`` skips the committed tree (the archive pass). Sizes only — the page's words are never read or
     printed (the CI log is public)."""
     limit = stub_size() if limit is None else limit
-    rels = [f"{RETIRED_INSTALLMENT_DIR}{slug}/index.html" for slug in RETIRED_INSTALLMENTS]
+    rels = [f"{RETIRED_INSTALLMENT_DIR}{slug}/index.html" for slug in RETIRED_INSTALLMENTS] + list(RETIRED_LEGACY_PAGES)
     sizes = {o["Key"]: int(o.get("Size") or 0) for o in listing}
     out = []
     for rel in rels:
