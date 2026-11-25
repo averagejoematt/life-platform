@@ -1,7 +1,8 @@
 # remediation/
 
-The remediation agent (ADR-064; shadow permanently per the ADR-129 amendment of 2026-08-30,
-#2833). **Kept, load-bearing:** `agent.py` triages CloudWatch alarms / failed CI / DLQ depth /
+The remediation agent (ADR-064). **OFF by owner ruling** (2026-10-11 on #4651, restored
+2026-11-24 — the ADR-129 amendment of that date); `shadow`, its only running mode (ADR-129
+amendment of 2026-08-30, #2833), needs a separate owner approval. **Kept, load-bearing:** `agent.py` triages CloudWatch alarms / failed CI / DLQ depth /
 QA-smoke results, opens PRs a human merges, and hands the curated needs-human list on —
 as lines in the daily LP digest on a scheduled or alarm-dispatched run, as an email only on a
 manual `workflow_dispatch` or when the digest publish fails (#5821, owner ruling 2026-11-15);

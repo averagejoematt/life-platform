@@ -2086,6 +2086,8 @@ aws ssm get-parameter --name /life-platform/remediation-mode --region us-west-2 
   --query Parameter.Value --output text
 ```
 
+**Ruled state: `off`** (owner rulings 2026-10-11 on #4651 and 2026-11-24). Setting `shadow` needs a separate, explicit owner approval — do not run the `shadow` form below without one.
+
 **Switch mode (panic-off, or back to shadow):**
 ```bash
 aws ssm put-parameter --name /life-platform/remediation-mode --value shadow \
