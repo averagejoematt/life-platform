@@ -216,8 +216,13 @@ def test_parsers_are_byte_identical_to_the_pre_5433_parsers():
     for shape in range(4):  # every non-empty header shape counts something (4 files per shape)
         assert sum(sum(a.values()) for a in ref_attempts[4 * shape : 4 * shape + 4]), f"header shape {shape} counted nothing"
     assert not any(sum(a.values()) for a in ref_attempts[16:]), "an empty #Fields: header must skip every row"
-    assert new_attempts == ref_attempts
-    assert td.aggregate_subscribe_attempts(texts) == {k: sum(a[k] for a in ref_attempts) for k in ("page_views", "attempts", "successes")}
+    # 2026-11-24: the parser also counts the platform's own tools on separate keys; none appears in these fixtures, so
+    # the three reader keys must still equal the pre-#5433 reference and the new keys must be zero.
+    reader_keys = ("page_views", "attempts", "successes")
+    assert [{k: a[k] for k in reader_keys} for a in new_attempts] == ref_attempts
+    assert not any(a[k] for a in new_attempts for k in a if k not in reader_keys)
+    totals = td.aggregate_subscribe_attempts(texts)
+    assert {k: totals[k] for k in reader_keys} == {k: sum(a[k] for a in ref_attempts) for k in reader_keys}
 
 
 def test_mutation_control_the_identity_check_sees_a_filter_change(monkeypatch):

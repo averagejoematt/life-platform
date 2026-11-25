@@ -490,7 +490,14 @@ def test_parse_subscribe_attempts_ignores_unrelated_traffic():
 
 def test_aggregate_subscribe_attempts_sums_across_log_files():
     totals = td.aggregate_subscribe_attempts([ATTEMPT_SAMPLE, ATTEMPT_SAMPLE])
-    assert totals == {"page_views": 4, "attempts": 6, "successes": 2}
+    assert totals == {
+        "page_views": 4,
+        "attempts": 6,
+        "successes": 2,
+        "internal_page_views": 0,
+        "synthetic_attempts": 0,
+        "synthetic_successes": 0,
+    }
 
 
 def test_aggregate_subscribe_attempts_empty_is_a_valid_reading():
