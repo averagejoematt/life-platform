@@ -2805,7 +2805,15 @@ figure.moment-own {
     line-height: 1.45;
   }
   .ed-opening {
-    line-height: 1.42;
+    font-size: 19px;
+    line-height: 1.4;
+  }
+  .ed-how p {
+    font-size: 13px;
+  }
+  #what-happens-next.section {
+    padding-top: 24px;
+    padding-bottom: 24px;
   }
   .ed-hero h1 {
     margin-bottom: 12px;
