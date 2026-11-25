@@ -2402,8 +2402,9 @@ figure.moment-own {
   border-radius: 2px;
 }
 .ed-btn:hover {
-  background: #000;
+  background: var(--ink);
   color: var(--paper);
+  text-decoration: underline;
 }
 .ed-links {
   display: flex;
@@ -2448,7 +2449,7 @@ figure.moment-own {
 .ed-how b,
 .ed-lbl {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: var(--fs-label);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   font-weight: 600;

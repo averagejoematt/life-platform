@@ -52,6 +52,12 @@ _HREF = re.compile(r'\bhref="([^"]*)"')
 _ADDRESS = re.compile(r"^/(?:story|data|system)/[A-Za-z0-9_\-/]*/$")
 
 
+def is_site_build(dist: str) -> bool:
+    """A real v9 build (astro writes its bundle to _astro/ on every build); a hand-made test dist of a page or two is
+    not one, and the three checks below hold real builds only."""
+    return os.path.isdir(os.path.join(dist, "_astro"))
+
+
 def load_features(path: str = FEATURES_JSON) -> list[dict]:
     with open(path, encoding="utf-8") as fh:
         return list(json.load(fh).get("features") or [])
@@ -154,6 +160,8 @@ def rebuild(region: str) -> tuple[str | None, list[str], list[str]]:
 
 
 def feature_fingerprint(dist: str, features: list[dict] | None = None, features_dir: str = FEATURES_DIR) -> list[str]:
+    if not is_site_build(dist):
+        return []
     out = []
     for f in load_features() if features is None else features:
         fid, sha = f.get("id"), f.get("sha256")
@@ -201,6 +209,8 @@ def _day_words(iso: str | None) -> str:
 
 
 def first_person_pin(dist: str, pins: dict | None = None) -> list[str]:
+    if not is_site_build(dist):
+        return []
     pins = FIRST_PERSON_SHA256 if pins is None else pins
     rel = "index.html"
     try:
@@ -232,6 +242,8 @@ def _attr(page: str, marker: str) -> list[str]:
 def progress_agreement(dist: str) -> list[str]:
     """The pounds figure on the homepage's data line, its body figure, its "What happens next" block and the path's "What
     happens next" page — one computation, one number."""
+    if not is_site_build(dist):
+        return []
     out = []
     seen: dict[str, str] = {}
 
@@ -291,6 +303,7 @@ def self_test() -> list[str]:
 
         def run(body, first="2 January 2026"):
             os.makedirs(os.path.join(d, "dist", "story", "features", "t"), exist_ok=True)
+            os.makedirs(os.path.join(d, "dist", "_astro"), exist_ok=True)
             with open(os.path.join(d, "dist", "story", "features", "t", "index.html"), "w", encoding="utf-8") as fh:
                 fh.write(page(body, first))
             return feature_fingerprint(os.path.join(d, "dist"), [f], os.path.join(d, "f"))
@@ -309,7 +322,7 @@ def self_test() -> list[str]:
         if not run(good, first="3 January 2026"):
             missed.append("feature_fingerprint missed a wrong first-publication day")
         # the first-person pin
-        os.makedirs(os.path.join(d, "home"), exist_ok=True)
+        os.makedirs(os.path.join(d, "home", "_astro"), exist_ok=True)
         pins = {"headline": hashlib.sha256(b"Words.").hexdigest(), "opening": hashlib.sha256("I’m here.".encode()).hexdigest()}
 
         def home(h, o):
@@ -328,6 +341,7 @@ def self_test() -> list[str]:
                 missed.append(f"first_person_pin missed {name}")
         # progress agreement
         os.makedirs(os.path.join(d, "p", "story", "start", "what-happens-next"), exist_ok=True)
+        os.makedirs(os.path.join(d, "p", "_astro"), exist_ok=True)
 
         def prog(a, b, c, body):
             with open(os.path.join(d, "p", "index.html"), "w", encoding="utf-8") as fh:
@@ -345,6 +359,9 @@ def self_test() -> list[str]:
             missed.append("progress_agreement missed the path page disagreeing")
         if not prog("42.1", "42.1", "42.1", "42.8"):
             missed.append("progress_agreement missed the body figure disagreeing")
+        # a hand-made dist that is not a build is not graded; a build missing the feature page is
+        if feature_fingerprint(os.path.join(d, "home"), [f], os.path.join(d, "f")) == []:
+            missed.append("feature_fingerprint passed a build with no feature page")
     return missed
 
 

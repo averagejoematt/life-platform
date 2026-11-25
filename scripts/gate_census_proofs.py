@@ -5277,3 +5277,31 @@ STRUCTURAL_HAND_PROOFS["structural::test_next_previews_retired_6223.py"] = {
     ),
     "proved_on": "2026-11-23",
 }
+
+# #6258 — the editorial release (owner authorisation, review 14, 2026-11-24): the feature's approved bytes bound to one
+# SHA-256, the owner's first-person homepage words pinned, ONE RSS item for the feature with every existing item
+# unchanged, and no subscriber sender reading the features. The deploy-time checks themselves (feature fingerprint,
+# first-person pin, progress agreement) also self-test inside check_www_build.py before every scan.
+STRUCTURAL_HAND_PROOFS["structural::test_editorial_release_6258.py"] = {
+    "gate_name": "test_editorial_release_6258.py",
+    "command": "python3 -m pytest tests/test_editorial_release_6258.py -q -p no:warnings   # baseline 8 passed",
+    "mutation": (
+        "Four plants, ONE AT A TIME, each reverted: M1 a module lambdas/emails/zz_plant_6258.py naming '/story/features/'; "
+        "M2 features.json's sha256 f550bac9… → f550bac8…; M3 www_editorial_checks.FIRST_PERSON_SHA256['opening'] "
+        "af2d603b… → af2d603c…; M4 v4_build_rss.main adding the feature posts twice."
+    ),
+    "observed": (
+        "2026-11-25, #6258 lane. BASELINE 8 passed. M1 1 failed (test_no_subscriber_sender_reads_the_features). M2 3 failed "
+        "(test_the_feature_text_is_the_approved_bytes_and_one_pin_binds_it, test_the_feed_gains_exactly_one_item_and_no_"
+        "existing_item_changes, test_a_built_dist_passes_the_editorial_checks). M3 2 failed (test_the_first_person_pins_"
+        "are_the_authorised_words, test_a_built_dist_passes_the_editorial_checks). M4 1 failed (test_the_feed_gains_"
+        "exactly_one_item_and_no_existing_item_changes). REVERTED 8 passed."
+    ),
+    "scope": (
+        "The committed feature text and its pin, the homepage source's two static first-person strings and their pins, the "
+        "RSS builder over a mocked feed, every .py under lambdas/, and a built www/dist when one exists (skipped "
+        "otherwise; the web gate builds one and runs the same checks through check_www_build.scan). NOT SEEN: the deployed "
+        "site and the deployed feed — those are the post-merge live checks named in the PR."
+    ),
+    "proved_on": "2026-11-25",
+}

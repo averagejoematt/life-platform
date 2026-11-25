@@ -746,6 +746,47 @@ PAGE_BINDINGS.append(
         ],
     }
 )
+# #6258 — the editorial release (owner authorisation, review 14, 2026-11-24): the featured path's two framing cards and its
+# "What happens next" step, and the coaches introduced. Static builds from the publication snapshot.
+PAGE_BINDINGS.extend(
+    [
+        {
+            "path": "/story/start/rate-flag/",
+            "name": "Story · start here, 1 of 3: The Rate Flag (v9)",
+            "door": "story",
+            "narrative_order": 108.1,
+            "story_intent": "the featured path's first step: one ordinary week in November, framed, with a link into the chapter",
+            "endpoints": [{"url": "/api/chapters", "role": "primary", "metrics": []}],
+        },
+        {
+            "path": "/story/start/prologue/",
+            "name": "Story · start here, 2 of 3: how it started (v9)",
+            "door": "story",
+            "narrative_order": 108.2,
+            "story_intent": "the featured path's second step: the night before day one, framed, with a link into the prologue",
+            "endpoints": [{"url": "/api/chapters", "role": "primary", "metrics": []}],
+        },
+        {
+            "path": "/story/start/what-happens-next/",
+            "name": "Story · what happens next (v9)",
+            "door": "story",
+            "narrative_order": 108.4,
+            "story_intent": "three questions nobody can answer yet, each with the same current figures as the homepage, then the invitation to follow",
+            "endpoints": [
+                {"url": "/api/journey", "role": "primary", "metrics": []},
+                {"url": "/api/calibration", "role": "secondary", "metrics": []},
+            ],
+        },
+        {
+            "path": "/system/coaches/",
+            "name": "System · the coaches, introduced (v9)",
+            "door": "method",
+            "narrative_order": 110.5,
+            "story_intent": "Park, Reyes and Webb in plain words, each with the record one level down, read live with its date",
+            "endpoints": [{"url": "/api/calibration", "role": "primary", "metrics": []}],
+        },
+    ]
+)
 # #5920: the maintained policy at its own address — the owner's text from the generated twin (www/src/privacy/policy.json).
 PAGE_BINDINGS.append(
     {
