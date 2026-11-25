@@ -211,6 +211,12 @@ Working-style corrections the owner has made more than once. They are not author
    and report one grade.
 6. **Ideation includes the off-site channels.** Syndication, messaging surfaces, video and
    audio formats are in scope for a product ideation pass, not only pages on the site.
+7. **State the finish line before the work starts** (owner, 2026-11-24). Every multi-step
+   job and every agent brief names its success criteria and its stopping point; prefer a
+   small, well-scoped change; give mechanical work to a cheaper model where quality permits;
+   stop a review loop when a round finds nothing new; in the wrap, record the defects the
+   checks actually caught, the rework and the time saved. Rigour stays where the risk is
+   real — security, privacy and correctness.
 
 ---
 

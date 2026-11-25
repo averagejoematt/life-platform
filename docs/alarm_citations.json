@@ -64,10 +64,11 @@
  },
  "freshness-interior-gap": {
   "added": "2026-11-14",
-  "cause": "eightsleep:2026-11-10",
-  "cause_observed": "2026-11-14",
-  "citation": "NEW EPISODE, ALARM since 2026-11-11T17:46Z (1 datapoint >= 1). LIVE CAUSE, read 2026-11-14 from /aws/lambda/life-platform-freshness-checker (filter-log-events '\"Interior gaps\"'): every run through 16:26Z logs `Interior gaps detected behind high-water mark: {'Eight Sleep': ['2026-11-10']}` — DATE#2026-11-09 and DATE#2026-11-11 exist, DATE#2026-11-10 does not. The vendor has no session for that night: eightsleep-data-ingestion's gap-fill re-asks every run and logs `No day matching 2026-11-10. Available: ['2026-11-09']` -> `2026-11-10: no records after transform` (13:15Z 2026-11-13 and 15:15Z 2026-11-14 runs). Same class as the 2026-09-20 episode, which cleared on the mechanism below. Dated, self-clearing: the source runs `record_gap_exhausted_absence=True` with LOOKBACK_DAYS 7, so the absence marker for 2026-11-10 lands when the day leaves the gap-fill window (on or about 2026-11-17) and InteriorGapCount reads 0 from that run; the 24h count alarm stays lit about a day longer. EXPIRES 2026-11-19: if it is still lit then, the marker did not land and that is a NEW defect (the absence-marker mechanism), not this episode.",
-  "note": "Re-cited 2026-11-14 (#5934): the prior entry described the 2026-09-20 night and predated this episode."
+  "cause": "eightsleep:2026-11-20",
+  "cause_observed": "2026-11-25",
+  "updated": "2026-11-25T17:06:00Z",
+  "citation": "NEW EPISODE, ALARM since 2026-11-21T17:46Z (InteriorGapCount daily Maximum >= 1). LIVE CAUSE, read 2026-11-25 from /aws/lambda/life-platform-freshness-checker (filter-log-events '\"Interior gaps\"'): every run through 2026-11-24T17:45Z logs `Interior gaps detected behind high-water mark: {'Eight Sleep': ['2026-11-20']}`. The vendor has no session for that night: eightsleep-data-ingestion's gap-fill re-asks on every run and logs `No day matching 2026-11-20. Available: ['2026-11-19']` -> `2026-11-20: no records after transform` (latest 2026-11-25T15:15Z). This is the same class as the 2026-11-10 night, which cleared by the mechanism below: the absence marker for 2026-11-10 was logged 2026-11-17T15:15Z, and the InteriorGapCount daily datapoints read 0 from 2026-11-18 through 2026-11-20 UTC. Dated and self-clearing: the source runs `record_gap_exhausted_absence=True` with LOOKBACK_DAYS 7, so the 2026-11-20 marker lands on or about 2026-11-27T15:15Z and the daily-Maximum alarm clears a day later. EXPIRES 2026-11-29T18:00Z. If it is still lit then, the marker did not land, which is a new defect in the absence-marker mechanism and not this episode.",
+  "note": "Re-cited 2026-11-25 (#4034/#3501): the 2026-11-14 entry described the 2026-11-10 night, which cleared 2026-11-17."
  },
  "life-platform-budget-tier-escalation": {
   "added": "2026-10-21",
@@ -133,11 +134,11 @@
  },
  "chronicle-delivery-heartbeat": {
   "added": "2026-10-04",
-  "cause": "week-8-desk-stale-thread-fallback",
-  "cause_observed": "2026-10-31",
-  "updated": "2026-10-31",
-  "citation": "#4531 — week 7 was budget-paused (2026-10-21T15:00:34Z 'Budget guard paused chronicle') and week 8's desk budget failed validation twice on stale threads (2026-10-28T15:03:06Z: the ledger's last told weeks were 5 and a backfilled 6, so the calendar count called every live thread stale). The run fell back to the legacy writer and stored Week 8 as an unapproved draft, preview email sent 15:03:54Z; seven zero days → ALARM 2026-10-28 16:00Z. The code fix (staleness counts installments told; the desk retires what a retry leaves stale) is in the Session CL integration PR. Clears when the owner approves Week 8 from the preview email, or at the first delivered week after the Wed 2026-11-04 run. Re-derived 2026-10-31T17:45Z (Session CO): the Week 8 draft DATE#2026-10-27 is still unapproved (2d23h at the 14:27Z pre-flight), the 48-h sweep holds it daily, no subscriber delivery since — the cause is unchanged and is the owner's approve, not a code path.",
-  "note": "Prior entry (2026-10-17, cause week-6-unapproved-draft): the week-6 unapproved legacy draft (#4914). Prior entry (2026-10-04, issue 4593, closed): week 4 published by the season promote, which bypasses chronicle-approve, the only path that invokes the email sender; cleared when week 5 delivered through the approve path 2026-10-09 18:00Z. The current episode is a different cause on the same heartbeat."
+  "cause": "no-approved-chapter-since-2026-11-14",
+  "cause_observed": "2026-11-25",
+  "updated": "2026-11-25T17:06:00Z",
+  "citation": "#4531. NEW EPISODE, ALARM since 2026-11-21T01:49Z (ChronicleSent + ChroniclePaused, daily Sum < 1 on 7 of 7 datapoints). The alarm is correct, on a state the owner clears. Re-derived 2026-11-25 by filter-log-events on /aws/lambda/chronicle-email-sender and /aws/lambda/wednesday-chronicle. The last delivery was 2026-11-14T00:24Z (`ChronicleSent=1`, installment 2026-11-10). The Wednesday 2026-11-18 run stored a draft 'awaiting approval', which was later retired with the held weeks (owner ruling), and the 2026-11-25T16:05Z run stored a new draft 'awaiting approval'. Each Wednesday the sender logged 'Most recent Chronicle installment is still a draft' -> `[dead-man] ChronicleSent=0` (2026-11-18T16:10Z, 2026-11-25T16:10Z), and no budget pause was involved. The code path is working; the input is the owner's approval. Clears on the first delivered chapter after the owner approves the 2026-11-25 draft from its preview. If chapters are now meant to be less than weekly (three held weeks were retired this month), the 7-day dead-man expects a cadence the product no longer promises. The subscribe page now says 'a Chronicle chapter on a Wednesday after a new chapter is approved', and re-tuning to that is a ruling for the Story Desk epic #4531.",
+  "note": "Prior entry (2026-10-31, cause week-8-desk-stale-thread-fallback): the Week 8 desk fallback draft, cleared 2026-11-14T01:14Z. Prior entries: week-6 unapproved draft (#4914), week-4 season promote (issue 4593). The current episode is a different cause on the same heartbeat."
  },
  "swallowed-permission-denial": {
   "added": "2026-10-20",
@@ -156,7 +157,11 @@
  },
  "site-api-p95-latency-high": {
   "added": "2026-10-04",
-  "citation": "#4607 — GET /api/edition takes about five seconds uncached: pull requests 4602 and 4603 grew its upstreams from 9 to 17, read one after another. The alarm (p95 over 5000 ms, one 5-minute period) entered ALARM and cleared twice on 2026-10-04 (18:26–18:31Z and 19:00–19:05Z), each on cold loads of the preview front page under /next/v8/ (screenshot runs and cache-busted checks). Only the preview reads the route; the live front page does not. It will flap again on any cold preview load until #4607 lands; it gates the cut-over (issue 4588)."
+  "cause": "site-api-uncached-route-latency-2026-11-22",
+  "cause_observed": "2026-11-25",
+  "updated": "2026-11-25T17:30:00Z",
+  "citation": "#6271 — NEW EPISODE: flapping since 2026-11-21 (ALARM entries per day from describe-alarm-history: 26, 30, 42 and 45 on 2026-11-21 to 11-24, against 1 to 10 a day from 11-14 to 11-20), and lit again at 2026-11-25T17:01Z on p95 5193 ms. Re-derived 2026-11-25 by Logs Insights start-query over the `route_metric` lines in /aws/lambda/life-platform-site-api: every request over 4.5 s in the last 48 h is on one of three routes, /api/edition (110, max 6.9 s), /api/chapters (76, max 9.4 s, none before 2026-11-23) and /api/vitals_depth (46, max 13.7 s). The daily slow counts stepped up on 2026-11-22/23. By hand the first read of /api/chapters took 6.8 s and of /api/edition 7.1 s, and a repeat of either took 0.08 s, so the cost is in the uncached path, which readers meet. A real latency regression, owned by #6271. It also times out the qa-smoke census probe (#6269). Clears when #6271's fix holds for 72 h.",
+  "note": "Re-cited 2026-11-25 (#2996/#3501): the 2026-10-04 entry cited the closed issue 4607 (an /api/edition fan-out on the retired /next/v8/ preview), a different episode on the same alarm."
  },
  "key-rotator-errors": {
   "added": "2026-10-10",
@@ -240,22 +245,25 @@
  },
  "qa-smoke-warnings": {
   "added": "2026-10-28",
-  "cause_observed": "2026-11-16",
-  "updated": "2026-11-16",
-  "citation": "#5928 — the 'no red without an owner' review epic owns this standing any-WARN alarm; its live cause line is a union of the intermittent ids below, so each declared id carries its own sentence and owner (#5934: live ⊆ declared, and a declared id unseen in /aws/lambda/life-platform-qa-smoke for 7 days is reported for pruning). (1) `public_brief:cycle_liveness` (#5928) — Monday's public-brief cycle 2026-11-16 (run status ok) held 2 of 4 coaches, not failed: nutrition_coach `inputs_stale` (`total_calories_kcal`: no MacroFactor export after 2026-11-13) and glucose_coach `required_inputs_absent` (no glucose source, chronic); sanctioned holds, clears on the next cycle once an export is uploaded. (2) `public_brief:macrofactor_export_age` (#5928) — the weekly Saturday-to-Monday export-age WARN asking for the owner's MacroFactor upload; last seen 2026-11-16T08:42Z, recurs from Saturday 2026-11-21 if no export lands. (3) `weeks:absence_agreement` (#6113) — the check spends its 60 s census budget on api_status and reports NOT OBSERVED; intermittent, several runs a day on 2026-11-16. (4) `reader_truth:verdict` and (5) `reader_truth:confirm` — the Reader Truth LLM pass's low/med site-copy findings and its unconfirmed-high demotion (a high that did not reproduce on the second pass); a site-copy finding owned by the website session, intermittent several times a day since 2026-11-10.",
-  "note": "Re-cited 2026-11-16 for #5934: every id named in `[QA] CAUSE warn` lines over the 168 h before 2026-11-16T23:30Z, read by filter-log-events on /aws/lambda/life-platform-qa-smoke, is declared except `morning_checkin:weekday_liveness` and `data:orphan_routine_drafts` (last seen 2026-11-13T19:32Z, absent from every run since). The earlier single-id citation chased the union run to run (tracker #6053).",
+  "cause_observed": "2026-11-25",
+  "updated": "2026-11-25T17:06:00Z",
+  "citation": "PERSISTENCE ALARM since PR 6231 (owner ruling 2026-11-23): `qa-smoke-warnings` watches PersistentWarnCount (daily Maximum >= 1). It counts a platform warning id seen on each of the last 3 Pacific days, plus `reader_truth:confirm` from its first day; owner-engagement warns are excluded. A one-day warning no longer pages. This episode began 2026-11-24T08:07Z, when the run's `[QA] PERSISTENT warn 3d` line first named data:pk_family_census,public_brief:cycle_liveness,story_season:chapter_door (plus weeks:fact_agreement from 2026-11-24T15:55Z). The gate's cause channel is still the `[QA] CAUSE warn` line (every alarmed warning, persistent or not), so each id below has its own owner. Re-derived 2026-11-25 by filter-log-events on /aws/lambda/life-platform-qa-smoke. (1) `data:pk_family_census` (#6240, #6245): 2 of 123 live pk families are unclassified by phase_taxonomy. SOURCE#brief_trial is the format switch of #6240's compact Morning Brief, and SOURCE#outbound_format is the switch of #6245's compact Nutrition Review. Each story owes its partition a SOURCE_CLASS/_PK_RULES entry and a wipe PARTITIONS entry. First seen 2026-11-22T23:40Z, on every run since. (2) `public_brief:cycle_liveness` (#5928): the Monday cycle of 2026-11-23 briefed 3 of 4 coaches. glucose_coach was held with its required inputs absent (no glucose source), a sanctioned and chronic hold that recurs every cycle while no source exists, so it stays in the persistent set. Whether a sanctioned chronic hold should count toward persistence is #5928's call. (3) `story_season:chapter_door` (#6269): /api/chapters times out against the census probe's 6 s per-read cap on its first (uncached) read, measured at 6.8 s on 2026-11-25. (4) `weeks:fact_agreement` (#6269): api_edition NOT OBSERVED, same timeout (7.1 s first read). (5) `reader_truth:verdict` (#5928): low/medium site-copy findings (audience_violation on /now/ and /data/vitals/ second-person copy) on several runs 2026-11-24 to 2026-11-25. These are intermittent and not in any persistent line.",
+  "note": "Re-cited 2026-11-25 for #5934/#3501. Pruned `public_brief:macrofactor_export_age` and `weeks:absence_agreement` (unseen on the warn channel for 7 days; absence_agreement now reports as a FAIL, cited under qa-smoke-failures) and `reader_truth:confirm` (last on the warn channel 2026-11-23T04:40Z, where it made the first PERSISTENT line under the day-one rule; on no later run). The prior entry described the retired any-WARN rule (WarnCount >= 1).",
   "cause": [
+   "data:pk_family_census",
    "public_brief:cycle_liveness",
-   "public_brief:macrofactor_export_age",
-   "reader_truth:confirm",
-   "reader_truth:verdict",
-   "weeks:absence_agreement"
+   "story_season:chapter_door",
+   "weeks:fact_agreement",
+   "reader_truth:verdict"
   ]
  },
  "field-notes-missing": {
   "added": "2026-10-25",
-  "citation": "#5128 (closed on live proof) — the dead-man fired correctly on 2026-10-24/25 for the W42 miss (generated:false after the Sunday cron), cleared after the W42 regenerate at 15:18Z and stayed OK through the W43 run at 18:00:05Z. A true positive by the instrument this issue built, not a defect.",
-  "note": "Session CF 2026-10-25: answered as a flap per the fired-and-cleared rule; state OK at 19:06Z."
+  "cause": "field-notes-grounding-held-w46-w47",
+  "cause_observed": "2026-11-25",
+  "updated": "2026-11-25T17:06:00Z",
+  "citation": "#6270 — NEW EPISODE, ALARM since 2026-11-17T20:54Z (FieldNotesOutcome Sum < 1 on 7 daily datapoints, missing = breaching). Re-derived 2026-11-25 by filter-log-events on /aws/lambda/field-notes-generate. The Sunday 19:00Z run ran both weeks, and the grounding gate HELD the edition both times: 2026-W46 (2026-11-15T19:00:55Z, 3 findings -> 1 after the one rewrite, `[grounding] HELD 2026-W46`, FieldNotesOutcome 0) and 2026-W47 (2026-11-22T19:00:55Z, 2 findings, `rewrite not better (2 → 2)`, `[grounding] HELD 2026-W47`, FieldNotesOutcome 0). The findings are figures absent from the generator's data payload and a weight change stated with no window. The gate is correct, and the stall is the generator's, owned by #6270. Clears on the first Sunday run that writes an edition.",
+  "note": "Re-cited 2026-11-25 (#2996/#3501): the prior entry cited the closed #5128 for the 2026-10-24/25 W42 flap, a different episode on the same dead-man."
  },
  "ai-dev-session-month-high": {
   "added": "2026-10-25",
@@ -266,10 +274,17 @@
  },
  "qa-smoke-failures": {
   "added": "2026-10-27",
-  "cause_observed": "2026-11-17",
-  "updated": "2026-11-17",
-  "citation": "Both of this episode's causes are answered, and the alarm is a dated, self-clearing count. `story_season:episode_or_hold`: the owner's hold on week 10 was recorded 2026-11-17T01:38Z (PR 6123; `panel_owner_hold.py --verify` PASS, qa-smoke reads it as held; issue 6112 closed on it). `hooks:liveness_matrix`: the reader-call door read missing until its runtime switch was set at ~03:10Z (issue 6138 closed on it). The 2026-11-17 04:44Z qa-smoke run logged `[QA] CAUSE fail none`. FailCount is count-aggregated, so the alarm stays lit until the failing datapoints leave its window. EXPIRES 2026-11-18T12:00Z: still lit then means a new FAIL — read the latest `[QA] CAUSE fail` line.",
-  "cause": "story_season:episode_or_hold,hooks:liveness_matrix"
+  "cause_observed": "2026-11-25",
+  "updated": "2026-11-25T17:06:00Z",
+  "citation": "NEW EPISODE, ALARM since 2026-11-21T19:32Z (FailCount, daily Maximum >= 1). Re-derived 2026-11-25 from every `[QA] CAUSE fail` and `[QA] FAIL` line in /aws/lambda/life-platform-qa-smoke (filter-log-events, 2026-11-21 -> 2026-11-25T08:45Z). The latest run names three ids, and none of them is a reader-facing defect. Each check lags a sanctioned change and is owned by #6268. (1) `permalink_blackhole:published_vs_redirects` (#6268): the 8 published /journal/posts/week-NN/ addresses now 301 to /story/week-NN/. That is the owner ruling of 2026-11-22 (legacy chapter addresses follow the served edition, PR 6234). Each target was checked by hand on 2026-11-25: it serves 200 with the same chapter title. The check still reads any 301 on a published URL as the old blackhole. First seen 2026-11-23T18:15Z. (2) `recall:corpus_freshness` (#6268): it expects the 2026-09-05 installment in the recall corpus, but that row carries the owner's `withdrawn` annotation (2026-11-23T00:00Z), and the indexer never indexes a withdrawn chapter. The sensor's published-set filter lacks the same predicate, so self-heal logs `skipped:no-text`. First seen 2026-11-23T01:42Z. (3) `weeks:absence_agreement` (#6268): 'measurements: api_source_freshness=80d, api_status=60d; tolerance 16d'. api_status month-floors the silence ('2mo ago'), and the 20 % tolerance is narrower than that rounding. Every run since 2026-11-21T19:32Z. Intermittent: (4) `reader_truth:verdict` (#5928): a high finding confirmed on the second pass in 2 runs (2026-11-24T00:07Z, 2026-11-25T06:31Z), fingerprint e8f2c1 on /api/coaches: one coach's record reads 'through' a date three days earlier than the other coaches'. The ruling ledger adjudicated the same fingerprint ADVISORY in the runs between. (5) `story_season:chapter_door` (#6269): FAILED once, at 2026-11-24T06:23Z ('the newest published chapter is 10 days old (limit 10)'), on the one run whose /api/chapters read beat the census probe's 6 s cap. On the other runs it times out as a WARN (#6269). The state it reports is real and owner-dependent: the newest published chapter is 2026-11-14, and the 2026-11-25 Wednesday draft awaits approval. EXPECT: still lit until #6268 ships. A new id on the latest `[QA] CAUSE fail` line is a new cause.",
+  "note": "Re-cited 2026-11-25 (#5934/#3501). Pruned `hooks:liveness_matrix` and `story_season:episode_or_hold` (the 2026-11-17 causes, unseen in the 7-day channel window). Earlier in this same episode the channel also named `habit_cross_source` (2026-11-22T08:14Z -> 19:06Z) and `public_forecast:cycle_liveness` (2026-11-22T17:55Z -> 2026-11-23T08:23Z, the forecast pilot's first cycle), and `subscriber_promise:cadence_agreement` once at 2026-11-24T08:07Z (the subscribe page stated 'three' emails a week; the page was corrected in PR 6261). None is on any run after those times. They are left undeclared because the stale-declaration rule would red them.",
+  "cause": [
+   "permalink_blackhole:published_vs_redirects",
+   "recall:corpus_freshness",
+   "weeks:absence_agreement",
+   "reader_truth:verdict",
+   "story_season:chapter_door"
+  ]
  },
  "ingest-reconciliation-whoop": {
   "added": "2026-10-26",
@@ -304,5 +319,12 @@
   "cause": "fitness battery cadence state missed (due 2026-11-01)",
   "cause_observed": "2026-11-17",
   "citation": "Fired-and-cleared episode, #5760 / #5051. The nightly pre-draft's fitness-battery leg (`mcp/tools_fitness_tests.py::nightly_leg`) emitted FitnessBatteryMissed=1 from 2026-11-15 (cadence state `missed`, due_on 2026-11-01): the alarm fired once, as designed, when the battery dead-man (#5078) first saw a missed window. It cleared 2026-11-17T03:01Z when the same leg read state `upcoming`, due_on 2026-12-13, basis `program_week` — the cadence re-based after Monday 2026-11-16's test-first session. No code defect; the next breach is a real miss."
+ },
+ "site-api-handled-5xx": {
+  "added": "2026-11-25",
+  "cause": "platform-forecasts-decimal-500",
+  "cause_observed": "2026-11-25",
+  "updated": "2026-11-25T17:06:00Z",
+  "citation": "FIRED AND CLEARED (#2912): ALARM 2026-11-23T17:49:47Z -> OK 17:52:47Z (describe-alarm-history), on one 15-minute datapoint of 5 Handled5xx at 17:34Z. get-metric-statistics on LifePlatform/SiteAPI Handled5xx (2026-11-22 -> 2026-11-25, 900 s): every nonzero datapoint carries Route=/api/platform_forecasts and falls between 2026-11-23 17:00Z and 18:45Z. The cause was the platform-forecast pilot's first live row, which returned 500 because Decimal versions and counts could not be served as JSON. Fixed by PR 6239 (merged 2026-11-23T18:55:49Z). The same metric read shows nothing above 0 after 18:45Z, and the route returned 200 by hand on 2026-11-25. This is a code defect already fixed, so no issue is owed. Prune this entry once the alarm has been OK for more than 72 h after 2026-11-23T17:52Z."
  }
 }

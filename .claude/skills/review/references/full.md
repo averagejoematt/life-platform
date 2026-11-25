@@ -161,7 +161,7 @@ letter grade for its area, and what an A looks like.
 | Data-viz expert | Charts & instruments | honesty of encodings, uncertainty shown (n, CIs), legibility |
 | QS / biohacker authority | Scientific credibility | correlative-only framing, protocol justification, measurement plans |
 | Narrative editor | Voice & immersion | copy quality, coach personas, podcast coherence, duplicated narratives across lenses/timescales |
-| Security/privacy lead | Exposure | privacy absolutes (substances, age, genome), public-repo hygiene, auth surfaces |
+| Security/privacy lead | Exposure | privacy absolutes (substances, age, genome), public-repo hygiene, auth surfaces; every public figure, streak or aggregate about a private category traced to an owner approval on record — an OLD surface is not grandfathered (2026-11-24: one was, until #6262) |
 | Accessibility specialist | a11y | contrast, focus, semantics, tap targets |
 | First-time reader (persona, via render-qa on LIVE pages) | Comprehension | does each page explain itself cold? where does immersion break? |
 | Observability lead | Telemetry & alerting | alarm coverage vs real failure modes, EMF/usage telemetry, DLQs, log structure/retention, drift sentinel + remediation-agent efficacy |

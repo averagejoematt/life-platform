@@ -44,10 +44,11 @@ that's a design conversation, not a new top-level directory.
 
 Routing is directory-style: a page is `site/<path>/index.html`, served at `/<path>/`.
 
-`site/next/**` is the preview path for the page rebuilds (`/next/`, `/next/v8/…`; see
+`site/next/**` was the preview path for the v7 and v8 page rebuilds (`/next/`, `/next/v8/…`; see
 [SITE_TRANSFORMATION_V7.md](SITE_TRANSFORMATION_V7.md) and [design/v8/README.md](design/v8/README.md)).
-Those pages carry no doors nav or footer (`v4_apply_chrome.py` leaves them chrome-free) and are not part
-of the reachable set. A page built from the kit loads `clean.css` instead of the stylesheet pair below.
+It was retired on 2026-11-23 (#6223): nothing is committed there, each address 301s to its successor
+(`redirects.map`), and `tests/test_next_previews_retired_6223.py` fails a page that comes back. The v9
+build rehearses at `/next/v9/`, which is S3 only and never under `site/`. A page built from the kit loads `clean.css` instead of the stylesheet pair below.
 
 ## 2. Anatomy of a page
 
@@ -151,7 +152,7 @@ after editing, commit the regenerated output in the same PR.)
 **Hand-authored pages** (edit the HTML directly): `/` (`site/index.html`, except its sentinel-marked
 proof block), `/cockpit/` (same), `/privacy/` (except the generated Permanence clause list),
 `/subscribe/` (+ `subscribe.html`, `/subscribe/confirm/`), `404.html`, the redirect stub `/mind/`,
-`site/kit/`, `site/next/**` (the preview path), and all of `assets/css/` + `assets/js/` **except** the
+`site/kit/`, and all of `assets/css/` + `assets/js/` **except** the
 generated `assets/js/portrait_data.js`. The `/journal/essays/*` pages are generator output
 (`v4_build_journal.py`); an essay's body fragment and `site/journal/blog.json` are what you edit.
 `/legacy/` is frozen verbatim — served with unhashed assets, never touched.

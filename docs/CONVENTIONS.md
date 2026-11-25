@@ -1794,6 +1794,17 @@ unit test is entitled to make. The `sourceIp` half of the same lesson is guarded
 set-wise by an AST walk, so the next handler that derives its own identity fails on
 the day it lands instead of a month later.
 
+**Two recurrences on one day (2026-11-23), both on our OWN wire.** (1) A route reading
+DynamoDB was tested with plain numbers; the table returns `Decimal`, and `json.dumps` of
+the first live row made `/api/platform_forecasts` answer 500 for ~2.5 h (#6239; the
+class's open tracker is #5524, no Decimal-coercion gate). (2) The edition verifier's
+rehearsal ran on the exporter's null-tolerant snapshot, not the live response; the first
+live run crashed on a week whose served `url` is null (#6236 now runs the rehearsal on
+the live response and pins the live shape). So: **a handler that serialises DynamoDB
+items is tested with `Decimal` values, and a rehearsal runs the instrument on the same
+response the real run will read** — a fixture shaped by the producer's own exporter is
+the author's assumption, not the wire.
+
 ---
 
 ## 10. Filing discipline — file into the class, not the symptom (2026-08-23)

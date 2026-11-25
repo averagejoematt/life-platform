@@ -82,6 +82,20 @@ write surface is your own worktree and your own branch.
    issue that closes on live proof was closed by exactly that sentence). Write
    "Refs #N; the issue stays open until …". `scripts/assert_pr_green.py <PR>` prints the
    CLOSING-SET it parsed.
+3e. **A heredoc whose body is text, not commands, is QUOTED: `<<'EOF'`.** In an unquoted
+   heredoc (`<<EOF`) the shell still runs every `$(...)` and backtick span in the body
+   before the receiving command sees it, so a PR body or comment that wraps the fleet
+   deploy command in backticks EXECUTES it. 2026-11-22: a lane did
+   exactly that from the main checkout and uploaded two fleet bundle zips to S3 (no
+   function updated; docs/INCIDENT_LOG.md). `scripts/hooks/guard_bash.py` treats a heredoc
+   body fed to `cat`/`gh` as data, so it cannot see this — the quote is the guard. Better
+   still, write the body to a lane-unique file with the Write tool and pass `--body-file`.
+3f. **Never `--no-verify`, not even on an unpushed WIP commit** (2026-11-22, undone before
+   push): a hook that refuses is the finding — fix what it names. **A pushed lane branch is
+   public the moment it is pushed** (public repo; the branch keeps its history after a
+   squash): fixtures, comments and examples use synthetic values, never a real reading from
+   the owner's data (2026-11-23: one real nutrition figure reached a public branch in a
+   comment and a fixture; a follow-up commit cleaned the squash, not the branch history).
 3b. **Never run `git stash` (or `stash pop`/`stash apply`) in a lane.** `refs/stash` is
    a repository-level ref — per `git help worktree` §DETAILS, refs are shared across
    all worktrees except `refs/bisect`, `refs/worktree` and `refs/rewritten`, and
@@ -151,6 +165,12 @@ write surface is your own worktree and your own branch.
    when the subject's fractional age crossed a rounding edge, two hours after two
    unrelated merges, which were bisected first. Structural check: `grep -n` the asserted
    literal's producer for a clock read before you pin it.
+6a3. **A test that depends on a module constant bound at import from the environment**
+   (`SITE_URL = os.environ.get(...)`) patches the module ATTRIBUTE (`monkeypatch.setattr`)
+   or derives its expectation from the bound value — setting the env var is too late when
+   another test file imported the module first at collection time. 2026-11-23/24:
+   `test_weekly_signal_display_6244` passed alone and redded main ~1.5 h in the full suite
+   (fixed hermetic by #6250). Run a new test file once inside the full suite, not only alone.
 
 6b. **If your issue carries `review:*` or `incident*` labels (#3594):** it names a class,
    not just the specimen you're fixing. Re-run the issue's own `## Set` enumeration query

@@ -82,6 +82,13 @@ deleted). It enforces rules 1–3 below rather than asking you to recall them.
    owns reaping and `scripts/lane_worktree.py` owns locking, so a lane never runs
    either by hand. `git rebase`/`merge`, `HEAD`, and the index stay per-worktree
    (`git help worktree` §DETAILS) and need no special care.
+7. **The shared main checkout stays on `main` — never create or switch a branch in it.**
+   Every concurrent session pulls there; `git pull --ff-only origin main` on another branch
+   fast-forwards THAT branch, not `main`. 2026-11-23: one session's `git checkout -b` in the
+   main checkout meant other sessions advanced its branch for several hours believing they
+   were current (nothing landed on main by mistake). Branch work goes in a lane worktree
+   (this skill); before a pull in the main checkout, `git branch --show-current` must print
+   `main`.
 
 **Release when the lane is done** (after the PR merges — not when the PR opens; a pushed
 branch awaiting merge is still live work). The driver does this in `/land` §5, after a

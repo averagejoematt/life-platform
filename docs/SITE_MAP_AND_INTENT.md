@@ -12,6 +12,27 @@
 >
 > Intent-only by design (no live numbers — those drift). If a page's *purpose* changes, update it here.
 
+## The /next/ preview is retired (2026-11-23, #6223)
+
+The v9 build (`www/`) has owned `/`, `/story/`, `/data/` and `/privacy/` since 2026-11-01 (#5534, ADR-166). The
+sections below describe the v8 kit as it stood on 2026-10-18 and are kept as the record of that design; they are no
+longer the map of what is served. On 2026-11-23 the owner authorised retiring the 21 preview pages that were still
+committed under `site/next/` (nine v7 pages, twelve v8 kit pages) and re-published by every site deploy:
+
+- nothing is committed under `site/next/`; the generators that wrote there (`scripts/v7_build.py`, `scripts/v7/`,
+  `scripts/v8_build_appendix.py`) are removed;
+- every retired address is a 301 at the edge (`redirects.map`, `NEXT_PREVIEW_REDIRECTS` in
+  `scripts/v4_migration_inventory.py`): a v7 page to the page at the same path without `/next`, the four v8 doors to
+  their live placements (`/`, `/start/`, `/story/`, `/coaches/`), a v8 deep page to the v9 page that took its job
+  (`/system/`, `/system/forecasts/`, `/system/everything-else/`, `/data/`) or to `/`;
+- `scripts/check_public_copies.py` holds `site/next/` RETIRED (rule B: must hold nothing), the v9 rehearsal preview
+  `site/next/v9/` excepted; `tests/test_next_previews_retired_6223.py` holds the repo to all of it.
+
+Two v8 kit pages are still served with no v9 twin, `/start/` and `/coaches/` (noindex, canonical to `/` and
+`/system/`), plus the four `/reference/2026-11-01-*-v8/` copies. Their deep links were written against
+`data-ck-base="/next/v8/"` and now arrive at the successors above through the 301s. Whether those two pages are
+themselves retired is an open owner decision.
+
 ## Where the site is (2026-10-18)
 
 **The v8 kit pages are the approved direction.** The owner rejected six generated designs on

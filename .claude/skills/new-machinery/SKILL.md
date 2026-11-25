@@ -78,3 +78,14 @@ uncontracted agreement, or a scheduleless dead-man is **off-charter and must say
   structurally unreachable for six days behind a green fixture test. Assert set equality in
   both directions, and derive the transform's lookup tables by AST so a third table added
   later joins the request on its own.
+- **A store written at runtime and rendered by a build gets the build's gates at WRITE
+  time.** Otherwise the first bad record reds every later build: 2026-11-22, a published
+  correction's evidence text (a raw internal id, then ISO dates in page addresses) failed
+  the site build's text gates for ~2 h, twice. #6203 checks proposals; stored records are
+  #6224 item 2. Call the build's own rule function from the writer and the validator —
+  never a copy of it.
+- **A new outbound channel (email, feed, share kit, generated JSON) reads through the SAME
+  publication gate as the site, not its own read path.** 2026-11-23: the between-chapters
+  subscriber email had been mailing items the site withholds, and the daily brief's summary
+  line reached two public JSON files unscreened (#6246, #6262). Ask: which gate decides what
+  the site may show, and does this channel call it?

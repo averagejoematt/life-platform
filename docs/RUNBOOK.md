@@ -803,6 +803,28 @@ not the program week):
    note, a dek printed once in the header, a signature line's class, the title line as the page heading and the summary
    line as the header summary — `content.chapter_editions.PERMITTED_PRESENTATION`. A withdrawn edition is reported as
    withdrawn.
+8. Point the chapter's legacy address at it (owner ruling 2026-11-22, final edition rehearsal §4; owner-attended S3 write
+   under `generated/` + a CloudFront invalidation), only once step 7 passes:
+   ```bash
+   curl -s https://averagejoematt.com/rss.xml > <private>/rss_before.xml                     # the feed baseline
+   python3 scripts/legacy_chapter_redirects.py --chapter week-NN                             # dry run: the plan, reads only
+   python3 scripts/legacy_chapter_redirects.py --chapter week-NN --apply                     # attended
+   python3 scripts/verify_legacy_chapter_redirects.py --chapter week-NN --feed-baseline <private>/rss_before.xml \
+       [--terms <off-repo terms file>] [--rollback]                                           # read-only
+   ```
+   The writer refuses a chapter without its step-3 backup pointer and restore rehearsal, or whose pointer names another
+   journal page than the chapter's own `url_legacy` (two records must agree on the page — a page id is not a week
+   number). It replaces `generated/journal/posts/<page>/index.html` with a redirect document (S3
+   `WebsiteRedirectLocation` = `/story/<id>/`, canonical + refresh to the same, noindex, no edition text), sets the
+   chapter's `posts.json` excerpt and its share kit (`/moments/share-kits/<page>/kit.json`) to the edition's summary
+   (the kit's `canonical_url` to the chapter) after a write-once copy of each under `backups/legacy-chapter-addresses/`,
+   reads every write back and invalidates the touched paths. The feed's item `<link>` moves to `/story/<id>/` at the
+   next site deploy; its `<guid>` (the bare legacy URL, `isPermaLink="true"`), title, pubDate and the item count never
+   do. `scripts/check_public_copies.py` rule G reds while a served edition's legacy page, manifest excerpt, share kit
+   or (once rebuilt after the redirect) archived page still carries the first edition. A withdrawn edition: rerun the
+   writer — the excerpt and kit go back to the earliest private copy, the legacy page keeps redirecting to the canonical
+   chapter (the governed page whichever edition it serves). Rollback per object: copy its prior version
+   (`aws s3api list-object-versions`) or the printed private copy back over it, then invalidate the path.
 
 **The presentation transformation (owner rulings 2026-11-22, rehearsal §2).** An edition's approved text is, exactly:
 
@@ -818,8 +840,8 @@ not the program week):
 body)` is its exact inverse, and a text not in this form is refused at proposal (so every stored edition rebuilds
 byte-for-byte). The SHA-256 approval stays on the WHOLE text. When served: the title is the page heading (h1), the
 summary is the chapter's summary everywhere one is shown (header, `/story/` row, Moments card — cited as "<title>,
-<ordinal> edition, revised <day>" — description and og metadata, the feed item's description; never its title, link,
-guid or pubDate, and no new item), and the body is the article; neither the title line nor the summary is repeated in
+<ordinal> edition, revised <day>" — description and og metadata, the feed item's description; never its title,
+guid or pubDate, and no new item — the item's link moves to the chapter, step 8), and the body is the article; neither the title line nor the summary is repeated in
 the body. The one rule for which summary a surface shows is `www/src/lib/chapter_truth.js::applyChapterSummaries`
 (edition summary → #6177 replacement when `CHAPTER_TRUTH_LIVE` → the served summary); `scripts/v4_build_rss.py` applies
 the same order. `chronicle_edition_verify.py` rebuilds the text from the DEPLOYED heading, header summary and the served

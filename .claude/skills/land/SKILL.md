@@ -123,6 +123,19 @@ object to `backups/` before it removes it; the archive is regenerated, never rem
 exits 0. The v9 deploy runs the same guard (`--check`) after every sync; a red there is a copy to repair, never a
 reason to revert the root.
 
+**The guard does not enumerate every copy yet (#6223), so a privacy removal also walks these by hand (2026-11-23/24):**
+superseded link-preview images (`site/assets/og/**`), CI artifacts on this PUBLIC repo that hold rendered pages or
+screenshots (`gh api repos/{owner}/{repo}/actions/artifacts` — preserve privately, then delete), every generated JSON
+a writer copies the text into (`generated/*.json`, e.g. the brief's summary line in `public_stats.json`/`pulse.json`),
+and every outbound channel that renders it (subscriber email). Then rebuild the archive. **Order matters:** merge the
+repo-side stub or fix FIRST, then quarantine the stored copy — the reverse leaves a window in which the guard reads
+the page as unreadable and reds every build (2026-11-25, ~32 min, #6266).
+
+**A red root smoke also freezes the rollback baseline.** "Record this green root build as the previous build" is
+skipped on every red run, so `www-previous/LATEST` keeps the last green build — 2026-11-22/23 it stayed ~8.7 h at a
+build from before the editions, and a rollback in that window would have restored retired pages. When root smoke is
+red, the rollback target is stale: fix the red before anything else ships to the root.
+
 A CloudFront path is cached (`/archive/latest.tar.gz` for an hour, and a query string is not part of its key), so
 "I re-fetched it" proves nothing until the invalidation completes.
 
