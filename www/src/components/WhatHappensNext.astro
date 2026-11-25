@@ -16,7 +16,8 @@ interface Props {
 const { page = false, follow = false } = Astro.props as Props;
 const ed = await loadEditorial();
 const qs = whatHappensNext({ p: ed.p, checked: ed.checked, own: ed.own });
-const asOf = ed.edition?.as_of ? dayInWords(ed.edition.as_of) : null;
+// a date is kept on one line at 390 px (non-breaking spaces; the words are unchanged)
+const asOf = ed.edition?.as_of ? dayInWords(ed.edition.as_of)!.replace(/ /g, "\u00a0") : null;
 ---
 
 <div class="ed-narrow" data-what-happens-next data-progress-below={ed.p ? ed.p.below : undefined} data-progress-day={ed.p?.day ?? undefined}>

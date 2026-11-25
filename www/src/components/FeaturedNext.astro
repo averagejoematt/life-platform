@@ -10,4 +10,4 @@ interface Props {
 const { label, to, words } = Astro.props as Props;
 ---
 
-<div class="ed-next" data-featured-next><span class="ed-lbl">{label}</span><a href={href(to)}>{words}</a></div>
+<div class="ed-next" data-featured-next><span class="ed-lbl">{label}</span><a href={href(to)}>{words.replace(/ →$/, "\u00a0→")}</a></div>

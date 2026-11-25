@@ -2765,3 +2765,16 @@ figure.moment-own {
   line-height: 1.15;
   margin: 2px 0 8px;
 }
+/* the preview's link colour on the editorial pages: links are cobalt */
+.ed-links a,
+.ed-next a,
+.ed-rows a,
+.ed-how a,
+.ed-q a,
+.ed-narrow p a,
+.ed-dek a,
+.ed-coach a,
+.ed-meta a,
+.fx a {
+  color: var(--cobalt);
+}
