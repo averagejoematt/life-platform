@@ -101,3 +101,23 @@ def test_rule_e_reds_on_an_archived_full_page():
     v = G.retired_installment_issues([], {"web/legacy/chronicle/posts/issue-05/index.html": FILLER.encode()}, None)
     assert [(c, r) for c, r, _d in v] == [("archive", "E")]
     assert G.retired_installment_issues([], {"web/legacy/chronicle/posts/issue-05/index.html": _stub()}, None) == []
+
+
+# ── owner ruling 2026-11-24: two more quarantined legacy pages ────────────────────────────────────────────────────────
+def test_the_two_quarantined_legacy_pages_are_committed_no_larger_than_the_stub():
+    limit = G.stub_size()
+    for rel in G.RETIRED_LEGACY_PAGES:
+        path = os.path.join(REPO, "site", rel)
+        assert os.path.isfile(path), f"{rel} must stay as a stub so the sync overwrites any served copy"
+        with open(path, "rb") as fh:
+            body = fh.read()
+        assert len(body) <= limit and b"no longer available" in body, rel
+
+
+def test_rule_e_reds_on_a_full_page_at_a_quarantined_legacy_page():
+    for rel in G.RETIRED_LEGACY_PAGES:
+        served = [{"Key": "site/" + rel, "Size": len(FILLER)}]
+        assert [i for i in G.retired_installment_issues(served, None, site_dir=None) if rel in i[2]], rel
+        archived = {"web/" + rel: FILLER.encode()}
+        assert [i for i in G.retired_installment_issues([], archived, site_dir=None) if rel in i[2]], rel
+    assert G.retired_installment_issues([], None) == []
