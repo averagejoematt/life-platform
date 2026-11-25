@@ -162,9 +162,12 @@ def _default_of_param_call(rel_path: str, func: str, first_arg: str) -> object |
 RECORDED_RUNTIME = {
     "remediation_mode": {
         "param": "/life-platform/remediation-mode",
-        "value": "shadow",
-        "recorded": "2026-08-30",
+        "value": "off",
+        "recorded": "2026-11-24",
         "source": (
+            "Owner ruling 2026-11-24: OFF, restoring the 2026-10-11 ruling on #4651 (the parameter had read `off` "
+            "since 2026-10-03 and was set back to `shadow` on 2026-10-17 without a recorded decision). `shadow` needs "
+            "a separate owner approval. Earlier history: "
             "ADR-129 (demoted 2026-07-06 on zero merged safe-class PRs in ~6 weeks) + its 2026-08-30 amendment "
             "(#2833): shadow is PERMANENT. `auto` is a retired value — remediation/agent.py coerces it to shadow "
             "and reports it — and the numeric re-promotion bar (#1337) was retired with it. The recorded value "

@@ -22,6 +22,12 @@ a stale `auto` in SSM runs as shadow and is reported as needs-human.
 > parameter reads `off` the agent is a no-op. Which value is intended is an owner ruling;
 > this page records the fact and does not choose. The merge ban does not depend on the
 > mode: `Bash(gh pr merge *)` is in `disallowed_tools` in `remediation/agent.py`.
+>
+> **Resolved (2026-11-24) — the intended value is `off`.** The owner ruled "off" on 2026-10-11
+> (#4651). The parameter was set back to `shadow` on 2026-10-17 with no recorded decision and
+> the agent ran Mon/Wed/Fri until 2026-11-23. The owner ruled OFF again on 2026-11-24 and the
+> parameter was set to `off` the same day (version 6). Setting `shadow` needs a separate,
+> explicit owner approval. Monitoring, detection and alarms do not depend on the agent.
 
 ---
 

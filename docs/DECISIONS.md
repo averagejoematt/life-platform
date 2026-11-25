@@ -4383,6 +4383,12 @@ cross-referenced against `s3://matthew-life-platform/remediation-log/automerge/`
 >
 > **Rent:** the remediation row in `docs/PROPORTIONALITY.md` (the measured history is in ADR-129, #4271). **Audit log:** every run → `s3://matthew-life-platform/remediation-log/YYYY/MM/DD/HHMMSS.json`; the `automerge/` sub-prefix is history (it holds zero objects).
 
+### ADR-129 Amendment (2026-11-24 — the agent is OFF by owner ruling; `shadow` needs a separate approval)
+
+**Context.** The 2026-08-30 amendment made `shadow` the only running mode. On 2026-10-11 the owner ruled the agent **off** (#4651: about $7 a month, zero pull requests opened in the trailing 30 days); the SSM parameter had read `off` since 2026-10-03. On 2026-10-17 the parameter was set back to `shadow` (SSM parameter history, version 5) with no recorded decision, and the agent ran Mon/Wed/Fri until 2026-11-23 while `docs/PROPORTIONALITY.md` recorded OFF and `CLAUDE.md` said "shadow permanently". A product assessment on 2026-11-24 found the three records disagreeing.
+
+**Decision (owner, 2026-11-24).** **Off.** `/life-platform/remediation-mode` was set to `off` the same day (version 6). The switch, `docs/PROPORTIONALITY.md`, `docs/REMEDIATION_TAXONOMY.md`, `docs/RUNBOOK.md`, `CLAUDE.md`, `remediation/README.md` and the recorded value in `tests/public_claims_registry.py` now say the same thing. Setting `shadow` again needs a separate, explicit owner approval; `auto` stays retired. Ordinary monitoring, detection and alarms are unchanged — none of them depends on the agent. The workflow and code stay in place: the scheduled run fires and no-ops at the gate.
+
 ## ADR-130: GitHub Pages disabled — a second, unmanaged public surface redundant with the canonical CloudFront site (E8/#752)
 
 **Date:** 2026-07-06 · **Status:** Accepted · **Story:** #752 (R21 definitive review, kill list / perimeter close-out)
