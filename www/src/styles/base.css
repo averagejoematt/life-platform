@@ -2778,3 +2778,59 @@ figure.moment-own {
 .fx a {
   color: var(--cobalt);
 }
+.ed-qd {
+  padding-top: 10px;
+  margin-top: 14px;
+}
+.ed-qd summary {
+  cursor: pointer;
+  min-height: 44px;
+  list-style-position: outside;
+}
+.ed-qd summary .ed-q-h {
+  font-family: var(--sans);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-size: 20px;
+  line-height: 1.2;
+}
+.ed-qd p {
+  margin-top: 8px;
+}
+/* the front page's phone-height budget (tests/web_preview_gate.py FRONT_PAGE_SCREENS = 7.5): tighter spacing on a phone,
+   no word removed */
+@media (max-width: 899px) {
+  .ed-how {
+    margin-top: 16px;
+    line-height: 1.45;
+  }
+  .ed-opening {
+    line-height: 1.42;
+  }
+  .ed-hero h1 {
+    margin-bottom: 12px;
+  }
+  #what-happens-next .ed-kicker {
+    margin-bottom: 6px;
+  }
+  .ed-tagline {
+    margin-top: 12px;
+  }
+  .ed-dataline {
+    margin-bottom: 14px;
+  }
+  .ed-links {
+    margin-top: 10px;
+  }
+  #what-happens-next .ed-h1 {
+    font-size: 28px !important;
+    margin-bottom: 8px;
+  }
+  .ed-qd {
+    margin-top: 6px;
+    padding-top: 6px;
+  }
+  .ed-qd summary .ed-q-h {
+    font-size: 17px;
+  }
+}

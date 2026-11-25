@@ -26,15 +26,26 @@ const asOf = ed.edition?.as_of ? dayInWords(ed.edition.as_of)!.replace(/ /g, "\u
   <p class="ed-kicker">What happens next{asOf && ` · as of ${asOf}`}</p>
   {page ? <h1 class="ed-h1">What nobody knows yet</h1> : <h2 class="ed-h1" style="font-size:34px">What nobody knows yet</h2>}
   {
-    qs.map((x) => (
-      <section class="ed-q">
-        <span class="n">{x.n}</span>
-        {page ? <h2>{x.q}</h2> : <h3 class="ed-q-h">{x.q}</h3>}
-        <p>{x.text}</p>
-      </section>
-    ))
+    qs.map((x) =>
+      page ? (
+        <section class="ed-q">
+          <span class="n">{x.n}</span>
+          <h2>{x.q}</h2>
+          <p>{x.text}</p>
+        </section>
+      ) : (
+        /* the homepage carries the same three questions, each closed until a reader opens it: the front page keeps
+           its phone-height budget (tests/web_preview_gate.py FRONT_PAGE_SCREENS) with every word of the block on it */
+        <details class="ed-q ed-qd">
+          <summary>
+            <span class="n">{x.n}</span> <span class="ed-q-h">{x.q}</span>
+          </summary>
+          <p>{x.text}</p>
+        </details>
+      ),
+    )
   }
-  <p style="margin-top:26px;font-weight:700"><a href={href("/system/ledger/")}>The open predictions, with their dates →</a></p>
+  <p style={`margin-top:${page ? 26 : 10}px;font-weight:700`}><a href={href("/system/ledger/")}>The open predictions, with their dates →</a></p>
   {
     follow && (
       <div class="ed-sub" id="follow">
