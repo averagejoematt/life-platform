@@ -71,6 +71,7 @@ from common.pacific_time import parse_iso_utc  # #1964: THE ISO parser (naive in
 from common.send_guard import guarded_send_email, is_dry_run  # #2222: SES send-suppressor gate
 
 from operational.ops_pack_record import pack_text  # #6176: the pack as a log record
+from operational.traffic_digest_funnel_html import build_subscriber_funnel_html as _funnel_html
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -165,6 +166,18 @@ def _ipkey(ip: str, ua: str) -> str:
 def _is_bot(ua: str) -> bool:
     u = ua.lower()
     return any(b in u for b in _BOT_RE)
+
+
+# The platform's own tools, by the User-Agent each one sends: the subscribe canary and QA smoke (`life-platform-*`), the
+# leak-token sweep and the accuracy audit. Owner ruling 2026-11-24: in the week to 23 Nov all 117 "successful sign-ups"
+# were the canary and about 280 of 358 /subscribe/ views were these tools. They are counted apart from readers in the
+# subscribe funnel, never dropped — the canary's health stays visible on its own line.
+_INTERNAL_UA = ("life-platform-", "leak-token-sweep", "accuracy-audit")
+
+
+def _is_internal(ua: str) -> bool:
+    u = ua.lower()
+    return any(m in u for m in _INTERNAL_UA)
 
 
 _NON_PAGE_PREFIXES = ("/assets/", "/api/", "/legacy/")
@@ -349,6 +362,7 @@ def parse_subscribe_attempts(text: str) -> dict:
     already a /subscribe/ view or a POST /api/subscribe — the same conjunction."""
     unquote = urllib.parse.unquote
     page_views = attempts = successes = 0
+    internal_page_views = synthetic_attempts = synthetic_successes = 0
     width, col = 0, {}  # col is read only once a #Fields: header set width
     for line in text.splitlines():
         if line.startswith("#Fields:"):
@@ -366,22 +380,44 @@ def parse_subscribe_attempts(text: str) -> dict:
         if method == "GET":
             if status not in ("200", "304") or _norm_page(unquote(_cell(parts, col["stem"]))) != _SUBSCRIBE_PAGE:
                 continue
-            if not _is_bot(unquote(_cell(parts, col["ua"]))):
+            ua = unquote(_cell(parts, col["ua"]))
+            if _is_internal(ua):
+                internal_page_views += 1
+            elif not _is_bot(ua):
                 page_views += 1
         elif method == "POST":
             if unquote(_cell(parts, col["stem"])) != "/api/subscribe":
                 continue
-            if not _is_bot(unquote(_cell(parts, col["ua"]))):
+            ua = unquote(_cell(parts, col["ua"]))
+            if _is_internal(ua):
+                synthetic_attempts += 1
+                if status.startswith("2"):
+                    synthetic_successes += 1
+            elif not _is_bot(ua):
                 attempts += 1
                 if status.startswith("2"):
                     successes += 1
-    return {"page_views": page_views, "attempts": attempts, "successes": successes}
+    return {
+        "page_views": page_views,
+        "attempts": attempts,
+        "successes": successes,
+        "internal_page_views": internal_page_views,
+        "synthetic_attempts": synthetic_attempts,
+        "synthetic_successes": synthetic_successes,
+    }
 
 
 def aggregate_subscribe_attempts(texts) -> dict:
     """Sum `parse_subscribe_attempts` over every fetched log file — the same
     `texts` list the page-view aggregation already holds in memory."""
-    totals = {"page_views": 0, "attempts": 0, "successes": 0}
+    totals = {
+        "page_views": 0,
+        "attempts": 0,
+        "successes": 0,
+        "internal_page_views": 0,
+        "synthetic_attempts": 0,
+        "synthetic_successes": 0,
+    }
     for text in texts or []:
         one = parse_subscribe_attempts(text)
         for k in totals:
@@ -518,60 +554,8 @@ def collect_subscriber_funnel(now=None):
 
 
 def build_subscriber_funnel_html(funnel):
-    """Render the subscriber-funnel section. Must never raise — every key may
-    be absent or error-shaped, and a crash here would take the whole Monday
-    ops email down (same contract as build_green_report_html)."""
-    parts = ['<h2 style="font-size:16px;margin-top:24px">Subscriber funnel</h2>']
-    funnel = funnel or {}
-    if funnel.get("error") or "by_status" not in funnel:
-        reason = funnel.get("error") or "no subscriber reading in this run"
-        parts.append(f'<p style="color:#6e665a;font-size:13px">not collected — {reason}</p>')
-        return "".join(parts)
-    status_pairs = funnel.get("by_status") or []
-    if status_pairs:
-        rows = "".join(
-            f'<tr><td style="padding:4px 0;font-family:monospace">{k}</td>'
-            f'<td style="padding:4px 0;text-align:right;font-variant-numeric:tabular-nums">{v}</td></tr>'
-            for k, v in status_pairs
-        )
-    else:
-        rows = '<tr><td colspan="2" style="color:#888;padding:6px 0">No subscribers yet.</td></tr>'
-    parts.append(f'<table style="width:100%;border-collapse:collapse">{rows}</table>')
-    window = funnel.get("window_days") or DAYS
-    # #3619 ROW1: the attempt stage, from the CF-log scan merged into `funnel` in
-    # the handler. Absent (older callers, or a fail-soft aggregation error) simply
-    # omits the line — never a crash, never a fabricated zero.
-    if "subscribe_page_views_7d" in funnel:
-        views = funnel.get("subscribe_page_views_7d") or 0
-        attempts = funnel.get("subscribe_attempts_7d") or 0
-        successes = funnel.get("subscribe_successes_7d") or 0
-        confirmed_7d = funnel.get("new_confirmed_7d") or 0
-        parts.append(
-            f'<p style="margin:6px 0;font-size:13px">/subscribe/ views <strong>{views}</strong> &rarr; '
-            f"POST /api/subscribe 2xx <strong>{successes}</strong> of <strong>{attempts}</strong> attempts &rarr; "
-            f"confirmed <strong>{confirmed_7d}</strong> (last {window} days)</p>"
-        )
-    parts.append(
-        f'<p style="margin:6px 0;font-size:13px"><strong>{funnel.get("new_pending_7d") or 0}</strong> new pending · '
-        f'<strong>{funnel.get("new_confirmed_7d") or 0}</strong> new confirmed in the last {window} days</p>'
-    )
-    oldest = funnel.get("oldest_pending_days")
-    if oldest is not None and oldest > window:
-        parts.append(
-            f'<p style="margin:6px 0;color:#9a6700;font-size:13px">⚠ oldest pending confirmation is {oldest} days old — '
-            "its confirmation link is long expired; the funnel is leaking</p>"
-        )
-    canary_rows = funnel.get("canary_rows") or 0
-    if canary_rows:
-        parts.append(
-            f'<p style="margin:6px 0;color:#b42318;font-size:13px">✗ {canary_rows} synthetic canary row(s) in the subscriber '
-            "partition — canary cleanup failed; these are excluded from the counts above but must be deleted (#1954)</p>"
-        )
-    parts.append(
-        '<p style="color:#888;font-size:12px;margin:8px 0 0">Read-only join of the subscriber partition — counts exclude '
-        "synthetic canary rows.</p>"
-    )
-    return "".join(parts)
+    """The subscriber-funnel section (operational/traffic_digest_funnel_html.py), at this lambda's window."""
+    return _funnel_html(funnel, default_window_days=DAYS)
 
 
 def build_html(agg, start_date, end_date, green_html="", funnel=None, ops_html=""):
