@@ -2799,7 +2799,7 @@ figure.moment-own {
 }
 /* the front page's phone-height budget (tests/web_preview_gate.py FRONT_PAGE_SCREENS = 7.5): tighter spacing on a phone,
    no word removed */
-@media (max-width: 899px) {
+@media (max-width: 860px) {
   .ed-how {
     margin-top: 16px;
     line-height: 1.45;
