@@ -167,6 +167,18 @@ def _is_bot(ua: str) -> bool:
     return any(b in u for b in _BOT_RE)
 
 
+# The platform's own tools, by the User-Agent each one sends: the subscribe canary and QA smoke (`life-platform-*`), the
+# leak-token sweep and the accuracy audit. Owner ruling 2026-11-24: in the week to 23 Nov all 117 "successful sign-ups"
+# were the canary and about 280 of 358 /subscribe/ views were these tools. They are counted apart from readers in the
+# subscribe funnel, never dropped — the canary's health stays visible on its own line.
+_INTERNAL_UA = ("life-platform-", "leak-token-sweep", "accuracy-audit")
+
+
+def _is_internal(ua: str) -> bool:
+    u = ua.lower()
+    return any(m in u for m in _INTERNAL_UA)
+
+
 _NON_PAGE_PREFIXES = ("/assets/", "/api/", "/legacy/")
 
 
@@ -349,6 +361,7 @@ def parse_subscribe_attempts(text: str) -> dict:
     already a /subscribe/ view or a POST /api/subscribe — the same conjunction."""
     unquote = urllib.parse.unquote
     page_views = attempts = successes = 0
+    internal_page_views = synthetic_attempts = synthetic_successes = 0
     width, col = 0, {}  # col is read only once a #Fields: header set width
     for line in text.splitlines():
         if line.startswith("#Fields:"):
@@ -366,22 +379,44 @@ def parse_subscribe_attempts(text: str) -> dict:
         if method == "GET":
             if status not in ("200", "304") or _norm_page(unquote(_cell(parts, col["stem"]))) != _SUBSCRIBE_PAGE:
                 continue
-            if not _is_bot(unquote(_cell(parts, col["ua"]))):
+            ua = unquote(_cell(parts, col["ua"]))
+            if _is_internal(ua):
+                internal_page_views += 1
+            elif not _is_bot(ua):
                 page_views += 1
         elif method == "POST":
             if unquote(_cell(parts, col["stem"])) != "/api/subscribe":
                 continue
-            if not _is_bot(unquote(_cell(parts, col["ua"]))):
+            ua = unquote(_cell(parts, col["ua"]))
+            if _is_internal(ua):
+                synthetic_attempts += 1
+                if status.startswith("2"):
+                    synthetic_successes += 1
+            elif not _is_bot(ua):
                 attempts += 1
                 if status.startswith("2"):
                     successes += 1
-    return {"page_views": page_views, "attempts": attempts, "successes": successes}
+    return {
+        "page_views": page_views,
+        "attempts": attempts,
+        "successes": successes,
+        "internal_page_views": internal_page_views,
+        "synthetic_attempts": synthetic_attempts,
+        "synthetic_successes": synthetic_successes,
+    }
 
 
 def aggregate_subscribe_attempts(texts) -> dict:
     """Sum `parse_subscribe_attempts` over every fetched log file — the same
     `texts` list the page-view aggregation already holds in memory."""
-    totals = {"page_views": 0, "attempts": 0, "successes": 0}
+    totals = {
+        "page_views": 0,
+        "attempts": 0,
+        "successes": 0,
+        "internal_page_views": 0,
+        "synthetic_attempts": 0,
+        "synthetic_successes": 0,
+    }
     for text in texts or []:
         one = parse_subscribe_attempts(text)
         for k in totals:
@@ -550,7 +585,18 @@ def build_subscriber_funnel_html(funnel):
             f'<p style="margin:6px 0;font-size:13px">/subscribe/ views <strong>{views}</strong> &rarr; '
             f"POST /api/subscribe 2xx <strong>{successes}</strong> of <strong>{attempts}</strong> attempts &rarr; "
             f"confirmed <strong>{confirmed_7d}</strong> (last {window} days)</p>"
+            '<p style="margin:2px 0 6px;color:#888;font-size:12px">Views and attempts are browser-like requests after a '
+            "user-agent filter, with the platform's own tools left out: an estimate, not verified people.</p>"
         )
+        if "subscribe_synthetic_attempts_7d" in funnel:
+            syn_ok = funnel.get("subscribe_synthetic_successes_7d") or 0
+            syn_all = funnel.get("subscribe_synthetic_attempts_7d") or 0
+            internal_views = funnel.get("subscribe_internal_page_views_7d") or 0
+            parts.append(
+                '<p style="margin:6px 0;color:#6e665a;font-size:13px">Synthetic checks, not readers: canary POST 2xx '
+                f"<strong>{syn_ok}</strong> of <strong>{syn_all}</strong> &middot; /subscribe/ views by the platform's own tools "
+                f"<strong>{internal_views}</strong></p>"
+            )
     parts.append(
         f'<p style="margin:6px 0;font-size:13px"><strong>{funnel.get("new_pending_7d") or 0}</strong> new pending · '
         f'<strong>{funnel.get("new_confirmed_7d") or 0}</strong> new confirmed in the last {window} days</p>'

@@ -425,12 +425,67 @@ ATTEMPT_SAMPLE = HEADER + "\n".join(
 
 def test_parse_subscribe_attempts_counts_views_and_outcomes():
     result = td.parse_subscribe_attempts(ATTEMPT_SAMPLE)
-    assert result == {"page_views": 2, "attempts": 3, "successes": 1}
+    assert result == {
+        "page_views": 2,
+        "attempts": 3,
+        "successes": 1,
+        "internal_page_views": 0,
+        "synthetic_attempts": 0,
+        "synthetic_successes": 0,
+    }
+
+
+def test_parse_subscribe_attempts_counts_the_platforms_own_tools_apart_from_readers():
+    """Owner ruling 2026-11-24: the canary's POSTs and the QA tools' page views are not reader conversions. They are
+    counted on their own keys (canary health stays visible), and a real reader's failed submission is still an attempt."""
+    sample = HEADER + "\n".join(
+        [
+            _row("2026-11-20", "1.1.1.1", "GET", "/subscribe/", "200", "-", "Mozilla/5.0 (Mac)"),
+            _row("2026-11-20", "5.5.5.5", "GET", "/subscribe/", "200", "-", "life-platform-qa-smoke/1.0"),
+            _row("2026-11-20", "5.5.5.6", "GET", "/subscribe/", "200", "-", "leak-token-sweep/1.0"),
+            _row("2026-11-20", "5.5.5.7", "GET", "/subscribe/", "200", "-", "accuracy-audit/1.0"),
+            _row("2026-11-20", "6.6.6.6", "POST", "/api/subscribe", "200", "-", "life-platform-canary/1.0"),
+            _row("2026-11-20", "6.6.6.7", "POST", "/api/subscribe", "500", "-", "life-platform-canary/1.0"),
+            _row("2026-11-20", "1.1.1.1", "POST", "/api/subscribe", "500", "-", "Mozilla/5.0 (Mac)"),
+        ]
+    )
+    assert td.parse_subscribe_attempts(sample) == {
+        "page_views": 1,
+        "attempts": 1,
+        "successes": 0,
+        "internal_page_views": 3,
+        "synthetic_attempts": 2,
+        "synthetic_successes": 1,
+    }
+
+
+def test_build_html_labels_the_estimate_and_reports_the_canary_on_its_own_line():
+    funnel = td.aggregate_subscriber_funnel(SUBSCRIBER_FIXTURE, now=FUNNEL_NOW)
+    funnel.update(
+        subscribe_page_views_7d=80,
+        subscribe_attempts_7d=0,
+        subscribe_successes_7d=0,
+        subscribe_internal_page_views_7d=281,
+        subscribe_synthetic_attempts_7d=117,
+        subscribe_synthetic_successes_7d=117,
+    )
+    html = td.build_html(td.aggregate([]), "Nov 16", "Nov 23", funnel=funnel)
+    assert "2xx <strong>0</strong> of <strong>0</strong> attempts" in html
+    assert "an estimate, not verified people" in html
+    assert "canary POST 2xx <strong>117</strong> of <strong>117</strong>" in html
+    assert "own tools <strong>281</strong>" in html
 
 
 def test_parse_subscribe_attempts_ignores_unrelated_traffic():
     unrelated = HEADER + _row("2026-08-01", "1.1.1.1", "GET", "/data/", "200", "-", "Mozilla/5.0")
-    assert td.parse_subscribe_attempts(unrelated) == {"page_views": 0, "attempts": 0, "successes": 0}
+    assert td.parse_subscribe_attempts(unrelated) == {
+        "page_views": 0,
+        "attempts": 0,
+        "successes": 0,
+        "internal_page_views": 0,
+        "synthetic_attempts": 0,
+        "synthetic_successes": 0,
+    }
 
 
 def test_aggregate_subscribe_attempts_sums_across_log_files():
@@ -439,7 +494,14 @@ def test_aggregate_subscribe_attempts_sums_across_log_files():
 
 
 def test_aggregate_subscribe_attempts_empty_is_a_valid_reading():
-    assert td.aggregate_subscribe_attempts([]) == {"page_views": 0, "attempts": 0, "successes": 0}
+    assert td.aggregate_subscribe_attempts([]) == {
+        "page_views": 0,
+        "attempts": 0,
+        "successes": 0,
+        "internal_page_views": 0,
+        "synthetic_attempts": 0,
+        "synthetic_successes": 0,
+    }
 
 
 def test_build_html_renders_the_attempt_stage_when_present():
