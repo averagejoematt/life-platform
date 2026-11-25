@@ -10,12 +10,31 @@ import { hasPage, href, pathOf } from "../../lib/url.js";
 import { PERSONA_DISCLOSURE, correctionsFor, rowMark } from "../../lib/chapter_corrections.js"; // #6177
 import { loadChapterCorrections } from "../../lib/snapshot.js";
 import { indexByline } from "../../lib/chapter_truth.js"; // #6177: the index byline claims no approval it cannot show
+import { PATH, chapterIndex } from "../../lib/editorial.js"; // the editorial release: the date-first index (owner, reviews 11 and 14)
+import { FEATURE_LIST } from "../../lib/feature.js";
+import { latestEdition, loadChapterEditions } from "../../lib/snapshot.js";
+import { editionFor } from "../../lib/chapter_editions.js";
 
 const all = await loadAll();
-const correctionDoc = await loadChapterCorrections(); // #6177: a chapter with a standing approved correction is marked on its row
+const correctionDoc = await loadChapterCorrections();
+// The date-first index (owner, review 11: "simpler date-first chapter numbering without changing historical identifiers,
+// records or URLs" and "concise, truthful gap labels"; labels approved as supplied, review 14). Every row is derived:
+// the covered days, the date-first number (format.js applyChapterNumbers), and a gap row for each run of days no
+// published chapter covers, named from the program weeks' own states. Chapter pages and URLs are unchanged.
+const edition = await latestEdition();
+const prologueEd = editionFor(await loadChapterEditions(), "week-01");
+const indexRows = chapterIndex({
+  chapters: all.byType.chapter,
+  startDate: edition?.start_date || edition?.blocks?.today?.data?.start_date || null,
+  asOf: edition?.as_of || null,
+  prologueFirstPublished: prologueEd?.first_published || null,
+});
+const revisits = (id: string) => FEATURE_LIST.filter((f: any) => f.chapter_id === id);
 const chapters = [...all.byType.chapter].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.week ?? 0) - (a.week ?? 0)));
 // #6081: counted the way every page counts them — the numbered chapters, and the prologue said as such (format.js)
 const count = chapterCount(chapters);
+const SPELL = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"];
+const countLine = `${count.prologue ? "A prologue and " : ""}${SPELL[count.n] || count.n} ${count.n === 1 ? "chapter" : "chapters"} so far`; // #6177: a chapter with a standing approved correction is marked on its row
 const episodes = all.byType.episode.length;
 // The line through the chapters (2026-11-14, sprint II): each row carries its week's weigh-ins on the whole journey's
 // weight scale, so reading down the list the line steps back through the weeks — including the weeks with no chapter,
@@ -42,21 +61,48 @@ const stripOf = (c: any) => {
 <Base title="The story" top="story" description="Every weekly chapter of an experiment in changing a life with AI coaches — the weight is the part that's working; the rest is still open. The chapters published, and the weeks held, skipped or retired, said plainly.">
   <section class="section">
     <div class="wrap">
-      <p class="label">Story · <span data-ch-count>{count.words}</span> published{episodes ? ` · ${episodes} with audio` : ""}</p>
+      <p class="ed-kicker">Story · every chapter, in the order of the days it covers</p>
       <h1 style="margin-top:10px">The chapters</h1>
-      <p class="dek" style="margin-top:14px;max-width:720px">
-        One ordinary man, a team of AI coaches and a public record: an experiment in whether a life can be engineered better, told a chapter a
-        week. The weight is the part that is working. Whether the habits hold, whether he is any happier and whether the AI earns its place
-        are still open — and that is what the chapters are about.
+      <p class="ed-dek" style="margin-top:14px;max-width:720px">
+        {countLine}, written by Elena Voss, an AI editorial persona. New here? <a href={href(PATH[0].to)}>Start with The Rate Flag →</a>
       </p>
       <p class="muted" style="margin-top:12px;max-width:720px;font-size:15px">
         <span data-byline>{indexByline()}</span> A week with no chapter says so here, in its place.
       </p>
       <p class="persona-disclosure" style="margin-top:8px;max-width:720px" data-persona-disclosure>{PERSONA_DISCLOSURE}</p>
       <p style="margin-top:16px;font-size:15px;font-weight:700;display:flex;flex-wrap:wrap;gap:8px 28px">
-        <a href={href("/story/moments/")}>New here? Start with the moments that explain it →</a>
         <a href="https://averagejoematt.com/subscribe/">Get each chapter by email →</a>
       </p>
+    </div>
+  </section>
+  <section class="wrap" style="padding-bottom:28px">
+    <div class="ed-wide" data-chapter-index>
+      <ul class="ed-rows">
+        {
+          indexRows.map((r: any) =>
+            r.kind === "gap" ? (
+              <li class="gap" data-index-gap>
+                <span class="d">{r.d}</span>
+                <span class="s">{r.s}</span>
+                <span class="t">{r.t}</span>
+              </li>
+            ) : (
+              <li data-index-chapter={r.chapter.id} data-index-no={r.chapter.week === 0 ? "00" : String(r.chapter.chapter_no ?? r.chapter.week).padStart(2, "0")}>
+                <span class="d">{r.d}</span>
+                <span class="s">{r.s}</span>
+                <span class="t">
+                  <a href={href(pathOf("chapter", r.chapter.id))}>{r.chapter.title}</a>
+                  {revisits(r.chapter.id).map((f: any) => (
+                    <div class="extra">
+                      Revisited: <a href={href(f.path)}>an editorial retrospective, {dayInWords(f.dated)}</a>
+                    </div>
+                  ))}
+                </span>
+              </li>
+            ),
+          )
+        }
+      </ul>
     </div>
   </section>
   <section class="wrap" style="padding-bottom:28px">

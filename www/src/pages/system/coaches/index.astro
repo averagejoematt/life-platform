@@ -1,0 +1,131 @@
+---
+// The coaches, introduced (owner, review 12 §Coaches; approved as supplied, review 14): Park, Webb and Reyes, the three a
+// reader meets first in the story, in plain words, each with "the record" one level down. The introductions are the
+// approved copy; every count in the records is the platform's, read from this build's snapshot with its date, and the
+// full directory stays on /system/.
+import Base from "../../../layouts/Base.astro";
+import { coachLead, verdictWords } from "../../../lib/calibration.js";
+import { askTally, coachRecordWords, floorDays, kindWords } from "../../../lib/editorial.js";
+import { featureMeta } from "../../../lib/feature.js";
+import { dayInWords } from "../../../lib/format.js";
+import { loadAll, loadCalibration, loadCoachRoom } from "../../../lib/snapshot.js";
+import { loadEditorial } from "../../../lib/editorial_data.js";
+import { roomPublic } from "../../../lib/room.js";
+import { href } from "../../../lib/url.js";
+
+const all = await loadAll();
+const ed = await loadEditorial();
+let cal: any = null;
+let room: any = null;
+if (roomPublic()) {
+  try {
+    const f: any = await loadCalibration();
+    cal = f?.state === "ok" ? f.calibration || {} : null;
+  } catch {
+    cal = null;
+  }
+  try {
+    const r: any = await loadCoachRoom();
+    room = r?.state === "ok" ? r.coaches || {} : null;
+  } catch {
+    room = null;
+  }
+}
+const asOf = ed.checked ? dayInWords(ed.checked.asOf).replace(/ \d{4}$/, "") : null;
+const coach = (id: string) => all.get("coach", id);
+const kinds = (id: string) => coach(id)?.versus_guess?.kinds || [];
+const lead = (id: string) => (cal ? coachLead(cal, id) : null);
+const asks = (id: string) => askTally(room?.[id]?.asks?.commitment_counts);
+const week: any = ed.edition?.blocks?.week?.state === "ok" ? ed.edition.blocks.week.data : null;
+const floor = floorDays(week?.measures?.food);
+const weekEnd = week?.days?.length ? week.days[week.days.length - 1] : null;
+const feature = featureMeta("parks-blind-spot-revisited");
+const status = ed.edition ? [ed.edition.day_n != null ? `Day ${ed.edition.day_n}` : null, dayInWords(ed.edition.as_of)].filter(Boolean).join(" · ") : null;
+
+const park = { rec: coachRecordWords(lead("sleep_coach")), dir: kindWords(kinds("sleep_coach"), "direction", verdictWords), num: kindWords(kinds("sleep_coach"), "number", verdictWords, { guessOf: false }) };
+const reyes = coachRecordWords(lead("physical_coach"), { short: true });
+const webb = coachRecordWords(lead("nutrition_coach"), { short: true });
+---
+
+<Base title="The coaches" top="system" status={status}>
+  <section class="section">
+    <div class="wrap">
+      <div class="ed-narrow">
+        <p class="ed-kicker">The coaches</p>
+        <h1 class="ed-h1">The coaches</h1>
+        <p class="ed-dek">
+          Eight AI coaches, software built with Claude, not people, read his data and say what they expect to happen. Three of them are the ones you meet first in the story. Most of what they write isn't published; what they predicted and asked for is, and so is whether it came true.
+        </p>
+        <section class="ed-coach" data-coach="sleep_coach">
+          <h2>Lisa Park</h2>
+          <p class="role">Sleep</p>
+          <p class="c">
+            Lisa Park watches his sleep: how long he sleeps, how deep it goes, and how he recovers the next morning. She has one idea she keeps coming back to, in her own words: deep sleep “will rise as Zone 2 training volume builds”. So far his deep sleep hasn't done that in any window that was graded. That says the prediction missed, not that her reasoning is wrong. Her forecasts of how long he will sleep have done better.
+          </p>
+          <p class="c">What Matt did with her advice is not recorded. <a href={href(feature.path)}>Park's Blind Spot, revisited →</a></p>
+          <details class="ed-details last">
+            <summary>The record</summary>
+            <div class="body">
+              <ul>
+                <li>What she reads, per her page: “sleep architecture, timing, and recovery”.</li>
+                <li>Deep-sleep calls graded wrong on 3, 8, 9 and 26 October 2026, none right. Her 2 November call was due on 23 November and was still ungraded on 24 November.</li>
+                <li>Since 15 November her 17 September call carries a platform note: the grade tests the direction, not the mechanism.</li>
+                {park.rec && <li data-coach-record>As of {asOf}: {park.rec}.{park.dir && park.num && ` Direction calls ${park.dir}; number calls ${park.num}.`}</li>}
+                {asks("sleep_coach") && <li>Asks: {asks("sleep_coach")}; what Matt did: not recorded.</li>}
+              </ul>
+            </div>
+          </details>
+        </section>
+        <section class="ed-coach" data-coach="physical_coach">
+          <h2>Max Reyes</h2>
+          <p class="role">Training</p>
+          <p class="c">
+            Max Reyes watches training, cardio, mobility and body composition. Before day one he said the weight would come down over the first fortnight, and it did. In late September he put his view plainly: “Weight will continue to decline, but body composition question remains open.” The first half has held. The second is still open: nothing has measured his body composition directly since a scan in March. Lately his advice has been about protein.
+          </p>
+          <p class="c">What Matt did with it is not recorded.</p>
+          <details class="ed-details last">
+            <summary>The record</summary>
+            <div class="body">
+              <ul>
+                <li>What he reads, per his page: “training, cardio, mobility, and body composition”.</li>
+                <li>Sealed weight call of 5 September: first graded wrong on 4 October, graded right under a corrected rule (correction recorded 12 October 2026).</li>
+                <li>His words of 25 September: graded right (weight 313.1 lb on 25 September to 306.1 lb on 9 October).</li>
+                <li>Only DEXA scan on the record: 30 March 2026.</li>
+                <li>Protein asks: graded not met on 16 and 19 November; due 26 and 30 November.{asks("physical_coach") && ` Asks overall: ${asks("physical_coach")}; what Matt did: not recorded.`}</li>
+                {reyes && <li data-coach-record>As of {asOf}: {reyes}.</li>}
+              </ul>
+            </div>
+          </details>
+        </section>
+        <section class="ed-coach" data-coach="nutrition_coach">
+          <h2>Marcus Webb</h2>
+          <p class="role">Nutrition</p>
+          <p class="c">
+            Marcus Webb watches food: protein, how consistently it's logged, and the size of the deficit. Early on he expected protein to slide over the second half of September, and it did, with three days under 100 grams near the end. Since then his advice has kept coming back to eating more protein. In the most recent week on the record, the 170-gram floor wasn't reached on any of the four days logged.
+          </p>
+          <p class="c">What Matt did with the advice is not recorded.</p>
+          <details class="ed-details last">
+            <summary>The record</summary>
+            <div class="body">
+              <ul>
+                <li>What he reads, per his page: “Protein, adherence, and sustainable deficits”.</li>
+                <li>Call of 16 September, protein to trend down over 14 days: 215 g on 16 September to 141 g on 30 September; first graded wrong on 30 September, then right on 9 November (a corrected grade; the original is kept).</li>
+                <li>Protein asks graded not met when they fell due on 19 and 23 November 2026.{asks("nutrition_coach") && ` Asks overall: ${asks("nutrition_coach")}; what Matt did: not recorded.`}</li>
+                {floor && weekEnd && <li>Protein floor met on {floor.met} of {floor.logged} logged days in the seven days to {dayInWords(weekEnd).replace(/ \d{4}$/, "")} (homepage).</li>}
+                {webb && <li data-coach-record>As of {asOf}: {webb}.</li>}
+              </ul>
+            </div>
+          </details>
+        </section>
+        <p style="margin-top:26px;font-weight:700">Henning Brandt, James Okafor, Nathan Reeves, Amara Patel and the head coach, Eli Marsh, are in the full coaching directory <a href={href("/system/")} aria-label="The full coaching directory">→</a></p>
+        {
+          ed.checked && (
+            <p class="ed-meta" data-coaches-checked>
+              All the coaches together, as of {dayInWords(ed.checked.asOf)}: {ed.checked.k} right of the {ed.checked.n} forecasts that could be checked fairly (of {ed.checked.eligible} graded), against {ed.checked.baseline} for a guess that nothing changes. <a href={href("/system/calibration/")}>How the grading works →</a> The chapters are written by Elena Voss, an AI editorial persona.
+            </p>
+          )
+        }
+      </div>
+    </div>
+  </section>
+</Base>

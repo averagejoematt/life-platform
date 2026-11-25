@@ -1,0 +1,13 @@
+---
+// "Next" on the featured path: one link forward, in page chrome.
+import { href } from "../lib/url.js";
+
+interface Props {
+  label: string;
+  to: string;
+  words: string;
+}
+const { label, to, words } = Astro.props as Props;
+---
+
+<div class="ed-next" data-featured-next><span class="ed-lbl">{label}</span><a href={href(to)}>{words}</a></div>

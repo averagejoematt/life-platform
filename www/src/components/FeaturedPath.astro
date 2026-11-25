@@ -1,0 +1,23 @@
+---
+// The featured path (owner, review 12: "The Rate Flag → Prologue → Park's Blind Spot, revisited → What happens next →
+// Subscribe", kept distinct from the chronological chapters). Page chrome only: it never sits inside a chapter's text.
+import { PATH } from "../lib/editorial.js";
+import { href } from "../lib/url.js";
+
+interface Props {
+  on?: string | null;
+}
+const { on = null } = Astro.props as Props;
+---
+
+<ol class="ed-path" aria-label="Start here" data-featured-path>
+  {
+    PATH.map((s) => (
+      <li class={s.key === on ? "on" : ""}>
+        <a href={href(s.to)} aria-current={s.key === on ? "page" : undefined}>
+          {s.label}
+        </a>
+      </li>
+    ))
+  }
+</ol>

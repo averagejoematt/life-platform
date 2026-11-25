@@ -8,7 +8,7 @@ import Base from "../layouts/Base.astro";
 import Provenance from "../components/Provenance.astro";
 import StatusTag from "../components/StatusTag.astro";
 import VersusGuess from "../components/VersusGuess.astro";
-import OpenQuestions from "../components/OpenQuestions.astro";
+import WhatHappensNext from "../components/WhatHappensNext.astro";
 import OwnWords from "../components/OwnWords.astro";
 import { NARRATOR_BYLINE } from "../lib/narrator.js";
 import { headline, weeklyBars } from "../lib/chart.js";
@@ -16,11 +16,15 @@ import { readingWords, scaleWords, weeklySpark } from "../lib/spark.js";
 import { chapterCount, chapterMeta, chapterWindow, dayInWords, nextChapter, domainWords, num, kOfN, clip, heldCallWords } from "../lib/format.js";
 import { connectedTo, loadAll, loadSeries, latestEdition, dayLine, loadCalibration, loadJourney, loadLab } from "../lib/snapshot.js";
 import { labEnabled } from "../lib/lab.js";
-import { bodyChange, fourParts, labVerdicts } from "../lib/standing.js";
+import { fourParts, labVerdicts } from "../lib/standing.js";
 import { lineCounts, theLine } from "../lib/theline.js";
 import { verifiedLead } from "../lib/calibration.js";
 import { roomPublic } from "../lib/room.js";
 import { href, pathOf } from "../lib/url.js";
+import { loadEditorial } from "../lib/editorial_data.js";
+import { PATH, PATH_CHAPTERS, progressLine } from "../lib/editorial.js";
+import { editionFor, editionReading } from "../lib/chapter_editions.js";
+import { loadChapterEditions } from "../lib/snapshot.js";
 
 const all = await loadAll();
 const edition = await latestEdition();
@@ -224,7 +228,15 @@ if (labEnabled()) {
     labFile = null;
   }
 }
-const body = bodyChange(weightSeries, startDate, lineData?.startValue ?? null);
+// The editorial release (owner, review 14): the body figure, the first screen's data line and "What happens next" read ONE
+// computation (lib/editorial_data.js loadEditorial → lib/editorial.js progress, over standing.js bodyChange with the
+// same series, start day and start weight this page always used), so the three cannot disagree.
+const ed = await loadEditorial();
+const body = ed.p ? ed.p.body : null;
+const dataLine = progressLine(ed.p);
+const rateFlag = all.get("chapter", PATH_CHAPTERS["rate-flag"]);
+const rateFlagEd = rateFlag ? editionFor(await loadChapterEditions(), rateFlag.id) : null;
+const rateFlagMin = rateFlagEd ? editionReading(rateFlagEd).read_minutes : rateFlag?.read_minutes;
 const fp = fourParts({ body, lab: labVerdicts(labFile), measured, lead: soFarLead });
 const fig = (id: string) => fp.find((p) => p.id === id)!;
 const labTests = labVerdicts(labFile);
@@ -244,7 +256,7 @@ const standing: Standing[] = [
     text: labTests
       ? `pre-registered tests ${labTests.decided === 1 ? "has" : "have"} a verdict. Whether the new habits hold is not known yet.`
       : "Whether the new habits hold is not known yet; the Laboratory is not served in this snapshot.",
-    to: "#open-questions",
+    to: "#what-happens-next",
   },
   {
     ...fig("life"),
@@ -267,18 +279,29 @@ const standing: Standing[] = [
       <p class="label">
         An experiment, in public{startDate && ` · began ${dayInWords(startDate)}`}{edition?.day_n != null && ` · day ${edition.day_n}`}
       </p>
-      <div class="opening-grid">
-        <h1>Can an ordinary person engineer an extraordinary life?</h1>
-        <div class="premise">
-          <p class="dek">
-            I'm Matt. British, in Seattle. On {startDate ? dayInWords(startDate, { short: true }) : "day one"} I weighed
-            {today?.start_weight_lbs ? ` ${num(today.start_weight_lbs, 0)} pounds` : " what the scale said"} and started this: the data sources on my
-            body, a team of AI coaches, one honest journal. The weight is the catalyst, not the point. The point is whether any of it adds up to a
-            better life — healthier, happier, more capable — and whether the AI earns its place. I can't answer that yet.
-          </p>
-          <p class="margin">
-            The "Average" is aspirational. Most of my numbers are currently above it, and I'm working on that in the only direction that counts.
-          </p>
+      {/* The first screen (owner authorisation, review 14, 2026-11-24). The headline and the opening paragraph are the
+          owner's own first-person words, authorised exactly: STATIC text, never a variable, never generated or rewritten
+          by code — scripts/check_www_build.py::first_person_pin hashes both as built. The data line below them is the
+          platform's voice and changes with the data. */}
+      <div class="ed-hero-grid">
+        <div class="ed-hero"><h1 data-first-person-headline>I lost 115 pounds once. I regained it all, and more.</h1></div>
+        <div>
+          <p class="ed-opening" data-first-person>I’m Matt. British, in Seattle. On 6 September 2026 I weighed 327.3 pounds and started again, by my own count ‘the 15th or 16th reset in a few months’. This time a team of AI coaches is part of it. I can’t yet say whether the coaches are helping.</p>
+          {dataLine && <p class="ed-dataline" data-progress-line data-progress-below={ed.p.below}>{dataLine}</p>}
+          <a class="ed-btn" href={href(PATH[0].to)}>Start with one week: The Rate Flag{rateFlagMin ? ` · ${rateFlagMin} min` : ""} →</a>
+          <div class="ed-links"><a href={href(PATH[1].to)}>How it started</a><a href={href("/system/coaches/")}>Meet the coaches</a></div>
+          <p class="ed-tagline">Can an ordinary person engineer an extraordinary life?</p>
+          <div class="ed-how" data-how-checked>
+            <b>How the coaches are checked</b>
+            <p>Every night the data lands in one place and each coach reads one slice of it. Each prediction they make carries a date; when the date arrives, a separate program checks it, and the result is published, right or wrong.</p>
+            {
+              ed.checked && (
+                <p data-coaches-checked>
+                  As of {dayInWords(ed.checked.asOf)}: of {ed.checked.eligible} coach predictions graded right or wrong so far, {ed.checked.n} could be checked fairly. On those {ed.checked.n} the coaches were right {ed.checked.k} times and a guess that nothing changes {ed.checked.baseline} times{ed.checked.words ? `: ${ed.checked.words}` : ""}. Predictions still open are not counted. <a href={href("/system/calibration/")}>How the grading works →</a>
+                </p>
+              )
+            }
+          </div>
         </div>
       </div>
       <div class="standing" data-standing>
@@ -461,7 +484,12 @@ const standing: Standing[] = [
     )
   }
 
-  <OpenQuestions measured={measured} dimensions={dims.map((d) => ({ label: d.label, measured: d.measured }))} foodText={week?.measures?.food?.state === "ok" ? week.measures.food.data?.text : null} />
+  {/* "What happens next" replaces "What nobody knows yet" (owner, review 11 §What happens next; review 14) */}
+  <section class="section hair" id="what-happens-next">
+    <div class="wrap">
+      <WhatHappensNext />
+    </div>
+  </section>
 
   <section class="section hair">
     <div class="wrap">

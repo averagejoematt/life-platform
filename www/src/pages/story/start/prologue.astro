@@ -1,0 +1,48 @@
+---
+// Start here · 2 of 3: the prologue, framed (the featured path, owner review 12). The chapter is unchanged. The card
+// names 5 September as the narrated day and 2 October as the first publication (owner, review 13 §5) and never repeats
+// the chapter header's disputed data cutoff.
+import Base from "../../../layouts/Base.astro";
+import FeaturedPath from "../../../components/FeaturedPath.astro";
+import FeaturedNext from "../../../components/FeaturedNext.astro";
+import { PATH, PATH_CHAPTERS, PROLOGUE_NARRATED } from "../../../lib/editorial.js";
+import { dayInWords } from "../../../lib/format.js";
+import { loadAll, loadChapterEditions } from "../../../lib/snapshot.js";
+import { editionFor, editionReading } from "../../../lib/chapter_editions.js";
+import { loadEditorial } from "../../../lib/editorial_data.js";
+import { hasPage, href, pathOf } from "../../../lib/url.js";
+
+const all = await loadAll();
+const ed = await loadEditorial();
+const c = all.get("chapter", PATH_CHAPTERS.prologue);
+const live = c && c.status === "published" && hasPage("chapter", c) ? c : null;
+const e = live ? editionFor(await loadChapterEditions(), live.id) : null;
+const minutes = e ? editionReading(e).read_minutes : live?.read_minutes;
+const first = e?.first_published || live?.published_at || null;
+const meta = live
+  ? [`Prologue · ${dayInWords(PROLOGUE_NARRATED, { weekday: true })}, the night before day 1`, first ? `first published ${dayInWords(first)}` : null, minutes ? `Read · ${minutes} min` : null]
+      .filter(Boolean)
+      .join(" · ")
+  : null;
+const status = ed.edition ? [ed.edition.day_n != null ? `Day ${ed.edition.day_n}` : null, dayInWords(ed.edition.as_of)].filter(Boolean).join(" · ") : null;
+---
+
+<Base title="Start here: how it started" top="story" status={status}>
+  <section class="section">
+    <div class="wrap">
+      <FeaturedPath on="prologue" />
+      <div class="ed-narrow">
+        <p class="ed-kicker">Start here · 2 of 3</p>
+        <div class="ed-card" data-path-card="prologue">
+          {meta && <p class="ed-meta">{meta}</p>}
+          <h1>Before the Numbers</h1>
+          <p class="ed-dek">
+            He had lost 115 pounds once and regained it all, and more. This chapter sets out, in the plan's own words, what was meant to be different this time. That evening the coaches put their first predictions on the record, before a single day of data.
+          </p>
+          {live && <a class="ed-btn" href={href(pathOf("chapter", live.id))}>Read the prologue →</a>}
+        </div>
+        <FeaturedNext label="Next · 3 of 3" to={PATH[2].to} words="Where the AI got it wrong: Park's Blind Spot, revisited →" />
+      </div>
+    </div>
+  </section>
+</Base>

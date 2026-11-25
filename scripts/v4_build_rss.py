@@ -19,6 +19,7 @@ the repo root, then deploy site/ (sync_site_to_s3.sh calls this automatically):
 
 from __future__ import annotations
 
+import hashlib
 import html
 import json
 import re
@@ -253,6 +254,34 @@ def _blog_posts() -> list[dict]:
     return [p for p in (data.get("posts") or []) if p.get("date") and p.get("title") and p.get("url")]
 
 
+# The editorial release (owner authorisation, review 14, 2026-11-24): ONE item per editorial feature — its permanent
+# address as guid and link, its approved title and summary from its approved text, and its ACTUAL first-publication day
+# as pubDate, all read from the committed www/src/features/ (features.json + the text file). A feature creates no
+# chronicle row, so nothing here — or anywhere — sends it to subscribers.
+FEATURES_JSON = Path(__file__).resolve().parent.parent / "www" / "src" / "features" / "features.json"
+
+
+def _feature_posts() -> list[dict]:
+    """The features as feed posts (fail-closed per feature: one that cannot be read exactly is left out, never guessed)."""
+    try:
+        data = json.loads(FEATURES_JSON.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    out = []
+    for f in data.get("features") or []:
+        try:
+            text = (FEATURES_JSON.parent / f["text_file"]).read_bytes().decode("utf-8")
+            day = str(f["first_published"])
+            datetime.strptime(day, "%Y-%m-%d")
+        except (OSError, KeyError, ValueError, UnicodeDecodeError):
+            continue
+        blocks = text.split("\n\n")
+        if len(blocks) < 3 or not blocks[0].startswith("# ") or hashlib.sha256(text.encode("utf-8")).hexdigest() != f.get("sha256"):
+            continue
+        out.append({"date": day, "title": blocks[0][2:], "url": f["path"], "excerpt": blocks[2], "_pub": rfc822(day)})
+    return out
+
+
 # #6224: the essay's canonical page is the v9 one (/story/essays/<id>/); the generated legacy permalink names it as its
 # canonical. The feed item's <link> goes there; its <guid> stays the bare legacy permalink, so no reader is re-notified.
 ESSAY_CANONICAL = "/story/essays/{id}/"
@@ -402,6 +431,7 @@ def main() -> int:
     # Matt's essays are occasional by nature and must never trip it — merge after.
     _freshness_check(posts)
     posts += _blog_posts()
+    posts += _feature_posts()  # the editorial release: one item per feature, nothing else changes
     posts.sort(key=lambda p: p["date"], reverse=True)
 
     now = format_datetime(datetime.now(timezone.utc))

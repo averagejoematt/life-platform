@@ -109,8 +109,14 @@ export function chapterMeta(c) {
   if (!c) return null;
   const week = Number.isInteger(c.week) ? c.week : null;
   const prologue = week === 0;
-  const number = week == null ? "—" : String(week).padStart(2, "0");
-  const name = prologue ? "Prologue" : week == null ? String(c.week_label || "") : `Chapter ${number}`;
+  // the editorial release (owner, reviews 11 and 14, 2026-11-24): chapters are numbered date-first, 1, 2, 3 … in the
+  // order of the days they cover (`chapter_no`, applyChapterNumbers); a week with no published chapter has no chapter
+  // number. The program week stays the historical identifier ("Week 10"). An object without `chapter_no` (a test's
+  // lone chapter) keeps the program week.
+  const seq = Number.isInteger(c.chapter_no) ? c.chapter_no : null;
+  const unnumbered = "chapter_no" in c && seq == null && !prologue;
+  const number = week == null || unnumbered ? "—" : String(prologue ? 0 : (seq ?? week)).padStart(2, "0");
+  const name = prologue ? "Prologue" : week == null || unnumbered ? String(c.week_label || "") : `Chapter ${number}`;
   const isPub = c.status === "published";
   const covers = isPub ? chapterCovers(c) : null;
   const coversShort = isPub ? chapterCovers(c, { short: true }) : null;
@@ -122,8 +128,20 @@ export function chapterMeta(c) {
   // #6161: a plain sentence, shown at the foot of the chapter (never before its prose); none for the prologue
   const weekNote = differs && week >= 1 ? `This chapter covers ${covers.replace(/^Day/, "day").replace(" · ", ", ")}; program week ${week} ran ${programWeek}.` : null;
   const win = chapterWindow(c);
-  const tick = isPub && week >= 1 && win ? { date: win[1], n: String(week) } : null;
+  const tick = isPub && week >= 1 && win ? { date: win[1], n: String(seq ?? week) } : null;
   return { week, number, name, prologue, window, windowShort, programWeek, published: chapterPublished(c), weekNote, tick };
+}
+
+/** The date-first chapter numbers (owner, reviews 11 and 14): every published chapter after the prologue, in the order of
+ *  the days it covers (its data date when no covered days are served), gets `chapter_no` 1, 2, 3 …; every other numbered
+ *  week gets `chapter_no: null` (no chapter number). In place; returns the chapters. Historical ids, weeks and URLs are
+ *  untouched. */
+export function applyChapterNumbers(chapters) {
+  const key = (c) => c.covers_start || c.date || "";
+  const pub = (chapters || []).filter((c) => c && c.status === "published" && Number.isInteger(c.week) && c.week >= 1).sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : a.week - b.week));
+  for (const c of chapters || []) if (c && Number.isInteger(c.week) && c.week >= 1) c.chapter_no = null;
+  pub.forEach((c, i) => (c.chapter_no = i + 1));
+  return chapters;
 }
 
 /** How many chapters are published, said the same way on every page: "7 chapters and a prologue" ({spell:true}: "seven
@@ -176,7 +194,9 @@ export function gapWords(chapters, fromWeek, toWeek) {
 export function nextChapter(chapters, draftDate) {
   if (!ISO_DAY_RE.test(draftDate || "")) return null;
   const c = (chapters || []).find((x) => x && x.status !== "published" && Number.isInteger(x.week) && x.week >= 1 && ISO_DAY_RE.test(x.week_start || "") && ISO_DAY_RE.test(x.week_end || "") && x.week_start <= draftDate && draftDate <= x.week_end);
-  return { number: c ? String(c.week).padStart(2, "0") : null, date: draftDate };
+  // date-first numbering (owner, review 14): a chapter gets its number when it is published, so the next one is not
+  // numbered in advance (its program week is not its chapter number)
+  return { number: c && !("chapter_no" in c) ? String(c.week).padStart(2, "0") : null, date: draftDate };
 }
 
 /** A number with a fixed number of decimals and en-GB grouping; null -> "—". */

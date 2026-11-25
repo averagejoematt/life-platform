@@ -64,6 +64,7 @@ sys.path.insert(0, REPO)
 from deploy import www_owned_paths  # noqa: E402 — the one reader of owned_paths.json (#5534)
 
 sys.path.insert(0, os.path.join(REPO, "scripts"))
+import www_editorial_checks  # noqa: E402 — the editorial release (owner review 14): feature fingerprint, first-person pin, one progress figure
 import www_label_contract  # noqa: E402 — #5953: each tile/series/Day label names the number printed beside it, fixture AND live
 import www_launch_switch  # noqa: E402 — the committed go-live constants (LAB_LIVE, STORY_LIVE): a live feature is not a leak
 import www_verbatim  # noqa: E402 — dates in words, quote-aware (owner ruling 2026-11-02); a page-universal rule, fixture AND live
@@ -449,6 +450,9 @@ def scan(dist: str, require_noindex: bool, forbidden_ids: set[str] | None = None
     issues.extend(story_leaks(dist))
     issues.extend(readercall_leaks(dist))
     issues.extend(own_words_scope(dist, snapshot_dir))
+    issues.extend(www_editorial_checks.feature_fingerprint(dist))
+    issues.extend(www_editorial_checks.first_person_pin(dist))
+    issues.extend(www_editorial_checks.progress_agreement(dist))
     return issues
 
 
@@ -1018,6 +1022,10 @@ def main() -> int:
     blind = www_label_contract.self_test()
     if blind:
         log(f"  ✗ BLIND: the label contract missed a planted wrong label: {blind}")
+        return 2
+    blind = www_editorial_checks.self_test()
+    if blind:
+        log(f"  ✗ BLIND: the editorial checks missed a planted failure: {blind}")
         return 2
     issues = scan(args.dist, require_noindex=preview)
     for i in issues:

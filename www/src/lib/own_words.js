@@ -37,7 +37,9 @@ export const OWN_WORDS = {
     date: "2026-11-08",
     text: "None of the coaches has really changed what I do.",
     sk: "QUOTE#2026-11-08#569e6bcd01",
-    scope: ["/system/calibration/"],
+    scope: ["/system/calibration/", "/", "/story/start/what-happens-next/"],
+    // + "What happens next", on the homepage and the featured path's page: the owner approved its three questions as
+    // supplied, this line in the second (authorisation, review 14, 2026-11-24)
     // a dated reflection beside the measured record: never evidence that coaching had no effect
     frame: "How it seemed to me on one day. It is not a measurement.",
   },
