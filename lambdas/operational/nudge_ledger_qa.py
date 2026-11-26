@@ -344,6 +344,9 @@ MORNING_REPEAT_WARN = 5  # consecutive completed weekdays with the SAME sanction
 #: with the day it began, never a warning. Every other repeated skip (dark, budget, held, capped, quiet_hours) still warns,
 #: and a weekday with no sanctioned outcome still fails.
 INTENTIONAL_PAUSE = "silence_respected"
+#: Owner ruling 2026-11-26 (#6290): the Telegram morning check-in is suspended on purpose. A week of it is a STATUS that says
+#: so, never a warning and never a claim that anything was sent (``outbound_trial.TELEGRAM_MORNING_CHECKIN_HELD``).
+HELD_BY_RULING = "held_by_owner_ruling"  # = coach.morning_checkin_ledger.HELD_BY_RULING (contract test)
 
 
 def check_morning_checkin_liveness(
@@ -397,6 +400,12 @@ def check_morning_checkin_liveness(
     window = outcomes[:MORNING_REPEAT_WARN]
     first = window[0][1]
     if len(window) >= MORNING_REPEAT_WARN and first in SANCTIONED and first != SENT and all(r == first for _, r in window):
+        if first == HELD_BY_RULING:
+            c.ok(
+                "morning check-in HELD by owner ruling (2026-11-26, #6290): the run is evaluated every weekday and deliberately "
+                "not sent - a status, not a fault; restore with outbound_trial.TELEGRAM_MORNING_CHECKIN_HELD = False"
+            )
+            return [c]
         if first == INTENTIONAL_PAUSE:
             run = 0
             while run < len(outcomes) and outcomes[run][1] == first:
