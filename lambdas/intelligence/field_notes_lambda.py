@@ -139,6 +139,18 @@ def _latest_item(source):
     return strava_read_seam(source, items[0] if items else None)
 
 
+def _journey_start_lbs():
+    """The current cycle's starting weight — the SAME constant the grounding gate's
+    baseline-framing rule measures against (``cycle_gate_params``), so the payload and the
+    gate cannot disagree about where the journey started. ``None`` when unavailable."""
+    try:
+        from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS
+
+        return float(EXPERIMENT_BASELINE_WEIGHT_LBS)
+    except Exception:  # noqa: BLE001 — the payload simply omits the figure; the model is told never to invent one
+        return None
+
+
 def gather_week_data(start_date, end_date):
     """Gather data from all partitions for a given week."""
     data = {}
@@ -176,16 +188,27 @@ def gather_week_data(start_date, end_date):
         data["training"] = {"sessions": week["sessions"], "total_minutes": round(week["minutes"])}
 
     # Weight (Withings)
+    # #6270: the keys carry their window. Bare `start`/`end`/`change` keys handed the model a
+    # "from <start> to <end>" sentence with no window in it, which the baseline-framing rule
+    # rightly reads as a from-the-start claim (W47 held on exactly that). The journey start is
+    # carried as its own figure (the same constant the gate measures against, Tier 1 public),
+    # so a legitimate "since the start" sentence is grounded rather than reconstructed from a
+    # prior note's figure (W46 called a prior week's reading the "starting point" and held).
     weights = _query_day_records("withings", start_date, end_date)
     if weights:
         wt = [float(w.get("weight_lbs", 0)) for w in weights if w.get("weight_lbs")]
         if wt:
             data["weight"] = {
-                "readings": len(wt),
-                "start": wt[0],
-                "end": wt[-1],
-                "change": round(wt[-1] - wt[0], 1),
+                "window": f"this week ({start_date} to {end_date})",
+                "readings_this_week": len(wt),
+                "first_reading_this_week_lbs": wt[0],
+                "last_reading_this_week_lbs": wt[-1],
+                "change_this_week_lbs": round(wt[-1] - wt[0], 1),
             }
+            baseline = _journey_start_lbs()
+            if baseline is not None:
+                data["weight"]["journey_start_lbs"] = baseline
+                data["weight"]["change_since_journey_start_lbs"] = round(wt[-1] - baseline, 1)
 
     # Habits (habit_scores)
     # Truth audit 2026-07-10: habit_scores records have NO `completion_rate` field —
@@ -316,7 +339,25 @@ Requirements:
 - UNITS: HRV is in milliseconds (ms), never bpm. Heart rate is in bpm. Never swap them.
 - Do NOT use bullet points — flowing prose only
 - If a data domain has no entries, acknowledge the gap briefly
-- Tone should match the data: don't be affirming when the data is concerning"""
+- Tone should match the data: don't be affirming when the data is concerning
+{NUMBER_INSTRUCTIONS}"""
+
+
+# #6270: W46 and W47 were both HELD by the grounding gate on figures the prompt invited and
+# the payload never carried — a round approximation of a payload figure ("roughly 1,000"
+# calories for an average the data states exactly), an estimate the data has no input for
+# (calories "below maintenance" — no maintenance figure exists in the payload), a multi-week
+# total the model summed itself, and a weight "from X to Y" with no window named. These rules
+# forbid exactly those classes; they do not touch the gate, which still decides.
+# NO DIGITS in this block: the prompt IS the gate's allow-list (`_note_grounding_findings`), so
+# an example figure written here would ground that figure in every note — a gate bypass.
+NUMBER_INSTRUCTIONS = """
+NUMBERS — every figure you write is checked against the data above, and a note with an unsupported figure is not published:
+- Use ONLY numbers that appear in the data above, written as given (dropping trailing decimal places is fine). Never round a figure to a round hundred or thousand, and never write "about", "roughly" or "nearly" before a number — quote it as given or describe it without a number.
+- Never compute a new figure: no totals across weeks, no differences between weeks, no per-day or per-week rates you derived, no percentages of your own.
+- Never estimate a figure the data does not carry: no maintenance or burn calories, no deficits, no targets, goals or thresholds. To raise a concern about intake or recovery, describe it in words.
+- WEIGHT: every sentence that states a weight change or a "from X to Y" pair names its window in that same sentence — "this week" for the first/last reading this week, or "since the start" for journey_start_lbs and change_since_journey_start_lbs. The ONLY starting or baseline weight is journey_start_lbs; never call any other reading a "starting point" or "baseline".
+- Prior weeks' notes are for continuity and tone. You may restate a figure from one exactly as written there, naming its week, but never combine figures across weeks."""
 
 
 _FN_NULLABLE = {"anyOf": [{"type": "string"}, {"type": "null"}]}
@@ -556,6 +597,41 @@ def clear_held_marker(iso_week):
             logger.warning(f"[field_notes] held marker clear failed ({type(e).__name__})")
 
 
+def _findings_detail(findings):
+    """The log/marker summary of a findings list (first three details)."""
+    return "; ".join(str(f.get("detail", "")) for f in findings[:3])
+
+
+# #6270: the field-note specific lines the rewrite carries after the shared per-finding
+# corrections. No digits (the prompt is the allow-list — see NUMBER_INSTRUCTIONS).
+_REWRITE_INSTRUCTIONS = (
+    "Rewrite the full JSON response. Apply every correction above — a rewrite that keeps any one of them is not published. "
+    "For a weight change, put the window in the same sentence ('this week', or 'since the start' measured from journey_start_lbs). "
+    "For a figure that is not in the data, delete it or say it in words; do not swap it for a different number that is not in the data either."
+)
+
+
+def rewrite_prompt(prompt, findings):
+    """The one corrective rewrite's prompt: the original prompt plus EVERY finding, each with
+    the shared per-class instruction (``grounded_generation.correction_prompt`` — the stale
+    baseline names the real start weight, a fabricated number says remove it or describe it
+    qualitatively). Before #6270 the rewrite got the first three findings' details run
+    together in one sentence and a generic "never state a number" line; W47's rewrite
+    reproduced both findings (2 → 2) and the week was held.
+
+    Only the INSTRUCTION to the model changes here — the findings are judged by the same
+    gate, against the same allow-list (the original prompt), with the same keep rule."""
+    try:
+        from ai.grounded_generation import correction_prompt
+
+        correction = correction_prompt(list(findings))
+    except Exception:  # noqa: BLE001 — degrade to the plain list; the gate still judges the rewrite
+        correction = "CORRECTION REQUIRED — your draft was not grounded in the data:\n" + "\n".join(
+            f"- {f.get('detail', '')}" for f in findings
+        )
+    return f"{prompt}\n\n{correction}\n\n{_REWRITE_INSTRUCTIONS}"
+
+
 def generate_field_notes(iso_week):
     start, end = week_bounds(iso_week)
     logger.info(f"Generating field notes for {iso_week} ({start} to {end})")
@@ -588,15 +664,10 @@ def generate_field_notes(iso_week):
     # then-hold, the ADR-151/#2395 posture).
     findings = _note_grounding_findings(analysis, prompt, week=(start, end))
     if findings:
-        detail = "; ".join(str(f.get("detail", "")) for f in findings[:3])
+        detail = _findings_detail(findings)
         _draft_note = {f: analysis.get(f) for f in _NOTE_FIELDS}  # #812/#744: pre-rewrite note for retention
         logger.info(f"[grounding] {len(findings)} finding(s) in {iso_week}: {detail} — one corrective rewrite")
-        fix_prompt = (
-            prompt
-            + "\n\nCORRECTION REQUIRED — your previous draft was not grounded in the week's "
-            + f"data: {detail}. Rewrite the full JSON response. Never state a number or date "
-            + "that is not in the data above; when unsure, describe the pattern without one."
-        )
+        fix_prompt = rewrite_prompt(prompt, findings)
         try:
             retry = _call_notes_model(fix_prompt, api_key)
             retry_findings = _note_grounding_findings(retry, prompt, week=(start, end))
@@ -625,6 +696,9 @@ def generate_field_notes(iso_week):
             # HOLD — the one rewrite did not clear the findings. No write: the reader
             # surface reads the WEEK# row, so an absent row is an absent note, never
             # failed text. A later manual invoke can regenerate the week.
+            # #6270: name the findings of the draft actually held, not the first draft's — the
+            # W46 HELD line said "1 finding(s)" and then listed the first draft's three.
+            detail = _findings_detail(findings)
             logger.warning(f"[grounding] HELD {iso_week}: {len(findings)} finding(s) after the one rewrite — {detail}")
             write_held_marker(iso_week, "grounding_held", detail, len(findings))
             return {"status": "held", "week": iso_week, "findings": len(findings)}
