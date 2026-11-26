@@ -110,7 +110,7 @@ def test_the_level_name_is_not_rendered_in_reader_copy():
     assert "p.tier" not in _code(ABSENCE) and "Foundation" not in _code(ABSENCE)
     # the no-JS proof block and the share tags carry the number, never the name
     proof = HTML[HTML.index("<!-- cockpit-proof:start -->") : HTML.index("<!-- cockpit-proof:end -->")]
-    assert "Character level" in proof and "Foundation" not in proof
+    assert ("Character level" in proof or "Scores are being recalculated" in proof) and "Foundation" not in proof
     for tag in ('property="og:title"', 'name="twitter:title"', 'property="og:description"'):
         line = next(ln for ln in HTML.splitlines() if tag in ln)
         assert "Foundation" not in line, tag

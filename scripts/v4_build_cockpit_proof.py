@@ -81,7 +81,14 @@ def main() -> int:
         print("error: no injection anchor found in site/cockpit/index.html.", file=sys.stderr)
         return 2
     _apply_chrome.write_page(NOW, out)  # #3721
-    print("updated site/cockpit/index.html — cockpit proof + data-driven OG baked (level + pillars + as-of).")
+    print(
+        "updated site/cockpit/index.html — cockpit proof + data-driven OG baked "
+        + (
+            "(scores recalculating: no level, no pillars, no as-of)."
+            if char.get("status") == "recalculating"
+            else "(level + pillars + as-of)."
+        )
+    )
     return 0
 
 
