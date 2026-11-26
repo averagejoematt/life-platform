@@ -62,7 +62,8 @@ def published_installment_dates(installments) -> list:
 
     Phase-visible only, matching `recall_indexer.published_post_links`: a wiped
     prior-cycle installment has no page and is not something this check can require an
-    embedding for. Status-gated too — a draft is deliberately not indexed.
+    embedding for. Withdrawn chapters are excluded through `chapter_reads.is_withdrawn`, the
+    predicate the indexer applies (#6199 G1, #6268). Status-gated too — a draft is deliberately not indexed.
 
     KEYED ON THE SORT KEY, NOT THE `date` ATTRIBUTE. Those two disagree on live records:
     a reset's carry-forward re-stamps `date` while the sk keeps the original, so
@@ -76,12 +77,16 @@ def published_installment_dates(installments) -> list:
     comparison must use the key the writer actually wrote.
     """
     from ai.recall_indexer import date_from_sk
+    from content import chapter_reads
     from experiment.phase_filter import singleton_visible
 
     return sorted(
         date_from_sk(str(i.get("sk", "")))
         for i in installments
-        if singleton_visible(i) and date_from_sk(str(i.get("sk", ""))) and str(i.get("status", "")) == "published"
+        if singleton_visible(i)
+        and not chapter_reads.is_withdrawn(i)  # #6268: the indexer's own predicate (#6199 G1) — it never writes a withdrawn chapter
+        and date_from_sk(str(i.get("sk", "")))
+        and str(i.get("status", "")) == "published"
     )
 
 
@@ -96,13 +101,17 @@ def published_link_expectations(installments) -> dict:
     leftover URL from a retired scheme.
     """
     from ai.recall_indexer import date_from_sk, published_post_links
+    from content import chapter_reads
     from experiment.phase_filter import singleton_visible
 
     links = published_post_links(installments)
     return {
         date_from_sk(str(i.get("sk", ""))): links.get((i.get("date", ""), str(i.get("sk", ""))), "")
         for i in installments
-        if singleton_visible(i) and date_from_sk(str(i.get("sk", ""))) and str(i.get("status", "")) == "published"
+        if singleton_visible(i)
+        and not chapter_reads.is_withdrawn(i)  # #6268: the indexer's own predicate (#6199 G1) — it never writes a withdrawn chapter
+        and date_from_sk(str(i.get("sk", "")))
+        and str(i.get("status", "")) == "published"
     }
 
 

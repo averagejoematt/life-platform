@@ -226,6 +226,51 @@ def test_probe_fails_on_a_live_301_and_only_on_a_redirect():
     assert len(errors) == 1 and "/journal/posts/week-01/" in errors[0]
 
 
+def test_a_301_to_the_served_edition_with_a_200_target_is_sanctioned_6268():
+    """Owner ruling 2026-11-22 (#6193): /journal/posts/week-NN/ -> /story/week-NN/ is the design, not a blackhole."""
+    base = "https://example.com"
+    opener = _FakeOpener(
+        {
+            f"{base}/journal/posts/week-04/": ("http_error", 301, "/story/week-04/"),
+            f"{base}/journal/posts/week-05/": ("http_error", 301, f"{base}/story/week-05/"),  # absolute, same host
+            f"{base}/story/week-04/": ("ok", 200),
+            f"{base}/story/week-05/": ("ok", 200),
+        }
+    )
+    failures, errors = pb.probe_live_permalinks(["/journal/posts/week-04/", "/journal/posts/week-05/"], opener=opener, base_url=base)
+    assert failures == [] and errors == []
+
+
+def test_a_301_anywhere_else_still_fails_6268():
+    base = "https://example.com"
+    cases = {
+        "/story/journal/": "blackhole",  # the #3284 hub
+        "/story/week-05/": "wrong week",  # right shape, wrong chapter
+        "https://evil.example.org/story/week-04/": "other host",
+        "/journal/posts/week-04/": "self loop",
+    }
+    for location in cases:
+        opener = _FakeOpener({f"{base}/journal/posts/week-04/": ("http_error", 301, location), f"{base}/story/week-04/": ("ok", 200)})
+        failures, _ = pb.probe_live_permalinks(["/journal/posts/week-04/"], opener=opener, base_url=base)
+        assert len(failures) == 1 and "301" in failures[0], (cases[location], failures)
+
+
+def test_a_served_edition_that_is_not_200_or_redirects_onward_fails_6268():
+    base = "https://example.com"
+    for target in (("http_error", 404, None), ("http_error", 301, "/journal/posts/week-04/"), ("ok", 500)):
+        opener = _FakeOpener({f"{base}/journal/posts/week-04/": ("http_error", 301, "/story/week-04/"), f"{base}/story/week-04/": target})
+        failures, _ = pb.probe_live_permalinks(["/journal/posts/week-04/"], opener=opener, base_url=base)
+        assert len(failures) == 1 and "not 200" in failures[0], (target, failures)
+
+
+def test_the_sanctioned_target_comes_from_the_ruling_mapping_6268():
+    from content import legacy_chapter_addresses as lca
+
+    assert pb.lca is lca
+    assert pb.served_edition_target("/journal/posts/week-04/", lca.story_path("week-04"), "https://example.com") == "/story/week-04/"
+    assert pb.served_edition_target("/not-a-permalink/", "/story/week-04/", "https://example.com") is None
+
+
 def _wire_check(monkeypatch, posts_payload, map_entries, opener_script):
     """Point the live check at scripted stand-ins for its three inputs."""
 

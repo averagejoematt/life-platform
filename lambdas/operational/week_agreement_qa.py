@@ -52,7 +52,8 @@ from operational.census_probe import ProbeBudget
 # ── small helpers ────────────────────────────────────────────────────────────
 _REL_DAYS = re.compile(r"(\d+(?:\.\d+)?)\s*(d|day|days|h|hour|hours|w|week|weeks|mo|month|months|y|year|years)\b", re.I)
 _UNIT_DAYS = {"d": 1.0, "day": 1.0, "days": 1.0, "h": 1 / 24.0, "hour": 1 / 24.0, "hours": 1 / 24.0, "w": 7.0, "week": 7.0, "weeks": 7.0}
-_UNIT_DAYS.update({"mo": 30.0, "month": 30.0, "months": 30.0, "y": 365.0, "year": 365.0, "years": 365.0})
+_MONTH_DAYS = 30.0  # the width of one rendered month (the "mo" unit below) — the coarsest granularity a surface floors to
+_UNIT_DAYS.update({"mo": _MONTH_DAYS, "month": 30.0, "months": 30.0, "y": 365.0, "year": 365.0, "years": 365.0})
 
 
 def _pt_date_of(iso_ts: str) -> Optional[str]:
@@ -497,6 +498,13 @@ def check_absence_agreement(Check, tier, pt_now, *, site_base_url: str, budget: 
         # health panel says "5mo ago" — and a month-rounded value is up to a month adrift
         # by construction. Anything past a fifth is two different last-record dates.
         tol = max(1.5, 0.2 * hi)
+        # #6268: a surface that renders whole months ("2mo ago" -> 60d) FLOORS the silence, so it can
+        # lag the exact figure by up to a month (80d reads as "2mo") — far past a fifth of the larger
+        # figure between day ~75 and ~89. Size the tolerance to that coarsest granularity, but only
+        # when the lagging value really is a month rendering (a whole multiple of 30d); two surfaces
+        # that both speak in days keep the tight bound, so two different last-record dates still fail.
+        if lo >= _MONTH_DAYS and lo % _MONTH_DAYS == 0:
+            tol = max(tol, _MONTH_DAYS)
         if hi - lo > tol:
             shown = ", ".join(f"{s}={d:.0f}d" for s, d in pairs)
             violations.append(f"{sid}: surfaces disagree on how long it has been silent ({shown}; tolerance {tol:.0f}d)")

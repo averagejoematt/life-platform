@@ -410,6 +410,31 @@ def test_month_granularity_is_not_a_disagreement():
     assert check.passed is True, check.message
 
 
+def test_a_month_floored_silence_up_to_a_month_adrift_is_not_a_disagreement_6268():
+    """80d exact vs '2mo ago' (60d): the live 2026-11-25 shape, red at the 20% rule (tolerance 16d)."""
+    row = {"id": "garmin", "status": "paused", "desc": "paused (ADR-074)", "days_dark": 80, "last_update": "2026-09-06"}
+    payloads = _absence_payloads(
+        "PAUSED in the source registry — paused (ADR-074). Last record: 2mo ago.", freshness_row=row, rel="2mo ago"
+    )
+    check = _run_absence(payloads)
+    assert check.passed is True, check.message
+
+
+def test_two_different_last_record_dates_still_fail_6268():
+    # day-granular vs day-granular: 80d vs 55d are two different last-record dates
+    row = {"id": "garmin", "status": "paused", "desc": "paused (ADR-074)", "days_dark": 80, "last_update": "2026-09-06"}
+    payloads = _absence_payloads(
+        "PAUSED in the source registry — paused (ADR-074). Last record: 55d ago.", freshness_row=row, rel="55d ago"
+    )
+    assert _run_absence(payloads).passed is False
+    # month-floored but more than a month adrift: 120d vs '2mo ago' (60d)
+    row = {"id": "garmin", "status": "paused", "desc": "paused (ADR-074)", "days_dark": 120, "last_update": "2026-07-28"}
+    payloads = _absence_payloads(
+        "PAUSED in the source registry — paused (ADR-074). Last record: 2mo ago.", freshness_row=row, rel="2mo ago"
+    )
+    assert _run_absence(payloads).passed is False
+
+
 def test_a_never_rendering_is_an_honest_duration():
     rows = wq._extract_status_components(
         {"groups": [{"components": [{"id": "x", "status": "blue", "last_sync_relative": "never", "comment": "c"}]}]}
