@@ -454,7 +454,7 @@ def _cause_verdict(facet: dict, cause_text: str, duration_days: Optional[float])
     return None
 
 
-def _judge_surface_rows(sid, facet, surface_id, rows, violations, advisories, details) -> Optional[float]:
+def _judge_surface_rows(sid, facet, surface_id, rows, violations, advisories, details) -> Optional[tuple]:
     """Judge EVERY row one surface renders for `sid` (#5527); return the surface's duration, or None.
 
     A partition with several sub-feeds (apple_health) renders several rows on one surface. Each
