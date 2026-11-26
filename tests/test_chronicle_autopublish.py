@@ -209,3 +209,46 @@ def test_find_stale_drafts_reads_every_page(mod):
         stale = mod._find_stale_drafts(48, 10)
     assert [s["date"] for s in stale] == ["new"]
     assert q.call_args_list[1].kwargs["ExclusiveStartKey"] == {"k": 1}
+
+
+def test_the_held_notice_fires_once_then_goes_quiet(mod, monkeypatch):
+    """Owner ruling 2026-11-26: no repeating daily approval reminder. The alarm token is logged on the first sweep
+    past the review window (age 48–72 h) and never again; the draft is still held, and nothing is written."""
+    loud_lines = []
+    real = mod.logger.error
+
+    def _record(msg, *args, **kw):
+        text = msg % args if args else str(msg)
+        if mod.HELD_TOKEN in text:
+            loud_lines.append(text)
+        return real(msg, *args, **kw)
+
+    monkeypatch.setattr(mod.logger, "error", _record)
+
+    def run(age_h):
+        row = {"sk": "DATE#w", "date": "w", "status": "draft", "generated_at": _iso(age_h), "week_number": 12}
+        loud_lines.clear()
+        with (
+            mock.patch.object(mod, "_find_stale_drafts", return_value=[row]),
+            mock.patch.object(mod, "_audit_refusal", return_value=[]),
+            mock.patch.object(mod.table, "put_item") as put,
+            mock.patch.object(mod.table, "update_item") as upd,
+        ):
+            held = mod._sweep_stale_drafts(48)
+        assert not put.called and not upd.called
+        return held, bool(loud_lines)
+
+    held, loud = run(50)
+    assert [h["date"] for h in held] == ["w"] and loud  # first sweep past the window: one notice
+    for later in (74, 98, 200):
+        held, loud = run(later)
+        assert [h["date"] for h in held] == ["w"] and not loud  # still held, silent
+
+
+def test_first_notice_window_edges(mod):
+    now = datetime.now(timezone.utc)
+    at = lambda h: {"generated_at": (now - timedelta(hours=h)).isoformat()}  # noqa: E731
+    assert not mod._first_notice(at(47.9), 48, now)
+    assert mod._first_notice(at(48), 48, now) and mod._first_notice(at(71.9), 48, now)
+    assert not mod._first_notice(at(72), 48, now)
+    assert not mod._first_notice({"generated_at": "not a date"}, 48, now)
