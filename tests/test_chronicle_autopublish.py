@@ -198,3 +198,14 @@ def test_commit_recap_defaults_the_phase_when_the_installment_carries_none(mod):
         mod._commit_recap(item)
     assert all(w["phase"] == mod.EXPERIMENT_PHASE_CURRENT for w in writes)
     assert all("cycle" not in w for w in writes)
+
+
+def test_find_stale_drafts_reads_every_page(mod):
+    """2026-11-26: chronicle rows carry full text, so one Query page stopped at DATE#2026-11-17 and the week-12 draft
+    sat on page 2, unseen. The sweep must follow LastEvaluatedKey to the end."""
+    page1 = {"Items": [{"sk": "DATE#old", "date": "old", "status": "published", "generated_at": _iso(72)}], "LastEvaluatedKey": {"k": 1}}
+    page2 = {"Items": [{"sk": "DATE#new", "date": "new", "status": "draft", "generated_at": _iso(72), "week_number": 12}]}
+    with mock.patch.object(mod.table, "query", side_effect=[page1, page2]) as q:
+        stale = mod._find_stale_drafts(48, 10)
+    assert [s["date"] for s in stale] == ["new"]
+    assert q.call_args_list[1].kwargs["ExclusiveStartKey"] == {"k": 1}

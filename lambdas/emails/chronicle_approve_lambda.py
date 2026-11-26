@@ -573,12 +573,21 @@ def _find_stale_drafts(hours: float, max_days: float) -> list[dict]:
     stale_before = now - hours * 3600.0  # must be older than this
     too_old_before = now - max_days * 86400.0  # but newer than this
     out: list[dict[str, Any]] = []
+    # Every page: chronicle rows carry full text, so one Query page (1 MB) stops weeks short of the newest draft
+    # (2026-11-26: page 1 ended at DATE#2026-11-17 with the week-12 draft on page 2) and the sweep went quiet on it.
+    items: list[dict[str, Any]] = []
+    kw: dict[str, Any] = {"KeyConditionExpression": Key("pk").eq(CHRONICLE_PK) & Key("sk").begins_with("DATE#")}
     try:
-        resp = table.query(KeyConditionExpression=Key("pk").eq(CHRONICLE_PK) & Key("sk").begins_with("DATE#"))
+        while True:
+            resp = table.query(**kw)
+            items += resp.get("Items", [])
+            if not resp.get("LastEvaluatedKey"):
+                break
+            kw["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
     except Exception as exc:
         logger.error("sweep: DDB query failed: %s", exc)
         return out
-    for it in resp.get("Items", []):
+    for it in items:
         if it.get("status") != "draft":
             continue  # a published, changes_requested or RETIRED (#6178) row is never swept
         if not _publishable(it):
