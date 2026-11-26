@@ -31,6 +31,15 @@ CONFIG = json.load(open(os.path.join(ROOT, "config", "character_sheet.json"), en
 PRIVATE_DAYS = {3, 4, 9, 10, 11, 17, 24}  # day indexes carrying private inputs in the "private" history
 
 
+@pytest.fixture(autouse=True)
+def _scores_live_6224(monkeypatch):
+    """#6224: this file tests the SCORED public serving — the state after a verified recompute flips
+    ``PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE`` off. The pending state is tests/test_public_mind_unscored_6224.py's."""
+    from health import character_privacy as _cp
+
+    monkeypatch.setattr(_cp, "PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE", False)
+
+
 def _days(n=N_DAYS):
     return [(date.fromisoformat(GENESIS) + timedelta(days=i)).isoformat() for i in range(n)]
 

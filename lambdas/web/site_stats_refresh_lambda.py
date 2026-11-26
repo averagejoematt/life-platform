@@ -349,7 +349,9 @@ def lambda_handler(event, context):
     # ── 6. Merge — preserve everything except vitals + streak + _meta ────────
     # Update character in payload
     existing_char = existing.get("character") or {}
-    if char_level is not None:
+    if (character or {}).get("scores_pending"):  # #6224 containment: never carry a stale level forward while pending
+        existing_char = character_privacy.public_headline(character) or {}
+    elif char_level is not None:
         existing_char = {
             "level": int(char_level),
             "tier": char_tier or existing_char.get("tier"),

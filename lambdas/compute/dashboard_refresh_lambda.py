@@ -216,9 +216,23 @@ def _buddy_friendly_name(name, sport_type):
     return name
 
 
+def _buddy_character(character_sheet):
+    """buddy/data.json's character block from the PUBLIC sheet — #6224: the "being recalculated" state while pending."""
+    if not character_sheet:
+        return None
+    if character_sheet.get("scores_pending"):  # #6224 containment: the state, never a number
+        return {"status": "recalculating", "note": character_sheet.get("pending_note"), "level": None, "tier": None}
+    return {
+        "level": character_sheet.get("character_level", 1),
+        "tier": character_sheet.get("character_tier"),
+        "tier_emoji": character_sheet.get("character_tier_emoji"),
+        "events": character_sheet.get("level_events", []),
+    }
+
+
 def _build_avatar_data(character_sheet, profile, current_weight=None):
     """Build avatar display state from character sheet + weight data."""
-    if not character_sheet:
+    if not character_sheet or character_sheet.get("scores_pending"):  # #6224: no tier/level to draw while recalculated
         return None
 
     tier = (character_sheet.get("character_tier") or "Foundation").lower().replace(" ", "_")
@@ -724,16 +738,7 @@ def refresh_buddy(profile, yesterday, today):
                 "goal_lbs": int(goal_weight),
             },
             "last_updated_friendly": friendly_time,
-            "character_sheet": (
-                {
-                    "level": character_sheet.get("character_level", 1),
-                    "tier": character_sheet.get("character_tier"),
-                    "tier_emoji": character_sheet.get("character_tier_emoji"),
-                    "events": character_sheet.get("level_events", []),
-                }
-                if character_sheet
-                else None
-            ),
+            "character_sheet": _buddy_character(character_sheet),
             "avatar": _build_avatar_data(character_sheet, profile, current_weight),
         }
 

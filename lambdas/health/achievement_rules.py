@@ -307,6 +307,15 @@ def unlock_hint(rule: BadgeRule, signals: dict, earned: bool) -> str | None:
     return None
 
 
+def level_badges_pending(achievements: list[dict], note: str) -> list[dict]:
+    """#6224 containment (owner ruling 2026-11-26): while the public character level is being recalculated, a level
+    badge is served as PENDING — neither earned nor un-earned, no date — with the reason as its hint."""
+    level_ids = {r.id for r in BADGE_RULES if r.signal == "current_level"}
+    return [
+        dict(a, earned=None, earned_date=None, status="pending", unlock_hint=note) if a.get("id") in level_ids else a for a in achievements
+    ]
+
+
 def render(signals: dict, first_earns: dict[str, dict]) -> list[dict]:
     """Build the /api/achievements badge list.
 

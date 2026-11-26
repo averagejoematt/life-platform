@@ -239,6 +239,13 @@ describe v1 where they speak of the public Mind's components; everything else ho
 serves the PUBLIC contract (`character_public.public_contract`): no restraint component, no restraint-conditioned effect,
 Mind with no components and `scored_in_public: false`, and no effect that reads or targets Mind.
 
+**Containment until the recompute (#6224, owner ruling 2026-11-26).** `character_privacy.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE`
+(True) makes `public_sheet` serve every value carried through the stored (contaminated) chain as "being recalculated"
+(`suppress_pending`): no overall level, tier, XP, XP debt, mood, composite, effects or level events; all of consistency;
+each pillar's level/tier/XP. The four public-input pillars keep their raw score (`level_pending`). Level badges are served
+pending, no level event or milestone level rung is credited, and every public file writes the state, never a number. Only
+a verified recompute (applied, read back, route-walked) flips it — never a deploy alone.
+
 "Public Mind, composite, XP, Day grades and overall levels must depend only on public-eligible inputs." Every public
 surface serves a PUBLIC variant of the sheet; the stored method-1 record (everything above) stays the owner's — MCP,
 emails, coaches — with its original timestamps, and is never overwritten.

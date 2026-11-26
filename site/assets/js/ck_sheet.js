@@ -63,10 +63,12 @@ export const driverWords = (ids) => (ids || []).map((id) => DRIVERS[id] || Strin
 // from one day to the next; a whole score beside a tenth of a point could not (#4580 round 1).
 export function areaSentence(p) {
   if (!p) return "";
+  if (p.scores_pending) return p.pending_note || "Being recalculated."; // #6224 containment
   if (p.not_scored) return p.not_scored_note || "Not scored in public: its inputs are private."; // #6224
   if (p.not_instrumented) return "Not measured yet: nothing records this area.";
   const level = num(p.level);
   const score = num(p.raw_score);
+  if (p.level_pending && score !== null) return `Score ${score.toFixed(1)} of 100; the level is being recalculated.`; // #6224
   if (level === null || score === null) return "Not served right now.";
   // An area held for thin coverage prints its score like every other row (round 2, sheet:
   // "left out", "still counts" and "too little to score yet" sat within one screen); that it is
@@ -141,6 +143,7 @@ export function countsNote(body) {
 // The one level, with how many areas it was worked out from and the day it is for.
 export function levelHTML(body) {
   const c = body && body.character;
+  if (c && c.status === "recalculating") return soft(c.pending_note || "Being recalculated."); // #6224 containment
   if (!c || num(c.level) === null) return soft("The level is not served right now.");
   const day = dayInWords(c.as_of_date);
   const [n, of] = [num(c.composite_pillar_count), num(c.composite_pillar_total)];

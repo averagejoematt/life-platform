@@ -19,6 +19,8 @@ import sys
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
@@ -28,6 +30,15 @@ from web import site_api_vitals as vitals  # noqa: E402
 NEW_IDS = {"fortnight", "half_year_hold", "adept", "master_of_the_craft", "lost_5", "30_days"}
 
 KNOWN_CATEGORIES = {"streak", "level", "milestone", "data", "science", "challenge"}
+
+
+@pytest.fixture(autouse=True)
+def _scores_live_6224(monkeypatch):
+    """#6224: this file tests the SCORED public serving — the state after a verified recompute flips
+    ``PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE`` off. The pending state is tests/test_public_mind_unscored_6224.py's."""
+    from health import character_privacy as _cp
+
+    monkeypatch.setattr(_cp, "PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE", False)
 
 
 def _cond_strings(cond, out):

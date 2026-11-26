@@ -47,6 +47,24 @@ USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 logger = logging.getLogger(__name__)
 
 
+# #6224: the plain lines the public Ask model is given in place of character numbers it may not state.
+CHARACTER_PENDING_LINE = "the character scores are being recalculated; Mind is not scored in public"
+MIND_NOT_SCORED_LINE = "Mind is not scored in public (its inputs are private)"
+
+
+def pillar_line(name: str, pd: dict) -> str:
+    """One pillar as the Ask model reads it: a public score (and level/tier where served), or the plain state — never a
+    number for a pillar not scored in public or being recalculated (#6224)."""
+    if pd.get("not_scored"):
+        return f"{name} pillar: not scored in public"
+    if pd.get("pending") or pd.get("raw_score") is None:
+        return f"{name} pillar: being recalculated"
+    out = f"{name} pillar: score {float(pd['raw_score']):.1f}"
+    if pd.get("level") is not None:
+        out += f", level {float(pd['level']):.0f}, tier {pd.get('tier')}"
+    return out
+
+
 def _table():
     """The ONE table handle — resolved through the lambda module at call time, so
     the behavior suite's 39 existing `monkeypatch.setattr(ai, "table", ...)` sites
@@ -241,13 +259,25 @@ def _ask_fetch_context() -> dict:
 
             rec = character_privacy.public_sheet(_decimal_to_float(resp.get("Item")))
             if rec:
-                ctx["character_level"] = float(rec.get("character_level", 1))
-                ctx["character_tier"] = rec.get("character_tier", "Foundation")
-                pillars = {}
+                # #6224: while the scores are pending a recompute the model gets NO overall level/tier/XP/composite, and
+                # never a Mind number — a plain line it can repeat instead.
+                if rec.get("scores_pending"):
+                    ctx["character_note"] = CHARACTER_PENDING_LINE
+                else:
+                    ctx["character_level"] = float(rec.get("character_level", 1))
+                    ctx["character_tier"] = rec.get("character_tier", "Foundation")
+                    ctx["character_note"] = MIND_NOT_SCORED_LINE
+                pillars: dict = {}
                 for p in ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]:
                     pd = rec.get(f"pillar_{p}", {})
                     if character_privacy.is_not_scored(pd):  # #6224: no number for a pillar not scored in public
-                        pillars[p] = {"not_scored": True, "note": pd.get("not_scored_note")}
+                        pillars[p] = {"not_scored": True}
+                        continue
+                    if pd.get("scores_pending"):
+                        pillars[p] = {"pending": True}
+                        continue
+                    if pd.get("level_pending"):  # the raw score of a public-input pillar stays; its level is pending
+                        pillars[p] = {"raw_score": float(pd.get("raw_score", 0))}
                         continue
                     pillars[p] = {
                         "level": float(pd.get("level", 1)),
@@ -523,8 +553,10 @@ def _board_facts_block(ctx: dict = None) -> str:
         lines.append(f"last sleep: {ctx['sleep_hours']:.1f} h{_v_ann}")
     if ctx.get("character_level") is not None:
         lines.append(f"character level: {ctx['character_level']:.0f} ({ctx.get('character_tier', 'Foundation')})")
+    if ctx.get("character_note"):
+        lines.append(ctx["character_note"])
     for pname, pd in (ctx.get("pillars") or {}).items():
-        lines.append(f"pillar {pname}: {pd.get('raw_score', 0):.0f}/100")
+        lines.append(pillar_line(pname, pd))  # #6224: never a fake 0 for a pillar with no public score
     if ctx.get("habit_completion_pct") is not None:
         lines.append(f"habit completion: {ctx['habit_completion_pct']:.0f}%")
     lines += [ln.rstrip(".") for ln in watch_lines(ctx)]  # #4979: dated in-line, source-labelled

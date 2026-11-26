@@ -95,11 +95,12 @@ def tokens() -> list:
         out += [name.lower(), name.lower().replace(" ", "-"), name.lower().replace(" ", "_"), ids[name].lower()]
     # #6224: the restraint-derived names a stored character variant carried (an effect read from the restraint streaks,
     # its condition, the restraint component and its event label).
-    out += [EFFECT_CANARY.lower(), RESTRAINT_CONDITION.split()[0], RESTRAINT_COMPONENT, "vice control"]
-    # #6224: the engine config's own restraint-conditioned effects, by name (/api/character_config serves the config).
-    out += [
-        str(e.get("name")).lower() for e in _engine_config().get("cross_pillar_effects") or [] if "vice_streak" in str(e.get("condition"))
-    ]
+    out += [EFFECT_CANARY.lower()]
+    # #6224/#6223: the policy's own withheld words (the restraint component, the condition, the config's restraint-
+    # conditioned effect names) — the ONE list the public-copies guard's archive rule reads too.
+    from health import character_privacy as CP
+
+    out += CP.withheld_public_tokens(_engine_config())
     return out
 
 
@@ -315,7 +316,56 @@ def mind_numbers(body) -> list:
     return sorted(found)
 
 
-def walk(ungated: bool = False, frozen: bool = False, published: bool = False, fd_public: bool = False, mind_scored: bool = False) -> dict:
+# #6224 (containment, owner ruling 2026-11-26): while the character scores are pending a recompute no public body carries
+# a numeric overall level, tier, XP, XP debt or composite.
+OVERALL_KEYS = frozenset({"character_level", "character_xp", "character_xp_debt", "character_tier", "composite_score", "current_level"})
+OVERALL_HOLDERS = frozenset({"character", "character_stats", "character_sheet"})
+OVERALL_HELD_KEYS = frozenset({"level", "xp_total", "xp", "xp_debt", "tier", "composite_score", "composite_delta_1d"})
+
+
+def overall_numbers(body) -> list:
+    """Every overall character value (level/tier/XP/composite) a served body carries, as sorted key paths."""
+    if isinstance(body, str):
+        try:
+            body = json.loads(body)
+        except ValueError:
+            return []
+    found: set = set()
+
+    def value(v) -> bool:
+        return (isinstance(v, (int, float)) and not isinstance(v, bool)) or (isinstance(v, str) and v != "")
+
+    def walk_(node, path):
+        if isinstance(node, dict):
+            for k, v in node.items():
+                if k in OVERALL_KEYS and value(v):
+                    found.add(f"{path}.{k}")
+                if k in OVERALL_HOLDERS and isinstance(v, dict):
+                    found.update(f"{path}.{k}.{x}" for x in OVERALL_HELD_KEYS if value(v.get(x)))
+                walk_(v, f"{path}.{k}")
+        elif isinstance(node, list):
+            for v in node:
+                walk_(v, f"{path}[]")
+
+    walk_(body, "")
+    return sorted(found)
+
+
+def _scores_live() -> None:
+    """#6224's containment control: the pending switch off (the state after a verified recompute)."""
+    from health import character_privacy as CP
+
+    CP.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE = False
+
+
+def walk(
+    ungated: bool = False,
+    frozen: bool = False,
+    published: bool = False,
+    fd_public: bool = False,
+    mind_scored: bool = False,
+    scores_live: bool = False,
+) -> dict:
     if not frozen:
         jw.FROZEN = datetime.now(timezone.utc)  # the base rows are dated relative to this; the real clock, not a frozen one
     base_rows = jw._rows
@@ -328,6 +378,8 @@ def walk(ungated: bool = False, frozen: bool = False, published: bool = False, f
         _fd_public()
     if mind_scored:
         _mind_scored()
+    if scores_live:
+        _scores_live()
     L = jw._wire("gaps")
     import boto3
 
@@ -338,7 +390,7 @@ def walk(ungated: bool = False, frozen: bool = False, published: bool = False, f
     P._domains_cache = json.loads(json.dumps(DOMAINS_CONFIG))
 
     toks = tokens()
-    out = {"routes": 0, "answered": 0, "raised": {}, "leaks": {}, "figures": {}, "bodies": {}, "mind": {}}
+    out = {"routes": 0, "answered": 0, "raised": {}, "leaks": {}, "figures": {}, "bodies": {}, "mind": {}, "overall": {}}
     for path in rw.route_paths(L):
         out["routes"] += 1
         event = {
@@ -369,6 +421,9 @@ def walk(ungated: bool = False, frozen: bool = False, published: bool = False, f
         minds = mind_numbers(resp.get("body"))
         if minds:
             out["mind"][path] = minds
+        overall = overall_numbers(resp.get("body"))
+        if overall:
+            out["overall"][path] = overall
         if path in KEEP_BODIES:
             body = resp.get("body")
             out["bodies"][path] = json.loads(body) if isinstance(body, str) else body
@@ -439,6 +494,7 @@ if __name__ == "__main__":
             published="--published" in sys.argv,
             fd_public="--fd-public" in sys.argv,
             mind_scored="--mind-scored" in sys.argv,
+            scores_live="--scores-live" in sys.argv,
         )
     finally:
         sys.stdout = _real_stdout

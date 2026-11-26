@@ -252,12 +252,14 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
           <div class="tile">
             <span class="label">The engine's score</span>
             <span class={`v num${engine ? "" : " muted"}`}>
-              {engine ? `Level ${num(d.engine.level, 0)}` : "—"}
+              {engine ? (d.engine.pending ? "Being recalculated" : `Level ${num(d.engine.level, 0)}`) : "—"}
               {engine && d.engine.composite != null && <small> · {num(d.engine.composite, 1)}</small>}
             </span>
             <span class="d mono">
               {
-                engine
+                engine && d.engine.pending
+                  ? "the corrected public method"
+                  : engine
                   ? d.engine.delta != null
                     ? `${d.engine.delta >= 0 ? "+" : "−"}${num(Math.abs(d.engine.delta), 1)} since the morning before`
                     : "no change served"

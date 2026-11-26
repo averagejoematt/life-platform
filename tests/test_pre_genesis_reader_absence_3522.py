@@ -35,6 +35,8 @@ import re
 import sys
 from datetime import datetime, timedelta
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
 from public_variant_fixtures import with_public  # noqa: E402 — 2026-11-05: public readers serve the public variant
@@ -48,6 +50,15 @@ from web import (  # noqa: E402
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 PILLARS = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
+
+
+@pytest.fixture(autouse=True)
+def _scores_live_6224(monkeypatch):
+    """#6224: this file tests the SCORED public serving — the state after a verified recompute flips
+    ``PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE`` off. The pending state is tests/test_public_mind_unscored_6224.py's."""
+    from health import character_privacy as _cp
+
+    monkeypatch.setattr(_cp, "PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE", False)
 
 
 def _today_pt():

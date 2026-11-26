@@ -231,7 +231,8 @@ def build_character(stats):
     line and never chronological age (ADR-104 + phenoage privacy). Falls back to the
     platform streak/day figures when character_stats.json isn't available yet."""
     cstats = _load_character_stats()
-    if cstats.get("character"):
+    # #6224 containment: while the character scores are being recalculated the card draws no level, tier or XP
+    if cstats.get("character") and (cstats.get("character") or {}).get("status") != "recalculating":
         return card_engine.render("character", cstats)
 
     # Fallback (first days / stats not yet computed): the historic minimal card.

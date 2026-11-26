@@ -52,6 +52,15 @@ ORDINARY = "ordinary_a"
 # ── 1. the character sheet's public variant ───────────────────────────────────────────────
 
 
+@pytest.fixture(autouse=True)
+def _scores_live_6224(monkeypatch):
+    """#6224: this file tests the SCORED public serving — the state after a verified recompute flips
+    ``PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE`` off. The pending state is tests/test_public_mind_unscored_6224.py's."""
+    from health import character_privacy as _cp
+
+    monkeypatch.setattr(_cp, "PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE", False)
+
+
 def _days(n=N_DAYS):
     return [(date.fromisoformat(GENESIS) + timedelta(days=i)).isoformat() for i in range(n)]
 
@@ -324,8 +333,9 @@ def walks() -> dict:
     runs = {
         ("gated", "low"): ("--state", "low", "--now", now),
         ("gated", "high"): ("--state", "high", "--now", now),
-        ("published", "low"): ("--state", "low", "--now", now, "--published"),
-        ("published", "high"): ("--state", "high", "--now", now, "--published"),
+        # #6224: the control also turns the containment switch off, or no restraint-derived character value is served
+        ("published", "low"): ("--state", "low", "--now", now, "--published", "--scores-live"),
+        ("published", "high"): ("--state", "high", "--now", now, "--published", "--scores-live"),
     }
     with ThreadPoolExecutor(max_workers=int(os.environ.get("RESTRAINT_WALK_WORKERS", "4"))) as pool:
         futures = {k: pool.submit(_walk, *a) for k, a in runs.items()}

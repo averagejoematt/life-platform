@@ -43,6 +43,7 @@ from health import (
     character_engine,
     character_privacy,  # owner ruling 2026-11-05: character_stats.json is read through the public variant
     character_public,  # owner ruling 2026-11-05: the public variant computed beside method 1
+    character_public_rows,  # #6224: the rows of a pillar/headline with no public number
     personal_baselines,  # #1412: personal-variance targets overlay (ADR-105 rule 4)
 )
 
@@ -883,26 +884,8 @@ def publish_site_stats(record, yesterday_str, history_depth):
             "consistency": "🎯",
         }
 
-        def _site_pillar(p):
-            pd = record.get(f"pillar_{p}", {})
-            if character_privacy.is_not_scored(pd):  # #6224: Mind is not scored in public — the reason, never a number
-                return {
-                    "name": p,
-                    "emoji": PILLAR_EMOJI_MAP.get(p, ""),
-                    "level": None,
-                    "raw_score": None,
-                    "tier": None,
-                    "not_instrumented": True,
-                    "not_scored": True,
-                    "not_scored_note": pd.get("not_scored_note"),
-                    "xp_delta": None,
-                    "challenge_bonus_xp": None,
-                    "trend": "neutral",
-                }
-            return None
-
         pillars_for_site = [
-            _site_pillar(p)
+            character_public_rows.site_pillar(p, record.get(f"pillar_{p}"), PILLAR_EMOJI_MAP.get(p, ""))  # #6224
             or {
                 "name": p,
                 "emoji": PILLAR_EMOJI_MAP.get(p, ""),
@@ -971,8 +954,8 @@ def publish_site_stats(record, yesterday_str, history_depth):
                 _scores = {}
                 for _p in PILLAR_ORDER:
                     _pdata = _last_rec.get(f"pillar_{_p}") or {}
-                    if character_privacy.is_not_scored(_pdata):
-                        continue  # #6224: a pillar not scored in public has no weekly value (omitted, never 0)
+                    if character_privacy.is_not_scored(_pdata) or _pdata.get("scores_pending"):
+                        continue  # #6224: not scored / being recalculated — no weekly value (omitted, never 0)
                     _scores[_p] = round(float(_pdata.get("level_score") or _pdata.get("raw_score") or 0), 1)
                 _wk_dt = datetime.strptime(_last_date, "%Y-%m-%d")
                 _mon_dt = _wk_dt - timedelta(days=_wk_dt.weekday())
@@ -989,7 +972,12 @@ def publish_site_stats(record, yesterday_str, history_depth):
 
         write_character_stats(
             s3_client=boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-west-2")),
-            character={
+            character=(
+                character_public_rows.pending_headline(days_active=int(history_depth), started_date=EXPERIMENT_START_DATE)
+                if record.get("scores_pending")  # #6224 containment: being recalculated — the state, never a number
+                else None
+            )
+            or {
                 "level": float(char_level),
                 "tier": char_tier,
                 "tier_emoji": char_emoji,

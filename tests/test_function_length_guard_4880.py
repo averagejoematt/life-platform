@@ -147,7 +147,6 @@ FUNCTION_LENGTH_COUNTS = {
     "lambdas/web/site_api_ai_lambda.py::_handle_board_followup": 181,
     "lambdas/web/site_api_body.py::vitals": 174,
     "lambdas/web/site_api_budget.py::inference_receipt": 229,
-    "lambdas/web/site_api_character.py::character": 186,
     "lambdas/web/site_api_coach_ledger.py::handle_predictions": 156,  # owner 2026-11-09: the overall block moved to _overall_block
     "lambdas/web/site_api_coach_narrative.py::handle_coach_analysis": 190,
     "lambdas/web/site_api_coach_narrative.py::handle_coach_timeline": 163,

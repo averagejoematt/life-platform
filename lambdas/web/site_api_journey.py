@@ -712,6 +712,9 @@ def journey_waveform(*, _g) -> dict:
                         pass
         # #6224: the sum keeps its 0–700 scale (and the colour bands their meaning) when a pillar is not scored in
         # public — renormalised over the scored pillars, the composite's rule, never with the pillar at a neutral score.
+        # While the scores are pending a recompute the level scores are not served: no day has a score (gray, never red).
+        if item.get("scores_pending"):
+            continue
         by_date[date_str] = round(total * len(PILLARS) / scored, 1) if scored else 0.0
 
     # Build ordered genesis→today series (one point per experiment day)
@@ -735,6 +738,7 @@ def journey_waveform(*, _g) -> dict:
         {
             "days": days,
             "max_score": max_score,
+            "score_status": character_privacy.PENDING_STATUS if character_privacy.scores_pending() else "scored",  # #6224
             "window": window,
             "day_n": day_count,
             "week_n": ((day_count - 1) // 7) + 1,
@@ -804,6 +808,9 @@ def achievements(*, _g) -> dict:
     first_earns = {k: v for k, v in first_earns.items() if k not in streak_badges}
 
     achievements = achievement_rules.render(signals, first_earns)
+    level_pending = character_privacy.scores_pending()
+    if level_pending:  # #6224 containment: a level badge is neither earned nor un-earned while the level is recalculated
+        achievements = achievement_rules.level_badges_pending(achievements, character_privacy.PENDING_NOTE)
     earned_count = sum(1 for a in achievements if a["earned"])
 
     return _ok(
@@ -814,7 +821,8 @@ def achievements(*, _g) -> dict:
                 "total": len(achievements),
                 "current_streak": signals["current_streak"],
                 "days_tracked": signals["days_tracked"],
-                "current_level": signals["current_level"],
+                "current_level": None if level_pending else signals["current_level"],
+                "level_status": character_privacy.PENDING_STATUS if level_pending else "scored",
                 "current_weight": round(signals["current_weight"]),
                 "completed_challenges": signals["completed_challenges"],
                 "perfect_challenges": signals["perfect_challenges"],

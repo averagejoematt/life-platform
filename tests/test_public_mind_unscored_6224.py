@@ -210,7 +210,7 @@ def _v1_variant() -> dict:
 def test_a_stored_v1_variant_is_served_with_mind_not_scored_and_unnamed():
     record = _v1_variant()
     before = copy.deepcopy(record)
-    view = character_privacy.public_sheet(record)
+    view = character_privacy.public_sheet(record, pending=False)  # the Mind scrub, apart from the containment switch
     assert record == before, "the stored record is never changed"
     assert view["pillar_mind"] == character_privacy.not_scored_pillar("mind")
     assert [e["name"] for e in view["active_effects"]] == ["Sleep Effect"]  # mind's and (on v1) all_pillars' are gone
@@ -224,7 +224,7 @@ def test_a_stored_v1_variant_is_served_with_mind_not_scored_and_unnamed():
 
 def test_must_fail_control_without_the_scrub_the_v1_mind_numbers_are_served(monkeypatch):
     monkeypatch.setattr(character_privacy, "scrub_unscored", lambda view: view)
-    view = character_privacy.public_sheet(_v1_variant())
+    view = character_privacy.public_sheet(_v1_variant(), pending=False)
     assert RW.mind_numbers(view), "the detector must see a v1 Mind served as stored"
 
 
@@ -232,7 +232,7 @@ def test_on_a_v2_variant_the_all_pillars_effect_stands():
     """v2's all_pillars reads only the scored pillars, so its firing says nothing about Mind: it is kept."""
     rec = _v1_variant()
     rec["public"]["public_method_version"] = character_privacy.PUBLIC_METHOD_VERSION
-    view = character_privacy.public_sheet(rec)
+    view = character_privacy.public_sheet(rec, pending=False)
     assert {"All Effect", "Sleep Effect"} == {e["name"] for e in view["active_effects"]}
 
 
@@ -478,6 +478,7 @@ def walks() -> dict:
         "fd_public_late": ("--state", "low", "--now", now, "--fd", "late", "--fd-public"),
         "mind_scored": ("--state", "low", "--now", now, "--fd", "early", "--mind-scored"),
         "published": ("--state", "low", "--now", now, "--fd", "early", "--published"),
+        "scores_live": ("--state", "low", "--now", now, "--fd", "early", "--scores-live"),
     }
     with ThreadPoolExecutor(max_workers=int(os.environ.get("RESTRAINT_WALK_WORKERS", "4"))) as pool:
         futures = {k: pool.submit(_walk, *a) for k, a in runs.items()}
@@ -553,3 +554,95 @@ def test_the_dry_run_manifest_takes_before_from_the_served_public_block(historie
     assert row["character_level"][0] != float(low[d]["character_level"]) or low[d]["character_level"] == 41  # not method 1
     assert row["method1"]["character_level"][0] == float(low[d]["character_level"])  # method 1 kept for the private trail
     assert CLI.summary([row], [])["level_changed_dates"] == [d]
+
+
+# ── D. containment: the contaminated chain values are pending a recompute ────────────────
+
+
+def test_no_public_body_carries_an_overall_level_xp_or_composite_while_pending(walks):
+    """Owner ruling 2026-11-26: until the corrected recompute, no public route presents the overall level, tier, XP, XP
+    debt or composite as an authoritative value — it serves the "being recalculated" state."""
+    assert character_privacy.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE is True
+    for k in ("early", "late", "high"):
+        assert walks[k]["overall"] == {}, (k, walks[k]["overall"])
+
+
+def test_must_fail_control_with_the_switch_off_the_overall_values_return(walks):
+    seen = set(walks["scores_live"]["overall"])
+    assert {"/api/character", "/api/character_stats", "/api/snapshot", "/api/achievements"} <= seen, seen
+    assert walks["scores_live"]["mind"] == {}, "Mind stays unscored whatever the switch says"
+
+
+def test_a_pending_view_keeps_the_verbatim_raw_scores_and_nothing_chain_carried(histories):
+    _, _, pub, _ = histories
+    d = _days()[-1]
+    view = character_privacy.public_sheet({"sk": f"DATE#{d}", "date": d, "public": pub[d]})
+    assert view["scores_pending"] and view["score_status"] == "recalculating"
+    assert not set(character_privacy.PENDING_OVERALL_KEYS) & set(view)
+    assert view["level_events"] == [] and view["active_effects"] == []
+    assert view["pillar_consistency"] == character_privacy.pending_pillar("consistency")
+    assert view["pillar_mind"] == character_privacy.not_scored_pillar("mind")
+    for p in character_public.VERBATIM_PILLARS:
+        assert view[f"pillar_{p}"]["raw_score"] == pub[d][f"pillar_{p}"]["raw_score"]
+        assert not set(character_privacy.PENDING_PILLAR_KEYS) & set(view[f"pillar_{p}"])
+    assert character_privacy.public_event_sheets([{"sk": f"DATE#{d}", "date": d, "public": pub[d]}]) == []
+    assert character_privacy.event_level_series([{"sk": f"DATE#{d}", "date": d, "public": pub[d]}]) == []
+    live = character_privacy.public_sheet({"sk": f"DATE#{d}", "date": d, "public": pub[d]}, pending=False)
+    assert live["character_level"] == pub[d]["character_level"]  # control: the switch is what withholds it
+
+
+class _AskTable:
+    def __init__(self, item):
+        self.item = item
+
+    def get_item(self, Key=None, **_kw):
+        return {"Item": copy.deepcopy(self.item)} if str(Key.get("pk", "")).endswith("character_sheet") else {}
+
+    def query(self, **_kw):
+        return {"Items": []}
+
+
+def _ask_prompt(monkeypatch, pending: bool) -> tuple:
+    from web import site_api_ai_context as AC, site_api_ai_lambda as AI
+
+    block = {
+        "public_method_version": character_privacy.PUBLIC_METHOD_V1,
+        "origin": "live",
+        "character_level": 27,
+        "character_tier": "Momentum",
+        "character_xp": 219.5,
+        "pillar_mind": {"level": 39, "raw_score": 59.1, "tier": "Momentum"},
+        "pillar_sleep": {"level": 30, "raw_score": 71.0, "tier": "Momentum"},
+    }
+    from common.pacific_time import pacific_today
+
+    d = pacific_today()
+    monkeypatch.setattr(
+        AI, "table", _AskTable({"pk": "USER#matthew#SOURCE#character_sheet", "sk": f"DATE#{d}", "date": d, "public": block})
+    )
+    monkeypatch.setattr(character_privacy, "PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE", pending)
+    ctx = AC._ask_fetch_context()
+    return ctx, AI._ask_build_prompt(ctx), AC._board_facts_block(ctx)
+
+
+def test_the_public_ask_context_states_no_overall_level_and_no_mind_number(monkeypatch):
+    """The public Ask and board contexts (#6224): no overall level/tier/XP while pending, never a Mind number, and a plain
+    line the model can repeat. No model call is made."""
+    import re
+
+    ctx, prompt, facts = _ask_prompt(monkeypatch, pending=True)
+    assert (
+        "character_level" not in ctx
+        and ctx["character_note"] == "the character scores are being recalculated; Mind is not scored in public"
+    )
+    for text in (prompt, facts):
+        assert not re.search(r"\b27(\.0)?\b|219\.5|\b39\b|59\.1", text)
+        assert "mind pillar: not scored in public" in text
+        assert not re.search(r"(?i)character level: \d", text)
+    assert "the character scores are being recalculated" in prompt and "the character scores are being recalculated" in facts
+
+
+def test_must_fail_control_the_ask_context_states_the_level_when_scores_are_live(monkeypatch):
+    ctx, prompt, facts = _ask_prompt(monkeypatch, pending=False)
+    assert ctx["character_level"] == 27.0 and "level 27" in prompt and "character level: 27" in facts
+    assert "59.1" not in prompt and "mind pillar: not scored in public" in prompt  # Mind is never a number

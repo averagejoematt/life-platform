@@ -396,11 +396,16 @@ const food = z
   .strict();
 const engine = z
   .object({
-    level: z.number(),
+    // #6224: `pending` — the character scores are being recalculated (owner ruling 2026-11-26): no level, no composite.
+    level: n,
+    pending: z.literal(true).optional(),
     composite: n,
     delta: n,
-    // #6224: `not_scored` (Mind, owner rulings 2026-11-26) is sent only for a pillar the public method does not score.
-    pillars: z.array(z.object({ name: z.string().min(1), score: n, not_instrumented: z.boolean(), not_scored: z.literal(true).optional() }).strict()),
+    // #6224: `not_scored` (Mind, owner rulings 2026-11-26) is sent only for a pillar the public method does not score;
+    // `pending` only for a pillar whose value is being recalculated.
+    pillars: z.array(
+      z.object({ name: z.string().min(1), score: n, not_instrumented: z.boolean(), not_scored: z.literal(true).optional(), pending: z.literal(true).optional() }).strict(),
+    ),
     // owner ruling 2026-11-05: which method computed the score (character_privacy.PUBLIC_METHOD_LABELS), or null
     method: z.string().min(1).nullable(),
   })

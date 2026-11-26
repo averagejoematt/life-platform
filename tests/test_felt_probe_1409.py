@@ -19,6 +19,8 @@ import json
 import os
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
 # evening_nudge_lambda requires SES env at import
@@ -29,6 +31,15 @@ from content import ritual_link  # noqa: E402
 from experiment import phase_taxonomy  # noqa: E402
 from public_variant_fixtures import with_public  # noqa: E402 — 2026-11-05: the public variant
 from web import site_api_data as data  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _scores_live_6224(monkeypatch):
+    """#6224: this file tests the SCORED public serving — the state after a verified recompute flips
+    ``PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE`` off. The pending state is tests/test_public_mind_unscored_6224.py's."""
+    from health import character_privacy as _cp
+
+    monkeypatch.setattr(_cp, "PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE", False)
 
 
 # ── taxonomy + rail membership ────────────────────────────────────────────────

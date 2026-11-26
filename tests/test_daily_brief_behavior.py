@@ -113,6 +113,15 @@ D60 = "2026-06-08"  # today - 60
 D90 = "2026-05-09"  # today - 90
 
 
+@pytest.fixture(autouse=True)
+def _scores_live_6224(monkeypatch):
+    """#6224: this file tests the SCORED public serving — the state after a verified recompute flips
+    ``PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE`` off. The pending state is tests/test_public_mind_unscored_6224.py's."""
+    from health import character_privacy as _cp
+
+    monkeypatch.setattr(_cp, "PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE", False)
+
+
 class _FrozenDatetime(datetime):
     """`datetime` with a pinned `now()`.
 
@@ -2179,10 +2188,23 @@ class TestPreComputedContext:
 
     def test_the_character_sheet_reaches_both_the_renderer_and_the_public_character_block(self, handler_env):
         cs = day_row("character_sheet", YESTERDAY, character_level=Decimal("7"), tier_name="Forged", xp_total=Decimal("4100"))
+        # #6224: public_stats.json's character block is the PUBLIC variant's, never the method-1 record's (that was a leak)
+        cs["public"] = {"public_method_version": "character-public-v2", "origin": "live", "character_level": Decimal("5")}
         handler_env["table"].store[(cs["pk"], cs["sk"])] = cs
         brief.lambda_handler({}, None)
-        assert handler_env["html"].calls[0][1]["character_sheet"]["character_level"] == 7.0
-        assert _published(handler_env)["character"]["level"] == 7.0
+        assert handler_env["html"].calls[0][1]["character_sheet"]["character_level"] == 7.0  # the owner's email: method 1
+        assert _published(handler_env)["character"]["level"] == 5.0
+
+    def test_while_pending_the_public_character_block_is_the_recalculating_state(self, handler_env, monkeypatch):
+        from health import character_privacy
+
+        monkeypatch.setattr(character_privacy, "PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE", True)
+        cs = day_row("character_sheet", YESTERDAY, character_level=Decimal("7"))
+        cs["public"] = {"public_method_version": "character-public-v2", "origin": "live", "character_level": Decimal("5")}
+        handler_env["table"].store[(cs["pk"], cs["sk"])] = cs
+        brief.lambda_handler({}, None)
+        published = _published(handler_env)["character"]
+        assert published["status"] == "recalculating" and published["level"] is None
 
     def test_no_character_sheet_publishes_absence_rather_than_a_level_zero(self, handler_env):
         brief.lambda_handler({}, None)

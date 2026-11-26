@@ -731,6 +731,8 @@ def _character(table, wk: Dict[str, Any]) -> Dict[str, Any]:
                 events.append(
                     {"pillar": e.get("pillar"), "type": e.get("type"), "from": _f(e.get("old_level")), "to": _f(e.get("new_level"))}
                 )
+    if last.get("scores_pending"):  # #6224 containment: no level to narrate while the scores are recalculated
+        return {"status": "recalculating", "note": "the character scores are being recalculated; do not state a level"}
     return {
         "character_level_end": _f(last.get("character_level")),
         "pillar_levels_end": {

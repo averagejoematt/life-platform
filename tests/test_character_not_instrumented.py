@@ -21,6 +21,8 @@ import json
 import os
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
 from health import character_privacy  # noqa: E402
@@ -29,6 +31,15 @@ from web import site_api_vitals as vitals  # noqa: E402
 
 _GENESIS = "2026-06-08"  # pinned: fixture records at 2026-06-20 are in-experiment
 _NOTE = "No relationship data source feeds this pillar yet — tracked as future work (#747)."
+
+
+@pytest.fixture(autouse=True)
+def _scores_live_6224(monkeypatch):
+    """#6224: this file tests the SCORED public serving — the state after a verified recompute flips
+    ``PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE`` off. The pending state is tests/test_public_mind_unscored_6224.py's."""
+    from health import character_privacy as _cp
+
+    monkeypatch.setattr(_cp, "PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE", False)
 
 
 def _pillar(raw_score, not_instrumented=False, note=None):

@@ -118,9 +118,15 @@ def _attach_pillar_absence(pillars, *, table, now, window_start) -> None:
             p["absence"] = a
 
 
-def _not_scored_row(name: str, emoji: str, pd: dict) -> dict:
+def _not_scored_row(name: str, emoji: str, pd: dict, pending: bool = False) -> dict:
     """#6224: the /api/character row of a pillar the public method does not score — the same keys as a scored row, every
-    number None, the reason in ``not_scored_note`` (and ``not_instrumented_note``, which the readers already print)."""
+    number None, the reason in ``not_scored_note`` (and ``not_instrumented_note``, which the readers already print).
+    ``pending``: a pillar whose values are all being recalculated (``character_privacy.suppress_pending``)."""
+    if pending:
+        note = pd.get("pending_note") or character_privacy.PENDING_NOTE
+        row = _not_scored_row(name, emoji, {"not_scored_note": note})
+        row.update({"not_scored": False, "not_scored_note": None, "scores_pending": True, "pending_note": note})
+        return row
     note = pd.get("not_scored_note") or character_privacy.UNSCORED_PUBLIC_PILLARS.get(name)
     return {
         "name": name,
@@ -141,6 +147,108 @@ def _not_scored_row(name: str, emoji: str, pd: dict) -> dict:
         "xp_debt": None,
         "neglect_decay": None,
         "drivers": {"top": [], "dragging": [], "absent": [], "no_data": []},
+    }
+
+
+def _pillar_row(p: str, pd: dict, emoji: str) -> dict:
+    """One /api/character pillar row (#6224: not scored, pending, or scored — never a defaulted number)."""
+    if character_privacy.is_not_scored(pd):
+        # #6224 (owner rulings 2026-11-26): a pillar the public method does not score — the reason, the held flags
+        # every renderer's held branch reads, and no number (never a 0 or a level-1 default that reads as a score).
+        return _not_scored_row(p, emoji, pd)
+    if pd.get("scores_pending"):  # #6224 containment: every value of this pillar is being recalculated
+        return _not_scored_row(p, emoji, pd, pending=True)
+    _drivers = pd.get("drivers") or {}
+    _lp = bool(pd.get("level_pending"))  # #6224: the raw score stays, the chain-carried level/tier/XP are pending
+    return {
+        "name": p,
+        "emoji": emoji,
+        "level": None if _lp else float(pd.get("level", 1)),
+        "raw_score": float(pd.get("raw_score", 0)),
+        "tier": None if _lp else pd.get("tier", "Foundation"),
+        "level_pending": _lp,
+        "xp_delta": None if _lp else float(pd.get("xp_delta", 0)),
+        "xp_earned": None if _lp else float(pd.get("xp_earned", 0)),
+        "score_delta": None,  # day-over-day move; filled below when a prior day exists
+        # ADR-104 provenance — computed by the engine, never narrated:
+        # how much real data backs the score, which behaviors didn't
+        # happen, what's lifting/dragging, and whether levels are frozen
+        # because the day carried no signal.
+        "data_coverage": (float(pd["data_coverage"]) if pd.get("data_coverage") is not None else None),
+        "coverage_hold": bool(pd.get("coverage_hold", False)),
+        # #747: engine-computed, deterministic (ADR-105) — True only when
+        # every weighted component had zero data today. Distinct from
+        # coverage_hold (a real pillar having a thin day): this means the
+        # pillar has no data source feeding it at all. Front end renders
+        # a labeled "not yet instrumented" state instead of the bare
+        # neutral raw_score; clears itself the day a component gets a
+        # real value, no front-end change required.
+        "not_instrumented": bool(pd.get("not_instrumented", False)),
+        "not_instrumented_note": pd.get("not_instrumented_note"),
+        "absent_behaviors": [str(b) for b in (pd.get("absent_behaviors") or [])],
+        # #913 neglect honesty — the visible XP bleed (owed below the
+        # 0-floor) and today's presence-driven atrophy on this pillar
+        # (None when engaged / planned pause / not behavioral-heavy).
+        # Absent on pre-v1.3.0 records → honest 0/None defaults.
+        "xp_debt": None if _lp else float(pd.get("xp_debt", 0) or 0),
+        "neglect_decay": (
+            {
+                "applied": True,
+                "multiplier": float(pd["neglect_decay"].get("multiplier", 1)),
+                "gap_days": float(pd["neglect_decay"].get("gap_days", 0)),
+            }
+            if isinstance(pd.get("neglect_decay"), dict)
+            else None
+        ),
+        # Owner ruling 2026-11-03: a component computed from a private source (the journal's
+        # consistency, the journal-coded values read) is never NAMED as a driver — its place
+        # on a top/dragging/absent list would say how the journal went.
+        "drivers": {
+            k: [str(x) for x in (_drivers.get(k) or []) if character_privacy.component_is_publishable(str(x))]
+            for k in ("top", "dragging", "absent", "no_data")
+        },
+    }
+
+
+def _character_block(record, pending, date_str, composite, composite_delta_1d, count, total, composite_note) -> dict:
+    """/api/character's ``character`` headline: #6224 containment — the "being recalculated" state while pending."""
+    if pending:
+        return {
+            "level": None,
+            "tier": None,
+            "tier_emoji": None,
+            "xp_total": None,
+            "xp_debt": None,
+            "character_mood": None,
+            "character_mood_inputs": None,
+            "status": character_privacy.PENDING_STATUS,
+            "pending_note": record.get("pending_note") or character_privacy.PENDING_NOTE,
+            "as_of_date": date_str,
+            "composite_score": None,
+            "composite_delta_1d": None,
+            "composite_pillar_count": count,
+            "composite_pillar_total": total,
+            "composite_note": character_privacy.PENDING_NOTE,
+        }
+    return {
+        "level": float(record.get("character_level", 1)),
+        "tier": record.get("character_tier", "Foundation"),
+        "tier_emoji": record.get("character_tier_emoji", "🔨"),
+        "xp_total": float(record.get("character_xp", 0)),
+        # #913: the visible bleed + the deterministic mood (engine-
+        # computed, ADR-105). Absent on pre-v1.3.0 records → 0 / None.
+        "xp_debt": float(record.get("character_xp_debt", 0) or 0),
+        "character_mood": record.get("character_mood"),
+        "character_mood_inputs": (record.get("character_mood_inputs") if isinstance(record.get("character_mood_inputs"), dict) else None),
+        "status": "scored",
+        "as_of_date": date_str,
+        "composite_score": round(composite, 1),
+        "composite_delta_1d": composite_delta_1d,
+        # DIL-049 D4: how much of the composite is real signal right now —
+        # see the note above `composite_note` for why this exists.
+        "composite_pillar_count": count,
+        "composite_pillar_total": total,
+        "composite_note": composite_note,
     }
 
 
@@ -275,64 +383,7 @@ def character(date: str | None = None, *, _g) -> dict:
         return _zeroed_pre_experiment(EXPERIMENT_START)
     date_str = str(record["sk"]).replace("DATE#", "")[:10]
 
-    pillars = []
-    for p in PILLAR_ORDER:
-        pd = record.get(f"pillar_{p}", {})
-        if character_privacy.is_not_scored(pd):
-            # #6224 (owner rulings 2026-11-26): a pillar the public method does not score — the reason, the held flags
-            # every renderer's held branch reads, and no number (never a 0 or a level-1 default that reads as a score).
-            pillars.append(_not_scored_row(p, PILLAR_EMOJI.get(p, ""), pd))
-            continue
-        _drivers = pd.get("drivers") or {}
-        pillars.append(
-            {
-                "name": p,
-                "emoji": PILLAR_EMOJI.get(p, ""),
-                "level": float(pd.get("level", 1)),
-                "raw_score": float(pd.get("raw_score", 0)),
-                "tier": pd.get("tier", "Foundation"),
-                "xp_delta": float(pd.get("xp_delta", 0)),
-                "xp_earned": float(pd.get("xp_earned", 0)),
-                "score_delta": None,  # day-over-day move; filled below when a prior day exists
-                # ADR-104 provenance — computed by the engine, never narrated:
-                # how much real data backs the score, which behaviors didn't
-                # happen, what's lifting/dragging, and whether levels are frozen
-                # because the day carried no signal.
-                "data_coverage": (float(pd["data_coverage"]) if pd.get("data_coverage") is not None else None),
-                "coverage_hold": bool(pd.get("coverage_hold", False)),
-                # #747: engine-computed, deterministic (ADR-105) — True only when
-                # every weighted component had zero data today. Distinct from
-                # coverage_hold (a real pillar having a thin day): this means the
-                # pillar has no data source feeding it at all. Front end renders
-                # a labeled "not yet instrumented" state instead of the bare
-                # neutral raw_score; clears itself the day a component gets a
-                # real value, no front-end change required.
-                "not_instrumented": bool(pd.get("not_instrumented", False)),
-                "not_instrumented_note": pd.get("not_instrumented_note"),
-                "absent_behaviors": [str(b) for b in (pd.get("absent_behaviors") or [])],
-                # #913 neglect honesty — the visible XP bleed (owed below the
-                # 0-floor) and today's presence-driven atrophy on this pillar
-                # (None when engaged / planned pause / not behavioral-heavy).
-                # Absent on pre-v1.3.0 records → honest 0/None defaults.
-                "xp_debt": float(pd.get("xp_debt", 0) or 0),
-                "neglect_decay": (
-                    {
-                        "applied": True,
-                        "multiplier": float(pd["neglect_decay"].get("multiplier", 1)),
-                        "gap_days": float(pd["neglect_decay"].get("gap_days", 0)),
-                    }
-                    if isinstance(pd.get("neglect_decay"), dict)
-                    else None
-                ),
-                # Owner ruling 2026-11-03: a component computed from a private source (the journal's
-                # consistency, the journal-coded values read) is never NAMED as a driver — its place
-                # on a top/dragging/absent list would say how the journal went.
-                "drivers": {
-                    k: [str(x) for x in (_drivers.get(k) or []) if character_privacy.component_is_publishable(str(x))]
-                    for k in ("top", "dragging", "absent", "no_data")
-                },
-            }
-        )
+    pillars = [_pillar_row(p, record.get(f"pillar_{p}", {}), PILLAR_EMOJI.get(p, "")) for p in PILLAR_ORDER]
 
     # Pre-experiment: show zeroed character (experiment hasn't started)
     if date_str < EXPERIMENT_START:
@@ -362,6 +413,7 @@ def character(date: str | None = None, *, _g) -> dict:
     _composite_pillar_count = len(_composite_scores)
     _composite_pillar_total = len(pillars)
     composite_note = _composite_note(pillars, _composite_pillar_count, _composite_pillar_total)
+    pending = bool(record.get("scores_pending"))  # #6224 containment (character_privacy.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE)
     composite_delta_1d = None
     if prior_record:
         _yd_raw = [(prior_record.get(f"pillar_{p}") or {}).get("raw_score") for p in PILLAR_ORDER]
@@ -376,7 +428,7 @@ def character(date: str | None = None, *, _g) -> dict:
             if _yd_composite_scores
             else sum(v or 0 for v in _yd_scores) / max(len(_yd_scores), 1)
         )
-        composite_delta_1d = round(composite - _yd_composite, 1)
+        composite_delta_1d = None if pending else round(composite - _yd_composite, 1)
         # per-pillar day-over-day score move (aligned by PILLAR_ORDER); none for a pillar with no public score (#6224)
         for _pp, _yd_s in zip(pillars, _yd_scores):
             _pp["score_delta"] = round(_pp["raw_score"] - _yd_s, 1) if _pp["raw_score"] is not None and _yd_s is not None else None
@@ -388,28 +440,13 @@ def character(date: str | None = None, *, _g) -> dict:
     # end re-derives: `state` ∈ {dark, logged, unknown} plus the #2382 transition kind.
     _attach_pillar_absence(pillars, table=table, now=datetime.now(PT), window_start=EXPERIMENT_START)
 
+    character_block = _character_block(
+        record, pending, date_str, composite, composite_delta_1d, _composite_pillar_count, _composite_pillar_total, composite_note
+    )
     return _ok(
         {
             "character": {
-                "level": float(record.get("character_level", 1)),
-                "tier": record.get("character_tier", "Foundation"),
-                "tier_emoji": record.get("character_tier_emoji", "🔨"),
-                "xp_total": float(record.get("character_xp", 0)),
-                # #913: the visible bleed + the deterministic mood (engine-
-                # computed, ADR-105). Absent on pre-v1.3.0 records → 0 / None.
-                "xp_debt": float(record.get("character_xp_debt", 0) or 0),
-                "character_mood": record.get("character_mood"),
-                "character_mood_inputs": (
-                    record.get("character_mood_inputs") if isinstance(record.get("character_mood_inputs"), dict) else None
-                ),
-                "as_of_date": date_str,
-                "composite_score": round(composite, 1),
-                "composite_delta_1d": composite_delta_1d,
-                # DIL-049 D4: how much of the composite is real signal right now —
-                # see the note above `composite_note` for why this exists.
-                "composite_pillar_count": _composite_pillar_count,
-                "composite_pillar_total": _composite_pillar_total,
-                "composite_note": composite_note,
+                **character_block,
                 "time_travel": bool(date),
                 "method": _method_label(table, record, datetime.now(PT).date()),  # which method computed this value (2026-11-05/06)
                 # #590: the engine's designed cross-pillar couplings that are ACTIVE
@@ -690,6 +727,16 @@ def character_receipt(date: str | None = None, verify: bool = False, *, _g) -> d
             cache_seconds=cache_s,
         )
 
+    if character_privacy.scores_pending():  # #6224 containment: a receipt carries the headline level and the chain values
+        return _ok(
+            {
+                "available": False,
+                "date": date,
+                "status": character_privacy.PENDING_STATUS,
+                "reason": character_privacy.PENDING_NOTE,
+            },
+            cache_seconds=cache_s,
+        )
     receipt = _public_receipt(_decimal_to_float({k: v for k, v in item.items() if k not in ("pk", "sk")}))
     if receipt is None:  # owner ruling 2026-11-05: only the public variant's receipt is ever served (fail closed)
         return _ok(
@@ -775,11 +822,15 @@ def character_stats(*, _g) -> dict:
                 "not_scored_note": pd.get("not_scored_note"),
             }
             continue
+        if pd.get("scores_pending"):  # #6224 containment: being recalculated — the note, never a number
+            pillars[p] = {"level": None, "raw_score": None, "tier": None, "not_instrumented": True, "scores_pending": True}
+            continue
+        _lp = bool(pd.get("level_pending"))
         pillars[p] = {
-            "level": float(pd.get("level", 1)),
+            "level": None if _lp else float(pd.get("level", 1)),
             # owner ruling 2026-11-06: an unavailable pillar (no measurement) serves no score, never a placeholder
             "raw_score": None if pd.get("not_instrumented") else float(pd.get("raw_score", 0)),
-            "tier": pd.get("tier", "Foundation"),
+            "tier": None if _lp else pd.get("tier", "Foundation"),
             "not_instrumented": bool(pd.get("not_instrumented", False)),
         }
 
@@ -807,6 +858,22 @@ def character_stats(*, _g) -> dict:
             cache_seconds=3600,
         )
 
+    if record.get("scores_pending"):  # #6224 containment: the overall values are being recalculated
+        return _ok(
+            {
+                "character_stats": {
+                    "level": None,
+                    "tier": None,
+                    "tier_emoji": None,
+                    "xp_total": None,
+                    "status": character_privacy.PENDING_STATUS,
+                    "pending_note": character_privacy.PENDING_NOTE,
+                    "as_of_date": date_str,
+                },
+                "pillars": pillars,
+            },
+            cache_seconds=3600,
+        )
     return _ok(
         {
             "character_stats": {

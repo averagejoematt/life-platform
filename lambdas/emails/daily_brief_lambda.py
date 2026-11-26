@@ -2491,13 +2491,14 @@ def lambda_handler(event, context):
                 _hab_line = public_tier0_narrative(_pub_t0)
                 if _hab_line:
                     _group_narratives["habits"] = _hab_line
-                # Mind — character level + tier
-                if character_sheet:
-                    _cs = character_sheet if isinstance(character_sheet, dict) else {}
-                    _cs_level = _cs.get("level") or _cs.get("character_level")
-                    _cs_tier = _cs.get("tier") or _cs.get("tier_name")
-                    if _cs_level:
-                        _group_narratives["mind"] = f"Character at Level {_cs_level}" + (f" — {_cs_tier} tier." if _cs_tier else ".")
+                # Mind — the PUBLIC character headline (#6224: never the method-1 record; "being recalculated" while pending)
+                _pub_head = character_privacy.public_headline(character_sheet) if character_sheet else None
+                if _pub_head and _pub_head.get("status") == character_privacy.PENDING_STATUS:
+                    _group_narratives["mind"] = "The character scores are being recalculated."
+                elif _pub_head and _pub_head.get("level"):
+                    _group_narratives["mind"] = f"Character at Level {int(float(_pub_head['level']))}" + (
+                        f" — {_pub_head['tier']} tier." if _pub_head.get("tier") else "."
+                    )
                 # Platform — use TL;DR if available, else systems count
                 if _brief_excerpt:
                     _group_narratives["platform"] = _brief_excerpt[:160].rstrip() + ("…" if len(_brief_excerpt) > 160 else "")
@@ -2611,20 +2612,8 @@ def lambda_handler(event, context):
                 # unqualified.
                 elena_hero_line_as_of=yesterday if _elena_hero_line else None,
                 # PB-R1: Character sheet headline data for homepage heartbeat + nav badge
-                character=(
-                    {
-                        "level": (character_sheet or {}).get("level") or (character_sheet or {}).get("character_level"),
-                        "tier": (character_sheet or {}).get("tier") or (character_sheet or {}).get("tier_name"),
-                        "tier_emoji": (character_sheet or {}).get("tier_emoji", "\U0001f528"),
-                        "xp_total": (character_sheet or {}).get("xp_total"),
-                        "composite_score": (character_sheet or {}).get("composite_score"),
-                        "next_level_xp": (character_sheet or {}).get("next_level_xp"),
-                        "xp_to_next": (character_sheet or {}).get("xp_to_next"),
-                        "days_active": (character_sheet or {}).get("days_active"),
-                    }
-                    if character_sheet
-                    else None
-                ),
+                # #6224: the PUBLIC headline (the variant, never the method-1 record; pending while recalculated)
+                character=character_privacy.public_headline(character_sheet) if character_sheet else None,
             )
             logger.info("site_writer: public_stats.json written with baseline + character")
 
