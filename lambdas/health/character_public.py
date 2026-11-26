@@ -251,8 +251,7 @@ def without_private_modifiers(raw: Any, details: Any) -> tuple:
     not classify public (``activity_publication``; unclassified fails closed) — the food-delivery multiplier on Nutrition
     (owner ruling 2026-11-26: the source's dates are private, and its multiplier must not reach the public variant). The
     pre-modifier values are the ones the engine recorded before it applied the multiplier; a record that carries a
-    modifier without them cannot be restored exactly and raises (none stored before #6224 carries one: checked
-    read-only on 2026-11-25, 241 records, 0 with a modifier)."""
+    modifier without them cannot be restored exactly and raises (fail closed — never divided back out)."""
     d = copy.deepcopy(details or {})
     mod = d.get("_modifier")
     if not isinstance(mod, dict) or activity_publication.source_is_public(mod.get("source")):
