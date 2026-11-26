@@ -235,7 +235,9 @@ live v2 day after v1 history carries no headline level event (a move from a v1 l
 a raw-score modifier whose source is not public is not applied (`character_public.without_private_modifiers`) — the
 food-delivery multiplier on Nutrition (`food_delivery` is PRIVATE in `activity_publication`, owner ruling 2026-11-26:
 its last-recorded date is private), restored from the pre-modifier values the engine now records. The bullets below
-describe v1 where they speak of the public Mind's components; everything else holds for v2.
+describe v1 where they speak of the public Mind's components; everything else holds for v2. `/api/character_config`
+serves the PUBLIC contract (`character_public.public_contract`): no restraint component, no restraint-conditioned effect,
+Mind with no components and `scored_in_public: false`, and no effect that reads or targets Mind.
 
 "Public Mind, composite, XP, Day grades and overall levels must depend only on public-eligible inputs." Every public
 surface serves a PUBLIC variant of the sheet; the stored method-1 record (everything above) stays the owner's — MCP,

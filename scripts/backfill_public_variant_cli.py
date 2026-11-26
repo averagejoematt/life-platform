@@ -108,15 +108,25 @@ def run_replays(snap: dict, config: dict, run_ts: str) -> tuple:
 # ── the manifest ──────────────────────────────────────────────────────────────────────────
 
 
+def served_today(stored: dict) -> Optional[dict]:
+    """#6224: what readers are served from a record TODAY, before the recompute — the stored ``public`` block (the
+    variant every public route reads), with the private-source pillar held, exactly as the deployed routes serve it. Its
+    Mind is the stored one: the code that serves Mind as not scored is the change this run's "after" side shows. None
+    when the record carries no servable public variant (no route serves anything for it)."""
+    view = character_privacy.public_view(stored)
+    if view is None:
+        return None
+    for name in character_privacy.PRIVATE_SOURCE_PILLARS:
+        if f"pillar_{name}" in view:
+            view[f"pillar_{name}"] = character_privacy.public_pillar(name, view[f"pillar_{name}"])
+    return view
+
+
 def served_view(stored: dict, public_block: Optional[dict]) -> Optional[dict]:
-    """What /api/character serves from a record: the CURRENT serving (``public_block`` None: method 1 with the private
-    pillar held, as main serves it before this change) or the new one (the public variant)."""
+    """What /api/character serves from a record: TODAY's serving (``public_block`` None: the stored public block,
+    ``served_today``) or the serving after the recompute (the recomputed public variant through ``public_sheet``)."""
     if public_block is None:
-        out = dict(stored)
-        for name in character_privacy.PRIVATE_SOURCE_PILLARS:
-            if f"pillar_{name}" in out:
-                out[f"pillar_{name}"] = character_privacy.public_pillar(name, out[f"pillar_{name}"])
-        return out
+        return served_today(stored)
     return character_privacy.public_sheet(dict(stored, **{B.PUBLIC: public_block}))
 
 
@@ -136,7 +146,17 @@ def _num(x):
     return None if x is None else round(float(x), 4)
 
 
+def _pv(view: Optional[dict], *path):
+    node: Any = view or {}
+    for k in path:
+        node = node.get(k) if isinstance(node, dict) else None
+    return node
+
+
 def character_rows(snap: dict, char: dict) -> list:
+    """Per date, every value a reader sees, BEFORE (``served_today``: the stored public block the routes serve now) and
+    AFTER (the recomputed public variant as ``public_sheet`` serves it) — #6224: the owner approves the exact public
+    change. ``method1`` keeps the private method-1 values for the private correction trail (``R.ledger_rows``)."""
     rows = []
     for d in sorted(char):
         m1 = snap["sheets"][d]
@@ -147,33 +167,39 @@ def character_rows(snap: dict, char: dict) -> list:
             for p in character_public.VERBATIM_PILLARS
             for f in VERBATIM_CHECK
         )
+        row: dict[str, Any] = {
+            "date": d,
+            "before_basis": "stored public block (served today)" if cur else "no public variant stored (nothing served)",
+            "character_level": [_num(_pv(cur, "character_level")), _num(_pv(new, "character_level"))],
+            "character_tier": [_pv(cur, "character_tier"), _pv(new, "character_tier")],
+            "character_xp": [_num(_pv(cur, "character_xp")), _num(_pv(new, "character_xp"))],
+            "character_xp_debt": [_num(_pv(cur, "character_xp_debt")), _num(_pv(new, "character_xp_debt"))],
+            "composite": [route_composite(cur), route_composite(new)],
+            "character_mood": [_pv(cur, "character_mood"), _pv(new, "character_mood")],
+            "level_events": [_events(cur or {}), _events(new or {})],
+        }
+        for p in ROUTE_PILLARS:
+            row[f"{p}_level"] = [_num(_pv(cur, f"pillar_{p}", "level")), _num(_pv(new, f"pillar_{p}", "level"))]
+            row[f"{p}_score"] = [_num(_pv(cur, f"pillar_{p}", "raw_score")), _num(_pv(new, f"pillar_{p}", "raw_score"))]
+        row["level_changed"] = row["character_level"][0] != row["character_level"][1]
         mp, pp = m1.get("pillar_mind") or {}, (pub or {}).get("pillar_mind") or {}
-        rows.append(
+        held = dict(m1)
+        for name in character_privacy.PRIVATE_SOURCE_PILLARS:
+            if f"pillar_{name}" in held:
+                held[f"pillar_{name}"] = character_privacy.public_pillar(name, held[f"pillar_{name}"])
+        row["method1"] = {  # private trail: method 1 -> the recomputed public value
+            "mind_raw": [_num(mp.get("raw_score")), _num(pp.get("raw_score"))],
+            "mind_level": [_num(mp.get("level")), _num(pp.get("level"))],
+            "composite": [route_composite(held), route_composite(new)],
+            "character_xp": [_num(m1.get("character_xp")), _num((pub or {}).get("character_xp"))],
+            "character_level": [_num(m1.get("character_level")), _num((pub or {}).get("character_level"))],
+            "consistency_level": [
+                _num((m1.get("pillar_consistency") or {}).get("level")),
+                _num(((pub or {}).get("pillar_consistency") or {}).get("level")),
+            ],
+        }
+        row.update(
             {
-                "date": d,
-                "mind_raw": [_num(mp.get("raw_score")), _num(pp.get("raw_score"))],
-                "mind_level": [_num(mp.get("level")), _num(pp.get("level"))],
-                "mind_level_score": [_num(mp.get("level_score")), _num(pp.get("level_score"))],
-                "mind_data_coverage": [_num(mp.get("data_coverage")), _num(pp.get("data_coverage"))],
-                "mind_xp_total": [_num(mp.get("xp_total")), _num(pp.get("xp_total"))],
-                "consistency_raw": [
-                    _num((m1.get("pillar_consistency") or {}).get("raw_score")),
-                    _num(((pub or {}).get("pillar_consistency") or {}).get("raw_score")),
-                ],
-                "consistency_level": [
-                    _num((m1.get("pillar_consistency") or {}).get("level")),
-                    _num(((pub or {}).get("pillar_consistency") or {}).get("level")),
-                ],
-                "composite": [route_composite(cur), route_composite(new)],
-                "character_xp": [_num(m1.get("character_xp")), _num((pub or {}).get("character_xp"))],
-                "character_xp_debt": [_num(m1.get("character_xp_debt")), _num((pub or {}).get("character_xp_debt"))],
-                "character_level": [_num(m1.get("character_level")), _num((pub or {}).get("character_level"))],
-                "character_mood": [m1.get("character_mood"), (pub or {}).get("character_mood")],
-                "relationships_xp_total": [
-                    _num((m1.get("pillar_relationships") or {}).get("xp_total")),
-                    _num(((pub or {}).get("pillar_relationships") or {}).get("xp_total")),
-                ],
-                "level_events": [_events(m1), _events(pub or {})],
                 "verbatim_pillars_unchanged": unchanged,
                 "presence": char[d].get("presence"),
                 "method1_replay_mismatches": char[d].get("fidelity"),
@@ -181,8 +207,9 @@ def character_rows(snap: dict, char: dict) -> list:
                 "order_fix": char[d].get("order_fix"),
             }
         )
-        changed = any(rows[-1][f][0] != rows[-1][f][1] for f in ("character_level", "character_xp", "mind_level", "consistency_level"))
-        rows[-1]["reasons"] = R.character_reasons(m1, pub, char[d].get("order_fix"), changed)
+        changed = any(_changed(row[f]) for f in ("character_level", "character_xp", "mind_level", "consistency_level"))
+        row["reasons"] = R.character_reasons(m1, pub, char[d].get("order_fix"), changed)
+        rows.append(row)
     return rows
 
 
@@ -228,17 +255,22 @@ def _changed(pair) -> bool:
 
 def summary(char_rows: list, g_rows: list) -> dict:
     fields = (
-        "mind_raw",
-        "mind_level",
-        "composite",
-        "character_xp",
         "character_level",
-        "consistency_raw",
-        "consistency_level",
+        "character_tier",
+        "character_xp",
+        "character_xp_debt",
+        "composite",
         "character_mood",
         "level_events",
+        *(f"{p}_{k}" for p in ROUTE_PILLARS for k in ("level", "score")),
     )
-    out: dict[str, Any] = {"character_dates": len(char_rows), "day_grade_dates": len(g_rows)}
+    out: dict[str, Any] = {
+        "character_dates": len(char_rows),
+        "day_grade_dates": len(g_rows),
+        # #6224: "before" is what readers are served today (the stored public block), never method 1
+        "before_basis": "stored public block (served today)",
+        "level_changed_dates": [r["date"] for r in char_rows if r["level_changed"]],
+    }
     for f in fields:
         changed = [r["date"] for r in char_rows if _changed(r[f])]
         deltas = [abs(r[f][1] - r[f][0]) for r in char_rows if _changed(r[f]) and all(isinstance(x, (int, float)) for x in r[f])]
@@ -433,12 +465,6 @@ def _weekly_levels(snap: dict, char: dict, tag: str) -> list:
     ]
 
 
-def _method1_as_public(m1: dict) -> dict:
-    block = {k: v for k, v in m1.items() if k not in ("pk", "sk", "phase", "input_manifest", "input_status", "run_id")}
-    block.update({"public_method_version": character_privacy.PUBLIC_METHOD_VERSION, "origin": "recomputed"})
-    return block
-
-
 def route_outputs(table, snap: dict, char: dict, receipts: dict) -> dict:
     """The served bodies of the character routes, before and after, evaluated by the routes' own handlers."""
     from web import site_api_character, site_api_discovery, site_api_journey, site_api_vitals
@@ -446,11 +472,20 @@ def route_outputs(table, snap: dict, char: dict, receipts: dict) -> dict:
     def _body(resp, before):
         body = json.loads(resp["body"])
         body.pop("_meta", None)
-        if before and isinstance(body.get("character"), dict):
-            body["character"].pop("method", None)  # main serves no method label
         return body
 
     def _bodies(inject, before):
+        if before:  # today's serving: the stored public blocks, Mind as stored (the not-scored serving is the change)
+            keep = (character_privacy.scrub_unscored, character_privacy.public_pillar)
+            character_privacy.scrub_unscored = lambda view: view
+            character_privacy.public_pillar = lambda name, pillar: pillar if name == "mind" else keep[1](name, pillar)
+            try:
+                return _bodies_now(inject, before)
+            finally:
+                character_privacy.scrub_unscored, character_privacy.public_pillar = keep
+        return _bodies_now(inject, before)
+
+    def _bodies_now(inject, before):
         g = dict(vars(site_api_vitals))
         g["table"] = InjectingTable(table, inject)
         out = {"character_latest": _body(site_api_character.character(None, _g=g), before)}
@@ -471,7 +506,7 @@ def route_outputs(table, snap: dict, char: dict, receipts: dict) -> dict:
             }
         return out
 
-    before_inject = {B.SHEET_PK: {f"DATE#{d}": _method1_as_public(snap["sheets"][d]) for d in snap["sheets"]}}
+    before_inject: dict = {}  # #6224: the stored records as they are — their public block is what readers are served today
     after_inject = {
         B.SHEET_PK: {f"DATE#{d}": r["public"] for d, r in char.items()},
         B.RECEIPT_PK: {f"DATE#{d}": v for d, v in receipts.items()},

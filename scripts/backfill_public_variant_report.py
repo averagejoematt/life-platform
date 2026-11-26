@@ -12,7 +12,7 @@ import json
 from typing import Optional
 
 import backfill_public_variant as B
-from health import character_public, habit_pct_public
+from health import character_privacy, character_public, habit_pct_public
 
 PRIVATE_MIND = ("journal_consistency", "state_of_mind_valence", "values_alignment", "stress_management")
 LEDGER_VERSION = "public-variant-correction-ledger-v1"
@@ -204,10 +204,20 @@ def ledger_rows(c_rows: list, g_rows: list, h_rows: list, snap: dict, run_ts: st
     fields = ("mind_raw", "mind_level", "composite", "character_xp", "character_level", "consistency_level")
     for r in c_rows:
         rec = snap["sheets"][r["date"]]
+        m1 = r.get("method1") or r  # #6224: the method-1 pairs live under "method1" (the row's top level is the served change)
         for f in fields:
-            if r[f][0] != r[f][1]:
+            if m1[f][0] != m1[f][1]:
                 out.append(
-                    _ledger("character_sheet", r["date"], f, r[f], rec.get("computed_at"), "character-public-v1", r["reasons"], run_ts)
+                    _ledger(
+                        "character_sheet",
+                        r["date"],
+                        f,
+                        m1[f],
+                        rec.get("computed_at"),
+                        character_privacy.PUBLIC_METHOD_VERSION,
+                        r["reasons"],
+                        run_ts,
+                    )
                 )
     for r in g_rows:
         rec = snap["grades"][r["date"]]

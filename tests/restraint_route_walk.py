@@ -96,7 +96,28 @@ def tokens() -> list:
     # #6224: the restraint-derived names a stored character variant carried (an effect read from the restraint streaks,
     # its condition, the restraint component and its event label).
     out += [EFFECT_CANARY.lower(), RESTRAINT_CONDITION.split()[0], RESTRAINT_COMPONENT, "vice control"]
+    # #6224: the engine config's own restraint-conditioned effects, by name (/api/character_config serves the config).
+    out += [
+        str(e.get("name")).lower() for e in _engine_config().get("cross_pillar_effects") or [] if "vice_streak" in str(e.get("condition"))
+    ]
     return out
+
+
+def _engine_config() -> dict:
+    with open(os.path.join(os.path.dirname(_HERE), "config", "character_sheet.json"), encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+class _ConfigS3(rw._DeadClient):
+    """#6224: an S3 client that serves the repo's engine config (so /api/character_config answers and the walk reads
+    what it serves) and nothing else — every other call is dead, as in the base walk."""
+
+    def get_object(self, Bucket=None, Key=None, **_kw):  # noqa: N803 — boto3's spelling
+        if str(Key).endswith("/character_sheet.json"):
+            import io
+
+            return {"Body": io.BytesIO(json.dumps(_engine_config()).encode())}
+        raise rw._Dead("external call get_object disabled in the route walk")
 
 
 STATE: dict = {"value": None}  # None: the label walk's mixed pattern; "low" | "high": the invariance axis (#6224)
@@ -308,6 +329,9 @@ def walk(ungated: bool = False, frozen: bool = False, published: bool = False, f
     if mind_scored:
         _mind_scored()
     L = jw._wire("gaps")
+    import boto3
+
+    boto3.client = lambda *a, **k: _ConfigS3()  # type: ignore[assignment]
 
     from web import site_api_protocols as P
 

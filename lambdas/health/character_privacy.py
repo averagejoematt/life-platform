@@ -243,9 +243,10 @@ PUBLIC_CORRECTION_NOTICE_V1 = (
 )
 # #6224: the v2 recalculation's notice — the same words on every date.
 PUBLIC_CORRECTION_NOTICE = (
-    "These scores were recalculated. Mind is no longer scored in public, because its inputs are private, so the overall "
-    "level, the composite and the XP total are now worked out from the other areas without it. Any move in them on this "
-    "date is that change of method, not a change in what he did."
+    "These scores were recalculated. Mind is no longer scored in public, because its inputs are private, so it shows no "
+    "score or level. The overall level, the composite and the XP total are now worked out from the other areas alone, "
+    "and on most dates the level and the XP total read lower than before. That is the method changing, not a change in "
+    "what he did."
 )
 PUBLIC_CORRECTION_NOTICES = {PUBLIC_METHOD_V1: PUBLIC_CORRECTION_NOTICE_V1, PUBLIC_METHOD_VERSION: PUBLIC_CORRECTION_NOTICE}
 

@@ -106,6 +106,29 @@ def public_config(config: dict[str, Any]) -> dict[str, Any]:
     return cfg
 
 
+def public_contract(config: dict[str, Any]) -> dict[str, Any]:
+    """#6224: the engine config as the PUBLIC "how the engine works" contract (``/api/character_config``) may describe
+    it: ``public_config`` (no restraint component, no restraint-conditioned effect) with every pillar the public method
+    does not score emptied of components, and no cross-pillar effect whose condition reads such a pillar (it is never
+    evaluated publicly) — and that pillar's key taken out of every effect's targets."""
+    cfg = public_config(config)
+    for name in UNSCORED_PILLARS:
+        pillar = (cfg.get("pillars") or {}).get(name)
+        if isinstance(pillar, dict):
+            cfg["pillars"][name] = dict(pillar, components={})
+    effects = []
+    for e in cfg.get("cross_pillar_effects") or []:
+        cond = str((e or {}).get("condition") or "").lower().split()
+        if any(name in cond for name in UNSCORED_PILLARS):
+            continue
+        if isinstance(e.get("targets"), dict):
+            e = dict(e, targets={k: v for k, v in e["targets"].items() if k not in UNSCORED_PILLARS})
+        effects.append(e)
+    if isinstance(cfg.get("cross_pillar_effects"), list):
+        cfg["cross_pillar_effects"] = effects
+    return cfg
+
+
 # Owner ruling 2026-11-06: "Missing data must not be represented as a genuine zero score. If no public-eligible Mind
 # measurements are available, use an explicit unavailable/insufficient-data state rather than reporting a misleading
 # 0.0." The unavailable state is the engine's existing no-signal state (`not_instrumented`): no XP judgment, levels

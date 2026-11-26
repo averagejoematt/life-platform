@@ -541,6 +541,13 @@ def character_config(*, _g) -> dict:
     except Exception as e:
         logger.warning("character_config: baselines overlay failed (authored config served): %s", e)
 
+    # #6224: the contract describes the PUBLIC method only — no restraint component, no effect whose condition reads a
+    # restraint streak (``character_public.public_config``), and no component, weight-in-use or effect of a pillar the
+    # public method does not score (Mind: ``public_contract``). The method-1 config stays the owner's.
+    from health import character_public as _cpub
+
+    cfg = _cpub.public_contract(cfg)
+
     def _scalars(o: dict) -> dict:
         return {k: v for k, v in (o or {}).items() if isinstance(v, (int, float, str, bool))}
 

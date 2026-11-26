@@ -477,6 +477,7 @@ def walks() -> dict:
         "fd_public_early": ("--state", "low", "--now", now, "--fd", "early", "--fd-public"),
         "fd_public_late": ("--state", "low", "--now", now, "--fd", "late", "--fd-public"),
         "mind_scored": ("--state", "low", "--now", now, "--fd", "early", "--mind-scored"),
+        "published": ("--state", "low", "--now", now, "--fd", "early", "--published"),
     }
     with ThreadPoolExecutor(max_workers=int(os.environ.get("RESTRAINT_WALK_WORKERS", "4"))) as pool:
         futures = {k: pool.submit(_walk, *a) for k, a in runs.items()}
@@ -510,3 +511,45 @@ def test_no_public_body_carries_a_mind_score_or_level(walks):
 def test_must_fail_control_a_scored_mind_is_seen_on_the_character_routes(walks):
     seen = set(walks["mind_scored"]["mind"])
     assert {"/api/character", "/api/character_stats", "/api/mind_overview", "/api/snapshot"} <= seen, seen
+
+
+def test_the_public_engine_contract_carries_no_restraint_input_and_no_mind_scoring(walks):
+    """/api/character_config describes the PUBLIC method only (#6224): no restraint component, no restraint-conditioned
+    effect, Mind not scored. The gated walks find no restraint name on it (the tokens include the config's own
+    restraint-conditioned effect names); with the restraint switch on, the walk does — so it reads that route."""
+    for k in ("early", "late", "high"):
+        assert "/api/character_config" not in walks[k]["leaks"], walks[k]["leaks"]
+    assert "/api/character_config" in walks["published"]["leaks"], walks["published"]["leaks"]
+
+
+def test_public_contract_drops_restraint_and_mind_scoring_from_the_config():
+    cfg = character_public.public_contract(CONFIG)
+    assert cfg["pillars"]["mind"]["components"] == {}
+    assert not [e for e in cfg["cross_pillar_effects"] if character_privacy.effect_reads_restraint(e)]
+    assert not [e for e in cfg["cross_pillar_effects"] if "mind" in str(e.get("condition")).lower().split()]
+    assert not [e for e in cfg["cross_pillar_effects"] if "mind" in (e.get("targets") or {})]
+    # control: the method-1 config has all three, so the contract is what removed them
+    assert CONFIG["pillars"]["mind"]["components"] and any(
+        character_privacy.effect_reads_restraint(e) for e in CONFIG["cross_pillar_effects"]
+    )
+    assert any("mind" in str(e.get("condition")).lower().split() for e in CONFIG["cross_pillar_effects"])
+    assert CONFIG["cross_pillar_effects"] != cfg["cross_pillar_effects"]
+
+
+def test_the_dry_run_manifest_takes_before_from_the_served_public_block(histories):
+    """The owner approves the exact public change: a manifest row's "before" is the stored public block readers are
+    served today (Mind as stored), never method 1; "after" is the recomputed variant as served (Mind not scored)."""
+    import backfill_public_variant_cli as CLI
+
+    (low, s_low), _, pub, _ = histories
+    d = _days()[-1]
+    stored_block = dict(pub[d], public_method_version=character_privacy.PUBLIC_METHOD_V1, character_level=41, character_xp=999.0)
+    stored_block["pillar_mind"] = {"level": 33.0, "raw_score": 61.0, "tier": "Momentum"}
+    snap = {"sheets": {d: dict(low[d], public=stored_block)}}
+    char = {d: {"public": pub[d], "presence": None, "fidelity": [], "order_fix": None}}
+    row = CLI.character_rows(snap, char)[0]
+    assert row["character_level"] == [41.0, float(pub[d]["character_level"])] and row["level_changed"]
+    assert row["character_xp"][0] == 999.0 and row["mind_level"] == [33.0, None] and row["mind_score"] == [61.0, None]
+    assert row["character_level"][0] != float(low[d]["character_level"]) or low[d]["character_level"] == 41  # not method 1
+    assert row["method1"]["character_level"][0] == float(low[d]["character_level"])  # method 1 kept for the private trail
+    assert CLI.summary([row], [])["level_changed_dates"] == [d]
