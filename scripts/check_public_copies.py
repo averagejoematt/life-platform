@@ -584,6 +584,65 @@ def archive_api_issues(members: dict[str, bytes], live_get, facts: dict | None =
     return out
 
 
+def _withheld_tokens() -> list[str]:
+    """The words the live publication policy withholds (``character_privacy.withheld_public_tokens`` — the route walk's
+    list), or none while the owner has published restraint data."""
+    from common import restraint_publication
+    from health import character_privacy
+
+    if restraint_publication.RESTRAINT_DATA_PUBLISHED:
+        return []
+    with open(os.path.join(REPO, "config", "character_sheet.json"), encoding="utf-8") as fh:
+        return character_privacy.withheld_public_tokens(json.load(fh))
+
+
+def _method_versions(node) -> set[str]:
+    """Every character public-method version an archived body declares (``character.method.version`` and kin)."""
+    found: set[str] = set()
+    if isinstance(node, dict):
+        for k, v in node.items():
+            if k in ("version", "public_method_version") and isinstance(v, str) and v.startswith("character-public-"):
+                found.add(v)
+            if k not in ("history", "method_history"):  # the method history names every version by design
+                found |= _method_versions(v)
+    elif isinstance(node, list):
+        for v in node:
+            found |= _method_versions(v)
+    return found
+
+
+def archive_privacy_issues(members: dict[str, bytes], manifest: dict, tokens: list | None = None) -> list[tuple[str, str, str]]:
+    """#6223 rule C (privacy class; ``--check`` red like the rest of rule C): an archived ``api/`` copy that carries a word
+    the live publication policy withholds (``_withheld_tokens`` — the route walk's one list), or that declares a
+    character public-method version older than the live one; and an archive built before the newest privacy-relevant
+    method change (``character_privacy.PUBLIC_METHOD_HISTORY``'s newest ``defined_on``) — its route copies predate it."""
+    from health import character_privacy
+
+    toks = _withheld_tokens() if tokens is None else tokens
+    out = []
+    for name, body in sorted(members.items()):
+        if not (name.startswith("api/") and name.endswith(".json")):
+            continue
+        text = body.decode("utf-8", "replace").lower()
+        hits = sorted(t for t in toks if t in text)
+        if hits:
+            out.append(("archive", "C", f"{name}: carries {len(hits)} word(s) the live publication policy withholds, e.g. {hits[0]!r}"))
+        try:
+            old = sorted(v for v in _method_versions(json.loads(body)) if v != character_privacy.PUBLIC_METHOD_VERSION)
+        except ValueError:
+            old = []
+        if old:
+            out.append(
+                ("archive", "C", f"{name}: a copy served under {old[0]}, older than the live {character_privacy.PUBLIC_METHOD_VERSION}")
+            )
+    epoch = max((str(m.get("defined_on") or "") for m in character_privacy.PUBLIC_METHOD_HISTORY), default="")
+    built = str((manifest or {}).get("generated_at") or "")
+    character_copies = [n for n in members if n.startswith(("api/character", "api/snapshot")) and n.endswith(".json")]
+    if epoch and built and built[:10] < epoch and character_copies:
+        out.append(("archive", "C", f"built {built[:10]}, before the public method change of {epoch} — its route copies predate it"))
+    return out
+
+
 def archive_age_issue(manifest: dict, mode: str, now: datetime, markers: list) -> list[tuple[str, str, str]]:
     """Rule B for the archive."""
     try:
@@ -717,6 +776,7 @@ def evaluate(
                 if os.path.isdir(tree):
                     violations += [("archive", "C", f"{pre}{i}") for i in policy_issues(tree, snapshot_dir)]
             violations += archive_api_issues(members, live_get, facts)
+            violations += archive_privacy_issues(members, json.loads(members.get("MANIFEST.json") or b"{}"))
         violations += legacy_chapter_issues(snapshot_dir, listing, fetch_key, members if archive_blob is not None else None, facts)
     return violations, facts
 
