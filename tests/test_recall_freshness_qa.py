@@ -152,6 +152,26 @@ def test_phase_invisible_installments_are_not_required():
     assert got == [W1]
 
 
+def test_a_withdrawn_chapter_is_not_required_but_a_normal_one_still_is_6268():
+    """The indexer never writes a withdrawn chapter (#6199 G1); requiring it was a stale expectation."""
+    withdrawn = dict(_inst(W2), withdrawn=True)
+    assert rf.published_installment_dates([_inst(W1), withdrawn]) == [W1]
+    assert rf.published_installment_dates([_inst(W1), _inst(W2)]) == [W1, W2]
+    assert rf.published_installment_dates([withdrawn]) == []
+
+
+def test_sensor_and_indexer_share_one_withdrawn_predicate_6268():
+    import inspect
+
+    from ai import recall_indexer as ri
+    from content import chapter_reads
+
+    assert ri.chapter_reads is chapter_reads
+    assert "chapter_reads.is_withdrawn" in inspect.getsource(rf.published_installment_dates)
+    assert "chapter_reads.is_withdrawn" in inspect.getsource(ri)
+    assert "def is_withdrawn" not in inspect.getsource(rf)
+
+
 # ── WIRING ──────────────────────────────────────────────────────────────────
 def test_the_check_is_registered_in_the_nightly_sweep():
     """The failure this whole file exists to prevent is a correct check nobody runs."""

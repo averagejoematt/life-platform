@@ -410,6 +410,41 @@ def test_month_granularity_is_not_a_disagreement():
     assert check.passed is True, check.message
 
 
+def test_a_month_floored_silence_up_to_a_month_adrift_is_not_a_disagreement_6268():
+    """80d exact vs '2mo ago' (60d): the live 2026-11-25 shape, red at the 20% rule (tolerance 16d)."""
+    row = {"id": "garmin", "status": "paused", "desc": "paused (ADR-074)", "days_dark": 80, "last_update": "2026-09-06"}
+    payloads = _absence_payloads(
+        "PAUSED in the source registry — paused (ADR-074). Last record: 2mo ago.", freshness_row=row, rel="2mo ago"
+    )
+    check = _run_absence(payloads)
+    assert check.passed is True, check.message
+
+
+def _agree(days_dark, rel, comment_rel=None):
+    row = {"id": "garmin", "status": "paused", "desc": "paused (ADR-074)", "days_dark": days_dark, "last_update": "2026-09-06"}
+    payloads = _absence_payloads(f"PAUSED in the source registry — paused (ADR-074). Last record: {rel}.", freshness_row=row, rel=rel)
+    return _run_absence(payloads).passed
+
+
+def test_a_day_rendered_60_is_exact_not_month_floored_6268():
+    assert _agree(85, "60d ago") is False  # two different last-record dates; 60 is not a month rendering
+    assert _agree(60, "60d ago") is True
+
+
+def test_a_month_floor_may_lag_by_less_than_a_month_and_never_lead_6268():
+    assert _agree(60, "2mo ago") is True  # the floor's lower edge
+    assert _agree(80, "2mo ago") is True
+    assert _agree(89, "2mo ago") is True
+    assert _agree(95, "2mo ago") is False  # more than a month behind
+    assert _agree(90, "2mo ago") is False  # a full month behind is the NEXT floor
+    assert _agree(50, "2mo ago") is False  # a floor cannot lead the exact figure
+
+
+def test_two_day_rendered_surfaces_keep_the_twenty_percent_rule_6268():
+    assert _agree(80, "55d ago") is False
+    assert _agree(80, "70d ago") is True  # inside a fifth, unchanged
+
+
 def test_a_never_rendering_is_an_honest_duration():
     rows = wq._extract_status_components(
         {"groups": [{"components": [{"id": "x", "status": "blue", "last_sync_relative": "never", "comment": "c"}]}]}

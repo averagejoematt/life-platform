@@ -43,7 +43,10 @@ wires in.
 
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
+
+from content import legacy_chapter_addresses as lca
 
 from operational.qa_check import CONTENT_TRUTH, Check
 from operational.qa_check_reader_truth import SITE_BASE_URL
@@ -70,12 +73,48 @@ def assess_permalink_blackhole(post_urls, redirect_entries):
     ]
 
 
+def served_edition_target(path, location, base):
+    """The sanctioned 301 (#6268, owner ruling 2026-11-22, #6193/PR #6234): a legacy chapter address
+    `/journal/posts/week-NN/` follows its served edition to `/story/week-NN/`. The expected target is derived
+    from the ruling's own mapping (`legacy_chapter_addresses.page_id` + `story_path`) — never a second regex.
+    Returns the expected story path when `location` is exactly it (same host or relative), else None."""
+    try:
+        expected = lca.story_path(lca.page_id(path))
+    except lca.PlanError:
+        return None
+    parts = urllib.parse.urlsplit(str(location or ""))
+    host = urllib.parse.urlsplit(base).netloc
+    if parts.netloc not in ("", host) or parts.query or parts.fragment:
+        return None
+    return expected if parts.path == expected else None
+
+
+def _redirect_leg(path, code, location, opener, base, timeout):
+    """Failure text for a published permalink that 301s, or None when it is the sanctioned hop to its served
+    edition AND that edition answers 200 directly (a redirect loop, a further hop or a 404 target all fail)."""
+    blackhole = (
+        f"{path} -> HTTP {code} to {location!r} at the edge — a published permalink is being "
+        f"redirected (publish the regenerated v4-redirects function, #3284)"
+    )
+    target = served_edition_target(path, location, base)
+    if target is None:
+        return blackhole
+    try:
+        resp = opener.open(base + target, timeout=timeout)
+    except urllib.error.HTTPError as e:
+        return f"{path} -> {target} (its served edition) answers HTTP {e.code}, not 200 (#6268)"
+    status = getattr(resp, "status", None)
+    return None if status == 200 else f"{path} -> {target} (its served edition) answers HTTP {status}, not 200 (#6268)"
+
+
 def probe_live_permalinks(post_urls, opener=None, base_url=None, timeout=10):
     """Live-leg probe: GET each permalink with redirect-following disabled.
     Returns (failures, errors): a 301/308 observed at the edge is a failure
-    (the published CloudFront function still redirects it); any other
-    non-redirect HTTP status passes THIS check (page-health sweeps own 404s);
-    transport problems are errors (visible, fail-soft — never a verdict)."""
+    (the published CloudFront function still redirects it) UNLESS it is the
+    sanctioned hop to the chapter's served edition and that target returns 200
+    (#6268); any other non-redirect HTTP status passes THIS check (page-health
+    sweeps own 404s); transport problems are errors (visible, fail-soft — never
+    a verdict)."""
     if opener is None:
         opener = build_no_redirect_opener()
     base = (base_url or SITE_BASE_URL).rstrip("/")
@@ -85,11 +124,13 @@ def probe_live_permalinks(post_urls, opener=None, base_url=None, timeout=10):
             opener.open(base + path, timeout=timeout)
         except urllib.error.HTTPError as e:
             if e.code in EXPECTED_REDIRECT_CODES:
-                location = e.headers.get("Location")
-                failures.append(
-                    f"{path} -> HTTP {e.code} to {location!r} at the edge — a published permalink is being "
-                    f"redirected (publish the regenerated v4-redirects function, #3284)"
-                )
+                try:
+                    problem = _redirect_leg(path, e.code, e.headers.get("Location"), opener, base, timeout)
+                except Exception as e2:
+                    errors.append(f"{path} -> served-edition request error (fail-soft): {str(e2)[:120]}")
+                    continue
+                if problem:
+                    failures.append(problem)
         except Exception as e:
             errors.append(f"{path} -> request error (fail-soft): {str(e)[:120]}")
     return failures, errors
