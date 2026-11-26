@@ -122,6 +122,32 @@ MEMORY_CATEGORIES: dict[str, dict] = {
         "coach_domains": frozenset({"physical"}),  # physical_coach absorbs training (persona_registry)
         "durable": True,
     },
+    "personal_record": {
+        # #6287 (owner rulings 2026-11-26): a reviewed personal record from conversation — a
+        # recollection, a confirmed event, his own statement, or an interpretation he looked
+        # at. Three rules make it different from life_context, and they are code, not prose:
+        #   * QUEUE-ONLY: write_platform_memory refuses a direct write; the row is written
+        #     only inside manage_pending_writes' approve call (pending_writes.approval_scope),
+        #     which stamps owner_reviewed_at. "Permission to save privately is not permission
+        #     to share with coaches" — so the default tier is PRIVATE, and coach_context is a
+        #     per-item opt-in given at enqueue (OPT_IN_TIERS); public_ok is impossible.
+        #   * PROVENANCE: evidence_kind + event_date/event_date_precision + source_ref are
+        #     validated (validate_provenance); an interpretation is never injected as fact.
+        #   * A record with an event_date is exempt from the relevance window below.
+        "description": (
+            "Reviewed personal record from conversation (owner statement, confirmed event, recollection, self-report, "
+            "observed pattern, interpretation) with evidence_kind + event_date provenance. QUEUE-ONLY: written only by "
+            "manage_pending_writes approve; private unless coach_context is chosen per item at enqueue."
+        ),
+        "channels": (CHANNEL_CONVERSATION,),
+        "retention_days": 365,
+        "privacy_tier": TIER_PRIVATE,
+        "coach_domains": ALL_DOMAINS,
+        "durable": True,
+        "queue_only": True,
+        "provenance_required": True,
+        "opt_in_tiers": (TIER_COACH_CONTEXT,),
+    },
     "coaching_calibration": {
         "description": "How to coach Matthew — computed response patterns plus explicit asks from chat ('push harder').",
         "channels": (CHANNEL_CONVERSATION, CHANNEL_COMPUTED),
@@ -276,7 +302,129 @@ _META_FIELDS = {
     "tombstoned_at",
     "record_type",
     "version",
+    # #6287 provenance — rendered as the line's label, never as its text
+    "evidence_kind",
+    "event_date",
+    "event_date_precision",
+    "source_ref",
+    "owner_reviewed_at",
+    "reviewed_via",
 }
+
+# ── #6287: provenance for reviewed personal records ──────────────────────────
+EVIDENCE_KINDS = (
+    "owner_statement",
+    "confirmed_event",
+    "recollection",
+    "self_report",
+    "observed_pattern",
+    "ai_interpretation",
+    "competing_hypothesis",
+    "confirmed_insight",
+    "rejected_interpretation",
+)
+#: Kinds that may reach a coach prompt (at coach_context tier only), each with its label.
+#: observed_pattern is deliberately absent: until the owner rules otherwise a pattern is an
+#: observation about him, not something he said — it stays readable, never injected.
+INJECTABLE_EVIDENCE_LABELS = {
+    "owner_statement": "his statement",
+    "confirmed_event": "confirmed event",
+    "recollection": "recollection",
+    "self_report": "self-report",
+    "confirmed_insight": "confirmed insight",
+}
+#: Never injected as fact, at any tier. A rejected interpretation is KEPT (so it is not
+#: re-proposed) and is never injected.
+NON_INJECTABLE_EVIDENCE = frozenset({"ai_interpretation", "competing_hypothesis", "rejected_interpretation"})
+
+DATE_PRECISIONS = ("day", "month", "season", "year", "unknown")
+SEASONS = ("spring", "summer", "autumn", "winter")
+_SEASON_ALIASES = {"fall": "autumn"}
+
+#: Fields the approval path stamps — a caller can never supply them.
+APPROVAL_STAMPED_FIELDS = ("owner_reviewed_at", "reviewed_via")
+
+
+def _infer_precision(event_date: str) -> str | None:
+    s = event_date
+    if len(s) == 4 and s.isdigit():
+        return "year"
+    if len(s) == 7 and s[4] == "-" and s[:4].isdigit() and s[5:].isdigit():
+        return "month"
+    if len(s) == 10:
+        return "day"
+    if s[:4].isdigit() and s[4:5] == "-":
+        return "season"
+    return None
+
+
+def normalize_event_date(event_date, precision) -> tuple[str | None, str | None, str | None]:
+    """(error, event_date, precision) for a personal record's event date.
+
+    Accepted shapes, one per precision: day ``YYYY-MM-DD``, month ``YYYY-MM``,
+    season ``YYYY-<spring|summer|autumn|winter>`` (``fall`` → ``autumn``), year ``YYYY``.
+    ``unknown`` carries no date. A precision given with a date must match the date's shape;
+    a date given without one has its precision inferred from the shape."""
+    if precision is not None and precision not in DATE_PRECISIONS:
+        return f"event_date_precision must be one of {list(DATE_PRECISIONS)}", None, None
+    if event_date in (None, ""):
+        if precision in (None, "unknown"):
+            return None, None, ("unknown" if precision == "unknown" else None)
+        return f"event_date_precision '{precision}' needs an event_date (or use 'unknown')", None, None
+    if not isinstance(event_date, str):
+        return "event_date must be a string", None, None
+    s = event_date.strip().lower()
+    if precision == "unknown":
+        return "event_date_precision 'unknown' takes no event_date — drop one of them", None, None
+    shape = _infer_precision(s)
+    if shape is None:
+        return f"event_date {event_date!r} is not YYYY, YYYY-MM, YYYY-<season> or YYYY-MM-DD", None, None
+    if precision is not None and precision != shape:
+        return f"event_date {event_date!r} has {shape} precision but event_date_precision says '{precision}'", None, None
+    try:
+        if shape == "day":
+            s = _date.fromisoformat(s).isoformat()
+        elif shape == "month":
+            month = int(s[5:])
+            if not 1 <= month <= 12:
+                raise ValueError(month)
+        elif shape == "season":
+            season = _SEASON_ALIASES.get(s[5:], s[5:])
+            if season not in SEASONS:
+                raise ValueError(season)
+            s = f"{s[:4]}-{season}"
+        int(s[:4])
+    except (TypeError, ValueError):
+        return f"event_date {event_date!r} is not a valid {shape}", None, None
+    return None, s, shape
+
+
+def validate_provenance(fields: dict) -> tuple[str | None, dict]:
+    """(error, normalized) for a personal record's provenance fields.
+
+    ``evidence_kind`` is required; ``event_date``/``event_date_precision`` per
+    normalize_event_date; ``source_ref`` an opaque non-empty string (never fetched).
+    ``owner_reviewed_at``/``reviewed_via`` are stamped by the approval path and refused here."""
+    for stamped in APPROVAL_STAMPED_FIELDS:
+        if fields.get(stamped) not in (None, ""):
+            return f"{stamped} is stamped by the approval path (manage_pending_writes approve) — never supplied by the caller", {}
+    kind = fields.get("evidence_kind")
+    if kind not in EVIDENCE_KINDS:
+        return f"evidence_kind is required and must be one of {list(EVIDENCE_KINDS)}", {}
+    err, event_date, precision = normalize_event_date(fields.get("event_date"), fields.get("event_date_precision"))
+    if err:
+        return err, {}
+    out = {"evidence_kind": kind}
+    if event_date is not None:
+        out["event_date"] = event_date
+    if precision is not None:
+        out["event_date_precision"] = precision
+    ref = fields.get("source_ref")
+    if ref is not None:
+        if not isinstance(ref, str) or not ref.strip() or len(ref) > 200:
+            return "source_ref must be a non-empty opaque string (≤200 chars), e.g. a Notion page id", {}
+        out["source_ref"] = ref.strip()
+    return None, out
 
 
 def canonical_category(name) -> str | None:
@@ -313,6 +461,8 @@ def taxonomy_summary() -> list[dict]:
                 "privacy_tier": spec["privacy_tier"],
                 "retention_days": spec["retention_days"],
                 "conversation_writable": CHANNEL_CONVERSATION in spec["channels"],
+                # #6287: "queue_only" → write it with manage_pending_writes(enqueue), never directly
+                "write_path": "queue_only" if spec.get("queue_only") else "direct",
             }
         )
     return out
@@ -327,12 +477,48 @@ def normalize_domain(coach_id) -> str | None:
 
 
 def effective_tier(record: dict, spec: dict) -> str:
-    """The category default, tightened (never loosened) by a per-record override."""
+    """The category default, tightened (never loosened) by a per-record override.
+
+    #6287: the one exception is a category's ``opt_in_tiers`` — a per-item choice the owner
+    made at enqueue (personal_record: ``coach_context``). It is the ONLY loosening there
+    is, and ``public_ok`` is never in that set."""
     default = spec["privacy_tier"]
     override = record.get("privacy_tier")
     if override in _TIER_RANK and _TIER_RANK[override] > _TIER_RANK[default]:
         return override
+    if override in spec.get("opt_in_tiers", ()) and override != TIER_PUBLIC_OK:
+        return override
     return default
+
+
+def is_queue_only(category: str | None) -> bool:
+    """#6287: True when a direct write_platform_memory call must be refused for `category`."""
+    return bool(category and MEMORY_CATEGORIES.get(category, {}).get("queue_only"))
+
+
+def injection_label(record: dict, spec: dict) -> str | None:
+    """#6287: the evidence label a provenance-carrying record is injected under, or None
+    when it must not be injected at all.
+
+    A record (any category) whose evidence_kind is an interpretation, a competing
+    hypothesis or a rejected interpretation is NEVER injected. In a provenance_required
+    category a record must also carry an injectable evidence_kind and an owner_reviewed_at
+    stamp. Records with no provenance in an ordinary category return "" (inject, no label)."""
+    kind = record.get("evidence_kind")
+    if kind in NON_INJECTABLE_EVIDENCE:
+        return None
+    if spec.get("provenance_required"):
+        if kind not in INJECTABLE_EVIDENCE_LABELS or not record.get("owner_reviewed_at"):
+            return None
+    if kind not in INJECTABLE_EVIDENCE_LABELS:
+        return "" if kind is None else None
+    label = INJECTABLE_EVIDENCE_LABELS[kind]
+    event_date = record.get("event_date")
+    if event_date:
+        label += f", event {event_date}"
+    elif record.get("event_date_precision") == "unknown":
+        label += ", date unknown"
+    return label
 
 
 def _category_of(record: dict) -> str | None:
@@ -412,8 +598,15 @@ def select_conversation_memories(records, coach_id=None, max_items: int = DEFAUL
             continue
         if effective_tier(rec, spec) == TIER_PRIVATE:
             continue
+        label = injection_label(rec, spec)
+        if label is None:
+            continue  # #6287: an interpretation is never injected as fact
         rec_date = _date_of(rec)
-        if rec_date is None or (today - rec_date).days > spec["retention_days"] or rec_date > today:
+        if rec_date is None or rec_date > today:
+            continue
+        # #6287: a record that names when its event happened is about that event, not about
+        # how recently it was said — it is exempt from the category's relevance window.
+        if not rec.get("event_date") and (today - rec_date).days > spec["retention_days"]:
             continue
         domains = rec.get("domains") or spec["coach_domains"]
         if domain is not None and domains != ALL_DOMAINS:
@@ -453,7 +646,11 @@ def format_platform_memory_block(selected: list[dict], max_chars: int = DEFAULT_
         if not text:
             continue
         confidence = " (shared in confidence)" if effective_tier(rec, spec) == TIER_COACH_CONTEXT else ""
-        line = f"- [{entry['date']} · {entry['category']}] {text}{confidence}"
+        label = injection_label(rec, spec)
+        if label is None:
+            continue  # defence in depth — select_conversation_memories already dropped it
+        kind = f" · {label}" if label else ""
+        line = f"- [{entry['date']} · {entry['category']}{kind}] {text}{confidence}"
         if budget - (len(line) + 1) < 0:
             break
         budget -= len(line) + 1

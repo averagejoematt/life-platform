@@ -59,10 +59,12 @@ RULINGS (recorded here because the code enforces them)
 
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import hashlib
 import json
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Iterator
 
 SOURCE = "pending_writes"
 PK = "USER#matthew#SOURCE#pending_writes"
@@ -87,6 +89,34 @@ RESOLVED_TTL_DAYS = 90
 #: 400 KB; this leaves room for the rest of the row and is far above any write tool's
 #: realistic argument set (the MCP layer already caps each string argument at 2,000 chars).
 MAX_ARGS_JSON_BYTES = 32_000
+
+
+# ── #6287: the approval scope ────────────────────────────────────────────────
+# A queue-only target (write_platform_memory for `personal_record`) must refuse any call
+# that is not the approve path performing a queued item. The proof is THIS context
+# variable, set only by `mcp/tools_pending_writes.py::_approve` around the one in-process
+# call it makes. It is not an argument: a model composing tool arguments cannot set it,
+# and a direct MCP call (or a queued item's own target_args) arrives with it unset.
+_APPROVAL: contextvars.ContextVar[dict | None] = contextvars.ContextVar("pending_write_approval", default=None)
+
+
+@contextlib.contextmanager
+def approval_scope(pending_id: str, target_tool: str, approved_at: str) -> Iterator[dict]:
+    """Mark the enclosed call as the approve path performing `pending_id` on `target_tool`."""
+    scope = {"pending_id": pending_id, "target_tool": target_tool, "approved_at": approved_at}
+    token = _APPROVAL.set(scope)
+    try:
+        yield scope
+    finally:
+        _APPROVAL.reset(token)
+
+
+def current_approval(target_tool: str) -> dict | None:
+    """The approval scope when the current call is the approve path for `target_tool`, else None."""
+    scope = _APPROVAL.get()
+    if not scope or scope.get("target_tool") != target_tool:
+        return None
+    return dict(scope)
 
 
 def canonical_args(args: dict) -> str:

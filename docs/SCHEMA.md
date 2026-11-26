@@ -265,7 +265,7 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `…SOURCE#decisions` / `DECISION#<ISO-ts>` | logged decisions + outcomes | `mcp/tools_decisions.py` | `get_decisions` | ✓ |
 | `…SOURCE#decisions` / `ADVICELINK#<decision-ts>#<ref_kind>#<coach_id>#<ref_id>` | **advice links (#5612, ruling F)** — ONE logged decision ↔ ONE coach recommendation, `state` ∈ {`acted_on`,`declined`,`partially_followed`,`unknown`}, evidence required for every state but `unknown`; absence of a row = `unknown`; no backfill. Field table in the Decisions section below | MCP `log_advice_link` ONLY (`mcp/tools_advice_links.py`, registry `lambdas/coach/advice_links.py`) | `get_decisions` (owner); no public reader | n/v (fires on the first owner link) |
 | `…SOURCE#rewards` / `REWARD#<id>` | reward definitions | `lambdas/content/output_writers.py` (MCP `set_reward`) | `get_rewards` | empty |
-| `…SOURCE#platform_memory` / `MEMORY#<category>#<date>` | platform memory — **split by category**: durable categories (baseline_snapshot, re_entry, cycle_marker, cycle, life_context, constraints_preferences) are cross_phase; coach running-state categories are experiment_scoped. Canonical taxonomy = `lambdas/ai/platform_memory.py` (#1482) | `mcp/tools_memory.py`, failure-pattern/insight/hypothesis computes | `read_platform_memory`, digests, coach prompt injection (`platform_memory_block`) | ✓ |
+| `…SOURCE#platform_memory` / `MEMORY#<category>#<date>` | platform memory — **split by category**: durable categories (baseline_snapshot, re_entry, cycle_marker, cycle, life_context, constraints_preferences, training, personal_record) are cross_phase; coach running-state categories are experiment_scoped. Canonical taxonomy = `lambdas/ai/platform_memory.py` (#1482) | `mcp/tools_memory.py`, failure-pattern/insight/hypothesis computes | `read_platform_memory`, digests, coach prompt injection (`platform_memory_block`) | ✓ |
 
 ### Coach intelligence tier (`pk COACH#<coach_id>` — all EXPERIMENT_SCOPED)
 
@@ -2468,6 +2468,7 @@ Structured key-value memory store for compounding intelligence — computed reco
 | `life_context` | conversation | 365d | coach_context | cross_phase | Durable life events/situation shared in chat (travel, work stress, family) |
 | `constraints_preferences` | conversation | 730d | coach_context | cross_phase | Standing constraints + preferences (equipment, injuries, food dislikes, framing) |
 | `training` | conversation | 730d | coach_context | cross_phase | Standing training constraints (the RDL gate, a toe flag, a back flag, #4077) — `plan_next_session` stage 1 reads it as `standing_constraints_from_chat`, distinct from `constraints_preferences` so it stays a single-domain, narrow read |
+| `personal_record` | conversation (**queue-only**) | 365d; **none when `event_date` is set** | **private** (per-item opt-in to coach_context; never public_ok) | cross_phase | Reviewed personal record from chat with provenance (#6287) — see below |
 | `coaching_calibration` | conversation, computed | 365d | coach_context | experiment_scoped | How to coach Matthew — computed response patterns + explicit chat asks |
 | `failure_patterns` | conversation, computed | 180d | coach_context | experiment_scoped | Conditions preceding low days (computed attribution + chat-narrated failure modes) |
 | `what_worked` | conversation, computed | 365d | coach_context | experiment_scoped | Episodic wins (issue alias: `episodic_wins`) |
@@ -2484,6 +2485,18 @@ Structured key-value memory store for compounding intelligence — computed reco
 Aliases (normalized on MCP write/read): `failure_pattern` → `failure_patterns`, `episodic_wins` → `what_worked`.
 
 **Privacy tiers** (per-category default; a per-record `privacy_tier` field may only *tighten* it): `public_ok` — a coach may cite it on public surfaces; `coach_context` — reaches coach prompts marked "(shared in confidence)", informs the read without its specifics being restated; `private` — never enters any generation prompt (MCP read only). #1483 will formalize the public-site side.
+
+**Reviewed personal records (`personal_record`, #6287 — owner rulings 2026-11-26).** One category in this partition, not a second memory system. Rules, all code (`lambdas/ai/platform_memory.py`, `mcp/tools_memory.py`, `mcp/tools_pending_writes.py`):
+
+- **Queue-only.** A direct `write_platform_memory(category="personal_record")` is refused and writes nothing. The row is written only inside `manage_pending_writes(action="approve")`, which sets `coach.pending_writes.approval_scope` (a context variable, not an argument) around its in-process call to the tool. Discarding a queued item writes nothing to this partition. `delete_platform_memory` tombstones a record as for every category.
+- **Provenance fields** (validated at enqueue and again at the write):
+  - `evidence_kind` (required) ∈ `owner_statement`, `confirmed_event`, `recollection`, `self_report`, `observed_pattern`, `ai_interpretation`, `competing_hypothesis`, `confirmed_insight`, `rejected_interpretation`.
+  - `event_date` + `event_date_precision` ∈ `day` (`YYYY-MM-DD`), `month` (`YYYY-MM`), `season` (`YYYY-spring|summer|autumn|winter`, `fall`→`autumn`), `year` (`YYYY`), `unknown` (no date). A precision given with a date must match its shape; omitted, it is inferred.
+  - `source_ref` — opaque string (e.g. a Notion page id), ≤200 chars, never fetched.
+  - `owner_reviewed_at` (ISO instant of the approval) + `reviewed_via` (`manage_pending_writes:<pending_id>`) — **stamped by the approve path; a caller-supplied value is refused.**
+- **Tier.** `private` unless the queued item itself says `privacy_tier="coach_context"` (the category's `opt_in_tiers` — the only per-record loosening in the registry); `public_ok` is refused.
+- **Injection.** Never when private. Never `ai_interpretation`, `competing_hypothesis` or `rejected_interpretation` (a rejected interpretation is kept so it is not re-proposed), and `observed_pattern` is not injected either until ruled otherwise. A row with no `owner_reviewed_at` is not injected. Injected lines carry their evidence kind and event date: `[<date> · personal_record · recollection, event 2019-summer] …`. A record with an `event_date` is exempt from the relevance window.
+- `read_platform_memory` returns every provenance field.
 
 **Coach prompt injection (#1482):** `platform_memory.platform_memory_block(coach_id)` renders the most recent conversation-channel records (`channel == "conversation"` only — honest provenance) that pass category/retention/privacy/domain filters into a bounded block (≤6 items, ≤1800 chars — ADR-063 budget) that `ai_calls._run_coach_v2_pipeline` injects into the daily-brief coach system prompt. The block sits above the few-shot block, so its numbers enter the ADR-104 fabrication allow-list — injected memories are valid grounding sources; the block's own rules require coaches to cite them as "you mentioned", never as measured data.
 

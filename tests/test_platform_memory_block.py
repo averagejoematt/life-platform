@@ -102,7 +102,15 @@ def test_taxonomy_summary_covers_every_category():
     summary = pm.taxonomy_summary()
     assert {e["category"] for e in summary} == set(pm.MEMORY_CATEGORIES)
     for e in summary:
-        assert set(e) == {"category", "description", "channels", "privacy_tier", "retention_days", "conversation_writable"}
+        assert set(e) == {
+            "category",
+            "description",
+            "channels",
+            "privacy_tier",
+            "retention_days",
+            "conversation_writable",
+            "write_path",
+        }  # write_path: #6287
 
 
 # ── cross-registry drift gates ───────────────────────────────────────────────

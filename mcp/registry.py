@@ -1275,6 +1275,35 @@ TOOLS = {
                             "physical, glucose, labs, explorer). Default: the category's rule (usually all coaches)."
                         ),
                     },
+                    # #6287: provenance — personal_record only (queue-only; see the description)
+                    "evidence_kind": {
+                        "type": "string",
+                        "enum": [
+                            "owner_statement",
+                            "confirmed_event",
+                            "recollection",
+                            "self_report",
+                            "observed_pattern",
+                            "ai_interpretation",
+                            "competing_hypothesis",
+                            "confirmed_insight",
+                            "rejected_interpretation",
+                        ],  # == platform_memory.EVIDENCE_KINDS (tests/test_personal_record_review_6287.py)
+                        "description": "personal_record only (required there): what kind of evidence the record is.",
+                    },
+                    "event_date": {
+                        "type": "string",
+                        "description": "personal_record only: when the event happened — YYYY, YYYY-MM, YYYY-<season> or YYYY-MM-DD.",
+                    },
+                    "event_date_precision": {
+                        "type": "string",
+                        "enum": ["day", "month", "season", "year", "unknown"],  # == platform_memory.DATE_PRECISIONS
+                        "description": "personal_record only: precision of event_date (inferred from its shape if omitted; 'unknown' = no date).",
+                    },
+                    "source_ref": {
+                        "type": "string",
+                        "description": "personal_record only: opaque reference to where it came from (e.g. a Notion page id); never fetched.",
+                    },
                 },
                 "required": ["category", "content"],
             },
