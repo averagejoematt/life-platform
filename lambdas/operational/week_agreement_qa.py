@@ -102,7 +102,7 @@ def _month_floored(text: str) -> bool:
     """True when the duration was RENDERED in whole months ('2mo ago'): the surface floored the silence to a month
     boundary, so it may lag the exact figure (#6268). Days, hours, weeks and years are not month-floored here."""
     m = _REL_DAYS.search(str(text or "").lower())
-    return bool(m) and m.group(2).lower() in ("mo", "month", "months")
+    return m is not None and m.group(2).lower() in ("mo", "month", "months")
 
 
 def _durations_disagree(a: tuple, b: tuple) -> bool:
