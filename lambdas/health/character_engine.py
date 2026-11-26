@@ -41,6 +41,7 @@ from training import session_count  # #5387: THE session count — one gym visit
 
 from health import character_privacy, character_zone2, personal_baselines, protein_engine  # #5129 owner-only · #5214 · #5056 · #5389 Zone 2
 from health.calorie_target import target_kcal  # #5095: the ONE calorie target
+from health.character_headline import headline_level  # #6066: Step 6's exact mean, shared with the receipt replay
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,8 @@ logger = logging.getLogger(__name__)
 _config_cache: dict[str, Any] = {"data": None, "ts": 0}  # dict[str, Any]: heterogeneous, see #2638
 _CONFIG_TTL_S = 300  # 5 minutes
 
-ENGINE_VERSION = "1.8.0"  # #1411: fitted-not-authored — active effects carry fit_status/n_eff/CI badges (ADR-105)
+ENGINE_VERSION = "1.9.0"  # #6066: the headline mean is exact arithmetic — an exact integer boundary counts as reached
+# v1.8.0 — #1411: fitted-not-authored — active effects carry fit_status/n_eff/CI badges (ADR-105)
 # #1412 (no version bump — no transition-formula change): component targets may arrive
 # personalized via personal_baselines.apply_character_targets; _weighted_pillar_score
 # surfaces each target's derivation provenance into component details. Target values
@@ -1701,11 +1703,11 @@ PILLAR_COMPUTERS = {
     "relationships": compute_relationships_raw,
 }
 
-# The order compute_character_sheet builds and SUMS the pillars in (Step 1's computers, then Step 2's consistency
-# meta-pillar). It is part of the headline's arithmetic, not a presentation detail: the headline level is the FLOOR of a
-# float weighted mean, and at an exact integer boundary the sum's order decides the floor (2026-11-14: exactly 20 —
-# 19.999999999999996 in this order, 20.000000000000004 alphabetically). progression_receipts replays in this order.
+# The order compute_character_sheet builds the pillars in (Step 1's computers, then Step 2's consistency meta-pillar),
+# and the order progression_receipts replays them in. Until v1.9.0 the float sum's order decided the floor at an exact
+# boundary (2026-11-14); since #6066 the mean is exact (character_headline), so the order can no longer move the level.
 HEADLINE_PILLAR_ORDER = (*PILLAR_COMPUTERS, "consistency")
+
 
 # Keys a computed record carries that the sheet item never stores: the #1373 fire-time transition capture (it persists
 # to the receipt partition) and the public variant's own capture (owner ruling 2026-11-05, health.character_public).
@@ -2009,18 +2011,16 @@ def compute_character_sheet(
     # silently capping the reachable headline at floor(93.07) = 93 and pushing
     # Elite out of any horizon. Once a pillar earns its first level it counts
     # forever — going dark later drags honestly instead of vanishing.
-    weighted_level_sum = 0.0
-    total_weight = 0.0
+    # #6066 (v1.9.0): the mean is exact (headline_level) — an exact integer boundary counts as reached.
+    headline_terms = []
     headline_excluded = []
     for pillar_name, result in pillar_results.items():
         if result.get("not_instrumented") and result["level"] <= 1:
             headline_excluded.append(pillar_name)
             continue
-        weight = pillar_configs.get(pillar_name, {}).get("weight", 1.0 / 7)
-        weighted_level_sum += result["level"] * weight
-        total_weight += weight
+        headline_terms.append((result["level"], pillar_configs.get(pillar_name, {}).get("weight", 1.0 / 7)))
 
-    character_level = max(1, min(100, int(math.floor(weighted_level_sum / total_weight)))) if total_weight > 0 else 1
+    character_level = headline_level(headline_terms)
     character_tier = get_tier(character_level, config)
 
     prev_char_level = previous_day_state.get("character_level", 1) if previous_day_state else 1

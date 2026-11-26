@@ -40,6 +40,7 @@ from health.character_engine import (
     compute_ema_level_score,
     compute_relationships_raw,
     evaluate_level_changes,
+    headline_level,
     pillar_drivers,
 )
 
@@ -47,7 +48,7 @@ from health.character_engine import (
 
 
 def test_engine_version():
-    assert ENGINE_VERSION == "1.8.0"  # #1411: fitted-not-authored — active effects carry fit badges
+    assert ENGINE_VERSION == "1.9.0"  # #6066: exact headline mean — an exact integer boundary counts as reached
 
 
 # ── F-01: Confidence scoring ──
@@ -1111,3 +1112,75 @@ def test_zone2_adequacy_drops_tombstoned_rows_as_the_api_does():
     dead = _whoop_workout("2026-10-19", "w1", 45)
     dead["tombstone"] = True
     assert _z2_score({"date": "2026-10-20", "strava_7d": [], "whoop_7d": [dead]}) == 0.0
+
+
+# ── #6066 (v1.9.0): the headline mean is exact — an exact integer boundary counts as reached ──
+# Synthetic levels over the config's weights (config/character_sheet.json pillars, in hundredths); no stored day.
+
+_HEADLINE_WEIGHTS = {
+    "sleep": 0.2,
+    "movement": 0.18,
+    "nutrition": 0.18,
+    "metabolic": 0.12,
+    "mind": 0.15,
+    "relationships": 0.07,
+    "consistency": 0.1,
+}
+
+
+def test_headline_level_reads_an_exact_boundary_as_reached_in_every_order():
+    """Mean exactly 20 (Σ level·hundredths = 1860 = 20 × 93, relationships excluded): the float sum read 19 in the
+    compute's order; the exact mean reads 20 in all 720 orders, with float, Decimal (a DynamoDB read) or str weights."""
+    import itertools
+    from decimal import Decimal
+
+    levels = {"sleep": 17, "movement": 20, "nutrition": 23, "metabolic": 23, "mind": 20, "consistency": 17}
+    acc = tot = 0.0  # the pre-v1.9.0 accumulation, term by term (builtin sum() compensates since 3.12 — not the engine)
+    for n in levels:
+        acc += levels[n] * _HEADLINE_WEIGHTS[n]
+        tot += _HEADLINE_WEIGHTS[n]
+    assert math.floor(acc / tot) == 19  # non-vacuity: the float arithmetic floors it to 19 in this (the compute's) order
+    bad = []
+    for order in itertools.permutations(levels):
+        for cast in (float, lambda w: Decimal(str(w)), str):
+            got = headline_level([(levels[n], cast(_HEADLINE_WEIGHTS[n])) for n in order])
+            if got != 20:
+                bad.append((order, cast, got))
+    assert not bad, f"{len(bad)} reading(s) not 20, first: {bad[:3]}"
+    assert headline_level([]) == 1 and headline_level([(150, 0.5)]) == 100 and headline_level([(0, 0.5)]) == 1
+
+
+def test_headline_level_never_promotes_a_mean_genuinely_below_the_boundary():
+    """The no-promotion proof. With the config's weights c (hundredths) the exact mean is K/W, K = Σ level·c and
+    W = Σ c ≤ 100 over the included pillars, so the LARGEST value under N+1 any input can produce is N+1 − 1/W
+    (N + 0.99 with all seven pillars, N + 92/93 with six). headline_level must equal the integer floor K // W on every
+    pillar subset — including draws that land exactly on N+1 − 1/W, which must read N, not N+1."""
+    import itertools
+    import random
+
+    rng = random.Random(6066)
+    cents = {n: round(w * 100) for n, w in _HEADLINE_WEIGHTS.items()}
+    assert sum(cents.values()) == 100
+    wrong, largest_sub_boundary_hits = [], 0
+    for r in range(1, len(cents) + 1):
+        for subset in itertools.combinations(cents, r):
+            W = sum(cents[n] for n in subset)
+            for _ in range(300):
+                levels = {n: rng.randint(1, 100) for n in subset}
+                K = sum(levels[n] * cents[n] for n in subset)
+                order = list(subset)
+                rng.shuffle(order)
+                got = headline_level([(levels[n], _HEADLINE_WEIGHTS[n]) for n in order])
+                if got != max(1, min(100, K // W)):
+                    wrong.append((subset, levels, got))
+                if W > 1 and K % W == W - 1:
+                    largest_sub_boundary_hits += 1  # mean == K//W + 1 − 1/W: as close under the boundary as W allows
+    assert not wrong, f"{len(wrong)} disagreement(s) with exact integer floor, first: {wrong[:3]}"
+    assert largest_sub_boundary_hits > 0  # non-vacuity: the sweep did reach the largest sub-boundary means
+    # The explicit worst cases: N+1 − 1/W for the full set (W=100) and the six instrumented pillars (W=93), N = 19.
+    six = {"sleep": 18, "movement": 18, "nutrition": 22, "metabolic": 22, "mind": 21, "consistency": 20}
+    assert sum(six[n] * cents[n] for n in six) == 20 * 93 - 1
+    assert headline_level([(six[n], _HEADLINE_WEIGHTS[n]) for n in six]) == 19
+    seven = dict(six, relationships=20)
+    assert sum(seven[n] * cents[n] for n in seven) == 20 * 100 - 1
+    assert headline_level([(seven[n], _HEADLINE_WEIGHTS[n]) for n in seven]) == 19
