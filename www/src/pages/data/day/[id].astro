@@ -251,9 +251,11 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
           </div>
           <div class="tile">
             <span class="label">The engine's score</span>
-            <span class={`v num${engine ? "" : " muted"}`}>
-              {engine ? (d.engine.pending ? "Being recalculated" : `Level ${num(d.engine.level, 0)}`) : "—"}
-              {engine && d.engine.composite != null && <small> · {num(d.engine.composite, 1)}</small>}
+            <span class={`v num${engine && !d.engine.pending ? "" : " muted"}`}>
+              {/* #6224: the pending state is a dash with a small caption. The words at the 40px figure size overflowed a 390px screen by 28px and rolled back every root deploy (2026-11-26). */}
+              {engine && !d.engine.pending ? `Level ${num(d.engine.level, 0)}` : "—"}
+              {engine && d.engine.pending && <small> being recalculated</small>}
+              {engine && !d.engine.pending && d.engine.composite != null && <small> · {num(d.engine.composite, 1)}</small>}
             </span>
             <span class="d mono">
               {
@@ -451,7 +453,7 @@ const provenance = { state: d.state, as_of: d.as_of, data_through: d.data_throug
               <>
                 <p class="small">{engine.line}.</p>
                 {engine.rows.map((r) => (
-                  <div class="bar-row">
+                  <div class={`bar-row${r.absent && String(r.value).length > 8 ? " stated" : ""}`}>
                     <span class="k">{r.label}</span>
                     <span class="t" aria-hidden="true">
                       {!r.absent && <i class={r.low ? "low" : undefined} style={`width:${r.width.toFixed(1)}%`} />}

@@ -1497,6 +1497,15 @@ details.more summary {
   color: var(--muted);
   font-size: var(--fs-small);
 }
+/* #6224: a stated row ("not scored in public", "being recalculated") has no bar to draw; its words take the track
+   and value columns. In the 56px value column they overflowed a 390px screen by 33px and every root deploy rolled back. */
+.bar-row.stated .t {
+  display: none;
+}
+.bar-row.stated .v {
+  grid-column: 2 / -1;
+  text-align: left;
+}
 .bar-row .t {
   height: 12px;
   background: var(--paper);
