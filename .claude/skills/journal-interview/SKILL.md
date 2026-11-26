@@ -76,6 +76,19 @@ CHAT_MODES.md's verbatim/skip rules for the distinction). Do not invent detail h
 give you — a composed journal entry is still a narrative surface (ADR-104's
 grounded-generation posture applies).
 
+### 3b. Show him the entry before it is written
+
+Paste the composed entry in the chat, with the date and template it will carry. He corrects
+it in plain words; revise and show the whole entry again until he says it is right. Only on
+his explicit yes do you go to step 4. No yes → nothing is written, and that is a normal
+ending.
+
+- The entry contains only what he said. Add no feeling, reason or detail he did not give;
+  keep his exact phrases where they carry the meaning.
+- Say once, the first time in a session: a page in the journal database is read by the
+  platform's enrichment and can reach the journal coach. If he wants something kept out of
+  that, it belongs in a `reflect` conversation's private record, not in this entry.
+
 ### 4. Write the page — the date-key gotcha is load-bearing, don't skip it
 
 Call `notion-create-pages` with:

@@ -69,7 +69,16 @@ Compose ONE dated markdown brief with exactly these sections:
    substances/vices per the sensitive-content policy). This section is what makes the
    brief publication-ready-WITH-guardrails.
 
-Store it (S3 path above). Confirm the upload out loud with the exact key.
+**Review before anything is stored.** Show him the complete brief in the chat first. He
+corrects it in plain words; revise and show it again until he says it is right. He may also
+say "don't keep this". Only on his explicit yes: store it (S3 path above) and confirm the
+upload out loud with the exact key. No yes → nothing is written anywhere, and that is a
+normal ending.
+
+Keep the kinds of content apart inside the brief: his exact words are in quotation marks,
+events and dates are marked confirmed or recollection, and anything that is your reading
+sits only in the editorial-notes section, labelled as yours. Never write first-person text
+he did not say.
 
 ### 4. Close — cross-links, all optional
 
@@ -78,11 +87,17 @@ Store it (S3 path above). Confirm the upload out loud with the exact key.
   publishing stays gated on Matthew regardless.
 - **Quote nomination:** flag 1-3 quotes that could someday be public, for his explicit
   clearance — cleared ones go in the brief's editorial section as pre-approved.
-- **Coach context:** one `write_platform_memory` line (allude tier — "milestone
-  interview <date>, themes: <3-5 words>"; no quotes, no substance) so coaches know the
-  ritual happened without reading it.
-- Log the ritual itself via `log_decision` if the interview produced a call, or
-  `save_insight` if it surfaced a pattern.
+- **Coach context — only if he wants the coaches to know:** private is the default, and
+  keeping the brief is not permission to share anything from it with the coaches. If he
+  says yes, queue ONE line with `manage_pending_writes` (`enqueue`, target
+  `write_platform_memory`: "milestone interview <date>, themes: <3-5 words>"; no quotes, no
+  substance), show it, and `approve` only on his yes.
+- A call the interview produced goes to `log_decision`, a pattern to `save_insight` — each
+  only if he says so, shown to him first, through the same queue.
+
+For the varied reflective modes (relationships, work and purpose, values, strengths, a
+pattern in the data, a short journal), use `.claude/skills/reflect/SKILL.md`; this skill
+stays the long-form milestone interview.
 
 ### 5. Cadence + triggers
 
