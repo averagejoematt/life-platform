@@ -736,6 +736,7 @@ def _character(table, wk: Dict[str, Any]) -> Dict[str, Any]:
         "pillar_levels_end": {
             p: _f((last.get(f"pillar_{p}") or {}).get("level"))
             for p in ("sleep", "movement", "nutrition", "metabolic", "mind", "consistency")
+            if not character_privacy.is_not_scored(last.get(f"pillar_{p}"))  # #6224: Mind is not scored in public
         },
         "level_events": events[:8],
         "note": "texture only — a reader does not know this vocabulary; use sparingly",

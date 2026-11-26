@@ -115,8 +115,10 @@ def test_handle_character_instrumented_pillar_unaffected(monkeypatch):
     assert met["not_instrumented"] is False and met["not_instrumented_note"] is None and met["raw_score"] == 62.0
     rel = next(p for p in body["pillars"] if p["name"] == "relationships")
     assert rel["not_instrumented"] is True and rel["raw_score"] == 50.0
-    # six public pillars: the composite is their average
-    assert body["character"]["composite_score"] == round((70.0 * 5 + 62.0) / 6, 1)
+    # five scored public pillars: the composite is their average (#6224: Mind is not scored in public, so it is out)
+    mind = next(p for p in body["pillars"] if p["name"] == "mind")
+    assert mind["not_scored"] is True and mind["raw_score"] is None and mind["level"] is None
+    assert body["character"]["composite_score"] == round((70.0 * 4 + 62.0) / 5, 1)
 
 
 def test_handle_character_pre_genesis_record_serves_zeroed_sheet(monkeypatch):

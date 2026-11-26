@@ -228,7 +228,11 @@ def lambda_handler(event: dict, context) -> dict:
 
         today_str = pacific_today()
         data = eng.gather_data(days=LOOKBACK_DAYS)
-        rows = eng.build_data_narrative(data)
+        try:  # #6224: the registry marks restraint habits, which habit_pct leaves out (habit_pct_public v2)
+            registry = (eng.fetch_profile() or {}).get("habit_registry") or {}
+        except Exception:  # noqa: BLE001 — without it the tracker group still marks them; never a reason to fail the run
+            registry = {}
+        rows = eng.build_data_narrative(data, registry)
         rows_by_date = {r["date"]: r for r in rows if r.get("date")}
 
         payload = build_payload(rows_by_date, today_str)

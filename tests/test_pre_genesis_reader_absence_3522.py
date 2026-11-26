@@ -152,10 +152,11 @@ def test_a_real_sheet_is_untouched(monkeypatch):
         monkeypatch.setattr(mod, "EXPERIMENT_START", _iso(_today_pt() - timedelta(days=30)), raising=False)
     monkeypatch.setattr(vitals, "table", _Table(), raising=False)
     b = _body(vitals.handle_character())
-    # relationships (index 5) reads only private sources: served held (owner rulings 2026-11-03/04)
-    assert [p["raw_score"] for p in b["pillars"]] == [40, 45, 50, 55, 60, 50, 70]
+    # relationships (index 5) reads only private sources: served held (owner rulings 2026-11-03/04); Mind (index 4) is
+    # not scored in public (#6224, owner rulings 2026-11-26): no score at all
+    assert [p["raw_score"] for p in b["pillars"]] == [40, 45, 50, 55, None, 50, 70]
     for p in b["pillars"]:
-        held = p["name"] == "relationships"
+        held = p["name"] in ("relationships", "mind")
         assert p["not_instrumented"] is held
         assert p["coverage_hold"] is held
 

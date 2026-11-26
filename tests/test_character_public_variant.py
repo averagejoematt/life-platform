@@ -156,6 +156,8 @@ def test_public_receipts_are_byte_identical(histories):
 
 def test_mutation_control_a_public_method_that_kept_the_private_components_would_move(histories, monkeypatch):
     quiet, private, _q, _p = histories
+    # #6224: v2 does not score Mind at all, so the control also reopens Mind's scoring (the v1 arithmetic)
+    monkeypatch.setattr(character_public, "UNSCORED_PILLARS", ())
     monkeypatch.setattr(character_public, "mind_component_is_public", lambda name: name in character_public.MIND_COMPONENT_SOURCES)
     assert _canon(_public_blocks(_replay(quiet))) != _canon(_public_blocks(_replay(private)))
 
@@ -260,7 +262,8 @@ def test_public_sheet_serves_the_variant_and_never_method1(histories):
     _quiet, private, _q, p = histories
     d = _days()[10]
     view = character_privacy.public_sheet(_stored(private[d], p[d]["public"]))
-    assert view["pillar_mind"]["raw_score"] == p[d]["public"]["pillar_mind"]["raw_score"]
+    # #6224: Mind is not scored in public — the variant stores the not-scored shape and the view serves it
+    assert view["pillar_mind"] == p[d]["public"]["pillar_mind"] == character_privacy.not_scored_pillar("mind")
     assert view["character_xp"] == p[d]["public"]["character_xp"]
     assert view["date"] == d and view["public_method_version"] == character_privacy.PUBLIC_METHOD_VERSION
     assert character_privacy.public_sheet(private[d]) is None  # no variant: nothing (fail closed)

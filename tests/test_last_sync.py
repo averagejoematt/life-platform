@@ -58,7 +58,11 @@ def test_every_registry_source_rendered(monkeypatch):
     automatically. The front-end applies no filter (pinned below)."""
     body = _body(monkeypatch, {})
     ids = [s["id"] for s in body["sources"]]
-    expected = set(public_board_sources()) | set(public_paused_sources())
+    from common import activity_publication as AP
+
+    # every registry source the activity policy classifies public (#6224: the food-delivery source is private)
+    expected = set(AP.public_mapping(public_board_sources())) | set(AP.public_mapping(public_paused_sources()))
+    assert "food_delivery" not in expected
     assert set(ids) == expected
     assert len(ids) == len(expected)  # no dupes, count matches the registry
 

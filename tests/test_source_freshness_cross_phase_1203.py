@@ -97,10 +97,9 @@ def test_source_freshness_reports_true_last_update_for_pilot_only_source(monkeyp
     assert md["status"] == "behavioral-stale"  # behavioral — never a broken-pipe stamp
     assert isinstance(md["days_dark"], int) and md["days_dark"] > 0
 
-    # food_delivery is the other pre-cycle-dark manual source called out in the issue.
-    fd = by["food_delivery"]
-    assert fd["last_update"] == _PILOT_DATE
-    assert isinstance(fd["days_dark"], int) and fd["days_dark"] > 0
+    # food_delivery was the other pre-cycle-dark manual source called out in the issue. #6224 (owner ruling 2026-11-26):
+    # its last-recorded date is private, so the source is omitted from the public board altogether.
+    assert "food_delivery" not in by
 
 
 def test_last_sync_reports_true_last_seen_for_pilot_only_source(monkeypatch):

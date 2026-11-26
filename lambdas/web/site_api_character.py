@@ -118,6 +118,46 @@ def _attach_pillar_absence(pillars, *, table, now, window_start) -> None:
             p["absence"] = a
 
 
+def _not_scored_row(name: str, emoji: str, pd: dict) -> dict:
+    """#6224: the /api/character row of a pillar the public method does not score — the same keys as a scored row, every
+    number None, the reason in ``not_scored_note`` (and ``not_instrumented_note``, which the readers already print)."""
+    note = pd.get("not_scored_note") or character_privacy.UNSCORED_PUBLIC_PILLARS.get(name)
+    return {
+        "name": name,
+        "emoji": emoji,
+        "level": None,
+        "raw_score": None,
+        "tier": None,
+        "xp_delta": None,
+        "xp_earned": None,
+        "score_delta": None,
+        "data_coverage": None,
+        "coverage_hold": True,
+        "not_instrumented": True,
+        "not_instrumented_note": note,
+        "not_scored": True,
+        "not_scored_note": note,
+        "absent_behaviors": [],
+        "xp_debt": None,
+        "neglect_decay": None,
+        "drivers": {"top": [], "dragging": [], "absent": [], "no_data": []},
+    }
+
+
+def _composite_note(pillars: list, count: int, total: int) -> "str | None":
+    """DIL-049 D4: what the composite averages over, said as a sentence — and since #6224, WHY a pillar is out: one the
+    public method does not score (its inputs are private) is named as such, not called uninstrumented."""
+    if count >= total:
+        return None
+    unscored = [str(p["name"]).capitalize() for p in pillars if p.get("not_scored")]
+    held = total - count - len(unscored)
+    parts = [f"{n} (not scored in public: its inputs are private)" for n in unscored]
+    if held:
+        parts.append(f"{held} not yet instrumented pillar(s)")
+    verb = "is" if total - count == 1 else "are"
+    return f"composite_score is the mean of {count} of {total} pillars — {' and '.join(parts)} {verb} excluded, not averaged in at a neutral score."
+
+
 def character(date: str | None = None, *, _g) -> dict:
     """
     GET /api/character[?date=YYYY-MM-DD]
@@ -238,6 +278,11 @@ def character(date: str | None = None, *, _g) -> dict:
     pillars = []
     for p in PILLAR_ORDER:
         pd = record.get(f"pillar_{p}", {})
+        if character_privacy.is_not_scored(pd):
+            # #6224 (owner rulings 2026-11-26): a pillar the public method does not score — the reason, the held flags
+            # every renderer's held branch reads, and no number (never a 0 or a level-1 default that reads as a score).
+            pillars.append(_not_scored_row(p, PILLAR_EMOJI.get(p, ""), pd))
+            continue
         _drivers = pd.get("drivers") or {}
         pillars.append(
             {
@@ -301,7 +346,7 @@ def character(date: str | None = None, *, _g) -> dict:
     composite = (
         sum(_composite_scores) / len(_composite_scores)
         if _composite_scores
-        else sum(p["raw_score"] for p in pillars) / max(len(pillars), 1)
+        else sum(p["raw_score"] or 0 for p in pillars) / max(len(pillars), 1)
     )
     # DIL-049 (D4 score-transparency, cheap half): the rule for what the composite
     # averages over is already stated on /method/game ("renormalized over the
@@ -316,27 +361,25 @@ def character(date: str | None = None, *, _g) -> dict:
     # part that goes quiet once every pillar is instrumented.
     _composite_pillar_count = len(_composite_scores)
     _composite_pillar_total = len(pillars)
-    composite_note = (
-        f"composite_score is the mean of {_composite_pillar_count} of {_composite_pillar_total} pillars — "
-        f"{_composite_pillar_total - _composite_pillar_count} not yet instrumented pillar(s) are excluded, not averaged in at a neutral score."
-        if _composite_pillar_count < _composite_pillar_total
-        else None
-    )
+    composite_note = _composite_note(pillars, _composite_pillar_count, _composite_pillar_total)
     composite_delta_1d = None
     if prior_record:
-        _yd_scores = [float(prior_record.get(f"pillar_{p}", {}).get("raw_score", 0)) for p in PILLAR_ORDER]
+        _yd_raw = [(prior_record.get(f"pillar_{p}") or {}).get("raw_score") for p in PILLAR_ORDER]
+        _yd_scores = [float(v) if v is not None else None for v in _yd_raw]
         _yd_composite_scores = [
-            float(prior_record.get(f"pillar_{p}", {}).get("raw_score", 0))
+            float((prior_record.get(f"pillar_{p}") or {}).get("raw_score", 0))
             for p in PILLAR_ORDER
-            if not prior_record.get(f"pillar_{p}", {}).get("not_instrumented")
+            if not (prior_record.get(f"pillar_{p}") or {}).get("not_instrumented")
         ]
         _yd_composite = (
-            sum(_yd_composite_scores) / len(_yd_composite_scores) if _yd_composite_scores else sum(_yd_scores) / max(len(_yd_scores), 1)
+            sum(_yd_composite_scores) / len(_yd_composite_scores)
+            if _yd_composite_scores
+            else sum(v or 0 for v in _yd_scores) / max(len(_yd_scores), 1)
         )
         composite_delta_1d = round(composite - _yd_composite, 1)
-        # per-pillar day-over-day score move (aligned by PILLAR_ORDER)
+        # per-pillar day-over-day score move (aligned by PILLAR_ORDER); none for a pillar with no public score (#6224)
         for _pp, _yd_s in zip(pillars, _yd_scores):
-            _pp["score_delta"] = round(_pp["raw_score"] - _yd_s, 1)
+            _pp["score_delta"] = round(_pp["raw_score"] - _yd_s, 1) if _pp["raw_score"] is not None and _yd_s is not None else None
 
     # #2388 — the honest-absence state, derived HERE because it is a fact about the
     # ingestion registry (per-source `stale_hours`), not about the score. Without it the
@@ -462,6 +505,7 @@ def _public_method(table) -> dict:
         "version": character_privacy.PUBLIC_METHOD_VERSION,
         "effective_from": character_privacy.PUBLIC_METHOD_EFFECTIVE_FROM,
         "history": [dict(m) for m in character_privacy.PUBLIC_METHOD_HISTORY],
+        "unscored_pillars": dict(character_privacy.UNSCORED_PUBLIC_PILLARS),  # #6224: not scored in public, and why
         "correction": public_corrections.served_ledger(item),
     }
 
@@ -512,7 +556,12 @@ def character_config(*, _g) -> dict:
             "weight": p.get("weight"),
             "ema_lambda": p.get("ema_lambda"),
             "components": {cn: _component_out(cv) for cn, cv in (p.get("components") or {}).items()},
+            # #6224: whether the PUBLIC method scores this pillar (the weights above are the engine's; an unscored
+            # pillar's weight is not in the public headline mean, which renormalises over the scored ones)
+            "scored_in_public": character_privacy.pillar_scored_in_public(name),
         }
+        if not character_privacy.pillar_scored_in_public(name):
+            pillars_out[name]["not_scored_note"] = character_privacy.UNSCORED_PUBLIC_PILLARS[name]
     leveling = {k: v for k, v in (cfg.get("leveling") or {}).items() if k in _CHAR_CONFIG_LEVELING_KEYS}
     tiers = [{"name": t.get("name"), "min_level": t.get("min_level"), "max_level": t.get("max_level")} for t in cfg.get("tiers") or []]
     # #1411 (ADR-105): merge the latest quarterly effect fit so the sheet's
@@ -709,6 +758,16 @@ def character_stats(*, _g) -> dict:
     pillars = {}
     for p in PILLARS:
         pd = record.get(f"pillar_{p}", {})
+        if character_privacy.is_not_scored(pd):  # #6224: the reason, never a number
+            pillars[p] = {
+                "level": None,
+                "raw_score": None,
+                "tier": None,
+                "not_instrumented": True,
+                "not_scored": True,
+                "not_scored_note": pd.get("not_scored_note"),
+            }
+            continue
         pillars[p] = {
             "level": float(pd.get("level", 1)),
             # owner ruling 2026-11-06: an unavailable pillar (no measurement) serves no score, never a placeholder

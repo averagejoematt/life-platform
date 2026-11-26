@@ -419,7 +419,7 @@
       "id": "2026-w45-habit-completion-recovery",
       "level": "high",
       "methods": {
-        "habit_pct": "habit-pct-public-v1"
+        "habit_pct": "habit-pct-public-v2"
       },
       "metric_a": "Habit Completion",
       "metric_b": "Recovery",

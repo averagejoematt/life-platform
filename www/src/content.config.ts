@@ -399,7 +399,8 @@ const engine = z
     level: z.number(),
     composite: n,
     delta: n,
-    pillars: z.array(z.object({ name: z.string().min(1), score: n, not_instrumented: z.boolean() }).strict()),
+    // #6224: `not_scored` (Mind, owner rulings 2026-11-26) is sent only for a pillar the public method does not score.
+    pillars: z.array(z.object({ name: z.string().min(1), score: n, not_instrumented: z.boolean(), not_scored: z.literal(true).optional() }).strict()),
     // owner ruling 2026-11-05: which method computed the score (character_privacy.PUBLIC_METHOD_LABELS), or null
     method: z.string().min(1).nullable(),
   })

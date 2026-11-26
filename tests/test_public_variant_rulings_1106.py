@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.join(ROOT, "tests"))
 import backfill_public_variant as B  # noqa: E402
 import test_character_public_variant as T  # noqa: E402 — the two-history fixtures
 from common import activity_publication as A  # noqa: E402
-from health import character_engine, character_public, core_habits, habit_pct_public  # noqa: E402
+from health import character_engine, character_privacy, character_public, core_habits, habit_pct_public  # noqa: E402
 
 histories = T.histories  # the module-scoped fixture
 CONFIG = T.CONFIG
@@ -123,7 +123,10 @@ def test_the_unavailable_mind_leaves_the_composite_and_routes_serve_no_score(his
     items = [dict(quiet[d], pk=B.SHEET_PK, **{B.PUBLIC: block})]
     body = json.loads(T._served(monkeypatch, items, lambda: V.handle_character(None)))
     mind = next(p for p in body["pillars"] if p["name"] == "mind")
-    assert mind["not_instrumented"] is True and mind["not_instrumented_note"] == character_public.UNAVAILABLE_NOTE
+    # #6224 (owner rulings 2026-11-26): Mind is not scored in public — whatever the stored block says, it is served in the
+    # not-scored shape (the 2026-11-06 unavailable state is the same held branch, with the reason it is not scored)
+    assert mind["not_instrumented"] is True and mind["not_scored"] is True and mind["raw_score"] is None
+    assert mind["not_instrumented_note"] == character_privacy.UNSCORED_PUBLIC_PILLARS["mind"]
     measured = [p for p in body["pillars"] if not p["not_instrumented"]]
     assert "mind" not in {p["name"] for p in measured} and body["character"]["composite_pillar_count"] == len(measured)
     assert body["character"]["composite_score"] == round(sum(p["raw_score"] for p in measured) / len(measured), 1)
@@ -221,7 +224,7 @@ def test_the_published_habit_pct_readers_use_the_public_method(monkeypatch):
         monkeypatch.setattr(wc, "fetch_range", lambda source, s, e, stub=stub: stub.get(source, []))
         assert wc.assemble_daily_series("2026-10-01", "2026-10-01")["2026-10-01"]["habit_pct"] == 0.5
     src = open(os.path.join(ROOT, "lambdas", "compute", "hypothesis_engine_lambda.py"), encoding="utf-8").read()
-    assert "habit_pct_public.public_habit_pct(hab)" in src
+    assert "habit_pct_public.public_habit_pct(hab, registry, window=" in src  # #6224: v2, restraint habits out too
 
 
 def test_the_backfill_reconstructs_the_fixed_order_from_the_stored_habit_scores():

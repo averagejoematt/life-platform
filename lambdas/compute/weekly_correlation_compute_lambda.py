@@ -52,6 +52,7 @@ from decimal import Decimal
 
 import boto3
 from common import (
+    activity_publication,  # #6224: the public tier-0 predicate + the tier0_streak method stamp
     digest_utils,  # shared query_range implementations (#970)
     stats_core,  # bundled shared module (#529): the one sanctioned stats implementation
 )
@@ -226,10 +227,45 @@ def interpret_r(r, n=None):
 # ==============================================================================
 
 
-def assemble_daily_series(start_date, end_date):
+# #6224: the public tier-0 run looks this far back before the window, so a run alive on the window's first day is not
+# truncated to the window (a run longer than this is reported at this length — a lower bound, the same cap the public
+# /api/habit_streaks walk uses).
+TIER0_RUN_LOOKBACK_DAYS = 366
+
+
+def fetch_habit_registry():
+    """The owner's habit registry (``PROFILE#v1.habit_registry``) by Query, or None when it cannot be read (#6224: the
+    public tier-0 run needs tier membership and the restraint flags; without them no public run is computed)."""
+    try:
+        resp = table.query(
+            KeyConditionExpression="pk = :pk AND sk = :sk",
+            ExpressionAttributeValues={":pk": f"USER#{USER_ID}", ":sk": "PROFILE#v1"},
+            Limit=1,
+        )
+        items = resp.get("Items") or []
+        return (items[0] or {}).get("habit_registry") or {} if items else {}
+    except Exception as e:
+        logger.warning("habit registry read failed (no public tier-0 run this week): %s", e)
+        return None
+
+
+def public_tier0_streaks(habitify_rows, registry, restraints, days, floor):
+    """``{day: public run}`` for each day in ``days`` (#6224): the run of perfect PUBLIC tier-0 days ending that day,
+    through THE shared predicate (``activity_publication.public_tier0_by_date`` / ``public_tier0_run``) — restraint
+    habits are in neither the numerator nor the denominator. The stored ``computed_metrics.tier0_streak`` counts them,
+    so it is not read."""
+    by_date = activity_publication.public_tier0_by_date(habitify_rows, registry, restraints)
+    return {d: float(activity_publication.public_tier0_run(by_date, d, floor)) for d in days}
+
+
+def assemble_daily_series(start_date, end_date, registry=None):
     """
     Fetch all source records for the lookback window and build a
     date-keyed dict of extracted metric values.
+
+    ``registry`` (#6224): the owner's habit registry. With it, ``tier0_streak`` is the PUBLIC run and ``habit_pct`` leaves
+    out every restraint habit the registry flags; without it (None) no ``tier0_streak`` is computed (fail closed) and
+    habit_pct leaves out the restraint habits the tracker group and the stored streak keys mark.
 
     Returns: dict[date_str → dict[metric_name → float]]
     """
@@ -250,6 +286,16 @@ def assemble_daily_series(start_date, end_date):
     }
     # #5398: the Hevy rows (the routine source, #5369) anchor a gym visit for THE session count behind training_mins
     visit_mins = training_mins_series.visit_minutes_by_date(sources["strava"], fetch_range("hevy", start_date, end_date))
+    # #6224: one restraint set for the window — the tracker groups, the registry flags, every stored streak key.
+    streak_keys = {str(k) for r in fetch_range("habit_scores", start_date, end_date) for k in ((r or {}).get("vice_streaks") or {})}
+    restraints = habit_pct_public.window_restraints(sources["habitify"], registry or {}, streak_keys)
+    tier0_runs = {}
+    if registry is not None:
+        run_floor = (datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=TIER0_RUN_LOOKBACK_DAYS)).strftime("%Y-%m-%d")
+        run_rows = fetch_range("habitify", run_floor, end_date)
+        restraints = habit_pct_public.window_restraints(run_rows, registry, restraints)
+        run_days = [r.get("date") or str(r.get("sk", "")).replace("DATE#", "")[:10] for r in sources["habitify"]]
+        tier0_runs = public_tier0_streaks(run_rows, registry, restraints, [d for d in run_days if d], run_floor)
 
     # Build date-indexed lookup per source
     by_date = {}
@@ -310,16 +356,17 @@ def assemble_daily_series(start_date, end_date):
         # ── Composite / Computed ──────────────────────────────────────────
         metrics["day_grade"] = day_grade_public.public_score(src_map.get("day_grade"))  # owner ruling 2026-11-05: public variant only
         metrics["readiness"] = safe_float(cm, "readiness_score")
-        metrics["tier0_streak"] = safe_float(cm, "tier0_streak")
+        # #6224: the PUBLIC run (restraint habits out, ``public_tier0_streaks``) — never the stored computed_metrics one.
+        metrics["tier0_streak"] = tier0_runs.get(d)
         # #1843: video-diary/solo-recording session count — the diary-as-intervention
         # candidate variable. safe_float only returns None when the key is absent
         # (pre-#1843 days), so 0 (an honest no-session day) survives as 0.0.
         metrics["diary_sessions"] = safe_float(cm, "diary_sessions")
 
         # ── Habits ────────────────────────────────────────────────────────
-        # Owner ruling 2026-11-06: over PUBLIC habits only (health.habit_pct_public, habit-pct-public-v1) — the
-        # Morning/Evening Journal habits never count; a day with no public habit has no value, never a 0.
-        metrics["habit_pct"] = habit_pct_public.public_habit_pct(hab) if hab else None
+        # Owner rulings 2026-11-06/26: over PUBLIC, non-restraint habits only (health.habit_pct_public v2) — the
+        # Morning/Evening Journal habits and every restraint habit never count; no public habit is no value, never a 0.
+        metrics["habit_pct"] = habit_pct_public.public_habit_pct(hab, registry or {}, restraints) if hab else None
 
         # ── Cross-domain (#1406) ──────────────────────────────────────────
         # Glucose variability = %CV. Prefer the ingestion-persisted CV (computed
@@ -600,7 +647,11 @@ def store_correlations(week_key, correlations, start_date, end_date, computed_at
         "end_date": end_date,
         "lookback_days": Decimal(str(LOOKBACK_DAYS)),
         # Owner rulings 2026-11-05/06: the versioned methods behind the two derived metrics (the correction record)
-        "metric_methods": {"day_grade": day_grade_public.METHOD_VERSION, "habit_pct": habit_pct_public.METHOD_VERSION},
+        "metric_methods": {
+            "day_grade": day_grade_public.METHOD_VERSION,
+            "habit_pct": habit_pct_public.METHOD_VERSION,
+            "tier0_streak": activity_publication.TIER0_STREAK_PUBLIC_METHOD,  # #6224: the public run, restraint habits out
+        },
         "n_pairs": Decimal(str(len(correlations))),
         "correlations": _dec_correlations(correlations),
         "computed_at": computed_at,
@@ -1157,7 +1208,7 @@ def lambda_handler(event, context):
 
     # Assemble daily metric series
     logger.info("Fetching source data...")
-    series = assemble_daily_series(start_date, end_date)
+    series = assemble_daily_series(start_date, end_date, registry=fetch_habit_registry())
     logger.info("Assembled %d days of data", len(series))
 
     if len(series) < experiment_gates.CORRELATION_MIN_N:

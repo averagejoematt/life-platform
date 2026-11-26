@@ -696,17 +696,23 @@ def journey_waveform(*, _g) -> dict:
         if not date_str:
             continue
         total = 0.0
+        scored = 0
         for pillar in PILLARS:
             pdata = item.get(pillar, {})
             # boto3 Table resource returns already-deserialized Python values
             if isinstance(pdata, dict):
+                if character_privacy.is_not_scored(pdata):
+                    continue  # #6224: Mind is not scored in public — out of the sum, never a 0
+                scored += 1
                 ls = pdata.get("level_score")
                 if ls is not None:
                     try:
                         total += float(ls)
                     except (TypeError, ValueError):
                         pass
-        by_date[date_str] = round(total, 1)
+        # #6224: the sum keeps its 0–700 scale (and the colour bands their meaning) when a pillar is not scored in
+        # public — renormalised over the scored pillars, the composite's rule, never with the pillar at a neutral score.
+        by_date[date_str] = round(total * len(PILLARS) / scored, 1) if scored else 0.0
 
     # Build ordered genesis→today series (one point per experiment day)
     days = []

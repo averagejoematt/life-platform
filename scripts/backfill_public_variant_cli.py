@@ -560,10 +560,9 @@ def main(argv: list) -> int:
     if not args.skip_routes:
         manifest["routes"] = route_outputs(table, snap, char, receipts)
     plan = B.plan_writes(char, grades, set(snap["receipts"]), receipts)
-    without_habits = B.replay_character(snap["sheets"], snap["engagement"], snap["habit_scores"], config, run_ts, order_fix=False)
-    ledger_item = B.public_corrections.build_ledger(
-        {d: r["public"] for d, r in without_habits.items()}, {d: r["public"] for d, r in char.items()}, run_ts[:10]
-    )
+    # #6224: the v2 ledger carries the range, the count and the reasons — no per-date before/after (a v1 "before"
+    # included Mind, whose inputs are private; public_corrections.build_ledger).
+    ledger_item = B.public_corrections.build_ledger({d: r["public"] for d, r in char.items()}, run_ts[:10])
     _write(os.path.join(args.out, "public_correction_ledger.json"), ledger_item)
     stored = {(B.SHEET_PK, f"DATE#{d}"): r for d, r in snap["sheets"].items()}
     stored.update({(B.RECEIPT_PK, f"DATE#{d}"): r for d, r in snap["receipts"].items()})

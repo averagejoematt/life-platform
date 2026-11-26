@@ -1179,7 +1179,8 @@ class TestHandlerFullCompute:
         assert [h["week_end"] for h in history] == ["2026-07-28", DATE]
         assert history[-1]["week_start"] == "2026-08-03"  # Monday of the week
         assert history[-1]["week_label"].startswith("Wk ")
-        assert set(history[-1]["pillars"]) == set(csl.PILLAR_ORDER)
+        # #6224: Mind is not scored in public — it has no weekly value (omitted, never a 0)
+        assert set(history[-1]["pillars"]) == set(csl.PILLAR_ORDER) - {"mind"}
         assert history[0]["pillars"]["sleep"] == 45.0
 
     def test_site_writer_failure_never_fails_the_compute(self, monkeypatch, wired):

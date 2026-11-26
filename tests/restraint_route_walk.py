@@ -31,6 +31,13 @@ public route's body to be identical across the two states. The stored ingest rol
 stored tier-0 counts and streak are recomputed per state the way the ingest and the scorer write them, so a route that
 reads a stored figure which counted a restraint habit moves and fails by name.
 
+`--fd early|late` is the FOOD-DELIVERY axis (#6224, owner ruling 2026-11-26: the food-delivery source's last-recorded
+date is private): only the food_delivery partition's newest row and the stored character manifest's food_delivery
+`latest_day` move (two dates far apart), so a route that says when that source last recorded moves and fails.
+`--fd-public` is its control (the source re-classified public, the state before the ruling). `--mind-scored` is the
+control for the Mind assertion (#6224: Mind is not scored in public): `public_sheet` stops replacing Mind with the
+not-scored shape, so the stored variant's Mind numbers reach the character routes and `mind_numbers` must see them.
+
 `--ungated` is the mutation control: the policy names every restraint habit (`category()` answers for
 all of them). The same walk must then find the canaries on the routes the policy governs — so the test
 proves it can see a reintroduced label on each of them, and pins WHICH routes the policy governs.
@@ -93,6 +100,8 @@ def tokens() -> list:
 
 
 STATE: dict = {"value": None}  # None: the label walk's mixed pattern; "low" | "high": the invariance axis (#6224)
+FD: dict = {"day_offset": None}  # #6224: days before today of the food_delivery partition's newest row (None: no row)
+FD_OFFSETS = {"early": 200, "late": 120}
 
 # #6224: what a stored pre-#6224 public character variant carried — a cross-pillar effect read from the restraint
 # streaks, the restraint component on Mind's driver list and component details, and a level event naming it. Planted on
@@ -120,13 +129,32 @@ def _plant_character(r: dict) -> None:
     pv["level_events"] = [{"type": "level_up", "pillar": "mind", "top_driver": "Vice Control", "top_driver_value": Decimal("100")}]
 
 
+def _fd_day():
+    from datetime import timedelta
+
+    from common.pacific_time import PACIFIC
+
+    return (jw.FROZEN.astimezone(PACIFIC).date() - timedelta(days=FD["day_offset"])).isoformat()
+
+
 def _augment(rows: list) -> list:
     ids = _ids()
     user = "USER#matthew"
+    if FD["day_offset"] is not None:
+        # #6224: the food-delivery source's rows (synthetic) — the newest one's date is the axis; an older one is fixed.
+        for day in ("2026-01-10", _fd_day()):
+            rows.append({"pk": f"{user}#SOURCE#food_delivery", "sk": f"DATE#{day}", "date": day, "import_date": day, "delivery_index": 0})
     for i, r in enumerate(rows):
         pk = str(r.get("pk", ""))
         if pk.endswith("#SOURCE#character_sheet"):
             _plant_character(r)
+            if FD["day_offset"] is not None and isinstance((r.get("input_manifest") or {}).get("sources"), dict):
+                r["input_manifest"]["sources"]["food_delivery"] = {
+                    "status": "paused",
+                    "latest_day": _fd_day(),
+                    "age_hours": Decimal(FD["day_offset"] * 24),
+                    "stale_after_hours": Decimal("336"),
+                }
         if pk.endswith("#SOURCE#habitify"):
             statuses = r["habit_statuses"]
             for k, (name, (group, _streak, _flag)) in enumerate(SIGNALS.items()):
@@ -212,7 +240,61 @@ def _publish() -> None:
     RP.RESTRAINT_DATA_PUBLISHED = True
 
 
-def walk(ungated: bool = False, frozen: bool = False, published: bool = False) -> dict:
+def _fd_public() -> None:
+    """#6224's food-delivery control: the source classified public again (the state before the 2026-11-26 ruling)."""
+    from common import activity_publication as AP
+
+    AP.ACTIVITY_ONLY_SOURCES["food_delivery"] = AP.PUBLIC
+
+
+def _mind_scored() -> None:
+    """#6224's Mind control: ``public_sheet`` serves the stored variant's Mind as stored (the not-scored shape is not
+    applied), the state before Mind was unscored in public."""
+    from health import character_privacy as CP
+
+    keep = CP.public_pillar
+    CP.scrub_unscored = lambda view: view
+    CP.public_pillar = lambda name, pillar: pillar if name == "mind" else keep(name, pillar)
+
+
+# #6224: the keys that carry a Mind score, level, tier or XP on a served body.
+MIND_SCORE_KEYS = frozenset({"level", "raw_score", "score", "level_score", "tier", "xp_total", "xp_delta", "xp_earned", "xp_debt"})
+MIND_KEYS = frozenset({"mind", "pillar_mind", "mind_pillar"})
+
+
+def mind_numbers(body) -> list:
+    """Every place a served body carries a Mind score/level/tier/XP value (#6224: Mind is not scored in public) — a
+    pillar row named "mind", or the value under a Mind key — as sorted key paths. None is not a value."""
+    if isinstance(body, str):
+        try:
+            body = json.loads(body)
+        except ValueError:
+            return []
+    found: set = set()
+
+    def value(v) -> bool:
+        return (isinstance(v, (int, float)) and not isinstance(v, bool)) or (isinstance(v, str) and v != "")
+
+    def walk_(node, path):
+        if isinstance(node, dict):
+            if str(node.get("name") or "").lower() == "mind" or str(node.get("pillar") or "").lower() == "mind":
+                found.update(f"{path}.{k}" for k in MIND_SCORE_KEYS | {"old_level", "new_level"} if value(node.get(k)))
+            for k, v in node.items():
+                if k in MIND_KEYS:
+                    if isinstance(v, (int, float)) and not isinstance(v, bool):
+                        found.add(f"{path}.{k}")
+                    elif isinstance(v, dict):
+                        found.update(f"{path}.{k}.{x}" for x in MIND_SCORE_KEYS if v.get(x) is not None)
+                walk_(v, f"{path}.{k}")
+        elif isinstance(node, list):
+            for v in node:
+                walk_(v, f"{path}[]")
+
+    walk_(body, "")
+    return sorted(found)
+
+
+def walk(ungated: bool = False, frozen: bool = False, published: bool = False, fd_public: bool = False, mind_scored: bool = False) -> dict:
     if not frozen:
         jw.FROZEN = datetime.now(timezone.utc)  # the base rows are dated relative to this; the real clock, not a frozen one
     base_rows = jw._rows
@@ -221,6 +303,10 @@ def walk(ungated: bool = False, frozen: bool = False, published: bool = False) -
         _ungate()
     if published:
         _publish()
+    if fd_public:
+        _fd_public()
+    if mind_scored:
+        _mind_scored()
     L = jw._wire("gaps")
 
     from web import site_api_protocols as P
@@ -228,7 +314,7 @@ def walk(ungated: bool = False, frozen: bool = False, published: bool = False) -
     P._domains_cache = json.loads(json.dumps(DOMAINS_CONFIG))
 
     toks = tokens()
-    out = {"routes": 0, "answered": 0, "raised": {}, "leaks": {}, "figures": {}, "bodies": {}}
+    out = {"routes": 0, "answered": 0, "raised": {}, "leaks": {}, "figures": {}, "bodies": {}, "mind": {}}
     for path in rw.route_paths(L):
         out["routes"] += 1
         event = {
@@ -256,6 +342,9 @@ def walk(ungated: bool = False, frozen: bool = False, published: bool = False) -
         figs = restraint_figures(resp.get("body"))
         if figs:
             out["figures"][path] = figs
+        minds = mind_numbers(resp.get("body"))
+        if minds:
+            out["mind"][path] = minds
         if path in KEEP_BODIES:
             body = resp.get("body")
             out["bodies"][path] = json.loads(body) if isinstance(body, str) else body
@@ -317,8 +406,16 @@ if __name__ == "__main__":
         assert state in ("low", "high"), state
         STATE["value"] = state
         jw._freeze(sys.argv[sys.argv.index("--now") + 1])  # one instant for both states (before any handler import)
+    if "--fd" in sys.argv:
+        FD["day_offset"] = FD_OFFSETS[sys.argv[sys.argv.index("--fd") + 1]]
     try:
-        result = walk(ungated="--ungated" in sys.argv, frozen=state is not None, published="--published" in sys.argv)
+        result = walk(
+            ungated="--ungated" in sys.argv,
+            frozen=state is not None,
+            published="--published" in sys.argv,
+            fd_public="--fd-public" in sys.argv,
+            mind_scored="--mind-scored" in sys.argv,
+        )
     finally:
         sys.stdout = _real_stdout
     print(json.dumps(result, default=str))

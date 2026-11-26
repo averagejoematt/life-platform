@@ -833,7 +833,8 @@ def test_packet_character_sheet_level_events_are_typed_by_tier_change():
 
     assert "LEVEL EVENTS THIS WEEK (these are story moments):" in text
     assert "  2026-08-11: sleep TIER CHANGE: Foundation → Momentum (Level 3 → 4)" in text
-    assert "  2026-08-11: mind level_up: Level 2 → 3" in text
+    # #6224 (owner rulings 2026-11-26): Mind is not scored in public — its level events never reach the public chronicle
+    assert "mind level_up" not in text
     assert "ACTIVE EFFECTS (cross-pillar buffs/debuffs):" in text
     assert "  + Synthetic Buff: synthetic effect description" in text
 

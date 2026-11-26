@@ -190,9 +190,9 @@ def test_a_stored_pre_6224_variant_is_served_without_any_restraint_name():
     before = copy.deepcopy(record)
     view = character_privacy.public_sheet(record)
     assert [e["name"] for e in view["active_effects"]] == ["Ordinary Effect"]
-    assert "vice_control" not in view["pillar_mind"]["components"]
-    assert view["pillar_mind"]["drivers"]["top"] == ["t0_habit_compliance"]
-    assert "top_driver" not in view["level_events"][0]
+    # since Mind is not scored in public (owner rulings 2026-11-26) its block, drivers and events are gone entirely
+    assert view["pillar_mind"] == character_privacy.not_scored_pillar("mind")
+    assert view["level_events"] == []
     assert record == before, "the scrub must not mutate the stored record it was handed"
 
 
@@ -200,7 +200,6 @@ def test_must_fail_control_the_scrub_keys_off_the_switch(monkeypatch):
     monkeypatch.setattr(RP, "RESTRAINT_DATA_PUBLISHED", True)
     view = character_privacy.public_sheet(_stored_pre_6224_variant())
     assert "Restraint Effect Canary" in [e["name"] for e in view["active_effects"]]
-    assert "vice_control" in view["pillar_mind"]["drivers"]["top"]
 
 
 # ── 2. the public tier-0 figures: one predicate ───────────────────────────────────────────

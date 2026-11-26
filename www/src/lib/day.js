@@ -245,12 +245,13 @@ export function foodRows(food) {
 
 const PILLAR_WORDS = { sleep: "Sleep", movement: "Movement", nutrition: "Nutrition", metabolic: "Metabolic", mind: "Mind", relationships: "Relationships", consistency: "Consistency" };
 
-/** The engine's seven areas: an area with no instrument is "absent", never a number. */
+/** The engine's seven areas: an area with no instrument is "absent", never a number; one the public method does not
+ *  score (#6224: Mind — its inputs are private) says so. */
 export function engineRows(engine) {
   return engine.pillars.map((p) => ({
     label: PILLAR_WORDS[p.name] || p.name,
     absent: p.not_instrumented || p.score == null,
-    value: p.not_instrumented || p.score == null ? "absent" : num(p.score, 0),
+    value: p.not_scored ? "not scored in public" : p.not_instrumented || p.score == null ? "absent" : num(p.score, 0),
     width: p.not_instrumented || p.score == null ? 0 : Math.max(0, Math.min(100, p.score)),
     low: !p.not_instrumented && p.score != null && p.score < 20,
   }));

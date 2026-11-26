@@ -353,7 +353,10 @@ def engine_of(payload: Any, day: str) -> dict | None:
         if p is None:
             continue
         ni = bool(p.get("not_instrumented"))
-        pillars.append({"name": name, "score": None if ni else _num(p.get("raw_score")), "not_instrumented": ni})
+        row = {"name": name, "score": None if ni else _num(p.get("raw_score")), "not_instrumented": ni}
+        if p.get("not_scored"):  # #6224: not scored in public (its inputs are private) — said so, never "absent" alone
+            row["not_scored"] = True
+        pillars.append(row)
     return {
         "level": _num(c.get("level")),
         "composite": _num(c.get("composite_score")),
@@ -542,7 +545,9 @@ def check_layers(o: dict, where: str) -> None:
         if e["method"] is not None and not (isinstance(e["method"], str) and e["method"]):
             raise SchemaError(f"{where}.engine.method: a sentence or null")
         for p in e["pillars"]:
-            _keys(p, {"name", "score", "not_instrumented"}, f"{where}.engine.pillar")
+            _keys(p, {"name", "score", "not_instrumented"} | ({"not_scored"} if "not_scored" in p else set()), f"{where}.engine.pillar")
+            if "not_scored" in p and not (p["not_scored"] is True and p["not_instrumented"] and p["score"] is None):
+                raise SchemaError(f"{where}.engine.pillar {p['name']}: a pillar not scored in public carries no score")
             if p["not_instrumented"] and p["score"] is not None:
                 raise SchemaError(f"{where}.engine.pillar {p['name']}: an absent area carries no score (never 50)")
     for ln in o["coach_lines"]:

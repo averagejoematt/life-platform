@@ -241,6 +241,9 @@ def _build_avatar_data(character_sheet, profile, current_weight=None):
     badges = {}
     for pn in pillar_names:
         pd = character_sheet.get(f"pillar_{pn}", {})
+        if isinstance(pd, dict) and pd.get("not_scored"):
+            badges[pn] = "not_scored"  # #6224: Mind is not scored in public — no level to light a badge from
+            continue
         lvl = pd.get("level", 1) if pd else 1
         if lvl >= 61:
             badges[pn] = "bright"
@@ -264,9 +267,10 @@ def _build_avatar_data(character_sheet, profile, current_weight=None):
     }
 
     char_lvl = character_sheet.get("character_level", 1)
-    all_discipline = all(badges[p] != "hidden" for p in pillar_names)
+    scored = [p for p in pillar_names if badges[p] != "not_scored"]  # #6224: judged over the scored pillars only
+    all_discipline = all(badges[p] != "hidden" for p in scored)
     elite_crown = char_lvl >= 81
-    alignment_ring = all_discipline and all(badges[p] == "bright" for p in pillar_names)
+    alignment_ring = all_discipline and all(badges[p] == "bright" for p in scored)
 
     return {
         "tier": tier,

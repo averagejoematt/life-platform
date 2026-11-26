@@ -12,6 +12,10 @@ identify private activity:
   is the part that moved the numbers up.
 * The reason categories are ONE list for the whole correction, never per date. The same sentences stand on every date.
 
+v2 (#6224, owner rulings 2026-11-26): Mind is not scored in public. Both v1 values of a date included Mind — computed
+partly from restraint habits — so the v2 ledger serves no per-date rows at all (``build_ledger``), and the v1 item (key
+``CORRECTION#character-public-v1``) is no longer read by any route: the served ledger is the CURRENT version's.
+
 Stored as one item, ``USER#<id>#SOURCE#public_corrections`` / ``CORRECTION#<method version>``, written by
 ``scripts/backfill_public_variant.py --apply``; served by ``/api/character_config`` under ``public_method``.
 """
@@ -23,13 +27,13 @@ from typing import Any, Optional
 from health import character_privacy, day_grade_public, habit_pct_public
 
 SOURCE = "public_corrections"
-LEDGER_VERSION = "public-correction-ledger-v1"
+LEDGER_VERSION = "public-correction-ledger-v2"
+# #6224 (owner rulings 2026-11-26): the v2 recalculation's reasons. The same sentences stand on every date.
 REASON_CATEGORIES = (
-    "Private inputs were removed from the public scores (the same rule on every date).",
-    "Habit results that used to arrive after the score was worked out are now counted.",
-    "A day with no public measurement is shown as unavailable, not as a zero.",
-    "Consistency, levels and XP were worked through again from those corrected daily scores.",
-    "The day grade and habit completion use public-eligible inputs only.",
+    "Mind is not scored in public: its inputs are private. It has no public score, level or XP.",
+    "The overall level, the composite and the XP total are worked out from the other areas, without Mind.",
+    "The food-delivery adjustment to Nutrition is not applied in public, and restraint habits count in no public figure.",
+    "Consistency, levels and XP were worked through again from those daily scores.",
 )
 SERVED_KEYS = (
     "ledger_version",
@@ -49,27 +53,14 @@ def correction_sk(version: str = character_privacy.PUBLIC_METHOD_VERSION) -> str
     return f"CORRECTION#{version}"
 
 
-def _pillar(block: dict, name: str) -> dict:
-    return block.get(f"pillar_{name}") or {}
+def build_ledger(after: dict, recalculated_on: str) -> dict:
+    """The v2 ledger item's body (#6224). ``after``: {date: public block} — the recalculated public values.
 
-
-def _row(day: str, before: dict, after: dict) -> dict:
-    def mind(b: dict) -> Optional[float]:
-        p = _pillar(b, "mind")
-        return None if p.get("not_instrumented") else p.get("level")
-
-    return {
-        "date": day,
-        "overall_level": [before.get("character_level"), after.get("character_level")],
-        "mind_level": [mind(before), mind(after)],
-        "character_xp": [before.get("character_xp"), after.get("character_xp")],
-    }
-
-
-def build_ledger(before: dict, after: dict, recalculated_on: str) -> dict:
-    """The ledger item's body. ``before`` / ``after``: {date: public block} — the public method without and with the
-    habit results. Neither reads a method-1 value, so nothing here can move with a private input."""
-    days = sorted(d for d in after if after[d] and before.get(d))
+    It carries NO per-date rows. The v1 ledger's rows paired two public-method values per date, both of which included
+    Mind; under v2 the "before" of a date is a value computed WITH Mind — whose inputs the owner ruled private
+    (2026-11-26) — so a per-date before/after would publish Mind's contribution as the difference. What is served is the
+    range, the count and the reasons, which say the same thing on every date."""
+    days = sorted(d for d in after if after[d])
     return {
         "ledger_version": LEDGER_VERSION,
         "method_versions": {
@@ -84,12 +75,12 @@ def build_ledger(before: dict, after: dict, recalculated_on: str) -> dict:
         "dates_recalculated": len(days),
         "reason_categories": list(REASON_CATEGORIES),
         "notice": character_privacy.PUBLIC_CORRECTION_NOTICE,
-        "rows": [_row(d, before[d], after[d]) for d in days],
+        "rows": [],
     }
 
 
 def served_ledger(item: Any) -> Optional[dict[str, Any]]:
     """The ledger as a public route serves it: the whitelisted keys, or None when no correction is recorded."""
     if not isinstance(item, dict) or item.get("ledger_version") != LEDGER_VERSION:
-        return None
+        return None  # a v1 ledger item (rows carrying Mind levels) is never served under v2
     return {k: item.get(k) for k in SERVED_KEYS}

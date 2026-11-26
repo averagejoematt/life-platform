@@ -289,10 +289,12 @@ export function weekWords(w, { short = false } = {}) {
  * the public method's stamp, carried from the record (common.activity_publication.PUBLIC_METRIC_METHODS — the same
  * versions, pinned equal by tests/test_lab_findings_over_time.py). Matched broadly: "Day grade", "habits", any case.
  */
-export const PUBLIC_METHODS = { day_grade: ["day-grade-public-v1"], habit_pct: ["habit-pct-public-v1"] };
+// #6224: habit_pct v2 leaves restraint habits out; tier0_streak is the public run (restraint habits out) and versioned.
+export const PUBLIC_METHODS = { day_grade: ["day-grade-public-v1"], habit_pct: ["habit-pct-public-v2"], tier0_streak: ["tier0-streak-public-v1"] };
 const METHOD_VERSIONED = [
   [/grade/i, "day_grade"],
   [/habit/i, "habit_pct"],
+  [/tier[\s_-]*0|streak/i, "tier0_streak"],
 ];
 
 /** The method-versioned metric keys a finding names (a label or a key). */

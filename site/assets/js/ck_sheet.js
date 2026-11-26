@@ -63,6 +63,7 @@ export const driverWords = (ids) => (ids || []).map((id) => DRIVERS[id] || Strin
 // from one day to the next; a whole score beside a tenth of a point could not (#4580 round 1).
 export function areaSentence(p) {
   if (!p) return "";
+  if (p.not_scored) return p.not_scored_note || "Not scored in public: its inputs are private."; // #6224
   if (p.not_instrumented) return "Not measured yet: nothing records this area.";
   const level = num(p.level);
   const score = num(p.raw_score);
@@ -127,9 +128,12 @@ export function areasHTML(body) {
 export function countsNote(body) {
   const pillars = ((body && body.pillars) || []).filter((p) => p && p.name);
   const name = (p) => AREAS[p.name] || p.name;
-  const out = pillars.filter((p) => p.not_instrumented).map(name);
+  // #6224: an area the public method does not score is left out for that reason, not for want of an instrument.
+  const unscored = pillars.filter((p) => p.not_scored).map(name);
+  const out = pillars.filter((p) => p.not_instrumented && !p.not_scored).map(name);
   const thin = pillars.filter((p) => p.coverage_hold && !p.not_instrumented).map(name);
   const parts = [];
+  if (unscored.length) parts.push(`${listWords(unscored)} ${unscored.length > 1 ? "are" : "is"} not scored in public, because the inputs are private, and ${unscored.length > 1 ? "are" : "is"} left out`);
   if (out.length) parts.push(`${listWords(out)} ${out.length > 1 ? "have" : "has"} nothing measuring ${out.length > 1 ? "them" : "it"} and ${out.length > 1 ? "are" : "is"} left out`);
   if (thin.length) parts.push(`${listWords(thin)} ${thin.length > 1 ? "are" : "is"} measured thinly and still count${thin.length > 1 ? "" : "s"}`);
   return parts.length ? `${parts.join("; ")}.` : "";

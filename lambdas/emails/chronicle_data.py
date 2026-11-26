@@ -700,6 +700,9 @@ def build_data_packet(data):
             for pn in pillar_names:
                 pd = latest_cs.get(f"pillar_{pn}") or {}
                 ep = earliest_cs.get(f"pillar_{pn}") or {}
+                if character_privacy.is_not_scored(pd):  # #6224: Mind is not scored in public — never a default level
+                    packet.append(f"  {pillar_labels.get(pn, pn)}: not scored in public (its inputs are private)")
+                    continue
                 p_lvl = pd.get("level", 1)
                 p_tier = pd.get("tier", "Foundation")
                 p_raw = pd.get("raw_score")

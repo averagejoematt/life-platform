@@ -94,7 +94,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, Optional
 
 from common.macrofactor_fields import intake_window  # #5431: intake reads bounded at the Pacific today
 from common.numeric import floats_to_decimal  # #5524: the one float->Decimal walker (NaN/Inf guarded)
@@ -133,6 +133,14 @@ GLOBAL_COOLDOWN_DAYS = 12
 # a milestone, however far below the threshold it lands.
 WEIGHT_WINDOW_DAYS = 7
 WEIGHT_MIN_WEIGHINS = 3
+
+# #6224 (owner ruling 2026-11-26: "Remove restraint-derived contributions from public streak milestones"): the streak
+# rungs are judged on the PUBLIC tier-0 run (``common.activity_publication.public_tier0_figures`` — restraint habits in
+# neither the numerator nor the denominator), and each streak entry records that basis. A streak entry WITHOUT it was
+# written from the stored ``habit_scores.t0_perfect_streak``, which counts restraint habits: it stays in the ledger (a
+# rung consumed is consumed forever — it is never re-fired) but is never served (``read_announced_events``).
+STREAK_LADDER = "streak"
+TIER0_STREAK_BASIS = "public_tier0_run"
 
 # `origin` values on a stored entry.
 ORIGIN_CROSSING = "crossing"  # the writer watched the rung cross while the ledger was live
@@ -283,7 +291,12 @@ def _satisfied(rule: MilestoneRule, signals: dict, today: str) -> tuple[bool, di
     value = signals.get(rule.signal)
     if value is None:
         return False, None
-    return int(value) >= rule.threshold, {"value": int(value), "threshold": rule.threshold}
+    meas = {"value": int(value), "threshold": rule.threshold}
+    if rule.signal == "tier0_streak":
+        if signals.get("tier0_streak_basis") != TIER0_STREAK_BASIS:
+            return False, None  # #6224: a streak rung is judged on the public run only (fail closed)
+        meas["basis"] = TIER0_STREAK_BASIS
+    return int(value) >= rule.threshold, meas
 
 
 def _days_between(earlier: str, later: str) -> int:
@@ -441,13 +454,27 @@ def read_ledger(table, user_prefix: str) -> dict:
     }
 
 
+def servable_event(entry: Any) -> bool:
+    """#6224: an entry a consumer may surface — every rung except a streak rung written from the stored streak (no
+    ``measurement.basis`` of the public run), which counted restraint habits. Such an entry stays consumed; it is not
+    served while ``RESTRAINT_DATA_PUBLISHED`` is False."""
+    if not isinstance(entry, dict):
+        return False
+    if (entry.get("ladder") or entry.get("category")) != STREAK_LADDER:
+        return True
+    from common import restraint_publication as RP  # noqa: PLC0415
+
+    return bool(RP.RESTRAINT_DATA_PUBLISHED) or (entry.get("measurement") or {}).get("basis") == TIER0_STREAK_BASIS
+
+
 def read_announced_events(table, user_prefix: str) -> list[dict]:
     """The consumer surface (#1628): announced events only, oldest first.
 
     Baseline and subsumed entries are consumed rungs, not announcements — a
-    consumer must never surface them as news.
+    consumer must never surface them as news. #6224: neither is a streak rung written from the stored streak
+    (``servable_event``) — the digest's named recipients and the coach event triggers read this.
     """
-    events = [e for e in read_ledger(table, user_prefix)["events"] if e.get("announce") and e.get("event_date")]
+    events = [e for e in read_ledger(table, user_prefix)["events"] if e.get("announce") and e.get("event_date") and servable_event(e)]
     return sorted(events, key=lambda e: str(e["event_date"]))
 
 
@@ -625,7 +652,13 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
 
     habits_sorted = sorted(habits, key=lambda i: str(i.get("sk") or ""))
     latest_habit = habits_sorted[-1] if habits_sorted else {}
-    tier0_streak = int(_f(latest_habit.get("t0_perfect_streak")) or 0)
+    # #6224: the PUBLIC run, through the shared predicate — never the stored `t0_perfect_streak` (it counts restraint
+    # habits). A failed read leaves no streak signal: no streak rung is judged on a figure that might count one.
+    tier0_streak = None
+    try:
+        tier0_streak = _public_tier0_run(_query_all, _range, user_prefix, latest_habit, _back(366))  # room for the 365 rung
+    except Exception as e:  # noqa: BLE001
+        logging.getLogger(__name__).warning("[milestone_ledger] public tier-0 run unavailable — no streak rung judged: %s", e)
 
     chars_sorted = sorted(chars, key=lambda i: str(i.get("sk") or ""))
     character_level = character_privacy.event_level(chars_sorted)  # owner ruling 2026-11-06: public, never by recalculation
@@ -713,6 +746,7 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
     return {
         "weight_series": weight_series,
         "tier0_streak": tier0_streak,
+        "tier0_streak_basis": TIER0_STREAK_BASIS if tier0_streak is not None else None,
         "days_tracked": len(habits_sorted),
         "character_level": character_level,
         # #1628 window-milestone signal families (pure inputs to process_milestones)
@@ -727,6 +761,23 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
         "expenditure_source_by_day": expenditure_source_by_day,  # #1808
         "waist_by_day": waist_by_day,
     }
+
+
+def _public_tier0_run(query_all, range_of, user_prefix: str, latest_habit: dict, start: str) -> Optional[int]:
+    """#6224: the public tier-0 run as of the latest scored day — ``activity_publication.public_tier0_figures`` over the
+    stored Habitify rows, the owner's registry and the latest stored streak keys (the restraint set the public
+    ``/api/habit_streaks`` uses). None when there is no scored day."""
+    from common import activity_publication as AP  # noqa: PLC0415
+
+    as_of = str(latest_habit.get("date") or str(latest_habit.get("sk", "")).replace("DATE#", ""))[:10]
+    if not as_of:
+        return None
+    root = user_prefix.split("#SOURCE#")[0]
+    prof = query_all(KeyConditionExpression="pk = :pk AND sk = :sk", ExpressionAttributeValues={":pk": root, ":sk": "PROFILE#v1"})
+    registry = (prof[0] if prof else {}).get("habit_registry") or {}
+    rows = [r for r in range_of("habitify", start) if str(r.get("sk", "")).replace("DATE#", "")[:10] <= as_of]
+    restraints = {str(k) for k in (latest_habit.get("vice_streaks") or {})}
+    return int(AP.public_tier0_figures(rows, registry, restraints, as_of, start)["streak"])
 
 
 def _any_signal_present(signals: dict) -> bool:

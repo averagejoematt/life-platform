@@ -57,7 +57,6 @@ PRIVATE = NP.PRIVATE
 # Each is already on a public surface by an earlier decision; listing them here records it.
 ACTIVITY_ONLY_SOURCES: dict[str, str] = {
     "todoist": PUBLIC,  # task completions — the status board and the values channel of the fulfillment index
-    "food_delivery": PUBLIC,  # the six-monthly delivery-index CSV (status board, paused)
     "macrofactor_workouts": PUBLIC,  # the MacroFactor workout CSV drop (status board)
     "dropbox": PUBLIC,  # the MacroFactor file-drop poller (registry facets only)
     "evening_ritual": PUBLIC,  # the one-tap connection rail (ADR-124) — the fulfillment index's baseline
@@ -146,6 +145,16 @@ CHALLENGE_TARGET_FAMILIES: dict[str, str] = {
     },
     **{k: "state_of_mind" for k in ("avg_mood_post_light", "mood_stability")},  # How We Feel / State of Mind: PRIVATE
     **{k: "journal" for k in ("urge_logs", "trigger_logs")},  # reflective logs of urges and triggers: PRIVATE
+}
+
+# Activity sources the narrative registry does not name that an owner ruling made PRIVATE (each with its ruling). A
+# source here is omitted by every surface that asks (status board, /api/last_sync, /api/source_freshness, the public
+# input manifest behind /api/character and /api/snapshot, a public receipt's input rows).
+ACTIVITY_PRIVATE_SOURCES: dict[str, str] = {
+    # #6224 (owner ruling 2026-11-26): "Treat the food-delivery source's last-recorded date as private unless separately
+    # authorized." The six-monthly delivery-index CSV records a restraint behaviour, so WHEN it last recorded is a
+    # restraint figure. Was PUBLIC (status board, paused) until then.
+    "food_delivery": PRIVATE,
 }
 
 # Activity-only OVERRIDES of a narrative classification: a source whose DATA is owner-only but whose
@@ -440,9 +449,16 @@ def correlation_pair_is_public(pair: Any) -> bool:
 # stamps nothing, so its pairs naming these metrics are withheld (fail closed: a missing or unknown stamp is private).
 # Held equal to ``health.day_grade_public.METHOD_VERSIONS`` / ``health.habit_pct_public.METHOD_VERSION`` by
 # tests/test_lab_findings_over_time.py (this module cannot import ``health``: day_grade_public imports it).
+# #6224 (owner ruling 2026-11-26: "Remove restraint-derived contributions from ... correlation metrics"): habit_pct's
+# public method is v2 (restraint habits excluded through ``restraint_exclusions``) and ``tier0_streak`` is method-versioned
+# too — the stored ``computed_metrics.tier0_streak`` counts restraint habits, the public one is the run of perfect PUBLIC
+# tier-0 days (``public_tier0_run``). A record stamped with habit_pct v1, or with no tier0_streak stamp, has its pairs
+# naming them withheld.
+TIER0_STREAK_PUBLIC_METHOD = "tier0-streak-public-v1"
 PUBLIC_METRIC_METHODS: dict[str, tuple[str, ...]] = {
     "day_grade": ("day-grade-public-v1",),
-    "habit_pct": ("habit-pct-public-v1",),
+    "habit_pct": ("habit-pct-public-v2",),
+    "tier0_streak": (TIER0_STREAK_PUBLIC_METHOD,),
 }
 
 
@@ -589,7 +605,7 @@ def unlocked_baseline_records(table: Any, query: Mapping, unlocked: Any) -> list
 def source_class(source_id: Any) -> Optional[str]:
     """PUBLIC, PRIVATE, or None (unclassified — callers treat it as private)."""
     sid = str(source_id or "").strip()
-    return ACTIVITY_OVERRIDES.get(sid) or NP.classify(sid) or ACTIVITY_ONLY_SOURCES.get(sid)
+    return ACTIVITY_OVERRIDES.get(sid) or NP.classify(sid) or ACTIVITY_ONLY_SOURCES.get(sid) or ACTIVITY_PRIVATE_SOURCES.get(sid)
 
 
 def source_is_public(source_id: Any) -> bool:
@@ -719,24 +735,33 @@ def public_group_pcts(statuses: Any, groups: Iterable[Any], registry: Any = None
 # ── the public TIER-0 figures (#6224) ───────────────────────────────────────────────────────
 
 
+def restraint_exclusions(statuses: Any, registry: Any = None, restraints: Optional[Iterable[Any]] = None) -> set:
+    """THE restraint set a public habit figure leaves out (#6224, owner ruling 2026-11-24): every habit
+    ``restraint_publication.restraint_names`` marks (its tracker group or the registry flag) plus every name in
+    ``restraints`` (a stored streak key, which the caller has and this function does not). Empty while
+    ``RESTRAINT_DATA_PUBLISHED`` is True (an owner approval on record)."""
+    from common import restraint_publication as RP  # noqa: PLC0415 — keeps this module's import surface unchanged
+
+    if RP.RESTRAINT_DATA_PUBLISHED:
+        return set()
+    reg = registry if isinstance(registry, Mapping) else {}
+    return RP.restraint_names(statuses, reg) | {str(r) for r in (restraints or ())}
+
+
 def public_tier0_counts(statuses: Any, registry: Any = None, restraints: Optional[Iterable[Any]] = None) -> tuple:
     """``(done, total)`` over the day's PUBLIC tier-0 habits — THE one predicate every public tier-0 figure is counted
-    through (``/api/habits``, ``/api/habit_streaks``, ``public_stats.json`` and the cards drawn from it).
+    through (``/api/habits``, ``/api/habit_streaks``, ``public_stats.json`` and the cards drawn from it, the milestone
+    streak rungs, the weekly correlations' ``tier0_streak``, ``/api/pulse``).
 
     A habit counts when it is classified public here, sits in tier 0 of the owner's registry, was scheduled that day,
-    and is not a restraint habit (owner ruling 2026-11-24, ``common.restraint_publication``: no restraint figure — and a
-    tier-0 share that counts one is a figure its behaviour can be read from — while ``RESTRAINT_DATA_PUBLISHED`` is
-    False). A restraint is any habit ``restraint_publication.restraint_names`` marks (its tracker group or the registry
-    flag) plus every name in ``restraints`` (a stored streak key, which the caller has and this function does not).
-    The stored ``habit_scores.tier0_done/tier0_total`` count every tier-0 habit, private ones included, so a public
-    surface never reads them."""
-    from common import restraint_publication as RP  # noqa: PLC0415 — keeps this module's import surface unchanged
+    and is not a restraint habit (``restraint_exclusions``; owner ruling 2026-11-24, ``common.restraint_publication``:
+    no restraint figure — and a tier-0 share that counts one is a figure its behaviour can be read from). The stored
+    ``habit_scores.tier0_done/tier0_total`` count every tier-0 habit, private ones included, so a public surface never
+    reads them."""
     from common.habit_registry import habit_tier  # noqa: PLC0415
 
     reg = registry if isinstance(registry, Mapping) else {}
-    excluded: set = set()
-    if not RP.RESTRAINT_DATA_PUBLISHED:
-        excluded = RP.restraint_names(statuses, reg) | {str(r) for r in (restraints or ())}
+    excluded = restraint_exclusions(statuses, reg, restraints)
     done = total = 0
     for name, st in public_habit_statuses(statuses, reg).items():
         meta = reg.get(name)
@@ -747,6 +772,53 @@ def public_tier0_counts(statuses: Any, registry: Any = None, restraints: Optiona
         total += 1
         done += 1 if st.get("status") == "completed" else 0
     return done, total
+
+
+def _row_day(row: Any) -> str:
+    row = row if isinstance(row, Mapping) else {}
+    return str(row.get("date") or str(row.get("sk", "")).replace("DATE#", ""))[:10]
+
+
+def public_tier0_by_date(rows: Any, registry: Any = None, restraints: Optional[Iterable[Any]] = None) -> dict:
+    """``{day: (done, total)}`` through ``public_tier0_counts`` for stored Habitify rows. The restraint set is the
+    union over EVERY row given (a habit marked a restraint on any day is one on every day) plus ``restraints``."""
+    reg = registry if isinstance(registry, Mapping) else {}
+    rows = [r for r in rows or () if isinstance(r, Mapping)]
+    union = {str(r) for r in (restraints or ())}
+    for row in rows:
+        union |= restraint_exclusions(row.get("habit_statuses") or {}, reg)
+    return {_row_day(row): public_tier0_counts(row.get("habit_statuses") or {}, reg, union) for row in rows}
+
+
+def public_tier0_run(by_date: Mapping, as_of: str, start: str) -> int:
+    """The public run ending at ``as_of``: perfect public tier-0 days walked back ONE calendar day at a time, never
+    before ``start`` (a day with no row breaks it — never skipped over)."""
+    from datetime import datetime as _dt, timedelta as _td  # noqa: PLC0415
+
+    try:  # two calendar days (YYYY-MM-DD), no instant (#3609)
+        day, floor = _dt.strptime(str(as_of)[:10], "%Y-%m-%d").date(), _dt.strptime(str(start)[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return 0
+    days = []
+    while day >= floor:
+        days.append(by_date.get(day.isoformat(), (0, 0)))
+        day -= _td(days=1)
+    return public_tier0_streak(days)
+
+
+def public_tier0_figures(rows: Any, registry: Any, restraints: Optional[Iterable[Any]], as_of: str, start: str) -> dict:
+    """``{as_of_date, done, total, pct, streak}`` — the public tier-0 figures for ``as_of`` from the stored Habitify rows
+    from ``start`` to ``as_of``. Pure; every caller does its own reads (``web.site_api_habits.public_tier0_summary``,
+    ``health.milestone_ledger.collect_signals``)."""
+    by_date = public_tier0_by_date(rows, registry, restraints)
+    done, total = by_date.get(str(as_of)[:10], (0, 0))
+    return {
+        "as_of_date": as_of,
+        "done": done,
+        "total": total,
+        "pct": round(done / total * 100) if total else 0,
+        "streak": public_tier0_run(by_date, as_of, start),
+    }
 
 
 def public_tier0_streak(days_newest_first: Iterable[Any]) -> int:

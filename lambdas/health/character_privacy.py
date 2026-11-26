@@ -102,8 +102,47 @@ HELD_PILLAR: dict[str, Any] = {
 }
 
 
+# #6224 (owner rulings 2026-11-26): "Keep Mind unscored publicly." — "Do not publish a derived Mind score using private
+# inputs. Show an accurate public 'not scored' or unavailable state, with an explanation where appropriate. Don't invent a
+# public proxy merely to fill a graphical gap." Mind's inputs include private ones (its habit shares count restraint
+# habits; the journal's components), and a share recounted over public habits only would be exactly such a proxy. So the
+# public method does not score the pillar at all: no score, level, tier, XP, drivers or level events, and no place in the
+# composite, the headline level or the XP total. Public routes serve the shape below — no number in it — and name the
+# reason. Only an owner ruling reopens it.
+UNSCORED_PUBLIC_PILLARS: dict[str, str] = {"mind": "Not scored in public: its inputs are private."}
+
+
+def pillar_scored_in_public(name: Any) -> bool:
+    """False for a pillar the public method does not score (``UNSCORED_PUBLIC_PILLARS``)."""
+    return str(name) not in UNSCORED_PUBLIC_PILLARS
+
+
+def not_scored_pillar(name: str) -> dict[str, Any]:
+    """The served shape of a pillar the public method does not score: the reason and the held flags every renderer's
+    existing held branch engages on (``not_instrumented``, ``coverage_hold``), and NO number — no score, level, tier or
+    XP key at all, so no reader can default one in."""
+    note = UNSCORED_PUBLIC_PILLARS.get(str(name), PRIVATE_PILLAR_NOTE)
+    return {
+        "not_scored": True,
+        "not_scored_note": note,
+        "not_instrumented": True,
+        "not_instrumented_note": note,
+        "coverage_hold": True,
+        "absent_behaviors": [],
+        "drivers": {"top": [], "dragging": [], "absent": [], "no_data": []},
+    }
+
+
+def is_not_scored(pillar: Any) -> bool:
+    """True for a served pillar in the not-scored shape (``not_scored_pillar``)."""
+    return isinstance(pillar, dict) and bool(pillar.get("not_scored"))
+
+
 def pillar_is_publishable(name: str) -> bool:
-    """False for a pillar every input of which is a non-public source (fail closed on an unclassified one)."""
+    """False for a pillar every input of which is a non-public source (fail closed on an unclassified one), and for a
+    pillar the public method does not score (#6224) — neither has a public transition, mismatch or score to serve."""
+    if not pillar_scored_in_public(name):
+        return False
     srcs = PRIVATE_SOURCE_PILLARS.get(str(name))
     if srcs is None:
         return True
@@ -113,7 +152,9 @@ def pillar_is_publishable(name: str) -> bool:
 
 
 def public_pillar(name: str, pillar: Any) -> Any:
-    """The pillar as a public surface may serve it: unchanged, or the constant held shape."""
+    """The pillar as a public surface may serve it: unchanged, the not-scored shape (#6224), or the constant held shape."""
+    if not pillar_scored_in_public(name):
+        return not_scored_pillar(name)
     if pillar_is_publishable(name):
         return pillar
     held = {k: (list(v) if isinstance(v, list) else dict(v) if isinstance(v, dict) else v) for k, v in HELD_PILLAR.items()}
@@ -130,10 +171,15 @@ def public_pillar(name: str, pillar: Any) -> Any:
 # reads the sheet through ``public_sheet``, which serves the public variant and NOTHING when it is absent
 # (fail closed: never a fallback to method 1). The arithmetic is ``health.character_public``.
 PUBLIC_KEY = "public"
-PUBLIC_METHOD_VERSION = "character-public-v1"
-PUBLIC_METHOD_VERSIONS = (PUBLIC_METHOD_VERSION,)  # every version a reader may serve; an unknown one is not served
+PUBLIC_METHOD_V1 = "character-public-v1"
+PUBLIC_METHOD_VERSION = "character-public-v2"  # #6224 (2026-11-26): Mind not scored in public; no restraint/delivery input
+# Every version a reader may serve; an unknown one is not served. A v1 variant stays servable until the recompute
+# replaces it — ``public_sheet`` serves its Mind as not scored, but its composite, level and XP still carry Mind's
+# contribution until then (``scripts/backfill_public_variant.py``).
+PUBLIC_METHOD_VERSIONS = (PUBLIC_METHOD_V1, PUBLIC_METHOD_VERSION)
 PUBLIC_METHOD_EFFECTIVE_FROM = "2026-09-06"  # the first date the method applies to: the experiment's genesis
 PUBLIC_METHOD_DEFINED_ON = "2026-11-05"  # the owner's ruling
+PUBLIC_METHOD_V2_DEFINED_ON = "2026-11-26"  # #6224: the owner's rulings that Mind is not scored in public
 METHOD_1 = "method-1"
 PUBLIC_METHOD_HISTORY = (
     {
@@ -144,37 +190,64 @@ PUBLIC_METHOD_HISTORY = (
         "privately, with its original timestamps, and never republished.",
     },
     {
-        "version": PUBLIC_METHOD_VERSION,
+        "version": PUBLIC_METHOD_V1,
         "from": PUBLIC_METHOD_EFFECTIVE_FROM,
         "defined_on": PUBLIC_METHOD_DEFINED_ON,
+        "published_until": PUBLIC_METHOD_V2_DEFINED_ON,
         "note": "Public-eligible inputs only. Restraint-habit streaks are private: they are held out of the Mind score and "
         "its data coverage, and no effect that reads them is applied (ruling of 2026-11-24). Dates before it was adopted "
         "were recomputed from the stored inputs; what the site showed on those dates at the time was computed under method 1.",
+    },
+    {
+        "version": PUBLIC_METHOD_VERSION,
+        "from": PUBLIC_METHOD_EFFECTIVE_FROM,
+        "defined_on": PUBLIC_METHOD_V2_DEFINED_ON,
+        "note": "Mind is not scored in public: its inputs are private. It has no public score, level, tier or XP, and the "
+        "composite, the overall level and the XP total are worked out from the other areas without it, not with Mind at a "
+        "neutral score. The food-delivery adjustment to Nutrition is not applied, and restraint habits count nowhere. Dates "
+        "before it was adopted were recalculated the same way.",
     },
 )
 # The label a public history surface prints beside a value. It depends on the method and the record's origin only
 # (a live compute vs. a recomputation of the past) — never on whether a private input existed that day, so it is the
 # same sentence on a journal day and on a quiet day.
-PUBLIC_METHOD_LABELS = {
-    "live": "Computed that morning under the public method (v1), from the records available then. Private inputs, "
-    "restraint-habit streaks among them, are left out.",
-    "recomputed": "Recalculated later under the public method (v1), from the records available when it was recalculated, "
-    "not from what was available on this date. Private inputs, restraint-habit streaks among them, are left out. The score "
-    "shown on this date at the time came "
-    "from an earlier method and is not republished.",
+PUBLIC_METHOD_LABELS_BY_VERSION = {
+    PUBLIC_METHOD_V1: {
+        "live": "Computed that morning under the public method (v1), from the records available then. Private inputs, "
+        "restraint-habit streaks among them, are left out.",
+        "recomputed": "Recalculated later under the public method (v1), from the records available when it was "
+        "recalculated, not from what was available on this date. Private inputs, restraint-habit streaks among them, are "
+        "left out. The score shown on this date at the time came from an earlier method and is not republished.",
+    },
+    PUBLIC_METHOD_VERSION: {
+        "live": "Computed that morning under the public method (v2), from the records available then. Private inputs are "
+        "left out, and Mind is not scored in public: the level and composite are worked out without it.",
+        "recomputed": "Recalculated later under the public method (v2), from the records available when it was "
+        "recalculated, not from what was available on this date. Private inputs are left out, and Mind is not scored in "
+        "public: the level and composite are worked out without it. The score shown on this date at the time came from an "
+        "earlier method and is not republished.",
+    },
 }
+PUBLIC_METHOD_LABELS = PUBLIC_METHOD_LABELS_BY_VERSION[PUBLIC_METHOD_VERSION]
 # Owner ruling 2026-11-06: the difference between a score recalculated from today's records and a score actually
 # available on the date, as data. `origin` is the field; `basis` says what it means.
 PUBLIC_METHOD_BASIS = {"live": "records_available_at_compute", "recomputed": "records_available_at_recalculation"}
 # Owner ruling 2026-11-06: the jump in the recalculated scores is a correction, not a change in behaviour. Printed beside
 # recalculated values; the same words on every date.
-PUBLIC_CORRECTION_NOTICE = (
+PUBLIC_CORRECTION_NOTICE_V1 = (
     "These scores were recalculated. Two things changed how they are worked out, and neither is a change in what he did. "
     "Private inputs were taken out of the public scores. And a timing fault was fixed: habit results used to reach the "
     "Mind score too late to count, so habits he had logged were being read as not done. With those results now counted, "
     "Mind and the overall level read higher across the whole experiment. That is the record being corrected, not a sudden "
     "improvement."
 )
+# #6224: the v2 recalculation's notice — the same words on every date.
+PUBLIC_CORRECTION_NOTICE = (
+    "These scores were recalculated. Mind is no longer scored in public, because its inputs are private, so the overall "
+    "level, the composite and the XP total are now worked out from the other areas without it. Any move in them on this "
+    "date is that change of method, not a change in what he did."
+)
+PUBLIC_CORRECTION_NOTICES = {PUBLIC_METHOD_V1: PUBLIC_CORRECTION_NOTICE_V1, PUBLIC_METHOD_VERSION: PUBLIC_CORRECTION_NOTICE}
 
 # The record keys a public view carries from the stored record's envelope (identity, phase, the input manifest — which
 # public routes re-judge over public sources themselves). Every score comes from the public variant.
@@ -208,14 +281,15 @@ def public_method_label(record: Any) -> Optional[dict[str, Any]]:
     if pv is None:
         return None
     origin = _origin(pv)
+    version = pv.get("public_method_version")
     return {
-        "version": pv.get("public_method_version"),
+        "version": version,
         "effective_from": pv.get("effective_from", PUBLIC_METHOD_EFFECTIVE_FROM),
         "origin": origin,
         "basis": PUBLIC_METHOD_BASIS[origin],
         "recalculated_on": str(pv.get("computed_at") or "")[:10] or None if origin == "recomputed" else None,
-        "label": PUBLIC_METHOD_LABELS[origin],
-        "notice": PUBLIC_CORRECTION_NOTICE if origin == "recomputed" else None,
+        "label": PUBLIC_METHOD_LABELS_BY_VERSION.get(version, PUBLIC_METHOD_LABELS)[origin],
+        "notice": PUBLIC_CORRECTION_NOTICES.get(version, PUBLIC_CORRECTION_NOTICE) if origin == "recomputed" else None,
     }
 
 
@@ -299,12 +373,60 @@ def public_sheet(record: Any) -> Any:
         key = f"pillar_{name}"
         if key in out:
             out[key] = public_pillar(name, out[key])
+    scrub_unscored(out)
     if not restraint_published():
         scrub_restraint(out)
     if _origin(out) != "live":  # owner ruling 2026-11-06: a recalculation is not an event — no reader can celebrate it
         out["recalculated_level_events"] = out.get("level_events") or []
         out["level_events"] = []
     return out
+
+
+_PILLAR_WORDS = ("sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency")
+
+
+def _condition_reads(condition: Any, name: str) -> bool:
+    return name in str(condition or "").lower().replace("(", " ").replace(")", " ").split()
+
+
+def scrub_unscored(view: dict[str, Any]) -> dict[str, Any]:
+    """#6224: a public view with every pillar the public method does not score (``UNSCORED_PUBLIC_PILLARS``) in the
+    not-scored shape, in place, whatever version computed it: the pillar block; its level events and its place on a
+    headline level-up's drivers; an active effect whose condition reads it (its firing would say where its score stood —
+    and on a v1 variant, an ``all_pillars`` condition read it too); its key in any effect's targets; and the headline's
+    excluded list. A v2 variant carries none of these (the engine never scored the pillar); this covers a v1 variant until
+    the recompute replaces it — whose composite, level and XP still include the pillar until then."""
+    names = [n for n in _PILLAR_WORDS if not pillar_scored_in_public(n)]
+    if not names:
+        return view
+    v1 = view.get("public_method_version") == PUBLIC_METHOD_V1
+    for name in names:
+        view[f"pillar_{name}"] = not_scored_pillar(name)
+    view["unscored_pillars"] = list(names)
+    if isinstance(view.get("active_effects"), list):
+        kept = []
+        for e in view["active_effects"]:
+            cond = e.get("condition") if isinstance(e, dict) else None
+            if any(_condition_reads(cond, n) for n in names) or (v1 and _condition_reads(cond, "all_pillars")):
+                continue
+            if isinstance(e, dict) and isinstance(e.get("targets"), dict):
+                e = dict(e, targets={k: t for k, t in e["targets"].items() if k not in names})
+            kept.append(e)
+        view["active_effects"] = kept
+    for key in ("level_events", "recalculated_level_events"):
+        if not isinstance(view.get(key), list):
+            continue
+        out = []
+        for ev in view[key]:
+            if isinstance(ev, dict) and str(ev.get("pillar") or "").lower() in names:
+                continue
+            if isinstance(ev, dict) and isinstance(ev.get("drivers"), list):
+                ev = dict(ev, drivers=[d for d in ev["drivers"] if not (isinstance(d, dict) and str(d.get("pillar")) in names)])
+            out.append(ev)
+        view[key] = out
+    excluded = [p for p in (view.get("headline_excluded_pillars") or []) if p not in names]
+    view["headline_excluded_pillars"] = excluded + names
+    return view
 
 
 def _slug(label: Any) -> str:

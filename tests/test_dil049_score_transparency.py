@@ -172,10 +172,11 @@ def test_composite_discloses_when_a_pillar_is_excluded(monkeypatch):
     monkeypatch.setattr(vitals, "EXPERIMENT_START", _GENESIS)
     body = json.loads(vitals.handle_character()["body"])
     ch = body["character"]
-    assert ch["composite_pillar_count"] == 6
+    # #6224: Mind is not scored in public — out too, and the note says why
+    assert ch["composite_pillar_count"] == 5
     assert ch["composite_pillar_total"] == 7
     assert ch["composite_note"] is not None
-    assert "6 of 7" in ch["composite_note"]
+    assert "5 of 7" in ch["composite_note"] and "Mind (not scored in public: its inputs are private)" in ch["composite_note"]
 
 
 def test_composite_note_is_silent_once_every_pillar_is_instrumented(monkeypatch):
@@ -188,9 +189,13 @@ def test_composite_note_is_silent_once_every_pillar_is_instrumented(monkeypatch)
     monkeypatch.setattr(vitals, "table", _FakeTable([rec]))
     monkeypatch.setattr(vitals, "EXPERIMENT_START", _GENESIS)
     ch = json.loads(vitals.handle_character()["body"])["character"]
-    assert (ch["composite_pillar_count"], ch["composite_pillar_total"]) == (6, 7) and ch["composite_note"]
+    assert (ch["composite_pillar_count"], ch["composite_pillar_total"]) == (5, 7) and ch["composite_note"]
     monkeypatch.setattr(activity_publication, "source_is_public", lambda s: True)
     ch = json.loads(vitals.handle_character()["body"])["character"]
-    assert ch["composite_pillar_count"] == 7
+    # #6224: Mind stays unscored in public whatever the source policy says (owner rulings 2026-11-26)
+    assert ch["composite_pillar_count"] == 6
     assert ch["composite_pillar_total"] == 7
-    assert ch["composite_note"] is None
+    assert ch["composite_note"] == (
+        "composite_score is the mean of 6 of 7 pillars — Mind (not scored in public: its inputs are private) is excluded, "
+        "not averaged in at a neutral score."
+    )

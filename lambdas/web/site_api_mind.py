@@ -79,7 +79,15 @@ def mind_overview(*, _g) -> dict:
                 "raw_score": float(mp.get("raw_score", 0)),
                 "tier": mp.get("tier", "Foundation"),
             }
-            if mp.get("not_instrumented"):  # owner ruling 2026-11-06: insufficient public data is a state, never a 0.0
+            if character_privacy.is_not_scored(mp):  # #6224 (owner rulings 2026-11-26): Mind is not scored in public
+                mind_pillar = {
+                    "level": None,
+                    "raw_score": None,
+                    "tier": None,
+                    "state": "not_scored",
+                    "note": mp.get("not_scored_note"),
+                }
+            elif mp.get("not_instrumented"):  # owner ruling 2026-11-06: insufficient public data is a state, never a 0.0
                 mind_pillar = {
                     "level": None,
                     "raw_score": None,

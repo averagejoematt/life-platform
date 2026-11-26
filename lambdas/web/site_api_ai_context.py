@@ -246,6 +246,9 @@ def _ask_fetch_context() -> dict:
                 pillars = {}
                 for p in ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]:
                     pd = rec.get(f"pillar_{p}", {})
+                    if character_privacy.is_not_scored(pd):  # #6224: no number for a pillar not scored in public
+                        pillars[p] = {"not_scored": True, "note": pd.get("not_scored_note")}
+                        continue
                     pillars[p] = {
                         "level": float(pd.get("level", 1)),
                         "raw_score": float(pd.get("raw_score", 0)),

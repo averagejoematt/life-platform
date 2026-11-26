@@ -22,6 +22,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
 
+import public_tier0_fixture  # noqa: E402 — #6224: the public run behind the streak rungs
 from health import (
     milestone_ledger as ml,  # noqa: E402
     process_milestones as pm,  # noqa: E402
@@ -87,6 +88,13 @@ def _z2_day(d: str, z2_seconds: float) -> dict:
 
 def _habit_day(d: str, streak: int) -> dict:
     return {"pk": USER_PREFIX + "habit_scores", "sk": f"DATE#{d}", "t0_perfect_streak": streak}
+
+
+def _put_habit_day(table, d: str, streak: int) -> None:
+    """The day's habit_scores row AND (#6224) the stored Habitify rows whose PUBLIC tier-0 run ending ``d`` is
+    ``streak`` — the streak rungs are judged on the public run, never on the stored ``t0_perfect_streak``."""
+    table.put_item(Item=_habit_day(d, streak))
+    public_tier0_fixture.plant_public_run(lambda item: table.put_item(Item=item), USER_PREFIX, d, streak)
 
 
 def _sweep(table, today, **kw):
@@ -372,10 +380,10 @@ def test_weight_is_not_companion_to_streak():
     process/composition companions qualify (the issue's ranking rule)."""
     table = FakeTable()
     for i, d in enumerate(_span("2026-04-26", 5)):
-        table.put_item(Item=_habit_day(d, i + 1))
+        _put_habit_day(table, d, i + 1)
     _sweep(table, "2026-04-30")  # genesis: streak 5, nothing consumed above streak floor
     for d, streak in zip(_span("2026-05-01", 3), (6, 7, 8)):
-        table.put_item(Item=_habit_day(d, streak))
+        _put_habit_day(table, d, streak)
         table.put_item(Item=_weight_day(d, 245.0))
         r = _sweep(table, d)
     # streak_7 announced alone; weight stays deferred with no ledger item.

@@ -195,8 +195,9 @@
     },
     {
      "name": "mind",
-     "not_instrumented": false,
-     "score": 9.0
+     "not_instrumented": true,
+     "not_scored": true,
+     "score": null
     },
     {
      "name": "relationships",
@@ -386,8 +387,9 @@
     },
     {
      "name": "mind",
-     "not_instrumented": false,
-     "score": 9.0
+     "not_instrumented": true,
+     "not_scored": true,
+     "score": null
     },
     {
      "name": "relationships",
@@ -676,8 +678,9 @@
     },
     {
      "name": "mind",
-     "not_instrumented": false,
-     "score": 9.0
+     "not_instrumented": true,
+     "not_scored": true,
+     "score": null
     },
     {
      "name": "relationships",
@@ -895,8 +898,9 @@
     },
     {
      "name": "mind",
-     "not_instrumented": false,
-     "score": 9.0
+     "not_instrumented": true,
+     "not_scored": true,
+     "score": null
     },
     {
      "name": "relationships",
@@ -1167,8 +1171,9 @@
     },
     {
      "name": "mind",
-     "not_instrumented": false,
-     "score": 9.0
+     "not_instrumented": true,
+     "not_scored": true,
+     "score": null
     },
     {
      "name": "relationships",
@@ -1388,8 +1393,9 @@
     },
     {
      "name": "mind",
-     "not_instrumented": false,
-     "score": 9.0
+     "not_instrumented": true,
+     "not_scored": true,
+     "score": null
     },
     {
      "name": "relationships",
@@ -1678,8 +1684,9 @@
     },
     {
      "name": "mind",
-     "not_instrumented": false,
-     "score": 9.0
+     "not_instrumented": true,
+     "not_scored": true,
+     "score": null
     },
     {
      "name": "relationships",
@@ -1916,8 +1923,9 @@
     },
     {
      "name": "mind",
-     "not_instrumented": false,
-     "score": 9.0
+     "not_instrumented": true,
+     "not_scored": true,
+     "score": null
     },
     {
      "name": "relationships",
@@ -2097,8 +2105,9 @@
     },
     {
      "name": "mind",
-     "not_instrumented": false,
-     "score": 9.0
+     "not_instrumented": true,
+     "not_scored": true,
+     "score": null
     },
     {
      "name": "relationships",
@@ -2374,8 +2383,9 @@
     },
     {
      "name": "mind",
-     "not_instrumented": false,
-     "score": 9.0
+     "not_instrumented": true,
+     "not_scored": true,
+     "score": null
     },
     {
      "name": "relationships",
@@ -2575,8 +2585,9 @@
     },
     {
      "name": "mind",
-     "not_instrumented": false,
-     "score": 9.0
+     "not_instrumented": true,
+     "not_scored": true,
+     "score": null
     },
     {
      "name": "relationships",
@@ -2892,8 +2903,9 @@
     },
     {
      "name": "mind",
-     "not_instrumented": false,
-     "score": 9.0
+     "not_instrumented": true,
+     "not_scored": true,
+     "score": null
     },
     {
      "name": "relationships",
@@ -3152,8 +3164,9 @@
     },
     {
      "name": "mind",
-     "not_instrumented": false,
-     "score": 9.0
+     "not_instrumented": true,
+     "not_scored": true,
+     "score": null
     },
     {
      "name": "relationships",
@@ -3462,8 +3475,9 @@
     },
     {
      "name": "mind",
-     "not_instrumented": false,
-     "score": 9.0
+     "not_instrumented": true,
+     "not_scored": true,
+     "score": null
     },
     {
      "name": "relationships",

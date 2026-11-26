@@ -882,8 +882,28 @@ def publish_site_stats(record, yesterday_str, history_depth):
             "relationships": "💬",
             "consistency": "🎯",
         }
+
+        def _site_pillar(p):
+            pd = record.get(f"pillar_{p}", {})
+            if character_privacy.is_not_scored(pd):  # #6224: Mind is not scored in public — the reason, never a number
+                return {
+                    "name": p,
+                    "emoji": PILLAR_EMOJI_MAP.get(p, ""),
+                    "level": None,
+                    "raw_score": None,
+                    "tier": None,
+                    "not_instrumented": True,
+                    "not_scored": True,
+                    "not_scored_note": pd.get("not_scored_note"),
+                    "xp_delta": None,
+                    "challenge_bonus_xp": None,
+                    "trend": "neutral",
+                }
+            return None
+
         pillars_for_site = [
-            {
+            _site_pillar(p)
+            or {
                 "name": p,
                 "emoji": PILLAR_EMOJI_MAP.get(p, ""),
                 "level": float(record.get(f"pillar_{p}", {}).get("level", 1)),
@@ -951,6 +971,8 @@ def publish_site_stats(record, yesterday_str, history_depth):
                 _scores = {}
                 for _p in PILLAR_ORDER:
                     _pdata = _last_rec.get(f"pillar_{_p}") or {}
+                    if character_privacy.is_not_scored(_pdata):
+                        continue  # #6224: a pillar not scored in public has no weekly value (omitted, never 0)
                     _scores[_p] = round(float(_pdata.get("level_score") or _pdata.get("raw_score") or 0), 1)
                 _wk_dt = datetime.strptime(_last_date, "%Y-%m-%d")
                 _mon_dt = _wk_dt - timedelta(days=_wk_dt.weekday())

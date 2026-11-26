@@ -1723,6 +1723,17 @@ def _pillar_raw_and_details(name, compute_fn, data, config, *extra):
     return raw_score, copy.deepcopy(details)  # a copy: the engine annotates details in place
 
 
+# The (pillar, computer) pairs the day scores. #6224: ``data["unscored_pillars"]`` names a pillar the caller does not
+# score at all (the public method's Mind, owner rulings 2026-11-26) — left out of the whole state chain: no raw score,
+# level, XP or event, no place in the consistency variance, the effects' conditions, the mood's composite or the
+# headline mean; never scored at a placeholder. Method 1 sets none. The ``_modifier`` record's
+# ``pre_modifier_raw_unblended`` is the day's unblended raw before a modifier, so a reader that may not apply it (the
+# public method, when its source is not public) restores the day exactly — never by dividing it back out.
+def _scored_computers(data: dict[str, Any]) -> list:
+    unscored = {str(p) for p in (data.get("unscored_pillars") or ())}
+    return [(name, fn) for name, fn in PILLAR_COMPUTERS.items() if name not in unscored]
+
+
 def compute_character_sheet(
     data: dict[str, Any], previous_day_state: Optional[dict[str, Any]], raw_score_histories: dict[str, list[float]], config: dict[str, Any]
 ) -> dict[str, Any]:
@@ -1757,7 +1768,7 @@ def compute_character_sheet(
     raw_modifiers = data.get("raw_score_modifiers") or {}
     pillar_raw_scores = {}
     pillar_details = {}
-    for pillar_name, compute_fn in PILLAR_COMPUTERS.items():
+    for pillar_name, compute_fn in _scored_computers(data):
         raw_score, details = _pillar_raw_and_details(pillar_name, compute_fn, data, config)
         mod = raw_modifiers.get(pillar_name)
         if mod and raw_score is not None:
@@ -1770,6 +1781,7 @@ def compute_character_sheet(
                     "source": mod.get("source"),
                     "multiplier": mult,
                     "pre_modifier_raw": raw_score,
+                    "pre_modifier_raw_unblended": details.get("_raw_unblended"),  # #6224: restorable exactly
                 }
                 raw_score = round(_clamp(raw_score * mult), 1)
                 if details.get("_raw_unblended") is not None:

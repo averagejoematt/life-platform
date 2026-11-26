@@ -1557,7 +1557,7 @@ def handler_env(monkeypatch, table, frozen_clock):
 
     monkeypatch.setattr(eng, "gather_data", lambda *a, **k: {"whoop": [{"date": DAY}]})
     monkeypatch.setattr(eng, "fetch_profile", lambda: {})
-    monkeypatch.setattr(eng, "build_data_narrative", lambda data: state["rows"])
+    monkeypatch.setattr(eng, "build_data_narrative", lambda data, registry=None: state["rows"])
     monkeypatch.setattr(eng, "load_existing_hypotheses", lambda *a, **k: list(state["hypotheses"]))
     monkeypatch.setattr(eng, "fetch_journal_candidates", lambda *a, **k: [])
     monkeypatch.setattr(eng, "narrate_resolution", lambda *a, **k: "")
