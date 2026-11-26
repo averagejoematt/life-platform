@@ -183,11 +183,17 @@ def test_vo2max_points_name_their_device(monkeypatch):
 # ── /api/pulse_history: whose steps, and the watch's active energy ────────────
 
 
+def _as_projected(rows: list, projection) -> list:
+    """What DynamoDB returns for ``projection`` (#6271): ``sk``/``tombstone`` and the named attributes only."""
+    keep = None if projection is None else {"sk", "tombstone", *projection}
+    return [r if keep is None else {k: v for k, v in r.items() if k in keep} for r in rows]
+
+
 def _pulse_body(rows: dict) -> tuple[dict, str]:
     g = {
         "EXPERIMENT_START": "2026-10-14",
         "_get_profile": lambda: {"journey_start_weight_lbs": 300},
-        "_query_source": lambda source, start, end, include_pilot=False: rows.get(source, []),
+        "_query_source": lambda source, start, end, include_pilot=False, projection=None: _as_projected(rows.get(source, []), projection),
     }
     text = pulse.pulse_history(_g=g)["body"]
     return json.loads(text), text

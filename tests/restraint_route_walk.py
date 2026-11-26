@@ -23,6 +23,14 @@ every `habit_scores.vice_streaks` map and `missed_tier0` list, the owner's regis
 `related_habits`, and the public domains config. A route that serves any of them by name fails, whether
 or not it is one this issue knew about.
 
+`--state low|high --now ISO` is the INVARIANCE axis (#6224, owner ruling 2026-11-24: no figure from which a restraint
+habit's count or behaviour can be derived): only the restraint habits move — every planted restraint habit done
+(`high`) or missed (`low`) on every day, every stored restraint streak 90 or 0 — with the ordinary habits, every other
+row and the clock (frozen at `--now`) held fixed, so `tests/test_restraint_public_figures_6224.py` can require every
+public route's body to be identical across the two states. The stored ingest roll-ups (`by_group`, `habits`) and the
+stored tier-0 counts and streak are recomputed per state the way the ingest and the scorer write them, so a route that
+reads a stored figure which counted a restraint habit moves and fails by name.
+
 `--ungated` is the mutation control: the policy names every restraint habit (`category()` answers for
 all of them). The same walk must then find the canaries on the routes the policy governs — so the test
 proves it can see a reintroduced label on each of them, and pins WHICH routes the policy governs.
@@ -78,7 +86,38 @@ def tokens() -> list:
     ids = _ids()
     for name in CANARIES + NAMEABLE:
         out += [name.lower(), name.lower().replace(" ", "-"), name.lower().replace(" ", "_"), ids[name].lower()]
+    # #6224: the restraint-derived names a stored character variant carried (an effect read from the restraint streaks,
+    # its condition, the restraint component and its event label).
+    out += [EFFECT_CANARY.lower(), RESTRAINT_CONDITION.split()[0], RESTRAINT_COMPONENT, "vice control"]
     return out
+
+
+STATE: dict = {"value": None}  # None: the label walk's mixed pattern; "low" | "high": the invariance axis (#6224)
+
+# #6224: what a stored pre-#6224 public character variant carried — a cross-pillar effect read from the restraint
+# streaks, the restraint component on Mind's driver list and component details, and a level event naming it. Planted on
+# the walk's stored character row; none of them may reach a public body (the tokens below).
+EFFECT_CANARY = "Restraint Effect Canary"
+RESTRAINT_COMPONENT = "vice_control"
+RESTRAINT_CONDITION = "any_vice_streak > 30"
+
+
+def _restraint_done(i: int, k: int) -> bool:
+    state = STATE["value"]
+    if state is None:
+        return (i + k) % 4 != 0
+    return state == "high"
+
+
+def _plant_character(r: dict) -> None:
+    pv = r.get("public")
+    if not isinstance(pv, dict):
+        return
+    pv["active_effects"] = [{"name": EFFECT_CANARY, "emoji": "", "condition": RESTRAINT_CONDITION, "targets": {"mind": {"value": 0.03}}}]
+    mind = pv.setdefault("pillar_mind", {})
+    mind["drivers"] = {"top": [RESTRAINT_COMPONENT], "dragging": [], "absent": [], "no_data": []}
+    mind["components"] = {RESTRAINT_COMPONENT: {"score": Decimal("100"), "weight": Decimal("0.1")}}
+    pv["level_events"] = [{"type": "level_up", "pillar": "mind", "top_driver": "Vice Control", "top_driver_value": Decimal("100")}]
 
 
 def _augment(rows: list) -> list:
@@ -86,10 +125,12 @@ def _augment(rows: list) -> list:
     user = "USER#matthew"
     for i, r in enumerate(rows):
         pk = str(r.get("pk", ""))
+        if pk.endswith("#SOURCE#character_sheet"):
+            _plant_character(r)
         if pk.endswith("#SOURCE#habitify"):
             statuses = r["habit_statuses"]
             for k, (name, (group, _streak, _flag)) in enumerate(SIGNALS.items()):
-                done = (i + k) % 4 != 0
+                done = _restraint_done(i, k)
                 statuses[name] = {
                     "status": "completed" if done else "failed",
                     "habit_id": ids[name],
@@ -113,12 +154,29 @@ def _augment(rows: list) -> list:
             r["habits"] = {n: Decimal("1") if s["status"] == "completed" else Decimal("0") for n, s in statuses.items()}
         elif pk.endswith("#SOURCE#habit_scores"):
             day = int(str(r["sk"])[-2:])
-            r["vice_streaks"] = {n: Decimal((day + k) % 9) for k, (n, sig) in enumerate(SIGNALS.items()) if sig[1]}
+            if STATE["value"] is None:
+                r["vice_streaks"] = {n: Decimal((day + k) % 9) for k, (n, sig) in enumerate(SIGNALS.items()) if sig[1]}
+            else:
+                # The stored tier-0 counts and run, as the scorer writes them: every planted restraint habit is tier 0
+                # in the registry below, so they move with the restraint state (a route that reads them moves too).
+                held = STATE["value"] == "high"
+                r["vice_streaks"] = {n: Decimal(90 if held else 0) for n, sig in SIGNALS.items() if sig[1]}
+                r["tier0_done"] = Decimal(int(r.get("tier0_done", 0)) + (len(SIGNALS) if held else 0))
+                r["tier0_total"] = Decimal(int(r.get("tier0_total", 0)) + len(SIGNALS))
+                r["tier0_pct"] = Decimal(str(round(int(r["tier0_done"]) / int(r["tier0_total"]), 3)))
+                r["t0_perfect_streak"] = Decimal(9 if held else 0)
             r["vices_held"] = Decimal(sum(1 for v in r["vice_streaks"].values() if v > 0))
             r["vices_total"] = Decimal(len(r["vice_streaks"]))
             r["missed_tier0"] = [CANARIES[0], ORDINARY]
         elif pk == user and r.get("sk") == "PROFILE#v1":
             r["habit_registry"] = {n: {"status": "active", "tier": 2, "vice": True} for n, sig in SIGNALS.items() if sig[2]}
+            if STATE["value"] is not None:
+                # #6224: every planted restraint habit in TIER 0 (the registry flag kept where the label walk set it), and
+                # the ordinary habit too, so the public tier-0 figures have a public habit to count and are not vacuous.
+                reg = r["habit_registry"]
+                for n, sig in SIGNALS.items():
+                    reg[n] = {"status": "active", "tier": 0, **({"vice": True} if sig[2] else {})}
+                reg[ORDINARY] = {"status": "active", "tier": 0}
     rows.append(
         {
             "pk": f"{user}#SOURCE#protocols",
@@ -145,12 +203,24 @@ def _ungate() -> None:
     RP.category = lambda _name: "ungated"
 
 
-def walk(ungated: bool = False) -> dict:
-    jw.FROZEN = datetime.now(timezone.utc)  # the base rows are dated relative to this; the real clock, not a frozen one
+def _publish() -> None:
+    """#6224's mutation control: the restraint switch flipped (``RESTRAINT_DATA_PUBLISHED``) — the state an owner
+    approval would put it in. The character and tier-0 holds key off it, so with it on the planted restraint names
+    reach /api/character and the restraint state moves the tier-0 routes: the walk can see both."""
+    from common import restraint_publication as RP
+
+    RP.RESTRAINT_DATA_PUBLISHED = True
+
+
+def walk(ungated: bool = False, frozen: bool = False, published: bool = False) -> dict:
+    if not frozen:
+        jw.FROZEN = datetime.now(timezone.utc)  # the base rows are dated relative to this; the real clock, not a frozen one
     base_rows = jw._rows
     jw._rows = lambda variant: _augment(base_rows(variant))
     if ungated:
         _ungate()
+    if published:
+        _publish()
     L = jw._wire("gaps")
 
     from web import site_api_protocols as P
@@ -189,6 +259,15 @@ def walk(ungated: bool = False) -> dict:
         if path in KEEP_BODIES:
             body = resp.get("body")
             out["bodies"][path] = json.loads(body) if isinstance(body, str) else body
+        if frozen:  # the invariance axis compares every route's whole body across the two restraint states
+            body = resp.get("body")
+            try:
+                parsed = json.loads(body) if isinstance(body, str) else body
+            except ValueError:
+                parsed = body
+            out.setdefault("all_bodies", {})[path] = json.dumps(
+                {"status": resp.get("statusCode"), "body": jw._normalise(parsed)}, sort_keys=True, default=str
+            )
     out["unparsed_queries"] = rw.STATS["unparsed_queries"]
     return out
 
@@ -233,8 +312,13 @@ if __name__ == "__main__":
     logging.disable(logging.CRITICAL)
     _real_stdout = sys.stdout
     sys.stdout = io.StringIO()  # handlers print; keep stdout for the one JSON line
+    state = sys.argv[sys.argv.index("--state") + 1] if "--state" in sys.argv else None
+    if state is not None:
+        assert state in ("low", "high"), state
+        STATE["value"] = state
+        jw._freeze(sys.argv[sys.argv.index("--now") + 1])  # one instant for both states (before any handler import)
     try:
-        result = walk(ungated="--ungated" in sys.argv)
+        result = walk(ungated="--ungated" in sys.argv, frozen=state is not None, published="--published" in sys.argv)
     finally:
         sys.stdout = _real_stdout
     print(json.dumps(result, default=str))

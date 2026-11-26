@@ -217,7 +217,11 @@ def _table(rows_by_suffix: dict, profile: dict | None = None) -> FakeDdbTable:
     """A table whose query() answers by the partition asked for, and whose get_item serves the profile."""
 
     def hook(_table, **kwargs):
-        strings = _cond_strings(kwargs.get("KeyConditionExpression"), [])
+        cond = kwargs.get("KeyConditionExpression")
+        if isinstance(cond, str):  # #6224: restraint_publication's loader uses the string form (no boto3 import)
+            strings = [v for v in (kwargs.get("ExpressionAttributeValues") or {}).values() if isinstance(v, str)]
+        else:
+            strings = _cond_strings(cond, [])
         pk = next((s for s in strings if s.startswith("USER#")), "")
         for suffix, rows in rows_by_suffix.items():
             if pk.endswith(suffix):
