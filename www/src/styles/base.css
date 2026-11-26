@@ -2457,6 +2457,7 @@ figure.moment-own {
 }
 .ed-how p {
   margin: 4px 0 10px;
+  max-width: 62ch; /* the how-checked band is full width under the hero grid: keep the existing prose measure */
 }
 .ed-hero h1 {
   font-size: 42px;
