@@ -307,6 +307,32 @@ def unlock_hint(rule: BadgeRule, signals: dict, earned: bool) -> str | None:
     return None
 
 
+def level_badge_first_crossings(chars: Any) -> dict[str, str]:
+    """#6224: ``{badge_id: date}`` — the first date the credited public level series
+    (``character_privacy.event_level_series``) reaches each level badge's rung. A rung it never reaches is absent."""
+    series = character_privacy.event_level_series(chars)
+    out: dict[str, str] = {}
+    for rule in BADGE_RULES:
+        if rule.signal != "current_level":
+            continue
+        hit = next((d for d, lv in series if d and lv >= rule.threshold), None)
+        if hit:
+            out[rule.id] = hit
+    return out
+
+
+def with_corrected_level_badges(first_earns: dict, chars: Any) -> dict:
+    """``first_earns`` with every level badge's record replaced by the corrected public chain's first crossing — kept
+    (same date), moved (new date) or gone (never reached); never a date the chain does not show (owner decision
+    2026-11-26). Only when the credited series holds a corrected-chain variant; otherwise unchanged."""
+    if not any(character_privacy.is_corrected_chain(character_privacy.public_variant(c)) for c in chars or []):
+        return first_earns
+    level_ids = {r.id for r in BADGE_RULES if r.signal == "current_level"}
+    out = {k: v for k, v in (first_earns or {}).items() if k not in level_ids}
+    out.update({bid: {"earned_date": d, "basis": "corrected_public_level"} for bid, d in level_badge_first_crossings(chars).items()})
+    return out
+
+
 def level_badges_pending(achievements: list[dict], note: str) -> list[dict]:
     """#6224 containment (owner ruling 2026-11-26): while the public character level is being recalculated, a level
     badge is served as PENDING — neither earned nor un-earned, no date — with the reason as its hint."""

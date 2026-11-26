@@ -349,11 +349,14 @@ PUBLIC_CORRECTION_NOTICE_V1 = (
     "improvement."
 )
 # #6224: the v2 recalculation's notice — the same words on every date.
+# #6224: the owner's text, exactly (2026-11-26) — four paragraphs; no per-date before/after is published anywhere.
 PUBLIC_CORRECTION_NOTICE = (
-    "These scores were recalculated. Mind is no longer scored in public, because its inputs are private, so it shows no "
-    "score or level. The overall level, the composite and the XP total are now worked out from the other areas alone, "
-    "and on most dates the level and the XP total read lower than before. That is the method changing, not a change in "
-    "what he did."
+    "We've updated how the public character's scores are calculated.\n\n"
+    "Earlier versions included information that should not have contributed to the public character. We've removed "
+    "those inputs and recalculated the historical scores using the approved public data.\n\n"
+    "As a result, some previously displayed levels, XP totals and achievement dates may differ. The underlying "
+    "activities and measurements have not changed.\n\n"
+    "Mind is no longer scored publicly. Previous character scores are superseded by the corrected values."
 )
 PUBLIC_CORRECTION_NOTICES = {PUBLIC_METHOD_V1: PUBLIC_CORRECTION_NOTICE_V1, PUBLIC_METHOD_VERSION: PUBLIC_CORRECTION_NOTICE}
 
@@ -432,16 +435,30 @@ def _level(value: Any) -> int:
         return 1
 
 
+def is_corrected_chain(view: Any) -> bool:
+    """#6224 (owner decision 2026-11-26): True for a variant of the CURRENT public method — the corrected public chain.
+    Its stored events are that chain's own day-over-day transitions, so they are served on their dates whatever the
+    record's origin (a recomputed date serves the corrected chain's events — not nothing, and not method 1's)."""
+    return isinstance(view, dict) and view.get("public_method_version") == PUBLIC_METHOD_VERSION
+
+
 def public_event_sheets(records: Any) -> list[dict[str, Any]]:
-    """The public views that may carry an EVENT (owner ruling 2026-11-06: a recalculation is not an achievement). A
-    recomputed record never does, and neither does a live record until its level passes the highest recalculated level —
-    otherwise the first live day would read as a level-up from the old published number. Oldest first, as given.
-    #6224: none while the scores are pending a recompute."""
+    """The public views that may carry an EVENT, oldest first, as given. #6224: none while the scores are pending a
+    recompute.
+
+    A corrected-chain variant (``is_corrected_chain``) always may: its events are the corrected chain's own transitions
+    on their own dates (owner decision 2026-11-26: "Preserve unrelated valid activity and achievement events ... Do not
+    erase legitimate history merely because a day's character sheet was recomputed"). The 2026-11-06 ruling's intent —
+    a recalculation is not an achievement — still holds there: the move from a previously published value to the
+    corrected one is never an event (``character_public.compute_public_variant`` drops a headline event across a method
+    change, and a recomputed chain starts from no previous published state). For an OLDER-method variant the 11-06 rule
+    stands unchanged: a recomputed one carries none, and a live one only once its level passes the highest recalculated
+    level."""
     if scores_pending():
         return []
     views = public_sheets(records, pending=False)
-    floor = max((_level(v.get("character_level")) for v in views if _origin(v) != "live"), default=0)
-    return [v for v in views if _origin(v) == "live" and _level(v.get("character_level")) > floor]
+    floor = max((_level(v.get("character_level")) for v in views if _origin(v) != "live" and not is_corrected_chain(v)), default=0)
+    return [v for v in views if is_corrected_chain(v) or (_origin(v) == "live" and _level(v.get("character_level")) > floor)]
 
 
 def event_level_series(records: Any) -> list[tuple[str, int]]:
@@ -449,7 +466,8 @@ def event_level_series(records: Any) -> list[tuple[str, int]]:
     recalculated date is the historical fact (the stored method-1 level, frozen — it cannot move again), and a live
     public level counts once it passes the highest recalculated level. A level reached only by recalculation is never
     credited, so the correction fires no badge and no milestone. #6224: none while the scores are pending a recompute
-    (a level badge or milestone is then neither earned nor un-earned)."""
+    (a level badge or milestone is then neither earned nor un-earned); a corrected-chain variant credits its own public
+    level on its own date (owner decision 2026-11-26: level-dependent unlocks follow the corrected historical scores)."""
     out: list[tuple[str, int]] = []
     if scores_pending():
         return out
@@ -459,7 +477,9 @@ def event_level_series(records: Any) -> list[tuple[str, int]]:
             continue
         d = str(rec.get("date") or str(rec.get("sk", "")).replace("DATE#", ""))[:10]
         pv = public_variant(rec)
-        if pv is None or _origin(pv) != "live":
+        if pv is not None and is_corrected_chain(pv):  # #6224: the corrected public chain's level on every date (badges, milestones)
+            out.append((d, _level(pv.get("character_level"))))
+        elif pv is None or _origin(pv) != "live":
             out.append((d, _level(rec.get("character_level"))))
         elif d in event_days:
             out.append((d, _level(pv.get("character_level"))))
@@ -490,7 +510,7 @@ def public_sheet(record: Any, pending: Optional[bool] = None) -> Any:
     scrub_unscored(out)
     if not restraint_published():
         scrub_restraint(out)
-    if _origin(out) != "live":  # owner ruling 2026-11-06: a recalculation is not an event — no reader can celebrate it
+    if _origin(out) != "live" and not is_corrected_chain(out):  # 11-06: a recalculation (older method) is not an event
         out["recalculated_level_events"] = out.get("level_events") or []
         out["level_events"] = []
     if scores_pending() if pending is None else pending:  # #6224 containment: the chain values are being recalculated

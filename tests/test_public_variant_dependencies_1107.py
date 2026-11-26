@@ -99,9 +99,9 @@ def test_a_day_whose_habit_scores_are_not_ready_reads_them_as_missing_never_zero
 # ── recalculated history is labelled, and fires nothing ─────────────────────────────────
 
 
-def _rec(day, level, origin, m1_level=None, events=None):
+def _rec(day, level, origin, m1_level=None, events=None, version=None):
     block = {
-        "public_method_version": character_privacy.PUBLIC_METHOD_VERSION,
+        "public_method_version": version or character_privacy.PUBLIC_METHOD_VERSION,
         "origin": origin,
         "computed_at": "2026-11-08T03:00:00+00:00",
         "character_level": level,
@@ -123,28 +123,34 @@ def test_recalculated_values_say_so_in_data_api_and_pages():
     assert character_privacy.PUBLIC_CORRECTION_NOTICE in S.engine_of(payload, "2026-10-01")["method"]
 
 
+# #6224 (owner decision 2026-11-26): the 2026-11-06 event rule below now governs an OLDER-method variant only; a
+# corrected-chain (current-method) variant serves its own chain's events on their dates
+# (tests/test_public_events_recompute_6224.py).
+V1 = character_privacy.PUBLIC_METHOD_V1
+
+
 def test_a_recalculated_record_carries_no_level_event_on_any_public_reader():
     ev = [{"type": "character_level_up", "old_level": 9, "new_level": 12}]
-    view = character_privacy.public_sheet(_rec("2026-10-01", 12, "recomputed", events=ev))
+    view = character_privacy.public_sheet(_rec("2026-10-01", 12, "recomputed", events=ev, version=V1))
     assert view["level_events"] == [] and view["recalculated_level_events"] == ev
-    assert character_privacy.public_sheet(_rec("2026-11-09", 22, "live", events=ev))["level_events"] == ev
+    assert character_privacy.public_sheet(_rec("2026-11-09", 22, "live", events=ev, version=V1))["level_events"] == ev
 
 
 def test_the_correction_earns_no_badge_and_no_milestone():
-    recs = [_rec("2026-10-01", 18, "recomputed", m1_level=13), _rec("2026-11-04", 21, "recomputed", m1_level=16)]
+    recs = [_rec("2026-10-01", 18, "recomputed", m1_level=13, version=V1), _rec("2026-11-04", 21, "recomputed", m1_level=16, version=V1)]
     assert character_privacy.event_level(recs) == 16  # the level actually reached then, never the recalculated 21
-    recs.append(_rec("2026-11-09", 21, "live"))  # live, but only back at the recalculated level: no event
+    recs.append(_rec("2026-11-09", 21, "live", version=V1))  # live, but only back at the recalculated level: no event
     assert character_privacy.event_level(recs) == 16 and character_privacy.public_event_sheets(recs) == []
-    recs.append(_rec("2026-11-10", 22, "live"))  # a real rise above the corrected history
+    recs.append(_rec("2026-11-10", 22, "live", version=V1))  # a real rise above the corrected history
     assert character_privacy.event_level(recs) == 22 and [v["date"] for v in character_privacy.public_event_sheets(recs)] == ["2026-11-10"]
 
 
 def test_the_timeline_draws_no_level_up_from_recalculated_history(monkeypatch):
     from web import site_api_journey, site_api_vitals as V
 
-    recs = [_rec(f"2026-10-{d:02d}", lvl, "recomputed") for d, lvl in ((1, 5), (2, 9), (3, 12))] + [
-        _rec("2026-11-09", 12, "live"),
-        _rec("2026-11-10", 14, "live"),
+    recs = [_rec(f"2026-10-{d:02d}", lvl, "recomputed", version=V1) for d, lvl in ((1, 5), (2, 9), (3, 12))] + [
+        _rec("2026-11-09", 12, "live", version=V1),
+        _rec("2026-11-10", 14, "live", version=V1),
     ]
     for r in recs:
         r["pk"] = B.SHEET_PK

@@ -313,41 +313,47 @@ def privacy_vs_timing(snap: dict, privacy_only: dict, full: dict) -> dict:
 
 
 def level_credit_changes(snap: dict, char: dict) -> dict:
-    """F(4): what the level badges, the level milestones and the served level events credit, before and after. Both read
-    ``character_privacy.event_level_series`` (scores live: the state once the switch flips after the recompute)."""
+    """F(4) + the owner's 2026-11-26 correction: the EVENT COMPARISON (``backfill_public_variant_events``) — every event
+    served before vs after (KEPT / MOVED / REMOVED / ADDED, with reasons and the per-date values that prove each), the level
+    badges' and the level milestone ladder's first-crossing dates, and the zero-loss check for the public-input pillars."""
+    import backfill_public_variant_events as EV
     from health import achievement_rules, milestone_ledger
 
-    before_recs = [snap["sheets"][d] for d in sorted(snap["sheets"])]
+    dates = sorted(snap["sheets"])
+    before_recs = [snap["sheets"][d] for d in dates]
     after_recs = [
-        dict(snap["sheets"][d], **{B.PUBLIC: char[d]["public"]}) if char.get(d, {}).get("public") else snap["sheets"][d]
-        for d in sorted(snap["sheets"])
+        dict(snap["sheets"][d], **{B.PUBLIC: char[d]["public"]}) if char.get(d, {}).get("public") else snap["sheets"][d] for d in dates
     ]
-    keep = character_privacy.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE
-    character_privacy.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE = False
-    try:
-        series = {"before": character_privacy.event_level_series(before_recs), "after": character_privacy.event_level_series(after_recs)}
-        events = {
-            "before": [(v.get("date"), _events(v)) for v in character_privacy.public_event_sheets(before_recs)],
-            "after": [(v.get("date"), _events(v)) for v in character_privacy.public_event_sheets(after_recs)],
-        }
-    finally:
-        character_privacy.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE = keep
+    badges = {r.id: r.threshold for r in achievement_rules.BADGE_RULES if r.signal == "current_level"}
+    ladder = sorted(r.threshold for r in milestone_ledger.MILESTONE_RULES if r.signal == "character_level")
+    return EV.event_comparison(before_recs, after_recs, badges, ladder)
 
-    def first_crossing(s: list, n: int):
-        return next((d for d, lv in s if lv >= n), None)
 
-    rungs = sorted({r.threshold for r in achievement_rules.BADGE_RULES if r.signal == "current_level"})
-    rungs += sorted({r.threshold for r in milestone_ledger.MILESTONE_RULES if r.signal == "character_level"} - set(rungs))
-    crossings = {n: [first_crossing(series["before"], n), first_crossing(series["after"], n)] for n in sorted(set(rungs))}
-    return {
-        "level_rungs_first_crossed": {str(n): v for n, v in crossings.items()},
-        "level_rungs_that_change": [n for n, v in crossings.items() if v[0] != v[1]],
-        "level_badges": [r.id for r in achievement_rules.BADGE_RULES if r.signal == "current_level"],
-        "level_events_served": events,
-        "level_event_dates_disappearing": sorted({d for d, _ in events["before"]} - {d for d, _ in events["after"]}),
-        "note": "badges and milestones credit event_level_series; while PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE is on, none "
-        "is credited and level badges are served as pending",
-    }
+def _event_lines(lv: dict) -> list:
+    """The SUMMARY.md lines of the event comparison (totals by kind, the zero-loss check, badges and milestones)."""
+    totals, out = lv["events"]["totals"], []
+    for who in sorted(totals):
+        t = totals[who]
+        out.append(f"- {who}: KEPT {t['KEPT']} · MOVED {t['MOVED']} · REMOVED {t['REMOVED']} · ADDED {t['ADDED']}")
+    for r in lv["events"]["rows"]:
+        if r["status"] != "KEPT":
+            tail = f" → {r['new_date']}" if r["status"] == "MOVED" else f" ({r.get('reason')})" if r["status"] == "REMOVED" else ""
+            proof = r.get("corrected_values") or {}
+            vals = (
+                f" [corrected: {proof.get('previous_day')} {proof.get('level_before')} → {r['date']} {proof.get('level_on_date')}]"
+                if proof
+                else ""
+            )
+            out.append(f"  - {r['status']} {r['date']} {r['who']} {r['type']} {r['old']}→{r['new']}{tail}{vals}")
+    lost, mism = lv["verbatim_losses"], lv["stored_verbatim_mismatches"]
+    out.append(
+        f"- Public-input pillar (sleep/movement/nutrition/metabolic) events LOST: {len(lost)}"
+        + (" — none." if not lost else f": {', '.join(r['date'] + ' ' + r['who'] for r in lost)}")
+        + f" Stored per-date pillar events differing: {len(mism)}."
+    )
+    for name, group in (("Level badges", lv["level_badges"]), ("Level milestones", lv["level_milestones"])):
+        out.append(f"- {name}: " + "; ".join(f"{k} {v['before']} → {v['after']} ({v['status']})" for k, v in group.items()))
+    return out
 
 
 def summary_md(manifest: dict, notice: str, out_dir: str) -> str:
@@ -376,13 +382,11 @@ def summary_md(manifest: dict, notice: str, out_dir: str) -> str:
         + ".",
         "- A privacy-only apply: `--no-order-fix` (the per-date table is `manifest.json` → `privacy_vs_timing`).",
         "",
-        "## Levels, badges, milestones, level events",
-        f"- Level rungs whose first-crossing date changes: {lv['level_rungs_that_change'] or 'none'} "
-        f"(badges {', '.join(lv['level_badges'])}; milestone level ladder).",
-        f"- Served level-event dates that disappear: {', '.join(lv['level_event_dates_disappearing']) or 'none'}.",
+        "## Event comparison (before = what the public routes served before the containment switch)",
+        *_event_lines(lv),
         "",
         "## The correction notice readers will see",
-        f"> {notice}",
+        *(f"> {ln}" if ln else ">" for ln in notice.split("\n")),
         "",
         "## What the write touches",
         f"- Planned writes: {plan['writes']} ({', '.join(f'{k.split(chr(35) + 'SOURCE' + chr(35))[-1]} {v}' for k, v in plan['by_partition'].items())}); "

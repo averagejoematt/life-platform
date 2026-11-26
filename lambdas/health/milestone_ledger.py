@@ -475,7 +475,50 @@ def read_announced_events(table, user_prefix: str) -> list[dict]:
     (``servable_event``) — the digest's named recipients and the coach event triggers read this.
     """
     events = [e for e in read_ledger(table, user_prefix)["events"] if e.get("announce") and e.get("event_date") and servable_event(e)]
+    events = corrected_level_entries(events, _character_records(table, user_prefix))
     return sorted(events, key=lambda e: str(e["event_date"]))
+
+
+def _character_records(table, user_prefix: str) -> list:
+    kwargs: dict[str, Any] = {
+        "KeyConditionExpression": "pk = :pk AND begins_with(sk, :sk)",
+        "ExpressionAttributeValues": {":pk": user_prefix + "character_sheet", ":sk": "DATE#"},
+    }
+    items: list[dict] = []
+    try:
+        while True:
+            resp = table.query(**kwargs)
+            items.extend(resp.get("Items", []))
+            last = resp.get("LastEvaluatedKey")
+            if not last:
+                return sorted(items, key=lambda i: str(i.get("sk") or ""))
+            kwargs = dict(kwargs, ExclusiveStartKey=last)
+    except Exception as e:  # noqa: BLE001 — without the records no level entry can be re-dated: serve none of them
+        logging.getLogger(__name__).warning("[milestone_ledger] character records unavailable — level rungs withheld: %s", e)
+        return []
+
+
+def corrected_level_entries(events: list, character_records: list) -> list:
+    """#6224 (owner decision 2026-11-26: "Move milestones to their correct dates where necessary ... Do not retain
+    achievements that no longer satisfy their actual eligibility rules. Do not invent replacement events"): a served
+    level-ladder entry is dated where the credited public level (``character_privacy.event_level_series``) first reaches
+    its rung — KEPT on the same date, MOVED (``redated_from`` names the stored date) — and withheld when that series never
+    reaches it. Nothing is added here and the ledger is never written. Other ladders pass through unchanged. Applies once
+    a corrected-chain variant is stored; before that, the entries are served as written."""
+    if not any(character_privacy.is_corrected_chain(character_privacy.public_variant(r)) for r in character_records or []):
+        return events
+    series = character_privacy.event_level_series(character_records)
+    out = []
+    for e in events:
+        if (e.get("ladder") or e.get("category")) != "level":
+            out.append(e)
+            continue
+        rule = RULES_BY_ID.get(str(e.get("milestone_id")))
+        hit = next((d for d, lv in series if d and rule and lv >= rule.threshold), None)
+        if hit is None:
+            continue  # the corrected chain does not reach this rung: not served
+        out.append(e if hit == e.get("event_date") else dict(e, event_date=hit, redated_from=e.get("event_date")))
+    return out
 
 
 # ── Digest cursor (#1623) ─────────────────────────────────────────────────────
